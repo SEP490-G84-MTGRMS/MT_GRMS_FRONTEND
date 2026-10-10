@@ -49,6 +49,9 @@ export const Navbar: FC<NavbarProps> = ({ onOpenLogin, onOpenTrial }) => {
             <a href="#hoi-dap" className="nav-link" onClick={() => setMobileMenuOpen(false)}>
               Chính sách & Hỏi đáp
             </a>
+            <a href="/admin/dashboard" className="nav-link" style={{ color: 'var(--blue-primary)', fontWeight: 600 }}>
+              👑 Demo Admin
+            </a>
           </nav>
 
           <div className="nav-buttons">
