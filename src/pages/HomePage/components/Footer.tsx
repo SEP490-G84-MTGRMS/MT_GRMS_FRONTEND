@@ -68,6 +68,11 @@ export const Footer: FC = () => {
             <li>
               <a href="#hoi-dap">Câu hỏi thường gặp</a>
             </li>
+            <li>
+              <a href="/admin/dashboard" style={{ color: 'var(--blue-primary)', fontWeight: 600 }}>
+                👑 Cổng Master Admin
+              </a>
+            </li>
           </ul>
         </div>
 

@@ -1,9 +1,12 @@
 import { createBrowserRouter } from 'react-router-dom';
-import { MasterLayout } from '../layouts/MasterLayout';
 import { PosLayout } from '../layouts/PosLayout';
 import { WebStoreLayout } from '../layouts/WebStoreLayout';
 import { AuthLayout } from '../layouts/AuthLayout';
 import { HomePage } from '../pages/HomePage';
+
+import { AdminLayout } from '../layouts/AdminLayout';
+import { AdminDashboardPage } from '../pages/admin/AdminDashboardPage';
+import { TenantManagementPage } from '../pages/admin/TenantManagementPage';
 
 export const router = createBrowserRouter([
   {
@@ -11,12 +14,34 @@ export const router = createBrowserRouter([
     element: <HomePage />,
   },
   {
-    path: '/dashboard',
-    element: <MasterLayout />,
+    path: '/admin',
+    element: <AdminLayout />,
     children: [
       {
         index: true,
-        element: <div className="text-gray-600">Trang Bảng điều khiển Quản trị (Dashboard)</div>,
+        element: <AdminDashboardPage />,
+      },
+      {
+        path: 'dashboard',
+        element: <AdminDashboardPage />,
+      },
+      {
+        path: 'tenants',
+        element: <TenantManagementPage />,
+      },
+    ],
+  },
+  {
+    path: '/dashboard',
+    element: <AdminLayout />,
+    children: [
+      {
+        index: true,
+        element: <AdminDashboardPage />,
+      },
+      {
+        path: 'tenants',
+        element: <TenantManagementPage />,
       },
     ],
   },
