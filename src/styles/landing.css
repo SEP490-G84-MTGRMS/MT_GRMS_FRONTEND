@@ -1,0 +1,2170 @@
+/* ==========================================================================
+   MT-GRMS - Thiết Kế Bo Tròn Hiện Đại Phong Cách KiotViet
+   Phông chữ: Be Vietnam Pro | Bo tròn toàn diện | Xanh Electric KiotViet (#0066FF)
+   ========================================================================== */
+
+:root {
+  /* KiotViet Brand Blue Palette */
+  --blue-primary: #0066ff;
+  --blue-hover: #0052cc;
+  --blue-dark: #003d99;
+  --blue-light: #f0f6ff;
+  --blue-subtle: #e8f1ff;
+  --blue-border: #dbe9fe;
+  --cyan-accent: #00c2ff;
+
+  /* Functional Status Colors */
+  --green-money: #00c853;
+  --green-light: #e8f9ee;
+  --green-border: #bbf7d0;
+
+  --orange-accent: #ff9500;
+  --orange-light: #fff8eb;
+  --orange-border: #ffe8cc;
+
+  --red-accent: #ff3b30;
+  --red-light: #fff0f0;
+  --red-border: #ffd6d6;
+
+  /* Neutrals */
+  --bg-page: #ffffff;
+  --bg-soft-blue: #f7faff;
+  --bg-card: #ffffff;
+  --border-light: #edf2f9;
+  --border-subtle: #e5edf8;
+
+  --text-main: #111827;
+  --text-muted: #4b5563;
+  --text-faint: #9ca3af;
+
+  /* Typography */
+  --font-sans: 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', Consolas, monospace;
+
+  /* KiotViet Rounded Scale (Bo tròn toàn diện) */
+  --radius-xs: 8px;
+  --radius-sm: 12px;
+  --radius-md: 18px;
+  --radius-lg: 24px;
+  --radius-xl: 28px;
+  --radius-2xl: 36px;
+  --radius-pill: 9999px;
+
+  /* Shadows */
+  --shadow-sm: 0 2px 8px rgba(0, 50, 150, 0.04);
+  --shadow-card: 0 10px 30px rgba(0, 50, 150, 0.06);
+  --shadow-floating: 0 18px 48px rgba(0, 50, 150, 0.08);
+  --shadow-blue-glow: 0 10px 25px -4px rgba(0, 102, 255, 0.32);
+}
+
+/* Reset & Box Sizing */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  scroll-behavior: smooth;
+  font-size: 16px;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--bg-page);
+  color: var(--text-main);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+::selection {
+  background-color: #dbeafe;
+  color: var(--blue-primary);
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button, input, select {
+  font-family: inherit;
+  color: inherit;
+}
+
+.container {
+  width: 100%;
+  max-width: 1240px;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 24px;
+  padding-right: 24px;
+}
+
+.max-w-860 {
+  max-width: 860px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* ==========================================================================
+   Top Announcement Bar
+   ========================================================================== */
+.top-announcement {
+  background: #0047ba;
+  color: #ffffff;
+  font-size: 0.84rem;
+  padding: 8px 16px;
+}
+
+.top-anno-inner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  text-align: center;
+}
+
+.anno-badge {
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  letter-spacing: 0.04em;
+}
+
+.anno-text {
+  font-weight: 500;
+}
+
+.anno-link {
+  color: #a5f3fc;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  transition: opacity 0.15s;
+}
+
+.anno-link:hover {
+  opacity: 0.85;
+}
+
+/* ==========================================================================
+   Header & Navigation
+   ========================================================================== */
+.site-header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: rgba(255, 255, 255, 0.97);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid #edf2f9;
+  transition: box-shadow 0.2s;
+}
+
+.site-header.scrolled {
+  box-shadow: 0 4px 20px rgba(0, 50, 150, 0.06);
+}
+
+.nav-container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 76px;
+}
+
+.brand-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.logo-symbol {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.logo-text {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.logo-name {
+  font-size: 1.55rem;
+  font-weight: 800;
+  color: var(--blue-primary);
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+
+.logo-badge {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #ff6b00;
+  background: #fff2e8;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.text-nowrap {
+  white-space: nowrap;
+}
+
+.nav-right-group {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+  margin-left: auto;
+}
+
+.nav-menu {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  white-space: nowrap;
+}
+
+.nav-link {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #374151;
+  transition: color 0.15s;
+  position: relative;
+}
+
+.nav-link:hover {
+  color: var(--blue-primary);
+}
+
+.nav-highlight {
+  color: var(--blue-primary);
+  font-weight: 700;
+}
+
+.nav-buttons {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  white-space: nowrap;
+}
+
+.mobile-toggle {
+  display: none;
+  background: none;
+  border: none;
+  cursor: pointer;
+  flex-direction: column;
+  gap: 5px;
+  padding: 6px;
+}
+
+.mobile-toggle span {
+  display: block;
+  width: 22px;
+  height: 2px;
+  background-color: var(--text-main);
+  border-radius: 2px;
+}
+
+/* ==========================================================================
+   Buttons (Tất cả nút đều chuẩn Pill bo tròn)
+   ========================================================================== */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-weight: 600;
+  font-size: 0.95rem;
+  padding: 11px 24px;
+  border-radius: var(--radius-pill);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.btn-pill {
+  border-radius: var(--radius-pill) !important;
+}
+
+.btn-lg {
+  padding: 15px 34px;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.btn-block {
+  width: 100%;
+}
+
+.btn-primary {
+  background: var(--blue-primary);
+  color: #ffffff;
+  border-color: var(--blue-primary);
+}
+
+.btn-primary:hover {
+  background: var(--blue-hover);
+  border-color: var(--blue-hover);
+}
+
+.btn-glow {
+  box-shadow: var(--shadow-blue-glow);
+}
+
+.btn-glow:hover {
+  box-shadow: 0 12px 28px -2px rgba(0, 102, 255, 0.45);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: #374151;
+  font-weight: 600;
+}
+
+.btn-ghost:hover {
+  color: var(--blue-primary);
+  background: var(--blue-light);
+}
+
+.btn-play-pill {
+  background: var(--blue-light);
+  color: var(--blue-primary);
+  border: 1px solid var(--blue-border);
+  padding: 14px 26px;
+  border-radius: var(--radius-pill);
+  font-size: 1.02rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  transition: all 0.2s ease;
+}
+
+.btn-play-pill:hover {
+  background: #e2eeff;
+  border-color: #bcd7ff;
+}
+
+.play-circle {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 3px 8px rgba(0, 102, 255, 0.2);
+  color: var(--blue-primary);
+  flex-shrink: 0;
+}
+
+.btn-outline-blue {
+  background: transparent;
+  color: var(--blue-primary);
+  border: 1.5px solid var(--blue-primary);
+}
+
+.btn-outline-blue:hover {
+  background: var(--blue-light);
+}
+
+.btn-white-pill {
+  background: #ffffff;
+  color: var(--blue-primary);
+  font-weight: 700;
+  border: none;
+  padding: 16px 36px;
+  border-radius: var(--radius-pill);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+  transition: all 0.2s;
+}
+
+.btn-white-pill:hover {
+  background: #f8fafc;
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.22);
+}
+
+/* ==========================================================================
+   Hero Section (Chuẩn KiotViet: Heading lớn, hình ảnh chủ tiệm + laptop)
+   ========================================================================== */
+.hero-section {
+  padding: 60px 0 70px;
+  background: radial-gradient(circle at 85% 20%, rgba(200, 230, 255, 0.45) 0%, rgba(255, 255, 255, 0) 65%), #ffffff;
+  overflow: hidden;
+}
+
+.hero-grid {
+  display: grid;
+  grid-template-columns: 1.05fr 1.1fr;
+  align-items: center;
+  gap: 48px;
+}
+
+.hero-title {
+  font-size: clamp(2.8rem, 4.4vw, 3.85rem);
+  font-weight: 800;
+  line-height: 1.18;
+  letter-spacing: -0.03em;
+  color: #111827;
+  margin-bottom: 24px;
+}
+
+.text-blue {
+  color: var(--blue-primary);
+}
+
+.hero-desc {
+  font-size: 1.1rem;
+  line-height: 1.68;
+  color: var(--text-muted);
+  margin-bottom: 34px;
+  max-width: 540px;
+}
+
+.hero-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.hero-subnote-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.92rem;
+  color: #526077;
+  margin-top: 26px;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+
+.hero-subnote-link:hover {
+  color: var(--blue-primary);
+}
+
+.bulb-icon {
+  font-size: 1.1rem;
+}
+
+.bulb-arrow {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--blue-primary);
+}
+
+/* Hero Right: Showcase Card với Image & Floating Badges */
+.hero-visual-frame {
+  position: relative;
+  width: 100%;
+}
+
+.hero-img-wrapper {
+  position: relative;
+  border-radius: var(--radius-2xl);
+  overflow: hidden;
+  box-shadow: 0 24px 60px rgba(0, 60, 180, 0.12);
+  border: 4px solid #ffffff;
+  background: #eaf3ff;
+}
+
+.hero-showcase-img {
+  width: 100%;
+  height: auto;
+  display: block;
+  object-fit: cover;
+}
+
+/* Floating Badges Bo Tròn Quanh Hero Image (Hoàn toàn tĩnh, không nhúng nhảy) */
+.floating-badge {
+  position: absolute;
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(12px);
+  border-radius: var(--radius-pill);
+  padding: 10px 18px;
+  box-shadow: 0 14px 34px rgba(0, 30, 90, 0.12);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  z-index: 5;
+  pointer-events: none;
+}
+
+.badge-top-fefo {
+  top: 18px;
+  left: -20px;
+  border: 1.5px solid rgba(255, 77, 130, 0.25);
+}
+
+.badge-bottom-vietqr {
+  bottom: 24px;
+  right: -20px;
+  border: 1.5px solid rgba(0, 200, 83, 0.3);
+}
+
+.badge-icon-bubble {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.badge-text-col {
+  display: flex;
+  flex-direction: column;
+}
+
+.badge-text-col strong {
+  font-size: 0.88rem;
+  color: #111827;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.badge-text-col span {
+  font-size: 0.76rem;
+  color: #64748b;
+  margin-top: 2px;
+}
+
+/* ==========================================================================
+   Floating 3-Features Banner (Phong cách KiotViet: Card 28px nổi giữa hero)
+   ========================================================================== */
+.floating-features-section {
+  position: relative;
+  z-index: 10;
+  margin-top: -36px;
+  margin-bottom: 20px;
+}
+
+.hero-floating-card {
+  background: #ffffff;
+  border-radius: var(--radius-xl);
+  padding: 32px 42px;
+  box-shadow: 0 20px 48px rgba(0, 40, 120, 0.08);
+  border: 1px solid rgba(0, 102, 255, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 28px;
+}
+
+.float-feature-col {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex: 1;
+}
+
+.float-icon-wrap {
+  width: 60px;
+  height: 60px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.icon-pink-soft {
+  background: #fff0f5;
+}
+
+.icon-orange-soft {
+  background: #fff6eb;
+}
+
+.icon-blue-soft {
+  background: #eef6ff;
+}
+
+.float-content {
+  display: flex;
+  flex-direction: column;
+}
+
+.float-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #111827;
+  margin-bottom: 4px;
+}
+
+.float-desc {
+  font-size: 0.88rem;
+  color: #5e6d8a;
+  line-height: 1.5;
+}
+
+.float-divider {
+  width: 1px;
+  height: 52px;
+  background: #edf2f9;
+  flex-shrink: 0;
+}
+
+/* ==========================================================================
+   Section Layouts & Headings
+   ========================================================================== */
+.section-padded {
+  padding: 85px 0;
+  scroll-margin-top: 80px;
+}
+
+.bg-soft-blue {
+  background-color: var(--bg-soft-blue);
+}
+
+.section-heading-center {
+  text-align: center;
+  max-width: 820px;
+  margin: 0 auto 52px;
+}
+
+.sub-heading-pill {
+  display: inline-block;
+  background: var(--blue-light);
+  color: var(--blue-primary);
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 5px 16px;
+  border-radius: var(--radius-pill);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  margin-bottom: 14px;
+}
+
+.main-heading {
+  font-size: clamp(2rem, 3.2vw, 2.6rem);
+  font-weight: 800;
+  color: #111827;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+  margin-bottom: 14px;
+}
+
+.heading-lead {
+  font-size: 1.05rem;
+  color: var(--text-muted);
+  line-height: 1.65;
+}
+
+/* ==========================================================================
+   Section 2: So Sánh Trực Diện MT-GRMS vs KiotViet
+   ========================================================================== */
+.comparison-card-wrapper {
+  background: #ffffff;
+  border-radius: var(--radius-xl);
+  border: 1px solid #e2edfd;
+  box-shadow: 0 16px 45px rgba(0, 50, 150, 0.06);
+  overflow: hidden;
+}
+
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.compare-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.compare-table th {
+  padding: 22px 24px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  background: #f8fbff;
+  border-bottom: 2px solid #e5edf8;
+  color: #374151;
+}
+
+.compare-table td {
+  padding: 20px 24px;
+  font-size: 0.92rem;
+  border-bottom: 1px solid #edf2f9;
+  vertical-align: top;
+  line-height: 1.55;
+}
+
+.col-criteria {
+  width: 28%;
+}
+
+.col-manual {
+  width: 36%;
+  color: #64748b;
+}
+
+.col-mtgrms {
+  width: 36%;
+}
+
+.highlighted-col {
+  background: #f4f8ff !important;
+  border-left: 2px solid var(--blue-primary);
+  border-right: 2px solid var(--blue-primary);
+  position: relative;
+}
+
+.badge-recommended {
+  display: inline-block;
+  background: var(--blue-primary);
+  color: #ffffff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  margin-bottom: 6px;
+}
+
+.col-sub {
+  display: block;
+  font-size: 0.78rem;
+  color: var(--blue-primary);
+  font-weight: 600;
+  margin-top: 2px;
+}
+
+.feature-name strong {
+  display: block;
+  color: #111827;
+  font-size: 0.98rem;
+  margin-bottom: 3px;
+}
+
+.feature-note {
+  font-size: 0.8rem;
+  color: #94a3b8;
+}
+
+.val-mtgrms {
+  background: #f8fbff;
+  border-left: 2px solid var(--blue-primary);
+  border-right: 2px solid var(--blue-primary);
+}
+
+.status-pass {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  color: #111827;
+}
+
+.status-pass-text {
+  flex: 1;
+  font-size: 0.92rem;
+  line-height: 1.5;
+  color: #111827;
+}
+
+.check-circle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #00c853;
+  color: #ffffff;
+  font-size: 0.72rem;
+  font-weight: 800;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+/* ==========================================================================
+   Section 3: Quầy Thu Ngân Trực Quan (Interactive POS Terminal Simulator)
+   ========================================================================== */
+.pos-demo-container {
+  display: grid;
+  grid-template-columns: 1.15fr 1fr;
+  gap: 32px;
+  align-items: start;
+}
+
+.shelf-card {
+  background: #ffffff;
+  border-radius: var(--radius-xl);
+  padding: 28px;
+  border: 1px solid #e5edf8;
+  box-shadow: var(--shadow-card);
+}
+
+.shelf-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #edf2f9;
+}
+
+.shelf-title-box {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.shelf-icon {
+  font-size: 1.4rem;
+}
+
+.shelf-title-box h3 {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #111827;
+}
+
+.badge-barcode {
+  background: #f1f5f9;
+  color: #475569;
+  font-size: 0.76rem;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+}
+
+.shelf-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
+}
+
+.product-item-card {
+  background: #ffffff;
+  border: 1px solid #edf2f9;
+  border-radius: var(--radius-md);
+  padding: 16px;
+  position: relative;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.product-item-card:hover {
+  border-color: var(--blue-border);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0, 102, 255, 0.08);
+}
+
+.prod-badge {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: var(--radius-pill);
+  margin-bottom: 8px;
+}
+
+.badge-red {
+  background: #ffe8ec;
+  color: #ff3b30;
+}
+
+.badge-amber {
+  background: #fff4e5;
+  color: #ff9500;
+}
+
+.badge-green {
+  background: #e6f9ed;
+  color: #00c853;
+}
+
+.badge-blue {
+  background: #eaf4ff;
+  color: var(--blue-primary);
+}
+
+.prod-icon-circle {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.3rem;
+  margin-bottom: 8px;
+}
+
+.bg-pink-soft { background: #ffeef2; }
+.bg-blue-soft { background: #eaf4ff; }
+.bg-gold-soft { background: #fff8eb; }
+.bg-green-soft { background: #e8f9ee; }
+.bg-red-soft { background: #ffeef0; }
+.bg-purple-soft { background: #f5eeff; }
+
+.prod-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #111827;
+  line-height: 1.3;
+  margin-bottom: 3px;
+}
+
+.prod-meta {
+  font-size: 0.76rem;
+  color: #64748b;
+  margin-bottom: 10px;
+}
+
+.prod-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.prod-price {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--blue-primary);
+  font-family: var(--font-mono);
+}
+
+.btn-add-pill {
+  background: var(--blue-light);
+  color: var(--blue-primary);
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  transition: all 0.15s;
+}
+
+.product-item-card:hover .btn-add-pill {
+  background: var(--blue-primary);
+  color: #ffffff;
+}
+
+/* POS Terminal Console */
+.terminal-card {
+  background: #ffffff;
+  border-radius: var(--radius-xl);
+  border: 2px solid var(--blue-primary);
+  box-shadow: 0 16px 44px rgba(0, 102, 255, 0.1);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.terminal-card-header {
+  background: #f8fbff;
+  padding: 16px 22px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #e2edfd;
+}
+
+.term-status-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pulse-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #00c853;
+  box-shadow: 0 0 0 3px rgba(0, 200, 83, 0.2);
+}
+
+.term-meta {
+  font-size: 0.8rem;
+  font-family: var(--font-mono);
+  color: #64748b;
+  font-weight: 600;
+}
+
+.terminal-card-body {
+  padding: 18px 22px;
+  min-height: 250px;
+  max-height: 330px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.cart-item-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  background: #f8fbff;
+  border-radius: var(--radius-md);
+  border: 1px solid #e5edf8;
+  gap: 12px;
+}
+
+.item-core {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.item-headline {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.item-headline span:first-child {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: #111827;
+  line-height: 1.3;
+}
+
+.item-badge-pill {
+  display: inline-block;
+  align-self: flex-start;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+}
+
+.tag-fefo-red {
+  background: #ffe8ec;
+  color: #ff3b30;
+}
+
+.tag-amber {
+  background: #fff4e5;
+  color: #ff9500;
+}
+
+.tag-green {
+  background: #e6f9ed;
+  color: #00c853;
+}
+
+.item-unit-row {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.btn-unit-opt {
+  font-size: 0.74rem;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: var(--radius-pill);
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.btn-unit-opt.active {
+  background: var(--blue-primary);
+  border-color: var(--blue-primary);
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.item-stepper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.btn-step {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.9rem;
+  cursor: pointer;
+  color: #111827;
+  transition: all 0.15s;
+}
+
+.btn-step:hover {
+  background: #e2e8f0;
+}
+
+.step-num {
+  font-size: 0.9rem;
+  font-weight: 700;
+  min-width: 20px;
+  text-align: center;
+}
+
+.item-tally {
+  font-size: 0.94rem;
+  font-weight: 800;
+  color: var(--blue-primary);
+  font-family: var(--font-mono);
+  white-space: nowrap;
+  flex-shrink: 0;
+  min-width: 82px;
+  text-align: right;
+}
+
+.btn-del {
+  background: none;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  font-size: 1.25rem;
+  line-height: 1;
+  padding: 2px 4px;
+  flex-shrink: 0;
+  transition: color 0.15s;
+}
+
+.btn-del:hover {
+  color: #ff3b30;
+}
+
+/* Footer quầy thu ngân */
+.terminal-card-footer {
+  background: #f8fbff;
+  border-top: 1px solid #e2edfd;
+  padding: 20px 22px;
+}
+
+.tally-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.9rem;
+  color: #64748b;
+  margin-bottom: 6px;
+}
+
+.tally-row-main {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 16px;
+}
+
+.tally-row-main span {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #111827;
+}
+
+.tally-price {
+  font-size: 1.7rem;
+  font-weight: 900;
+  color: var(--blue-primary);
+  font-family: var(--font-mono);
+}
+
+.pay-method-pill-group {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.method-pill {
+  flex: 1;
+  padding: 8px 10px;
+  border-radius: var(--radius-pill);
+  border: 1px solid #dbe9fe;
+  background: #ffffff;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #374151;
+  cursor: pointer;
+  transition: all 0.15s;
+  text-align: center;
+}
+
+.method-pill.active {
+  background: var(--blue-primary);
+  color: #ffffff;
+  border-color: var(--blue-primary);
+}
+
+/* Modal Payment Result Bo Tròn */
+.modal-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 20, 40, 0.6);
+  backdrop-filter: blur(5px);
+  z-index: 1000;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.modal-backdrop.open {
+  display: flex;
+}
+
+.modal-dialog-box {
+  background: #ffffff;
+  border-radius: var(--radius-xl);
+  max-width: 520px;
+  width: 100%;
+  padding: 36px 32px;
+  position: relative;
+  box-shadow: 0 25px 60px rgba(0, 40, 120, 0.2);
+  animation: modalPop 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes modalPop {
+  0% { transform: scale(0.92); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.dialog-close-btn {
+  position: absolute;
+  top: 18px;
+  right: 20px;
+  background: #f3f4f6;
+  border: none;
+  font-size: 1.4rem;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #64748b;
+}
+
+.dialog-close-btn:hover {
+  background: #e5e7eb;
+  color: #111827;
+}
+
+/* ==========================================================================
+   Section 4: Giải Pháp Quản Lý Tiệm Tạp Hóa (KiotViet Accordion + Showcase)
+   ========================================================================== */
+.solution-showcase-box {
+  background: #ffffff;
+  border-radius: 28px;
+  border: 1.5px solid #edf2f7;
+  box-shadow: 0 16px 45px rgba(0, 60, 160, 0.06);
+  padding: 44px 40px;
+  display: grid;
+  grid-template-columns: 1.05fr 1fr;
+  gap: 40px;
+  align-items: center;
+}
+
+.solution-accordion-col {
+  display: flex;
+  flex-direction: column;
+}
+
+.solution-acc-item {
+  border-bottom: 1px solid #edf2f7;
+  padding: 2px 0;
+  transition: all 0.2s ease;
+}
+
+.solution-acc-item:last-child {
+  border-bottom: none;
+}
+
+.solution-acc-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 0;
+  cursor: pointer;
+  user-select: none;
+}
+
+.solution-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #1e293b;
+  transition: color 0.2s;
+  padding-right: 16px;
+}
+
+.solution-acc-item.active .solution-title {
+  color: #0f172a;
+  font-weight: 800;
+}
+
+.solution-acc-head:hover .solution-title {
+  color: var(--blue-primary);
+}
+
+.btn-acc-toggle {
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  cursor: pointer;
+  background: var(--blue-primary);
+  color: #ffffff;
+  box-shadow: 0 4px 10px rgba(0, 102, 255, 0.22);
+  transition: all 0.2s ease;
+}
+
+.solution-acc-item.active .btn-acc-toggle {
+  background: #f1f5f9;
+  color: #64748b;
+  box-shadow: none;
+  border: 1.5px solid #e2e8f0;
+}
+
+.btn-acc-toggle .icon-toggle {
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.solution-acc-body {
+  display: none;
+  padding-bottom: 16px;
+  animation: fadeInAcc 0.25s ease-out;
+}
+
+@keyframes fadeInAcc {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.solution-acc-item.active .solution-acc-body {
+  display: block;
+}
+
+.solution-acc-body p {
+  font-size: 0.92rem;
+  color: #64748b;
+  line-height: 1.65;
+  margin-bottom: 12px;
+}
+
+.solution-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--blue-primary);
+  text-decoration: none;
+  transition: gap 0.2s;
+}
+
+.solution-link:hover {
+  color: #004ecc;
+  gap: 9px;
+}
+
+/* Cột Phải: Visual Showcase Card */
+.solution-visual-col {
+  width: 100%;
+}
+
+.solution-visual-card {
+  position: relative;
+  background: linear-gradient(145deg, #f0f7ff 0%, #dbeefe 100%);
+  border-radius: 24px;
+  overflow: hidden;
+  height: 480px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  border: 1px solid #d4e5fc;
+  box-shadow: inset 0 2px 8px rgba(255, 255, 255, 0.8);
+}
+
+/* Các vòng sóng radar đồng tâm */
+.radar-orbit {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  top: 50%;
+  left: 28%;
+  transform: translate(-50%, -50%);
+}
+
+.orbit-ring-1 {
+  width: 250px;
+  height: 250px;
+  border: 1.5px solid rgba(0, 102, 255, 0.16);
+}
+
+.orbit-ring-2 {
+  width: 370px;
+  height: 370px;
+  border: 1.5px solid rgba(0, 102, 255, 0.12);
+}
+
+.orbit-ring-3 {
+  width: 490px;
+  height: 490px;
+  border: 1.5px dashed rgba(0, 102, 255, 0.1);
+}
+
+.orbit-connect-dot {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  background: var(--blue-primary);
+  border-radius: 50%;
+  opacity: 0.7;
+  z-index: 2;
+}
+
+.dot-1 {
+  top: 32%;
+  left: 20%;
+}
+
+.dot-2 {
+  top: 48%;
+  left: 36%;
+}
+
+.dot-3 {
+  top: 68%;
+  left: 28%;
+}
+
+/* Các khối bong bóng biểu tượng nổi */
+.orbit-bubble-node {
+  position: absolute;
+  z-index: 4;
+}
+
+.node-top-fefo {
+  top: 16%;
+  left: 20%;
+}
+
+.node-mid-vietqr {
+  top: 46%;
+  left: 14%;
+}
+
+.node-bot-zalo {
+  top: 74%;
+  left: 22%;
+}
+
+.orbit-badge-icon {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 10px 24px rgba(0, 40, 120, 0.16);
+  border: 3.5px solid #ffffff;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.orbit-badge-icon:hover {
+  transform: scale(1.06);
+  box-shadow: 0 14px 28px rgba(0, 40, 120, 0.24);
+}
+
+.bg-pink-gradient {
+  background: linear-gradient(135deg, #ff4d82 0%, #ff758c 100%);
+}
+
+.bg-blue-gradient {
+  background: linear-gradient(135deg, #0066ff 0%, #00a2ff 100%);
+}
+
+.bg-orange-gradient {
+  background: linear-gradient(135deg, #ff9900 0%, #ff5e36 100%);
+}
+
+/* Hình ảnh chủ tiệm trên góc phải của khung */
+.solution-person-wrapper {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 72%;
+  height: 98%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.solution-person-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 72% top;
+  border-radius: 0 0 24px 0;
+  mask-image: linear-gradient(to right, transparent 0%, black 25%);
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, black 25%);
+}
+
+@media (max-width: 991px) {
+  .solution-showcase-box {
+    grid-template-columns: 1fr;
+    padding: 30px 24px;
+    gap: 32px;
+  }
+  .solution-visual-card {
+    height: 380px;
+  }
+  .solution-person-wrapper {
+    width: 80%;
+  }
+}
+
+/* ==========================================================================
+   Section: Danh Sách Dịch Vụ & Tiện Ích (3x3 Grid chuẩn KiotViet / MISA)
+   ========================================================================== */
+.services-grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 26px;
+}
+
+.service-card {
+  background: #ffffff;
+  border-radius: 24px;
+  padding: 34px 28px;
+  border: 1.5px solid #edf2f7;
+  box-shadow: 0 4px 20px rgba(0, 40, 120, 0.04);
+  display: flex;
+  flex-direction: column;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.service-card:hover {
+  border-color: #bcd7ff;
+  box-shadow: 0 12px 32px rgba(0, 102, 255, 0.08);
+}
+
+.service-icon-wrap {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.service-card h3 {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 12px;
+  line-height: 1.4;
+}
+
+.service-card p {
+  font-size: 0.92rem;
+  color: #64748b;
+  line-height: 1.65;
+  margin: 0;
+}
+
+@media (max-width: 991px) {
+  .services-grid-3 {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+  }
+}
+
+@media (max-width: 640px) {
+  .services-grid-3 {
+    grid-template-columns: 1fr;
+  }
+  .service-card {
+    padding: 26px 20px;
+  }
+}
+
+/* ==========================================================================
+   Section 6: Testimonials
+   ========================================================================== */
+.testimonial-bubble-card {
+  background: #ffffff;
+  border-radius: var(--radius-lg);
+  padding: 32px 28px;
+  border: 1px solid #edf2f9;
+  box-shadow: var(--shadow-card);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.card-featured-shadow {
+  box-shadow: 0 16px 40px rgba(0, 102, 255, 0.1);
+  border-color: #bcd7ff;
+}
+
+.stars-gold {
+  color: #ffb800;
+  font-size: 1.1rem;
+  letter-spacing: 2px;
+  margin-bottom: 14px;
+}
+
+.quote-content {
+  font-size: 0.94rem;
+  color: #374151;
+  line-height: 1.65;
+  margin-bottom: 22px;
+  font-style: italic;
+}
+
+.author-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.avatar-circle {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+.avatar-pink { background: #ffe4e6; color: #e11d48; }
+.avatar-blue { background: #dbeafe; color: #1d4ed8; }
+.avatar-green { background: #dcfce7; color: #15803d; }
+
+.author-row strong {
+  display: block;
+  font-size: 0.92rem;
+  color: #111827;
+}
+
+.author-row span {
+  font-size: 0.78rem;
+  color: #64748b;
+}
+
+/* ==========================================================================
+   Section 7: Bảng Giá (Cards bo tròn 28px)
+   ========================================================================== */
+.pricing-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 28px;
+  align-items: center;
+}
+
+.pricing-card-rounded {
+  background: #ffffff;
+  border-radius: var(--radius-xl);
+  padding: 36px 30px;
+  border: 1.5px solid #edf2f9;
+  box-shadow: var(--shadow-card);
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  transition: all 0.25s ease;
+}
+
+.pricing-card-rounded:hover {
+  box-shadow: 0 16px 40px rgba(0, 50, 150, 0.08);
+}
+
+.card-popular-blue {
+  border: 2.5px solid var(--blue-primary);
+  box-shadow: 0 20px 50px rgba(0, 102, 255, 0.14);
+  transform: scale(1.03);
+}
+
+.popular-ribbon-pill {
+  position: absolute;
+  top: -14px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--blue-primary);
+  color: #ffffff;
+  font-size: 0.76rem;
+  font-weight: 700;
+  padding: 4px 18px;
+  border-radius: var(--radius-pill);
+  box-shadow: 0 4px 12px rgba(0, 102, 255, 0.35);
+  white-space: nowrap;
+}
+
+.pricing-head h3 {
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: #111827;
+  margin-bottom: 4px;
+}
+
+.pricing-head p {
+  font-size: 0.85rem;
+  color: #64748b;
+  margin-bottom: 18px;
+}
+
+.pricing-cost {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+
+.cost-num {
+  font-size: 2.3rem;
+  font-weight: 900;
+  font-family: var(--font-mono);
+  color: #111827;
+}
+
+.cost-unit {
+  font-size: 0.95rem;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.cost-daily-pill {
+  display: inline-block;
+  align-self: flex-start;
+  background: #f1f5f9;
+  color: #475569;
+  font-size: 0.76rem;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  margin-bottom: 22px;
+}
+
+.bg-blue-pill {
+  background: var(--blue-light);
+  color: var(--blue-primary);
+  font-weight: 700;
+}
+
+.pricing-list {
+  list-style: none;
+  margin-bottom: 28px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.pricing-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 0.88rem;
+  color: #374151;
+  line-height: 1.45;
+}
+
+.icon-tick {
+  color: #00c853;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+/* ==========================================================================
+   Section 8: FAQ Accordion
+   ========================================================================== */
+.accordion-group {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.accordion-card {
+  background: #ffffff;
+  border-radius: var(--radius-md);
+  border: 1px solid #e2edfd;
+  overflow: hidden;
+  transition: all 0.2s;
+}
+
+.accordion-head-btn {
+  width: 100%;
+  padding: 20px 24px;
+  background: none;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #111827;
+  cursor: pointer;
+  text-align: left;
+  gap: 16px;
+}
+
+.acc-plus {
+  font-size: 1.4rem;
+  font-weight: 400;
+  color: var(--blue-primary);
+  flex-shrink: 0;
+  transition: transform 0.2s;
+}
+
+.accordion-card.active .acc-plus {
+  transform: rotate(45deg);
+}
+
+.accordion-body-text {
+  display: none;
+  padding: 0 24px 20px;
+  font-size: 0.92rem;
+  color: var(--text-muted);
+  line-height: 1.65;
+}
+
+.accordion-card.active .accordion-body-text {
+  display: block;
+}
+
+/* ==========================================================================
+   Final CTA Banner
+   ========================================================================== */
+.cta-banner-card {
+  background: linear-gradient(135deg, #0052cc 0%, #0066ff 100%);
+  border-radius: var(--radius-xl);
+  padding: 60px 40px;
+  text-align: center;
+  color: #ffffff;
+  box-shadow: 0 20px 50px rgba(0, 102, 255, 0.25);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.cta-banner-title {
+  font-size: clamp(2rem, 3.2vw, 2.6rem);
+  font-weight: 800;
+  margin-bottom: 16px;
+  letter-spacing: -0.02em;
+}
+
+.cta-banner-desc {
+  font-size: 1.1rem;
+  max-width: 650px;
+  opacity: 0.92;
+  line-height: 1.6;
+  margin-bottom: 32px;
+}
+
+.cta-subnote {
+  font-size: 0.85rem;
+  opacity: 0.8;
+  margin-top: 18px;
+}
+
+/* ==========================================================================
+   Footer
+   ========================================================================== */
+.site-footer {
+  background: #f9fbfd;
+  border-top: 1px solid #edf2f9;
+  padding: 64px 0 0;
+}
+
+.footer-layout {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr 1.1fr;
+  gap: 40px;
+  padding-bottom: 48px;
+}
+
+.footer-brand-box .brand-logo {
+  margin-bottom: 14px;
+}
+
+.footer-desc {
+  font-size: 0.88rem;
+  color: #64748b;
+  line-height: 1.6;
+  margin-bottom: 18px;
+}
+
+.footer-tags {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.tech-pill {
+  background: #eef2f8;
+  color: #475569;
+  font-size: 0.74rem;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+}
+
+.footer-links-col h4 {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #111827;
+  margin-bottom: 16px;
+}
+
+.footer-links-col ul {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.footer-links-col a,
+.footer-links-col p {
+  font-size: 0.88rem;
+  color: #64748b;
+  transition: color 0.15s;
+  line-height: 1.5;
+}
+
+.footer-links-col a:hover {
+  color: var(--blue-primary);
+}
+
+.footer-links-col p {
+  margin-bottom: 8px;
+}
+
+.footer-bottom-line {
+  border-top: 1px solid #edf2f9;
+  padding: 22px 0;
+}
+
+.bottom-inner {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.82rem;
+  color: #94a3b8;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+/* ==========================================================================
+   Modals & Form Inputs
+   ========================================================================== */
+.modal-head {
+  margin-bottom: 22px;
+}
+
+.modal-title {
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: #111827;
+  margin-bottom: 6px;
+}
+
+.modal-sub {
+  font-size: 0.88rem;
+  color: #64748b;
+}
+
+.form-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form-label {
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: #374151;
+}
+
+.req {
+  color: #ff3b30;
+}
+
+.input-rounded {
+  width: 100%;
+  padding: 12px 18px;
+  border-radius: var(--radius-pill);
+  border: 1.5px solid #d1d5db;
+  font-size: 0.92rem;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.input-rounded:focus {
+  border-color: var(--blue-primary);
+}
+
+.form-check-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.84rem;
+  color: #475569;
+}
+
+/* ==========================================================================
+   Floating Chat Button (Góc dưới bên phải giống hệt KiotViet)
+   ========================================================================== */
+.floating-chat-trigger {
+  position: fixed;
+  bottom: 28px;
+  right: 28px;
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  background: var(--blue-primary);
+  box-shadow: 0 8px 24px rgba(0, 102, 255, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 999;
+  transition: all 0.2s ease;
+}
+
+.floating-chat-trigger:hover {
+  background: var(--blue-hover);
+  box-shadow: 0 10px 28px rgba(0, 102, 255, 0.45);
+}
+
+/* Toast Area */
+.toast-area {
+  position: fixed;
+  bottom: 96px;
+  right: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 1000;
+  pointer-events: none;
+}
+
+.toast-msg {
+  background: #111827;
+  color: #ffffff;
+  font-size: 0.86rem;
+  font-weight: 600;
+  padding: 10px 18px;
+  border-radius: var(--radius-pill);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+  animation: toastFade 0.25s ease;
+}
+
+@keyframes toastFade {
+  0% { opacity: 0; transform: translateY(10px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+/* ==========================================================================
+   Responsive Breakpoints
+   ========================================================================== */
+@media (max-width: 1024px) {
+  .hero-grid {
+    grid-template-columns: 1fr;
+    gap: 40px;
+    text-align: center;
+  }
+
+  .hero-desc {
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .hero-actions {
+    justify-content: center;
+  }
+
+  .hero-floating-card {
+    flex-direction: column;
+    padding: 28px;
+    gap: 20px;
+  }
+
+  .float-divider {
+    width: 100%;
+    height: 1px;
+  }
+
+  .cards-grid-3,
+  .pricing-cards-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .card-popular-blue {
+    transform: none;
+  }
+
+  .pos-demo-container {
+    grid-template-columns: 1fr;
+  }
+
+  .footer-layout {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .nav-menu {
+    display: none;
+  }
+
+  .mobile-toggle {
+    display: flex;
+  }
+
+  .roi-two-boxes {
+    grid-template-columns: 1fr;
+  }
+
+  .shelf-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .footer-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .bottom-inner {
+    flex-direction: column;
+    text-align: center;
+  }
+}

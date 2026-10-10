@@ -1,48 +1,64 @@
 # AGENTS.md — Quy Định Dành Cho AI Agent & Developer tại MT_GRMS_FRONTEND
 
 > **Dự án**: MT_GRMS_FRONTEND (React 19 / TypeScript / Vite / TailwindCSS / Ant Design)  
-> **Quy tắc cốt lõi**: `RULE-WORKLOG-AND-COMMIT`
+> **Cơ chế quản lý tập trung**: AI Team Kit (SEP Kit 6 Bước & OpenSpec)
 
 ---
 
-## 📌 QUY TẮC BẮT BUỘC: GHI FILE WORKLOG (.MD) KHI CODE & COMMIT
+## 📌 QUY TRÌNH PHÁT TRIỂN & QUẢN LÝ CODE TẬP TRUNG (AI TEAM KIT)
 
-Bất kỳ khi nào AI Agent hoặc Developer thực hiện viết code, sửa code, chỉnh sửa UI, refactor hoặc chuẩn bị commit trong repository này:
+Toàn bộ quy trình từ đặc tả, chia việc theo người phụ trách, phản biện review UI/UX, kiểm soát code hoàn thành và nghiệm thu merge PR được quản lý tập trung qua **AI Team Kit** (`ai-team-kit/team-ai-knowledge/openspec/`).
 
-### 1. Hành Động Bắt Buộc:
-1. **Tạo / Cập nhật file Markdown tóm tắt** tại `docs/worklogs/`:
-   - Tên file: `YYYY-MM-DD_<MÃ_TÍNH_NĂNG>_<AUTHOR>_<MÔ_TẢ_NGẮN>.md`
-   - *Ví dụ*: `2026-10-02_FE-01_TAM_product-table-component.md`, `2026-10-02_FE-05_AI_batch-stock-modal.md`.
-   - Có thể sao chép khung mẫu chuẩn từ [`docs/worklogs/WORKLOG_TEMPLATE.md`](./docs/worklogs/WORKLOG_TEMPLATE.md).
+### 1. Phân Chia Công Việc Theo Từng Thành Viên (Assignee)
+- Mỗi tính năng hoặc bugfix UI là một **Change** trong OpenSpec:
+  - Khi bắt đầu, dev/agent chạy:
+    ```bash
+    /sep-spec <Mô tả chức năng/lỗi cần làm>
+    ```
+  - MCP Server tự động ghi nhận người phụ trách (`assignee: @github_username`).
+  - Mỗi thành viên phụ trách UI (Tâm, Đức, Sơn, An, Nhật...) làm việc trên Change tương ứng của mình.
 
-2. **Nội Dung Bắt Buộc Phải Có Trong File Worklog**:
-   - **Mục đích thay đổi (Why)**: Bài toán giải quyết, lý do thay đổi giao diện hoặc logic.
-   - **Danh sách file & Tóm tắt chi tiết (What)**: Liệt kê cụ thể từng file trong `src/` (components, pages, services, hooks, types) và tóm tắt những gì đã sửa đổi/thêm mới.
-   - **Thay Đổi UI/UX & API Integration**:
-     - Component mới / UI flow.
-     - API integration: Endpoint nào đã được gọi, DTO types tương ứng.
-     - Breaking changes: Có làm ảnh hưởng trang nào khác không.
-   - **Kết quả kiểm thử**:
-     - `npm run build`: 0 lỗi biên dịch TypeScript/Vite.
-     - Đã test hiển thị và tương tác trực tiếp trên giao diện trình duyệt.
-   - **Chỉ Dẫn Dành Cho Manager Khi Duyệt & Merge PR**:
-     - Đánh giá mức độ rủi ro (Low / Medium / High).
-     - Các file Manager cần review kỹ nhất.
-     - Hướng dẫn test nhanh giao diện (đường dẫn URL, tài khoản test, điều kiện dữ liệu).
+### 2. Đẩy Lên Review Đa Chiều (Persona Multi-Agent Review)
+- Trước khi code UI/logic, ở bước **3: `/sep-verify-spec`**, hệ thống bắt buộc chạy review 5 chiều:
+  - **Skeptic** (`review/skeptic.md` - Bắt buộc): Phản biện trạng thái Loading, Empty, Error state, khả năng xử lý bất đồng bộ, responsiveness.
+  - **Codebase Reviewer** (`review/codebase.md`): Kiểm tra quy chuẩn KiotViet Style (Solid & Stable, bo tròn Full Pill / 24-28px, phông chữ `Be Vietnam Pro`, cấm animation nhún nhảy vô tận).
+  - **Guardian** (`review/guardian.md`): Kiểm tra phân quyền UI theo Role & Tenant isolation.
+  - **Advocate** (`review/advocate.md`): Tối ưu trải nghiệm thu ngân/quản lý kho, thao tác phím tắt, tốc độ POS.
 
-3. **Cập Nhật CHANGELOG.md**:
-   - Thêm 1-2 dòng tóm tắt công việc vào [`CHANGELOG.md`](./CHANGELOG.md) dưới mục `[Unreleased]`.
+### 3. Quản Lý Tiến Độ Code Đã Làm (Tasks Checklist)
+- Các đầu việc UI được bóc tách chi tiết trong `tasks.md`:
+  1. Types & DTO contracts khớp với Backend.
+  2. API Services & TanStack Query hooks.
+  3. UI Components theo đúng Design System chuẩn KiotViet.
+  4. Trang chức năng (Page) & Routing.
+  5. Kiểm thử tương tác người dùng.
+- Ở bước **4: `/sep-apply`**, chỉ khi toàn bộ checklist trong `tasks.md` được đánh dấu `[x]` thì mới được chuyển sang bước kiểm thử.
 
-4. **Khi Commit Code**:
-   - File worklog markdown PHẢI được `git add` và commit cùng lượt với các file code Frontend.
-   - Commit message mẫu:
-     ```text
-     feat(FE-xx): <tóm tắt ngắn> [worklog: docs/worklogs/<tên-file>.md]
-     ```
+### 4. Nghiệm Thu Kiểm Thử Tự Động (Test Report Verification)
+- Ở bước **5: `/sep-test`**, Agent/Dev bắt buộc chạy kiểm thử:
+  ```bash
+  npm run build
+  ```
+  (0 lỗi TypeScript, 0 lỗi Vite bundle) và kiểm tra giao diện trên trình duyệt thực tế.
+- Kết quả được ghi vào `test-report.md` với `verdict: PASS`.
 
-5. **Khi Mở Pull Request**:
-   - Dán đường dẫn file worklog markdown vào phần mô tả PR theo [`pull_request_template.md`](./.github/pull_request_template.md).
-   - Manager duyệt PR dựa trên tóm tắt này để merge an toàn.
+### 5. Hỗ Trợ Admin & Tech Lead Review & Merge PR An Toàn
+Admin / PM chỉ cần thực hiện 2 thao tác để kiểm tra trước khi bấm Merge PR trên GitHub:
+1. **Kiểm tra danh sách và tiến độ toàn team**:
+   ```bash
+   cd ai-team-kit/team-ai-knowledge
+   npm run sep -- list --all
+   ```
+2. **Kiểm tra chi tiết change cần merge**:
+   ```bash
+   npm run sep -- status <tên-change>
+   ```
+3. **Tiêu chí Admin cho phép Merge**:
+   - [x] Change đã vượt qua bước Verify Spec và có persona review đầy đủ.
+   - [x] 100% tasks trong `tasks.md` đã tick `[x]`.
+   - [x] `test-report.md` đạt `verdict: PASS`.
+   - [x] Giao diện tuân thủ quy chuẩn thiết kế, không có hiệu ứng rung lắc/nhún nhảy.
+4. **Sau khi Merge**: Chạy `/sep-archive <tên-change>` để đóng change và lưu spec vào `openspec/specs/`.
 
 <!-- sep-kit:start -->
 ## Quy trình SEP (team-ai-knowledge)
