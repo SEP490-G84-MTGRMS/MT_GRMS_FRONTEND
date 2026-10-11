@@ -3,6 +3,7 @@ import { PosLayout } from '../layouts/PosLayout';
 import { WebStoreLayout } from '../layouts/WebStoreLayout';
 import { AuthLayout } from '../layouts/AuthLayout';
 import { HomePage } from '../pages/HomePage';
+import { SupplierListPage, SupplierDetailPage } from '../features/supplier';
 
 import { AdminLayout } from '../layouts/AdminLayout';
 import { AdminDashboardPage } from '../pages/admin/AdminDashboardPage';
@@ -32,6 +33,20 @@ export const router = createBrowserRouter([
     ],
   },
   {
+    path: '/store-owner',
+    element: <AdminLayout />,
+    children: [
+      {
+        path: 'suppliers',
+        element: <SupplierListPage />,
+      },
+      {
+        path: 'suppliers/:id',
+        element: <SupplierDetailPage />,
+      },
+    ],
+  },
+  {
     path: '/dashboard',
     element: <AdminLayout />,
     children: [
@@ -43,7 +58,23 @@ export const router = createBrowserRouter([
         path: 'tenants',
         element: <TenantManagementPage />,
       },
+      {
+        path: 'suppliers',
+        element: <SupplierListPage />,
+      },
+      {
+        path: 'suppliers/:id',
+        element: <SupplierDetailPage />,
+      },
     ],
+  },
+  {
+    path: '/suppliers',
+    element: <SupplierListPage />,
+  },
+  {
+    path: '/suppliers/:id',
+    element: <SupplierDetailPage />,
   },
   {
     path: '/pos',
