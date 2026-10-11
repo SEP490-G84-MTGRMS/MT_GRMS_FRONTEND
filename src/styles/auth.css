@@ -1,0 +1,654 @@
+/* ==========================================================================
+   MT-GRMS - Authentication Module Styles
+   Thiết kế chuẩn KiotViet & login.html:
+   - Thống nhất phông chữ: Be Vietnam Pro + JetBrains Mono
+   - Bo tròn toàn diện: Full Pill (9999px) & Rounded Card (28px)
+   - Màu sắc: Electric Blue (#0066FF), Nền Canvas (#F7FAFF), Viền (#EDF2F9)
+   - Pattern lưới tinh tế .bg-grid-subtle
+   - Solid & Stable: Không hiệu ứng nhún nhảy
+   - Monochrome SVG Icons
+   ========================================================================== */
+
+/* Lưới nền tinh tế chuẩn login.html */
+.bg-grid-subtle {
+  background-size: 32px 32px;
+  background-image:
+    linear-gradient(to right, rgba(0, 102, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(0, 102, 255, 0.04) 1px, transparent 1px);
+}
+
+/* Khung toàn màn hình Shell Auth Layout */
+.auth-shell {
+  min-height: 100vh;
+  width: 100%;
+  background-color: var(--bg-soft-blue);
+  color: var(--text-main);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  font-family: var(--font-sans);
+  box-sizing: border-box;
+}
+
+/* Header thương hiệu MT-GRMS */
+.auth-header {
+  width: 100%;
+  background-color: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border-light);
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+
+.auth-header-inner {
+  width: 100%;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 20px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-sizing: border-box;
+}
+
+.auth-header-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+}
+
+.auth-logo-badge {
+  width: 40px;
+  height: 40px;
+  border-radius: 14px;
+  background-color: var(--blue-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  font-weight: 800;
+  font-size: 1.15rem;
+  box-shadow: 0 4px 12px rgba(0, 102, 255, 0.25);
+  flex-shrink: 0;
+}
+
+.auth-brand-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.auth-brand-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.auth-brand-name-text {
+  font-family: var(--font-sans);
+  font-weight: 800;
+  font-size: 1.25rem;
+  color: var(--blue-primary);
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+
+.auth-badge-enterprise {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  font-size: 11px;
+  font-weight: 600;
+  background-color: var(--blue-light);
+  color: var(--blue-primary);
+  border: 1px solid var(--blue-border);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.auth-brand-subtext {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.auth-header-hotline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+
+.auth-header-hotline:hover {
+  color: var(--blue-primary);
+}
+
+.auth-hotline-icon-box {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-pill);
+  background-color: #f8fafc;
+  border: 1px solid var(--border-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--blue-primary);
+  flex-shrink: 0;
+}
+
+.auth-hotline-num {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: var(--text-main);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Khu vực nội dung trung tâm (Centered Card) */
+.auth-main-area {
+  width: 100%;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 16px 48px 16px;
+  box-sizing: border-box;
+}
+
+.auth-card-wrapper {
+  width: 100%;
+  max-width: 520px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* Thẻ Form Chính (Centered Modal Card) */
+.auth-card {
+  width: 100%;
+  background-color: #ffffff;
+  border-radius: 28px;
+  border: 1px solid var(--border-light);
+  padding: 28px 24px;
+  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.08);
+  box-sizing: border-box;
+}
+
+@media (min-width: 640px) {
+  .auth-card {
+    padding: 36px 36px;
+  }
+}
+
+/* Header trong Thẻ Form */
+.auth-card-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.auth-back-home-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-decoration: none;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.auth-back-home-link:hover {
+  color: var(--blue-primary);
+  background-color: var(--blue-light);
+}
+
+.auth-ssl-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 9px;
+  border-radius: var(--radius-pill);
+  font-size: 11px;
+  font-weight: 600;
+  background-color: #f8fafc;
+  color: var(--text-muted);
+  border: 1px solid var(--border-light);
+}
+
+.auth-card-heading {
+  font-family: var(--font-sans);
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: var(--text-main);
+  letter-spacing: -0.02em;
+  margin: 0 0 6px 0;
+  text-align: center;
+}
+
+.auth-card-subheading {
+  font-size: 0.88rem;
+  color: var(--text-muted);
+  text-align: center;
+  margin: 0 0 20px 0;
+  line-height: 1.45;
+}
+
+/* Tabs chuyển đổi phương thức đăng nhập */
+.auth-pills-tabs {
+  display: flex;
+  padding: 4px;
+  background-color: #f1f5f9;
+  border-radius: var(--radius-pill);
+  margin-bottom: 24px;
+  gap: 4px;
+}
+
+.auth-pill-tab-btn {
+  flex: 1;
+  padding: 9px 12px;
+  font-size: 13px;
+  font-family: var(--font-sans);
+  font-weight: 500;
+  border-radius: var(--radius-pill);
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all 0.18s ease;
+}
+
+.auth-pill-tab-btn.active {
+  background-color: #ffffff;
+  color: var(--blue-primary);
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+/* Biểu mẫu và các nhóm trường */
+.auth-form-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.auth-field-block {
+  display: flex;
+  flex-direction: column;
+}
+
+.auth-field-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.auth-field-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-main);
+  font-family: var(--font-sans);
+}
+
+.auth-field-sublabel {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.auth-input-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.auth-input-prefix-icon {
+  position: absolute;
+  left: 14px;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.auth-styled-input {
+  width: 100%;
+  height: 44px;
+  background-color: rgba(248, 250, 252, 0.85);
+  border: 1.5px solid var(--border-light);
+  padding: 0 16px 0 44px;
+  border-radius: 14px;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  color: var(--text-main);
+  box-sizing: border-box;
+  outline: none;
+  transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.auth-styled-input.font-mono-input {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.auth-styled-input:focus {
+  background-color: #ffffff;
+  border-color: var(--blue-primary);
+  box-shadow: 0 0 0 3px rgba(0, 102, 255, 0.12);
+}
+
+.auth-styled-input.has-eye-btn {
+  padding-right: 44px;
+}
+
+.auth-eye-btn {
+  position: absolute;
+  right: 12px;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-xs);
+  transition: color 0.15s ease;
+}
+
+.auth-eye-btn:hover {
+  color: var(--text-main);
+}
+
+/* Hàng chọn ghi nhớ và quên mật khẩu */
+.auth-remember-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 2px;
+  font-size: 12px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.auth-checkbox-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+  color: var(--text-muted);
+}
+
+.auth-native-check {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--blue-primary);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.auth-link-text {
+  color: var(--blue-primary);
+  font-weight: 600;
+  text-decoration: none;
+  font-family: var(--font-sans);
+  transition: color 0.15s ease;
+}
+
+.auth-link-text:hover {
+  color: var(--blue-hover);
+  text-decoration: underline;
+}
+
+/* Nút bấm Chính Full Pill */
+.auth-cta-primary-btn {
+  width: 100%;
+  height: 48px;
+  border-radius: var(--radius-pill);
+  background-color: var(--blue-primary);
+  color: #ffffff;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 700;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  box-shadow: 0 8px 20px rgba(0, 102, 255, 0.25);
+  transition: background-color 0.15s ease, box-shadow 0.15s ease;
+  margin-top: 4px;
+}
+
+.auth-cta-primary-btn:hover:not(:disabled) {
+  background-color: var(--blue-hover);
+  box-shadow: 0 10px 25px rgba(0, 102, 255, 0.35);
+}
+
+.auth-cta-primary-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* Nút phụ Vào nhanh POS */
+.auth-cta-secondary-btn {
+  width: 100%;
+  height: 44px;
+  border-radius: var(--radius-pill);
+  border: 1.5px solid var(--blue-primary);
+  background-color: transparent;
+  color: var(--blue-primary);
+  font-family: var(--font-sans);
+  font-size: 13.5px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+  margin-top: 2px;
+}
+
+.auth-cta-secondary-btn:hover {
+  background-color: var(--blue-light);
+}
+
+/* Khung Tab Quét Mã QR */
+.auth-qr-pane {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px 0;
+  text-align: center;
+}
+
+.auth-qr-frame {
+  padding: 14px;
+  background-color: #ffffff;
+  border: 1px solid var(--border-light);
+  border-radius: 20px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.04);
+  margin-bottom: 16px;
+}
+
+.auth-qr-inner-box {
+  width: 190px;
+  height: 190px;
+  background-color: #f8fafc;
+  border: 1.5px dashed #cbd5e1;
+  border-radius: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.auth-qr-center-logo {
+  position: absolute;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-pill);
+  background-color: var(--blue-primary);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 13px;
+  box-shadow: 0 4px 10px rgba(0, 102, 255, 0.3);
+}
+
+.auth-qr-guide-text {
+  font-size: 12px;
+  color: var(--text-muted);
+  max-width: 320px;
+  line-height: 1.55;
+  margin: 0;
+}
+
+.auth-qr-sync-indicator {
+  margin-top: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--blue-primary);
+}
+
+/* Footer chân trang đầy đủ */
+.auth-footer {
+  width: 100%;
+  background-color: #ffffff;
+  border-top: 1px solid var(--border-light);
+  padding: 16px 20px;
+  box-sizing: border-box;
+}
+
+.auth-footer-inner {
+  width: 100%;
+  max-width: 1280px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+@media (min-width: 768px) {
+  .auth-footer-inner {
+    flex-direction: row;
+  }
+}
+
+.auth-footer-security {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.auth-security-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 500;
+  color: var(--text-main);
+}
+
+.auth-security-divider {
+  color: #cbd5e1;
+  display: none;
+}
+
+@media (min-width: 768px) {
+  .auth-security-divider {
+    display: inline;
+  }
+}
+
+.auth-footer-copyright {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--text-muted);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Hàng chuyển sang Đăng ký / Đăng nhập dưới đáy card */
+.auth-bottom-switch-link {
+  text-align: center;
+  margin-top: 20px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+/* Demo account pills bar */
+.auth-quick-demo-box {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--border-subtle);
+}
+
+.auth-quick-demo-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-faint);
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.auth-quick-demo-btns {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.auth-quick-demo-btn {
+  padding: 4px 12px;
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+  font-weight: 600;
+  background-color: var(--bg-soft-blue);
+  color: var(--blue-primary);
+  border: 1px solid var(--blue-border);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.auth-quick-demo-btn:hover {
+  background-color: var(--blue-subtle);
+  border-color: var(--blue-primary);
+}

@@ -1,4 +1,4 @@
-import { createBrowserRouter } from 'react-router-dom';
+import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { PosLayout } from '../layouts/PosLayout';
 import { WebStoreLayout } from '../layouts/WebStoreLayout';
 import { AuthLayout } from '../layouts/AuthLayout';
@@ -7,6 +7,7 @@ import { HomePage } from '../pages/HomePage';
 import { AdminLayout } from '../layouts/AdminLayout';
 import { AdminDashboardPage } from '../pages/admin/AdminDashboardPage';
 import { TenantManagementPage } from '../pages/admin/TenantManagementPage';
+import { LoginPage, RegisterPage, ForgotPasswordPage } from '../pages/auth';
 
 export const router = createBrowserRouter([
   {
@@ -70,9 +71,34 @@ export const router = createBrowserRouter([
     element: <AuthLayout />,
     children: [
       {
+        index: true,
+        element: <Navigate to="/auth/login" replace />,
+      },
+      {
         path: 'login',
-        element: <div className="text-gray-600 text-center">Trang Đăng nhập Hệ thống</div>,
+        element: <LoginPage />,
+      },
+      {
+        path: 'register',
+        element: <RegisterPage />,
+      },
+      {
+        path: 'forgot-password',
+        element: <ForgotPasswordPage />,
       },
     ],
+  },
+  // Đường dẫn rút gọn tiện dụng
+  {
+    path: '/login',
+    element: <Navigate to="/auth/login" replace />,
+  },
+  {
+    path: '/register',
+    element: <Navigate to="/auth/register" replace />,
+  },
+  {
+    path: '/forgot-password',
+    element: <Navigate to="/auth/forgot-password" replace />,
   },
 ]);

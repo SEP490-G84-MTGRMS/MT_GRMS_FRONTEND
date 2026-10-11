@@ -5,6 +5,7 @@
 
 @import './styles/landing.css';
 @import './styles/admin.css';
+@import './styles/auth.css';
 
 :root {
   /* KiotViet Brand Blue Palette - MÃ MÀU CHỦ ĐẠO TOÀN DỰ ÁN */
