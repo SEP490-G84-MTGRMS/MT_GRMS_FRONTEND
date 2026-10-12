@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MT-GRMS - Video Bán Hàng Bằng Máy Tính Điện Tử (POS Checkout)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --blue-primary: #0066FF;
+      --blue-hover: #0052CC;
+      --green-money: #00C853;
+      --red-accent: #FF3B30;
+      --text-main: #0F172A;
+      --text-muted: #64748B;
+      --font-sans: 'Be Vietnam Pro', -apple-system, sans-serif;
+      --font-mono: 'JetBrains Mono', Consolas, monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: var(--font-sans);
+      background-color: #050b18;
+      color: #FFFFFF;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 16px;
+      overflow-x: hidden;
+    }
+
+    /* THANH ĐIỀU HƯỚNG TRÊN CÙNG */
+    .top-bar {
+      width: 100%;
+      max-width: 1380px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      padding: 10px 20px;
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(14px);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 9999px;
+      margin-bottom: 16px;
+    }
+
+    .brand-group {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-logo-m {
+      width: 34px;
+      height: 34px;
+      border-radius: 10px;
+      background: var(--blue-primary);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 15px;
+    }
+
+    .brand-title {
+      font-size: 16px;
+      font-weight: 800;
+      letter-spacing: -0.01em;
+      color: #fff;
+    }
+
+    .brand-subtitle {
+      font-size: 11px;
+      color: #94A3B8;
+      margin-left: 6px;
+    }
+
+    .controls-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .ctrl-btn {
+      padding: 7px 16px;
+      border-radius: 9999px;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      background: rgba(255, 255, 255, 0.08);
+      color: #E2E8F0;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: var(--font-sans);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s ease;
+    }
+
+    .ctrl-btn:hover {
+      background: rgba(255, 255, 255, 0.18);
+      color: #fff;
+    }
+
+    .ctrl-btn.active {
+      background: var(--blue-primary);
+      border-color: var(--blue-primary);
+      color: #fff;
+      box-shadow: 0 4px 14px rgba(0, 102, 255, 0.4);
+    }
+
+    .btn-download-video {
+      background: var(--green-money);
+      border-color: var(--green-money);
+      color: #fff;
+      font-weight: 700;
+    }
+
+    .btn-download-video:hover {
+      background: #009624;
+    }
+
+    /* KHUNG CHÍNH CHỨA VIDEO PLAYER */
+    .video-theater-stage {
+      width: 100%;
+      max-width: 1380px;
+      aspect-ratio: 16 / 9;
+      background: #000;
+      border-radius: 24px;
+      overflow: hidden;
+      border: 1.5px solid rgba(255, 255, 255, 0.12);
+      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.65);
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* Thẻ HTML5 <video> phát kết quả edit cuối cùng */
+    #mainVideoPlayer {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    /* Thẻ video nguồn ẩn dùng để nạp source cảnh quay */
+    .hidden-source-media {
+      display: none;
+    }
+
+    /* Canvas biên tập và render các lớp (Layers Compositor) */
+    #editCanvas {
+      display: none;
+    }
+
+    /* HUY HIỆU TRẠNG THÁI VIDEO TRÊN PLAYER */
+    .player-overlay-tag {
+      position: absolute;
+      top: 18px;
+      left: 20px;
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      padding: 5px 14px;
+      border-radius: 9999px;
+      font-size: 12px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      z-index: 20;
+    }
+
+    .live-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--red-accent);
+      box-shadow: 0 0 10px var(--red-accent);
+      animation: live-blink 1.2s infinite;
+    }
+
+    @keyframes live-blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    /* THANH TIẾN TRÌNH QUÁ TRÌNH BÁN HÀNG DƯỚI VIDEO */
+    .checkout-timeline-panel {
+      width: 100%;
+      max-width: 1380px;
+      margin-top: 16px;
+      background: rgba(15, 23, 42, 0.7);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 20px;
+      padding: 14px 20px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 12px;
+    }
+
+    .step-card {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 14px;
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      transition: all 0.2s ease;
+    }
+
+    .step-card.active {
+      background: rgba(0, 102, 255, 0.2);
+      border-color: var(--blue-primary);
+    }
+
+    .step-num {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.12);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 800;
+      font-family: var(--font-mono);
+    }
+
+    .step-card.active .step-num {
+      background: var(--blue-primary);
+    }
+
+    .step-info-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: #FFFFFF;
+    }
+
+    .step-info-desc {
+      font-size: 11px;
+      color: #94A3B8;
+    }
+
+    /* GHI CHÚ CHỈ DẪN KỸ THUẬT */
+    .bottom-notes {
+      width: 100%;
+      max-width: 1380px;
+      margin-top: 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+      font-size: 12px;
+      color: #64748B;
+    }
+
+    .link-return-auth {
+      color: var(--blue-primary);
+      text-decoration: none;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- THANH ĐIỀU HƯỚNG TRÊN CÙNG -->
+  <header class="top-bar">
+    <div class="brand-group">
+      <div class="brand-logo-m">M</div>
+      <div>
+        <span class="brand-title">MT-GRMS</span>
+        <span class="brand-subtitle">Video Bán Hàng Máy Tính Điện Tử (POS)</span>
+      </div>
+    </div>
+
+    <div class="controls-group">
+      <button class="ctrl-btn active" id="btnSoundToggle" onclick="toggleAudioFx()">
+        <span id="soundIcon">🔊 Âm thanh Bíp POS: BẬT</span>
+      </button>
+      <button class="ctrl-btn" onclick="restartSellingSession()">
+        <span>🔄 Phát lại từ đầu</span>
+      </button>
+      <button class="ctrl-btn btn-download-video" onclick="exportEditedVideo()">
+        <span>💾 Tải Video Đã Edit (.webm)</span>
+      </button>
+      <a href="/login_video_preview.html" class="ctrl-btn">
+        <span>🎬 Dùng làm Video Nền Đăng nhập &rarr;</span>
+      </a>
+    </div>
+  </header>
+
+  <!-- KHUNG CHIẾU VIDEO THÀNH PHẨM (HTML5 <video> PLAYER THEO YÊU CẦU) -->
+  <main class="video-theater-stage">
+    <div class="player-overlay-tag">
+      <div class="live-dot"></div>
+      <span id="playerStatusLabel">BÁN HÀNG TẠI QUẦY • MÁY TÍNH POS CHUYÊN DỤNG</span>
+    </div>
+
+    <!-- THẺ VIDEO PHÁT CHÍNH -->
+    <video id="mainVideoPlayer" autoplay loop muted playsinline></video>
+
+    <!-- NGUỒN VIDEO GỐC NẠP TỪ WIKIMEDIA (ẨN TRONG DOM ĐỂ VẼ LÊN CANVAS) -->
+    <video id="srcBarcode" class="hidden-source-media" src="/barcode_scan_raw.webm" loop muted playsinline crossorigin="anonymous"></video>
+    <video id="srcSupermarket" class="hidden-source-media" src="/supermarket_raw.webm" loop muted playsinline crossorigin="anonymous"></video>
+
+    <!-- CANVAS ENGINE CHỊU TRÁCH NHIỆM BIÊN TẬP VÀ COMPOSITE TẤT CẢ LỚP VIDEO -->
+    <canvas id="editCanvas" width="1920" height="1080"></canvas>
+  </main>
+
+  <!-- BẢNG TIẾN TRÌNH CÁC BƯỚC BÁN HÀNG BẰNG MÁY TÍNH -->
+  <section class="checkout-timeline-panel">
+    <div class="step-card active" id="step1">
+      <div class="step-num">1</div>
+      <div>
+        <div class="step-info-title">Quét mã vạch tự động</div>
+        <div class="step-info-desc">Tia laser nhận diện mã vạch trong 0.2s</div>
+      </div>
+    </div>
+    <div class="step-card" id="step2">
+      <div class="step-num">2</div>
+      <div>
+        <div class="step-info-title">Máy tính lập hóa đơn</div>
+        <div class="step-info-desc">Cộng dồn số lượng và giá tự động</div>
+      </div>
+    </div>
+    <div class="step-card" id="step3">
+      <div class="step-num">3</div>
+      <div>
+        <div class="step-info-title">Sinh mã VietQR động</div>
+        <div class="step-info-desc">Tự khớp chính xác số tiền đơn hàng</div>
+      </div>
+    </div>
+    <div class="step-card" id="step4">
+      <div class="step-num">4</div>
+      <div>
+        <div class="step-info-title">Thanh toán & In Bill</div>
+        <div class="step-info-desc">Khớp tiền thành công, in hóa đơn tích tắc</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- GHI CHÚ CUỐI TRANG -->
+  <footer class="bottom-notes">
+    <div>
+      <span>Nguồn video: Hoạt động máy quét mã vạch quầy thu ngân thực tế (CC BY-SA) kết hợp giao diện máy tính MT-GRMS POS Enterprise.</span>
+    </div>
+    <div>
+      <a href="/auth/login" class="link-return-auth">
+        <span>Vào Màn hình Đăng nhập MT-GRMS</span> &rarr;
+      </a>
+    </div>
+  </footer>
+
+  <!-- SCRIPT ENGINE BIÊN TẬP (EDIT) & TỔNG HỢP VIDEO MÁY TÍNH BÁN HÀNG POS -->
+  <script>
+    const canvas = document.getElementById('editCanvas');
+    const ctx = canvas.getContext('2d');
+    const mainVideo = document.getElementById('mainVideoPlayer');
+    const srcBarcode = document.getElementById('srcBarcode');
+    const srcSupermarket = document.getElementById('srcSupermarket');
+
+    // Khởi tạo AudioContext để tạo tiếng "Bíp!" máy quét mã vạch POS chân thực
+    let audioCtx = null;
+    let isSoundEnabled = true;
+
+    function playPosBeep(freq = 1800, duration = 0.08) {
+      if (!isSoundEnabled) return;
+      try {
+        if (!audioCtx) {
+          audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (audioCtx.state === 'suspended') {
+          audioCtx.resume();
+        }
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + duration);
+      } catch (e) {
+        // Audio error handled
+      }
+    }
+
+    function toggleAudioFx() {
+      isSoundEnabled = !isSoundEnabled;
+      document.getElementById('soundIcon').textContent = isSoundEnabled
+        ? '🔊 Âm thanh Bíp POS: BẬT'
+        : '🔇 Âm thanh Bíp POS: TẮT';
+      document.getElementById('btnSoundToggle').classList.toggle('active', isSoundEnabled);
+    }
+
+    // DANH SÁCH MẶT HÀNG TẠP HÓA VIỆT NAM TRONG KỊCH BẢN BÁN HÀNG
+    const CART_ITEMS = [
+      { name: 'Mì Hảo Hảo Tôm Chua Cay', qty: 10, unit: 'Gói', price: 4500, total: 45000, barcode: '893456312456', frameTrigger: 30 },
+      { name: 'Sữa tươi Vinamilk Có Đường 180ml', qty: 4, unit: 'Hộp', price: 9000, total: 36000, barcode: '893123456789', frameTrigger: 100 },
+      { name: 'Dầu ăn Tường An Cooking Oil 1L', qty: 1, unit: 'Chai', price: 52000, total: 52000, barcode: '893678901234', frameTrigger: 170 },
+      { name: 'Bánh Chocopie Orion 360g', qty: 1, unit: 'Hộp', price: 55000, total: 55000, barcode: '893890123456', frameTrigger: 240 }
+    ];
+
+    let currentFrame = 0;
+    const TOTAL_LOOP_FRAMES = 420; // ~ 7 giây mỗi chu kỳ bán hàng hoàn tất 1 đơn
+
+    function startVideoSources() {
+      srcBarcode.play().catch(() => {});
+      srcSupermarket.play().catch(() => {});
+    }
+
+    function renderEditedVideo() {
+      currentFrame = (currentFrame + 1) % TOTAL_LOOP_FRAMES;
+
+      // 1. LỚP NỀN: Video thực tế siêu thị (Supermarket background) làm mờ điện ảnh
+      ctx.fillStyle = '#0f172a';
+      ctx.fillRect(0, 0, 1920, 1080);
+
+      if (srcSupermarket.readyState >= 2) {
+        ctx.save();
+        ctx.globalAlpha = 0.45;
+        ctx.drawImage(srcSupermarket, 0, 0, 1920, 1080);
+        ctx.restore();
+      }
+
+      // Lớp gradient phủ tối dịu mắt
+      const vignette = ctx.createRadialGradient(960, 540, 200, 960, 540, 1000);
+      vignette.addColorStop(0, 'rgba(15, 23, 42, 0.7)');
+      vignette.addColorStop(1, 'rgba(5, 11, 24, 0.95)');
+      ctx.fillStyle = vignette;
+      ctx.fillRect(0, 0, 1920, 1080);
+
+      // 2. KHUNG MÀN HÌNH MÁY TÍNH ĐIỆN TỬ BÁN HÀNG CHUYÊN NGHIỆP (ELECTRONIC POS MONITOR)
+      drawComputerPosInterface();
+
+      // 3. KHUNG VIDEO THỰC TẾ THU NGÂN QUÉT MÃ VẠCH (Picture-in-Picture Live Scanner Feed)
+      drawScannerFeedPip();
+
+      // 4. HIỆU ỨNG TIA QUÉT LASER VÀ ÂM THANH
+      handleScanningEvents();
+
+      // 5. GIAI ĐOẠN THANH TOÁN VIETQR & IN BILL
+      handlePaymentPhase();
+
+      requestAnimationFrame(renderEditedVideo);
+    }
+
+    // VẼ MÀN HÌNH MÁY TÍNH BÁN HÀNG POS ĐIỆN TỬ (MT-GRMS RETAIL DESKTOP UI)
+    function drawComputerPosInterface() {
+      const monX = 120;
+      const monY = 80;
+      const monW = 1240;
+      const monH = 920;
+
+      // Khung viền màn hình máy tính mỏng cao cấp
+      ctx.fillStyle = '#1e293b';
+      roundRect(ctx, monX - 10, monY - 10, monW + 20, monH + 20, 24);
+      ctx.fill();
+
+      // Màn hình hiển thị chính (Nền sáng KiotViet Style)
+      ctx.fillStyle = '#FFFFFF';
+      roundRect(ctx, monX, monY, monW, monH, 18);
+      ctx.fill();
+
+      // Header thanh công cụ máy tính POS
+      ctx.fillStyle = '#0066FF';
+      roundRect(ctx, monX, monY, monW, 64, { tl: 18, tr: 18, bl: 0, br: 0 });
+      ctx.fill();
+
+      // Tiêu đề phần mềm trên máy tính
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = '800 20px "Be Vietnam Pro"';
+      ctx.textAlign = 'left';
+      ctx.fillText('MT-GRMS POS • Quầy Bán Hàng Thu Ngân 01', monX + 24, monY + 40);
+
+      ctx.font = '600 13px "JetBrains Mono"';
+      ctx.textAlign = 'right';
+      ctx.fillText('HÓA ĐƠN #HD-20261012-094 • F9: THANH TOÁN', monX + monW - 24, monY + 40);
+
+      // BẢNG DANH SÁCH GIỎ HÀNG ĐANG BÁN TRÊN MÁY TÍNH
+      // Tiêu đề cột
+      const tableY = monY + 90;
+      ctx.fillStyle = '#F1F5F9';
+      ctx.fillRect(monX + 20, tableY, monW - 40, 38);
+
+      ctx.fillStyle = '#475569';
+      ctx.font = '700 13px "Be Vietnam Pro"';
+      ctx.textAlign = 'left';
+      ctx.fillText('STT', monX + 35, tableY + 24);
+      ctx.fillText('MÃ VẠCH', monX + 90, tableY + 24);
+      ctx.fillText('TÊN MẶT HÀNG', monX + 260, tableY + 24);
+      ctx.fillText('ĐƠN VỊ', monX + 660, tableY + 24);
+      ctx.fillText('SL', monX + 760, tableY + 24);
+      ctx.fillText('ĐƠN GIÁ', monX + 850, tableY + 24);
+      ctx.textAlign = 'right';
+      ctx.fillText('THÀNH TIỀN', monX + monW - 45, tableY + 24);
+
+      // Render từng sản phẩm khi được quét mã
+      let grandTotal = 0;
+      let activeItemCount = 0;
+
+      CART_ITEMS.forEach((item, index) => {
+        if (currentFrame >= item.barcodeScanFrame) {
+          activeItemCount++;
+          grandTotal += item.total;
+          const rowY = tableY + 48 + index * 54;
+
+          // Hàng chẵn/lẻ
+          ctx.fillStyle = index % 2 === 0 ? '#FFFFFF' : '#F8FAFC';
+          ctx.fillRect(monX + 20, rowY - 14, monW - 40, 48);
+
+          // Nội dung dòng
+          ctx.fillStyle = '#0F172A';
+          ctx.font = '600 14px "JetBrains Mono"';
+          ctx.textAlign = 'left';
+          ctx.fillText((index + 1).toString(), monX + 42, rowY + 16);
+          ctx.fillStyle = '#64748B';
+          ctx.fillText(item.barcode, monX + 90, rowY + 16);
+
+          ctx.fillStyle = '#0F172A';
+          ctx.font = '700 14px "Be Vietnam Pro"';
+          ctx.fillText(item.name, monX + 260, rowY + 16);
+
+          ctx.font = '600 13px "Be Vietnam Pro"';
+          ctx.fillStyle = '#475569';
+          ctx.fillText(item.unit, monX + 660, rowY + 16);
+
+          ctx.font = '700 14px "JetBrains Mono"';
+          ctx.fillText(item.qty.toString(), monX + 765, rowY + 16);
+
+          ctx.font = '600 14px "JetBrains Mono"';
+          ctx.fillText(item.price.toLocaleString('vi-VN') + ' đ', monX + 850, rowY + 16);
+
+          ctx.fillStyle = '#0066FF';
+          ctx.font = '800 15px "JetBrains Mono"';
+          ctx.textAlign = 'right';
+          ctx.fillText(item.total.toLocaleString('vi-VN') + ' đ', monX + monW - 45, rowY + 16);
+        }
+      });
+
+      // KHUNG TỔNG TIỀN VÀ NÚT BẤM DƯỚI ĐÁY MÀN HÌNH
+      const bottomY = monY + monH - 140;
+      ctx.fillStyle = '#F8FAFC';
+      ctx.fillRect(monX + 20, bottomY, monW - 40, 120);
+
+      ctx.fillStyle = '#475569';
+      ctx.font = '600 14px "Be Vietnam Pro"';
+      ctx.textAlign = 'left';
+      ctx.fillText(`Tổng số lượng hàng: ${activeItemCount} món`, monX + 45, bottomY + 45);
+      ctx.fillText('Hình thức: Quét mã vạch tự động (Laser Scanner)', monX + 45, bottomY + 80);
+
+      ctx.fillStyle = '#0F172A';
+      ctx.font = '700 16px "Be Vietnam Pro"';
+      ctx.textAlign = 'right';
+      ctx.fillText('KHÁCH PHẢI TRẢ:', monX + monW - 270, bottomY + 45);
+
+      ctx.fillStyle = '#00C853';
+      ctx.font = '900 34px "JetBrains Mono"';
+      ctx.fillText(grandTotal.toLocaleString('vi-VN') + ' đ', monX + monW - 45, bottomY + 50);
+
+      // Nút F9 Thanh toán trên giao diện máy tính
+      const btnPayY = bottomY + 68;
+      ctx.fillStyle = currentFrame >= 310 ? '#00C853' : '#0066FF';
+      roundRect(ctx, monX + monW - 270, btnPayY, 225, 42, 9999);
+      ctx.fill();
+
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = '800 14px "Be Vietnam Pro"';
+      ctx.textAlign = 'center';
+      const payLabel = currentFrame >= 340 ? '✓ ĐÃ HOÀN TẤT ĐƠN' : (currentFrame >= 310 ? '⚡ ĐANG KHỚP VIETQR' : '💳 [F9] THANH TOÁN NGAY');
+      ctx.fillText(payLabel, monX + monW - 157, btnPayY + 26);
+    }
+
+    // GẮN FRAME TRIGGER CHO CÁC MẶT HÀNG
+    CART_ITEMS[0].barcodeScanFrame = 35;
+    CART_ITEMS[1].barcodeScanFrame = 105;
+    CART_ITEMS[2].barcodeScanFrame = 175;
+    CART_ITEMS[3].barcodeScanFrame = 245;
+
+    // VẼ KHUNG VIDEO NGUỒN PIP: NGƯỜI THU NGÂN QUÉT HÀNG BẰNG MÁY QUÉT ĐIỆN TỬ
+    function drawScannerFeedPip() {
+      const pipX = 1400;
+      const pipY = 80;
+      const pipW = 400;
+      const pipH = 340;
+
+      // Khung viền kim loại cao cấp
+      ctx.fillStyle = '#0F172A';
+      roundRect(ctx, pipX, pipY, pipW, pipH, 20);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(0, 102, 255, 0.4)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // Video nguồn Barcode Scanner thật
+      if (srcBarcode.readyState >= 2) {
+        ctx.save();
+        roundRect(ctx, pipX + 8, pipY + 8, pipW - 16, pipH - 46, 14);
+        ctx.clip();
+        ctx.drawImage(srcBarcode, pipX + 8, pipY + 8, pipW - 16, pipH - 46);
+        ctx.restore();
+      }
+
+      // Nhãn thẻ Pip
+      ctx.fillStyle = '#E2E8F0';
+      ctx.font = '700 12px "Be Vietnam Pro"';
+      ctx.textAlign = 'center';
+      ctx.fillText('CAMERA THỰC TẾ: MÁY QUÉT MÃ VẠCH QUẦY POS', pipX + pipW / 2, pipY + pipH - 14);
+    }
+
+    // XỬ LÝ SỰ KIỆN QUÉT MÃ VẠCH VÀ TIA LASER
+    function handleScanningEvents() {
+      CART_ITEMS.forEach(item => {
+        if (currentFrame === item.barcodeScanFrame) {
+          playPosBeep(1900, 0.08); // Phát tiếng Bíp!
+          updateTimelineStep(1);
+        }
+
+        // Tia laser quét xuất hiện trong khoảng 20 frames quanh thời điểm quét
+        if (currentFrame >= item.barcodeScanFrame - 10 && currentFrame <= item.barcodeScanFrame + 10) {
+          drawLaserBeam();
+        }
+      });
+    }
+
+    function drawLaserBeam() {
+      const beamY = 560 + Math.sin(currentFrame * 0.4) * 40;
+      const laserGrad = ctx.createLinearGradient(1380, beamY, 1820, beamY);
+      laserGrad.addColorStop(0, 'rgba(255, 0, 0, 0)');
+      laserGrad.addColorStop(0.5, 'rgba(255, 30, 30, 0.95)');
+      laserGrad.addColorStop(1, 'rgba(255, 0, 0, 0)');
+      ctx.strokeStyle = laserGrad;
+      ctx.lineWidth = 3.5;
+      ctx.beginPath();
+      ctx.moveTo(1380, beamY);
+      ctx.lineTo(1820, beamY);
+      ctx.stroke();
+    }
+
+    // GIAI ĐOẠN 3 & 4: THANH TOÁN VIETQR VÀ IN HÓA ĐƠN
+    function handlePaymentPhase() {
+      const qrPanelX = 1400;
+      const qrPanelY = 440;
+      const qrPanelW = 400;
+      const qrPanelH = 560;
+
+      ctx.fillStyle = '#FFFFFF';
+      roundRect(ctx, qrPanelX, qrPanelY, qrPanelW, qrPanelH, 20);
+      ctx.fill();
+      ctx.strokeStyle = '#E2E8F0';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      if (currentFrame < 300) {
+        // Trạng thái chờ thanh toán
+        updateTimelineStep(2);
+        ctx.fillStyle = '#64748B';
+        ctx.font = '600 14px "Be Vietnam Pro"';
+        ctx.textAlign = 'center';
+        ctx.fillText('Đang chờ quét thêm hàng...', qrPanelX + qrPanelW / 2, qrPanelY + 250);
+        ctx.font = '12px "Be Vietnam Pro"';
+        ctx.fillText('Bấm [F9] để bật mã thanh toán VietQR', qrPanelX + qrPanelW / 2, qrPanelY + 280);
+      } else if (currentFrame >= 300 && currentFrame < 360) {
+        // ĐANG KHỚP MÃ VIETQR ĐỘNG
+        updateTimelineStep(3);
+        ctx.fillStyle = '#0066FF';
+        ctx.font = '800 16px "Be Vietnam Pro"';
+        ctx.textAlign = 'center';
+        ctx.fillText('QUÉT MÃ VIETQR ĐỘNG', qrPanelX + qrPanelW / 2, qrPanelY + 45);
+
+        // Vẽ mô phỏng mã QR
+        drawMockQrCode(qrPanelX + 110, qrPanelY + 70, 180);
+
+        ctx.fillStyle = '#0F172A';
+        ctx.font = '700 18px "JetBrains Mono"';
+        ctx.fillText('188.000 đ', qrPanelX + qrPanelW / 2, qrPanelY + 290);
+
+        ctx.fillStyle = '#00C853';
+        ctx.font = '600 12px "Be Vietnam Pro"';
+        ctx.fillText('⚡ Đang đồng bộ thông báo ngân hàng...', qrPanelX + qrPanelW / 2, qrPanelY + 325);
+      } else {
+        // THANH TOÁN THÀNH CÔNG VÀ IN HÓA ĐƠN
+        updateTimelineStep(4);
+        if (currentFrame === 360) {
+          playPosBeep(2400, 0.15); // Tiếng Kaching thành công
+        }
+
+        ctx.fillStyle = '#00C853';
+        ctx.font = '800 18px "Be Vietnam Pro"';
+        ctx.textAlign = 'center';
+        ctx.fillText('✓ ĐÃ KHỚP TIỀN THÀNH CÔNG!', qrPanelX + qrPanelW / 2, qrPanelY + 60);
+
+        ctx.fillStyle = '#0F172A';
+        ctx.font = '800 24px "JetBrains Mono"';
+        ctx.fillText('+ 188.000 đ', qrPanelX + qrPanelW / 2, qrPanelY + 105);
+
+        // Mô phỏng hóa đơn in ra từ máy in bill nhiệt
+        ctx.fillStyle = '#F8FAFC';
+        ctx.fillRect(qrPanelX + 30, qrPanelY + 140, qrPanelW - 60, 360);
+        ctx.strokeStyle = '#CBD5E1';
+        ctx.strokeRect(qrPanelX + 30, qrPanelY + 140, qrPanelW - 60, 360);
+
+        ctx.fillStyle = '#1E293B';
+        ctx.font = '800 13px "Be Vietnam Pro"';
+        ctx.fillText('TIỆM TẠP HÓA MT-GRMS', qrPanelX + qrPanelW / 2, qrPanelY + 175);
+        ctx.font = '500 11px "JetBrains Mono"';
+        ctx.fillText('Ngày: 12/10/2026 - Giờ: 21:58', qrPanelX + qrPanelW / 2, qrPanelY + 200);
+        ctx.fillText('-----------------------------------', qrPanelX + qrPanelW / 2, qrPanelY + 220);
+        ctx.fillText('4 món hàng • Đã chuyển khoản', qrPanelX + qrPanelW / 2, qrPanelY + 245);
+        ctx.font = 'bold 12px "Be Vietnam Pro"';
+        ctx.fillText('CẢM ƠN QUÝ KHÁCH & HẸN GẶP LẠI!', qrPanelX + qrPanelW / 2, qrPanelY + 320);
+      }
+    }
+
+    function drawMockQrCode(x, y, s) {
+      ctx.fillStyle = '#000000';
+      ctx.fillRect(x, y, s, s);
+      // Góc định vị QR
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(x + 10, y + 10, s - 20, s - 20);
+      ctx.fillStyle = '#000000';
+      ctx.fillRect(x + 20, y + 20, 40, 40);
+      ctx.fillRect(x + s - 60, y + 20, 40, 40);
+      ctx.fillRect(x + 20, y + s - 60, 40, 40);
+      // Tâm logo MT
+      ctx.fillStyle = '#0066FF';
+      ctx.fillRect(x + s / 2 - 16, y + s / 2 - 16, 32, 32);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = '800 14px "Be Vietnam Pro"';
+      ctx.textAlign = 'center';
+      ctx.fillText('M', x + s / 2, y + s / 2 + 5);
+    }
+
+    function updateTimelineStep(activeStep) {
+      for (let i = 1; i <= 4; i++) {
+        const el = document.getElementById('step' + i);
+        if (el) el.classList.toggle('active', i === activeStep);
+      }
+    }
+
+    function restartSellingSession() {
+      currentFrame = 0;
+      startVideoSources();
+    }
+
+    // HÀM BO GÓC CHUẨN CANVAS
+    function roundRect(c, x, y, w, h, r) {
+      const maxR = Math.min(w / 2, h / 2);
+      let radii = 0;
+      if (typeof r === 'number') {
+        radii = Math.min(r, maxR);
+      } else if (r && typeof r === 'object') {
+        radii = [
+          Math.min(r.tl || 0, maxR),
+          Math.min(r.tr || 0, maxR),
+          Math.min(r.br || 0, maxR),
+          Math.min(r.bl || 0, maxR)
+        ];
+      }
+      c.beginPath();
+      if (typeof c.roundRect === 'function') {
+        c.roundRect(x, y, w, h, radii);
+      } else {
+        const rad = typeof radii === 'number' ? radii : 12;
+        c.rect(x, y, w, h);
+      }
+    }
+
+    // KẾT NỐI STREAM SANG THẺ <video> CHÍNH
+    function initPlayerStream() {
+      startVideoSources();
+      renderEditedVideo();
+
+      try {
+        const stream = canvas.captureStream(60);
+        mainVideo.srcObject = stream;
+        mainVideo.play().catch(e => console.log('Player autoplay:', e));
+      } catch (err) {
+        console.warn('CaptureStream error:', err);
+      }
+    }
+
+    // XUẤT VIDEO ĐÃ EDIT THÀNH FILE .WEBM TẢI VỀ MÁY
+    function exportEditedVideo() {
+      alert('Đang ghi lại video bán hàng điện tử (7 giây, chu kỳ 1 giao dịch trọn vẹn). Video sẽ tự động được tải về sau khi hoàn tất!');
+      currentFrame = 0;
+      const stream = canvas.captureStream(30);
+      const chunks = [];
+      try {
+        const rec = new MediaRecorder(stream, { mimeType: 'video/webm' });
+        rec.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+        rec.onstop = () => {
+          const blob = new Blob(chunks, { type: 'video/webm' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.style.display = 'none';
+          a.href = url;
+          a.download = 'mtgrms_video_ban_hang_pos_dien_tu.webm';
+          document.body.appendChild(a);
+          a.click();
+          setTimeout(() => {
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+          }, 100);
+        };
+        rec.start();
+        setTimeout(() => {
+          if (rec.state === 'recording') rec.stop();
+        }, 7500);
+      } catch (e) {
+        alert('Lỗi xuất video: ' + e.message);
+      }
+    }
+
+    window.addEventListener('DOMContentLoaded', initPlayerStream);
+  </script>
+</body>
+</html>

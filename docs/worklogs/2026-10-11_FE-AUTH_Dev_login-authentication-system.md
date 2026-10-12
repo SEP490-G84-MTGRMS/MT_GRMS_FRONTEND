@@ -41,6 +41,7 @@
 - `src/stores/useAuthStore.ts`: Zustand store quản lý phiên đăng nhập.
 - `src/styles/auth.css`: Styling đồng bộ hệ thống KiotViet Blue Palette.
 - `public/login_video_preview.html`: Trang HTML xem trước video nền động (HTML5 video tag) trình diễn 5 tiện ích bán lẻ cốt lõi (POS, FEFO, Đa đơn vị, VietQR, Sổ nợ) kèm điều khiển tương tác.
+- `public/pos_selling_video.html`: Video biên tập bán hàng bằng máy tính POS điện tử (kết hợp video quét mã laser thật, mô phỏng lên đơn hàng, âm thanh bíp và khớp tiền VietQR).
 - `src/app/router.tsx`: Khai báo các đường dẫn `/auth/login`, `/auth/register`, `/auth/forgot-password`.
 
 ### 3. Chi Tiết UI/UX & API Integration
