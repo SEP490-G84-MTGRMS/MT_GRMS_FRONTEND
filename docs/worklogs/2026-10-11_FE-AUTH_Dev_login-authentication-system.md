@@ -15,6 +15,7 @@
   - Trang Quên mật khẩu (`ForgotPasswordPage`): Khôi phục tài khoản với mã OTP.
   - Tối ưu Đăng ký Phone-First: Loại bỏ trường Email đăng ký phù hợp thói quen tiểu thương tạp hóa Việt Nam.
   - Tối ưu tỷ lệ Zero-Scroll: Căn chỉnh padding, gap và bố cục 2 cột mật khẩu để form vừa vặn 100% trong khung nhìn không cần cuộn chuột.
+  - Hoàn thiện UI/UX: Chuẩn hóa nhãn Mật khẩu (≥ 8 ký tự), đồng bộ placeholder và chống gãy dòng tên thương hiệu MT-GRMS.
   - Quản lý trạng thái phiên đăng nhập (`useAuthStore`): Lưu trữ token, profile, role-based navigation.
   - Xử lý API & Interceptor (`authService`, `httpClient`): Cơ chế refresh token tự động và fallback demo accounts.
   - Bảo vệ điều hướng (`ProtectedRoute`): Kiểm soát quyền truy cập theo phân quyền.

@@ -205,7 +205,7 @@ export const RegisterPage: FC = () => {
               id="reg-phone"
               type="tel"
               className="auth-styled-input font-mono-input"
-              placeholder="0912 345 678"
+              placeholder="VD: 0912 345 678"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               disabled={isLoading}
@@ -214,15 +214,12 @@ export const RegisterPage: FC = () => {
           </div>
         </div>
 
-        {/* Hàng 2 cột: Mật khẩu & Xác nhận mật khẩu (gọn gàng, tiết kiệm chiều cao) */}
+        {/* Hàng 2 cột: Mật khẩu & Xác nhận mật khẩu (gọn gàng, cân đối) */}
         <div className="auth-field-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
           <div className="auth-field-block">
-            <div className="auth-field-label-row" style={{ marginBottom: '5px' }}>
-              <label htmlFor="reg-password" className="auth-field-label">
-                Mật khẩu
-              </label>
-              <span className="auth-field-sublabel">$\ge 8$ ký tự</span>
-            </div>
+            <label htmlFor="reg-password" className="auth-field-label" style={{ marginBottom: '6px' }}>
+              Mật khẩu <span style={{ fontWeight: 400, color: 'var(--text-muted)', fontSize: '11.5px' }}>(≥ 8 ký tự)</span>
+            </label>
             <div className="auth-input-container">
               <span className="auth-input-prefix-icon">
                 <Lock size={17} strokeWidth={1.8} />
@@ -231,7 +228,7 @@ export const RegisterPage: FC = () => {
                 id="reg-password"
                 type={showPassword ? 'text' : 'password'}
                 className="auth-styled-input has-eye-btn"
-                placeholder="Mật khẩu..."
+                placeholder="Nhập mật khẩu..."
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 autoComplete="new-password"
@@ -250,8 +247,8 @@ export const RegisterPage: FC = () => {
           </div>
 
           <div className="auth-field-block">
-            <label htmlFor="reg-confirm-password" className="auth-field-label" style={{ marginBottom: '5px' }}>
-              Xác nhận mật khẩu
+            <label htmlFor="reg-confirm-password" className="auth-field-label" style={{ marginBottom: '6px' }}>
+              Xác nhận lại mật khẩu
             </label>
             <div className="auth-input-container">
               <span className="auth-input-prefix-icon">
@@ -261,7 +258,7 @@ export const RegisterPage: FC = () => {
                 id="reg-confirm-password"
                 type={showConfirmPassword ? 'text' : 'password'}
                 className="auth-styled-input has-eye-btn"
-                placeholder="Nhập lại..."
+                placeholder="Nhập lại mật khẩu..."
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 autoComplete="new-password"
@@ -310,7 +307,8 @@ export const RegisterPage: FC = () => {
             />
             <span style={{ fontSize: '12px', lineHeight: 1.45 }}>
               Tôi đồng ý với <span className="auth-link-text">Điều khoản sử dụng</span> và{' '}
-              <span className="auth-link-text">Chính sách bảo mật</span> của MT-GRMS.
+              <span className="auth-link-text">Chính sách bảo mật</span> của{' '}
+              <span style={{ whiteSpace: 'nowrap' }}>MT&#8209;GRMS</span>.
             </span>
           </label>
         </div>
