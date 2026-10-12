@@ -3,9 +3,9 @@ import { PosLayout } from '../layouts/PosLayout';
 import { WebStoreLayout } from '../layouts/WebStoreLayout';
 import { AuthLayout } from '../layouts/AuthLayout';
 import { HomePage } from '../pages/HomePage';
-import { SupplierListPage, SupplierDetailPage } from '../features/supplier';
+import { SupplierListPage, SupplierDetailPage, SupplierProductManagementPage } from '../features/supplier';
 
-import { AdminLayout } from '../layouts/AdminLayout';
+import { StoreOwnerLayout } from '../layouts/StoreOwnerLayout';
 import { AdminDashboardPage } from '../pages/admin/AdminDashboardPage';
 import { TenantManagementPage } from '../pages/admin/TenantManagementPage';
 
@@ -16,7 +16,7 @@ export const router = createBrowserRouter([
   },
   {
     path: '/admin',
-    element: <AdminLayout />,
+    element: <StoreOwnerLayout />,
     children: [
       {
         index: true,
@@ -30,25 +30,57 @@ export const router = createBrowserRouter([
         path: 'tenants',
         element: <TenantManagementPage />,
       },
-    ],
-  },
-  {
-    path: '/store-owner',
-    element: <AdminLayout />,
-    children: [
       {
         path: 'suppliers',
         element: <SupplierListPage />,
       },
       {
+        path: 'suppliers/products',
+        element: <SupplierProductManagementPage />,
+      },
+      {
         path: 'suppliers/:id',
         element: <SupplierDetailPage />,
+      },
+      {
+        path: 'suppliers/:id/products',
+        element: <SupplierProductManagementPage />,
+      },
+    ],
+  },
+  {
+    path: '/store-owner',
+    element: <StoreOwnerLayout />,
+    children: [
+      {
+        index: true,
+        element: <AdminDashboardPage />,
+      },
+      {
+        path: 'dashboard',
+        element: <AdminDashboardPage />,
+      },
+      {
+        path: 'suppliers',
+        element: <SupplierListPage />,
+      },
+      {
+        path: 'suppliers/products',
+        element: <SupplierProductManagementPage />,
+      },
+      {
+        path: 'suppliers/:id',
+        element: <SupplierDetailPage />,
+      },
+      {
+        path: 'suppliers/:id/products',
+        element: <SupplierProductManagementPage />,
       },
     ],
   },
   {
     path: '/dashboard',
-    element: <AdminLayout />,
+    element: <StoreOwnerLayout />,
     children: [
       {
         index: true,
@@ -63,18 +95,40 @@ export const router = createBrowserRouter([
         element: <SupplierListPage />,
       },
       {
+        path: 'suppliers/products',
+        element: <SupplierProductManagementPage />,
+      },
+      {
         path: 'suppliers/:id',
         element: <SupplierDetailPage />,
+      },
+      {
+        path: 'suppliers/:id/products',
+        element: <SupplierProductManagementPage />,
       },
     ],
   },
   {
     path: '/suppliers',
-    element: <SupplierListPage />,
-  },
-  {
-    path: '/suppliers/:id',
-    element: <SupplierDetailPage />,
+    element: <StoreOwnerLayout />,
+    children: [
+      {
+        index: true,
+        element: <SupplierListPage />,
+      },
+      {
+        path: 'products',
+        element: <SupplierProductManagementPage />,
+      },
+      {
+        path: ':id',
+        element: <SupplierDetailPage />,
+      },
+      {
+        path: ':id/products',
+        element: <SupplierProductManagementPage />,
+      },
+    ],
   },
   {
     path: '/pos',

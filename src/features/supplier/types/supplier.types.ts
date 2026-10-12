@@ -108,13 +108,52 @@ export interface SupplierDeliveryConfig {
 
 export interface SupplierProductItem {
   id: string;
+  supplierId: string;
+  productId: string;
+  barcode: string;
   sku: string;
   name: string;
-  unit: string;
-  importPrice: number;
+  categoryName?: string;
+  deliveryUoM: string;
+  baseUoM: string;
+  agreedPrice: number;
+  importPrice?: number; // alias cho backward compatibility
+  unit?: string;        // alias cho backward compatibility
   moq: number;
+  isPrimary: boolean;
+  supplierProductCode?: string;
   effectiveDate: string;
-  status: 'Active' | 'PendingReview' | 'Discontinued';
+  status: 'Active' | 'Inactive';
+}
+
+export interface MasterProduct {
+  id: string;
+  barcode: string;
+  sku: string;
+  name: string;
+  categoryName: string;
+  baseUoM: string;
+  defaultWholesalePrice: number;
+  defaultMoq: number;
+}
+
+export interface AssignProductInput {
+  supplierId: string;
+  productId: string;
+  deliveryUoM: string;
+  agreedPrice: number;
+  moq: number;
+  isPrimary?: boolean;
+  supplierProductCode?: string;
+}
+
+export interface EditSupplierProductInput {
+  id: string;
+  deliveryUoM: string;
+  agreedPrice: number;
+  moq: number;
+  isPrimary: boolean;
+  supplierProductCode?: string;
 }
 
 export interface PurchaseOrderItem {
