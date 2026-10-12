@@ -6,15 +6,14 @@ import {
   User,
   Store,
   Phone,
-  Mail,
   Lock,
   Eye,
   EyeOff,
-  ArrowRight,
   AlertCircle,
   Loader2,
   CheckCircle2,
   ShieldCheck,
+  ArrowRight,
 } from 'lucide-react';
 import { authService } from '../../features/auth/authService';
 import { useAuthStore } from '../../stores/useAuthStore';
@@ -26,7 +25,6 @@ export const RegisterPage: FC = () => {
   const [fullName, setFullName] = useState('');
   const [storeName, setStoreName] = useState('');
   const [phone, setPhone] = useState('');
-  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [agreeTerms, setAgreeTerms] = useState(true);
@@ -68,10 +66,6 @@ export const RegisterPage: FC = () => {
       setErrorMessage('Vui lòng nhập số điện thoại liên hệ.');
       return;
     }
-    if (!email.trim() || !email.includes('@')) {
-      setErrorMessage('Vui lòng nhập địa chỉ email hợp lệ.');
-      return;
-    }
     if (password.length < 8) {
       setErrorMessage('Mật khẩu bảo mật phải có tối thiểu 8 ký tự.');
       return;
@@ -91,7 +85,6 @@ export const RegisterPage: FC = () => {
         fullName: fullName.trim(),
         storeName: storeName.trim(),
         phone: phone.trim(),
-        email: email.trim(),
         password,
         agreeTerms,
       });
@@ -199,133 +192,110 @@ export const RegisterPage: FC = () => {
           </div>
         </div>
 
-        {/* SĐT & Email */}
-        <div className="auth-field-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-          <div className="auth-field-block">
-            <label htmlFor="reg-phone" className="auth-field-label" style={{ marginBottom: '6px' }}>
-              Số điện thoại
-            </label>
-            <div className="auth-input-container">
-              <span className="auth-input-prefix-icon">
-                <Phone size={18} strokeWidth={1.8} />
-              </span>
-              <input
-                id="reg-phone"
-                type="tel"
-                className="auth-styled-input font-mono-input"
-                placeholder="0912 345 678"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                disabled={isLoading}
-                required
-              />
-            </div>
-          </div>
-
-          <div className="auth-field-block">
-            <label htmlFor="reg-email" className="auth-field-label" style={{ marginBottom: '6px' }}>
-              Email đăng ký
-            </label>
-            <div className="auth-input-container">
-              <span className="auth-input-prefix-icon">
-                <Mail size={18} strokeWidth={1.8} />
-              </span>
-              <input
-                id="reg-email"
-                type="email"
-                className="auth-styled-input"
-                placeholder="chucuahang@mtmart.vn"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                autoComplete="email"
-                disabled={isLoading}
-                required
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Mật khẩu */}
+        {/* Số điện thoại */}
         <div className="auth-field-block">
-          <div className="auth-field-label-row">
-            <label htmlFor="reg-password" className="auth-field-label">
-              Mật khẩu
-            </label>
-            <span className="auth-field-sublabel">Tối thiểu 8 ký tự</span>
-          </div>
-          <div className="auth-input-container">
-            <span className="auth-input-prefix-icon">
-              <Lock size={18} strokeWidth={1.8} />
-            </span>
-            <input
-              id="reg-password"
-              type={showPassword ? 'text' : 'password'}
-              className="auth-styled-input has-eye-btn"
-              placeholder="Nhập mật khẩu an toàn..."
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              autoComplete="new-password"
-              disabled={isLoading}
-              required
-            />
-            <button
-              type="button"
-              className="auth-eye-btn"
-              onClick={() => setShowPassword(!showPassword)}
-              aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
-            >
-              {showPassword ? <EyeOff size={18} strokeWidth={1.8} /> : <Eye size={18} strokeWidth={1.8} />}
-            </button>
-          </div>
-
-          {password && (
-            <div className="auth-strength-meter">
-              <div className="auth-strength-bar">
-                <div
-                  className="auth-strength-fill"
-                  style={{
-                    width: passwordStrength.width,
-                    backgroundColor: passwordStrength.color,
-                  }}
-                />
-              </div>
-              <span className="auth-strength-text" style={{ color: passwordStrength.color, fontFamily: 'var(--font-mono)' }}>
-                {passwordStrength.text}
-              </span>
-            </div>
-          )}
-        </div>
-
-        {/* Xác nhận mật khẩu */}
-        <div className="auth-field-block">
-          <label htmlFor="reg-confirm-password" className="auth-field-label" style={{ marginBottom: '6px' }}>
-            Xác nhận lại mật khẩu
+          <label htmlFor="reg-phone" className="auth-field-label" style={{ marginBottom: '5px' }}>
+            Số điện thoại
           </label>
           <div className="auth-input-container">
             <span className="auth-input-prefix-icon">
-              <Lock size={18} strokeWidth={1.8} />
+              <Phone size={18} strokeWidth={1.8} />
             </span>
             <input
-              id="reg-confirm-password"
-              type={showConfirmPassword ? 'text' : 'password'}
-              className="auth-styled-input has-eye-btn"
-              placeholder="Nhập lại chính xác mật khẩu..."
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              autoComplete="new-password"
+              id="reg-phone"
+              type="tel"
+              className="auth-styled-input font-mono-input"
+              placeholder="0912 345 678"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
               disabled={isLoading}
               required
             />
-            <button
-              type="button"
-              className="auth-eye-btn"
-              onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-              aria-label={showConfirmPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
-            >
-              {showConfirmPassword ? <EyeOff size={18} strokeWidth={1.8} /> : <Eye size={18} strokeWidth={1.8} />}
-            </button>
           </div>
         </div>
+
+        {/* Hàng 2 cột: Mật khẩu & Xác nhận mật khẩu (gọn gàng, tiết kiệm chiều cao) */}
+        <div className="auth-field-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+          <div className="auth-field-block">
+            <div className="auth-field-label-row" style={{ marginBottom: '5px' }}>
+              <label htmlFor="reg-password" className="auth-field-label">
+                Mật khẩu
+              </label>
+              <span className="auth-field-sublabel">$\ge 8$ ký tự</span>
+            </div>
+            <div className="auth-input-container">
+              <span className="auth-input-prefix-icon">
+                <Lock size={17} strokeWidth={1.8} />
+              </span>
+              <input
+                id="reg-password"
+                type={showPassword ? 'text' : 'password'}
+                className="auth-styled-input has-eye-btn"
+                placeholder="Mật khẩu..."
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete="new-password"
+                disabled={isLoading}
+                required
+              />
+              <button
+                type="button"
+                className="auth-eye-btn"
+                onClick={() => setShowPassword(!showPassword)}
+                aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+              >
+                {showPassword ? <EyeOff size={16} strokeWidth={1.8} /> : <Eye size={16} strokeWidth={1.8} />}
+              </button>
+            </div>
+          </div>
+
+          <div className="auth-field-block">
+            <label htmlFor="reg-confirm-password" className="auth-field-label" style={{ marginBottom: '5px' }}>
+              Xác nhận mật khẩu
+            </label>
+            <div className="auth-input-container">
+              <span className="auth-input-prefix-icon">
+                <Lock size={17} strokeWidth={1.8} />
+              </span>
+              <input
+                id="reg-confirm-password"
+                type={showConfirmPassword ? 'text' : 'password'}
+                className="auth-styled-input has-eye-btn"
+                placeholder="Nhập lại..."
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                autoComplete="new-password"
+                disabled={isLoading}
+                required
+              />
+              <button
+                type="button"
+                className="auth-eye-btn"
+                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                aria-label={showConfirmPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+              >
+                {showConfirmPassword ? <EyeOff size={16} strokeWidth={1.8} /> : <Eye size={16} strokeWidth={1.8} />}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {password && (
+          <div className="auth-strength-meter" style={{ marginTop: '-4px', marginBottom: '2px' }}>
+            <div className="auth-strength-bar">
+              <div
+                className="auth-strength-fill"
+                style={{
+                  width: passwordStrength.width,
+                  backgroundColor: passwordStrength.color,
+                }}
+              />
+            </div>
+            <span className="auth-strength-text" style={{ color: passwordStrength.color, fontFamily: 'var(--font-mono)' }}>
+              {passwordStrength.text}
+            </span>
+          </div>
+        )}
 
         {/* Đồng ý điều khoản */}
         <div className="auth-remember-row" style={{ alignItems: 'flex-start' }}>

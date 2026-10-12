@@ -21,7 +21,7 @@ export interface RegisterPayload {
   fullName: string;
   storeName: string;
   phone: string;
-  email: string;
+  email?: string;
   password: string;
   agreeTerms: boolean;
 }

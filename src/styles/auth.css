@@ -47,7 +47,7 @@
   max-width: 1280px;
   margin: 0 auto;
   padding: 0 20px;
-  height: 64px;
+  height: 54px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -158,7 +158,7 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 32px 16px 48px 16px;
+  padding: 16px 16px 20px 16px;
   box-sizing: border-box;
 }
 
@@ -174,16 +174,16 @@
 .auth-card {
   width: 100%;
   background-color: #ffffff;
-  border-radius: 28px;
+  border-radius: 24px;
   border: 1px solid var(--border-light);
-  padding: 28px 24px;
-  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.08);
+  padding: 22px 24px;
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.07);
   box-sizing: border-box;
 }
 
 @media (min-width: 640px) {
   .auth-card {
-    padding: 36px 36px;
+    padding: 24px 32px;
   }
 }
 
@@ -228,20 +228,20 @@
 
 .auth-card-heading {
   font-family: var(--font-sans);
-  font-size: 1.6rem;
+  font-size: 1.45rem;
   font-weight: 800;
   color: var(--text-main);
   letter-spacing: -0.02em;
-  margin: 0 0 6px 0;
+  margin: 0 0 4px 0;
   text-align: center;
 }
 
 .auth-card-subheading {
-  font-size: 0.88rem;
+  font-size: 0.82rem;
   color: var(--text-muted);
   text-align: center;
-  margin: 0 0 20px 0;
-  line-height: 1.45;
+  margin: 0 0 14px 0;
+  line-height: 1.4;
 }
 
 /* Tabs chuyển đổi phương thức đăng nhập */
@@ -250,13 +250,13 @@
   padding: 4px;
   background-color: #f1f5f9;
   border-radius: var(--radius-pill);
-  margin-bottom: 24px;
+  margin-bottom: 20px;
   gap: 4px;
 }
 
 .auth-pill-tab-btn {
   flex: 1;
-  padding: 9px 12px;
+  padding: 8px 12px;
   font-size: 13px;
   font-family: var(--font-sans);
   font-weight: 500;
@@ -283,7 +283,7 @@
 .auth-form-fields {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
 }
 
 .auth-field-block {
@@ -331,13 +331,13 @@
 
 .auth-styled-input {
   width: 100%;
-  height: 44px;
+  height: 42px;
   background-color: rgba(248, 250, 252, 0.85);
   border: 1.5px solid var(--border-light);
   padding: 0 16px 0 44px;
-  border-radius: 14px;
+  border-radius: 13px;
   font-family: var(--font-sans);
-  font-size: 14px;
+  font-size: 13.5px;
   color: var(--text-main);
   box-sizing: border-box;
   outline: none;
@@ -423,12 +423,12 @@
 /* Nút bấm Chính Full Pill */
 .auth-cta-primary-btn {
   width: 100%;
-  height: 48px;
+  height: 44px;
   border-radius: var(--radius-pill);
   background-color: var(--blue-primary);
   color: #ffffff;
   font-family: var(--font-sans);
-  font-size: 14px;
+  font-size: 13.5px;
   font-weight: 700;
   border: none;
   display: flex;
@@ -438,7 +438,7 @@
   cursor: pointer;
   box-shadow: 0 8px 20px rgba(0, 102, 255, 0.25);
   transition: background-color 0.15s ease, box-shadow 0.15s ease;
-  margin-top: 4px;
+  margin-top: 2px;
 }
 
 .auth-cta-primary-btn:hover:not(:disabled) {
@@ -545,7 +545,7 @@
   width: 100%;
   background-color: #ffffff;
   border-top: 1px solid var(--border-light);
-  padding: 16px 20px;
+  padding: 10px 20px;
   box-sizing: border-box;
 }
 
@@ -606,7 +606,7 @@
 /* Hàng chuyển sang Đăng ký / Đăng nhập dưới đáy card */
 .auth-bottom-switch-link {
   text-align: center;
-  margin-top: 20px;
+  margin-top: 12px;
   font-size: 13px;
   color: var(--text-muted);
 }

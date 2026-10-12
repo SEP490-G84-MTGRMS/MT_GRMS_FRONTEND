@@ -91,7 +91,7 @@ export const authService = {
       await new Promise(resolve => setTimeout(resolve, 400));
       const newUser: UserProfile = {
         id: `usr_new_${Date.now()}`,
-        email: payload.email,
+        email: payload.email || `${payload.phone}@mtgrms.vn`,
         fullName: payload.fullName,
         role: 'STORE_OWNER',
         tenantId: `TNT_${Date.now().toString(36).toUpperCase()}`,
