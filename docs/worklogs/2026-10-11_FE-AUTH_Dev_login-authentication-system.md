@@ -10,7 +10,8 @@
 
 ### 1. Mục Đích Thay Đổi (Why)
 - Xây dựng hoàn chỉnh phân hệ Xác thực người dùng (Authentication & Authorization) cho MT-GRMS:
-  - Trang Đăng nhập (`LoginPage`): Hỗ trợ đăng nhập bằng tên miền cửa hàng, SĐT/email, mật khẩu và quét mã QR tiện lợi.
+  - Trang Đăng nhập (`LoginPage`): Tinh giản giao diện Phone-First trực diện, loại bỏ tab chuyển đổi và trường mã chuỗi gian hàng (tenant code), chỉ giữ Số điện thoại và Mật khẩu.
+  - Tối ưu Xác thực SĐT: Hỗ trợ tìm kiếm và khớp tài khoản demo bằng cả Số điện thoại hoặc Email trong `authService.ts`.
   - Trang Đăng ký cửa hàng (`RegisterPage`): Đăng ký chuỗi bán lẻ mới với xác thực form.
   - Trang Quên mật khẩu (`ForgotPasswordPage`): Khôi phục tài khoản với mã OTP.
   - Tối ưu Đăng ký Phone-First: Loại bỏ trường Email đăng ký phù hợp thói quen tiểu thương tạp hóa Việt Nam.

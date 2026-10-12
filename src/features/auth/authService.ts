@@ -53,16 +53,20 @@ export const authService = {
       return response.data;
     } catch {
       // Fallback giả lập logic xác thực cho môi trường phát triển / kiểm thử UI
+      const cleanInput = credentials.email.trim();
+      const phoneClean = cleanInput.replace(/\s+/g, '');
       const foundDemo = DEMO_ACCOUNTS.find(
-        acc => acc.email.toLowerCase() === credentials.email.toLowerCase().trim()
+        acc =>
+          acc.email.toLowerCase() === cleanInput.toLowerCase() ||
+          (acc.user.phone && acc.user.phone.replace(/\s+/g, '') === phoneClean)
       );
 
       const defaultUser: UserProfile = foundDemo
         ? foundDemo.user
         : {
             id: `usr_${Date.now()}`,
-            email: credentials.email,
-            fullName: credentials.email.split('@')[0] || 'Chủ Cửa Hàng',
+            email: cleanInput,
+            fullName: cleanInput.includes('@') ? cleanInput.split('@')[0] : 'Chủ Cửa Hàng',
             role: 'STORE_OWNER',
             tenantId: credentials.tenantCode || 'TENANT-DEFAULT',
             tenantName: 'Cửa hàng MT-GRMS',
