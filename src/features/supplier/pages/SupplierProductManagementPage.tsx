@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef } from 'react';
 import type { FC } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import {
   INITIAL_SUPPLIERS,
   MASTER_PRODUCTS,
@@ -214,49 +214,12 @@ export const SupplierProductManagementPage: FC = () => {
       {/* Page Header */}
       <div className="admin-page-header">
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
-            <span
-              style={{
-                fontSize: 11,
-                fontWeight: 700,
-                textTransform: 'uppercase',
-                letterSpacing: '0.06em',
-                padding: '2px 8px',
-                borderRadius: 'var(--radius-pill)',
-                background: 'var(--blue-light)',
-                color: 'var(--blue-primary)',
-                border: '1px solid var(--blue-border)',
-              }}
-            >
-              Store Owner
-            </span>
-            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-              Chuỗi Siêu thị Mini Minh Đức
-            </span>
-          </div>
           <h1 style={{ display: 'flex', alignItems: 'center', margin: 0, lineHeight: 1.25 }}>
             <Layers size={20} style={{ verticalAlign: 'middle', marginRight: 8, color: 'var(--blue-primary)' }} />
             Sản Phẩm Theo Nhà Cung Cấp
           </h1>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
-          <Link
-            to="/store-owner/suppliers"
-            className="admin-btn admin-btn-secondary"
-            style={{
-              textDecoration: 'none',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6,
-              height: 38,
-              padding: '0 16px',
-              borderRadius: 'var(--radius-pill)',
-              whiteSpace: 'nowrap',
-              boxSizing: 'border-box',
-            }}
-          >
-            <span>Danh sách NCC</span>
-          </Link>
           <button
             type="button"
             id="btnOpenAssignProductModal"

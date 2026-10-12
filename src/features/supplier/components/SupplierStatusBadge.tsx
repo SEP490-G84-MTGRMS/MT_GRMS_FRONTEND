@@ -28,12 +28,12 @@ export const SupplierCategoryBadge: FC<{ category: SupplierCategory }> = ({ cate
     LOGISTICS: 'badge--logistics',
   };
   const labels: Record<SupplierCategory, string> = {
-    FRESH: '🥦 Nông sản',
-    AMBIENT: '📦 Đồ khô',
-    FROZEN: '❄️ Đông lạnh',
-    UTILITIES: '⚡ Điện nước',
-    RENT: '🏠 Mặt bằng',
-    LOGISTICS: '🚚 Vận chuyển',
+    FRESH: 'Nông sản',
+    AMBIENT: 'Đồ khô',
+    FROZEN: 'Đông lạnh',
+    UTILITIES: 'Điện nước',
+    RENT: 'Mặt bằng',
+    LOGISTICS: 'Vận chuyển',
   };
   return (
     <span

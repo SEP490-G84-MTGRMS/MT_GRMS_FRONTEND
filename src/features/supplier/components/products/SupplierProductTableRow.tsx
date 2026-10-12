@@ -44,13 +44,10 @@ export const SupplierProductTableRow: FC<SupplierProductTableRowProps> = ({
       <td style={{ padding: '12px 14px', whiteSpace: 'nowrap' }}>
         <span
           style={{
-            fontFamily: 'JetBrains Mono, monospace',
+            fontFamily: 'var(--font-mono)',
             fontSize: '0.82rem',
-            fontWeight: 600,
+            fontWeight: 500,
             color: '#334155',
-            backgroundColor: '#f1f5f9',
-            padding: '2px 8px',
-            borderRadius: 6,
           }}
         >
           {item.barcode}
@@ -61,14 +58,10 @@ export const SupplierProductTableRow: FC<SupplierProductTableRowProps> = ({
       <td style={{ padding: '12px 14px', whiteSpace: 'nowrap' }}>
         <span
           style={{
-            fontFamily: 'JetBrains Mono, monospace',
+            fontFamily: 'var(--font-mono)',
             fontSize: '0.82rem',
             fontWeight: 600,
             color: 'var(--blue-primary)',
-            backgroundColor: 'var(--blue-light)',
-            border: '1px solid var(--blue-border)',
-            padding: '2px 8px',
-            borderRadius: 6,
           }}
         >
           {item.sku}
@@ -87,14 +80,10 @@ export const SupplierProductTableRow: FC<SupplierProductTableRowProps> = ({
         <div>
           <span
             style={{
-              fontFamily: 'JetBrains Mono, monospace',
-              fontSize: '0.8rem',
+              fontFamily: 'var(--font-mono)',
+              fontSize: '0.82rem',
               fontWeight: 600,
               color: '#475569',
-              backgroundColor: '#f8fafc',
-              border: '1px solid #e2e8f0',
-              padding: '2px 7px',
-              borderRadius: 6,
             }}
           >
             {supplierCode || item.supplierId}
@@ -105,7 +94,7 @@ export const SupplierProductTableRow: FC<SupplierProductTableRowProps> = ({
                 fontSize: '0.72rem',
                 color: '#94a3b8',
                 marginTop: 3,
-                fontFamily: 'JetBrains Mono, monospace',
+                fontFamily: 'var(--font-mono)',
               }}
               title="Mã sản phẩm của Nhà cung cấp"
             >
@@ -126,10 +115,7 @@ export const SupplierProductTableRow: FC<SupplierProductTableRowProps> = ({
       <td style={{ padding: '12px 14px', whiteSpace: 'nowrap' }}>
         <span
           style={{
-            fontSize: '0.76rem',
-            padding: '2px 10px',
-            borderRadius: 9999,
-            backgroundColor: '#f1f5f9',
+            fontSize: '0.82rem',
             color: '#475569',
             fontWeight: 500,
           }}
@@ -149,7 +135,7 @@ export const SupplierProductTableRow: FC<SupplierProductTableRowProps> = ({
       <td style={{ padding: '12px 14px', textAlign: 'right', whiteSpace: 'nowrap' }}>
         <span
           style={{
-            fontFamily: 'JetBrains Mono, monospace',
+            fontFamily: 'var(--font-mono)',
             fontSize: '0.92rem',
             fontWeight: 700,
             color: 'var(--blue-primary)',
@@ -163,7 +149,7 @@ export const SupplierProductTableRow: FC<SupplierProductTableRowProps> = ({
       <td style={{ padding: '12px 14px', textAlign: 'right', whiteSpace: 'nowrap' }}>
         <span
           style={{
-            fontFamily: 'JetBrains Mono, monospace',
+            fontFamily: 'var(--font-mono)',
             fontSize: '0.85rem',
             color: '#475569',
           }}
@@ -172,21 +158,28 @@ export const SupplierProductTableRow: FC<SupplierProductTableRowProps> = ({
         </span>
       </td>
 
-      {/* 11. Status Badge */}
+      {/* 11. Status */}
       <td style={{ padding: '12px 14px', textAlign: 'center', whiteSpace: 'nowrap' }}>
         <span
           style={{
-            display: 'inline-block',
-            padding: '3px 10px',
-            borderRadius: 9999,
-            fontSize: '0.75rem',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            fontSize: '0.82rem',
             fontWeight: 600,
-            backgroundColor: item.status === 'Active' ? '#e6f4ea' : '#f1f5f9',
-            color: item.status === 'Active' ? '#008800' : '#64748b',
-            border: `1px solid ${item.status === 'Active' ? '#b7e1cd' : '#cbd5e1'}`,
+            color: item.status === 'Active' ? 'var(--green-money)' : 'var(--text-muted)',
           }}
         >
-          ● {item.status === 'Active' ? 'Active' : 'Inactive'}
+          <span
+            style={{
+              width: 7,
+              height: 7,
+              borderRadius: '50%',
+              backgroundColor: item.status === 'Active' ? 'var(--green-money)' : '#94a3b8',
+              display: 'inline-block',
+            }}
+          />
+          {item.status === 'Active' ? 'Active' : 'Inactive'}
         </span>
       </td>
 
@@ -201,15 +194,23 @@ export const SupplierProductTableRow: FC<SupplierProductTableRowProps> = ({
               display: 'inline-flex',
               alignItems: 'center',
               gap: 4,
-              padding: '6px 12px',
-              borderRadius: 9999,
-              backgroundColor: 'var(--blue-light)',
-              border: '1px solid var(--blue-border)',
-              color: 'var(--blue-primary)',
+              padding: '5px 12px',
+              borderRadius: 'var(--radius-pill)',
+              backgroundColor: 'transparent',
+              border: '1px solid var(--border-mid)',
+              color: 'var(--text-main)',
               fontSize: '0.78rem',
               fontWeight: 600,
               cursor: 'pointer',
               transition: 'all 0.15s ease',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.borderColor = 'var(--blue-primary)';
+              e.currentTarget.style.color = 'var(--blue-primary)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.borderColor = 'var(--border-mid)';
+              e.currentTarget.style.color = 'var(--text-main)';
             }}
           >
             <Edit2 size={12} /> Sửa
@@ -223,15 +224,21 @@ export const SupplierProductTableRow: FC<SupplierProductTableRowProps> = ({
               display: 'inline-flex',
               alignItems: 'center',
               gap: 4,
-              padding: '6px 12px',
-              borderRadius: 9999,
-              backgroundColor: item.status === 'Active' ? '#fff1f2' : '#f0fdf4',
-              border: `1px solid ${item.status === 'Active' ? '#fecdd3' : '#bbf7d0'}`,
-              color: item.status === 'Active' ? '#e11d48' : '#16a34a',
+              padding: '5px 12px',
+              borderRadius: 'var(--radius-pill)',
+              backgroundColor: 'transparent',
+              border: '1px solid var(--border-mid)',
+              color: item.status === 'Active' ? '#dc2626' : '#16a34a',
               fontSize: '0.78rem',
               fontWeight: 600,
               cursor: 'pointer',
               transition: 'all 0.15s ease',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.borderColor = item.status === 'Active' ? '#dc2626' : '#16a34a';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.borderColor = 'var(--border-mid)';
             }}
           >
             <Power size={12} /> {item.status === 'Active' ? 'Ngưng' : 'Bật'}

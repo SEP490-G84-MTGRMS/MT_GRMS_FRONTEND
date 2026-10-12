@@ -216,30 +216,10 @@ export const SupplierListPage: FC = () => {
       {/* Toast Notification */}
       <AdminToast toast={toast} onClose={() => setToast(null)} />
 
-      {/* Page Header (Subtitle removed as requested) */}
+      {/* Page Header */}
       <div className="admin-page-header">
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-            <span
-              style={{
-                fontSize: 11,
-                fontWeight: 700,
-                textTransform: 'uppercase',
-                letterSpacing: '0.06em',
-                padding: '2px 8px',
-                borderRadius: 'var(--radius-pill)',
-                background: 'var(--blue-light)',
-                color: 'var(--blue-primary)',
-                border: '1px solid var(--blue-border)',
-              }}
-            >
-              Store Owner
-            </span>
-            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-              Chuỗi Siêu thị Mini Minh Đức
-            </span>
-          </div>
-          <h1>Quản lý Nhà Cung Cấp</h1>
+          <h1 style={{ margin: 0, lineHeight: 1.25 }}>Quản lý Nhà Cung Cấp</h1>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <Link
