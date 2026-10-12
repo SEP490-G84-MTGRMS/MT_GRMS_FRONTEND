@@ -221,7 +221,7 @@ export const RegisterPage: FC = () => {
               id="reg-fullname"
               type="text"
               className="auth-styled-input"
-              placeholder="VD: Trần Hoàng Long"
+              placeholder="Họ và tên đại diện"
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
               disabled={isLoading}
@@ -247,7 +247,7 @@ export const RegisterPage: FC = () => {
               id="reg-storename"
               type="text"
               className="auth-styled-input"
-              placeholder="VD: Siêu thị MT Mart Q1"
+              placeholder="Tên cửa hàng"
               value={storeName}
               onChange={(e) => setStoreName(e.target.value)}
               disabled={isLoading}
@@ -273,7 +273,7 @@ export const RegisterPage: FC = () => {
               id="reg-phone"
               type="tel"
               className="auth-styled-input font-mono-input"
-              placeholder="VD: 0912 345 678"
+              placeholder="Số điện thoại"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               disabled={isLoading}
@@ -375,9 +375,7 @@ export const RegisterPage: FC = () => {
               type="button"
               className="auth-eye-btn"
               onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-              aria-label={
-                showConfirmPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"
-              }
+              aria-label={showConfirmPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
             >
               {showConfirmPassword ? (
                 <EyeOff size={16} strokeWidth={1.8} />

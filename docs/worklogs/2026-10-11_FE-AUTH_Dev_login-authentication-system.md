@@ -20,6 +20,7 @@
   - Quản lý trạng thái phiên đăng nhập (`useAuthStore`): Lưu trữ token, profile, role-based navigation.
   - Xử lý API & Interceptor (`authService`, `httpClient`): Cơ chế refresh token tự động và fallback demo accounts.
   - Bảo vệ điều hướng (`ProtectedRoute`): Kiểm soát quyền truy cập theo phân quyền.
+  - Tinh giản Khung Auth Layout (`AuthLayout.tsx`): Loại bỏ header và footer bao quanh, tập trung 100% thị giác vào form thẻ đăng nhập và đăng ký ở chính giữa màn hình.
   - Đăng xuất (`AdminTopbar`): Nút đăng xuất an toàn xóa phiên và chuyển hướng về đăng nhập.
 
 ### 2. Danh Sách Tệp Đã Sửa Đổi & Thêm Mới (What)
