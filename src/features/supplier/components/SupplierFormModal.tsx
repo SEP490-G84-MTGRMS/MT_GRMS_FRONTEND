@@ -140,12 +140,12 @@ export const SupplierFormModal: FC<Props> = ({ isOpen, editingSupplier, onClose,
                     <select value={formData.category}
                       onChange={e => set({ category: e.target.value as SupplierCategory })}
                       className="form-select">
-                      <option value="FRESH">🥦 FRESH (Nông sản tươi)</option>
-                      <option value="AMBIENT">📦 AMBIENT (Đồ khô / Tạp hóa)</option>
-                      <option value="FROZEN">❄️ FROZEN (Hàng đông lạnh)</option>
-                      <option value="UTILITIES">⚡ UTILITIES (Điện nước)</option>
-                      <option value="RENT">🏠 RENT (Thuê mặt bằng)</option>
-                      <option value="LOGISTICS">🚚 LOGISTICS (Vận chuyển)</option>
+                      <option value="FRESH">FRESH (Nông sản tươi)</option>
+                      <option value="AMBIENT">AMBIENT (Đồ khô / Tạp hóa)</option>
+                      <option value="FROZEN">FROZEN (Hàng đông lạnh)</option>
+                      <option value="UTILITIES">UTILITIES (Điện nước)</option>
+                      <option value="RENT">RENT (Thuê mặt bằng)</option>
+                      <option value="LOGISTICS">LOGISTICS (Vận chuyển)</option>
                     </select>
                   </div>
                 </div>

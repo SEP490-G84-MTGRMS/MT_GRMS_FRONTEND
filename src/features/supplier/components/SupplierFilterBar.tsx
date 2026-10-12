@@ -102,12 +102,12 @@ export const SupplierFilterBar: FC<Props> = ({
             }}
           >
             <option value="">Tất cả phân loại</option>
-            <option value="FRESH">🥦 Nông sản tươi</option>
-            <option value="AMBIENT">📦 Đồ khô / Gia vị</option>
-            <option value="FROZEN">❄️ Hàng đông lạnh</option>
-            <option value="UTILITIES">⚡ Tiện ích / Điện nước</option>
-            <option value="RENT">🏠 Mặt bằng kho bãi</option>
-            <option value="LOGISTICS">🚚 Vận chuyển logistics</option>
+            <option value="FRESH">Nông sản tươi</option>
+            <option value="AMBIENT">Đồ khô / Gia vị</option>
+            <option value="FROZEN">Hàng đông lạnh</option>
+            <option value="UTILITIES">Tiện ích / Điện nước</option>
+            <option value="RENT">Mặt bằng kho bãi</option>
+            <option value="LOGISTICS">Vận chuyển logistics</option>
           </select>
 
           {/* Select Công nợ */}
