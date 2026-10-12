@@ -1,0 +1,1165 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MT-GRMS - Xem Trước Nền Video Tiện Ích Bán Lẻ</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --blue-primary: #0066FF;
+      --blue-hover: #0052CC;
+      --blue-light: #F0F6FF;
+      --blue-border: #DBE9FE;
+      --green-money: #00C853;
+      --orange-warn: #FF9500;
+      --red-urgent: #FF3B30;
+      --text-main: #0F172A;
+      --text-muted: #64748B;
+      --radius-pill: 9999px;
+      --radius-card: 26px;
+      --font-sans: 'Be Vietnam Pro', -apple-system, sans-serif;
+      --font-mono: 'JetBrains Mono', Consolas, monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: var(--font-sans);
+      background-color: #0b132b;
+      color: var(--text-main);
+      min-height: 100vh;
+      overflow-x: hidden;
+      position: relative;
+    }
+
+    /* KHUNG VIDEO NỀN CHÍNH */
+    .video-background-container {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    /* Thẻ HTML5 <video> theo đúng yêu cầu của người dùng */
+    #bgVideo {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transform: scale(1.02);
+      filter: saturate(1.15) contrast(1.05);
+      transition: filter 0.3s ease;
+    }
+
+    /* Canvas ẩn dùng để render hoạt hình đồ họa tiện ích và stream thẳng vào thẻ <video> */
+    #renderCanvas {
+      display: none;
+    }
+
+    /* LỚP PHỦ TỐI & MỜ GLASSMORPHISM BẢO ĐẢM ĐỌC RÕ CHỮ */
+    .video-overlay-layer {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 2;
+      background: radial-gradient(circle at center, rgba(11, 25, 60, 0.45) 0%, rgba(5, 12, 35, 0.75) 100%);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      pointer-events: none;
+      transition: backdrop-filter 0.3s ease, background 0.3s ease;
+    }
+
+    /* GIAO DIỆN CHÍNH (Z-INDEX TRÊN VIDEO) */
+    .app-viewport {
+      position: relative;
+      z-index: 10;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      align-items: center;
+      padding: 24px 20px;
+    }
+
+    /* THANH ĐIỀU KHIỂN & BẬT TẮT TIỆN ÍCH TRÊN CÙNG */
+    .top-utility-toolbar {
+      width: 100%;
+      max-width: 1200px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      background: rgba(255, 255, 255, 0.92);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.6);
+      padding: 8px 16px;
+      border-radius: var(--radius-pill);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+    }
+
+    .brand-pill {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .brand-logo-m {
+      width: 32px;
+      height: 32px;
+      border-radius: 10px;
+      background: var(--blue-primary);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 14px;
+    }
+
+    .brand-title {
+      font-weight: 800;
+      color: var(--blue-primary);
+      font-size: 15px;
+      letter-spacing: -0.01em;
+    }
+
+    .utility-nav-buttons {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .utility-btn {
+      padding: 6px 14px;
+      border-radius: var(--radius-pill);
+      border: 1px solid #E2E8F0;
+      background: #F8FAFC;
+      color: #475569;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s ease;
+      font-family: var(--font-sans);
+    }
+
+    .utility-btn:hover {
+      background: #EDF2F7;
+      color: var(--blue-primary);
+    }
+
+    .utility-btn.active {
+      background: var(--blue-primary);
+      color: #fff;
+      border-color: var(--blue-primary);
+      box-shadow: 0 4px 12px rgba(0, 102, 255, 0.3);
+    }
+
+    .tool-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn-action {
+      padding: 6px 12px;
+      border-radius: var(--radius-pill);
+      border: 1px solid var(--blue-border);
+      background: var(--blue-light);
+      color: var(--blue-primary);
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      transition: all 0.2s ease;
+    }
+
+    .btn-action:hover {
+      background: var(--blue-primary);
+      color: #fff;
+    }
+
+    /* KHU VỰC TRUNG TÂM: FORM ĐĂNG NHẬP + CÁNH TIỆN ÍCH 2 BÊN */
+    .center-stage {
+      width: 100%;
+      max-width: 1240px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 32px;
+      margin: auto 0;
+    }
+
+    /* THẺ TIỆN ÍCH CÁNH TRÁI */
+    .side-utility-widget {
+      flex: 1;
+      max-width: 320px;
+      background: rgba(255, 255, 255, 0.94);
+      backdrop-filter: blur(14px);
+      border: 1px solid rgba(255, 255, 255, 0.8);
+      border-radius: var(--radius-card);
+      padding: 20px;
+      box-shadow: 0 16px 40px rgba(0, 20, 60, 0.2);
+      display: none;
+    }
+
+    @media (min-width: 1080px) {
+      .side-utility-widget {
+        display: block;
+      }
+    }
+
+    .widget-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 3px 10px;
+      border-radius: var(--radius-pill);
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: 12px;
+    }
+
+    .badge-fefo {
+      background: #FFF8EB;
+      color: #D97706;
+      border: 1px solid #FDE68A;
+    }
+
+    .badge-vietqr {
+      background: #E8F9EE;
+      color: #059669;
+      border: 1px solid #A7F3D0;
+    }
+
+    .widget-title {
+      font-size: 16px;
+      font-weight: 800;
+      color: var(--text-main);
+      margin-bottom: 8px;
+    }
+
+    .widget-desc {
+      font-size: 13px;
+      color: var(--text-muted);
+      line-height: 1.5;
+      margin-bottom: 16px;
+    }
+
+    .widget-metric-card {
+      background: #F8FAFC;
+      border: 1px solid #E2E8F0;
+      border-radius: 16px;
+      padding: 12px 14px;
+    }
+
+    .metric-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      margin-bottom: 6px;
+    }
+
+    .metric-val {
+      font-family: var(--font-mono);
+      font-weight: 700;
+      color: var(--blue-primary);
+    }
+
+    /* THẺ FORM ĐĂNG NHẬP CHÍNH */
+    .auth-login-card {
+      width: 100%;
+      max-width: 440px;
+      background: rgba(255, 255, 255, 0.98);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-radius: 28px;
+      border: 1px solid rgba(255, 255, 255, 0.9);
+      padding: 28px 30px;
+      box-shadow: 0 24px 60px rgba(0, 15, 50, 0.35);
+      position: relative;
+    }
+
+    .card-topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+
+    .btn-back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-decoration: none;
+      padding: 4px 10px;
+      border-radius: var(--radius-pill);
+      transition: all 0.15s ease;
+    }
+
+    .btn-back-link:hover {
+      color: var(--blue-primary);
+      background: var(--blue-light);
+    }
+
+    .badge-live-video {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 2px 10px;
+      border-radius: var(--radius-pill);
+      font-size: 11px;
+      font-weight: 700;
+      background: #E0F2FE;
+      color: #0369A1;
+      border: 1px solid #BAE6FD;
+    }
+
+    .pulse-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #0284C7;
+      animation: pulse-op 1.5s infinite;
+    }
+
+    @keyframes pulse-op {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.85); }
+    }
+
+    .card-heading {
+      font-size: 24px;
+      font-weight: 800;
+      color: var(--text-main);
+      text-align: center;
+      letter-spacing: -0.02em;
+      margin-bottom: 4px;
+    }
+
+    .card-subheading {
+      font-size: 12.5px;
+      color: var(--text-muted);
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      margin-bottom: 14px;
+    }
+
+    .field-label {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text-main);
+      margin-bottom: 6px;
+    }
+
+    .input-box {
+      position: relative;
+      display: flex;
+      align-items: center;
+      width: 100%;
+    }
+
+    .input-icon {
+      position: absolute;
+      left: 14px;
+      color: #94A3B8;
+      display: flex;
+      align-items: center;
+      pointer-events: none;
+    }
+
+    .form-input {
+      width: 100%;
+      height: 44px;
+      padding: 0 42px;
+      border-radius: 14px;
+      border: 1.5px solid #E2E8F0;
+      background: #F8FAFC;
+      font-size: 13.5px;
+      font-family: var(--font-sans);
+      color: var(--text-main);
+      outline: none;
+      transition: all 0.2s ease;
+    }
+
+    .form-input:focus {
+      background: #FFFFFF;
+      border-color: var(--blue-primary);
+      box-shadow: 0 0 0 3px rgba(0, 102, 255, 0.12);
+    }
+
+    .eye-toggle-btn {
+      position: absolute;
+      right: 12px;
+      background: none;
+      border: none;
+      color: #94A3B8;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      padding: 4px;
+    }
+
+    .remember-forgot-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin: 14px 0 18px 0;
+      font-size: 12px;
+    }
+
+    .check-wrap {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      cursor: pointer;
+      color: var(--text-muted);
+    }
+
+    .check-wrap input {
+      accent-color: var(--blue-primary);
+      cursor: pointer;
+    }
+
+    .link-forgot {
+      color: var(--blue-primary);
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    .btn-login-submit {
+      width: 100%;
+      height: 48px;
+      border-radius: var(--radius-pill);
+      background: var(--blue-primary);
+      color: #FFFFFF;
+      border: none;
+      font-size: 14px;
+      font-weight: 700;
+      font-family: var(--font-sans);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      box-shadow: 0 10px 24px rgba(0, 102, 255, 0.35);
+      transition: all 0.2s ease;
+    }
+
+    .btn-login-submit:hover {
+      background: var(--blue-hover);
+      transform: translateY(-1px);
+      box-shadow: 0 12px 28px rgba(0, 102, 255, 0.4);
+    }
+
+    .btn-pos-quick {
+      width: 100%;
+      height: 44px;
+      border-radius: var(--radius-pill);
+      background: #FFFFFF;
+      color: var(--blue-primary);
+      border: 1.5px solid var(--blue-border);
+      font-size: 13px;
+      font-weight: 600;
+      font-family: var(--font-sans);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin-top: 10px;
+      transition: all 0.15s ease;
+    }
+
+    .btn-pos-quick:hover {
+      background: var(--blue-light);
+      border-color: var(--blue-primary);
+    }
+
+    .bottom-register-link {
+      text-align: center;
+      margin-top: 18px;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .bottom-register-link a {
+      color: var(--blue-primary);
+      text-decoration: none;
+      font-weight: 700;
+    }
+
+    /* FOOTER THANH TIỆN ÍCH DƯỚI CÙNG */
+    .bottom-status-strip {
+      width: 100%;
+      max-width: 900px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 20px;
+      background: rgba(15, 23, 42, 0.7);
+      backdrop-filter: blur(12px);
+      border-radius: var(--radius-pill);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: #E2E8F0;
+      font-size: 12px;
+    }
+
+    .status-badge-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .status-indicator-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--green-money);
+      box-shadow: 0 0 10px var(--green-money);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- KHUNG VIDEO NỀN THỰC THI (HTML5 <video> TAG THEO YÊU CẦU) -->
+  <div class="video-background-container">
+    <video id="bgVideo" autoplay muted loop playsinline></video>
+  </div>
+
+  <!-- LỚP MỜ ĐỘ PHỦ TỰ NHIÊN -->
+  <div class="video-overlay-layer" id="overlayLayer"></div>
+
+  <!-- CANVAS ẨN CHỊU TRÁCH NHIỆM RENDER VIDEO CHUYỂN ĐỘNG CÁC TIỆN ÍCH MT-GRMS -->
+  <canvas id="renderCanvas" width="1920" height="1080"></canvas>
+
+  <!-- GIAO DIỆN CHÍNH VIEWPORT -->
+  <div class="app-viewport">
+    
+    <!-- THANH MENU ĐIỀU KHIỂN & CHUYỂN TIỆN ÍCH NỀN -->
+    <header class="top-utility-toolbar">
+      <div class="brand-pill">
+        <div class="brand-logo-m">M</div>
+        <div>
+          <span class="brand-title">MT-GRMS</span>
+          <span style="font-size: 11px; color: var(--text-muted); margin-left: 6px;">Tiện ích bán lẻ</span>
+        </div>
+      </div>
+
+      <!-- Nút chọn các cảnh tiện ích trong Video nền -->
+      <nav class="utility-nav-buttons">
+        <button class="utility-btn active" onclick="switchScene(0)">
+          <span>🛒 1. Quầy POS Siêu Tốc</span>
+        </button>
+        <button class="utility-btn" onclick="switchScene(1)">
+          <span>📅 2. Hạn FEFO 3 Mức</span>
+        </button>
+        <button class="utility-btn" onclick="switchScene(2)">
+          <span>📦 3. Đa Đơn Vị Thùng/Lon</span>
+        </button>
+        <button class="utility-btn" onclick="switchScene(3)">
+          <span>⚡ 4. VietQR Tự Động</span>
+        </button>
+        <button class="utility-btn" onclick="switchScene(4)">
+          <span>📒 5. Sổ Nợ Khách Quen</span>
+        </button>
+      </nav>
+
+      <!-- Các tùy chọn hiển thị và Tải Video -->
+      <div class="tool-actions">
+        <button class="btn-action" onclick="toggleBlur()" id="blurToggleBtn" title="Tăng giảm độ mờ video nền">
+          <span>🔍 Chỉnh độ mờ</span>
+        </button>
+        <button class="btn-action" onclick="downloadVideoRecording()" title="Tải đoạn video nền WebM về máy">
+          <span>💾 Tải Video</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- TRUNG TÂM MÀN HÌNH: THẺ ĐĂNG NHẬP VÀ 2 WIDGET TIỆN ÍCH NỔI -->
+    <main class="center-stage">
+      
+      <!-- CÁNH TRÁI: TIỆN ÍCH ĐANG PHÁT TRÊN VIDEO NỀN -->
+      <aside class="side-utility-widget" id="leftWidget">
+        <div class="widget-badge badge-fefo" id="widgetBadge">
+          <span>TIỆN ÍCH CỐT LÕI</span>
+        </div>
+        <h3 class="widget-title" id="widgetTitle">Cảnh Báo Cận Hạn FEFO</h3>
+        <p class="widget-desc" id="widgetDesc">
+          Tự động phân nhóm 3 mức cảnh báo cận hạn (Xanh an toàn, Cam 8-15 ngày, Đỏ ≤7 ngày), loại bỏ 100% tình trạng hàng hóa hết date tồn đọng dưới đáy kệ.
+        </p>
+        <div class="widget-metric-card">
+          <div class="metric-row">
+            <span>Mặt hàng cận hạn hôm nay:</span>
+            <span class="metric-val" style="color: var(--red-urgent);" id="widgetStat1">4 sản phẩm</span>
+          </div>
+          <div class="metric-row">
+            <span>Tiết kiệm vốn thất thoát:</span>
+            <span class="metric-val" style="color: var(--green-money);" id="widgetStat2">+4.200.000 đ/tháng</span>
+          </div>
+        </div>
+      </aside>
+
+      <!-- GIỮA: THẺ FORM ĐĂNG NHẬP CHUẨN MT-GRMS (PHONE-FIRST) -->
+      <section class="auth-login-card">
+        <div class="card-topbar">
+          <a href="/" class="btn-back-link">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M19 12H5M12 19l-7-7 7-7"/>
+            </svg>
+            <span>Trang chủ</span>
+          </a>
+          <span class="badge-live-video">
+            <span class="pulse-dot"></span>
+            <span id="sceneStatusText">Đang chiếu: Quầy POS</span>
+          </span>
+        </div>
+
+        <h1 class="card-heading">Đăng nhập</h1>
+        <p class="card-subheading">Hệ thống quản lý chuỗi bán lẻ &amp; tiệm tạp hóa</p>
+
+        <form onsubmit="handleDemoSubmit(event)">
+          <!-- Số điện thoại -->
+          <div class="form-group">
+            <label class="field-label" for="phoneInput">Số điện thoại</label>
+            <div class="input-box">
+              <span class="input-icon">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+                </svg>
+              </span>
+              <input type="text" id="phoneInput" class="form-input" value="0901 234 567" placeholder="Nhập số điện thoại...">
+            </div>
+          </div>
+
+          <!-- Mật khẩu -->
+          <div class="form-group">
+            <label class="field-label" for="passInput">Mật khẩu</label>
+            <div class="input-box">
+              <span class="input-icon">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 2l-2 2m-1.5 1.5L16 7l-1.5 1.5-1.5-1.5-1.5 1.5-1.5-1.5-1.5 1.5L7 8.5 5.5 10 2 13.5V22h8.5L22 10.5 17.5 6zM7 17a2 2 0 1 1 0-4 2 2 0 0 1 0 4z"/>
+                </svg>
+              </span>
+              <input type="password" id="passInput" class="form-input" value="password123" placeholder="Nhập mật khẩu...">
+              <button type="button" class="eye-toggle-btn" onclick="togglePassVisibility()" aria-label="Hiện/Ẩn mật khẩu">
+                <svg id="eyeIcon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                  <circle cx="12" cy="12" r="3"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- Ghi nhớ & Quên mật khẩu -->
+          <div class="remember-forgot-row">
+            <label class="check-wrap">
+              <input type="checkbox" checked>
+              <span>Ghi nhớ 30 ngày</span>
+            </label>
+            <a href="#" class="link-forgot">Quên mật khẩu?</a>
+          </div>
+
+          <!-- Nút đăng nhập chính -->
+          <button type="submit" class="btn-login-submit" id="loginBtn">
+            <span>ĐĂNG NHẬP VÀO HỆ THỐNG</span>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M5 12h14M12 5l7 7-7 7"/>
+            </svg>
+          </button>
+
+          <!-- Nút vào nhanh POS -->
+          <button type="button" class="btn-pos-quick" onclick="alert('Điều hướng thẳng vào Quầy POS Thu Ngân Siêu Tốc')">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+              <polyline points="9 22 9 12 15 12 15 22"/>
+            </svg>
+            <span>Vào Nhanh Quầy POS Thu Ngân</span>
+          </button>
+        </form>
+
+        <div class="bottom-register-link">
+          Chưa có tài khoản quản lý? <a href="/auth/register">Đăng ký dùng thử ngay</a>
+        </div>
+      </section>
+
+      <!-- CÁNH PHẢI: TÍNH NĂNG ĐẶC BIỆT KẾ TIẾP -->
+      <aside class="side-utility-widget" id="rightWidget">
+        <div class="widget-badge badge-vietqr">
+          <span>TỰ ĐỘNG HÓA</span>
+        </div>
+        <h3 class="widget-title">Khớp Tiền VietQR Động</h3>
+        <p class="widget-desc">
+          Màn hình phụ hoặc bill tự sinh mã QR thanh toán kèm số tiền chính xác, kết nối thông báo tức thời ngay khi tiền về tài khoản ngân hàng.
+        </p>
+        <div class="widget-metric-card">
+          <div class="metric-row">
+            <span>Thời gian thanh toán:</span>
+            <span class="metric-val" style="color: var(--blue-primary);">&lt; 3 giây / khách</span>
+          </div>
+          <div class="metric-row">
+            <span>Tỷ lệ sai lệch tiền:</span>
+            <span class="metric-val" style="color: var(--green-money);">0.00%</span>
+          </div>
+        </div>
+      </aside>
+
+    </main>
+
+    <!-- THANH TRẠNG THÁI CUỐI TRANG -->
+    <footer class="bottom-status-strip">
+      <div class="status-badge-item">
+        <div class="status-indicator-dot"></div>
+        <span>Video Nền Đang Hoạt Động (60 FPS Motion Background Stream)</span>
+      </div>
+      <div>
+        <span>MT-GRMS v2.4 Enterprise Retail Suite • Chuẩn KiotViet UI</span>
+      </div>
+    </footer>
+
+  </div>
+
+  <!-- JAVASCRIPT: ENGINE RENDER VIDEO HOẠT HÌNH CÁC TIỆN ÍCH MT-GRMS & STREAM THẲNG VÀO THẺ <video> -->
+  <script>
+    const canvas = document.getElementById('renderCanvas');
+    const ctx = canvas.getContext('2d');
+    const bgVideo = document.getElementById('bgVideo');
+
+    // Dữ liệu kịch bản 5 tiện ích bán lẻ
+    const UTILITY_SCENES = [
+      {
+        id: 'pos',
+        name: 'Quầy POS Siêu Tốc',
+        title: 'Bán Hàng POS & Quét Mã Vạch Laser',
+        desc: 'Tự động nhận diện mã vạch trong 0.2 giây, phím tắt nhanh F3, F9, in hóa đơn nhiệt tức thì, giảm tải giờ cao điểm.',
+        badge: 'BÁN HÀNG TỨC THÌ',
+        stat1Label: 'Tốc độ quét mã:',
+        stat1Val: '0.2 giây / món',
+        stat2Label: 'Hiệu suất tính tiền:',
+        stat2Val: '+45% khách / giờ',
+        primaryColor: '#0066FF',
+        accentColor: '#00C2FF'
+      },
+      {
+        id: 'fefo',
+        name: 'Hạn Dùng FEFO',
+        title: 'Quản Lý Hạn Sử Dụng FEFO 3 Mức Màu',
+        desc: 'Hệ thống tự động phân loại date hàng hóa: Xanh an toàn (>15 ngày), Cam cảnh báo (8-15 ngày), Đỏ khẩn cấp (≤7 ngày).',
+        badge: 'CHỐNG THẤT THOÁT',
+        stat1Label: 'Cảnh báo đỏ hôm nay:',
+        stat1Val: '4 sản phẩm',
+        stat2Label: 'Tiết kiệm vốn hủy hàng:',
+        stat2Val: '+4.200.000 đ/tháng',
+        primaryColor: '#FF9500',
+        accentColor: '#FF3B30'
+      },
+      {
+        id: 'multi_unit',
+        name: 'Đa Đơn Vị Thùng/Lon',
+        title: 'Quy Đổi Đa Đơn Vị Thùng - Lon - Lốc',
+        desc: 'Tự động nhân chia tồn kho và đơn giá bán: 1 Thùng = 4 Lốc = 24 Lon. Bán xé lẻ tự trừ kho chuẩn xác.',
+        badge: 'KHO TẠP HÓA',
+        stat1Label: 'Quy đổi hỗ trợ:',
+        stat1Val: 'Thùng / Lốc / Lon / Gói',
+        stat2Label: 'Sai số kiểm kho:',
+        stat2Val: '0%',
+        primaryColor: '#00C853',
+        accentColor: '#10B981'
+      },
+      {
+        id: 'vietqr',
+        name: 'VietQR Động',
+        title: 'Khớp Tiền Tự Động Qua VietQR Động',
+        desc: 'Tạo mã QR kèm đúng số tiền của hóa đơn. Khách chuyển khoản là POS tự nhận diện, xóa bỏ nỗi lo chụp màn hình giả.',
+        badge: 'THANH TOÁN THÔNG MINH',
+        stat1Label: 'Thời gian khớp tiền:',
+        stat1Val: '< 2 giây',
+        stat2Label: 'Chống gian lận chuyển khoản:',
+        stat2Val: 'Tuyệt đối 100%',
+        primaryColor: '#0066FF',
+        accentColor: '#38BDF8'
+      },
+      {
+        id: 'credit',
+        name: 'Sổ Nợ Khách Quen',
+        title: 'Sổ Nợ Điện Tử & Nhắc Nợ Zalo',
+        desc: 'Ghi sổ công nợ một chạm cho bà con lối xóm, gửi tin nhắn đối soát sao kê nợ văn minh qua Zalo cá nhân.',
+        badge: 'GẮN KẾT KHÁCH HÀNG',
+        stat1Label: 'Tổng công nợ thu hồi:',
+        stat1Val: '98.5%',
+        stat2Label: 'Thời gian ghi sổ:',
+        stat2Val: '3 giây',
+        primaryColor: '#8B5CF6',
+        accentColor: '#A855F7'
+      }
+    ];
+
+    let currentSceneIndex = 0;
+    let sceneTimer = 0;
+    const SCENE_DURATION = 360; // 360 frames ~ 6 giây mỗi cảnh
+    let globalFrame = 0;
+
+    // Các hạt vi mô phát sáng bay nhẹ trong không gian
+    const particles = [];
+    for (let i = 0; i < 40; i++) {
+      particles.push({
+        x: Math.random() * 1920,
+        y: Math.random() * 1080,
+        size: Math.random() * 3 + 1,
+        speedX: (Math.random() - 0.5) * 0.8,
+        speedY: (Math.random() - 0.5) * 0.8,
+        opacity: Math.random() * 0.5 + 0.2
+      });
+    }
+
+    // VẼ KHUNG NỀN VÀ CẢNH ĐỒ HỌA TIỆN ÍCH LÊN CANVAS
+    function renderFrame() {
+      globalFrame++;
+      sceneTimer++;
+      if (sceneTimer >= SCENE_DURATION) {
+        sceneTimer = 0;
+        currentSceneIndex = (currentSceneIndex + 1) % UTILITY_SCENES.length;
+        updateUIInfo(currentSceneIndex);
+      }
+
+      const scene = UTILITY_SCENES[currentSceneIndex];
+      const progress = sceneTimer / SCENE_DURATION;
+
+      // 1. Nền Gradient chuyển động sâu thẳm
+      const bgGrad = ctx.createRadialGradient(960, 540, 100, 960, 540, 1100);
+      bgGrad.addColorStop(0, '#0f172a');
+      bgGrad.addColorStop(0.5, '#070f26');
+      bgGrad.addColorStop(1, '#030712');
+      ctx.fillStyle = bgGrad;
+      ctx.fillRect(0, 0, 1920, 1080);
+
+      // 2. Lưới phối cảnh công nghệ
+      ctx.strokeStyle = 'rgba(0, 102, 255, 0.08)';
+      ctx.lineWidth = 1;
+      const gridSize = 64;
+      const shiftX = (globalFrame * 0.5) % gridSize;
+      const shiftY = (globalFrame * 0.5) % gridSize;
+
+      for (let x = shiftX; x < 1920; x += gridSize) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, 1080);
+        ctx.stroke();
+      }
+      for (let y = shiftY; y < 1080; y += gridSize) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(1920, y);
+        ctx.stroke();
+      }
+
+      // 3. Hạt bụi sáng lơ lửng
+      ctx.fillStyle = '#60A5FA';
+      particles.forEach(p => {
+        p.x += p.speedX;
+        p.y += p.speedY;
+        if (p.x < 0) p.x = 1920;
+        if (p.x > 1920) p.x = 0;
+        if (p.y < 0) p.y = 1080;
+        if (p.y > 1080) p.y = 0;
+
+        ctx.globalAlpha = p.opacity;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        ctx.fill();
+      });
+      ctx.globalAlpha = 1.0;
+
+      // 4. VẼ HỌA TIẾT THEO CẢNH TIỆN ÍCH HIỆN TẠI
+      drawSceneGraphics(scene, progress);
+
+      requestAnimationFrame(renderFrame);
+    }
+
+    // Họa tiết đồ họa sinh động cho từng tiện ích
+    function drawSceneGraphics(scene, p) {
+      const time = globalFrame * 0.03;
+
+      // CẢNH 1: QUẦY POS BÁN HÀNG & QUÉT MÃ VẠCH
+      if (scene.id === 'pos') {
+        // Tia laser quét mã vạch
+        const laserY = 480 + Math.sin(time * 3) * 120;
+        const grad = ctx.createLinearGradient(400, laserY, 1520, laserY);
+        grad.addColorStop(0, 'rgba(239, 68, 68, 0)');
+        grad.addColorStop(0.5, 'rgba(239, 68, 68, 0.85)');
+        grad.addColorStop(1, 'rgba(239, 68, 68, 0)');
+        ctx.strokeStyle = grad;
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.moveTo(350, laserY);
+        ctx.lineTo(1570, laserY);
+        ctx.stroke();
+
+        // Mô phỏng hóa đơn POS và vạch barcode 2 bên
+        drawBarcodePattern(380, 420, 180, 90, time);
+        drawBarcodePattern(1360, 420, 180, 90, time + 2);
+      }
+
+      // CẢNH 2: HẠN DÙNG FEFO 3 MỨC MÀU
+      else if (scene.id === 'fefo') {
+        // 3 Vòng hào quang 3 mức màu FEFO phát sáng
+        drawGlowingOrb(420, 500, '#00C853', 'XANH AN TOÀN', 'Hạn > 15 ngày');
+        drawGlowingOrb(960, 260, '#FF9500', 'CAM CẢNH BÁO', 'Hạn 8-15 ngày');
+        drawGlowingOrb(1500, 500, '#FF3B30', 'ĐỎ KHẨN CẤP', 'Hạn ≤ 7 ngày');
+      }
+
+      // CẢNH 3: ĐA ĐƠN VỊ THÙNG / LON
+      else if (scene.id === 'multi_unit') {
+        // Hộp quy đổi 1 Thùng = 24 Lon chuyển động
+        drawUnitBoxes(400, 520, '1 THÙNG', '24 LON', '#00C853');
+        drawUnitBoxes(1400, 520, '1 LỐC', '6 LON', '#3B82F6');
+      }
+
+      // CẢNH 4: VIETQR ĐỘNG KHỚP TIỀN
+      else if (scene.id === 'vietqr') {
+        // Khung quét QR với sóng phát thanh toán
+        drawQRFrame(430, 520, time);
+        drawQRFrame(1420, 520, time + 1);
+      }
+
+      // CẢNH 5: SỔ NỢ ZALO
+      else if (scene.id === 'credit') {
+        drawCreditLedger(420, 500, 'Chị Lan (Tạp Hóa)', 'Nợ: 85.000 đ', '#10B981');
+        drawCreditLedger(1420, 500, 'Anh Hùng (Đầu Ngõ)', 'Nợ: 120.000 đ', '#8B5CF6');
+      }
+    }
+
+    // Các hàm phụ trợ vẽ vector đồ họa siêu nét
+    function drawBarcodePattern(x, y, w, h, t) {
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.12)';
+      ctx.fillRect(x - 10, y - 10, w + 20, h + 20);
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.75)';
+      const bars = [4, 2, 8, 3, 5, 2, 9, 3, 4, 6, 2, 8, 4, 2, 7, 3];
+      let curX = x;
+      bars.forEach((bw, idx) => {
+        ctx.fillRect(curX, y, bw, h);
+        curX += bw + 5;
+      });
+    }
+
+    function drawGlowingOrb(x, y, color, title, subtitle) {
+      const rad = ctx.createRadialGradient(x, y, 10, x, y, 120);
+      rad.addColorStop(0, color);
+      rad.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = rad;
+      ctx.globalAlpha = 0.35;
+      ctx.beginPath();
+      ctx.arc(x, y, 120, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1.0;
+
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = 'bold 15px "Be Vietnam Pro"';
+      ctx.textAlign = 'center';
+      ctx.fillText(title, x, y + 10);
+      ctx.fillStyle = color;
+      ctx.font = '12px "JetBrains Mono"';
+      ctx.fillText(subtitle, x, y + 32);
+    }
+
+    function drawUnitBoxes(x, y, topText, btmText, color) {
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2;
+      ctx.strokeRect(x - 70, y - 60, 140, 120);
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.06)';
+      ctx.fillRect(x - 70, y - 60, 140, 120);
+
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = 'bold 16px "Be Vietnam Pro"';
+      ctx.textAlign = 'center';
+      ctx.fillText(topText, x, y - 15);
+      ctx.fillStyle = color;
+      ctx.font = 'bold 20px "JetBrains Mono"';
+      ctx.fillText('= ' + btmText, x, y + 25);
+    }
+
+    function drawQRFrame(x, y, t) {
+      ctx.strokeStyle = 'rgba(0, 194, 255, 0.8)';
+      ctx.lineWidth = 3;
+      ctx.strokeRect(x - 60, y - 60, 120, 120);
+
+      const pulse = (Math.sin(t * 3) + 1) * 20;
+      ctx.strokeStyle = 'rgba(0, 194, 255, 0.3)';
+      ctx.strokeRect(x - 60 - pulse, y - 60 - pulse, 120 + pulse * 2, 120 + pulse * 2);
+
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = 'bold 13px "Be Vietnam Pro"';
+      ctx.textAlign = 'center';
+      ctx.fillText('QUÉT VIETQR', x, y + 85);
+    }
+
+    function drawCreditLedger(x, y, name, amount, col) {
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
+      ctx.fillRect(x - 90, y - 50, 180, 100);
+      ctx.strokeStyle = col;
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(x - 90, y - 50, 180, 100);
+
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = 'bold 14px "Be Vietnam Pro"';
+      ctx.textAlign = 'center';
+      ctx.fillText(name, x, y - 15);
+      ctx.fillStyle = col;
+      ctx.font = 'bold 16px "JetBrains Mono"';
+      ctx.fillText(amount, x, y + 20);
+    }
+
+    // KẾT NỐI VÀ STREAM CANVAS SANG THẺ <video>
+    function initVideoStream() {
+      renderFrame();
+
+      try {
+        // Sử dụng HTML5 captureStream để stream trực tiếp 60 FPS vào thẻ <video>
+        const stream = canvas.captureStream(60);
+        bgVideo.srcObject = stream;
+        bgVideo.play().catch(e => console.log('Autoplay handled:', e));
+      } catch (err) {
+        console.warn('Canvas captureStream fallback:', err);
+      }
+    }
+
+    // Chuyển đổi cảnh thủ công khi bấm nút
+    function switchScene(index) {
+      currentSceneIndex = index;
+      sceneTimer = 0;
+      updateUIInfo(index);
+
+      // Cập nhật nút active
+      const btns = document.querySelectorAll('.utility-btn');
+      btns.forEach((b, i) => {
+        b.classList.toggle('active', i === index);
+      });
+    }
+
+    // Cập nhật thông tin trên widget nổi
+    function updateUIInfo(index) {
+      const scene = UTILITY_SCENES[index];
+      document.getElementById('sceneStatusText').textContent = 'Đang chiếu: ' + scene.name;
+      document.getElementById('widgetTitle').textContent = scene.title;
+      document.getElementById('widgetDesc').textContent = scene.desc;
+      document.getElementById('widgetBadge').textContent = scene.badge;
+      document.getElementById('widgetStat1').textContent = scene.stat1Val;
+      document.getElementById('widgetStat2').textContent = scene.stat2Val;
+    }
+
+    // Điều chỉnh độ mờ video nền
+    let blurLevel = 1;
+    function toggleBlur() {
+      const overlay = document.getElementById('overlayLayer');
+      const btn = document.getElementById('blurToggleBtn');
+      blurLevel = (blurLevel + 1) % 3;
+
+      if (blurLevel === 0) {
+        // Tắt mờ hoàn toàn để xem trọn vẹn video
+        overlay.style.backdropFilter = 'blur(0px)';
+        overlay.style.background = 'rgba(5, 12, 35, 0.35)';
+        btn.textContent = '👁️ Mờ: Tắt (Nét nhất)';
+      } else if (blurLevel === 1) {
+        // Mờ nhẹ chuẩn KiotViet
+        overlay.style.backdropFilter = 'blur(4px)';
+        overlay.style.background = 'radial-gradient(circle at center, rgba(11, 25, 60, 0.45) 0%, rgba(5, 12, 35, 0.75) 100%)';
+        btn.textContent = '🔍 Mờ: Vừa (Chuẩn)';
+      } else {
+        // Mờ sâu tập trung vào form
+        overlay.style.backdropFilter = 'blur(12px)';
+        overlay.style.background = 'rgba(5, 12, 35, 0.85)';
+        btn.textContent = '🌫️ Mờ: Sâu (Tối ưu đọc)';
+      }
+    }
+
+    // Tải đoạn video nền WebM về máy
+    let mediaRecorder = null;
+    let recordedChunks = [];
+    function downloadVideoRecording() {
+      alert('Đang bắt đầu ghi hình video tiện ích 8 giây. Video sẽ tự động được tải xuống sau khi hoàn tất!');
+
+      const stream = canvas.captureStream(30);
+      recordedChunks = [];
+      try {
+        mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
+        mediaRecorder.ondataavailable = e => {
+          if (e.data.size > 0) recordedChunks.push(e.data);
+        };
+        mediaRecorder.onstop = () => {
+          const blob = new Blob(recordedChunks, { type: 'video/webm' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.style.display = 'none';
+          a.href = url;
+          a.download = 'mtgrms_tien_ich_video_nen.webm';
+          document.body.appendChild(a);
+          a.click();
+          setTimeout(() => {
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+          }, 100);
+        };
+        mediaRecorder.start();
+        setTimeout(() => {
+          if (mediaRecorder.state === 'recording') {
+            mediaRecorder.stop();
+          }
+        }, 8000);
+      } catch (err) {
+        alert('Trình duyệt không hỗ trợ MediaRecorder: ' + err.message);
+      }
+    }
+
+    // Toggle ẩn/hiện mật khẩu
+    let isPassVisible = false;
+    function togglePassVisibility() {
+      const pass = document.getElementById('passInput');
+      isPassVisible = !isPassVisible;
+      pass.type = isPassVisible ? 'text' : 'password';
+    }
+
+    // Mô phỏng submit đăng nhập
+    function handleDemoSubmit(e) {
+      e.preventDefault();
+      const btn = document.getElementById('loginBtn');
+      btn.innerHTML = '<span>ĐANG XÁC THỰC BẢO MẬT...</span>';
+      setTimeout(() => {
+        alert('Đăng nhập tài khoản demo thành công! Chuyển hướng vào Bảng Điều Khiển Quản Trị.');
+        btn.innerHTML = '<span>ĐĂNG NHẬP VÀO HỆ THỐNG</span><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>';
+      }, 700);
+    }
+
+    // Khởi chạy khi tài liệu sẵn sàng
+    window.addEventListener('DOMContentLoaded', initVideoStream);
+  </script>
+</body>
+</html>
