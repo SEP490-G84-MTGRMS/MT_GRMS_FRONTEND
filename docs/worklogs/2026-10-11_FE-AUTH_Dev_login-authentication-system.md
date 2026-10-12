@@ -56,6 +56,7 @@
 - [x] Đã chạy `npm run build`: Thành công không có lỗi TypeScript hay Vite build.
 - [x] Đã kiểm tra luồng đăng nhập tài khoản demo trên trình duyệt: Chuyển hướng chính xác theo vai trò Super Admin / Cashier.
 - [x] Đã kiểm tra tính năng Đăng xuất: Xóa sạch `access_token` và `auth_user`, điều hướng về `/auth/login`.
+- [x] Đã xây dựng bộ Studio Video Demo quy trình 6 bước quản lý tiệm tạp hóa (`public/grocery_workflow_demo.html`) và POS bán hàng (`public/pos_selling_video.html`), hỗ trợ export video WebM và âm thanh Web Audio POS phục vụ làm tư liệu thuyết minh / bảo vệ đồ án.
 
 ---
 
@@ -65,7 +66,10 @@
   - `src/features/auth/authService.ts`
   - `src/stores/useAuthStore.ts`
   - `src/pages/auth/LoginPage.tsx`
+  - `public/grocery_workflow_demo.html`
 - **Hướng dẫn test nhanh**:
   - Truy cập URL `http://localhost:5173/auth/login`.
   - Bấm nút "Đăng nhập" với tài khoản demo điền sẵn, kiểm tra chuyển hướng vào `/admin/dashboard`.
   - Bấm nút "Đăng xuất" ở góc trên bên phải thanh Topbar để xác nhận đăng xuất.
+  - Mở `http://localhost:5173/grocery_workflow_demo.html` để xem video demo quy trình quản lý tạp hóa chuẩn 6 bước và tải video demo về máy.
+
