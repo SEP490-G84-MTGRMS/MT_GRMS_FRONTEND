@@ -1,5 +1,6 @@
 import { useState, useMemo, useRef } from 'react';
 import type { FC } from 'react';
+import { Link } from 'react-router-dom';
 import type {
   SupplierSummary,
   SupplierFilterState,
@@ -241,6 +242,14 @@ export const SupplierListPage: FC = () => {
           <h1>Quản lý Nhà Cung Cấp</h1>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <Link
+            to="/store-owner/suppliers/products"
+            className="admin-btn admin-btn-secondary"
+            style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 6 }}
+            title="Quản lý danh mục sản phẩm theo từng Nhà cung cấp"
+          >
+            <span>Sản phẩm theo NCC</span>
+          </Link>
           <button
             type="button"
             className="admin-btn admin-btn-secondary"

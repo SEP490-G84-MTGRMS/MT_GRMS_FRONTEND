@@ -38,7 +38,7 @@
 .dashboard-brand-logo {
   width: 32px;
   height: 32px;
-  background: linear-gradient(135deg, #0066ff, #0047ba);
+  background: linear-gradient(135deg, var(--blue-primary), var(--blue-dark));
   border-radius: 10px;
   display: flex;
   align-items: center;
@@ -74,7 +74,7 @@
   width: 34px;
   height: 34px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #0066ff, #00c2ff);
+  background: linear-gradient(135deg, var(--blue-primary), var(--cyan-accent));
   display: flex;
   align-items: center;
   justify-content: center;
@@ -90,12 +90,12 @@
   align-items: center;
   gap: 6px;
   padding: 4px 12px;
-  background: #f0f6ff;
-  border: 1px solid #bfdbfe;
+  background: var(--blue-light);
+  border: 1px solid var(--blue-border);
   border-radius: 9999px;
   font-size: 0.72rem;
   font-weight: 600;
-  color: #1d4ed8;
+  color: var(--blue-dark);
 }
 
 /* ── Body: Sidebar + Main ── */
@@ -151,13 +151,13 @@
 }
 
 .sidebar-item:hover {
-  background: #f0f6ff;
-  color: #0066ff;
+  background: var(--blue-light);
+  color: var(--blue-primary);
 }
 
 .sidebar-item.active {
-  background: #eff6ff;
-  color: #0066ff;
+  background: var(--blue-light);
+  color: var(--blue-primary);
   font-weight: 700;
 }
 
@@ -183,7 +183,7 @@
 }
 
 .sidebar-item-badge--blue {
-  background: #0066ff;
+  background: var(--blue-primary);
 }
 
 .sidebar-divider {
@@ -219,6 +219,6 @@
   text-decoration: none;
   font-weight: 500;
 }
-.dashboard-breadcrumb a:hover { color: #0066ff; }
+.dashboard-breadcrumb a:hover { color: var(--blue-primary); }
 .dashboard-breadcrumb span { color: #d1d5db; }
 .dashboard-breadcrumb strong { color: #374151; font-weight: 600; }

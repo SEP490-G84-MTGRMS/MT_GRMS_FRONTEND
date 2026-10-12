@@ -102,7 +102,7 @@ export const SupplierDetailDrawer: FC<Props> = ({
                 </div>
                 <div style={{ textAlign: 'right', fontFamily: 'var(--font-mono)' }}>
                   <div className="info-section-title" style={{ marginBottom: 4, border: 'none', padding: 0 }}>Hạn Nợ Trả</div>
-                  <div style={{ fontWeight: 700, color: '#0066ff', fontSize: '0.9rem' }}>
+                  <div style={{ fontWeight: 700, color: 'var(--blue-primary)', fontSize: '0.9rem' }}>
                     {supplier.paymentTermDays === 0 ? 'Thanh toán ngay' : `${supplier.paymentTermDays} ngày`}
                   </div>
                 </div>
@@ -151,7 +151,7 @@ export const SupplierDetailDrawer: FC<Props> = ({
                       <span style={{ fontWeight: 700, color: '#1e3a8a', fontSize: '0.8rem' }}>{supplier.bankName}</span>
                       <button type="button"
                         onClick={() => handleCopy(supplier.bankAccount!, 'STK')}
-                        className="btn-pay" style={{ color: '#0066ff', background: '#fff', borderColor: '#bfdbfe' }}>
+                        className="btn-pay" style={{ color: 'var(--blue-primary)', background: '#fff', borderColor: '#bfdbfe' }}>
                         {copiedField === 'STK' ? <Check size={12} style={{ color: '#00c853' }} /> : <Copy size={12} />}
                         {copiedField === 'STK' ? 'Đã sao chép' : 'Sao chép STK'}
                       </button>
@@ -221,7 +221,7 @@ export const SupplierDetailDrawer: FC<Props> = ({
                   <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#1e40af', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>
                     DƯ NỢ HIỆN TẠI (OPEN AP)
                   </div>
-                  <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: '1.1rem', color: '#0066ff' }}>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: '1.1rem', color: 'var(--blue-primary)' }}>
                     {fmt(supplier.currentDebt)}
                   </div>
                 </div>
@@ -249,7 +249,7 @@ export const SupplierDetailDrawer: FC<Props> = ({
                         <tr key={entry.id}>
                           <td>
                             <span className={DOC_TYPE_CLS[entry.docType]}>{DOC_TYPE_LABEL[entry.docType]}</span>
-                            <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: '0.72rem', color: '#0066ff', marginTop: 4 }}>
+                            <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: '0.72rem', color: 'var(--blue-primary)', marginTop: 4 }}>
                               {entry.docNo}
                             </div>
                             <div style={{ fontSize: '0.68rem', color: '#9ca3af', marginTop: 2 }}>

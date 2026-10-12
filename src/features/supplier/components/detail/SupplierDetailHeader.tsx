@@ -1,6 +1,7 @@
 import type { FC } from 'react';
+import { Link } from 'react-router-dom';
 import type { SupplierSummary } from '../../types/supplier.types';
-import { ArrowLeft, Building2, Edit3 } from 'lucide-react';
+import { ArrowLeft, Building2, Edit3, Package } from 'lucide-react';
 
 interface Props {
   supplier: SupplierSummary;
@@ -74,6 +75,26 @@ export const SupplierDetailHeader: FC<Props> = ({ supplier, onBack, onEdit }) =>
           >
             {supplier.status === 'Active' ? 'Đang hoạt động' : 'Tạm ngưng'}
           </span>
+
+          <Link
+            to={`/store-owner/suppliers/${supplier.id}/products`}
+            className="admin-btn admin-btn-secondary"
+            style={{
+              height: 38,
+              padding: '0 16px',
+              borderRadius: 'var(--radius-pill)',
+              fontSize: 13,
+              fontWeight: 600,
+              gap: 6,
+              textDecoration: 'none',
+              display: 'inline-flex',
+              alignItems: 'center',
+            }}
+            title="Quản lý danh mục sản phẩm của nhà cung cấp này"
+          >
+            <Package size={14} />
+            <span>Sản phẩm ({supplier.code})</span>
+          </Link>
 
           <button
             type="button"

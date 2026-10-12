@@ -85,12 +85,12 @@ export const SupplierProductsTab: FC<Props> = ({ products }) => {
                     <td>
                       <b style={{ color: 'var(--text-main)' }}>{p.name}</b>
                     </td>
-                    <td style={{ textAlign: 'center' }}>{p.unit}</td>
+                    <td style={{ textAlign: 'center' }}>{p.unit || p.deliveryUoM}</td>
                     <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', fontWeight: 700, color: '#111827' }}>
-                      {fmt(p.importPrice)}
+                      {fmt(p.importPrice ?? p.agreedPrice ?? 0)}
                     </td>
                     <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', color: 'var(--text-muted)' }}>
-                      {p.moq} {p.unit}
+                      {p.moq} {p.unit || p.deliveryUoM}
                     </td>
                     <td style={{ textAlign: 'center', fontSize: 12, color: 'var(--text-muted)' }}>
                       {p.effectiveDate}
