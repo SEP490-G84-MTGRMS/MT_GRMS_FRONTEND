@@ -6,6 +6,13 @@ import { HomePage } from '../pages/HomePage';
 import { SupplierListPage, SupplierDetailPage, SupplierProductManagementPage } from '../features/supplier';
 import { OrderMatrixPage } from '../features/purchase-order';
 import { ServiceExpensesPage } from '../features/service-expenses/pages/ServiceExpensesPage';
+import {
+  EmployeeListPage,
+  WorkSchedulePage,
+  WorkshiftManagementPage,
+  AttendancePage,
+  PayslipManagementPage,
+} from '../features/employee';
 import { StoreOwnerLayout } from '../layouts/StoreOwnerLayout';
 import { AdminDashboardPage } from '../pages/admin/AdminDashboardPage';
 import { TenantManagementPage } from '../pages/admin/TenantManagementPage';
@@ -55,6 +62,26 @@ export const router = createBrowserRouter([
         path: 'expenses',
         element: <ServiceExpensesPage />,
       },
+      {
+        path: 'employees',
+        element: <EmployeeListPage />,
+      },
+      {
+        path: 'employees/schedule',
+        element: <WorkSchedulePage />,
+      },
+      {
+        path: 'employees/shifts',
+        element: <WorkshiftManagementPage />,
+      },
+      {
+        path: 'employees/attendance',
+        element: <AttendancePage />,
+      },
+      {
+        path: 'employees/payroll',
+        element: <PayslipManagementPage />,
+      },
     ],
   },
   {
@@ -93,6 +120,26 @@ export const router = createBrowserRouter([
         path: 'expenses',
         element: <ServiceExpensesPage />,
       },
+      {
+        path: 'employees',
+        element: <EmployeeListPage />,
+      },
+      {
+        path: 'employees/schedule',
+        element: <WorkSchedulePage />,
+      },
+      {
+        path: 'employees/shifts',
+        element: <WorkshiftManagementPage />,
+      },
+      {
+        path: 'employees/attendance',
+        element: <AttendancePage />,
+      },
+      {
+        path: 'employees/payroll',
+        element: <PayslipManagementPage />,
+      },
     ],
   },
   {
@@ -130,6 +177,52 @@ export const router = createBrowserRouter([
       {
         path: 'expenses',
         element: <Navigate to="/store-owner/expenses" replace />,
+      },
+      {
+        path: 'employees',
+        element: <EmployeeListPage />,
+      },
+      {
+        path: 'employees/schedule',
+        element: <WorkSchedulePage />,
+      },
+      {
+        path: 'employees/shifts',
+        element: <WorkshiftManagementPage />,
+      },
+      {
+        path: 'employees/attendance',
+        element: <AttendancePage />,
+      },
+      {
+        path: 'employees/payroll',
+        element: <PayslipManagementPage />,
+      },
+    ],
+  },
+  {
+    path: '/employees',
+    element: <StoreOwnerLayout />,
+    children: [
+      {
+        index: true,
+        element: <EmployeeListPage />,
+      },
+      {
+        path: 'schedule',
+        element: <WorkSchedulePage />,
+      },
+      {
+        path: 'shifts',
+        element: <WorkshiftManagementPage />,
+      },
+      {
+        path: 'attendance',
+        element: <AttendancePage />,
+      },
+      {
+        path: 'payroll',
+        element: <PayslipManagementPage />,
       },
     ],
   },
