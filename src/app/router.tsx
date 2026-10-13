@@ -7,6 +7,12 @@ import { SupplierListPage, SupplierDetailPage, SupplierProductManagementPage } f
 import { OrderMatrixPage } from '../features/purchase-order';
 import { ServiceExpensesPage } from '../features/service-expenses/pages/ServiceExpensesPage';
 import { ProductListPage } from '../features/product';
+import {
+  TransferListPage,
+  CreateTransferPage,
+  ReceiveTransferPage,
+  TransferDetailPage,
+} from '../features/transfer';
 import { StoreOwnerLayout } from '../layouts/StoreOwnerLayout';
 import { AdminDashboardPage } from '../pages/admin/AdminDashboardPage';
 import { TenantManagementPage } from '../pages/admin/TenantManagementPage';
@@ -79,6 +85,22 @@ export const router = createBrowserRouter([
         element: <ProductListPage />,
       },
       {
+        path: 'transfers',
+        element: <TransferListPage />,
+      },
+      {
+        path: 'transfers/create',
+        element: <CreateTransferPage />,
+      },
+      {
+        path: 'transfers/:id',
+        element: <TransferDetailPage />,
+      },
+      {
+        path: 'transfers/:id/receive',
+        element: <ReceiveTransferPage />,
+      },
+      {
         path: 'suppliers',
         element: <SupplierListPage />,
       },
@@ -117,6 +139,22 @@ export const router = createBrowserRouter([
         element: <ProductListPage />,
       },
       {
+        path: 'transfers',
+        element: <TransferListPage />,
+      },
+      {
+        path: 'transfers/create',
+        element: <CreateTransferPage />,
+      },
+      {
+        path: 'transfers/:id',
+        element: <TransferDetailPage />,
+      },
+      {
+        path: 'transfers/:id/receive',
+        element: <ReceiveTransferPage />,
+      },
+      {
         path: 'tenants',
         element: <TenantManagementPage />,
       },
@@ -143,6 +181,28 @@ export const router = createBrowserRouter([
       {
         path: 'expenses',
         element: <Navigate to="/store-owner/expenses" replace />,
+      },
+    ],
+  },
+  {
+    path: '/transfers',
+    element: <StoreOwnerLayout />,
+    children: [
+      {
+        index: true,
+        element: <TransferListPage />,
+      },
+      {
+        path: 'create',
+        element: <CreateTransferPage />,
+      },
+      {
+        path: ':id',
+        element: <TransferDetailPage />,
+      },
+      {
+        path: ':id/receive',
+        element: <ReceiveTransferPage />,
       },
     ],
   },

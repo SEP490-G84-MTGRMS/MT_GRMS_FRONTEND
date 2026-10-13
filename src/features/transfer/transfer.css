@@ -1,0 +1,192 @@
+/* ==========================================================================
+   Transfer Feature Styles (FE-15 Inter-Branch Inventory Transfer)
+   Tuân thủ KiotViet Style: Deep Teal (#0F766E), Be Vietnam Pro, Bo tròn 24-28px
+   ========================================================================== */
+
+.transfer-container {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  width: 100%;
+}
+
+.transfer-header-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  background: #ffffff;
+  padding: 16px 24px;
+  border-radius: var(--radius-xl, 24px);
+  box-shadow: 0 4px 16px rgba(15, 118, 110, 0.05);
+  border: 1px solid var(--border-light, #edf2f9);
+}
+
+.transfer-title-area {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.transfer-title-area h1 {
+  font-size: 24px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0;
+  letter-spacing: -0.02em;
+}
+
+.transfer-grid {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+@media (max-width: 1024px) {
+  .transfer-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Sidebar filter */
+.transfer-sidebar {
+  background: #ffffff;
+  border-radius: var(--radius-xl, 24px);
+  padding: 20px;
+  box-shadow: 0 4px 16px rgba(15, 118, 110, 0.05);
+  border: 1px solid var(--border-light, #edf2f9);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.transfer-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill, 9999px);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.transfer-status-draft {
+  background: #f1f5f9;
+  color: #475569;
+  border: 1px solid #cbd5e1;
+}
+
+.transfer-status-transit {
+  background: #dbeafe;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+}
+
+.transfer-status-received {
+  background: #dcfce7;
+  color: #15803d;
+  border: 1px solid #bbf7d0;
+}
+
+.transfer-status-cancelled {
+  background: #fee2e2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+}
+
+/* Transfer Table */
+.transfer-table-wrapper {
+  background: #ffffff;
+  border-radius: var(--radius-xl, 24px);
+  box-shadow: 0 4px 16px rgba(15, 118, 110, 0.05);
+  border: 1px solid var(--border-light, #edf2f9);
+  overflow: hidden;
+}
+
+.transfer-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 13.5px;
+}
+
+.transfer-table th {
+  background: #f1f5f9;
+  color: #334155;
+  font-weight: 700;
+  padding: 12px 14px;
+  border-bottom: 1px solid #e2e8f0;
+  white-space: nowrap;
+}
+
+.transfer-table td {
+  padding: 12px 14px;
+  border-bottom: 1px solid #f1f5f9;
+  vertical-align: middle;
+  color: #1e293b;
+}
+
+.transfer-table tr:hover td {
+  background-color: #f8fafc;
+}
+
+.transfer-link {
+  color: var(--blue-primary, #0F766E);
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.transfer-link:hover {
+  text-decoration: underline;
+}
+
+/* Stepper Timeline */
+.transfer-stepper {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 16px 0 24px 0;
+  position: relative;
+}
+
+.transfer-step-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  z-index: 2;
+}
+
+.transfer-step-circle {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.transfer-step-circle.active {
+  background: #0F766E;
+  color: #ffffff;
+}
+
+.transfer-step-circle.done {
+  background: #10b981;
+  color: #ffffff;
+}
+
+.transfer-step-circle.pending {
+  background: #e2e8f0;
+  color: #64748b;
+}
+
+.transfer-step-circle.cancelled {
+  background: #ef4444;
+  color: #ffffff;
+}
