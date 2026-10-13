@@ -77,27 +77,27 @@ export const DashboardAnalyticsChart: FC<DashboardAnalyticsChartProps> = ({ data
       {
         label: 'Doanh thu MRR',
         data: data.map((d) => d.mrr),
-        borderColor: '#0066FF',
+        borderColor: '#0F766E',
         borderWidth: 2.8,
         tension: 0.38,
         fill: true,
         backgroundColor: (context: ScriptableContext<'line'>) => {
           const chart = context.chart;
           const { ctx, chartArea } = chart;
-          if (!chartArea) return 'rgba(0, 102, 255, 0.08)';
+          if (!chartArea) return 'rgba(15, 118, 110, 0.08)';
           const gradient = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
-          gradient.addColorStop(0, 'rgba(0, 102, 255, 0.22)');
-          gradient.addColorStop(0.65, 'rgba(0, 102, 255, 0.04)');
-          gradient.addColorStop(1, 'rgba(0, 102, 255, 0.00)');
+          gradient.addColorStop(0, 'rgba(15, 118, 110, 0.22)');
+          gradient.addColorStop(0.65, 'rgba(15, 118, 110, 0.04)');
+          gradient.addColorStop(1, 'rgba(15, 118, 110, 0.00)');
           return gradient;
         },
         pointBackgroundColor: '#FFFFFF',
-        pointBorderColor: '#0066FF',
+        pointBorderColor: '#0F766E',
         pointBorderWidth: 2.5,
         pointRadius: 4.5,
         pointHoverRadius: 7,
         pointHoverBackgroundColor: '#FFFFFF',
-        pointHoverBorderColor: '#0052CC',
+        pointHoverBorderColor: '#115E59',
         pointHoverBorderWidth: 3,
       },
     ],
@@ -182,8 +182,8 @@ export const DashboardAnalyticsChart: FC<DashboardAnalyticsChartProps> = ({ data
       {
         label: 'Chuỗi cửa hàng mới',
         data: data.map((d) => d.newTenants),
-        backgroundColor: '#0066FF',
-        hoverBackgroundColor: '#0052CC',
+        backgroundColor: '#0F766E',
+        hoverBackgroundColor: '#115E59',
         borderRadius: 6,
         borderSkipped: false,
         maxBarThickness: 34,
@@ -268,16 +268,16 @@ export const DashboardAnalyticsChart: FC<DashboardAnalyticsChartProps> = ({ data
       {
         label: 'Gói Cơ Bản (Basic)',
         data: data.map((d) => d.revenueBreakdown.basic),
-        backgroundColor: '#00C2FF',
-        hoverBackgroundColor: '#00A3D9',
+        backgroundColor: '#14B8A6',
+        hoverBackgroundColor: '#0D9488',
         borderRadius: 4,
         stack: 'breakdown',
       },
       {
         label: 'Gói Nâng Cao (Advanced)',
         data: data.map((d) => d.revenueBreakdown.advanced),
-        backgroundColor: '#0066FF',
-        hoverBackgroundColor: '#0052CC',
+        backgroundColor: '#0F766E',
+        hoverBackgroundColor: '#115E59',
         borderRadius: 4,
         stack: 'breakdown',
       },

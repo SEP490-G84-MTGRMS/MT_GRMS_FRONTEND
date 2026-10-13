@@ -3,6 +3,8 @@ import { NavLink, Link } from "react-router-dom";
 import {
   DashboardIcon,
   StoreIcon,
+  TruckIcon,
+  PackageIcon,
   HomeIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
@@ -102,6 +104,38 @@ export const AdminSidebar: FC<AdminSidebarProps> = ({ isOpen = true, onToggle })
           <StoreIcon size={19} />
           <span className="admin-nav-label">Khách hàng thuê</span>
           <span className="nav-badge">128</span>
+        </NavLink>
+
+        <div className="admin-nav-section-title" style={{ marginTop: 14 }}>
+          Store Owner
+        </div>
+
+        <NavLink
+          to="/store-owner/suppliers"
+          title="Quản lý Nhà cung cấp"
+          className={({ isActive }) =>
+            `admin-nav-item ${isActive ? "active" : ""}`
+          }
+        >
+          <TruckIcon size={19} />
+          <span className="admin-nav-label">Nhà cung cấp</span>
+          <span className="nav-badge" style={{ background: "var(--blue-primary)", color: "#ffffff" }}>
+            18 NCC
+          </span>
+        </NavLink>
+
+        <NavLink
+          to="/store-owner/suppliers/products"
+          title="Quản lý Sản phẩm theo Nhà cung cấp"
+          className={({ isActive }) =>
+            `admin-nav-item ${isActive ? "active" : ""}`
+          }
+        >
+          <PackageIcon size={19} />
+          <span className="admin-nav-label">Sản phẩm NCC</span>
+          <span className="nav-badge" style={{ background: "#e0f2fe", color: "#0284c7" }}>
+            Master
+          </span>
         </NavLink>
       </nav>
 

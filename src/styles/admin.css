@@ -397,7 +397,7 @@
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #0066ff, #0047ba);
+  background: linear-gradient(135deg, var(--blue-primary), var(--blue-dark));
   color: #ffffff;
   display: flex;
   align-items: center;
@@ -414,9 +414,9 @@
 /* Page Headers */
 .admin-page-header {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
-  margin-bottom: 22px;
+  margin-bottom: 20px;
   gap: 16px;
   flex-wrap: wrap;
 }
@@ -426,7 +426,8 @@
   font-weight: 800;
   color: var(--text-main);
   letter-spacing: -0.02em;
-  margin: 0 0 4px 0;
+  margin: 0;
+  line-height: 1.25;
 }
 
 .admin-page-header p {
@@ -1380,3 +1381,60 @@
 .admin-toast-close:hover {
   color: var(--text-main);
 }
+
+/* ── AppTopNav Responsive ── */
+/* Hide hamburger on desktop, show nav items normally */
+.topnav-hamburger { display: none !important; }
+.topnav-primary   { display: block; }
+
+/* ── AppTopNav Hover Dropdowns ── */
+.topnav-dropdown-bridge {
+  display: none;
+}
+.topnav-group:hover .topnav-dropdown-bridge,
+.topnav-dropdown-bridge.is-open {
+  display: block;
+}
+.topnav-group:hover .topnav-group-btn,
+.topnav-group-btn.is-open {
+  background-color: rgba(0, 0, 0, 0.2) !important;
+  border-bottom: 3px solid #ffffff !important;
+}
+.topnav-group:hover .topnav-chevron,
+.topnav-group-btn.is-open .topnav-chevron {
+  transform: rotate(180deg) !important;
+}
+
+@media (max-width: 768px) {
+  .topnav-hamburger { display: flex !important; }
+  .topnav-primary   { display: none; }
+}
+
+/* ── Filter Toolbar Responsive ── */
+.filter-toggle-mobile {
+  display: none !important;
+}
+
+.filter-secondary-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 768px) {
+  .filter-toggle-mobile {
+    display: inline-flex !important;
+  }
+  .filter-secondary-group {
+    display: none;
+    width: 100%;
+    padding-top: 10px;
+    border-top: 1px dashed var(--border-light);
+  }
+  .filter-secondary-group.is-open {
+    display: flex;
+  }
+}
+
+

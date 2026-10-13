@@ -2,7 +2,6 @@ import { useState } from 'react';
 import type { FC } from 'react';
 import { Outlet } from 'react-router-dom';
 import { AdminSidebar } from './AdminSidebar';
-import { AdminTopbar } from './AdminTopbar';
 
 export const AdminLayout: FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(() => {
@@ -33,7 +32,6 @@ export const AdminLayout: FC = () => {
     <div className={`admin-shell ${!isSidebarOpen ? 'sidebar-collapsed' : ''}`}>
       <AdminSidebar isOpen={isSidebarOpen} onToggle={handleToggleSidebar} />
       <main className="admin-main">
-        <AdminTopbar />
         <div className="admin-content-area">
           <Outlet />
         </div>
