@@ -13,7 +13,7 @@ const NAV_SECTIONS = [
   {
     label: 'Kho & Mua hàng',
     items: [
-      { to: '/dashboard/suppliers', icon: '🤝', label: 'Nhà Cung Cấp', badge: 'Mới' },
+      { to: '/store-owner/suppliers', icon: '🤝', label: 'Nhà Cung Cấp', badge: 'Mới' },
       { to: '/dashboard/inventory', icon: '📦', label: 'Tồn kho' },
       { to: '/dashboard/purchase-orders', icon: '📋', label: 'Đơn Nhập hàng' },
     ],
@@ -21,6 +21,7 @@ const NAV_SECTIONS = [
   {
     label: 'Tài chính',
     items: [
+      { to: '/store-owner/expenses', icon: '💸', label: 'Chi phí vận hành (FE-07)', badge: 'FE-07' },
       { to: '/dashboard/ap-ledger', icon: '💳', label: 'Công nợ NCC (AP)' },
       { to: '/dashboard/ar-ledger', icon: '💰', label: 'Công nợ KH (AR)' },
       { to: '/dashboard/cashflow', icon: '📊', label: 'Dòng tiền' },

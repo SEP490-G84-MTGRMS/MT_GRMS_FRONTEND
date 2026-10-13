@@ -8,6 +8,7 @@ import {
   BellIcon,
   ChevronRightIcon,
   MenuIcon,
+  TrendingUpIcon,
 } from '../../features/admin/components';
 
 /* ─── Data ─── */
@@ -48,6 +49,14 @@ const NAV_GROUPS: NavGroup[] = [
     children: [
       { label: 'Nhà cung cấp', to: '/store-owner/suppliers' },
       { label: 'Đặt hàng theo ma trận', to: '/store-owner/purchase-orders/create-matrix', badge: 'Grid' },
+    ],
+  },
+  {
+    id: 'finance',
+    label: 'Tài chính',
+    icon: TrendingUpIcon,
+    children: [
+      { label: 'Chi phí vận hành (FE-07)', to: '/store-owner/expenses', badge: 'FE-07' },
     ],
   },
 ];

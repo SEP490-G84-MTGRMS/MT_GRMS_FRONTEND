@@ -1,11 +1,11 @@
-import { createBrowserRouter } from 'react-router-dom';
+import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { PosLayout } from '../layouts/PosLayout';
 import { WebStoreLayout } from '../layouts/WebStoreLayout';
 import { AuthLayout } from '../layouts/AuthLayout';
 import { HomePage } from '../pages/HomePage';
 import { SupplierListPage, SupplierDetailPage, SupplierProductManagementPage } from '../features/supplier';
 import { OrderMatrixPage } from '../features/purchase-order';
-
+import { ServiceExpensesPage } from '../features/service-expenses/pages/ServiceExpensesPage';
 import { StoreOwnerLayout } from '../layouts/StoreOwnerLayout';
 import { AdminDashboardPage } from '../pages/admin/AdminDashboardPage';
 import { TenantManagementPage } from '../pages/admin/TenantManagementPage';
@@ -51,6 +51,10 @@ export const router = createBrowserRouter([
         path: 'purchase-orders/create-matrix',
         element: <OrderMatrixPage />,
       },
+      {
+        path: 'expenses',
+        element: <ServiceExpensesPage />,
+      },
     ],
   },
   {
@@ -84,6 +88,10 @@ export const router = createBrowserRouter([
       {
         path: 'purchase-orders/create-matrix',
         element: <OrderMatrixPage />,
+      },
+      {
+        path: 'expenses',
+        element: <ServiceExpensesPage />,
       },
     ],
   },
@@ -119,6 +127,10 @@ export const router = createBrowserRouter([
         path: 'purchase-orders/create-matrix',
         element: <OrderMatrixPage />,
       },
+      {
+        path: 'expenses',
+        element: <Navigate to="/store-owner/expenses" replace />,
+      },
     ],
   },
   {
@@ -140,6 +152,10 @@ export const router = createBrowserRouter([
       {
         path: ':id/products',
         element: <SupplierProductManagementPage />,
+      },
+      {
+        path: 'expenses',
+        element: <Navigate to="/store-owner/expenses" replace />,
       },
     ],
   },
