@@ -1,24 +1,24 @@
 import type { FC } from 'react';
 import {
-  ChevronLeftIcon,
-  ChevronRightIcon,
   EyeIcon,
   CloseIcon,
   AuditIcon,
 } from '../../admin/components';
+import { TablePagination } from '../../../components/common';
 import {
   EXPENSE_CATEGORY_LABELS,
   type ServiceExpenseDto,
 } from '../types/expense.types';
 import { ExpenseStatusBadge } from './ExpenseStatusBadge';
 
-interface ExpenseTableProps {
+export interface ExpenseTableProps {
   data?: ServiceExpenseDto[];
   isLoading?: boolean;
   totalItems?: number;
   page?: number;
   pageSize?: number;
   onPageChange: (newPage: number) => void;
+  onPageSizeChange?: (newPageSize: number) => void;
   onViewBill: (url: string, title: string) => void;
   onPay: (item: ServiceExpenseDto) => void;
   onCancel: (item: ServiceExpenseDto) => void;
@@ -39,11 +39,11 @@ export const ExpenseTable: FC<ExpenseTableProps> = ({
   page = 1,
   pageSize = 10,
   onPageChange,
+  onPageSizeChange,
   onViewBill,
   onPay,
   onCancel,
 }) => {
-  const totalPages = Math.ceil(totalItems / pageSize) || 1;
 
   if (isLoading) {
     return (
@@ -75,10 +75,10 @@ export const ExpenseTable: FC<ExpenseTableProps> = ({
             alignItems: 'center',
             justifyContent: 'center',
             marginBottom: '16px',
-            color: 'var(--blue-primary, #0066ff)',
+            color: 'var(--blue-primary, #0F766E)',
           }}
         >
-          <AuditIcon size={28} color="#0066ff" />
+          <AuditIcon size={28} color="#0F766E" />
         </div>
         <h4
           style={{
@@ -211,38 +211,16 @@ export const ExpenseTable: FC<ExpenseTableProps> = ({
         </table>
       </div>
 
-      {/* Pagination Footer */}
-      <div className="expense-pagination">
-        <div>
-          Hiển thị{' '}
-          <strong>
-            {Math.min(totalItems, (page - 1) * pageSize + 1)} -{' '}
-            {Math.min(totalItems, page * pageSize)}
-          </strong>{' '}
-          trên tổng số <strong>{totalItems}</strong> khoản chi
-        </div>
-        <div className="expense-page-btns">
-          <button
-            type="button"
-            disabled={page <= 1}
-            onClick={() => onPageChange(page - 1)}
-            className="page-btn"
-          >
-            <ChevronLeftIcon size={14} color="currentColor" />
-          </button>
-          <span style={{ fontSize: '0.8rem', fontWeight: 600, padding: '0 8px' }}>
-            Trang {page} / {totalPages}
-          </span>
-          <button
-            type="button"
-            disabled={page >= totalPages}
-            onClick={() => onPageChange(page + 1)}
-            className="page-btn"
-          >
-            <ChevronRightIcon size={14} color="currentColor" />
-          </button>
-        </div>
-      </div>
+      {/* Shared Pagination Footer */}
+      <TablePagination
+        currentPage={page}
+        pageSize={pageSize}
+        totalItems={totalItems}
+        itemLabel="khoản chi"
+        isLoading={isLoading}
+        onPageChange={onPageChange}
+        onPageSizeChange={onPageSizeChange}
+      />
     </div>
   );
 };

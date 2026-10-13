@@ -5,9 +5,17 @@ interface OrderMatrixHeaderProps {
   status: string;
   onBack: () => void;
   onSave?: () => void;
+  title?: string;
+  readOnly?: boolean;
 }
 
-export const OrderMatrixHeader: FC<OrderMatrixHeaderProps> = ({ status, onBack, onSave }) => {
+export const OrderMatrixHeader: FC<OrderMatrixHeaderProps> = ({
+  status,
+  onBack,
+  onSave,
+  title,
+  readOnly = false,
+}) => {
   return (
     <div
       style={{
@@ -32,13 +40,12 @@ export const OrderMatrixHeader: FC<OrderMatrixHeaderProps> = ({ status, onBack, 
           }}
         >
           <Grid size={22} style={{ color: 'var(--blue-primary)' }} />
-          Tạo Đơn Mua Hàng
+          {title || (readOnly ? 'Chi Tiết Đơn Đặt Hàng' : 'Tạo Đơn Mua Hàng')}
         </h1>
-
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        {onSave && (
+        {!readOnly && onSave && (
           <button
             type="button"
             onClick={onSave}
@@ -49,6 +56,22 @@ export const OrderMatrixHeader: FC<OrderMatrixHeaderProps> = ({ status, onBack, 
             <Save size={14} />
             <span>Lưu</span>
           </button>
+        )}
+
+        {readOnly && (
+          <span
+            style={{
+              fontSize: 12,
+              fontWeight: 700,
+              padding: '4px 12px',
+              borderRadius: 'var(--radius-pill)',
+              backgroundColor: '#f1f5f9',
+              color: '#475569',
+              border: '1px solid #cbd5e1',
+            }}
+          >
+            Chế độ: <b>Chỉ xem (Chi tiết)</b>
+          </span>
         )}
 
         <span

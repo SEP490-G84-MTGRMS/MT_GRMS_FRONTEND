@@ -137,7 +137,7 @@ export const CreateExpenseModal: FC<CreateExpenseModalProps> = ({
                 height: '32px',
                 borderRadius: '50%',
                 background: 'var(--blue-light, #f0f6ff)',
-                color: 'var(--blue-primary, #0066ff)',
+                color: 'var(--blue-primary, #0F766E)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -324,7 +324,7 @@ export const CreateExpenseModal: FC<CreateExpenseModalProps> = ({
                         style={{ display: 'none' }}
                         onChange={handleFileChange}
                       />
-                      <div style={{ color: 'var(--blue-primary, #0066ff)' }}>
+                      <div style={{ color: 'var(--blue-primary, #0F766E)' }}>
                         <UploadIcon size={24} color="currentColor" />
                       </div>
                       <div

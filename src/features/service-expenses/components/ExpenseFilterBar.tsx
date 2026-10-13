@@ -119,7 +119,7 @@ export const ExpenseFilterBar: FC<ExpenseFilterBarProps> = ({
             onChange={(e) => handlePeriodSelect(e.target.value as PeriodType)}
             aria-label="Kỳ thời gian"
             className="expense-filter-select"
-            style={{ fontWeight: 600, color: 'var(--blue-primary, #0066ff)' }}
+            style={{ fontWeight: 600, color: 'var(--blue-primary, #0F766E)' }}
           >
             <option value="this-month">Tháng này (10/2026)</option>
             <option value="last-month">Tháng trước (09/2026)</option>

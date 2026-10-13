@@ -76,3 +76,35 @@ export interface GeneratedPO {
   status: 'APPROVED' | 'PENDING_APPROVAL';
   itemCount: number;
 }
+
+export type BranchInventoryStatus = 'stable' | 'need_replenish' | 'no_data';
+
+export interface BranchListItem {
+  id: string;
+  code: string;
+  name: string;
+  address: string;
+  managerName: string;
+  managerPhone: string;
+  managerEmail?: string;
+  stockQty: number; // Số lượng tồn kho thực tế
+  orderQty: number; // Số lượng đặt hàng hiện tại của chi nhánh
+  inventoryStatus?: BranchInventoryStatus;
+  inventoryNote?: string;
+  orderSummary: string;
+  draftCount: number;
+  pendingCount: number;
+  status: 'active' | 'inactive';
+  lastUpdated: string;
+  region?: string;
+}
+
+export interface BranchFilterState {
+  keyword: string;
+  branchCode: string;
+  status: 'all' | 'active' | 'inactive';
+  dateFrom: string;
+  dateTo: string;
+  pageIndex: number;
+  pageSize: number;
+}

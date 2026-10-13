@@ -48,7 +48,9 @@ const NAV_GROUPS: NavGroup[] = [
     icon: TruckIcon,
     children: [
       { label: 'Nhà cung cấp', to: '/store-owner/suppliers' },
-      { label: 'Đặt hàng theo ma trận', to: '/store-owner/purchase-orders/create-matrix', badge: 'Grid' },
+      { label: 'Đặt hàng theo chi nhánh', to: '/store-owner/purchase-orders/branches' },
+      { label: 'Đặt hàng theo ma trận (Store Owner)', to: '/store-owner/purchase-orders/create-matrix', badge: 'Grid' },
+      { label: 'Đặt hàng theo ma trận (Nhân viên)', to: '/employee/purchase-orders/create-matrix', badge: 'Staff' },
     ],
   },
   {
@@ -56,6 +58,7 @@ const NAV_GROUPS: NavGroup[] = [
     label: 'Tài chính',
     icon: TrendingUpIcon,
     children: [
+      { label: 'Khách hàng & Công nợ (FE-08)', to: '/store-owner/customers', badge: 'FE-08' },
       { label: 'Chi phí vận hành (FE-07)', to: '/store-owner/expenses', badge: 'FE-07' },
     ],
   },

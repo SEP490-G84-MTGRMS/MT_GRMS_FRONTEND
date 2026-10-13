@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { FC } from 'react';
 import type { SupplierSummary } from '../types/supplier.types';
+import { TablePagination } from '../../../components/common';
 import { SupplierTableRow } from './SupplierTableRow';
 
 interface Props {
@@ -27,7 +28,6 @@ export const SupplierTable: FC<Props> = ({
   onPayDebt,
 }) => {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const totalPages = Math.ceil(totalCount / pageSize) || 1;
 
   const toggleSelectAll = () => {
     if (selectedIds.length === suppliers.length) {
@@ -101,51 +101,15 @@ export const SupplierTable: FC<Props> = ({
         </tbody>
       </table>
 
-      {/* Pagination Footer */}
-      <div className="admin-pagination-footer">
-        <div>
-          Đang hiển thị <b>{suppliers.length > 0 ? (pageIndex - 1) * pageSize + 1 : 0} - {Math.min(pageIndex * pageSize, totalCount)}</b> trong tổng số <b>{totalCount}</b> nhà cung cấp
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--text-muted)' }}>
-            <span>Số dòng:</span>
-            <select
-              value={pageSize}
-              onChange={(e) => onPageSizeChange(Number(e.target.value))}
-              style={{
-                height: 32,
-                padding: '0 8px',
-                borderRadius: 'var(--radius-pill)',
-                border: '1px solid var(--border-light)',
-                backgroundColor: 'var(--bg-soft-blue)',
-                fontFamily: 'inherit',
-                fontSize: 12.5,
-                color: 'var(--text-main)',
-                outline: 'none',
-                cursor: 'pointer',
-              }}
-            >
-              <option value={10}>10 / trang</option>
-              <option value={20}>20 / trang</option>
-              <option value={50}>50 / trang</option>
-            </select>
-          </div>
-
-          <div style={{ display: 'flex', gap: 4 }}>
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
-              <button
-                key={pageNum}
-                type="button"
-                className={`admin-page-btn ${pageIndex === pageNum ? 'active' : ''}`}
-                onClick={() => onPageChange(pageNum)}
-              >
-                {pageNum}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
+      {/* Shared Pagination Footer */}
+      <TablePagination
+        currentPage={pageIndex}
+        pageSize={pageSize}
+        totalItems={totalCount}
+        itemLabel="nhà cung cấp"
+        onPageChange={onPageChange}
+        onPageSizeChange={onPageSizeChange}
+      />
     </div>
   );
 };

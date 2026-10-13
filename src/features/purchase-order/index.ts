@@ -8,4 +8,8 @@ export * from './components/matrix/OrderMatrixToolbar';
 export * from './components/matrix/OrderMatrixTable';
 export * from './components/matrix/OrderMatrixFooter';
 export * from './components/matrix/OrderMatrixStatusModal';
+export * from './components/branch/BranchOrderTable';
+export * from './components/branch/BranchDetailModal';
 export * from './pages/OrderMatrixPage';
+export * from './pages/BranchOrderListPage';
+export * from './pages/EmployeeOrderMatrixPage';
