@@ -48,6 +48,7 @@ const NAV_GROUPS: NavGroup[] = [
     icon: TruckIcon,
     children: [
       { label: 'Nhà cung cấp', to: '/store-owner/suppliers' },
+      { label: 'Đặt hàng theo ma trận', to: '/store-owner/purchase-orders/create-matrix', badge: 'Grid' },
     ],
   },
   {
@@ -279,7 +280,8 @@ export const AppTopNav: FC = () => {
           location.pathname === c.to ||
           location.pathname.startsWith(c.to + '/') ||
           (c.to === '/store-owner/suppliers' && (location.pathname === '/admin/suppliers' || location.pathname.startsWith('/admin/suppliers/'))) ||
-          (c.to === '/store-owner/suppliers/products' && (location.pathname === '/admin/suppliers/products' || location.pathname.startsWith('/admin/suppliers/products/')))
+          (c.to === '/store-owner/suppliers/products' && (location.pathname === '/admin/suppliers/products' || location.pathname.startsWith('/admin/suppliers/products/'))) ||
+          (c.to === '/store-owner/purchase-orders/create-matrix' && (location.pathname === '/admin/purchase-orders/create-matrix' || location.pathname.startsWith('/admin/purchase-orders/create-matrix/')))
       );
     }
     return false;
