@@ -6,6 +6,7 @@ import { HomePage } from '../pages/HomePage';
 import { SupplierListPage, SupplierDetailPage, SupplierProductManagementPage } from '../features/supplier';
 import { OrderMatrixPage } from '../features/purchase-order';
 import { ServiceExpensesPage } from '../features/service-expenses/pages/ServiceExpensesPage';
+import { ProductListPage } from '../features/product';
 import { StoreOwnerLayout } from '../layouts/StoreOwnerLayout';
 import { AdminDashboardPage } from '../pages/admin/AdminDashboardPage';
 import { TenantManagementPage } from '../pages/admin/TenantManagementPage';
@@ -55,6 +56,10 @@ export const router = createBrowserRouter([
         path: 'expenses',
         element: <ServiceExpensesPage />,
       },
+      {
+        path: 'products',
+        element: <ProductListPage />,
+      },
     ],
   },
   {
@@ -68,6 +73,10 @@ export const router = createBrowserRouter([
       {
         path: 'dashboard',
         element: <AdminDashboardPage />,
+      },
+      {
+        path: 'products',
+        element: <ProductListPage />,
       },
       {
         path: 'suppliers',
@@ -104,6 +113,10 @@ export const router = createBrowserRouter([
         element: <AdminDashboardPage />,
       },
       {
+        path: 'products',
+        element: <ProductListPage />,
+      },
+      {
         path: 'tenants',
         element: <TenantManagementPage />,
       },
@@ -130,6 +143,16 @@ export const router = createBrowserRouter([
       {
         path: 'expenses',
         element: <Navigate to="/store-owner/expenses" replace />,
+      },
+    ],
+  },
+  {
+    path: '/products',
+    element: <StoreOwnerLayout />,
+    children: [
+      {
+        index: true,
+        element: <ProductListPage />,
       },
     ],
   },
