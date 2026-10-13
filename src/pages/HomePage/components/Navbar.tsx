@@ -52,6 +52,9 @@ export const Navbar: FC<NavbarProps> = ({ onOpenLogin, onOpenTrial }) => {
             <a href="/admin/dashboard" className="nav-link" style={{ color: 'var(--blue-primary)', fontWeight: 600 }}>
               👑 Demo Admin
             </a>
+            <a href="/employee/pos" className="nav-link" style={{ color: '#0F766E', fontWeight: 600 }}>
+              🧑‍💼 Demo Employee (POS)
+            </a>
           </nav>
 
           <div className="nav-buttons">
