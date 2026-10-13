@@ -1,0 +1,190 @@
+/* ==========================================================================
+   FE-10 Dashboard KPIs & Profit and Loss (P&L) Report — Dedicated Stylesheet
+   Chuẩn MT-GRMS Design System: Deep Teal (#0F766E) | KiotViet Pills | Be Vietnam Pro
+   Đồng bộ 100% với FE-07 Service Expenses, FE-08 Customer CRM & StoreOwnerLayout
+   ========================================================================== */
+
+:root {
+  --teal-primary: #0F766E;
+  --teal-dark: #115E59;
+  --teal-soft-bg: #F0FDFA;
+  --teal-border: #99F6E4;
+  --teal-light-bg: #CCFBF1;
+  --radius-card: 20px;
+  --radius-pill: 9999px;
+  --font-pnl: var(--font-sans, 'Be Vietnam Pro', sans-serif);
+}
+
+/* ── Page Layout Container ── */
+.pnl-page {
+  width: 100%;
+  min-height: 100vh;
+  background-color: var(--teal-soft-bg, #F0FDFA);
+  font-family: var(--font-pnl);
+  box-sizing: border-box;
+  padding-bottom: 48px;
+}
+
+/* ── Top Header Banner ── */
+.pnl-topbar-wrapper {
+  background: #ffffff;
+  border-bottom: 1px solid var(--teal-border, #99F6E4);
+  padding: 18px 24px;
+  margin-bottom: 24px;
+  box-shadow: 0 1px 3px rgba(15, 118, 110, 0.05);
+}
+
+.pnl-topbar-container {
+  max-width: 1280px;
+  margin: 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.pnl-topbar-title-group {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.pnl-topbar-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  background: var(--teal-primary, #0F766E);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(15, 118, 110, 0.25);
+  flex-shrink: 0;
+}
+
+.pnl-topbar-text h1 {
+  font-size: 1.45rem;
+  font-weight: 800;
+  color: #111827;
+  letter-spacing: -0.02em;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pnl-topbar-text p {
+  font-size: 0.8rem;
+  color: #4B5563;
+  font-weight: 500;
+  margin: 4px 0 0 0;
+}
+
+/* ── Pill Buttons ── */
+.btn-primary-pill {
+  background: var(--teal-primary, #0F766E);
+  color: #ffffff;
+  border-radius: var(--radius-pill, 9999px);
+  padding: 9px 20px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 4px 14px rgba(15, 118, 110, 0.28);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.btn-primary-pill:hover {
+  background: var(--teal-dark, #115E59);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(15, 118, 110, 0.35);
+}
+
+.btn-secondary-pill {
+  background: #ffffff;
+  color: #4B5563;
+  border-radius: var(--radius-pill, 9999px);
+  padding: 8px 16px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  border: 1px solid #E5E7EB;
+  transition: all 0.18s ease;
+  white-space: nowrap;
+}
+
+.btn-secondary-pill:hover {
+  background: #F9FAFB;
+  color: #111827;
+  border-color: #D1D5DB;
+}
+
+.btn-secondary-pill.active {
+  background: var(--teal-primary, #0F766E);
+  color: #ffffff;
+  border-color: var(--teal-primary, #0F766E);
+  box-shadow: 0 2px 8px rgba(15, 118, 110, 0.25);
+}
+
+/* ── Standard MT-GRMS Card ── */
+.pnl-card {
+  background: #ffffff;
+  border-radius: var(--radius-card, 20px);
+  border: 1px solid rgba(153, 246, 228, 0.6);
+  box-shadow: 0 2px 10px rgba(15, 118, 110, 0.04);
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.pnl-card:hover {
+  box-shadow: 0 6px 16px rgba(15, 118, 110, 0.08);
+}
+
+/* ── Filter Bar ── */
+.pnl-filter-container {
+  background: #ffffff;
+  border-radius: var(--radius-card, 20px);
+  border: 1px solid var(--teal-border, #99F6E4);
+  box-shadow: 0 4px 14px rgba(15, 118, 110, 0.05);
+  padding: 16px 20px;
+  margin-bottom: 24px;
+}
+
+/* ── Segmented Pill Tabs ── */
+.pnl-segmented-tabs {
+  display: inline-flex;
+  padding: 4px;
+  background: #F3F4F6;
+  border-radius: var(--radius-pill, 9999px);
+  gap: 4px;
+  border: 1px solid #E5E7EB;
+}
+
+.pnl-segmented-tab-btn {
+  padding: 6px 14px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  border-radius: var(--radius-pill, 9999px);
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  color: #4B5563;
+  transition: all 0.18s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pnl-segmented-tab-btn.active {
+  background: #ffffff;
+  color: var(--teal-primary, #0F766E);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}

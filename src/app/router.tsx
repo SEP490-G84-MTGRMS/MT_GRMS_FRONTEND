@@ -1,4 +1,4 @@
-﻿import { createBrowserRouter, Navigate } from 'react-router-dom';
+import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { PosLayout } from '../layouts/PosLayout';
 import { WebStoreLayout } from '../layouts/WebStoreLayout';
 import { AuthLayout } from '../layouts/AuthLayout';
@@ -7,6 +7,7 @@ import { SupplierListPage, SupplierDetailPage, SupplierProductManagementPage } f
 import { OrderMatrixPage } from '../features/purchase-order';
 import { ServiceExpensesPage } from '../features/service-expenses/pages/ServiceExpensesPage';
 import { CustomerManagementPage } from '../features/customer-crm';
+import { ReportsPnlDashboardPage } from '../features/reports-pnl';
 import { StoreOwnerLayout } from '../layouts/StoreOwnerLayout';
 import { AdminDashboardPage } from '../pages/admin/AdminDashboardPage';
 import { TenantManagementPage } from '../pages/admin/TenantManagementPage';
@@ -60,6 +61,10 @@ export const router = createBrowserRouter([
         path: 'customers',
         element: <CustomerManagementPage />,
       },
+      {
+        path: 'reports/pnl',
+        element: <ReportsPnlDashboardPage />,
+      },
     ],
   },
   {
@@ -101,6 +106,10 @@ export const router = createBrowserRouter([
       {
         path: 'customers',
         element: <CustomerManagementPage />,
+      },
+      {
+        path: 'reports/pnl',
+        element: <ReportsPnlDashboardPage />,
       },
     ],
   },
