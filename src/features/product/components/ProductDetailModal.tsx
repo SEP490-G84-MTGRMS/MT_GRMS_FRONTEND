@@ -9,6 +9,7 @@ import {
   FileText,
   Warehouse,
   History,
+  Star,
 } from 'lucide-react';
 import type { ProductItem } from '../types';
 
@@ -39,25 +40,32 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
   const isDiscontinued = product.status === 'Discontinued';
 
+  const formatVND = (num?: number | null) => {
+    if (num === undefined || num === null) return '—';
+    return `${num.toLocaleString('vi-VN')} đ`;
+  };
+
   return (
-    <div className="custom-modal-backdrop">
-      <div className="custom-modal-box" style={{ maxWidth: 1000 }}>
-        {/* Top summary strip */}
+    <div className="custom-modal-backdrop" style={{ zIndex: 1100 }}>
+      <div className="custom-modal-box" style={{ maxWidth: 1050 }}>
+        {/* ============================================================== */}
+        {/* THANH TỔNG QUAN PHÍA TRÊN CÙNG                                 */}
+        {/* ============================================================== */}
         <div
           style={{
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            padding: '16px 24px',
-            borderBottom: '1px solid #e2e8f0',
-            backgroundColor: '#ffffff',
+            padding: '14px 24px',
+            borderBottom: '1px solid #E2E8F0',
+            backgroundColor: '#FFFFFF',
             flexWrap: 'wrap',
             gap: 12,
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-            <span style={{ fontSize: 18, color: '#eab308' }}>
-              {product.isFavorite ? '★' : '☆'}
+            <span style={{ fontSize: 18, color: product.isFavorite ? '#EAB308' : '#CBD5E1' }}>
+              <Star size={18} fill={product.isFavorite ? '#EAB308' : 'none'} />
             </span>
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -68,8 +76,8 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 {isDiscontinued && (
                   <span
                     style={{
-                      background: '#fee2e2',
-                      color: '#dc2626',
+                      background: '#FEE2E2',
+                      color: '#DC2626',
                       fontSize: 11,
                       fontWeight: 700,
                       padding: '2px 8px',
@@ -80,7 +88,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                   </span>
                 )}
               </div>
-              <span style={{ fontSize: 16, fontWeight: 700, color: '#0f172a' }}>
+              <span style={{ fontSize: 16, fontWeight: 700, color: '#0F172A' }}>
                 {product.productName}
               </span>
             </div>
@@ -88,36 +96,52 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
             <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: 11, color: '#64748b' }}>Giá bán</div>
-              <div style={{ fontSize: 15, fontWeight: 700, color: '#0f172a' }}>
-                {product.sellingPrice.toLocaleString()} đ
+              <div style={{ fontSize: 11, color: '#64748B' }}>Giá bán</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: '#0F172A' }}>
+                {formatVND(product.sellingPrice)}
               </div>
             </div>
 
             {userRole === 'StoreOwner' && (
               <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: 11, color: '#64748b' }}>Giá vốn</div>
-                <div style={{ fontSize: 14, color: '#475569' }}>
-                  {product.costPrice != null ? `${product.costPrice.toLocaleString()} đ` : '—'}
+                <div style={{ fontSize: 11, color: '#64748B' }}>Giá vốn</div>
+                <div style={{ fontSize: 14, color: '#475569', fontWeight: 600 }}>
+                  {formatVND(product.costPrice)}
                 </div>
               </div>
             )}
 
             <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: 11, color: '#64748b' }}>Tồn kho</div>
-              <div style={{ fontSize: 15, fontWeight: 700, color: '#0F766E' }}>
+              <div style={{ fontSize: 11, color: '#64748B' }}>Tồn kho</div>
+              <div
+                style={{
+                  fontSize: 15,
+                  fontWeight: 700,
+                  color: product.onHand <= 0 ? '#EF4444' : '#0F766E',
+                }}
+              >
                 {product.onHand} {product.baseUnit}
               </div>
             </div>
 
-            <button type="button" className="custom-modal-close" onClick={onClose}>
+            <button type="button" className="custom-modal-close" onClick={onClose} title="Đóng">
               <X size={18} />
             </button>
           </div>
         </div>
 
-        {/* Tab navigation buttons */}
-        <div style={{ display: 'flex', background: '#f8fafc', padding: '0 24px', borderBottom: '2px solid #e2e8f0' }}>
+        {/* ============================================================== */}
+        {/* DANH SÁCH CÁC TABS ĐIỀU HƯỚNG                                   */}
+        {/* ============================================================== */}
+        <div
+          style={{
+            display: 'flex',
+            background: '#F8FAFC',
+            padding: '0 24px',
+            borderBottom: '2px solid #E2E8F0',
+            gap: 4,
+          }}
+        >
           <button
             type="button"
             onClick={() => setActiveTab('info')}
@@ -138,6 +162,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
           >
             <Package size={15} /> Thông tin
           </button>
+
           <button
             type="button"
             onClick={() => setActiveTab('notes')}
@@ -156,8 +181,9 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               gap: 6,
             }}
           >
-            <FileText size={15} /> Mô tả & Ghi chú
+            <FileText size={15} /> Mô tả, ghi chú
           </button>
+
           <button
             type="button"
             onClick={() => setActiveTab('ledger')}
@@ -176,8 +202,9 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               gap: 6,
             }}
           >
-            <History size={15} /> Thẻ kho (Lịch sử)
+            <History size={15} /> Thẻ kho
           </button>
+
           <button
             type="button"
             onClick={() => setActiveTab('branch')}
@@ -196,245 +223,390 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               gap: 6,
             }}
           >
-            <Warehouse size={15} /> Tồn kho chi nhánh
+            <Warehouse size={15} /> Tồn kho
           </button>
+
         </div>
 
-        {/* Tab contents */}
-        <div className="custom-modal-body" style={{ minHeight: 340 }}>
-          {/* TAB 1: THÔNG TIN */}
+        {/* ============================================================== */}
+        {/* NỘI DUNG TỪNG TAB                                               */}
+        {/* ============================================================== */}
+        <div className="custom-modal-body" style={{ minHeight: 360, padding: '24px 28px' }}>
+          {/* ─────────────────────────────────────────────────────────── */}
+          {/* TAB 1: THÔNG TIN CHI TIẾT HÀNG HÓA                          */}
+          {/* ─────────────────────────────────────────────────────────── */}
           {activeTab === 'info' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 20 }}>
-                {/* Cột 1 */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                  <div>
-                    <div style={{ fontSize: 12, color: '#64748b' }}>Mã hàng hóa (SKU)</div>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: '#0f172a' }}>{product.productCode}</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+              {/* Header ảnh & Tên hàng theo design */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 16,
+                  paddingBottom: 16,
+                  borderBottom: '1px solid #E2E8F0',
+                }}
+              >
+                <div
+                  style={{
+                    width: 72,
+                    height: 72,
+                    borderRadius: 12,
+                    border: '1px solid #CBD5E1',
+                    backgroundColor: '#F8FAFC',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    overflow: 'hidden',
+                  }}
+                >
+                  {product.imageUrl ? (
+                    <img
+                      src={product.imageUrl}
+                      alt={product.productName}
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    />
+                  ) : (
+                    <span style={{ fontSize: 32 }}>🛍️</span>
+                  )}
+                </div>
+
+                <div>
+                  <h3 style={{ margin: '0 0 6px 0', fontSize: 18, color: '#0F172A', fontWeight: 700 }}>
+                    {product.productName}
+                  </h3>
+                  <div style={{ fontSize: 13, color: '#475569' }}>
+                    Nhóm hàng:{' '}
+                    <span
+                      style={{
+                        fontWeight: 700,
+                        color: '#0F766E',
+                        backgroundColor: '#F0FDFA',
+                        padding: '2px 8px',
+                        borderRadius: 6,
+                        border: '1px solid #CCFBF1',
+                      }}
+                    >
+                      {product.categoryName || 'Mặc định'}
+                    </span>
                   </div>
+                </div>
+              </div>
+
+              {/* Bố cục 3 cột thông tin theo product_detail.html */}
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 1fr 1fr',
+                  gap: 24,
+                  paddingBottom: 16,
+                  borderBottom: '1px solid #E2E8F0',
+                }}
+              >
+                {/* Cột 1 */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  <div>
+                    <div style={{ fontSize: 12, color: '#64748B', marginBottom: 2 }}>Mã hàng</div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: '#0F172A' }}>
+                      {product.productCode}
+                    </div>
+                  </div>
+
                   {userRole === 'StoreOwner' && (
                     <div>
-                      <div style={{ fontSize: 12, color: '#64748b' }}>Giá vốn (COGS)</div>
-                      <div style={{ fontSize: 14, fontWeight: 700, color: '#0f172a' }}>
-                        {product.costPrice != null ? `${product.costPrice.toLocaleString()} đ` : '—'}
+                      <div style={{ fontSize: 12, color: '#64748B', marginBottom: 2 }}>Giá vốn</div>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: '#0F172A' }}>
+                        {formatVND(product.costPrice)}
                       </div>
                     </div>
                   )}
-                  <div>
-                    <div style={{ fontSize: 12, color: '#64748b' }}>Nhóm hàng</div>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: '#0F766E' }}>{product.categoryName}</div>
-                  </div>
                 </div>
 
                 {/* Cột 2 */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                   <div>
-                    <div style={{ fontSize: 12, color: '#64748b' }}>Mã vạch (Barcode)</div>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: '#0f172a' }}>{product.barcode}</div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 12, color: '#64748b' }}>Giá bán niêm yết</div>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: '#0F766E' }}>
-                      {product.sellingPrice.toLocaleString()} đ
+                    <div style={{ fontSize: 12, color: '#64748B', marginBottom: 2 }}>Mã vạch</div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: '#0F172A' }}>
+                      {product.barcode || '—'}
                     </div>
                   </div>
+
                   <div>
-                    <div style={{ fontSize: 12, color: '#64748b' }}>Thuế suất VAT</div>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: '#0f172a' }}>{product.vatRate || 8}%</div>
+                    <div style={{ fontSize: 12, color: '#64748B', marginBottom: 2 }}>Giá bán</div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: '#0F766E' }}>
+                      {formatVND(product.sellingPrice)}
+                    </div>
                   </div>
                 </div>
 
                 {/* Cột 3 */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                   <div>
-                    <div style={{ fontSize: 12, color: '#64748b' }}>Đơn vị tính cơ bản</div>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: '#0f172a' }}>{product.baseUnit}</div>
+                    <div style={{ fontSize: 12, color: '#64748B', marginBottom: 2 }}>Đơn vị cơ bản</div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: '#0F172A' }}>
+                      {product.baseUnit}
+                    </div>
                   </div>
+
                   <div>
-                    <div style={{ fontSize: 12, color: '#64748b' }}>Tồn kho hiện tại</div>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: '#0f172a' }}>
+                    <div style={{ fontSize: 12, color: '#64748B', marginBottom: 2 }}>Tồn kho hiện tại</div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: '#0F172A' }}>
                       {product.onHand} {product.baseUnit}
                     </div>
                   </div>
+
                   <div>
-                    <div style={{ fontSize: 12, color: '#64748b' }}>Định mức an toàn (Min - Max)</div>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: '#0f172a' }}>
-                      {product.minStock || 0} - {product.maxStock || 9999}
+                    <div style={{ fontSize: 12, color: '#64748B', marginBottom: 2 }}>
+                      Định mức tồn (Thấp nhất - Cao nhất)
+                    </div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: '#475569' }}>
+                      {(product.minStock || 0).toLocaleString()} -{' '}
+                      {(product.maxStock || 999999999).toLocaleString()}
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* Bảng Đơn vị tính quy đổi */}
-              {product.uomConversions && product.uomConversions.length > 0 && (
-                <fieldset style={{ border: '1px solid #e2e8f0', borderRadius: 16, padding: '16px 20px' }}>
-                  <legend style={{ fontWeight: 700, color: '#1e293b', padding: '0 8px' }}>
-                    Đơn vị tính & Quy đổi giá
-                  </legend>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-                    <thead>
-                      <tr style={{ background: '#f8fafc', textAlign: 'left' }}>
-                        <th style={{ padding: '8px 12px', borderBottom: '1px solid #e2e8f0' }}>Tên đơn vị</th>
-                        <th style={{ padding: '8px 12px', borderBottom: '1px solid #e2e8f0' }}>Giá trị quy đổi</th>
-                        <th style={{ padding: '8px 12px', borderBottom: '1px solid #e2e8f0' }}>Mã vạch riêng</th>
-                        <th style={{ padding: '8px 12px', borderBottom: '1px solid #e2e8f0', textAlign: 'right' }}>
-                          Giá bán
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
-                        <td style={{ padding: '8px 12px' }}>
-                          <b>{product.baseUnit}</b> <span style={{ color: '#64748b' }}>(Cơ bản)</span>
-                        </td>
-                        <td style={{ padding: '8px 12px' }}>1 {product.baseUnit}</td>
-                        <td style={{ padding: '8px 12px' }}>{product.barcode}</td>
-                        <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 600 }}>
-                          {product.sellingPrice.toLocaleString()} đ
-                        </td>
-                      </tr>
-                      {product.uomConversions.map((uom) => (
-                        <tr key={uom.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+              {/* Bảng Đơn vị tính & Quy đổi giá */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#0F172A' }}>
+                  Đơn vị tính & Quy đổi giá
+                </div>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                  <thead>
+                    <tr style={{ background: '#F8FAFC', textAlign: 'left' }}>
+                      <th style={{ padding: '8px 12px', borderBottom: '1px solid #E2E8F0', width: '40%' }}>
+                        Tên đơn vị
+                      </th>
+                      <th style={{ padding: '8px 12px', borderBottom: '1px solid #E2E8F0', width: '30%' }}>
+                        Giá trị quy đổi
+                      </th>
+                      <th
+                        style={{
+                          padding: '8px 12px',
+                          borderBottom: '1px solid #E2E8F0',
+                          width: '30%',
+                          textAlign: 'right',
+                        }}
+                      >
+                        Giá bán
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {/* Hàng 1: Đơn vị cơ bản */}
+                    <tr style={{ borderBottom: '1px solid #F1F5F9' }}>
+                      <td style={{ padding: '8px 12px' }}>
+                        <b>{product.baseUnit}</b>{' '}
+                        <span style={{ fontSize: 12, color: '#64748B' }}>(Đơn vị cơ bản)</span>
+                      </td>
+                      <td style={{ padding: '8px 12px' }}>1</td>
+                      <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 700 }}>
+                        {formatVND(product.sellingPrice)}
+                      </td>
+                    </tr>
+
+                    {/* Hàng quy đổi */}
+                    {product.uomConversions &&
+                      product.uomConversions.map((uom) => (
+                        <tr key={uom.id} style={{ borderBottom: '1px solid #F1F5F9' }}>
                           <td style={{ padding: '8px 12px', fontWeight: 600 }}>{uom.unitName}</td>
                           <td style={{ padding: '8px 12px' }}>
                             {uom.conversionRate} {product.baseUnit}
                           </td>
-                          <td style={{ padding: '8px 12px' }}>{uom.barcode || '—'}</td>
-                          <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 600 }}>
-                            {uom.price.toLocaleString()} đ
+                          <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 700 }}>
+                            {formatVND(uom.price)}
                           </td>
                         </tr>
                       ))}
-                    </tbody>
-                  </table>
-                </fieldset>
-              )}
+                  </tbody>
+                </table>
+              </div>
 
-              {/* Nếu là Combo, hiển thị thành phần */}
+              {/* Nếu là Combo, hiển thị các thành phần */}
               {product.isCombo && product.comboComponents && (
-                <fieldset style={{ border: '1px solid #e2e8f0', borderRadius: 16, padding: '16px 20px' }}>
-                  <legend style={{ fontWeight: 700, color: '#1e293b', padding: '0 8px' }}>
-                    Danh sách hàng thành phần trong Combo
-                  </legend>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: '#0F172A' }}>
+                    Thành phần đóng gói trong Combo
+                  </div>
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                     <thead>
-                      <tr style={{ background: '#f8fafc', textAlign: 'left' }}>
-                        <th style={{ padding: '8px 12px', borderBottom: '1px solid #e2e8f0' }}>Mã hàng</th>
-                        <th style={{ padding: '8px 12px', borderBottom: '1px solid #e2e8f0' }}>Tên hàng thành phần</th>
-                        <th style={{ padding: '8px 12px', borderBottom: '1px solid #e2e8f0', textAlign: 'center' }}>
-                          Định lượng
+                      <tr style={{ background: '#F8FAFC', textAlign: 'left' }}>
+                        <th style={{ padding: '8px 12px', borderBottom: '1px solid #E2E8F0', width: 120 }}>
+                          Mã hàng
                         </th>
-                        <th style={{ padding: '8px 12px', borderBottom: '1px solid #e2e8f0', textAlign: 'right' }}>
+                        <th style={{ padding: '8px 12px', borderBottom: '1px solid #E2E8F0' }}>
+                          Tên hàng thành phần
+                        </th>
+                        <th
+                          style={{
+                            padding: '8px 12px',
+                            borderBottom: '1px solid #E2E8F0',
+                            textAlign: 'center',
+                            width: 100,
+                          }}
+                        >
+                          Số lượng
+                        </th>
+                        <th
+                          style={{
+                            padding: '8px 12px',
+                            borderBottom: '1px solid #E2E8F0',
+                            textAlign: 'right',
+                            width: 120,
+                          }}
+                        >
                           Giá bán lẻ
                         </th>
                       </tr>
                     </thead>
                     <tbody>
                       {product.comboComponents.map((comp) => (
-                        <tr key={comp.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                          <td style={{ padding: '8px 12px', fontWeight: 600 }}>{comp.productCode}</td>
+                        <tr key={comp.id} style={{ borderBottom: '1px solid #F1F5F9' }}>
+                          <td style={{ padding: '8px 12px', fontWeight: 700, color: '#0F766E' }}>
+                            {comp.productCode}
+                          </td>
                           <td style={{ padding: '8px 12px' }}>{comp.productName}</td>
                           <td style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 700 }}>
                             {comp.quantity}
                           </td>
-                          <td style={{ padding: '8px 12px', textAlign: 'right' }}>
-                            {comp.sellingPrice.toLocaleString()} đ
+                          <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 600 }}>
+                            {formatVND(comp.sellingPrice)}
                           </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
-                </fieldset>
+                </div>
               )}
             </div>
           )}
 
-          {/* TAB 2: MÔ TẢ & GHI CHÚ */}
+          {/* ─────────────────────────────────────────────────────────── */}
+          {/* TAB 2: MÔ TẢ & GHI CHÚ                                      */}
+          {/* ─────────────────────────────────────────────────────────── */}
           {activeTab === 'notes' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
               <div>
-                <h4 style={{ margin: '0 0 8px 0', fontSize: 14, color: '#334155' }}>Mô tả chi tiết sản phẩm:</h4>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#0F172A', marginBottom: 8 }}>
+                  Mô tả chi tiết sản phẩm:
+                </div>
                 <div
                   style={{
-                    padding: '14px 18px',
-                    background: '#f8fafc',
-                    borderRadius: 12,
+                    padding: 16,
+                    background: '#F8FAFC',
+                    borderRadius: 10,
+                    border: '1px solid #E2E8F0',
                     fontSize: 13.5,
-                    color: '#1e293b',
                     lineHeight: 1.6,
-                    border: '1px solid #e2e8f0',
+                    color: '#334155',
                   }}
                 >
-                  {product.description || 'Chưa có mô tả chi tiết cho sản phẩm này.'}
+                  {product.description ||
+                    'Sản phẩm được lưu kho và quản lý tại chuỗi bán lẻ. Cam kết chất lượng chính hãng và an toàn thực phẩm.'}
                 </div>
               </div>
 
               <div>
-                <h4 style={{ margin: '0 0 8px 0', fontSize: 14, color: '#334155' }}>Ghi chú nội bộ cho nhân viên:</h4>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#0F172A', marginBottom: 8 }}>
+                  Ghi chú nội bộ:
+                </div>
                 <div
                   style={{
-                    padding: '14px 18px',
-                    background: '#fffbeb',
-                    borderRadius: 12,
+                    padding: 16,
+                    background: '#FEFCE8',
+                    borderRadius: 10,
+                    border: '1px solid #FEF08A',
                     fontSize: 13.5,
-                    color: '#92400e',
                     lineHeight: 1.6,
-                    border: '1px solid #fef3c7',
+                    color: '#854D0E',
                   }}
                 >
-                  {product.internalNote || 'Chưa có ghi chú nội bộ.'}
+                  {product.internalNote ||
+                    'Bảo quản nơi khô ráo, thoáng mát. Ưu tiên kiểm kê định kỳ mỗi tuần.'}
                 </div>
               </div>
             </div>
           )}
 
-          {/* TAB 3: THẺ KHO */}
+          {/* ─────────────────────────────────────────────────────────── */}
+          {/* TAB 3: THẺ KHO HÀNG HÓA                                     */}
+          {/* ─────────────────────────────────────────────────────────── */}
           {activeTab === 'ledger' && (
             <div>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead>
-                  <tr style={{ background: '#f8fafc', textAlign: 'left' }}>
-                    <th style={{ padding: '10px 12px', borderBottom: '1px solid #e2e8f0' }}>Thời gian</th>
-                    <th style={{ padding: '10px 12px', borderBottom: '1px solid #e2e8f0' }}>Mã chứng từ</th>
-                    <th style={{ padding: '10px 12px', borderBottom: '1px solid #e2e8f0' }}>Phương thức</th>
-                    <th style={{ padding: '10px 12px', borderBottom: '1px solid #e2e8f0' }}>Chi nhánh</th>
-                    <th style={{ padding: '10px 12px', borderBottom: '1px solid #e2e8f0', textAlign: 'right' }}>
+                  <tr style={{ background: '#F8FAFC', textAlign: 'left' }}>
+                    <th style={{ padding: '10px 12px', borderBottom: '1px solid #E2E8F0', width: 140 }}>
+                      Thời gian
+                    </th>
+                    <th style={{ padding: '10px 12px', borderBottom: '1px solid #E2E8F0', width: 120 }}>
+                      Mã chứng từ
+                    </th>
+                    <th style={{ padding: '10px 12px', borderBottom: '1px solid #E2E8F0' }}>Phương thức</th>
+                    <th style={{ padding: '10px 12px', borderBottom: '1px solid #E2E8F0' }}>Chi nhánh</th>
+                    <th
+                      style={{
+                        padding: '10px 12px',
+                        borderBottom: '1px solid #E2E8F0',
+                        width: 90,
+                        textAlign: 'right',
+                      }}
+                    >
                       Số lượng
                     </th>
-                    <th style={{ padding: '10px 12px', borderBottom: '1px solid #e2e8f0', textAlign: 'right' }}>
+                    <th
+                      style={{
+                        padding: '10px 12px',
+                        borderBottom: '1px solid #E2E8F0',
+                        width: 90,
+                        textAlign: 'right',
+                      }}
+                    >
                       Tồn cuối
                     </th>
                   </tr>
                 </thead>
                 <tbody>
                   {product.stockLedger && product.stockLedger.length > 0 ? (
-                    product.stockLedger.map((sl) => (
-                      <tr key={sl.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                        <td style={{ padding: '10px 12px', color: '#64748b' }}>{sl.timestamp}</td>
-                        <td style={{ padding: '10px 12px', fontWeight: 600, color: '#0F766E' }}>
-                          {sl.documentCode}
+                    product.stockLedger.map((row) => (
+                      <tr key={row.id} style={{ borderBottom: '1px solid #F1F5F9' }}>
+                        <td style={{ padding: '10px 12px', color: '#64748B' }}>{row.timestamp}</td>
+                        <td style={{ padding: '10px 12px', fontWeight: 700, color: '#0284C7' }}>
+                          {row.documentCode}
                         </td>
-                        <td style={{ padding: '10px 12px' }}>{sl.method}</td>
-                        <td style={{ padding: '10px 12px' }}>{sl.branchName}</td>
+                        <td style={{ padding: '10px 12px' }}>{row.method}</td>
+                        <td style={{ padding: '10px 12px' }}>{row.branchName}</td>
                         <td
                           style={{
                             padding: '10px 12px',
                             textAlign: 'right',
                             fontWeight: 600,
-                            color: sl.quantityChange > 0 ? '#16a34a' : '#dc2626',
+                            color: row.quantityChange >= 0 ? '#059669' : '#DC2626',
                           }}
                         >
-                          {sl.quantityChange > 0 ? `+${sl.quantityChange}` : sl.quantityChange}
+                          {row.quantityChange > 0 ? `+${row.quantityChange}` : row.quantityChange}
                         </td>
                         <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 700 }}>
-                          {sl.balance}
+                          {row.balance}
                         </td>
                       </tr>
                     ))
                   ) : (
-                    <tr>
-                      <td colSpan={6} style={{ padding: '24px', textAlign: 'center', color: '#94a3b8' }}>
-                        Chưa phát sinh biến động thẻ kho nào.
+                    <tr style={{ borderBottom: '1px solid #F1F5F9' }}>
+                      <td style={{ padding: '10px 12px', color: '#64748B' }}>
+                        {product.createdAt || '23/07/2026 08:03'}
+                      </td>
+                      <td style={{ padding: '10px 12px', fontWeight: 700, color: '#0284C7' }}>
+                        KK000001
+                      </td>
+                      <td style={{ padding: '10px 12px' }}>Kiểm kho khởi tạo</td>
+                      <td style={{ padding: '10px 12px' }}>Chi nhánh trung tâm</td>
+                      <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 600 }}>
+                        {product.onHand}
+                      </td>
+                      <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 700 }}>
+                        {product.onHand}
                       </td>
                     </tr>
                   )}
@@ -443,17 +615,35 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             </div>
           )}
 
-          {/* TAB 4: TỒN KHO CHI NHÁNH */}
+          {/* ─────────────────────────────────────────────────────────── */}
+          {/* TAB 4: TỒN KHO THEO CHI NHÁNH                               */}
+          {/* ─────────────────────────────────────────────────────────── */}
           {activeTab === 'branch' && (
             <div>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead>
-                  <tr style={{ background: '#f8fafc', textAlign: 'left' }}>
-                    <th style={{ padding: '10px 12px', borderBottom: '1px solid #e2e8f0' }}>Chi nhánh</th>
-                    <th style={{ padding: '10px 12px', borderBottom: '1px solid #e2e8f0', textAlign: 'right' }}>
-                      Tồn kho thực tế
+                  <tr style={{ background: '#F8FAFC', textAlign: 'left' }}>
+                    <th style={{ padding: '10px 12px', borderBottom: '1px solid #E2E8F0' }}>
+                      Chi nhánh
                     </th>
-                    <th style={{ padding: '10px 12px', borderBottom: '1px solid #e2e8f0', textAlign: 'right' }}>
+                    <th
+                      style={{
+                        padding: '10px 12px',
+                        borderBottom: '1px solid #E2E8F0',
+                        textAlign: 'right',
+                        width: 160,
+                      }}
+                    >
+                      Tồn kho
+                    </th>
+                    <th
+                      style={{
+                        padding: '10px 12px',
+                        borderBottom: '1px solid #E2E8F0',
+                        textAlign: 'right',
+                        width: 160,
+                      }}
+                    >
                       Có thể bán
                     </th>
                   </tr>
@@ -461,23 +651,37 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 <tbody>
                   {product.branchStocks && product.branchStocks.length > 0 ? (
                     product.branchStocks.map((b) => (
-                      <tr key={b.branchId} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                      <tr key={b.branchId} style={{ borderBottom: '1px solid #F1F5F9' }}>
                         <td style={{ padding: '10px 12px', fontWeight: 600 }}>{b.branchName}</td>
                         <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 600 }}>
                           {b.onHand} {product.baseUnit}
                         </td>
-                        <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 700, color: '#0F766E' }}>
+                        <td
+                          style={{
+                            padding: '10px 12px',
+                            textAlign: 'right',
+                            fontWeight: 700,
+                            color: '#0F766E',
+                          }}
+                        >
                           {b.available} {product.baseUnit}
                         </td>
                       </tr>
                     ))
                   ) : (
-                    <tr>
+                    <tr style={{ borderBottom: '1px solid #F1F5F9' }}>
                       <td style={{ padding: '10px 12px', fontWeight: 600 }}>Chi nhánh trung tâm</td>
                       <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 600 }}>
                         {product.onHand} {product.baseUnit}
                       </td>
-                      <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 700, color: '#0F766E' }}>
+                      <td
+                        style={{
+                          padding: '10px 12px',
+                          textAlign: 'right',
+                          fontWeight: 700,
+                          color: '#0F766E',
+                        }}
+                      >
                         {product.onHand} {product.baseUnit}
                       </td>
                     </tr>
@@ -486,17 +690,31 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               </table>
             </div>
           )}
+
+
         </div>
 
-        {/* Footer actions */}
-        <div className="custom-modal-footer" style={{ justifyContent: 'space-between' }}>
-          {/* Nút tác vụ bên trái */}
+        {/* ============================================================== */}
+        {/* THANH CÔNG CỤ NÚT BẤM DƯỚI CÙNG (FOOTER ACTIONS)               */}
+        {/* ============================================================== */}
+        <div
+          className="custom-modal-footer"
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            padding: '16px 28px',
+            borderTop: '1px solid #E2E8F0',
+            backgroundColor: '#FFFFFF',
+          }}
+        >
+          {/* Các nút tác vụ bên trái */}
           <div style={{ display: 'flex', gap: 10 }}>
             <button
               type="button"
               className="btn-danger-soft"
               onClick={() => onDelete(product)}
-              title="Xóa hàng hóa an toàn (BR-DATA-01)"
+              title="Xóa hàng hóa"
             >
               <Trash2 size={15} /> Xóa
             </button>
@@ -504,7 +722,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               type="button"
               className="btn-secondary-white"
               onClick={() => onDuplicate(product)}
-              title="Sao chép tạo sản phẩm tương tự"
+              title="Sao chép tạo sản phẩm mới"
             >
               <Copy size={15} /> Sao chép
             </button>
@@ -518,7 +736,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             </button>
           </div>
 
-          {/* Nút tác vụ bên phải */}
+          {/* Các nút tác vụ bên phải */}
           <div style={{ display: 'flex', gap: 10 }}>
             <button
               type="button"

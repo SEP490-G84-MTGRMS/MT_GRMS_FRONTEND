@@ -475,15 +475,25 @@ export const ProductListPage: React.FC = () => {
               <tbody>
                 {filteredProducts.map((p) => {
                   const isChecked = selectedProductIds.includes(p.id);
+                  const isSelected = selectedProduct?.id === p.id && isDetailModalOpen;
                   return (
                     <tr
                       key={p.id}
+                      onClick={() => {
+                        setSelectedProduct(p);
+                        setIsDetailModalOpen(true);
+                      }}
                       style={{
-                        backgroundColor: p.status === 'Discontinued' ? '#f8fafc' : undefined,
+                        cursor: 'pointer',
+                        backgroundColor: isSelected
+                          ? '#f0fdfa'
+                          : p.status === 'Discontinued'
+                          ? '#f8fafc'
+                          : undefined,
                         opacity: p.status === 'Discontinued' ? 0.75 : 1,
                       }}
                     >
-                      <td style={{ textAlign: 'center' }}>
+                      <td style={{ textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
                         <input
                           type="checkbox"
                           checked={isChecked}
@@ -496,7 +506,7 @@ export const ProductListPage: React.FC = () => {
                           }}
                         />
                       </td>
-                      <td style={{ textAlign: 'center' }}>
+                      <td style={{ textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
                         <button
                           type="button"
                           className={`favorite-star-btn ${p.isFavorite ? 'active' : ''}`}
@@ -507,24 +517,12 @@ export const ProductListPage: React.FC = () => {
                         </button>
                       </td>
                       <td>
-                        <span
-                          className="product-code-link"
-                          onClick={() => {
-                            setSelectedProduct(p);
-                            setIsDetailModalOpen(true);
-                          }}
-                        >
+                        <span className="product-code-link">
                           {p.productCode}
                         </span>
                       </td>
                       <td>
-                        <span
-                          style={{ fontWeight: 600, cursor: 'pointer', color: '#1e293b' }}
-                          onClick={() => {
-                            setSelectedProduct(p);
-                            setIsDetailModalOpen(true);
-                          }}
-                        >
+                        <span style={{ fontWeight: 600, color: '#1e293b' }}>
                           {p.productName}
                         </span>
                         {p.isCombo && <span className="badge-combo">Combo</span>}
@@ -589,16 +587,7 @@ export const ProductListPage: React.FC = () => {
         </div>
       </div>
 
-      {/* 3. Category Modal */}
-      <CategoryModal
-        isOpen={isCategoryModalOpen}
-        categoryToEdit={categoryToEdit}
-        onClose={() => setIsCategoryModalOpen(false)}
-        onSave={handleSaveCategory}
-        onDelete={handleDeleteCategory}
-      />
-
-      {/* 4. Product Form Modal (Add / Edit Standard Product) */}
+      {/* 3. Product Form Modal (Add / Edit Standard Product) */}
       <ProductFormModal
         isOpen={isProductFormOpen}
         productToEdit={productToEdit}
@@ -612,7 +601,7 @@ export const ProductListPage: React.FC = () => {
         userRole={userRole}
       />
 
-      {/* 5. Combo Form Modal */}
+      {/* 4. Combo Form Modal */}
       <ComboFormModal
         isOpen={isComboFormOpen}
         categories={categories}
@@ -625,7 +614,7 @@ export const ProductListPage: React.FC = () => {
         }}
       />
 
-      {/* 6. Product Detail Modal */}
+      {/* 5. Product Detail Modal */}
       <ProductDetailModal
         isOpen={isDetailModalOpen}
         product={selectedProduct}
@@ -639,6 +628,15 @@ export const ProductListPage: React.FC = () => {
         onToggleStatus={handleToggleStatus}
         onDuplicate={handleDuplicateProduct}
         userRole={userRole}
+      />
+
+      {/* 6. Category Modal (Placed last with high z-index to always render on top when opened from form modals) */}
+      <CategoryModal
+        isOpen={isCategoryModalOpen}
+        categoryToEdit={categoryToEdit}
+        onClose={() => setIsCategoryModalOpen(false)}
+        onSave={handleSaveCategory}
+        onDelete={handleDeleteCategory}
       />
     </div>
   );

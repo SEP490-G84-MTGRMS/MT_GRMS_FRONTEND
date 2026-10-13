@@ -57,8 +57,21 @@ export const CategoryModal: React.FC<CategoryModalProps> = ({
   };
 
   return (
-    <div className="custom-modal-backdrop">
-      <div className="custom-modal-box" style={{ maxWidth: 480 }}>
+    <div
+      className="custom-modal-backdrop"
+      style={{
+        zIndex: 1200,
+        backgroundColor: 'rgba(15, 23, 42, 0.65)',
+        backdropFilter: 'blur(5px)',
+      }}
+    >
+      <div
+        className="custom-modal-box"
+        style={{
+          maxWidth: 480,
+          boxShadow: '0 25px 60px rgba(0, 0, 0, 0.4)',
+        }}
+      >
         {/* Header */}
         <div className="custom-modal-header">
           <h3>{categoryToEdit ? 'Sửa nhóm hàng' : 'Tạo nhóm hàng'}</h3>

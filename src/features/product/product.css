@@ -253,8 +253,13 @@
   color: #1e293b;
 }
 
-.product-main-table tr:hover td {
-  background-color: #f8fafc;
+.product-main-table tbody tr {
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.product-main-table tbody tr:hover td {
+  background-color: #f0fdfa;
 }
 
 .product-code-link {

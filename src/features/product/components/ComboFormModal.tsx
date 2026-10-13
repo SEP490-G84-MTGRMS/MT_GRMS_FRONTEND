@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { X, Plus, Trash2, AlertCircle, Package } from 'lucide-react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { X, Trash2, AlertCircle, Package, Search } from 'lucide-react';
 import type { ProductItem, Category, ComboComponent } from '../types';
 
 interface ComboFormModalProps {
@@ -26,38 +26,83 @@ export const ComboFormModal: React.FC<ComboFormModalProps> = ({
   const [baseUnit, setBaseUnit] = useState('Giỏ quà');
   const [sellingPrice, setSellingPrice] = useState<number>(200000);
   const [components, setComponents] = useState<ComboComponent[]>([]);
-  const [selectedProductId, setSelectedProductId] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const searchContainerRef = useRef<HTMLDivElement>(null);
   const [description, setDescription] = useState('');
   const [internalNote, setInternalNote] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
 
-  if (!isOpen) return null;
+  // Click outside to close search dropdown
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        searchContainerRef.current &&
+        !searchContainerRef.current.contains(e.target as Node)
+      ) {
+        setIsSearchOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Reset form when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setProductCode('');
+      setBarcode('');
+      setProductName('');
+      setCategoryId(categories[0]?.id || '');
+      setBaseUnit('Giỏ quà');
+      setSellingPrice(200000);
+      setComponents([]);
+      setSearchTerm('');
+      setIsSearchOpen(false);
+      setDescription('');
+      setInternalNote('');
+      setErrorMsg('');
+    }
+  }, [isOpen]);
 
   // Non-combo products available for picking
   const selectableProducts = availableProducts.filter((p) => !p.isCombo);
 
-  const handleAddComponent = () => {
-    if (!selectedProductId) return;
-    const found = selectableProducts.find((p) => p.id === selectedProductId);
-    if (!found) return;
-
-    if (components.some((c) => c.productId === found.id)) {
-      setErrorMsg(`Sản phẩm "${found.productName}" đã có trong danh sách thành phần!`);
-      return;
+  // Filter products for search autocomplete
+  const searchResults = useMemo(() => {
+    if (!searchTerm.trim()) {
+      return selectableProducts.slice(0, 8);
     }
+    const q = searchTerm.toLowerCase().trim();
+    return selectableProducts.filter(
+      (p) =>
+        p.productName.toLowerCase().includes(q) ||
+        p.productCode.toLowerCase().includes(q) ||
+        p.barcode.toLowerCase().includes(q)
+    );
+  }, [selectableProducts, searchTerm]);
 
-    const newComp: ComboComponent = {
-      id: `comp-${Date.now()}`,
-      productId: found.id,
-      productCode: found.productCode,
-      productName: found.productName,
-      quantity: 1,
-      costPrice: found.costPrice || 0,
-      sellingPrice: found.sellingPrice,
-    };
-
-    setComponents([...components, newComp]);
-    setSelectedProductId('');
+  // Select a product to add/increment in components
+  const handleSelectProduct = (p: ProductItem) => {
+    const existingIndex = components.findIndex((c) => c.productId === p.id);
+    if (existingIndex >= 0) {
+      const updated = [...components];
+      updated[existingIndex].quantity += 1;
+      setComponents(updated);
+    } else {
+      const newComp: ComboComponent = {
+        id: `comp-${Date.now()}`,
+        productId: p.id,
+        productCode: p.productCode,
+        productName: p.productName,
+        quantity: 1,
+        costPrice: p.costPrice || 0,
+        sellingPrice: p.sellingPrice,
+      };
+      setComponents([...components, newComp]);
+    }
+    setSearchTerm('');
+    setIsSearchOpen(false);
     setErrorMsg('');
   };
 
@@ -148,8 +193,10 @@ export const ComboFormModal: React.FC<ComboFormModalProps> = ({
     onClose();
   };
 
+  if (!isOpen) return null;
+
   return (
-    <div className="custom-modal-backdrop">
+    <div className="custom-modal-backdrop" style={{ zIndex: 1100 }}>
       <div className="custom-modal-box" style={{ maxWidth: 950 }}>
         {/* Header */}
         <div className="custom-modal-header">
@@ -274,29 +321,158 @@ export const ComboFormModal: React.FC<ComboFormModalProps> = ({
               Hàng thành phần đóng gói
             </legend>
 
-            {/* Chọn thêm hàng thành phần */}
-            <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
-              <select
-                className="filter-select"
-                style={{ flex: 1 }}
-                value={selectedProductId}
-                onChange={(e) => setSelectedProductId(e.target.value)}
-              >
-                <option value="">-- Chọn sản phẩm thành phần để thêm vào combo --</option>
-                {selectableProducts.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    [{p.productCode}] {p.productName} - Tồn: {p.onHand} {p.baseUnit} - Giá bán: {p.sellingPrice.toLocaleString()} đ
-                  </option>
-                ))}
-              </select>
-              <button
-                type="button"
-                className="btn-primary-teal"
-                style={{ padding: '8px 16px' }}
-                onClick={handleAddComponent}
-              >
-                <Plus size={16} /> Thêm vào Combo
-              </button>
+            {/* Ô tìm kiếm hàng thành phần */}
+            <div ref={searchContainerRef} style={{ position: 'relative', marginBottom: 14 }}>
+              <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                <Search
+                  size={18}
+                  color="#64748B"
+                  style={{ position: 'absolute', left: 14, pointerEvents: 'none' }}
+                />
+                <input
+                  type="text"
+                  className="filter-input"
+                  style={{
+                    paddingLeft: 42,
+                    paddingRight: 36,
+                    height: 42,
+                    fontSize: 13,
+                    borderRadius: 10,
+                  }}
+                  placeholder="Nhập tên, mã hàng hoặc quét barcode để tìm và thêm hàng thành phần..."
+                  value={searchTerm}
+                  onChange={(e) => {
+                    setSearchTerm(e.target.value);
+                    setIsSearchOpen(true);
+                  }}
+                  onFocus={() => setIsSearchOpen(true)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && searchResults.length > 0) {
+                      e.preventDefault();
+                      handleSelectProduct(searchResults[0]);
+                    }
+                  }}
+                />
+                {searchTerm && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearchTerm('');
+                      setIsSearchOpen(false);
+                    }}
+                    style={{
+                      position: 'absolute',
+                      right: 12,
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      color: '#94A3B8',
+                      display: 'flex',
+                      alignItems: 'center',
+                      padding: 2,
+                    }}
+                  >
+                    <X size={16} />
+                  </button>
+                )}
+              </div>
+
+              {/* Danh sách kết quả tìm kiếm thả xuống */}
+              {isSearchOpen && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: 'calc(100% + 4px)',
+                    left: 0,
+                    right: 0,
+                    backgroundColor: '#FFFFFF',
+                    borderRadius: 12,
+                    border: '1px solid #CBD5E1',
+                    boxShadow: '0 12px 32px rgba(15, 23, 42, 0.16)',
+                    maxHeight: 260,
+                    overflowY: 'auto',
+                    zIndex: 100,
+                  }}
+                >
+                  {searchResults.length > 0 ? (
+                    searchResults.map((p) => {
+                      const isAlreadyIn = components.some((c) => c.productId === p.id);
+                      return (
+                        <div
+                          key={p.id}
+                          onClick={() => handleSelectProduct(p)}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '10px 16px',
+                            cursor: 'pointer',
+                            borderBottom: '1px solid #F1F5F9',
+                            transition: 'background-color 0.15s ease',
+                            backgroundColor: '#FFFFFF',
+                          }}
+                          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#F0FDFA')}
+                          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#FFFFFF')}
+                        >
+                          <div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <span style={{ fontWeight: 700, color: '#0F766E', fontSize: 13 }}>
+                                {p.productCode}
+                              </span>
+                              <span style={{ fontWeight: 600, color: '#0F172A', fontSize: 13 }}>
+                                {p.productName}
+                              </span>
+                              {isAlreadyIn && (
+                                <span
+                                  style={{
+                                    fontSize: 11,
+                                    backgroundColor: '#FEF3C7',
+                                    color: '#B45309',
+                                    padding: '1px 6px',
+                                    borderRadius: 9999,
+                                    fontWeight: 600,
+                                  }}
+                                >
+                                  Đã có (+1)
+                                </span>
+                              )}
+                            </div>
+                            <div style={{ fontSize: 11.5, color: '#64748B', marginTop: 2 }}>
+                              ĐVT: <b>{p.baseUnit}</b> &bull; Barcode: {p.barcode || '—'}
+                            </div>
+                          </div>
+
+                          <div style={{ textAlign: 'right' }}>
+                            <div style={{ fontWeight: 700, color: '#0F172A', fontSize: 13 }}>
+                              {p.sellingPrice.toLocaleString()} đ
+                            </div>
+                            <div
+                              style={{
+                                fontSize: 11.5,
+                                color: p.onHand <= 0 ? '#EF4444' : '#059669',
+                                fontWeight: 600,
+                              }}
+                            >
+                              Tồn kho: {p.onHand} {p.baseUnit}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div
+                      style={{
+                        padding: '20px 16px',
+                        textAlign: 'center',
+                        color: '#94A3B8',
+                        fontSize: 13,
+                      }}
+                    >
+                      Không tìm thấy sản phẩm nào khớp với từ khóa "{searchTerm}"
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Bảng chi tiết thành phần */}
