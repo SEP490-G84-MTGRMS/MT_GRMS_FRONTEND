@@ -8,6 +8,7 @@ interface OrderMatrixTableProps {
   qtyMap: QtyMatrixMap;
   showSoh: boolean;
   onQtyChange: (productId: string, dateKey: string, val: number) => void;
+  readOnly?: boolean;
 }
 
 export const OrderMatrixTable: FC<OrderMatrixTableProps> = ({
@@ -16,6 +17,7 @@ export const OrderMatrixTable: FC<OrderMatrixTableProps> = ({
   qtyMap,
   showSoh,
   onQtyChange,
+  readOnly = false,
 }) => {
   const fmt = (n: number) => new Intl.NumberFormat('vi-VN').format(n);
 
@@ -272,6 +274,23 @@ export const OrderMatrixTable: FC<OrderMatrixTableProps> = ({
                                   value={q > 0 ? q : ''}
                                   disabled
                                 />
+                              </td>
+                            );
+                          }
+
+                          if (readOnly) {
+                            return (
+                              <td key={d.dateKey} style={{ textAlign: 'center', backgroundColor: '#fcfcfd' }}>
+                                <span
+                                  style={{
+                                    fontFamily: 'var(--font-mono)',
+                                    fontWeight: q > 0 ? 700 : 400,
+                                    color: q > 0 ? 'var(--blue-primary)' : '#cbd5e1',
+                                    fontSize: 12.5,
+                                  }}
+                                >
+                                  {q > 0 ? q : '—'}
+                                </span>
                               </td>
                             );
                           }
