@@ -394,6 +394,7 @@ export const EmployeeOrderMatrixPage: FC = () => {
         status={status}
         onBack={() => navigate(-1)}
         onSave={handleSaveDraft}
+        onGoToCutoffHub={() => navigate('/store-owner/purchase-orders/dispatch-hub')}
         readOnly={isReadOnly}
         title={isReadOnly ? `Chi Tiết Đơn Đặt Hàng — ${employeeBranch.name}` : `Đặt Hàng Theo Ma Trận — ${employeeBranch.name}`}
       />

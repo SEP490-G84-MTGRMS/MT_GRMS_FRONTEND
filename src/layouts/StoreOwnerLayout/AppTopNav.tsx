@@ -51,6 +51,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'Đặt hàng theo chi nhánh', to: '/store-owner/purchase-orders/branches' },
       { label: 'Đặt hàng theo ma trận (Store Owner)', to: '/store-owner/purchase-orders/create-matrix', badge: 'Grid' },
       { label: 'Đặt hàng theo ma trận (Nhân viên)', to: '/employee/purchase-orders/create-matrix', badge: 'Staff' },
+      { label: 'Chốt đơn & Tách PO (Cutoff Hub)', to: '/store-owner/purchase-orders/dispatch-hub', badge: 'Hub' },
     ],
   },
   {

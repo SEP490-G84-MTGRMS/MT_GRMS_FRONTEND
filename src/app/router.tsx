@@ -4,7 +4,7 @@ import { WebStoreLayout } from '../layouts/WebStoreLayout';
 import { AuthLayout } from '../layouts/AuthLayout';
 import { HomePage } from '../pages/HomePage';
 import { SupplierListPage, SupplierDetailPage, SupplierProductManagementPage } from '../features/supplier';
-import { OrderMatrixPage, BranchOrderListPage, EmployeeOrderMatrixPage } from '../features/purchase-order';
+import { OrderMatrixPage, BranchOrderListPage, EmployeeOrderMatrixPage, SupplierOrderDispatchHubPage } from '../features/purchase-order';
 import { ServiceExpensesPage } from '../features/service-expenses/pages/ServiceExpensesPage';
 import { CustomerManagementPage } from '../features/customer-crm';
 import { StoreOwnerLayout } from '../layouts/StoreOwnerLayout';
@@ -65,6 +65,14 @@ export const router = createBrowserRouter([
         element: <EmployeeOrderMatrixPage />,
       },
       {
+        path: 'purchase-orders/dispatch-hub',
+        element: <SupplierOrderDispatchHubPage />,
+      },
+      {
+        path: 'purchase-orders/cutoff-hub',
+        element: <SupplierOrderDispatchHubPage />,
+      },
+      {
         path: 'expenses',
         element: <ServiceExpensesPage />,
       },
@@ -117,6 +125,14 @@ export const router = createBrowserRouter([
       {
         path: 'purchase-orders/employee-matrix',
         element: <EmployeeOrderMatrixPage />,
+      },
+      {
+        path: 'purchase-orders/dispatch-hub',
+        element: <SupplierOrderDispatchHubPage />,
+      },
+      {
+        path: 'purchase-orders/cutoff-hub',
+        element: <SupplierOrderDispatchHubPage />,
       },
       {
         path: 'expenses',
