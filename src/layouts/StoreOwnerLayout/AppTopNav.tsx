@@ -56,6 +56,7 @@ const NAV_GROUPS: NavGroup[] = [
     label: 'Tài chính',
     icon: TrendingUpIcon,
     children: [
+      { label: 'Sổ quỹ & Dòng tiền (FE-17)', to: '/store-owner/cashbook', badge: 'FE-17' },
       { label: 'Báo cáo Lãi / Lỗ & KPIs (FE-10)', to: '/store-owner/reports/pnl', badge: 'FE-10' },
       { label: 'Khách hàng & Công nợ (FE-08)', to: '/store-owner/customers', badge: 'FE-08' },
       { label: 'Chi phí vận hành (FE-07)', to: '/store-owner/expenses', badge: 'FE-07' },

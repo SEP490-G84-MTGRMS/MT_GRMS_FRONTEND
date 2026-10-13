@@ -8,6 +8,7 @@ import { OrderMatrixPage } from '../features/purchase-order';
 import { ServiceExpensesPage } from '../features/service-expenses/pages/ServiceExpensesPage';
 import { CustomerManagementPage } from '../features/customer-crm';
 import { ReportsPnlDashboardPage } from '../features/reports-pnl';
+import { CashbookPage } from '../features/cashbook';
 import { StoreOwnerLayout } from '../layouts/StoreOwnerLayout';
 import { AdminDashboardPage } from '../pages/admin/AdminDashboardPage';
 import { TenantManagementPage } from '../pages/admin/TenantManagementPage';
@@ -65,6 +66,10 @@ export const router = createBrowserRouter([
         path: 'reports/pnl',
         element: <ReportsPnlDashboardPage />,
       },
+      {
+        path: 'cashbook',
+        element: <CashbookPage />,
+      },
     ],
   },
   {
@@ -111,6 +116,10 @@ export const router = createBrowserRouter([
         path: 'reports/pnl',
         element: <ReportsPnlDashboardPage />,
       },
+      {
+        path: 'cashbook',
+        element: <CashbookPage />,
+      },
     ],
   },
   {
@@ -152,6 +161,10 @@ export const router = createBrowserRouter([
       {
         path: 'customers',
         element: <Navigate to="/store-owner/customers" replace />,
+      },
+      {
+        path: 'cashbook',
+        element: <Navigate to="/store-owner/cashbook" replace />,
       },
     ],
   },
