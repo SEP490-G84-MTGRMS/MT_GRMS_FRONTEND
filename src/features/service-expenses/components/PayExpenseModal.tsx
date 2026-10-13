@@ -1,5 +1,5 @@
 import { type FC, useState } from 'react';
-import { Banknote, CheckCircle, Loader2, X } from 'lucide-react';
+import { CloseIcon, TrendingUpIcon } from '../../admin/components';
 import {
   EXPENSE_CATEGORY_LABELS,
   type PayExpenseRequest,
@@ -59,155 +59,198 @@ export const PayExpenseModal: FC<PayExpenseModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-white rounded-[24px] shadow-2xl max-w-md w-full overflow-hidden border border-gray-100 flex flex-col">
+    <div className="expense-modal-backdrop" onClick={onClose}>
+      <div
+        className="expense-modal-dialog"
+        style={{ maxWidth: '480px' }}
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
-        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-[#f7faff]">
-          <div className="flex items-center gap-2">
-            <div className="p-2 rounded-full bg-emerald-50 text-emerald-600">
-              <Banknote className="w-5 h-5" />
+        <div className="expense-modal-header">
+          <div className="expense-modal-title">
+            <div
+              style={{
+                width: '32px',
+                height: '32px',
+                borderRadius: '50%',
+                background: '#ecfdf5',
+                color: '#059669',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <TrendingUpIcon size={16} color="#059669" />
             </div>
-            <h3 className="font-bold text-gray-900 text-base">
-              Xác nhận thanh toán chi phí
-            </h3>
+            <h3>Xác nhận thanh toán chi phí</h3>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100 transition-colors"
+            className="modal-close-btn"
+            title="Đóng cửa sổ"
           >
-            <X className="w-5 h-5" />
+            <CloseIcon size={16} color="currentColor" />
           </button>
         </div>
 
         {/* Content */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          {/* Summary Box */}
-          <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100 space-y-2">
-            <div className="flex justify-between text-xs text-gray-500">
-              <span>Mã chi phí:</span>
-              <span className="font-semibold text-gray-700">{item.expenseId}</span>
-            </div>
-            <div className="flex justify-between text-xs text-gray-500">
-              <span>Danh mục:</span>
-              <span className="font-medium text-gray-700">
-                {EXPENSE_CATEGORY_LABELS[item.category] || item.category}
-              </span>
-            </div>
-            <div className="flex justify-between text-xs text-gray-500">
-              <span>Nhà cung cấp:</span>
-              <span className="font-medium text-gray-700">{item.vendorName}</span>
-            </div>
-            <div className="pt-2 border-t border-gray-200 flex justify-between items-center">
-              <span className="text-sm font-semibold text-gray-800">
-                Số tiền thanh toán:
-              </span>
-              <span className="text-xl font-extrabold text-[#0066ff]">
-                {formatCurrency(item.amount)}
-              </span>
-            </div>
-          </div>
-
-          {/* Payment Method */}
-          <div>
-            <label className="block text-xs font-semibold text-gray-700 mb-1.5">
-              Phương thức thanh toán <span className="text-red-500">*</span>
-            </label>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => setPaymentMethod('Cash')}
-                className={`py-2 px-3 text-sm font-medium rounded-full border transition-all ${
-                  paymentMethod === 'Cash'
-                    ? 'bg-blue-50 border-[#0066ff] text-[#0066ff]'
-                    : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
-                }`}
-              >
-                Tiền mặt (Quỹ)
-              </button>
-              <button
-                type="button"
-                onClick={() => setPaymentMethod('BankTransfer')}
-                className={`py-2 px-3 text-sm font-medium rounded-full border transition-all ${
-                  paymentMethod === 'BankTransfer'
-                    ? 'bg-blue-50 border-[#0066ff] text-[#0066ff]'
-                    : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
-                }`}
-              >
-                Chuyển khoản NH
-              </button>
-            </div>
-          </div>
-
-          {/* Cashbook Integration Checkbox */}
-          <div className="p-3 bg-blue-50/50 rounded-2xl border border-blue-100 flex items-start gap-3">
-            <input
-              type="checkbox"
-              id="cashbook-check"
-              checked={createCashBookEntry}
-              onChange={(e) => setCreateCashBookEntry(e.target.checked)}
-              className="mt-1 w-4 h-4 rounded text-[#0066ff] focus:ring-[#0066ff] border-gray-300"
-            />
-            <label
-              htmlFor="cashbook-check"
-              className="text-xs text-gray-700 cursor-pointer select-none"
+        <form onSubmit={handleSubmit}>
+          <div className="expense-modal-body">
+            {/* Summary Box */}
+            <div
+              style={{
+                padding: '16px',
+                background: 'var(--bg-soft-blue, #f7faff)',
+                borderRadius: '16px',
+                border: '1px solid var(--blue-border, #dbe9fe)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '8px',
+              }}
             >
-              <span className="font-semibold block text-gray-800">
-                Tự động tạo phiếu chi trong Sổ quỹ (FE-17)
-              </span>
-              Hạch toán ngay số tiền này vào dòng tiền chi nhánh để bảo đảm tính
-              chính xác của báo cáo tài chính.
-            </label>
-          </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: '#64748b' }}>
+                <span>Mã chi phí:</span>
+                <span style={{ fontWeight: 700, color: 'var(--blue-primary, #0066ff)' }}>{item.expenseId}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: '#64748b' }}>
+                <span>Danh mục:</span>
+                <span style={{ fontWeight: 600, color: '#334155' }}>
+                  {EXPENSE_CATEGORY_LABELS[item.category] || item.category}
+                </span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: '#64748b' }}>
+                <span>Nhà cung cấp:</span>
+                <span style={{ fontWeight: 600, color: '#334155' }}>{item.vendorName}</span>
+              </div>
+              <div
+                style={{
+                  paddingTop: '8px',
+                  marginTop: '4px',
+                  borderTop: '1px solid #e2e8f0',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                }}
+              >
+                <span style={{ fontSize: '0.84rem', fontWeight: 700, color: '#1e293b' }}>
+                  Số tiền thanh toán:
+                </span>
+                <span style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--blue-primary, #0066ff)' }}>
+                  {formatCurrency(item.amount)}
+                </span>
+              </div>
+            </div>
 
-          {/* Payment Date */}
-          <div>
-            <label className="block text-xs font-semibold text-gray-700 mb-1">
-              Ngày ghi nhận thanh toán
-            </label>
-            <input
-              type="date"
-              value={paymentDate}
-              onChange={(e) => setPaymentDate(e.target.value)}
-              className="w-full px-4 py-2 text-sm bg-gray-50 border border-gray-200 rounded-full focus:outline-none focus:border-[#0066ff]"
-            />
-          </div>
+            {/* Payment Method */}
+            <div className="form-group">
+              <label className="form-label">
+                Phương thức thanh toán <span style={{ color: '#ef4444' }}>*</span>
+              </label>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                <button
+                  type="button"
+                  onClick={() => setPaymentMethod('Cash')}
+                  style={{
+                    padding: '9px 12px',
+                    borderRadius: 'var(--radius-pill, 9999px)',
+                    fontSize: '0.83rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    transition: 'all 0.15s',
+                    border: paymentMethod === 'Cash' ? '1px solid var(--blue-primary, #0066ff)' : '1px solid #e2e8f0',
+                    background: paymentMethod === 'Cash' ? 'var(--blue-light, #f0f6ff)' : '#ffffff',
+                    color: paymentMethod === 'Cash' ? 'var(--blue-primary, #0066ff)' : '#475569',
+                  }}
+                >
+                  Tiền mặt (Quỹ quầy)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPaymentMethod('BankTransfer')}
+                  style={{
+                    padding: '9px 12px',
+                    borderRadius: 'var(--radius-pill, 9999px)',
+                    fontSize: '0.83rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    transition: 'all 0.15s',
+                    border: paymentMethod === 'BankTransfer' ? '1px solid var(--blue-primary, #0066ff)' : '1px solid #e2e8f0',
+                    background: paymentMethod === 'BankTransfer' ? 'var(--blue-light, #f0f6ff)' : '#ffffff',
+                    color: paymentMethod === 'BankTransfer' ? 'var(--blue-primary, #0066ff)' : '#475569',
+                  }}
+                >
+                  Chuyển khoản NH
+                </button>
+              </div>
+            </div>
 
-          {/* Note */}
-          <div>
-            <label className="block text-xs font-semibold text-gray-700 mb-1">
-              Ghi chú thanh toán
-            </label>
-            <input
-              type="text"
-              placeholder="VD: Đã chi tiền mặt từ két ca sáng..."
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              className="w-full px-4 py-2 text-sm bg-gray-50 border border-gray-200 rounded-full focus:outline-none focus:border-[#0066ff]"
-            />
+            {/* Cashbook Integration Checkbox */}
+            <div
+              style={{
+                padding: '12px 16px',
+                background: '#f0fdf4',
+                borderRadius: '16px',
+                border: '1px solid #bbf7d0',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+              }}
+            >
+              <input
+                type="checkbox"
+                id="cashbook-check"
+                checked={createCashBookEntry}
+                onChange={(e) => setCreateCashBookEntry(e.target.checked)}
+                style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+              />
+              <label htmlFor="cashbook-check" style={{ fontSize: '0.8rem', color: '#166534', cursor: 'pointer', fontWeight: 500 }}>
+                Tự động tạo phiếu chi trong Sổ quỹ (FE-17 Cashbook)
+              </label>
+            </div>
+
+            {/* Payment Date */}
+            <div className="form-group">
+              <label className="form-label">
+                Ngày chi tiền thực tế <span style={{ color: '#ef4444' }}>*</span>
+              </label>
+              <input
+                type="date"
+                value={paymentDate}
+                onChange={(e) => setPaymentDate(e.target.value)}
+                className="form-input"
+              />
+            </div>
+
+            {/* Note */}
+            <div className="form-group">
+              <label className="form-label">Ghi chú thanh toán</label>
+              <textarea
+                rows={2}
+                placeholder="Nhập mã giao dịch ngân hàng hoặc ghi chú..."
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                className="form-textarea"
+              />
+            </div>
           </div>
 
           {/* Action buttons */}
-          <div className="pt-3 flex items-center justify-end gap-3 border-t border-gray-100">
+          <div className="expense-modal-footer">
             <button
               type="button"
               onClick={onClose}
               disabled={isSubmitting}
-              className="px-5 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-full transition-colors"
+              className="btn-secondary-pill"
             >
               Hủy bỏ
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="px-6 py-2 text-sm font-medium text-white bg-[#0066ff] hover:bg-[#0052cc] rounded-full transition-colors shadow-sm flex items-center gap-2 disabled:opacity-50"
+              className="btn-primary-pill"
             >
-              {isSubmitting ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <CheckCircle className="w-4 h-4" />
-              )}
-              <span>Xác nhận thanh toán</span>
+              <span>{isSubmitting ? 'Đang xử lý...' : 'Xác nhận thanh toán'}</span>
             </button>
           </div>
         </form>

@@ -1,5 +1,5 @@
 import { type FC, useState } from 'react';
-import { ExternalLink, ImageOff, X } from 'lucide-react';
+import { CloseIcon, ExportIcon } from '../../admin/components';
 
 interface BillPreviewModalProps {
   isOpen: boolean;
@@ -19,46 +19,75 @@ export const BillPreviewModal: FC<BillPreviewModalProps> = ({
   if (!isOpen || !imageUrl) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-white rounded-[24px] shadow-2xl max-w-2xl w-full overflow-hidden border border-gray-100 flex flex-col">
+    <div className="expense-modal-backdrop" onClick={onClose}>
+      <div
+        className="expense-modal-dialog"
+        style={{ maxWidth: '640px' }}
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
-        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-[#f7faff]">
-          <h3 className="font-bold text-gray-900 text-base truncate max-w-[80%]">
-            {title}
-          </h3>
-          <div className="flex items-center gap-2">
+        <div className="expense-modal-header">
+          <div className="expense-modal-title">
+            <h3 style={{ maxWidth: '480px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {title}
+            </h3>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <a
               href={imageUrl}
               target="_blank"
               rel="noreferrer"
-              className="p-1.5 text-gray-400 hover:text-[#0066ff] rounded-full hover:bg-gray-100 transition-colors"
+              className="action-icon-btn"
               title="Mở ảnh trong tab mới"
             >
-              <ExternalLink className="w-4 h-4" />
+              <ExportIcon size={14} color="currentColor" />
             </a>
             <button
               type="button"
               onClick={onClose}
-              className="p-1.5 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100 transition-colors"
+              className="modal-close-btn"
+              title="Đóng cửa sổ"
             >
-              <X className="w-5 h-5" />
+              <CloseIcon size={16} color="currentColor" />
             </button>
           </div>
         </div>
 
         {/* Image Content */}
-        <div className="p-6 flex items-center justify-center bg-gray-50 min-h-[320px] max-h-[70vh] overflow-auto">
+        <div
+          style={{
+            padding: '24px',
+            background: '#f8fafc',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            minHeight: '320px',
+            maxHeight: '65vh',
+            overflow: 'auto',
+          }}
+        >
           {hasError ? (
-            <div className="text-center p-8">
-              <div className="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-3">
-                <ImageOff className="w-8 h-8" />
+            <div style={{ textAlign: 'center', padding: '32px 16px' }}>
+              <div
+                style={{
+                  width: '54px',
+                  height: '54px',
+                  background: '#fef2f2',
+                  color: '#ef4444',
+                  borderRadius: '50%',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginBottom: '12px',
+                }}
+              >
+                <CloseIcon size={24} color="#ef4444" />
               </div>
-              <p className="font-semibold text-gray-800">
+              <p style={{ fontWeight: 700, color: '#1e293b', margin: '0 0 6px 0' }}>
                 Không thể tải ảnh hóa đơn chứng từ
               </p>
-              <p className="text-xs text-gray-400 mt-1 max-w-sm mx-auto">
-                Đường dẫn liên kết không tồn tại hoặc đã hết hạn truy cập. Bạn có
-                thể mở thử đường dẫn ngoài bằng nút liên kết phía trên.
+              <p style={{ fontSize: '0.78rem', color: '#94a3b8', margin: 0, maxWidth: '360px' }}>
+                Đường dẫn liên kết không tồn tại hoặc đã hết hạn truy cập. Bạn có thể mở liên kết ngoài bằng nút mở rộng phía trên.
               </p>
             </div>
           ) : (
@@ -66,17 +95,24 @@ export const BillPreviewModal: FC<BillPreviewModalProps> = ({
               src={imageUrl}
               alt="Hóa đơn chứng từ chi phí"
               onError={() => setHasError(true)}
-              className="max-h-[60vh] max-w-full rounded-2xl shadow-sm object-contain border border-gray-200"
+              style={{
+                maxHeight: '58vh',
+                maxWidth: '100%',
+                borderRadius: '16px',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+                objectFit: 'contain',
+                border: '1px solid #e2e8f0',
+              }}
             />
           )}
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-3 border-t border-gray-100 flex justify-end bg-white">
+        <div className="expense-modal-footer">
           <button
             type="button"
             onClick={onClose}
-            className="px-5 py-2 text-sm font-medium text-white bg-[#0066ff] hover:bg-[#0052cc] rounded-full transition-colors"
+            className="btn-primary-pill"
           >
             Đóng xem
           </button>

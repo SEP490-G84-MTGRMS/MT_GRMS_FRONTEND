@@ -1,17 +1,13 @@
-import { createBrowserRouter } from 'react-router-dom';
+import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { PosLayout } from '../layouts/PosLayout';
 import { WebStoreLayout } from '../layouts/WebStoreLayout';
 import { AuthLayout } from '../layouts/AuthLayout';
 import { HomePage } from '../pages/HomePage';
-<<<<<<< HEAD
-import { ServiceExpensesPage } from '../features/service-expenses/pages/ServiceExpensesPage';
-=======
 import { SupplierListPage, SupplierDetailPage, SupplierProductManagementPage } from '../features/supplier';
-
+import { ServiceExpensesPage } from '../features/service-expenses/pages/ServiceExpensesPage';
 import { StoreOwnerLayout } from '../layouts/StoreOwnerLayout';
 import { AdminDashboardPage } from '../pages/admin/AdminDashboardPage';
 import { TenantManagementPage } from '../pages/admin/TenantManagementPage';
->>>>>>> f1504be62cde29a5c3f71a0fab54e8f5c68353ef
 
 export const router = createBrowserRouter([
   {
@@ -50,6 +46,10 @@ export const router = createBrowserRouter([
         path: 'suppliers/:id/products',
         element: <SupplierProductManagementPage />,
       },
+      {
+        path: 'expenses',
+        element: <ServiceExpensesPage />,
+      },
     ],
   },
   {
@@ -79,6 +79,10 @@ export const router = createBrowserRouter([
       {
         path: 'suppliers/:id/products',
         element: <SupplierProductManagementPage />,
+      },
+      {
+        path: 'expenses',
+        element: <ServiceExpensesPage />,
       },
     ],
   },
@@ -110,6 +114,10 @@ export const router = createBrowserRouter([
         path: 'suppliers/:id/products',
         element: <SupplierProductManagementPage />,
       },
+      {
+        path: 'expenses',
+        element: <Navigate to="/store-owner/expenses" replace />,
+      },
     ],
   },
   {
@@ -134,7 +142,7 @@ export const router = createBrowserRouter([
       },
       {
         path: 'expenses',
-        element: <ServiceExpensesPage />,
+        element: <Navigate to="/store-owner/expenses" replace />,
       },
     ],
   },

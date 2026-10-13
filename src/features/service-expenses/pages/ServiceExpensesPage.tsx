@@ -1,5 +1,10 @@
-import { type FC, useState } from 'react';
-import { PlusCircle, RefreshCw } from 'lucide-react';
+import { type FC, useState, useRef } from 'react';
+import {
+  AdminToast,
+  type ToastState,
+  PlusIcon,
+  RefreshIcon,
+} from '../../admin/components';
 import { BillPreviewModal } from '../components/BillPreviewModal';
 import { CreateExpenseModal } from '../components/CreateExpenseModal';
 import { ExpenseFilterBar } from '../components/ExpenseFilterBar';
@@ -19,15 +24,23 @@ import type {
   PayExpenseRequest,
   ServiceExpenseDto,
 } from '../types/expense.types';
+import { calculatePeriodRange } from '../utils/datePeriodUtils';
+import '../service-expenses.css';
 
 export const ServiceExpensesPage: FC = () => {
-  const [filters, setFilters] = useState<ExpenseFilterParams>({
-    page: 1,
-    pageSize: 10,
-    branchId: '',
-    category: '',
-    status: '',
-    keyword: '',
+  const [periodLabel, setPeriodLabel] = useState('Tháng 10/2026');
+  const [filters, setFilters] = useState<ExpenseFilterParams>(() => {
+    const range = calculatePeriodRange('this-month');
+    return {
+      page: 1,
+      pageSize: 10,
+      branchId: '',
+      category: '',
+      status: '',
+      keyword: '',
+      fromDate: range.fromDate,
+      toDate: range.toDate,
+    };
   });
 
   // Modals state
@@ -37,7 +50,20 @@ export const ServiceExpensesPage: FC = () => {
     url: string;
     title: string;
   } | null>(null);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Toast state (AdminToast standard)
+  const [toast, setToast] = useState<ToastState | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showToast = (message: string, type: ToastState['type'] = 'success') => {
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current);
+    }
+    setToast({ id: Date.now().toString(), message, type });
+    toastTimerRef.current = setTimeout(() => {
+      setToast(null);
+    }, 2800);
+  };
 
   // Queries & Mutations
   const {
@@ -47,17 +73,15 @@ export const ServiceExpensesPage: FC = () => {
     isRefetching,
   } = useServiceExpenses(filters);
 
-  const { data: summaryData, isLoading: isSummaryLoading } =
-    useExpenseSummary(filters.branchId || undefined);
+  const { data: summaryData, isLoading: isSummaryLoading } = useExpenseSummary(
+    filters.branchId || undefined,
+    filters.fromDate,
+    filters.toDate
+  );
 
   const createExpenseMutation = useCreateExpense();
   const payExpenseMutation = usePayExpense();
   const cancelExpenseMutation = useCancelExpense();
-
-  const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3500);
-  };
 
   const handleFilterChange = (updated: Partial<ExpenseFilterParams>) => {
     setFilters((prev) => ({
@@ -68,6 +92,8 @@ export const ServiceExpensesPage: FC = () => {
   };
 
   const handleResetFilters = () => {
+    const range = calculatePeriodRange('this-month');
+    setPeriodLabel(range.label);
     setFilters({
       page: 1,
       pageSize: 10,
@@ -75,12 +101,14 @@ export const ServiceExpensesPage: FC = () => {
       category: '',
       status: '',
       keyword: '',
+      fromDate: range.fromDate,
+      toDate: range.toDate,
     });
   };
 
   const handleCreateSubmit = async (data: CreateExpenseRequest) => {
     await createExpenseMutation.mutateAsync(data);
-    showToast('Đã ghi nhận chi phí vận hành mới thành công!');
+    showToast('Đã ghi nhận chi phí vận hành mới thành công!', 'success');
   };
 
   const handlePaySubmit = async (
@@ -88,7 +116,7 @@ export const ServiceExpensesPage: FC = () => {
     data: PayExpenseRequest
   ) => {
     await payExpenseMutation.mutateAsync({ expenseId, data });
-    showToast('Đã hoàn tất thanh toán và hạch toán dòng tiền!');
+    showToast('Đã hoàn tất thanh toán và hạch toán dòng tiền Sổ quỹ!', 'success');
   };
 
   const handleCancelClick = async (item: ServiceExpenseDto) => {
@@ -101,63 +129,65 @@ export const ServiceExpensesPage: FC = () => {
       expenseId: item.expenseId,
       reason: 'Người dùng hủy thao tác trên hệ thống quản lý',
     });
-    showToast('Đã hủy khoản chi phí thành công.');
+    showToast('Đã hủy khoản chi phí thành công.', 'info');
   };
 
   return (
-    <div className="space-y-6">
-      {/* Toast Notification */}
-      {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 bg-gray-900 text-white px-5 py-3 rounded-full shadow-xl text-sm font-medium animate-in fade-in slide-in-from-bottom-3 duration-200 flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-emerald-400" />
-          {toastMessage}
-        </div>
+    <div className="expense-page">
+      {/* Toast Notification (Shared AdminToast) */}
+      {toast && (
+        <AdminToast
+          toast={toast}
+          onClose={() => setToast(null)}
+        />
       )}
 
-      {/* Header Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">
-            Quản Lý Chi Phí Dịch Vụ & Vận Hành (FE-07)
+      {/* Top Header Bar */}
+      <div className="expense-topbar">
+        <div className="expense-topbar-title">
+          <h1>
+            <span>Quản Lý Chi Phí Dịch Vụ & Vận Hành (FE-07)</span>
           </h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Theo dõi hóa đơn định kỳ, kiểm soát hạn trả nợ và liên kết tự động Sổ
-            quỹ tiền mặt
+          <p>
+            Theo dõi hóa đơn định kỳ, kiểm soát hạn nợ đối soát và liên kết tự động Sổ quỹ tiền mặt
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="expense-topbar-actions">
           <button
             type="button"
             onClick={() => refetch()}
             disabled={isRefetching}
-            title="Làm mới dữ liệu"
-            className="p-2.5 bg-white border border-gray-200 hover:bg-gray-50 rounded-full text-gray-600 shadow-sm transition-colors disabled:opacity-50"
+            title="Làm mới dữ liệu danh sách"
+            className="action-icon-btn"
           >
-            <RefreshCw
-              className={`w-4 h-4 ${isRefetching ? 'animate-spin' : ''}`}
-            />
+            <RefreshIcon size={16} color="currentColor" />
           </button>
 
           <button
             type="button"
             onClick={() => setIsCreateOpen(true)}
-            className="px-5 py-2.5 text-sm font-semibold text-white bg-[#0066ff] hover:bg-[#0052cc] rounded-full shadow-[0_10px_25px_-4px_rgba(0,102,255,0.32)] transition-all flex items-center gap-2"
+            className="btn-primary-pill"
           >
-            <PlusCircle className="w-4 h-4" />
+            <PlusIcon size={16} color="#ffffff" />
             <span>Ghi nhận chi phí</span>
           </button>
         </div>
       </div>
 
       {/* 4 KPI Summary Cards */}
-      <ExpenseKpiCards summary={summaryData} isLoading={isSummaryLoading} />
+      <ExpenseKpiCards
+        summary={summaryData}
+        isLoading={isSummaryLoading}
+        periodLabel={periodLabel}
+      />
 
       {/* Filter Bar */}
       <ExpenseFilterBar
         filters={filters}
         onFilterChange={handleFilterChange}
         onReset={handleResetFilters}
+        onPeriodLabelChange={setPeriodLabel}
       />
 
       {/* Main Expense Table */}

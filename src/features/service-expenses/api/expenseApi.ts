@@ -112,6 +112,8 @@ const filterMockList = (params?: ExpenseFilterParams): ServiceExpenseDto[] => {
     if (params?.branchId && item.branchId !== params.branchId) return false;
     if (params?.category && item.category !== params.category) return false;
     if (params?.status && item.status !== params.status) return false;
+    if (params?.fromDate && item.expenseDate < params.fromDate) return false;
+    if (params?.toDate && item.expenseDate > params.toDate) return false;
     if (params?.keyword) {
       const q = params.keyword.toLowerCase();
       const matchVendor = item.vendorName.toLowerCase().includes(q);
@@ -158,22 +160,33 @@ export const getServiceExpenses = async (
 /**
  * Fetch monthly KPI summary metrics
  * @param branchId Optional branch filter
+ * @param fromDate Optional start date
+ * @param toDate Optional end date
  * @returns Promise with summary numbers
  */
 export const getExpenseSummary = async (
-  branchId?: string
+  branchId?: string,
+  fromDate?: string,
+  toDate?: string
 ): Promise<ExpenseSummaryDto> => {
   try {
     const res = await httpClient.get<ApiResponse<ExpenseSummaryDto>>(
       '/service-expenses/summary',
-      { params: { branchId } }
+      { params: { branchId, fromDate, toDate } }
     );
     if (res.data?.data) return res.data.data;
   } catch (error) {
     console.warn('API summary unavailable, calculating from mock:', error);
   }
 
-  const list = branchId ? mockExpenses.filter((e) => e.branchId === branchId) : mockExpenses;
+  let list = branchId ? mockExpenses.filter((e) => e.branchId === branchId) : mockExpenses;
+  if (fromDate) {
+    list = list.filter((e) => e.expenseDate >= fromDate);
+  }
+  if (toDate) {
+    list = list.filter((e) => e.expenseDate <= toDate);
+  }
+
   const totalExpenseThisMonth = list
     .filter((e) => e.status !== 'Cancelled')
     .reduce((sum, item) => sum + item.amount, 0);

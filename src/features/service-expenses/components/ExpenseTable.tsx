@@ -1,12 +1,11 @@
 import type { FC } from 'react';
 import {
-  Banknote,
-  ChevronLeft,
-  ChevronRight,
-  Eye,
-  FileX,
-  ReceiptText,
-} from 'lucide-react';
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  EyeIcon,
+  CloseIcon,
+  AuditIcon,
+} from '../../admin/components';
 import {
   EXPENSE_CATEGORY_LABELS,
   type ServiceExpenseDto,
@@ -48,94 +47,126 @@ export const ExpenseTable: FC<ExpenseTableProps> = ({
 
   if (isLoading) {
     return (
-      <div className="bg-white border border-gray-100 rounded-[24px] shadow-sm overflow-hidden p-6">
-        <div className="space-y-4">
-          {[1, 2, 3, 4, 5].map((i) => (
-            <div
-              key={i}
-              className="h-12 bg-gray-100 rounded-xl animate-pulse"
-            />
-          ))}
-        </div>
+      <div className="expense-table-container" style={{ padding: '24px' }}>
+        {[1, 2, 3, 4, 5].map((i) => (
+          <div
+            key={i}
+            className="skeleton-line"
+            style={{ height: '36px', marginBottom: '12px' }}
+          />
+        ))}
       </div>
     );
   }
 
   if (data.length === 0) {
     return (
-      <div className="bg-white border border-gray-100 rounded-[24px] shadow-sm p-12 text-center">
-        <div className="w-16 h-16 bg-blue-50 text-[#0066ff] rounded-full flex items-center justify-center mx-auto mb-4">
-          <ReceiptText className="w-8 h-8" />
+      <div
+        className="expense-table-container"
+        style={{ padding: '64px 24px', textAlign: 'center' }}
+      >
+        <div
+          style={{
+            width: '56px',
+            height: '56px',
+            background: 'var(--blue-light, #f0f6ff)',
+            borderRadius: '50%',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginBottom: '16px',
+            color: 'var(--blue-primary, #0066ff)',
+          }}
+        >
+          <AuditIcon size={28} color="#0066ff" />
         </div>
-        <h4 className="text-lg font-bold text-gray-800">
+        <h4
+          style={{
+            fontSize: '1.05rem',
+            fontWeight: 800,
+            color: 'var(--text-main, #111827)',
+            margin: '0 0 6px 0',
+          }}
+        >
           Chưa có khoản chi phí nào phù hợp
         </h4>
-        <p className="text-sm text-gray-500 mt-1 max-w-md mx-auto">
-          Không tìm thấy dữ liệu khớp với bộ lọc tìm kiếm hiện tại. Thử thay đổi
-          bộ lọc hoặc ghi nhận chi phí mới.
+        <p
+          style={{
+            fontSize: '0.82rem',
+            color: 'var(--text-muted, #4b5563)',
+            maxWidth: '400px',
+            margin: '0 auto',
+          }}
+        >
+          Không tìm thấy dữ liệu khớp với bộ lọc tìm kiếm hiện tại. Thử thay đổi bộ
+          lọc hoặc ghi nhận khoản chi mới.
         </p>
       </div>
     );
   }
 
   return (
-    <div className="bg-white border border-gray-100 rounded-[24px] shadow-sm overflow-hidden flex flex-col">
-      <div className="overflow-x-auto">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-[#f7faff] text-gray-600 font-semibold border-b border-gray-100">
+    <div className="expense-table-container">
+      <div style={{ overflowX: 'auto' }}>
+        <table className="expense-table">
+          <thead>
             <tr>
-              <th className="py-4 px-5">Mã & Ngày</th>
-              <th className="py-4 px-4">Danh mục</th>
-              <th className="py-4 px-4">Chi nhánh</th>
-              <th className="py-4 px-4">Nhà cung cấp</th>
-              <th className="py-4 px-4">Hạn thanh toán</th>
-              <th className="py-4 px-4 text-right">Số tiền</th>
-              <th className="py-4 px-4 text-center">Trạng thái</th>
-              <th className="py-4 px-5 text-right">Thao tác</th>
+              <th style={{ width: '15%' }}>Mã & Ngày</th>
+              <th style={{ width: '13%' }}>Danh mục</th>
+              <th style={{ width: '15%' }}>Chi nhánh</th>
+              <th style={{ width: '21%' }}>Nhà cung cấp / Nội dung</th>
+              <th style={{ width: '11%' }}>Hạn thanh toán</th>
+              <th style={{ width: '12%', textAlign: 'right' }}>Số tiền</th>
+              <th style={{ width: '13%', textAlign: 'center' }}>Trạng thái</th>
+              <th style={{ width: '10%', textAlign: 'right' }}>Thao tác</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
+          <tbody>
             {data.map((item) => (
-              <tr
-                key={item.expenseId}
-                className="hover:bg-blue-50/40 transition-colors"
-              >
-                <td className="py-3.5 px-5">
-                  <div className="font-semibold text-gray-900">
-                    {item.expenseId}
+              <tr key={item.expenseId}>
+                <td>
+                  <div className="expense-table-code">{item.expenseId}</div>
+                  <div style={{ fontSize: '0.74rem', color: '#94a3b8' }}>
+                    {item.expenseDate}
                   </div>
-                  <div className="text-xs text-gray-400">{item.expenseDate}</div>
                 </td>
-                <td className="py-3.5 px-4">
-                  <span className="font-medium text-gray-700">
+                <td>
+                  <span style={{ fontWeight: 600, color: '#334155' }}>
                     {EXPENSE_CATEGORY_LABELS[item.category] || item.category}
                   </span>
                 </td>
-                <td className="py-3.5 px-4 text-gray-600">
+                <td style={{ color: '#475569' }}>
                   {item.branchName || item.branchId}
                 </td>
-                <td className="py-3.5 px-4">
-                  <div className="font-medium text-gray-800 max-w-[200px] truncate">
-                    {item.vendorName}
-                  </div>
+                <td>
+                  <div className="expense-table-vendor">{item.vendorName}</div>
                   {item.note && (
-                    <div className="text-xs text-gray-400 max-w-[200px] truncate">
+                    <div
+                      style={{
+                        fontSize: '0.74rem',
+                        color: '#94a3b8',
+                        maxWidth: '220px',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }}
+                      title={item.note}
+                    >
                       {item.note}
                     </div>
                   )}
                 </td>
-                <td className="py-3.5 px-4 text-gray-600">{item.dueDate}</td>
-                <td className="py-3.5 px-4 text-right font-bold text-gray-900">
+                <td style={{ color: '#64748b', fontSize: '0.8rem' }}>
+                  {item.dueDate}
+                </td>
+                <td className="expense-table-amount">
                   {formatCurrency(item.amount)}
                 </td>
-                <td className="py-3.5 px-4 text-center">
-                  <ExpenseStatusBadge
-                    status={item.status}
-                    dueDate={item.dueDate}
-                  />
+                <td style={{ textAlign: 'center' }}>
+                  <ExpenseStatusBadge status={item.status} dueDate={item.dueDate} />
                 </td>
-                <td className="py-3.5 px-5 text-right">
-                  <div className="flex items-center justify-end gap-1.5">
+                <td>
+                  <div className="table-action-group" style={{ justifyContent: 'flex-end' }}>
                     {item.attachedBillUrl && (
                       <button
                         type="button"
@@ -146,9 +177,9 @@ export const ExpenseTable: FC<ExpenseTableProps> = ({
                           )
                         }
                         title="Xem hóa đơn đính kèm"
-                        className="p-1.5 text-gray-500 hover:text-[#0066ff] hover:bg-blue-50 rounded-full transition-colors"
+                        className="action-icon-btn"
                       >
-                        <Eye className="w-4 h-4" />
+                        <EyeIcon size={14} color="currentColor" />
                       </button>
                     )}
 
@@ -157,18 +188,18 @@ export const ExpenseTable: FC<ExpenseTableProps> = ({
                         <button
                           type="button"
                           onClick={() => onPay(item)}
-                          className="px-3 py-1 text-xs font-medium text-white bg-[#0066ff] hover:bg-[#0052cc] rounded-full transition-colors flex items-center gap-1 shadow-sm"
+                          className="action-btn-pay"
+                          title="Xác nhận thanh toán khoản chi này"
                         >
-                          <Banknote className="w-3 h-3" />
                           Thanh toán
                         </button>
                         <button
                           type="button"
                           onClick={() => onCancel(item)}
                           title="Hủy khoản chi"
-                          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors"
+                          className="action-icon-btn danger"
                         >
-                          <FileX className="w-4 h-4" />
+                          <CloseIcon size={13} color="currentColor" />
                         </button>
                       </>
                     )}
@@ -181,36 +212,34 @@ export const ExpenseTable: FC<ExpenseTableProps> = ({
       </div>
 
       {/* Pagination Footer */}
-      <div className="py-3.5 px-6 border-t border-gray-100 flex items-center justify-between text-xs text-gray-500">
+      <div className="expense-pagination">
         <div>
           Hiển thị{' '}
-          <span className="font-semibold text-gray-700">
+          <strong>
             {Math.min(totalItems, (page - 1) * pageSize + 1)} -{' '}
             {Math.min(totalItems, page * pageSize)}
-          </span>{' '}
-          trên tổng số{' '}
-          <span className="font-semibold text-gray-700">{totalItems}</span> khoản
-          chi
+          </strong>{' '}
+          trên tổng số <strong>{totalItems}</strong> khoản chi
         </div>
-        <div className="flex items-center gap-2">
+        <div className="expense-page-btns">
           <button
             type="button"
             disabled={page <= 1}
             onClick={() => onPageChange(page - 1)}
-            className="p-1.5 rounded-full border border-gray-200 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            className="page-btn"
           >
-            <ChevronLeft className="w-4 h-4" />
+            <ChevronLeftIcon size={14} color="currentColor" />
           </button>
-          <span className="font-medium text-gray-700">
+          <span style={{ fontSize: '0.8rem', fontWeight: 600, padding: '0 8px' }}>
             Trang {page} / {totalPages}
           </span>
           <button
             type="button"
             disabled={page >= totalPages}
             onClick={() => onPageChange(page + 1)}
-            className="p-1.5 rounded-full border border-gray-200 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            className="page-btn"
           >
-            <ChevronRight className="w-4 h-4" />
+            <ChevronRightIcon size={14} color="currentColor" />
           </button>
         </div>
       </div>

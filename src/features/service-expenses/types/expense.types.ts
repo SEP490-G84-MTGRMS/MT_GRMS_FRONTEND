@@ -95,8 +95,19 @@ export const createExpenseSchema = z.object({
     .positive('Số tiền chi phí phải lớn hơn 0'),
   expenseDate: z.string().min(1, 'Vui lòng chọn ngày phát sinh chi phí'),
   dueDate: z.string().min(1, 'Vui lòng chọn hạn thanh toán'),
-  vendorName: z.string().trim().min(2, 'Tên nhà cung cấp tối thiểu 2 ký tự'),
-  attachedBillUrl: z.string().url('Đường dẫn ảnh hóa đơn không hợp lệ').optional().or(z.literal('')),
+  attachedBillUrl: z
+    .string()
+    .refine(
+      (val) =>
+        !val ||
+        val.startsWith('http://') ||
+        val.startsWith('https://') ||
+        val.startsWith('data:image/') ||
+        val.startsWith('blob:'),
+      { message: 'Chứng từ đính kèm phải là đường dẫn URL hoặc tệp ảnh hợp lệ' }
+    )
+    .optional()
+    .or(z.literal('')),
   note: z.string().max(500, 'Ghi chú tối đa 500 ký tự').optional(),
 });
 

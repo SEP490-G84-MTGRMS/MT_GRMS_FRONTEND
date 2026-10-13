@@ -1,15 +1,16 @@
 import type { FC } from 'react';
 import {
-  AlertTriangle,
-  CheckCircle2,
-  Clock,
-  TrendingDown,
-} from 'lucide-react';
+  TrendingUpIcon,
+  ClockIcon,
+  CheckCircleIcon,
+  AlertTriangleIcon,
+} from '../../admin/components';
 import type { ExpenseSummaryDto } from '../types/expense.types';
 
 interface ExpenseKpiCardsProps {
   summary?: ExpenseSummaryDto;
   isLoading?: boolean;
+  periodLabel?: string;
 }
 
 /**
@@ -24,83 +25,76 @@ const formatCurrency = (val?: number): string => {
   }).format(val);
 };
 
-export const ExpenseKpiCards: FC<ExpenseKpiCardsProps> = ({ summary, isLoading }) => {
+export const ExpenseKpiCards: FC<ExpenseKpiCardsProps> = ({
+  summary,
+  isLoading,
+  periodLabel,
+}) => {
   if (isLoading) {
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div className="expense-kpi-grid">
         {[1, 2, 3, 4].map((i) => (
-          <div
-            key={i}
-            className="h-28 bg-white border border-gray-100 rounded-[24px] p-5 shadow-sm animate-pulse flex flex-col justify-between"
-          >
-            <div className="h-4 bg-gray-200 rounded w-1/2" />
-            <div className="h-7 bg-gray-200 rounded w-3/4 mt-2" />
+          <div key={i} className="expense-kpi-card" style={{ minHeight: '120px' }}>
+            <div className="skeleton-line" style={{ width: '45%', marginBottom: '16px' }} />
+            <div className="skeleton-line" style={{ width: '70%', height: '24px' }} />
           </div>
         ))}
       </div>
     );
   }
 
+  const currentPeriod = periodLabel || 'tháng này';
+
   const cards = [
     {
-      title: 'Tổng chi phí tháng này',
+      title: `Tổng chi phí (${currentPeriod})`,
       value: formatCurrency(summary?.totalExpenseThisMonth),
-      subtext: 'Bao gồm mọi khoản chi',
-      icon: TrendingDown,
-      iconBg: 'bg-blue-50 text-[#0066ff]',
-      borderColor: 'hover:border-blue-200',
+      subtext: 'Bao gồm mọi khoản chi vận hành',
+      icon: TrendingUpIcon,
+      iconClass: 'kpi-icon-blue',
+      iconColor: '#0066ff',
     },
     {
       title: 'Chờ thanh toán',
       value: formatCurrency(summary?.totalPendingAmount),
       subtext: 'Cần giải ngân kịp hạn',
-      icon: Clock,
-      iconBg: 'bg-amber-50 text-amber-600',
-      borderColor: 'hover:border-amber-200',
+      icon: ClockIcon,
+      iconClass: 'kpi-icon-amber',
+      iconColor: '#d97706',
     },
     {
-      title: 'Đã hoàn tất thanh toán',
+      title: `Đã thanh toán (${currentPeriod})`,
       value: formatCurrency(summary?.totalPaidAmount),
       subtext: 'Đã hạch toán sổ quỹ',
-      icon: CheckCircle2,
-      iconBg: 'bg-emerald-50 text-emerald-600',
-      borderColor: 'hover:border-emerald-200',
+      icon: CheckCircleIcon,
+      iconClass: 'kpi-icon-green',
+      iconColor: '#059669',
     },
     {
       title: 'Khoản chi quá hạn',
-      value: `${summary?.overdueCount ?? 0} khoản`,
-      subtext: 'Cần xử lý khẩn cấp',
-      icon: AlertTriangle,
-      iconBg: 'bg-red-50 text-red-600',
-      borderColor: 'hover:border-red-200',
-      isWarning: (summary?.overdueCount ?? 0) > 0,
+      value: summary?.overdueCount ? `${summary.overdueCount} khoản` : '0 khoản',
+      subtext: summary?.overdueCount ? 'Cần xử lý khẩn cấp' : 'Không có khoản nợ trễ',
+      icon: AlertTriangleIcon,
+      iconClass: 'kpi-icon-red',
+      iconColor: '#dc2626',
     },
   ];
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+    <div className="expense-kpi-grid">
       {cards.map((card, idx) => {
         const IconComponent = card.icon;
         return (
-          <div
-            key={idx}
-            className={`bg-white border border-gray-100 rounded-[24px] p-5 shadow-sm transition-all duration-200 ${card.borderColor} flex items-start justify-between`}
-          >
-            <div>
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">
-                {card.title}
-              </p>
-              <h3
-                className={`text-2xl font-bold mt-2 tracking-tight ${
-                  card.isWarning ? 'text-red-600' : 'text-gray-900'
-                }`}
-              >
-                {card.value}
-              </h3>
-              <p className="text-xs text-gray-400 mt-1">{card.subtext}</p>
+          <div key={idx} className="expense-kpi-card">
+            <div className="expense-kpi-header">
+              <span className="expense-kpi-title">{card.title}</span>
+              <div className={`expense-kpi-icon ${card.iconClass}`}>
+                <IconComponent size={18} color={card.iconColor} />
+              </div>
             </div>
-            <div className={`p-3 rounded-full ${card.iconBg}`}>
-              <IconComponent className="w-5 h-5" />
+            <div>
+              <div className="expense-kpi-value">{card.value}</div>
+              <div className="expense-kpi-subtext">{card.subtext}</div>
             </div>
           </div>
         );

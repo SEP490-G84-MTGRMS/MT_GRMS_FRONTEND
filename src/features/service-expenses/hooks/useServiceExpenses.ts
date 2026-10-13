@@ -20,7 +20,8 @@ export const expenseKeys = {
   lists: () => [...expenseKeys.all, 'list'] as const,
   list: (params?: ExpenseFilterParams) => [...expenseKeys.lists(), params] as const,
   summaries: () => [...expenseKeys.all, 'summary'] as const,
-  summary: (branchId?: string) => [...expenseKeys.summaries(), branchId] as const,
+  summary: (branchId?: string, fromDate?: string, toDate?: string) =>
+    [...expenseKeys.summaries(), branchId, fromDate, toDate] as const,
 };
 
 /**
@@ -36,13 +37,19 @@ export const useServiceExpenses = (params?: ExpenseFilterParams) => {
 };
 
 /**
- * Hook to retrieve monthly KPI summary cards
+ * Hook to retrieve KPI summary cards for a period
  * @param branchId Optional branch ID
+ * @param fromDate Optional start date
+ * @param toDate Optional end date
  */
-export const useExpenseSummary = (branchId?: string) => {
+export const useExpenseSummary = (
+  branchId?: string,
+  fromDate?: string,
+  toDate?: string
+) => {
   return useQuery({
-    queryKey: expenseKeys.summary(branchId),
-    queryFn: () => getExpenseSummary(branchId),
+    queryKey: expenseKeys.summary(branchId, fromDate, toDate),
+    queryFn: () => getExpenseSummary(branchId, fromDate, toDate),
     staleTime: 1000 * 60,
   });
 };
