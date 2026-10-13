@@ -37,19 +37,12 @@ export const TenantDataTable: FC<TenantDataTableProps> = ({
   const getPlanBadge = (plan: Tenant['plan']) => {
     switch (plan) {
       case 'enterprise':
-        return (
-          <span
-            className="admin-badge"
-            style={{ background: '#eef2ff', color: '#4f46e5', border: '1px solid #c7d2fe' }}
-          >
-            Doanh Nghiệp
-          </span>
-        );
+        return <span className="admin-table-neutral-tag">Doanh Nghiệp</span>;
       case 'advanced':
-        return <span className="admin-badge admin-badge-blue">Nâng Cao</span>;
+        return <span className="admin-table-neutral-tag">Nâng Cao</span>;
       case 'basic':
       default:
-        return <span className="admin-badge admin-badge-blue">Cơ Bản</span>;
+        return <span className="admin-table-neutral-tag">Cơ Bản</span>;
     }
   };
 
@@ -172,7 +165,7 @@ export const TenantDataTable: FC<TenantDataTableProps> = ({
                     {t.status === 'locked' ? (
                       <button
                         type="button"
-                        className="admin-btn admin-btn-sm admin-btn-success"
+                        className="admin-table-btn"
                         onClick={() => onUnlock(t)}
                       >
                         Mở khóa
@@ -181,14 +174,14 @@ export const TenantDataTable: FC<TenantDataTableProps> = ({
                       <>
                         <button
                           type="button"
-                          className="admin-btn admin-btn-sm admin-btn-secondary"
+                          className="admin-table-btn"
                           onClick={() => onExtendGrace(t)}
                         >
                           Thêm ngày
                         </button>
                         <button
                           type="button"
-                          className="admin-btn admin-btn-sm admin-btn-danger"
+                          className="admin-table-btn"
                           onClick={() => onLock(t)}
                         >
                           Khóa mềm
@@ -197,7 +190,7 @@ export const TenantDataTable: FC<TenantDataTableProps> = ({
                     ) : (
                       <button
                         type="button"
-                        className="admin-btn admin-btn-sm admin-btn-secondary"
+                        className="admin-table-btn"
                         onClick={() => onLock(t)}
                       >
                         Khóa
@@ -205,7 +198,7 @@ export const TenantDataTable: FC<TenantDataTableProps> = ({
                     )}
                     <button
                       type="button"
-                      className="admin-btn admin-btn-sm admin-btn-primary"
+                      className="admin-table-btn admin-table-btn-primary"
                       onClick={() => onDetail(t)}
                     >
                       Chi tiết

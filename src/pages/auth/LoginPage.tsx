@@ -45,7 +45,6 @@ export const LoginPage: FC = () => {
       setIsLoading(true);
       const res = await authService.login({
         email: phoneOrEmail.trim(),
-        usernameOrEmail: phoneOrEmail.trim(),
         password,
         rememberMe,
       });

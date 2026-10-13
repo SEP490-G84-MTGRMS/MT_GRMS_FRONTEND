@@ -79,17 +79,6 @@ export const SupplierDetailHeader: FC<Props> = ({ supplier, onBack, onEdit }) =>
           <Link
             to={`/store-owner/suppliers/${supplier.id}/products`}
             className="admin-btn admin-btn-secondary"
-            style={{
-              height: 38,
-              padding: '0 16px',
-              borderRadius: 'var(--radius-pill)',
-              fontSize: 13,
-              fontWeight: 600,
-              gap: 6,
-              textDecoration: 'none',
-              display: 'inline-flex',
-              alignItems: 'center',
-            }}
             title="Quản lý danh mục sản phẩm của nhà cung cấp này"
           >
             <Package size={14} />
@@ -98,16 +87,8 @@ export const SupplierDetailHeader: FC<Props> = ({ supplier, onBack, onEdit }) =>
 
           <button
             type="button"
-            className="admin-btn admin-btn-secondary"
+            className="admin-btn admin-btn-primary"
             onClick={onEdit}
-            style={{
-              height: 38,
-              padding: '0 18px',
-              borderRadius: 'var(--radius-pill)',
-              fontSize: 13,
-              fontWeight: 600,
-              gap: 6,
-            }}
           >
             <Edit3 size={14} />
             <span>Chỉnh sửa</span>

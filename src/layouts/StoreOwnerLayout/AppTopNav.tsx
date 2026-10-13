@@ -46,8 +46,30 @@ const NAV_GROUPS: NavGroup[] = [
     id: 'goods',
     label: 'Hàng hóa',
     icon: PackageIcon,
-    children: [
-      { label: 'Sản phẩm theo NCC', to: '/store-owner/suppliers/products', badge: 'Master' },
+    sections: [
+      {
+        title: 'Danh mục & Sản phẩm',
+        items: [
+          { label: 'Danh mục hàng hóa', to: '/store-owner/suppliers/products' },
+          { label: 'Sản phẩm theo NCC', to: '/store-owner/suppliers/products', badge: 'Master', badgeType: 'blue' },
+          { label: 'Thiết lập bảng giá', to: '/store-owner/suppliers/products?view=pricing' },
+        ],
+      },
+      {
+        title: 'Kho & Hạn dùng (FEFO)',
+        items: [
+          { label: 'Kiểm kho & Cân đối', to: '/store-owner/suppliers/products?view=inventory' },
+          { label: 'Quản lý Date (FEFO)', to: '/store-owner/suppliers/products?view=fefo', badge: 'Mới', badgeType: 'red' },
+          { label: 'Chuyển kho chi nhánh', to: '/store-owner/suppliers/products?view=transfers' },
+        ],
+      },
+      {
+        title: 'Quy cách & Đóng gói',
+        items: [
+          { label: 'Combo - Đóng gói', to: '/store-owner/suppliers/products?view=combos' },
+          { label: 'In mã vạch & Tem giá', to: '/store-owner/suppliers/products?view=barcodes' },
+        ],
+      },
     ],
   },
   {
@@ -81,8 +103,30 @@ const NAV_GROUPS: NavGroup[] = [
     id: 'finance',
     label: 'Tài chính',
     icon: TrendingUpIcon,
-    children: [
-      { label: 'Chi phí vận hành (FE-07)', to: '/store-owner/expenses', badge: 'FE-07' },
+    sections: [
+      {
+        title: 'Chi phí & Vận hành',
+        items: [
+          { label: 'Chi phí vận hành', to: '/store-owner/expenses', badge: 'FE-07', badgeType: 'red' },
+          { label: 'Sổ quỹ tiền mặt & Bank', to: '/store-owner/expenses?view=cashbook' },
+          { label: 'Tạo phiếu chi dịch vụ', to: '/store-owner/expenses?view=create', badge: 'Mới', badgeType: 'red' },
+        ],
+      },
+      {
+        title: 'Công nợ & Đối soát',
+        items: [
+          { label: 'Công nợ nhà cung cấp', to: '/store-owner/suppliers?view=debt' },
+          { label: 'Sổ nợ khách & VietQR', to: '/store-owner/suppliers?view=customer-debt', badge: 'VietQR', badgeType: 'blue' },
+          { label: 'Theo dõi trả góp / gối đầu', to: '/store-owner/expenses?view=installments' },
+        ],
+      },
+      {
+        title: 'Báo cáo tài chính',
+        items: [
+          { label: 'Báo cáo kết quả kinh doanh', to: '/admin/dashboard' },
+          { label: 'Dòng tiền kinh doanh', to: '/store-owner/expenses?view=cashflow' },
+        ],
+      },
     ],
   },
 ];
@@ -214,6 +258,22 @@ const NavDropdown: FC<DropdownProps> = ({
       return (
         (currPath === toPath || currPath.startsWith(toPath + '/')) &&
         !currPath.includes('/products') &&
+        !hasOtherView
+      );
+    }
+
+    if (toPath === '/store-owner/suppliers/products') {
+      const hasOtherView = Boolean(currQuery && currQuery.includes('view='));
+      return (
+        (currPath === toPath || currPath.startsWith(toPath + '/')) &&
+        !hasOtherView
+      );
+    }
+
+    if (toPath === '/store-owner/expenses') {
+      const hasOtherView = Boolean(currQuery && (currQuery.includes('view=') || currQuery.includes('tab=')));
+      return (
+        (currPath === toPath || currPath.startsWith(toPath + '/')) &&
         !hasOtherView
       );
     }
@@ -896,6 +956,20 @@ export const AppTopNav: FC = () => {
                                 return (
                                   (currPath === toPath || currPath.startsWith(toPath + '/')) &&
                                   !currPath.includes('/products') &&
+                                  !hasOtherView
+                                );
+                              }
+                              if (toPath === '/store-owner/suppliers/products') {
+                                const hasOtherView = currQuery.includes('view=');
+                                return (
+                                  (currPath === toPath || currPath.startsWith(toPath + '/')) &&
+                                  !hasOtherView
+                                );
+                              }
+                              if (toPath === '/store-owner/expenses') {
+                                const hasOtherView = currQuery.includes('view=') || currQuery.includes('tab=');
+                                return (
+                                  (currPath === toPath || currPath.startsWith(toPath + '/')) &&
                                   !hasOtherView
                                 );
                               }

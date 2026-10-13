@@ -85,11 +85,12 @@ export const AdminDashboardPage: FC = () => {
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <select
             style={{
-              height: 38,
-              padding: '0 28px 0 14px',
-              borderRadius: 'var(--radius-pill)',
-              border: '1px solid var(--border-light)',
+              height: 34,
+              padding: '0 28px 0 12px',
+              borderRadius: 6,
+              border: '1px solid #d1d5db',
               backgroundColor: '#ffffff',
+              color: '#1e293b',
               fontFamily: 'inherit',
               fontSize: 13,
               cursor: 'pointer',
