@@ -384,5 +384,60 @@ export const TruckIcon: FC<IconProps> = ({ size = defaultProps.size, className, 
   </svg>
 );
 
+/** ✖️ Đóng / Hủy */
+export const CloseIcon: FC<IconProps> = ({ size = defaultProps.size, className, color = 'currentColor', style }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke={color}
+    strokeWidth={defaultProps.strokeWidth}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+    style={style}
+  >
+    <line x1="18" y1="6" x2="6" y2="18" />
+    <line x1="6" y1="6" x2="18" y2="18" />
+  </svg>
+);
 
+/** 👁️ Xem chi tiết */
+export const EyeIcon: FC<IconProps> = ({ size = defaultProps.size, className, color = 'currentColor', style }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke={color}
+    strokeWidth={defaultProps.strokeWidth}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+    style={style}
+  >
+    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+    <circle cx="12" cy="12" r="3" />
+  </svg>
+);
 
+/** 📤 Tải tệp lên / Upload */
+export const UploadIcon: FC<IconProps> = ({ size = defaultProps.size, className, color = 'currentColor', style }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke={color}
+    strokeWidth={defaultProps.strokeWidth}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+    style={style}
+  >
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+    <polyline points="17 8 12 3 7 8" />
+    <line x1="12" y1="3" x2="12" y2="15" />
+  </svg>
+);
