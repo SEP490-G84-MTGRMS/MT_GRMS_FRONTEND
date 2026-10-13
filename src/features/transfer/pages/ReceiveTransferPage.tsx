@@ -2,9 +2,11 @@ import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
-  CheckCircle,
+  Search,
+  User,
+  Check,
+  Save,
   AlertTriangle,
-  CheckCheck,
 } from 'lucide-react';
 import { INITIAL_TRANSFERS } from '../services/mockData';
 import type { TransferOrder, TransferItem } from '../types';
@@ -17,12 +19,40 @@ export const ReceiveTransferPage: React.FC = () => {
 
   const foundTransfer = INITIAL_TRANSFERS.find((t) => t.id === id) || INITIAL_TRANSFERS[0];
   const [transfer, setTransfer] = useState<TransferOrder>(foundTransfer);
-  const [items, setItems] = useState<TransferItem[]>(foundTransfer.items);
+  const [items, setItems] = useState<TransferItem[]>([
+    {
+      id: 'ti-1',
+      productId: 'prod-102',
+      productCode: 'SP000063',
+      productName: 'Bộ 3 bình gốm sứ - Gốm sứ',
+      unitName: 'Chiếc',
+      onHandSender: 10,
+      onHandReceiver: 0,
+      sentQty: 5,
+      receivedQty: 5,
+      unitPrice: 1600000,
+      amount: 8000000,
+    },
+    {
+      id: 'ti-2',
+      productId: 'prod-101',
+      productCode: 'SP652379',
+      productName: 'Bình hoa decor',
+      unitName: 'Cái',
+      onHandSender: 18,
+      onHandReceiver: 0,
+      sentQty: 10,
+      receivedQty: 9, // Lệch 1 theo đúng ảnh wireframe
+      unitPrice: 200000,
+      amount: 1800000,
+    },
+  ]);
 
   // Tab filter: 'all' | 'match' | 'mismatch' | 'unreceived'
   const [activeTab, setActiveTab] = useState<'all' | 'match' | 'mismatch' | 'unreceived'>('all');
-  const [discrepancyNote, setDiscrepancyNote] = useState(transfer.discrepancyNote || '');
-  const [errorMsg, setErrorMsg] = useState('');
+  const [searchKw, setSearchKw] = useState('');
+  const [receiveNote, setReceiveNote] = useState('Thiếu 1 bình hoa decor');
+  const [receiveTime] = useState('15/10/2025 12:09');
 
   // Toast
   const [toast, setToast] = useState<ToastState | null>(null);
@@ -48,19 +78,14 @@ export const ReceiveTransferPage: React.FC = () => {
     );
   };
 
-  const handleReceiveAll = () => {
-    setItems(
-      items.map((it) => ({
-        ...it,
-        receivedQty: it.sentQty,
-        amount: it.sentQty * it.unitPrice,
-      }))
-    );
-    showToast('Đã gán nhận đủ 100% số lượng cho tất cả mặt hàng.');
-  };
-
   // Filtered rows
   const filteredItems = items.filter((it) => {
+    if (searchKw.trim()) {
+      const kw = searchKw.trim().toLowerCase();
+      const match = it.productCode.toLowerCase().includes(kw) || it.productName.toLowerCase().includes(kw);
+      if (!match) return false;
+    }
+
     const recv = it.receivedQty ?? it.sentQty;
     if (activeTab === 'match') return recv === it.sentQty;
     if (activeTab === 'mismatch') return recv < it.sentQty;
@@ -70,31 +95,33 @@ export const ReceiveTransferPage: React.FC = () => {
 
   const totalSent = items.reduce((sum, it) => sum + it.sentQty, 0);
   const totalReceived = items.reduce((sum, it) => sum + (it.receivedQty ?? it.sentQty), 0);
-  const totalDamaged = totalSent - totalReceived;
+  const totalDifference = totalSent - totalReceived;
   const totalAmountReceived = items.reduce(
     (sum, it) => sum + (it.receivedQty ?? it.sentQty) * it.unitPrice,
     0
   );
 
-  const hasDiscrepancy = totalDamaged > 0;
+  const countMatch = items.filter((it) => (it.receivedQty ?? it.sentQty) === it.sentQty).length;
+  const countMismatch = items.filter((it) => (it.receivedQty ?? it.sentQty) < it.sentQty).length;
+  const countUnreceived = items.filter((it) => (it.receivedQty ?? it.sentQty) === 0).length;
 
   const handleConfirm = () => {
-    if (hasDiscrepancy && !discrepancyNote.trim()) {
-      setErrorMsg('Bắt buộc nhập lý do giải trình khi số lượng thực nhận nhỏ hơn số lượng xuất chuyển!');
+    if (totalDifference > 0 && !receiveNote.trim()) {
+      showToast('Bắt buộc nhập lý do chênh lệch nhận hàng vào ô "Ghi chú nhận"!', 'warning');
       return;
     }
 
     const updated: TransferOrder = {
       ...transfer,
       status: 'Received',
-      receiveDate: new Date().toLocaleDateString('vi-VN'),
-      discrepancyNote: discrepancyNote.trim(),
+      receiveDate: receiveTime,
+      discrepancyNote: receiveNote.trim(),
       items,
     };
 
     setTransfer(updated);
     showToast(
-      `Xác nhận nhập kho thành công cho phiếu ${transfer.transferCode}! Đã ghi nhận ${totalReceived} sản phẩm vào tồn kho chi nhánh nhận (BR-TRF-03).`
+      `Xác nhận nhận hàng thành công cho phiếu ${transfer.transferCode}! Tồn kho chi nhánh nhận đã được tự động cộng thêm.`
     );
 
     setTimeout(() => {
@@ -106,115 +133,187 @@ export const ReceiveTransferPage: React.FC = () => {
     <div className="transfer-container">
       {toast && <AdminToast toast={toast} onClose={() => setToast(null)} />}
 
-      {/* Header bar */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#ffffff', padding: '16px 24px', borderRadius: 24, border: '1px solid #edf2f9' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+      {/* Top Header Toolbar (Khớp Ảnh 3: Receive transfer) */}
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          background: '#ffffff',
+          padding: '16px 24px',
+          borderRadius: 24,
+          border: '1px solid #edf2f9',
+          boxShadow: '0 4px 16px rgba(15, 118, 110, 0.05)',
+          flexWrap: 'wrap',
+          gap: 16,
+        }}
+      >
+        {/* Trái: Link quay lại + Ô tìm kiếm */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16, flex: 1, maxWidth: 600 }}>
           <button
             type="button"
-            className="btn-secondary-white"
             onClick={() => navigate('/store-owner/transfers')}
-            style={{ padding: '6px 12px' }}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              background: 'none',
+              border: 'none',
+              color: '#0F766E',
+              fontSize: 14,
+              fontWeight: 700,
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+            }}
           >
-            <ArrowLeft size={16} /> Danh sách phiếu
+            <ArrowLeft size={16} /> Chuyển hàng
           </button>
-          <div>
-            <h1 style={{ fontSize: 20, fontWeight: 700, margin: 0, color: '#0f172a' }}>
-              Xác nhận nhận hàng - {transfer.transferCode}
-            </h1>
-            <div style={{ fontSize: 13, color: '#64748b', marginTop: 2 }}>
-              Từ: <b>{transfer.fromBranchName}</b> &rarr; Đến: <b>{transfer.toBranchName}</b>
-            </div>
+
+          {/* Ô tìm kiếm hàng hóa */}
+          <div style={{ position: 'relative', flex: 1, maxWidth: 360 }}>
+            <input
+              type="text"
+              className="filter-input"
+              style={{ paddingLeft: 36, borderRadius: 9999 }}
+              placeholder="🔍 Tìm hàng hóa theo mã hoặc tên (F3)..."
+              value={searchKw}
+              onChange={(e) => setSearchKw(e.target.value)}
+            />
+            <Search size={15} style={{ position: 'absolute', left: 12, top: 11, color: '#94a3b8' }} />
           </div>
         </div>
 
-        <button
-          type="button"
-          className="btn-secondary-white"
-          style={{ borderColor: '#0F766E', color: '#0F766E' }}
-          onClick={handleReceiveAll}
-        >
-          <CheckCheck size={16} /> Nhận đủ tất cả (100%)
-        </button>
+        {/* Phải: Người thực hiện & Ngày giờ nhận */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, fontSize: 13, color: '#64748b' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600, color: '#1e293b' }}>
+            <User size={16} color="#0F766E" />
+            <span>Admin</span>
+          </div>
+          <span
+            style={{
+              padding: '4px 10px',
+              backgroundColor: '#f1f5f9',
+              borderRadius: 6,
+              border: '1px solid #e2e8f0',
+              fontWeight: 600,
+              color: '#0f172a',
+            }}
+          >
+            {receiveTime}
+          </span>
+        </div>
       </div>
 
-      {/* Main 2-column layout */}
+      {/* Main 2-column Layout */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 24, alignItems: 'start' }}>
-        {/* Cột trái (72%): Bảng kiểm đếm */}
-        <div style={{ background: '#ffffff', borderRadius: 24, border: '1px solid #edf2f9', padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {/* Tabs phân loại kiểm đếm */}
-          <div style={{ display: 'flex', gap: 10, borderBottom: '1px solid #e2e8f0', paddingBottom: 10 }}>
+        {/* CỘT TRÁI: Bảng nhận hàng */}
+        <div
+          style={{
+            background: '#ffffff',
+            borderRadius: 24,
+            border: '1px solid #edf2f9',
+            boxShadow: '0 4px 16px rgba(15, 118, 110, 0.05)',
+            padding: 24,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 16,
+          }}
+        >
+          {/* Tabs phân loại tình trạng */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 20, borderBottom: '2px solid #e2e8f0', paddingBottom: 8 }}>
             <button
               type="button"
               onClick={() => setActiveTab('all')}
               style={{
-                padding: '6px 14px',
-                borderRadius: 9999,
+                background: 'none',
                 border: 'none',
-                background: activeTab === 'all' ? '#0F766E' : '#f1f5f9',
-                color: activeTab === 'all' ? '#ffffff' : '#334155',
-                fontWeight: 600,
-                fontSize: 13,
                 cursor: 'pointer',
+                fontWeight: activeTab === 'all' ? 700 : 500,
+                color: activeTab === 'all' ? '#0F766E' : '#64748b',
+                fontSize: 13.5,
+                borderBottom: activeTab === 'all' ? '2px solid #0F766E' : 'none',
+                paddingBottom: 6,
+                marginBottom: -10,
               }}
             >
               Tất cả ({items.length})
             </button>
+
             <button
               type="button"
               onClick={() => setActiveTab('match')}
               style={{
-                padding: '6px 14px',
-                borderRadius: 9999,
+                background: 'none',
                 border: 'none',
-                background: activeTab === 'match' ? '#0F766E' : '#f1f5f9',
-                color: activeTab === 'match' ? '#ffffff' : '#334155',
-                fontWeight: 600,
-                fontSize: 13,
                 cursor: 'pointer',
+                fontWeight: activeTab === 'match' ? 700 : 500,
+                color: activeTab === 'match' ? '#16a34a' : '#64748b',
+                fontSize: 13.5,
+                borderBottom: activeTab === 'match' ? '2px solid #16a34a' : 'none',
+                paddingBottom: 6,
+                marginBottom: -10,
               }}
             >
-              Khớp ({items.filter((it) => (it.receivedQty ?? it.sentQty) === it.sentQty).length})
+              Khớp ({countMatch})
             </button>
+
             <button
               type="button"
               onClick={() => setActiveTab('mismatch')}
               style={{
-                padding: '6px 14px',
-                borderRadius: 9999,
+                background: 'none',
                 border: 'none',
-                background: activeTab === 'mismatch' ? '#dc2626' : '#fee2e2',
-                color: activeTab === 'mismatch' ? '#ffffff' : '#dc2626',
-                fontWeight: 600,
-                fontSize: 13,
                 cursor: 'pointer',
+                fontWeight: activeTab === 'mismatch' ? 700 : 500,
+                color: activeTab === 'mismatch' ? '#ea580c' : '#ea580c',
+                fontSize: 13.5,
+                borderBottom: activeTab === 'mismatch' ? '2px solid #ea580c' : 'none',
+                paddingBottom: 6,
+                marginBottom: -10,
               }}
             >
-              Lệch / Thiếu ({items.filter((it) => (it.receivedQty ?? it.sentQty) < it.sentQty).length})
+              Lệch ({countMismatch})
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab('unreceived')}
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                fontWeight: activeTab === 'unreceived' ? 700 : 500,
+                color: activeTab === 'unreceived' ? '#0F766E' : '#64748b',
+                fontSize: 13.5,
+                borderBottom: activeTab === 'unreceived' ? '2px solid #0F766E' : 'none',
+                paddingBottom: 6,
+                marginBottom: -10,
+              }}
+            >
+              Chưa nhận ({countUnreceived})
             </button>
           </div>
 
-          {/* Bảng kiểm đếm */}
-          <div style={{ overflowX: 'auto' }}>
+          {/* Table */}
+          <div style={{ overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: 16 }}>
             <table className="transfer-table">
               <thead>
                 <tr>
                   <th style={{ width: 40, textAlign: 'center' }}>STT</th>
-                  <th style={{ width: 120 }}>Mã hàng</th>
+                  <th style={{ width: 110 }}>Mã hàng</th>
                   <th>Tên hàng</th>
-                  <th style={{ width: 70, textAlign: 'center' }}>ĐVT</th>
-                  <th style={{ width: 90, textAlign: 'center' }}>SL chuyển</th>
-                  <th style={{ width: 110, textAlign: 'center', backgroundColor: '#e0f2fe' }}>
-                    <span style={{ color: '#0369a1', fontWeight: 700 }}>SL thực nhận</span>
-                  </th>
-                  <th style={{ width: 90, textAlign: 'center' }}>Chênh lệch</th>
-                  <th style={{ width: 110, textAlign: 'right' }}>Giá chuyển</th>
-                  <th style={{ width: 120, textAlign: 'right' }}>Thành tiền nhận</th>
+                  <th style={{ width: 60, textAlign: 'center' }}>ĐVT</th>
+                  <th style={{ width: 70, textAlign: 'right' }}>Tồn kho</th>
+                  <th style={{ width: 80, textAlign: 'center' }}>SL chuyển</th>
+                  <th style={{ width: 100, textAlign: 'center', backgroundColor: '#e0f2fe' }}>SL nhận</th>
+                  <th style={{ width: 100, textAlign: 'right' }}>Giá chuyển</th>
+                  <th style={{ width: 120, textAlign: 'right' }}>Thành tiền</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredItems.map((it, idx) => {
-                  const recv = it.receivedQty ?? it.sentQty;
-                  const diff = it.sentQty - recv;
+                  const recvQty = it.receivedQty ?? it.sentQty;
+                  const diff = it.sentQty - recvQty;
                   const isDiff = diff > 0;
 
                   return (
@@ -224,133 +323,210 @@ export const ReceiveTransferPage: React.FC = () => {
                         backgroundColor: isDiff ? '#fffbeb' : undefined,
                       }}
                     >
-                      <td style={{ textAlign: 'center' }}>{idx + 1}</td>
-                      <td style={{ fontWeight: 600, color: '#0F766E' }}>{it.productCode}</td>
+                      <td style={{ textAlign: 'center', color: '#64748b' }}>{idx + 1}</td>
+                      <td>
+                        <span className="transfer-link">{it.productCode}</span>
+                      </td>
                       <td>
                         <div style={{ fontWeight: 600, color: '#0f172a' }}>{it.productName}</div>
-                        {it.batchNumber && (
-                          <div style={{ fontSize: 11, color: '#0369a1', marginTop: 2 }}>
-                            Lô: {it.batchNumber} (HSD: {it.expiryDate})
-                          </div>
-                        )}
+                        <div style={{ fontSize: 11.5, color: '#94a3b8', marginTop: 2 }}>
+                          ✏ Ghi chú...
+                        </div>
                       </td>
                       <td style={{ textAlign: 'center' }}>{it.unitName}</td>
+                      <td style={{ textAlign: 'right', color: '#64748b' }}>{it.onHandReceiver}</td>
                       <td style={{ textAlign: 'center', fontWeight: 600 }}>{it.sentQty}</td>
-                      <td style={{ textAlign: 'center', backgroundColor: '#f0f9ff' }}>
+
+                      {/* Ô nhập SL nhận kèm badge Lệch nếu có */}
+                      <td style={{ textAlign: 'center', backgroundColor: isDiff ? '#fef3c7' : '#f0f9ff' }}>
                         <input
                           type="number"
                           className="filter-input"
                           style={{
-                            width: 70,
+                            width: 55,
                             textAlign: 'center',
-                            borderColor: isDiff ? '#f59e0b' : '#0284c7',
+                            padding: '4px',
+                            borderRadius: 6,
+                            borderColor: isDiff ? '#f59e0b' : '#cbd5e1',
                             fontWeight: 700,
                           }}
-                          value={recv}
+                          value={recvQty}
                           onChange={(e) => handleUpdateReceivedQty(it.id, Number(e.target.value))}
                           min={0}
                           max={it.sentQty}
                         />
-                      </td>
-                      <td style={{ textAlign: 'center' }}>
-                        {isDiff ? (
-                          <span style={{ color: '#dc2626', fontWeight: 700, background: '#fee2e2', padding: '2px 6px', borderRadius: 4, fontSize: 12 }}>
-                            -{diff}
-                          </span>
-                        ) : (
-                          <span style={{ color: '#16a34a', fontWeight: 600, fontSize: 12 }}>✓ Khớp</span>
+                        {isDiff && (
+                          <div
+                            style={{
+                              fontSize: 10.5,
+                              color: '#b45309',
+                              fontWeight: 700,
+                              marginTop: 2,
+                            }}
+                          >
+                            Lệch -{diff}
+                          </div>
                         )}
                       </td>
-                      <td style={{ textAlign: 'right' }}>{it.unitPrice.toLocaleString()} đ</td>
+
+                      <td style={{ textAlign: 'right' }}>{it.unitPrice.toLocaleString()}</td>
                       <td style={{ textAlign: 'right', fontWeight: 700, color: '#0F766E' }}>
-                        {(recv * it.unitPrice).toLocaleString()} đ
+                        {(recvQty * it.unitPrice).toLocaleString()}
                       </td>
                     </tr>
                   );
                 })}
 
-                {/* Dòng tổng */}
-                <tr style={{ background: '#f8fafc', fontWeight: 700 }}>
-                  <td colSpan={4} style={{ textAlign: 'right', padding: 12 }}>
-                    Tổng cộng:
+                {/* Dòng tổng cộng */}
+                <tr style={{ backgroundColor: '#f8fafc', fontWeight: 700 }}>
+                  <td colSpan={5} style={{ textAlign: 'right', padding: 12 }}>
+                    Tổng:
                   </td>
                   <td style={{ textAlign: 'center' }}>{totalSent}</td>
-                  <td style={{ textAlign: 'center', color: '#0284c7' }}>{totalReceived}</td>
-                  <td style={{ textAlign: 'center', color: totalDamaged > 0 ? '#dc2626' : '#16a34a' }}>
-                    {totalDamaged > 0 ? `-${totalDamaged}` : '0'}
+                  <td style={{ textAlign: 'center', color: '#0F766E', fontSize: 14 }}>
+                    {totalReceived}
                   </td>
-                  <td style={{ textAlign: 'right' }}>Tổng tiền nhận:</td>
-                  <td style={{ textAlign: 'right', color: '#0F766E' }}>
+                  <td />
+                  <td style={{ textAlign: 'right', color: '#0F766E', fontSize: 14 }}>
                     {totalAmountReceived.toLocaleString()} đ
                   </td>
                 </tr>
               </tbody>
             </table>
           </div>
+
+          {/* Khung Hướng dẫn xác nhận nhận hàng */}
+          <div
+            style={{
+              padding: 16,
+              backgroundColor: '#f8fafc',
+              borderRadius: 16,
+              border: '1px solid #e2e8f0',
+              fontSize: 12.5,
+              color: '#475569',
+              lineHeight: 1.6,
+            }}
+          >
+            <div style={{ fontWeight: 700, color: '#1e293b', marginBottom: 4 }}>
+              Hướng dẫn xác nhận nhận hàng
+            </div>
+            <div>&bull; <b>SL nhận:</b> Hệ thống mặc định điền đủ số lượng chuyển. Hãy kiểm đếm và sửa lại số lượng thực tế nhận được.</div>
+            <div>&bull; <b>Trường hợp có chênh lệch:</b> Bắt buộc phải điền rõ lý do hư hỏng, thất lạc hoặc giao thiếu vào ô "Ghi chú nhận" bên cột phải.</div>
+            <div>&bull; <b>Cập nhật kho tự động:</b> Sau khi nhấn "Nhận hàng", hệ thống sẽ tự động ghi tăng tồn kho tại chi nhánh nhận và kết thúc phiếu chuyển.</div>
+          </div>
         </div>
 
-        {/* Cột phải (28%): Tổng kết đối soát */}
-        <div style={{ background: '#ffffff', borderRadius: 24, border: '1px solid #edf2f9', padding: 24, display: 'flex', flexDirection: 'column', gap: 18 }}>
-          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#0f172a', borderBottom: '1px solid #f1f5f9', paddingBottom: 10 }}>
-            Biên bản kiểm đếm
-          </h3>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, fontSize: 13.5 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: '#64748b' }}>Tổng số lượng gửi:</span>
-              <b>{totalSent} món</b>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: '#64748b' }}>Số lượng thực nhận:</span>
-              <b style={{ color: '#0F766E' }}>{totalReceived} món</b>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: '#64748b' }}>Chênh lệch thất thoát:</span>
-              <b style={{ color: totalDamaged > 0 ? '#dc2626' : '#16a34a' }}>
-                {totalDamaged} món
-              </b>
-            </div>
+        {/* CỘT PHẢI: Thông tin phiếu & Ghi chú nhận */}
+        <div
+          style={{
+            background: '#ffffff',
+            borderRadius: 24,
+            border: '1px solid #edf2f9',
+            boxShadow: '0 4px 16px rgba(15, 118, 110, 0.05)',
+            padding: 24,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 14,
+            fontSize: 13,
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #f1f5f9', paddingBottom: 8 }}>
+            <span style={{ color: '#64748b' }}>Mã chuyển hàng:</span>
+            <span style={{ fontWeight: 700, color: '#0F766E' }}>{transfer.transferCode}</span>
           </div>
 
-          {/* Ô nhập giải trình nếu có chênh lệch */}
-          {hasDiscrepancy && (
-            <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: 14 }}>
-              <label style={{ display: 'block', marginBottom: 6, fontSize: 13, fontWeight: 700, color: '#b91c1c' }}>
-                Giải trình chênh lệch / bể vỡ <span style={{ color: '#ef4444' }}>*</span>
-              </label>
-              <textarea
-                className="filter-input"
-                rows={3}
-                style={{ borderColor: '#ef4444', backgroundColor: '#fffbeb' }}
-                placeholder="Bắt buộc nhập nguyên nhân (ví dụ: Bể vỡ khi bốc dỡ, giao thiếu so với phiếu...)"
-                value={discrepancyNote}
-                onChange={(e) => {
-                  setDiscrepancyNote(e.target.value);
-                  setErrorMsg('');
-                }}
-                required
-              />
-              <div style={{ fontSize: 11.5, color: '#92400e', marginTop: 4 }}>
-                * Phần chênh lệch thiếu sẽ được hạch toán vào sổ hao hụt vận chuyển (BR-TRF-04).
-              </div>
-            </div>
-          )}
+          <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #f1f5f9', paddingBottom: 8 }}>
+            <span style={{ color: '#64748b' }}>Trạng thái:</span>
+            <span style={{ fontWeight: 700, color: '#2563eb' }}>Đang chuyển</span>
+          </div>
 
-          {errorMsg && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#dc2626', fontSize: 12, background: '#fee2e2', padding: 8, borderRadius: 8 }}>
-              <AlertTriangle size={14} /> {errorMsg}
-            </div>
-          )}
+          <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #f1f5f9', paddingBottom: 8 }}>
+            <span style={{ color: '#64748b' }}>Chi nhánh gửi:</span>
+            <span style={{ fontWeight: 600, color: '#0f172a' }}>{transfer.fromBranchName}</span>
+          </div>
 
-          {/* Nút xác nhận nhập kho */}
-          <div style={{ paddingTop: 10, borderTop: '1px solid #f1f5f9' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #f1f5f9', paddingBottom: 8 }}>
+            <span style={{ color: '#64748b' }}>Ngày chuyển:</span>
+            <span>{transfer.transferDate}</span>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #f1f5f9', paddingBottom: 8 }}>
+            <span style={{ color: '#64748b' }}>Ghi chú chuyển:</span>
+            <span style={{ fontStyle: 'italic', color: '#64748b' }}>
+              {transfer.note || '(Không có)'}
+            </span>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #f1f5f9', paddingBottom: 8 }}>
+            <span style={{ color: '#64748b' }}>Tổng SL chuyển:</span>
+            <span style={{ fontWeight: 700 }}>{totalSent}</span>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #f1f5f9', paddingBottom: 8 }}>
+            <span style={{ color: '#64748b' }}>Tổng SL nhận:</span>
+            <span style={{ fontWeight: 700, color: totalDifference > 0 ? '#ea580c' : '#16a34a' }}>
+              {totalReceived} {totalDifference > 0 && `(Lệch ${totalDifference})`}
+            </span>
+          </div>
+
+          {/* Ghi chú nhận * */}
+          <div style={{ paddingTop: 4 }}>
+            <label style={{ display: 'block', fontWeight: 700, color: '#1e293b', marginBottom: 6 }}>
+              Ghi chú nhận *:
+            </label>
+            <textarea
+              className="filter-input"
+              style={{
+                width: '100%',
+                minHeight: 70,
+                borderRadius: 12,
+                resize: 'vertical',
+                boxSizing: 'border-box',
+              }}
+              placeholder="Nhập lý do chênh lệch nhận hàng..."
+              value={receiveNote}
+              onChange={(e) => setReceiveNote(e.target.value)}
+            />
+          </div>
+
+          {/* Cảnh báo thời gian nhận */}
+          <div
+            style={{
+              padding: '10px 14px',
+              backgroundColor: '#fef2f2',
+              borderRadius: 12,
+              border: '1px solid #fee2e2',
+              fontSize: 11.5,
+              color: '#b91c1c',
+              lineHeight: 1.5,
+              display: 'flex',
+              gap: 6,
+            }}
+          >
+            <AlertTriangle size={15} style={{ flexShrink: 0, marginTop: 1 }} />
+            <span>
+              <b>Lưu ý:</b> Thời gian nhận hàng không được sớm hơn thời gian chuyển hàng ({transfer.transferDate}).
+            </span>
+          </div>
+
+          {/* Nút bấm Lưu tạm & Nhận hàng */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 4 }}>
+            <button
+              type="button"
+              className="btn-secondary-white"
+              onClick={() => showToast('Đã lưu tạm thông tin kiểm đếm nhận hàng.')}
+              style={{ justifyContent: 'center' }}
+            >
+              <Save size={15} /> Lưu tạm
+            </button>
+
             <button
               type="button"
               className="btn-primary-teal"
-              style={{ width: '100%', justifyContent: 'center', padding: '12px' }}
               onClick={handleConfirm}
+              style={{ justifyContent: 'center' }}
             >
-              <CheckCircle size={16} /> Xác nhận nhập kho
+              <Check size={15} /> Nhận hàng
             </button>
           </div>
         </div>

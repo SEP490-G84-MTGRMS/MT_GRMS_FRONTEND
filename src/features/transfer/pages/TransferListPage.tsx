@@ -16,6 +16,7 @@ import type { TransferOrder, TransferStatus } from '../types';
 import { INITIAL_BRANCHES, INITIAL_TRANSFERS } from '../services/mockData';
 import { TransferFilterSidebar } from '../components/TransferFilterSidebar';
 import { ImportTransferExcelModal } from '../components/ImportTransferExcelModal';
+import { TransferDetailModal } from '../components/TransferDetailModal';
 import { AdminToast, type ToastState } from '../../admin/components';
 import '../transfer.css';
 
@@ -40,12 +41,14 @@ export const TransferListPage: React.FC = () => {
     'Received',
     'Cancelled',
   ]);
-  const [timeRange, setTimeRange] = useState<'all' | 'this_month' | 'custom'>('all');
+  const [timeRange, setTimeRange] = useState<'all' | 'this_month' | 'custom'>('this_month');
   const [customDate, setCustomDate] = useState('');
   const [recvStatus, setRecvStatus] = useState<'all' | 'match' | 'mismatch'>('all');
 
-  // Modals
+  // Modals & Selection
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [selectedTransfer, setSelectedTransfer] = useState<TransferOrder | null>(null);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   // Toast
@@ -69,7 +72,7 @@ export const TransferListPage: React.FC = () => {
     setFromBranchId('');
     setToBranchId('');
     setSelectedStatuses(['Draft', 'In-Transit', 'Received', 'Cancelled']);
-    setTimeRange('all');
+    setTimeRange('this_month');
     setCustomDate('');
     setRecvStatus('all');
   };
@@ -120,30 +123,30 @@ export const TransferListPage: React.FC = () => {
 
   const totalTransferValue = filteredTransfers.reduce((sum, t) => sum + t.totalAmount, 0);
 
-  const renderStatusBadge = (status: TransferStatus) => {
+  const renderStatus = (status: TransferStatus) => {
     switch (status) {
       case 'Draft':
         return (
-          <span className="transfer-status-badge transfer-status-draft">
-            <Clock size={12} /> Phiếu tạm
+          <span className="transfer-status-text draft">
+            <Clock size={14} /> Phiếu tạm
           </span>
         );
       case 'In-Transit':
         return (
-          <span className="transfer-status-badge transfer-status-transit">
-            <Truck size={12} /> Đang chuyển
+          <span className="transfer-status-text transit">
+            <Truck size={14} /> Đang chuyển
           </span>
         );
       case 'Received':
         return (
-          <span className="transfer-status-badge transfer-status-received">
-            <CheckCircle size={12} /> Đã nhận
+          <span className="transfer-status-text received">
+            <CheckCircle size={14} /> Đã nhận
           </span>
         );
       case 'Cancelled':
         return (
-          <span className="transfer-status-badge transfer-status-cancelled">
-            <Ban size={12} /> Đã hủy
+          <span className="transfer-status-text cancelled">
+            <Ban size={14} /> Đã hủy
           </span>
         );
     }
@@ -151,9 +154,10 @@ export const TransferListPage: React.FC = () => {
 
   return (
     <div className="transfer-container">
+      {/* Toast Notification */}
       {toast && <AdminToast toast={toast} onClose={() => setToast(null)} />}
 
-      {/* 1. Header Toolbar */}
+      {/* 1. Header Toolbar Đồng nhất Design System (24px radius, Deep Teal) */}
       <div className="transfer-header-toolbar">
         <div className="transfer-title-area">
           <Truck size={28} color="#0F766E" />
@@ -172,8 +176,8 @@ export const TransferListPage: React.FC = () => {
           </span>
         </div>
 
-        {/* Ô tìm kiếm nhanh theo mã phiếu */}
-        <div style={{ flex: 1, maxWidth: 320, position: 'relative', margin: '0 12px' }}>
+        {/* Ô tìm kiếm nhanh bo tròn dạng pill */}
+        <div style={{ flex: 1, maxWidth: 360, position: 'relative', margin: '0 12px' }}>
           <input
             type="text"
             className="filter-input"
@@ -185,9 +189,9 @@ export const TransferListPage: React.FC = () => {
           <Search size={16} style={{ position: 'absolute', left: 12, top: 11, color: '#94a3b8' }} />
         </div>
 
-        {/* Hành động chính */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-          {/* RBAC Role Toggle (BR-SEC-02 test) */}
+        {/* Hành động chính bên phải */}
+        <div className="transfer-header-actions">
+          {/* RBAC Role Switcher (BR-SEC-02 Test) */}
           <div
             style={{
               display: 'flex',
@@ -205,16 +209,30 @@ export const TransferListPage: React.FC = () => {
             <select
               value={userRole}
               onChange={(e) => setUserRole(e.target.value as any)}
-              style={{ border: 'none', background: 'none', fontWeight: 700, color: '#0F766E', outline: 'none', cursor: 'pointer' }}
+              style={{
+                border: 'none',
+                background: 'none',
+                fontWeight: 700,
+                color: '#0F766E',
+                outline: 'none',
+                cursor: 'pointer',
+              }}
             >
               <option value="StoreOwner">Chủ chuỗi (Toàn quyền)</option>
-              <option value="Employee">Nhân viên kho (Phân quyền BR-SEC-02)</option>
+              <option value="Employee">Nhân viên kho (BR-SEC-02)</option>
             </select>
             {userRole === 'Employee' && (
               <select
                 value={currentBranchId}
                 onChange={(e) => setCurrentBranchId(e.target.value)}
-                style={{ border: 'none', background: 'none', fontWeight: 600, color: '#334155', outline: 'none', cursor: 'pointer' }}
+                style={{
+                  border: 'none',
+                  background: 'none',
+                  fontWeight: 600,
+                  color: '#334155',
+                  outline: 'none',
+                  cursor: 'pointer',
+                }}
               >
                 {branches.map((b) => (
                   <option key={b.id} value={b.id}>
@@ -237,6 +255,7 @@ export const TransferListPage: React.FC = () => {
             type="button"
             className="btn-secondary-white"
             onClick={() => setIsImportModalOpen(true)}
+            title="Nhập danh mục từ Excel"
           >
             <Upload size={15} /> Import file
           </button>
@@ -245,13 +264,14 @@ export const TransferListPage: React.FC = () => {
             type="button"
             className="btn-secondary-white"
             onClick={() => showToast(`Đang xuất file Excel cho ${filteredTransfers.length} phiếu chuyển hàng...`)}
+            title="Xuất file Excel"
           >
             <Download size={15} /> Xuất file
           </button>
         </div>
       </div>
 
-      {/* 2. Grid Body: Sidebar + Table */}
+      {/* 2. Main Body Grid: Sidebar (280px) + Table (1fr) */}
       <div className="transfer-grid">
         {/* Cột trái: Bộ lọc Sidebar */}
         <TransferFilterSidebar
@@ -271,25 +291,15 @@ export const TransferListPage: React.FC = () => {
           onResetFilters={handleResetFilters}
         />
 
-        {/* Cột phải: Bảng dữ liệu phiếu chuyển */}
+        {/* Cột phải: Bảng dữ liệu phiếu chuyển bo tròn 24px */}
         <div className="transfer-table-wrapper">
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              padding: '14px 20px',
-              backgroundColor: '#f8fafc',
-              borderBottom: '1px solid #e2e8f0',
-              fontSize: 13.5,
-              color: '#475569',
-            }}
-          >
+          {/* Summary bar */}
+          <div className="transfer-table-summary-bar">
             <div>
               Hiển thị <b>{filteredTransfers.length}</b> phiếu chuyển
             </div>
             <div>
-              Tổng giá trị chuyển: <b style={{ color: '#0F766E' }}>{totalTransferValue.toLocaleString()} đ</b>
+              Tổng giá trị chuyển: <b style={{ color: '#0F766E', fontSize: 14.5 }}>{totalTransferValue.toLocaleString()} đ</b>
             </div>
           </div>
 
@@ -311,6 +321,7 @@ export const TransferListPage: React.FC = () => {
                           setSelectedIds(filteredTransfers.map((t) => t.id));
                         }
                       }}
+                      style={{ accentColor: '#0F766E', cursor: 'pointer' }}
                     />
                   </th>
                   <th style={{ width: 36, textAlign: 'center' }}>★</th>
@@ -321,7 +332,6 @@ export const TransferListPage: React.FC = () => {
                   <th>Tới chi nhánh</th>
                   <th style={{ width: 130, textAlign: 'right' }}>Giá trị chuyển</th>
                   <th style={{ width: 130, textAlign: 'center' }}>Trạng thái</th>
-                  <th style={{ width: 110, textAlign: 'center' }}>Thao tác</th>
                 </tr>
               </thead>
               <tbody>
@@ -330,8 +340,15 @@ export const TransferListPage: React.FC = () => {
                   const isReceiving = t.status === 'In-Transit';
 
                   return (
-                    <tr key={t.id}>
-                      <td style={{ textAlign: 'center' }}>
+                    <tr
+                      key={t.id}
+                      onClick={() => {
+                        setSelectedTransfer(t);
+                        setIsDetailModalOpen(true);
+                      }}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      <td style={{ textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
                         <input
                           type="checkbox"
                           checked={isChecked}
@@ -342,22 +359,27 @@ export const TransferListPage: React.FC = () => {
                               setSelectedIds([...selectedIds, t.id]);
                             }
                           }}
+                          style={{ accentColor: '#0F766E', cursor: 'pointer' }}
                         />
                       </td>
-                      <td style={{ textAlign: 'center' }}>
+                      <td style={{ textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
                         <button
                           type="button"
-                          className={`favorite-star-btn ${t.isFavorite ? 'active' : ''}`}
                           onClick={(e) => handleToggleFavorite(t.id, e)}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            fontSize: 15,
+                            color: t.isFavorite ? '#eab308' : '#94a3b8',
+                            padding: 0,
+                          }}
                         >
                           {t.isFavorite ? '★' : '☆'}
                         </button>
                       </td>
                       <td>
-                        <span
-                          className="transfer-link"
-                          onClick={() => navigate(`/store-owner/transfers/${t.id}`)}
-                        >
+                        <span className="transfer-link">
                           {t.transferCode}
                         </span>
                       </td>
@@ -366,50 +388,44 @@ export const TransferListPage: React.FC = () => {
                         {t.receiveDate ? (
                           t.receiveDate
                         ) : isReceiving ? (
-                          <span
-                            onClick={() => navigate(`/store-owner/transfers/${t.id}/receive`)}
-                            style={{ color: '#0F766E', fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}
+                          <button
+                            type="button"
+                            className="btn-primary-teal"
+                            style={{
+                              padding: '3px 10px',
+                              fontSize: 12,
+                              borderRadius: 9999,
+                              fontWeight: 600,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 4,
+                            }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigate(`/store-owner/transfers/${t.id}/receive`);
+                            }}
                           >
-                            Nhận hàng &gt;
-                          </span>
+                            <CheckCircle size={13} /> Nhận hàng
+                          </button>
+                        ) : t.status === 'Draft' ? (
+                          <span style={{ fontStyle: 'italic', color: '#64748b' }}>(Chưa nhận)</span>
                         ) : (
-                          '—'
+                          <span style={{ fontStyle: 'italic', color: '#dc2626' }}>(Đã hủy)</span>
                         )}
                       </td>
                       <td style={{ fontWeight: 600, color: '#1e293b' }}>{t.fromBranchName}</td>
                       <td style={{ fontWeight: 600, color: '#1e293b' }}>{t.toBranchName}</td>
-                      <td style={{ textAlign: 'right', fontWeight: 700 }}>
+                      <td style={{ textAlign: 'right', fontWeight: 700, color: '#0f172a' }}>
                         {t.totalAmount.toLocaleString()} đ
                       </td>
-                      <td style={{ textAlign: 'center' }}>{renderStatusBadge(t.status)}</td>
-                      <td style={{ textAlign: 'center' }}>
-                        {isReceiving ? (
-                          <button
-                            type="button"
-                            className="btn-primary-teal"
-                            style={{ padding: '4px 10px', fontSize: 12 }}
-                            onClick={() => navigate(`/store-owner/transfers/${t.id}/receive`)}
-                          >
-                            Nhận hàng
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            className="btn-secondary-white"
-                            style={{ padding: '4px 10px', fontSize: 12 }}
-                            onClick={() => navigate(`/store-owner/transfers/${t.id}`)}
-                          >
-                            Chi tiết
-                          </button>
-                        )}
-                      </td>
+                      <td style={{ textAlign: 'center' }}>{renderStatus(t.status)}</td>
                     </tr>
                   );
                 })}
 
                 {filteredTransfers.length === 0 && (
                   <tr>
-                    <td colSpan={10} style={{ padding: '40px 20px', textAlign: 'center', color: '#94a3b8' }}>
+                    <td colSpan={9} style={{ padding: '40px 20px', textAlign: 'center', color: '#94a3b8' }}>
                       <FileText size={40} style={{ margin: '0 auto 10px auto', opacity: 0.5 }} />
                       <div style={{ fontSize: 15, fontWeight: 600 }}>Không tìm thấy phiếu chuyển hàng nào</div>
                       <div style={{ fontSize: 13, marginTop: 4 }}>
@@ -430,6 +446,17 @@ export const TransferListPage: React.FC = () => {
         onClose={() => setIsImportModalOpen(false)}
         onConfirmUpload={(fileName) => {
           showToast(`Đã import thành công danh sách hàng từ file: ${fileName}`);
+        }}
+      />
+
+      {/* Modal Pop-up Chi tiết phiếu chuyển hàng */}
+      <TransferDetailModal
+        isOpen={isDetailModalOpen}
+        transfer={selectedTransfer}
+        onClose={() => setIsDetailModalOpen(false)}
+        onUpdateTransfer={(updated) => {
+          setTransfers(transfers.map((t) => (t.id === updated.id ? updated : t)));
+          setSelectedTransfer(updated);
         }}
       />
     </div>

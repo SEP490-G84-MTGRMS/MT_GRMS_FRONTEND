@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import type { Branch, TransferStatus } from '../types';
 
 interface TransferFilterSidebarProps {
@@ -41,19 +41,33 @@ export const TransferFilterSidebar: React.FC<TransferFilterSidebarProps> = ({
     { key: 'Cancelled', label: 'Đã hủy' },
   ];
 
+  const [filterTransferDate, setFilterTransferDate] = useState(true);
+  const [filterReceiveDate, setFilterReceiveDate] = useState(false);
+
   return (
     <aside className="transfer-sidebar">
-      {/* 1. Chi nhánh Chuyển đi */}
-      <div>
-        <div style={{ fontSize: 14, fontWeight: 700, color: '#1e293b', marginBottom: 8 }}>
-          Chuyển đi (Kho gửi)
-        </div>
+      {/* Sidebar Header */}
+      <div className="transfer-sidebar-header">
+        <h3>Bộ lọc chuyển hàng</h3>
+        <button
+          type="button"
+          className="transfer-action-link"
+          onClick={onResetFilters}
+          title="Đặt lại toàn bộ tiêu chí lọc"
+        >
+          Đặt lại
+        </button>
+      </div>
+
+      {/* Chuyển đi */}
+      <div className="filter-group-card" style={{ borderTop: 'none', paddingTop: 0 }}>
+        <div className="filter-group-title">Chuyển đi (Kho gửi)</div>
         <select
           className="filter-select"
           value={fromBranchId}
           onChange={(e) => onChangeFromBranch(e.target.value)}
         >
-          <option value="">Tất cả chi nhánh gửi</option>
+          <option value="">Chi nhánh trung tâm</option>
           {branches.map((b) => (
             <option key={b.id} value={b.id}>
               {b.name}
@@ -62,7 +76,7 @@ export const TransferFilterSidebar: React.FC<TransferFilterSidebarProps> = ({
         </select>
       </div>
 
-      {/* 2. Chi nhánh Nhận về */}
+      {/* Nhận về */}
       <div className="filter-group-card">
         <div className="filter-group-title">Nhận về (Kho nhận)</div>
         <select
@@ -70,7 +84,7 @@ export const TransferFilterSidebar: React.FC<TransferFilterSidebarProps> = ({
           value={toBranchId}
           onChange={(e) => onChangeToBranch(e.target.value)}
         >
-          <option value="">Tất cả chi nhánh nhận</option>
+          <option value="">Chọn chi nhánh</option>
           {branches.map((b) => (
             <option key={b.id} value={b.id}>
               {b.name}
@@ -79,73 +93,102 @@ export const TransferFilterSidebar: React.FC<TransferFilterSidebarProps> = ({
         </select>
       </div>
 
-      {/* 3. Trạng thái phiếu */}
+      {/* Trạng thái */}
       <div className="filter-group-card">
         <div className="filter-group-title">Trạng thái</div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+        <div className="transfer-tags-container">
           {ALL_STATUSES.map((st) => {
-            const isChecked = selectedStatuses.includes(st.key);
+            const isSelected = selectedStatuses.includes(st.key);
+            if (!isSelected) return null;
             return (
-              <label
-                key={st.key}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  padding: '6px 8px',
-                  borderRadius: 8,
-                  backgroundColor: isChecked ? '#f0fdfa' : '#f8fafc',
-                  border: isChecked ? '1px solid #0F766E' : '1px solid #e2e8f0',
-                  fontSize: 12.5,
-                  cursor: 'pointer',
-                  userSelect: 'none',
-                }}
-              >
-                <input
-                  type="checkbox"
-                  checked={isChecked}
-                  onChange={() => onToggleStatus(st.key)}
-                  style={{ accentColor: '#0F766E' }}
-                />
-                <span style={{ fontWeight: isChecked ? 700 : 500, color: isChecked ? '#0F766E' : '#334155' }}>
-                  {st.label}
-                </span>
-              </label>
+              <span key={st.key} className="transfer-tag-pill">
+                <span>{st.label}</span>
+                <button
+                  type="button"
+                  className="transfer-tag-del"
+                  onClick={() => onToggleStatus(st.key)}
+                  title={`Bỏ lọc ${st.label}`}
+                >
+                  &times;
+                </button>
+              </span>
             );
           })}
         </div>
+
+        {/* Nút thêm lại trạng thái đã xóa */}
+        {selectedStatuses.length < ALL_STATUSES.length && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+            {ALL_STATUSES.filter((st) => !selectedStatuses.includes(st.key)).map((st) => (
+              <button
+                key={st.key}
+                type="button"
+                onClick={() => onToggleStatus(st.key)}
+                style={{
+                  fontSize: 11.5,
+                  padding: '3px 8px',
+                  background: '#f8fafc',
+                  border: '1px dashed #0F766E',
+                  borderRadius: 9999,
+                  cursor: 'pointer',
+                  color: '#0F766E',
+                  fontWeight: 600,
+                }}
+              >
+                + {st.label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* 4. Thời gian */}
+      {/* Thời gian */}
       <div className="filter-group-card">
         <div className="filter-group-title">Thời gian</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 13 }}>
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
             <input
-              type="radio"
-              name="transfer_time_radio"
-              checked={timeRange === 'all'}
-              onChange={() => onChangeTimeRange('all')}
+              type="checkbox"
+              checked={filterTransferDate}
+              onChange={(e) => setFilterTransferDate(e.target.checked)}
+              style={{ accentColor: '#0F766E', cursor: 'pointer' }}
             />
-            Toàn thời gian
+            <span>Ngày chuyển</span>
           </label>
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
             <input
+              type="checkbox"
+              checked={filterReceiveDate}
+              onChange={(e) => setFilterReceiveDate(e.target.checked)}
+              style={{ accentColor: '#0F766E', cursor: 'pointer' }}
+            />
+            <span>Ngày nhận</span>
+          </label>
+        </div>
+
+        {/* Ngăn cách giữa checkbox và radio */}
+        <div style={{ borderTop: '1px solid #e2e8f0', margin: '10px 0' }} />
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 13 }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+            <input
               type="radio"
-              name="transfer_time_radio"
-              checked={timeRange === 'this_month'}
+              name="wf_time_radio"
+              checked={timeRange === 'this_month' || timeRange === 'all'}
               onChange={() => onChangeTimeRange('this_month')}
+              style={{ accentColor: '#0F766E', cursor: 'pointer' }}
             />
-            Tháng này
+            <span>Tháng này</span>
           </label>
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
             <input
               type="radio"
-              name="transfer_time_radio"
+              name="wf_time_radio"
               checked={timeRange === 'custom'}
               onChange={() => onChangeTimeRange('custom')}
+              style={{ accentColor: '#0F766E', cursor: 'pointer' }}
             />
-            Tùy chỉnh ngày
+            <span>Tùy chỉnh</span>
           </label>
           {timeRange === 'custom' && (
             <input
@@ -153,65 +196,55 @@ export const TransferFilterSidebar: React.FC<TransferFilterSidebarProps> = ({
               className="filter-input"
               value={customDate || ''}
               onChange={(e) => onChangeCustomDate(e.target.value)}
-              style={{ marginTop: 4 }}
+              style={{ marginTop: 6 }}
             />
           )}
         </div>
       </div>
 
-      {/* 5. Tình trạng nhận hàng */}
+      {/* Tình trạng nhận hàng */}
       <div className="filter-group-card">
         <div className="filter-group-title">Tình trạng nhận hàng</div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 13 }}>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-            <input
-              type="radio"
-              name="recv_status_radio"
-              checked={recvStatus === 'all'}
-              onChange={() => onChangeRecvStatus('all')}
-            />
-            Tất cả
-          </label>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-            <input
-              type="radio"
-              name="recv_status_radio"
-              checked={recvStatus === 'match'}
-              onChange={() => onChangeRecvStatus('match')}
-            />
-            Khớp số lượng
-          </label>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-            <input
-              type="radio"
-              name="recv_status_radio"
-              checked={recvStatus === 'mismatch'}
-              onChange={() => onChangeRecvStatus('mismatch')}
-            />
-            Lệch / Thiếu hụt
-          </label>
-        </div>
-      </div>
-
-      {/* Nút đặt lại bộ lọc */}
-      <div style={{ paddingTop: 10, borderTop: '1px solid #f1f5f9' }}>
-        <button
-          type="button"
-          onClick={onResetFilters}
+        <div
           style={{
-            width: '100%',
-            padding: '8px',
-            background: 'none',
-            border: '1px solid #cbd5e1',
-            borderRadius: 14,
-            fontSize: 12.5,
-            fontWeight: 600,
-            color: '#64748b',
-            cursor: 'pointer',
+            display: 'grid',
+            gridTemplateColumns: 'auto 1fr',
+            columnGap: 14,
+            rowGap: 8,
+            fontSize: 13,
           }}
         >
-          Đặt lại bộ lọc
-        </button>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+            <input
+              type="radio"
+              name="wf_recv_radio"
+              checked={recvStatus === 'all'}
+              onChange={() => onChangeRecvStatus('all')}
+              style={{ accentColor: '#0F766E', cursor: 'pointer' }}
+            />
+            <span>Tất cả</span>
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+            <input
+              type="radio"
+              name="wf_recv_radio"
+              checked={recvStatus === 'mismatch'}
+              onChange={() => onChangeRecvStatus('mismatch')}
+              style={{ accentColor: '#0F766E', cursor: 'pointer' }}
+            />
+            <span>Không khớp</span>
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', gridColumn: 'span 2' }}>
+            <input
+              type="radio"
+              name="wf_recv_radio"
+              checked={recvStatus === 'match'}
+              onChange={() => onChangeRecvStatus('match')}
+              style={{ accentColor: '#0F766E', cursor: 'pointer' }}
+            />
+            <span>Khớp</span>
+          </label>
+        </div>
       </div>
     </aside>
   );

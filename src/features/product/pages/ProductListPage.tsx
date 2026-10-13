@@ -478,12 +478,17 @@ export const ProductListPage: React.FC = () => {
                   return (
                     <tr
                       key={p.id}
+                      onClick={() => {
+                        setSelectedProduct(p);
+                        setIsDetailModalOpen(true);
+                      }}
                       style={{
                         backgroundColor: p.status === 'Discontinued' ? '#f8fafc' : undefined,
                         opacity: p.status === 'Discontinued' ? 0.75 : 1,
+                        cursor: 'pointer',
                       }}
                     >
-                      <td style={{ textAlign: 'center' }}>
+                      <td style={{ textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
                         <input
                           type="checkbox"
                           checked={isChecked}
@@ -496,7 +501,7 @@ export const ProductListPage: React.FC = () => {
                           }}
                         />
                       </td>
-                      <td style={{ textAlign: 'center' }}>
+                      <td style={{ textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
                         <button
                           type="button"
                           className={`favorite-star-btn ${p.isFavorite ? 'active' : ''}`}

@@ -29,8 +29,8 @@ export const ImportTransferExcelModal: React.FC<ImportTransferExcelModalProps> =
   };
 
   return (
-    <div className="custom-modal-backdrop">
-      <div className="custom-modal-box" style={{ maxWidth: 480 }}>
+    <div className="custom-modal-backdrop" style={{ zIndex: 1200 }} onClick={onClose}>
+      <div className="custom-modal-box" style={{ maxWidth: 480 }} onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="custom-modal-header">
           <h3>Thêm sản phẩm từ file Excel</h3>

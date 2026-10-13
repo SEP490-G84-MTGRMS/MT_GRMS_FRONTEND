@@ -4,6 +4,7 @@ export * from './components/TransferFilterSidebar';
 export * from './components/SelectBatchModal';
 export * from './components/CancelTransferModal';
 export * from './components/ImportTransferExcelModal';
+export * from './components/TransferDetailModal';
 export * from './pages/TransferListPage';
 export * from './pages/CreateTransferPage';
 export * from './pages/ReceiveTransferPage';

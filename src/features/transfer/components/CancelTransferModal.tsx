@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, AlertTriangle } from 'lucide-react';
 
 interface CancelTransferModalProps {
@@ -17,6 +17,13 @@ export const CancelTransferModal: React.FC<CancelTransferModalProps> = ({
   const [reason, setReason] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
 
+  useEffect(() => {
+    if (isOpen) {
+      setReason('');
+      setErrorMsg('');
+    }
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -30,8 +37,16 @@ export const CancelTransferModal: React.FC<CancelTransferModalProps> = ({
   };
 
   return (
-    <div className="custom-modal-backdrop">
-      <div className="custom-modal-box" style={{ maxWidth: 500 }}>
+    <div
+      className="custom-modal-backdrop"
+      style={{ zIndex: 1300, backgroundColor: 'rgba(15, 23, 42, 0.65)' }}
+      onClick={onClose}
+    >
+      <div
+        className="custom-modal-box"
+        style={{ maxWidth: 500 }}
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
         <div className="custom-modal-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
