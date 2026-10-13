@@ -52,7 +52,7 @@ export const ExpenseKpiCards: FC<ExpenseKpiCardsProps> = ({
       subtext: 'Bao gồm mọi khoản chi vận hành',
       icon: TrendingUpIcon,
       iconClass: 'kpi-icon-blue',
-      iconColor: '#0066ff',
+      iconColor: '#0F766E',
     },
     {
       title: 'Chờ thanh toán',

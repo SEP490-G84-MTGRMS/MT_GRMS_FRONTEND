@@ -1,8 +1,9 @@
 import { useState, useMemo } from 'react';
 import type { FC } from 'react';
 import type { SupplierProductItem, SupplierSummary } from '../../types/supplier.types';
+import { TablePagination } from '../../../../components/common';
 import { SupplierProductTableRow } from './SupplierProductTableRow';
-import { PackageX, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
+import { PackageX, Plus } from 'lucide-react';
 
 interface SupplierProductTableProps {
   products: SupplierProductItem[];
@@ -20,8 +21,7 @@ export const SupplierProductTable: FC<SupplierProductTableProps> = ({
   onOpenAssignModal,
 }) => {
   const [currentPage, setCurrentPage] = useState(1);
-  const pageSize = 10;
-  const totalPages = Math.ceil(products.length / pageSize) || 1;
+  const [pageSize, setPageSize] = useState(10);
 
   const startIndex = (currentPage - 1) * pageSize;
   const currentProducts = products.slice(startIndex, startIndex + pageSize);
@@ -134,90 +134,16 @@ export const SupplierProductTable: FC<SupplierProductTableProps> = ({
         </table>
       </div>
 
-      {/* Pagination Footer */}
+      {/* Shared Pagination Footer */}
       {products.length > 0 && (
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            padding: '14px 20px',
-            borderTop: '1px solid var(--border-light)',
-            backgroundColor: '#ffffff',
-            flexWrap: 'wrap',
-            gap: 12,
-          }}
-        >
-          <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
-            Hiển thị <b>{Math.min(startIndex + 1, products.length)}</b> –{' '}
-            <b>{Math.min(startIndex + pageSize, products.length)}</b> trong tổng số{' '}
-            <b>{products.length}</b> sản phẩm
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <button
-              type="button"
-              disabled={currentPage === 1}
-              onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
-              style={{
-                width: 32,
-                height: 32,
-                borderRadius: 8,
-                border: '1px solid var(--border-mid)',
-                backgroundColor: currentPage === 1 ? 'var(--bg-soft-blue)' : '#ffffff',
-                color: currentPage === 1 ? 'var(--border-mid)' : 'var(--text-main)',
-                cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <ChevronLeft size={16} />
-            </button>
-
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-              <button
-                key={page}
-                type="button"
-                onClick={() => setCurrentPage(page)}
-                style={{
-                  width: 32,
-                  height: 32,
-                  borderRadius: 8,
-                  border: `1px solid ${page === currentPage ? 'var(--blue-primary)' : 'var(--border-mid)'}`,
-                  backgroundColor: page === currentPage ? 'var(--blue-primary)' : '#ffffff',
-                  color: page === currentPage ? '#ffffff' : 'var(--text-main)',
-                  fontSize: '0.82rem',
-                  fontWeight: page === currentPage ? 700 : 500,
-                  cursor: 'pointer',
-                  fontFamily: 'var(--font-mono)',
-                }}
-              >
-                {page}
-              </button>
-            ))}
-
-            <button
-              type="button"
-              disabled={currentPage === totalPages}
-              onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
-              style={{
-                width: 32,
-                height: 32,
-                borderRadius: 8,
-                border: '1px solid var(--border-mid)',
-                backgroundColor: currentPage === totalPages ? 'var(--bg-soft-blue)' : '#ffffff',
-                color: currentPage === totalPages ? 'var(--border-mid)' : 'var(--text-main)',
-                cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <ChevronRight size={16} />
-            </button>
-          </div>
-        </div>
+        <TablePagination
+          currentPage={currentPage}
+          pageSize={pageSize}
+          totalItems={products.length}
+          itemLabel="sản phẩm"
+          onPageChange={setCurrentPage}
+          onPageSizeChange={setPageSize}
+        />
       )}
     </div>
   );

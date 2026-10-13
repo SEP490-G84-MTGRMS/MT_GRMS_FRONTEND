@@ -1,4 +1,4 @@
-import { createBrowserRouter, Navigate } from 'react-router-dom';
+﻿import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { PosLayout } from '../layouts/PosLayout';
 import { WebStoreLayout } from '../layouts/WebStoreLayout';
 import { AuthLayout } from '../layouts/AuthLayout';
@@ -6,6 +6,7 @@ import { HomePage } from '../pages/HomePage';
 import { SupplierListPage, SupplierDetailPage, SupplierProductManagementPage } from '../features/supplier';
 import { OrderMatrixPage } from '../features/purchase-order';
 import { ServiceExpensesPage } from '../features/service-expenses/pages/ServiceExpensesPage';
+import { CustomerManagementPage } from '../features/customer-crm';
 import { StoreOwnerLayout } from '../layouts/StoreOwnerLayout';
 import { AdminDashboardPage } from '../pages/admin/AdminDashboardPage';
 import { TenantManagementPage } from '../pages/admin/TenantManagementPage';
@@ -55,6 +56,10 @@ export const router = createBrowserRouter([
         path: 'expenses',
         element: <ServiceExpensesPage />,
       },
+      {
+        path: 'customers',
+        element: <CustomerManagementPage />,
+      },
     ],
   },
   {
@@ -92,6 +97,10 @@ export const router = createBrowserRouter([
       {
         path: 'expenses',
         element: <ServiceExpensesPage />,
+      },
+      {
+        path: 'customers',
+        element: <CustomerManagementPage />,
       },
     ],
   },
@@ -131,6 +140,10 @@ export const router = createBrowserRouter([
         path: 'expenses',
         element: <Navigate to="/store-owner/expenses" replace />,
       },
+      {
+        path: 'customers',
+        element: <Navigate to="/store-owner/customers" replace />,
+      },
     ],
   },
   {
@@ -156,6 +169,20 @@ export const router = createBrowserRouter([
       {
         path: 'expenses',
         element: <Navigate to="/store-owner/expenses" replace />,
+      },
+      {
+        path: 'customers',
+        element: <Navigate to="/store-owner/customers" replace />,
+      },
+    ],
+  },
+  {
+    path: '/customers',
+    element: <StoreOwnerLayout />,
+    children: [
+      {
+        index: true,
+        element: <CustomerManagementPage />,
       },
     ],
   },
