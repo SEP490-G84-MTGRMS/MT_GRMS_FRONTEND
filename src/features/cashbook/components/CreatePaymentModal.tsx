@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import type { FC, FormEvent } from 'react';
 import type { CashAccount, CreatePaymentDTO, CounterpartyType } from '../types/cashbook.types';
 
@@ -34,10 +34,8 @@ export const CreatePaymentModal: FC<CreatePaymentModalProps> = ({
     'Chi khác',
   ];
 
-  const selectedAccount = useMemo(
-    () => accounts.find((a) => a.id === accountId) || accounts[0],
-    [accounts, accountId]
-  );
+  // Tính trực tiếp, loại bỏ hook useMemo sau early return
+  const selectedAccount = accounts.find((a) => a.id === accountId) || accounts[0];
 
   const parsedAmount = Number(amountStr.replace(/\D/g, '')) || 0;
 

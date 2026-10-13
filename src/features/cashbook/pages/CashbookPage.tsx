@@ -249,38 +249,46 @@ export const CashbookPage: FC = () => {
         }}
       />
 
-      {/* Modals */}
-      <CreateReceiptModal
-        isOpen={isReceiptModalOpen}
-        accounts={accounts}
-        onClose={() => setIsReceiptModalOpen(false)}
-        onSubmit={handleCreateReceipt}
-      />
+      {/* Modals rendered conditionally to guarantee fresh lifecycle and zero hook mismatches */}
+      {isReceiptModalOpen && (
+        <CreateReceiptModal
+          isOpen={isReceiptModalOpen}
+          accounts={accounts}
+          onClose={() => setIsReceiptModalOpen(false)}
+          onSubmit={handleCreateReceipt}
+        />
+      )}
 
-      <CreatePaymentModal
-        isOpen={isPaymentModalOpen}
-        accounts={accounts}
-        onClose={() => setIsPaymentModalOpen(false)}
-        onSubmit={handleCreatePayment}
-      />
+      {isPaymentModalOpen && (
+        <CreatePaymentModal
+          isOpen={isPaymentModalOpen}
+          accounts={accounts}
+          onClose={() => setIsPaymentModalOpen(false)}
+          onSubmit={handleCreatePayment}
+        />
+      )}
 
-      <CashReconciliationModal
-        isOpen={isReconcileModalOpen}
-        account={accountToReconcile}
-        onClose={() => {
-          setIsReconcileModalOpen(false);
-          setAccountToReconcile(null);
-        }}
-        onSubmit={handleReconcile}
-      />
+      {isReconcileModalOpen && accountToReconcile && (
+        <CashReconciliationModal
+          isOpen={isReconcileModalOpen}
+          account={accountToReconcile}
+          onClose={() => {
+            setIsReconcileModalOpen(false);
+            setAccountToReconcile(null);
+          }}
+          onSubmit={handleReconcile}
+        />
+      )}
 
-      <CashbookExportModal
-        isOpen={isExportModalOpen}
-        transactions={transactions}
-        selectedAccount={selectedAccountObj}
-        onClose={() => setIsExportModalOpen(false)}
-        onShowToast={showToast}
-      />
+      {isExportModalOpen && (
+        <CashbookExportModal
+          isOpen={isExportModalOpen}
+          transactions={transactions}
+          selectedAccount={selectedAccountObj}
+          onClose={() => setIsExportModalOpen(false)}
+          onShowToast={showToast}
+        />
+      )}
     </div>
   );
 };

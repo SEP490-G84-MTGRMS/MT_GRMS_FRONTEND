@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import type { FC, FormEvent } from 'react';
 import type { CashAccount, CashReconciliationDTO } from '../types/cashbook.types';
 
@@ -28,13 +28,8 @@ export const CashReconciliationModal: FC<CashReconciliationModalProps> = ({
   const diff = actualCounted - systemBalance;
   const hasDiscrepancy = diff !== 0;
 
-  const isFormValid = useMemo(() => {
-    if (actualStr === '') return false;
-    if (hasDiscrepancy && !reason.trim()) {
-      return false; // Bắt buộc lý do theo Rule GBR-CSH-04
-    }
-    return true;
-  }, [actualStr, hasDiscrepancy, reason]);
+  // Tính trực tiếp không cần useMemo, loại bỏ hoàn toàn vi phạm Rules of Hooks
+  const isFormValid = actualStr !== '' && (!hasDiscrepancy || Boolean(reason.trim()));
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
