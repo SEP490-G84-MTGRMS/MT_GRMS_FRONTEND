@@ -4,6 +4,7 @@ import { PosLayout } from '../layouts/PosLayout';
 import { WebStoreLayout } from '../layouts/WebStoreLayout';
 import { AuthLayout } from '../layouts/AuthLayout';
 import { HomePage } from '../pages/HomePage';
+import { ServiceExpensesPage } from '../features/service-expenses/pages/ServiceExpensesPage';
 
 export const router = createBrowserRouter([
   {
@@ -17,6 +18,10 @@ export const router = createBrowserRouter([
       {
         index: true,
         element: <div className="text-gray-600">Trang Bảng điều khiển Quản trị (Dashboard)</div>,
+      },
+      {
+        path: 'expenses',
+        element: <ServiceExpensesPage />,
       },
     ],
   },
