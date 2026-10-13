@@ -1,10 +1,10 @@
-﻿import { createBrowserRouter, Navigate } from 'react-router-dom';
+import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { PosLayout } from '../layouts/PosLayout';
 import { WebStoreLayout } from '../layouts/WebStoreLayout';
 import { AuthLayout } from '../layouts/AuthLayout';
 import { HomePage } from '../pages/HomePage';
 import { SupplierListPage, SupplierDetailPage, SupplierProductManagementPage } from '../features/supplier';
-import { OrderMatrixPage, BranchOrderListPage } from '../features/purchase-order';
+import { OrderMatrixPage, BranchOrderListPage, EmployeeOrderMatrixPage } from '../features/purchase-order';
 import { ServiceExpensesPage } from '../features/service-expenses/pages/ServiceExpensesPage';
 import { CustomerManagementPage } from '../features/customer-crm';
 import { StoreOwnerLayout } from '../layouts/StoreOwnerLayout';
@@ -61,6 +61,10 @@ export const router = createBrowserRouter([
         element: <OrderMatrixPage />,
       },
       {
+        path: 'purchase-orders/employee-matrix',
+        element: <EmployeeOrderMatrixPage />,
+      },
+      {
         path: 'expenses',
         element: <ServiceExpensesPage />,
       },
@@ -109,6 +113,10 @@ export const router = createBrowserRouter([
       {
         path: 'purchase-orders/create-matrix',
         element: <OrderMatrixPage />,
+      },
+      {
+        path: 'purchase-orders/employee-matrix',
+        element: <EmployeeOrderMatrixPage />,
       },
       {
         path: 'expenses',
@@ -237,6 +245,34 @@ export const router = createBrowserRouter([
       {
         path: 'login',
         element: <div className="text-gray-600 text-center">Trang Đăng nhập Hệ thống</div>,
+      },
+    ],
+  },
+  {
+    path: '/employee',
+    element: <StoreOwnerLayout />,
+    children: [
+      {
+        index: true,
+        element: <Navigate to="/employee/purchase-orders/create-matrix" replace />,
+      },
+      {
+        path: 'purchase-orders/create-matrix',
+        element: <EmployeeOrderMatrixPage />,
+      },
+    ],
+  },
+  {
+    path: '/branch',
+    element: <StoreOwnerLayout />,
+    children: [
+      {
+        index: true,
+        element: <Navigate to="/branch/purchase-orders/create-matrix" replace />,
+      },
+      {
+        path: 'purchase-orders/create-matrix',
+        element: <EmployeeOrderMatrixPage />,
       },
     ],
   },
