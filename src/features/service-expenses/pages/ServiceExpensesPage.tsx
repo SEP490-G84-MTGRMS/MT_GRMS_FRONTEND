@@ -200,6 +200,9 @@ export const ServiceExpensesPage: FC = () => {
         onPageChange={(newPage) =>
           setFilters((prev) => ({ ...prev, page: newPage }))
         }
+        onPageSizeChange={(newPageSize) =>
+          setFilters((prev) => ({ ...prev, pageSize: newPageSize, page: 1 }))
+        }
         onViewBill={(url, title) => setPreviewBill({ url, title })}
         onPay={(item) => setPayingItem(item)}
         onCancel={handleCancelClick}

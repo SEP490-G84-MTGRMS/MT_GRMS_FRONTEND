@@ -111,7 +111,7 @@ export const PayExpenseModal: FC<PayExpenseModalProps> = ({
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: '#64748b' }}>
                 <span>Mã chi phí:</span>
-                <span style={{ fontWeight: 700, color: 'var(--blue-primary, #0066ff)' }}>{item.expenseId}</span>
+                <span style={{ fontWeight: 700, color: 'var(--blue-primary, #0F766E)' }}>{item.expenseId}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: '#64748b' }}>
                 <span>Danh mục:</span>
@@ -136,7 +136,7 @@ export const PayExpenseModal: FC<PayExpenseModalProps> = ({
                 <span style={{ fontSize: '0.84rem', fontWeight: 700, color: '#1e293b' }}>
                   Số tiền thanh toán:
                 </span>
-                <span style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--blue-primary, #0066ff)' }}>
+                <span style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--blue-primary, #0F766E)' }}>
                   {formatCurrency(item.amount)}
                 </span>
               </div>
@@ -158,9 +158,9 @@ export const PayExpenseModal: FC<PayExpenseModalProps> = ({
                     fontWeight: 600,
                     cursor: 'pointer',
                     transition: 'all 0.15s',
-                    border: paymentMethod === 'Cash' ? '1px solid var(--blue-primary, #0066ff)' : '1px solid #e2e8f0',
+                    border: paymentMethod === 'Cash' ? '1px solid var(--blue-primary, #0F766E)' : '1px solid #e2e8f0',
                     background: paymentMethod === 'Cash' ? 'var(--blue-light, #f0f6ff)' : '#ffffff',
-                    color: paymentMethod === 'Cash' ? 'var(--blue-primary, #0066ff)' : '#475569',
+                    color: paymentMethod === 'Cash' ? 'var(--blue-primary, #0F766E)' : '#475569',
                   }}
                 >
                   Tiền mặt (Quỹ quầy)
@@ -175,9 +175,9 @@ export const PayExpenseModal: FC<PayExpenseModalProps> = ({
                     fontWeight: 600,
                     cursor: 'pointer',
                     transition: 'all 0.15s',
-                    border: paymentMethod === 'BankTransfer' ? '1px solid var(--blue-primary, #0066ff)' : '1px solid #e2e8f0',
+                    border: paymentMethod === 'BankTransfer' ? '1px solid var(--blue-primary, #0F766E)' : '1px solid #e2e8f0',
                     background: paymentMethod === 'BankTransfer' ? 'var(--blue-light, #f0f6ff)' : '#ffffff',
-                    color: paymentMethod === 'BankTransfer' ? 'var(--blue-primary, #0066ff)' : '#475569',
+                    color: paymentMethod === 'BankTransfer' ? 'var(--blue-primary, #0F766E)' : '#475569',
                   }}
                 >
                   Chuyển khoản NH
