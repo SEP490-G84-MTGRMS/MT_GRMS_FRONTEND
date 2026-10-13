@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { FC } from 'react';
 import { ArrowLeftRight, Plus } from 'lucide-react';
+import { TablePagination } from '../../../components/common';
 import type { CashInOutTransaction } from '../types/pos.types';
 
 interface Props {
@@ -18,7 +19,6 @@ export const ShiftCashInOutTable: FC<Props> = ({
   const [currentPage, setCurrentPage] = useState(1);
 
   const totalCount = transactions.length;
-  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
   const startIndex = (currentPage - 1) * pageSize;
   const currentItems = transactions.slice(startIndex, startIndex + pageSize);
 
@@ -107,59 +107,21 @@ export const ShiftCashInOutTable: FC<Props> = ({
         </table>
       </div>
 
-      {/* Pagination Footer - Chỉ hiển thị khi có nhiều trang */}
+      {/* Shared Pagination Footer - Chuẩn Hệ Thống */}
       {totalCount > pageSize && (
-        <div className="admin-pagination-footer" style={{ marginTop: '12px' }}>
-          <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
-            Đang hiển thị{' '}
-            <b>
-              {totalCount > 0 ? startIndex + 1 : 0} - {Math.min(startIndex + pageSize, totalCount)}
-            </b>{' '}
-            trong tổng số <b>{totalCount}</b> phiếu thu/chi
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--text-muted)' }}>
-              <span>Số dòng:</span>
-              <select
-                value={pageSize}
-                onChange={(e) => {
-                  setPageSize(Number(e.target.value));
-                  setCurrentPage(1);
-                }}
-                style={{
-                  height: 32,
-                  padding: '0 8px',
-                  borderRadius: 'var(--radius-pill)',
-                  border: '1px solid var(--border-light)',
-                  backgroundColor: 'var(--bg-soft-blue)',
-                  fontFamily: 'inherit',
-                  fontSize: 12.5,
-                  color: 'var(--text-main)',
-                  outline: 'none',
-                  cursor: 'pointer',
-                }}
-              >
-                <option value={10}>10 / trang</option>
-                <option value={20}>20 / trang</option>
-                <option value={50}>50 / trang</option>
-              </select>
-            </div>
-
-            <div style={{ display: 'flex', gap: 4 }}>
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
-                <button
-                  key={pageNum}
-                  type="button"
-                  className={`admin-page-btn ${currentPage === pageNum ? 'active' : ''}`}
-                  onClick={() => setCurrentPage(pageNum)}
-                >
-                  {pageNum}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
+        <TablePagination
+          currentPage={currentPage}
+          pageSize={pageSize}
+          totalItems={totalCount}
+          itemLabel="phiếu thu/chi"
+          pageSizeOptions={[10, 20, 50]}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={(newSize) => {
+            setPageSize(newSize);
+            setCurrentPage(1);
+          }}
+          className="mt-3 rounded-lg border border-[#e2e8f0]"
+        />
       )}
     </div>
   );

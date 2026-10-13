@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { FC } from 'react';
 import { Package, Plus } from 'lucide-react';
+import { TablePagination } from '../../../components/common';
 import type { Product, Category } from '../types/pos.types';
 
 interface Props {
@@ -21,7 +22,6 @@ export const PosCatalogGrid: FC<Props> = ({ products, categories, onAddToCart })
   });
 
   const totalCount = filteredProducts.length;
-  const totalPages = Math.ceil(totalCount / pageSize) || 1;
 
   const currentProducts = filteredProducts.slice(
     (currentPage - 1) * pageSize,
@@ -30,11 +30,6 @@ export const PosCatalogGrid: FC<Props> = ({ products, categories, onAddToCart })
 
   const handleCategorySelect = (catId: string) => {
     setSelectedCategory(catId);
-    setCurrentPage(1);
-  };
-
-  const handlePageSizeChange = (newSize: number) => {
-    setPageSize(newSize);
     setCurrentPage(1);
   };
 
@@ -155,71 +150,22 @@ export const PosCatalogGrid: FC<Props> = ({ products, categories, onAddToCart })
           ))}
         </div>
 
-        {/* Thanh Phân Trang Chuẩn Hệ Thống (admin-pagination-footer khớp 100% SupplierTable) */}
-        <div className="admin-pagination-footer" style={{ marginTop: 12, borderRadius: 'var(--radius-sm)' }}>
-          <div>
-            Đang hiển thị <b>{totalCount > 0 ? (currentPage - 1) * pageSize + 1 : 0} - {Math.min(currentPage * pageSize, totalCount)}</b> trong tổng số <b>{totalCount}</b> sản phẩm
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--text-muted)' }}>
-              <span>Số dòng:</span>
-              <select
-                value={pageSize}
-                onChange={(e) => handlePageSizeChange(Number(e.target.value))}
-                style={{
-                  height: 32,
-                  padding: '0 8px',
-                  borderRadius: 'var(--radius-pill)',
-                  border: '1px solid var(--border-light)',
-                  backgroundColor: 'var(--bg-soft-blue)',
-                  fontFamily: 'inherit',
-                  fontSize: 12.5,
-                  color: 'var(--text-main)',
-                  outline: 'none',
-                  cursor: 'pointer',
-                }}
-              >
-                <option value={10}>10 / trang</option>
-                <option value={20}>20 / trang</option>
-                <option value={50}>50 / trang</option>
-              </select>
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <button
-                type="button"
-                className="admin-page-btn"
-                disabled={currentPage <= 1}
-                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                style={{ opacity: currentPage <= 1 ? 0.5 : 1, cursor: currentPage <= 1 ? 'not-allowed' : 'pointer' }}
-              >
-                &lt;
-              </button>
-
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
-                <button
-                  key={pageNum}
-                  type="button"
-                  className={`admin-page-btn ${currentPage === pageNum ? 'active' : ''}`}
-                  onClick={() => setCurrentPage(pageNum)}
-                >
-                  {pageNum}
-                </button>
-              ))}
-
-              <button
-                type="button"
-                className="admin-page-btn"
-                disabled={currentPage >= totalPages}
-                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                style={{ opacity: currentPage >= totalPages ? 0.5 : 1, cursor: currentPage >= totalPages ? 'not-allowed' : 'pointer' }}
-              >
-                &gt;
-              </button>
-            </div>
-          </div>
-        </div>
+        {/* Thanh Phân Trang Dùng Chung Chuẩn Prototype */}
+        {filteredProducts.length > 0 && (
+          <TablePagination
+            currentPage={currentPage}
+            pageSize={pageSize}
+            totalItems={totalCount}
+            itemLabel="sản phẩm"
+            pageSizeOptions={[10, 20, 50]}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={(newSize) => {
+              setPageSize(newSize);
+              setCurrentPage(1);
+            }}
+            className="mt-3 rounded-md border border-[#e2e8f0]"
+          />
+        )}
       </fieldset>
     </div>
   );
