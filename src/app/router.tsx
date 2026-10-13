@@ -1,9 +1,15 @@
-import { createBrowserRouter } from 'react-router-dom';
-import { MasterLayout } from '../layouts/MasterLayout';
+﻿import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { PosLayout } from '../layouts/PosLayout';
 import { WebStoreLayout } from '../layouts/WebStoreLayout';
 import { AuthLayout } from '../layouts/AuthLayout';
 import { HomePage } from '../pages/HomePage';
+import { SupplierListPage, SupplierDetailPage, SupplierProductManagementPage } from '../features/supplier';
+import { OrderMatrixPage, BranchOrderListPage } from '../features/purchase-order';
+import { ServiceExpensesPage } from '../features/service-expenses/pages/ServiceExpensesPage';
+import { CustomerManagementPage } from '../features/customer-crm';
+import { StoreOwnerLayout } from '../layouts/StoreOwnerLayout';
+import { AdminDashboardPage } from '../pages/admin/AdminDashboardPage';
+import { TenantManagementPage } from '../pages/admin/TenantManagementPage';
 
 export const router = createBrowserRouter([
   {
@@ -11,12 +17,196 @@ export const router = createBrowserRouter([
     element: <HomePage />,
   },
   {
-    path: '/dashboard',
-    element: <MasterLayout />,
+    path: '/admin',
+    element: <StoreOwnerLayout />,
     children: [
       {
         index: true,
-        element: <div className="text-gray-600">Trang Bảng điều khiển Quản trị (Dashboard)</div>,
+        element: <AdminDashboardPage />,
+      },
+      {
+        path: 'dashboard',
+        element: <AdminDashboardPage />,
+      },
+      {
+        path: 'tenants',
+        element: <TenantManagementPage />,
+      },
+      {
+        path: 'suppliers',
+        element: <SupplierListPage />,
+      },
+      {
+        path: 'suppliers/products',
+        element: <SupplierProductManagementPage />,
+      },
+      {
+        path: 'suppliers/:id',
+        element: <SupplierDetailPage />,
+      },
+      {
+        path: 'suppliers/:id/products',
+        element: <SupplierProductManagementPage />,
+      },
+      {
+        path: 'purchase-orders',
+        element: <BranchOrderListPage />,
+      },
+      {
+        path: 'purchase-orders/branches',
+        element: <BranchOrderListPage />,
+      },
+      {
+        path: 'purchase-orders/create-matrix',
+        element: <OrderMatrixPage />,
+      },
+      {
+        path: 'expenses',
+        element: <ServiceExpensesPage />,
+      },
+      {
+        path: 'customers',
+        element: <CustomerManagementPage />,
+      },
+    ],
+  },
+  {
+    path: '/store-owner',
+    element: <StoreOwnerLayout />,
+    children: [
+      {
+        index: true,
+        element: <AdminDashboardPage />,
+      },
+      {
+        path: 'dashboard',
+        element: <AdminDashboardPage />,
+      },
+      {
+        path: 'suppliers',
+        element: <SupplierListPage />,
+      },
+      {
+        path: 'suppliers/products',
+        element: <SupplierProductManagementPage />,
+      },
+      {
+        path: 'suppliers/:id',
+        element: <SupplierDetailPage />,
+      },
+      {
+        path: 'suppliers/:id/products',
+        element: <SupplierProductManagementPage />,
+      },
+      {
+        path: 'purchase-orders',
+        element: <BranchOrderListPage />,
+      },
+      {
+        path: 'purchase-orders/branches',
+        element: <BranchOrderListPage />,
+      },
+      {
+        path: 'purchase-orders/create-matrix',
+        element: <OrderMatrixPage />,
+      },
+      {
+        path: 'expenses',
+        element: <ServiceExpensesPage />,
+      },
+      {
+        path: 'customers',
+        element: <CustomerManagementPage />,
+      },
+    ],
+  },
+  {
+    path: '/dashboard',
+    element: <StoreOwnerLayout />,
+    children: [
+      {
+        index: true,
+        element: <AdminDashboardPage />,
+      },
+      {
+        path: 'tenants',
+        element: <TenantManagementPage />,
+      },
+      {
+        path: 'suppliers',
+        element: <SupplierListPage />,
+      },
+      {
+        path: 'suppliers/products',
+        element: <SupplierProductManagementPage />,
+      },
+      {
+        path: 'suppliers/:id',
+        element: <SupplierDetailPage />,
+      },
+      {
+        path: 'suppliers/:id/products',
+        element: <SupplierProductManagementPage />,
+      },
+      {
+        path: 'purchase-orders',
+        element: <Navigate to="/store-owner/purchase-orders/branches" replace />,
+      },
+      {
+        path: 'purchase-orders/branches',
+        element: <Navigate to="/store-owner/purchase-orders/branches" replace />,
+      },
+      {
+        path: 'purchase-orders/create-matrix',
+        element: <OrderMatrixPage />,
+      },
+      {
+        path: 'expenses',
+        element: <Navigate to="/store-owner/expenses" replace />,
+      },
+      {
+        path: 'customers',
+        element: <Navigate to="/store-owner/customers" replace />,
+      },
+    ],
+  },
+  {
+    path: '/suppliers',
+    element: <StoreOwnerLayout />,
+    children: [
+      {
+        index: true,
+        element: <SupplierListPage />,
+      },
+      {
+        path: 'products',
+        element: <SupplierProductManagementPage />,
+      },
+      {
+        path: ':id',
+        element: <SupplierDetailPage />,
+      },
+      {
+        path: ':id/products',
+        element: <SupplierProductManagementPage />,
+      },
+      {
+        path: 'expenses',
+        element: <Navigate to="/store-owner/expenses" replace />,
+      },
+      {
+        path: 'customers',
+        element: <Navigate to="/store-owner/customers" replace />,
+      },
+    ],
+  },
+  {
+    path: '/customers',
+    element: <StoreOwnerLayout />,
+    children: [
+      {
+        index: true,
+        element: <CustomerManagementPage />,
       },
     ],
   },
