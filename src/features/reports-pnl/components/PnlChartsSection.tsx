@@ -59,7 +59,10 @@ const TrendChartCard: React.FC<{
 }> = ({ trendData, isLoading }) => {
   if (isLoading) {
     return (
-      <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-xs animate-pulse h-80" />
+      <div className="pnl-chart-card" style={{ minHeight: '360px', opacity: 0.6 }}>
+        <div style={{ height: '20px', background: '#e2e8f0', borderRadius: '8px', width: '40%', marginBottom: '16px' }} />
+        <div style={{ height: '280px', background: '#f8fafc', borderRadius: '16px' }} />
+      </div>
     );
   }
 
@@ -70,24 +73,24 @@ const TrendChartCard: React.FC<{
         type: 'bar' as const,
         label: 'Doanh thu thuần',
         data: trendData.map((d) => d.netRevenue),
-        backgroundColor: 'rgba(15, 118, 110, 0.75)', // Teal 700
-        borderRadius: 4,
+        backgroundColor: 'rgba(15, 118, 110, 0.78)', // Deep Teal
+        borderRadius: 6,
         order: 2,
       },
       {
         type: 'bar' as const,
         label: 'Tổng chi phí & Giá vốn',
         data: trendData.map((d) => d.cogs + d.expenses),
-        backgroundColor: 'rgba(245, 158, 11, 0.65)', // Amber 500
-        borderRadius: 4,
+        backgroundColor: 'rgba(245, 158, 11, 0.72)', // Amber
+        borderRadius: 6,
         order: 3,
       },
       {
         type: 'line' as const,
         label: 'Lợi nhuận ròng',
         data: trendData.map((d) => d.netProfit),
-        borderColor: '#10B981', // Emerald 500
-        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+        borderColor: '#10B981', // Emerald
+        backgroundColor: 'rgba(16, 185, 129, 0.12)',
         borderWidth: 2.5,
         fill: true,
         tension: 0.3,
@@ -106,7 +109,7 @@ const TrendChartCard: React.FC<{
         position: 'top' as const,
         labels: {
           boxWidth: 12,
-          font: { size: 11 },
+          font: { size: 11, family: 'var(--font-sans)' },
         },
       },
       tooltip: {
@@ -123,35 +126,29 @@ const TrendChartCard: React.FC<{
       y: {
         ticks: {
           callback: (value: any) => `${value / 1000000} tr`,
-          font: { size: 10 },
+          font: { size: 10, family: 'var(--font-sans)' },
         },
-        grid: { color: 'rgba(0, 0, 0, 0.05)' },
+        grid: { color: 'rgba(0, 0, 0, 0.04)' },
       },
       x: {
         grid: { display: false },
-        ticks: { font: { size: 10 } },
+        ticks: { font: { size: 10, family: 'var(--font-sans)' } },
       },
     },
   };
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-xs flex flex-col justify-between">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <div className="p-1.5 bg-emerald-50 text-emerald-700 rounded-lg">
-            <TrendingUp size={18} />
-          </div>
-          <div>
-            <h3 className="text-sm font-semibold text-gray-900">
-              Xu Hướng Doanh Thu & Lợi Nhuận
-            </h3>
-            <p className="text-xs text-gray-400">
-              So sánh Doanh thu thuần, Chi phí và Lợi nhuận ròng
-            </p>
-          </div>
+    <div className="pnl-chart-card">
+      <div className="pnl-card-title-group">
+        <div className="pnl-card-icon-badge" style={{ background: 'var(--blue-subtle, #CCFBF1)', color: 'var(--blue-primary, #0F766E)' }}>
+          <TrendingUp size={20} />
+        </div>
+        <div>
+          <h3>Xu Hướng Doanh Thu & Lợi Nhuận</h3>
+          <p>So sánh biến động Doanh thu thuần, Chi phí và Lợi nhuận ròng qua các kỳ</p>
         </div>
       </div>
-      <div className="h-72 w-full">
+      <div className="pnl-chart-container">
         <Chart type="bar" data={chartData as any} options={chartOptions as any} />
       </div>
     </div>
@@ -167,7 +164,10 @@ const ExpenseDonutCard: React.FC<{
 }> = ({ breakdown, isLoading }) => {
   if (isLoading) {
     return (
-      <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-xs animate-pulse h-80" />
+      <div className="pnl-chart-card" style={{ minHeight: '360px', opacity: 0.6 }}>
+        <div style={{ height: '20px', background: '#e2e8f0', borderRadius: '8px', width: '40%', marginBottom: '16px' }} />
+        <div style={{ height: '280px', background: '#f8fafc', borderRadius: '16px' }} />
+      </div>
     );
   }
 
@@ -202,41 +202,33 @@ const ExpenseDonutCard: React.FC<{
   };
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-xs flex flex-col justify-between">
-      <div className="flex items-center gap-2 mb-3">
-        <div className="p-1.5 bg-amber-50 text-amber-700 rounded-lg">
-          <PieChartIcon size={18} />
+    <div className="pnl-chart-card">
+      <div className="pnl-card-title-group">
+        <div className="pnl-card-icon-badge" style={{ background: '#FEF3C7', color: '#D97706' }}>
+          <PieChartIcon size={20} />
         </div>
         <div>
-          <h3 className="text-sm font-semibold text-gray-900">
-            Cơ Cấu Chi Phí Vận Hành
-          </h3>
-          <p className="text-xs text-gray-400">Tỷ trọng các nhóm chi phí & hao hụt</p>
+          <h3>Cơ Cấu Chi Phí Vận Hành</h3>
+          <p>Tỷ trọng các nhóm chi phí dịch vụ và hao hụt kho</p>
         </div>
       </div>
 
-      <div className="relative h-44 my-1">
+      <div className="pnl-donut-container">
         <Doughnut data={data} options={options} />
       </div>
 
-      <div className="space-y-1.5 pt-2 border-t border-gray-100 max-h-32 overflow-y-auto">
+      <div className="pnl-donut-legend">
         {breakdown.map((item) => (
-          <div
-            key={item.categoryCode}
-            className="flex items-center justify-between text-xs"
-          >
-            <div className="flex items-center gap-2 truncate">
-              <span
-                className="w-2.5 h-2.5 rounded-full shrink-0"
-                style={{ backgroundColor: item.color }}
-              />
-              <span className="text-gray-600 truncate">{item.categoryName}</span>
+          <div key={item.categoryCode} className="pnl-legend-row">
+            <div className="pnl-legend-item-left">
+              <span className="pnl-legend-color-dot" style={{ backgroundColor: item.color }} />
+              <span style={{ color: 'var(--text-muted, #4b5563)' }}>{item.categoryName}</span>
             </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <span className="font-medium text-gray-900">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontWeight: 700, color: 'var(--text-main, #111827)' }}>
                 {formatVnd(item.amount)}
               </span>
-              <span className="text-gray-400 text-[11px] w-9 text-right font-medium">
+              <span style={{ color: 'var(--text-faint, #9ca3af)', fontSize: '0.72rem', minWidth: '38px', textAlign: 'right' }}>
                 {item.percentage}%
               </span>
             </div>
@@ -259,7 +251,10 @@ const TopProductsCard: React.FC<{
 
   if (isLoading) {
     return (
-      <div className="bg-white rounded-[20px] border border-teal-100 p-5 shadow-xs animate-pulse h-80" />
+      <div className="pnl-top-products-wrapper" style={{ opacity: 0.6 }}>
+        <div style={{ height: '24px', background: '#e2e8f0', borderRadius: '8px', width: '30%', marginBottom: '16px' }} />
+        <div style={{ height: '200px', background: '#f8fafc', borderRadius: '16px' }} />
+      </div>
     );
   }
 
@@ -267,47 +262,36 @@ const TopProductsCard: React.FC<{
   const displayedProducts = products.slice(startIndex, startIndex + pageSize);
 
   return (
-    <div className="bg-white rounded-[20px] border border-teal-100 p-5 shadow-xs flex flex-col justify-between">
-      <div className="flex items-center gap-2 mb-4">
-        <div className="p-2 bg-teal-50 text-teal-800 rounded-xl">
-          <Award size={18} />
+    <div className="pnl-top-products-wrapper">
+      <div className="pnl-card-title-group">
+        <div className="pnl-card-icon-badge" style={{ background: '#E0F2FE', color: '#0284C7' }}>
+          <Award size={20} />
         </div>
         <div>
-          <h3 className="text-sm font-bold text-gray-900">
-            Top Sản Phẩm Đóng Góp Doanh Số
-          </h3>
-          <p className="text-xs text-gray-500">
-            Mặt hàng bán chạy và biên lãi gộp đóng góp cho cửa hàng
-          </p>
+          <h3>Top Sản Phẩm Đóng Góp Doanh Số</h3>
+          <p>Mặt hàng bán chạy và tỷ lệ biên lãi gộp đóng góp cho chuỗi</p>
         </div>
       </div>
 
-      <div className="divide-y divide-gray-100 overflow-y-auto mb-3">
+      <div style={{ marginBottom: '16px' }}>
         {displayedProducts.map((item, index) => {
           const rank = startIndex + index + 1;
           return (
-            <div
-              key={item.productId}
-              className="py-2.5 flex items-center justify-between text-xs hover:bg-teal-50/40 px-2 rounded-lg transition-colors"
-            >
-              <div className="flex items-center gap-2.5 min-w-0 pr-2">
-                <span className="w-5 h-5 rounded-full bg-teal-100 text-teal-900 font-bold text-[11px] flex items-center justify-center shrink-0">
-                  {rank}
-                </span>
-                <div className="truncate">
-                  <p className="font-semibold text-gray-800 truncate">
-                    {item.productName}
-                  </p>
-                  <p className="text-[11px] text-gray-400">
-                    Mã: {item.productCode} • SL: {item.quantitySold.toLocaleString()}
-                  </p>
+            <div key={item.productId} className="pnl-product-row">
+              <div className="pnl-product-left">
+                <span className="pnl-rank-badge">{rank}</span>
+                <div style={{ minWidth: 0 }}>
+                  <div className="pnl-product-name">{item.productName}</div>
+                  <div className="pnl-product-meta">
+                    Mã: {item.productCode} • SL bán: {item.quantitySold.toLocaleString()}
+                  </div>
                 </div>
               </div>
-              <div className="text-right shrink-0">
-                <p className="font-bold text-gray-900">{formatVnd(item.revenue)}</p>
-                <p className="text-[11px] text-teal-700 font-medium">
+              <div className="pnl-product-right">
+                <div className="pnl-product-revenue">{formatVnd(item.revenue)}</div>
+                <div className="pnl-product-profit">
                   Lãi: {formatVnd(item.profit)} ({item.marginPct}%)
-                </p>
+                </div>
               </div>
             </div>
           );
@@ -341,21 +325,15 @@ export const PnlChartsSection: React.FC<PnlChartsSectionProps> = ({
   isLoading,
 }) => {
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-8">
-      {/* Trend Chart (7 columns) */}
-      <div className="lg:col-span-7">
+    <>
+      {/* 2-Column Trend & Donut Charts Grid */}
+      <div className="pnl-charts-grid">
         <TrendChartCard trendData={trendData} isLoading={isLoading} />
-      </div>
-
-      {/* Expense Donut Chart (5 columns) */}
-      <div className="lg:col-span-5">
         <ExpenseDonutCard breakdown={expenseBreakdown} isLoading={isLoading} />
       </div>
 
-      {/* Top Products Highlights (Full Width Banner) */}
-      <div className="lg:col-span-12">
-        <TopProductsCard products={topProducts} isLoading={isLoading} />
-      </div>
-    </div>
+      {/* Full Width Top Products Highlight Banner */}
+      <TopProductsCard products={topProducts} isLoading={isLoading} />
+    </>
   );
 };

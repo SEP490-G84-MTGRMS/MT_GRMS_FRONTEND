@@ -158,7 +158,7 @@ export const ReportsPnlDashboardPage: React.FC = () => {
       </div>
 
       {/* Main Content Area */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6">
+      <div className="pnl-content-container">
         {/* Error Alert Box */}
         {errorMsg && (
           <div className="mb-6 p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 flex items-center gap-3 text-xs font-semibold shadow-xs">

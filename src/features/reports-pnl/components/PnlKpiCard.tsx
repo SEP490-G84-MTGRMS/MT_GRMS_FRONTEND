@@ -7,13 +7,12 @@ export interface PnlKpiCardProps {
   subValue?: string;
   growthPct: number;
   icon: React.ReactNode;
-  iconBgColor?: string;
-  borderColor?: string;
+  iconClass?: string;
   isLoading?: boolean;
 }
 
 /**
- * Individual KPI Summary Card component with growth badge and subtle accents.
+ * Individual KPI Summary Card component matching MT-GRMS Design System.
  */
 export const PnlKpiCard: React.FC<PnlKpiCardProps> = ({
   title,
@@ -21,19 +20,15 @@ export const PnlKpiCard: React.FC<PnlKpiCardProps> = ({
   subValue,
   growthPct,
   icon,
-  iconBgColor = 'bg-emerald-50 text-emerald-700',
-  borderColor = 'border-gray-200',
+  iconClass = 'pnl-icon-teal',
   isLoading = false,
 }) => {
   if (isLoading) {
     return (
-      <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-xs animate-pulse">
-        <div className="flex items-center justify-between mb-3">
-          <div className="h-4 bg-gray-200 rounded w-24" />
-          <div className="h-8 w-8 bg-gray-200 rounded-lg" />
-        </div>
-        <div className="h-7 bg-gray-300 rounded w-36 mb-2" />
-        <div className="h-3 bg-gray-200 rounded w-20" />
+      <div className="pnl-kpi-card" style={{ opacity: 0.6 }}>
+        <div style={{ height: '14px', background: '#e2e8f0', borderRadius: '8px', width: '50%', marginBottom: '12px' }} />
+        <div style={{ height: '26px', background: '#cbd5e1', borderRadius: '8px', width: '75%', marginBottom: '8px' }} />
+        <div style={{ height: '12px', background: '#f1f5f9', borderRadius: '6px', width: '40%' }} />
       </div>
     );
   }
@@ -42,47 +37,38 @@ export const PnlKpiCard: React.FC<PnlKpiCardProps> = ({
   const isZero = growthPct === 0;
 
   return (
-    <div
-      className={`bg-white rounded-[20px] border ${borderColor} p-4.5 shadow-xs hover:shadow-md transition-all duration-200 flex flex-col justify-between`}
-    >
-      <div className="flex items-center justify-between gap-2 mb-2">
-        <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider truncate">
+    <div className="pnl-kpi-card">
+      <div className="pnl-kpi-header">
+        <span className="pnl-kpi-title" title={title}>
           {title}
         </span>
-        <div className={`p-2.5 rounded-xl shrink-0 ${iconBgColor}`}>
+        <div className={`pnl-kpi-icon ${iconClass}`}>
           {icon}
         </div>
       </div>
 
       <div>
-        <div className="text-xl font-extrabold text-gray-900 tracking-tight mb-1">
-          {value}
-        </div>
-        {subValue && (
-          <div className="text-xs text-gray-500 font-medium mb-2 truncate">
-            {subValue}
-          </div>
-        )}
+        <div className="pnl-kpi-value">{value}</div>
+        {subValue && <div className="pnl-kpi-subtext">{subValue}</div>}
       </div>
 
-      <div className="flex items-center gap-1.5 pt-2 border-t border-gray-100 text-xs font-semibold">
+      <div className="pnl-kpi-footer">
         {isZero ? (
-          <span className="inline-flex items-center gap-0.5 text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full text-[11px]">
-            <Minus size={12} />
-            0%
+          <span className="pnl-growth-badge pnl-growth-neutral">
+            <Minus size={11} /> 0%
           </span>
         ) : isPositive ? (
-          <span className="inline-flex items-center gap-0.5 text-teal-800 bg-teal-50 px-2 py-0.5 rounded-full text-[11px] font-bold">
-            <TrendingUp size={12} />
-            +{growthPct}%
+          <span className="pnl-growth-badge pnl-growth-positive">
+            <TrendingUp size={11} /> +{growthPct}%
           </span>
         ) : (
-          <span className="inline-flex items-center gap-0.5 text-rose-700 bg-rose-50 px-2 py-0.5 rounded-full text-[11px] font-bold">
-            <TrendingDown size={12} />
-            {growthPct}%
+          <span className="pnl-growth-badge pnl-growth-negative">
+            <TrendingDown size={11} /> {growthPct}%
           </span>
         )}
-        <span className="text-gray-400 font-normal text-[11px]">so với kỳ trước</span>
+        <span style={{ color: 'var(--text-faint, #9ca3af)', fontSize: '0.7rem' }}>
+          so với kỳ trước
+        </span>
       </div>
     </div>
   );

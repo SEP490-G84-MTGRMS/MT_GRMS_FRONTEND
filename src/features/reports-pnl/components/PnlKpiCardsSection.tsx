@@ -15,9 +15,6 @@ interface PnlKpiCardsSectionProps {
   isLoading: boolean;
 }
 
-/**
- * Formats standard VND currency without decimal.
- */
 function formatVnd(val: number): string {
   return new Intl.NumberFormat('vi-VN', {
     style: 'currency',
@@ -27,7 +24,7 @@ function formatVnd(val: number): string {
 }
 
 /**
- * Section rendering 6 key financial and operational KPI cards.
+ * Section rendering 6 key financial and operational KPI cards in a 6-column grid.
  */
 export const PnlKpiCardsSection: React.FC<PnlKpiCardsSectionProps> = ({
   kpi,
@@ -35,7 +32,7 @@ export const PnlKpiCardsSection: React.FC<PnlKpiCardsSectionProps> = ({
 }) => {
   if (isLoading || !kpi) {
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-6">
+      <div className="pnl-kpi-grid">
         {[...Array(6)].map((_, i) => (
           <PnlKpiCard
             key={i}
@@ -51,7 +48,7 @@ export const PnlKpiCardsSection: React.FC<PnlKpiCardsSectionProps> = ({
   }
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-6">
+    <div className="pnl-kpi-grid">
       {/* 1. Doanh thu thuần */}
       <PnlKpiCard
         title="Doanh thu thuần"
@@ -59,8 +56,7 @@ export const PnlKpiCardsSection: React.FC<PnlKpiCardsSectionProps> = ({
         subValue={`Gộp: ${formatVnd(kpi.grossSales)}`}
         growthPct={kpi.netRevenueGrowthPct}
         icon={<DollarSign size={20} />}
-        iconBgColor="bg-teal-50 text-teal-800"
-        borderColor="border-teal-200"
+        iconClass="pnl-icon-teal"
       />
 
       {/* 2. Lợi nhuận gộp */}
@@ -70,8 +66,7 @@ export const PnlKpiCardsSection: React.FC<PnlKpiCardsSectionProps> = ({
         subValue={`Biên lãi gộp: ${kpi.grossMarginPct}%`}
         growthPct={kpi.grossProfitGrowthPct}
         icon={<TrendingUp size={20} />}
-        iconBgColor="bg-sky-50 text-sky-700"
-        borderColor="border-sky-200"
+        iconClass="pnl-icon-sky"
       />
 
       {/* 3. Lợi nhuận ròng */}
@@ -81,19 +76,17 @@ export const PnlKpiCardsSection: React.FC<PnlKpiCardsSectionProps> = ({
         subValue={`Biên lãi ròng: ${kpi.netMarginPct}%`}
         growthPct={kpi.netProfitGrowthPct}
         icon={<Coins size={20} />}
-        iconBgColor="bg-teal-50 text-teal-800"
-        borderColor="border-teal-300"
+        iconClass="pnl-icon-emerald"
       />
 
-      {/* 4. Chi phí vận hành */}
+      {/* 4. Chi phí dịch vụ ngoài */}
       <PnlKpiCard
         title="Chi phí dịch vụ (FE-07)"
         value={formatVnd(kpi.operatingExpenses)}
         subValue={`Hao hụt kho: ${formatVnd(kpi.shrinkageLoss)}`}
         growthPct={kpi.expensesGrowthPct}
         icon={<Receipt size={20} />}
-        iconBgColor="bg-amber-50 text-amber-700"
-        borderColor="border-amber-200"
+        iconClass="pnl-icon-amber"
       />
 
       {/* 5. Tổng đơn hàng */}
@@ -103,19 +96,17 @@ export const PnlKpiCardsSection: React.FC<PnlKpiCardsSectionProps> = ({
         subValue="Đơn bán lẻ POS"
         growthPct={kpi.ordersGrowthPct}
         icon={<ShoppingCart size={20} />}
-        iconBgColor="bg-indigo-50 text-indigo-700"
-        borderColor="border-indigo-200"
+        iconClass="pnl-icon-indigo"
       />
 
-      {/* 6. Giá trị trung bình đơn (AOV) */}
+      {/* 6. AOV */}
       <PnlKpiCard
         title="AOV (TB / Đơn)"
         value={formatVnd(kpi.averageOrderValue)}
         subValue="Giá trị trung bình đơn"
         growthPct={kpi.aovGrowthPct}
         icon={<Percent size={20} />}
-        iconBgColor="bg-slate-100 text-slate-700"
-        borderColor="border-slate-200"
+        iconClass="pnl-icon-slate"
       />
     </div>
   );

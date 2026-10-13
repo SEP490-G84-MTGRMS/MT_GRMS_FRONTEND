@@ -36,87 +36,74 @@ const PnlTableRow: React.FC<{
   const hasChildren = item.children && item.children.length > 0;
   const isExpanded = expandedIds.has(item.id);
 
-  // Styling based on level and status
-  let rowBg = 'hover:bg-gray-50';
-  let textClass = 'text-gray-800 text-xs';
-  let borderBottom = 'border-b border-gray-100';
-
+  let rowClass = 'pnl-row-hover';
   if (item.isTotal) {
-    rowBg = 'bg-teal-50/80 hover:bg-teal-100/70 font-bold';
-    textClass = 'text-teal-950 text-xs font-bold';
-    borderBottom = 'border-b-2 border-teal-300';
+    rowClass = 'pnl-row-total';
   } else if (item.isHeader) {
-    rowBg = 'bg-gray-100/90 hover:bg-gray-200/80 font-bold tracking-wide';
-    textClass = 'text-gray-900 text-xs font-bold';
-    borderBottom = 'border-b border-gray-200';
-  } else if (item.level === 3) {
-    textClass = 'text-gray-600 text-xs pl-4';
+    rowClass = 'pnl-row-header';
   }
 
   // Padding indent for hierarchy
-  const indentClass =
-    item.level === 1 ? 'pl-4' : item.level === 2 ? 'pl-9' : 'pl-14';
+  const indentPx = item.level === 1 ? 16 : item.level === 2 ? 38 : 60;
 
   return (
     <>
-      <tr className={`transition-colors duration-150 ${rowBg} ${borderBottom}`}>
-        {/* Code */}
-        <td className="py-2.5 px-3 text-xs font-mono text-gray-400 w-24 shrink-0">
+      <tr className={rowClass}>
+        {/* Code Column */}
+        <td className="pnl-td" style={{ fontFamily: 'var(--font-mono)', width: '90px', color: '#94A3B8', fontSize: '0.75rem' }}>
           {item.code}
         </td>
 
         {/* Title with expand toggle */}
-        <td className={`py-2.5 px-3 ${indentClass}`}>
-          <div className="flex items-center gap-1.5">
+        <td className="pnl-td" style={{ paddingLeft: `${indentPx}px` }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             {hasChildren ? (
               <button
                 type="button"
                 onClick={() => onToggle(item.id)}
-                className="p-1 rounded text-gray-500 hover:text-gray-800 hover:bg-gray-200 cursor-pointer transition-colors"
+                style={{
+                  border: 'none',
+                  background: 'none',
+                  padding: '3px',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  color: '#64748B',
+                  display: 'flex',
+                  alignItems: 'center',
+                }}
                 title={isExpanded ? 'Thu gọn' : 'Mở rộng'}
               >
                 {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
               </button>
             ) : (
-              <span className="w-5" />
+              <span style={{ width: '20px', display: 'inline-block' }} />
             )}
-            <span className={textClass}>{item.title}</span>
+            <span style={{ fontWeight: item.isHeader || item.isTotal ? 800 : 500 }}>
+              {item.title}
+            </span>
           </div>
         </td>
 
-        {/* Amount */}
-        <td className="py-2.5 px-3 text-right font-medium text-xs">
-          <span
-            className={
-              item.isNegative && !item.isTotal
-                ? 'text-rose-600'
-                : item.isTotal
-                ? 'text-emerald-900 font-bold'
-                : 'text-gray-900'
-            }
-          >
+        {/* Amount Column */}
+        <td className="pnl-td" style={{ textAlign: 'right', fontWeight: item.isTotal ? 800 : 600, width: '180px' }}>
+          <span style={{ color: item.isNegative && !item.isTotal ? '#DC2626' : undefined }}>
             {formatVnd(item.amount)}
           </span>
         </td>
 
-        {/* Percentage of Net Revenue */}
-        <td className="py-2.5 px-4 text-right text-xs text-gray-500 w-44">
-          <div className="flex items-center justify-end gap-2">
-            <div className="w-16 bg-gray-200 rounded-full h-1.5 overflow-hidden hidden sm:block">
+        {/* Percentage Column with Mini Progress Bar */}
+        <td className="pnl-td" style={{ textAlign: 'right', width: '170px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '10px' }}>
+            <div className="pnl-progress-bar-bg">
               <div
-                className={`h-full rounded-full ${
-                  item.isTotal ? 'bg-emerald-600' : 'bg-teal-500'
-                }`}
+                className="pnl-progress-bar-fill"
                 style={{
                   width: `${Math.min(Math.abs(item.percentageOfNetRevenue), 100)}%`,
+                  backgroundColor: item.isTotal ? 'var(--blue-primary, #0F766E)' : '#14B8A6',
                 }}
               />
             </div>
-            <span
-              className={`font-semibold text-xs w-12 text-right ${
-                item.isTotal ? 'text-emerald-900' : 'text-gray-700'
-              }`}
-            >
+            <span style={{ fontWeight: 700, minWidth: '45px', textAlign: 'right' }}>
               {item.percentageOfNetRevenue}%
             </span>
           </div>
@@ -145,7 +132,6 @@ export const PnlStatementTable: React.FC<PnlStatementTableProps> = ({
   pnlTree,
   isLoading,
 }) => {
-  // Collect all expandable ids initially expanded
   const getAllParentIds = (items: PnlLineItem[]): string[] => {
     let ids: string[] = [];
     for (const it of items) {
@@ -180,64 +166,64 @@ export const PnlStatementTable: React.FC<PnlStatementTableProps> = ({
 
   if (isLoading) {
     return (
-      <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-xs animate-pulse">
-        <div className="h-6 bg-gray-200 rounded w-48 mb-4" />
-        <div className="space-y-3">
-          {[...Array(8)].map((_, i) => (
-            <div key={i} className="h-8 bg-gray-100 rounded w-full" />
-          ))}
-        </div>
+      <div className="pnl-table-box" style={{ padding: '24px', opacity: 0.6 }}>
+        <div style={{ height: '24px', background: '#e2e8f0', borderRadius: '8px', width: '40%', marginBottom: '20px' }} />
+        {[...Array(6)].map((_, i) => (
+          <div key={i} style={{ height: '36px', background: '#f8fafc', borderRadius: '8px', marginBottom: '8px' }} />
+        ))}
       </div>
     );
   }
 
   return (
-    <div className="bg-white rounded-[20px] border border-teal-200/80 shadow-xs overflow-hidden">
-      {/* Table Header Controls */}
-      <div className="p-4 border-b border-teal-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-teal-50/30">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-teal-100 text-teal-800 rounded-xl shadow-xs">
-            <FileSpreadsheet size={18} />
+    <div className="pnl-table-box">
+      {/* Table Header Controls Bar */}
+      <div className="pnl-table-header-bar">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div className="pnl-card-icon-badge" style={{ background: 'var(--blue-subtle, #CCFBF1)', color: 'var(--blue-primary, #0F766E)' }}>
+            <FileSpreadsheet size={20} />
           </div>
           <div>
-            <h3 className="text-sm font-bold text-gray-900">
-              Báo Cáo Kết Quả Kinh Doanh (P&L Statement)
+            <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-main, #111827)', margin: 0 }}>
+              Báo Cáo Kết Quả Hoạt Động Kinh Doanh (P&L Statement)
             </h3>
-            <p className="text-xs text-gray-500">
+            <p style={{ fontSize: '0.74rem', color: 'var(--text-muted, #4b5563)', margin: '2px 0 0 0' }}>
               Cân đối Doanh thu, Giá vốn xuất kho (FEFO), Chi phí vận hành & Lợi nhuận
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 self-end sm:self-auto">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <button
             type="button"
             onClick={handleExpandAll}
-            className="btn-secondary-pill text-xs py-1 px-3"
+            className="btn-secondary-pill"
+            style={{ fontSize: '0.76rem', padding: '6px 14px' }}
           >
             <Maximize2 size={12} />
-            Mở rộng tất cả
+            <span>Mở rộng tất cả</span>
           </button>
           <button
             type="button"
             onClick={handleCollapseAll}
-            className="btn-secondary-pill text-xs py-1 px-3"
+            className="btn-secondary-pill"
+            style={{ fontSize: '0.76rem', padding: '6px 14px' }}
           >
             <Minimize2 size={12} />
-            Thu gọn tất cả
+            <span>Thu gọn tất cả</span>
           </button>
         </div>
       </div>
 
       {/* Table Content */}
-      <div className="overflow-x-auto">
-        <table className="w-full text-left border-collapse">
+      <div style={{ overflowX: 'auto', width: '100%' }}>
+        <table className="pnl-table-element">
           <thead>
-            <tr className="bg-gray-100/75 border-b border-gray-200 text-[11px] font-bold text-gray-600 uppercase tracking-wider">
-              <th className="py-2.5 px-3 w-24">Mã</th>
-              <th className="py-2.5 px-3">Khoản Mục Tài Chính</th>
-              <th className="py-2.5 px-3 text-right w-44">Số Tiền (VNĐ)</th>
-              <th className="py-2.5 px-4 text-right w-44">Tỷ Lệ / Doanh Thu</th>
+            <tr>
+              <th className="pnl-th" style={{ width: '90px' }}>Mã</th>
+              <th className="pnl-th">Khoản Mục Tài Chính</th>
+              <th className="pnl-th" style={{ textAlign: 'right', width: '180px' }}>Số Tiền (VNĐ)</th>
+              <th className="pnl-th" style={{ textAlign: 'right', width: '170px' }}>Tỷ Lệ / Doanh Thu</th>
             </tr>
           </thead>
           <tbody>
@@ -254,14 +240,14 @@ export const PnlStatementTable: React.FC<PnlStatementTableProps> = ({
       </div>
 
       {/* Table Footer Notes */}
-      <div className="p-3 bg-gray-50 border-t border-gray-200 text-xs text-gray-500 flex items-center justify-between">
-        <div className="flex items-center gap-1.5 text-[11px]">
-          <HelpCircle size={13} className="text-gray-400" />
+      <div style={{ padding: '12px 20px', background: '#F8FAFC', borderTop: '1px solid var(--border-subtle, #e5edf8)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.72rem', color: 'var(--text-muted, #4b5563)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <HelpCircle size={14} style={{ color: 'var(--blue-primary, #0F766E)' }} />
           <span>
-            * Số liệu tính toán trực tiếp từ Doanh số bán POS, Giá vốn theo lô FEFO, và Chứng từ chi phí FE-07.
+            * Số liệu tính toán từ Doanh số bán POS, Giá vốn theo lô FEFO, và Chứng từ chi phí FE-07.
           </span>
         </div>
-        <span className="text-[11px] font-medium text-gray-400">Đơn vị: VNĐ</span>
+        <span style={{ fontWeight: 600 }}>Đơn vị tính: VNĐ</span>
       </div>
     </div>
   );
