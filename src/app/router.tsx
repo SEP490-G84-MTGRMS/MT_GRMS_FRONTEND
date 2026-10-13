@@ -4,6 +4,7 @@ import { WebStoreLayout } from '../layouts/WebStoreLayout';
 import { AuthLayout } from '../layouts/AuthLayout';
 import { HomePage } from '../pages/HomePage';
 import { SupplierListPage, SupplierDetailPage, SupplierProductManagementPage } from '../features/supplier';
+import { OrderMatrixPage } from '../features/purchase-order';
 
 import { StoreOwnerLayout } from '../layouts/StoreOwnerLayout';
 import { AdminDashboardPage } from '../pages/admin/AdminDashboardPage';
@@ -46,6 +47,10 @@ export const router = createBrowserRouter([
         path: 'suppliers/:id/products',
         element: <SupplierProductManagementPage />,
       },
+      {
+        path: 'purchase-orders/create-matrix',
+        element: <OrderMatrixPage />,
+      },
     ],
   },
   {
@@ -76,6 +81,10 @@ export const router = createBrowserRouter([
         path: 'suppliers/:id/products',
         element: <SupplierProductManagementPage />,
       },
+      {
+        path: 'purchase-orders/create-matrix',
+        element: <OrderMatrixPage />,
+      },
     ],
   },
   {
@@ -105,6 +114,10 @@ export const router = createBrowserRouter([
       {
         path: 'suppliers/:id/products',
         element: <SupplierProductManagementPage />,
+      },
+      {
+        path: 'purchase-orders/create-matrix',
+        element: <OrderMatrixPage />,
       },
     ],
   },
