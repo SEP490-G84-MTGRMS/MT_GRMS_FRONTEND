@@ -10,6 +10,7 @@ import { CustomerManagementPage } from '../features/customer-crm';
 import { StoreOwnerLayout } from '../layouts/StoreOwnerLayout';
 import { AdminDashboardPage } from '../pages/admin/AdminDashboardPage';
 import { TenantManagementPage } from '../pages/admin/TenantManagementPage';
+import { PosCheckoutPage, PosShiftPage } from '../features/pos';
 
 export const router = createBrowserRouter([
   {
@@ -224,7 +225,34 @@ export const router = createBrowserRouter([
     children: [
       {
         index: true,
-        element: <div className="p-4 text-emerald-400">Màn hình Quầy Bán hàng POS Checkout</div>,
+        element: <PosCheckoutPage />,
+      },
+      {
+        path: 'shift',
+        element: <PosShiftPage />,
+      },
+    ],
+  },
+  {
+    path: '/employee',
+    children: [
+      {
+        index: true,
+        element: <Navigate to="/employee/pos" replace />,
+      },
+      {
+        path: 'pos',
+        element: <PosLayout />,
+        children: [
+          {
+            index: true,
+            element: <PosCheckoutPage />,
+          },
+          {
+            path: 'shift',
+            element: <PosShiftPage />,
+          },
+        ],
       },
     ],
   },

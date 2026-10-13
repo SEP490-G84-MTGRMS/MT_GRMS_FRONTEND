@@ -84,4 +84,20 @@ html, body {
   flex-direction: column;
   box-sizing: border-box;
   text-align: left;
+  font-family: var(--font-sans);
+}
+
+/* Đồng bộ toàn bộ các thẻ form, nút và bảng kế thừa font prototype chuẩn (Be Vietnam Pro) */
+button,
+input,
+optgroup,
+select,
+textarea {
+  font-family: inherit;
+}
+
+/* Đồng bộ class .font-mono luôn dùng font chuẩn JetBrains Mono */
+.font-mono,
+.tabular-nums.font-mono {
+  font-family: var(--font-mono) !important;
 }
