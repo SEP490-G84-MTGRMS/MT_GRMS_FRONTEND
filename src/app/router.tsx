@@ -4,7 +4,7 @@ import { WebStoreLayout } from '../layouts/WebStoreLayout';
 import { AuthLayout } from '../layouts/AuthLayout';
 import { HomePage } from '../pages/HomePage';
 import { SupplierListPage, SupplierDetailPage, SupplierProductManagementPage } from '../features/supplier';
-import { OrderMatrixPage } from '../features/purchase-order';
+import { OrderMatrixPage, BranchOrderListPage } from '../features/purchase-order';
 import { ServiceExpensesPage } from '../features/service-expenses/pages/ServiceExpensesPage';
 import { StoreOwnerLayout } from '../layouts/StoreOwnerLayout';
 import { AdminDashboardPage } from '../pages/admin/AdminDashboardPage';
@@ -48,6 +48,14 @@ export const router = createBrowserRouter([
         element: <SupplierProductManagementPage />,
       },
       {
+        path: 'purchase-orders',
+        element: <BranchOrderListPage />,
+      },
+      {
+        path: 'purchase-orders/branches',
+        element: <BranchOrderListPage />,
+      },
+      {
         path: 'purchase-orders/create-matrix',
         element: <OrderMatrixPage />,
       },
@@ -86,6 +94,14 @@ export const router = createBrowserRouter([
         element: <SupplierProductManagementPage />,
       },
       {
+        path: 'purchase-orders',
+        element: <BranchOrderListPage />,
+      },
+      {
+        path: 'purchase-orders/branches',
+        element: <BranchOrderListPage />,
+      },
+      {
         path: 'purchase-orders/create-matrix',
         element: <OrderMatrixPage />,
       },
@@ -122,6 +138,14 @@ export const router = createBrowserRouter([
       {
         path: 'suppliers/:id/products',
         element: <SupplierProductManagementPage />,
+      },
+      {
+        path: 'purchase-orders',
+        element: <Navigate to="/store-owner/purchase-orders/branches" replace />,
+      },
+      {
+        path: 'purchase-orders/branches',
+        element: <Navigate to="/store-owner/purchase-orders/branches" replace />,
       },
       {
         path: 'purchase-orders/create-matrix',

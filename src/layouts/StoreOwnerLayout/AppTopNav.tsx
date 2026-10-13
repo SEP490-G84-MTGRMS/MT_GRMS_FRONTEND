@@ -48,6 +48,7 @@ const NAV_GROUPS: NavGroup[] = [
     icon: TruckIcon,
     children: [
       { label: 'Nhà cung cấp', to: '/store-owner/suppliers' },
+      { label: 'Đặt hàng theo chi nhánh', to: '/store-owner/purchase-orders/branches' },
       { label: 'Đặt hàng theo ma trận', to: '/store-owner/purchase-orders/create-matrix', badge: 'Grid' },
     ],
   },

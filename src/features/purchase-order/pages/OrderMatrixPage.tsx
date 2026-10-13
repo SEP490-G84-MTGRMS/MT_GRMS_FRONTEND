@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import type { FC } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
@@ -111,13 +111,23 @@ export const OrderMatrixPage: FC = () => {
   const [searchParams] = useSearchParams();
 
   const initialSupplier = searchParams.get('supplier') || 'ALL';
-  const initialBranch = searchParams.get('branch') || 'DC1';
+  const branchParam = searchParams.get('branchId') || searchParams.get('branch');
+  const initialBranch = branchParam && MOCK_BRANCHES.some((b) => b.id === branchParam) ? branchParam : 'DC1';
+  const isReadOnly = searchParams.get('mode') === 'view' || searchParams.get('readOnly') === 'true';
   const initialViewMode = 14;
   const initialViewFrom = parseDateStr(BASE_TODAY);
   const initialDays = computeDayColumns(initialViewFrom, initialViewMode, initialSupplier);
 
   // State: Filter Scope
   const [selectedBranchId, setSelectedBranchId] = useState<string>(initialBranch);
+
+  // Sync selectedBranchId if URL query changes
+  useEffect(() => {
+    const currentParam = searchParams.get('branchId') || searchParams.get('branch');
+    if (currentParam && MOCK_BRANCHES.some((b) => b.id === currentParam)) {
+      setSelectedBranchId(currentParam);
+    }
+  }, [searchParams]);
   const [selectedSupplierId, setSelectedSupplierId] = useState<string>(initialSupplier);
   const viewMode = 14;
   const [viewFrom, setViewFrom] = useState<Date>(initialViewFrom);
@@ -387,8 +397,10 @@ export const OrderMatrixPage: FC = () => {
       {/* 1. Page Header */}
       <OrderMatrixHeader
         status={status}
-        onBack={() => navigate('/store-owner/suppliers')}
+        onBack={() => navigate('/store-owner/purchase-orders/branches')}
         onSave={handleSaveDraft}
+        readOnly={isReadOnly}
+        title={isReadOnly ? `Chi Tiết Đơn Đặt Hàng — ${MOCK_BRANCHES.find((b) => b.id === selectedBranchId)?.name || ''}` : undefined}
       />
 
       {/* 2. Unified Filter + Action Bar (1 row) */}
@@ -444,6 +456,7 @@ export const OrderMatrixPage: FC = () => {
           qtyMap={qtyMap}
           showSoh={showSoh}
           onQtyChange={handleQtyChange}
+          readOnly={isReadOnly}
         />
       </div>
     </div>
