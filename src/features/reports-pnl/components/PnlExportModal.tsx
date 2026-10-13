@@ -34,6 +34,7 @@ function formatVnd(val: number): string {
 
 /**
  * Modal dialog for export options (CSV/Excel download and A4 Print Preview).
+ * Fully refactored to 100% Vanilla CSS conforming to MT-GRMS Design System.
  */
 export const PnlExportModal: React.FC<PnlExportModalProps> = ({
   isOpen,
@@ -59,9 +60,11 @@ export const PnlExportModal: React.FC<PnlExportModalProps> = ({
     const appendItems = (items: PnlLineItem[]) => {
       for (const it of items) {
         rows.push(
-          `"${it.code}","${it.title.replace(/"/g, '""')}",${it.amount},"${it.percentageOfNetRevenue}%"`
+          `"${it.code}","${it.title}",${it.amount},"${it.percentageOfNetRevenue}%"`
         );
-        if (it.children) appendItems(it.children);
+        if (it.children && it.children.length > 0) {
+          appendItems(it.children);
+        }
       }
     };
 
@@ -89,19 +92,30 @@ export const PnlExportModal: React.FC<PnlExportModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
-      <div className="bg-white rounded-[24px] shadow-2xl border border-teal-100 w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
+    <div className="pnl-modal-backdrop" onClick={onClose}>
+      <div
+        className="pnl-modal-window"
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+      >
         {/* Modal Header */}
-        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between bg-teal-50/40">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-teal-100 text-teal-800 rounded-xl shadow-xs">
+        <div className="pnl-modal-header">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div
+              className="pnl-card-icon-badge"
+              style={{
+                background: 'var(--blue-subtle, #CCFBF1)',
+                color: 'var(--blue-primary, #0F766E)',
+              }}
+            >
               <Printer size={18} />
             </div>
             <div>
-              <h2 className="text-base font-bold text-gray-900">
+              <h2 style={{ fontSize: '1rem', fontWeight: 800, margin: 0, color: 'var(--text-main, #111827)' }}>
                 In & Xuất Báo Cáo Tài Chính P&L
               </h2>
-              <p className="text-xs text-gray-500">
+              <p style={{ fontSize: '0.75rem', color: 'var(--text-muted, #64748b)', margin: '2px 0 0' }}>
                 Xuất file Excel (.csv) hoặc xem trước bản in chuẩn khổ giấy A4
               </p>
             </div>
@@ -109,22 +123,19 @@ export const PnlExportModal: React.FC<PnlExportModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-200 rounded-lg transition-colors cursor-pointer"
+            className="pnl-modal-close-btn"
+            title="Đóng modal"
           >
             <X size={18} />
           </button>
         </div>
 
         {/* Tab Controls */}
-        <div className="flex border-b border-gray-200 px-6 bg-white gap-4">
+        <div className="pnl-modal-tabs-bar">
           <button
             type="button"
             onClick={() => setActiveTab('PDF')}
-            className={`py-3 text-xs font-semibold border-b-2 flex items-center gap-2 transition-colors cursor-pointer ${
-              activeTab === 'PDF'
-                ? 'border-teal-700 text-teal-800'
-                : 'border-transparent text-gray-500 hover:text-gray-800'
-            }`}
+            className={`pnl-modal-tab-btn ${activeTab === 'PDF' ? 'active' : ''}`}
           >
             <Printer size={15} />
             Bản In / Xuất PDF (Khổ A4)
@@ -132,11 +143,7 @@ export const PnlExportModal: React.FC<PnlExportModalProps> = ({
           <button
             type="button"
             onClick={() => setActiveTab('EXCEL')}
-            className={`py-3 text-xs font-semibold border-b-2 flex items-center gap-2 transition-colors cursor-pointer ${
-              activeTab === 'EXCEL'
-                ? 'border-teal-700 text-teal-800'
-                : 'border-transparent text-gray-500 hover:text-gray-800'
-            }`}
+            className={`pnl-modal-tab-btn ${activeTab === 'EXCEL' ? 'active' : ''}`}
           >
             <FileSpreadsheet size={15} />
             Bảng Tính Excel (.CSV)
@@ -144,37 +151,32 @@ export const PnlExportModal: React.FC<PnlExportModalProps> = ({
         </div>
 
         {/* Modal Body */}
-        <div className="p-6 overflow-y-auto flex-1 bg-gray-50/40">
+        <div className="pnl-modal-body">
           {activeTab === 'PDF' ? (
             /* A4 Print Sheet Preview */
-            <div
-              id="printable-pnl-sheet"
-              className="bg-white border border-gray-300 rounded-lg p-8 shadow-sm max-w-3xl mx-auto text-gray-900 text-xs"
-            >
+            <div id="printable-pnl-sheet" className="pnl-print-sheet">
               {/* Report Header */}
-              <div className="border-b-2 border-gray-800 pb-4 mb-6">
-                <div className="flex justify-between items-start">
+              <div className="pnl-print-header">
+                <div className="pnl-print-header-top">
                   <div>
-                    <h3 className="text-base font-extrabold uppercase tracking-wide text-emerald-800">
+                    <h3 className="pnl-print-brand">
                       HỆ THỐNG BÁN LẺ TẠP HÓA MT-GRMS
                     </h3>
-                    <p className="text-xs text-gray-600 flex items-center gap-1 mt-0.5">
-                      <Building size={12} />
-                      Chi nhánh: <span className="font-semibold">{currentBranchName}</span>
+                    <p style={{ display: 'flex', alignItems: 'center', gap: '4px', margin: '4px 0 0', color: '#475569' }}>
+                      <Building size={13} />
+                      Chi nhánh: <strong>{currentBranchName}</strong>
                     </p>
                   </div>
-                  <div className="text-right text-[11px] text-gray-500">
-                    <p>Mẫu số: B02-DNN</p>
-                    <p>Ban hành theo TT 133/2016/TT-BTC</p>
+                  <div style={{ textAlign: 'right', fontSize: '0.7rem', color: '#64748b' }}>
+                    <p style={{ margin: 0 }}>Mẫu số: B02-DNN</p>
+                    <p style={{ margin: '2px 0 0' }}>Ban hành theo TT 133/2016/TT-BTC</p>
                   </div>
                 </div>
 
-                <div className="text-center mt-4">
-                  <h1 className="text-lg font-black text-gray-900 uppercase">
-                    BÁO CÁO KẾT QUẢ HOẠT ĐỘNG KINH DOANH (P&L)
-                  </h1>
-                  <p className="text-xs text-gray-600 mt-1 flex items-center justify-center gap-1">
-                    <Calendar size={12} />
+                <div className="pnl-print-title">
+                  <h1>BÁO CÁO KẾT QUẢ HOẠT ĐỘNG KINH DOANH (P&L)</h1>
+                  <p style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', margin: '6px 0 0', color: '#475569' }}>
+                    <Calendar size={13} />
                     Thời gian: Từ ngày {filter.startDate} đến ngày {filter.endDate}
                   </p>
                 </div>
@@ -182,28 +184,28 @@ export const PnlExportModal: React.FC<PnlExportModalProps> = ({
 
               {/* KPI Mini Summary */}
               {kpi && (
-                <div className="grid grid-cols-4 gap-2 mb-6 p-3 bg-gray-50 border border-gray-200 rounded-md text-center">
+                <div className="pnl-print-kpi-summary">
                   <div>
-                    <p className="text-[10px] text-gray-500">DOANH THU THUẦN</p>
-                    <p className="font-bold text-xs text-gray-900">
+                    <p style={{ fontSize: '0.65rem', color: '#64748b', margin: '0 0 2px', textTransform: 'uppercase' }}>DOANH THU THUẦN</p>
+                    <p style={{ fontWeight: 800, color: '#0F172A', margin: 0 }}>
                       {formatVnd(kpi.netRevenue)}
                     </p>
                   </div>
                   <div>
-                    <p className="text-[10px] text-gray-500">GIÁ VỐN (COGS)</p>
-                    <p className="font-bold text-xs text-gray-900">
+                    <p style={{ fontSize: '0.65rem', color: '#64748b', margin: '0 0 2px', textTransform: 'uppercase' }}>GIÁ VỐN (COGS)</p>
+                    <p style={{ fontWeight: 800, color: '#0F172A', margin: 0 }}>
                       {formatVnd(kpi.cogs)}
                     </p>
                   </div>
                   <div>
-                    <p className="text-[10px] text-gray-500">CHI PHÍ VẬN HÀNH</p>
-                    <p className="font-bold text-xs text-gray-900">
+                    <p style={{ fontSize: '0.65rem', color: '#64748b', margin: '0 0 2px', textTransform: 'uppercase' }}>CHI PHÍ VẬN HÀNH</p>
+                    <p style={{ fontWeight: 800, color: '#0F172A', margin: 0 }}>
                       {formatVnd(kpi.operatingExpenses + kpi.shrinkageLoss)}
                     </p>
                   </div>
                   <div>
-                    <p className="text-[10px] text-gray-500">LỢI NHUẬN RÒNG</p>
-                    <p className="font-bold text-xs text-emerald-700">
+                    <p style={{ fontSize: '0.65rem', color: '#64748b', margin: '0 0 2px', textTransform: 'uppercase' }}>LỢI NHUẬN RÒNG</p>
+                    <p style={{ fontWeight: 800, color: 'var(--blue-primary, #0F766E)', margin: 0 }}>
                       {formatVnd(kpi.netProfit)}
                     </p>
                   </div>
@@ -211,41 +213,38 @@ export const PnlExportModal: React.FC<PnlExportModalProps> = ({
               )}
 
               {/* Statement Items Table */}
-              <table className="w-full border-collapse border border-gray-300 text-xs mb-8">
+              <table className="pnl-print-table">
                 <thead>
-                  <tr className="bg-gray-100 border-b border-gray-300 font-bold text-gray-800">
-                    <th className="border border-gray-300 p-2 w-16 text-center">Mã</th>
-                    <th className="border border-gray-300 p-2 text-left">Chỉ Tiêu Tài Chính</th>
-                    <th className="border border-gray-300 p-2 text-right w-36">Số Tiền (VNĐ)</th>
-                    <th className="border border-gray-300 p-2 text-right w-24">Tỷ Lệ %</th>
+                  <tr>
+                    <th style={{ width: '60px', textAlign: 'center' }}>Mã</th>
+                    <th style={{ textAlign: 'left' }}>Chỉ Tiêu Tài Chính</th>
+                    <th style={{ textAlign: 'right', width: '130px' }}>Số Tiền (VNĐ)</th>
+                    <th style={{ textAlign: 'right', width: '80px' }}>Tỷ Lệ %</th>
                   </tr>
                 </thead>
                 <tbody>
                   {pnlTree.map((row) => (
                     <tr
                       key={row.id}
-                      className={
-                        row.isTotal
-                          ? 'font-bold bg-emerald-50/60'
-                          : row.isHeader
-                          ? 'font-bold bg-gray-50'
-                          : ''
-                      }
+                      style={{
+                        backgroundColor: row.isTotal ? '#CCFBF1' : row.isHeader ? '#F8FAFC' : 'transparent',
+                        fontWeight: row.isTotal || row.isHeader ? 800 : 500,
+                      }}
                     >
-                      <td className="border border-gray-300 p-1.5 text-center font-mono text-[11px]">
+                      <td style={{ textAlign: 'center', fontFamily: 'var(--font-mono, monospace)', color: '#64748b' }}>
                         {row.code}
                       </td>
                       <td
-                        className={`border border-gray-300 p-1.5 ${
-                          row.level === 2 ? 'pl-6' : row.level === 3 ? 'pl-10' : ''
-                        }`}
+                        style={{
+                          paddingLeft: `${row.level === 2 ? 24 : row.level === 3 ? 40 : 10}px`,
+                        }}
                       >
                         {row.title}
                       </td>
-                      <td className="border border-gray-300 p-1.5 text-right font-medium">
+                      <td style={{ textAlign: 'right', fontWeight: row.isTotal ? 800 : 600 }}>
                         {formatVnd(row.amount)}
                       </td>
-                      <td className="border border-gray-300 p-1.5 text-right font-medium">
+                      <td style={{ textAlign: 'right' }}>
                         {row.percentageOfNetRevenue}%
                       </td>
                     </tr>
@@ -254,47 +253,59 @@ export const PnlExportModal: React.FC<PnlExportModalProps> = ({
               </table>
 
               {/* Signatures */}
-              <div className="grid grid-cols-3 text-center text-xs pt-4 mt-8 border-t border-gray-200">
+              <div className="pnl-print-signatures">
                 <div>
-                  <p className="font-bold">Người Lập Biểu</p>
-                  <p className="text-[11px] text-gray-400 italic">(Ký, họ tên)</p>
-                  <div className="h-16" />
-                  <p className="font-medium text-gray-700">Nhân viên kế toán</p>
+                  <p style={{ fontWeight: 700, margin: 0 }}>Người Lập Biểu</p>
+                  <p style={{ fontSize: '0.7rem', color: '#94a3b8', fontStyle: 'italic', margin: '2px 0 0' }}>(Ký, họ tên)</p>
+                  <div style={{ height: '48px' }} />
+                  <p style={{ color: '#475569', fontWeight: 600, margin: 0 }}>Nhân viên kế toán</p>
                 </div>
                 <div>
-                  <p className="font-bold">Kế Toán Trưởng</p>
-                  <p className="text-[11px] text-gray-400 italic">(Ký, họ tên)</p>
-                  <div className="h-16" />
-                  <p className="font-medium text-gray-700">Trưởng ban kiểm soát</p>
+                  <p style={{ fontWeight: 700, margin: 0 }}>Kế Toán Trưởng</p>
+                  <p style={{ fontSize: '0.7rem', color: '#94a3b8', fontStyle: 'italic', margin: '2px 0 0' }}>(Ký, họ tên)</p>
+                  <div style={{ height: '48px' }} />
+                  <p style={{ color: '#475569', fontWeight: 600, margin: 0 }}>Trưởng ban kiểm soát</p>
                 </div>
                 <div>
-                  <p className="font-bold">Giám Đốc / Chủ Tiệm</p>
-                  <p className="text-[11px] text-gray-400 italic">(Ký, đóng dấu)</p>
-                  <div className="h-16" />
-                  <p className="font-semibold text-emerald-800">Store Owner</p>
+                  <p style={{ fontWeight: 700, margin: 0 }}>Giám Đốc / Chủ Tiệm</p>
+                  <p style={{ fontSize: '0.7rem', color: '#94a3b8', fontStyle: 'italic', margin: '2px 0 0' }}>(Ký, đóng dấu)</p>
+                  <div style={{ height: '48px' }} />
+                  <p style={{ color: 'var(--blue-primary, #0F766E)', fontWeight: 700, margin: 0 }}>Store Owner</p>
                 </div>
               </div>
             </div>
           ) : (
             /* Excel Tab */
-            <div className="max-w-xl mx-auto bg-white border border-gray-200 rounded-xl p-6 text-center">
-              <div className="w-16 h-16 bg-emerald-100 text-emerald-800 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <div className="pnl-excel-card">
+              <div
+                style={{
+                  width: '64px',
+                  height: '64px',
+                  background: 'var(--blue-subtle, #CCFBF1)',
+                  color: 'var(--blue-primary, #0F766E)',
+                  borderRadius: '16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  margin: '0 auto 16px',
+                }}
+              >
                 <FileSpreadsheet size={32} />
               </div>
-              <h3 className="text-base font-bold text-gray-900 mb-2">
+              <h3 style={{ fontSize: '1rem', fontWeight: 800, margin: '0 0 8px', color: 'var(--text-main, #111827)' }}>
                 Xuất Bảng Tính Excel (.CSV UTF-8)
               </h3>
-              <p className="text-xs text-gray-500 mb-6 max-w-md mx-auto">
+              <p style={{ fontSize: '0.78rem', color: 'var(--text-muted, #64748b)', margin: '0 auto 20px', maxWidth: '420px', lineHeight: 1.5 }}>
                 File tải về hỗ trợ chuẩn tiếng Việt UTF-8 có BOM, mở trực tiếp bằng Microsoft Excel mà không bị lỗi font chữ.
               </p>
 
-              <div className="flex justify-center gap-3">
+              <div style={{ display: 'flex', justifyContent: 'center' }}>
                 <button
                   type="button"
                   onClick={handleDownloadCsv}
-                  className="btn-primary-pill text-xs"
+                  className="btn-primary-pill"
                 >
-                  <Download size={16} />
+                  <Download size={15} />
                   Tải Xuống File .CSV
                 </button>
               </div>
@@ -303,15 +314,15 @@ export const PnlExportModal: React.FC<PnlExportModalProps> = ({
         </div>
 
         {/* Modal Footer */}
-        <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between bg-white">
-          <p className="text-xs text-gray-400">
+        <div className="pnl-modal-footer">
+          <p style={{ fontSize: '0.75rem', color: '#94A3B8', margin: 0 }}>
             * Nhấn Ctrl+P hoặc nút in để kích hoạt máy in / lưu file PDF
           </p>
-          <div className="flex items-center gap-3">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <button
               type="button"
               onClick={onClose}
-              className="btn-secondary-pill text-xs"
+              className="btn-secondary-pill"
             >
               Đóng
             </button>
@@ -319,7 +330,7 @@ export const PnlExportModal: React.FC<PnlExportModalProps> = ({
               <button
                 type="button"
                 onClick={handlePrint}
-                className="btn-primary-pill text-xs"
+                className="btn-primary-pill"
               >
                 <Printer size={15} />
                 In / Lưu PDF Ngay

@@ -111,12 +111,23 @@ export const ReportsPnlDashboardPage: React.FC = () => {
               <TrendingUp size={24} />
             </div>
             <div className="pnl-topbar-text">
-              <div className="flex items-center gap-2 mb-0.5">
-                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-teal-100 text-teal-900 uppercase tracking-wider">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px' }}>
+                <span
+                  style={{
+                    padding: '2px 10px',
+                    borderRadius: 'var(--radius-pill, 9999px)',
+                    fontSize: '0.65rem',
+                    fontWeight: 800,
+                    background: 'var(--blue-subtle, #CCFBF1)',
+                    color: 'var(--blue-primary, #0F766E)',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.04em',
+                  }}
+                >
                   FE-10 • Báo Cáo Tài Chính
                 </span>
-                <span className="text-gray-300 text-xs">•</span>
-                <span className="text-xs text-teal-700 font-semibold">
+                <span style={{ color: '#CBD5E1', fontSize: '0.75rem' }}>•</span>
+                <span style={{ fontSize: '0.75rem', color: 'var(--blue-primary, #0F766E)', fontWeight: 600 }}>
                   Thời Gian Thực
                 </span>
               </div>
@@ -128,7 +139,7 @@ export const ReportsPnlDashboardPage: React.FC = () => {
           </div>
 
           {/* View Mode Segmented Pill Tabs */}
-          <div className="pnl-segmented-tabs self-start md:self-auto">
+          <div className="pnl-segmented-tabs">
             <button
               type="button"
               onClick={() => setActiveTab('ALL')}
@@ -161,8 +172,22 @@ export const ReportsPnlDashboardPage: React.FC = () => {
       <div className="pnl-content-container">
         {/* Error Alert Box */}
         {errorMsg && (
-          <div className="mb-6 p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 flex items-center gap-3 text-xs font-semibold shadow-xs">
-            <AlertCircle size={18} className="shrink-0 text-rose-600" />
+          <div
+            style={{
+              marginBottom: '20px',
+              padding: '14px 18px',
+              borderRadius: '16px',
+              background: 'var(--red-light, #fff0f0)',
+              border: '1px solid var(--red-border, #ffd6d6)',
+              color: 'var(--red-accent, #ff3b30)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              fontSize: '0.8rem',
+              fontWeight: 600,
+            }}
+          >
+            <AlertCircle size={18} style={{ flexShrink: 0 }} />
             <span>{errorMsg}</span>
           </div>
         )}
@@ -197,7 +222,7 @@ export const ReportsPnlDashboardPage: React.FC = () => {
 
         {/* Section 3: P&L Statement Tree Table */}
         {(activeTab === 'ALL' || activeTab === 'STATEMENT') && (
-          <div className="mt-4">
+          <div style={{ marginTop: '16px' }}>
             <PnlStatementTable
               pnlTree={reportData?.pnlTree || []}
               isLoading={isLoading}

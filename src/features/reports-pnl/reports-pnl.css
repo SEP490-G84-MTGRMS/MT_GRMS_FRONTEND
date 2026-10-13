@@ -691,3 +691,211 @@
   border-radius: var(--radius-pill, 9999px);
   background-color: var(--blue-primary, #0F766E);
 }
+
+/* ==========================================================================
+   P&L Export & Print Preview Modal (Vanilla CSS Dialog)
+   ========================================================================== */
+.pnl-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background-color: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+.pnl-modal-window {
+  background: #ffffff;
+  border-radius: var(--radius-card, 24px);
+  border: 1px solid var(--border-light, #edf2f9);
+  box-shadow: 0 25px 50px -12px rgba(15, 118, 110, 0.25);
+  width: 100%;
+  max-width: 900px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: pnlModalPopIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes pnlModalPopIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.96) translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.pnl-modal-header {
+  padding: 18px 24px;
+  border-bottom: 1px solid var(--border-subtle, #e5edf8);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #F8FAFC;
+}
+
+.pnl-modal-close-btn {
+  border: none;
+  background: transparent;
+  padding: 6px;
+  border-radius: 8px;
+  color: var(--text-muted, #64748b);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.pnl-modal-close-btn:hover {
+  background: #E2E8F0;
+  color: var(--text-main, #111827);
+}
+
+.pnl-modal-tabs-bar {
+  display: flex;
+  padding: 0 24px;
+  background: #ffffff;
+  border-bottom: 1px solid var(--border-subtle, #e5edf8);
+  gap: 16px;
+}
+
+.pnl-modal-tab-btn {
+  padding: 12px 6px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  border: none;
+  background: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  color: var(--text-muted, #64748b);
+  transition: all 0.15s ease;
+}
+
+.pnl-modal-tab-btn.active {
+  border-bottom-color: var(--blue-primary, #0F766E);
+  color: var(--blue-primary, #0F766E);
+}
+
+.pnl-modal-body {
+  padding: 24px;
+  overflow-y: auto;
+  flex: 1;
+  background: #FAFAFA;
+}
+
+.pnl-print-sheet {
+  background: #ffffff;
+  border: 1px solid #CBD5E1;
+  border-radius: 8px;
+  padding: 32px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  max-width: 780px;
+  margin: 0 auto;
+  color: #0F172A;
+  font-size: 0.78rem;
+}
+
+.pnl-print-header {
+  border-bottom: 2px solid #0F172A;
+  padding-bottom: 16px;
+  margin-bottom: 24px;
+}
+
+.pnl-print-header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.pnl-print-brand {
+  font-size: 1rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: var(--blue-primary, #0F766E);
+  letter-spacing: 0.05em;
+}
+
+.pnl-print-title {
+  text-align: center;
+  margin-top: 16px;
+}
+
+.pnl-print-title h1 {
+  font-size: 1.15rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  color: #0F172A;
+  margin: 0;
+}
+
+.pnl-print-kpi-summary {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin-bottom: 24px;
+  padding: 12px;
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 6px;
+  text-align: center;
+}
+
+.pnl-print-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.75rem;
+  margin-bottom: 28px;
+}
+
+.pnl-print-table th,
+.pnl-print-table td {
+  border: 1px solid #CBD5E1;
+  padding: 6px 10px;
+}
+
+.pnl-print-table th {
+  background: #F1F5F9;
+  font-weight: 800;
+}
+
+.pnl-print-signatures {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  text-align: center;
+  font-size: 0.75rem;
+  padding-top: 16px;
+  margin-top: 28px;
+  border-top: 1px solid #E2E8F0;
+}
+
+.pnl-modal-footer {
+  padding: 16px 24px;
+  border-top: 1px solid var(--border-subtle, #e5edf8);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #ffffff;
+}
+
+.pnl-excel-card {
+  max-width: 520px;
+  margin: 0 auto;
+  background: #ffffff;
+  border: 1px solid var(--border-subtle, #e5edf8);
+  border-radius: 16px;
+  padding: 32px 24px;
+  text-align: center;
+}
+
