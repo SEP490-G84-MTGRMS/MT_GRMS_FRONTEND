@@ -3,6 +3,7 @@ export interface UserProfile {
   email: string;
   fullName: string;
   role: 'ADMIN' | 'MANAGER' | 'CASHIER' | 'STORE_OWNER';
+  roleName?: string;
   tenantId: string;
   tenantName?: string;
   branchId?: string;
@@ -11,7 +12,8 @@ export interface UserProfile {
 }
 
 export interface LoginCredentials {
-  email: string;
+  email?: string;
+  usernameOrEmail?: string;
   password: string;
   tenantCode?: string;
   rememberMe?: boolean;

@@ -48,39 +48,69 @@ export const authService = {
    * Đăng nhập hệ thống (kết nối Backend API, tự động fallback dữ liệu demo nếu backend chưa sẵn sàng)
    */
   async login(credentials: LoginCredentials): Promise<AuthResponse> {
+    const identifier = (credentials.usernameOrEmail || credentials.email || '').trim();
+    const payload = {
+      usernameOrEmail: identifier,
+      password: credentials.password,
+      tenantCode: credentials.tenantCode,
+    };
+
     try {
-      const response = await httpClient.post<AuthResponse>('/auth/login', credentials);
-      return response.data;
-    } catch {
-      // Fallback giả lập logic xác thực cho môi trường phát triển / kiểm thử UI
-      const cleanInput = credentials.email.trim();
-      const phoneClean = cleanInput.replace(/\s+/g, '');
-      const foundDemo = DEMO_ACCOUNTS.find(
-        acc =>
-          acc.email.toLowerCase() === cleanInput.toLowerCase() ||
-          (acc.user.phone && acc.user.phone.replace(/\s+/g, '') === phoneClean)
-      );
-
-      const defaultUser: UserProfile = foundDemo
-        ? foundDemo.user
-        : {
-            id: `usr_${Date.now()}`,
-            email: cleanInput,
-            fullName: cleanInput.includes('@') ? cleanInput.split('@')[0] : 'Chủ Cửa Hàng',
-            role: 'STORE_OWNER',
-            tenantId: credentials.tenantCode || 'TENANT-DEFAULT',
-            tenantName: 'Cửa hàng MT-GRMS',
-          };
-
-      // Mô phỏng độ trễ mạng nhẹ (300ms) để hiện loading button sắc nét
-      await new Promise(resolve => setTimeout(resolve, 300));
-
-      return {
-        accessToken: `mt_token_${Date.now()}_mock`,
-        refreshToken: `mt_refresh_${Date.now()}_mock`,
-        expiresIn: 3600,
-        user: defaultUser,
+      const response = await httpClient.post<any>('/auth/login', payload);
+      const resBody = response.data;
+      const authData = (resBody && resBody.data) ? resBody.data : resBody;
+      const rawUser = authData.user || {};
+      const normalizedUser: UserProfile = {
+        ...rawUser,
+        role: (rawUser.role || rawUser.roleName || 'ADMIN') as UserProfile['role'],
       };
+      return {
+        accessToken: authData.accessToken,
+        refreshToken: authData.refreshToken,
+        expiresIn: authData.expiresIn || 7200,
+        user: normalizedUser,
+      };
+    } catch (error: any) {
+      // Nếu Backend trả về lỗi cụ thể từ API (400, 401, 403, 500)
+      if (error?.response?.data?.message) {
+        throw new Error(error.response.data.message);
+      }
+      if (error?.response?.status === 401) {
+        throw new Error('Tài khoản hoặc mật khẩu không chính xác.');
+      }
+
+      // Chỉ fallback sang tài khoản demo khi có cờ VITE_ENABLE_MOCK_AUTH hoặc lỗi mạng cục bộ chưa mở backend
+      if (import.meta.env.VITE_ENABLE_MOCK_AUTH === 'true' || !error?.response) {
+        const cleanInput = identifier;
+        const phoneClean = cleanInput.replace(/\s+/g, '');
+        const foundDemo = DEMO_ACCOUNTS.find(
+          acc =>
+            acc.email.toLowerCase() === cleanInput.toLowerCase() ||
+            (acc.user.phone && acc.user.phone.replace(/\s+/g, '') === phoneClean)
+        );
+
+        const defaultUser: UserProfile = foundDemo
+          ? foundDemo.user
+          : {
+              id: `usr_${Date.now()}`,
+              email: cleanInput,
+              fullName: cleanInput.includes('@') ? cleanInput.split('@')[0] : 'Chủ Cửa Hàng',
+              role: 'STORE_OWNER',
+              tenantId: credentials.tenantCode || 'TENANT-DEFAULT',
+              tenantName: 'Cửa hàng MT-GRMS',
+            };
+
+        await new Promise(resolve => setTimeout(resolve, 300));
+
+        return {
+          accessToken: `mt_token_${Date.now()}_mock`,
+          refreshToken: `mt_refresh_${Date.now()}_mock`,
+          expiresIn: 3600,
+          user: defaultUser,
+        };
+      }
+
+      throw new Error(error?.message || 'Đăng nhập không thành công. Vui lòng thử lại.');
     }
   },
 
