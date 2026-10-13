@@ -15,7 +15,7 @@ export const ShiftCashInOutTable: FC<Props> = ({
   onOpenAddModal,
   theoreticalCash,
 }) => {
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(5);
   const [currentPage, setCurrentPage] = useState(1);
 
   const totalCount = transactions.length;
@@ -107,14 +107,14 @@ export const ShiftCashInOutTable: FC<Props> = ({
         </table>
       </div>
 
-      {/* Shared Pagination Footer - Chuẩn Hệ Thống */}
-      {totalCount > pageSize && (
+      {/* Shared Pagination Footer - Chuẩn Hệ Thống (Luôn hiển thị khi có dữ liệu) */}
+      {totalCount > 0 && (
         <TablePagination
           currentPage={currentPage}
           pageSize={pageSize}
           totalItems={totalCount}
           itemLabel="phiếu thu/chi"
-          pageSizeOptions={[10, 20, 50]}
+          pageSizeOptions={[5, 10, 20]}
           onPageChange={setCurrentPage}
           onPageSizeChange={(newSize) => {
             setPageSize(newSize);
