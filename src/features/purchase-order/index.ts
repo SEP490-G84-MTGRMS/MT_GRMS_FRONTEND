@@ -12,3 +12,4 @@ export * from './components/branch/BranchOrderTable';
 export * from './components/branch/BranchDetailModal';
 export * from './pages/OrderMatrixPage';
 export * from './pages/BranchOrderListPage';
+export * from './pages/EmployeeOrderMatrixPage';

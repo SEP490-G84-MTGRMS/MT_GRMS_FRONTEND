@@ -1,4 +1,4 @@
-﻿import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import type { FC } from 'react';
 import { NavLink, Link, useLocation } from 'react-router-dom';
 import {
@@ -49,7 +49,8 @@ const NAV_GROUPS: NavGroup[] = [
     children: [
       { label: 'Nhà cung cấp', to: '/store-owner/suppliers' },
       { label: 'Đặt hàng theo chi nhánh', to: '/store-owner/purchase-orders/branches' },
-      { label: 'Đặt hàng theo ma trận', to: '/store-owner/purchase-orders/create-matrix', badge: 'Grid' },
+      { label: 'Đặt hàng theo ma trận (Store Owner)', to: '/store-owner/purchase-orders/create-matrix', badge: 'Grid' },
+      { label: 'Đặt hàng theo ma trận (Nhân viên)', to: '/employee/purchase-orders/create-matrix', badge: 'Staff' },
     ],
   },
   {
