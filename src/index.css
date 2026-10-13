@@ -1,19 +1,21 @@
 /* ==========================================================================
    MT-GRMS - Global Design System & Core Styles
-   Phong cách chuẩn KiotViet: Bo tròn toàn diện (Pill & 24-28px) | Electric Blue (#0066FF) | Be Vietnam Pro
+   Phong cách chuẩn Bo tròn toàn diện (Pill & 24-28px) | Deep Teal (#0F766E) | Be Vietnam Pro
    ========================================================================== */
 
 @import './styles/landing.css';
+@import './styles/admin.css';
+@import './styles/dashboard.css';
 
 :root {
-  /* KiotViet Brand Blue Palette - MÃ MÀU CHỦ ĐẠO TOÀN DỰ ÁN */
-  --blue-primary: #0066ff;
-  --blue-hover: #0052cc;
-  --blue-dark: #003d99;
-  --blue-light: #f0f6ff;
-  --blue-subtle: #e8f1ff;
-  --blue-border: #dbe9fe;
-  --cyan-accent: #00c2ff;
+  /* Brand Deep Teal Palette - MÃ MÀU CHỦ ĐẠO TOÀN DỰ ÁN (#0F766E) */
+  --blue-primary: #0F766E;
+  --blue-hover: #115E59;
+  --blue-dark: #134E4A;
+  --blue-light: #F0FDFA;
+  --blue-subtle: #CCFBF1;
+  --blue-border: #99F6E4;
+  --cyan-accent: #14B8A6;
 
   /* Functional Status Colors (Màu trạng thái nghiệp vụ bán lẻ) */
   --green-money: #00c853;
@@ -30,7 +32,7 @@
 
   /* Neutrals & Surfaces */
   --bg-page: #ffffff;
-  --bg-soft-blue: #f7faff;
+  --bg-soft-blue: #F0FDFA;
   --bg-card: #ffffff;
   --border-light: #edf2f9;
   --border-subtle: #e5edf8;
@@ -53,10 +55,10 @@
   --radius-pill: 9999px;
 
   /* Shadows */
-  --shadow-sm: 0 2px 8px rgba(0, 50, 150, 0.04);
-  --shadow-card: 0 10px 30px rgba(0, 50, 150, 0.06);
-  --shadow-floating: 0 18px 48px rgba(0, 50, 150, 0.08);
-  --shadow-blue-glow: 0 10px 25px -4px rgba(0, 102, 255, 0.32);
+  --shadow-sm: 0 2px 8px rgba(15, 118, 110, 0.04);
+  --shadow-card: 0 10px 30px rgba(15, 118, 110, 0.06);
+  --shadow-floating: 0 18px 48px rgba(15, 118, 110, 0.08);
+  --shadow-blue-glow: 0 10px 25px -4px rgba(15, 118, 110, 0.32);
 }
 
 /* Base Root layout override */
