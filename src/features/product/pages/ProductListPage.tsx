@@ -303,25 +303,25 @@ export const ProductListPage: React.FC = () => {
     <div className="product-management-container">
       {/* Toast */}
       {toast && <AdminToast toast={toast} onClose={() => setToast(null)} />}
-
+      <div className="product-title-area">
+        <Package size={28} color="#0F766E" />
+        <h1>Hàng hóa</h1>
+        <span
+          style={{
+            fontSize: 13,
+            fontWeight: 600,
+            padding: '3px 10px',
+            borderRadius: 9999,
+            backgroundColor: '#ccfbf1',
+            color: '#0f766e',
+          }}
+        >
+          {filteredProducts.length} sản phẩm
+        </span>
+      </div>
       {/* 1. Header Toolbar */}
       <div className="product-header-toolbar">
-        <div className="product-title-area">
-          <Package size={28} color="#0F766E" />
-          <h1>Hàng hóa</h1>
-          <span
-            style={{
-              fontSize: 13,
-              fontWeight: 600,
-              padding: '3px 10px',
-              borderRadius: 9999,
-              backgroundColor: '#ccfbf1',
-              color: '#0f766e',
-            }}
-          >
-            {filteredProducts.length} sản phẩm
-          </span>
-        </div>
+
 
         {/* Ô tìm kiếm nhanh */}
         <div style={{ flex: 1, maxWidth: 360, position: 'relative', margin: '0 12px' }}>
@@ -329,7 +329,7 @@ export const ProductListPage: React.FC = () => {
             type="text"
             className="filter-input"
             style={{ paddingLeft: 34, borderRadius: 9999 }}
-            placeholder="🔍 Theo mã SKU, tên hàng, barcode..."
+            placeholder="Theo mã SKU, tên hàng, barcode..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -488,8 +488,8 @@ export const ProductListPage: React.FC = () => {
                         backgroundColor: isSelected
                           ? '#f0fdfa'
                           : p.status === 'Discontinued'
-                          ? '#f8fafc'
-                          : undefined,
+                            ? '#f8fafc'
+                            : undefined,
                         opacity: p.status === 'Discontinued' ? 0.75 : 1,
                       }}
                     >
