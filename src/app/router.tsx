@@ -5,6 +5,7 @@ import { AuthLayout } from '../layouts/AuthLayout';
 import { HomePage } from '../pages/HomePage';
 import { StoreOwnerLayout } from '../layouts/StoreOwnerLayout';
 import { AdminDashboardPage } from '../pages/admin/AdminDashboardPage';
+import { StoreOwnerDashboardPage } from '../features/store-owner-dashboard/pages/StoreOwnerDashboardPage';
 import { TenantManagementPage } from '../pages/admin/TenantManagementPage';
 // 1. Supplier Feature
 import {
@@ -240,11 +241,11 @@ export const router = createBrowserRouter([
     children: [
       {
         index: true,
-        element: <AdminDashboardPage />,
+        element: <StoreOwnerDashboardPage />,
       },
       {
         path: 'dashboard',
-        element: <AdminDashboardPage />,
+        element: <StoreOwnerDashboardPage />,
       },
       {
         path: 'products',

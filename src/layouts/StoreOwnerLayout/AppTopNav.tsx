@@ -943,7 +943,11 @@ export const AppTopNav: FC = () => {
       >
         {/* Brand */}
         <Link
-          to="/admin/dashboard"
+          to={
+            location.pathname.startsWith("/store-owner")
+              ? "/store-owner/dashboard"
+              : "/admin/dashboard"
+          }
           style={{
             display: "flex",
             alignItems: "center",
@@ -1184,11 +1188,16 @@ export const AppTopNav: FC = () => {
             const ref = getAnchorRef(group.id);
 
             if (group.to) {
+              const targetTo =
+                group.id === "overview" &&
+                location.pathname.startsWith("/store-owner")
+                  ? "/store-owner/dashboard"
+                  : group.to;
               // Direct link (no dropdown)
               return (
                 <NavLink
                   key={group.id}
-                  to={group.to}
+                  to={targetTo}
                   style={{
                     display: "inline-flex",
                     alignItems: "center",
