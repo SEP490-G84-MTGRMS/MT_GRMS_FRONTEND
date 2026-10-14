@@ -151,8 +151,26 @@ export class InvoiceItemDTO {
 }
 
 /**
+ * C# DTO: DebtPaymentRecordDTO
+ * Lịch sử các lần thanh toán nợ / thu tiền nợ cho hóa đơn bán nợ
+ */
+export class DebtPaymentRecordDTO {
+  paymentId: string = '';
+  paidAt: string = '';
+  amount: number = 0;
+  paymentMethod: 'CASH' | 'VIETQR' = 'CASH';
+  paymentMethodLabel: string = 'Tiền mặt';
+  cashierName: string = '';
+  note?: string = '';
+
+  constructor(init?: Partial<DebtPaymentRecordDTO>) {
+    Object.assign(this, init);
+  }
+}
+
+/**
  * C# Entity: Invoice / RetailOrder
- * Hóa đơn bán lẻ tại quầy POS (100% thanh toán, không công nợ, không ship)
+ * Hóa đơn bán lẻ tại quầy POS (hỗ trợ Tiền mặt, Chuyển khoản VietQR, và Ghi nợ / Bán nợ)
  */
 export class InvoiceDTO {
   invoiceId: string = '';           // HD000041
@@ -168,15 +186,20 @@ export class InvoiceDTO {
   // Tổng tiền
   totalMerchandiseAmount: number = 0;  // Tổng tiền hàng
   totalDiscount: number = 0;           // Tổng giảm giá
-  finalPaidAmount: number = 0;         // Khách đã trả (100%)
+  finalPaidAmount: number = 0;         // Tiền khách đã trả (thực tế nhận)
+  
+  // Quản lý công nợ hóa đơn
+  debtAmount: number = 0;              // Số tiền còn nợ (0 = không nợ / đã trả hết)
+  paidDebtAmount: number = 0;          // Số tiền nợ đã thu được qua các đợt
+  debtPaymentRecords: DebtPaymentRecordDTO[] = []; // Lịch sử các đợt thu nợ
   
   // Phương thức thanh toán
-  paymentMethod: 'VIETQR' | 'CASH' | 'MIXED' = 'VIETQR';
+  paymentMethod: 'VIETQR' | 'CASH' | 'DEBT' | 'MIXED' = 'VIETQR';
   paymentMethodLabel: string = 'VietQR (MBBank)';
   referenceCode?: string = '';         // Mã tham chiếu giao dịch ngân hàng
   
   // Trạng thái hóa đơn
-  status: 'COMPLETED' | 'CANCELLED' | 'RETURNED' = 'COMPLETED';
+  status: 'COMPLETED' | 'CANCELLED' | 'RETURNED' | 'DEBT' = 'COMPLETED';
   statusLabel: string = 'Hoàn thành';
   
   // Danh sách dòng hàng
@@ -226,11 +249,17 @@ export class InvoiceFilterStateDTO {
   timePreset: 'today' | 'yesterday' | 'week' | 'month' | 'custom' = 'today';
   customDateStart?: string = '';
   customDateEnd?: string = '';
-  status: 'ALL' | 'COMPLETED' | 'CANCELLED' = 'ALL';
-  paymentMethod: 'ALL' | 'VIETQR' | 'CASH' = 'ALL';
+  status: 'ALL' | 'COMPLETED' | 'CANCELLED' | 'DEBT' = 'ALL';
+  paymentMethod: 'ALL' | 'VIETQR' | 'CASH' | 'DEBT' = 'ALL';
   searchQuery: string = '';
 
   constructor(init?: Partial<InvoiceFilterStateDTO>) {
     Object.assign(this, init);
   }
 }
+
+export type DebtPaymentRecord = DebtPaymentRecordDTO;
+export type Invoice = InvoiceDTO;
+export type InvoiceItem = InvoiceItemDTO;
+export type PreOrder = PreOrderDTO;
+

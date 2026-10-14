@@ -14,8 +14,8 @@ interface Props {
   onCouponCodeChange: (code: string) => void;
   usePoints: boolean;
   onToggleUsePoints: (use: boolean) => void;
-  paymentMethod: 'cash' | 'vietqr';
-  onPaymentMethodChange: (method: 'cash' | 'vietqr') => void;
+  paymentMethod: 'cash' | 'vietqr' | 'debt';
+  onPaymentMethodChange: (method: 'cash' | 'vietqr' | 'debt') => void;
   cashTendered: number;
   onCashTenderedChange: (val: number) => void;
   onOpenVietQrModal: () => void;
@@ -145,8 +145,19 @@ export const PosPaymentPanel: FC<Props> = ({
             <div>
               <b>{customer.name}</b> ({customer.code})<br />
               <span className="pos-loyalty-text">
-                Điểm tích lũy: <b>{customer.loyaltyPoints} điểm</b> ({customer.membershipTier})
+                Điểm: <b>{customer.loyaltyPoints} điểm</b> ({customer.membershipTier})
               </span>
+              {customer.allowDebt ? (
+                <div style={{ marginTop: 4, fontSize: 11, color: '#334155' }}>
+                  <span>Hạn mức: <b style={{ color: '#0f766e' }}>{customer.debtLimit.toLocaleString('vi-VN')} đ</b></span>
+                  {' '}&bull;{' '}
+                  <span>Đang nợ: <b style={{ color: customer.currentDebt > 0 ? '#dc2626' : '#16a34a' }}>{customer.currentDebt.toLocaleString('vi-VN')} đ</b></span>
+                </div>
+              ) : (
+                <div style={{ marginTop: 3, fontSize: 11, color: '#94a3b8' }}>
+                  Chưa kích hoạt hạn mức mua nợ
+                </div>
+              )}
             </div>
             <button
               type="button"
@@ -163,7 +174,7 @@ export const PosPaymentPanel: FC<Props> = ({
           </div>
         ) : (
           <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 6, fontStyle: 'italic' }}>
-            Khách vãng lai (không tích điểm)
+            Khách vãng lai (không tích điểm, không bán nợ)
           </div>
         )}
       </fieldset>
@@ -252,7 +263,7 @@ export const PosPaymentPanel: FC<Props> = ({
           <b>Hình thức thanh toán</b>
         </legend>
 
-        <div style={{ display: 'flex', gap: 16, marginBottom: 8, fontSize: 13 }}>
+        <div style={{ display: 'flex', gap: 12, marginBottom: 8, fontSize: 13, flexWrap: 'wrap' }}>
           <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
             <input
               type="radio"
@@ -273,6 +284,17 @@ export const PosPaymentPanel: FC<Props> = ({
               }}
             />
             <b>Chuyển khoản VietQR</b>
+          </label>
+          <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+            <input
+              type="radio"
+              name="pay_method"
+              checked={paymentMethod === 'debt'}
+              onChange={() => onPaymentMethodChange('debt')}
+            />
+            <b style={{ color: paymentMethod === 'debt' ? '#d97706' : 'inherit' }}>
+              Ghi nợ (Bán nợ)
+            </b>
           </label>
         </div>
 
@@ -307,12 +329,58 @@ export const PosPaymentPanel: FC<Props> = ({
             </tbody>
           </table>
         )}
+
+        {/* Hiển thị thông tin kiểm tra công nợ khi chọn Ghi nợ */}
+        {paymentMethod === 'debt' && (
+          <div style={{ marginTop: 8, padding: 10, borderRadius: 6, backgroundColor: '#fffbeb', border: '1px solid #fef3c7', fontSize: 12 }}>
+            {!customer ? (
+              <div style={{ color: '#b45309', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ fontSize: 14 }}>⚠️</span>
+                <span><strong>Chưa chọn khách hàng:</strong> Vui lòng tìm và chọn khách hàng định danh trước khi thực hiện ghi nợ.</span>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
+                  <span>Hạn mức nợ cho phép:</span>
+                  <strong>{customer.debtLimit ? customer.debtLimit.toLocaleString('vi-VN') + ' đ' : '0 đ (Chưa cấp)'}</strong>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
+                  <span>Nợ hiện tại:</span>
+                  <span style={{ color: customer.currentDebt > 0 ? '#ef4444' : '#10b981', fontWeight: 600 }}>
+                    {customer.currentDebt.toLocaleString('vi-VN')} đ
+                  </span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed #cbd5e1', paddingTop: 4 }}>
+                  <span>Dự kiến sau đơn:</span>
+                  <strong style={{ color: (customer.currentDebt + finalAmount) > (customer.debtLimit || 0) ? '#dc2626' : '#1e293b' }}>
+                    {(customer.currentDebt + finalAmount).toLocaleString('vi-VN')} đ
+                  </strong>
+                </div>
+
+                {!customer.allowDebt ? (
+                  <div style={{ marginTop: 6, padding: '4px 8px', borderRadius: 4, backgroundColor: '#fee2e2', color: '#b91c1c', fontSize: 11 }}>
+                    ⚠️ Khách hàng này chưa được cấu hình cho phép mua nợ. Cần quyền quản trị viên duyệt nếu tiếp tục.
+                  </div>
+                ) : (customer.currentDebt + finalAmount) > customer.debtLimit ? (
+                  <div style={{ marginTop: 6, padding: '4px 8px', borderRadius: 4, backgroundColor: '#fee2e2', color: '#b91c1c', fontSize: 11 }}>
+                    ⚠️ <strong>Vượt hạn mức nợ {((customer.currentDebt + finalAmount) - customer.debtLimit).toLocaleString('vi-VN')} đ.</strong> Hệ thống sẽ yêu cầu xác nhận duyệt ngoại lệ khi thanh toán.
+                  </div>
+                ) : (
+                  <div style={{ marginTop: 6, padding: '4px 8px', borderRadius: 4, backgroundColor: '#dcfce7', color: '#15803d', fontSize: 11 }}>
+                    ✓ Nằm trong hạn mức cho phép. Khả dụng còn lại: {(customer.debtLimit - (customer.currentDebt + finalAmount)).toLocaleString('vi-VN')} đ.
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </fieldset>
 
       {/* NÚT THANH TOÁN TO TOÀN CHIỀU RỘNG */}
       <button
         type="button"
-        className="pos-checkout-big-btn"
+        className={`pos-checkout-big-btn ${paymentMethod === 'debt' ? 'pos-btn-debt' : ''}`}
+        style={paymentMethod === 'debt' ? { backgroundColor: '#d97706', borderColor: '#b45309' } : undefined}
         onClick={() => {
           if (paymentMethod === 'vietqr') {
             onOpenVietQrModal();
@@ -321,7 +389,9 @@ export const PosPaymentPanel: FC<Props> = ({
           }
         }}
       >
-        THANH TOÁN ({finalAmount.toLocaleString('vi-VN')} đ)
+        {paymentMethod === 'debt'
+          ? `GHI NỢ ĐƠN HÀNG (${finalAmount.toLocaleString('vi-VN')} đ)`
+          : `THANH TOÁN (${finalAmount.toLocaleString('vi-VN')} đ)`}
       </button>
     </div>
   );

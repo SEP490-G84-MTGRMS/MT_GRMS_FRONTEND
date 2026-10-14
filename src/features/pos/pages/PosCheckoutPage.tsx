@@ -16,6 +16,7 @@ import { AddCustomerModal } from '../components/modals/AddCustomerModal';
 import { VietQrModal } from '../components/modals/VietQrModal';
 import { QuickAddProductModal } from '../components/modals/QuickAddProductModal';
 import { BelowCostWarningModal } from '../components/modals/BelowCostWarningModal';
+import { DebtLimitWarningModal } from '../components/modals/DebtLimitWarningModal';
 import { OrderDiscountModal } from '../components/modals/OrderDiscountModal';
 import { PosReceiptModal } from '../components/PosReceiptModal';
 import '../pos.css';
@@ -69,9 +70,10 @@ export const PosCheckoutPage: FC = () => {
   const [isVietQrOpen, setIsVietQrOpen] = useState(false);
   const [isQuickAddProductOpen, setIsQuickAddProductOpen] = useState(false);
   const [belowCostWarningItem, setBelowCostWarningItem] = useState<CartItem | null>(null);
+  const [isDebtWarningOpen, setIsDebtWarningOpen] = useState(false);
   const [isOrderDiscountOpen, setIsOrderDiscountOpen] = useState(false);
-  const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
   const [receiptData, setReceiptData] = useState<ReceiptData | null>(null);
+  const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
 
   // Tab hiện tại
   const currentTab = tabs.find((t) => t.id === activeTabId) || tabs[0];
@@ -239,9 +241,16 @@ export const PosCheckoutPage: FC = () => {
   const finalAmount = Math.max(0, subTotalBeforePoints - pointsDeduction);
 
   // Tạo dữ liệu hóa đơn in K80
-  const buildReceiptData = (): ReceiptData => {
+  const buildReceiptData = (debtNote?: string): ReceiptData => {
     const vat = Math.round(finalAmount * 0.08); // VAT 8%
     const totalWithVat = finalAmount + vat;
+
+    let paymentMethodText = 'Tiền mặt';
+    if (currentTab.paymentMethod === 'vietqr') {
+      paymentMethodText = 'Chuyển khoản VietQR';
+    } else if (currentTab.paymentMethod === 'debt') {
+      paymentMethodText = 'Ghi nợ (Bán nợ)';
+    }
 
     return {
       storeName: 'MT-GROCERY STORE',
@@ -274,9 +283,27 @@ export const PosCheckoutPage: FC = () => {
       vatAmount: vat,
       finalAmount: totalWithVat,
       finalAmountInWords: 'Năm trăm ba mươi tư nghìn sáu trăm đồng chẵn',
-      paymentMethodText: currentTab.paymentMethod === 'vietqr' ? 'Chuyển khoản VietQR' : 'Tiền mặt',
+      paymentMethodText,
+      debtAmount: currentTab.paymentMethod === 'debt' ? totalWithVat : undefined,
+      debtNote,
       earnedPoints: Math.floor(finalAmount / 10000), // 10k = 1 điểm
     };
+  };
+
+  const executeCompleteCheckout = (debtNote?: string) => {
+    if (currentTab.paymentMethod === 'debt' && currentTab.customer) {
+      const vat = Math.round(finalAmount * 0.08);
+      const totalOrderDebt = finalAmount + vat;
+      const updatedDebt = currentTab.customer.currentDebt + totalOrderDebt;
+      const updatedCustomer = { ...currentTab.customer, currentDebt: updatedDebt };
+
+      setCustomers((prev) => prev.map((c) => (c.id === updatedCustomer.id ? updatedCustomer : c)));
+      updateCurrentTab({ customer: updatedCustomer });
+    }
+
+    const receipt = buildReceiptData(debtNote);
+    setReceiptData(receipt);
+    setIsReceiptModalOpen(true);
   };
 
   const handleCheckoutSubmit = () => {
@@ -294,9 +321,25 @@ export const PosCheckoutPage: FC = () => {
       return;
     }
 
-    const receipt = buildReceiptData();
-    setReceiptData(receipt);
-    setIsReceiptModalOpen(true);
+    if (currentTab.paymentMethod === 'debt') {
+      if (!currentTab.customer) {
+        alert('⚠️ Vui lòng tìm và chọn khách hàng định danh trước khi thực hiện bán nợ!');
+        return;
+      }
+
+      const debtLimit = currentTab.customer.debtLimit || 0;
+      const vat = Math.round(finalAmount * 0.08);
+      const totalOrderDebt = finalAmount + vat;
+      const nextDebt = currentTab.customer.currentDebt + totalOrderDebt;
+
+      // Cảnh báo nếu khách chưa được cấu hình allowDebt hoặc nợ vượt hạn mức
+      if (!currentTab.customer.allowDebt || nextDebt > debtLimit) {
+        setIsDebtWarningOpen(true);
+        return;
+      }
+    }
+
+    executeCompleteCheckout();
   };
 
   const handleHoldOrder = () => {
@@ -439,6 +482,16 @@ export const PosCheckoutPage: FC = () => {
         currentDiscountPercent={currentTab.orderDiscountPercent}
         onClose={() => setIsOrderDiscountOpen(false)}
         onApply={(percent) => updateCurrentTab({ orderDiscountPercent: percent })}
+      />
+
+      <DebtLimitWarningModal
+        isOpen={isDebtWarningOpen}
+        customer={currentTab.customer}
+        orderAmount={finalAmount + Math.round(finalAmount * 0.08)}
+        onClose={() => setIsDebtWarningOpen(false)}
+        onApprove={(note) => {
+          executeCompleteCheckout(note);
+        }}
       />
 
       <PosReceiptModal
