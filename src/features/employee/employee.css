@@ -482,7 +482,16 @@
   }
 }
 
+.emp-modal-card > form {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
 .emp-modal-header {
+  flex-shrink: 0;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -519,6 +528,7 @@
 }
 
 .emp-modal-tabs {
+  flex-shrink: 0;
   display: flex;
   border-bottom: 1px solid var(--emp-border);
   background: #F8FAFC;
@@ -556,10 +566,33 @@
 .emp-modal-body {
   padding: 24px;
   overflow-y: auto;
-  flex: 1;
+  overflow-x: hidden;
+  flex: 1 1 auto;
+  min-height: 0;
+  overscroll-behavior: contain;
+}
+
+/* Custom Scrollbar cho modal body */
+.emp-modal-body::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.emp-modal-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.emp-modal-body::-webkit-scrollbar-thumb {
+  background: #CBD5E1;
+  border-radius: 999px;
+}
+
+.emp-modal-body::-webkit-scrollbar-thumb:hover {
+  background: #94A3B8;
 }
 
 .emp-modal-footer {
+  flex-shrink: 0;
   display: flex;
   justify-content: flex-end;
   align-items: center;
