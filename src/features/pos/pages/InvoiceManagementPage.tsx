@@ -18,11 +18,14 @@ import {
   User,
   Phone,
   FileText,
+  DollarSign,
+  CreditCard,
 } from 'lucide-react';
 import { TablePagination } from '../../../components/common';
 import { ShiftKpiCard } from '../components/ShiftKpiCard';
 import { mockInvoicesList, mockPreOrdersList } from '../mock/inventoryMockData';
-import type { InvoiceDTO, PreOrderDTO } from '../types/inventory.types';
+import type { InvoiceDTO, PreOrderDTO, DebtPaymentRecordDTO } from '../types/inventory.types';
+import { CollectDebtModal } from '../components/modals/CollectDebtModal';
 import '../pos.css';
 
 export const InvoiceManagementPage: FC = () => {
@@ -42,8 +45,8 @@ export const InvoiceManagementPage: FC = () => {
   // Bộ lọc
   const [searchQuery, setSearchQuery] = useState('');
   const [timePreset, setTimePreset] = useState<'today' | 'yesterday' | 'week' | 'month'>('today');
-  const [paymentMethodFilter, setPaymentMethodFilter] = useState<'ALL' | 'VIETQR' | 'CASH'>('ALL');
-  const [statusFilter, setStatusFilter] = useState<'ALL' | 'COMPLETED' | 'CANCELLED'>('ALL');
+  const [paymentMethodFilter, setPaymentMethodFilter] = useState<'ALL' | 'VIETQR' | 'CASH' | 'DEBT'>('ALL');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'COMPLETED' | 'CANCELLED' | 'DEBT'>('ALL');
 
   // Danh sách hóa đơn có thể hủy / cập nhật trạng thái
   const [invoices, setInvoices] = useState<InvoiceDTO[]>(mockInvoicesList);
@@ -52,6 +55,9 @@ export const InvoiceManagementPage: FC = () => {
   const [cancelModalInvoice, setCancelModalInvoice] = useState<InvoiceDTO | null>(null);
   const [cancelReason, setCancelReason] = useState('Khách đổi ý trả lại hàng');
   const [cancelNote, setCancelNote] = useState('');
+
+  // Modal Thu nợ hóa đơn
+  const [collectDebtModalInvoice, setCollectDebtModalInvoice] = useState<InvoiceDTO | null>(null);
 
   // Danh sách dòng mở rộng (Accordion detail)
   const [expandedInvoiceId, setExpandedInvoiceId] = useState<string | null>(null);
@@ -87,6 +93,49 @@ export const InvoiceManagementPage: FC = () => {
     showToast(`Đã hủy thành công hóa đơn ${cancelModalInvoice.invoiceId} (${cancelReason})!`);
     setCancelModalInvoice(null);
     setCancelNote('');
+  };
+
+  // Thu tiền nợ hóa đơn
+  const handleCollectDebt = (
+    invoiceId: string,
+    payment: { amount: number; method: 'CASH' | 'VIETQR'; note: string; cashierName: string }
+  ) => {
+    setInvoices((prev) =>
+      prev.map((inv) => {
+        if (inv.invoiceId !== invoiceId) return inv;
+
+        const currentDebt = inv.debtAmount || 0;
+        const currentPaidDebt = inv.paidDebtAmount || 0;
+        const newDebt = Math.max(0, currentDebt - payment.amount);
+        const newPaidDebt = currentPaidDebt + payment.amount;
+        const isFullyPaid = newDebt === 0;
+
+        const newRecord: DebtPaymentRecordDTO = {
+          paymentId: `DPR-${Date.now()}`,
+          paidAt: `${new Date().toLocaleDateString('vi-VN')} ${new Date().toLocaleTimeString('vi-VN', {
+            hour: '2-digit',
+            minute: '2-digit',
+          })}`,
+          amount: payment.amount,
+          paymentMethod: payment.method,
+          paymentMethodLabel: payment.method === 'CASH' ? 'Tiền mặt' : 'Chuyển khoản VietQR',
+          note: payment.note,
+          cashierName: payment.cashierName,
+        };
+
+        return {
+          ...inv,
+          debtAmount: newDebt,
+          paidDebtAmount: newPaidDebt,
+          finalPaidAmount: inv.finalPaidAmount + payment.amount,
+          status: isFullyPaid ? 'COMPLETED' : 'DEBT',
+          statusLabel: isFullyPaid ? 'Hoàn thành' : `Còn nợ ${newDebt.toLocaleString('vi-VN')} đ`,
+          debtPaymentRecords: [...(inv.debtPaymentRecords || []), newRecord],
+        };
+      })
+    );
+
+    showToast(`Đã thu ${payment.amount.toLocaleString('vi-VN')} đ cho hóa đơn ${invoiceId} thành công!`);
   };
 
   // Lọc Hóa đơn
@@ -352,6 +401,7 @@ export const InvoiceManagementPage: FC = () => {
                     <option value="ALL">Tất cả phương thức</option>
                     <option value="VIETQR">Chuyển khoản VietQR</option>
                     <option value="CASH">Tiền mặt</option>
+                    <option value="DEBT">Ghi nợ (Còn nợ)</option>
                   </select>
 
                   <select
@@ -362,6 +412,7 @@ export const InvoiceManagementPage: FC = () => {
                   >
                     <option value="ALL">Tất cả trạng thái</option>
                     <option value="COMPLETED">Đã thanh toán 100%</option>
+                    <option value="DEBT">Đang ghi nợ (Chưa tất toán)</option>
                     <option value="CANCELLED">Đã hủy / Đổi trả</option>
                   </select>
                 </div>
@@ -385,7 +436,7 @@ export const InvoiceManagementPage: FC = () => {
                 </div>
 
                 <div className="shift-status-badge on-duty">
-                  <CheckCircle2 size={12} /> 100% Thanh toán tại quầy
+                  <CheckCircle2 size={12} /> Đồng bộ bán hàng POS
                 </div>
               </div>
 
@@ -404,12 +455,13 @@ export const InvoiceManagementPage: FC = () => {
                       <th style={{ textAlign: 'right' }}>Khách đã trả</th>
                       <th>Phương thức TT</th>
                       <th>Trạng thái</th>
-                      <th style={{ textAlign: 'center', width: 140 }}>Thao tác</th>
+                      <th style={{ textAlign: 'center', width: 170 }}>Thao tác</th>
                     </tr>
                   </thead>
                   {paginatedInvoices.map((inv) => {
                     const isExpanded = expandedInvoiceId === inv.invoiceId;
                     const isCompleted = inv.status === 'COMPLETED';
+                    const isDebt = inv.status === 'DEBT' || (inv.debtAmount !== undefined && inv.debtAmount > 0);
 
                     return (
                       <tbody key={inv.invoiceId}>
@@ -448,7 +500,7 @@ export const InvoiceManagementPage: FC = () => {
                             style={{
                               textAlign: 'right',
                               fontWeight: 700,
-                              color: isCompleted ? '#15803d' : '#dc2626',
+                              color: isCompleted ? '#15803d' : isDebt ? '#d97706' : '#dc2626',
                             }}
                           >
                             {inv.finalPaidAmount.toLocaleString('vi-VN')}
@@ -456,22 +508,42 @@ export const InvoiceManagementPage: FC = () => {
                           <td>
                             <span
                               className={`pos-method-pill ${
-                                inv.paymentMethod === 'VIETQR' ? 'vietqr' : 'cash'
+                                inv.paymentMethod === 'VIETQR' ? 'vietqr' : inv.paymentMethod === 'DEBT' ? 'debt' : 'cash'
                               }`}
+                              style={
+                                inv.paymentMethod === 'DEBT'
+                                  ? { backgroundColor: '#fffbeb', color: '#b45309', border: '1px solid #fde68a' }
+                                  : undefined
+                              }
                             >
-                              {inv.paymentMethod === 'VIETQR' ? <QrCode size={12} /> : <Banknote size={12} />}
+                              {inv.paymentMethod === 'VIETQR' ? (
+                                <QrCode size={12} />
+                              ) : inv.paymentMethod === 'DEBT' ? (
+                                <CreditCard size={12} />
+                              ) : (
+                                <Banknote size={12} />
+                              )}
                               <span>{inv.paymentMethodLabel}</span>
                             </span>
                           </td>
                           <td>
                             <span
                               className={`pos-status-pill ${
-                                isCompleted ? 'completed' : 'cancelled'
+                                isCompleted ? 'completed' : isDebt ? 'debt' : 'cancelled'
                               }`}
+                              style={
+                                isDebt
+                                  ? { backgroundColor: '#fef2f2', color: '#b91c1c', border: '1px solid #fecaca' }
+                                  : undefined
+                              }
                             >
                               {isCompleted ? (
                                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                                   <CheckCircle2 size={12} /> Hoàn thành
+                                </span>
+                              ) : isDebt ? (
+                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                                  <DollarSign size={12} /> Còn nợ {(inv.debtAmount || 0).toLocaleString('vi-VN')} đ
                                 </span>
                               ) : (
                                 'Đã hủy / Đổi trả'
@@ -480,6 +552,27 @@ export const InvoiceManagementPage: FC = () => {
                           </td>
                           <td style={{ textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
                             <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
+                              {isDebt && (
+                                <button
+                                  type="button"
+                                  className="pos-btn-primary-pill"
+                                  style={{
+                                    height: 26,
+                                    padding: '0 9px',
+                                    fontSize: 11,
+                                    backgroundColor: '#16a34a',
+                                    borderColor: '#15803d',
+                                  }}
+                                  title="Thu tiền nợ của hóa đơn này"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setCollectDebtModalInvoice(inv);
+                                  }}
+                                >
+                                  <DollarSign size={12} />
+                                  <span>Thu nợ</span>
+                                </button>
+                              )}
                               <button
                                 type="button"
                                 className="pos-btn-secondary-pill"
@@ -509,7 +602,7 @@ export const InvoiceManagementPage: FC = () => {
                                   <XCircle size={12} />
                                   <span>Hủy đơn</span>
                                 </button>
-                              ) : (
+                              ) : isDebt ? null : (
                                 <span style={{ fontSize: 11, color: '#94a3b8', fontStyle: 'italic', alignSelf: 'center' }}>
                                   Đã hủy
                                 </span>
@@ -541,6 +634,17 @@ export const InvoiceManagementPage: FC = () => {
                                   </div>
 
                                   <div style={{ display: 'flex', gap: 8 }}>
+                                    {isDebt && (
+                                      <button
+                                        type="button"
+                                        className="pos-btn-primary-pill"
+                                        style={{ height: 26, padding: '0 12px', fontSize: 11, backgroundColor: '#16a34a' }}
+                                        onClick={() => setCollectDebtModalInvoice(inv)}
+                                      >
+                                        <DollarSign size={12} />
+                                        <span>Thu Nợ Hóa Đơn ({(inv.debtAmount || 0).toLocaleString('vi-VN')} đ)</span>
+                                      </button>
+                                    )}
                                     {isCompleted && (
                                       <button
                                         type="button"
@@ -600,6 +704,66 @@ export const InvoiceManagementPage: FC = () => {
                                     ))}
                                   </tbody>
                                 </table>
+
+                                {/* THEO DÕI CÔNG NỢ & LỊCH SỬ THU NỢ CỦA HÓA ĐƠN */}
+                                {(inv.debtAmount !== undefined || (inv.debtPaymentRecords && inv.debtPaymentRecords.length > 0)) && (
+                                  <div style={{ marginTop: 12, padding: 10, borderRadius: 6, backgroundColor: '#fefce8', border: '1px solid #fef08a' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: inv.debtPaymentRecords && inv.debtPaymentRecords.length > 0 ? 8 : 0 }}>
+                                      <div>
+                                        <span style={{ fontWeight: 700, color: '#854d0e', fontSize: 12 }}>Theo dõi thanh toán công nợ: </span>
+                                        <span style={{ fontSize: 12, color: '#475569' }}>
+                                          Đã thanh toán: <strong style={{ color: '#16a34a' }}>{(inv.paidDebtAmount || 0).toLocaleString('vi-VN')} đ</strong> &bull;{' '}
+                                          Còn nợ lại: <strong style={{ color: (inv.debtAmount || 0) > 0 ? '#dc2626' : '#16a34a' }}>{(inv.debtAmount || 0).toLocaleString('vi-VN')} đ</strong>
+                                        </span>
+                                      </div>
+                                      {(inv.debtAmount || 0) > 0 && (
+                                        <button
+                                          type="button"
+                                          className="pos-btn-primary-pill"
+                                          style={{ height: 24, padding: '0 10px', fontSize: 11, backgroundColor: '#16a34a' }}
+                                          onClick={() => setCollectDebtModalInvoice(inv)}
+                                        >
+                                          <DollarSign size={12} />
+                                          <span>Thu Nợ Ngay</span>
+                                        </button>
+                                      )}
+                                    </div>
+
+                                    {inv.debtPaymentRecords && inv.debtPaymentRecords.length > 0 && (
+                                      <div style={{ marginTop: 6, borderTop: '1px dashed #fde047', paddingTop: 6 }}>
+                                        <div style={{ fontSize: 11.5, fontWeight: 600, color: '#713f12', marginBottom: 4 }}>
+                                          Lịch sử các đợt trả tiền ({inv.debtPaymentRecords.length} lần):
+                                        </div>
+                                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
+                                          <thead>
+                                            <tr style={{ color: '#64748b', textAlign: 'left', borderBottom: '1px solid #fef08a' }}>
+                                              <th style={{ padding: '3px 6px' }}>Thời gian</th>
+                                              <th style={{ padding: '3px 6px', textAlign: 'right' }}>Số tiền</th>
+                                              <th style={{ padding: '3px 6px', textAlign: 'center' }}>Hình thức</th>
+                                              <th style={{ padding: '3px 6px' }}>Thu ngân</th>
+                                              <th style={{ padding: '3px 6px' }}>Ghi chú</th>
+                                            </tr>
+                                          </thead>
+                                          <tbody>
+                                            {inv.debtPaymentRecords.map((r) => (
+                                              <tr key={r.paymentId}>
+                                                <td style={{ padding: '3px 6px' }}>{r.paidAt}</td>
+                                                <td style={{ padding: '3px 6px', textAlign: 'right', fontWeight: 600, color: '#15803d' }}>
+                                                  {r.amount.toLocaleString('vi-VN')} đ
+                                                </td>
+                                                <td style={{ padding: '3px 6px', textAlign: 'center' }}>
+                                                  {r.paymentMethod === 'CASH' ? 'Tiền mặt' : 'VietQR'}
+                                                </td>
+                                                <td style={{ padding: '3px 6px' }}>{r.cashierName}</td>
+                                                <td style={{ padding: '3px 6px', color: '#64748b' }}>{r.note}</td>
+                                              </tr>
+                                            ))}
+                                          </tbody>
+                                        </table>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
                               </div>
                             </td>
                           </tr>
@@ -823,6 +987,22 @@ export const InvoiceManagementPage: FC = () => {
                   <span>KHÁCH ĐÃ TRẢ:</span>
                   <span style={{ color: '#15803d' }}>{printingInvoice.finalPaidAmount.toLocaleString('vi-VN')} đ</span>
                 </div>
+                {printingInvoice.debtAmount !== undefined && (
+                  <div style={{ padding: '6px 8px', backgroundColor: '#fffbeb', border: '1px solid #fef3c7', borderRadius: 4, marginTop: 4 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
+                      <span style={{ color: '#b45309', fontWeight: 600 }}>Tiền nợ còn lại:</span>
+                      <strong style={{ color: printingInvoice.debtAmount > 0 ? '#dc2626' : '#16a34a' }}>
+                        {printingInvoice.debtAmount.toLocaleString('vi-VN')} đ
+                      </strong>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginTop: 2 }}>
+                      <span style={{ color: '#64748b' }}>Đã trả trước đó:</span>
+                      <strong style={{ color: '#16a34a' }}>
+                        {(printingInvoice.paidDebtAmount || 0).toLocaleString('vi-VN')} đ
+                      </strong>
+                    </div>
+                  </div>
+                )}
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginTop: 4 }}>
                   <span>Phương thức:</span>
                   <span>{printingInvoice.paymentMethodLabel}</span>
@@ -981,6 +1161,14 @@ export const InvoiceManagementPage: FC = () => {
           </div>
         </div>
       )}
+
+      {/* MODAL THU NỢ HÓA ĐƠN BÁN LẺ */}
+      <CollectDebtModal
+        isOpen={Boolean(collectDebtModalInvoice)}
+        invoice={collectDebtModalInvoice}
+        onClose={() => setCollectDebtModalInvoice(null)}
+        onCollectDebt={handleCollectDebt}
+      />
     </div>
   );
 };

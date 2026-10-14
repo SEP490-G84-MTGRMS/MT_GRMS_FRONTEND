@@ -71,6 +71,9 @@ export class CustomerDTO {
   group?: string;
   loyaltyPoints: number = 0;
   membershipTier: 'Standard' | 'Silver' | 'Gold' | 'VIP' = 'Standard';
+  debtLimit: number = 0;              // Hạn mức nợ tối đa (VD: 500.000 đ)
+  currentDebt: number = 0;            // Nợ hiện tại chưa trả (VD: 120.000 đ)
+  allowDebt: boolean = false;         // Cho phép ghi nợ
   note?: string;
 
   constructor(init?: Partial<CustomerDTO>) {
@@ -92,7 +95,7 @@ export class OrderTabDTO {
   couponDiscount: number = 0;
   usePoints: boolean = false;
   note: string = '';
-  paymentMethod: 'cash' | 'vietqr' = 'cash';
+  paymentMethod: 'cash' | 'vietqr' | 'debt' = 'cash';
   cashTendered: number = 0;
   createdAt: string = '';
 
@@ -170,6 +173,9 @@ export class ReceiptDataDTO {
   finalAmountInWords: string = '';
   paymentMethodText: string = 'Tiền mặt';
   earnedPoints: number = 0;
+  debtAmount?: number;
+  remainingDebt?: number;
+  debtNote?: string;
 
   constructor(init?: Partial<ReceiptDataDTO>) {
     Object.assign(this, init);
@@ -529,3 +535,4 @@ export type DenominationItem = DenominationItemDTO;
 export type ShiftHandoverData = ShiftHandoverDataDTO;
 export type ShiftHistoryItem = ShiftHistoryItemDTO;
 export type ShiftHistoryFilterState = ShiftHistoryFilterStateDTO;
+export type PaymentMethod = 'cash' | 'vietqr' | 'debt';

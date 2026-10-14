@@ -43,6 +43,9 @@ export const AddCustomerModal: FC<Props> = ({ isOpen, onClose, onSave }) => {
       note: note.trim() || undefined,
       loyaltyPoints: 0,
       membershipTier: 'Standard',
+      debtLimit: 0,
+      currentDebt: 0,
+      allowDebt: false,
     };
 
     onSave(newCust);

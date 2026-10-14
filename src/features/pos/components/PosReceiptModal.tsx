@@ -185,6 +185,14 @@ export const PosReceiptModal: FC<Props> = ({ isOpen, receiptData, onClose }) => 
                   {receiptData.paymentMethodText}
                 </span>
               </div>
+              {receiptData.debtAmount !== undefined && receiptData.debtAmount > 0 && (
+                <div className="flex justify-between items-center gap-2 text-amber-800 bg-amber-50 p-1.5 rounded border border-amber-200 mt-1">
+                  <span className="flex-1 min-w-0 font-medium">Số tiền ghi nợ đơn:</span>
+                  <span className="font-mono tabular-nums font-bold text-amber-900 whitespace-nowrap shrink-0">
+                    {receiptData.debtAmount.toLocaleString('vi-VN')} đ
+                  </span>
+                </div>
+              )}
               {receiptData.earnedPoints > 0 && (
                 <div className="flex justify-between items-center gap-2 text-teal-700">
                   <span className="flex-1 min-w-0">Điểm tích lũy cộng thêm:</span>
