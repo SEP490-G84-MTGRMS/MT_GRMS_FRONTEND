@@ -491,6 +491,7 @@ export const ProductListPage: React.FC = () => {
                             ? '#f8fafc'
                             : undefined,
                         opacity: p.status === 'Discontinued' ? 0.75 : 1,
+                        cursor: 'pointer',
                       }}
                     >
                       <td style={{ textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>

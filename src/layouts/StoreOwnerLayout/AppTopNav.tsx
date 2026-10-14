@@ -45,6 +45,7 @@ const NAV_GROUPS: NavGroup[] = [
     icon: PackageIcon,
     children: [
       { label: 'Danh mục hàng hóa', to: '/store-owner/products', badge: 'FE-01' },
+      { label: 'Chuyển hàng liên kho', to: '/store-owner/transfers', badge: 'FE-15' },
       { label: 'Sản phẩm theo NCC', to: '/store-owner/suppliers/products', badge: 'Master' },
     ],
   },
