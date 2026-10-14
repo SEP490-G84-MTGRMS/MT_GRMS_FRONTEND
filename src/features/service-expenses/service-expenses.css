@@ -1,6 +1,6 @@
 /* ==========================================================================
    FE-07 Service Expenses — Dedicated Design System Stylesheet
-   Chuẩn KiotViet Design System: Electric Blue (#0066FF) | Bo tròn Pill & 24px | Be Vietnam Pro
+   Chuẩn KiotViet Design System: Deep Teal (#0F766E) | Bo tròn Pill & 24px | Be Vietnam Pro
    Đồng bộ 100% với StoreOwnerLayout và phong cách của team
    ========================================================================== */
 
@@ -128,7 +128,7 @@
   border-radius: var(--radius-lg, 24px);
   border: 1px solid var(--border-subtle, #e5edf8);
   padding: 20px;
-  box-shadow: var(--shadow-card, 0 10px 30px rgba(0, 50, 150, 0.06));
+  box-shadow: var(--shadow-card, 0 10px 30px rgba(15, 118, 110, 0.06));
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -138,7 +138,7 @@
 
 .expense-kpi-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 14px 34px rgba(0, 50, 150, 0.09);
+  box-shadow: 0 14px 34px rgba(15, 118, 110, 0.09);
 }
 
 .expense-kpi-header {
@@ -165,7 +165,7 @@
   justify-content: center;
 }
 
-.kpi-icon-blue { background: #eff6ff; color: #0066ff; }
+.kpi-icon-blue { background: var(--blue-subtle, #CCFBF1); color: var(--blue-primary, #0F766E); }
 .kpi-icon-amber { background: #fffbeb; color: #d97706; }
 .kpi-icon-green { background: #ecfdf5; color: #059669; }
 .kpi-icon-red { background: #fef2f2; color: #dc2626; }
@@ -191,7 +191,7 @@
   border: 1px solid var(--border-subtle, #e5edf8);
   padding: 16px 20px;
   margin-bottom: 24px;
-  box-shadow: var(--shadow-card, 0 10px 30px rgba(0, 50, 150, 0.06));
+  box-shadow: var(--shadow-card, 0 10px 30px rgba(15, 118, 110, 0.06));
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -236,7 +236,7 @@
 }
 
 .expense-search-input:focus {
-  border-color: var(--blue-primary, #0066ff);
+  border-color: var(--blue-primary, #0F766E);
   background: #ffffff;
 }
 
@@ -253,7 +253,7 @@
 }
 
 .expense-filter-select:focus {
-  border-color: var(--blue-primary, #0066ff);
+  border-color: var(--blue-primary, #0F766E);
   background: #ffffff;
 }
 
@@ -278,7 +278,7 @@
 }
 
 .expense-date-input:focus {
-  border-color: var(--blue-primary, #0066ff);
+  border-color: var(--blue-primary, #0F766E);
   background: #ffffff;
 }
 
@@ -288,8 +288,8 @@
   font-size: 0.76rem;
   font-weight: 600;
   background: var(--blue-light, #f0f6ff);
-  color: var(--blue-primary, #0066ff);
-  border: 1px solid rgba(0, 102, 255, 0.2);
+  color: var(--blue-primary, #0F766E);
+  border: 1px solid rgba(15, 118, 110, 0.2);
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -301,7 +301,7 @@
   background: #ffffff;
   border-radius: var(--radius-lg, 24px);
   border: 1px solid var(--border-subtle, #e5edf8);
-  box-shadow: var(--shadow-card, 0 10px 30px rgba(0, 50, 150, 0.06));
+  box-shadow: var(--shadow-card, 0 10px 30px rgba(15, 118, 110, 0.06));
   overflow: hidden;
 }
 
@@ -337,7 +337,7 @@
 
 .expense-table-code {
   font-weight: 700;
-  color: var(--blue-primary, #0066ff);
+  color: var(--blue-primary, #0F766E);
   font-family: var(--font-mono, monospace);
   font-size: 0.82rem;
 }
@@ -434,7 +434,7 @@
 
 .action-icon-btn:hover {
   background: var(--blue-subtle, #e8f1ff);
-  color: var(--blue-primary, #0066ff);
+  color: var(--blue-primary, #0F766E);
   border-color: var(--blue-border, #dbe9fe);
 }
 
@@ -474,8 +474,8 @@
 }
 
 .page-btn:hover:not(:disabled) {
-  border-color: var(--blue-primary, #0066ff);
-  color: var(--blue-primary, #0066ff);
+  border-color: var(--blue-primary, #0F766E);
+  color: var(--blue-primary, #0F766E);
 }
 
 .page-btn:disabled {
@@ -500,7 +500,7 @@
 .expense-modal-dialog {
   background: #ffffff;
   border-radius: 24px;
-  box-shadow: 0 20px 48px rgba(0, 50, 150, 0.15);
+  box-shadow: 0 20px 48px rgba(15, 118, 110, 0.15);
   width: 100%;
   max-width: 520px;
   overflow: hidden;
@@ -599,8 +599,8 @@
 
 .form-input:focus, .form-select:focus, .form-textarea:focus {
   background: #ffffff;
-  border-color: var(--blue-primary, #0066ff);
-  box-shadow: 0 0 0 3px rgba(0, 102, 255, 0.12);
+  border-color: var(--blue-primary, #0F766E);
+  box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.12);
 }
 
 .form-input.error, .form-select.error {
@@ -646,8 +646,8 @@
 
 .expense-attach-tab-btn.active {
   background: var(--blue-light, #f0f6ff);
-  border-color: var(--blue-primary, #0066ff);
-  color: var(--blue-primary, #0066ff);
+  border-color: var(--blue-primary, #0F766E);
+  color: var(--blue-primary, #0F766E);
 }
 
 .expense-upload-dropzone {
@@ -666,7 +666,7 @@
 }
 
 .expense-upload-dropzone:hover {
-  border-color: var(--blue-primary, #0066ff);
+  border-color: var(--blue-primary, #0F766E);
   background: var(--blue-light, #f0f6ff);
 }
 

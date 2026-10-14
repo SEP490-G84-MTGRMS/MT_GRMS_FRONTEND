@@ -76,25 +76,27 @@ const NAV_GROUPS: NavGroup[] = [
     id: 'purchasing',
     label: 'Nhập hàng',
     icon: TruckIcon,
-    sections: [
+sections: [
       {
         title: 'Nhà cung cấp',
         items: [
-          { label: 'Nhà cung cấp', to: '/store-owner/suppliers' },
+          { label: 'Danh sách nhà cung cấp', to: '/store-owner/suppliers' },
           { label: 'Hóa đơn đầu vào', to: '/store-owner/suppliers?view=invoices', badge: 'Mới', badgeType: 'red' },
         ],
       },
       {
-        title: 'Mua hàng',
+        title: 'Đặt hàng & Nhập kho',
         items: [
-          { label: 'Nhập hàng', to: '/store-owner/suppliers?view=orders' },
+          { label: 'Đặt hàng theo chi nhánh', to: '/store-owner/purchase-orders/branches' },
+          { label: 'Đặt hàng ma trận (Store Owner)', to: '/store-owner/purchase-orders/create-matrix', badge: 'Grid', badgeType: 'blue' },
+          { label: 'Đặt hàng ma trận (Nhân viên)', to: '/employee/purchase-orders/create-matrix', badge: 'Staff', badgeType: 'blue' },
           { label: 'Trả hàng nhập', to: '/store-owner/suppliers?view=returns' },
         ],
       },
       {
-        title: 'Mua dịch vụ',
+        title: 'Dịch vụ & Tiện ích',
         items: [
-          { label: 'Mua dịch vụ', to: '/store-owner/expenses', badge: 'Mới', badgeType: 'red' },
+          { label: 'Chi phí mua dịch vụ (FE-07)', to: '/store-owner/expenses', badge: 'FE-07', badgeType: 'red' },
         ],
       },
     ],
@@ -107,16 +109,16 @@ const NAV_GROUPS: NavGroup[] = [
       {
         title: 'Chi phí & Vận hành',
         items: [
-          { label: 'Chi phí vận hành', to: '/store-owner/expenses', badge: 'FE-07', badgeType: 'red' },
+          { label: 'Chi phí vận hành (FE-07)', to: '/store-owner/expenses', badge: 'FE-07', badgeType: 'red' },
           { label: 'Sổ quỹ tiền mặt & Bank', to: '/store-owner/expenses?view=cashbook' },
           { label: 'Tạo phiếu chi dịch vụ', to: '/store-owner/expenses?view=create', badge: 'Mới', badgeType: 'red' },
         ],
       },
       {
-        title: 'Công nợ & Đối soát',
+        title: 'Khách hàng & Công nợ',
         items: [
+          { label: 'Khách hàng & Sổ nợ (FE-08)', to: '/store-owner/customers', badge: 'FE-08', badgeType: 'blue' },
           { label: 'Công nợ nhà cung cấp', to: '/store-owner/suppliers?view=debt' },
-          { label: 'Sổ nợ khách & VietQR', to: '/store-owner/suppliers?view=customer-debt', badge: 'VietQR', badgeType: 'blue' },
           { label: 'Theo dõi trả góp / gối đầu', to: '/store-owner/expenses?view=installments' },
         ],
       },
@@ -548,20 +550,40 @@ export const AppTopNav: FC = () => {
         location.pathname.startsWith('/store-owner/suppliers/products/') ||
         location.pathname === '/admin/suppliers/products' ||
         location.pathname.startsWith('/admin/suppliers/products/');
-      return isSupplier && !isProduct;
+      const isPurchaseOrder =
+        location.pathname.includes('/purchase-orders');
+      return (isSupplier && !isProduct) || isPurchaseOrder;
     }
     if (group.id === 'finance') {
       return (
         location.pathname === '/store-owner/expenses' ||
         location.pathname.startsWith('/store-owner/expenses/') ||
         location.pathname === '/admin/expenses' ||
-        location.pathname.startsWith('/admin/expenses/')
+        location.pathname.startsWith('/admin/expenses/') ||
+        location.pathname === '/store-owner/customers' ||
+        location.pathname.startsWith('/store-owner/customers/') ||
+        location.pathname === '/customers' ||
+        location.pathname.startsWith('/customers/')
       );
     }
     if (group.to) return location.pathname === group.to || location.pathname.startsWith(group.to + '/');
+    if (group.sections) {
+      return group.sections.some((sec) =>
+        sec.items.some(
+          (c) =>
+            location.pathname === c.to ||
+            location.pathname.startsWith(c.to.split('?')[0] + '/')
+        )
+      );
+    }
     if (group.children) {
       return group.children.some(
-        (c) => location.pathname === c.to || location.pathname.startsWith(c.to + '/')
+        (c) =>
+          location.pathname === c.to ||
+          location.pathname.startsWith(c.to + '/') ||
+          (c.to === '/store-owner/suppliers' && (location.pathname === '/admin/suppliers' || location.pathname.startsWith('/admin/suppliers/'))) ||
+          (c.to === '/store-owner/suppliers/products' && (location.pathname === '/admin/suppliers/products' || location.pathname.startsWith('/admin/suppliers/products/'))) ||
+          (c.to === '/store-owner/purchase-orders/create-matrix' && (location.pathname === '/admin/purchase-orders/create-matrix' || location.pathname.startsWith('/admin/purchase-orders/create-matrix/')))
       );
     }
     return false;

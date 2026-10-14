@@ -59,6 +59,14 @@ export const Navbar: FC<NavbarProps> = ({ onOpenTrial }) => {
             >
               👑 Demo Admin
             </Link>
+            <Link
+              to="/employee/pos"
+              className="nav-link"
+              onClick={() => setMobileMenuOpen(false)}
+              style={{ color: '#0F766E', fontWeight: 600 }}
+            >
+              🧑‍💼 Demo Employee (POS)
+            </Link>
           </nav>
 
           <div className="nav-buttons">

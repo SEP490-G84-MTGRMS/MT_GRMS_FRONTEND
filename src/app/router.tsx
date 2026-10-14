@@ -4,11 +4,14 @@ import { WebStoreLayout } from '../layouts/WebStoreLayout';
 import { AuthLayout } from '../layouts/AuthLayout';
 import { HomePage } from '../pages/HomePage';
 import { SupplierListPage, SupplierDetailPage, SupplierProductManagementPage } from '../features/supplier';
+import { OrderMatrixPage, BranchOrderListPage, EmployeeOrderMatrixPage } from '../features/purchase-order';
 import { ServiceExpensesPage } from '../features/service-expenses/pages/ServiceExpensesPage';
+import { CustomerManagementPage } from '../features/customer-crm';
 import { StoreOwnerLayout } from '../layouts/StoreOwnerLayout';
 import { AdminDashboardPage } from '../pages/admin/AdminDashboardPage';
 import { TenantManagementPage } from '../pages/admin/TenantManagementPage';
 import { LoginPage, RegisterPage, ForgotPasswordPage } from '../pages/auth';
+import { PosCheckoutPage, PosShiftPage } from '../features/pos';
 
 export const router = createBrowserRouter([
   {
@@ -48,8 +51,28 @@ export const router = createBrowserRouter([
         element: <SupplierProductManagementPage />,
       },
       {
+        path: 'purchase-orders',
+        element: <BranchOrderListPage />,
+      },
+      {
+        path: 'purchase-orders/branches',
+        element: <BranchOrderListPage />,
+      },
+      {
+        path: 'purchase-orders/create-matrix',
+        element: <OrderMatrixPage />,
+      },
+      {
+        path: 'purchase-orders/employee-matrix',
+        element: <EmployeeOrderMatrixPage />,
+      },
+      {
         path: 'expenses',
         element: <ServiceExpensesPage />,
+      },
+      {
+        path: 'customers',
+        element: <CustomerManagementPage />,
       },
     ],
   },
@@ -82,8 +105,28 @@ export const router = createBrowserRouter([
         element: <SupplierProductManagementPage />,
       },
       {
+        path: 'purchase-orders',
+        element: <BranchOrderListPage />,
+      },
+      {
+        path: 'purchase-orders/branches',
+        element: <BranchOrderListPage />,
+      },
+      {
+        path: 'purchase-orders/create-matrix',
+        element: <OrderMatrixPage />,
+      },
+      {
+        path: 'purchase-orders/employee-matrix',
+        element: <EmployeeOrderMatrixPage />,
+      },
+      {
         path: 'expenses',
         element: <ServiceExpensesPage />,
+      },
+      {
+        path: 'customers',
+        element: <CustomerManagementPage />,
       },
     ],
   },
@@ -116,8 +159,24 @@ export const router = createBrowserRouter([
         element: <SupplierProductManagementPage />,
       },
       {
+        path: 'purchase-orders',
+        element: <Navigate to="/store-owner/purchase-orders/branches" replace />,
+      },
+      {
+        path: 'purchase-orders/branches',
+        element: <Navigate to="/store-owner/purchase-orders/branches" replace />,
+      },
+      {
+        path: 'purchase-orders/create-matrix',
+        element: <OrderMatrixPage />,
+      },
+      {
         path: 'expenses',
         element: <Navigate to="/store-owner/expenses" replace />,
+      },
+      {
+        path: 'customers',
+        element: <Navigate to="/store-owner/customers" replace />,
       },
     ],
   },
@@ -145,6 +204,20 @@ export const router = createBrowserRouter([
         path: 'expenses',
         element: <Navigate to="/store-owner/expenses" replace />,
       },
+      {
+        path: 'customers',
+        element: <Navigate to="/store-owner/customers" replace />,
+      },
+    ],
+  },
+  {
+    path: '/customers',
+    element: <StoreOwnerLayout />,
+    children: [
+      {
+        index: true,
+        element: <CustomerManagementPage />,
+      },
     ],
   },
   {
@@ -153,7 +226,43 @@ export const router = createBrowserRouter([
     children: [
       {
         index: true,
-        element: <div className="p-4 text-emerald-400">Màn hình Quầy Bán hàng POS Checkout</div>,
+        element: <PosCheckoutPage />,
+      },
+      {
+        path: 'shift',
+        element: <PosShiftPage />,
+      },
+    ],
+  },
+  {
+    path: '/employee',
+    children: [
+      {
+        index: true,
+        element: <Navigate to="/employee/pos" replace />,
+      },
+      {
+        path: 'pos',
+        element: <PosLayout />,
+        children: [
+          {
+            index: true,
+            element: <PosCheckoutPage />,
+          },
+          {
+            path: 'shift',
+            element: <PosShiftPage />,
+          },
+        ],
+      },
+      {
+        element: <StoreOwnerLayout />,
+        children: [
+          {
+            path: 'purchase-orders/create-matrix',
+            element: <EmployeeOrderMatrixPage />,
+          },
+        ],
       },
     ],
   },
@@ -201,5 +310,19 @@ export const router = createBrowserRouter([
   {
     path: '/forgot-password',
     element: <Navigate to="/auth/forgot-password" replace />,
+  },
+  {
+    path: '/branch',
+    element: <StoreOwnerLayout />,
+    children: [
+      {
+        index: true,
+        element: <Navigate to="/branch/purchase-orders/create-matrix" replace />,
+      },
+      {
+        path: 'purchase-orders/create-matrix',
+        element: <EmployeeOrderMatrixPage />,
+      },
+    ],
   },
 ]);

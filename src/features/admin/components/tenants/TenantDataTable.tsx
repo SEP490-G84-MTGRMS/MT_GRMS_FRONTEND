@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { FC } from 'react';
 import type { Tenant } from '../../types/admin.types';
+import { TablePagination } from '../../../../components/common';
 
 interface TenantDataTableProps {
   tenants: Tenant[];
@@ -19,6 +20,12 @@ export const TenantDataTable: FC<TenantDataTableProps> = ({
 }) => {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  const displayedTenants = tenants.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
+  );
 
   const toggleSelectAll = () => {
     if (selectedIds.length === tenants.length) {
@@ -104,7 +111,7 @@ export const TenantDataTable: FC<TenantDataTableProps> = ({
               </td>
             </tr>
           ) : (
-            tenants.map((t) => (
+            displayedTenants.map((t) => (
               <tr key={t.id}>
                 <td style={{ textAlign: 'center' }}>
                   <input
@@ -211,39 +218,15 @@ export const TenantDataTable: FC<TenantDataTableProps> = ({
         </tbody>
       </table>
 
-      {/* Pagination Footer */}
-      <div className="admin-pagination-footer">
-        <div>
-          Đang hiển thị <b>1 - {tenants.length}</b> trong tổng số <b>128</b> khách hàng
-        </div>
-        <div style={{ display: 'flex', gap: 4 }}>
-          <button
-            type="button"
-            className={`admin-page-btn ${currentPage === 1 ? 'active' : ''}`}
-            onClick={() => setCurrentPage(1)}
-          >
-            1
-          </button>
-          <button
-            type="button"
-            className={`admin-page-btn ${currentPage === 2 ? 'active' : ''}`}
-            onClick={() => setCurrentPage(2)}
-          >
-            2
-          </button>
-          <button
-            type="button"
-            className={`admin-page-btn ${currentPage === 3 ? 'active' : ''}`}
-            onClick={() => setCurrentPage(3)}
-          >
-            3
-          </button>
-          <span style={{ padding: '4px 6px', color: 'var(--text-muted)' }}>&hellip;</span>
-          <button type="button" className="admin-page-btn" onClick={() => setCurrentPage(7)}>
-            7
-          </button>
-        </div>
-      </div>
+      {/* Shared Pagination Footer */}
+      <TablePagination
+        currentPage={currentPage}
+        pageSize={pageSize}
+        totalItems={tenants.length}
+        itemLabel="khách hàng tenant"
+        onPageChange={setCurrentPage}
+        onPageSizeChange={setPageSize}
+      />
     </div>
   );
 };
