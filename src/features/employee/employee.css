@@ -9,7 +9,7 @@
   --emp-teal-light: #CCFBF1;
   --emp-teal-bg: #F0FDFA;
   
-  --emp-bg: #F8FAFC;
+  --emp-bg: var(--bg-soft-blue, #F0FDFA);
   --emp-surface: #FFFFFF;
   --emp-border: #E2E8F0;
   --emp-border-light: #F1F5F9;
@@ -42,10 +42,10 @@
 .emp-page-container {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  background-color: var(--emp-bg);
-  min-height: calc(100vh - 120px);
-  padding: 16px 24px 32px;
+  gap: 20px;
+  background-color: transparent;
+  width: 100%;
+  padding: 0;
   font-family: 'Be Vietnam Pro', system-ui, -apple-system, sans-serif;
   color: var(--emp-text-primary);
 }
