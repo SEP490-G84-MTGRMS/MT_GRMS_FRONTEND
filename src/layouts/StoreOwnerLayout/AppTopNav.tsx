@@ -28,6 +28,24 @@ interface NavGroup {
   children?: NavSubItem[];
 }
 
+const UsersIcon: FC<{ size?: number; color?: string }> = ({ size = 18, color = 'currentColor' }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke={color}
+    strokeWidth={2}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+    <circle cx="9" cy="7" r="4" />
+    <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+  </svg>
+);
+
 const GiftNavIcon: FC<{ size?: number; color?: string }> = ({ size = 18, color = 'currentColor' }) => (
   <Gift size={size} color={color} />
 );
@@ -67,6 +85,17 @@ const NAV_GROUPS: NavGroup[] = [
     children: [
       { label: 'Khách hàng & Công nợ (FE-08)', to: '/store-owner/customers', badge: 'FE-08' },
       { label: 'Chi phí vận hành (FE-07)', to: '/store-owner/expenses', badge: 'FE-07' },
+    ],
+  },
+  {
+    id: 'employees',
+    label: 'Nhân viên',
+    icon: UsersIcon,
+    children: [
+      { label: 'Danh sách nhân viên', to: '/store-owner/employees' },
+      { label: 'Lịch làm việc', to: '/store-owner/employees/schedule', badge: 'Lịch' },
+      { label: 'Bảng chấm công', to: '/store-owner/employees/attendance', badge: 'GPS/QR' },
+      { label: 'Bảng tính lương', to: '/store-owner/employees/payroll', badge: 'Mới' },
     ],
   },
   {

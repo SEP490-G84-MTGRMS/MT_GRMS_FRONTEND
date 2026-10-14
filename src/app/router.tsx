@@ -6,6 +6,12 @@ import { HomePage } from '../pages/HomePage';
 import { SupplierListPage, SupplierDetailPage, SupplierProductManagementPage } from '../features/supplier';
 import { OrderMatrixPage, BranchOrderListPage, EmployeeOrderMatrixPage } from '../features/purchase-order';
 import { ServiceExpensesPage } from '../features/service-expenses/pages/ServiceExpensesPage';
+import {
+  EmployeeListPage,
+  WorkSchedulePage,
+  AttendancePage,
+  PayslipManagementPage,
+} from '../features/employee';
 import { ProductListPage } from '../features/product';
 import {
   TransferListPage,
@@ -77,6 +83,22 @@ export const router = createBrowserRouter([
         path: 'expenses',
         element: <ServiceExpensesPage />,
       },
+      {
+        path: 'employees',
+        element: <EmployeeListPage />,
+      },
+      {
+        path: 'employees/schedule',
+        element: <WorkSchedulePage />,
+      },
+      {
+        path: 'employees/attendance',
+        element: <AttendancePage />,
+      },
+      {
+        path: 'employees/payroll',
+        element: <PayslipManagementPage />,
+      },
     ],
   },
   {
@@ -146,6 +168,22 @@ export const router = createBrowserRouter([
       {
         path: 'expenses',
         element: <ServiceExpensesPage />,
+      },
+      {
+        path: 'employees',
+        element: <EmployeeListPage />,
+      },
+      {
+        path: 'employees/schedule',
+        element: <WorkSchedulePage />,
+      },
+      {
+        path: 'employees/attendance',
+        element: <AttendancePage />,
+      },
+      {
+        path: 'employees/payroll',
+        element: <PayslipManagementPage />,
       },
       {
         path: 'customers',
@@ -240,6 +278,44 @@ export const router = createBrowserRouter([
       {
         path: 'expenses',
         element: <Navigate to="/store-owner/expenses" replace />,
+      },
+      {
+        path: 'employees',
+        element: <EmployeeListPage />,
+      },
+      {
+        path: 'employees/schedule',
+        element: <WorkSchedulePage />,
+      },
+      {
+        path: 'employees/attendance',
+        element: <AttendancePage />,
+      },
+      {
+        path: 'employees/payroll',
+        element: <PayslipManagementPage />,
+      },
+    ],
+  },
+  {
+    path: '/employees',
+    element: <StoreOwnerLayout />,
+    children: [
+      {
+        index: true,
+        element: <EmployeeListPage />,
+      },
+      {
+        path: 'schedule',
+        element: <WorkSchedulePage />,
+      },
+      {
+        path: 'attendance',
+        element: <AttendancePage />,
+      },
+      {
+        path: 'payroll',
+        element: <PayslipManagementPage />,
       },
       {
         path: 'customers',
