@@ -9,8 +9,6 @@ import type {
 } from '../types';
 import {
   MOCK_EMPLOYEES,
-  MOCK_DEPARTMENTS,
-  MOCK_JOB_TITLES,
   MOCK_BRANCHES,
   MOCK_APPROVAL_REQUESTS,
 } from '../services/mockData';
@@ -25,8 +23,6 @@ export const EmployeeListPage: React.FC = () => {
   const navigate = useNavigate();
   // State data
   const [employees, setEmployees] = useState<Employee[]>(MOCK_EMPLOYEES);
-  const [departments] = useState(MOCK_DEPARTMENTS);
-  const [jobTitles] = useState(MOCK_JOB_TITLES);
   const [branches] = useState(MOCK_BRANCHES);
   const [approvalRequests, setApprovalRequests] = useState<ApprovalRequest[]>(MOCK_APPROVAL_REQUESTS);
 
@@ -36,8 +32,6 @@ export const EmployeeListPage: React.FC = () => {
     status: 'active',
     workingBranchId: '',
     salaryBranchId: '',
-    departmentId: '',
-    jobTitleId: '',
   });
 
   // Modals state
@@ -75,16 +69,6 @@ export const EmployeeListPage: React.FC = () => {
 
       // 4. Salary branch
       if (filters.salaryBranchId && emp.salaryBranchId !== filters.salaryBranchId) {
-        return false;
-      }
-
-      // 5. Department
-      if (filters.departmentId && emp.departmentId !== filters.departmentId) {
-        return false;
-      }
-
-      // 6. Job title
-      if (filters.jobTitleId && emp.jobTitleId !== filters.jobTitleId) {
         return false;
       }
 
@@ -322,18 +306,13 @@ export const EmployeeListPage: React.FC = () => {
         <EmployeeFilterSidebar
           filters={filters}
           onFilterChange={setFilters}
-          departments={departments}
-          jobTitles={jobTitles}
           branches={branches}
-          onOpenCreatePosition={() => alert('Mở popup thêm mới chức danh')}
           onResetFilters={() =>
             setFilters({
               keyword: '',
               status: 'all',
               workingBranchId: '',
               salaryBranchId: '',
-              departmentId: '',
-              jobTitleId: '',
             })
           }
         />
@@ -359,8 +338,6 @@ export const EmployeeListPage: React.FC = () => {
                 <th style={{ width: 110 }}>Mã chấm công</th>
                 <th>Tên nhân viên</th>
                 <th>Số điện thoại</th>
-                <th>Phòng ban</th>
-                <th>Chức danh</th>
                 <th className="align-right">Nợ và tạm ứng</th>
                 <th>Trạng thái</th>
               </tr>
@@ -402,8 +379,6 @@ export const EmployeeListPage: React.FC = () => {
                       </div>
                     </td>
                     <td style={{ color: '#334155' }}>{emp.phone}</td>
-                    <td>{emp.departmentName || '-'}</td>
-                    <td>{emp.jobTitleName || '-'}</td>
                     <td className="align-right">
                       <span className={`emp-debt-value ${emp.debtAmount === 0 ? 'zero' : ''}`}>
                         {formatVND(emp.debtAmount)}
@@ -422,7 +397,7 @@ export const EmployeeListPage: React.FC = () => {
                 ))
               ) : (
                 <tr>
-                  <td colSpan={10} style={{ textAlign: 'center', color: '#94A3B8', padding: 48 }}>
+                  <td colSpan={8} style={{ textAlign: 'center', color: '#94A3B8', padding: 48 }}>
                     Không tìm thấy nhân viên nào phù hợp với bộ lọc hiện tại
                   </td>
                 </tr>
@@ -442,8 +417,6 @@ export const EmployeeListPage: React.FC = () => {
         }}
         employee={editingEmployee}
         onSave={handleSaveEmployee}
-        departments={departments}
-        jobTitles={jobTitles}
         branches={branches}
       />
 

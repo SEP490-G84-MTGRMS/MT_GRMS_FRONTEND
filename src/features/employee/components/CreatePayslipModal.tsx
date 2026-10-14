@@ -141,7 +141,7 @@ export const CreatePayslipModal: React.FC<CreatePayslipModalProps> = ({
                 <div style={{ paddingTop: 8 }}>
                   <span
                     className="emp-status-pill"
-                    style={{ background: '#FEF3C7', color: '#B45309', border: '1px solid #FDE68A' }}
+                    style={{ background: '#FEF3C7', color: '#B45309', border: 'none' }}
                   >
                     Unpaid (Chưa thanh toán)
                   </span>

@@ -616,20 +616,7 @@ export const PayslipManagementPage: React.FC = () => {
                               ✓ Đã thanh toán
                             </span>
                           ) : (
-                            <span
-                              style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: 4,
-                                fontSize: 12,
-                                fontWeight: 700,
-                                padding: '3px 10px',
-                                borderRadius: 9999,
-                                background: '#FEF3C7',
-                                color: '#B45309',
-                                border: '1px solid #FDE68A',
-                              }}
-                            >
+                            <span className="emp-status-pill warning">
                               Chưa thanh toán
                             </span>
                           )}

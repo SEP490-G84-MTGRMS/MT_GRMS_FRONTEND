@@ -416,16 +416,32 @@
   font-weight: 600;
   padding: 3px 10px;
   border-radius: var(--emp-radius-pill);
+  border: none !important;
+  outline: none;
 }
 
 .emp-status-pill.active {
   background: var(--emp-success-light);
   color: #065F46;
+  border: none !important;
 }
 
 .emp-status-pill.inactive {
   background: #F1F5F9;
   color: #64748B;
+  border: none !important;
+}
+
+.emp-status-pill.warning {
+  background: #FEF3C7;
+  color: #B45309;
+  border: none !important;
+}
+
+.emp-status-pill.danger {
+  background: #FEE2E2;
+  color: #B91C1C;
+  border: none !important;
 }
 
 /* ─── Modal Overlays ─── */

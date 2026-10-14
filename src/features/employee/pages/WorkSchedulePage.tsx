@@ -197,7 +197,7 @@ export const WorkSchedulePage: React.FC = () => {
                                 key={item.id}
                                 style={{
                                   background: `${item.shiftColor}18`,
-                                  border: `1px solid ${item.shiftColor}50`,
+                                  border: 'none',
                                   color: item.shiftColor,
                                   borderRadius: 6,
                                   padding: '4px 8px',

@@ -210,12 +210,7 @@ export const AttendancePage: React.FC = () => {
                             key={att.id}
                             style={{
                               background: '#FFFFFF',
-                              border:
-                                att.status === 'ontime'
-                                  ? '1px solid #A7F3D0'
-                                  : att.status === 'late'
-                                  ? '1px solid #FDE68A'
-                                  : '1px solid #E2E8F0',
+                              border: '1px solid #E2E8F0',
                               borderRadius: 8,
                               padding: '6px 8px',
                               cursor: 'pointer',

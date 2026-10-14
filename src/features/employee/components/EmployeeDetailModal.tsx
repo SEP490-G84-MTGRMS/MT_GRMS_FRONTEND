@@ -218,14 +218,6 @@ export const EmployeeDetailModal: React.FC<EmployeeDetailModalProps> = ({
                   <div className="emp-section-title">Thông tin công việc</div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 12, fontSize: 13 }}>
                     <div>
-                      <span style={{ color: '#64748B' }}>Phòng ban:</span>
-                      <div style={{ fontWeight: 600 }}>{employee.departmentName || 'Chưa phân bổ'}</div>
-                    </div>
-                    <div>
-                      <span style={{ color: '#64748B' }}>Chức danh:</span>
-                      <div style={{ fontWeight: 600 }}>{employee.jobTitleName || 'Chưa phân bổ'}</div>
-                    </div>
-                    <div>
                       <span style={{ color: '#64748B' }}>Chi nhánh trả lương:</span>
                       <div style={{ fontWeight: 600, color: '#0F766E' }}>{employee.salaryBranchName}</div>
                     </div>

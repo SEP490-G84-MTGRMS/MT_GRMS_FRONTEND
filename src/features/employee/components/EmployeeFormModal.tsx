@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import type {
   Employee,
-  Department,
-  JobTitle,
   Branch,
   AllowanceItem,
   SalaryType,
@@ -16,8 +14,6 @@ interface EmployeeFormModalProps {
   onClose: () => void;
   employee?: Employee | null;
   onSave: (employee: Employee, isAddNew?: boolean) => void;
-  departments: Department[];
-  jobTitles: JobTitle[];
   branches: Branch[];
 }
 
@@ -26,11 +22,9 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
   onClose,
   employee,
   onSave,
-  departments,
-  jobTitles,
   branches,
 }) => {
-  const [activeTab, setActiveTab] = useState<'info' | 'salary' | 'insurance'>('info');
+  const [activeTab, setActiveTab] = useState<'info' | 'salary'>('info');
 
   // Sub-modals
   const [showCreateUser, setShowCreateUser] = useState(false);
@@ -50,10 +44,7 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
   const [city, setCity] = useState('');
 
   // Work info
-  const [departmentId, setDepartmentId] = useState('');
-  const [jobTitleId, setJobTitleId] = useState('');
   const [startDate, setStartDate] = useState('');
-  const [salaryBranchId, setSalaryBranchId] = useState('');
   const [workingBranchIds, setWorkingBranchIds] = useState<string[]>([]);
   const [userId, setUserId] = useState('');
   const [userName, setUserName] = useState('');
@@ -89,10 +80,7 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
       setAddress(employee.address || '');
       setCity(employee.city || '');
 
-      setDepartmentId(employee.departmentId || '');
-      setJobTitleId(employee.jobTitleId || '');
       setStartDate(employee.startDate || '');
-      setSalaryBranchId(employee.salaryBranchId || (branches[0]?.id || ''));
       setWorkingBranchIds(employee.workingBranchIds || [branches[0]?.id || '']);
       setUserId(employee.userId || '');
       setUserName(employee.userName || '');
@@ -125,10 +113,7 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
       setAddress('');
       setCity('');
 
-      setDepartmentId(departments[0]?.id || '');
-      setJobTitleId(jobTitles[0]?.id || '');
       setStartDate(new Date().toISOString().split('T')[0]);
-      setSalaryBranchId(branches[0]?.id || '');
       setWorkingBranchIds([branches[0]?.id || '']);
       setUserId('');
       setUserName('');
@@ -142,7 +127,7 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
       setBaseSalary(7500000);
       setAllowances(MOCK_DEFAULT_ALLOWANCES);
     }
-  }, [employee, branches, departments, jobTitles, isOpen]);
+  }, [employee, branches, isOpen]);
 
   if (!isOpen) return null;
 
@@ -192,14 +177,8 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
       alert('Vui lòng nhập Số điện thoại!');
       return;
     }
-    if (!salaryBranchId) {
-      alert('Vui lòng chọn Chi nhánh trả lương!');
-      return;
-    }
-
-    const deptName = departments.find((d) => d.id === departmentId)?.name;
-    const titleName = jobTitles.find((jt) => jt.id === jobTitleId)?.name;
-    const sBranchName = branches.find((b) => b.id === salaryBranchId)?.name || 'Chi nhánh trung tâm';
+    const sBranchId = employee?.salaryBranchId || workingBranchIds[0] || branches[0]?.id || '';
+    const sBranchName = branches.find((b) => b.id === sBranchId)?.name || 'Chi nhánh trung tâm';
     const wBranchNames = branches
       .filter((b) => workingBranchIds.includes(b.id))
       .map((b) => b.name);
@@ -220,12 +199,8 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
       citizenId,
       address,
       city,
-      departmentId,
-      departmentName: deptName,
-      jobTitleId,
-      jobTitleName: titleName,
       startDate,
-      salaryBranchId,
+      salaryBranchId: sBranchId,
       salaryBranchName: sBranchName,
       workingBranchIds,
       workingBranchNames: wBranchNames,
@@ -290,13 +265,6 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
               onClick={() => setActiveTab('salary')}
             >
               Thiết lập lương
-            </button>
-            <button
-              type="button"
-              className={`emp-modal-tab-btn ${activeTab === 'insurance' ? 'active' : ''}`}
-              onClick={() => setActiveTab('insurance')}
-            >
-              Thuế TNCN & BHXH
             </button>
           </div>
 
@@ -386,65 +354,23 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
                   <div className="emp-section-title">Thông tin công việc</div>
                   <div className="emp-grid-2">
                     <div className="emp-form-group">
-                      <label className="emp-form-label">Phòng ban</label>
-                      <select
-                        className="emp-form-select"
-                        value={departmentId}
-                        onChange={(e) => setDepartmentId(e.target.value)}
-                      >
-                        <option value="">Chọn phòng ban</option>
-                        {departments.map((d) => (
-                          <option key={d.id} value={d.id}>
-                            {d.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div className="emp-form-group">
-                      <label className="emp-form-label">Chức danh</label>
-                      <select
-                        className="emp-form-select"
-                        value={jobTitleId}
-                        onChange={(e) => setJobTitleId(e.target.value)}
-                      >
-                        <option value="">Chọn chức danh</option>
-                        {jobTitles.map((jt) => (
-                          <option key={jt.id} value={jt.id}>
-                            {jt.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-
-                  <div className="emp-grid-2">
-                    <div className="emp-form-group">
-                      <label className="emp-form-label">
-                        Chi nhánh trả lương <span className="required">*</span>
-                      </label>
-                      <select
-                        className="emp-form-select"
-                        value={salaryBranchId}
-                        onChange={(e) => setSalaryBranchId(e.target.value)}
-                        required
-                      >
-                        <option value="">Chọn chi nhánh trả lương</option>
-                        {branches.map((b) => (
-                          <option key={b.id} value={b.id}>
-                            {b.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div className="emp-form-group">
                       <label className="emp-form-label">Ngày bắt đầu làm việc</label>
                       <input
                         type="date"
                         className="emp-form-input"
                         value={startDate}
                         onChange={(e) => setStartDate(e.target.value)}
+                      />
+                    </div>
+
+                    <div className="emp-form-group">
+                      <label className="emp-form-label">Mã chấm công</label>
+                      <input
+                        type="text"
+                        className="emp-form-input"
+                        placeholder="Mã máy chấm công (nếu có)"
+                        value={attendanceCode}
+                        onChange={(e) => setAttendanceCode(e.target.value)}
                       />
                     </div>
                   </div>
@@ -496,26 +422,15 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
                     </div>
 
                     <div className="emp-form-group">
-                      <label className="emp-form-label">Mã chấm công</label>
+                      <label className="emp-form-label">Ghi chú</label>
                       <input
                         type="text"
                         className="emp-form-input"
-                        placeholder="Mã máy chấm công (nếu có)"
-                        value={attendanceCode}
-                        onChange={(e) => setAttendanceCode(e.target.value)}
+                        placeholder="Ghi chú nhân sự..."
+                        value={note}
+                        onChange={(e) => setNote(e.target.value)}
                       />
                     </div>
-                  </div>
-
-                  <div className="emp-form-group">
-                    <label className="emp-form-label">Ghi chú</label>
-                    <input
-                      type="text"
-                      className="emp-form-input"
-                      placeholder="Ghi chú nhân sự..."
-                      value={note}
-                      onChange={(e) => setNote(e.target.value)}
-                    />
                   </div>
                 </div>
 
@@ -803,57 +718,6 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
                       </tbody>
                     </table>
                   )}
-                </div>
-              </div>
-            )}
-
-            {/* TAB 3: THUẾ TNCN & BHXH */}
-            {activeTab === 'insurance' && (
-              <div>
-                <div className="emp-section-card">
-                  <div className="emp-section-title">Thuế thu nhập cá nhân (TNCN)</div>
-                  <div className="emp-grid-2">
-                    <div className="emp-form-group">
-                      <label className="emp-form-label">Mã số thuế cá nhân</label>
-                      <input
-                        type="text"
-                        className="emp-form-input"
-                        placeholder="Nhập mã số thuế"
-                      />
-                    </div>
-                    <div className="emp-form-group">
-                      <label className="emp-form-label">Số người phụ thuộc giảm trừ</label>
-                      <input
-                        type="number"
-                        defaultValue={0}
-                        min={0}
-                        className="emp-form-input"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="emp-section-card">
-                  <div className="emp-section-title">Bảo hiểm xã hội & Y tế</div>
-                  <div className="emp-grid-2">
-                    <div className="emp-form-group">
-                      <label className="emp-form-label">Mã số sổ BHXH</label>
-                      <input
-                        type="text"
-                        className="emp-form-input"
-                        placeholder="Nhập mã số BHXH"
-                      />
-                    </div>
-                    <div className="emp-form-group">
-                      <label className="emp-form-label">Mức lương đóng BHXH (VNĐ)</label>
-                      <input
-                        type="number"
-                        defaultValue={5000000}
-                        step={500000}
-                        className="emp-form-input"
-                      />
-                    </div>
-                  </div>
                 </div>
               </div>
             )}

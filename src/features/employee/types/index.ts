@@ -141,8 +141,8 @@ export interface EmployeeFilterState {
   status: 'all' | 'active' | 'inactive';
   workingBranchId: string;
   salaryBranchId: string;
-  departmentId: string;
-  jobTitleId: string;
+  departmentId?: string;
+  jobTitleId?: string;
 }
 
 export interface WorkShiftDefinition {
