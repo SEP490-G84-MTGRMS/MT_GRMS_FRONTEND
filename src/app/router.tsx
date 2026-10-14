@@ -6,6 +6,7 @@ import { HomePage } from '../pages/HomePage';
 import { SupplierListPage, SupplierDetailPage, SupplierProductManagementPage } from '../features/supplier';
 import { OrderMatrixPage, BranchOrderListPage, EmployeeOrderMatrixPage } from '../features/purchase-order';
 import { ServiceExpensesPage } from '../features/service-expenses/pages/ServiceExpensesPage';
+import { ProductListPage } from '../features/product';
 import { CustomerManagementPage } from '../features/customer-crm';
 import { StoreOwnerLayout } from '../layouts/StoreOwnerLayout';
 import { AdminDashboardPage } from '../pages/admin/AdminDashboardPage';
@@ -70,34 +71,6 @@ export const router = createBrowserRouter([
         path: 'expenses',
         element: <ServiceExpensesPage />,
       },
-      {
-        path: 'customers',
-        element: <CustomerManagementPage />,
-      },
-      {
-        path: 'promotions',
-        element: <PromotionListPage />,
-      },
-      {
-        path: 'vouchers',
-        element: <VoucherListPage />,
-      },
-      {
-        path: 'loyalty-config',
-        element: <LoyaltyConfigPage />,
-      },
-      {
-        path: 'inventory-lookup',
-        element: <InventoryLookupPage />,
-      },
-      {
-        path: 'orders',
-        element: <InvoiceManagementPage />,
-      },
-      {
-        path: 'invoices',
-        element: <InvoiceManagementPage />,
-      },
     ],
   },
   {
@@ -111,6 +84,10 @@ export const router = createBrowserRouter([
       {
         path: 'dashboard',
         element: <AdminDashboardPage />,
+      },
+      {
+        path: 'products',
+        element: <ProductListPage />,
       },
       {
         path: 'suppliers',
@@ -187,6 +164,10 @@ export const router = createBrowserRouter([
         element: <AdminDashboardPage />,
       },
       {
+        path: 'products',
+        element: <ProductListPage />,
+      },
+      {
         path: 'tenants',
         element: <TenantManagementPage />,
       },
@@ -225,6 +206,16 @@ export const router = createBrowserRouter([
       {
         path: 'customers',
         element: <Navigate to="/store-owner/customers" replace />,
+      },
+    ],
+  },
+  {
+    path: '/products',
+    element: <StoreOwnerLayout />,
+    children: [
+      {
+        index: true,
+        element: <ProductListPage />,
       },
     ],
   },
