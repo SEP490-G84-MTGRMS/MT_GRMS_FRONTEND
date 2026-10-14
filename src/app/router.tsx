@@ -10,6 +10,7 @@ import { CustomerManagementPage } from '../features/customer-crm';
 import { StoreOwnerLayout } from '../layouts/StoreOwnerLayout';
 import { AdminDashboardPage } from '../pages/admin/AdminDashboardPage';
 import { TenantManagementPage } from '../pages/admin/TenantManagementPage';
+import { SubscriptionPlanPage } from '../pages/admin/SubscriptionPlanPage';
 import { LoginPage, RegisterPage, ForgotPasswordPage } from '../pages/auth';
 import { PosCheckoutPage, PosShiftPage } from '../features/pos';
 
@@ -33,6 +34,14 @@ export const router = createBrowserRouter([
       {
         path: 'tenants',
         element: <TenantManagementPage />,
+      },
+      {
+        path: 'subscriptions',
+        element: <SubscriptionPlanPage />,
+      },
+      {
+        path: 'plans',
+        element: <SubscriptionPlanPage />,
       },
       {
         path: 'suppliers',

@@ -1,12 +1,12 @@
-import { useState, useRef } from 'react';
-import type { FC } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useRef } from "react";
+import type { FC } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   mockKpiMetrics,
   mockUrgentAlertTenants,
   mockTenants,
   mockMonthlyAnalytics,
-} from '../../features/admin/data/mockAdminData';
+} from "../../features/admin/data/mockAdminData";
 import {
   KpiCard,
   UrgentAlertTable,
@@ -18,8 +18,8 @@ import {
   type ToastState,
   RefreshIcon,
   ExportIcon,
-} from '../../features/admin/components';
-import type { Tenant, LockType } from '../../features/admin/types/admin.types';
+} from "../../features/admin/components";
+import type { Tenant, LockType } from "../../features/admin/types/admin.types";
 
 export const AdminDashboardPage: FC = () => {
   const navigate = useNavigate();
@@ -30,7 +30,7 @@ export const AdminDashboardPage: FC = () => {
   const [toast, setToast] = useState<ToastState | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const showToast = (message: string, type: ToastState['type'] = 'success') => {
+  const showToast = (message: string, type: ToastState["type"] = "success") => {
     if (toastTimerRef.current) {
       clearTimeout(toastTimerRef.current);
     }
@@ -41,31 +41,37 @@ export const AdminDashboardPage: FC = () => {
   };
 
   const handleOpenDetailBySubdomain = (subdomain: string) => {
-    const found = mockTenants.find((t) => t.subdomain === subdomain) || mockTenants[0];
+    const found =
+      mockTenants.find((t) => t.subdomain === subdomain) || mockTenants[0];
     setSelectedTenant(found);
     setIsDetailOpen(true);
   };
 
   const handleOpenGraceBySubdomain = (subdomain: string) => {
-    const found = mockTenants.find((t) => t.subdomain === subdomain) || mockTenants[0];
+    const found =
+      mockTenants.find((t) => t.subdomain === subdomain) || mockTenants[0];
     setSelectedTenant(found);
     setIsGraceOpen(true);
   };
 
   const handleOpenLockBySubdomain = (subdomain: string) => {
-    const found = mockTenants.find((t) => t.subdomain === subdomain) || mockTenants[0];
+    const found =
+      mockTenants.find((t) => t.subdomain === subdomain) || mockTenants[0];
     setSelectedTenant(found);
     setIsLockOpen(true);
   };
 
   const handleExtendGraceSubmit = (tenant: Tenant, days: number) => {
-    showToast(`Đã gia hạn thêm ${days} ngày ân hạn thành công cho chuỗi ${tenant.name}.`, 'success');
+    showToast(
+      `Đã gia hạn thêm ${days} ngày ân hạn thành công cho chuỗi ${tenant.name}.`,
+      "success",
+    );
   };
 
   const handleApplyLockSubmit = (tenant: Tenant, lockType: LockType) => {
     showToast(
-      `Đã thi hành lệnh ${lockType === 'hard' ? 'Đình chỉ (Hard-Lock)' : 'Khóa mềm (Soft-Lock)'} đối với ${tenant.name}.`,
-      'warning'
+      `Đã thi hành lệnh ${lockType === "hard" ? "Đình chỉ (Hard-Lock)" : "Khóa mềm (Soft-Lock)"} đối với ${tenant.name}.`,
+      "warning",
     );
   };
 
@@ -77,24 +83,21 @@ export const AdminDashboardPage: FC = () => {
       {/* Page Header */}
       <div className="admin-page-header">
         <div>
-          <h1>Tổng quan Nền tảng (Master Dashboard)</h1>
-          <p>
-            Theo dõi sức khỏe toàn hệ thống SaaS, quy mô chuỗi khách hàng và tốc độ tăng trưởng doanh thu định kỳ.
-          </p>
+          <h1>Tổng quan Nền tảng</h1>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <select
             style={{
               height: 34,
-              padding: '0 28px 0 12px',
+              padding: "0 28px 0 12px",
               borderRadius: 6,
-              border: '1px solid #d1d5db',
-              backgroundColor: '#ffffff',
-              color: '#1e293b',
-              fontFamily: 'inherit',
+              border: "1px solid #d1d5db",
+              backgroundColor: "#ffffff",
+              color: "#1e293b",
+              fontFamily: "inherit",
               fontSize: 13,
-              cursor: 'pointer',
-              outline: 'none',
+              cursor: "pointer",
+              outline: "none",
             }}
           >
             <option>30 ngày gần nhất</option>
@@ -105,7 +108,9 @@ export const AdminDashboardPage: FC = () => {
           <button
             type="button"
             className="admin-btn admin-btn-secondary"
-            onClick={() => showToast('Dữ liệu hệ thống đã được đồng bộ mới nhất!')}
+            onClick={() =>
+              showToast("Dữ liệu hệ thống đã được đồng bộ mới nhất!")
+            }
           >
             <RefreshIcon size={14} />
             <span>Làm mới</span>
@@ -113,7 +118,11 @@ export const AdminDashboardPage: FC = () => {
           <button
             type="button"
             className="admin-btn admin-btn-primary"
-            onClick={() => showToast('Đang kết xuất báo cáo tổng quan ra tệp Excel (.xlsx)...')}
+            onClick={() =>
+              showToast(
+                "Đang kết xuất báo cáo tổng quan ra tệp Excel (.xlsx)...",
+              )
+            }
           >
             <ExportIcon size={14} />
             <span>Xuất báo cáo</span>
@@ -128,8 +137,10 @@ export const AdminDashboardPage: FC = () => {
             key={metric.id}
             metric={metric}
             onClick={() => {
-              if (metric.id === 'kpi-tenants' || metric.id === 'kpi-active') {
-                navigate('/admin/tenants');
+              if (metric.id === "kpi-tenants" || metric.id === "kpi-active") {
+                navigate("/admin/tenants");
+              } else if (metric.id === "kpi-revenue") {
+                navigate("/admin/subscriptions");
               }
             }}
           />
@@ -142,7 +153,7 @@ export const AdminDashboardPage: FC = () => {
       {/* URGENT ALERTS TABLE */}
       <UrgentAlertTable
         tenants={mockUrgentAlertTenants}
-        onViewAll={() => navigate('/admin/tenants')}
+        onViewAll={() => navigate("/admin/tenants")}
         onDetail={handleOpenDetailBySubdomain}
         onExtendGrace={handleOpenGraceBySubdomain}
         onLock={handleOpenLockBySubdomain}
