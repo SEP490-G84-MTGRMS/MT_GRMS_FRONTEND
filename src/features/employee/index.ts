@@ -9,6 +9,7 @@ export * from './components/CreateUserModal';
 export * from './components/CreateAllowanceModal';
 export * from './components/ShiftFormModal';
 export * from './components/AddScheduleModal';
+export * from './components/ScheduleScopeConfirmModal';
 export * from './components/AttendanceDetailModal';
 export * from './components/CreatePayslipModal';
 export * from './components/PayslipDetailModal';

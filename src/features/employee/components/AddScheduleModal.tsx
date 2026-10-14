@@ -6,6 +6,7 @@ import type {
   Branch,
   ScheduleAssignment,
 } from '../types';
+import { ScheduleScopeConfirmModal, type ScheduleScopeType } from './ScheduleScopeConfirmModal';
 
 interface AddScheduleModalProps {
   isOpen: boolean;
@@ -16,7 +17,10 @@ interface AddScheduleModalProps {
   defaultEmployeeId?: string;
   defaultDayOfWeek?: 'T2' | 'T3' | 'T4' | 'T5' | 'T6' | 'T7' | 'CN';
   defaultDateStr?: string;
+  editingAssignment?: ScheduleAssignment | null;
   onSave: (assignments: ScheduleAssignment[]) => void;
+  onUpdate?: (updatedAssignment: ScheduleAssignment) => void;
+  onDelete?: (assignmentId: string) => void;
 }
 
 interface DayItem {
@@ -43,23 +47,37 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
   branches,
   defaultEmployeeId,
   defaultDayOfWeek,
+  editingAssignment,
   onSave,
+  onUpdate,
+  onDelete,
 }) => {
+  const isEditMode = !!editingAssignment;
+
+  // Popup xác nhận phạm vi áp dụng (khi update hoặc delete)
+  const [showScopeModal, setShowScopeModal] = useState(false);
+  const [scopeAction, setScopeAction] = useState<'update' | 'delete'>('update');
+  const [pendingUpdatedItem, setPendingUpdatedItem] = useState<ScheduleAssignment | null>(null);
+  const [pendingExtraAssignments, setPendingExtraAssignments] = useState<ScheduleAssignment[]>([]);
+
   // Nhân viên chính
-  const [employeeId, setEmployeeId] = useState(defaultEmployeeId || (employees[0]?.id || ''));
+  const [employeeId, setEmployeeId] = useState(
+    editingAssignment?.employeeId || defaultEmployeeId || (employees[0]?.id || '')
+  );
 
   // Ca làm việc: id của shift hoặc 'custom'
-  const [selectedShiftId, setSelectedShiftId] = useState<string>(shifts[0]?.id || 'custom');
+  const [selectedShiftId, setSelectedShiftId] = useState<string>(
+    editingAssignment?.shiftId || shifts[0]?.id || 'custom'
+  );
   const [customStartTime, setCustomStartTime] = useState('00:00');
   const [customEndTime, setCustomEndTime] = useState('00:00');
 
   // Lặp lại hàng tuần
   const [isRepeating, setIsRepeating] = useState(true);
   const [selectedDays, setSelectedDays] = useState<Array<'T2' | 'T3' | 'T4' | 'T5' | 'T6' | 'T7' | 'CN'>>(
-    defaultDayOfWeek ? [defaultDayOfWeek] : ['T3']
+    editingAssignment ? [editingAssignment.dayOfWeek] : defaultDayOfWeek ? [defaultDayOfWeek] : ['T3']
   );
   const [endDate, setEndDate] = useState('');
-  const [workOnHolidays, setWorkOnHolidays] = useState(false);
 
   // Thêm lịch tương tự cho nhân viên khác
   const [applyToOthers, setApplyToOthers] = useState(false);
@@ -68,14 +86,46 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
   const [isOtherEmpDropdownOpen, setIsOtherEmpDropdownOpen] = useState(false);
 
   useEffect(() => {
-    if (defaultEmployeeId) setEmployeeId(defaultEmployeeId);
-    if (defaultDayOfWeek) setSelectedDays([defaultDayOfWeek]);
-  }, [defaultEmployeeId, defaultDayOfWeek, isOpen]);
+    if (!isOpen) return;
+
+    if (editingAssignment) {
+      setEmployeeId(editingAssignment.employeeId);
+      setSelectedShiftId(editingAssignment.shiftId);
+      if (editingAssignment.shiftId === 'custom' && editingAssignment.shiftTime) {
+        const parts = editingAssignment.shiftTime.split('-').map((s) => s.trim());
+        if (parts[0]) setCustomStartTime(parts[0]);
+        if (parts[1]) setCustomEndTime(parts[1]);
+      }
+      setSelectedDays([editingAssignment.dayOfWeek]);
+      setApplyToOthers(false);
+      setSelectedOtherEmpIds([]);
+    } else {
+      if (defaultEmployeeId) {
+        setEmployeeId(defaultEmployeeId);
+      } else if (employees.length > 0) {
+        setEmployeeId(employees[0].id);
+      }
+      if (defaultDayOfWeek) {
+        setSelectedDays([defaultDayOfWeek]);
+      }
+      setSelectedShiftId(shifts[0]?.id || 'custom');
+      setApplyToOthers(false);
+      setSelectedOtherEmpIds([]);
+    }
+  }, [isOpen, editingAssignment, defaultEmployeeId, defaultDayOfWeek, employees, shifts]);
 
   // Thông tin nhân viên chính
   const currentEmp = useMemo(() => {
     return employees.find((e) => e.id === employeeId) || employees[0];
   }, [employees, employeeId]);
+
+  // Ngày hiển thị trong popup xác nhận
+  const displayDateFormatted = useMemo(() => {
+    if (!editingAssignment?.dateStr) return '16/10/2026';
+    const str = editingAssignment.dateStr;
+    if (str.includes('/2026')) return str;
+    return `${str}/2026`;
+  }, [editingAssignment]);
 
   // Tên ngày hiện tại hiển thị ở subtitle
   const currentDayInfo = useMemo(() => {
@@ -156,6 +206,53 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
 
     const branchNameFinal = branches[0]?.name || 'Chi nhánh trung tâm';
 
+    // Nếu đang ở chế độ Cập nhật ca cụ thể -> mở popup xác nhận phạm vi thay đổi
+    if (isEditMode && editingAssignment) {
+      const activeDay = selectedDays[0] || editingAssignment.dayOfWeek;
+      const dayObj = DAYS.find((item) => item.key === activeDay);
+
+      const updatedItem: ScheduleAssignment = {
+        ...editingAssignment,
+        employeeId: currentEmp.id,
+        employeeName: currentEmp.fullName,
+        employeeCode: currentEmp.employeeCode,
+        shiftId: shiftIdFinal,
+        shiftName,
+        shiftTime,
+        shiftColor,
+        dayOfWeek: activeDay,
+        dateStr: dayObj?.date || editingAssignment.dateStr,
+        branchName: branchNameFinal,
+      };
+
+      const extraAssignments: ScheduleAssignment[] = [];
+      if (applyToOthers && selectedOtherEmpIds.length > 0) {
+        selectedOtherEmpIds.forEach((eId) => {
+          const empItem = employees.find((e) => e.id === eId);
+          if (!empItem) return;
+          extraAssignments.push({
+            id: `sa_${Date.now()}_${eId}_${activeDay}_${Math.floor(Math.random() * 1000)}`,
+            employeeId: empItem.id,
+            employeeName: empItem.fullName,
+            employeeCode: empItem.employeeCode,
+            shiftId: shiftIdFinal,
+            shiftName,
+            shiftTime,
+            shiftColor,
+            dayOfWeek: activeDay,
+            dateStr: dayObj?.date || '29/09',
+            branchName: branchNameFinal,
+          });
+        });
+      }
+
+      setPendingUpdatedItem(updatedItem);
+      setPendingExtraAssignments(extraAssignments);
+      setScopeAction('update');
+      setShowScopeModal(true);
+      return;
+    }
+
     // Tập hợp tất cả nhân viên được áp dụng
     const targetEmpIds = [currentEmp.id];
     if (applyToOthers && selectedOtherEmpIds.length > 0) {
@@ -208,9 +305,26 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
           }}
         >
           <div>
-            <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#0F172A' }}>
-              Thêm lịch làm việc
-            </h3>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#0F172A' }}>
+                {isEditMode ? 'Cập nhật ca làm việc' : 'Phân ca làm việc'}
+              </h3>
+              {isEditMode && (
+                <span
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 600,
+                    background: '#F0FDFA',
+                    color: '#0F766E',
+                    border: '1px solid #99F6E4',
+                    padding: '2px 8px',
+                    borderRadius: 9999,
+                  }}
+                >
+                  Chỉnh sửa
+                </span>
+              )}
+            </div>
             <div style={{ fontSize: 13, color: '#64748B', marginTop: 4, display: 'flex', alignItems: 'center', flexWrap: 'wrap' }}>
               {!defaultEmployeeId ? (
                 <select
@@ -269,7 +383,7 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
                 }}
               >
                 {/* Danh sách các ca mặc định cố định */}
-                {shifts.filter((sh) => sh.id !== 'custom').map((sh, idx, arr) => {
+                {shifts.filter((sh) => sh.id !== 'custom').map((sh) => {
                   const isSelected = selectedShiftId === sh.id;
                   return (
                     <div
@@ -697,36 +811,93 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
             </div>
           </div>
 
-          {/* Footer nút Bỏ qua & Lưu */}
+          {/* Footer nút Bỏ qua & Lưu / Cập nhật */}
           <div
             className="emp-modal-footer"
             style={{
               padding: '14px 24px',
               borderTop: '1px solid #E2E8F0',
               display: 'flex',
-              justifyContent: 'flex-end',
+              justifyContent: isEditMode && onDelete ? 'space-between' : 'flex-end',
+              alignItems: 'center',
               gap: 10,
               background: '#F8FAFC',
             }}
           >
-            <button
-              type="button"
-              className="emp-btn emp-btn-secondary"
-              onClick={onClose}
-              style={{ minWidth: 80, height: 36, fontSize: 13 }}
-            >
-              Bỏ qua
-            </button>
-            <button
-              type="submit"
-              className="emp-btn emp-btn-primary"
-              style={{ minWidth: 80, height: 36, fontSize: 13 }}
-            >
-              Lưu
-            </button>
+            {isEditMode && onDelete && (
+              <button
+                type="button"
+                className="emp-btn"
+                style={{
+                  background: '#FEF2F2',
+                  border: '1px solid #FECACA',
+                  color: '#DC2626',
+                  height: 36,
+                  fontSize: 13,
+                  fontWeight: 600,
+                  padding: '0 12px',
+                  borderRadius: 6,
+                  cursor: 'pointer',
+                }}
+                onClick={() => {
+                  if (editingAssignment) {
+                    setScopeAction('delete');
+                    setShowScopeModal(true);
+                  }
+                }}
+              >
+                Hủy ca này
+              </button>
+            )}
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <button
+                type="button"
+                className="emp-btn emp-btn-secondary"
+                onClick={onClose}
+                style={{ minWidth: 80, height: 36, fontSize: 13 }}
+              >
+                Bỏ qua
+              </button>
+              <button
+                type="submit"
+                className="emp-btn emp-btn-primary"
+                style={{ minWidth: 80, height: 36, fontSize: 13 }}
+              >
+                {isEditMode ? 'Cập nhật' : 'Lưu'}
+              </button>
+            </div>
           </div>
         </form>
       </div>
+
+      {/* Popup Áp dụng thay đổi này cho (Cập nhật hoặc Xóa ca) */}
+      <ScheduleScopeConfirmModal
+        isOpen={showScopeModal}
+        onClose={() => setShowScopeModal(false)}
+        actionType={scopeAction}
+        dateStr={displayDateFormatted}
+        startDateStr={displayDateFormatted}
+        endDateStr="31/10/2026"
+        onConfirm={(scope) => {
+          if (scopeAction === 'update' && pendingUpdatedItem) {
+            if (onUpdate) {
+              onUpdate(pendingUpdatedItem);
+            } else {
+              onSave([pendingUpdatedItem]);
+            }
+            if (pendingExtraAssignments.length > 0) {
+              onSave(pendingExtraAssignments);
+            }
+          } else if (scopeAction === 'delete' && editingAssignment) {
+            if (onDelete) {
+              onDelete(editingAssignment.id);
+            }
+          }
+          setShowScopeModal(false);
+          onClose();
+        }}
+      />
     </div>
   );
 };

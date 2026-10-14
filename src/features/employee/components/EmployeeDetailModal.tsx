@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Pencil, Download, Banknote, Calendar, Plus } from 'lucide-react';
+import { Pencil, Download, Banknote } from 'lucide-react';
 import type { Employee, DebtTransaction } from '../types';
 
 interface EmployeeDetailModalProps {

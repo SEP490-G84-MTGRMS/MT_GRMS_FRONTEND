@@ -15,8 +15,8 @@ import {
 } from '../services/mockData';
 import { AddScheduleModal } from '../components/AddScheduleModal';
 import { EmployeeDetailModal } from '../components/EmployeeDetailModal';
-import { BatchUpdateScheduleModal } from '../components/BatchUpdateScheduleModal';
 import { ShiftInfoModal } from '../components/ShiftInfoModal';
+import { ScheduleScopeConfirmModal } from '../components/ScheduleScopeConfirmModal';
 import '../employee.css';
 
 const getWeekDates = (offsetWeeks: number) => {
@@ -75,7 +75,8 @@ export const WorkSchedulePage: React.FC = () => {
 
   // Modal states
   const [showAddModal, setShowAddModal] = useState(false);
-  const [showBatchModal, setShowBatchModal] = useState(false);
+  const [editingAssignment, setEditingAssignment] = useState<ScheduleAssignment | null>(null);
+  const [deletingAssignment, setDeletingAssignment] = useState<ScheduleAssignment | null>(null);
   const [showShiftInfoModal, setShowShiftInfoModal] = useState(false);
   const [selectedEmpId, setSelectedEmpId] = useState<string | undefined>();
   const [selectedDay, setSelectedDay] = useState<'T2' | 'T3' | 'T4' | 'T5' | 'T6' | 'T7' | 'CN' | undefined>();
@@ -91,6 +92,14 @@ export const WorkSchedulePage: React.FC = () => {
   const handleOpenCell = (empId: string, day: 'T2' | 'T3' | 'T4' | 'T5' | 'T6' | 'T7' | 'CN') => {
     setSelectedEmpId(empId);
     setSelectedDay(day);
+    setEditingAssignment(null);
+    setShowAddModal(true);
+  };
+
+  const handleEditAssignment = (assignment: ScheduleAssignment) => {
+    setSelectedEmpId(assignment.employeeId);
+    setSelectedDay(assignment.dayOfWeek);
+    setEditingAssignment(assignment);
     setShowAddModal(true);
   };
 
@@ -98,10 +107,15 @@ export const WorkSchedulePage: React.FC = () => {
     setAssignments((prev) => [...prev, ...newItems]);
   };
 
-  const handleDeleteAssignment = (assignId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (window.confirm('Bạn có muốn hủy phân ca này?')) {
-      setAssignments((prev) => prev.filter((a) => a.id !== assignId));
+  const handleUpdateAssignment = (updated: ScheduleAssignment) => {
+    setAssignments((prev) => prev.map((a) => (a.id === updated.id ? updated : a)));
+  };
+
+  const handleDeleteAssignment = (assignId: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    const item = assignments.find((a) => a.id === assignId);
+    if (item) {
+      setDeletingAssignment(item);
     }
   };
 
@@ -138,19 +152,6 @@ export const WorkSchedulePage: React.FC = () => {
     );
   };
 
-  const handleSaveBatchAssignments = (newItems: ScheduleAssignment[], replaceExisting: boolean) => {
-    if (replaceExisting) {
-      // Lấy danh sách ID các nhân viên được cập nhật
-      const targetEmpIds = new Set(newItems.map((item) => item.employeeId));
-      // Loại bỏ các ca cũ của các nhân viên này và thêm các ca mới
-      setAssignments((prev) => [
-        ...prev.filter((a) => !targetEmpIds.has(a.employeeId)),
-        ...newItems,
-      ]);
-    } else {
-      setAssignments((prev) => [...prev, ...newItems]);
-    }
-  };
 
   const formatVND = (num?: number) => {
     if (!num) return '0 ₫';
@@ -287,18 +288,6 @@ export const WorkSchedulePage: React.FC = () => {
             <span>Thông tin ca</span>
           </button>
 
-          {/* Nút cập nhật hàng loạt */}
-          <button
-            type="button"
-            className="emp-btn emp-btn-outline-teal"
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
-            onClick={() => setShowBatchModal(true)}
-            title="Cập nhật hàng loạt ca làm việc cho nhiều nhân viên"
-          >
-            <Calendar size={15} />
-            <span>Cập nhật hàng loạt</span>
-          </button>
-
           <button
             type="button"
             className="emp-btn emp-btn-primary"
@@ -306,6 +295,7 @@ export const WorkSchedulePage: React.FC = () => {
             onClick={() => {
               setSelectedEmpId(undefined);
               setSelectedDay(undefined);
+              setEditingAssignment(null);
               setShowAddModal(true);
             }}
           >
@@ -459,6 +449,8 @@ export const WorkSchedulePage: React.FC = () => {
                             {matched.map((item) => (
                               <div
                                 key={item.id}
+                                onClick={() => handleEditAssignment(item)}
+                                title="Nhấn để cập nhật ca làm việc này"
                                 style={{
                                   background: `${item.shiftColor}18`,
                                   border: 'none',
@@ -472,6 +464,16 @@ export const WorkSchedulePage: React.FC = () => {
                                   gap: 4,
                                   width: '90%',
                                   justifyContent: 'space-between',
+                                  cursor: 'pointer',
+                                  transition: 'all 0.15s ease',
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.filter = 'brightness(0.95)';
+                                  e.currentTarget.style.transform = 'translateY(-1px)';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.filter = 'none';
+                                  e.currentTarget.style.transform = 'none';
                                 }}
                               >
                                 <span>{item.shiftName}</span>
@@ -577,12 +579,11 @@ export const WorkSchedulePage: React.FC = () => {
                       <td key={day.key} style={{ verticalAlign: 'middle', padding: '8px 6px' }}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'center' }}>
                           {assignedEmps.map((item) => {
-                            const empObj = employees.find((e) => e.id === item.employeeId);
                             return (
                               <div
                                 key={item.id}
-                                onClick={() => empObj && setSelectedDetailEmployee(empObj)}
-                                title={`Nhấn để xem lịch làm việc của ${item.employeeName}`}
+                                onClick={() => handleEditAssignment(item)}
+                                title={`Nhấn để cập nhật ca làm của ${item.employeeName}`}
                                 style={{
                                   background: '#F0FDFA',
                                   border: '1px solid #99F6E4',
@@ -656,16 +657,22 @@ export const WorkSchedulePage: React.FC = () => {
         </div>
       )}
 
-      {/* Modal Phân Ca */}
+      {/* Modal Phân Ca / Cập Nhật Ca Làm Việc */}
       <AddScheduleModal
         isOpen={showAddModal}
-        onClose={() => setShowAddModal(false)}
+        onClose={() => {
+          setShowAddModal(false);
+          setEditingAssignment(null);
+        }}
         employees={employees}
         shifts={shifts}
         branches={branches}
         defaultEmployeeId={selectedEmpId}
         defaultDayOfWeek={selectedDay}
+        editingAssignment={editingAssignment}
         onSave={handleSaveAssignments}
+        onUpdate={handleUpdateAssignment}
+        onDelete={handleDeleteAssignment}
       />
 
       {/* Modal Chi Tiết Lịch Làm Việc Của Nhân Viên (360 độ - tab Lịch làm việc) */}
@@ -679,21 +686,39 @@ export const WorkSchedulePage: React.FC = () => {
         onAddPayment={handleAddPayment}
       />
 
-      {/* Modal Cập Nhật Lịch Làm Việc Hàng Loạt */}
-      <BatchUpdateScheduleModal
-        isOpen={showBatchModal}
-        onClose={() => setShowBatchModal(false)}
-        employees={employees}
-        shifts={shifts}
-        branches={branches}
-        onSaveBatch={handleSaveBatchAssignments}
-      />
-
       {/* Modal Thông Tin Các Ca Làm Việc Cố Định */}
       <ShiftInfoModal
         isOpen={showShiftInfoModal}
         onClose={() => setShowShiftInfoModal(false)}
         shifts={shifts}
+      />
+
+      {/* Popup Áp dụng thay đổi này cho (khi hủy ca từ bảng lịch làm việc) */}
+      <ScheduleScopeConfirmModal
+        isOpen={!!deletingAssignment}
+        onClose={() => setDeletingAssignment(null)}
+        actionType="delete"
+        dateStr={
+          deletingAssignment?.dateStr
+            ? deletingAssignment.dateStr.includes('/2026')
+              ? deletingAssignment.dateStr
+              : `${deletingAssignment.dateStr}/2026`
+            : '16/10/2026'
+        }
+        startDateStr={
+          deletingAssignment?.dateStr
+            ? deletingAssignment.dateStr.includes('/2026')
+              ? deletingAssignment.dateStr
+              : `${deletingAssignment.dateStr}/2026`
+            : '16/10/2026'
+        }
+        endDateStr="31/10/2026"
+        onConfirm={() => {
+          if (deletingAssignment) {
+            setAssignments((prev) => prev.filter((a) => a.id !== deletingAssignment.id));
+          }
+          setDeletingAssignment(null);
+        }}
       />
     </div>
   );
