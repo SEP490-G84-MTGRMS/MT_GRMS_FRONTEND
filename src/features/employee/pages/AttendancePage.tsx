@@ -18,6 +18,7 @@ import {
 } from '../services/mockData';
 import { AttendanceDetailModal } from '../components/AttendanceDetailModal';
 import { ApprovalRequestsModal } from '../components/ApprovalRequestsModal';
+import { GpsLocationsModal } from '../components/GpsLocationsModal';
 import '../employee.css';
 
 const getWeekDates = (offsetWeeks: number) => {
@@ -384,45 +385,11 @@ export const AttendancePage: React.FC = () => {
           </div>
         </div>
       )}
-
-      {/* Popup Địa chỉ GPS */}
-      {showGpsModal && (
-        <div className="emp-modal-overlay">
-          <div className="emp-modal-card" style={{ maxWidth: 520 }}>
-            <div className="emp-modal-header">
-              <h3>Thiết lập vị trí GPS chấm công</h3>
-              <button type="button" className="emp-modal-close-btn" onClick={() => setShowGpsModal(false)}>
-                &times;
-              </button>
-            </div>
-            <div className="emp-modal-body">
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                <div style={{ background: '#F0FDFA', border: '1px solid #99F6E4', padding: 12, borderRadius: 8, fontSize: 13 }}>
-                  <div style={{ fontWeight: 700, color: '#0F766E', display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <MapPin size={15} />
-                    <span>Chi nhánh trung tâm</span>
-                  </div>
-                  <div style={{ color: '#64748B', marginTop: 2 }}>Số 42 Cầu Giấy, Q. Cầu Giấy, Hà Nội</div>
-                  <div style={{ fontSize: 11, color: '#0F766E', marginTop: 4 }}>Bán kính hợp lệ: <b>250 mét</b> &bull; GPS: 21.0362, 105.7905</div>
-                </div>
-                <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', padding: 12, borderRadius: 8, fontSize: 13 }}>
-                  <div style={{ fontWeight: 700, color: '#1E293B', display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <MapPin size={15} />
-                    <span>Chi nhánh 2</span>
-                  </div>
-                  <div style={{ color: '#64748B', marginTop: 2 }}>Số 15 Lê Văn Lương, Q. Thanh Xuân, Hà Nội</div>
-                  <div style={{ fontSize: 11, color: '#64748B', marginTop: 4 }}>Bán kính hợp lệ: <b>200 mét</b> &bull; GPS: 21.0028, 105.8012</div>
-                </div>
-              </div>
-            </div>
-            <div className="emp-modal-footer">
-              <button type="button" className="emp-btn emp-btn-secondary" onClick={() => setShowGpsModal(false)}>
-                Đóng
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Popup Địa chỉ chấm công chuẩn theo hình ảnh */}
+      <GpsLocationsModal
+        isOpen={showGpsModal}
+        onClose={() => setShowGpsModal(false)}
+      />
     </div>
   );
 };

@@ -371,7 +371,7 @@ export const WorkSchedulePage: React.FC = () => {
                     {/* 7 Ngày trong tuần */}
                     {DAYS_HEADER.map((day) => {
                       const matched = assignments.filter(
-                        (a) => a.employeeId === emp.id && a.dayOfWeek === day.key
+                        (a) => a && a.employeeId === emp.id && a.dayOfWeek === day.key
                       );
 
                       return (
@@ -510,18 +510,19 @@ export const WorkSchedulePage: React.FC = () => {
 
                   {DAYS_HEADER.map((day) => {
                     const assignedEmps = assignments.filter(
-                      (a) => a.shiftId === sh.id && a.dayOfWeek === day.key
+                      (a) => a && a.shiftId === sh.id && a.dayOfWeek === day.key
                     );
 
                     return (
                       <td key={day.key} style={{ verticalAlign: 'middle', padding: '8px 6px' }}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'center' }}>
                           {assignedEmps.map((item) => {
+                            if (!item) return null;
                             return (
                               <div
                                 key={item.id}
                                 onClick={() => handleEditAssignment(item)}
-                                title={`Nhấn để cập nhật ca làm của ${item.employeeName}`}
+                                title={`Nhấn để cập nhật ca làm của ${item.employeeName || ''}`}
                                 style={{
                                   background: '#F0FDFA',
                                   border: '1px solid #99F6E4',
@@ -558,7 +559,7 @@ export const WorkSchedulePage: React.FC = () => {
                                   }}
                                 >
                                   <User size={13} color="#0F766E" />
-                                  <span>{item.employeeName}</span>
+                                  <span>{item.employeeName || ''}</span>
                                 </div>
                                 {sh.id === 'custom' && item.shiftTime && (
                                   <div

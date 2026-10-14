@@ -15,6 +15,7 @@ import {
   Building2,
   ChevronDown,
   X,
+  Clock,
 } from 'lucide-react';
 import type { PayslipDetailedRecord, Branch } from '../types';
 import { MOCK_PAYSLIPS_MANAGEMENT, MOCK_BRANCHES } from '../services/mockData';
@@ -64,8 +65,18 @@ export const PayslipManagementPage: React.FC = () => {
 
   // Format Helpers
   const formatVND = (num?: number) => {
-    if (num === undefined || num === null) return '0 đ';
-    return `${num.toLocaleString('vi-VN')} đ`;
+    if (num === undefined || num === null) return '0\u00A0₫';
+    return `${num.toLocaleString('vi-VN')}\u00A0₫`;
+  };
+
+  const formatDate = (dateStr?: string) => {
+    if (!dateStr) return '—';
+    const cleanDate = dateStr.split(' ')[0];
+    const parts = cleanDate.split('-');
+    if (parts.length === 3) {
+      return `${parts[2]}/${parts[1]}/${parts[0]}`;
+    }
+    return cleanDate;
   };
 
   // Month navigation
@@ -713,7 +724,7 @@ export const PayslipManagementPage: React.FC = () => {
         </aside>
 
         {/* NỘI DUNG CHÍNH (PHẢI) */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 }}>
           {/* ─── 2.1 THẺ THỐNG KÊ KPI ĐỒNG NHẤT HỆ THỐNG ─── */}
           <div className="emp-kpi-grid">
             {/* Card 1: Tổng số phiếu */}
@@ -772,11 +783,11 @@ export const PayslipManagementPage: React.FC = () => {
           </div>
 
           {/* ─── 2.2 BẢNG DỮ LIỆU PHIẾU LƯƠNG CHUẨN KIOTVIET ─── */}
-          <div className="emp-table-container">
-            <table className="emp-table">
+          <div className="emp-table-container" style={{ overflowX: 'auto', background: '#FFFFFF' }}>
+            <table className="emp-table" style={{ width: '100%', minWidth: 880 }}>
               <thead>
                 <tr>
-                  <th style={{ width: 40, textAlign: 'center' }}>
+                  <th style={{ width: 44, textAlign: 'center' }}>
                     <input
                       type="checkbox"
                       style={{ accentColor: '#0F766E' }}
@@ -787,23 +798,20 @@ export const PayslipManagementPage: React.FC = () => {
                       onChange={handleSelectAll}
                     />
                   </th>
-                  <th style={{ width: 50, textAlign: 'center' }}></th>
-                  <th style={{ width: 110 }}>Mã NV</th>
-                  <th>Tên nhân viên</th>
-                  <th style={{ width: 110, textAlign: 'center' }}>Kỳ lương</th>
-                  <th style={{ textAlign: 'center' }}>Công chuẩn | OT</th>
-                  <th style={{ textAlign: 'right' }}>Lương cơ sở</th>
-                  <th style={{ textAlign: 'right' }}>Thực nhận (Net)</th>
-                  <th style={{ textAlign: 'center' }}>Trạng thái</th>
-                  <th style={{ textAlign: 'center' }}>Ngày trả</th>
-                  <th style={{ textAlign: 'center', width: 150 }}>Thao tác</th>
+                  <th style={{ width: 95, whiteSpace: 'nowrap' }}>Mã NV</th>
+                  <th style={{ minWidth: 200, whiteSpace: 'nowrap' }}>Nhân viên</th>
+                  <th style={{ width: 110, textAlign: 'center', whiteSpace: 'nowrap' }}>Kỳ lương</th>
+                  <th style={{ width: 120, textAlign: 'right', whiteSpace: 'nowrap' }}>Lương cơ sở</th>
+                  <th style={{ width: 130, textAlign: 'right', whiteSpace: 'nowrap' }}>Thực nhận (Net)</th>
+                  <th style={{ width: 140, textAlign: 'center', whiteSpace: 'nowrap' }}>Trạng thái</th>
+                  <th style={{ width: 100, textAlign: 'center', whiteSpace: 'nowrap' }}>Ngày trả</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredPayslips.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={11}
+                      colSpan={8}
                       style={{
                         textAlign: 'center',
                         padding: '50px 20px',
@@ -834,11 +842,17 @@ export const PayslipManagementPage: React.FC = () => {
                     return (
                       <tr
                         key={item.id}
+                        onClick={() => setViewingPayslip(item)}
+                        title="Nhấn để xem chi tiết phiếu lương"
                         style={{
                           background: isSelected ? '#F0FDFA' : undefined,
+                          cursor: 'pointer',
                         }}
                       >
-                        <td style={{ textAlign: 'center' }}>
+                        <td
+                          style={{ textAlign: 'center', width: 44 }}
+                          onClick={(e) => e.stopPropagation()}
+                        >
                           <input
                             type="checkbox"
                             style={{ accentColor: '#0F766E' }}
@@ -846,36 +860,76 @@ export const PayslipManagementPage: React.FC = () => {
                             onChange={() => handleToggleRow(item.id)}
                           />
                         </td>
-                        <td style={{ textAlign: 'center' }}>
-                          <div className="emp-avatar-cell" style={{ margin: '0 auto' }}>
-                            {initials}
-                          </div>
-                        </td>
-                        <td>
-                          <span style={{ fontWeight: 700, color: '#0F766E' }}>
+                        <td style={{ whiteSpace: 'nowrap' }}>
+                          <span
+                            style={{
+                              fontWeight: 700,
+                              color: '#0F766E',
+                              background: '#F0FDFA',
+                              padding: '3px 8px',
+                              borderRadius: 6,
+                              border: '1px solid #CCFBF1',
+                              fontSize: 12.5,
+                            }}
+                          >
                             {item.employeeCode}
                           </span>
                         </td>
                         <td>
-                          <div style={{ fontWeight: 600, color: '#0F172A' }}>
-                            {item.employeeName}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <div className="emp-avatar-cell" style={{ flexShrink: 0 }}>
+                              {initials}
+                            </div>
+                            <div style={{ minWidth: 0 }}>
+                              <div style={{ fontWeight: 600, color: '#0F172A', fontSize: 13.5, lineHeight: 1.3 }}>
+                                {item.employeeName}
+                              </div>
+                              <div
+                                style={{
+                                  fontSize: 12,
+                                  color: '#64748B',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: 4,
+                                  marginTop: 2,
+                                  whiteSpace: 'nowrap',
+                                }}
+                                title={item.branchName}
+                              >
+                                <Building2 size={12} color="#94A3B8" style={{ flexShrink: 0 }} />
+                                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                  {item.branchName}
+                                </span>
+                              </div>
+                            </div>
                           </div>
-                          <div style={{ fontSize: 12, color: '#64748B' }}>
-                            {item.branchName}
-                          </div>
                         </td>
-                        <td style={{ textAlign: 'center', fontWeight: 600, color: '#475569' }}>
-                          {item.periodMonth}
+                        <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
+                          <span
+                            style={{
+                              display: 'inline-block',
+                              padding: '3px 8px',
+                              borderRadius: 6,
+                              background: '#F1F5F9',
+                              color: '#334155',
+                              fontWeight: 600,
+                              fontSize: 12,
+                            }}
+                          >
+                            {item.periodMonth.split('-').length === 2
+                              ? `Tháng ${item.periodMonth.split('-')[1]}/${item.periodMonth.split('-')[0]}`
+                              : item.periodMonth}
+                          </span>
                         </td>
-                        <td style={{ textAlign: 'center' }}>
-                          <span style={{ fontWeight: 600 }}>{item.workedDays}</span> công
-                          {item.otHours > 0 && (
-                            <span style={{ color: '#0F766E', fontWeight: 600, marginLeft: 4 }}>
-                              | {item.otHours}h OT
-                            </span>
-                          )}
-                        </td>
-                        <td style={{ textAlign: 'right', color: '#64748B' }}>
+
+                        <td
+                          style={{
+                            textAlign: 'right',
+                            color: '#64748B',
+                            fontVariantNumeric: 'tabular-nums',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
                           {formatVND(item.contractBaseSalary)}
                         </td>
                         <td
@@ -884,65 +938,47 @@ export const PayslipManagementPage: React.FC = () => {
                             fontWeight: 800,
                             color: '#047857',
                             fontSize: 14,
+                            fontVariantNumeric: 'tabular-nums',
+                            whiteSpace: 'nowrap',
                           }}
                         >
                           {formatVND(item.netSalary)}
                         </td>
-                        <td style={{ textAlign: 'center' }}>
+                        <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
                           {isPaid ? (
-                            <span className="emp-status-pill active" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                              <Check size={12} />
+                            <span
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 5,
+                                fontSize: 13,
+                                fontWeight: 600,
+                                color: '#059669',
+                              }}
+                            >
+                              <Check size={14} strokeWidth={2.5} />
                               <span>Đã thanh toán</span>
                             </span>
                           ) : (
-                            <span className="emp-status-pill warning">
-                              Chưa thanh toán
+                            <span
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 5,
+                                fontSize: 13,
+                                fontWeight: 600,
+                                color: '#D97706',
+                              }}
+                            >
+                              <Clock size={14} strokeWidth={2.2} />
+                              <span>Chưa thanh toán</span>
                             </span>
                           )}
                         </td>
-                        <td style={{ textAlign: 'center', fontSize: 12, color: '#64748B' }}>
-                          {item.paidAt ? item.paidAt.split(' ')[0] : '—'}
+                        <td style={{ textAlign: 'center', fontSize: 12, color: '#64748B', whiteSpace: 'nowrap' }}>
+                          {formatDate(item.paidAt)}
                         </td>
-                        <td style={{ textAlign: 'center' }}>
-                          <div
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: 6,
-                            }}
-                          >
-                            <button
-                              type="button"
-                              className="emp-btn emp-btn-secondary"
-                              style={{ height: 32, padding: '0 10px', fontSize: 12 }}
-                              onClick={() => setViewingPayslip(item)}
-                            >
-                              Chi tiết
-                            </button>
-                            {!isPaid ? (
-                              <button
-                                type="button"
-                                className="emp-btn emp-btn-primary"
-                                style={{ height: 32, padding: '0 10px', fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 4 }}
-                                onClick={() => setPayingPayslip(item)}
-                              >
-                                <CreditCard size={13} />
-                                <span>Trả lương</span>
-                              </button>
-                            ) : (
-                              <span
-                                style={{
-                                  fontSize: 12,
-                                  fontWeight: 600,
-                                  color: '#059669',
-                                  padding: '0 6px',
-                                }}
-                              >
-                                Hoàn tất
-                              </span>
-                            )}
-                          </div>
-                        </td>
+
                       </tr>
                     );
                   })
