@@ -806,3 +806,51 @@
   font-size: 12px;
   color: var(--emp-text-muted);
 }
+
+/* ─── Bộ điều hướng ngày / tuần / tháng chuẩn đồng bộ ─── */
+.emp-date-navigator {
+  display: inline-flex;
+  align-items: center;
+  background: #FFFFFF;
+  border: 1px solid var(--emp-border, #CBD5E1);
+  border-radius: 8px;
+  padding: 3px 4px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+  font-family: var(--font-sans, 'Be Vietnam Pro', sans-serif);
+  user-select: none;
+}
+
+.emp-date-navigator-btn {
+  background: #F1F5F9;
+  border: 1px solid var(--emp-border, #CBD5E1);
+  border-radius: 6px;
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--emp-text-primary, #1E293B);
+  transition: all 0.15s ease;
+  padding: 0;
+  line-height: 1;
+}
+
+.emp-date-navigator-btn:hover {
+  background: #E2E8F0;
+  color: #0F172A;
+}
+
+.emp-date-navigator-label {
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--emp-text-primary, #1E293B);
+  padding: 0 14px;
+  white-space: nowrap;
+  letter-spacing: normal;
+  line-height: 20px;
+}

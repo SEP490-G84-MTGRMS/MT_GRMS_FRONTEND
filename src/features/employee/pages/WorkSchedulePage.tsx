@@ -181,83 +181,21 @@ export const WorkSchedulePage: React.FC = () => {
           </div>
 
           {/* Điều hướng tuần */}
-          <div
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              background: '#FFFFFF',
-              border: '1px solid #CBD5E1',
-              borderRadius: 8,
-              padding: '3px 4px',
-              boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
-            }}
-          >
+          <div className="emp-date-navigator">
             <button
               type="button"
+              className="emp-date-navigator-btn"
               onClick={handlePrevWeek}
               title="Tuần trước"
-              style={{
-                background: '#F1F5F9',
-                border: '1px solid #CBD5E1',
-                borderRadius: 6,
-                width: 28,
-                height: 28,
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: 'pointer',
-                fontWeight: 700,
-                fontSize: 13,
-                color: '#1E293B',
-                transition: 'all 0.15s ease',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = '#E2E8F0';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = '#F1F5F9';
-              }}
             >
               &lt;
             </button>
-            <span
-              style={{
-                fontSize: 14,
-                fontWeight: 800,
-                color: '#0F172A',
-                padding: '0 14px',
-                letterSpacing: '-0.2px',
-                userSelect: 'none',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              {weekData.label}
-            </span>
+            <span className="emp-date-navigator-label">{weekData.label}</span>
             <button
               type="button"
+              className="emp-date-navigator-btn"
               onClick={handleNextWeek}
               title="Tuần sau"
-              style={{
-                background: '#F1F5F9',
-                border: '1px solid #CBD5E1',
-                borderRadius: 6,
-                width: 28,
-                height: 28,
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: 'pointer',
-                fontWeight: 700,
-                fontSize: 13,
-                color: '#1E293B',
-                transition: 'all 0.15s ease',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = '#E2E8F0';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = '#F1F5F9';
-              }}
             >
               &gt;
             </button>
