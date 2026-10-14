@@ -179,7 +179,7 @@ export const SubscriptionPlanDetailPage: React.FC = () => {
           <button
             type="button"
             className="admin-btn admin-btn-secondary"
-            onClick={() => setIsUpdateOpen(true)}
+            onClick={() => navigate(`/admin/subscriptions/${currentPlan.id}/edit`)}
             style={{ display: 'flex', alignItems: 'center', gap: 6 }}
           >
             <Edit2 size={14} />

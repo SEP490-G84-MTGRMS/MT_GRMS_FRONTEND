@@ -253,7 +253,7 @@ export const SubscriptionPlanPage: React.FC = () => {
         onKeywordChange={setKeyword}
         statusFilter={statusFilter}
         onStatusFilterChange={setStatusFilter}
-        onOpenCreate={() => setIsCreateOpen(true)}
+        onOpenCreate={() => navigate('/admin/subscriptions/create')}
         onExportExcel={handleExportExcel}
         visibleCount={filteredPlans.length}
         totalCount={plans.length}
@@ -263,7 +263,7 @@ export const SubscriptionPlanPage: React.FC = () => {
       <PlanDataTable
         plans={filteredPlans}
         onDetail={(plan) => navigate(`/admin/subscriptions/${plan.id}`)}
-        onEdit={(plan) => setUpdateTarget(plan)}
+        onEdit={(plan) => navigate(`/admin/subscriptions/${plan.id}/edit`)}
         onToggleStatus={handleToggleStatus}
       />
 

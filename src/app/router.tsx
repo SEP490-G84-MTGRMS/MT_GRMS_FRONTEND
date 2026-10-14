@@ -12,6 +12,8 @@ import { AdminDashboardPage } from '../pages/admin/AdminDashboardPage';
 import { TenantManagementPage } from '../pages/admin/TenantManagementPage';
 import { SubscriptionPlanPage } from '../pages/admin/SubscriptionPlanPage';
 import { SubscriptionPlanDetailPage } from '../pages/admin/SubscriptionPlanDetailPage';
+import { SubscriptionPlanCreatePage } from '../pages/admin/SubscriptionPlanCreatePage';
+import { SubscriptionPlanEditPage } from '../pages/admin/SubscriptionPlanEditPage';
 import { LoginPage, RegisterPage, ForgotPasswordPage } from '../pages/auth';
 import { PosCheckoutPage, PosShiftPage } from '../features/pos';
 
@@ -41,16 +43,40 @@ export const router = createBrowserRouter([
         element: <SubscriptionPlanPage />,
       },
       {
+        path: 'subscriptions/create',
+        element: <SubscriptionPlanCreatePage />,
+      },
+      {
         path: 'subscriptions/:id',
         element: <SubscriptionPlanDetailPage />,
+      },
+      {
+        path: 'subscriptions/:id/edit',
+        element: <SubscriptionPlanEditPage />,
+      },
+      {
+        path: 'subscriptions/edit/:id',
+        element: <SubscriptionPlanEditPage />,
       },
       {
         path: 'plans',
         element: <SubscriptionPlanPage />,
       },
       {
+        path: 'plans/create',
+        element: <SubscriptionPlanCreatePage />,
+      },
+      {
         path: 'plans/:id',
         element: <SubscriptionPlanDetailPage />,
+      },
+      {
+        path: 'plans/:id/edit',
+        element: <SubscriptionPlanEditPage />,
+      },
+      {
+        path: 'plans/edit/:id',
+        element: <SubscriptionPlanEditPage />,
       },
       {
         path: 'suppliers',

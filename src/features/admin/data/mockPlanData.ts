@@ -186,3 +186,5 @@ export const mockSubscriptionPlans: SubscriptionPlan[] = [
     updatedAt: '01/10/2026',
   },
 ];
+
+export const mockPlans = mockSubscriptionPlans;
