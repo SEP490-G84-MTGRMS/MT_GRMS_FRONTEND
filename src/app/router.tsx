@@ -10,7 +10,8 @@ import { CustomerManagementPage } from '../features/customer-crm';
 import { StoreOwnerLayout } from '../layouts/StoreOwnerLayout';
 import { AdminDashboardPage } from '../pages/admin/AdminDashboardPage';
 import { TenantManagementPage } from '../pages/admin/TenantManagementPage';
-import { PosCheckoutPage, PosShiftPage } from '../features/pos';
+import { PosCheckoutPage, PosShiftPage, InventoryLookupPage, InvoiceManagementPage } from '../features/pos';
+import { PromotionListPage, VoucherListPage, LoyaltyConfigPage } from '../features/promotion';
 
 export const router = createBrowserRouter([
   {
@@ -73,6 +74,30 @@ export const router = createBrowserRouter([
         path: 'customers',
         element: <CustomerManagementPage />,
       },
+      {
+        path: 'promotions',
+        element: <PromotionListPage />,
+      },
+      {
+        path: 'vouchers',
+        element: <VoucherListPage />,
+      },
+      {
+        path: 'loyalty-config',
+        element: <LoyaltyConfigPage />,
+      },
+      {
+        path: 'inventory-lookup',
+        element: <InventoryLookupPage />,
+      },
+      {
+        path: 'orders',
+        element: <InvoiceManagementPage />,
+      },
+      {
+        path: 'invoices',
+        element: <InvoiceManagementPage />,
+      },
     ],
   },
   {
@@ -126,6 +151,30 @@ export const router = createBrowserRouter([
       {
         path: 'customers',
         element: <CustomerManagementPage />,
+      },
+      {
+        path: 'promotions',
+        element: <PromotionListPage />,
+      },
+      {
+        path: 'vouchers',
+        element: <VoucherListPage />,
+      },
+      {
+        path: 'loyalty-config',
+        element: <LoyaltyConfigPage />,
+      },
+      {
+        path: 'inventory-lookup',
+        element: <InventoryLookupPage />,
+      },
+      {
+        path: 'orders',
+        element: <InvoiceManagementPage />,
+      },
+      {
+        path: 'invoices',
+        element: <InvoiceManagementPage />,
       },
     ],
   },
@@ -231,6 +280,18 @@ export const router = createBrowserRouter([
         path: 'shift',
         element: <PosShiftPage />,
       },
+      {
+        path: 'inventory-lookup',
+        element: <InventoryLookupPage />,
+      },
+      {
+        path: 'orders',
+        element: <InvoiceManagementPage />,
+      },
+      {
+        path: 'invoices',
+        element: <InvoiceManagementPage />,
+      },
     ],
   },
   {
@@ -251,6 +312,44 @@ export const router = createBrowserRouter([
           {
             path: 'shift',
             element: <PosShiftPage />,
+          },
+          {
+            path: 'inventory-lookup',
+            element: <InventoryLookupPage />,
+          },
+          {
+            path: 'orders',
+            element: <InvoiceManagementPage />,
+          },
+          {
+            path: 'invoices',
+            element: <InvoiceManagementPage />,
+          },
+        ],
+      },
+      {
+        path: 'inventory-lookup',
+        element: <InventoryLookupPage />,
+      },
+      {
+        path: 'orders',
+        element: <InvoiceManagementPage />,
+      },
+      {
+        path: 'invoices',
+        element: <InvoiceManagementPage />,
+      },
+      {
+        path: 'purchase-orders',
+        element: <StoreOwnerLayout />,
+        children: [
+          {
+            index: true,
+            element: <Navigate to="/employee/purchase-orders/create-matrix" replace />,
+          },
+          {
+            path: 'create-matrix',
+            element: <EmployeeOrderMatrixPage />,
           },
         ],
       },
@@ -273,20 +372,6 @@ export const router = createBrowserRouter([
       {
         path: 'login',
         element: <div className="text-gray-600 text-center">Trang Đăng nhập Hệ thống</div>,
-      },
-    ],
-  },
-  {
-    path: '/employee',
-    element: <StoreOwnerLayout />,
-    children: [
-      {
-        index: true,
-        element: <Navigate to="/employee/purchase-orders/create-matrix" replace />,
-      },
-      {
-        path: 'purchase-orders/create-matrix',
-        element: <EmployeeOrderMatrixPage />,
       },
     ],
   },

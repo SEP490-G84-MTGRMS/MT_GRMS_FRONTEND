@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import type { FC } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Menu, Bookmark, Printer, Clock, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Menu, Bookmark, Printer, Clock, Plus, ChevronLeft, ChevronRight, Layers, Receipt } from 'lucide-react';
 import type { OrderTab } from '../types/pos.types';
 
 interface Props {
@@ -245,13 +245,43 @@ export const PosHeader: FC<Props> = ({
 
                 <button
                   type="button"
+                  className="pos-dropdown-item"
+                  onClick={() => {
+                    setIsMenuOpen(false);
+                    navigate(location.pathname.startsWith('/employee') ? '/employee/inventory-lookup' : '/pos/inventory-lookup');
+                  }}
+                >
+                  <Layers size={16} className="text-teal-700" />
+                  <div className="item-content">
+                    <div className="item-title">Tra cứu tồn kho & Lô FEFO</div>
+                    <div className="item-desc">Tồn đa chi nhánh, hạn dùng & xả hàng</div>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  className="pos-dropdown-item"
+                  onClick={() => {
+                    setIsMenuOpen(false);
+                    navigate(location.pathname.startsWith('/employee') ? '/employee/orders' : '/pos/orders');
+                  }}
+                >
+                  <Receipt size={16} className="text-teal-700" />
+                  <div className="item-content">
+                    <div className="item-title">Quản lý hóa đơn & Đặt trước</div>
+                    <div className="item-desc">Lịch sử hóa đơn, in lại bill & giữ kho</div>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
                   className="pos-dropdown-item highlight"
                   onClick={() => {
                     setIsMenuOpen(false);
                     if (onCloseShift) {
                       onCloseShift();
                     } else {
-                      navigate('/pos/shift');
+                      navigate(location.pathname.startsWith('/employee') ? '/employee/pos/shift' : '/pos/shift');
                     }
                   }}
                 >

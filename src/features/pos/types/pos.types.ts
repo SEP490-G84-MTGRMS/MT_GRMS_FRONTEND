@@ -11,49 +11,57 @@
  * Product DTO in POS Catalog / Barcode scanner
  * C# Equivalent: PosProductDto / ProductDto
  */
-export interface ProductDto {
-  id: string;
-  sku: string;
-  barcode: string;
-  name: string;
+export class ProductDTO {
+  id: string = '';
+  sku: string = '';
+  barcode: string = '';
+  name: string = '';
   imageUrl?: string;
   spec?: string;
-  category: string;
-  baseUnit: string;
-  basePrice: number;
-  costPrice: number;
-  quantityOnHand: number;
+  category: string = '';
+  baseUnit: string = '';
+  basePrice: number = 0;
+  costPrice: number = 0;
+  quantityOnHand: number = 0;
   allocatedQty?: number;
   batchCode?: string;
   expiryDate?: string;
+
+  constructor(init?: Partial<ProductDTO>) {
+    Object.assign(this, init);
+  }
 }
 
 /**
  * Cart Line Item DTO
  * C# Equivalent: PosCartItemDto / OrderItemDto
  */
-export interface CartItemDto {
-  id: string;
-  product: ProductDto;
-  unit: string;
-  quantity: number;
-  unitPrice: number;
-  discountPerItem: number;
-  discountType: 'vnd' | 'percent';
-  actualPrice: number;
-  totalAmount: number;
+export class CartItemDTO {
+  id: string = '';
+  product: ProductDTO = new ProductDTO();
+  unit: string = '';
+  quantity: number = 1;
+  unitPrice: number = 0;
+  discountPerItem: number = 0;
+  discountType: 'vnd' | 'percent' = 'vnd';
+  actualPrice: number = 0;
+  totalAmount: number = 0;
   isBelowCostApproved?: boolean;
+
+  constructor(init?: Partial<CartItemDTO>) {
+    Object.assign(this, init);
+  }
 }
 
 /**
  * Customer Profile DTO
  * C# Equivalent: PosCustomerDto / CustomerDto
  */
-export interface CustomerDto {
-  id: string;
-  code: string;
-  name: string;
-  phone: string;
+export class CustomerDTO {
+  id: string = '';
+  code: string = '';
+  name: string = '';
+  phone: string = '';
   email?: string;
   address?: string;
   area?: string;
@@ -61,87 +69,111 @@ export interface CustomerDto {
   dob?: string;
   gender?: 'Nam' | 'Nữ';
   group?: string;
-  loyaltyPoints: number;
-  membershipTier: 'Standard' | 'Silver' | 'Gold' | 'VIP';
+  loyaltyPoints: number = 0;
+  membershipTier: 'Standard' | 'Silver' | 'Gold' | 'VIP' = 'Standard';
   note?: string;
+
+  constructor(init?: Partial<CustomerDTO>) {
+    Object.assign(this, init);
+  }
 }
 
 /**
  * Multi-Order Working Tab DTO
  * C# Equivalent: PosOrderTabDto / WorkingOrderDto
  */
-export interface OrderTabDto {
-  id: number;
-  name: string;
-  cart: CartItemDto[];
-  customer: CustomerDto | null;
-  orderDiscountPercent: number;
-  couponCode: string;
-  couponDiscount: number;
-  usePoints: boolean;
-  note: string;
-  paymentMethod: 'cash' | 'vietqr';
-  cashTendered: number;
-  createdAt: string;
+export class OrderTabDTO {
+  id: number = 1;
+  name: string = 'Đơn 1';
+  cart: CartItemDTO[] = [];
+  customer: CustomerDTO | null = null;
+  orderDiscountPercent: number = 0;
+  couponCode: string = '';
+  couponDiscount: number = 0;
+  usePoints: boolean = false;
+  note: string = '';
+  paymentMethod: 'cash' | 'vietqr' = 'cash';
+  cashTendered: number = 0;
+  createdAt: string = '';
+
+  constructor(init?: Partial<OrderTabDTO>) {
+    Object.assign(this, init);
+  }
 }
 
 /**
  * Product Category DTO
  * C# Equivalent: PosCategoryDto / CategoryDto
  */
-export interface CategoryDto {
-  id: string;
-  name: string;
-  count: number;
+export class CategoryDTO {
+  id: string = '';
+  name: string = '';
+  count: number = 0;
+
+  constructor(init?: Partial<CategoryDTO>) {
+    Object.assign(this, init);
+  }
 }
 
 /**
  * Receipt Item DTO (Line item on printed thermal receipt)
  * C# Equivalent: ReceiptItemDto / OrderReceiptItemDto
  */
-export interface ReceiptItemDto {
-  stt: number;
-  name: string;
-  unitPrice: number;
+export class ReceiptItemDTO {
+  stt: number = 1;
+  name: string = '';
+  unitPrice: number = 0;
   batchCode?: string;
-  quantity: number;
-  totalAmount: number;
+  quantity: number = 1;
+  totalAmount: number = 0;
+
+  constructor(init?: Partial<ReceiptItemDTO>) {
+    Object.assign(this, init);
+  }
 }
 
 /**
  * Receipt Customer Info DTO
  * C# Equivalent: ReceiptCustomerDto
  */
-export interface ReceiptCustomerDto {
-  name: string;
-  phone: string;
+export class ReceiptCustomerDTO {
+  name: string = '';
+  phone: string = '';
   address?: string;
+
+  constructor(init?: Partial<ReceiptCustomerDTO>) {
+    Object.assign(this, init);
+  }
 }
 
 /**
  * Thermal Receipt Printout DTO (K80 / 80mm format)
  * C# Equivalent: PosReceiptDto / ReceiptDataDto
  */
-export interface ReceiptDataDto {
-  storeName: string;
-  storeAddress: string;
-  storePhone: string;
-  hotline: string;
-  orderCode: string;
-  createdAt: string;
-  cashierName: string;
-  posMachine: string;
-  branchName: string;
-  customer: ReceiptCustomerDto | null;
-  items: ReceiptItemDto[];
-  totalItemAmount: number;
-  orderDiscountAmount: number;
-  pointsDiscountAmount: number;
-  vatAmount: number;
-  finalAmount: number;
-  finalAmountInWords: string;
-  paymentMethodText: string;
-  earnedPoints: number;
+export class ReceiptDataDTO {
+  storeName: string = '';
+  storeAddress: string = '';
+  storePhone: string = '';
+  hotline: string = '';
+  orderCode: string = '';
+  createdAt: string = '';
+  cashierName: string = '';
+  posMachine: string = '';
+  branchName: string = '';
+  customer: ReceiptCustomerDTO | null = null;
+  items: ReceiptItemDTO[] = [];
+  totalItemAmount: number = 0;
+  orderDiscountAmount: number = 0;
+  pointsDiscountAmount: number = 0;
+  vatAmount: number = 0;
+  finalAmount: number = 0;
+  finalAmountInWords: string = '';
+  paymentMethodText: string = 'Tiền mặt';
+  earnedPoints: number = 0;
+
+  constructor(init?: Partial<ReceiptDataDTO>) {
+    Object.assign(this, init);
+  }
 }
 
 // ============================================================================
@@ -152,108 +184,140 @@ export interface ReceiptDataDto {
  * Active Shift Details DTO
  * C# Equivalent: PosShiftInfoDto / ShiftDto
  */
-export interface ShiftInfoDto {
-  shiftCode: string;
-  shiftName: string;
-  branchName: string;
-  posMachine: string;
-  cashierName: string;
-  cashierCode: string;
-  supervisorName: string;
-  startTime: string;
-  durationText: string;
-  status: 'on_duty' | 'closed';
+export class ShiftInfoDTO {
+  shiftCode: string = '';
+  shiftName: string = '';
+  branchName: string = '';
+  posMachine: string = '';
+  cashierName: string = '';
+  cashierCode: string = '';
+  supervisorName: string = '';
+  startTime: string = '';
+  durationText: string = '';
+  status: 'on_duty' | 'closed' = 'on_duty';
+
+  constructor(init?: Partial<ShiftInfoDTO>) {
+    Object.assign(this, init);
+  }
 }
 
 /**
  * Shift Summary KPI Metric DTO
  * C# Equivalent: ShiftKpiItemDto
  */
-export interface ShiftKpiItemDto {
-  id: string;
-  title: string;
-  value: number;
-  formattedValue: string;
-  subtitle: string;
-  colorType: 'primary' | 'success' | 'warning' | 'info';
+export class ShiftKpiItemDTO {
+  id: string = '';
+  title: string = '';
+  value: number = 0;
+  formattedValue: string = '';
+  subtitle: string = '';
+  colorType: 'primary' | 'success' | 'warning' | 'info' = 'primary';
+
+  constructor(init?: Partial<ShiftKpiItemDTO>) {
+    Object.assign(this, init);
+  }
 }
 
 /**
  * Revenue Breakdown by Payment Method DTO
  * C# Equivalent: PaymentMethodRevenueDto
  */
-export interface PaymentMethodRevenueDto {
-  id: string;
-  methodName: string;
-  methodDescription: string;
-  orderCount: number;
-  amount: number;
-  percentage: number;
-  icon: string;
+export class PaymentMethodRevenueDTO {
+  id: string = '';
+  methodName: string = '';
+  methodDescription: string = '';
+  orderCount: number = 0;
+  amount: number = 0;
+  percentage: number = 0;
+  icon: string = '';
+
+  constructor(init?: Partial<PaymentMethodRevenueDTO>) {
+    Object.assign(this, init);
+  }
 }
 
 /**
  * Cash Drawer In/Out Transaction DTO (Thu / Chi tại két)
  * C# Equivalent: CashDrawerTransactionDto / CashInOutTransactionDto
  */
-export interface CashInOutTransactionDto {
-  id: string;
-  code: string;
-  time: string;
-  type: 'in' | 'out';
-  typeLabel: string;
-  reason: string;
-  amount: number;
+export class CashInOutTransactionDTO {
+  id: string = '';
+  code: string = '';
+  time: string = '';
+  type: 'in' | 'out' = 'in';
+  typeLabel: string = '';
+  reason: string = '';
+  amount: number = 0;
   note?: string;
+
+  constructor(init?: Partial<CashInOutTransactionDTO>) {
+    Object.assign(this, init);
+  }
 }
 
 /**
  * Currency Denomination Tally Item DTO (Kiểm đếm tiền mặt theo mệnh giá)
  * C# Equivalent: CashDenominationDto / DenominationItemDto
  */
-export interface DenominationItemDto {
-  value: number;
-  label: string;
-  count: number;
+export class DenominationItemDTO {
+  value: number = 0;
+  label: string = '';
+  count: number = 0;
+
+  constructor(init?: Partial<DenominationItemDTO>) {
+    Object.assign(this, init);
+  }
 }
 
 /**
  * Shift Handover / Cash Float Handover DTO
  * C# Equivalent: ShiftHandoverDto / ShiftHandoverDataDto
  */
-export interface ShiftHandoverDataDto {
-  receiverName: string;
-  floatRetained: number;
-  cashHandedOver: number;
-  notes: string;
+export class ShiftHandoverDataDTO {
+  receiverName: string = '';
+  floatRetained: number = 0;
+  cashHandedOver: number = 0;
+  notes: string = '';
+
+  constructor(init?: Partial<ShiftHandoverDataDTO>) {
+    Object.assign(this, init);
+  }
 }
 
 /**
  * Historical Shift Record DTO
  * C# Equivalent: ShiftHistoryItemDto / ShiftSummaryRecordDto
  */
-export interface ShiftHistoryItemDto {
-  shiftCode: string;
-  branchName: string;
-  timeRange: string;
-  cashierName: string;
-  initialFloat: number;
-  totalRevenue: number;
-  actualCashCounted: number;
-  reconciliationDiff: number;
-  reconciliationStatus: 'match' | 'surplus' | 'deficit';
-  status: 'completed' | 'on_duty';
+export class ShiftHistoryItemDTO {
+  shiftCode: string = '';
+  branchName: string = '';
+  timeRange: string = '';
+  cashierName: string = '';
+  initialFloat: number = 0;
+  totalRevenue: number = 0;
+  actualCashCounted: number = 0;
+  reconciliationDiff: number = 0;
+  reconciliationStatus: 'match' | 'surplus' | 'deficit' = 'match';
+  status: 'completed' | 'on_duty' = 'completed';
+
+  constructor(init?: Partial<ShiftHistoryItemDTO>) {
+    Object.assign(this, init);
+  }
 }
 
 /**
  * Shift History Query Filter DTO
  * C# Equivalent: ShiftHistoryFilterQueryDto
  */
-export interface ShiftHistoryFilterStateDto {
-  timePreset: 'today' | 'yesterday' | 'last_7_days' | 'this_month' | 'custom';
-  customDate: string;
-  cashierName: string;
-  branchName: string;
+export class ShiftHistoryFilterStateDTO {
+  timePreset: 'today' | 'yesterday' | 'last_7_days' | 'this_month' | 'custom' = 'today';
+  customDate: string = '';
+  cashierName: string = '';
+  branchName: string = '';
+
+  constructor(init?: Partial<ShiftHistoryFilterStateDTO>) {
+    Object.assign(this, init);
+  }
 }
 
 // ============================================================================
@@ -264,142 +328,204 @@ export interface ShiftHistoryFilterStateDto {
  * Request payload for creating a new POS Order
  * C# Equivalent: MT_GRMS.Application.PosOrders.Dtos.OrderCreateRequest
  */
-export interface OrderCreateRequestDto {
+export class OrderCreateRequestDTO {
   storeId?: string;
   cashierId?: string;
-  customerId?: string | null;
-  items: OrderItemCreateDto[];
-  paymentMethod: 'cash' | 'vietqr';
+  customerId?: string | null = null;
+  items: OrderItemCreateDTO[] = [];
+  paymentMethod: 'cash' | 'vietqr' = 'cash';
   cashTendered?: number;
   orderDiscountPercent?: number;
   couponCode?: string;
   couponDiscount?: number;
   usePoints?: boolean;
   note?: string;
+
+  constructor(init?: Partial<OrderCreateRequestDTO>) {
+    Object.assign(this, init);
+  }
 }
 
 /**
  * Request payload line item for creating order
  * C# Equivalent: MT_GRMS.Application.PosOrders.Dtos.OrderItemCreateDto
  */
-export interface OrderItemCreateDto {
-  productId: string;
-  productName: string;
-  unit: string;
-  quantity: number;
-  unitPrice: number;
+export class OrderItemCreateDTO {
+  productId: string = '';
+  productName: string = '';
+  unit: string = '';
+  quantity: number = 1;
+  unitPrice: number = 0;
   discountPerItem?: number;
-  actualPrice: number;
-  totalAmount: number;
+  actualPrice: number = 0;
+  totalAmount: number = 0;
+
+  constructor(init?: Partial<OrderItemCreateDTO>) {
+    Object.assign(this, init);
+  }
 }
 
 /**
  * Response payload after creating order
  * C# Equivalent: MT_GRMS.Application.PosOrders.Dtos.OrderResponse
  */
-export interface OrderResponseDto {
-  id: string;
-  orderCode: string;
-  storeId: string;
-  totalAmount: number;
-  paymentStatus: 'Pending' | 'Paid' | 'Failed';
-  createdAt: string;
-  items: OrderItemResponseDto[];
+export class OrderResponseDTO {
+  id: string = '';
+  orderCode: string = '';
+  storeId: string = '';
+  totalAmount: number = 0;
+  paymentStatus: 'Pending' | 'Paid' | 'Failed' = 'Paid';
+  createdAt: string = '';
+  items: OrderItemResponseDTO[] = [];
+
+  constructor(init?: Partial<OrderResponseDTO>) {
+    Object.assign(this, init);
+  }
 }
 
 /**
  * Response payload item
  * C# Equivalent: MT_GRMS.Application.PosOrders.Dtos.OrderItemResponse
  */
-export interface OrderItemResponseDto {
-  id: string;
-  productId: string;
-  productName: string;
-  unitPrice: number;
-  quantity: number;
-  totalLineAmount: number;
+export class OrderItemResponseDTO {
+  id: string = '';
+  productId: string = '';
+  productName: string = '';
+  unitPrice: number = 0;
+  quantity: number = 1;
+  totalLineAmount: number = 0;
+
+  constructor(init?: Partial<OrderItemResponseDTO>) {
+    Object.assign(this, init);
+  }
 }
 
 /**
  * Request payload for Quick Add Product
  * C# Equivalent: QuickAddProductRequestDto
  */
-export interface QuickProductCreateRequestDto {
-  name: string;
+export class QuickProductCreateRequestDTO {
+  name: string = '';
   sku?: string;
-  baseUnit: string;
-  basePrice: number;
+  baseUnit: string = '';
+  basePrice: number = 0;
   costPrice?: number;
-  category: string;
+  category: string = '';
   initialStock?: number;
+
+  constructor(init?: Partial<QuickProductCreateRequestDTO>) {
+    Object.assign(this, init);
+  }
 }
 
 /**
  * Request payload for Quick Add Customer
  * C# Equivalent: QuickAddCustomerRequestDto
  */
-export interface CustomerCreateRequestDto {
-  name: string;
-  phone: string;
+export class CustomerCreateRequestDTO {
+  name: string = '';
+  phone: string = '';
   email?: string;
   address?: string;
   gender?: 'Nam' | 'Nữ';
   dob?: string;
   note?: string;
+
+  constructor(init?: Partial<CustomerCreateRequestDTO>) {
+    Object.assign(this, init);
+  }
 }
 
 /**
  * Request payload for Cash In / Out (Thu / Chi)
  * C# Equivalent: CashInOutRequestDto
  */
-export interface CashInOutRequestDto {
-  shiftCode: string;
-  type: 'in' | 'out';
-  reason: string;
-  amount: number;
+export class CashInOutRequestDTO {
+  shiftCode: string = '';
+  type: 'in' | 'out' = 'in';
+  reason: string = '';
+  amount: number = 0;
   note?: string;
+
+  constructor(init?: Partial<CashInOutRequestDTO>) {
+    Object.assign(this, init);
+  }
 }
 
 /**
  * Request payload for Opening Shift Float
  * C# Equivalent: ShiftOpenRequestDto
  */
-export interface ShiftOpenRequestDto {
-  cashierCode: string;
-  posMachine: string;
-  initialFloat: number;
+export class ShiftOpenRequestDTO {
+  cashierCode: string = '';
+  posMachine: string = '';
+  initialFloat: number = 0;
   note?: string;
+
+  constructor(init?: Partial<ShiftOpenRequestDTO>) {
+    Object.assign(this, init);
+  }
 }
 
 /**
  * Request payload for Closing Shift
  * C# Equivalent: ShiftCloseRequestDto
  */
-export interface ShiftCloseRequestDto {
-  shiftCode: string;
-  actualCashCounted: number;
-  floatRetained: number;
-  cashHandedOver: number;
-  receiverName: string;
-  denominations: DenominationItemDto[];
+export class ShiftCloseRequestDTO {
+  shiftCode: string = '';
+  actualCashCounted: number = 0;
+  floatRetained: number = 0;
+  cashHandedOver: number = 0;
+  receiverName: string = '';
+  denominations: DenominationItemDTO[] = [];
   notes?: string;
+
+  constructor(init?: Partial<ShiftCloseRequestDTO>) {
+    Object.assign(this, init);
+  }
 }
 
 // ============================================================================
 // Backwards Compatibility Type Aliases
 // (Allows existing frontend components to compile cleanly without breaking)
 // ============================================================================
-export type Product = ProductDto;
-export type CartItem = CartItemDto;
-export type Customer = CustomerDto;
-export type OrderTab = OrderTabDto;
-export type Category = CategoryDto;
-export type ReceiptData = ReceiptDataDto;
-export type ShiftInfo = ShiftInfoDto;
-export type ShiftKpiItem = ShiftKpiItemDto;
-export type PaymentMethodRevenue = PaymentMethodRevenueDto;
-export type CashInOutTransaction = CashInOutTransactionDto;
-export type DenominationItem = DenominationItemDto;
-export type ShiftHandoverData = ShiftHandoverDataDto;
-export type ShiftHistoryItem = ShiftHistoryItemDto;
-export type ShiftHistoryFilterState = ShiftHistoryFilterStateDto;
+export type ProductDto = ProductDTO;
+export type CartItemDto = CartItemDTO;
+export type CustomerDto = CustomerDTO;
+export type OrderTabDto = OrderTabDTO;
+export type CategoryDto = CategoryDTO;
+export type ReceiptItemDto = ReceiptItemDTO;
+export type ReceiptCustomerDto = ReceiptCustomerDTO;
+export type ReceiptDataDto = ReceiptDataDTO;
+export type ShiftInfoDto = ShiftInfoDTO;
+export type ShiftKpiItemDto = ShiftKpiItemDTO;
+export type PaymentMethodRevenueDto = PaymentMethodRevenueDTO;
+export type CashInOutTransactionDto = CashInOutTransactionDTO;
+export type DenominationItemDto = DenominationItemDTO;
+export type ShiftHandoverDataDto = ShiftHandoverDataDTO;
+export type ShiftHistoryItemDto = ShiftHistoryItemDTO;
+export type ShiftHistoryFilterStateDto = ShiftHistoryFilterStateDTO;
+export type OrderCreateRequestDto = OrderCreateRequestDTO;
+export type OrderItemCreateDto = OrderItemCreateDTO;
+export type OrderResponseDto = OrderResponseDTO;
+export type OrderItemResponseDto = OrderItemResponseDTO;
+export type QuickProductCreateRequestDto = QuickProductCreateRequestDTO;
+export type CustomerCreateRequestDto = CustomerCreateRequestDTO;
+export type CashInOutRequestDto = CashInOutRequestDTO;
+export type ShiftOpenRequestDto = ShiftOpenRequestDTO;
+export type ShiftCloseRequestDto = ShiftCloseRequestDTO;
+
+export type Product = ProductDTO;
+export type CartItem = CartItemDTO;
+export type Customer = CustomerDTO;
+export type OrderTab = OrderTabDTO;
+export type Category = CategoryDTO;
+export type ReceiptData = ReceiptDataDTO;
+export type ShiftInfo = ShiftInfoDTO;
+export type ShiftKpiItem = ShiftKpiItemDTO;
+export type PaymentMethodRevenue = PaymentMethodRevenueDTO;
+export type CashInOutTransaction = CashInOutTransactionDTO;
+export type DenominationItem = DenominationItemDTO;
+export type ShiftHandoverData = ShiftHandoverDataDTO;
+export type ShiftHistoryItem = ShiftHistoryItemDTO;
+export type ShiftHistoryFilterState = ShiftHistoryFilterStateDTO;

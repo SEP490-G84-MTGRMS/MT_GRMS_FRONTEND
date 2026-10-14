@@ -1,6 +1,10 @@
 export * from './types/pos.types';
+export * from './types/inventory.types';
 export * from './pages/PosCheckoutPage';
 export * from './pages/PosShiftPage';
+export * from './pages/InventoryLookupPage';
+export * from './pages/InvoiceManagementPage';
+export * from './mock/inventoryMockData';
 export * from './components/PosHeader';
 export * from './components/PosCartTable';
 export * from './components/PosCatalogGrid';
@@ -17,3 +21,4 @@ export * from './components/ShiftHistoryTable';
 export * from './components/modals/CashInOutModal';
 export * from './components/modals/ZReportModal';
 export * from './components/modals/EditFloatModal';
+
