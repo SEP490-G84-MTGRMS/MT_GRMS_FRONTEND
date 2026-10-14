@@ -19,6 +19,7 @@ import {
   BranchOrderListPage,
   EmployeeOrderMatrixPage,
   SupplierOrderDispatchHubPage,
+  StoreOwnerPurchaseOrderListPage,
 } from '../features/purchase-order';
 
 // 3. Service Expenses Feature (FE-07)
@@ -192,6 +193,10 @@ export const router = createBrowserRouter([
         element: <SupplierOrderDispatchHubPage />,
       },
       {
+        path: 'purchase-orders/list',
+        element: <StoreOwnerPurchaseOrderListPage />,
+      },
+      {
         path: 'expenses',
         element: <ServiceExpensesPage />,
       },
@@ -322,6 +327,10 @@ export const router = createBrowserRouter([
       {
         path: 'purchase-orders/cutoff-hub',
         element: <SupplierOrderDispatchHubPage />,
+      },
+      {
+        path: 'purchase-orders/list',
+        element: <StoreOwnerPurchaseOrderListPage />,
       },
       {
         path: 'expenses',

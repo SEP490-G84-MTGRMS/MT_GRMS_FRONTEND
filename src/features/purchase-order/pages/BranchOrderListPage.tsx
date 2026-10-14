@@ -126,6 +126,7 @@ export const BranchOrderListPage: FC = () => {
     setFilterInputs(DEFAULT_FILTERS);
     setAppliedFilters(DEFAULT_FILTERS);
     setPageIndex(1);
+    showToast('Đã đặt lại bộ lọc tìm kiếm', 'info');
   };
 
   const handleOrder = (branchId: string) => {
@@ -169,16 +170,16 @@ export const BranchOrderListPage: FC = () => {
           </h1>
         </div>
 
-        {/* Optional Action: Lịch sử đơn hàng */}
+        {/* Action: Lịch sử đơn hàng */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <button
             type="button"
             onClick={() => {
-              showToast('Tính năng lịch sử đơn hàng đang được cập nhật.', 'info');
+              navigate('/store-owner/purchase-orders/list');
             }}
             className="po-btn po-btn-outline"
             style={{ height: 32, padding: '0 14px' }}
-            title="Xem lịch sử các đơn mua hàng đã tạo"
+            title="Xem danh sách / lịch sử các đơn mua hàng đã tạo"
           >
             <History size={14} />
             <span>Lịch sử đơn hàng</span>
