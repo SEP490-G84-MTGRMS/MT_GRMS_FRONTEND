@@ -35,10 +35,11 @@
 
 .transfer-title-area h1 {
   font-size: 24px;
-  font-weight: 700;
-  color: #0f172a;
+  font-weight: 800;
+  color: var(--text-main, #0f172a);
   margin: 0;
   letter-spacing: -0.02em;
+  line-height: 1.25;
 }
 
 .transfer-header-actions {

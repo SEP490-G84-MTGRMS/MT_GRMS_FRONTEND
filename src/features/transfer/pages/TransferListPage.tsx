@@ -157,24 +157,27 @@ export const TransferListPage: React.FC = () => {
       {/* Toast Notification */}
       {toast && <AdminToast toast={toast} onClose={() => setToast(null)} />}
 
+      {/* Title Area bên ngoài, phía trên Header Toolbar */}
+      <div className="transfer-title-area">
+        <Truck size={28} color="#0F766E" />
+        <h1>Chuyển hàng</h1>
+        <span
+          style={{
+            fontSize: 13,
+            fontWeight: 600,
+            padding: '3px 10px',
+            borderRadius: 9999,
+            backgroundColor: '#ccfbf1',
+            color: '#0f766e',
+          }}
+        >
+          {filteredTransfers.length} phiếu
+        </span>
+      </div>
+
       {/* 1. Header Toolbar Đồng nhất Design System (24px radius, Deep Teal) */}
       <div className="transfer-header-toolbar">
-        <div className="transfer-title-area">
-          <Truck size={28} color="#0F766E" />
-          <h1>Chuyển hàng</h1>
-          <span
-            style={{
-              fontSize: 13,
-              fontWeight: 600,
-              padding: '3px 10px',
-              borderRadius: 9999,
-              backgroundColor: '#ccfbf1',
-              color: '#0f766e',
-            }}
-          >
-            {filteredTransfers.length} phiếu
-          </span>
-        </div>
+
 
         {/* Ô tìm kiếm nhanh bo tròn dạng pill */}
         <div style={{ flex: 1, maxWidth: 360, position: 'relative', margin: '0 12px' }}>
@@ -182,7 +185,7 @@ export const TransferListPage: React.FC = () => {
             type="text"
             className="filter-input"
             style={{ paddingLeft: 34, borderRadius: 9999 }}
-            placeholder="🔍 Theo mã phiếu chuyển (TRFxxxxxx)..."
+            placeholder="Theo mã phiếu chuyển (TRFxxxxxx)..."
             value={searchCode}
             onChange={(e) => setSearchCode(e.target.value)}
           />
