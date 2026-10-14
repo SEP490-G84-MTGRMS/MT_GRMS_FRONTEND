@@ -5,6 +5,7 @@ interface OrderMatrixHeaderProps {
   status: string;
   onBack: () => void;
   onSave?: () => void;
+  onGoToCutoffHub?: () => void;
   title?: string;
   readOnly?: boolean;
 }
@@ -13,6 +14,7 @@ export const OrderMatrixHeader: FC<OrderMatrixHeaderProps> = ({
   status,
   onBack,
   onSave,
+  onGoToCutoffHub,
   title,
   readOnly = false,
 }) => {
@@ -45,6 +47,29 @@ export const OrderMatrixHeader: FC<OrderMatrixHeaderProps> = ({
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        {onGoToCutoffHub && (
+          <button
+            type="button"
+            onClick={onGoToCutoffHub}
+            className="po-btn"
+            style={{
+              height: 32,
+              padding: '0 14px',
+              background: '#fef2f2',
+              border: '1px solid #fecaca',
+              color: '#b91c1c',
+              fontWeight: 700,
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+            }}
+            title="Mở Trung tâm Chốt Đơn & Tách PO theo Nhà Cung Cấp"
+          >
+            <span>⚡ Chốt đơn (Cutoff Hub)</span>
+          </button>
+        )}
+
         {!readOnly && onSave && (
           <button
             type="button"

@@ -108,3 +108,35 @@ export interface BranchFilterState {
   pageIndex: number;
   pageSize: number;
 }
+
+/* ─── Supplier Order Dispatch & Cutoff Hub Types ─── */
+export type CutoffUrgency = 'critical' | 'today' | 'later' | 'completed';
+
+export interface DispatchItemSku {
+  id: string;
+  name: string;
+  sku: string;
+  unit: string;
+  price: number;
+  qty: number;
+  cutoffSchedule: string;
+  groupType?: 'daily' | 'weekly';
+}
+
+export interface SupplierDispatchGroup {
+  id: string;
+  code: string;
+  name: string;
+  categoryTags: string[];
+  cutoffTimeStr: string;
+  countdownDisplay: string;
+  remainingMinutes?: number;
+  urgency: CutoffUrgency;
+  expectedDelivery: string;
+  minOrderValue: number;
+  items: DispatchItemSku[];
+  note: string;
+  status: 'draft' | 'dispatched';
+  poCode?: string;
+  dispatchedAt?: string;
+}

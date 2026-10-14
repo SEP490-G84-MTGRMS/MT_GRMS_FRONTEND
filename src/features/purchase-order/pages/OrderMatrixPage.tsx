@@ -399,6 +399,7 @@ export const OrderMatrixPage: FC = () => {
         status={status}
         onBack={() => navigate('/store-owner/purchase-orders/branches')}
         onSave={handleSaveDraft}
+        onGoToCutoffHub={() => navigate('/store-owner/purchase-orders/dispatch-hub')}
         readOnly={isReadOnly}
         title={isReadOnly ? `Chi Tiết Đơn Đặt Hàng — ${MOCK_BRANCHES.find((b) => b.id === selectedBranchId)?.name || ''}` : undefined}
       />

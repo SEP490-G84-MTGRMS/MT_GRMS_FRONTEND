@@ -141,6 +141,18 @@ const NAV_GROUPS: NavGroup[] = [
             badge: "Chủ",
             badgeType: "blue",
           },
+          {
+            label: "Chốt đơn với nhà cung cấp",
+            to: "/store-owner/purchase-orders/dispatch-hub",
+            badge: "Hub",
+            badgeType: "blue",
+          },
+          {
+            label: "Danh sách đơn mua hàng (PO)",
+            to: "/store-owner/purchase-orders/list",
+            badge: "PO",
+            badgeType: "blue",
+          },
           { label: "Trả hàng nhập", to: "/store-owner/suppliers?view=returns" },
         ],
       },
