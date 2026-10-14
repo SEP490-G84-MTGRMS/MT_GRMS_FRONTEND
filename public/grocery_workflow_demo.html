@@ -1,0 +1,1363 @@
+<!-- 
+========================================================================================
+MT-GRMS - CÁC ĐƯỜNG LINK VIDEO NỀN GỐC & TỆP NGUỒN (RAW VIDEO ASSETS):
+1. Video Kệ Hàng Siêu Thị & Khách Mua Hàng Thực Tế (49.1 MB):
+   - Link trực tiếp tải về: https://upload.wikimedia.org/wikipedia/commons/2/24/Daily_Life_in_Tokyo_in_2013_%E2%80%93_Supermarket_in_Hanzomon_Station_Area.webm
+   - File cục bộ trong dự án: MT_GRMS_FRONTEND/public/supermarket_raw.webm (và Html/demo/supermarket_raw.webm)
+
+2. Video Thao Tác Quét Mã Vạch Laser Quầy Thu Ngân Thực Tế (420 KB):
+   - Trang xem trực tiếp trên Web (Player): https://commons.wikimedia.org/wiki/File:Barcode_scanning_device_(cash_register).webm
+   - Link trực tiếp tải file WebM: https://upload.wikimedia.org/wikipedia/commons/6/6a/Barcode_scanning_device_%28cash_register%29.webm
+   - File cục bộ trong dự án: MT_GRMS_FRONTEND/public/barcode_scan_raw.webm (và Html/demo/barcode_scan_raw.webm)
+
+3. Kho Video Stock Miễn Phí Bản Quyền (Pexels / Pixabay) để chèn thêm vào CapCut:
+   - Pexels Grocery Store: https://www.pexels.com/search/videos/grocery%20store/
+   - Pixabay Supermarket: https://pixabay.com/videos/search/supermarket/
+========================================================================================
+-->
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MT-GRMS - Video Demo Quy Trình Quản Lý Tiệm Tạp Hóa (Full Workflow)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --blue-primary: #0066FF;
+      --blue-hover: #0052CC;
+      --green-money: #00C853;
+      --orange-warn: #FF9500;
+      --red-urgent: #FF3B30;
+      --purple-accent: #8B5CF6;
+      --text-main: #0F172A;
+      --text-muted: #64748B;
+      --font-sans: 'Be Vietnam Pro', -apple-system, sans-serif;
+      --font-mono: 'JetBrains Mono', Consolas, monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: var(--font-sans);
+      background-color: #070e1e;
+      color: #FFFFFF;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 16px;
+      overflow-x: hidden;
+    }
+
+    /* THANH ĐIỀU HƯỚNG TRÊN CÙNG */
+    .top-header-bar {
+      width: 100%;
+      max-width: 1400px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      padding: 12px 24px;
+      background: rgba(15, 23, 42, 0.9);
+      backdrop-filter: blur(14px);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 9999px;
+      margin-bottom: 16px;
+    }
+
+    .brand-box {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-logo-m {
+      width: 36px;
+      height: 36px;
+      border-radius: 12px;
+      background: var(--blue-primary);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 16px;
+      box-shadow: 0 4px 14px rgba(0, 102, 255, 0.4);
+    }
+
+    .brand-title {
+      font-size: 16px;
+      font-weight: 800;
+      letter-spacing: -0.01em;
+      color: #fff;
+    }
+
+    .brand-tagline {
+      font-size: 11.5px;
+      color: #94A3B8;
+      margin-left: 6px;
+    }
+
+    .top-action-btns {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .btn-top {
+      padding: 8px 18px;
+      border-radius: 9999px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      background: rgba(255, 255, 255, 0.08);
+      color: #E2E8F0;
+      font-size: 12.5px;
+      font-weight: 600;
+      font-family: var(--font-sans);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s ease;
+      text-decoration: none;
+    }
+
+    .btn-top:hover {
+      background: rgba(255, 255, 255, 0.2);
+      color: #fff;
+    }
+
+    .btn-top.active {
+      background: var(--blue-primary);
+      border-color: var(--blue-primary);
+      color: #fff;
+      box-shadow: 0 4px 14px rgba(0, 102, 255, 0.4);
+    }
+
+    .btn-export-video {
+      background: var(--green-money);
+      border-color: var(--green-money);
+      color: #fff;
+      font-weight: 700;
+    }
+
+    .btn-export-video:hover {
+      background: #009624;
+    }
+
+    /* KHUNG CHIẾU VIDEO CHÍNH (THEATER PLAYER 16:9 FULL HD) */
+    .workflow-theater-wrapper {
+      width: 100%;
+      max-width: 1400px;
+      aspect-ratio: 16 / 9;
+      background: #000;
+      border-radius: 24px;
+      overflow: hidden;
+      border: 1.5px solid rgba(255, 255, 255, 0.15);
+      box-shadow: 0 30px 70px rgba(0, 0, 0, 0.75);
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* Thẻ HTML5 <video> phát thành phẩm */
+    #workflowVideoPlayer {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .hidden-media-feed {
+      display: none;
+    }
+
+    #workflowCanvas {
+      display: none;
+    }
+
+    /* HUY HIỆU TRẠNG THÁI GIAI ĐOẠN ĐANG PHÁT TRÊN VIDEO */
+    .stage-indicator-pill {
+      position: absolute;
+      top: 20px;
+      left: 24px;
+      background: rgba(15, 23, 42, 0.88);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      padding: 6px 16px;
+      border-radius: 9999px;
+      font-size: 13px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      z-index: 20;
+    }
+
+    .live-recording-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: var(--red-urgent);
+      box-shadow: 0 0 10px var(--red-urgent);
+      animation: blink-live 1.2s infinite;
+    }
+
+    @keyframes blink-live {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.3; transform: scale(0.85); }
+    }
+
+    /* BẢNG TIMELINE 6 BƯỚC QUY TRÌNH QUẢN LÝ TẠP HÓA DƯỚI VIDEO */
+    .workflow-timeline-grid {
+      width: 100%;
+      max-width: 1400px;
+      margin-top: 18px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+      gap: 10px;
+    }
+
+    .workflow-step-btn {
+      background: rgba(15, 23, 42, 0.75);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 16px;
+      padding: 12px 14px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      cursor: pointer;
+      text-align: left;
+      transition: all 0.2s ease;
+      font-family: var(--font-sans);
+      color: #FFFFFF;
+    }
+
+    .workflow-step-btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.3);
+    }
+
+    .workflow-step-btn.active {
+      background: rgba(0, 102, 255, 0.25);
+      border-color: var(--blue-primary);
+      box-shadow: 0 4px 18px rgba(0, 102, 255, 0.35);
+    }
+
+    .step-badge-num {
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.12);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: 800;
+      font-family: var(--font-mono);
+      flex-shrink: 0;
+    }
+
+    .workflow-step-btn.active .step-badge-num {
+      background: var(--blue-primary);
+    }
+
+    .step-text-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: #FFFFFF;
+      margin-bottom: 2px;
+    }
+
+    .step-text-desc {
+      font-size: 11px;
+      color: #94A3B8;
+      line-height: 1.35;
+    }
+
+    /* KHUNG TÀI LIỆU KỊCH BẢN THUYẾT MINH & NGUỒN VIDEO ĐỂ DỰNG CLIP DEMO */
+    .script-guide-box {
+      width: 100%;
+      max-width: 1400px;
+      margin-top: 24px;
+      background: rgba(15, 23, 42, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 20px;
+      padding: 24px 28px;
+    }
+
+    .script-guide-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      padding-bottom: 12px;
+    }
+
+    .script-guide-title {
+      font-size: 17px;
+      font-weight: 800;
+      color: #FFFFFF;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .script-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 12px;
+      font-size: 13px;
+    }
+
+    .script-table th {
+      text-align: left;
+      padding: 10px 14px;
+      background: rgba(255, 255, 255, 0.05);
+      color: #94A3B8;
+      font-weight: 700;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .script-table td {
+      padding: 12px 14px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      vertical-align: top;
+      line-height: 1.5;
+    }
+
+    .time-code {
+      font-family: var(--font-mono);
+      font-weight: 700;
+      color: var(--blue-primary);
+      white-space: nowrap;
+    }
+
+    .feature-tag {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 9999px;
+      font-size: 11px;
+      font-weight: 700;
+      background: rgba(0, 102, 255, 0.2);
+      color: #60A5FA;
+    }
+
+    .voiceover-text {
+      color: #E2E8F0;
+      font-style: italic;
+    }
+
+    /* KHUNG THẺ DANH SÁCH LINK NGUỒN VIDEO GỐC */
+    .raw-video-links-card {
+      width: 100%;
+      max-width: 1400px;
+      margin-top: 24px;
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      border-radius: 20px;
+      padding: 24px 28px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+    }
+
+    .raw-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 12px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .raw-card-title {
+      font-size: 17px;
+      font-weight: 800;
+      color: #38BDF8;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .raw-card-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 4px 12px;
+      border-radius: 9999px;
+      background: rgba(56, 189, 248, 0.15);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      color: #7DD3FC;
+      font-size: 11.5px;
+      font-weight: 700;
+    }
+
+    .raw-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+      gap: 16px;
+      margin-top: 14px;
+    }
+
+    .raw-item-box {
+      background: rgba(2, 6, 23, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 16px;
+      padding: 16px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .raw-item-tag {
+      font-size: 11px;
+      font-weight: 700;
+      color: #94A3B8;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .raw-item-name {
+      font-size: 14.5px;
+      font-weight: 700;
+      color: #FFFFFF;
+    }
+
+    .raw-item-desc {
+      font-size: 12px;
+      color: #94A3B8;
+      line-height: 1.45;
+    }
+
+    .raw-path-box {
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 8px;
+      padding: 6px 10px;
+      font-size: 11px;
+      color: #38BDF8;
+      word-break: break-all;
+      font-family: var(--font-mono);
+    }
+
+    .raw-btn-group {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 6px;
+    }
+
+    .btn-link-action {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 14px;
+      border-radius: 9999px;
+      background: var(--blue-primary);
+      color: #FFFFFF;
+      font-size: 12px;
+      font-weight: 600;
+      text-decoration: none;
+      transition: all 0.2s ease;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .btn-link-action:hover {
+      background: var(--blue-hover);
+    }
+
+    .btn-link-local {
+      background: rgba(255, 255, 255, 0.08);
+      color: #E2E8F0;
+      border-color: rgba(255, 255, 255, 0.15);
+    }
+
+    .btn-link-local:hover {
+      background: rgba(255, 255, 255, 0.16);
+      color: #FFFFFF;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- HEADER THANH ĐIỀU HƯỚNG TRÊN CÙNG -->
+  <header class="top-header-bar">
+    <div class="brand-box">
+      <div class="brand-logo-m">M</div>
+      <div>
+        <span class="brand-title">MT-GRMS</span>
+        <span class="brand-tagline">Video Demo Quy Trình Quản Lý Tiệm Tạp Hóa</span>
+      </div>
+    </div>
+
+    <div class="top-action-btns">
+      <a href="#rawVideoLinksSection" class="btn-top" style="border-color: #38BDF8; color: #38BDF8;">
+        <span>🔗 Link Video Nền Gốc</span>
+      </a>
+      <button class="btn-top active" id="btnAudioToggle" onclick="toggleAudio()">
+        <span id="audioLabel">🔊 Âm thanh nghiệp vụ: BẬT</span>
+      </button>
+      <button class="btn-top" onclick="restartWorkflow()">
+        <span>🔄 Phát từ đầu</span>
+      </button>
+      <button class="btn-top btn-export-video" onclick="exportWorkflowVideo()">
+        <span>💾 Tải Video Quy Trình (.webm)</span>
+      </button>
+      <a href="/login_video_preview.html" class="btn-top">
+        <span>🎬 Xem làm Video Nền Đăng nhập &rarr;</span>
+      </a>
+    </div>
+  </header>
+
+  <!-- KHUNG PHÁT VIDEO CHÍNH (HTML5 <video> THEATER) -->
+  <main class="workflow-theater-wrapper">
+    <div class="stage-indicator-pill">
+      <div class="live-recording-dot"></div>
+      <span id="currentStageLabel">BƯỚC 1/6: NHẬP HÀNG & QUY ĐỔI ĐA ĐƠN VỊ THÙNG/LON</span>
+    </div>
+
+    <!-- THẺ VIDEO PHÁT CHÍNH -->
+    <video id="workflowVideoPlayer" autoplay loop muted playsinline></video>
+
+    <!-- NGUỒN VIDEO GỐC NẠP SẴN TRONG PROJECT (HỖ TRỢ CẢ ĐƯỜNG DẪN CỤC BỘ & LINK TRỰC TUYẾN) -->
+    <video id="feedBarcode" class="hidden-media-feed" loop muted playsinline crossorigin="anonymous">
+      <source src="./barcode_scan_raw.webm" type="video/webm">
+      <source src="/barcode_scan_raw.webm" type="video/webm">
+      <source src="https://upload.wikimedia.org/wikipedia/commons/6/6a/Barcode_scanning_device_%28cash_register%29.webm" type="video/webm">
+    </video>
+    <video id="feedSupermarket" class="hidden-media-feed" loop muted playsinline crossorigin="anonymous">
+      <source src="./supermarket_raw.webm" type="video/webm">
+      <source src="/supermarket_raw.webm" type="video/webm">
+      <source src="https://upload.wikimedia.org/wikipedia/commons/2/24/Daily_Life_in_Tokyo_in_2013_%E2%80%93_Supermarket_in_Hanzomon_Station_Area.webm" type="video/webm">
+    </video>
+
+    <!-- CANVAS ENGINE TỔNG HỢP VIDEO CHUYỂN CẢNH ĐA BƯỚC -->
+    <canvas id="workflowCanvas" width="1920" height="1080"></canvas>
+  </main>
+
+  <!-- BẢNG ĐIỀU HƯỚNG 6 BƯỚC TRONG QUY TRÌNH -->
+  <section class="workflow-timeline-grid">
+    <button class="workflow-step-btn active" id="btnStep0" onclick="jumpToStep(0)">
+      <div class="step-badge-num">1</div>
+      <div>
+        <div class="step-text-title">1. Nhập hàng & Quy đổi</div>
+        <div class="step-text-desc">Thùng ↔ Lon, tính giá vốn tự động</div>
+      </div>
+    </button>
+
+    <button class="workflow-step-btn" id="btnStep1" onclick="jumpToStep(1)">
+      <div class="step-badge-num">2</div>
+      <div>
+        <div class="step-text-title">2. Hạn dùng FEFO</div>
+        <div class="step-text-desc">3 mức Xanh/Cam/Đỏ, chống hủy date</div>
+      </div>
+    </button>
+
+    <button class="workflow-step-btn" id="btnStep2" onclick="jumpToStep(2)">
+      <div class="step-badge-num">3</div>
+      <div>
+        <div class="step-text-title">3. Bán hàng POS Siêu tốc</div>
+        <div class="step-text-desc">Quét laser 0.2s, lập hóa đơn tự động</div>
+      </div>
+    </button>
+
+    <button class="workflow-step-btn" id="btnStep3" onclick="jumpToStep(3)">
+      <div class="step-badge-num">4</div>
+      <div>
+        <div class="step-text-title">4. VietQR & In Bill</div>
+        <div class="step-text-desc">Khớp tiền tự động, in bill tích tắc</div>
+      </div>
+    </button>
+
+    <button class="workflow-step-btn" id="btnStep4" onclick="jumpToStep(4)">
+      <div class="step-badge-num">5</div>
+      <div>
+        <div class="step-text-title">5. Sổ nợ Zalo 1 chạm</div>
+        <div class="step-text-desc">Ghi nợ khách quen, nhắn tin đối soát</div>
+      </div>
+    </button>
+
+    <button class="workflow-step-btn" id="btnStep5" onclick="jumpToStep(5)">
+      <div class="step-badge-num">6</div>
+      <div>
+        <div class="step-text-title">6. Báo cáo Realtime</div>
+        <div class="step-text-desc">Doanh thu & tồn kho từ xa trên app</div>
+      </div>
+    </button>
+  </section>
+
+  <!-- KHU VỰC CÁC ĐƯỜNG LINK VIDEO NỀN GỐC & TỆP TẢI VỀ -->
+  <section class="raw-video-links-card" id="rawVideoLinksSection">
+    <div class="raw-card-header">
+      <div class="raw-card-title">
+        <span>🎬 Tổng Hợp Link Nguồn Video Nền & Tệp Gốc (Raw Video Assets)</span>
+      </div>
+      <span class="raw-card-badge">Tư liệu dựng video Demo</span>
+    </div>
+
+    <p style="color: #94A3B8; font-size: 13px; margin-bottom: 16px; line-height: 1.5;">
+      Dưới đây là các đường link trực tiếp tải video nền thực tế (kệ hàng siêu thị/tạp hóa và thao tác quét mã vạch laser quầy thu ngân) cùng đường dẫn tệp đã tải sẵn trong máy tính của bạn:
+    </p>
+
+    <div class="raw-grid">
+      <!-- Thẻ 1: Video Siêu thị / Tạp hóa -->
+      <div class="raw-item-box">
+        <div class="raw-item-tag">Video 01 • Nền Không Gian Siêu Thị / Tạp Hóa</div>
+        <div class="raw-item-name">Kệ Hàng Siêu Thị & Khách Mua Hàng Thực Tế (49.1 MB)</div>
+        <div class="raw-item-desc">Thước phim thực tế quay cảnh các quầy kệ hàng tiêu dùng, bánh kẹo, thực phẩm và khách chọn đồ.</div>
+        <div class="raw-path-box">
+          <code>File trên máy: MT_GRMS_FRONTEND/public/supermarket_raw.webm (và Html/demo/supermarket_raw.webm)</code>
+        </div>
+        <div class="raw-btn-group">
+          <a href="https://commons.wikimedia.org/wiki/File:Daily_Life_in_Tokyo_in_2013_%E2%80%93_Supermarket_in_Hanzomon_Station_Area.webm" target="_blank" rel="noopener" class="btn-link-action" style="background: #0066FF;">
+            <span>▶️ Xem Trực Tiếp Trên Web (Wikimedia)</span>
+          </a>
+          <a href="https://upload.wikimedia.org/wikipedia/commons/2/24/Daily_Life_in_Tokyo_in_2013_%E2%80%93_Supermarket_in_Hanzomon_Station_Area.webm" target="_blank" rel="noopener" class="btn-link-action btn-link-local">
+            <span>🌐 Tải File Gốc WebM</span>
+          </a>
+          <a href="/supermarket_raw.webm" target="_blank" class="btn-link-action btn-link-local">
+            <span>💻 Mở Tệp Trong Máy</span>
+          </a>
+        </div>
+      </div>
+
+      <!-- Thẻ 2: Video Quét mã vạch Laser -->
+      <div class="raw-item-box">
+        <div class="raw-item-tag">Video 02 • Cận Cảnh Thao Tác Bán Hàng</div>
+        <div class="raw-item-name">Thao Tác Quét Mã Vạch Laser Quầy Thu Ngân (420 KB)</div>
+        <div class="raw-item-desc">Cận cảnh nhân viên cầm sản phẩm quét qua tia laser đỏ của máy đọc mã vạch, phản ánh chính xác nghiệp vụ POS.</div>
+        <div class="raw-path-box">
+          <code>File trên máy: MT_GRMS_FRONTEND/public/barcode_scan_raw.webm (và Html/demo/barcode_scan_raw.webm)</code>
+        </div>
+        <div class="raw-btn-group">
+          <a href="https://commons.wikimedia.org/wiki/File:Barcode_scanning_device_(cash_register).webm" target="_blank" rel="noopener" class="btn-link-action" style="background: #0066FF;">
+            <span>▶️ Xem Trực Tiếp Trên Web (Wikimedia)</span>
+          </a>
+          <a href="https://upload.wikimedia.org/wikipedia/commons/6/6a/Barcode_scanning_device_%28cash_register%29.webm" target="_blank" rel="noopener" class="btn-link-action btn-link-local">
+            <span>🌐 Tải File Gốc WebM</span>
+          </a>
+          <a href="/barcode_scan_raw.webm" target="_blank" class="btn-link-action btn-link-local">
+            <span>💻 Mở Tệp Trong Máy</span>
+          </a>
+        </div>
+      </div>
+
+      <!-- Thẻ 3: Kho video stock bổ sung -->
+      <div class="raw-item-box">
+        <div class="raw-item-tag">Kho Tư Liệu Bổ Sung • Miễn Phí Bản Quyền (Free Stock)</div>
+        <div class="raw-item-name">Kho Video Tạp Hóa & Quầy Tính Tiền (Pexels / Pixabay)</div>
+        <div class="raw-item-desc">Hàng trăm video miễn phí bản quyền 1080p/4K về cửa hàng bán lẻ, bà con mua hàng, quầy tính tiền để bạn chèn thêm vào CapCut.</div>
+        <div class="raw-btn-group">
+          <a href="https://www.pexels.com/search/videos/barcode%20scanner/" target="_blank" rel="noopener" class="btn-link-action" style="background: #0066FF;">
+            <span>🔍 Pexels Quét Mã Vạch</span>
+          </a>
+          <a href="https://www.pexels.com/search/videos/grocery%20store/" target="_blank" rel="noopener" class="btn-link-action btn-link-local">
+            <span>🛒 Pexels Grocery Videos</span>
+          </a>
+          <a href="https://pixabay.com/videos/search/supermarket/" target="_blank" rel="noopener" class="btn-link-action btn-link-local">
+            <span>🏪 Pixabay Supermarket</span>
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- KHUNG KỊCH BẢN THUYẾT MINH (VOICEOVER SCRIPT) CHO VIDEO DEMO DỰ ÁN -->
+  <section class="script-guide-box">
+    <div class="script-guide-header">
+      <div class="script-guide-title">
+        <span>🎙️ Kịch Bản Thuyết Minh & Storyboard Video Demo Đồ Án (Voiceover Script)</span>
+      </div>
+      <div>
+        <span style="font-size: 12px; color: #94A3B8;">Chuẩn bị cho video báo cáo tốt nghiệp / thuyết trình hội đồng</span>
+      </div>
+    </div>
+
+    <table class="script-table">
+      <thead>
+        <tr>
+          <th style="width: 90px;">Mốc Giờ</th>
+          <th style="width: 180px;">Bước Nghiệp Vụ</th>
+          <th style="width: 280px;">Khung Hình Video Thể Hiện</th>
+          <th>Lời Thoại Thuyết Minh Khuyên Dùng (Voiceover)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="time-code">0:00 - 0:08</td>
+          <td><span class="feature-tag">Bước 1: Nhập Kho</span><br><strong>Quy đổi đa đơn vị</strong></td>
+          <td>Nhập 1 Thùng Bia Tiger / Sữa tươi. Hệ thống tự động phân tách thành 24 Lon, chia giá vốn chuẩn xác.</td>
+          <td class="voiceover-text">"Khi hàng hóa về cửa hàng, chủ tiệm nhập theo thùng nhưng bán theo lon hoặc lốc. Hệ thống MT-GRMS tự động quy đổi đa đơn vị hai chiều, giúp kiểm kê không sai lệch một sản phẩm nào."</td>
+        </tr>
+        <tr>
+          <td class="time-code">0:08 - 0:16</td>
+          <td><span class="feature-tag">Bước 2: Quản Trị Date</span><br><strong>Thuật toán FEFO 3 mức</strong></td>
+          <td>Kệ hàng phân nhóm 3 màu: Xanh (>15 ngày), Cam (8-15 ngày), Đỏ (≤7 ngày). Cảnh báo hàng ưu tiên bán trước.</td>
+          <td class="voiceover-text">"Với đặc thù hàng tạp hóa nhanh hỏng, MT-GRMS áp dụng thuật toán FEFO phân loại 3 mức màu trực quan. Hàng cận date được đưa lên đầu kệ bán trước, giảm thiểu 100% thất thoát do hủy hàng."</td>
+        </tr>
+        <tr>
+          <td class="time-code">0:16 - 0:26</td>
+          <td><span class="feature-tag">Bước 3: Thu Ngân POS</span><br><strong>Quét mã vạch Laser</strong></td>
+          <td>Camera quét mã vạch thực tế phát tia laser đỏ, từng mặt hàng Mì Hảo Hảo, Sữa Vinamilk nhảy vào giỏ hàng máy tính kèm tiếng bíp.</td>
+          <td class="voiceover-text">"Tại quầy thu ngân, nhân viên chỉ mất 0.2 giây để quét mã vạch sản phẩm. Mọi thao tác đều có phím tắt nhanh, giao diện chữ to số to tối ưu cho mọi lứa tuổi thao tác."</td>
+        </tr>
+        <tr>
+          <td class="time-code">0:26 - 0:34</td>
+          <td><span class="feature-tag">Bước 4: Thanh Toán</span><br><strong>VietQR động & In Bill</strong></td>
+          <td>Mã VietQR tự sinh chính xác 188.000 đ. Khách quét là máy tính báo khớp tiền thành công, máy in nhiệt in bill tức thì.</td>
+          <td class="voiceover-text">"Khách hàng thanh toán qua mã VietQR động chính xác từng đồng. Tiền về tài khoản là hệ thống tự khớp đơn ngay lập tức, hoàn toàn không sợ gian lận chuyển khoản giả."</td>
+        </tr>
+        <tr>
+          <td class="time-code">0:34 - 0:42</td>
+          <td><span class="feature-tag">Bước 5: Sổ Nợ Khách</span><br><strong>Đồng bộ sổ nợ Zalo</strong></td>
+          <td>Khách quen mua thiếu, ghi nợ 1 chạm vào danh bạ khách, hệ thống gửi thông báo xác nhận văn minh qua Zalo.</td>
+          <td class="voiceover-text">"Nét đặc thù của tiệm tạp hóa Việt Nam là bán nợ cho bà con quen thuộc. MT-GRMS số hóa sổ nợ giấy truyền thống, ghi nợ một chạm và tự gửi sao kê đối soát văn minh qua Zalo."</td>
+        </tr>
+        <tr>
+          <td class="time-code">0:42 - 0:50</td>
+          <td><span class="feature-tag">Bước 6: Báo Cáo</span><br><strong>Quản lý chuỗi từ xa</strong></td>
+          <td>Biểu đồ doanh thu thời gian thực, số dư sổ quỹ, cảnh báo kho hàng gửi về ứng dụng di động của chủ chuỗi.</td>
+          <td class="voiceover-text">"Dù ở bất kỳ đâu, chủ tiệm vẫn nắm trọn tình hình doanh số, lợi nhuận và hạn dùng hàng hóa theo thời gian thực ngay trên chiếc điện thoại thông minh."</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- JAVASCRIPT: ENGINE BIÊN TẬP VÀ PHÁT VIDEO QUY TRÌNH 6 BƯỚC -->
+  <script>
+    const canvas = document.getElementById('workflowCanvas');
+    const ctx = canvas.getContext('2d');
+    const videoPlayer = document.getElementById('workflowVideoPlayer');
+    const feedBarcode = document.getElementById('feedBarcode');
+    const feedSupermarket = document.getElementById('feedSupermarket');
+
+    // DỮ LIỆU 6 BƯỚC QUY TRÌNH QUẢN LÝ TIỆM TẠP HÓA
+    const WORKFLOW_STEPS = [
+      {
+        stepNum: 1,
+        title: 'BƯỚC 1/6: NHẬP HÀNG & QUY ĐỔI ĐA ĐƠN VỊ THÙNG / LON',
+        badge: 'QUY TRÌNH NHẬP KHO',
+        subtitle: 'Tự động nhân chia tồn kho & giá vốn hai chiều',
+        durationFrames: 300 // ~ 5 giây
+      },
+      {
+        stepNum: 2,
+        title: 'BƯỚC 2/6: QUẢN LÝ HẠN DÙNG FEFO 3 MỨC MÀU TRỰC QUAN',
+        badge: 'CHỐNG THẤT THOÁT',
+        subtitle: 'Xanh an toàn • Cam 8-15 ngày • Đỏ khẩn cấp ≤7 ngày',
+        durationFrames: 300
+      },
+      {
+        stepNum: 3,
+        title: 'BƯỚC 3/6: BÁN HÀNG TẠI QUẦY POS & QUÉT MÃ VẠCH LASER',
+        badge: 'THU NGÂN SIÊU TỐC',
+        subtitle: 'Quét laser 0.2s, máy tính tự động nhảy đơn hàng',
+        durationFrames: 360
+      },
+      {
+        stepNum: 4,
+        title: 'BƯỚC 4/6: THANH TOÁN VIETQR ĐỘNG KHỚP TIỀN & IN BILL',
+        badge: 'THANH TOÁN THÔNG MINH',
+        subtitle: 'Khớp tiền chuyển khoản tức thì, in bill nhiệt 80mm',
+        durationFrames: 300
+      },
+      {
+        stepNum: 5,
+        title: 'BƯỚC 5/6: SỔ NỢ ĐIỆN TỬ & NHẮC NỢ ZALO VĂN MINH',
+        badge: 'GẮN KẾT KHÁCH HÀNG',
+        subtitle: 'Ghi nợ 1 chạm cho bà con lối xóm, gửi tin nhắn Zalo',
+        durationFrames: 300
+      },
+      {
+        stepNum: 6,
+        title: 'BƯỚC 6/6: BÁO CÁO DOANH THU & QUẢN TRỊ TỪ XA REALTIME',
+        badge: 'BÁO CÁO CHỦ TIỆM',
+        subtitle: 'Theo dõi doanh số, lãi lỗ và kho hàng mọi lúc mọi nơi',
+        durationFrames: 300
+      }
+    ];
+
+    let currentStepIdx = 0;
+    let stepFrameCounter = 0;
+    let globalFrameCounter = 0;
+    let isSoundOn = true;
+    let audioCtx = null;
+
+    function playBeepSound(freq = 1900, duration = 0.08) {
+      if (!isSoundOn) return;
+      try {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.18, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + duration);
+      } catch (e) {}
+    }
+
+    function toggleAudio() {
+      isSoundOn = !isSoundOn;
+      document.getElementById('audioLabel').textContent = isSoundOn
+        ? '🔊 Âm thanh nghiệp vụ: BẬT'
+        : '🔇 Âm thanh nghiệp vụ: TẮT';
+      document.getElementById('btnAudioToggle').classList.toggle('active', isSoundOn);
+    }
+
+    function startHiddenMedia() {
+      feedBarcode.play().catch(() => {});
+      feedSupermarket.play().catch(() => {});
+    }
+
+    // VÒNG LẶP RENDER VIDEO QUY TRÌNH TỔNG THỂ
+    function renderWorkflowScene() {
+      globalFrameCounter++;
+      stepFrameCounter++;
+
+      const step = WORKFLOW_STEPS[currentStepIdx];
+      if (stepFrameCounter >= step.durationFrames) {
+        stepFrameCounter = 0;
+        currentStepIdx = (currentStepIdx + 1) % WORKFLOW_STEPS.length;
+        updateActiveStepUi(currentStepIdx);
+      }
+
+      const p = stepFrameCounter / step.durationFrames;
+
+      // 1. Nền video thực tế siêu thị làm mờ nghệ thuật
+      ctx.fillStyle = '#070e1e';
+      ctx.fillRect(0, 0, 1920, 1080);
+
+      if (feedSupermarket.readyState >= 2) {
+        ctx.save();
+        ctx.globalAlpha = 0.35;
+        ctx.drawImage(feedSupermarket, 0, 0, 1920, 1080);
+        ctx.restore();
+      }
+
+      // Gradient làm dịu mắt
+      const grad = ctx.createRadialGradient(960, 540, 200, 960, 540, 1100);
+      grad.addColorStop(0, 'rgba(7, 14, 30, 0.7)');
+      grad.addColorStop(1, 'rgba(4, 8, 18, 0.96)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 1920, 1080);
+
+      // 2. Tiêu đề quy trình trên video
+      drawWorkflowHeader(step);
+
+      // 3. Nội dung hoạt hình theo từng bước nghiệp vụ
+      drawStepContent(currentStepIdx, p);
+
+      requestAnimationFrame(renderWorkflowScene);
+    }
+
+    // TIÊU ĐỀ BƯỚC ĐANG PHÁT TRÊN KHUNG HÌNH
+    function drawWorkflowHeader(step) {
+      ctx.fillStyle = '#0066FF';
+      roundRect(ctx, 120, 70, 260, 36, 9999);
+      ctx.fill();
+
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = '800 13px "Be Vietnam Pro"';
+      ctx.textAlign = 'center';
+      ctx.fillText(step.badge, 250, 93);
+
+      ctx.font = '900 32px "Be Vietnam Pro"';
+      ctx.textAlign = 'left';
+      ctx.fillText(step.title, 120, 150);
+
+      ctx.font = '500 16px "Be Vietnam Pro"';
+      ctx.fillStyle = '#94A3B8';
+      ctx.fillText(step.subtitle, 120, 180);
+    }
+
+    // NỘI DUNG TỪNG BƯỚC QUY TRÌNH
+    function drawStepContent(stepIdx, p) {
+      const time = globalFrameCounter * 0.03;
+
+      // BƯỚC 1: NHẬP HÀNG & QUY ĐỔI ĐA ĐƠN VỊ
+      if (stepIdx === 0) {
+        drawBoxCard(140, 240, 780, 720, 'ĐƠN NHẬP KHO #NK-20261012-01', () => {
+          ctx.fillStyle = '#1E293B';
+          ctx.font = '700 16px "Be Vietnam Pro"';
+          ctx.fillText('Nhà cung cấp: Công ty Bia Tiger & Thực phẩm sạch', 180, 330);
+          ctx.fillText('Số lượng nhập: 50 Thùng (Quy đổi tự động)', 180, 370);
+
+          // Sơ đồ quy đổi
+          drawUnitBadge(180, 430, '1 THÙNG', 'Giá: 384.000 đ', '#0066FF');
+          ctx.fillStyle = '#0066FF';
+          ctx.font = '800 28px "JetBrains Mono"';
+          ctx.fillText('⟷', 430, 490);
+          drawUnitBadge(500, 430, '4 LỐC', 'Giá: 96.000 đ', '#00C853');
+          ctx.fillText('⟷', 750, 490);
+          drawUnitBadge(820, 430, '24 LON', 'Giá: 18.000 đ/lon', '#FF9500');
+
+          ctx.fillStyle = '#00C853';
+          ctx.font = '800 22px "Be Vietnam Pro"';
+          ctx.fillText('✓ Hệ thống tự động chia tồn kho: +1.200 Lon', 180, 680);
+          ctx.fillStyle = '#475569';
+          ctx.font = '500 14px "Be Vietnam Pro"';
+          ctx.fillText('Bán xé lẻ lon tự trừ tồn kho thùng, giá vốn phân bổ chính xác 100%.', 180, 720);
+        });
+
+        // Minh họa thùng hàng 3D bên phải
+        drawIllustrateBox(1080, 240, 700, 720, 'KIỂM ĐẾM & PHÂN TÁCH KHO TỰ ĐỘNG');
+      }
+
+      // BƯỚC 2: HẠN DÙNG FEFO 3 MỨC MÀU
+      else if (stepIdx === 1) {
+        drawBoxCard(140, 240, 1640, 720, 'BẢNG PHÂN LOẠI DATE FEFO (FIRST-EXPIRED, FIRST-OUT)', () => {
+          // 3 Cột 3 mức màu FEFO
+          drawFefoColumn(180, 320, 480, 580, '#00C853', 'MỨC 1: XANH AN TOÀN', 'Hạn > 15 ngày', [
+            'Nước ngọt Coca-Cola 330ml (còn 180 ngày)',
+            'Dầu ăn Tường An 1L (còn 240 ngày)',
+            'Mì Hảo Hảo Tôm Chua Cay (còn 90 ngày)'
+          ], '✓ Đặt tại kho dự trữ bên trong');
+
+          drawFefoColumn(720, 320, 480, 580, '#FF9500', 'MỨC 2: CAM CẢNH BÁO', 'Hạn 8 - 15 ngày', [
+            'Sữa chua Vinamilk 100g (còn 12 ngày)',
+            'Bánh mì sandwich mềm (còn 10 ngày)',
+            'Chả lụa tiệt trùng 500g (còn 9 ngày)'
+          ], '⚠️ Đẩy ra phía ngoài mặt kệ trưng bày');
+
+          drawFefoColumn(1260, 320, 480, 580, '#FF3B30', 'MỨC 3: ĐỎ KHẨN CẤP', 'Hạn ≤ 7 ngày', [
+            'Sữa tươi thanh trùng 900ml (còn 3 ngày)',
+            'Bánh bao tươi trứng cút (còn 2 ngày)',
+            'Sữa chua nếp cẩm (còn 4 ngày)'
+          ], '🚨 BẬT BÁN KHUYẾN MÃI / BÁN TRƯỚC');
+        });
+      }
+
+      // BƯỚC 3: THU NGÂN POS & QUÉT MÃ VẠCH
+      else if (stepIdx === 2) {
+        // Bên trái: Máy tính POS
+        drawBoxCard(140, 240, 1080, 720, 'GIAO DIỆN MÁY TÍNH THU NGÂN POS', () => {
+          ctx.fillStyle = '#0F172A';
+          ctx.font = '700 16px "Be Vietnam Pro"';
+          ctx.fillText('Đang quét mặt hàng số 4: Bánh Chocopie Orion 360g', 180, 330);
+
+          // Bảng hàng hóa
+          ctx.fillStyle = '#F8FAFC';
+          ctx.fillRect(180, 360, 1000, 280);
+          ctx.strokeStyle = '#E2E8F0';
+          ctx.strokeRect(180, 360, 1000, 280);
+
+          ctx.fillStyle = '#1E293B';
+          ctx.font = 'bold 15px "Be Vietnam Pro"';
+          ctx.fillText('1. Mì Hảo Hảo Tôm Chua Cay x 10 gói ................... 45.000 đ', 210, 410);
+          ctx.fillText('2. Sữa tươi Vinamilk 180ml x 4 hộp ..................... 36.000 đ', 210, 460);
+          ctx.fillText('3. Dầu ăn Tường An 1L x 1 chai ........................ 52.000 đ', 210, 510);
+          ctx.fillStyle = '#0066FF';
+          ctx.fillText('4. Bánh Chocopie Orion 360g x 1 hộp [VỪA QUÉT] ....... 55.000 đ', 210, 560);
+
+          ctx.fillStyle = '#00C853';
+          ctx.font = '900 36px "JetBrains Mono"';
+          ctx.fillText('TỔNG CỘNG: 188.000 đ', 180, 710);
+        });
+
+        // Bên phải: Video live feed quét laser
+        drawPipFeed(1260, 240, 520, 720, 'CAMERA THỰC TẾ: QUÉT LASER QUẦY POS');
+      }
+
+      // BƯỚC 4: VIETQR & IN BILL
+      else if (stepIdx === 3) {
+        drawBoxCard(140, 240, 800, 720, 'KHỚP TIỀN VIETQR ĐỘNG TỰ ĐỘNG', () => {
+          ctx.fillStyle = '#1E293B';
+          ctx.font = '700 18px "Be Vietnam Pro"';
+          ctx.fillText('Mã VietQR tự động sinh số tiền: 188.000 đ', 180, 340);
+
+          // Vẽ mô phỏng QR Code lớn
+          drawBigQr(180, 380, 260);
+
+          ctx.fillStyle = '#00C853';
+          ctx.font = '800 20px "Be Vietnam Pro"';
+          ctx.fillText('⚡ ĐÃ NHẬN TIỀN: +188.000 đ', 480, 480);
+          ctx.fillStyle = '#64748B';
+          ctx.font = '14px "Be Vietnam Pro"';
+          ctx.fillText('Ngân hàng: MB Bank (Tự động khớp đơn trong 1.5s)', 480, 520);
+          ctx.fillText('Khách không cần đọc mã giao dịch, máy tính tự thông báo.', 480, 550);
+        });
+
+        // Bên phải: Hóa đơn in nhiệt chạy ra
+        drawBoxCard(980, 240, 800, 720, 'MÁY IN BILL NHIỆT 80MM TỰ ĐỘNG IN HÓA ĐƠN', () => {
+          ctx.fillStyle = '#F8FAFC';
+          ctx.fillRect(1040, 320, 680, 560);
+          ctx.strokeStyle = '#CBD5E1';
+          ctx.strokeRect(1040, 320, 680, 560);
+
+          ctx.fillStyle = '#0F172A';
+          ctx.font = '800 18px "Be Vietnam Pro"';
+          ctx.textAlign = 'center';
+          ctx.fillText('TIỆM TẠP HÓA MT-GRMS', 1380, 380);
+          ctx.font = '500 13px "JetBrains Mono"';
+          ctx.fillText('Số phiếu: #HD-20261012-094 • Quầy 01', 1380, 410);
+          ctx.fillText('----------------------------------------------------', 1380, 435);
+          ctx.textAlign = 'left';
+          ctx.fillText('4 Mặt hàng • Thanh toán VietQR', 1080, 470);
+          ctx.font = 'bold 20px "JetBrains Mono"';
+          ctx.fillText('TỔNG TIỀN: 188.000 đ (ĐÃ TT)', 1080, 520);
+          ctx.font = 'italic 14px "Be Vietnam Pro"';
+          ctx.textAlign = 'center';
+          ctx.fillText('CẢM ƠN QUÝ KHÁCH & HẸN GẶP LẠI!', 1380, 640);
+        });
+      }
+
+      // BƯỚC 5: SỔ NỢ ZALO 1 CHẠM
+      else if (stepIdx === 4) {
+        drawBoxCard(140, 240, 1640, 720, 'SỔ CÔNG NỢ ĐIỆN TỬ & GỬI NHẮC NỢ ZALO', () => {
+          ctx.fillStyle = '#1E293B';
+          ctx.font = '700 18px "Be Vietnam Pro"';
+          ctx.fillText('Danh sách khách quen mua thiếu (Đã số hóa thay thế sổ tay giấy):', 180, 330);
+
+          // 3 Thẻ khách hàng
+          drawCustomerDebtCard(180, 370, 'Chị Lan (Tạp Hóa Đầu Hẻm)', '0912 345 678', '85.000 đ', 'Hôm qua mua 2 chai dầu ăn', '#0066FF');
+          drawCustomerDebtCard(720, 370, 'Anh Hùng (Nhà số 14)', '0988 123 456', '140.000 đ', 'Mua 1 thùng bia Tiger thiếu 140k', '#8B5CF6');
+          drawCustomerDebtCard(1260, 370, 'Bác Ba (Hưu trí)', '0903 987 654', '42.000 đ', 'Mua gạo & đường cát', '#00C853');
+
+          ctx.fillStyle = '#0066FF';
+          ctx.font = '800 16px "Be Vietnam Pro"';
+          ctx.fillText('📲 Bấm [Gửi Zalo]: Hệ thống tự động gửi tin nhắn sao kê văn minh kèm link VietQR chuyển khoản nhanh.', 180, 840);
+        });
+      }
+
+      // BƯỚC 6: BÁO CÁO DOANH THU & QUẢN TRỊ TỪ XA
+      else if (stepIdx === 5) {
+        drawBoxCard(140, 240, 1640, 720, 'BÁO CÁO DOANH THU & THEO DÕI TỪ XA TRÊN SMARTPHONE', () => {
+          // Chỉ số KPI
+          drawKpiCard(180, 330, 360, 140, 'DOANH THU HÔM NAY', '18.450.000 đ', '+24% so với hôm qua', '#00C853');
+          drawKpiCard(580, 330, 360, 140, 'LỢI NHUẬN GỘP', '4.120.000 đ', 'Tỷ suất: 22.3%', '#0066FF');
+          drawKpiCard(980, 330, 360, 140, 'SỐ LƯỢNG HÓA ĐƠN', '142 Đơn', 'Bán chạy: Sữa & Mì tôm', '#FF9500');
+          drawKpiCard(1380, 330, 360, 140, 'CẢNH BÁO TỒN KHO', '2 Mặt hàng', 'Cần nhập thêm Bia Tiger', '#EF4444');
+
+          // Biểu đồ doanh số dạng cột
+          drawChartArea(180, 510, 1560, 350);
+        });
+      }
+    }
+
+    // CÁC HÀM TIỆN ÍCH VẼ ĐỒ HỌA
+    function drawBoxCard(x, y, w, h, title, contentCb) {
+      ctx.fillStyle = '#FFFFFF';
+      roundRect(ctx, x, y, w, h, 24);
+      ctx.fill();
+
+      // Thanh header thẻ
+      ctx.fillStyle = '#F1F5F9';
+      roundRect(ctx, x, y, w, 56, { tl: 24, tr: 24, bl: 0, br: 0 });
+      ctx.fill();
+
+      ctx.fillStyle = '#0F172A';
+      ctx.font = '800 16px "Be Vietnam Pro"';
+      ctx.textAlign = 'left';
+      ctx.fillText(title, x + 24, y + 35);
+
+      if (contentCb) contentCb();
+    }
+
+    function drawUnitBadge(x, y, title, subtitle, color) {
+      ctx.fillStyle = '#F8FAFC';
+      roundRect(ctx, x, y, 220, 120, 16);
+      ctx.fill();
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      ctx.fillStyle = '#0F172A';
+      ctx.font = '900 20px "Be Vietnam Pro"';
+      ctx.textAlign = 'center';
+      ctx.fillText(title, x + 110, y + 50);
+
+      ctx.fillStyle = color;
+      ctx.font = '600 14px "JetBrains Mono"';
+      ctx.fillText(subtitle, x + 110, y + 85);
+    }
+
+    function drawIllustrateBox(x, y, w, h, title) {
+      drawBoxCard(x, y, w, h, title, () => {
+        ctx.fillStyle = '#475569';
+        ctx.font = '600 15px "Be Vietnam Pro"';
+        ctx.fillText('Mô phỏng thùng hàng bia Tiger 24 lon:', x + 30, y + 100);
+
+        // Grid 24 lon bia
+        const startX = x + 40;
+        const startY = y + 140;
+        for (let r = 0; r < 4; r++) {
+          for (let c = 0; c < 6; c++) {
+            const cx = startX + c * 105;
+            const cy = startY + r * 115;
+            ctx.fillStyle = '#F1F5F9';
+            roundRect(ctx, cx, cy, 90, 95, 12);
+            ctx.fill();
+            ctx.fillStyle = '#0066FF';
+            ctx.font = 'bold 12px "JetBrains Mono"';
+            ctx.textAlign = 'center';
+            ctx.fillText('LON ' + (r * 6 + c + 1), cx + 45, cy + 52);
+          }
+        }
+      });
+    }
+
+    function drawFefoColumn(x, y, w, h, col, title, sub, items, act) {
+      ctx.fillStyle = '#F8FAFC';
+      roundRect(ctx, x, y, w, h, 18);
+      ctx.fill();
+      ctx.strokeStyle = col;
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+
+      ctx.fillStyle = col;
+      ctx.font = '800 16px "Be Vietnam Pro"';
+      ctx.textAlign = 'left';
+      ctx.fillText(title, x + 20, y + 45);
+
+      ctx.fillStyle = '#64748B';
+      ctx.font = '600 13px "JetBrains Mono"';
+      ctx.fillText(sub, x + 20, y + 75);
+
+      ctx.fillStyle = '#0F172A';
+      ctx.font = '500 14px "Be Vietnam Pro"';
+      items.forEach((it, idx) => {
+        ctx.fillText('• ' + it, x + 20, y + 130 + idx * 50);
+      });
+
+      // Khung hành động
+      ctx.fillStyle = col;
+      roundRect(ctx, x + 16, y + h - 70, w - 32, 48, 12);
+      ctx.fill();
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = 'bold 13px "Be Vietnam Pro"';
+      ctx.textAlign = 'center';
+      ctx.fillText(act, x + w / 2, y + h - 40);
+    }
+
+    function drawPipFeed(x, y, w, h, title) {
+      drawBoxCard(x, y, w, h, title, () => {
+        if (feedBarcode.readyState >= 2) {
+          ctx.save();
+          roundRect(ctx, x + 20, y + 80, w - 40, h - 120, 16);
+          ctx.clip();
+          ctx.drawImage(feedBarcode, x + 20, y + 80, w - 40, h - 120);
+          ctx.restore();
+        }
+
+        // Tia laser quét mã
+        const laserY = y + 250 + Math.sin(globalFrameCounter * 0.2) * 80;
+        ctx.strokeStyle = 'rgba(255, 0, 0, 0.9)';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(x + 30, laserY);
+        ctx.lineTo(x + w - 30, laserY);
+        ctx.stroke();
+      });
+    }
+
+    function drawBigQr(x, y, s) {
+      ctx.fillStyle = '#000000';
+      ctx.fillRect(x, y, s, s);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(x + 15, y + 15, s - 30, s - 30);
+      ctx.fillStyle = '#000000';
+      ctx.fillRect(x + 30, y + 30, 60, 60);
+      ctx.fillRect(x + s - 90, y + 30, 60, 60);
+      ctx.fillRect(x + 30, y + s - 90, 60, 60);
+      ctx.fillStyle = '#0066FF';
+      ctx.fillRect(x + s / 2 - 25, y + s / 2 - 25, 50, 50);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = '800 24px "Be Vietnam Pro"';
+      ctx.textAlign = 'center';
+      ctx.fillText('M', x + s / 2, y + s / 2 + 8);
+    }
+
+    function drawCustomerDebtCard(x, y, name, phone, debt, note, col) {
+      ctx.fillStyle = '#F8FAFC';
+      roundRect(ctx, x, y, 480, 420, 18);
+      ctx.fill();
+      ctx.strokeStyle = '#E2E8F0';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      ctx.fillStyle = '#0F172A';
+      ctx.font = '800 18px "Be Vietnam Pro"';
+      ctx.textAlign = 'left';
+      ctx.fillText(name, x + 24, y + 50);
+
+      ctx.fillStyle = '#64748B';
+      ctx.font = '500 14px "JetBrains Mono"';
+      ctx.fillText('SĐT: ' + phone, x + 24, y + 85);
+
+      ctx.fillStyle = '#EF4444';
+      ctx.font = '900 28px "JetBrains Mono"';
+      ctx.fillText('NỢ: ' + debt, x + 24, y + 145);
+
+      ctx.fillStyle = '#475569';
+      ctx.font = '14px "Be Vietnam Pro"';
+      ctx.fillText('Chi tiết: ' + note, x + 24, y + 200);
+
+      // Nút gửi Zalo
+      ctx.fillStyle = col;
+      roundRect(ctx, x + 24, y + 270, 432, 52, 9999);
+      ctx.fill();
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = '800 15px "Be Vietnam Pro"';
+      ctx.textAlign = 'center';
+      ctx.fillText('💬 GỬI NHẮC NỢ QUA ZALO', x + 240, y + 302);
+    }
+
+    function drawKpiCard(x, y, w, h, label, val, note, col) {
+      ctx.fillStyle = '#F8FAFC';
+      roundRect(ctx, x, y, w, h, 16);
+      ctx.fill();
+      ctx.strokeStyle = '#E2E8F0';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      ctx.fillStyle = '#64748B';
+      ctx.font = '700 12px "Be Vietnam Pro"';
+      ctx.textAlign = 'left';
+      ctx.fillText(label, x + 20, y + 35);
+
+      ctx.fillStyle = col;
+      ctx.font = '900 26px "JetBrains Mono"';
+      ctx.fillText(val, x + 20, y + 80);
+
+      ctx.fillStyle = '#475569';
+      ctx.font = '500 12px "Be Vietnam Pro"';
+      ctx.fillText(note, x + 20, y + 115);
+    }
+
+    function drawChartArea(x, y, w, h) {
+      ctx.fillStyle = '#F8FAFC';
+      roundRect(ctx, x, y, w, h, 16);
+      ctx.fill();
+      ctx.strokeStyle = '#E2E8F0';
+      ctx.stroke();
+
+      ctx.fillStyle = '#0F172A';
+      ctx.font = '800 15px "Be Vietnam Pro"';
+      ctx.textAlign = 'left';
+      ctx.fillText('BIỂU ĐỒ DOANH SỐ 7 NGÀY GẦN NHẤT (THEO GIỜ THỰC TẾ)', x + 24, y + 38);
+
+      // 7 Cột doanh thu
+      const days = ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'Chủ Nhật'];
+      const heights = [140, 180, 160, 210, 230, 270, 290];
+      const colW = 120;
+      const startX = x + 100;
+
+      days.forEach((d, i) => {
+        const cx = startX + i * 200;
+        const ch = heights[i];
+        const cy = y + h - 50 - ch;
+
+        ctx.fillStyle = i === 6 ? '#0066FF' : '#93C5FD';
+        roundRect(ctx, cx, cy, colW, ch, { tl: 8, tr: 8, bl: 0, br: 0 });
+        ctx.fill();
+
+        ctx.fillStyle = '#475569';
+        ctx.font = '600 13px "Be Vietnam Pro"';
+        ctx.textAlign = 'center';
+        ctx.fillText(d, cx + colW / 2, y + h - 20);
+
+        ctx.fillStyle = '#0F172A';
+        ctx.font = 'bold 13px "JetBrains Mono"';
+        ctx.fillText((ch * 80).toLocaleString('vi-VN') + 'k', cx + colW / 2, cy - 10);
+      });
+    }
+
+    function roundRect(c, x, y, w, h, r) {
+      const maxR = Math.min(w / 2, h / 2);
+      let radii = 0;
+      if (typeof r === 'number') radii = Math.min(r, maxR);
+      else if (r && typeof r === 'object') {
+        radii = [Math.min(r.tl || 0, maxR), Math.min(r.tr || 0, maxR), Math.min(r.br || 0, maxR), Math.min(r.bl || 0, maxR)];
+      }
+      c.beginPath();
+      if (typeof c.roundRect === 'function') c.roundRect(x, y, w, h, radii);
+      else c.rect(x, y, w, h);
+    }
+
+    function jumpToStep(idx) {
+      currentStepIdx = idx;
+      stepFrameCounter = 0;
+      updateActiveStepUi(idx);
+      playBeepSound(1900, 0.08);
+    }
+
+    function updateActiveStepUi(idx) {
+      const step = WORKFLOW_STEPS[idx];
+      document.getElementById('currentStageLabel').textContent = step.title;
+      for (let i = 0; i < 6; i++) {
+        const el = document.getElementById('btnStep' + i);
+        if (el) el.classList.toggle('active', i === idx);
+      }
+    }
+
+    function restartWorkflow() {
+      currentStepIdx = 0;
+      stepFrameCounter = 0;
+      updateActiveStepUi(0);
+      startHiddenMedia();
+    }
+
+    function initWorkflowPlayerStream() {
+      startHiddenMedia();
+      renderWorkflowScene();
+
+      try {
+        const stream = canvas.captureStream(60);
+        videoPlayer.srcObject = stream;
+        videoPlayer.play().catch(e => console.log('Autoplay:', e));
+      } catch (err) {
+        console.warn('Stream fallback:', err);
+      }
+    }
+
+    // XUẤT TOÀN BỘ VIDEO QUY TRÌNH RA FILE .WEBM ĐỂ CHÈN VÀO VIDEO DEMO
+    function exportWorkflowVideo() {
+      alert('Đang bắt đầu ghi hình video quy trình 6 bước (30 giây đầy đủ). Video sẽ tự động tải xuống sau khi ghi xong!');
+      currentStepIdx = 0;
+      stepFrameCounter = 0;
+      const stream = canvas.captureStream(30);
+      const chunks = [];
+      try {
+        const rec = new MediaRecorder(stream, { mimeType: 'video/webm' });
+        rec.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+        rec.onstop = () => {
+          const blob = new Blob(chunks, { type: 'video/webm' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.style.display = 'none';
+          a.href = url;
+          a.download = 'mtgrms_video_quy_trinh_quan_ly_tap_hoa.webm';
+          document.body.appendChild(a);
+          a.click();
+          setTimeout(() => {
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+          }, 100);
+        };
+        rec.start();
+        setTimeout(() => {
+          if (rec.state === 'recording') rec.stop();
+        }, 30000);
+      } catch (e) {
+        alert('Lỗi xuất video: ' + e.message);
+      }
+    }
+
+    window.addEventListener('DOMContentLoaded', initWorkflowPlayerStream);
+  </script>
+</body>
+</html>

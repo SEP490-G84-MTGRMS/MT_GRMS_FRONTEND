@@ -1,18 +1,19 @@
 import { useState } from 'react';
 import type { FC } from 'react';
+import { Link } from 'react-router-dom';
 
 interface NavbarProps {
-  onOpenLogin: () => void;
+  onOpenLogin?: () => void;
   onOpenTrial: () => void;
 }
 
-export const Navbar: FC<NavbarProps> = ({ onOpenLogin, onOpenTrial }) => {
+export const Navbar: FC<NavbarProps> = ({ onOpenTrial }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (
     <header className="site-header" id="header">
       <div className="container nav-container">
-        <a href="#" className="brand-logo" aria-label="MT-GRMS Trang Chủ">
+        <Link to="/" className="brand-logo" aria-label="MT-GRMS Trang Chủ">
           <div className="logo-symbol">
             <svg width="30" height="30" viewBox="0 0 32 32" fill="none">
               <path
@@ -36,7 +37,7 @@ export const Navbar: FC<NavbarProps> = ({ onOpenLogin, onOpenTrial }) => {
           <div className="logo-text">
             <span className="logo-name">MT-GRMS</span>
           </div>
-        </a>
+        </Link>
 
         <div className="nav-right-group">
           <nav className={`nav-menu ${mobileMenuOpen ? 'active' : ''}`} id="navMenu">
@@ -49,15 +50,29 @@ export const Navbar: FC<NavbarProps> = ({ onOpenLogin, onOpenTrial }) => {
             <a href="#hoi-dap" className="nav-link" onClick={() => setMobileMenuOpen(false)}>
               Chính sách & Hỏi đáp
             </a>
-            <a href="/admin/dashboard" className="nav-link" style={{ color: 'var(--blue-primary)', fontWeight: 600 }}>
+
+            <Link
+              to="/admin/dashboard"
+              className="nav-link"
+              onClick={() => setMobileMenuOpen(false)}
+              style={{ color: 'var(--blue-primary)', fontWeight: 600 }}
+            >
               👑 Demo Admin
-            </a>
+            </Link>
+            <Link
+              to="/employee/pos"
+              className="nav-link"
+              onClick={() => setMobileMenuOpen(false)}
+              style={{ color: '#0F766E', fontWeight: 600 }}
+            >
+              🧑‍💼 Demo Employee (POS)
+            </Link>
           </nav>
 
           <div className="nav-buttons">
-            <button type="button" className="btn btn-ghost btn-pill" onClick={onOpenLogin}>
+            <Link to="/auth/login" className="btn btn-ghost btn-pill">
               Đăng nhập
-            </button>
+            </Link>
             <button type="button" className="btn btn-primary btn-pill" onClick={onOpenTrial}>
               Dùng thử miễn phí
             </button>

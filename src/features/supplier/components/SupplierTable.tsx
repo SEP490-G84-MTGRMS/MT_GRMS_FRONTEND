@@ -69,12 +69,12 @@ export const SupplierTable: FC<Props> = ({
             </th>
             <th style={{ width: '7%' }}>Mã NCC</th>
             <th style={{ width: '17%' }}>Tên Nhà Cung Cấp</th>
-            <th style={{ width: '9.5%', textAlign: 'center' }}>Phân loại</th>
+            <th style={{ width: '9.5%' }}>Phân loại</th>
             <th style={{ width: '15.5%' }}>Người liên hệ</th>
-            <th style={{ width: '7%', textAlign: 'center' }}>Hạn nợ</th>
+            <th style={{ width: '7%' }}>Hạn nợ</th>
             <th style={{ width: '11%', textAlign: 'right' }}>Đang nợ</th>
             <th style={{ width: '9%', textAlign: 'right' }}>Quá hạn</th>
-            <th style={{ width: '8%', textAlign: 'center' }}>Trạng thái</th>
+            <th style={{ width: '8%' }}>Trạng thái</th>
             <th style={{ width: '13%', textAlign: 'right' }}>Hành động</th>
           </tr>
         </thead>
