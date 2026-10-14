@@ -1,11 +1,12 @@
-import type { FC } from "react";
+import type { FC } from 'react';
+import { Link } from 'react-router-dom';
 
 export const Footer: FC = () => {
   return (
     <footer className="site-footer">
       <div className="container footer-layout">
         <div className="footer-brand-box">
-          <a href="#" className="brand-logo footer-logo">
+          <Link to="/" className="brand-logo footer-logo">
             <div className="logo-symbol">
               <svg width="24" height="24" viewBox="0 0 32 32" fill="none">
                 <path
@@ -19,7 +20,7 @@ export const Footer: FC = () => {
               </svg>
             </div>
             <span className="logo-name">MT-GRMS</span>
-          </a>
+          </Link>
           <p className="footer-desc">
             Hệ thống quản lý bán lẻ đa chi nhánh chuyên biệt 100% cho tiệm tạp
             hóa gia đình và siêu thị mini. Dự án thuộc Đồ án Tốt nghiệp Kỹ thuật
@@ -69,9 +70,14 @@ export const Footer: FC = () => {
               <a href="#hoi-dap">Câu hỏi thường gặp</a>
             </li>
             <li>
-              <a href="/admin/dashboard" style={{ color: 'var(--blue-primary)', fontWeight: 600 }}>
+              <Link to="/auth/login" style={{ color: 'var(--blue-primary)', fontWeight: 600 }}>
+                🔑 Đăng nhập hệ thống
+              </Link>
+            </li>
+            <li>
+              <Link to="/admin/dashboard" style={{ color: 'var(--blue-primary)', fontWeight: 600 }}>
                 👑 Cổng Master Admin
-              </a>
+              </Link>
             </li>
           </ul>
         </div>
@@ -82,7 +88,7 @@ export const Footer: FC = () => {
             <strong>Hotline / Zalo:</strong> 0123.456.789
           </p>
           <p>
-            <strong>Email:</strong>email@gmail.com
+            <strong>Email:</strong> email@gmail.com
           </p>
           <p>
             <strong>Địa chỉ:</strong> Khu Công nghệ cao Hòa Lạc, Km29 Đại lộ

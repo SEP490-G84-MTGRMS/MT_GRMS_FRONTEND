@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { FC } from 'react';
 import type { SupplierSummary, PurchaseOrderItem } from '../../types/supplier.types';
 import { History } from 'lucide-react';
@@ -16,7 +17,22 @@ const PO_STATUS_LABEL: Record<PurchaseOrderItem['status'], { text: string; bg: s
 };
 
 export const SupplierHistoryTab: FC<Props> = ({ supplier, purchaseOrders }) => {
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const fmt = (val: number) => new Intl.NumberFormat('vi-VN').format(val) + ' đ';
+
+  const toggleSelectAll = () => {
+    if (selectedIds.length === purchaseOrders.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(purchaseOrders.map((po) => po.id));
+    }
+  };
+
+  const toggleSelectOne = (id: string) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -48,12 +64,19 @@ export const SupplierHistoryTab: FC<Props> = ({ supplier, purchaseOrders }) => {
           <table className="admin-data-table" style={{ width: '100%' }}>
             <thead>
               <tr>
+                <th style={{ width: 30, textAlign: 'center', padding: '10px 4px' }}>
+                  <input
+                    type="checkbox"
+                    checked={purchaseOrders.length > 0 && selectedIds.length === purchaseOrders.length}
+                    onChange={toggleSelectAll}
+                  />
+                </th>
                 <th style={{ width: 150 }}>Mã Đơn PO</th>
                 <th style={{ width: 120 }}>Ngày đặt</th>
                 <th style={{ width: 120 }}>Ngày giao</th>
                 <th>Chi nhánh nhận</th>
                 <th style={{ width: 140, textAlign: 'right' }}>Giá trị đơn</th>
-                <th style={{ width: 140, textAlign: 'center' }}>Trạng thái</th>
+                <th style={{ width: 140, textAlign: 'left' }}>Trạng thái</th>
               </tr>
             </thead>
             <tbody>
@@ -62,6 +85,13 @@ export const SupplierHistoryTab: FC<Props> = ({ supplier, purchaseOrders }) => {
                   const badgeStyle = PO_STATUS_LABEL[po.status] || PO_STATUS_LABEL.COMPLETED;
                   return (
                     <tr key={po.id}>
+                      <td style={{ textAlign: 'center', padding: '10px 4px' }}>
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.includes(po.id)}
+                          onChange={() => toggleSelectOne(po.id)}
+                        />
+                      </td>
                       <td>
                         <span className="admin-subdomain-tag" style={{ fontFamily: 'var(--font-mono)' }}>
                           {po.code}
@@ -75,15 +105,12 @@ export const SupplierHistoryTab: FC<Props> = ({ supplier, purchaseOrders }) => {
                       <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', fontWeight: 700, color: '#111827' }}>
                         {fmt(po.totalAmount)}
                       </td>
-                      <td style={{ textAlign: 'center' }}>
+                      <td style={{ textAlign: 'left' }}>
                         <span
-                          className="admin-badge"
                           style={{
-                            backgroundColor: badgeStyle.bg,
                             color: badgeStyle.color,
-                            border: `1px solid ${badgeStyle.border}`,
-                            padding: '3px 10px',
-                            fontSize: 11.5,
+                            fontSize: 13,
+                            fontWeight: 500,
                           }}
                         >
                           {badgeStyle.text}
@@ -94,7 +121,7 @@ export const SupplierHistoryTab: FC<Props> = ({ supplier, purchaseOrders }) => {
                 })
               ) : (
                 <tr>
-                  <td colSpan={6} style={{ textAlign: 'center', padding: '30px', color: 'var(--text-muted)' }}>
+                  <td colSpan={7} style={{ textAlign: 'center', padding: '30px', color: 'var(--text-muted)' }}>
                     Chưa có đơn hàng nào được ghi nhận.
                   </td>
                 </tr>

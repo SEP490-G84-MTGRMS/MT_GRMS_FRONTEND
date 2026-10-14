@@ -10,7 +10,7 @@ export const StoreOwnerLayout: FC = () => {
         flexDirection: 'column',
         minHeight: '100vh',
         width: '100%',
-        backgroundColor: 'var(--bg-soft-blue)',
+        backgroundColor: '#ffffff',
         color: 'var(--text-main)',
       }}
     >

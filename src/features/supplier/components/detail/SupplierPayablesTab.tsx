@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { FC } from 'react';
 import type { SupplierSummary, APLedgerEntry } from '../../types/supplier.types';
 import { CreditCard, FileSpreadsheet } from 'lucide-react';
@@ -15,7 +16,22 @@ const DOC_TYPE_LABEL: Record<APLedgerEntry['docType'], string> = {
 };
 
 export const SupplierPayablesTab: FC<Props> = ({ supplier, apLedgers }) => {
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const fmt = (val: number) => new Intl.NumberFormat('vi-VN').format(val) + ' đ';
+
+  const toggleSelectAll = () => {
+    if (selectedIds.length === apLedgers.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(apLedgers.map((e) => e.id));
+    }
+  };
+
+  const toggleSelectOne = (id: string) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -49,7 +65,7 @@ export const SupplierPayablesTab: FC<Props> = ({ supplier, apLedgers }) => {
             type="button"
             className="admin-btn admin-btn-secondary"
             onClick={() => alert(`Đang xuất bảng đối soát công nợ NCC ${supplier.name} ra Excel!`)}
-            style={{ height: 36, padding: '0 16px', gap: 6, borderRadius: 'var(--radius-pill)' }}
+            style={{ height: 34, padding: '0 14px', gap: 6, borderRadius: 6 }}
           >
             <FileSpreadsheet size={14} />
             <span>Xuất Sao Kê Excel</span>
@@ -99,6 +115,13 @@ export const SupplierPayablesTab: FC<Props> = ({ supplier, apLedgers }) => {
           <table className="admin-data-table" style={{ width: '100%' }}>
             <thead>
               <tr>
+                <th style={{ width: 30, textAlign: 'center', padding: '10px 4px' }}>
+                  <input
+                    type="checkbox"
+                    checked={apLedgers.length > 0 && selectedIds.length === apLedgers.length}
+                    onChange={toggleSelectAll}
+                  />
+                </th>
                 <th style={{ width: 140 }}>Mã chứng từ</th>
                 <th style={{ width: 110 }}>Loại</th>
                 <th style={{ width: 120 }}>Ngày GD</th>
@@ -111,6 +134,13 @@ export const SupplierPayablesTab: FC<Props> = ({ supplier, apLedgers }) => {
               {apLedgers.length > 0 ? (
                 apLedgers.map((entry) => (
                   <tr key={entry.id}>
+                    <td style={{ textAlign: 'center', padding: '10px 4px' }}>
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.includes(entry.id)}
+                        onChange={() => toggleSelectOne(entry.id)}
+                      />
+                    </td>
                     <td>
                       <span className="admin-subdomain-tag" style={{ fontFamily: 'var(--font-mono)' }}>
                         {entry.docNo}
@@ -118,13 +148,10 @@ export const SupplierPayablesTab: FC<Props> = ({ supplier, apLedgers }) => {
                     </td>
                     <td>
                       <span
-                        className="admin-badge"
                         style={{
-                          backgroundColor: entry.direction === 1 ? 'var(--blue-light)' : '#e8f9ee',
-                          color: entry.direction === 1 ? 'var(--blue-primary)' : '#008800',
-                          border: `1px solid ${entry.direction === 1 ? 'var(--blue-border)' : '#008800'}`,
-                          padding: '2px 8px',
-                          fontSize: 11,
+                          color: entry.direction === 1 ? 'var(--blue-primary, #0f766e)' : '#16a34a',
+                          fontSize: 13,
+                          fontWeight: 500,
                         }}
                       >
                         {DOC_TYPE_LABEL[entry.docType] || entry.docType}
@@ -156,7 +183,7 @@ export const SupplierPayablesTab: FC<Props> = ({ supplier, apLedgers }) => {
                 ))
               ) : (
                 <tr>
-                  <td colSpan={6} style={{ textAlign: 'center', padding: '30px', color: 'var(--text-muted)' }}>
+                  <td colSpan={7} style={{ textAlign: 'center', padding: '30px', color: 'var(--text-muted)' }}>
                     Chưa có giao dịch phát sinh công nợ nào.
                   </td>
                 </tr>

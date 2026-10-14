@@ -60,9 +60,21 @@ export const LoginModal: FC<LoginModalProps> = ({ isOpen, onClose, onSuccess }) 
           </div>
 
           <div className="form-field">
-            <label htmlFor="loginPass" className="form-label">
-              Mật khẩu
-            </label>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <label htmlFor="loginPass" className="form-label" style={{ marginBottom: 0 }}>
+                Mật khẩu
+              </label>
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  navigate('/auth/forgot-password');
+                }}
+                style={{ background: 'none', border: 'none', color: 'var(--blue-primary)', fontSize: '0.8rem', cursor: 'pointer', padding: 0 }}
+              >
+                Quên mật khẩu?
+              </button>
+            </div>
             <input
               type="password"
               id="loginPass"
@@ -77,6 +89,20 @@ export const LoginModal: FC<LoginModalProps> = ({ isOpen, onClose, onSuccess }) 
           <button type="submit" className="btn btn-primary btn-pill btn-block btn-lg">
             Đăng nhập vào hệ thống
           </button>
+
+          <div style={{ textAlign: 'center', marginTop: '14px', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+            Chưa có tài khoản?{' '}
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                navigate('/auth/register');
+              }}
+              style={{ background: 'none', border: 'none', color: 'var(--blue-primary)', fontWeight: 600, cursor: 'pointer', padding: 0 }}
+            >
+              Đăng ký ngay
+            </button>
+          </div>
         </form>
       </div>
     </div>
