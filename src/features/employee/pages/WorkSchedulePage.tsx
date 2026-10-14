@@ -1,5 +1,4 @@
-import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState, useMemo } from 'react';
 import { Search, Clock, Plus, Download, User, Calendar } from 'lucide-react';
 import type {
   Employee,
@@ -17,17 +16,41 @@ import {
 import { AddScheduleModal } from '../components/AddScheduleModal';
 import { EmployeeDetailModal } from '../components/EmployeeDetailModal';
 import { BatchUpdateScheduleModal } from '../components/BatchUpdateScheduleModal';
+import { ShiftInfoModal } from '../components/ShiftInfoModal';
 import '../employee.css';
 
-const DAYS_HEADER: Array<{ key: 'T2' | 'T3' | 'T4' | 'T5' | 'T6' | 'T7' | 'CN'; label: string; date: number; isToday?: boolean }> = [
-  { key: 'T2', label: 'Thứ hai', date: 14 },
-  { key: 'T3', label: 'Thứ ba', date: 15 },
-  { key: 'T4', label: 'Thứ tư', date: 16 },
-  { key: 'T5', label: 'Thứ năm', date: 17 },
-  { key: 'T6', label: 'Thứ sáu', date: 18, isToday: true },
-  { key: 'T7', label: 'Thứ bảy', date: 19 },
-  { key: 'CN', label: 'Chủ nhật', date: 20 },
-];
+const getWeekDates = (offsetWeeks: number) => {
+  // Mốc mặc định: Thứ Hai 14/10/2026 (Tuần 3 - Th. 10 2026)
+  const baseMonday = new Date(2026, 9, 14);
+  const monday = new Date(baseMonday);
+  monday.setDate(baseMonday.getDate() + offsetWeeks * 7);
+
+  // Tính tuần trong tháng
+  const firstDay = new Date(monday.getFullYear(), monday.getMonth(), 1);
+  const firstDayOffset = (firstDay.getDay() + 6) % 7; // Thứ 2 là 0, CN là 6
+  const weekNumber = Math.ceil((monday.getDate() + firstDayOffset) / 7);
+  const month = monday.getMonth() + 1;
+  const year = monday.getFullYear();
+  const label = `Tuần ${weekNumber} - Th. ${month} ${year}`;
+
+  const dayKeys: Array<'T2' | 'T3' | 'T4' | 'T5' | 'T6' | 'T7' | 'CN'> = [
+    'T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN',
+  ];
+  const dayNames = ['Thứ hai', 'Thứ ba', 'Thứ tư', 'Thứ năm', 'Thứ sáu', 'Thứ bảy', 'Chủ nhật'];
+
+  const days = dayKeys.map((key, index) => {
+    const cur = new Date(monday);
+    cur.setDate(monday.getDate() + index);
+    return {
+      key,
+      label: dayNames[index],
+      date: cur.getDate(),
+      isToday: offsetWeeks === 0 && key === 'T6',
+    };
+  });
+
+  return { label, days };
+};
 
 export const WorkSchedulePage: React.FC = () => {
   const [employees, setEmployees] = useState<Employee[]>(MOCK_EMPLOYEES);
@@ -42,11 +65,18 @@ export const WorkSchedulePage: React.FC = () => {
 
   const [viewMode, setViewMode] = useState<'by_employee' | 'by_shift'>('by_employee');
   const [searchEmployee, setSearchEmployee] = useState('');
-  const [weekLabel] = useState('Tuần 3 - Th. 10 2026');
+  const [weekOffset, setWeekOffset] = useState(0);
+
+  const weekData = useMemo(() => getWeekDates(weekOffset), [weekOffset]);
+  const DAYS_HEADER = weekData.days;
+
+  const handlePrevWeek = () => setWeekOffset((prev) => prev - 1);
+  const handleNextWeek = () => setWeekOffset((prev) => prev + 1);
 
   // Modal states
   const [showAddModal, setShowAddModal] = useState(false);
   const [showBatchModal, setShowBatchModal] = useState(false);
+  const [showShiftInfoModal, setShowShiftInfoModal] = useState(false);
   const [selectedEmpId, setSelectedEmpId] = useState<string | undefined>();
   const [selectedDay, setSelectedDay] = useState<'T2' | 'T3' | 'T4' | 'T5' | 'T6' | 'T7' | 'CN' | undefined>();
 
@@ -150,13 +180,85 @@ export const WorkSchedulePage: React.FC = () => {
           </div>
 
           {/* Điều hướng tuần */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#F8FAFC', padding: '4px 12px', borderRadius: 9999, border: '1px solid #E2E8F0' }}>
-            <button type="button" style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontWeight: 700 }}>
-              &larr;
+          <div
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              background: '#FFFFFF',
+              border: '1px solid #CBD5E1',
+              borderRadius: 8,
+              padding: '3px 4px',
+              boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
+            }}
+          >
+            <button
+              type="button"
+              onClick={handlePrevWeek}
+              title="Tuần trước"
+              style={{
+                background: '#F1F5F9',
+                border: '1px solid #CBD5E1',
+                borderRadius: 6,
+                width: 28,
+                height: 28,
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                fontWeight: 700,
+                fontSize: 13,
+                color: '#1E293B',
+                transition: 'all 0.15s ease',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = '#E2E8F0';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = '#F1F5F9';
+              }}
+            >
+              &lt;
             </button>
-            <span style={{ fontSize: 13, fontWeight: 700, color: '#0F766E' }}>{weekLabel}</span>
-            <button type="button" style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontWeight: 700 }}>
-              &rarr;
+            <span
+              style={{
+                fontSize: 14,
+                fontWeight: 800,
+                color: '#0F172A',
+                padding: '0 14px',
+                letterSpacing: '-0.2px',
+                userSelect: 'none',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {weekData.label}
+            </span>
+            <button
+              type="button"
+              onClick={handleNextWeek}
+              title="Tuần sau"
+              style={{
+                background: '#F1F5F9',
+                border: '1px solid #CBD5E1',
+                borderRadius: 6,
+                width: 28,
+                height: 28,
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                fontWeight: 700,
+                fontSize: 13,
+                color: '#1E293B',
+                transition: 'all 0.15s ease',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = '#E2E8F0';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = '#F1F5F9';
+              }}
+            >
+              &gt;
             </button>
           </div>
         </div>
@@ -173,16 +275,17 @@ export const WorkSchedulePage: React.FC = () => {
             <option value="by_shift">Xem theo ca</option>
           </select>
 
-          <Link to="/store-owner/employees/shifts" style={{ textDecoration: 'none' }}>
-            <button
-              type="button"
-              className="emp-btn emp-btn-secondary"
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
-            >
-              <Clock size={15} />
-              <span>Quản lý ca</span>
-            </button>
-          </Link>
+          {/* Nút hiển thị Thông tin ca làm việc */}
+          <button
+            type="button"
+            className="emp-btn emp-btn-secondary"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+            onClick={() => setShowShiftInfoModal(true)}
+            title="Xem quy định và khung giờ 4 ca làm việc cố định"
+          >
+            <Clock size={15} />
+            <span>Thông tin ca</span>
+          </button>
 
           {/* Nút cập nhật hàng loạt */}
           <button
@@ -584,6 +687,13 @@ export const WorkSchedulePage: React.FC = () => {
         shifts={shifts}
         branches={branches}
         onSaveBatch={handleSaveBatchAssignments}
+      />
+
+      {/* Modal Thông Tin Các Ca Làm Việc Cố Định */}
+      <ShiftInfoModal
+        isOpen={showShiftInfoModal}
+        onClose={() => setShowShiftInfoModal(false)}
+        shifts={shifts}
       />
     </div>
   );

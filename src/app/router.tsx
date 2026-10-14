@@ -9,7 +9,6 @@ import { ServiceExpensesPage } from '../features/service-expenses/pages/ServiceE
 import {
   EmployeeListPage,
   WorkSchedulePage,
-  WorkshiftManagementPage,
   AttendancePage,
   PayslipManagementPage,
 } from '../features/employee';
@@ -71,10 +70,6 @@ export const router = createBrowserRouter([
         element: <WorkSchedulePage />,
       },
       {
-        path: 'employees/shifts',
-        element: <WorkshiftManagementPage />,
-      },
-      {
         path: 'employees/attendance',
         element: <AttendancePage />,
       },
@@ -127,10 +122,6 @@ export const router = createBrowserRouter([
       {
         path: 'employees/schedule',
         element: <WorkSchedulePage />,
-      },
-      {
-        path: 'employees/shifts',
-        element: <WorkshiftManagementPage />,
       },
       {
         path: 'employees/attendance',
@@ -187,10 +178,6 @@ export const router = createBrowserRouter([
         element: <WorkSchedulePage />,
       },
       {
-        path: 'employees/shifts',
-        element: <WorkshiftManagementPage />,
-      },
-      {
         path: 'employees/attendance',
         element: <AttendancePage />,
       },
@@ -211,10 +198,6 @@ export const router = createBrowserRouter([
       {
         path: 'schedule',
         element: <WorkSchedulePage />,
-      },
-      {
-        path: 'shifts',
-        element: <WorkshiftManagementPage />,
       },
       {
         path: 'attendance',

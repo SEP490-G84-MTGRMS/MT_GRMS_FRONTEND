@@ -84,7 +84,6 @@ const NAV_GROUPS: NavGroup[] = [
     children: [
       { label: 'Danh sách nhân viên', to: '/store-owner/employees' },
       { label: 'Lịch làm việc', to: '/store-owner/employees/schedule', badge: 'Lịch' },
-      { label: 'Quản lý ca làm việc', to: '/store-owner/employees/shifts' },
       { label: 'Bảng chấm công', to: '/store-owner/employees/attendance', badge: 'GPS/QR' },
       { label: 'Bảng tính lương', to: '/store-owner/employees/payroll', badge: 'Mới' },
     ],

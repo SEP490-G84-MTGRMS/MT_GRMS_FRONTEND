@@ -15,6 +15,5 @@ export * from './components/PayslipDetailModal';
 export * from './components/PayslipPaymentModal';
 export * from './pages/EmployeeListPage';
 export * from './pages/WorkSchedulePage';
-export * from './pages/WorkshiftManagementPage';
 export * from './pages/AttendancePage';
 export * from './pages/PayslipManagementPage';
