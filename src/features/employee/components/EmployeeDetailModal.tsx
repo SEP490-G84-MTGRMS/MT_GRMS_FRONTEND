@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Pencil, Download, Banknote } from 'lucide-react';
+import { Pencil, Download, Banknote, Calendar, Plus } from 'lucide-react';
 import type { Employee, DebtTransaction } from '../types';
 
 interface EmployeeDetailModalProps {
@@ -9,6 +9,7 @@ interface EmployeeDetailModalProps {
   onEdit: (employee: Employee) => void;
   onToggleStatus: (employeeId: string) => void;
   onAddPayment: (employeeId: string, payment: DebtTransaction) => void;
+  initialTab?: 'info' | 'schedule' | 'salary' | 'payslip' | 'debt';
 }
 
 export const EmployeeDetailModal: React.FC<EmployeeDetailModalProps> = ({
@@ -18,8 +19,15 @@ export const EmployeeDetailModal: React.FC<EmployeeDetailModalProps> = ({
   onEdit,
   onToggleStatus,
   onAddPayment,
+  initialTab = 'info',
 }) => {
-  const [activeTab, setActiveTab] = useState<'info' | 'schedule' | 'salary' | 'payslip' | 'debt'>('info');
+  const [activeTab, setActiveTab] = useState<'info' | 'schedule' | 'salary' | 'payslip' | 'debt'>(initialTab);
+
+  React.useEffect(() => {
+    if (isOpen && initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [isOpen, initialTab]);
   const [scheduleView, setScheduleView] = useState<'table' | 'list'>('table');
 
   // Schedule Filter State (Chỉ theo tuần)

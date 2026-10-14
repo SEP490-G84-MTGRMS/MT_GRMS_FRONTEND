@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Search, Clock, Plus, Download, User } from 'lucide-react';
+import { Search, Clock, Plus, Download, User, Calendar } from 'lucide-react';
 import type {
   Employee,
+  EmployeeStatus,
   WorkShiftDefinition,
   ScheduleAssignment,
+  DebtTransaction,
 } from '../types';
 import {
   MOCK_EMPLOYEES,
@@ -13,6 +15,8 @@ import {
   MOCK_SCHEDULE_ASSIGNMENTS,
 } from '../services/mockData';
 import { AddScheduleModal } from '../components/AddScheduleModal';
+import { EmployeeDetailModal } from '../components/EmployeeDetailModal';
+import { BatchUpdateScheduleModal } from '../components/BatchUpdateScheduleModal';
 import '../employee.css';
 
 const DAYS_HEADER: Array<{ key: 'T2' | 'T3' | 'T4' | 'T5' | 'T6' | 'T7' | 'CN'; label: string; date: number; isToday?: boolean }> = [
@@ -26,10 +30,15 @@ const DAYS_HEADER: Array<{ key: 'T2' | 'T3' | 'T4' | 'T5' | 'T6' | 'T7' | 'CN'; 
 ];
 
 export const WorkSchedulePage: React.FC = () => {
-  const [employees] = useState<Employee[]>(MOCK_EMPLOYEES);
-  const [shifts] = useState<WorkShiftDefinition[]>(MOCK_WORK_SHIFTS);
+  const [employees, setEmployees] = useState<Employee[]>(MOCK_EMPLOYEES);
+  const [shifts, setShifts] = useState<WorkShiftDefinition[]>(MOCK_WORK_SHIFTS);
   const [branches] = useState(MOCK_BRANCHES);
   const [assignments, setAssignments] = useState<ScheduleAssignment[]>(MOCK_SCHEDULE_ASSIGNMENTS);
+
+  // Đảm bảo luôn đồng bộ danh sách ca (bao gồm cả Ca tùy chọn)
+  React.useEffect(() => {
+    setShifts(MOCK_WORK_SHIFTS);
+  }, []);
 
   const [viewMode, setViewMode] = useState<'by_employee' | 'by_shift'>('by_employee');
   const [searchEmployee, setSearchEmployee] = useState('');
@@ -37,8 +46,12 @@ export const WorkSchedulePage: React.FC = () => {
 
   // Modal states
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showBatchModal, setShowBatchModal] = useState(false);
   const [selectedEmpId, setSelectedEmpId] = useState<string | undefined>();
   const [selectedDay, setSelectedDay] = useState<'T2' | 'T3' | 'T4' | 'T5' | 'T6' | 'T7' | 'CN' | undefined>();
+
+  // State mở Modal chi tiết nhân viên (chuyên tab Lịch làm việc)
+  const [selectedDetailEmployee, setSelectedDetailEmployee] = useState<Employee | null>(null);
 
   const filteredEmployees = employees.filter((e) =>
     e.fullName.toLowerCase().includes(searchEmployee.toLowerCase()) ||
@@ -59,6 +72,53 @@ export const WorkSchedulePage: React.FC = () => {
     e.stopPropagation();
     if (window.confirm('Bạn có muốn hủy phân ca này?')) {
       setAssignments((prev) => prev.filter((a) => a.id !== assignId));
+    }
+  };
+
+  const handleToggleEmployeeStatus = (employeeId: string) => {
+    setEmployees((prev) =>
+      prev.map((e) => {
+        if (e.id === employeeId) {
+          const newStatus: EmployeeStatus = e.status === 'active' ? 'inactive' : 'active';
+          const updated: Employee = { ...e, status: newStatus };
+          if (selectedDetailEmployee?.id === employeeId) {
+            setSelectedDetailEmployee(updated);
+          }
+          return updated;
+        }
+        return e;
+      })
+    );
+  };
+
+  const handleAddPayment = (employeeId: string, payment: DebtTransaction) => {
+    setEmployees((prev) =>
+      prev.map((e) => {
+        if (e.id === employeeId) {
+          const updatedDebt = payment.remainingDebtAfter;
+          const updatedHistory = [payment, ...(e.debtHistory || [])];
+          const updated = { ...e, debtAmount: updatedDebt, debtHistory: updatedHistory };
+          if (selectedDetailEmployee?.id === employeeId) {
+            setSelectedDetailEmployee(updated);
+          }
+          return updated;
+        }
+        return e;
+      })
+    );
+  };
+
+  const handleSaveBatchAssignments = (newItems: ScheduleAssignment[], replaceExisting: boolean) => {
+    if (replaceExisting) {
+      // Lấy danh sách ID các nhân viên được cập nhật
+      const targetEmpIds = new Set(newItems.map((item) => item.employeeId));
+      // Loại bỏ các ca cũ của các nhân viên này và thêm các ca mới
+      setAssignments((prev) => [
+        ...prev.filter((a) => !targetEmpIds.has(a.employeeId)),
+        ...newItems,
+      ]);
+    } else {
+      setAssignments((prev) => [...prev, ...newItems]);
     }
   };
 
@@ -124,6 +184,18 @@ export const WorkSchedulePage: React.FC = () => {
             </button>
           </Link>
 
+          {/* Nút cập nhật hàng loạt */}
+          <button
+            type="button"
+            className="emp-btn emp-btn-outline-teal"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+            onClick={() => setShowBatchModal(true)}
+            title="Cập nhật hàng loạt ca làm việc cho nhiều nhân viên"
+          >
+            <Calendar size={15} />
+            <span>Cập nhật hàng loạt</span>
+          </button>
+
           <button
             type="button"
             className="emp-btn emp-btn-primary"
@@ -153,7 +225,7 @@ export const WorkSchedulePage: React.FC = () => {
       {/* ─── CHẾ ĐỘ XEM 1: THEO NHÂN VIÊN ─── */}
       {viewMode === 'by_employee' && (
         <div className="emp-table-container">
-          <table className="emp-table" style={{ textAlign: 'center' }}>
+          <table className="emp-table" style={{ textAlign: 'center', tableLayout: 'fixed', width: '100%' }}>
             <thead>
               <tr>
                 <th style={{ width: 200, textAlign: 'left' }}>Nhân viên</th>
@@ -183,10 +255,86 @@ export const WorkSchedulePage: React.FC = () => {
 
                 return (
                   <tr key={emp.id} style={{ height: 68 }}>
-                    {/* Cột nhân viên */}
-                    <td style={{ textAlign: 'left', verticalAlign: 'middle' }}>
-                      <div style={{ fontWeight: 700, color: '#0F172A' }}>{emp.fullName}</div>
-                      <div style={{ fontSize: 11, color: '#64748B' }}>{emp.employeeCode}</div>
+                    {/* Cột nhân viên (Click để xem chi tiết lịch làm việc 360) */}
+                    <td
+                      style={{
+                        textAlign: 'left',
+                        verticalAlign: 'middle',
+                        cursor: 'pointer',
+                        transition: 'background-color 0.15s ease',
+                      }}
+                      onClick={() => setSelectedDetailEmployee(emp)}
+                      title="Nhấn để xem chi tiết lịch làm việc của nhân viên này"
+                    >
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 10,
+                          padding: '4px 6px',
+                          borderRadius: 8,
+                          transition: 'background-color 0.15s ease',
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = '#F0FDFA';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = 'transparent';
+                        }}
+                      >
+                        <div
+                          className="emp-avatar-cell"
+                          style={{
+                            width: 36,
+                            height: 36,
+                            minWidth: 36,
+                            fontSize: 14,
+                            fontWeight: 700,
+                            borderRadius: '50%',
+                            background: '#CCFBF1',
+                            color: '#0F766E',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            border: '1px solid #99F6E4',
+                          }}
+                        >
+                          {emp.avatarUrl ? (
+                            <img src={emp.avatarUrl} alt={emp.fullName} style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+                          ) : (
+                            <span>{emp.fullName.charAt(0)}</span>
+                          )}
+                        </div>
+                        <div style={{ minWidth: 0, flex: 1 }}>
+                          <div
+                            style={{
+                              fontWeight: 700,
+                              color: '#0F766E',
+                              fontSize: 13,
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 6,
+                            }}
+                          >
+                            <span>{emp.fullName}</span>
+                          </div>
+                          <div style={{ fontSize: 11, color: '#64748B', display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                            <span style={{ fontWeight: 600 }}>{emp.employeeCode}</span>
+                            <span style={{ color: '#CBD5E1' }}>&bull;</span>
+                            <span
+                              style={{
+                                color: shiftCount > 0 ? '#0D9488' : '#94A3B8',
+                                fontWeight: 500,
+                              }}
+                            >
+                              {shiftCount} ca tuần này
+                            </span>
+                          </div>
+                        </div>
+                      </div>
                     </td>
 
                     {/* 7 Ngày trong tuần */}
@@ -283,10 +431,10 @@ export const WorkSchedulePage: React.FC = () => {
       {/* ─── CHẾ ĐỘ XEM 2: THEO CA LÀM VIỆC ─── */}
       {viewMode === 'by_shift' && (
         <div className="emp-table-container">
-          <table className="emp-table" style={{ textAlign: 'center' }}>
+          <table className="emp-table" style={{ textAlign: 'center', tableLayout: 'fixed', width: '100%' }}>
             <thead>
               <tr>
-                <th style={{ width: 220, textAlign: 'left' }}>Ca làm việc</th>
+                <th style={{ width: 230, textAlign: 'left' }}>Ca làm việc</th>
                 {DAYS_HEADER.map((d) => (
                   <th key={d.key} style={{ textAlign: 'center' }}>
                     <div>{d.label}</div>
@@ -297,22 +445,23 @@ export const WorkSchedulePage: React.FC = () => {
             </thead>
             <tbody>
               {shifts.map((sh) => (
-                <tr key={sh.id} style={{ height: 75 }}>
-                  <td style={{ textAlign: 'left' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <tr key={sh.id} style={{ height: 80 }}>
+                  <td style={{ textAlign: 'left', verticalAlign: 'middle', padding: '12px 16px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <span
                         style={{
                           width: 10,
                           height: 10,
+                          minWidth: 10,
                           borderRadius: 9999,
                           background: sh.color,
                           display: 'inline-block',
                         }}
                       />
-                      <span style={{ fontWeight: 700, color: '#0F172A' }}>{sh.name}</span>
+                      <span style={{ fontWeight: 700, color: '#0F172A', fontSize: 14 }}>{sh.name}</span>
                     </div>
-                    <div style={{ fontSize: 11, color: '#0F766E', marginTop: 2 }}>
-                      {sh.startTime} - {sh.endTime} ({sh.totalHours}h)
+                    <div style={{ fontSize: 11, color: '#0F766E', marginTop: 4, paddingLeft: 18 }}>
+                      {sh.id === 'custom' ? 'Thời gian linh hoạt theo phân ca' : `${sh.startTime} - ${sh.endTime} (${sh.totalHours}h)`}
                     </div>
                   </td>
 
@@ -322,28 +471,72 @@ export const WorkSchedulePage: React.FC = () => {
                     );
 
                     return (
-                      <td key={day.key} style={{ verticalAlign: 'top', padding: 8 }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                          {assignedEmps.map((item) => (
-                            <span
-                              key={item.id}
-                              style={{
-                                background: '#F8FAFC',
-                                border: '1px solid #E2E8F0',
-                                borderRadius: 6,
-                                padding: '3px 6px',
-                                fontSize: 11,
-                                fontWeight: 600,
-                                color: '#1E293B',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: 4,
-                              }}
-                            >
-                              <User size={12} color="#64748B" />
-                              <span>{item.employeeName}</span>
-                            </span>
-                          ))}
+                      <td key={day.key} style={{ verticalAlign: 'middle', padding: '8px 6px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'center' }}>
+                          {assignedEmps.map((item) => {
+                            const empObj = employees.find((e) => e.id === item.employeeId);
+                            return (
+                              <div
+                                key={item.id}
+                                onClick={() => empObj && setSelectedDetailEmployee(empObj)}
+                                title={`Nhấn để xem lịch làm việc của ${item.employeeName}`}
+                                style={{
+                                  background: '#F0FDFA',
+                                  border: '1px solid #99F6E4',
+                                  borderRadius: 8,
+                                  padding: '5px 8px',
+                                  width: '92%',
+                                  maxWidth: 165,
+                                  cursor: 'pointer',
+                                  textAlign: 'center',
+                                  transition: 'all 0.15s ease',
+                                  boxShadow: '0 1px 2px rgba(15, 118, 110, 0.05)',
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.background = '#CCFBF1';
+                                  e.currentTarget.style.borderColor = '#5EEAD4';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.background = '#F0FDFA';
+                                  e.currentTarget.style.borderColor = '#99F6E4';
+                                }}
+                              >
+                                <div
+                                  style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: 4,
+                                    fontSize: 12,
+                                    fontWeight: 700,
+                                    color: '#0F766E',
+                                    whiteSpace: 'nowrap',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                  }}
+                                >
+                                  <User size={13} color="#0F766E" />
+                                  <span>{item.employeeName}</span>
+                                </div>
+                                {sh.id === 'custom' && item.shiftTime && (
+                                  <div
+                                    style={{
+                                      fontSize: 10,
+                                      color: '#047857',
+                                      fontWeight: 600,
+                                      marginTop: 2,
+                                      background: '#DCFCE7',
+                                      borderRadius: 4,
+                                      padding: '1px 4px',
+                                      display: 'inline-block',
+                                    }}
+                                  >
+                                    {item.shiftTime}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
                           {assignedEmps.length === 0 && (
                             <span style={{ fontSize: 11, color: '#CBD5E1', fontStyle: 'italic' }}>
                               Trống ca
@@ -370,6 +563,27 @@ export const WorkSchedulePage: React.FC = () => {
         defaultEmployeeId={selectedEmpId}
         defaultDayOfWeek={selectedDay}
         onSave={handleSaveAssignments}
+      />
+
+      {/* Modal Chi Tiết Lịch Làm Việc Của Nhân Viên (360 độ - tab Lịch làm việc) */}
+      <EmployeeDetailModal
+        isOpen={!!selectedDetailEmployee}
+        onClose={() => setSelectedDetailEmployee(null)}
+        employee={selectedDetailEmployee}
+        initialTab="schedule"
+        onEdit={() => {}}
+        onToggleStatus={handleToggleEmployeeStatus}
+        onAddPayment={handleAddPayment}
+      />
+
+      {/* Modal Cập Nhật Lịch Làm Việc Hàng Loạt */}
+      <BatchUpdateScheduleModal
+        isOpen={showBatchModal}
+        onClose={() => setShowBatchModal(false)}
+        employees={employees}
+        shifts={shifts}
+        branches={branches}
+        onSaveBatch={handleSaveBatchAssignments}
       />
     </div>
   );

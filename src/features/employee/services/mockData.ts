@@ -360,6 +360,17 @@ export const MOCK_WORK_SHIFTS: WorkShiftDefinition[] = [
     color: '#6366F1',
     status: 'active',
   },
+  {
+    id: 'custom',
+    name: 'Ca tùy chọn',
+    startTime: '00:00',
+    endTime: '00:00',
+    totalHours: 0,
+    checkInAllowance: 'Linh hoạt',
+    breakTime: 'Không',
+    color: '#F59E0B',
+    status: 'active',
+  },
 ];
 
 export const MOCK_SCHEDULE_ASSIGNMENTS: ScheduleAssignment[] = [
@@ -439,6 +450,19 @@ export const MOCK_SCHEDULE_ASSIGNMENTS: ScheduleAssignment[] = [
     shiftColor: '#3B82F6',
     dayOfWeek: 'T6',
     dateStr: '18/10',
+    branchName: 'Chi nhánh trung tâm',
+  },
+  {
+    id: 'sa7',
+    employeeId: 'emp-4',
+    employeeName: 'Anh Phạm Hoàng',
+    employeeCode: 'NV5',
+    shiftId: 'custom',
+    shiftName: 'Ca tùy chọn',
+    shiftTime: '09:30 - 17:45',
+    shiftColor: '#F59E0B',
+    dayOfWeek: 'T7',
+    dateStr: '19/10',
     branchName: 'Chi nhánh trung tâm',
   },
 ];

@@ -268,8 +268,8 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
                   background: '#FFFFFF',
                 }}
               >
-                {/* Danh sách các ca mặc định */}
-                {shifts.map((sh, idx) => {
+                {/* Danh sách các ca mặc định cố định */}
+                {shifts.filter((sh) => sh.id !== 'custom').map((sh, idx, arr) => {
                   const isSelected = selectedShiftId === sh.id;
                   return (
                     <div
@@ -277,7 +277,7 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
                       onClick={() => setSelectedShiftId(sh.id)}
                       style={{
                         padding: '12px 16px',
-                        borderBottom: idx < shifts.length - 1 || true ? '1px solid #E2E8F0' : 'none',
+                        borderBottom: '1px solid #E2E8F0',
                         cursor: 'pointer',
                         display: 'flex',
                         alignItems: 'center',
