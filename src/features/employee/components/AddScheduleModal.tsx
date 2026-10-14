@@ -6,7 +6,7 @@ import type {
   Branch,
   ScheduleAssignment,
 } from '../types';
-import { ScheduleScopeConfirmModal, type ScheduleScopeType } from './ScheduleScopeConfirmModal';
+import { ScheduleScopeConfirmModal } from './ScheduleScopeConfirmModal';
 
 interface AddScheduleModalProps {
   isOpen: boolean;
@@ -879,7 +879,7 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
         dateStr={displayDateFormatted}
         startDateStr={displayDateFormatted}
         endDateStr="31/10/2026"
-        onConfirm={(scope) => {
+        onConfirm={(_scope) => {
           if (scopeAction === 'update' && pendingUpdatedItem) {
             if (onUpdate) {
               onUpdate(pendingUpdatedItem);

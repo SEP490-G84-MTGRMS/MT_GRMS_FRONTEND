@@ -23,6 +23,21 @@ export const SupplierHolidaysTab: FC<Props> = ({ supplier, initialConfig, onSave
   const [newToDate, setNewToDate] = useState('');
   const [newReason, setNewReason] = useState('');
   const [saveMsg, setSaveMsg] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+
+  const toggleSelectAll = () => {
+    if (selectedIds.length === holidays.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(holidays.map((h) => h.id));
+    }
+  };
+
+  const toggleSelectOne = (id: string) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
 
   const handleAdd = () => {
     if (!newFromDate || !newToDate || !newReason.trim()) {
@@ -136,7 +151,7 @@ export const SupplierHolidaysTab: FC<Props> = ({ supplier, initialConfig, onSave
               type="button"
               className="admin-btn admin-btn-primary"
               onClick={handleAdd}
-              style={{ height: 38, padding: '0 16px', borderRadius: 'var(--radius-pill)', gap: 6 }}
+              style={{ height: 38, padding: '0 16px', borderRadius: 6, gap: 6 }}
             >
               <Plus size={14} />
               <span>Thêm Kỳ Nghỉ</span>
@@ -149,6 +164,13 @@ export const SupplierHolidaysTab: FC<Props> = ({ supplier, initialConfig, onSave
           <table className="admin-data-table" style={{ width: '100%' }}>
             <thead>
               <tr>
+                <th style={{ width: 30, textAlign: 'center', padding: '10px 4px' }}>
+                  <input
+                    type="checkbox"
+                    checked={holidays.length > 0 && selectedIds.length === holidays.length}
+                    onChange={toggleSelectAll}
+                  />
+                </th>
                 <th style={{ width: 40, textAlign: 'center' }}>#</th>
                 <th style={{ width: 140 }}>Từ ngày</th>
                 <th style={{ width: 140 }}>Đến ngày</th>
@@ -160,6 +182,13 @@ export const SupplierHolidaysTab: FC<Props> = ({ supplier, initialConfig, onSave
               {holidays.length > 0 ? (
                 holidays.map((hol, idx) => (
                   <tr key={hol.id}>
+                    <td style={{ textAlign: 'center', padding: '10px 4px' }}>
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.includes(hol.id)}
+                        onChange={() => toggleSelectOne(hol.id)}
+                      />
+                    </td>
                     <td style={{ textAlign: 'center', color: 'var(--text-muted)' }}>{idx + 1}</td>
                     <td style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{hol.fromDate}</td>
                     <td style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{hol.toDate}</td>
@@ -168,19 +197,19 @@ export const SupplierHolidaysTab: FC<Props> = ({ supplier, initialConfig, onSave
                       <button
                         type="button"
                         onClick={() => handleDelete(hol.id)}
-                        className="admin-btn admin-btn-secondary"
-                        style={{ height: 28, padding: '0 8px', color: 'var(--red-accent)', borderRadius: 'var(--radius-pill)' }}
+                        className="admin-table-btn"
+                        style={{ color: '#dc2626' }}
                         title="Xóa kỳ nghỉ này"
                       >
-                        <Trash2 size={13} />
-                        <span style={{ fontSize: 11 }}>Xóa</span>
+                        <Trash2 size={12} />
+                        <span>Xóa</span>
                       </button>
                     </td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan={5} style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)' }}>
+                  <td colSpan={6} style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)' }}>
                     Chưa có kỳ nghỉ lễ nào được thiết lập.
                   </td>
                 </tr>
@@ -195,7 +224,7 @@ export const SupplierHolidaysTab: FC<Props> = ({ supplier, initialConfig, onSave
             type="button"
             className="admin-btn admin-btn-primary"
             onClick={handleSave}
-            style={{ height: 42, padding: '0 24px', borderRadius: 'var(--radius-pill)', gap: 8 }}
+            style={{ height: 38, padding: '0 20px', borderRadius: 6, gap: 8 }}
           >
             <CheckCircle2 size={16} />
             <span>Lưu Danh Sách Kỳ Nghỉ</span>

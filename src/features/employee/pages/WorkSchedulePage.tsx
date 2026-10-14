@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Search, Clock, Plus, Download, User, Calendar } from 'lucide-react';
+import { Search, Clock, Plus, Download, User } from 'lucide-react';
 import type {
   Employee,
   EmployeeStatus,

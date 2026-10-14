@@ -3,19 +3,20 @@
    Phong cách chuẩn Bo tròn toàn diện (Pill & 24-28px) | Deep Teal (#0F766E) | Be Vietnam Pro
    ========================================================================== */
 
-@import './styles/landing.css';
-@import './styles/admin.css';
-@import './styles/dashboard.css';
+@import "./styles/landing.css";
+@import "./styles/admin.css";
+@import "./styles/auth.css";
+@import "./styles/dashboard.css";
 
 :root {
   /* Brand Deep Teal Palette - MÃ MÀU CHỦ ĐẠO TOÀN DỰ ÁN (#0F766E) */
-  --blue-primary: #0F766E;
-  --blue-hover: #115E59;
-  --blue-dark: #134E4A;
-  --blue-light: #F0FDFA;
-  --blue-subtle: #CCFBF1;
-  --blue-border: #99F6E4;
-  --cyan-accent: #14B8A6;
+  --blue-primary: #0f766e;
+  --blue-hover: #115e59;
+  --blue-dark: #134e4a;
+  --blue-light: #f0fdfa;
+  --blue-subtle: #ccfbf1;
+  --blue-border: #99f6e4;
+  --cyan-accent: #14b8a6;
 
   /* Functional Status Colors (Màu trạng thái nghiệp vụ bán lẻ) */
   --green-money: #00c853;
@@ -32,7 +33,7 @@
 
   /* Neutrals & Surfaces */
   --bg-page: #ffffff;
-  --bg-soft-blue: #F0FDFA;
+  --bg-soft-blue: #ffffff;
   --bg-card: #ffffff;
   --border-light: #edf2f9;
   --border-subtle: #e5edf8;
@@ -42,8 +43,10 @@
   --text-faint: #9ca3af;
 
   /* Typography */
-  --font-sans: 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  --font-mono: 'JetBrains Mono', Consolas, monospace;
+  --font-sans:
+    "Be Vietnam Pro", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    sans-serif;
+  --font-mono: "JetBrains Mono", Consolas, monospace;
 
   /* KiotViet Rounded Scale (Bo tròn toàn diện) */
   --radius-xs: 8px;
@@ -62,7 +65,8 @@
 }
 
 /* Base Root layout override */
-html, body {
+html,
+body {
   margin: 0;
   padding: 0;
   width: 100%;

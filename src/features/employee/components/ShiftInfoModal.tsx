@@ -1,5 +1,5 @@
 import React from 'react';
-import { Clock, Info, CheckCircle2, ShieldCheck, Sparkles } from 'lucide-react';
+import { Clock, Info, ShieldCheck } from 'lucide-react';
 import type { WorkShiftDefinition } from '../types';
 
 interface ShiftInfoModalProps {

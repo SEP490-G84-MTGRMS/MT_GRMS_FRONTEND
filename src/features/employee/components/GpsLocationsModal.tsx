@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Pencil, Trash2, Info, X, MapPin, CheckCircle2, ShieldCheck, Navigation } from 'lucide-react';
+import { Plus, Pencil, Trash2, Info, MapPin, Navigation } from 'lucide-react';
 
 export interface GpsLocationItem {
   id: string;

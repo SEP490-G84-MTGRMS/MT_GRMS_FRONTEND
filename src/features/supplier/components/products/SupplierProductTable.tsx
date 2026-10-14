@@ -22,9 +22,24 @@ export const SupplierProductTable: FC<SupplierProductTableProps> = ({
 }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   const startIndex = (currentPage - 1) * pageSize;
   const currentProducts = products.slice(startIndex, startIndex + pageSize);
+
+  const toggleSelectAll = () => {
+    if (selectedIds.length === currentProducts.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(currentProducts.map((p) => p.id));
+    }
+  };
+
+  const toggleSelectOne = (id: string) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
 
   // Map of supplier details by id for quick lookup
   const supplierMap = useMemo(() => {
@@ -38,6 +53,7 @@ export const SupplierProductTable: FC<SupplierProductTableProps> = ({
       <div style={{ overflowX: 'auto', width: '100%' }}>
         <table className="admin-data-table">
           <colgroup>
+            <col style={{ width: 30 }} />
             <col style={{ width: '3%' }} />
             <col style={{ width: '9%' }} />
             <col style={{ width: '9%' }} />
@@ -54,6 +70,13 @@ export const SupplierProductTable: FC<SupplierProductTableProps> = ({
 
           <thead>
             <tr>
+              <th style={{ width: 30, textAlign: 'center', padding: '10px 4px' }}>
+                <input
+                  type="checkbox"
+                  checked={currentProducts.length > 0 && selectedIds.length === currentProducts.length}
+                  onChange={toggleSelectAll}
+                />
+              </th>
               <th style={{ textAlign: 'center' }}>#</th>
               <th>Mã Vạch</th>
               <th>Mã SKU</th>
@@ -61,10 +84,10 @@ export const SupplierProductTable: FC<SupplierProductTableProps> = ({
               <th>Mã NCC</th>
               <th>Tên Nhà Cung Cấp</th>
               <th>Ngành Hàng</th>
-              <th style={{ textAlign: 'center' }}>ĐVT</th>
+              <th style={{ textAlign: 'left' }}>ĐVT</th>
               <th style={{ textAlign: 'right' }}>Giá Nhập Sỉ Thỏa Thuận</th>
               <th style={{ textAlign: 'right' }}>MOQ</th>
-              <th style={{ textAlign: 'center' }}>Trạng Thái</th>
+              <th style={{ textAlign: 'left' }}>Trạng Thái</th>
               <th style={{ textAlign: 'right' }}>Thao Tác</th>
             </tr>
           </thead>
@@ -80,6 +103,8 @@ export const SupplierProductTable: FC<SupplierProductTableProps> = ({
                     item={p}
                     supplierCode={supp?.code}
                     supplierName={supp?.name}
+                    isSelected={selectedIds.includes(p.id)}
+                    onToggleSelect={toggleSelectOne}
                     onEdit={onEdit}
                     onToggleStatus={onToggleStatus}
                   />
@@ -87,7 +112,7 @@ export const SupplierProductTable: FC<SupplierProductTableProps> = ({
               })
             ) : (
               <tr>
-                <td colSpan={12} style={{ padding: '60px 20px', textAlign: 'center' }}>
+                <td colSpan={13} style={{ padding: '60px 20px', textAlign: 'center' }}>
                   <div
                     style={{
                       display: 'flex',

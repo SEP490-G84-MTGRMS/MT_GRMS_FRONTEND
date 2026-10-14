@@ -1,10 +1,9 @@
+import { useState } from 'react';
 import type { FC } from 'react';
 import type { BranchListItem } from '../../types/po.types';
 import {
   MapPin,
   Phone,
-  CheckCircle2,
-  XCircle,
   Eye,
   ShoppingCart,
   ChevronLeft,
@@ -32,6 +31,22 @@ export const BranchOrderTable: FC<BranchOrderTableProps> = ({
   onViewDetail,
   onOrder,
 }) => {
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+
+  const toggleSelectAll = () => {
+    if (selectedIds.length === branches.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(branches.map((b) => b.id));
+    }
+  };
+
+  const toggleSelectOne = (id: string) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
+
   const totalPages = Math.ceil(totalCount / pageSize) || 1;
   const fmt = (n: number) => new Intl.NumberFormat('vi-VN').format(n);
 
@@ -42,19 +57,13 @@ export const BranchOrderTable: FC<BranchOrderTableProps> = ({
           style={{
             display: 'inline-flex',
             alignItems: 'center',
-            gap: 4,
-            padding: '2px 8px',
-            borderRadius: 99,
-            fontSize: 11.5,
-            fontWeight: 600,
-            backgroundColor: '#ecfdf5',
-            color: '#047857',
-            border: '1px solid #a7f3d0',
+            fontSize: 13,
+            fontWeight: 500,
+            color: '#16a34a',
             whiteSpace: 'nowrap',
           }}
         >
-          <CheckCircle2 size={11} />
-          Đang hoạt động
+          Hoạt động
         </span>
       );
     }
@@ -63,18 +72,12 @@ export const BranchOrderTable: FC<BranchOrderTableProps> = ({
         style={{
           display: 'inline-flex',
           alignItems: 'center',
-          gap: 4,
-          padding: '2px 8px',
-          borderRadius: 99,
-          fontSize: 11.5,
-          fontWeight: 600,
-          backgroundColor: '#f1f5f9',
+          fontSize: 13,
+          fontWeight: 500,
           color: '#64748b',
-          border: '1px solid #cbd5e1',
           whiteSpace: 'nowrap',
         }}
       >
-        <XCircle size={11} />
         Ngừng hoạt động
       </span>
     );
@@ -86,17 +89,25 @@ export const BranchOrderTable: FC<BranchOrderTableProps> = ({
       <div className="po-branch-table-wrapper">
         <table className="po-branch-table">
           <colgroup>
-            <col style={{ width: '10%' }} />
-            <col style={{ width: '23%' }} />
-            <col style={{ width: '16%' }} />
+            <col style={{ width: '3%' }} />
+            <col style={{ width: '9%' }} />
+            <col style={{ width: '22%' }} />
+            <col style={{ width: '15%' }} />
             <col style={{ width: '10%' }} />
             <col style={{ width: '8%' }} />
-            <col style={{ width: '12%' }} />
+            <col style={{ width: '11%' }} />
             <col style={{ width: '10%' }} />
-            <col style={{ width: 204 }} />
+            <col style={{ width: 190 }} />
           </colgroup>
           <thead>
             <tr>
+              <th style={{ width: '3%', textAlign: 'center', padding: '10px 4px' }}>
+                <input
+                  type="checkbox"
+                  checked={branches.length > 0 && selectedIds.length === branches.length}
+                  onChange={toggleSelectAll}
+                />
+              </th>
               <th>Mã chi nhánh</th>
               <th>Tên chi nhánh</th>
               <th>Người phụ trách</th>
@@ -113,17 +124,23 @@ export const BranchOrderTable: FC<BranchOrderTableProps> = ({
                 const isInactive = branch.status === 'inactive';
                 return (
                   <tr key={branch.id}>
+                    {/* Checkbox */}
+                    <td style={{ textAlign: 'center', padding: '10px 4px' }}>
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.includes(branch.id)}
+                        onChange={() => toggleSelectOne(branch.id)}
+                      />
+                    </td>
+
                     {/* 1. Mã chi nhánh */}
                     <td>
                       <span
                         style={{
-                          fontFamily: 'monospace',
-                          fontSize: 11.5,
-                          fontWeight: 700,
-                          padding: '2px 7px',
-                          borderRadius: 4,
-                          backgroundColor: '#e0f2fe',
-                          color: '#0369a1',
+                          fontFamily: 'var(--font-mono, monospace)',
+                          fontSize: 12.5,
+                          fontWeight: 600,
+                          color: '#334155',
                           display: 'inline-block',
                           whiteSpace: 'nowrap',
                         }}
@@ -269,7 +286,7 @@ export const BranchOrderTable: FC<BranchOrderTableProps> = ({
               })
             ) : (
               <tr>
-                <td colSpan={8} style={{ textAlign: 'center', padding: '40px 20px', color: '#64748b' }}>
+                <td colSpan={9} style={{ textAlign: 'center', padding: '40px 20px', color: '#64748b' }}>
                   🔍 Không tìm thấy chi nhánh nào phù hợp với bộ lọc tìm kiếm.
                 </td>
               </tr>

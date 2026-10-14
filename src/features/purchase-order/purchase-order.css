@@ -86,7 +86,7 @@
   align-items: center;
   gap: 6px;
   background-color: #ffffff;
-  border: none;
+  border: 1px solid #cbd5e1;
   border-radius: 10px;
   padding: 0 10px;
   height: 48px;
@@ -124,7 +124,7 @@
   min-width: 32px;
   padding: 0 7px;
   border-radius: 7px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid #cbd5e1;
   background-color: #f8fafc;
   color: var(--text-main);
   font-size: 12px;
@@ -222,7 +222,7 @@
   right: 0;
   z-index: 200;
   background-color: #ffffff;
-  border: 1px solid #e2e8f0;
+  border: 1px solid #cbd5e1;
   border-radius: 12px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
   padding: 14px 16px;

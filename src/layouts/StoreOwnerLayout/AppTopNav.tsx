@@ -1,6 +1,6 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
-import type { FC } from 'react';
-import { NavLink, Link, useLocation } from 'react-router-dom';
+import { useState, useRef, useEffect, useCallback } from "react";
+import type { FC } from "react";
+import { NavLink, Link, useLocation } from "react-router-dom";
 import {
   DashboardIcon,
   TruckIcon,
@@ -9,8 +9,10 @@ import {
   ChevronRightIcon,
   MenuIcon,
   TrendingUpIcon,
-} from '../../features/admin/components';
-import { Gift } from 'lucide-react';
+  StoreIcon,
+  SubscriptionPlanIcon,
+} from "../../features/admin/components";
+import { Gift } from "lucide-react";
 
 /* ─── Data ─── */
 
@@ -18,6 +20,12 @@ interface NavSubItem {
   label: string;
   to: string;
   badge?: string;
+  badgeType?: "red" | "blue";
+}
+
+interface NavSection {
+  title: string;
+  items: NavSubItem[];
 }
 
 interface NavGroup {
@@ -26,6 +34,7 @@ interface NavGroup {
   icon: FC<{ size?: number; color?: string }>;
   to?: string; // direct link (no dropdown)
   children?: NavSubItem[];
+  sections?: NavSection[];
 }
 
 const UsersIcon: FC<{ size?: number; color?: string }> = ({ size = 18, color = 'currentColor' }) => (
@@ -52,39 +61,157 @@ const GiftNavIcon: FC<{ size?: number; color?: string }> = ({ size = 18, color =
 
 const NAV_GROUPS: NavGroup[] = [
   {
-    id: 'overview',
-    label: 'Tổng quan',
+    id: "overview",
+    label: "Tổng quan",
     icon: DashboardIcon,
-    to: '/admin/dashboard',
+    to: "/admin/dashboard",
   },
   {
-    id: 'goods',
-    label: 'Hàng hóa',
+    id: "goods",
+    label: "Hàng hóa",
     icon: PackageIcon,
-    children: [
-      { label: 'Danh mục hàng hóa', to: '/store-owner/products', badge: 'FE-01' },
-      { label: 'Chuyển hàng liên kho', to: '/store-owner/transfers', badge: 'FE-15' },
-      { label: 'Sản phẩm theo NCC', to: '/store-owner/suppliers/products', badge: 'Master' },
+    sections: [
+      {
+        title: "Danh mục & Sản phẩm",
+        items: [
+          { label: "Danh mục hàng hóa", to: "/store-owner/products", badge: "FE-01" },
+          { label: "Sản phẩm theo NCC", to: "/store-owner/suppliers/products", badge: "Master" },
+          {
+            label: "Thiết lập bảng giá",
+            to: "/store-owner/suppliers/products?view=pricing",
+          },
+        ],
+      },
+      {
+        title: "Kho & Hạn dùng (FEFO)",
+        items: [
+          {
+            label: "Kiểm kho & Cân đối",
+            to: "/store-owner/suppliers/products?view=inventory",
+          },
+          {
+            label: "Chuyển hàng liên kho",
+            to: "/store-owner/transfers",
+            badge: "FE-15",
+          },
+        ],
+      },
+      {
+        title: "Quy cách & Đóng gói",
+        items: [
+          {
+            label: "Combo - Đóng gói",
+            to: "/store-owner/suppliers/products?view=combos",
+          },
+          {
+            label: "In mã vạch & Tem giá",
+            to: "/store-owner/suppliers/products?view=barcodes",
+          },
+        ],
+      },
     ],
   },
   {
-    id: 'purchasing',
-    label: 'Mua hàng',
+    id: "purchasing",
+    label: "Nhập hàng",
     icon: TruckIcon,
-    children: [
-      { label: 'Nhà cung cấp', to: '/store-owner/suppliers' },
-      { label: 'Đặt hàng theo chi nhánh', to: '/store-owner/purchase-orders/branches' },
-      { label: 'Đặt hàng theo ma trận (Store Owner)', to: '/store-owner/purchase-orders/create-matrix', badge: 'Grid' },
-      { label: 'Đặt hàng theo ma trận (Nhân viên)', to: '/employee/purchase-orders/create-matrix', badge: 'Staff' },
+    sections: [
+      {
+        title: "Nhà cung cấp",
+        items: [
+          { label: "Danh sách nhà cung cấp", to: "/store-owner/suppliers" },
+          {
+            label: "Hóa đơn đầu vào",
+            to: "/store-owner/suppliers?view=invoices",
+            badge: "Mới",
+            badgeType: "red",
+          },
+        ],
+      },
+      {
+        title: "Đặt hàng & Nhập kho",
+        items: [
+          {
+            label: "Đặt hàng theo chi nhánh",
+            to: "/store-owner/purchase-orders/branches",
+          },
+          {
+            label: "Đặt hàng ma trận",
+            to: "/store-owner/purchase-orders/create-matrix",
+            badge: "Chủ",
+            badgeType: "blue",
+          },
+          { label: "Trả hàng nhập", to: "/store-owner/suppliers?view=returns" },
+        ],
+      },
+      {
+        title: "Dịch vụ & Tiện ích",
+        items: [
+          {
+            label: "Chi phí mua dịch vụ",
+            to: "/store-owner/expenses",
+            badge: "Mới",
+            badgeType: "red",
+          },
+        ],
+      },
     ],
   },
   {
-    id: 'finance',
-    label: 'Tài chính',
+    id: "finance",
+    label: "Tài chính",
     icon: TrendingUpIcon,
-    children: [
-      { label: 'Khách hàng & Công nợ (FE-08)', to: '/store-owner/customers', badge: 'FE-08' },
-      { label: 'Chi phí vận hành (FE-07)', to: '/store-owner/expenses', badge: 'FE-07' },
+    sections: [
+      {
+        title: "Chi phí & Vận hành",
+        items: [
+          {
+            label: "Chi phí vận hành",
+            to: "/store-owner/expenses",
+            badge: "Mới",
+            badgeType: "red",
+          },
+          {
+            label: "Sổ quỹ tiền mặt & Bank",
+            to: "/store-owner/expenses?view=cashbook",
+          },
+          {
+            label: "Tạo phiếu chi dịch vụ",
+            to: "/store-owner/expenses?view=create",
+            badge: "Mới",
+            badgeType: "red",
+          },
+        ],
+      },
+      {
+        title: "Khách hàng & Công nợ",
+        items: [
+          {
+            label: "Khách hàng & Sổ nợ",
+            to: "/store-owner/customers",
+            badge: "",
+            badgeType: "blue",
+          },
+          {
+            label: "Công nợ nhà cung cấp",
+            to: "/store-owner/suppliers?view=debt",
+          },
+          {
+            label: "Theo dõi trả góp / gối đầu",
+            to: "/store-owner/expenses?view=installments",
+          },
+        ],
+      },
+      {
+        title: "Báo cáo tài chính",
+        items: [
+          { label: "Báo cáo kết quả kinh doanh", to: "/admin/dashboard" },
+          {
+            label: "Dòng tiền kinh doanh",
+            to: "/store-owner/expenses?view=cashflow",
+          },
+        ],
+      },
     ],
   },
   {
@@ -108,6 +235,12 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'Thiết lập tích điểm', to: '/store-owner/loyalty-config' },
     ],
   },
+  {
+    id: 'subscriptions',
+    label: 'Gói dịch vụ',
+    icon: SubscriptionPlanIcon,
+    to: '/admin/subscriptions',
+  },
 ];
 
 /* ─── Brand Logo SVG ─── */
@@ -124,7 +257,14 @@ const BrandLogo: FC = () => (
     />
     <circle cx="14" cy="22" r="3.5" fill="#FFFFFF" />
     <defs>
-      <linearGradient id="navBrandGrad" x1="4" y1="2" x2="24" y2="31" gradientUnits="userSpaceOnUse">
+      <linearGradient
+        id="navBrandGrad"
+        x1="4"
+        y1="2"
+        x2="24"
+        y2="31"
+        gradientUnits="userSpaceOnUse"
+      >
         <stop stopColor="#0F766E" />
         <stop offset="1" stopColor="#134E4A" />
       </linearGradient>
@@ -143,9 +283,10 @@ const ChevronDown: FC<{ open: boolean }> = ({ open }) => (
     strokeWidth="2.5"
     strokeLinecap="round"
     strokeLinejoin="round"
+    className="topnav-chevron"
     style={{
-      transition: 'transform 0.18s ease',
-      transform: open ? 'rotate(180deg)' : 'rotate(0deg)',
+      transition: "transform 0.18s ease",
+      transform: open ? "rotate(180deg)" : "rotate(0deg)",
       opacity: 0.85,
     }}
   >
@@ -155,19 +296,52 @@ const ChevronDown: FC<{ open: boolean }> = ({ open }) => (
 
 /* ─── Dropdown ─── */
 interface DropdownProps {
-  items: NavSubItem[];
+  items?: NavSubItem[];
+  sections?: NavSection[];
   isOpen: boolean;
   anchorRef: React.RefObject<HTMLDivElement | null>;
   onClose: () => void;
+  onMouseEnter?: () => void;
+  onMouseLeave?: () => void;
   currentPath: string;
 }
 
-const NavDropdown: FC<DropdownProps> = ({ items, isOpen, anchorRef, onClose, currentPath }) => {
+const NavDropdown: FC<DropdownProps> = ({
+  items,
+  sections,
+  isOpen,
+  anchorRef,
+  onClose,
+  onMouseEnter,
+  onMouseLeave,
+  currentPath,
+}) => {
   const dropRef = useRef<HTMLDivElement>(null);
+  const [coords, setCoords] = useState<{ top: number; left: number }>({
+    top: 100,
+    left: 0,
+  });
+
+  const updateCoords = useCallback(() => {
+    if (anchorRef.current) {
+      const rect = anchorRef.current.getBoundingClientRect();
+      setCoords({ top: rect.bottom, left: rect.left });
+    }
+  }, [anchorRef]);
+
+  useEffect(() => {
+    updateCoords();
+    window.addEventListener("resize", updateCoords);
+    window.addEventListener("scroll", updateCoords, true);
+    return () => {
+      window.removeEventListener("resize", updateCoords);
+      window.removeEventListener("scroll", updateCoords, true);
+    };
+  }, [updateCoords]);
 
   useEffect(() => {
     if (!isOpen) return;
-    const handleKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    const handleKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     const handleClick = (e: MouseEvent) => {
       if (
         dropRef.current &&
@@ -178,109 +352,278 @@ const NavDropdown: FC<DropdownProps> = ({ items, isOpen, anchorRef, onClose, cur
         onClose();
       }
     };
-    document.addEventListener('keydown', handleKey);
-    document.addEventListener('mousedown', handleClick);
+    document.addEventListener("keydown", handleKey);
+    document.addEventListener("mousedown", handleClick);
     return () => {
-      document.removeEventListener('keydown', handleKey);
-      document.removeEventListener('mousedown', handleClick);
+      document.removeEventListener("keydown", handleKey);
+      document.removeEventListener("mousedown", handleClick);
     };
   }, [isOpen, onClose, anchorRef]);
 
-  if (!isOpen) return null;
+  const isMega = Boolean(sections && sections.length > 0);
+  const rect = anchorRef.current?.getBoundingClientRect();
+  const top = rect && rect.bottom > 0 ? rect.bottom : coords.top;
+  const rawLeft = rect && rect.left > 0 ? rect.left : coords.left;
+  const maxLeft =
+    typeof window !== "undefined"
+      ? window.innerWidth - (isMega ? 560 : 230) - 16
+      : rawLeft;
+  const left = Math.max(16, Math.min(rawLeft, maxLeft));
+
+  const checkItemActive = (to: string) => {
+    const [toPath, toQuery] = to.split("?");
+    const [currPath, currQuery] = currentPath.split("?");
+
+    if (toQuery) {
+      return (
+        currPath === toPath && Boolean(currQuery && currQuery.includes(toQuery))
+      );
+    }
+
+    if (toPath === "/store-owner/suppliers") {
+      const hasOtherView = Boolean(currQuery && currQuery.includes("view="));
+      return (
+        (currPath === toPath || currPath.startsWith(toPath + "/")) &&
+        !currPath.includes("/products") &&
+        !hasOtherView
+      );
+    }
+
+    if (toPath === "/store-owner/suppliers/products") {
+      const hasOtherView = Boolean(currQuery && currQuery.includes("view="));
+      return (
+        (currPath === toPath || currPath.startsWith(toPath + "/")) &&
+        !hasOtherView
+      );
+    }
+
+    if (toPath === "/store-owner/expenses") {
+      const hasOtherView = Boolean(
+        currQuery &&
+        (currQuery.includes("view=") || currQuery.includes("tab=")),
+      );
+      return (
+        (currPath === toPath || currPath.startsWith(toPath + "/")) &&
+        !hasOtherView
+      );
+    }
+
+    return currPath === toPath || currPath.startsWith(toPath + "/");
+  };
 
   return (
     <div
       ref={dropRef}
+      className={`topnav-dropdown-bridge ${isOpen ? "is-open" : ""}`}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
       style={{
-        position: 'fixed',
-        top: (() => {
-          if (!anchorRef.current) return 110;
-          const rect = anchorRef.current.getBoundingClientRect();
-          return rect.bottom + 6;
-        })(),
-        left: (() => {
-          if (!anchorRef.current) return 0;
-          const rect = anchorRef.current.getBoundingClientRect();
-          return rect.left;
-        })(),
+        position: "fixed",
+        top,
+        left,
         zIndex: 9999,
-        backgroundColor: '#ffffff',
-        borderRadius: 14,
-        boxShadow: '0 8px 32px rgba(0, 50, 150, 0.13), 0 2px 8px rgba(0, 50, 150, 0.06)',
-        border: '1px solid var(--border-light)',
-        padding: '8px 0',
-        minWidth: 220,
-        overflow: 'hidden',
+        paddingTop: 6, // Seamless gapless bridge to keep dropdown open during mouse hover
       }}
-      role="menu"
     >
-      {items.map((item) => {
-        const isActive = currentPath === item.to || currentPath.startsWith(item.to + '/');
-        return (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            onClick={onClose}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 10,
-              padding: '9px 18px',
-              textDecoration: 'none',
-              fontSize: '13.5px',
-              fontWeight: isActive ? 700 : 500,
-              color: isActive ? 'var(--blue-primary)' : 'var(--text-muted)',
-              backgroundColor: isActive ? 'var(--blue-light)' : 'transparent',
-              transition: 'all 0.14s ease',
-              position: 'relative',
-            }}
-            onMouseEnter={(e) => {
-              if (!isActive) {
-                e.currentTarget.style.backgroundColor = 'var(--bg-soft-blue)';
-                e.currentTarget.style.color = 'var(--text-main)';
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (!isActive) {
-                e.currentTarget.style.backgroundColor = 'transparent';
-                e.currentTarget.style.color = 'var(--text-muted)';
-              }
-            }}
-          >
-            {isActive && (
-              <span
+      <div
+        style={{
+          backgroundColor: "#ffffff",
+          borderRadius: 12,
+          boxShadow:
+            "0 12px 36px rgba(0, 30, 90, 0.15), 0 2px 8px rgba(0, 30, 90, 0.06)",
+          border: "1px solid var(--border-light)",
+          padding: isMega ? "18px 22px" : "8px 0",
+          minWidth: isMega ? 550 : 220,
+          overflow: "hidden",
+          display: isMega ? "flex" : "block",
+          gap: isMega ? 18 : 0,
+        }}
+        role="menu"
+      >
+        {/* Mega Menu Layout: 3 Columns like KiotViet */}
+        {isMega &&
+          sections?.map((sec, secIdx) => (
+            <div
+              key={sec.title}
+              style={{
+                flex: 1,
+                minWidth: 155,
+                display: "flex",
+                flexDirection: "column",
+                gap: 2,
+                borderRight:
+                  secIdx < sections.length - 1 ? "1px solid #EDF2F9" : "none",
+                paddingRight: secIdx < sections.length - 1 ? 18 : 0,
+              }}
+            >
+              <div
                 style={{
-                  position: 'absolute',
-                  left: 0,
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  width: 3,
-                  height: 18,
-                  borderRadius: '0 3px 3px 0',
-                  backgroundColor: 'var(--blue-primary)',
-                }}
-              />
-            )}
-            <ChevronRightIcon size={13} color={isActive ? 'var(--blue-primary)' : '#bbb'} />
-            <span style={{ flex: 1 }}>{item.label}</span>
-            {item.badge && (
-              <span
-                style={{
-                  fontSize: 10,
-                  fontWeight: 700,
-                  padding: '1px 7px',
-                  borderRadius: 'var(--radius-pill)',
-                  backgroundColor: isActive ? 'rgba(15,118,110,0.15)' : 'var(--blue-light)',
-                  color: 'var(--blue-primary)',
-                  fontFamily: 'var(--font-mono)',
+                  fontSize: "13px",
+                  fontWeight: 600,
+                  color: "#64748B",
+                  padding: "2px 10px 10px",
+                  lineHeight: 1.3,
+                  userSelect: "none",
                 }}
               >
-                {item.badge}
-              </span>
-            )}
-          </NavLink>
-        );
-      })}
+                {sec.title}
+              </div>
+              {sec.items.map((item) => {
+                const isActive = checkItemActive(item.to);
+                return (
+                  <NavLink
+                    key={item.label + item.to}
+                    to={item.to}
+                    onClick={onClose}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: 8,
+                      padding: "8px 10px",
+                      borderRadius: 8,
+                      textDecoration: "none",
+                      fontSize: "13.5px",
+                      fontWeight: isActive ? 600 : 500,
+                      color: isActive
+                        ? "var(--blue-primary)"
+                        : "var(--text-main)",
+                      backgroundColor: isActive
+                        ? "var(--blue-light)"
+                        : "transparent",
+                      transition: "all 0.14s ease",
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!isActive) {
+                        e.currentTarget.style.backgroundColor =
+                          "var(--bg-soft-blue)";
+                        e.currentTarget.style.color = "var(--blue-primary)";
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isActive) {
+                        e.currentTarget.style.backgroundColor = "transparent";
+                        e.currentTarget.style.color = "var(--text-main)";
+                      }
+                    }}
+                  >
+                    <span>{item.label}</span>
+                    {item.badge && (
+                      <span
+                        style={{
+                          fontSize: "10px",
+                          fontWeight: 700,
+                          padding: "1px 6px",
+                          borderRadius: "var(--radius-pill)",
+                          backgroundColor:
+                            item.badgeType === "red"
+                              ? "#FF3B30"
+                              : "var(--blue-light)",
+                          color:
+                            item.badgeType === "red"
+                              ? "#ffffff"
+                              : "var(--blue-primary)",
+                          fontFamily: "var(--font-sans)",
+                          lineHeight: 1.3,
+                          letterSpacing: "0.02em",
+                        }}
+                      >
+                        {item.badge}
+                      </span>
+                    )}
+                  </NavLink>
+                );
+              })}
+            </div>
+          ))}
+
+        {/* Standard Single-Column List */}
+        {!isMega &&
+          items?.map((item) => {
+            const isActive = checkItemActive(item.to);
+            return (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                onClick={onClose}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  padding: "9px 18px",
+                  textDecoration: "none",
+                  fontSize: "13.5px",
+                  fontWeight: isActive ? 700 : 500,
+                  color: isActive ? "var(--blue-primary)" : "var(--text-muted)",
+                  backgroundColor: isActive
+                    ? "var(--blue-light)"
+                    : "transparent",
+                  transition: "all 0.14s ease",
+                  position: "relative",
+                }}
+                onMouseEnter={(e) => {
+                  if (!isActive) {
+                    e.currentTarget.style.backgroundColor =
+                      "var(--bg-soft-blue)";
+                    e.currentTarget.style.color = "var(--text-main)";
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isActive) {
+                    e.currentTarget.style.backgroundColor = "transparent";
+                    e.currentTarget.style.color = "var(--text-muted)";
+                  }
+                }}
+              >
+                {isActive && (
+                  <span
+                    style={{
+                      position: "absolute",
+                      left: 0,
+                      top: "50%",
+                      transform: "translateY(-50%)",
+                      width: 3,
+                      height: 18,
+                      borderRadius: "0 3px 3px 0",
+                      backgroundColor: "var(--blue-primary)",
+                    }}
+                  />
+                )}
+                <ChevronRightIcon
+                  size={13}
+                  color={isActive ? "var(--blue-primary)" : "#bbb"}
+                />
+                <span style={{ flex: 1 }}>{item.label}</span>
+                {item.badge && (
+                  <span
+                    style={{
+                      fontSize: 10,
+                      fontWeight: 700,
+                      padding: "1px 7px",
+                      borderRadius: "var(--radius-pill)",
+                      backgroundColor:
+                        item.badgeType === "red"
+                          ? "#FF3B30"
+                          : isActive
+                            ? "rgba(15,118,110,0.15)"
+                            : "var(--blue-light)",
+                      color:
+                        item.badgeType === "red"
+                          ? "#ffffff"
+                          : "var(--blue-primary)",
+                      fontFamily:
+                        item.badgeType === "red"
+                          ? "var(--font-sans)"
+                          : "var(--font-mono)",
+                    }}
+                  >
+                    {item.badge}
+                  </span>
+                )}
+              </NavLink>
+            );
+          })}
+      </div>
     </div>
   );
 };
@@ -290,46 +633,147 @@ export const AppTopNav: FC = () => {
   const location = useLocation();
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const anchorRefs = useRef<Map<string, React.RefObject<HTMLDivElement | null>>>(new Map());
+  const anchorRefs = useRef<
+    Map<string, React.RefObject<HTMLDivElement | null>>
+  >(new Map());
+  const closeTimerRef = useRef<number | null>(null);
 
-  // Close dropdown on route change
-  useEffect(() => {
-    setOpenMenu(null);
-    setMobileOpen(false);
-  }, [location.pathname]);
-
-  const getAnchorRef = useCallback((id: string): React.RefObject<HTMLDivElement | null> => {
-    if (!anchorRefs.current.has(id)) {
-      anchorRefs.current.set(id, { current: null });
+  const clearCloseTimer = useCallback(() => {
+    if (closeTimerRef.current !== null) {
+      window.clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
     }
-    return anchorRefs.current.get(id)!;
   }, []);
 
-  const toggleMenu = (id: string) => {
-    setOpenMenu((prev) => (prev === id ? null : id));
-  };
+  // Close dropdown on route change and cleanup timer
+  useEffect(() => {
+    clearCloseTimer();
+    setOpenMenu(null);
+    setMobileOpen(false);
+    return () => {
+      clearCloseTimer();
+    };
+  }, [location.pathname, clearCloseTimer]);
+
+  const getAnchorRef = useCallback(
+    (id: string): React.RefObject<HTMLDivElement | null> => {
+      if (!anchorRefs.current.has(id)) {
+        anchorRefs.current.set(id, { current: null });
+      }
+      return anchorRefs.current.get(id)!;
+    },
+    [],
+  );
+
+  const handleMenuEnter = useCallback(
+    (id: string) => {
+      clearCloseTimer();
+      setOpenMenu(id);
+    },
+    [clearCloseTimer],
+  );
+
+  const handleMenuLeave = useCallback(() => {
+    clearCloseTimer();
+    closeTimerRef.current = window.setTimeout(() => {
+      setOpenMenu(null);
+    }, 180);
+  }, [clearCloseTimer]);
+
+  const toggleMenu = useCallback(
+    (id: string) => {
+      clearCloseTimer();
+      setOpenMenu((prev) => (prev === id ? null : id));
+    },
+    [clearCloseTimer],
+  );
 
   const isGroupActive = (group: NavGroup): boolean => {
-    if (group.id === 'overview') {
+    if (group.id === "overview") {
       return (
-        location.pathname === '/admin/dashboard' ||
-        location.pathname === '/admin' ||
-        location.pathname === '/admin/' ||
-        location.pathname === '/dashboard' ||
-        location.pathname === '/store-owner/dashboard' ||
-        location.pathname === '/store-owner' ||
-        location.pathname === '/store-owner/'
+        location.pathname === "/admin/dashboard" ||
+        location.pathname === "/admin" ||
+        location.pathname === "/admin/" ||
+        location.pathname === "/dashboard" ||
+        location.pathname === "/store-owner/dashboard" ||
+        location.pathname === "/store-owner" ||
+        location.pathname === "/store-owner/"
       );
     }
-    if (group.to) return location.pathname === group.to || location.pathname.startsWith(group.to + '/');
+    if (group.id === "goods") {
+      return (
+        location.pathname === "/store-owner/suppliers/products" ||
+        location.pathname.startsWith("/store-owner/suppliers/products/") ||
+        location.pathname === "/admin/suppliers/products" ||
+        location.pathname.startsWith("/admin/suppliers/products/")
+      );
+    }
+    if (group.id === "purchasing") {
+      const isSupplier =
+        location.pathname === "/store-owner/suppliers" ||
+        location.pathname.startsWith("/store-owner/suppliers/") ||
+        location.pathname === "/admin/suppliers" ||
+        location.pathname.startsWith("/admin/suppliers/");
+      const isProduct =
+        location.pathname === "/store-owner/suppliers/products" ||
+        location.pathname.startsWith("/store-owner/suppliers/products/") ||
+        location.pathname === "/admin/suppliers/products" ||
+        location.pathname.startsWith("/admin/suppliers/products/");
+      const isPurchaseOrder = location.pathname.includes("/purchase-orders");
+      return (isSupplier && !isProduct) || isPurchaseOrder;
+    }
+    if (group.id === "finance") {
+      return (
+        location.pathname === "/store-owner/expenses" ||
+        location.pathname.startsWith("/store-owner/expenses/") ||
+        location.pathname === "/admin/expenses" ||
+        location.pathname.startsWith("/admin/expenses/") ||
+        location.pathname === "/store-owner/customers" ||
+        location.pathname.startsWith("/store-owner/customers/") ||
+        location.pathname === "/customers" ||
+        location.pathname.startsWith("/customers/")
+      );
+    }
+    if (group.id === "subscriptions") {
+      return (
+        location.pathname === "/admin/subscriptions" ||
+        location.pathname.startsWith("/admin/subscriptions/") ||
+        location.pathname === "/admin/plans" ||
+        location.pathname.startsWith("/admin/plans/") ||
+        location.pathname === "/store-owner/subscriptions" ||
+        location.pathname.startsWith("/store-owner/subscriptions/")
+      );
+    }
+    if (group.to)
+      return (
+        location.pathname === group.to ||
+        location.pathname.startsWith(group.to + "/")
+      );
+    if (group.sections) {
+      return group.sections.some((sec) =>
+        sec.items.some(
+          (c) =>
+            location.pathname === c.to ||
+            location.pathname.startsWith(c.to.split("?")[0] + "/"),
+        ),
+      );
+    }
     if (group.children) {
       return group.children.some(
         (c) =>
           location.pathname === c.to ||
-          location.pathname.startsWith(c.to + '/') ||
-          (c.to === '/store-owner/suppliers' && (location.pathname === '/admin/suppliers' || location.pathname.startsWith('/admin/suppliers/'))) ||
-          (c.to === '/store-owner/suppliers/products' && (location.pathname === '/admin/suppliers/products' || location.pathname.startsWith('/admin/suppliers/products/'))) ||
-          (c.to === '/store-owner/purchase-orders/create-matrix' && (location.pathname === '/admin/purchase-orders/create-matrix' || location.pathname.startsWith('/admin/purchase-orders/create-matrix/')))
+          location.pathname.startsWith(c.to + "/") ||
+          (c.to === "/store-owner/suppliers" &&
+            (location.pathname === "/admin/suppliers" ||
+              location.pathname.startsWith("/admin/suppliers/"))) ||
+          (c.to === "/store-owner/suppliers/products" &&
+            (location.pathname === "/admin/suppliers/products" ||
+              location.pathname.startsWith("/admin/suppliers/products/"))) ||
+          (c.to === "/store-owner/purchase-orders/create-matrix" &&
+            (location.pathname === "/admin/purchase-orders/create-matrix" ||
+              location.pathname.startsWith(
+                "/admin/purchase-orders/create-matrix/",
+              ))),
       );
     }
     return false;
@@ -339,16 +783,20 @@ export const AppTopNav: FC = () => {
     <>
       {/* ── Row 1: Global Header ── */}
       <div
+        onMouseEnter={() => {
+          clearCloseTimer();
+          setOpenMenu(null);
+        }}
         style={{
           height: 56,
-          backgroundColor: '#ffffff',
-          borderBottom: '1px solid var(--border-light)',
-          display: 'flex',
-          alignItems: 'center',
-          padding: '0 24px',
+          backgroundColor: "#ffffff",
+          borderBottom: "1px solid var(--border-light)",
+          display: "flex",
+          alignItems: "center",
+          padding: "0 24px",
           gap: 16,
-          boxShadow: '0 1px 4px rgba(0, 40, 120, 0.04)',
-          position: 'sticky',
+          boxShadow: "0 1px 4px rgba(0, 40, 120, 0.04)",
+          position: "sticky",
           top: 0,
           zIndex: 200,
         }}
@@ -356,42 +804,81 @@ export const AppTopNav: FC = () => {
         {/* Brand */}
         <Link
           to="/admin/dashboard"
-          style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none', flexShrink: 0 }}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            textDecoration: "none",
+            flexShrink: 0,
+          }}
         >
           <BrandLogo />
           <div>
-            <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--text-main)', letterSpacing: '-0.02em', lineHeight: 1.15 }}>
+            <div
+              style={{
+                fontSize: 16,
+                fontWeight: 800,
+                color: "var(--text-main)",
+                letterSpacing: "-0.02em",
+                lineHeight: 1.15,
+              }}
+            >
               MT-GRMS
             </div>
-            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--blue-primary)', textTransform: 'uppercase', letterSpacing: '0.06em', lineHeight: 1 }}>
+            <div
+              style={{
+                fontSize: 10,
+                fontWeight: 700,
+                color: "var(--blue-primary)",
+                textTransform: "uppercase",
+                letterSpacing: "0.06em",
+                lineHeight: 1,
+              }}
+            >
               Quản lý Chuỗi Tạp Hóa
             </div>
           </div>
         </Link>
 
         {/* Right actions */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginLeft: 'auto', flexShrink: 0 }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            marginLeft: "auto",
+            flexShrink: 0,
+          }}
+        >
           {/* Tenant badge */}
           <div
             style={{
-              display: 'inline-flex',
-              alignItems: 'center',
+              display: "inline-flex",
+              alignItems: "center",
               gap: 7,
               height: 36,
-              padding: '0 14px',
-              borderRadius: 'var(--radius-pill)',
-              backgroundColor: 'var(--bg-soft-blue)',
-              border: '1px solid var(--border-light)',
-              fontSize: '12.5px',
+              padding: "0 14px",
+              borderRadius: "var(--radius-pill)",
+              backgroundColor: "var(--bg-soft-blue)",
+              border: "1px solid var(--border-light)",
+              fontSize: "12.5px",
               fontWeight: 600,
-              color: 'var(--text-muted)',
-              whiteSpace: 'nowrap',
-              boxSizing: 'border-box',
+              color: "var(--text-muted)",
+              whiteSpace: "nowrap",
+              boxSizing: "border-box",
             }}
           >
-            <span style={{ fontSize: 13, lineHeight: 1 }}>🏪</span>
+            <StoreIcon size={14} color="var(--blue-primary)" />
             <span>Mini Minh Đức</span>
-            <span style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: 'var(--green-money)', display: 'inline-block' }} />
+            <span
+              style={{
+                width: 6,
+                height: 6,
+                borderRadius: "50%",
+                backgroundColor: "var(--green-money)",
+                display: "inline-block",
+              }}
+            />
           </div>
 
           {/* Bell */}
@@ -400,84 +887,104 @@ export const AppTopNav: FC = () => {
             style={{
               width: 36,
               height: 36,
-              borderRadius: '50%',
-              border: '1px solid var(--border-light)',
-              backgroundColor: 'var(--bg-soft-blue)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
-              position: 'relative',
-              color: 'var(--text-muted)',
+              borderRadius: "50%",
+              border: "1px solid var(--border-light)",
+              backgroundColor: "var(--bg-soft-blue)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: "pointer",
+              position: "relative",
+              color: "var(--text-muted)",
               flexShrink: 0,
-              boxSizing: 'border-box',
-              transition: 'all 0.15s ease',
+              boxSizing: "border-box",
+              transition: "all 0.15s ease",
             }}
             title="Thông báo"
             onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = 'var(--blue-light)';
-              e.currentTarget.style.color = 'var(--blue-primary)';
+              e.currentTarget.style.backgroundColor = "var(--blue-light)";
+              e.currentTarget.style.color = "var(--blue-primary)";
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = 'var(--bg-soft-blue)';
-              e.currentTarget.style.color = 'var(--text-muted)';
+              e.currentTarget.style.backgroundColor = "var(--bg-soft-blue)";
+              e.currentTarget.style.color = "var(--text-muted)";
             }}
           >
             <BellIcon size={16} />
-            <span style={{
-              position: 'absolute',
-              top: 7,
-              right: 7,
-              width: 7,
-              height: 7,
-              borderRadius: '50%',
-              backgroundColor: 'var(--red-accent)',
-              border: '1.5px solid #fff',
-            }} />
+            <span
+              style={{
+                position: "absolute",
+                top: 7,
+                right: 7,
+                width: 7,
+                height: 7,
+                borderRadius: "50%",
+                backgroundColor: "var(--red-accent)",
+                border: "1.5px solid #fff",
+              }}
+            />
           </button>
 
           {/* Profile */}
           <div
             style={{
-              display: 'inline-flex',
-              alignItems: 'center',
+              display: "inline-flex",
+              alignItems: "center",
               gap: 8,
               height: 36,
-              padding: '0 12px 0 4px',
-              borderRadius: 'var(--radius-pill)',
-              border: '1px solid var(--border-light)',
-              backgroundColor: '#fff',
-              cursor: 'pointer',
+              padding: "0 12px 0 4px",
+              borderRadius: "var(--radius-pill)",
+              border: "1px solid var(--border-light)",
+              backgroundColor: "#fff",
+              cursor: "pointer",
               flexShrink: 0,
-              boxSizing: 'border-box',
-              transition: 'background-color 0.15s ease',
+              boxSizing: "border-box",
+              transition: "background-color 0.15s ease",
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = 'var(--bg-soft-blue)';
+              e.currentTarget.style.backgroundColor = "var(--bg-soft-blue)";
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = '#fff';
+              e.currentTarget.style.backgroundColor = "#fff";
             }}
           >
             <div
               style={{
                 width: 28,
                 height: 28,
-                borderRadius: '50%',
-                background: 'linear-gradient(135deg, #0F766E, #14B8A6)',
-                color: '#fff',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
+                borderRadius: "50%",
+                background: "linear-gradient(135deg, #0F766E, #14B8A6)",
+                color: "#fff",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
                 fontSize: 11,
                 fontWeight: 800,
               }}
             >
               SO
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
-              <span style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-main)', lineHeight: 1.15 }}>Minh Đức</span>
-              <span style={{ fontSize: 10, color: 'var(--blue-primary)', fontWeight: 600, lineHeight: 1 }}>Store Owner</span>
+            <div style={{ display: "flex", flexDirection: "column" }}>
+              <span
+                style={{
+                  fontSize: 12.5,
+                  fontWeight: 700,
+                  color: "var(--text-main)",
+                  lineHeight: 1.15,
+                }}
+              >
+                Minh Đức
+              </span>
+              <span
+                style={{
+                  fontSize: 10,
+                  color: "var(--blue-primary)",
+                  fontWeight: 600,
+                  lineHeight: 1,
+                }}
+              >
+                Store Owner
+              </span>
             </div>
           </div>
 
@@ -486,18 +993,18 @@ export const AppTopNav: FC = () => {
             type="button"
             onClick={() => setMobileOpen((v) => !v)}
             style={{
-              display: 'none',
+              display: "none",
               width: 36,
               height: 36,
-              borderRadius: 'var(--radius-pill)',
-              border: '1px solid var(--border-light)',
-              backgroundColor: 'var(--bg-soft-blue)',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
-              color: 'var(--text-muted)',
+              borderRadius: "var(--radius-pill)",
+              border: "1px solid var(--border-light)",
+              backgroundColor: "var(--bg-soft-blue)",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: "pointer",
+              color: "var(--text-muted)",
               flexShrink: 0,
-              boxSizing: 'border-box',
+              boxSizing: "border-box",
             }}
             className="topnav-hamburger"
             title="Menu"
@@ -511,24 +1018,24 @@ export const AppTopNav: FC = () => {
       <nav
         className="topnav-primary"
         style={{
-          backgroundColor: 'var(--blue-primary)',
-          borderBottom: '1px solid var(--blue-dark)',
-          position: 'sticky',
+          backgroundColor: "var(--blue-primary)",
+          borderBottom: "1px solid var(--blue-dark)",
+          position: "sticky",
           top: 56,
           zIndex: 190,
-          boxShadow: '0 2px 8px rgba(0, 50, 150, 0.15)',
+          boxShadow: "0 2px 8px rgba(0, 50, 150, 0.15)",
         }}
         aria-label="Điều hướng chính"
       >
         <div
           style={{
-            display: 'flex',
-            alignItems: 'stretch',
+            display: "flex",
+            alignItems: "stretch",
             height: 44,
-            padding: '0 24px',
+            padding: "0 24px",
             gap: 4,
-            overflowX: 'auto',
-            scrollbarWidth: 'none',
+            overflowX: "auto",
+            scrollbarWidth: "none",
           }}
         >
           {NAV_GROUPS.map((group) => {
@@ -543,29 +1050,36 @@ export const AppTopNav: FC = () => {
                   key={group.id}
                   to={group.to}
                   style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
+                    display: "inline-flex",
+                    alignItems: "center",
                     gap: 8,
-                    padding: '0 16px',
-                    height: '100%',
-                    textDecoration: 'none',
+                    padding: "0 16px",
+                    height: "100%",
+                    textDecoration: "none",
                     fontSize: 13.5,
-                    fontFamily: 'var(--font-sans)',
+                    fontFamily: "var(--font-sans)",
                     fontWeight: active ? 700 : 500,
-                    color: '#ffffff',
-                    backgroundColor: active ? 'rgba(0,0,0,0.2)' : 'transparent',
+                    color: "#ffffff",
+                    backgroundColor: active ? "rgba(0,0,0,0.2)" : "transparent",
                     borderRadius: 0,
-                    borderBottom: active ? '3px solid #ffffff' : '3px solid transparent',
-                    transition: 'all 0.15s ease',
-                    whiteSpace: 'nowrap',
+                    borderBottom: active
+                      ? "3px solid #ffffff"
+                      : "3px solid transparent",
+                    transition: "all 0.15s ease",
+                    whiteSpace: "nowrap",
                     flexShrink: 0,
-                    boxSizing: 'border-box',
+                    boxSizing: "border-box",
                   }}
                   onMouseEnter={(e) => {
-                    if (!active) e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.12)';
+                    clearCloseTimer();
+                    setOpenMenu(null);
+                    if (!active)
+                      e.currentTarget.style.backgroundColor =
+                        "rgba(255,255,255,0.12)";
                   }}
                   onMouseLeave={(e) => {
-                    if (!active) e.currentTarget.style.backgroundColor = 'transparent';
+                    if (!active)
+                      e.currentTarget.style.backgroundColor = "transparent";
                   }}
                 >
                   <group.icon size={16} color="currentColor" />
@@ -578,36 +1092,51 @@ export const AppTopNav: FC = () => {
             return (
               <div
                 key={group.id}
-                ref={(el) => { ref.current = el; }}
-                style={{ position: 'relative', display: 'flex', alignItems: 'stretch', height: '100%', flexShrink: 0 }}
+                id={`nav-group-${group.id}`}
+                ref={(el) => {
+                  ref.current = el;
+                }}
+                className="topnav-group"
+                style={{
+                  position: "relative",
+                  display: "flex",
+                  alignItems: "stretch",
+                  height: "100%",
+                  flexShrink: 0,
+                }}
+                onMouseEnter={() => handleMenuEnter(group.id)}
+                onMouseOver={() => handleMenuEnter(group.id)}
+                onMouseLeave={handleMenuLeave}
               >
                 <button
                   type="button"
+                  id={`nav-btn-${group.id}`}
+                  className={`topnav-group-btn ${isOpen ? "is-open" : ""}`}
                   onClick={() => toggleMenu(group.id)}
+                  onMouseEnter={() => handleMenuEnter(group.id)}
+                  onMouseOver={() => handleMenuEnter(group.id)}
                   style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
+                    display: "inline-flex",
+                    alignItems: "center",
                     gap: 8,
-                    padding: '0 16px',
-                    height: '100%',
-                    background: 'none',
-                    border: 'none',
-                    borderBottom: active || isOpen ? '3px solid #ffffff' : '3px solid transparent',
-                    backgroundColor: active || isOpen ? 'rgba(0,0,0,0.2)' : 'transparent',
-                    color: '#ffffff',
+                    padding: "0 16px",
+                    height: "100%",
+                    background: "none",
+                    border: "none",
+                    borderBottom:
+                      active || isOpen
+                        ? "3px solid #ffffff"
+                        : "3px solid transparent",
+                    backgroundColor:
+                      active || isOpen ? "rgba(0,0,0,0.2)" : "transparent",
+                    color: "#ffffff",
                     fontSize: 13.5,
                     fontWeight: active || isOpen ? 700 : 500,
-                    cursor: 'pointer',
-                    fontFamily: 'var(--font-sans)',
-                    transition: 'all 0.15s ease',
-                    whiteSpace: 'nowrap',
-                    boxSizing: 'border-box',
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!active && !isOpen) e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.12)';
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!active && !isOpen) e.currentTarget.style.backgroundColor = 'transparent';
+                    cursor: "pointer",
+                    fontFamily: "var(--font-sans)",
+                    transition: "all 0.15s ease",
+                    whiteSpace: "nowrap",
+                    boxSizing: "border-box",
                   }}
                   aria-expanded={isOpen}
                   aria-haspopup="true"
@@ -617,13 +1146,19 @@ export const AppTopNav: FC = () => {
                   <ChevronDown open={isOpen} />
                 </button>
 
-                {group.children && (
+                {(group.children || group.sections) && (
                   <NavDropdown
                     items={group.children}
+                    sections={group.sections}
                     isOpen={isOpen}
                     anchorRef={ref}
-                    onClose={() => setOpenMenu(null)}
-                    currentPath={location.pathname}
+                    onClose={() => {
+                      clearCloseTimer();
+                      setOpenMenu(null);
+                    }}
+                    onMouseEnter={clearCloseTimer}
+                    onMouseLeave={handleMenuLeave}
+                    currentPath={location.pathname + location.search}
                   />
                 )}
               </div>
@@ -636,50 +1171,76 @@ export const AppTopNav: FC = () => {
       {mobileOpen && (
         <div
           style={{
-            position: 'fixed',
+            position: "fixed",
             inset: 0,
             zIndex: 9998,
-            backgroundColor: 'rgba(15,23,42,0.45)',
+            backgroundColor: "rgba(15,23,42,0.45)",
           }}
           onClick={() => setMobileOpen(false)}
         >
           <div
             style={{
-              position: 'absolute',
+              position: "absolute",
               top: 0,
               left: 0,
               width: 280,
-              height: '100%',
-              backgroundColor: '#ffffff',
-              boxShadow: '4px 0 24px rgba(0,50,150,0.1)',
-              padding: '24px 0 32px',
-              overflowY: 'auto',
+              height: "100%",
+              backgroundColor: "#ffffff",
+              boxShadow: "4px 0 24px rgba(0,50,150,0.1)",
+              padding: "24px 0 32px",
+              overflowY: "auto",
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div style={{ padding: '0 20px 20px', borderBottom: '1px solid var(--border-light)', marginBottom: 12 }}>
-              <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--text-main)' }}>MT-GRMS</div>
-              <div style={{ fontSize: 11, color: 'var(--blue-primary)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            <div
+              style={{
+                padding: "0 20px 20px",
+                borderBottom: "1px solid var(--border-light)",
+                marginBottom: 12,
+              }}
+            >
+              <div
+                style={{
+                  fontSize: 16,
+                  fontWeight: 800,
+                  color: "var(--text-main)",
+                }}
+              >
+                MT-GRMS
+              </div>
+              <div
+                style={{
+                  fontSize: 11,
+                  color: "var(--blue-primary)",
+                  fontWeight: 700,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.05em",
+                }}
+              >
                 Quản lý Chuỗi Tạp Hóa
               </div>
             </div>
             {NAV_GROUPS.map((group) => (
-              <div key={group.id} style={{ padding: '0 12px 4px' }}>
+              <div key={group.id} style={{ padding: "0 12px 4px" }}>
                 {group.to ? (
                   <NavLink
                     to={group.to}
                     onClick={() => setMobileOpen(false)}
                     style={({ isActive }) => ({
-                      display: 'flex',
-                      alignItems: 'center',
+                      display: "flex",
+                      alignItems: "center",
                       gap: 10,
-                      padding: '11px 14px',
-                      borderRadius: 'var(--radius-pill)',
-                      textDecoration: 'none',
+                      padding: "11px 14px",
+                      borderRadius: "var(--radius-pill)",
+                      textDecoration: "none",
                       fontSize: 14,
                       fontWeight: isActive ? 700 : 500,
-                      color: isActive ? 'var(--blue-primary)' : 'var(--text-muted)',
-                      backgroundColor: isActive ? 'var(--blue-light)' : 'transparent',
+                      color: isActive
+                        ? "var(--blue-primary)"
+                        : "var(--text-muted)",
+                      backgroundColor: isActive
+                        ? "var(--blue-light)"
+                        : "transparent",
                     })}
                   >
                     <group.icon size={18} />
@@ -687,39 +1248,183 @@ export const AppTopNav: FC = () => {
                   </NavLink>
                 ) : (
                   <>
-                    <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em', padding: '10px 14px 4px' }}>
+                    <div
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 800,
+                        color: "var(--text-faint)",
+                        textTransform: "uppercase",
+                        letterSpacing: "0.05em",
+                        padding: "10px 14px 4px",
+                      }}
+                    >
                       {group.label}
                     </div>
-                    {group.children?.map((child) => {
-                      const isActive = location.pathname === child.to || location.pathname.startsWith(child.to + '/');
-                      return (
-                        <NavLink
-                          key={child.to}
-                          to={child.to}
-                          onClick={() => setMobileOpen(false)}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 10,
-                            padding: '9px 14px 9px 28px',
-                            borderRadius: 'var(--radius-pill)',
-                            textDecoration: 'none',
-                            fontSize: 13.5,
-                            fontWeight: isActive ? 700 : 500,
-                            color: isActive ? 'var(--blue-primary)' : 'var(--text-muted)',
-                            backgroundColor: isActive ? 'var(--blue-light)' : 'transparent',
-                          }}
-                        >
-                          <ChevronRightIcon size={13} />
-                          {child.label}
-                          {child.badge && (
-                            <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 'var(--radius-pill)', backgroundColor: '#e0f2fe', color: '#0284c7' }}>
-                              {child.badge}
-                            </span>
-                          )}
-                        </NavLink>
-                      );
-                    })}
+                    {group.sections
+                      ? group.sections.map((sec) => (
+                          <div key={sec.title} style={{ marginBottom: 6 }}>
+                            <div
+                              style={{
+                                fontSize: 11,
+                                fontWeight: 700,
+                                color: "#64748b",
+                                padding: "4px 14px 2px 24px",
+                              }}
+                            >
+                              {sec.title}
+                            </div>
+                            {sec.items.map((child) => {
+                              const isActive = (() => {
+                                const [toPath, toQuery] = child.to.split("?");
+                                const currPath = location.pathname;
+                                const currQuery = location.search;
+                                if (toQuery) {
+                                  return (
+                                    currPath === toPath &&
+                                    currQuery.includes(toQuery)
+                                  );
+                                }
+                                if (toPath === "/store-owner/suppliers") {
+                                  const hasOtherView =
+                                    currQuery.includes("view=");
+                                  return (
+                                    (currPath === toPath ||
+                                      currPath.startsWith(toPath + "/")) &&
+                                    !currPath.includes("/products") &&
+                                    !hasOtherView
+                                  );
+                                }
+                                if (
+                                  toPath === "/store-owner/suppliers/products"
+                                ) {
+                                  const hasOtherView =
+                                    currQuery.includes("view=");
+                                  return (
+                                    (currPath === toPath ||
+                                      currPath.startsWith(toPath + "/")) &&
+                                    !hasOtherView
+                                  );
+                                }
+                                if (toPath === "/store-owner/expenses") {
+                                  const hasOtherView =
+                                    currQuery.includes("view=") ||
+                                    currQuery.includes("tab=");
+                                  return (
+                                    (currPath === toPath ||
+                                      currPath.startsWith(toPath + "/")) &&
+                                    !hasOtherView
+                                  );
+                                }
+                                return (
+                                  currPath === toPath ||
+                                  currPath.startsWith(toPath + "/")
+                                );
+                              })();
+                              return (
+                                <NavLink
+                                  key={child.label + child.to}
+                                  to={child.to}
+                                  onClick={() => setMobileOpen(false)}
+                                  style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 10,
+                                    padding: "7px 14px 7px 32px",
+                                    borderRadius: "var(--radius-pill)",
+                                    textDecoration: "none",
+                                    fontSize: 13,
+                                    fontWeight: isActive ? 700 : 500,
+                                    color: isActive
+                                      ? "var(--blue-primary)"
+                                      : "var(--text-muted)",
+                                    backgroundColor: isActive
+                                      ? "var(--blue-light)"
+                                      : "transparent",
+                                  }}
+                                >
+                                  <span style={{ flex: 1 }}>{child.label}</span>
+                                  {child.badge && (
+                                    <span
+                                      style={{
+                                        fontSize: 9.5,
+                                        fontWeight: 700,
+                                        padding: "1px 6px",
+                                        borderRadius: "var(--radius-pill)",
+                                        backgroundColor:
+                                          child.badgeType === "red"
+                                            ? "#FF3B30"
+                                            : "#e0f2fe",
+                                        color:
+                                          child.badgeType === "red"
+                                            ? "#ffffff"
+                                            : "#0284c7",
+                                      }}
+                                    >
+                                      {child.badge}
+                                    </span>
+                                  )}
+                                </NavLink>
+                              );
+                            })}
+                          </div>
+                        ))
+                      : group.children?.map((child) => {
+                          const isActive = (() => {
+                            if (child.to === "/store-owner/suppliers") {
+                              return (
+                                (location.pathname === child.to ||
+                                  location.pathname.startsWith(
+                                    child.to + "/",
+                                  )) &&
+                                !location.pathname.includes("/products")
+                              );
+                            }
+                            return (
+                              location.pathname === child.to ||
+                              location.pathname.startsWith(child.to + "/")
+                            );
+                          })();
+                          return (
+                            <NavLink
+                              key={child.to}
+                              to={child.to}
+                              onClick={() => setMobileOpen(false)}
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 10,
+                                padding: "9px 14px 9px 28px",
+                                borderRadius: "var(--radius-pill)",
+                                textDecoration: "none",
+                                fontSize: 13.5,
+                                fontWeight: isActive ? 700 : 500,
+                                color: isActive
+                                  ? "var(--blue-primary)"
+                                  : "var(--text-muted)",
+                                backgroundColor: isActive
+                                  ? "var(--blue-light)"
+                                  : "transparent",
+                              }}
+                            >
+                              <ChevronRightIcon size={13} />
+                              {child.label}
+                              {child.badge && (
+                                <span
+                                  style={{
+                                    fontSize: 10,
+                                    fontWeight: 700,
+                                    padding: "1px 6px",
+                                    borderRadius: "var(--radius-pill)",
+                                    backgroundColor: "#e0f2fe",
+                                    color: "#0284c7",
+                                  }}
+                                >
+                                  {child.badge}
+                                </span>
+                              )}
+                            </NavLink>
+                          );
+                        })}
                   </>
                 )}
               </div>

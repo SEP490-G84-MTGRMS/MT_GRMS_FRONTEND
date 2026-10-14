@@ -7,6 +7,8 @@ interface SupplierProductTableRowProps {
   item: SupplierProductItem;
   supplierCode?: string;
   supplierName?: string;
+  isSelected?: boolean;
+  onToggleSelect?: (id: string) => void;
   onEdit: (item: SupplierProductItem) => void;
   onToggleStatus: (item: SupplierProductItem) => void;
 }
@@ -16,6 +18,8 @@ export const SupplierProductTableRow: FC<SupplierProductTableRowProps> = ({
   item,
   supplierCode,
   supplierName,
+  isSelected = false,
+  onToggleSelect,
   onEdit,
   onToggleStatus,
 }) => {
@@ -35,6 +39,15 @@ export const SupplierProductTableRow: FC<SupplierProductTableRowProps> = ({
         e.currentTarget.style.backgroundColor = 'transparent';
       }}
     >
+      {/* Checkbox */}
+      <td style={{ textAlign: 'center', padding: '10px 4px' }}>
+        <input
+          type="checkbox"
+          checked={isSelected}
+          onChange={() => onToggleSelect?.(item.id)}
+        />
+      </td>
+
       {/* 1. STT */}
       <td style={{ padding: '12px 14px', textAlign: 'center', fontSize: '0.8rem', color: '#94a3b8' }}>
         {index}
@@ -159,27 +172,17 @@ export const SupplierProductTableRow: FC<SupplierProductTableRowProps> = ({
       </td>
 
       {/* 11. Status */}
-      <td style={{ padding: '12px 14px', textAlign: 'center', whiteSpace: 'nowrap' }}>
+      <td style={{ padding: '12px 14px', textAlign: 'left', whiteSpace: 'nowrap' }}>
         <span
           style={{
             display: 'inline-flex',
             alignItems: 'center',
-            gap: 6,
-            fontSize: '0.82rem',
-            fontWeight: 600,
-            color: item.status === 'Active' ? 'var(--green-money)' : 'var(--text-muted)',
+            fontSize: 13,
+            fontWeight: 500,
+            color: item.status === 'Active' ? '#16a34a' : '#64748b',
           }}
         >
-          <span
-            style={{
-              width: 7,
-              height: 7,
-              borderRadius: '50%',
-              backgroundColor: item.status === 'Active' ? 'var(--green-money)' : '#94a3b8',
-              display: 'inline-block',
-            }}
-          />
-          {item.status === 'Active' ? 'Active' : 'Inactive'}
+          {item.status === 'Active' ? 'Hoạt động' : 'Tạm ngưng'}
         </span>
       </td>
 
@@ -190,28 +193,7 @@ export const SupplierProductTableRow: FC<SupplierProductTableRowProps> = ({
             type="button"
             onClick={() => onEdit(item)}
             title="Sửa giá & số lượng tối thiểu"
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 4,
-              padding: '5px 12px',
-              borderRadius: 'var(--radius-pill)',
-              backgroundColor: 'transparent',
-              border: '1px solid var(--border-mid)',
-              color: 'var(--text-main)',
-              fontSize: '0.78rem',
-              fontWeight: 600,
-              cursor: 'pointer',
-              transition: 'all 0.15s ease',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.borderColor = 'var(--blue-primary)';
-              e.currentTarget.style.color = 'var(--blue-primary)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.borderColor = 'var(--border-mid)';
-              e.currentTarget.style.color = 'var(--text-main)';
-            }}
+            className="admin-table-btn"
           >
             <Edit2 size={12} /> Sửa
           </button>
@@ -220,25 +202,9 @@ export const SupplierProductTableRow: FC<SupplierProductTableRowProps> = ({
             type="button"
             onClick={() => onToggleStatus(item)}
             title={item.status === 'Active' ? 'Tạm ngưng phân phối' : 'Kích hoạt lại'}
+            className="admin-table-btn"
             style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 4,
-              padding: '5px 12px',
-              borderRadius: 'var(--radius-pill)',
-              backgroundColor: 'transparent',
-              border: '1px solid var(--border-mid)',
               color: item.status === 'Active' ? '#dc2626' : '#16a34a',
-              fontSize: '0.78rem',
-              fontWeight: 600,
-              cursor: 'pointer',
-              transition: 'all 0.15s ease',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.borderColor = item.status === 'Active' ? '#dc2626' : '#16a34a';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.borderColor = 'var(--border-mid)';
             }}
           >
             <Power size={12} /> {item.status === 'Active' ? 'Ngưng' : 'Bật'}

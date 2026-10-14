@@ -6,7 +6,6 @@ import { HomePage } from '../pages/HomePage';
 import { StoreOwnerLayout } from '../layouts/StoreOwnerLayout';
 import { AdminDashboardPage } from '../pages/admin/AdminDashboardPage';
 import { TenantManagementPage } from '../pages/admin/TenantManagementPage';
-
 // 1. Supplier Feature
 import {
   SupplierListPage,
@@ -61,6 +60,13 @@ import {
   InvoiceManagementPage,
 } from '../features/pos';
 
+// 10. Subscriptions & Auth Features
+import { SubscriptionPlanPage } from '../pages/admin/SubscriptionPlanPage';
+import { SubscriptionPlanDetailPage } from '../pages/admin/SubscriptionPlanDetailPage';
+import { SubscriptionPlanCreatePage } from '../pages/admin/SubscriptionPlanCreatePage';
+import { SubscriptionPlanEditPage } from '../pages/admin/SubscriptionPlanEditPage';
+import { LoginPage, RegisterPage, ForgotPasswordPage } from '../pages/auth';
+
 export const router = createBrowserRouter([
   {
     path: '/',
@@ -103,6 +109,46 @@ export const router = createBrowserRouter([
       {
         path: 'transfers/:id/receive',
         element: <ReceiveTransferPage />,
+      },
+      {
+        path: 'subscriptions',
+        element: <SubscriptionPlanPage />,
+      },
+      {
+        path: 'subscriptions/create',
+        element: <SubscriptionPlanCreatePage />,
+      },
+      {
+        path: 'subscriptions/:id',
+        element: <SubscriptionPlanDetailPage />,
+      },
+      {
+        path: 'subscriptions/:id/edit',
+        element: <SubscriptionPlanEditPage />,
+      },
+      {
+        path: 'subscriptions/edit/:id',
+        element: <SubscriptionPlanEditPage />,
+      },
+      {
+        path: 'plans',
+        element: <SubscriptionPlanPage />,
+      },
+      {
+        path: 'plans/create',
+        element: <SubscriptionPlanCreatePage />,
+      },
+      {
+        path: 'plans/:id',
+        element: <SubscriptionPlanDetailPage />,
+      },
+      {
+        path: 'plans/:id/edit',
+        element: <SubscriptionPlanEditPage />,
+      },
+      {
+        path: 'plans/edit/:id',
+        element: <SubscriptionPlanEditPage />,
       },
       {
         path: 'suppliers',
@@ -219,6 +265,14 @@ export const router = createBrowserRouter([
       {
         path: 'transfers/:id/receive',
         element: <ReceiveTransferPage />,
+      },
+      {
+        path: 'subscriptions',
+        element: <SubscriptionPlanPage />,
+      },
+      {
+        path: 'subscriptions/:id',
+        element: <SubscriptionPlanDetailPage />,
       },
       {
         path: 'suppliers',
@@ -632,6 +686,15 @@ export const router = createBrowserRouter([
           },
         ],
       },
+      {
+        element: <StoreOwnerLayout />,
+        children: [
+          {
+            path: 'purchase-orders/create-matrix',
+            element: <EmployeeOrderMatrixPage />,
+          },
+        ],
+      },
     ],
   },
 
@@ -653,10 +716,35 @@ export const router = createBrowserRouter([
     element: <AuthLayout />,
     children: [
       {
+        index: true,
+        element: <Navigate to="/auth/login" replace />,
+      },
+      {
         path: 'login',
-        element: <div className="text-gray-600 text-center">Trang Đăng nhập Hệ thống</div>,
+        element: <LoginPage />,
+      },
+      {
+        path: 'register',
+        element: <RegisterPage />,
+      },
+      {
+        path: 'forgot-password',
+        element: <ForgotPasswordPage />,
       },
     ],
+  },
+  // Đường dẫn rút gọn tiện dụng
+  {
+    path: '/login',
+    element: <Navigate to="/auth/login" replace />,
+  },
+  {
+    path: '/register',
+    element: <Navigate to="/auth/register" replace />,
+  },
+  {
+    path: '/forgot-password',
+    element: <Navigate to="/auth/forgot-password" replace />,
   },
 
   // ─── BRANCH PORTAL (/branch) ───
@@ -681,4 +769,5 @@ export const router = createBrowserRouter([
     element: <Navigate to="/store-owner/dashboard" replace />,
   },
 ]);
+
 export default router;
