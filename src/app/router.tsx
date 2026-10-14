@@ -11,6 +11,7 @@ import { StoreOwnerLayout } from '../layouts/StoreOwnerLayout';
 import { AdminDashboardPage } from '../pages/admin/AdminDashboardPage';
 import { TenantManagementPage } from '../pages/admin/TenantManagementPage';
 import { SubscriptionPlanPage } from '../pages/admin/SubscriptionPlanPage';
+import { SubscriptionPlanDetailPage } from '../pages/admin/SubscriptionPlanDetailPage';
 import { LoginPage, RegisterPage, ForgotPasswordPage } from '../pages/auth';
 import { PosCheckoutPage, PosShiftPage } from '../features/pos';
 
@@ -40,8 +41,16 @@ export const router = createBrowserRouter([
         element: <SubscriptionPlanPage />,
       },
       {
+        path: 'subscriptions/:id',
+        element: <SubscriptionPlanDetailPage />,
+      },
+      {
         path: 'plans',
         element: <SubscriptionPlanPage />,
+      },
+      {
+        path: 'plans/:id',
+        element: <SubscriptionPlanDetailPage />,
       },
       {
         path: 'suppliers',
@@ -96,6 +105,14 @@ export const router = createBrowserRouter([
       {
         path: 'dashboard',
         element: <AdminDashboardPage />,
+      },
+      {
+        path: 'subscriptions',
+        element: <SubscriptionPlanPage />,
+      },
+      {
+        path: 'subscriptions/:id',
+        element: <SubscriptionPlanDetailPage />,
       },
       {
         path: 'suppliers',

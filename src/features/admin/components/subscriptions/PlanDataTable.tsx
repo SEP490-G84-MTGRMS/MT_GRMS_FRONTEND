@@ -90,6 +90,8 @@ export const PlanDataTable: FC<PlanDataTableProps> = ({
                   </td>
                   <td>
                     <span
+                      onClick={() => onDetail(p)}
+                      title="Bấm để xem hồ sơ chi tiết gói cước"
                       style={{
                         fontFamily: 'var(--font-mono)',
                         fontSize: 12,
@@ -100,13 +102,18 @@ export const PlanDataTable: FC<PlanDataTableProps> = ({
                         borderRadius: 6,
                         border: '1px solid #cbd5e1',
                         display: 'inline-block',
+                        cursor: 'pointer',
                       }}
                     >
                       {p.code}
                     </span>
                   </td>
                   <td>
-                    <div style={{ fontWeight: 700, color: 'var(--text-main)', fontSize: 13.5 }}>
+                    <div
+                      onClick={() => onDetail(p)}
+                      title="Bấm để xem hồ sơ chi tiết gói cước"
+                      style={{ fontWeight: 700, color: 'var(--text-main)', fontSize: 13.5, cursor: 'pointer' }}
+                    >
                       {p.name}
                     </div>
                     <div

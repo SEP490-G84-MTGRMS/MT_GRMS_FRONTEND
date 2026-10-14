@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import type {
   SubscriptionPlan,
   PlanStatus,
@@ -10,11 +11,11 @@ import {
   PlanDataTable,
   CreatePlanModal,
   UpdatePlanModal,
-  PlanDetailModal,
 } from "../../features/admin/components/subscriptions";
 import { CheckCircle2, AlertCircle } from "lucide-react";
 
 export const SubscriptionPlanPage: React.FC = () => {
+  const navigate = useNavigate();
   const [plans, setPlans] = useState<SubscriptionPlan[]>(mockSubscriptionPlans);
   const [keyword, setKeyword] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | PlanStatus>("all");
@@ -22,9 +23,6 @@ export const SubscriptionPlanPage: React.FC = () => {
   // Modals
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [updateTarget, setUpdateTarget] = useState<SubscriptionPlan | null>(
-    null,
-  );
-  const [detailTarget, setDetailTarget] = useState<SubscriptionPlan | null>(
     null,
   );
 
@@ -108,9 +106,6 @@ export const SubscriptionPlanPage: React.FC = () => {
     setPlans((prev) =>
       prev.map((p) => (p.id === updatedPlan.id ? updatedPlan : p)),
     );
-    if (detailTarget?.id === updatedPlan.id) {
-      setDetailTarget(updatedPlan);
-    }
     showToast(
       `Đã cập nhật cấu hình gói dịch vụ "${updatedPlan.name}" thành công!`,
     );
@@ -267,7 +262,7 @@ export const SubscriptionPlanPage: React.FC = () => {
       {/* DATA TABLE */}
       <PlanDataTable
         plans={filteredPlans}
-        onDetail={(plan) => setDetailTarget(plan)}
+        onDetail={(plan) => navigate(`/admin/subscriptions/${plan.id}`)}
         onEdit={(plan) => setUpdateTarget(plan)}
         onToggleStatus={handleToggleStatus}
       />
@@ -285,13 +280,6 @@ export const SubscriptionPlanPage: React.FC = () => {
         isOpen={Boolean(updateTarget)}
         onClose={() => setUpdateTarget(null)}
         onSave={handleUpdatePlan}
-      />
-
-      <PlanDetailModal
-        plan={detailTarget}
-        isOpen={Boolean(detailTarget)}
-        onClose={() => setDetailTarget(null)}
-        onEditPlan={(plan) => setUpdateTarget(plan)}
       />
     </div>
   );
