@@ -3,22 +3,71 @@ import { PosLayout } from '../layouts/PosLayout';
 import { WebStoreLayout } from '../layouts/WebStoreLayout';
 import { AuthLayout } from '../layouts/AuthLayout';
 import { HomePage } from '../pages/HomePage';
-import { SupplierListPage, SupplierDetailPage, SupplierProductManagementPage } from '../features/supplier';
-import { OrderMatrixPage, BranchOrderListPage, EmployeeOrderMatrixPage } from '../features/purchase-order';
-import { ServiceExpensesPage } from '../features/service-expenses/pages/ServiceExpensesPage';
-import { CustomerManagementPage } from '../features/customer-crm';
-import { ProductListPage } from '../features/product';
 import { StoreOwnerLayout } from '../layouts/StoreOwnerLayout';
 import { AdminDashboardPage } from '../pages/admin/AdminDashboardPage';
 import { TenantManagementPage } from '../pages/admin/TenantManagementPage';
-import { PosCheckoutPage, PosShiftPage, InventoryLookupPage, InvoiceManagementPage } from '../features/pos';
-import { PromotionListPage, VoucherListPage, LoyaltyConfigPage } from '../features/promotion';
+
+// 1. Supplier Feature
+import {
+  SupplierListPage,
+  SupplierDetailPage,
+  SupplierProductManagementPage,
+} from '../features/supplier';
+
+// 2. Purchase Orders Feature
+import {
+  OrderMatrixPage,
+  BranchOrderListPage,
+  EmployeeOrderMatrixPage,
+} from '../features/purchase-order';
+
+// 3. Service Expenses Feature (FE-07)
+import { ServiceExpensesPage } from '../features/service-expenses/pages/ServiceExpensesPage';
+
+// 4. Customer CRM Feature (FE-08)
+import { CustomerManagementPage } from '../features/customer-crm';
+
+// 5. Product Management Feature (FE-01)
+import { ProductListPage } from '../features/product';
+
+// 6. Transfer Feature (FE-15)
+import {
+  TransferListPage,
+  CreateTransferPage,
+  ReceiveTransferPage,
+  TransferDetailPage,
+} from '../features/transfer';
+
+// 7. Employee Management Feature
+import {
+  EmployeeListPage,
+  WorkSchedulePage,
+  AttendancePage,
+  PayslipManagementPage,
+} from '../features/employee';
+
+// 8. Promotions Feature
+import {
+  PromotionListPage,
+  VoucherListPage,
+  LoyaltyConfigPage,
+} from '../features/promotion';
+
+// 9. POS Feature
+import {
+  PosCheckoutPage,
+  PosShiftPage,
+  InventoryLookupPage,
+  InvoiceManagementPage,
+} from '../features/pos';
 
 export const router = createBrowserRouter([
   {
     path: '/',
     element: <HomePage />,
   },
+
+  // ─── ADMIN PORTAL (/admin) ───
   {
     path: '/admin',
     element: <StoreOwnerLayout />,
@@ -36,6 +85,26 @@ export const router = createBrowserRouter([
         element: <TenantManagementPage />,
       },
       {
+        path: 'products',
+        element: <ProductListPage />,
+      },
+      {
+        path: 'transfers',
+        element: <TransferListPage />,
+      },
+      {
+        path: 'transfers/create',
+        element: <CreateTransferPage />,
+      },
+      {
+        path: 'transfers/:id',
+        element: <TransferDetailPage />,
+      },
+      {
+        path: 'transfers/:id/receive',
+        element: <ReceiveTransferPage />,
+      },
+      {
         path: 'suppliers',
         element: <SupplierListPage />,
       },
@@ -76,6 +145,22 @@ export const router = createBrowserRouter([
         element: <CustomerManagementPage />,
       },
       {
+        path: 'employees',
+        element: <EmployeeListPage />,
+      },
+      {
+        path: 'employees/schedule',
+        element: <WorkSchedulePage />,
+      },
+      {
+        path: 'employees/attendance',
+        element: <AttendancePage />,
+      },
+      {
+        path: 'employees/payroll',
+        element: <PayslipManagementPage />,
+      },
+      {
         path: 'promotions',
         element: <PromotionListPage />,
       },
@@ -101,6 +186,8 @@ export const router = createBrowserRouter([
       },
     ],
   },
+
+  // ─── STORE OWNER PORTAL (/store-owner) ───
   {
     path: '/store-owner',
     element: <StoreOwnerLayout />,
@@ -118,6 +205,22 @@ export const router = createBrowserRouter([
         element: <ProductListPage />,
       },
       {
+        path: 'transfers',
+        element: <TransferListPage />,
+      },
+      {
+        path: 'transfers/create',
+        element: <CreateTransferPage />,
+      },
+      {
+        path: 'transfers/:id',
+        element: <TransferDetailPage />,
+      },
+      {
+        path: 'transfers/:id/receive',
+        element: <ReceiveTransferPage />,
+      },
+      {
         path: 'suppliers',
         element: <SupplierListPage />,
       },
@@ -158,6 +261,22 @@ export const router = createBrowserRouter([
         element: <CustomerManagementPage />,
       },
       {
+        path: 'employees',
+        element: <EmployeeListPage />,
+      },
+      {
+        path: 'employees/schedule',
+        element: <WorkSchedulePage />,
+      },
+      {
+        path: 'employees/attendance',
+        element: <AttendancePage />,
+      },
+      {
+        path: 'employees/payroll',
+        element: <PayslipManagementPage />,
+      },
+      {
         path: 'promotions',
         element: <PromotionListPage />,
       },
@@ -183,6 +302,8 @@ export const router = createBrowserRouter([
       },
     ],
   },
+
+  // ─── DASHBOARD ALIAS (/dashboard) ───
   {
     path: '/dashboard',
     element: <StoreOwnerLayout />,
@@ -194,6 +315,22 @@ export const router = createBrowserRouter([
       {
         path: 'products',
         element: <ProductListPage />,
+      },
+      {
+        path: 'transfers',
+        element: <TransferListPage />,
+      },
+      {
+        path: 'transfers/create',
+        element: <CreateTransferPage />,
+      },
+      {
+        path: 'transfers/:id',
+        element: <TransferDetailPage />,
+      },
+      {
+        path: 'transfers/:id/receive',
+        element: <ReceiveTransferPage />,
       },
       {
         path: 'tenants',
@@ -233,10 +370,53 @@ export const router = createBrowserRouter([
       },
       {
         path: 'customers',
-        element: <Navigate to="/store-owner/customers" replace />,
+        element: <CustomerManagementPage />,
+      },
+      {
+        path: 'employees',
+        element: <EmployeeListPage />,
+      },
+      {
+        path: 'employees/schedule',
+        element: <WorkSchedulePage />,
+      },
+      {
+        path: 'employees/attendance',
+        element: <AttendancePage />,
+      },
+      {
+        path: 'employees/payroll',
+        element: <PayslipManagementPage />,
+      },
+      {
+        path: 'promotions',
+        element: <PromotionListPage />,
+      },
+      {
+        path: 'vouchers',
+        element: <VoucherListPage />,
+      },
+      {
+        path: 'loyalty-config',
+        element: <LoyaltyConfigPage />,
+      },
+      {
+        path: 'inventory-lookup',
+        element: <InventoryLookupPage />,
+      },
+      {
+        path: 'orders',
+        element: <InvoiceManagementPage />,
+      },
+      {
+        path: 'invoices',
+        element: <InvoiceManagementPage />,
       },
     ],
   },
+
+  // ─── SHORTCUTS TOP-LEVEL ROUTES ───
+  // Products
   {
     path: '/products',
     element: <StoreOwnerLayout />,
@@ -247,6 +427,68 @@ export const router = createBrowserRouter([
       },
     ],
   },
+
+  // Transfers
+  {
+    path: '/transfers',
+    element: <StoreOwnerLayout />,
+    children: [
+      {
+        index: true,
+        element: <TransferListPage />,
+      },
+      {
+        path: 'create',
+        element: <CreateTransferPage />,
+      },
+      {
+        path: ':id',
+        element: <TransferDetailPage />,
+      },
+      {
+        path: ':id/receive',
+        element: <ReceiveTransferPage />,
+      },
+    ],
+  },
+
+  // Employees
+  {
+    path: '/employees',
+    element: <StoreOwnerLayout />,
+    children: [
+      {
+        index: true,
+        element: <EmployeeListPage />,
+      },
+      {
+        path: 'schedule',
+        element: <WorkSchedulePage />,
+      },
+      {
+        path: 'attendance',
+        element: <AttendancePage />,
+      },
+      {
+        path: 'payroll',
+        element: <PayslipManagementPage />,
+      },
+    ],
+  },
+
+  // Customers
+  {
+    path: '/customers',
+    element: <StoreOwnerLayout />,
+    children: [
+      {
+        index: true,
+        element: <CustomerManagementPage />,
+      },
+    ],
+  },
+
+  // Suppliers
   {
     path: '/suppliers',
     element: <StoreOwnerLayout />,
@@ -267,26 +509,42 @@ export const router = createBrowserRouter([
         path: ':id/products',
         element: <SupplierProductManagementPage />,
       },
-      {
-        path: 'expenses',
-        element: <Navigate to="/store-owner/expenses" replace />,
-      },
-      {
-        path: 'customers',
-        element: <Navigate to="/store-owner/customers" replace />,
-      },
     ],
   },
+
+  // Expenses
   {
-    path: '/customers',
+    path: '/expenses',
     element: <StoreOwnerLayout />,
     children: [
       {
         index: true,
-        element: <CustomerManagementPage />,
+        element: <ServiceExpensesPage />,
       },
     ],
   },
+
+  // Promotions
+  {
+    path: '/promotions',
+    element: <StoreOwnerLayout />,
+    children: [
+      {
+        index: true,
+        element: <PromotionListPage />,
+      },
+      {
+        path: 'vouchers',
+        element: <VoucherListPage />,
+      },
+      {
+        path: 'loyalty-config',
+        element: <LoyaltyConfigPage />,
+      },
+    ],
+  },
+
+  // ─── POS SYSTEM (/pos) ───
   {
     path: '/pos',
     element: <PosLayout />,
@@ -313,6 +571,8 @@ export const router = createBrowserRouter([
       },
     ],
   },
+
+  // ─── EMPLOYEE APP (/employee) ───
   {
     path: '/employee',
     children: [
@@ -374,6 +634,8 @@ export const router = createBrowserRouter([
       },
     ],
   },
+
+  // ─── WEB STORE (/store) ───
   {
     path: '/store',
     element: <WebStoreLayout />,
@@ -384,6 +646,8 @@ export const router = createBrowserRouter([
       },
     ],
   },
+
+  // ─── AUTHENTICATION (/auth) ───
   {
     path: '/auth',
     element: <AuthLayout />,
@@ -394,6 +658,8 @@ export const router = createBrowserRouter([
       },
     ],
   },
+
+  // ─── BRANCH PORTAL (/branch) ───
   {
     path: '/branch',
     element: <StoreOwnerLayout />,
@@ -408,4 +674,11 @@ export const router = createBrowserRouter([
       },
     ],
   },
+
+  // Catch-all fallback
+  {
+    path: '*',
+    element: <Navigate to="/store-owner/dashboard" replace />,
+  },
 ]);
+export default router;
