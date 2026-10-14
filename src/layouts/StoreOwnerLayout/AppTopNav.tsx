@@ -10,6 +10,7 @@ import {
   MenuIcon,
   TrendingUpIcon,
 } from '../../features/admin/components';
+import { Gift } from 'lucide-react';
 
 /* ─── Data ─── */
 
@@ -26,6 +27,10 @@ interface NavGroup {
   to?: string; // direct link (no dropdown)
   children?: NavSubItem[];
 }
+
+const GiftNavIcon: FC<{ size?: number; color?: string }> = ({ size = 18, color = 'currentColor' }) => (
+  <Gift size={size} color={color} />
+);
 
 const NAV_GROUPS: NavGroup[] = [
   {
@@ -60,6 +65,16 @@ const NAV_GROUPS: NavGroup[] = [
     children: [
       { label: 'Khách hàng & Công nợ (FE-08)', to: '/store-owner/customers', badge: 'FE-08' },
       { label: 'Chi phí vận hành (FE-07)', to: '/store-owner/expenses', badge: 'FE-07' },
+    ],
+  },
+  {
+    id: 'promotions',
+    label: 'Khuyến mãi',
+    icon: GiftNavIcon,
+    children: [
+      { label: 'Chương trình khuyến mãi', to: '/store-owner/promotions', badge: 'Mới' },
+      { label: 'Voucher & Coupon', to: '/store-owner/vouchers' },
+      { label: 'Thiết lập tích điểm', to: '/store-owner/loyalty-config' },
     ],
   },
 ];
