@@ -6,20 +6,8 @@ import { HomePage } from '../pages/HomePage';
 import { SupplierListPage, SupplierDetailPage, SupplierProductManagementPage } from '../features/supplier';
 import { OrderMatrixPage, BranchOrderListPage, EmployeeOrderMatrixPage } from '../features/purchase-order';
 import { ServiceExpensesPage } from '../features/service-expenses/pages/ServiceExpensesPage';
-import {
-  EmployeeListPage,
-  WorkSchedulePage,
-  AttendancePage,
-  PayslipManagementPage,
-} from '../features/employee';
-import { ProductListPage } from '../features/product';
-import {
-  TransferListPage,
-  CreateTransferPage,
-  ReceiveTransferPage,
-  TransferDetailPage,
-} from '../features/transfer';
 import { CustomerManagementPage } from '../features/customer-crm';
+import { ProductListPage } from '../features/product';
 import { StoreOwnerLayout } from '../layouts/StoreOwnerLayout';
 import { AdminDashboardPage } from '../pages/admin/AdminDashboardPage';
 import { TenantManagementPage } from '../pages/admin/TenantManagementPage';
@@ -84,20 +72,32 @@ export const router = createBrowserRouter([
         element: <ServiceExpensesPage />,
       },
       {
-        path: 'employees',
-        element: <EmployeeListPage />,
+        path: 'customers',
+        element: <CustomerManagementPage />,
       },
       {
-        path: 'employees/schedule',
-        element: <WorkSchedulePage />,
+        path: 'promotions',
+        element: <PromotionListPage />,
       },
       {
-        path: 'employees/attendance',
-        element: <AttendancePage />,
+        path: 'vouchers',
+        element: <VoucherListPage />,
       },
       {
-        path: 'employees/payroll',
-        element: <PayslipManagementPage />,
+        path: 'loyalty-config',
+        element: <LoyaltyConfigPage />,
+      },
+      {
+        path: 'inventory-lookup',
+        element: <InventoryLookupPage />,
+      },
+      {
+        path: 'orders',
+        element: <InvoiceManagementPage />,
+      },
+      {
+        path: 'invoices',
+        element: <InvoiceManagementPage />,
       },
     ],
   },
@@ -116,22 +116,6 @@ export const router = createBrowserRouter([
       {
         path: 'products',
         element: <ProductListPage />,
-      },
-      {
-        path: 'transfers',
-        element: <TransferListPage />,
-      },
-      {
-        path: 'transfers/create',
-        element: <CreateTransferPage />,
-      },
-      {
-        path: 'transfers/:id',
-        element: <TransferDetailPage />,
-      },
-      {
-        path: 'transfers/:id/receive',
-        element: <ReceiveTransferPage />,
       },
       {
         path: 'suppliers',
@@ -168,22 +152,6 @@ export const router = createBrowserRouter([
       {
         path: 'expenses',
         element: <ServiceExpensesPage />,
-      },
-      {
-        path: 'employees',
-        element: <EmployeeListPage />,
-      },
-      {
-        path: 'employees/schedule',
-        element: <WorkSchedulePage />,
-      },
-      {
-        path: 'employees/attendance',
-        element: <AttendancePage />,
-      },
-      {
-        path: 'employees/payroll',
-        element: <PayslipManagementPage />,
       },
       {
         path: 'customers',
@@ -228,22 +196,6 @@ export const router = createBrowserRouter([
         element: <ProductListPage />,
       },
       {
-        path: 'transfers',
-        element: <TransferListPage />,
-      },
-      {
-        path: 'transfers/create',
-        element: <CreateTransferPage />,
-      },
-      {
-        path: 'transfers/:id',
-        element: <TransferDetailPage />,
-      },
-      {
-        path: 'transfers/:id/receive',
-        element: <ReceiveTransferPage />,
-      },
-      {
         path: 'tenants',
         element: <TenantManagementPage />,
       },
@@ -280,68 +232,8 @@ export const router = createBrowserRouter([
         element: <Navigate to="/store-owner/expenses" replace />,
       },
       {
-        path: 'employees',
-        element: <EmployeeListPage />,
-      },
-      {
-        path: 'employees/schedule',
-        element: <WorkSchedulePage />,
-      },
-      {
-        path: 'employees/attendance',
-        element: <AttendancePage />,
-      },
-      {
-        path: 'employees/payroll',
-        element: <PayslipManagementPage />,
-      },
-    ],
-  },
-  {
-    path: '/employees',
-    element: <StoreOwnerLayout />,
-    children: [
-      {
-        index: true,
-        element: <EmployeeListPage />,
-      },
-      {
-        path: 'schedule',
-        element: <WorkSchedulePage />,
-      },
-      {
-        path: 'attendance',
-        element: <AttendancePage />,
-      },
-      {
-        path: 'payroll',
-        element: <PayslipManagementPage />,
-      },
-      {
         path: 'customers',
         element: <Navigate to="/store-owner/customers" replace />,
-      },
-    ],
-  },
-  {
-    path: '/transfers',
-    element: <StoreOwnerLayout />,
-    children: [
-      {
-        index: true,
-        element: <TransferListPage />,
-      },
-      {
-        path: 'create',
-        element: <CreateTransferPage />,
-      },
-      {
-        path: ':id',
-        element: <TransferDetailPage />,
-      },
-      {
-        path: ':id/receive',
-        element: <ReceiveTransferPage />,
       },
     ],
   },
