@@ -36,55 +36,58 @@ export const PlanBasicInfoForm: React.FC<PlanBasicInfoFormProps> = ({
       style={{
         background: '#ffffff',
         border: '1px solid var(--border-light, #e2e8f0)',
-        borderRadius: '16px',
-        padding: '24px',
-        boxShadow: '0 2px 8px rgba(0, 30, 90, 0.04)',
+        borderRadius: '12px',
+        padding: '14px 18px',
+        boxShadow: '0 1px 4px rgba(0, 30, 90, 0.03)',
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
+      {/* Header section */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
         <div
           style={{
-            width: '32px',
-            height: '32px',
-            borderRadius: '8px',
+            width: '26px',
+            height: '26px',
+            borderRadius: '6px',
             background: 'var(--blue-light, #f0f6ff)',
             color: 'var(--blue-primary, #0066ff)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
+            flexShrink: 0,
           }}
         >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
             <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
           </svg>
         </div>
         <div>
-          <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#1e293b' }}>
+          <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 700, color: '#1e293b' }}>
             1. Thông Tin Nhận Diện & Định Giá
           </h3>
-          <p style={{ margin: 0, fontSize: '13px', color: '#64748b' }}>
-            Mã định danh, tên hiển thị, phí niêm yết và chu kỳ thanh toán
-          </p>
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' }}>
+      {/* Grid Fields */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '10px 14px' }}>
         {/* Plan Code */}
         <div>
-          <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
-            Mã gói dịch vụ <span style={{ color: '#ef4444' }}>*</span>
-          </label>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
+            <label style={{ fontSize: '12px', fontWeight: 600, color: '#334155' }}>
+              Mã gói <span style={{ color: '#ef4444' }}>*</span>
+            </label>
+            {isEdit && <span style={{ fontSize: '11px', color: '#94a3b8' }}>Khóa duy nhất</span>}
+          </div>
           <input
             type="text"
             disabled={isEdit}
             value={code}
             onChange={(e) => onChange({ code: e.target.value.toUpperCase().replace(/\s+/g, '_') })}
-            placeholder="VD: PRO_MAX, STARTER..."
+            placeholder="VD: PLAN_PRO..."
             style={{
               width: '100%',
-              padding: '10px 14px',
-              fontSize: '14px',
+              padding: '6px 12px',
+              fontSize: '13px',
               fontFamily: "'JetBrains Mono', Consolas, monospace",
               fontWeight: 600,
               borderRadius: '9999px',
@@ -95,29 +98,23 @@ export const PlanBasicInfoForm: React.FC<PlanBasicInfoFormProps> = ({
               boxSizing: 'border-box',
             }}
           />
-          {errors.code ? (
-            <p style={{ margin: '4px 0 0 4px', fontSize: '12px', color: '#ef4444' }}>{errors.code}</p>
-          ) : (
-            <p style={{ margin: '4px 0 0 4px', fontSize: '12px', color: '#94a3b8' }}>
-              {isEdit ? 'Mã gói là khóa duy nhất, không thể chỉnh sửa sau khi tạo' : 'Dạng in hoa, viết liền, không dấu'}
-            </p>
-          )}
+          {errors.code && <p style={{ margin: '2px 0 0', fontSize: '11px', color: '#ef4444' }}>{errors.code}</p>}
         </div>
 
         {/* Plan Name */}
         <div>
-          <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
-            Tên thương mại gói <span style={{ color: '#ef4444' }}>*</span>
+          <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#334155', marginBottom: '3px' }}>
+            Tên thương mại <span style={{ color: '#ef4444' }}>*</span>
           </label>
           <input
             type="text"
             value={name}
             onChange={(e) => onChange({ name: e.target.value })}
-            placeholder="VD: Gói Siêu Thị Mini Đa Chi Nhánh..."
+            placeholder="VD: Gói Siêu Thị Mini..."
             style={{
               width: '100%',
-              padding: '10px 14px',
-              fontSize: '14px',
+              padding: '6px 12px',
+              fontSize: '13px',
               borderRadius: '9999px',
               border: `1px solid ${errors.name ? '#ef4444' : '#cbd5e1'}`,
               background: '#ffffff',
@@ -126,15 +123,13 @@ export const PlanBasicInfoForm: React.FC<PlanBasicInfoFormProps> = ({
               boxSizing: 'border-box',
             }}
           />
-          {errors.name && (
-            <p style={{ margin: '4px 0 0 4px', fontSize: '12px', color: '#ef4444' }}>{errors.name}</p>
-          )}
+          {errors.name && <p style={{ margin: '2px 0 0', fontSize: '11px', color: '#ef4444' }}>{errors.name}</p>}
         </div>
 
         {/* Monthly Price */}
         <div>
-          <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
-            Giá cước theo tháng (VNĐ) <span style={{ color: '#ef4444' }}>*</span>
+          <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#334155', marginBottom: '3px' }}>
+            Giá cước tháng <span style={{ color: '#ef4444' }}>*</span>
           </label>
           <div style={{ position: 'relative' }}>
             <input
@@ -146,8 +141,8 @@ export const PlanBasicInfoForm: React.FC<PlanBasicInfoFormProps> = ({
               placeholder="0"
               style={{
                 width: '100%',
-                padding: '10px 48px 10px 14px',
-                fontSize: '15px',
+                padding: '6px 42px 6px 12px',
+                fontSize: '13px',
                 fontFamily: "'JetBrains Mono', Consolas, monospace",
                 fontWeight: 600,
                 borderRadius: '9999px',
@@ -159,27 +154,32 @@ export const PlanBasicInfoForm: React.FC<PlanBasicInfoFormProps> = ({
             <span
               style={{
                 position: 'absolute',
-                right: '16px',
+                right: '12px',
                 top: '50%',
                 transform: 'translateY(-50%)',
-                fontSize: '13px',
+                fontSize: '11px',
                 fontWeight: 600,
                 color: '#64748b',
               }}
             >
-              đ/tháng
+              đ/th
             </span>
           </div>
-          {errors.monthlyPrice && (
-            <p style={{ margin: '4px 0 0 4px', fontSize: '12px', color: '#ef4444' }}>{errors.monthlyPrice}</p>
-          )}
+          {errors.monthlyPrice && <p style={{ margin: '2px 0 0', fontSize: '11px', color: '#ef4444' }}>{errors.monthlyPrice}</p>}
         </div>
 
         {/* Yearly Price */}
         <div>
-          <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
-            Giá cước theo năm (VNĐ) <span style={{ color: '#ef4444' }}>*</span>
-          </label>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
+            <label style={{ fontSize: '12px', fontWeight: 600, color: '#334155' }}>
+              Giá cước năm <span style={{ color: '#ef4444' }}>*</span>
+            </label>
+            {monthlyPrice > 0 && yearlyPrice > 0 && (
+              <span style={{ fontSize: '11px', color: '#16a34a', fontWeight: 600 }}>
+                Giảm {Math.max(0, Math.round((1 - yearlyPrice / (monthlyPrice * 12)) * 100))}%
+              </span>
+            )}
+          </div>
           <div style={{ position: 'relative' }}>
             <input
               type="number"
@@ -190,8 +190,8 @@ export const PlanBasicInfoForm: React.FC<PlanBasicInfoFormProps> = ({
               placeholder="0"
               style={{
                 width: '100%',
-                padding: '10px 48px 10px 14px',
-                fontSize: '15px',
+                padding: '6px 42px 6px 12px',
+                fontSize: '13px',
                 fontFamily: "'JetBrains Mono', Consolas, monospace",
                 fontWeight: 600,
                 borderRadius: '9999px',
@@ -203,10 +203,10 @@ export const PlanBasicInfoForm: React.FC<PlanBasicInfoFormProps> = ({
             <span
               style={{
                 position: 'absolute',
-                right: '16px',
+                right: '12px',
                 top: '50%',
                 transform: 'translateY(-50%)',
-                fontSize: '13px',
+                fontSize: '11px',
                 fontWeight: 600,
                 color: '#64748b',
               }}
@@ -214,18 +214,12 @@ export const PlanBasicInfoForm: React.FC<PlanBasicInfoFormProps> = ({
               đ/năm
             </span>
           </div>
-          {errors.yearlyPrice ? (
-            <p style={{ margin: '4px 0 0 4px', fontSize: '12px', color: '#ef4444' }}>{errors.yearlyPrice}</p>
-          ) : monthlyPrice > 0 && yearlyPrice > 0 ? (
-            <p style={{ margin: '4px 0 0 4px', fontSize: '12px', color: '#16a34a' }}>
-              Ưu đãi: Tiết kiệm {Math.max(0, Math.round((1 - yearlyPrice / (monthlyPrice * 12)) * 100))}% so với mua lẻ từng tháng
-            </p>
-          ) : null}
+          {errors.yearlyPrice && <p style={{ margin: '2px 0 0', fontSize: '11px', color: '#ef4444' }}>{errors.yearlyPrice}</p>}
         </div>
 
         {/* Status Dropdown */}
-        <div>
-          <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
+        <div style={{ gridColumn: 'span 2' }}>
+          <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#334155', marginBottom: '3px' }}>
             Trạng thái mở bán
           </label>
           <select
@@ -233,8 +227,8 @@ export const PlanBasicInfoForm: React.FC<PlanBasicInfoFormProps> = ({
             onChange={(e) => onChange({ status: e.target.value as PlanStatus })}
             style={{
               width: '100%',
-              padding: '10px 14px',
-              fontSize: '14px',
+              padding: '6px 12px',
+              fontSize: '13px',
               fontWeight: 500,
               borderRadius: '9999px',
               border: '1px solid #cbd5e1',
@@ -251,24 +245,24 @@ export const PlanBasicInfoForm: React.FC<PlanBasicInfoFormProps> = ({
       </div>
 
       {/* Description */}
-      <div style={{ marginTop: '20px' }}>
-        <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
-          Mô tả gói dịch vụ & Điểm nổi bật
+      <div style={{ marginTop: '10px' }}>
+        <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#334155', marginBottom: '3px' }}>
+          Mô tả gói dịch vụ & Khách hàng mục tiêu
         </label>
         <textarea
-          rows={3}
+          rows={2}
           value={description}
           onChange={(e) => onChange({ description: e.target.value })}
-          placeholder="Mô tả nhóm đối tượng khách hàng mục tiêu, quy mô khuyến nghị..."
+          placeholder="Mô tả nhóm quy mô cửa hàng, khuyến nghị sử dụng..."
           style={{
             width: '100%',
-            padding: '12px 14px',
-            fontSize: '14px',
-            borderRadius: '12px',
+            padding: '8px 12px',
+            fontSize: '12.5px',
+            borderRadius: '10px',
             border: '1px solid #cbd5e1',
             background: '#ffffff',
             outline: 'none',
-            resize: 'vertical',
+            resize: 'none',
             boxSizing: 'border-box',
             fontFamily: 'inherit',
           }}

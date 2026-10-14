@@ -5,6 +5,7 @@ import {
   PlanBasicInfoForm,
   PlanQuotasForm,
   PlanFeaturesForm,
+  PlanLivePreviewCard,
 } from '../../features/admin/components/subscriptions/forms';
 import {
   validatePlanCode,
@@ -71,36 +72,25 @@ export const SubscriptionPlanCreatePage: React.FC = () => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    // 1. Validate Code
     const codeValidation = validatePlanCode(code, mockPlans.map((p) => p.code));
-    // 2. Validate Pricing
     const pricingValidation = validatePlanPricing(monthlyPrice, yearlyPrice);
-    // 3. Validate Quotas
     const quotasValidation = validatePlanQuotas(quotas);
 
     const newErrors: Record<string, string> = {};
-    if (!name.trim()) {
-      newErrors.name = 'Vui lòng nhập tên thương mại cho gói dịch vụ';
-    }
-    if (!codeValidation.isValid) {
-      newErrors.code = codeValidation.error || 'Mã gói không hợp lệ';
-    }
+    if (!name.trim()) newErrors.name = 'Vui lòng nhập tên thương mại';
+    if (!codeValidation.isValid) newErrors.code = codeValidation.error || 'Mã không hợp lệ';
     if (!pricingValidation.isValid) {
-      if (pricingValidation.error?.includes('tháng')) {
-        newErrors.monthlyPrice = pricingValidation.error;
-      } else {
-        newErrors.yearlyPrice = pricingValidation.error || 'Giá cước không hợp lệ';
-      }
+      if (pricingValidation.error?.includes('tháng')) newErrors.monthlyPrice = pricingValidation.error;
+      else newErrors.yearlyPrice = pricingValidation.error || 'Giá không hợp lệ';
     }
     if (!quotasValidation.isValid) {
       if (quotasValidation.error?.includes('chi nhánh')) newErrors.maxBranches = quotasValidation.error;
       else if (quotasValidation.error?.includes('nhân viên')) newErrors.maxEmployees = quotasValidation.error;
-      else newErrors.maxStorageGb = quotasValidation.error || 'Hạn mức không hợp lệ';
+      else newErrors.maxStorageGb = quotasValidation.error || 'Quota không hợp lệ';
     }
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
 
@@ -122,15 +112,13 @@ export const SubscriptionPlanCreatePage: React.FC = () => {
       updatedAt: new Date().toISOString(),
     };
 
-    // Prepend to mock data store
     mockPlans.unshift(newPlan);
-
-    setToastMessage(`Đã khởi tạo thành công gói cước "${name}"! Đang chuyển hướng...`);
+    setToastMessage(`Đã khởi tạo thành công gói cước "${name}"!`);
 
     setTimeout(() => {
       setIsSubmitting(false);
       navigate('/admin/subscriptions');
-    }, 1000);
+    }, 800);
   };
 
   return (
@@ -139,7 +127,7 @@ export const SubscriptionPlanCreatePage: React.FC = () => {
         width: '100%',
         minHeight: '100vh',
         background: 'var(--bg-soft-blue, #f7faff)',
-        padding: '24px 32px 64px',
+        padding: '16px 28px 48px',
         boxSizing: 'border-box',
       }}
     >
@@ -148,14 +136,14 @@ export const SubscriptionPlanCreatePage: React.FC = () => {
         <div
           style={{
             position: 'fixed',
-            top: '24px',
-            right: '24px',
+            top: '20px',
+            right: '20px',
             background: '#16a34a',
             color: '#ffffff',
-            padding: '12px 24px',
+            padding: '10px 20px',
             borderRadius: '9999px',
             boxShadow: '0 8px 24px rgba(0, 0, 0, 0.15)',
-            fontSize: '14px',
+            fontSize: '13px',
             fontWeight: 600,
             zIndex: 9999,
             display: 'flex',
@@ -163,74 +151,69 @@ export const SubscriptionPlanCreatePage: React.FC = () => {
             gap: '8px',
           }}
         >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
             <polyline points="20 6 9 17 4 12" />
           </svg>
           {toastMessage}
         </div>
       )}
 
-      {/* Header & Breadcrumb */}
-      <div style={{ marginBottom: '24px' }}>
-        <button
-          type="button"
-          onClick={() => navigate('/admin/subscriptions')}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '6px',
-            background: 'none',
-            border: 'none',
-            color: 'var(--blue-primary, #0066ff)',
-            fontSize: '14px',
-            fontWeight: 600,
-            cursor: 'pointer',
-            padding: 0,
-            marginBottom: '12px',
-          }}
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <line x1="19" y1="12" x2="5" y2="12" />
-            <polyline points="12 19 5 12 12 5" />
-          </svg>
-          Quay lại danh mục Gói dịch vụ
-        </button>
+      {/* Header compact */}
+      <div style={{ marginBottom: '16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <button
+              type="button"
+              onClick={() => navigate('/admin/subscriptions')}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+                background: '#ffffff',
+                border: '1px solid #cbd5e1',
+                borderRadius: '9999px',
+                color: 'var(--blue-primary, #0066ff)',
+                fontSize: '12.5px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                padding: '5px 12px',
+              }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="19" y1="12" x2="5" y2="12" />
+                <polyline points="12 19 5 12 12 5" />
+              </svg>
+              Quay lại danh mục
+            </button>
 
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <h1 style={{ margin: 0, fontSize: '26px', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.02em' }}>
-                Khởi Tạo Gói Dịch Vụ Mới
-              </h1>
-              <span
-                style={{
-                  background: '#dbeafe',
-                  color: 'var(--blue-primary, #0066ff)',
-                  padding: '4px 12px',
-                  borderRadius: '9999px',
-                  fontSize: '12px',
-                  fontWeight: 700,
-                }}
-              >
-                FORM ĐĂNG KÝ
-              </span>
-            </div>
-            <p style={{ margin: '6px 0 0', fontSize: '14px', color: '#64748b' }}>
-              Thiết lập thông số định giá, hạn mức tài nguyên và ma trận phân quyền module cho thuê bao MT-GRMS
-            </p>
+            <h1 style={{ margin: 0, fontSize: '20px', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.02em' }}>
+              Khởi Tạo Gói Dịch Vụ Mới
+            </h1>
+            <span
+              style={{
+                background: '#dbeafe',
+                color: 'var(--blue-primary, #0066ff)',
+                padding: '2px 10px',
+                borderRadius: '9999px',
+                fontSize: '11px',
+                fontWeight: 700,
+              }}
+            >
+              FORM ĐĂNG KÝ
+            </span>
           </div>
 
-          <div style={{ display: 'flex', gap: '12px' }}>
+          <div style={{ display: 'flex', gap: '8px' }}>
             <button
               type="button"
               onClick={handleReset}
               style={{
-                padding: '10px 20px',
+                padding: '7px 16px',
                 borderRadius: '9999px',
                 border: '1px solid #cbd5e1',
                 background: '#ffffff',
                 color: '#475569',
-                fontSize: '14px',
+                fontSize: '12.5px',
                 fontWeight: 600,
                 cursor: 'pointer',
               }}
@@ -242,111 +225,85 @@ export const SubscriptionPlanCreatePage: React.FC = () => {
               onClick={handleSubmit}
               disabled={isSubmitting}
               style={{
-                padding: '10px 24px',
+                padding: '7px 20px',
                 borderRadius: '9999px',
                 border: 'none',
                 background: 'var(--blue-primary, #0066ff)',
                 color: '#ffffff',
-                fontSize: '14px',
+                fontSize: '12.5px',
                 fontWeight: 600,
                 cursor: 'pointer',
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '8px',
-                boxShadow: '0 4px 14px rgba(0, 102, 255, 0.25)',
+                gap: '6px',
+                boxShadow: '0 2px 8px rgba(0, 102, 255, 0.2)',
               }}
             >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                 <line x1="12" y1="5" x2="12" y2="19" />
                 <line x1="5" y1="12" x2="19" y2="12" />
               </svg>
-              {isSubmitting ? 'Đang khởi tạo...' : '+ Lưu & Mở Bán Gói Dịch Vụ'}
+              {isSubmitting ? 'Đang lưu...' : '+ Lưu & Mở Bán Gói'}
             </button>
           </div>
         </div>
       </div>
 
-      {/* Form Content */}
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-        <PlanBasicInfoForm
-          code={code}
-          name={name}
-          monthlyPrice={monthlyPrice}
-          yearlyPrice={yearlyPrice}
-          status={status}
-          description={description}
-          errors={errors}
-          onChange={(fields) => {
-            if (fields.code !== undefined) setCode(fields.code);
-            if (fields.name !== undefined) setName(fields.name);
-            if (fields.monthlyPrice !== undefined) setMonthlyPrice(fields.monthlyPrice);
-            if (fields.yearlyPrice !== undefined) setYearlyPrice(fields.yearlyPrice);
-            if (fields.status !== undefined) setStatus(fields.status);
-            if (fields.description !== undefined) setDescription(fields.description);
-          }}
-        />
-
-        <PlanQuotasForm
-          quotas={quotas}
-          errors={errors}
-          onChange={(newQuotas) => setQuotas((prev) => ({ ...prev, ...newQuotas }))}
-        />
-
-        <PlanFeaturesForm
-          features={features}
-          onChange={(newFeatures) => setFeatures(newFeatures)}
-        />
-
-        {/* Bottom Actions */}
+      {/* Main Grid: Left Form Controls (60%) vs Right Live Preview Card (40%) */}
+      <form onSubmit={handleSubmit}>
         <div
           style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'flex-end',
-            gap: '14px',
-            paddingTop: '16px',
-            borderTop: '1px solid #e2e8f0',
+            display: 'grid',
+            gridTemplateColumns: 'minmax(520px, 1.4fr) minmax(360px, 0.95fr)',
+            gap: '18px',
+            alignItems: 'start',
           }}
         >
-          <button
-            type="button"
-            onClick={() => navigate('/admin/subscriptions')}
-            style={{
-              padding: '12px 24px',
-              borderRadius: '9999px',
-              border: '1px solid #cbd5e1',
-              background: '#ffffff',
-              color: '#475569',
-              fontSize: '14px',
-              fontWeight: 600,
-              cursor: 'pointer',
-            }}
-          >
-            Hủy bỏ & Quay lại
-          </button>
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            style={{
-              padding: '12px 28px',
-              borderRadius: '9999px',
-              border: 'none',
-              background: 'var(--blue-primary, #0066ff)',
-              color: '#ffffff',
-              fontSize: '14px',
-              fontWeight: 600,
-              cursor: 'pointer',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '8px',
-              boxShadow: '0 4px 14px rgba(0, 102, 255, 0.25)',
-            }}
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <polyline points="20 6 9 17 4 12" />
-            </svg>
-            {isSubmitting ? 'Đang xử lý...' : 'Xác Nhận & Mở Bán Gói Cước'}
-          </button>
+          {/* CỘT TRÁI: 3 Section Form đầy đặn */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <PlanBasicInfoForm
+              code={code}
+              name={name}
+              monthlyPrice={monthlyPrice}
+              yearlyPrice={yearlyPrice}
+              status={status}
+              description={description}
+              errors={errors}
+              onChange={(fields) => {
+                if (fields.code !== undefined) setCode(fields.code);
+                if (fields.name !== undefined) setName(fields.name);
+                if (fields.monthlyPrice !== undefined) setMonthlyPrice(fields.monthlyPrice);
+                if (fields.yearlyPrice !== undefined) setYearlyPrice(fields.yearlyPrice);
+                if (fields.status !== undefined) setStatus(fields.status);
+                if (fields.description !== undefined) setDescription(fields.description);
+              }}
+            />
+
+            <PlanQuotasForm
+              quotas={quotas}
+              errors={errors}
+              onChange={(newQuotas) => setQuotas((prev) => ({ ...prev, ...newQuotas }))}
+            />
+
+            <PlanFeaturesForm
+              features={features}
+              onChange={(newFeatures) => setFeatures(newFeatures)}
+            />
+          </div>
+
+          {/* CỘT PHẢI: Live Preview Bảng Giá Khách Hàng */}
+          <div>
+            <PlanLivePreviewCard
+              code={code}
+              name={name}
+              monthlyPrice={monthlyPrice}
+              yearlyPrice={yearlyPrice}
+              status={status}
+              description={description}
+              quotas={quotas}
+              features={features}
+            />
+          </div>
         </div>
       </form>
     </div>
