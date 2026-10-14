@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Check, X } from 'lucide-react';
 import type { ApprovalRequest } from '../types';
 
 interface ApprovalRequestsModalProps {
@@ -168,18 +169,20 @@ export const ApprovalRequestsModal: React.FC<ApprovalRequestsModalProps> = ({
                     <button
                       type="button"
                       className="emp-btn emp-btn-primary"
-                      style={{ height: 32, fontSize: 12 }}
+                      style={{ height: 32, fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 6 }}
                       onClick={handleBulkApprove}
                     >
-                      ✓ Duyệt hàng loạt
+                      <Check size={14} />
+                      <span>Duyệt hàng loạt</span>
                     </button>
                     <button
                       type="button"
                       className="emp-btn emp-btn-danger-outline"
-                      style={{ height: 32, fontSize: 12 }}
+                      style={{ height: 32, fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 6 }}
                       onClick={handleBulkReject}
                     >
-                      ✕ Từ chối hàng loạt
+                      <X size={14} />
+                      <span>Từ chối hàng loạt</span>
                     </button>
                   </div>
                 </div>
@@ -245,12 +248,11 @@ export const ApprovalRequestsModal: React.FC<ApprovalRequestsModalProps> = ({
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'center',
-                                    fontWeight: 700,
                                   }}
                                   title="Duyệt yêu cầu"
                                   onClick={() => onApprove([req.id])}
                                 >
-                                  ✓
+                                  <Check size={14} />
                                 </button>
                                 <button
                                   type="button"
@@ -265,12 +267,11 @@ export const ApprovalRequestsModal: React.FC<ApprovalRequestsModalProps> = ({
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'center',
-                                    fontWeight: 700,
                                   }}
                                   title="Từ chối yêu cầu"
                                   onClick={() => onReject([req.id])}
                                 >
-                                  ✕
+                                  <X size={14} />
                                 </button>
                               </div>
                             </td>

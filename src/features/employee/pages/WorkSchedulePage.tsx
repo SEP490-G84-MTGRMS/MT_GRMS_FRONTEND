@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { Search, Clock, Plus, Download, User } from 'lucide-react';
 import type {
   Employee,
   WorkShiftDefinition,
@@ -76,7 +77,9 @@ export const WorkSchedulePage: React.FC = () => {
           </h2>
 
           <div className="emp-search-box" style={{ width: 240 }}>
-            <span className="emp-search-icon">🔍</span>
+            <span className="emp-search-icon">
+              <Search size={16} />
+            </span>
             <input
               type="text"
               placeholder="Lọc nhân viên..."
@@ -105,34 +108,43 @@ export const WorkSchedulePage: React.FC = () => {
             value={viewMode}
             onChange={(e) => setViewMode(e.target.value as 'by_employee' | 'by_shift')}
           >
-            <option value="by_employee">👤 Xem theo nhân viên</option>
-            <option value="by_shift">📅 Xem theo ca</option>
+            <option value="by_employee">Xem theo nhân viên</option>
+            <option value="by_shift">Xem theo ca</option>
           </select>
 
           <Link to="/store-owner/employees/shifts" style={{ textDecoration: 'none' }}>
-            <button type="button" className="emp-btn emp-btn-secondary">
-              📜 Quản lý ca
+            <button
+              type="button"
+              className="emp-btn emp-btn-secondary"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+            >
+              <Clock size={15} />
+              <span>Quản lý ca</span>
             </button>
           </Link>
 
           <button
             type="button"
             className="emp-btn emp-btn-primary"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
             onClick={() => {
               setSelectedEmpId(undefined);
               setSelectedDay(undefined);
               setShowAddModal(true);
             }}
           >
-            + Phân ca làm việc
+            <Plus size={15} />
+            <span>Phân ca làm việc</span>
           </button>
 
           <button
             type="button"
             className="emp-btn emp-btn-secondary"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
             onClick={() => alert('Xuất file lịch làm việc Excel')}
           >
-            📥 Xuất file
+            <Download size={15} />
+            <span>Xuất file</span>
           </button>
         </div>
       </div>
@@ -322,9 +334,13 @@ export const WorkSchedulePage: React.FC = () => {
                                 fontSize: 11,
                                 fontWeight: 600,
                                 color: '#1E293B',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 4,
                               }}
                             >
-                              👤 {item.employeeName}
+                              <User size={12} color="#64748B" />
+                              <span>{item.employeeName}</span>
                             </span>
                           ))}
                           {assignedEmps.length === 0 && (

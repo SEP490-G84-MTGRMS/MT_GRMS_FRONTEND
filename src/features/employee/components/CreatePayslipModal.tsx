@@ -49,7 +49,6 @@ export const CreatePayslipModal: React.FC<CreatePayslipModalProps> = ({
           employeeId: 'EMP-NEW',
           employeeCode: 'NV099',
           employeeName: 'Nhân viên Mới',
-          jobTitle: 'Nhân viên',
           branchName: bName,
           periodMonth,
           standardDays,
@@ -140,8 +139,7 @@ export const CreatePayslipModal: React.FC<CreatePayslipModalProps> = ({
                 <label className="emp-form-label">Trạng thái khởi tạo</label>
                 <div style={{ paddingTop: 8 }}>
                   <span
-                    className="emp-status-pill"
-                    style={{ background: '#FEF3C7', color: '#B45309', border: 'none' }}
+                    className="emp-status-pill warning"
                   >
                     Unpaid (Chưa thanh toán)
                   </span>

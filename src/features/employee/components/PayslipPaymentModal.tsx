@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Check, Lightbulb, Banknote } from 'lucide-react';
 import type { PayslipDetailedRecord } from '../types';
 
 interface PayslipPaymentModalProps {
@@ -128,10 +129,6 @@ export const PayslipPaymentModal: React.FC<PayslipPaymentModalProps> = ({
                   <div style={{ fontWeight: 700, color: '#0F172A' }}>
                     {payslip.employeeName} ({payslip.employeeCode})
                   </div>
-                </div>
-                <div>
-                  <span style={{ color: '#64748B' }}>Chức danh:</span>
-                  <div style={{ fontWeight: 500 }}>{payslip.jobTitle}</div>
                 </div>
                 <div>
                   <span style={{ color: '#64748B' }}>Chi nhánh:</span>
@@ -289,12 +286,20 @@ export const PayslipPaymentModal: React.FC<PayslipPaymentModalProps> = ({
                           style={{ padding: '2px 8px', fontSize: 11 }}
                           onClick={() => handleCopy(transferContent)}
                         >
-                          {isCopied ? '✓ Đã chép' : 'Sao chép'}
+                          {isCopied ? (
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                              <Check size={12} />
+                              <span>Đã chép</span>
+                            </span>
+                          ) : (
+                            'Sao chép'
+                          )}
                         </button>
                       </div>
                     </div>
-                    <div style={{ fontSize: 12, color: '#0284C7', fontStyle: 'italic', marginTop: 4 }}>
-                      💡 Tiền sẽ được chuyển thẳng vào tài khoản của nhân viên và tự động đánh dấu đã thanh toán.
+                    <div style={{ fontSize: 12, color: '#0284C7', fontStyle: 'italic', marginTop: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <Lightbulb size={14} />
+                      <span>Tiền sẽ được chuyển thẳng vào tài khoản của nhân viên và tự động đánh dấu đã thanh toán.</span>
                     </div>
                   </div>
                 </div>
@@ -311,8 +316,9 @@ export const PayslipPaymentModal: React.FC<PayslipPaymentModalProps> = ({
                     fontSize: 13,
                   }}
                 >
-                  <div style={{ fontWeight: 700, color: '#854D0E', marginBottom: 6 }}>
-                    💵 Chi trả lương trực tiếp bằng tiền mặt tại quỹ quầy
+                  <div style={{ fontWeight: 700, color: '#854D0E', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <Banknote size={16} />
+                    <span>Chi trả lương trực tiếp bằng tiền mặt tại quỹ quầy</span>
                   </div>
                   <div style={{ color: '#713F12', lineHeight: 1.5 }}>
                     Nhân viên ký nhận trực tiếp vào phiếu chi lương. Hệ thống sẽ tạo một bút toán chi vào Sổ quỹ tiền mặt
@@ -342,8 +348,9 @@ export const PayslipPaymentModal: React.FC<PayslipPaymentModalProps> = ({
             <button type="button" className="emp-btn-subtle" onClick={onClose}>
               Hủy bỏ
             </button>
-            <button type="submit" className="emp-btn-primary">
-              ✓ Xác nhận đã thanh toán ({formatVND(payslip.netSalary)})
+            <button type="submit" className="emp-btn-primary" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              <Check size={16} />
+              <span>Xác nhận đã thanh toán ({formatVND(payslip.netSalary)})</span>
             </button>
           </div>
         </form>

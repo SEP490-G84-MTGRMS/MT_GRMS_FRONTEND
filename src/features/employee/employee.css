@@ -407,40 +407,41 @@
   font-weight: 400;
 }
 
-/* ─── Status Pill ─── */
+/* ─── Status Pill (Text + Color Only) ─── */
 .emp-status-pill {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
-  padding: 3px 10px;
-  border-radius: var(--emp-radius-pill);
+  padding: 0 !important;
+  background: transparent !important;
+  border-radius: 0 !important;
   border: none !important;
   outline: none;
 }
 
 .emp-status-pill.active {
-  background: var(--emp-success-light);
-  color: #065F46;
+  background: transparent !important;
+  color: #059669 !important;
   border: none !important;
 }
 
 .emp-status-pill.inactive {
-  background: #F1F5F9;
-  color: #64748B;
+  background: transparent !important;
+  color: #64748B !important;
   border: none !important;
 }
 
 .emp-status-pill.warning {
-  background: #FEF3C7;
-  color: #B45309;
+  background: transparent !important;
+  color: #D97706 !important;
   border: none !important;
 }
 
 .emp-status-pill.danger {
-  background: #FEE2E2;
-  color: #B91C1C;
+  background: transparent !important;
+  color: #DC2626 !important;
   border: none !important;
 }
 

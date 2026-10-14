@@ -1,5 +1,16 @@
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import {
+  Search,
+  Plus,
+  Banknote,
+  ClipboardCheck,
+  MoreHorizontal,
+  Upload,
+  Download,
+  User,
+  AlertTriangle,
+} from 'lucide-react';
 import type {
   Employee,
   EmployeeStatus,
@@ -31,7 +42,6 @@ export const EmployeeListPage: React.FC = () => {
     keyword: '',
     status: 'active',
     workingBranchId: '',
-    salaryBranchId: '',
   });
 
   // Modals state
@@ -64,11 +74,6 @@ export const EmployeeListPage: React.FC = () => {
 
       // 3. Working branch
       if (filters.workingBranchId && !emp.workingBranchIds.includes(filters.workingBranchId)) {
-        return false;
-      }
-
-      // 4. Salary branch
-      if (filters.salaryBranchId && emp.salaryBranchId !== filters.salaryBranchId) {
         return false;
       }
 
@@ -195,7 +200,9 @@ export const EmployeeListPage: React.FC = () => {
           </h2>
 
           <div className="emp-search-box">
-            <span className="emp-search-icon">🔍</span>
+            <span className="emp-search-icon">
+              <Search size={16} />
+            </span>
             <input
               type="text"
               placeholder="Tìm theo mã, tên, SĐT nhân viên..."
@@ -207,7 +214,8 @@ export const EmployeeListPage: React.FC = () => {
 
         <div className="emp-header-actions">
           <button type="button" className="emp-btn emp-btn-primary" onClick={handleCreateNew}>
-            + Nhân viên
+            <Plus size={16} />
+            <span>Nhân viên</span>
           </button>
 
           <button
@@ -215,7 +223,8 @@ export const EmployeeListPage: React.FC = () => {
             className="emp-btn emp-btn-secondary"
             onClick={() => navigate('/store-owner/employees/payroll')}
           >
-            💵 Bảng tính lương
+            <Banknote size={16} />
+            <span>Bảng tính lương</span>
           </button>
 
           <button
@@ -223,7 +232,8 @@ export const EmployeeListPage: React.FC = () => {
             className="emp-btn emp-btn-secondary emp-approval-btn"
             onClick={() => setShowApprovalModal(true)}
           >
-            📋 Duyệt yêu cầu
+            <ClipboardCheck size={16} />
+            <span>Duyệt yêu cầu</span>
             {pendingRequestCount > 0 && (
               <span className="emp-pending-badge">{pendingRequestCount}</span>
             )}
@@ -234,10 +244,10 @@ export const EmployeeListPage: React.FC = () => {
             <button
               type="button"
               className="emp-btn emp-btn-secondary"
-              style={{ width: 40, padding: 0 }}
+              style={{ width: 40, padding: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
               onClick={() => setShowActionDropdown(!showActionDropdown)}
             >
-              &bull;&bull;&bull;
+              <MoreHorizontal size={18} />
             </button>
 
             {showActionDropdown && (
@@ -274,7 +284,8 @@ export const EmployeeListPage: React.FC = () => {
                     setShowActionDropdown(false);
                   }}
                 >
-                  📥 Nhập file Excel
+                  <Upload size={15} />
+                  <span>Nhập file Excel</span>
                 </button>
                 <button
                   type="button"
@@ -292,7 +303,8 @@ export const EmployeeListPage: React.FC = () => {
                   }}
                   onClick={handleExportExcel}
                 >
-                  📤 Xuất file Excel
+                  <Download size={15} />
+                  <span>Xuất file Excel</span>
                 </button>
               </div>
             )}
@@ -312,7 +324,6 @@ export const EmployeeListPage: React.FC = () => {
               keyword: '',
               status: 'all',
               workingBranchId: '',
-              salaryBranchId: '',
             })
           }
         />
@@ -366,7 +377,7 @@ export const EmployeeListPage: React.FC = () => {
                         {emp.avatarUrl ? (
                           <img src={emp.avatarUrl} alt={emp.fullName} />
                         ) : (
-                          <span>👤</span>
+                          <User size={18} color="#64748B" />
                         )}
                       </div>
                     </td>
@@ -375,7 +386,11 @@ export const EmployeeListPage: React.FC = () => {
                     <td>
                       <div className="emp-name-badge">
                         <span>{emp.fullName}</span>
-                        {emp.hasWarning && <span className="emp-warning-icon">⚠️</span>}
+                        {emp.hasWarning && (
+                          <span className="emp-warning-icon" title="Có cảnh báo">
+                            <AlertTriangle size={14} color="#F59E0B" />
+                          </span>
+                        )}
                       </div>
                     </td>
                     <td style={{ color: '#334155' }}>{emp.phone}</td>

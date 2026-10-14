@@ -1,4 +1,5 @@
 import React from 'react';
+import { Check, CreditCard, Printer, Download } from 'lucide-react';
 import type { PayslipDetailedRecord } from '../types';
 
 interface PayslipDetailModalProps {
@@ -43,10 +44,6 @@ export const PayslipDetailModal: React.FC<PayslipDetailModalProps> = ({
           <div className="emp-section-card">
             <div className="emp-section-title">1. Thông tin hợp đồng & Ngày công</div>
             <div className="emp-grid-3" style={{ fontSize: 13 }}>
-              <div>
-                <span style={{ color: '#64748B' }}>Chức danh:</span>
-                <div style={{ fontWeight: 600 }}>{payslip.jobTitle}</div>
-              </div>
               <div>
                 <span style={{ color: '#64748B' }}>Lương cơ sở hợp đồng:</span>
                 <div style={{ fontWeight: 700, color: '#0F766E' }}>{formatVND(payslip.contractBaseSalary)}</div>
@@ -159,22 +156,30 @@ export const PayslipDetailModal: React.FC<PayslipDetailModalProps> = ({
                   payslip.status === 'PAID' ? 'active' : 'inactive'
                 }`}
                 style={{
-                  fontSize: 13,
-                  padding: '6px 14px',
-                  background: payslip.status === 'PAID' ? '#DCFCE7' : '#FEF3C7',
-                  color: payslip.status === 'PAID' ? '#15803D' : '#B45309',
+                  fontSize: 14,
+                  fontWeight: 700,
+                  color: payslip.status === 'PAID' ? '#059669' : '#B45309',
                 }}
               >
-                {payslip.status === 'PAID' ? '✓ Đã thanh toán' : 'Chưa thanh toán'}
+                {payslip.status === 'PAID' ? (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                    <Check size={14} />
+                    <span>Đã thanh toán</span>
+                  </span>
+                ) : (
+                  'Chưa thanh toán'
+                )}
               </span>
 
               {payslip.status === 'UNPAID' && (
                 <button
                   type="button"
                   className="emp-btn emp-btn-primary"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
                   onClick={() => onPayNow(payslip)}
                 >
-                  💳 Thanh toán ngay
+                  <CreditCard size={15} />
+                  <span>Thanh toán ngay</span>
                 </button>
               )}
             </div>
@@ -186,16 +191,20 @@ export const PayslipDetailModal: React.FC<PayslipDetailModalProps> = ({
           <button
             type="button"
             className="emp-btn emp-btn-secondary"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
             onClick={() => window.print()}
           >
-            🖨️ In phiếu lương
+            <Printer size={14} />
+            <span>In phiếu lương</span>
           </button>
           <button
             type="button"
             className="emp-btn emp-btn-secondary"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
             onClick={() => alert('Xuất phiếu lương ra file PDF thành công!')}
           >
-            📥 Xuất PDF
+            <Download size={14} />
+            <span>Xuất PDF</span>
           </button>
           <button type="button" className="emp-btn emp-btn-secondary" onClick={onClose}>
             Đóng

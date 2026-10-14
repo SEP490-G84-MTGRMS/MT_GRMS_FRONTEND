@@ -12,11 +12,6 @@ export interface Department {
   employeeCount?: number;
 }
 
-export interface JobTitle {
-  id: string;
-  name: string;
-}
-
 export interface Branch {
   id: string;
   name: string;
@@ -52,6 +47,7 @@ export interface WorkShift {
 
 export interface PayslipItem {
   id: string;
+  code?: string;
   period: string; // Tháng 09/2026
   baseSalary: number;
   otSalary: number;
@@ -108,11 +104,9 @@ export interface Employee {
   // Work info
   departmentId?: string;
   departmentName?: string;
-  jobTitleId?: string;
-  jobTitleName?: string;
   startDate?: string;
-  salaryBranchId: string;
-  salaryBranchName: string;
+  salaryBranchId?: string;
+  salaryBranchName?: string;
   workingBranchIds: string[];
   workingBranchNames: string[];
   userId?: string;
@@ -140,9 +134,8 @@ export interface EmployeeFilterState {
   keyword: string;
   status: 'all' | 'active' | 'inactive';
   workingBranchId: string;
-  salaryBranchId: string;
+  salaryBranchId?: string;
   departmentId?: string;
-  jobTitleId?: string;
 }
 
 export interface WorkShiftDefinition {
@@ -197,7 +190,6 @@ export interface PayslipDetailedRecord {
   employeeId: string;
   employeeCode: string; // NV001
   employeeName: string; // Dung Phạm
-  jobTitle: string; // Thu ngân trưởng
   branchName: string; // Chi nhánh trung tâm
   periodMonth: string; // 2026-10
   

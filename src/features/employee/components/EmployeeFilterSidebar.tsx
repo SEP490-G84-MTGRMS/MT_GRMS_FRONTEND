@@ -22,10 +22,6 @@ export const EmployeeFilterSidebar: React.FC<EmployeeFilterSidebarProps> = ({
     onFilterChange({ ...filters, workingBranchId: branchId });
   };
 
-  const handleSalaryBranchChange = (branchId: string) => {
-    onFilterChange({ ...filters, salaryBranchId: branchId });
-  };
-
   const selectedBranchName = branches.find((b) => b.id === filters.workingBranchId)?.name;
 
   return (

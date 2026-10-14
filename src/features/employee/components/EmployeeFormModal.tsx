@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Camera, Trash2 } from 'lucide-react';
 import type {
   Employee,
   Branch,
@@ -177,8 +178,6 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
       alert('Vui lòng nhập Số điện thoại!');
       return;
     }
-    const sBranchId = employee?.salaryBranchId || workingBranchIds[0] || branches[0]?.id || '';
-    const sBranchName = branches.find((b) => b.id === sBranchId)?.name || 'Chi nhánh trung tâm';
     const wBranchNames = branches
       .filter((b) => workingBranchIds.includes(b.id))
       .map((b) => b.name);
@@ -200,8 +199,6 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
       address,
       city,
       startDate,
-      salaryBranchId: sBranchId,
-      salaryBranchName: sBranchName,
       workingBranchIds,
       workingBranchNames: wBranchNames,
       userId,
@@ -337,7 +334,9 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
                           <img src={avatarUrl} alt="Avatar" />
                         ) : (
                           <div style={{ textAlign: 'center', padding: 8 }}>
-                            <div style={{ fontSize: 28, color: '#94A3B8' }}>📷</div>
+                            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 4 }}>
+                              <Camera size={26} color="#94A3B8" />
+                            </div>
                             <span style={{ fontSize: 11, color: '#64748B', fontWeight: 600 }}>Tải ảnh đại diện</span>
                           </div>
                         )}
@@ -706,11 +705,15 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
                                   border: 'none',
                                   color: '#EF4444',
                                   cursor: 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  padding: 4,
                                 }}
                                 onClick={() => handleDeleteAllowance(al.id)}
                                 title="Xóa phụ cấp"
                               >
-                                🗑️
+                                <Trash2 size={16} />
                               </button>
                             </td>
                           </tr>

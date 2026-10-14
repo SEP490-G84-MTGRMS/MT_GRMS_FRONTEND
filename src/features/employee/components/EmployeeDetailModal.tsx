@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
+import { Pencil, Download, Printer, Banknote } from 'lucide-react';
 import type { Employee, DebtTransaction } from '../types';
 
 interface EmployeeDetailModalProps {
@@ -20,6 +21,52 @@ export const EmployeeDetailModal: React.FC<EmployeeDetailModalProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'info' | 'schedule' | 'salary' | 'payslip' | 'debt'>('info');
   const [scheduleView, setScheduleView] = useState<'table' | 'list'>('table');
+
+  // Schedule Filter State (Chỉ theo tuần)
+  const [scheduleWeek, setScheduleWeek] = useState<number>(1);
+  const [scheduleMonth, setScheduleMonth] = useState<number>(10);
+  const [scheduleYear, setScheduleYear] = useState<number>(2026);
+
+  const handlePrevSchedule = () => {
+    if (scheduleWeek > 1) {
+      setScheduleWeek(scheduleWeek - 1);
+    } else {
+      if (scheduleMonth === 1) {
+        setScheduleMonth(12);
+        setScheduleYear((prev) => prev - 1);
+      } else {
+        setScheduleMonth((prev) => prev - 1);
+      }
+      setScheduleWeek(4);
+    }
+  };
+
+  const handleNextSchedule = () => {
+    if (scheduleWeek < 4) {
+      setScheduleWeek(scheduleWeek + 1);
+    } else {
+      if (scheduleMonth === 12) {
+        setScheduleMonth(1);
+        setScheduleYear((prev) => prev + 1);
+      } else {
+        setScheduleMonth((prev) => prev + 1);
+      }
+      setScheduleWeek(1);
+    }
+  };
+
+  const schedulePeriodLabel = useMemo(() => {
+    return `Tuần ${scheduleWeek} - Th. ${scheduleMonth} ${scheduleYear}`;
+  }, [scheduleWeek, scheduleMonth, scheduleYear]);
+
+  // Payslip Filter State (Lọc theo trạng thái)
+  const [payslipStatusFilter, setPayslipStatusFilter] = useState<'all' | 'paid' | 'partial' | 'unpaid'>('all');
+
+  const filteredPayslips = useMemo(() => {
+    if (!employee?.payslips) return [];
+    if (payslipStatusFilter === 'all') return employee.payslips;
+    return employee.payslips.filter((ps) => ps.status === payslipStatusFilter);
+  }, [employee?.payslips, payslipStatusFilter]);
 
   // Payment modal state
   const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -102,7 +149,7 @@ export const EmployeeDetailModal: React.FC<EmployeeDetailModalProps> = ({
                 </div>
                 <div style={{ fontSize: 13, color: '#64748B', marginTop: 2 }}>
                   Mã NV: <b>{employee.employeeCode}</b> &bull; SĐT: <b>{employee.phone}</b> &bull; Chi nhánh:{' '}
-                  <b>{employee.salaryBranchName}</b>
+                  <b>{employee.workingBranchNames?.join(', ') || 'Chưa phân bổ'}</b>
                 </div>
               </div>
             </div>
@@ -114,22 +161,6 @@ export const EmployeeDetailModal: React.FC<EmployeeDetailModalProps> = ({
                   {formatVND(employee.debtAmount)}
                 </div>
               </div>
-              <button
-                type="button"
-                className="emp-btn emp-btn-outline-teal"
-                onClick={() => onEdit(employee)}
-              >
-                ✏️ Cập nhật
-              </button>
-              <button
-                type="button"
-                className={`emp-btn ${
-                  employee.status === 'active' ? 'emp-btn-danger-outline' : 'emp-btn-secondary'
-                }`}
-                onClick={() => onToggleStatus(employee.id)}
-              >
-                {employee.status === 'active' ? 'Ngừng làm việc' : 'Kích hoạt lại'}
-              </button>
               <button type="button" className="emp-modal-close-btn" onClick={onClose}>
                 &times;
               </button>
@@ -147,18 +178,19 @@ export const EmployeeDetailModal: React.FC<EmployeeDetailModalProps> = ({
             </button>
             <button
               type="button"
-              className={`emp-modal-tab-btn ${activeTab === 'schedule' ? 'active' : ''}`}
-              onClick={() => setActiveTab('schedule')}
-            >
-              Lịch làm việc
-            </button>
-            <button
-              type="button"
               className={`emp-modal-tab-btn ${activeTab === 'salary' ? 'active' : ''}`}
               onClick={() => setActiveTab('salary')}
             >
               Thiết lập lương
             </button>
+            <button
+              type="button"
+              className={`emp-modal-tab-btn ${activeTab === 'schedule' ? 'active' : ''}`}
+              onClick={() => setActiveTab('schedule')}
+            >
+              Lịch làm việc
+            </button>
+
             <button
               type="button"
               className={`emp-modal-tab-btn ${activeTab === 'payslip' ? 'active' : ''}`}
@@ -218,13 +250,9 @@ export const EmployeeDetailModal: React.FC<EmployeeDetailModalProps> = ({
                   <div className="emp-section-title">Thông tin công việc</div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 12, fontSize: 13 }}>
                     <div>
-                      <span style={{ color: '#64748B' }}>Chi nhánh trả lương:</span>
-                      <div style={{ fontWeight: 600, color: '#0F766E' }}>{employee.salaryBranchName}</div>
-                    </div>
-                    <div>
                       <span style={{ color: '#64748B' }}>Các chi nhánh làm việc:</span>
                       <div style={{ fontWeight: 600 }}>
-                        {employee.workingBranchNames?.join(', ') || employee.salaryBranchName}
+                        {employee.workingBranchNames?.join(', ') || 'Chưa phân bổ'}
                       </div>
                     </div>
                     <div>
@@ -270,10 +298,68 @@ export const EmployeeDetailModal: React.FC<EmployeeDetailModalProps> = ({
             {/* TAB 2: LỊCH LÀM VIỆC */}
             {activeTab === 'schedule' && (
               <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                  <div style={{ fontWeight: 700, fontSize: 15 }}>
-                    Lịch phân ca tuần hiện tại (14/10 - 20/10/2026)
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
+                  {/* Bộ điều hướng tuần: [ < ] Tuần 1 - Th. 10 2026 [ > ] */}
+                  <div
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      background: '#FFFFFF',
+                      border: '1px solid #CBD5E1',
+                      borderRadius: 6,
+                      padding: '2px 4px',
+                    }}
+                  >
+                    <button
+                      type="button"
+                      style={{
+                        background: '#F1F5F9',
+                        border: '1px solid #CBD5E1',
+                        borderRadius: 4,
+                        width: 24,
+                        height: 24,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                        fontWeight: 700,
+                        color: '#334155',
+                        fontSize: 12,
+                      }}
+                      onClick={handlePrevSchedule}
+                      title="Tuần trước"
+                    >
+                      &lt;
+                    </button>
+
+                    <span style={{ fontSize: 13, fontWeight: 700, color: '#0F172A', padding: '0 8px' }}>
+                      {schedulePeriodLabel}
+                    </span>
+
+                    <button
+                      type="button"
+                      style={{
+                        background: '#F1F5F9',
+                        border: '1px solid #CBD5E1',
+                        borderRadius: 4,
+                        width: 24,
+                        height: 24,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                        fontWeight: 700,
+                        color: '#334155',
+                        fontSize: 12,
+                      }}
+                      onClick={handleNextSchedule}
+                      title="Tuần sau"
+                    >
+                      &gt;
+                    </button>
                   </div>
+
                   <div style={{ display: 'flex', gap: 8 }}>
                     <button
                       type="button"
@@ -297,6 +383,8 @@ export const EmployeeDetailModal: React.FC<EmployeeDetailModalProps> = ({
                 {scheduleView === 'table' ? (
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 8 }}>
                     {['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'].map((day, idx) => {
+                      const startDay = (scheduleWeek - 1) * 7 + 1;
+                      const dayNumber = Math.min(startDay + idx, 31);
                       const shift = employee.workSchedule?.find((s) => s.dayOfWeek === day);
                       return (
                         <div
@@ -312,7 +400,7 @@ export const EmployeeDetailModal: React.FC<EmployeeDetailModalProps> = ({
                           }}
                         >
                           <div style={{ fontWeight: 700, fontSize: 13, color: '#0F766E' }}>
-                            {day} &bull; {14 + idx}/10
+                            {day} &bull; {dayNumber < 10 ? `0${dayNumber}` : dayNumber}/{scheduleMonth}
                           </div>
                           {shift ? (
                             <div style={{ marginTop: 8 }}>
@@ -344,18 +432,24 @@ export const EmployeeDetailModal: React.FC<EmployeeDetailModalProps> = ({
                     </thead>
                     <tbody>
                       {employee.workSchedule?.length ? (
-                        employee.workSchedule.map((s) => (
-                          <tr key={s.id}>
-                            <td style={{ fontWeight: 600 }}>{s.dayOfWeek} ({s.dateStr})</td>
-                            <td style={{ color: '#0F766E', fontWeight: 600 }}>{s.shiftName}</td>
-                            <td>{s.branchName}</td>
-                            <td style={{ color: '#64748B' }}>{s.note || '-'}</td>
-                          </tr>
-                        ))
+                        employee.workSchedule.map((s, idx) => {
+                          const startDay = (scheduleWeek - 1) * 7 + 1;
+                          const dayNumber = Math.min(startDay + idx, 31);
+                          return (
+                            <tr key={s.id}>
+                              <td style={{ fontWeight: 600 }}>
+                                {s.dayOfWeek} ({dayNumber < 10 ? `0${dayNumber}` : dayNumber}/{scheduleMonth})
+                              </td>
+                              <td style={{ color: '#0F766E', fontWeight: 600 }}>{s.shiftName}</td>
+                              <td>{s.branchName}</td>
+                              <td style={{ color: '#64748B' }}>{s.note || '-'}</td>
+                            </tr>
+                          );
+                        })
                       ) : (
                         <tr>
                           <td colSpan={4} style={{ textAlign: 'center', color: '#94A3B8' }}>
-                            Chưa có lịch phân ca trong tuần
+                            Chưa có lịch phân ca trong tuần này
                           </td>
                         </tr>
                       )}
@@ -374,10 +468,11 @@ export const EmployeeDetailModal: React.FC<EmployeeDetailModalProps> = ({
                     <button
                       type="button"
                       className="emp-btn emp-btn-outline-teal"
-                      style={{ height: 32, fontSize: 12 }}
+                      style={{ height: 32, fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 6 }}
                       onClick={() => onEdit(employee)}
                     >
-                      ✏️ Điều chỉnh mức lương
+                      <Pencil size={13} />
+                      <span>Điều chỉnh mức lương</span>
                     </button>
                   </div>
                   <div className="emp-grid-2" style={{ fontSize: 14 }}>
@@ -387,8 +482,8 @@ export const EmployeeDetailModal: React.FC<EmployeeDetailModalProps> = ({
                         {employee.salaryConfig?.salaryType === 'monthly'
                           ? 'Cố định hàng tháng'
                           : employee.salaryConfig?.salaryType === 'hourly'
-                          ? 'Theo giờ làm việc'
-                          : 'Theo ca làm việc'}
+                            ? 'Theo giờ làm việc'
+                            : 'Theo ca làm việc'}
                       </div>
                     </div>
                     <div>
@@ -457,16 +552,30 @@ export const EmployeeDetailModal: React.FC<EmployeeDetailModalProps> = ({
             {/* TAB 4: PHIẾU LƯƠNG */}
             {activeTab === 'payslip' && (
               <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                  <div style={{ fontWeight: 700, fontSize: 15 }}>Lịch sử phiếu lương cá nhân</div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div style={{ fontWeight: 700, fontSize: 15 }}>Lịch sử phiếu lương cá nhân</div>
+                    <select
+                      className="emp-filter-select"
+                      style={{ width: 150, height: 32, fontSize: 13 }}
+                      value={payslipStatusFilter}
+                      onChange={(e) => setPayslipStatusFilter(e.target.value as 'all' | 'paid' | 'partial' | 'unpaid')}
+                    >
+                      <option value="all">Tất cả</option>
+                      <option value="paid">Đã chi trả</option>
+                      <option value="partial">Chi 1 phần</option>
+                      <option value="unpaid">Chưa trả</option>
+                    </select>
+                  </div>
                   <div style={{ display: 'flex', gap: 8 }}>
                     <button
                       type="button"
                       className="emp-btn emp-btn-secondary"
-                      style={{ height: 32 }}
+                      style={{ height: 32, display: 'inline-flex', alignItems: 'center', gap: 6 }}
                       onClick={() => alert('Xuất danh sách phiếu lương thành công!')}
                     >
-                      📥 Xuất file Excel
+                      <Download size={14} />
+                      <span>Xuất file Excel</span>
                     </button>
                   </div>
                 </div>
@@ -474,63 +583,64 @@ export const EmployeeDetailModal: React.FC<EmployeeDetailModalProps> = ({
                 <table className="emp-table" style={{ border: '1px solid #E2E8F0', borderRadius: 12 }}>
                   <thead>
                     <tr>
-                      <th>Kỳ lương</th>
+                      <th>Mã phiếu lương</th>
+                      <th>Kỳ làm việc</th>
                       <th className="align-right">Lương chính</th>
-                      <th className="align-right">Tăng ca (OT)</th>
-                      <th className="align-right">Phụ cấp & Thưởng</th>
-                      <th className="align-right">Giảm trừ</th>
-                      <th className="align-right">Thực lĩnh</th>
-                      <th className="align-right">Còn nợ</th>
+                      <th className="align-right">Tổng lương</th>
+                      <th className="align-right">Đã trả</th>
+                      <th className="align-right">Còn cần trả</th>
                       <th>Trạng thái</th>
-                      <th style={{ width: 100 }}>Thao tác</th>
+
                     </tr>
                   </thead>
                   <tbody>
-                    {employee.payslips?.length ? (
-                      employee.payslips.map((ps) => (
+                    {filteredPayslips.length ? (
+                      filteredPayslips.map((ps) => (
                         <tr key={ps.id}>
-                          <td style={{ fontWeight: 700 }}>{ps.period}</td>
+                          <td style={{ fontWeight: 700, color: '#0F766E' }}>
+                            {ps.code || ps.id.toUpperCase()}
+                          </td>
+                          <td style={{ fontWeight: 600 }}>{ps.period}</td>
                           <td className="align-right">{formatVND(ps.baseSalary)}</td>
-                          <td className="align-right">{formatVND(ps.otSalary)}</td>
-                          <td className="align-right">{formatVND(ps.allowanceTotal + ps.bonus)}</td>
-                          <td className="align-right" style={{ color: '#EF4444' }}>-{formatVND(ps.deduction)}</td>
                           <td className="align-right" style={{ fontWeight: 700, color: '#0F766E' }}>
                             {formatVND(ps.netSalary)}
                           </td>
-                          <td className="align-right" style={{ fontWeight: 600 }}>
+                          <td className="align-right" style={{ fontWeight: 600, color: '#059669' }}>
+                            {formatVND(ps.paidAmount)}
+                          </td>
+                          <td
+                            className="align-right"
+                            style={{
+                              fontWeight: 600,
+                              color: ps.remainingDebt > 0 ? '#DC2626' : '#64748B',
+                            }}
+                          >
                             {formatVND(ps.remainingDebt)}
                           </td>
                           <td>
                             <span
-                              className={`emp-status-pill ${
-                                ps.status === 'paid' ? 'active' : ps.status === 'partial' ? 'warning' : 'inactive'
-                              }`}
+                              className={`emp-status-pill ${ps.status === 'paid'
+                                ? 'active'
+                                : ps.status === 'partial'
+                                  ? 'warning'
+                                  : 'inactive'
+                                }`}
                             >
-                              {ps.status === 'paid' ? 'Đã chi trả' : ps.status === 'partial' ? 'Chi 1 phần' : 'Chưa trả'}
+                              {ps.status === 'paid'
+                                ? 'Đã chi trả'
+                                : ps.status === 'partial'
+                                  ? 'Chi 1 phần'
+                                  : 'Chưa trả'}
                             </span>
-                          </td>
-                          <td>
-                            <button
-                              type="button"
-                              style={{
-                                background: 'transparent',
-                                border: 'none',
-                                color: '#0F766E',
-                                fontWeight: 600,
-                                cursor: 'pointer',
-                                fontSize: 12,
-                              }}
-                              onClick={() => alert(`In phiếu lương kỳ: ${ps.period}`)}
-                            >
-                              🖨️ In phiếu
-                            </button>
                           </td>
                         </tr>
                       ))
                     ) : (
                       <tr>
-                        <td colSpan={9} style={{ textAlign: 'center', color: '#94A3B8', padding: 24 }}>
-                          Chưa có phiếu lương nào được chốt cho nhân viên này
+                        <td colSpan={8} style={{ textAlign: 'center', color: '#94A3B8', padding: 24 }}>
+                          {payslipStatusFilter === 'all'
+                            ? 'Chưa có phiếu lương nào được chốt cho nhân viên này'
+                            : 'Không có phiếu lương nào phù hợp với trạng thái đã chọn'}
                         </td>
                       </tr>
                     )}
@@ -568,10 +678,11 @@ export const EmployeeDetailModal: React.FC<EmployeeDetailModalProps> = ({
                   <button
                     type="button"
                     className="emp-btn emp-btn-primary"
-                    style={{ height: 42, padding: '0 24px', fontSize: 14 }}
+                    style={{ height: 42, padding: '0 24px', fontSize: 14, display: 'inline-flex', alignItems: 'center', gap: 8 }}
                     onClick={handleOpenPayment}
                   >
-                    💵 Thanh toán lương / Tạm ứng
+                    <Banknote size={16} />
+                    <span>Thanh toán lương / Tạm ứng</span>
                   </button>
                 </div>
 
@@ -595,9 +706,8 @@ export const EmployeeDetailModal: React.FC<EmployeeDetailModalProps> = ({
                           <td>{tx.date}</td>
                           <td>
                             <span
-                              className={`emp-status-pill ${
-                                tx.type === 'salary_payment' ? 'active' : 'warning'
-                              }`}
+                              className={`emp-status-pill ${tx.type === 'salary_payment' ? 'active' : 'warning'
+                                }`}
                             >
                               {tx.type === 'salary_payment' ? 'Thanh toán lương' : 'Tạm ứng lương'}
                             </span>
@@ -624,6 +734,21 @@ export const EmployeeDetailModal: React.FC<EmployeeDetailModalProps> = ({
 
           {/* Footer */}
           <div className="emp-modal-footer">
+            <button
+              type="button"
+              className={`emp-btn ${employee.status === 'active' ? 'emp-btn-danger-outline' : 'emp-btn-secondary'
+                }`}
+              onClick={() => onToggleStatus(employee.id)}
+            >
+              {employee.status === 'active' ? 'Ngừng làm việc' : 'Kích hoạt lại'}
+            </button>
+            <button
+              type="button"
+              className="emp-btn emp-btn-outline-teal"
+              onClick={() => onEdit(employee)}
+            >
+              Cập nhật
+            </button>
             <button type="button" className="emp-btn emp-btn-secondary" onClick={onClose}>
               Đóng chi tiết
             </button>

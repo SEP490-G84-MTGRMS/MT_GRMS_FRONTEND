@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { Search, Plus, Download, Pencil, Trash2 } from 'lucide-react';
 import type { WorkShiftDefinition } from '../types';
 import { MOCK_WORK_SHIFTS } from '../services/mockData';
 import { ShiftFormModal } from '../components/ShiftFormModal';
@@ -73,7 +74,9 @@ export const WorkshiftManagementPage: React.FC = () => {
           </h2>
 
           <div className="emp-search-box">
-            <span className="emp-search-icon">🔍</span>
+            <span className="emp-search-icon">
+              <Search size={16} />
+            </span>
             <input
               type="text"
               placeholder="Tìm theo tên ca làm việc..."
@@ -95,15 +98,23 @@ export const WorkshiftManagementPage: React.FC = () => {
         </div>
 
         <div className="emp-header-actions">
-          <button type="button" className="emp-btn emp-btn-primary" onClick={handleCreateNew}>
-            + Tạo ca làm việc
+          <button
+            type="button"
+            className="emp-btn emp-btn-primary"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+            onClick={handleCreateNew}
+          >
+            <Plus size={16} />
+            <span>Tạo ca làm việc</span>
           </button>
           <button
             type="button"
             className="emp-btn emp-btn-secondary"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
             onClick={() => alert('Xuất danh sách ca làm việc ra Excel thành công!')}
           >
-            📥 Xuất file
+            <Download size={15} />
+            <span>Xuất file</span>
           </button>
         </div>
       </div>
@@ -176,7 +187,7 @@ export const WorkshiftManagementPage: React.FC = () => {
                     </span>
                   </td>
                   <td style={{ textAlign: 'center' }}>
-                    <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
+                    <div style={{ display: 'flex', gap: 8, justifyContent: 'center', alignItems: 'center' }}>
                       <button
                         type="button"
                         style={{
@@ -186,11 +197,15 @@ export const WorkshiftManagementPage: React.FC = () => {
                           color: '#0F766E',
                           fontWeight: 600,
                           fontSize: 13,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 4,
                         }}
                         onClick={() => handleEdit(sh)}
                         title="Sửa ca làm việc"
                       >
-                        ✏️ Sửa
+                        <Pencil size={13} />
+                        <span>Sửa</span>
                       </button>
                       <button
                         type="button"
@@ -201,11 +216,15 @@ export const WorkshiftManagementPage: React.FC = () => {
                           color: '#EF4444',
                           fontWeight: 600,
                           fontSize: 13,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          padding: 4,
                         }}
                         onClick={() => handleDelete(sh.id)}
                         title="Xóa ca"
                       >
-                        🗑️
+                        <Trash2 size={15} />
                       </button>
                     </div>
                   </td>

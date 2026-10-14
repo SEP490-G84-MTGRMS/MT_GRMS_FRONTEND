@@ -1,4 +1,15 @@
 import React, { useState } from 'react';
+import {
+  Search,
+  MapPin,
+  QrCode,
+  ClipboardCheck,
+  Download,
+  Check,
+  AlertTriangle,
+  Clock,
+  Smartphone,
+} from 'lucide-react';
 import type { AttendanceRecord, ApprovalRequest } from '../types';
 import {
   MOCK_WORK_SHIFTS,
@@ -76,7 +87,9 @@ export const AttendancePage: React.FC = () => {
           </h2>
 
           <div className="emp-search-box" style={{ width: 220 }}>
-            <span className="emp-search-icon">🔍</span>
+            <span className="emp-search-icon">
+              <Search size={16} />
+            </span>
             <input
               type="text"
               placeholder="Tìm kiếm nhân viên..."
@@ -110,25 +123,31 @@ export const AttendancePage: React.FC = () => {
           <button
             type="button"
             className="emp-btn emp-btn-secondary"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
             onClick={() => setShowGpsModal(true)}
           >
-            📍 Địa chỉ GPS
+            <MapPin size={15} />
+            <span>Địa chỉ GPS</span>
           </button>
 
           <button
             type="button"
             className="emp-btn emp-btn-secondary"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
             onClick={() => setShowQrModal(true)}
           >
-            📱 Mã QR GPS
+            <QrCode size={15} />
+            <span>Mã QR GPS</span>
           </button>
 
           <button
             type="button"
             className="emp-btn emp-btn-secondary emp-approval-btn"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
             onClick={() => setShowApprovalModal(true)}
           >
-            📋 Duyệt chấm công
+            <ClipboardCheck size={15} />
+            <span>Duyệt chấm công</span>
             {pendingAttendanceCount > 0 && (
               <span className="emp-pending-badge">{pendingAttendanceCount}</span>
             )}
@@ -137,9 +156,11 @@ export const AttendancePage: React.FC = () => {
           <button
             type="button"
             className="emp-btn emp-btn-primary"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
             onClick={() => alert('Xuất bảng chấm công ra file Excel')}
           >
-            📥 Xuất Excel
+            <Download size={15} />
+            <span>Xuất Excel</span>
           </button>
         </div>
       </div>
@@ -228,18 +249,21 @@ export const AttendancePage: React.FC = () => {
                             </div>
                             <div style={{ marginTop: 4 }}>
                               {att.status === 'ontime' && (
-                                <span style={{ fontSize: 10, color: '#059669', fontWeight: 700 }}>
-                                  ✓ Đúng giờ
+                                <span style={{ fontSize: 10, color: '#059669', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                                  <Check size={11} />
+                                  <span>Đúng giờ</span>
                                 </span>
                               )}
                               {att.status === 'late' && (
-                                <span style={{ fontSize: 10, color: '#D97706', fontWeight: 700 }}>
-                                  ⚠️ Muộn {att.lateMinutes}p
+                                <span style={{ fontSize: 10, color: '#D97706', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                                  <AlertTriangle size={11} />
+                                  <span>Muộn {att.lateMinutes}p</span>
                                 </span>
                               )}
                               {att.status === 'early' && (
-                                <span style={{ fontSize: 10, color: '#B45309', fontWeight: 700 }}>
-                                  ⏰ Về sớm
+                                <span style={{ fontSize: 10, color: '#B45309', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                                  <Clock size={11} />
+                                  <span>Về sớm</span>
                                 </span>
                               )}
                             </div>
@@ -300,10 +324,9 @@ export const AttendancePage: React.FC = () => {
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  fontSize: 64,
                 }}
               >
-                📱
+                <Smartphone size={64} color="#0F766E" />
               </div>
               <p style={{ marginTop: 16, fontSize: 13, color: '#475569' }}>
                 Quét mã QR bằng ứng dụng nhân viên khi có mặt tại cửa hàng để ghi nhận chấm công tự động.
@@ -334,12 +357,18 @@ export const AttendancePage: React.FC = () => {
             <div className="emp-modal-body">
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 <div style={{ background: '#F0FDFA', border: '1px solid #99F6E4', padding: 12, borderRadius: 8, fontSize: 13 }}>
-                  <div style={{ fontWeight: 700, color: '#0F766E' }}>📍 Chi nhánh trung tâm</div>
+                  <div style={{ fontWeight: 700, color: '#0F766E', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <MapPin size={15} />
+                    <span>Chi nhánh trung tâm</span>
+                  </div>
                   <div style={{ color: '#64748B', marginTop: 2 }}>Số 42 Cầu Giấy, Q. Cầu Giấy, Hà Nội</div>
                   <div style={{ fontSize: 11, color: '#0F766E', marginTop: 4 }}>Bán kính hợp lệ: <b>250 mét</b> &bull; GPS: 21.0362, 105.7905</div>
                 </div>
                 <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', padding: 12, borderRadius: 8, fontSize: 13 }}>
-                  <div style={{ fontWeight: 700, color: '#1E293B' }}>📍 Chi nhánh 2</div>
+                  <div style={{ fontWeight: 700, color: '#1E293B', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <MapPin size={15} />
+                    <span>Chi nhánh 2</span>
+                  </div>
                   <div style={{ color: '#64748B', marginTop: 2 }}>Số 15 Lê Văn Lương, Q. Thanh Xuân, Hà Nội</div>
                   <div style={{ fontSize: 11, color: '#64748B', marginTop: 4 }}>Bán kính hợp lệ: <b>200 mét</b> &bull; GPS: 21.0028, 105.8012</div>
                 </div>

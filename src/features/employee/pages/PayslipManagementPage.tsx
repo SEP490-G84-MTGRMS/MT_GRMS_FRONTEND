@@ -1,6 +1,20 @@
 import React, { useState, useMemo } from 'react';
+import {
+  Search,
+  Plus,
+  CreditCard,
+  Printer,
+  MoreHorizontal,
+  Download,
+  RefreshCw,
+  Users,
+  DollarSign,
+  Hourglass,
+  Check,
+  Inbox,
+} from 'lucide-react';
 import type { PayslipDetailedRecord, Branch } from '../types';
-import { MOCK_PAYSLIPS_MANAGEMENT, MOCK_BRANCHES, MOCK_JOB_TITLES } from '../services/mockData';
+import { MOCK_PAYSLIPS_MANAGEMENT, MOCK_BRANCHES } from '../services/mockData';
 import { CreatePayslipModal } from '../components/CreatePayslipModal';
 import { PayslipDetailModal } from '../components/PayslipDetailModal';
 import { PayslipPaymentModal } from '../components/PayslipPaymentModal';
@@ -16,7 +30,6 @@ export const PayslipManagementPage: React.FC = () => {
   const [periodMonth, setPeriodMonth] = useState<string>('2026-10');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'UNPAID' | 'PAID'>('ALL');
   const [selectedBranch, setSelectedBranch] = useState<string>('ALL');
-  const [selectedJobTitle, setSelectedJobTitle] = useState<string>('ALL');
 
   // Modals state
   const [isCreateOpen, setIsCreateOpen] = useState<boolean>(false);
@@ -70,24 +83,19 @@ export const PayslipManagementPage: React.FC = () => {
       if (selectedBranch !== 'ALL' && !item.branchName?.includes(selectedBranch)) {
         return false;
       }
-      // 4. Job title
-      if (selectedJobTitle !== 'ALL' && item.jobTitle !== selectedJobTitle) {
-        return false;
-      }
-      // 5. Keyword search
+      // 4. Keyword search
       if (keyword.trim()) {
         const q = keyword.toLowerCase().trim();
         const matchName = item.employeeName.toLowerCase().includes(q);
         const matchCode = item.employeeCode.toLowerCase().includes(q);
         const matchId = item.id.toLowerCase().includes(q);
-        const matchTitle = item.jobTitle.toLowerCase().includes(q);
-        if (!matchName && !matchCode && !matchId && !matchTitle) {
+        if (!matchName && !matchCode && !matchId) {
           return false;
         }
       }
       return true;
     });
-  }, [payslips, periodMonth, statusFilter, selectedBranch, selectedJobTitle, keyword]);
+  }, [payslips, periodMonth, statusFilter, selectedBranch, keyword]);
 
   // Statistics KPI
   const stats = useMemo(() => {
@@ -163,7 +171,6 @@ export const PayslipManagementPage: React.FC = () => {
     setPeriodMonth('2026-10');
     setStatusFilter('ALL');
     setSelectedBranch('ALL');
-    setSelectedJobTitle('ALL');
   };
 
   return (
@@ -178,10 +185,12 @@ export const PayslipManagementPage: React.FC = () => {
 
           {/* Ô tìm kiếm bo tròn full pill */}
           <div className="emp-search-box">
-            <span className="emp-search-icon">🔍</span>
+            <span className="emp-search-icon">
+              <Search size={16} />
+            </span>
             <input
               type="text"
-              placeholder="Tìm theo mã, tên NV, chức danh..."
+              placeholder="Tìm theo mã, tên NV..."
               value={keyword}
               onChange={(e) => setKeyword(e.target.value)}
             />
@@ -236,9 +245,11 @@ export const PayslipManagementPage: React.FC = () => {
           <button
             type="button"
             className="emp-btn emp-btn-primary"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
             onClick={() => setIsCreateOpen(true)}
           >
-            + Khởi tạo bảng lương
+            <Plus size={16} />
+            <span>Khởi tạo bảng lương</span>
           </button>
 
           <button
@@ -249,17 +260,23 @@ export const PayslipManagementPage: React.FC = () => {
             style={{
               opacity: selectedIds.length === 0 ? 0.6 : 1,
               cursor: selectedIds.length === 0 ? 'not-allowed' : 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
             }}
           >
-            💳 Chi trả hàng loạt {selectedIds.length > 0 ? `(${selectedIds.length})` : ''}
+            <CreditCard size={15} />
+            <span>Chi trả hàng loạt {selectedIds.length > 0 ? `(${selectedIds.length})` : ''}</span>
           </button>
 
           <button
             type="button"
             className="emp-btn emp-btn-secondary"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
             onClick={() => window.print()}
           >
-            🖨️ In danh sách
+            <Printer size={15} />
+            <span>In danh sách</span>
           </button>
 
           {/* Action Dropdown */}
@@ -267,10 +284,10 @@ export const PayslipManagementPage: React.FC = () => {
             <button
               type="button"
               className="emp-btn emp-btn-secondary"
-              style={{ width: 40, padding: 0 }}
+              style={{ width: 40, padding: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
               onClick={() => setShowActionDropdown(!showActionDropdown)}
             >
-              &bull;&bull;&bull;
+              <MoreHorizontal size={18} />
             </button>
 
             {showActionDropdown && (
@@ -307,7 +324,8 @@ export const PayslipManagementPage: React.FC = () => {
                     setShowActionDropdown(false);
                   }}
                 >
-                  📥 Xuất file Excel
+                  <Download size={14} />
+                  <span>Xuất file Excel</span>
                 </button>
                 <button
                   type="button"
@@ -328,7 +346,8 @@ export const PayslipManagementPage: React.FC = () => {
                     setShowActionDropdown(false);
                   }}
                 >
-                  ➕ Tính lại lương tháng
+                  <RefreshCw size={14} />
+                  <span>Tính lại lương tháng</span>
                 </button>
               </div>
             )}
@@ -414,25 +433,6 @@ export const PayslipManagementPage: React.FC = () => {
             ))}
           </div>
 
-          {/* Nhóm 4: Chức danh */}
-          <div className="emp-filter-group">
-            <div className="emp-filter-title">
-              <span>Chức danh</span>
-            </div>
-            <select
-              className="emp-filter-select"
-              value={selectedJobTitle}
-              onChange={(e) => setSelectedJobTitle(e.target.value)}
-            >
-              <option value="ALL">-- Tất cả chức danh --</option>
-              {MOCK_JOB_TITLES.map((jt) => (
-                <option key={jt.id} value={jt.name}>
-                  {jt.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
           {/* Nút đặt lại */}
           <button
             type="button"
@@ -452,7 +452,9 @@ export const PayslipManagementPage: React.FC = () => {
             <div className="emp-kpi-card">
               <div className="emp-kpi-header">
                 <span className="emp-kpi-label">Số phiếu lương</span>
-                <div className="emp-kpi-icon emp-kpi-icon--teal">👥</div>
+                <div className="emp-kpi-icon emp-kpi-icon--teal" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Users size={18} color="#0F766E" />
+                </div>
               </div>
               <div className="emp-kpi-value">{stats.totalCount}</div>
               <div className="emp-kpi-sub">Nhân sự trong kỳ {monthLabel}</div>
@@ -462,7 +464,9 @@ export const PayslipManagementPage: React.FC = () => {
             <div className="emp-kpi-card">
               <div className="emp-kpi-header">
                 <span className="emp-kpi-label">Tổng quỹ thực nhận</span>
-                <div className="emp-kpi-icon emp-kpi-icon--blue">💰</div>
+                <div className="emp-kpi-icon emp-kpi-icon--blue" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <DollarSign size={18} color="#1D4ED8" />
+                </div>
               </div>
               <div className="emp-kpi-value" style={{ color: '#1D4ED8' }}>
                 {formatVND(stats.totalNet)}
@@ -474,7 +478,9 @@ export const PayslipManagementPage: React.FC = () => {
             <div className="emp-kpi-card">
               <div className="emp-kpi-header">
                 <span className="emp-kpi-label">Chưa chi trả</span>
-                <div className="emp-kpi-icon emp-kpi-icon--amber">⏳</div>
+                <div className="emp-kpi-icon emp-kpi-icon--amber" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Hourglass size={18} color="#D97706" />
+                </div>
               </div>
               <div className="emp-kpi-value" style={{ color: '#D97706' }}>
                 {formatVND(stats.unpaidNet)}
@@ -486,7 +492,9 @@ export const PayslipManagementPage: React.FC = () => {
             <div className="emp-kpi-card">
               <div className="emp-kpi-header">
                 <span className="emp-kpi-label">Đã thanh toán</span>
-                <div className="emp-kpi-icon emp-kpi-icon--emerald">✓</div>
+                <div className="emp-kpi-icon emp-kpi-icon--emerald" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Check size={18} color="#059669" />
+                </div>
               </div>
               <div className="emp-kpi-value" style={{ color: '#059669' }}>
                 {formatVND(stats.paidNet)}
@@ -534,7 +542,9 @@ export const PayslipManagementPage: React.FC = () => {
                         color: '#94A3B8',
                       }}
                     >
-                      <div style={{ fontSize: 36, marginBottom: 8 }}>📭</div>
+                      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
+                        <Inbox size={36} color="#94A3B8" />
+                      </div>
                       <div style={{ fontSize: 14, fontWeight: 600 }}>
                         Không có phiếu lương nào phù hợp
                       </div>
@@ -583,7 +593,7 @@ export const PayslipManagementPage: React.FC = () => {
                             {item.employeeName}
                           </div>
                           <div style={{ fontSize: 12, color: '#64748B' }}>
-                            {item.jobTitle} &bull; {item.branchName}
+                            {item.branchName}
                           </div>
                         </td>
                         <td style={{ textAlign: 'center', fontWeight: 600, color: '#475569' }}>
@@ -612,8 +622,9 @@ export const PayslipManagementPage: React.FC = () => {
                         </td>
                         <td style={{ textAlign: 'center' }}>
                           {isPaid ? (
-                            <span className="emp-status-pill active">
-                              ✓ Đã thanh toán
+                            <span className="emp-status-pill active" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                              <Check size={12} />
+                              <span>Đã thanh toán</span>
                             </span>
                           ) : (
                             <span className="emp-status-pill warning">
@@ -644,10 +655,11 @@ export const PayslipManagementPage: React.FC = () => {
                               <button
                                 type="button"
                                 className="emp-btn emp-btn-primary"
-                                style={{ height: 32, padding: '0 10px', fontSize: 12 }}
+                                style={{ height: 32, padding: '0 10px', fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 4 }}
                                 onClick={() => setPayingPayslip(item)}
                               >
-                                💳 Trả lương
+                                <CreditCard size={13} />
+                                <span>Trả lương</span>
                               </button>
                             ) : (
                               <span

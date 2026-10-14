@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Check, AlertTriangle, Clock, X, User, MapPin, Smartphone } from 'lucide-react';
 import type { AttendanceRecord } from '../types';
 
 interface AttendanceDetailModalProps {
@@ -29,28 +30,36 @@ export const AttendanceDetailModal: React.FC<AttendanceDetailModalProps> = ({
   const getStatusBadge = () => {
     switch (record.status) {
       case 'ontime':
-        return <span className="emp-status-pill active">✓ Đúng giờ</span>;
+        return (
+          <span className="emp-status-pill active" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+            <Check size={13} />
+            <span>Đúng giờ</span>
+          </span>
+        );
       case 'late':
         return (
-          <span className="emp-status-pill" style={{ background: '#FFFBEB', color: '#B45309' }}>
-            ⚠️ Đi muộn {record.lateMinutes ? `(${record.lateMinutes}p)` : ''}
+          <span className="emp-status-pill" style={{ color: '#D97706', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+            <AlertTriangle size={13} />
+            <span>Đi muộn {record.lateMinutes ? `(${record.lateMinutes}p)` : ''}</span>
           </span>
         );
       case 'early':
         return (
-          <span className="emp-status-pill" style={{ background: '#FEF3C7', color: '#D97706' }}>
-            ⏰ Về sớm
+          <span className="emp-status-pill" style={{ color: '#B45309', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+            <Clock size={13} />
+            <span>Về sớm</span>
           </span>
         );
       case 'absent':
         return (
-          <span className="emp-status-pill" style={{ background: '#FEE2E2', color: '#B91C1C' }}>
-            ✕ Vắng mặt
+          <span className="emp-status-pill" style={{ color: '#DC2626', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+            <X size={13} />
+            <span>Vắng mặt</span>
           </span>
         );
       default:
         return (
-          <span className="emp-status-pill" style={{ background: '#F1F5F9', color: '#64748B' }}>
+          <span className="emp-status-pill" style={{ color: '#64748B' }}>
             Chưa chấm công
           </span>
         );
@@ -82,8 +91,8 @@ export const AttendanceDetailModal: React.FC<AttendanceDetailModalProps> = ({
               marginBottom: 16,
             }}
           >
-            <div className="emp-avatar-cell" style={{ width: 44, height: 44, fontSize: 20 }}>
-              👤
+            <div className="emp-avatar-cell" style={{ width: 44, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <User size={20} color="#64748B" />
             </div>
             <div>
               <div style={{ fontWeight: 700, fontSize: 16, color: '#0F172A' }}>
@@ -131,14 +140,16 @@ export const AttendanceDetailModal: React.FC<AttendanceDetailModalProps> = ({
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10, fontSize: 13 }}>
               <div>
                 <span style={{ color: '#64748B' }}>Vị trí GPS chấm công:</span>
-                <div style={{ fontWeight: 600, color: '#0F766E' }}>
-                  📍 {record.gpsLocation || 'Chấm công tại quầy thu ngân'}
+                <div style={{ fontWeight: 600, color: '#0F766E', display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                  <MapPin size={14} />
+                  <span>{record.gpsLocation || 'Chấm công tại quầy thu ngân'}</span>
                 </div>
               </div>
               <div>
                 <span style={{ color: '#64748B' }}>Thiết bị di động:</span>
-                <div style={{ fontWeight: 600 }}>
-                  📱 {record.deviceInfo || 'Thiết bị được duyệt: iPhone / Android'}
+                <div style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                  <Smartphone size={14} color="#64748B" />
+                  <span>{record.deviceInfo || 'Thiết bị được duyệt: iPhone / Android'}</span>
                 </div>
               </div>
             </div>
@@ -200,22 +211,24 @@ export const AttendanceDetailModal: React.FC<AttendanceDetailModalProps> = ({
               <button
                 type="button"
                 className="emp-btn emp-btn-danger-outline"
-                style={{ height: 34, fontSize: 12 }}
+                style={{ height: 34, fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 6 }}
                 onClick={() => setShowViolationForm(true)}
               >
-                ⚠️ Ghi nhận vi phạm
+                <AlertTriangle size={14} />
+                <span>Ghi nhận vi phạm</span>
               </button>
               {onUpdateStatus && record.status !== 'ontime' && (
                 <button
                   type="button"
                   className="emp-btn emp-btn-secondary"
-                  style={{ height: 34, fontSize: 12 }}
+                  style={{ height: 34, fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 6 }}
                   onClick={() => {
                     onUpdateStatus(record.id, 'ontime');
                     alert('Đã duyệt chuyển sang trạng thái Đúng giờ!');
                   }}
                 >
-                  ✓ Duyệt đúng giờ
+                  <Check size={14} />
+                  <span>Duyệt đúng giờ</span>
                 </button>
               )}
             </div>

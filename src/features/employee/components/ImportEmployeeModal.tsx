@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Download } from 'lucide-react';
 
 interface ImportEmployeeModalProps {
   isOpen: boolean;
@@ -63,10 +64,11 @@ export const ImportEmployeeModal: React.FC<ImportEmployeeModalProps> = ({
               <button
                 type="button"
                 className="emp-btn emp-btn-outline-teal"
-                style={{ height: 36, fontSize: 13 }}
+                style={{ height: 36, fontSize: 13, display: 'inline-flex', alignItems: 'center', gap: 6 }}
                 onClick={() => alert('Đang tải file mẫu: Mau_nhan_vien.xlsx')}
               >
-                📥 Tải về file mẫu Excel
+                <Download size={14} />
+                <span>Tải về file mẫu Excel</span>
               </button>
             </div>
 
