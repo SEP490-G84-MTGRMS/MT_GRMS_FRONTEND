@@ -218,21 +218,101 @@ const NAV_GROUPS: NavGroup[] = [
     id: 'employees',
     label: 'Nhân viên',
     icon: UsersIcon,
-    children: [
-      { label: 'Danh sách nhân viên', to: '/store-owner/employees' },
-      { label: 'Lịch làm việc', to: '/store-owner/employees/schedule', badge: 'Lịch' },
-      { label: 'Bảng chấm công', to: '/store-owner/employees/attendance', badge: 'GPS/QR' },
-      { label: 'Bảng tính lương', to: '/store-owner/employees/payroll', badge: 'Mới' },
+    sections: [
+      {
+        title: "Nhân sự & Hồ sơ",
+        items: [
+          { label: "Danh sách nhân viên", to: "/store-owner/employees" },
+          {
+            label: "Hồ sơ & Hợp đồng",
+            to: "/store-owner/employees?view=profiles",
+          },
+        ],
+      },
+      {
+        title: "Lịch & Chấm công",
+        items: [
+          {
+            label: "Lịch làm việc chi nhánh",
+            to: "/store-owner/employees/schedule",
+            badge: "Lịch",
+            badgeType: "blue",
+          },
+          {
+            label: "Bảng chấm công GPS/QR",
+            to: "/store-owner/employees/attendance",
+            badge: "GPS/QR",
+            badgeType: "blue",
+          },
+        ],
+      },
+      {
+        title: "Lương & Đãi ngộ",
+        items: [
+          {
+            label: "Bảng tính lương tháng",
+            to: "/store-owner/employees/payroll",
+            badge: "Mới",
+            badgeType: "red",
+          },
+          {
+            label: "Thiết lập ca & Phụ cấp",
+            to: "/store-owner/employees/schedule?view=shifts",
+          },
+        ],
+      },
     ],
   },
   {
     id: 'promotions',
     label: 'Khuyến mãi',
     icon: GiftNavIcon,
-    children: [
-      { label: 'Chương trình khuyến mãi', to: '/store-owner/promotions', badge: 'Mới' },
-      { label: 'Voucher & Coupon', to: '/store-owner/vouchers' },
-      { label: 'Thiết lập tích điểm', to: '/store-owner/loyalty-config' },
+    sections: [
+      {
+        title: "Chương trình ưu đãi",
+        items: [
+          {
+            label: "Chương trình khuyến mãi",
+            to: "/store-owner/promotions",
+            badge: "Mới",
+            badgeType: "red",
+          },
+          {
+            label: "Khuyến mãi theo khung giờ",
+            to: "/store-owner/promotions?view=flash-sale",
+          },
+        ],
+      },
+      {
+        title: "Voucher & Mã giảm giá",
+        items: [
+          {
+            label: "Danh sách Voucher & Coupon",
+            to: "/store-owner/vouchers",
+            badge: "Hot",
+            badgeType: "blue",
+          },
+          {
+            label: "Phát hành mã quà tặng",
+            to: "/store-owner/vouchers?action=create",
+          },
+        ],
+      },
+      {
+        title: "Tích điểm & Hội viên",
+        items: [
+          {
+            label: "Thiết lập tích điểm",
+            to: "/store-owner/loyalty-config",
+            badge: "Xu",
+            badgeType: "blue",
+          },
+          {
+            label: "Hạng thành viên & Chiết khấu",
+            to: "/store-owner/loyalty-config?view=tiers",
+          },
+        ],
+      },
     ],
   },
   {
@@ -366,7 +446,7 @@ const NavDropdown: FC<DropdownProps> = ({
   const rawLeft = rect && rect.left > 0 ? rect.left : coords.left;
   const maxLeft =
     typeof window !== "undefined"
-      ? window.innerWidth - (isMega ? 560 : 230) - 16
+      ? window.innerWidth - (isMega ? 700 : 250) - 16
       : rawLeft;
   const left = Math.max(16, Math.min(rawLeft, maxLeft));
 
@@ -408,6 +488,58 @@ const NavDropdown: FC<DropdownProps> = ({
       );
     }
 
+    if (toPath === "/store-owner/employees") {
+      const hasOtherView = Boolean(currQuery && currQuery.includes("view="));
+      return (
+        (currPath === toPath || currPath.startsWith(toPath + "/")) &&
+        !currPath.includes("/schedule") &&
+        !currPath.includes("/attendance") &&
+        !currPath.includes("/payroll") &&
+        !hasOtherView
+      );
+    }
+
+    if (toPath === "/store-owner/employees/schedule") {
+      const hasOtherView = Boolean(currQuery && currQuery.includes("view="));
+      return (
+        (currPath === toPath || currPath.startsWith(toPath + "/")) &&
+        !hasOtherView
+      );
+    }
+
+    if (toPath === "/store-owner/promotions") {
+      const hasOtherView = Boolean(
+        currQuery &&
+          (currQuery.includes("view=") || currQuery.includes("action=")),
+      );
+      return (
+        (currPath === toPath || currPath.startsWith(toPath + "/")) &&
+        !hasOtherView
+      );
+    }
+
+    if (toPath === "/store-owner/vouchers") {
+      const hasOtherView = Boolean(
+        currQuery &&
+          (currQuery.includes("view=") || currQuery.includes("action=")),
+      );
+      return (
+        (currPath === toPath || currPath.startsWith(toPath + "/")) &&
+        !hasOtherView
+      );
+    }
+
+    if (toPath === "/store-owner/loyalty-config") {
+      const hasOtherView = Boolean(
+        currQuery &&
+          (currQuery.includes("view=") || currQuery.includes("action=")),
+      );
+      return (
+        (currPath === toPath || currPath.startsWith(toPath + "/")) &&
+        !hasOtherView
+      );
+    }
+
     return currPath === toPath || currPath.startsWith(toPath + "/");
   };
 
@@ -432,11 +564,11 @@ const NavDropdown: FC<DropdownProps> = ({
           boxShadow:
             "0 12px 36px rgba(0, 30, 90, 0.15), 0 2px 8px rgba(0, 30, 90, 0.06)",
           border: "1px solid var(--border-light)",
-          padding: isMega ? "18px 22px" : "8px 0",
-          minWidth: isMega ? 550 : 220,
+          padding: isMega ? "18px 24px" : "8px 0",
+          minWidth: isMega ? 680 : 230,
           overflow: "hidden",
           display: isMega ? "flex" : "block",
-          gap: isMega ? 18 : 0,
+          gap: isMega ? 20 : 0,
         }}
         role="menu"
       >
@@ -447,13 +579,13 @@ const NavDropdown: FC<DropdownProps> = ({
               key={sec.title}
               style={{
                 flex: 1,
-                minWidth: 155,
+                minWidth: 195,
                 display: "flex",
                 flexDirection: "column",
                 gap: 2,
                 borderRight:
                   secIdx < sections.length - 1 ? "1px solid #EDF2F9" : "none",
-                paddingRight: secIdx < sections.length - 1 ? 18 : 0,
+                paddingRight: secIdx < sections.length - 1 ? 20 : 0,
               }}
             >
               <div
@@ -464,6 +596,7 @@ const NavDropdown: FC<DropdownProps> = ({
                   padding: "2px 10px 10px",
                   lineHeight: 1.3,
                   userSelect: "none",
+                  whiteSpace: "nowrap",
                 }}
               >
                 {sec.title}
@@ -479,7 +612,7 @@ const NavDropdown: FC<DropdownProps> = ({
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "space-between",
-                      gap: 8,
+                      gap: 10,
                       padding: "8px 10px",
                       borderRadius: 8,
                       textDecoration: "none",
@@ -492,6 +625,7 @@ const NavDropdown: FC<DropdownProps> = ({
                         ? "var(--blue-light)"
                         : "transparent",
                       transition: "all 0.14s ease",
+                      whiteSpace: "nowrap",
                     }}
                     onMouseEnter={(e) => {
                       if (!isActive) {
@@ -507,7 +641,7 @@ const NavDropdown: FC<DropdownProps> = ({
                       }
                     }}
                   >
-                    <span>{item.label}</span>
+                    <span style={{ whiteSpace: "nowrap" }}>{item.label}</span>
                     {item.badge && (
                       <span
                         style={{
@@ -526,6 +660,8 @@ const NavDropdown: FC<DropdownProps> = ({
                           fontFamily: "var(--font-sans)",
                           lineHeight: 1.3,
                           letterSpacing: "0.02em",
+                          flexShrink: 0,
+                          whiteSpace: "nowrap",
                         }}
                       >
                         {item.badge}
@@ -560,6 +696,7 @@ const NavDropdown: FC<DropdownProps> = ({
                     : "transparent",
                   transition: "all 0.14s ease",
                   position: "relative",
+                  whiteSpace: "nowrap",
                 }}
                 onMouseEnter={(e) => {
                   if (!isActive) {
@@ -592,8 +729,9 @@ const NavDropdown: FC<DropdownProps> = ({
                 <ChevronRightIcon
                   size={13}
                   color={isActive ? "var(--blue-primary)" : "#bbb"}
+                  style={{ flexShrink: 0 }}
                 />
-                <span style={{ flex: 1 }}>{item.label}</span>
+                <span style={{ flex: 1, whiteSpace: "nowrap" }}>{item.label}</span>
                 {item.badge && (
                   <span
                     style={{
@@ -615,6 +753,8 @@ const NavDropdown: FC<DropdownProps> = ({
                         item.badgeType === "red"
                           ? "var(--font-sans)"
                           : "var(--font-mono)",
+                      flexShrink: 0,
+                      whiteSpace: "nowrap",
                     }}
                   >
                     {item.badge}
