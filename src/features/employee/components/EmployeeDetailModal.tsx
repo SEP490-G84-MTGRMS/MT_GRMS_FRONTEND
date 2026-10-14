@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Pencil, Download, Printer, Banknote } from 'lucide-react';
+import { Pencil, Download, Banknote } from 'lucide-react';
 import type { Employee, DebtTransaction } from '../types';
 
 interface EmployeeDetailModalProps {
@@ -637,7 +637,7 @@ export const EmployeeDetailModal: React.FC<EmployeeDetailModalProps> = ({
                       ))
                     ) : (
                       <tr>
-                        <td colSpan={8} style={{ textAlign: 'center', color: '#94A3B8', padding: 24 }}>
+                        <td colSpan={7} style={{ textAlign: 'center', color: '#94A3B8', padding: 24 }}>
                           {payslipStatusFilter === 'all'
                             ? 'Chưa có phiếu lương nào được chốt cho nhân viên này'
                             : 'Không có phiếu lương nào phù hợp với trạng thái đã chọn'}

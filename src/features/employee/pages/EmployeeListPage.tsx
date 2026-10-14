@@ -192,12 +192,14 @@ export const EmployeeListPage: React.FC = () => {
   return (
     <div className="emp-page-container">
       {/* ─── HEADER BAR ─── */}
+      <div>
+        <h2 className="emp-header-title">
+          <span>Danh sách nhân viên</span>
+          <span className="count-badge">{filteredEmployees.length}</span>
+        </h2>
+      </div>
       <div className="emp-header-bar">
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <h2 className="emp-header-title">
-            <span>Danh sách nhân viên</span>
-            <span className="count-badge">{filteredEmployees.length}</span>
-          </h2>
 
           <div className="emp-search-box">
             <span className="emp-search-icon">
@@ -368,7 +370,7 @@ export const EmployeeListPage: React.FC = () => {
                       <input
                         type="checkbox"
                         checked={selectedIds.includes(emp.id)}
-                        onChange={() => {}}
+                        onChange={() => { }}
                         style={{ accentColor: '#0F766E' }}
                       />
                     </td>
@@ -401,9 +403,8 @@ export const EmployeeListPage: React.FC = () => {
                     </td>
                     <td>
                       <span
-                        className={`emp-status-pill ${
-                          emp.status === 'active' ? 'active' : 'inactive'
-                        }`}
+                        className={`emp-status-pill ${emp.status === 'active' ? 'active' : 'inactive'
+                          }`}
                       >
                         {emp.status === 'active' ? 'Đang làm việc' : 'Đã nghỉ'}
                       </span>
@@ -461,7 +462,7 @@ export const EmployeeListPage: React.FC = () => {
       <ImportEmployeeModal
         isOpen={showImportModal}
         onClose={() => setShowImportModal(false)}
-        onImportSuccess={() => {}}
+        onImportSuccess={() => { }}
       />
     </div>
   );

@@ -176,13 +176,14 @@ export const PayslipManagementPage: React.FC = () => {
   return (
     <div className="emp-page-container">
       {/* ─── 1. HEADER BAR ĐỒNG NHẤT VỚI HỆ THỐNG ─── */}
+      <div>
+        <h2 className="emp-header-title">
+          <span>Bảng tính lương</span>
+          <span className="count-badge">{filteredPayslips.length}</span>
+        </h2>
+      </div>
       <div className="emp-header-bar">
         <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
-          <h2 className="emp-header-title">
-            <span>Bảng tính lương</span>
-            <span className="count-badge">{filteredPayslips.length}</span>
-          </h2>
-
           {/* Ô tìm kiếm bo tròn full pill */}
           <div className="emp-search-box">
             <span className="emp-search-icon">

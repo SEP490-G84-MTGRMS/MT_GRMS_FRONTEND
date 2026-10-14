@@ -58,21 +58,23 @@ export const WorkshiftManagementPage: React.FC = () => {
 
   return (
     <div className="emp-page-container">
-      {/* Header Bar */}
-      <div className="emp-header-bar">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+      {/* ─── HEADER BAR ─── */}
+      <div>
+        <div style={{ marginBottom: 8 }}>
           <Link
             to="/store-owner/employees/schedule"
             style={{ textDecoration: 'none', color: '#0F766E', fontWeight: 600, fontSize: 13 }}
           >
-            &larr; Lịch làm việc
+            &larr; Quay lại lịch làm việc
           </Link>
-          <span style={{ color: '#CBD5E1' }}>|</span>
-          <h2 className="emp-header-title" style={{ margin: 0 }}>
-            <span>Ca làm việc</span>
-            <span className="count-badge">{filteredShifts.length}</span>
-          </h2>
-
+        </div>
+        <h2 className="emp-header-title">
+          <span>Ca làm việc</span>
+          <span className="count-badge">{filteredShifts.length}</span>
+        </h2>
+      </div>
+      <div className="emp-header-bar">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
           <div className="emp-search-box">
             <span className="emp-search-icon">
               <Search size={16} />

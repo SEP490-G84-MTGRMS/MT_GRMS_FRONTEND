@@ -79,13 +79,14 @@ export const AttendancePage: React.FC = () => {
 
   return (
     <div className="emp-page-container">
-      {/* Header Bar */}
+      {/* ─── HEADER BAR ─── */}
+      <div>
+        <h2 className="emp-header-title">
+          <span>Bảng chấm công</span>
+        </h2>
+      </div>
       <div className="emp-header-bar">
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <h2 className="emp-header-title" style={{ margin: 0 }}>
-            <span>Bảng chấm công</span>
-          </h2>
-
           <div className="emp-search-box" style={{ width: 220 }}>
             <span className="emp-search-icon">
               <Search size={16} />
