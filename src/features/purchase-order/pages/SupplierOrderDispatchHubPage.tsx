@@ -1,40 +1,36 @@
 import { useState, useMemo } from 'react';
 import type { FC } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Grid, ArrowLeft, Layers } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 import { MOCK_DISPATCH_SUPPLIERS } from '../lib/mockDispatchData';
 import { MOCK_BRANCHES } from '../lib/mockData';
 import type { SupplierDispatchGroup } from '../types/po.types';
-import { DispatchUrgencyBar } from '../components/dispatch/DispatchUrgencyBar';
 import { DispatchFilterBar, type DispatchTabType } from '../components/dispatch/DispatchFilterBar';
-import { SupplierDispatchCard } from '../components/dispatch/SupplierDispatchCard';
+import { SupplierDispatchTable } from '../components/dispatch/SupplierDispatchTable';
+import { SupplierDispatchDrawer } from '../components/dispatch/SupplierDispatchDrawer';
 import { DispatchConfirmModal } from '../components/dispatch/DispatchConfirmModal';
 import { AdminToast, type ToastState } from '../../admin/components';
+import '../purchase-order.css';
 
 export const SupplierOrderDispatchHubPage: FC = () => {
-  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
   // Branch scope
   const branchParam = searchParams.get('branchId') || searchParams.get('branch') || 'DC1';
   const [selectedBranchId, setSelectedBranchId] = useState<string>(branchParam);
-  const currentBranch = useMemo(() => {
-    return MOCK_BRANCHES.find((b) => b.id === selectedBranchId) || MOCK_BRANCHES[0];
-  }, [selectedBranchId]);
 
   // Master State: Suppliers
   const [suppliers, setSuppliers] = useState<SupplierDispatchGroup[]>(MOCK_DISPATCH_SUPPLIERS);
 
-  // Accordion Expand State: default expand critical ones (< 2 hours)
-  const [expandedIds, setExpandedIds] = useState<Set<string>>(() => {
-    const set = new Set<string>();
-    MOCK_DISPATCH_SUPPLIERS.filter((s) => s.urgency === 'critical').forEach((s) => set.add(s.id));
-    return set;
-  });
+  // Drawer Open State: holds the ID of supplier currently viewed in Drawer
+  const [selectedDrawerSupplierId, setSelectedDrawerSupplierId] = useState<string | null>(null);
 
   // Filter States
   const [activeTab, setActiveTab] = useState<DispatchTabType>('all');
   const [keyword, setKeyword] = useState<string>('');
+
+  // Pagination States
+  const [pageIndex, setPageIndex] = useState<number>(1);
+  const [pageSize, setPageSize] = useState<number>(10);
 
   // Toast
   const [toast, setToast] = useState<ToastState | null>(null);
@@ -54,17 +50,7 @@ export const SupplierOrderDispatchHubPage: FC = () => {
     isBatch: false,
   });
 
-  // Toggle Accordion Card
-  const handleToggleExpand = (id: string) => {
-    setExpandedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-
-  // Inline Quantity Edit
+  // Inline Quantity Edit in Drawer
   const handleUpdateItemQty = (supplierId: string, itemId: string, newQty: number) => {
     setSuppliers((prev) =>
       prev.map((sup) => {
@@ -73,6 +59,18 @@ export const SupplierOrderDispatchHubPage: FC = () => {
         return { ...sup, items: updatedItems };
       })
     );
+  };
+
+  // Delete Item from PO in Drawer
+  const handleDeleteItem = (supplierId: string, itemId: string) => {
+    setSuppliers((prev) =>
+      prev.map((sup) => {
+        if (sup.id !== supplierId) return sup;
+        const updatedItems = sup.items.filter((it) => it.id !== itemId);
+        return { ...sup, items: updatedItems };
+      })
+    );
+    showToast('Đã xóa mặt hàng khỏi đơn mua hàng.', 'info');
   };
 
   // Update Note
@@ -88,22 +86,6 @@ export const SupplierOrderDispatchHubPage: FC = () => {
       isOpen: true,
       targets: [sup],
       isBatch: false,
-    });
-  };
-
-  // Open Dispatch Modal for all today's suppliers (critical + today)
-  const handleOpenDispatchToday = () => {
-    const todayDueSuppliers = suppliers.filter(
-      (s) => s.status !== 'dispatched' && (s.urgency === 'critical' || s.urgency === 'today')
-    );
-    if (todayDueSuppliers.length === 0) {
-      showToast('Không có nhà cung cấp nào cần chốt trong hôm nay.', 'info');
-      return;
-    }
-    setModalState({
-      isOpen: true,
-      targets: todayDueSuppliers,
-      isBatch: true,
     });
   };
 
@@ -127,41 +109,12 @@ export const SupplierOrderDispatchHubPage: FC = () => {
 
     setModalState({ isOpen: false, targets: [], isBatch: false });
     showToast(
-      modalState.isBatch
-        ? `Đã chốt & phát hành thành công ${modalState.targets.length} Purchase Order cho các NCC hôm nay!`
-        : `Đã phát hành đơn mua hàng PO thành công cho ${modalState.targets[0].name}!`,
+      `Đã phát hành đơn mua hàng PO thành công cho ${modalState.targets[0]?.name}!`,
       'success'
     );
   };
 
-  // Calculate Metrics
-  const metrics = useMemo(() => {
-    const draftSuppliers = suppliers.filter((s) => s.status !== 'dispatched');
-    const totalAmount = draftSuppliers.reduce(
-      (sum, s) => sum + s.items.reduce((acc, it) => acc + it.qty * it.price, 0),
-      0
-    );
-    const totalSkus = draftSuppliers.reduce(
-      (sum, s) => sum + s.items.filter((it) => it.qty > 0).length,
-      0
-    );
-    const critical = draftSuppliers.filter((s) => s.urgency === 'critical').length;
-    const today = draftSuppliers.filter((s) => s.urgency === 'today').length;
-    const later = draftSuppliers.filter((s) => s.urgency === 'later').length;
-    const completed = suppliers.filter((s) => s.status === 'dispatched').length;
-
-    return {
-      totalSuppliers: draftSuppliers.length,
-      totalAmount,
-      totalSkus,
-      critical,
-      today,
-      later,
-      completed,
-    };
-  }, [suppliers]);
-
-  // Tab counts
+  // Tab counts for dropdown
   const tabCounts = useMemo(() => {
     return {
       all: suppliers.length,
@@ -177,7 +130,7 @@ export const SupplierOrderDispatchHubPage: FC = () => {
     const kw = keyword.trim().toLowerCase();
 
     return suppliers.filter((s) => {
-      // Tab filter
+      // Status dropdown filter
       if (activeTab === 'critical' && (s.status === 'dispatched' || s.urgency !== 'critical')) return false;
       if (activeTab === 'today' && (s.status === 'dispatched' || (s.urgency !== 'today' && s.urgency !== 'critical'))) return false;
       if (activeTab === 'later' && (s.status === 'dispatched' || s.urgency !== 'later')) return false;
@@ -196,141 +149,111 @@ export const SupplierOrderDispatchHubPage: FC = () => {
     });
   }, [suppliers, activeTab, keyword]);
 
+  // Paginated Suppliers
+  const pagedSuppliers = useMemo(() => {
+    const start = (pageIndex - 1) * pageSize;
+    return filteredSuppliers.slice(start, start + pageSize);
+  }, [filteredSuppliers, pageIndex, pageSize]);
+
+  // Drawer Navigation helpers
+  const selectedDrawerSupplier = useMemo(() => {
+    if (!selectedDrawerSupplierId) return null;
+    return suppliers.find((s) => s.id === selectedDrawerSupplierId) || null;
+  }, [suppliers, selectedDrawerSupplierId]);
+
+  const currentDrawerIndex = useMemo(() => {
+    if (!selectedDrawerSupplierId) return -1;
+    return filteredSuppliers.findIndex((s) => s.id === selectedDrawerSupplierId);
+  }, [filteredSuppliers, selectedDrawerSupplierId]);
+
+  const hasPrevSupplier = currentDrawerIndex > 0;
+  const hasNextSupplier = currentDrawerIndex >= 0 && currentDrawerIndex < filteredSuppliers.length - 1;
+
+  const handlePrevSupplier = () => {
+    if (hasPrevSupplier) {
+      setSelectedDrawerSupplierId(filteredSuppliers[currentDrawerIndex - 1].id);
+    }
+  };
+
+  const handleNextSupplier = () => {
+    if (hasNextSupplier) {
+      setSelectedDrawerSupplierId(filteredSuppliers[currentDrawerIndex + 1].id);
+    }
+  };
+
   return (
     <div className="po-matrix-container" style={{ width: '100%' }}>
       {/* Toast Notification */}
       <AdminToast toast={toast} onClose={() => setToast(null)} />
 
-      {/* ── Page Header (matching BranchOrderListPage & OrderMatrixPage style) ── */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          flexWrap: 'wrap',
-          gap: 12,
-          marginBottom: 6,
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-          <h1
-            style={{
-              fontSize: 20,
-              fontWeight: 800,
-              color: 'var(--text-main)',
-              margin: 0,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-            }}
-          >
-            <span style={{ color: 'var(--blue-primary, #0d9488)', display: 'inline-flex' }}>⚡</span>
-            <span>Trung tâm chốt đơn & tách PO theo nhà cung cấp</span>
-          </h1>
-          <span
-            style={{
-              fontSize: 12,
-              fontWeight: 600,
-              padding: '2px 8px',
-              borderRadius: 4,
-              background: '#e0f2fe',
-              color: '#0369a1',
-              border: '1px solid #bae6fd',
-            }}
-          >
-            Chi nhánh: {currentBranch.name}
-          </span>
-        </div>
-
-        {/* Action Buttons */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <button
-            type="button"
-            onClick={() => navigate('/store-owner/purchase-orders/create-matrix')}
-            className="po-btn po-btn-outline"
-            style={{ height: 32, padding: '0 14px' }}
-            title="Mở Bảng Lưới Đặt Hàng Ma Trận"
-          >
-            <Grid size={14} color="#0d9488" />
-            <span>Bảng lưới đặt hàng</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => navigate('/store-owner/purchase-orders/branches')}
-            className="po-btn po-btn-secondary"
-            style={{ height: 32, padding: '0 14px' }}
-            title="Quay lại danh sách chi nhánh"
-          >
-            <ArrowLeft size={14} />
-            <span>Quay lại</span>
-          </button>
-        </div>
+      {/* ── Tiêu đề trang đơn giản theo yêu cầu ── */}
+      <div style={{ marginBottom: 10 }}>
+        <h1
+          style={{
+            fontSize: 20,
+            fontWeight: 800,
+            color: 'var(--text-main)',
+            margin: 0,
+          }}
+        >
+          Chốt đơn với nhà cung cấp
+        </h1>
       </div>
 
-      {/* ── KHU VỰC 1: TOP URGENCY BAR ── */}
-      <DispatchUrgencyBar
-        totalSuppliers={metrics.totalSuppliers}
-        totalSkuCount={metrics.totalSkus}
-        totalAmount={metrics.totalAmount}
-        criticalCount={metrics.critical}
-        todayCount={metrics.today}
-        laterCount={metrics.later}
-        completedCount={metrics.completed}
-        onQuickDispatchToday={handleOpenDispatchToday}
-      />
-
-      {/* ── KHU VỰC 2: FILTER & GROUPING TABS ── */}
+      {/* ── BỘ LỌC TÌM KIẾM & CHỌN TRẠNG THÁI / CHI NHÁNH ── */}
       <DispatchFilterBar
         activeTab={activeTab}
-        onTabChange={(tab) => setActiveTab(tab)}
+        onTabChange={(tab) => {
+          setActiveTab(tab);
+          setPageIndex(1);
+        }}
         counts={tabCounts}
         keyword={keyword}
-        onKeywordChange={(kw) => setKeyword(kw)}
+        onKeywordChange={(kw) => {
+          setKeyword(kw);
+          setPageIndex(1);
+        }}
         branches={MOCK_BRANCHES}
         selectedBranchId={selectedBranchId}
         onSelectBranch={(id) => setSelectedBranchId(id)}
         onResetFilters={() => {
           setActiveTab('all');
           setKeyword('');
+          setPageIndex(1);
         }}
       />
 
-      {/* ── KHU VỰC 3: DANH SÁCH THẺ NCC (ACCORDION 2 TẦNG) ── */}
-      <div>
-        {filteredSuppliers.length === 0 ? (
-          <div
-            style={{
-              background: '#ffffff',
-              border: '1px solid #e2e8f0',
-              borderRadius: 8,
-              padding: '48px 24px',
-              textAlign: 'center',
-              color: '#64748b',
-            }}
-          >
-            <Layers size={36} color="#cbd5e1" style={{ margin: '0 auto 12px' }} />
-            <h4 style={{ margin: '0 0 6px', fontSize: 16, fontWeight: 700, color: '#334155' }}>
-              Không tìm thấy đơn hàng Nhà cung cấp phù hợp
-            </h4>
-            <p style={{ margin: 0, fontSize: 13 }}>
-              Vui lòng thử chọn lại tab hoặc điều chỉnh từ khóa tìm kiếm.
-            </p>
-          </div>
-        ) : (
-          filteredSuppliers.map((supplier) => (
-            <SupplierDispatchCard
-              key={supplier.id}
-              supplier={supplier}
-              isExpanded={expandedIds.has(supplier.id)}
-              onToggleExpand={() => handleToggleExpand(supplier.id)}
-              onUpdateItemQty={handleUpdateItemQty}
-              onUpdateNote={handleUpdateNote}
-              onDispatch={handleOpenDispatchSingle}
-            />
-          ))
-        )}
-      </div>
+      {/* ── BẢNG DỮ LIỆU CHÍNH CÓ PHÂN TRANG (MAIN DATA TABLE + PAGING) ── */}
+      <SupplierDispatchTable
+        suppliers={pagedSuppliers}
+        totalCount={filteredSuppliers.length}
+        pageIndex={pageIndex}
+        pageSize={pageSize}
+        onPageChange={(page) => setPageIndex(page)}
+        onPageSizeChange={(size) => {
+          setPageSize(size);
+          setPageIndex(1);
+        }}
+        onOpenDrawer={(id) => setSelectedDrawerSupplierId(id)}
+        onDispatchSingle={handleOpenDispatchSingle}
+      />
+
+      {/* ── NGĂN KÉO CHI TIẾT (SLIDE-OVER DRAWER) ── */}
+      <SupplierDispatchDrawer
+        supplier={selectedDrawerSupplier}
+        isOpen={Boolean(selectedDrawerSupplierId)}
+        onClose={() => setSelectedDrawerSupplierId(null)}
+        onPrevSupplier={handlePrevSupplier}
+        onNextSupplier={handleNextSupplier}
+        hasPrev={hasPrevSupplier}
+        hasNext={hasNextSupplier}
+        currentIndex={currentDrawerIndex >= 0 ? currentDrawerIndex : undefined}
+        totalSuppliersCount={filteredSuppliers.length}
+        onUpdateItemQty={handleUpdateItemQty}
+        onDeleteItem={handleDeleteItem}
+        onUpdateNote={handleUpdateNote}
+        onDispatch={handleOpenDispatchSingle}
+      />
 
       {/* ── MODAL XÁC NHẬN PHÁT HÀNH PO ── */}
       <DispatchConfirmModal

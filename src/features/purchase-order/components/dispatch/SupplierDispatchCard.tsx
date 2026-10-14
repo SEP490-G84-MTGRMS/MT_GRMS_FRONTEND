@@ -302,7 +302,7 @@ export const SupplierDispatchCard: FC<SupplierDispatchCardProps> = ({
 
       {/* ── TẦNG 2: BẢNG CHI TIẾT SKU EXPANDED ── */}
       {isExpanded && (
-        <div style={{ borderTop: '1px solid #e2e8f0', background: '#fafafa', padding: '14px 18px' }}>
+        <div style={{ borderTop: '1px solid #e2e8f0', background: '#ffffff', padding: '14px 18px' }}>
           {/* MOV Warning Banner if not met */}
           {!isMovMet && (
             <div

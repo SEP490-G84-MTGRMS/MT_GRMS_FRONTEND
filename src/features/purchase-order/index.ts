@@ -17,5 +17,7 @@ export * from './lib/mockDispatchData';
 export * from './components/dispatch/DispatchUrgencyBar';
 export * from './components/dispatch/DispatchFilterBar';
 export * from './components/dispatch/SupplierDispatchCard';
+export * from './components/dispatch/SupplierDispatchTable';
+export * from './components/dispatch/SupplierDispatchDrawer';
 export * from './components/dispatch/DispatchConfirmModal';
 export * from './pages/SupplierOrderDispatchHubPage';
