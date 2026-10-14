@@ -9,6 +9,7 @@ import { ServiceExpensesPage } from '../features/service-expenses/pages/ServiceE
 import { CustomerManagementPage } from '../features/customer-crm';
 import { ReportsPnlDashboardPage } from '../features/reports-pnl';
 import { CashbookPage } from '../features/cashbook';
+import { TaxSnapshotPage } from '../features/tax-snapshot';
 import { StoreOwnerLayout } from '../layouts/StoreOwnerLayout';
 import { AdminDashboardPage } from '../pages/admin/AdminDashboardPage';
 import { TenantManagementPage } from '../pages/admin/TenantManagementPage';
@@ -70,6 +71,10 @@ export const router = createBrowserRouter([
         path: 'cashbook',
         element: <CashbookPage />,
       },
+      {
+        path: 'tax-snapshots',
+        element: <TaxSnapshotPage />,
+      },
     ],
   },
   {
@@ -119,6 +124,10 @@ export const router = createBrowserRouter([
       {
         path: 'cashbook',
         element: <CashbookPage />,
+      },
+      {
+        path: 'tax-snapshots',
+        element: <TaxSnapshotPage />,
       },
     ],
   },
@@ -195,6 +204,16 @@ export const router = createBrowserRouter([
       {
         path: 'customers',
         element: <Navigate to="/store-owner/customers" replace />,
+      },
+    ],
+  },
+  {
+    path: '/tax-snapshots',
+    element: <StoreOwnerLayout />,
+    children: [
+      {
+        index: true,
+        element: <TaxSnapshotPage />,
       },
     ],
   },

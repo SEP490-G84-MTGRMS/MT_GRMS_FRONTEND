@@ -60,6 +60,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'Báo cáo Lãi / Lỗ & KPIs (FE-10)', to: '/store-owner/reports/pnl', badge: 'FE-10' },
       { label: 'Khách hàng & Công nợ (FE-08)', to: '/store-owner/customers', badge: 'FE-08' },
       { label: 'Chi phí vận hành (FE-07)', to: '/store-owner/expenses', badge: 'FE-07' },
+      { label: 'Kê khai thuế HKD (FE-19)', to: '/store-owner/tax-snapshots', badge: 'FE-19' },
     ],
   },
 ];
