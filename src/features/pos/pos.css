@@ -2031,10 +2031,10 @@
   flex-wrap: wrap;
   gap: 12px;
   background-color: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 16px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
   padding: 12px 18px;
-  box-shadow: var(--shadow-sm);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
 .filter-group-time {
@@ -2060,7 +2060,7 @@
   border: 1px solid #cbd5e1;
   background-color: #f8fafc;
   color: #475569;
-  border-radius: var(--radius-pill);
+  border-radius: 8px;
   font-size: 12px;
   cursor: pointer;
   transition: all 0.15s ease;
@@ -2077,7 +2077,7 @@
   height: 32px;
   padding: 0 10px;
   border: 1px solid #cbd5e1;
-  border-radius: var(--radius-pill);
+  border-radius: 8px;
   font-size: 12px;
   outline: none;
 }
@@ -2092,7 +2092,7 @@
   height: 34px;
   padding: 0 12px;
   border: 1px solid #cbd5e1;
-  border-radius: var(--radius-pill);
+  border-radius: 8px;
   font-size: 12.5px;
   outline: none;
   background-color: #ffffff;

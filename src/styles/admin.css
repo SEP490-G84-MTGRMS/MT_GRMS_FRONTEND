@@ -368,8 +368,8 @@
   height: 40px;
   padding: 0 16px 0 38px;
   background-color: var(--bg-soft-blue);
-  border: 1px solid var(--border-light);
-  border-radius: var(--radius-pill);
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
   font-family: var(--font-sans);
   font-size: 13px;
   color: var(--text-main);
@@ -380,7 +380,7 @@
 .admin-search-input:focus {
   background-color: #ffffff;
   border-color: var(--blue-primary);
-  box-shadow: 0 0 0 3px rgba(0, 102, 255, 0.12);
+  box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.15);
 }
 
 .admin-profile-pill {
@@ -457,15 +457,15 @@
 }
 
 .admin-btn-primary {
-  background-color: #0066ff;
+  background-color: var(--blue-primary, #0f766e);
   color: #ffffff;
-  border-color: #0066ff;
-  box-shadow: 0 1px 2px rgba(0, 102, 255, 0.2);
+  border-color: var(--blue-primary, #0f766e);
+  box-shadow: 0 1px 2px rgba(15, 118, 110, 0.2);
 }
 
 .admin-btn-primary:hover {
-  background-color: #0052cc;
-  border-color: #0052cc;
+  background-color: var(--blue-hover, #115e59);
+  border-color: var(--blue-hover, #115e59);
 }
 
 .admin-btn-secondary {
@@ -1017,11 +1017,11 @@
 /* Table Toolbar */
 .admin-toolbar-card {
   background: #ffffff;
-  border: 1px solid var(--border-light);
-  border-radius: var(--radius-xl);
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
   padding: 16px 20px;
   margin-bottom: 16px;
-  box-shadow: var(--shadow-sm);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -1039,12 +1039,12 @@
   align-items: center;
   gap: 6px;
   padding: 6px 16px;
-  border-radius: var(--radius-pill);
+  border-radius: 8px;
   font-size: 13px;
   font-weight: 600;
   color: var(--text-muted);
   background: var(--bg-soft-blue);
-  border: 1px solid var(--border-light);
+  border: 1px solid #cbd5e1;
   cursor: pointer;
   transition: all 0.15s ease;
   font-family: inherit;
@@ -1130,37 +1130,34 @@
 .admin-subdomain-tag {
   font-family: var(--font-mono);
   font-weight: 500;
-  color: #334155;
-  background: #f1f5f9;
-  border: 1px solid #e2e8f0;
-  padding: 2px 7px;
-  border-radius: 4px;
+  color: #374151;
+  background: transparent;
+  border: none;
+  padding: 0;
   display: inline-block;
-  font-size: 12px;
+  font-size: 12.5px;
 }
 
 /* Neutral Tags & Buttons in Tables */
 .admin-table-neutral-tag {
   display: inline-block;
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 500;
-  color: #334155;
-  background: #f1f5f9;
-  border: 1px solid #e2e8f0;
-  padding: 2px 8px;
-  border-radius: var(--radius-pill);
+  color: #374151;
+  background: transparent;
+  border: none;
+  padding: 0;
 }
 
 .admin-table-status-tag {
   display: inline-flex;
   align-items: center;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 500;
-  color: #475569;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  padding: 2px 8px;
-  border-radius: var(--radius-pill);
+  color: #374151;
+  background: transparent;
+  border: none;
+  padding: 0;
 }
 
 .admin-table-btn {
@@ -1190,15 +1187,15 @@
 }
 
 .admin-table-btn-primary {
-  background-color: #0066ff;
-  border-color: #0066ff;
+  background-color: var(--blue-primary, #0f766e);
+  border-color: var(--blue-primary, #0f766e);
   color: #ffffff;
   font-weight: 500;
 }
 
 .admin-table-btn-primary:hover {
-  background-color: #0052cc;
-  border-color: #0052cc;
+  background-color: var(--blue-hover, #115e59);
+  border-color: var(--blue-hover, #115e59);
   color: #ffffff;
 }
 
@@ -1207,38 +1204,38 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 2px 9px;
+  padding: 3px 10px;
   border-radius: var(--radius-pill);
   font-size: 11.5px;
   font-weight: 600;
   white-space: nowrap;
   background-color: #f1f5f9;
   color: #334155;
-  border: 1px solid #e2e8f0;
+  border: none;
 }
 
 .admin-badge-active {
   background-color: #f0fdf4;
   color: #166534;
-  border: 1px solid #dcfce7;
+  border: none;
 }
 
 .admin-badge-warning {
   background-color: #fefce8;
   color: #854d0e;
-  border: 1px solid #fef08a;
+  border: none;
 }
 
 .admin-badge-danger {
   background-color: #fef2f2;
   color: #991b1b;
-  border: 1px solid #fee2e2;
+  border: none;
 }
 
 .admin-badge-blue {
   background-color: #f1f5f9;
   color: #334155;
-  border: 1px solid #e2e8f0;
+  border: none;
 }
 
 /* Pagination Footer */
@@ -1271,14 +1268,14 @@
 
 .admin-page-btn:hover {
   background: #f8fafc;
-  color: #0066ff;
+  color: var(--blue-primary, #0f766e);
   border-color: #94a3b8;
 }
 
 .admin-page-btn.active {
-  background: #0066ff;
+  background: var(--blue-primary, #0f766e);
   color: #ffffff;
-  border-color: #0066ff;
+  border-color: var(--blue-primary, #0f766e);
 }
 
 /* Modal Dialogs */

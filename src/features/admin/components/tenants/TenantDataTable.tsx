@@ -56,24 +56,24 @@ export const TenantDataTable: FC<TenantDataTableProps> = ({
   const getStatusBadge = (tenant: Tenant) => {
     switch (tenant.status) {
       case 'active':
-        return <span className="admin-badge admin-badge-active">Hoạt động</span>;
+        return <span style={{ fontSize: 13, fontWeight: 500, color: '#16a34a' }}>Hoạt động</span>;
       case 'expiring':
-        return <span className="admin-badge admin-badge-warning">Sắp hết hạn</span>;
+        return <span style={{ fontSize: 13, fontWeight: 500, color: '#d97706' }}>Sắp hết hạn</span>;
       case 'grace':
         return (
-          <span className="admin-badge admin-badge-warning">
+          <span style={{ fontSize: 13, fontWeight: 500, color: '#d97706' }}>
             Ân hạn ({tenant.graceDaysRemaining ? 7 - tenant.graceDaysRemaining : 3}/7d)
           </span>
         );
       case 'locked':
         return (
-          <span className="admin-badge admin-badge-danger">
+          <span style={{ fontSize: 13, fontWeight: 500, color: '#dc2626' }}>
             Bị Khóa {tenant.lockType === 'hard' ? '(Hard-Lock)' : '(Soft-Lock)'}
           </span>
         );
       case 'pending':
         return (
-          <span className="admin-badge" style={{ background: '#f1f5f9', color: '#475569' }}>
+          <span style={{ fontSize: 13, fontWeight: 500, color: '#64748b' }}>
             Chờ kích hoạt
           </span>
         );
@@ -125,7 +125,7 @@ export const TenantDataTable: FC<TenantDataTableProps> = ({
                     className="admin-subdomain-tag"
                     style={
                       t.status === 'locked'
-                        ? { background: 'var(--red-light)', color: 'var(--red-accent)' }
+                        ? { color: '#dc2626' }
                         : {}
                     }
                   >

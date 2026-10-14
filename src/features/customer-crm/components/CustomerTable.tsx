@@ -1,5 +1,6 @@
+import { useState } from 'react';
 import type { FC } from 'react';
-import { Eye, Edit2, QrCode, AlertCircle, CheckCircle, ShieldAlert } from 'lucide-react';
+import { Eye, Edit2, QrCode, AlertCircle } from 'lucide-react';
 import { TablePagination } from '../../../components/common';
 import type { CustomerDto, MembershipTier } from '../types/customer.types';
 
@@ -28,25 +29,25 @@ const renderTierBadge = (tier: MembershipTier) => {
   switch (tier) {
     case 'VIP':
       return (
-        <span className="tier-badge tier-badge-vip">
-          👑 VIP
+        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--blue-primary, #0f766e)' }}>
+          VIP
         </span>
       );
     case 'Gold':
       return (
-        <span className="tier-badge tier-badge-gold">
-          ⭐ Gold
+        <span style={{ fontSize: 13, fontWeight: 500, color: '#d97706' }}>
+          Gold
         </span>
       );
     case 'Silver':
       return (
-        <span className="tier-badge tier-badge-silver">
-          🥈 Silver
+        <span style={{ fontSize: 13, fontWeight: 500, color: '#475569' }}>
+          Silver
         </span>
       );
     default:
       return (
-        <span className="tier-badge tier-badge-standard">
+        <span style={{ fontSize: 13, fontWeight: 400, color: '#64748b' }}>
           Standard
         </span>
       );
@@ -67,6 +68,22 @@ export const CustomerTable: FC<CustomerTableProps> = ({
   const displayedCustomers = onPageChange
     ? customers.slice((currentPage - 1) * pageSize, currentPage * pageSize)
     : customers;
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+
+  const toggleSelectAll = () => {
+    if (selectedIds.length === displayedCustomers.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(displayedCustomers.map((c) => c.id));
+    }
+  };
+
+  const toggleSelectOne = (id: string) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
+
   if (isLoading) {
     return (
       <div className="customer-table-container" style={{ padding: '48px', textAlign: 'center', color: '#64748b' }}>
@@ -109,14 +126,21 @@ export const CustomerTable: FC<CustomerTableProps> = ({
         <table className="customer-table">
           <thead>
             <tr>
+              <th style={{ width: 30, textAlign: 'center', padding: '10px 4px' }}>
+                <input
+                  type="checkbox"
+                  checked={displayedCustomers.length > 0 && selectedIds.length === displayedCustomers.length}
+                  onChange={toggleSelectAll}
+                />
+              </th>
               <th>Khách hàng</th>
               <th>Số điện thoại</th>
               <th>Hạng thẻ</th>
               <th style={{ textAlign: 'right' }}>Công nợ AR</th>
               <th style={{ textAlign: 'right' }}>Hạn mức nợ</th>
-              <th style={{ textAlign: 'center' }}>Tình trạng nợ</th>
+              <th style={{ textAlign: 'left' }}>Tình trạng nợ</th>
               <th style={{ textAlign: 'right' }}>Điểm thưởng</th>
-              <th style={{ textAlign: 'center' }}>Thao tác</th>
+              <th style={{ textAlign: 'right' }}>Thao tác</th>
             </tr>
           </thead>
           <tbody>
@@ -131,6 +155,18 @@ export const CustomerTable: FC<CustomerTableProps> = ({
                   key={c.id}
                   onClick={() => onSelect(c)}
                 >
+                  {/* Checkbox */}
+                  <td
+                    style={{ textAlign: 'center', padding: '10px 4px' }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.includes(c.id)}
+                      onChange={() => toggleSelectOne(c.id)}
+                    />
+                  </td>
+
                   {/* Họ tên */}
                   <td>
                     <div className="customer-name">
@@ -186,42 +222,18 @@ export const CustomerTable: FC<CustomerTableProps> = ({
                   </td>
 
                   {/* Trạng thái nợ */}
-                  <td style={{ textAlign: 'center' }}>
+                  <td style={{ textAlign: 'left' }}>
                     {isOverLimit ? (
-                      <span className="badge-over-limit">
-                        <ShieldAlert className="w-3.5 h-3.5" /> Quá hạn mức
+                      <span style={{ fontSize: 13, fontWeight: 600, color: '#dc2626' }}>
+                        Quá hạn mức
                       </span>
                     ) : hasDebt ? (
-                      <span
-                        style={{
-                          background: '#FEF3C7',
-                          color: '#B45309',
-                          borderRadius: '9999px',
-                          padding: '3px 10px',
-                          fontSize: '0.72rem',
-                          fontWeight: 600,
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                        }}
-                      >
+                      <span style={{ fontSize: 13, fontWeight: 500, color: '#d97706' }}>
                         Đang nợ ({debtPercent}%)
                       </span>
                     ) : (
-                      <span
-                        style={{
-                          background: '#ECFDF5',
-                          color: '#059669',
-                          borderRadius: '9999px',
-                          padding: '3px 10px',
-                          fontSize: '0.72rem',
-                          fontWeight: 600,
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                        }}
-                      >
-                        <CheckCircle className="w-3.5 h-3.5" /> Không nợ
+                      <span style={{ fontSize: 13, fontWeight: 500, color: '#16a34a' }}>
+                        Không nợ
                       </span>
                     )}
                   </td>
@@ -240,39 +252,43 @@ export const CustomerTable: FC<CustomerTableProps> = ({
 
                   {/* Thao tác */}
                   <td
-                    style={{ textAlign: 'center' }}
+                    style={{ textAlign: 'right' }}
                     onClick={(e) => e.stopPropagation()} // Prevent row click
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                    <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-end', gap: '6px' }}>
                       {/* Nút Thu nợ */}
                       {hasDebt && (
                         <button
+                          type="button"
                           onClick={() => onCollect(c)}
                           title="Lập phiếu thu nợ & Tạo VietQR"
-                          className="action-icon-btn collect-btn"
-                          style={{ width: 'auto', padding: '0 10px', height: '30px', fontSize: '0.75rem', gap: '4px' }}
+                          className="admin-table-btn admin-table-btn-primary"
                         >
-                          <QrCode className="w-3.5 h-3.5" />
+                          <QrCode size={12} />
                           <span>Thu nợ</span>
                         </button>
                       )}
 
-                      {/* Nút Xem Drawer */}
-                      <button
-                        onClick={() => onSelect(c)}
-                        title="Xem chi tiết hồ sơ"
-                        className="action-icon-btn"
-                      >
-                        <Eye className="w-4 h-4" />
-                      </button>
-
                       {/* Nút Sửa */}
                       <button
+                        type="button"
                         onClick={() => onEdit(c)}
                         title="Chỉnh sửa thông tin"
-                        className="action-icon-btn"
+                        className="admin-table-btn"
                       >
-                        <Edit2 className="w-4 h-4" />
+                        <Edit2 size={12} />
+                        <span>Sửa</span>
+                      </button>
+
+                      {/* Nút Xem Chi tiết */}
+                      <button
+                        type="button"
+                        onClick={() => onSelect(c)}
+                        title="Xem chi tiết hồ sơ"
+                        className="admin-table-btn"
+                      >
+                        <Eye size={12} />
+                        <span>Chi tiết</span>
                       </button>
                     </div>
                   </td>
