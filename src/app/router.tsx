@@ -79,6 +79,11 @@ import { SubscriptionPlanEditPage } from '../pages/admin/SubscriptionPlanEditPag
 import { TenantDetailPage } from '../pages/admin/TenantDetailPage';
 import { LoginPage, RegisterPage, ForgotPasswordPage } from '../pages/auth';
 
+// 11. Accounting & Finance Features (FE-10, FE-17, FE-19)
+import { ReportsPnlDashboardPage } from '../features/reports-pnl';
+import { CashbookPage } from '../features/cashbook';
+import { TaxSnapshotPage } from '../features/tax-snapshot';
+
 export const router = createBrowserRouter([
   {
     path: '/',
@@ -198,6 +203,26 @@ export const router = createBrowserRouter([
       {
         path: 'vouchers/*',
         element: <Navigate to="/store-owner/vouchers" replace />,
+      },
+      {
+        path: 'reports/pnl',
+        element: <Navigate to="/store-owner/reports/pnl" replace />,
+      },
+      {
+        path: 'cashbook',
+        element: <Navigate to="/store-owner/cashbook" replace />,
+      },
+      {
+        path: 'cashbook/*',
+        element: <Navigate to="/store-owner/cashbook" replace />,
+      },
+      {
+        path: 'tax-snapshots',
+        element: <Navigate to="/store-owner/tax-snapshots" replace />,
+      },
+      {
+        path: 'tax-snapshots/*',
+        element: <Navigate to="/store-owner/tax-snapshots" replace />,
       },
       {
         path: 'loyalty-config',
@@ -334,6 +359,18 @@ export const router = createBrowserRouter([
       {
         path: 'customers',
         element: <CustomerManagementPage />,
+      },
+      {
+        path: 'reports/pnl',
+        element: <ReportsPnlDashboardPage />,
+      },
+      {
+        path: 'cashbook',
+        element: <CashbookPage />,
+      },
+      {
+        path: 'tax-snapshots',
+        element: <TaxSnapshotPage />,
       },
       {
         path: 'employees',
@@ -487,6 +524,10 @@ export const router = createBrowserRouter([
         path: 'invoices',
         element: <InvoiceManagementPage />,
       },
+      {
+        path: 'cashbook',
+        element: <Navigate to="/store-owner/cashbook" replace />,
+      },
     ],
   },
 
@@ -587,7 +628,7 @@ export const router = createBrowserRouter([
     ],
   },
 
-  // Expenses
+  // Expenses (FE-07)
   {
     path: '/expenses',
     element: <StoreOwnerLayout />,
@@ -595,6 +636,30 @@ export const router = createBrowserRouter([
       {
         index: true,
         element: <ServiceExpensesPage />,
+      },
+    ],
+  },
+
+  // Tax Snapshots (FE-19)
+  {
+    path: '/tax-snapshots',
+    element: <StoreOwnerLayout />,
+    children: [
+      {
+        index: true,
+        element: <TaxSnapshotPage />,
+      },
+    ],
+  },
+
+  // Cashbook (FE-17)
+  {
+    path: '/cashbook',
+    element: <StoreOwnerLayout />,
+    children: [
+      {
+        index: true,
+        element: <CashbookPage />,
       },
     ],
   },

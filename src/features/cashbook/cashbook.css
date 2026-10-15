@@ -1,0 +1,615 @@
+/* ==========================================================================
+   FE-17 Sổ quỹ & Quản lý dòng tiền (Cashbook & Cash Flow)
+   MT-GRMS Design System: Deep Teal (#0F766E) | Card Radius 24px | Pill 9999px
+   100% Vanilla CSS Scoped
+   ========================================================================== */
+
+.cashbook-page-wrapper {
+  padding: 24px;
+  background-color: var(--bg-soft-blue, #f0fdfa);
+  min-height: calc(100vh - 64px);
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  font-family: var(--font-sans, 'Be Vietnam Pro', sans-serif);
+}
+
+/* ─── Header & Actions ─── */
+.cashbook-header-card {
+  background: var(--bg-card, #ffffff);
+  border-radius: var(--radius-lg, 24px);
+  padding: 24px 32px;
+  box-shadow: var(--shadow-sm, 0 2px 8px rgba(15, 118, 110, 0.04));
+  border: 1px solid var(--border-light, #edf2f9);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.cashbook-header-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cashbook-title {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text-main, #111827);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.cashbook-title-badge {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill, 9999px);
+  background-color: var(--blue-subtle, #ccfbf1);
+  color: var(--blue-primary, #0f766e);
+  border: 1px solid var(--blue-border, #99f6e4);
+}
+
+.cashbook-subtitle {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-muted, #4b5563);
+}
+
+.cashbook-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* ─── Buttons Standard MT-GRMS ─── */
+.cb-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border-radius: var(--radius-pill, 9999px);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+  border: 1px solid transparent;
+  outline: none;
+  font-family: inherit;
+}
+
+.cb-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.cb-btn-primary {
+  background-color: var(--blue-primary, #0f766e);
+  color: #ffffff;
+}
+
+.cb-btn-primary:hover:not(:disabled) {
+  background-color: var(--blue-hover, #115e59);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(15, 118, 110, 0.25);
+}
+
+.cb-btn-receipt {
+  background-color: var(--green-money, #00c853);
+  color: #ffffff;
+}
+
+.cb-btn-receipt:hover:not(:disabled) {
+  background-color: #00b34a;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 200, 83, 0.25);
+}
+
+.cb-btn-payment {
+  background-color: var(--red-accent, #ff3b30);
+  color: #ffffff;
+}
+
+.cb-btn-payment:hover:not(:disabled) {
+  background-color: #e03228;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(255, 59, 48, 0.25);
+}
+
+.cb-btn-outline {
+  background-color: #ffffff;
+  color: var(--blue-primary, #0f766e);
+  border-color: var(--blue-border, #99f6e4);
+}
+
+.cb-btn-outline:hover:not(:disabled) {
+  background-color: var(--blue-light, #f0fdfa);
+  border-color: var(--blue-primary, #0f766e);
+}
+
+/* ─── Cash Accounts Card Section ─── */
+.cash-accounts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 20px;
+}
+
+.cash-account-card {
+  background: var(--bg-card, #ffffff);
+  border-radius: var(--radius-lg, 24px);
+  padding: 20px 24px;
+  box-shadow: var(--shadow-sm, 0 2px 8px rgba(15, 118, 110, 0.04));
+  border: 1px solid var(--border-light, #edf2f9);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.cash-account-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-card, 0 10px 30px rgba(15, 118, 110, 0.08));
+  border-color: var(--blue-border, #99f6e4);
+}
+
+.cash-account-card.active-selected {
+  border: 2px solid var(--blue-primary, #0f766e);
+  background: #ffffff;
+}
+
+.account-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.account-type-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: var(--radius-pill, 9999px);
+}
+
+.account-type-badge.cash {
+  background-color: var(--orange-light, #fff8eb);
+  color: var(--orange-accent, #ff9500);
+  border: 1px solid var(--orange-border, #ffe8cc);
+}
+
+.account-type-badge.bank {
+  background-color: var(--blue-subtle, #ccfbf1);
+  color: var(--blue-primary, #0f766e);
+  border: 1px solid var(--blue-border, #99f6e4);
+}
+
+.account-branch-name {
+  font-size: 12px;
+  color: var(--text-faint, #9ca3af);
+  font-weight: 500;
+}
+
+.account-card-name {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-main, #111827);
+  margin: 0;
+}
+
+.account-card-detail {
+  font-size: 13px;
+  color: var(--text-muted, #4b5563);
+  font-family: var(--font-mono, monospace);
+  margin: 0;
+}
+
+.account-card-balance-block {
+  margin-top: 8px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--border-light, #edf2f9);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.account-balance-label {
+  font-size: 12px;
+  color: var(--text-muted, #4b5563);
+}
+
+.account-balance-amount {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--blue-primary, #0f766e);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ─── KPI Summary Strip ─── */
+.cashbook-kpi-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.kpi-stat-card {
+  background: #ffffff;
+  border-radius: var(--radius-lg, 24px);
+  padding: 16px 20px;
+  border: 1px solid var(--border-light, #edf2f9);
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.kpi-stat-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted, #4b5563);
+}
+
+.kpi-stat-val {
+  font-size: 20px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.kpi-stat-val.green {
+  color: var(--green-money, #00c853);
+}
+
+.kpi-stat-val.red {
+  color: var(--red-accent, #ff3b30);
+}
+
+.kpi-stat-val.blue {
+  color: var(--blue-primary, #0f766e);
+}
+
+/* ─── Filter Toolbar ─── */
+.cashbook-toolbar-card {
+  background: var(--bg-card, #ffffff);
+  border-radius: var(--radius-lg, 24px);
+  padding: 16px 24px;
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border-light, #edf2f9);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.toolbar-filter-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.toolbar-pills-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.pill-filter-btn {
+  padding: 6px 16px;
+  border-radius: var(--radius-pill, 9999px);
+  font-size: 13px;
+  font-weight: 600;
+  border: 1px solid var(--border-subtle, #e5edf8);
+  background-color: #ffffff;
+  color: var(--text-muted, #4b5563);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.pill-filter-btn:hover {
+  border-color: var(--blue-border, #99f6e4);
+  color: var(--blue-primary, #0f766e);
+}
+
+.pill-filter-btn.active {
+  background-color: var(--blue-primary, #0f766e);
+  color: #ffffff;
+  border-color: var(--blue-primary, #0f766e);
+}
+
+.toolbar-search-input {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background-color: var(--bg-soft-blue, #f0fdfa);
+  border: 1px solid var(--blue-border, #99f6e4);
+  border-radius: var(--radius-pill, 9999px);
+  padding: 8px 16px;
+  min-width: 280px;
+}
+
+.toolbar-search-input input {
+  border: none;
+  background: transparent;
+  outline: none;
+  width: 100%;
+  font-size: 13px;
+  color: var(--text-main, #111827);
+  font-family: inherit;
+}
+
+/* ─── Ledger Table ─── */
+.cashbook-table-container {
+  background: #ffffff;
+  border-radius: var(--radius-lg, 24px);
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border-light, #edf2f9);
+  overflow: hidden;
+}
+
+.cashbook-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 14px;
+}
+
+.cashbook-table th {
+  background-color: var(--blue-light, #f0fdfa);
+  color: var(--blue-dark, #134e4a);
+  font-weight: 700;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--blue-border, #99f6e4);
+  white-space: nowrap;
+}
+
+.cashbook-table td {
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border-light, #edf2f9);
+  vertical-align: middle;
+  color: var(--text-main, #111827);
+}
+
+.cashbook-table tr:hover td {
+  background-color: rgba(240, 253, 250, 0.5);
+}
+
+.tx-code-cell {
+  font-weight: 700;
+  color: var(--blue-primary, #0f766e);
+  font-family: var(--font-mono, monospace);
+  font-size: 13px;
+}
+
+.tx-type-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill, 9999px);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.tx-type-badge.receipt {
+  background-color: var(--green-light, #e8f9ee);
+  color: var(--green-money, #00c853);
+  border: 1px solid var(--green-border, #bbf7d0);
+}
+
+.tx-type-badge.payment {
+  background-color: var(--red-light, #fff0f0);
+  color: var(--red-accent, #ff3b30);
+  border: 1px solid var(--red-border, #ffd6d6);
+}
+
+.tx-type-badge.adjustment {
+  background-color: var(--orange-light, #fff8eb);
+  color: var(--orange-accent, #ff9500);
+  border: 1px solid var(--orange-border, #ffe8cc);
+}
+
+.amount-num {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  display: block;
+}
+
+.amount-num.receipt {
+  color: var(--green-money, #00c853);
+}
+
+.amount-num.payment {
+  color: var(--red-accent, #ff3b30);
+}
+
+.amount-num.balance {
+  color: var(--blue-primary, #0f766e);
+  font-weight: 800;
+}
+
+.automated-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill, 9999px);
+  background-color: #f3f4f6;
+  color: #6b7280;
+  border: 1px solid #e5e7eb;
+}
+
+/* ─── Modal Architecture ─── */
+.cb-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(17, 24, 39, 0.5);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1050;
+  padding: 20px;
+}
+
+.cb-modal-container {
+  background: #ffffff;
+  border-radius: var(--radius-lg, 24px);
+  width: 100%;
+  max-width: 540px;
+  box-shadow: var(--shadow-floating, 0 18px 48px rgba(15, 118, 110, 0.15));
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  animation: modalScaleUp 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes modalScaleUp {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.cb-modal-header {
+  padding: 20px 28px;
+  border-bottom: 1px solid var(--border-light, #edf2f9);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.cb-modal-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-main, #111827);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.cb-modal-close-btn {
+  background: transparent;
+  border: none;
+  font-size: 20px;
+  color: var(--text-faint, #9ca3af);
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 8px;
+}
+
+.cb-modal-close-btn:hover {
+  background-color: #f3f4f6;
+  color: var(--text-main);
+}
+
+.cb-modal-body {
+  padding: 24px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-height: 75vh;
+  overflow-y: auto;
+}
+
+.cb-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cb-form-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-main, #111827);
+}
+
+.cb-form-input,
+.cb-form-select,
+.cb-form-textarea {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid var(--border-subtle, #e5edf8);
+  border-radius: var(--radius-sm, 12px);
+  font-size: 14px;
+  font-family: inherit;
+  color: var(--text-main, #111827);
+  outline: none;
+  transition: border-color 0.2s;
+  box-sizing: border-box;
+}
+
+.cb-form-input:focus,
+.cb-form-select:focus,
+.cb-form-textarea:focus {
+  border-color: var(--blue-primary, #0f766e);
+  box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.12);
+}
+
+.cb-overdraft-alert {
+  background-color: var(--red-light, #fff0f0);
+  border: 1px solid var(--red-border, #ffd6d6);
+  border-radius: var(--radius-sm, 12px);
+  padding: 12px 16px;
+  color: var(--red-accent, #ff3b30);
+  font-size: 13px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cb-reconciliation-diff-box {
+  background-color: var(--blue-light, #f0fdfa);
+  border: 1px solid var(--blue-border, #99f6e4);
+  border-radius: var(--radius-sm, 12px);
+  padding: 14px 18px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.cb-modal-footer {
+  padding: 18px 28px;
+  border-top: 1px solid var(--border-light, #edf2f9);
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  background-color: #fafbfc;
+}
+
+/* ─── Print A4 Layout ─── */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .printable-a4-sheet,
+  .printable-a4-sheet * {
+    visibility: visible;
+  }
+  .printable-a4-sheet {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    padding: 20mm;
+    background: #ffffff;
+    font-size: 12pt;
+    color: #000000;
+  }
+}

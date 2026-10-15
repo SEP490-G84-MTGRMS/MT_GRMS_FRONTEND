@@ -1,19 +1,17 @@
-import { useState, useRef } from "react";
-import type { FC } from "react";
-import { Users } from "lucide-react";
-import { AdminToast, type ToastState } from "../../admin/components";
-import { useCustomerCrm } from "../hooks/useCustomerCrm";
-import { CustomerKpiCards } from "../components/CustomerKpiCards";
-import { CustomerFilterBar } from "../components/CustomerFilterBar";
-import { CustomerTable } from "../components/CustomerTable";
-import { CustomerDrawerDetail } from "../components/CustomerDrawerDetail";
-import { CustomerFormModal } from "../components/CustomerFormModal";
-import { DebtCollectionModal } from "../components/DebtCollectionModal";
-import type {
-  CreateCustomerInput,
-  UpdateCustomerInput,
-} from "../types/customer.types";
-import "../customer-crm.css";
+import { useState, useRef } from 'react';
+import type { FC } from 'react';
+import { Users } from 'lucide-react';
+import { AdminToast, type ToastState } from '../../admin/components';
+import { useCustomerCrm } from '../hooks/useCustomerCrm';
+import { CustomerKpiCards } from '../components/CustomerKpiCards';
+import { CustomerFilterBar } from '../components/CustomerFilterBar';
+import { CustomerTable } from '../components/CustomerTable';
+import { CustomerDrawerDetail } from '../components/CustomerDrawerDetail';
+import { CustomerFormModal } from '../components/CustomerFormModal';
+import { DebtCollectionModal } from '../components/DebtCollectionModal';
+import { CustomerDebtLedgerDrawer } from '../components/CustomerDebtLedgerDrawer';
+import type { CreateCustomerInput, UpdateCustomerInput } from '../types/customer.types';
+import '../customer-crm.css';
 
 export const CustomerManagementPage: FC = () => {
   const {
@@ -53,6 +51,7 @@ export const CustomerManagementPage: FC = () => {
     collectDebtMutation,
   } = useCustomerCrm();
 
+  const [ledgerCustomer, setLedgerCustomer] = useState<any>(null);
   const [toast, setToast] = useState<ToastState | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -148,6 +147,7 @@ export const CustomerManagementPage: FC = () => {
         onSelect={handleSelectCustomer}
         onEdit={handleOpenEditModal}
         onCollect={handleOpenCollectModal}
+        onViewLedger={(c) => setLedgerCustomer(c)}
         currentPage={currentPage}
         pageSize={pageSize}
         onPageChange={setCurrentPage}
@@ -160,6 +160,7 @@ export const CustomerManagementPage: FC = () => {
         onClose={handleCloseDrawer}
         onOpenEdit={handleOpenEditModal}
         onOpenCollect={handleOpenCollectModal}
+        onViewLedger={(c) => setLedgerCustomer(c)}
       />
 
       {/* 5. Create / Edit Modal */}
@@ -178,6 +179,14 @@ export const CustomerManagementPage: FC = () => {
         customer={collectingCustomer}
         onConfirm={handleCollectDebtConfirm}
         isSubmitting={collectDebtMutation.isPending}
+      />
+
+      {/* 7. Customer Debt Ledger Drawer */}
+      <CustomerDebtLedgerDrawer
+        isOpen={Boolean(ledgerCustomer)}
+        customer={ledgerCustomer}
+        onClose={() => setLedgerCustomer(null)}
+        onOpenCollect={handleOpenCollectModal}
       />
     </div>
   );

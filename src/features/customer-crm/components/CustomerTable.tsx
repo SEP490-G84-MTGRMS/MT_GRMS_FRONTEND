@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { FC } from 'react';
-import { Eye, Edit2, QrCode, AlertCircle } from 'lucide-react';
+import { Eye, Edit2, History, QrCode, AlertCircle } from 'lucide-react';
 import { TablePagination } from '../../../components/common';
 import type { CustomerDto, MembershipTier } from '../types/customer.types';
 
@@ -10,6 +10,7 @@ export interface CustomerTableProps {
   onSelect: (customer: CustomerDto) => void;
   onEdit: (customer: CustomerDto) => void;
   onCollect: (customer: CustomerDto) => void;
+  onViewLedger?: (customer: CustomerDto) => void;
   currentPage?: number;
   pageSize?: number;
   onPageChange?: (page: number) => void;
@@ -60,6 +61,7 @@ export const CustomerTable: FC<CustomerTableProps> = ({
   onSelect,
   onEdit,
   onCollect,
+  onViewLedger,
   currentPage = 1,
   pageSize = 10,
   onPageChange,
@@ -269,6 +271,26 @@ export const CustomerTable: FC<CustomerTableProps> = ({
                         </button>
                       )}
 
+{/* Nút Xem Sổ Biến Động Công Nợ */}
+                      {onViewLedger && (
+                        <button
+                          onClick={() => onViewLedger(c)}
+                          title="Xem sổ biến động công nợ"
+                          className="action-icon-btn"
+                          style={{ color: '#0F766E' }}
+                        >
+                          <History className="w-4 h-4" />
+                        </button>
+                      )}
+
+                      {/* Nút Xem Drawer */}
+                      <button
+                        onClick={() => onSelect(c)}
+                        title="Xem chi tiết hồ sơ"
+                        className="action-icon-btn"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </button>
                       {/* Nút Sửa */}
                       <button
                         type="button"

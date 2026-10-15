@@ -1,3 +1,5 @@
+import { EXPENSE_CATEGORY_LABELS } from '../types/expense.types';
+import { cashbookService } from '../../cashbook/services/cashbookService';
 import { httpClient } from '../../../api/httpClient';
 import type { ApiResponse, PagedResult } from '../../../api/types';
 import type {
@@ -239,6 +241,9 @@ export const createServiceExpense = async (
     vendorName: data.vendorName,
     cashBookId: null,
     attachedBillUrl: data.attachedBillUrl || null,
+      isRecurring: data.isRecurring || false,
+      recurringCycle: data.recurringCycle || undefined,
+      recurringDayOfMonth: data.recurringDayOfMonth || undefined,
     note: data.note || null,
     createdAt: new Date().toISOString(),
   };
@@ -270,12 +275,43 @@ export const payServiceExpense = async (
   const itemIndex = mockExpenses.findIndex((e) => e.expenseId === expenseId);
   if (itemIndex === -1) throw new Error('Khoản chi phí không tồn tại');
 
+  let generatedCashBookCode: string | null = null;
+  const currentItem = mockExpenses[itemIndex];
+
+  if (data.createCashBookEntry !== false) {
+    try {
+      const accounts = await cashbookService.getCashAccounts();
+      let accountId = data.paidFromAccountId;
+      if (!accountId) {
+        const fallback = accounts.find((a) => (data.paymentMethod === 'Cash' ? a.accountType === 'CASH' : a.accountType === 'BANK'));
+        accountId = fallback ? fallback.id : accounts[0]?.id;
+      }
+
+      if (accountId) {
+        const catLabel = EXPENSE_CATEGORY_LABELS[currentItem.category] || currentItem.category;
+        const tx = await cashbookService.createPayment({
+          accountId,
+          amount: currentItem.amount,
+          category: catLabel,
+          counterpartyType: 'SUPPLIER',
+          counterpartyName: currentItem.vendorName,
+          description: `Thanh toán chi phí ${catLabel} (${currentItem.expenseId}) cho ${currentItem.vendorName}`,
+          referenceDocId: currentItem.expenseId,
+          referenceDocType: 'SERVICE_EXPENSE',
+          sourceModuleName: 'SERVICE_OPEX',
+          isAutomated: true,
+        });
+        generatedCashBookCode = tx.transactionCode;
+      }
+    } catch (cbErr) {
+      console.warn('Failed to auto-journal into cashbook:', cbErr);
+    }
+  }
+
   const updated: ServiceExpenseDto = {
-    ...mockExpenses[itemIndex],
+    ...currentItem,
     status: 'Paid',
-    cashBookId: data.createCashBookEntry
-      ? `CB-2026-10-${Math.floor(1000 + Math.random() * 9000)}`
-      : null,
+    cashBookId: generatedCashBookCode || (data.createCashBookEntry ? `CB-2026-10-${Math.floor(1000 + Math.random() * 9000)}` : null),
   };
   mockExpenses[itemIndex] = updated;
   return updated;

@@ -1,3 +1,6 @@
+import { cashbookService } from '../../cashbook/services/cashbookService';
+import type { CashAccount } from '../../cashbook/types/cashbook.types';
+import type { CustomerDebtLedgerDto } from '../types/customer.types';
 ﻿import type {
   CustomerDto,
   CreateCustomerInput,
@@ -10,6 +13,26 @@
 import { INITIAL_MOCK_CUSTOMERS } from './mockCustomers';
 
 const STORAGE_KEY = 'MT_GRMS_CUSTOMERS_CACHE';
+const DEBT_LEDGER_STORAGE_KEY = 'MT_GRMS_DEBT_LEDGERS_CACHE';
+
+function getStoredDebtLedgers(): CustomerDebtLedgerDto[] {
+  try {
+    const raw = localStorage.getItem(DEBT_LEDGER_STORAGE_KEY);
+    if (!raw) return [];
+    return JSON.parse(raw) as CustomerDebtLedgerDto[];
+  } catch {
+    return [];
+  }
+}
+
+function saveStoredDebtLedgers(ledgers: CustomerDebtLedgerDto[]): void {
+  try {
+    localStorage.setItem(DEBT_LEDGER_STORAGE_KEY, JSON.stringify(ledgers));
+  } catch (e) {
+    console.error('Failed to save debt ledgers:', e);
+  }
+}
+
 
 /**
  * Get current customers from local storage cache or fallback to initial dataset
@@ -159,7 +182,7 @@ export const customerApi = {
   /**
    * Execute debt collection receipt
    */
-  async collectDebt(input: CollectDebtInput): Promise<CustomerDto> {
+    async collectDebt(input: CollectDebtInput): Promise<CustomerDto> {
     await new Promise((resolve) => setTimeout(resolve, 250));
     const list = getStoredCustomers();
     const index = list.findIndex((c) => c.id === input.customerId);
@@ -190,10 +213,57 @@ export const customerApi = {
       payments: [newPayment, ...(current.payments || [])],
     };
 
+    // Auto-sync to Cashbook (FE-17)
+    let receiptCode = `REC-${Date.now().toString().slice(-4)}`;
+    try {
+      const accounts = await cashbookService.getCashAccounts();
+      const targetAcc = input.targetAccountId
+        ? accounts.find((a: CashAccount) => a.id === input.targetAccountId)
+        : accounts.find((a: CashAccount) => (input.method === 'Cash' ? a.accountType === 'CASH' : a.accountType === 'BANK'));
+      const accountId = targetAcc ? targetAcc.id : accounts[0]?.id;
+
+      if (accountId) {
+        const receipt = await cashbookService.createReceipt({
+          accountId,
+          amount: input.amount,
+          category: 'Thu nợ khách hàng',
+          counterpartyType: 'CUSTOMER',
+          counterpartyName: current.fullName,
+          description: `Thu tiền nợ khách hàng ${current.fullName} (${current.phoneNumber}) qua ${input.method === 'VietQR' ? 'VietQR' : 'Tiền mặt'}. ${input.note || ''}`.trim(),
+          referenceDocType: 'DEBT_PAYMENT',
+          referenceDocId: newPayment.id,
+          sourceModuleName: 'CRM_DEBT',
+          isAutomated: true,
+        });
+        receiptCode = receipt.transactionCode;
+      }
+    } catch (cbErr) {
+      console.error('Failed to auto-sync debt payment to cashbook:', cbErr);
+    }
+
+    // Save to Customer Debt Ledger
+    const newLedgerEntry: CustomerDebtLedgerDto = {
+      id: `DL-${Date.now()}`,
+      customerId: current.id,
+      transactionType: 'DEBT_DECREASE',
+      amount: input.amount,
+      balanceAfter: updatedCustomer.currentDebtAR,
+      referenceDocId: newPayment.id,
+      paymentMethod: input.method,
+      cashTransactionCode: receiptCode,
+      note: input.note || `Thu nợ qua ${input.method === 'VietQR' ? 'VietQR' : 'Tiền mặt'}`,
+      createdAt: new Date().toISOString(),
+    };
+    const currentLedgers = getStoredDebtLedgers();
+    currentLedgers.unshift(newLedgerEntry);
+    saveStoredDebtLedgers(currentLedgers);
+
     list[index] = updatedCustomer;
     saveStoredCustomers(list);
     return updatedCustomer;
   },
+
+
 
   /**
    * Calculate KPI totals for the customer CRM summary
@@ -217,6 +287,37 @@ export const customerApi = {
   /**
    * Generate VietQR configuration payload
    */
+  /**
+   * Get detailed debt audit history for a customer
+   */
+  async getCustomerDebtLedger(customerId: string): Promise<CustomerDebtLedgerDto[]> {
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    const all = getStoredDebtLedgers();
+    const customerLedgers = all.filter((l) => l.customerId === customerId);
+
+    // If empty, generate realistic initial mock timeline for demonstration
+    if (customerLedgers.length === 0) {
+      const cust = (getStoredCustomers()).find((c) => c.id === customerId);
+      const currentDebt = cust ? cust.currentDebtAR : 0;
+      if (currentDebt > 0) {
+        return [
+          {
+            id: `DL-INIT-1`,
+            customerId,
+            transactionType: 'DEBT_INCREASE',
+            amount: currentDebt,
+            balanceAfter: currentDebt,
+            referenceDocId: 'HD-20261002-0042',
+            note: 'Đơn hàng mua nợ ghi sổ tại quầy POS',
+            createdAt: '2026-10-02T10:30:00Z',
+          },
+        ];
+      }
+    }
+
+    return customerLedgers;
+  },
+
   generateVietQr(customer: CustomerDto, amount: number): VietQrConfig {
     const bankId = '970422'; // MB Bank Napas Bin
     const bankName = 'MB Bank (Ngân hàng Quân Đội)';

@@ -161,9 +161,29 @@ export const ExpenseTable: FC<ExpenseTableProps> = ({
                   </div>
                 </td>
                 <td>
-                  <span style={{ fontWeight: 600, color: '#334155' }}>
-                    {EXPENSE_CATEGORY_LABELS[item.category] || item.category}
-                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                    <span style={{ fontWeight: 600, color: '#334155' }}>
+                      {EXPENSE_CATEGORY_LABELS[item.category] || item.category}
+                    </span>
+                    {item.isRecurring && (
+                      <span
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '3px',
+                          padding: '2px 6px',
+                          borderRadius: '9999px',
+                          background: '#EEF2FF',
+                          color: '#4F46E5',
+                          fontSize: '0.68rem',
+                          fontWeight: 700,
+                        }}
+                        title={'Chi phí lặp lại định kỳ hàng tháng (ngày ' + (item.recurringDayOfMonth || 1) + ')'}
+                      >
+                        🔁 Định kỳ
+                      </span>
+                    )}
+                  </div>
                 </td>
                 <td style={{ color: '#475569' }}>
                   {item.branchName || item.branchId}

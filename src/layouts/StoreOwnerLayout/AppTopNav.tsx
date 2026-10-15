@@ -1,6 +1,6 @@
-import { useState, useRef, useEffect, useCallback } from "react";
-import type { FC } from "react";
-import { NavLink, Link, useLocation } from "react-router-dom";
+import { useState, useRef, useEffect, useCallback } from 'react';
+import type { FC } from 'react';
+import { NavLink, Link, useLocation } from 'react-router-dom';
 import {
   DashboardIcon,
   TruckIcon,
@@ -196,20 +196,15 @@ const NAV_GROUPS: NavGroup[] = [
         title: "Chi phí & Vận hành",
         items: [
           {
-            label: "Chi phí vận hành",
+            label: "Chi phí vận hành (FE-07)",
             to: "/store-owner/expenses",
-            badge: "Mới",
+            badge: "FE-07",
             badgeType: "red",
           },
           {
-            label: "Sổ quỹ tiền mặt & Bank",
-            to: "/store-owner/expenses?view=cashbook",
-          },
-          {
-            label: "Tạo phiếu chi dịch vụ",
-            to: "/store-owner/expenses?view=create",
-            badge: "Mới",
-            badgeType: "red",
+            label: "Sổ quỹ & Dòng tiền (FE-17)",
+            to: "/store-owner/cashbook",
+            badge: "FE-17",
           },
         ],
       },
@@ -217,28 +212,30 @@ const NAV_GROUPS: NavGroup[] = [
         title: "Khách hàng & Công nợ",
         items: [
           {
-            label: "Khách hàng & Sổ nợ",
+            label: "Khách hàng & Sổ nợ (FE-08)",
             to: "/store-owner/customers",
-            badge: "",
+            badge: "FE-08",
             badgeType: "blue",
           },
           {
             label: "Công nợ nhà cung cấp",
             to: "/store-owner/suppliers?view=debt",
           },
-          {
-            label: "Theo dõi trả góp / gối đầu",
-            to: "/store-owner/expenses?view=installments",
-          },
         ],
       },
       {
-        title: "Báo cáo tài chính",
+        title: "Báo cáo tài chính & Thuế",
         items: [
           { label: "Báo cáo kết quả kinh doanh", to: "/store-owner/dashboard" },
           {
-            label: "Dòng tiền kinh doanh",
-            to: "/store-owner/expenses?view=cashflow",
+            label: "Báo cáo Lãi / Lỗ & KPIs (FE-10)",
+            to: "/store-owner/reports/pnl",
+            badge: "FE-10",
+          },
+          {
+            label: "Kê khai thuế HKD (FE-19)",
+            to: "/store-owner/tax-snapshots",
+            badge: "FE-19",
           },
         ],
       },
