@@ -22,14 +22,14 @@ export const Navbar: FC<NavbarProps> = ({ onOpenTrial }) => {
               />
               <path
                 d="M20 10C20 10 28 17.5 28 22C28 25.866 24.866 29 21 29C17.134 29 14 25.866 14 22C14 17.5 20 10 20 10Z"
-                fill="#00C2FF"
+                fill="#14B8A6"
                 fillOpacity="0.9"
               />
               <circle cx="14" cy="22" r="3.5" fill="#FFFFFF" />
               <defs>
                 <linearGradient id="brandBlueGrad" x1="4" y1="2" x2="24" y2="31" gradientUnits="userSpaceOnUse">
-                  <stop stopColor="#0066FF" />
-                  <stop offset="1" stopColor="#0047BA" />
+                  <stop stopColor="#0F766E" />
+                  <stop offset="1" stopColor="#134E4A" />
                 </linearGradient>
               </defs>
             </svg>
