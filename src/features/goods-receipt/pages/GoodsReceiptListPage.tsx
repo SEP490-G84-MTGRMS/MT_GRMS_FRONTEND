@@ -1,12 +1,13 @@
 import { useState, useMemo } from 'react';
 import type { FC } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   PackageCheck,
   Plus,
   FilePlus,
   ShieldCheck,
   UserCheck,
+  Layers,
 } from 'lucide-react';
 import type {
   GoodsReceiptListItem,
@@ -15,7 +16,6 @@ import type {
   UserRole,
 } from '../types/grn.types';
 import { MOCK_GOODS_RECEIPTS } from '../lib/mockGrnData';
-import { GrnQuickTabs } from '../components/GrnQuickTabs';
 import { GrnFilterBar } from '../components/GrnFilterBar';
 import { GrnTable } from '../components/GrnTable';
 import { GrnDetailDrawer } from '../components/GrnDetailDrawer';
@@ -37,6 +37,7 @@ const DEFAULT_FILTERS: GrnFilterState = {
 export const GoodsReceiptListPage: FC<{ defaultRole?: UserRole }> = ({
   defaultRole = 'store_owner',
 }) => {
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
   // Role management (Store Owner vs Employee)
@@ -44,7 +45,7 @@ export const GoodsReceiptListPage: FC<{ defaultRole?: UserRole }> = ({
   const [role, setRole] = useState<UserRole>(roleParam || defaultRole);
   const employeeBranchId = searchParams.get('branch') || 'BR-01';
 
-  // State
+  // Master State
   const [receipts, setReceipts] = useState<GoodsReceiptListItem[]>(MOCK_GOODS_RECEIPTS);
   const [activeTab, setActiveTab] = useState<GrnFilterTab>('ALL');
   const [filterInputs, setFilterInputs] = useState<GrnFilterState>(DEFAULT_FILTERS);
@@ -102,8 +103,8 @@ export const GoodsReceiptListPage: FC<{ defaultRole?: UserRole }> = ({
     };
   }, [roleScopedReceipts]);
 
-  // Filter handlers
-  const handleFilterInputChange = <K extends keyof GrnFilterState>(
+  // Filter input change
+  const handleFilterChange = <K extends keyof GrnFilterState>(
     key: K,
     value: GrnFilterState[K]
   ) => {
@@ -113,7 +114,6 @@ export const GoodsReceiptListPage: FC<{ defaultRole?: UserRole }> = ({
   const handleSearch = () => {
     setAppliedFilters({ ...filterInputs });
     setPageIndex(1);
-    showToast('Đã áp dụng bộ lọc tìm kiếm', 'info');
   };
 
   const handleReset = () => {
@@ -126,7 +126,6 @@ export const GoodsReceiptListPage: FC<{ defaultRole?: UserRole }> = ({
     setAppliedFilters(resetState);
     setActiveTab('ALL');
     setPageIndex(1);
-    showToast('Đã đặt lại bộ lọc về mặc định', 'info');
   };
 
   const handleTabChange = (tab: GrnFilterTab) => {
@@ -233,11 +232,11 @@ export const GoodsReceiptListPage: FC<{ defaultRole?: UserRole }> = ({
   };
 
   return (
-    <div className="po-matrix-container" style={{ padding: '16px 20px', minHeight: '100vh' }}>
+    <div className="po-matrix-container" style={{ width: '100%' }}>
       {/* Toast Notification */}
       <AdminToast toast={toast} onClose={() => setToast(null)} />
 
-      {/* ── 1. Page Header with Title, Role Switcher and Actions ── */}
+      {/* ── Page Header with Title, Role Switcher and Actions ── */}
       <div
         style={{
           display: 'flex',
@@ -245,66 +244,35 @@ export const GoodsReceiptListPage: FC<{ defaultRole?: UserRole }> = ({
           justifyContent: 'space-between',
           flexWrap: 'wrap',
           gap: 12,
-          marginBottom: 12,
+          marginBottom: 10,
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div
+        <div>
+          <h1
             style={{
-              width: 40,
-              height: 40,
-              borderRadius: 8,
-              backgroundColor: '#e6f7ff',
-              color: 'var(--blue-primary, #0066cc)',
+              fontSize: 20,
+              fontWeight: 800,
+              color: 'var(--text-main)',
+              margin: 0,
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center',
+              gap: 8,
             }}
           >
-            <PackageCheck size={24} />
-          </div>
-
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <h1
-                style={{
-                  fontSize: 20,
-                  fontWeight: 800,
-                  color: 'var(--text-main, #1e293b)',
-                  margin: 0,
-                  letterSpacing: -0.2,
-                }}
-              >
-                Danh sách phiếu nhập kho GRN & Lịch nhận hàng
-              </h1>
-              <span
-                style={{
-                  fontSize: 11,
-                  padding: '2px 8px',
-                  borderRadius: 4,
-                  backgroundColor: '#f1f5f9',
-                  color: '#475569',
-                  fontWeight: 600,
-                }}
-              >
-                UI-05-03
-              </span>
-            </div>
-            <div style={{ fontSize: 12, color: 'var(--text-muted, #64748b)', marginTop: 2 }}>
-              Quản lý lịch giao nhận hàng hóa từ nhà cung cấp, kiểm soát số lượng theo PO và ghi nhận lô hạn FEFO
-            </div>
-          </div>
+            <PackageCheck size={22} color="var(--blue-primary, #0f766e)" />
+            <span>Danh sách phiếu nhập kho (GRN) & Lịch nhận hàng</span>
+          </h1>
         </div>
 
-        {/* Right side: Role Switcher & New Actions */}
+        {/* Right side: Role Switcher & Action Buttons */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-          {/* Role Switcher Toggle */}
+          {/* Role Switcher Pill */}
           <div
             style={{
               display: 'flex',
               alignItems: 'center',
               backgroundColor: '#f1f5f9',
-              padding: 3,
+              padding: 2,
               borderRadius: 8,
               border: '1px solid #cbd5e1',
             }}
@@ -319,7 +287,7 @@ export const GoodsReceiptListPage: FC<{ defaultRole?: UserRole }> = ({
                 fontSize: 12,
                 fontWeight: role === 'store_owner' ? 700 : 500,
                 backgroundColor: role === 'store_owner' ? '#ffffff' : 'transparent',
-                color: role === 'store_owner' ? 'var(--blue-primary, #0066cc)' : '#475569',
+                color: role === 'store_owner' ? '#0f766e' : '#475569',
                 borderRadius: 6,
                 border: 'none',
                 boxShadow: role === 'store_owner' ? '0 1px 2px rgba(0,0,0,0.08)' : 'none',
@@ -357,12 +325,24 @@ export const GoodsReceiptListPage: FC<{ defaultRole?: UserRole }> = ({
             </button>
           </div>
 
+          {/* Quick link to PO List */}
+          <button
+            type="button"
+            onClick={() => navigate('/store-owner/purchase-orders/list')}
+            className="po-btn po-btn-outline"
+            style={{ height: 32, padding: '0 12px' }}
+            title="Chuyển sang danh sách đơn mua hàng (PO)"
+          >
+            <Layers size={14} color="#0d9488" />
+            <span>Đơn mua hàng PO</span>
+          </button>
+
           {/* Action buttons */}
           <button
             type="button"
             onClick={() => showToast('Mở màn hình Nhập kho từ đơn đặt hàng PO (grn_form.html?type=po)', 'info')}
-            className="po-btn po-btn-primary"
-            style={{ height: 32, padding: '0 12px', fontSize: 12, fontWeight: 700 }}
+            className="po-btn po-btn-secondary"
+            style={{ height: 32, padding: '0 12px' }}
           >
             <Plus size={14} />
             <span>+ Nhập kho từ PO</span>
@@ -372,7 +352,7 @@ export const GoodsReceiptListPage: FC<{ defaultRole?: UserRole }> = ({
             type="button"
             onClick={() => showToast('Mở màn hình Tạo phiếu nhập kho trực tiếp (grn_form.html?type=direct)', 'info')}
             className="po-btn po-btn-outline"
-            style={{ height: 32, padding: '0 12px', fontSize: 12 }}
+            style={{ height: 32, padding: '0 12px' }}
           >
             <FilePlus size={14} />
             <span>+ Tạo GRN trực tiếp</span>
@@ -380,24 +360,20 @@ export const GoodsReceiptListPage: FC<{ defaultRole?: UserRole }> = ({
         </div>
       </div>
 
-      {/* ── 2. Quick View Tabs ── */}
-      <GrnQuickTabs
-        activeTab={activeTab}
-        onTabChange={handleTabChange}
-        counts={tabCounts}
-      />
-
-      {/* ── 3. Unified Filter Bar ── */}
+      {/* ── UNIFIED FILTER BAR (Matching PoListFilterBar structure) ── */}
       <GrnFilterBar
         filterInputs={filterInputs}
         role={role}
         employeeBranchId={employeeBranchId}
-        onFilterChange={handleFilterInputChange}
+        activeTab={activeTab}
+        tabCounts={tabCounts}
+        onTabChange={handleTabChange}
+        onFilterChange={handleFilterChange}
         onSearch={handleSearch}
         onReset={handleReset}
       />
 
-      {/* ── 4. Main Data Table with Sticky Header & Pagination ── */}
+      {/* ── MAIN DATA TABLE WITH PAGING (Matching PoListTable structure) ── */}
       <GrnTable
         receipts={pagedReceipts}
         totalCount={filteredReceipts.length}
@@ -413,7 +389,7 @@ export const GoodsReceiptListPage: FC<{ defaultRole?: UserRole }> = ({
         onResetFilters={handleReset}
       />
 
-      {/* ── 5. Slide-over Detail Drawer ── */}
+      {/* ── SLIDE-OVER DETAIL DRAWER (Matching PoDetailDrawer structure) ── */}
       <GrnDetailDrawer
         receipt={selectedReceipt}
         isOpen={isDrawerOpen}
