@@ -499,6 +499,16 @@ export const GrnDetailDrawer: FC<GrnDetailDrawerProps> = ({
 
             <button
               type="button"
+              onClick={() => onAction?.('VIEW_DETAIL', receipt)}
+              className="po-btn po-btn-outline"
+              style={{ height: 32, padding: '0 12px', fontSize: 12, gap: 5, color: '#0f766e', borderColor: '#99f6e4' }}
+            >
+              <FileText size={14} />
+              <span>Xem chi tiết đầy đủ</span>
+            </button>
+
+            <button
+              type="button"
               onClick={onClose}
               className="po-btn po-btn-outline"
               style={{ height: 32, padding: '0 14px', fontSize: 12 }}

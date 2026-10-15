@@ -54,7 +54,15 @@ export interface GrnFilterState {
 
 export type UserRole = 'store_owner' | 'employee';
 
-export type PaymentTerm = '0' | '15' | '30';
+export type PaymentTerm =
+  | '0'
+  | '15'
+  | '30'
+  | 'CREDIT_15'
+  | 'CREDIT_30'
+  | 'CREDIT_45'
+  | 'CASH_ON_DELIVERY'
+  | 'ADVANCE_PAID';
 export type PaymentMethod = 'Credit' | 'Cash' | 'Bank';
 
 export interface PoLookupOption {
@@ -98,3 +106,25 @@ export interface GrnFormData {
   costs: GrnCostSummary;
   status: GrnStatus;
 }
+
+export type GrnRemainingOption = 'backorder' | 'cancel';
+
+export type PoStatusPreview = 'PARTIALLY_RECEIVED' | 'COMPLETED';
+
+export interface GrnDetailItem extends GrnItemDetail {
+  landedCostPerUnit?: number;
+  newUnitCost?: number;
+  retailPrice?: number;
+  marginPercent?: number;
+  isCatchWeight?: boolean;
+  isGift?: boolean;
+  remainingOption?: GrnRemainingOption;
+}
+
+export interface GrnPostSettings {
+  createApInvoice: boolean;
+  printShelfLabels: boolean;
+  attachmentName?: string;
+  attachmentSize?: string;
+}
+
