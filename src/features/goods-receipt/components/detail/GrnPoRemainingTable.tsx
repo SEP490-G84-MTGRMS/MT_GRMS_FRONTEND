@@ -3,6 +3,7 @@ import {
   ListChecks,
   CheckCircle2,
   Layers,
+  ArrowRight,
 } from 'lucide-react';
 import type { GrnDetailItem, GrnRemainingOption, PoStatusPreview } from '../../types/grn.types';
 
@@ -27,31 +28,41 @@ export const GrnPoRemainingTable: FC<GrnPoRemainingTableProps> = ({
     <div
       style={{
         backgroundColor: '#ffffff',
-        border: '1px solid #cbd5e1',
-        borderRadius: 8,
+        border: '1px solid #e2e8f0',
+        borderRadius: 10,
+        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)',
         overflow: 'hidden',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
       }}
     >
-      {/* Title Bar */}
+      {/* Title Bar matching GrnFormHeaderCard */}
       <div
         style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '12px 18px',
-          backgroundColor: '#f8fafc',
-          borderBottom: '1px solid #e2e8f0',
+          padding: '14px 20px',
+          borderBottom: '1px solid #f1f5f9',
+          flexWrap: 'wrap',
+          gap: 12,
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <ListChecks size={18} color="#0f766e" />
-          <span style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', textTransform: 'uppercase' }}>
+          <ListChecks size={18} color="#0d9488" />
+          <h2
+            style={{
+              fontSize: 14,
+              fontWeight: 700,
+              color: '#0f172a',
+              textTransform: 'uppercase',
+              letterSpacing: 0.3,
+              margin: 0,
+            }}
+          >
             Cập nhật trạng thái đơn PO (PO Update After Post)
-          </span>
+          </h2>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5 }}>
           <span style={{ color: '#64748b' }}>Đơn mua hàng gốc:</span>
           <span
             style={{
@@ -85,19 +96,29 @@ export const GrnPoRemainingTable: FC<GrnPoRemainingTableProps> = ({
           }}
         >
           <thead>
-            <tr style={{ backgroundColor: '#f1f5f9', borderBottom: '2px solid #cbd5e1' }}>
-              <th style={{ padding: '9px 12px', fontWeight: 700, color: '#334155', width: 140 }}>Mã PO</th>
-              <th style={{ padding: '9px 12px', fontWeight: 700, color: '#334155', minWidth: 220 }}>Sản phẩm</th>
-              <th style={{ padding: '9px 12px', fontWeight: 700, color: '#334155', textAlign: 'right', width: 110 }}>
+            <tr
+              style={{
+                backgroundColor: '#f8fafc',
+                borderBottom: '1px solid #cbd5e1',
+                color: '#475569',
+                fontSize: 12,
+                fontWeight: 700,
+                textTransform: 'uppercase',
+                letterSpacing: 0.4,
+              }}
+            >
+              <th style={{ padding: '9px 12px', width: 140 }}>Mã PO</th>
+              <th style={{ padding: '9px 12px', minWidth: 220 }}>Sản phẩm</th>
+              <th style={{ padding: '9px 12px', textAlign: 'right', width: 110 }}>
                 Đặt (Ordered)
               </th>
-              <th style={{ padding: '9px 12px', fontWeight: 700, color: '#334155', textAlign: 'right', width: 120 }}>
+              <th style={{ padding: '9px 12px', textAlign: 'right', width: 120 }}>
                 + Đã nhận
               </th>
-              <th style={{ padding: '9px 12px', fontWeight: 700, color: '#334155', textAlign: 'right', width: 110 }}>
+              <th style={{ padding: '9px 12px', textAlign: 'right', width: 110 }}>
                 Còn thiếu
               </th>
-              <th style={{ padding: '9px 12px', fontWeight: 700, color: '#334155', minWidth: 360 }}>
+              <th style={{ padding: '9px 12px', minWidth: 360 }}>
                 Hướng xử lý lượng thiếu (Remaining Handling Options)
               </th>
             </tr>
@@ -114,8 +135,15 @@ export const GrnPoRemainingTable: FC<GrnPoRemainingTableProps> = ({
                 <tr
                   key={item.id || idx}
                   style={{
-                    borderBottom: '1px solid #e2e8f0',
-                    backgroundColor: idx % 2 === 0 ? '#ffffff' : '#fcfcfc',
+                    borderBottom: '1px solid #f1f5f9',
+                    backgroundColor: idx % 2 === 0 ? '#ffffff' : '#fcfdff',
+                    transition: 'background-color 0.15s ease',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#f8fafc';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = idx % 2 === 0 ? '#ffffff' : '#fcfdff';
                   }}
                 >
                   {/* PO Ref */}
@@ -126,7 +154,9 @@ export const GrnPoRemainingTable: FC<GrnPoRemainingTableProps> = ({
                   {/* Product */}
                   <td style={{ padding: '9px 12px' }}>
                     <span style={{ fontWeight: 600, color: '#1e293b' }}>{item.productName}</span>
-                    <span style={{ marginLeft: 6, fontSize: 11, color: '#64748b' }}>({item.productCode})</span>
+                    <span style={{ marginLeft: 6, fontSize: 11.5, color: '#64748b', fontFamily: 'monospace' }}>
+                      ({item.productCode})
+                    </span>
                   </td>
 
                   {/* Ordered */}
@@ -149,8 +179,9 @@ export const GrnPoRemainingTable: FC<GrnPoRemainingTableProps> = ({
                           fontWeight: 700,
                           color: '#dc2626',
                           backgroundColor: '#fee2e2',
-                          padding: '2px 6px',
+                          padding: '2px 8px',
                           borderRadius: 4,
+                          border: '1px solid #fca5a5',
                         }}
                       >
                         {shortage} {item.unit}
@@ -172,7 +203,7 @@ export const GrnPoRemainingTable: FC<GrnPoRemainingTableProps> = ({
                             alignItems: 'center',
                             gap: 6,
                             cursor: readOnly ? 'default' : 'pointer',
-                            fontSize: 12,
+                            fontSize: 12.5,
                             fontWeight: selectedOption === 'backorder' ? 700 : 500,
                             color: selectedOption === 'backorder' ? '#0f766e' : '#475569',
                           }}
@@ -184,7 +215,7 @@ export const GrnPoRemainingTable: FC<GrnPoRemainingTableProps> = ({
                             checked={selectedOption === 'backorder'}
                             disabled={readOnly}
                             onChange={() => onRemainingOptionChange(item.id, 'backorder')}
-                            style={{ cursor: readOnly ? 'default' : 'pointer' }}
+                            style={{ cursor: readOnly ? 'default' : 'pointer', accentColor: '#0f766e' }}
                           />
                           <span>(•) NCC sẽ giao bù đợt sau (PO giữ mở)</span>
                         </label>
@@ -195,7 +226,7 @@ export const GrnPoRemainingTable: FC<GrnPoRemainingTableProps> = ({
                             alignItems: 'center',
                             gap: 6,
                             cursor: readOnly ? 'default' : 'pointer',
-                            fontSize: 12,
+                            fontSize: 12.5,
                             fontWeight: selectedOption === 'cancel' ? 700 : 500,
                             color: selectedOption === 'cancel' ? '#b45309' : '#475569',
                           }}
@@ -207,7 +238,7 @@ export const GrnPoRemainingTable: FC<GrnPoRemainingTableProps> = ({
                             checked={selectedOption === 'cancel'}
                             disabled={readOnly}
                             onChange={() => onRemainingOptionChange(item.id, 'cancel')}
-                            style={{ cursor: readOnly ? 'default' : 'pointer' }}
+                            style={{ cursor: readOnly ? 'default' : 'pointer', accentColor: '#0f766e' }}
                           />
                           <span>(•) Hủy phần thiếu (Đóng dòng)</span>
                         </label>
@@ -219,11 +250,11 @@ export const GrnPoRemainingTable: FC<GrnPoRemainingTableProps> = ({
                           alignItems: 'center',
                           gap: 4,
                           color: '#16a34a',
-                          fontSize: 12,
-                          fontWeight: 500,
+                          fontSize: 12.5,
+                          fontWeight: 600,
                         }}
                       >
-                        <CheckCircle2 size={13} />
+                        <CheckCircle2 size={14} />
                         <span>Đã giao đủ 100%</span>
                       </span>
                     )}
@@ -235,7 +266,7 @@ export const GrnPoRemainingTable: FC<GrnPoRemainingTableProps> = ({
         </table>
       </div>
 
-      {/* PO Status Preview Banner */}
+      {/* PO Status Preview Callout */}
       <div
         style={{
           display: 'flex',
@@ -248,7 +279,7 @@ export const GrnPoRemainingTable: FC<GrnPoRemainingTableProps> = ({
           borderTop: '1px solid #e2e8f0',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <span style={{ fontSize: 13, fontWeight: 700, color: '#1e293b' }}>
             Trạng thái PO sau khi duyệt:
           </span>
@@ -256,12 +287,12 @@ export const GrnPoRemainingTable: FC<GrnPoRemainingTableProps> = ({
             <span
               style={{
                 padding: '4px 10px',
-                borderRadius: 4,
+                borderRadius: 6,
                 fontSize: 12,
                 fontWeight: 800,
                 backgroundColor: poStatusPreview === 'COMPLETED' ? '#dcfce7' : '#fef3c7',
                 color: poStatusPreview === 'COMPLETED' ? '#15803d' : '#b45309',
-                border: `1px solid ${poStatusPreview === 'COMPLETED' ? '#bbf7d0' : '#fde68a'}`,
+                border: `1px solid ${poStatusPreview === 'COMPLETED' ? '#86efac' : '#fde68a'}`,
               }}
             >
               {poStatusPreview === 'COMPLETED'
@@ -275,13 +306,14 @@ export const GrnPoRemainingTable: FC<GrnPoRemainingTableProps> = ({
               style={{
                 height: 32,
                 padding: '0 10px',
-                fontSize: 12,
+                fontSize: 12.5,
                 fontWeight: 700,
                 borderRadius: 6,
                 border: '1px solid #cbd5e1',
                 backgroundColor: '#ffffff',
                 color: poStatusPreview === 'COMPLETED' ? '#15803d' : '#b45309',
                 cursor: 'pointer',
+                outline: 'none',
               }}
             >
               <option value="PARTIALLY_RECEIVED">
@@ -294,7 +326,8 @@ export const GrnPoRemainingTable: FC<GrnPoRemainingTableProps> = ({
           )}
         </div>
 
-        <div style={{ fontSize: 12, color: '#64748b' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5 }}>
+          <ArrowRight size={14} color="#64748b" />
           {poStatusPreview === 'COMPLETED' ? (
             <span style={{ color: '#15803d', fontWeight: 600 }}>
               Tất cả dòng sản phẩm đã hoàn thành hoặc hủy phần thiếu. Đơn PO sẽ được đóng lại.

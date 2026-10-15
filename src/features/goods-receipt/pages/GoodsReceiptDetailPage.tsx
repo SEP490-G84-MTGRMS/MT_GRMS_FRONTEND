@@ -6,6 +6,11 @@ import {
   ArrowLeft,
   ShieldCheck,
   UserCheck,
+  Calculator,
+  CreditCard,
+  Truck,
+  Percent,
+  ReceiptText,
 } from 'lucide-react';
 import type {
   GrnDetailItem,
@@ -25,6 +30,10 @@ import { GrnDetailSuccessModal } from '../components/detail/GrnDetailSuccessModa
 import { GrnPrintPreviewModal } from '../components/form/GrnPrintPreviewModal';
 import { AdminToast, type ToastState } from '../../admin/components';
 import '../../purchase-order/purchase-order.css';
+
+const formatCurrency = (val: number): string => {
+  return new Intl.NumberFormat('vi-VN').format(Math.round(val)) + ' đ';
+};
 
 export const GoodsReceiptDetailPage: FC<{ defaultRole?: UserRole }> = ({
   defaultRole = 'store_owner',
@@ -55,8 +64,14 @@ export const GoodsReceiptDetailPage: FC<{ defaultRole?: UserRole }> = ({
   // Items with detail fields
   const [items, setItems] = useState<GrnDetailItem[]>(() => {
     return existingReceipt.items.map((it) => {
-      const isCatchWeight = it.productCode === 'FR-THIT-01' || it.productName.toLowerCase().includes('xay') || it.productName.toLowerCase().includes('thịt');
-      const isGift = it.productCode === 'BV-PEPSI-01' || it.unitPrice === 0 || it.productName.toLowerCase().includes('tặng');
+      const isCatchWeight =
+        it.productCode === 'FR-THIT-01' ||
+        it.productName.toLowerCase().includes('xay') ||
+        it.productName.toLowerCase().includes('thịt');
+      const isGift =
+        it.productCode === 'BV-PEPSI-01' ||
+        it.unitPrice === 0 ||
+        it.productName.toLowerCase().includes('tặng');
       const retail = it.unitPrice > 0 ? it.unitPrice * 1.35 : 10000;
       return {
         ...it,
@@ -118,7 +133,7 @@ export const GoodsReceiptDetailPage: FC<{ defaultRole?: UserRole }> = ({
     setTimeout(() => setToast(null), 3000);
   };
 
-  // Switch role handler
+  // Switch role handler matching GoodsReceiptFormPage
   const handleToggleRole = (newRole: UserRole) => {
     setRole(newRole);
     const newParams = new URLSearchParams(searchParams);
@@ -130,7 +145,7 @@ export const GoodsReceiptDetailPage: FC<{ defaultRole?: UserRole }> = ({
     }
     setSearchParams(newParams, { replace: true });
     showToast(
-      `Đã chuyển sang góc nhìn ${newRole === 'store_owner' ? 'Chủ cửa hàng (Toàn chuỗi)' : 'Nhân viên kho (Chi nhánh ' + employeeBranchId + ')'}`,
+      `Đã chuyển sang góc nhìn ${newRole === 'store_owner' ? 'Chủ cửa hàng (Toàn chuỗi)' : 'Thủ kho (Chi nhánh ' + employeeBranchId + ')'}`,
       'info'
     );
   };
@@ -196,7 +211,7 @@ export const GoodsReceiptDetailPage: FC<{ defaultRole?: UserRole }> = ({
       {/* Toast Notification */}
       <AdminToast toast={toast} onClose={() => setToast(null)} />
 
-      {/* ── Top Header Navigation Bar ── */}
+      {/* ── Top Header Navigation Bar (Identical layout to GoodsReceiptFormPage) ── */}
       <div
         style={{
           display: 'flex',
@@ -210,97 +225,112 @@ export const GoodsReceiptDetailPage: FC<{ defaultRole?: UserRole }> = ({
           <button
             type="button"
             onClick={handleBackToList}
-            className="po-btn po-btn-outline"
-            style={{ height: 32, padding: '0 10px', gap: 4 }}
-            title="Quay về danh sách GRN"
-          >
-            <ArrowLeft size={14} />
-            <span>Quay lại</span>
-          </button>
-
-          <h1
             style={{
-              fontSize: 18,
-              fontWeight: 800,
-              color: '#0f172a',
-              margin: 0,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-            }}
-          >
-            <PackageCheck size={22} color="#0f766e" />
-            <span>
-              {isConfirmationMode
-                ? 'XÁC NHẬN TỔNG QUAN PHIẾU NHẬP KHO (CONFIRM GRN SUMMARY)'
-                : `CHI TIẾT PHIẾU NHẬP KHO: ${existingReceipt.code}`}
-            </span>
-          </h1>
-        </div>
-
-        {/* Right side: Role Switcher */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              backgroundColor: '#f1f5f9',
-              padding: 2,
+              width: 34,
+              height: 34,
               borderRadius: 8,
               border: '1px solid #cbd5e1',
+              backgroundColor: '#ffffff',
+              color: '#334155',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
             }}
-            title="Chuyển đổi góc nhìn vai trò"
+            title="Quay lại danh sách phiếu nhập kho"
           >
-            <button
-              type="button"
-              onClick={() => handleToggleRole('store_owner')}
-              style={{
-                height: 28,
-                padding: '0 10px',
-                fontSize: 12,
-                fontWeight: role === 'store_owner' ? 700 : 500,
-                backgroundColor: role === 'store_owner' ? '#ffffff' : 'transparent',
-                color: role === 'store_owner' ? '#0f766e' : '#475569',
-                borderRadius: 6,
-                border: 'none',
-                boxShadow: role === 'store_owner' ? '0 1px 2px rgba(0,0,0,0.08)' : 'none',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 5,
-              }}
-            >
-              <ShieldCheck size={14} />
-              <span>Chủ cửa hàng (All)</span>
-            </button>
+            <ArrowLeft size={16} />
+          </button>
 
-            <button
-              type="button"
-              onClick={() => handleToggleRole('employee')}
+          <div>
+            <h1
               style={{
-                height: 28,
-                padding: '0 10px',
-                fontSize: 12,
-                fontWeight: role === 'employee' ? 700 : 500,
-                backgroundColor: role === 'employee' ? '#ffffff' : 'transparent',
-                color: role === 'employee' ? '#059669' : '#475569',
-                borderRadius: 6,
-                border: 'none',
-                boxShadow: role === 'employee' ? '0 1px 2px rgba(0,0,0,0.08)' : 'none',
-                cursor: 'pointer',
+                fontSize: 18,
+                fontWeight: 800,
+                color: '#0f172a',
+                margin: 0,
                 display: 'flex',
                 alignItems: 'center',
-                gap: 5,
+                gap: 8,
               }}
             >
-              <UserCheck size={14} />
-              <span>Nhân viên ({employeeBranchId})</span>
-            </button>
+              <PackageCheck size={20} color="#0d9488" />
+              <span>
+                {isConfirmationMode
+                  ? 'Xác nhận tổng quan phiếu nhập kho (Confirm GRN Summary)'
+                  : `Chi tiết phiếu nhập kho ${existingReceipt.code}`}
+              </span>
+            </h1>
+            <p style={{ margin: '2px 0 0 0', fontSize: 12.5, color: '#64748b' }}>
+              {isConfirmationMode
+                ? 'Đối soát số lượng thực nhận, xử lý lượng thiếu đơn PO và xác nhận cập nhật kho'
+                : 'Lịch sử nhập kho, thông tin lô FEFO và chứng từ công nợ liên kết'}
+            </p>
           </div>
+        </div>
+
+        {/* Role Toggle Pill Switcher */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            backgroundColor: '#f1f5f9',
+            padding: 2,
+            borderRadius: 8,
+            border: '1px solid #cbd5e1',
+          }}
+          title="Chuyển đổi góc nhìn vai trò"
+        >
+          <button
+            type="button"
+            onClick={() => handleToggleRole('store_owner')}
+            style={{
+              height: 28,
+              padding: '0 10px',
+              fontSize: 12,
+              fontWeight: role === 'store_owner' ? 700 : 500,
+              backgroundColor: role === 'store_owner' ? '#ffffff' : 'transparent',
+              color: role === 'store_owner' ? '#0f766e' : '#475569',
+              borderRadius: 6,
+              border: 'none',
+              boxShadow: role === 'store_owner' ? '0 1px 2px rgba(0,0,0,0.08)' : 'none',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 5,
+            }}
+          >
+            <ShieldCheck size={14} />
+            <span>Chủ cửa hàng</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleToggleRole('employee')}
+            style={{
+              height: 28,
+              padding: '0 10px',
+              fontSize: 12,
+              fontWeight: role === 'employee' ? 700 : 500,
+              backgroundColor: role === 'employee' ? '#ffffff' : 'transparent',
+              color: role === 'employee' ? '#059669' : '#475569',
+              borderRadius: 6,
+              border: 'none',
+              boxShadow: role === 'employee' ? '0 1px 2px rgba(0,0,0,0.08)' : 'none',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 5,
+            }}
+          >
+            <UserCheck size={14} />
+            <span>Thủ kho ({employeeBranchId})</span>
+          </button>
         </div>
       </div>
 
-      {/* ── Box 1: General Info & Invoice Total Card ── */}
+      {/* ── Block 1: Header Info Card ── */}
       <GrnDetailHeaderCard
         grnNo={existingReceipt.code}
         branchName={existingReceipt.branchName}
@@ -320,10 +350,10 @@ export const GoodsReceiptDetailPage: FC<{ defaultRole?: UserRole }> = ({
         isConfirmationMode={isConfirmationMode}
       />
 
-      {/* ── Box 2: Stock to Add & Batch FEFO Table ── */}
+      {/* ── Block 2: Stock to Add & Batch FEFO Table ── */}
       <GrnStockFefoTable items={items} totalLandedCost={landedCost} />
 
-      {/* ── Box 3: PO Status Update & Remaining Handling Table ── */}
+      {/* ── Block 3: PO Status Update & Remaining Handling Table ── */}
       <GrnPoRemainingTable
         poReference={existingReceipt.poReference}
         items={items}
@@ -333,16 +363,138 @@ export const GoodsReceiptDetailPage: FC<{ defaultRole?: UserRole }> = ({
         readOnly={!isConfirmationMode && status === 'CONFIRMED'}
       />
 
-      {/* ── Box 4: Post Settings & Attachments Card ── */}
-      <GrnPostSettingsCard
-        settings={postSettings}
-        grandTotal={grandTotal}
-        totalLabels={totalLabels}
-        onSettingChange={handlePostSettingChange}
-        readOnly={!isConfirmationMode && status === 'CONFIRMED'}
-      />
+      {/* ── Block 4: Bottom 2-Column Grid (Post Settings & Financial Breakdown) ── */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))',
+          gap: 14,
+        }}
+      >
+        {/* Left Column: Post Settings & Attachments */}
+        <GrnPostSettingsCard
+          settings={postSettings}
+          grandTotal={grandTotal}
+          totalLabels={totalLabels}
+          onSettingChange={handlePostSettingChange}
+          readOnly={!isConfirmationMode && status === 'CONFIRMED'}
+        />
 
-      {/* ── Sticky Bottom Action Bar ── */}
+        {/* Right Column: Financial Summary Card matching GrnCostSummaryCard */}
+        <div
+          style={{
+            backgroundColor: '#ffffff',
+            border: '1px solid #e2e8f0',
+            borderRadius: 10,
+            padding: '16px 20px',
+            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between',
+          }}
+        >
+          <div>
+            {/* Title */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                paddingBottom: 12,
+                marginBottom: 16,
+                borderBottom: '1px solid #f1f5f9',
+              }}
+            >
+              <Calculator size={16} color="#0d9488" />
+              <h2
+                style={{
+                  fontSize: 14,
+                  fontWeight: 700,
+                  color: '#0f172a',
+                  textTransform: 'uppercase',
+                  letterSpacing: 0.3,
+                  margin: 0,
+                }}
+              >
+                Tổng kết tài chính &amp; Công nợ phải trả
+              </h2>
+            </div>
+
+            {/* Financial Rows */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {/* Tiền hàng */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#475569' }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <ReceiptText size={14} color="#64748b" />
+                  <span>Tổng tiền hàng (Base items):</span>
+                </span>
+                <strong style={{ color: '#1e293b' }}>{formatCurrency(goodsTotal)}</strong>
+              </div>
+
+              {/* Phí VC */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#475569' }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Truck size={14} color="#d97706" />
+                  <span>Chi phí vận chuyển (Landed Cost):</span>
+                </span>
+                <strong style={{ color: '#d97706' }}>+{formatCurrency(landedCost)}</strong>
+              </div>
+
+              {/* Chiết khấu */}
+              {discount > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#475569' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <Percent size={14} color="#dc2626" />
+                    <span>Chiết khấu NCC:</span>
+                  </span>
+                  <strong style={{ color: '#dc2626' }}>-{formatCurrency(discount)}</strong>
+                </div>
+              )}
+
+              {/* VAT */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#475569' }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Percent size={14} color="#64748b" />
+                  <span>Thuế VAT ({vatPercent}%):</span>
+                </span>
+                <strong style={{ color: '#1e293b' }}>
+                  +{formatCurrency(Math.round(((goodsTotal + landedCost - discount) * vatPercent) / 100))}
+                </strong>
+              </div>
+            </div>
+          </div>
+
+          {/* Grand Total Highlight Box */}
+          <div
+            style={{
+              marginTop: 18,
+              padding: '12px 16px',
+              backgroundColor: '#f0fdfa',
+              border: '1.5px solid #99f6e4',
+              borderRadius: 8,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            }}
+          >
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <CreditCard size={17} color="#0f766e" />
+                <span style={{ fontSize: 13, fontWeight: 700, color: '#0f766e', textTransform: 'uppercase' }}>
+                  Tổng công nợ ghi nhận (AP)
+                </span>
+              </div>
+              <span style={{ fontSize: 11.5, color: '#64748b' }}>Hạn thanh toán: Credit 30 days</span>
+            </div>
+
+            <div style={{ fontSize: 18, fontWeight: 900, color: '#0f766e' }}>
+              {formatCurrency(grandTotal)}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Block 5: Sticky Bottom Action Bar ── */}
       <GrnDetailActionBar
         status={status}
         isConfirmationMode={isConfirmationMode}
@@ -386,3 +538,5 @@ export const GoodsReceiptDetailPage: FC<{ defaultRole?: UserRole }> = ({
     </div>
   );
 };
+
+export default GoodsReceiptDetailPage;
