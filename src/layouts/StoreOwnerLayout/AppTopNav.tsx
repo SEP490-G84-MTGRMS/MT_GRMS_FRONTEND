@@ -9,7 +9,6 @@ import {
   ChevronRightIcon,
   MenuIcon,
   TrendingUpIcon,
-  StoreIcon,
   SubscriptionPlanIcon,
 } from "../../features/admin/components";
 import { Gift } from "lucide-react";
@@ -37,7 +36,10 @@ interface NavGroup {
   sections?: NavSection[];
 }
 
-const UsersIcon: FC<{ size?: number; color?: string }> = ({ size = 18, color = 'currentColor' }) => (
+const UsersIcon: FC<{ size?: number; color?: string }> = ({
+  size = 18,
+  color = "currentColor",
+}) => (
   <svg
     width={size}
     height={size}
@@ -55,16 +57,17 @@ const UsersIcon: FC<{ size?: number; color?: string }> = ({ size = 18, color = '
   </svg>
 );
 
-const GiftNavIcon: FC<{ size?: number; color?: string }> = ({ size = 18, color = 'currentColor' }) => (
-  <Gift size={size} color={color} />
-);
+const GiftNavIcon: FC<{ size?: number; color?: string }> = ({
+  size = 18,
+  color = "currentColor",
+}) => <Gift size={size} color={color} />;
 
 const NAV_GROUPS: NavGroup[] = [
   {
     id: "overview",
     label: "Tổng quan",
     icon: DashboardIcon,
-    to: "/admin/dashboard",
+    to: "/store-owner/dashboard",
   },
   {
     id: "goods",
@@ -74,8 +77,16 @@ const NAV_GROUPS: NavGroup[] = [
       {
         title: "Danh mục & Sản phẩm",
         items: [
-          { label: "Danh mục hàng hóa", to: "/store-owner/products", badge: "FE-01" },
-          { label: "Sản phẩm theo NCC", to: "/store-owner/suppliers/products", badge: "Master" },
+          {
+            label: "Danh mục hàng hóa",
+            to: "/store-owner/products",
+            badge: "FE-01",
+          },
+          {
+            label: "Sản phẩm theo NCC",
+            to: "/store-owner/suppliers/products",
+            badge: "Master",
+          },
           {
             label: "Thiết lập bảng giá",
             to: "/store-owner/suppliers/products?view=pricing",
@@ -205,7 +216,7 @@ const NAV_GROUPS: NavGroup[] = [
       {
         title: "Báo cáo tài chính",
         items: [
-          { label: "Báo cáo kết quả kinh doanh", to: "/admin/dashboard" },
+          { label: "Báo cáo kết quả kinh doanh", to: "/store-owner/dashboard" },
           {
             label: "Dòng tiền kinh doanh",
             to: "/store-owner/expenses?view=cashflow",
@@ -215,8 +226,8 @@ const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
-    id: 'employees',
-    label: 'Nhân viên',
+    id: "employees",
+    label: "Nhân viên",
     icon: UsersIcon,
     sections: [
       {
@@ -264,8 +275,8 @@ const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
-    id: 'promotions',
-    label: 'Khuyến mãi',
+    id: "promotions",
+    label: "Khuyến mãi",
     icon: GiftNavIcon,
     sections: [
       {
@@ -316,10 +327,10 @@ const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
-    id: 'subscriptions',
-    label: 'Gói dịch vụ',
+    id: "subscriptions",
+    label: "Gói dịch vụ",
     icon: SubscriptionPlanIcon,
-    to: '/admin/subscriptions',
+    to: "/store-owner/subscriptions",
   },
 ];
 
@@ -510,7 +521,7 @@ const NavDropdown: FC<DropdownProps> = ({
     if (toPath === "/store-owner/promotions") {
       const hasOtherView = Boolean(
         currQuery &&
-          (currQuery.includes("view=") || currQuery.includes("action=")),
+        (currQuery.includes("view=") || currQuery.includes("action=")),
       );
       return (
         (currPath === toPath || currPath.startsWith(toPath + "/")) &&
@@ -521,7 +532,7 @@ const NavDropdown: FC<DropdownProps> = ({
     if (toPath === "/store-owner/vouchers") {
       const hasOtherView = Boolean(
         currQuery &&
-          (currQuery.includes("view=") || currQuery.includes("action=")),
+        (currQuery.includes("view=") || currQuery.includes("action=")),
       );
       return (
         (currPath === toPath || currPath.startsWith(toPath + "/")) &&
@@ -532,7 +543,7 @@ const NavDropdown: FC<DropdownProps> = ({
     if (toPath === "/store-owner/loyalty-config") {
       const hasOtherView = Boolean(
         currQuery &&
-          (currQuery.includes("view=") || currQuery.includes("action=")),
+        (currQuery.includes("view=") || currQuery.includes("action=")),
       );
       return (
         (currPath === toPath || currPath.startsWith(toPath + "/")) &&
@@ -731,7 +742,9 @@ const NavDropdown: FC<DropdownProps> = ({
                   color={isActive ? "var(--blue-primary)" : "#bbb"}
                   style={{ flexShrink: 0 }}
                 />
-                <span style={{ flex: 1, whiteSpace: "nowrap" }}>{item.label}</span>
+                <span style={{ flex: 1, whiteSpace: "nowrap" }}>
+                  {item.label}
+                </span>
                 {item.badge && (
                   <span
                     style={{
@@ -1029,7 +1042,9 @@ export const AppTopNav: FC = () => {
                       fontFamily: "var(--font-sans)",
                       fontWeight: active ? 700 : 500,
                       color: "#ffffff",
-                      backgroundColor: active ? "rgba(0,0,0,0.2)" : "transparent",
+                      backgroundColor: active
+                        ? "rgba(0,0,0,0.2)"
+                        : "transparent",
                       borderRadius: 0,
                       borderBottom: active
                         ? "3px solid #ffffff"
@@ -1145,37 +1160,6 @@ export const AppTopNav: FC = () => {
               flexShrink: 0,
             }}
           >
-            {/* Tenant badge */}
-            <div
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 7,
-                height: 32,
-                padding: "0 12px",
-                borderRadius: "var(--radius-pill)",
-                backgroundColor: "rgba(255, 255, 255, 0.14)",
-                border: "1px solid rgba(255, 255, 255, 0.22)",
-                fontSize: "12px",
-                fontWeight: 600,
-                color: "#ffffff",
-                whiteSpace: "nowrap",
-                boxSizing: "border-box",
-              }}
-            >
-              <StoreIcon size={13} color="#ffffff" />
-              <span>Mini Minh Đức</span>
-              <span
-                style={{
-                  width: 6,
-                  height: 6,
-                  borderRadius: "50%",
-                  backgroundColor: "#4ADE80",
-                  display: "inline-block",
-                }}
-              />
-            </div>
-
             {/* Bell notification */}
             <button
               type="button"
@@ -1197,10 +1181,12 @@ export const AppTopNav: FC = () => {
               }}
               title="Thông báo"
               onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.25)";
+                e.currentTarget.style.backgroundColor =
+                  "rgba(255, 255, 255, 0.25)";
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.14)";
+                e.currentTarget.style.backgroundColor =
+                  "rgba(255, 255, 255, 0.14)";
               }}
             >
               <BellIcon size={15} />
@@ -1235,10 +1221,12 @@ export const AppTopNav: FC = () => {
                 transition: "background-color 0.15s ease",
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.25)";
+                e.currentTarget.style.backgroundColor =
+                  "rgba(255, 255, 255, 0.25)";
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.14)";
+                e.currentTarget.style.backgroundColor =
+                  "rgba(255, 255, 255, 0.14)";
               }}
             >
               <div

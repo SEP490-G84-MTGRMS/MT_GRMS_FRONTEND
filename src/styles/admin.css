@@ -125,6 +125,28 @@
   display: none;
 }
 
+.admin-shell.sidebar-collapsed .admin-sidebar-user-card {
+  padding: 4px 0;
+  background: transparent !important;
+  border: none !important;
+  justify-content: center !important;
+}
+
+.admin-shell.sidebar-collapsed .admin-user-info,
+.admin-shell.sidebar-collapsed .admin-user-chevron,
+.admin-shell.sidebar-collapsed .admin-logout-btn {
+  display: none !important;
+}
+
+.admin-shell.sidebar-collapsed .admin-system-status {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  margin: 0 auto;
+  justify-content: center;
+  border-radius: var(--radius-pill);
+}
+
 .admin-sidebar-header {
   height: 70px;
   padding: 0 16px 0 20px;
