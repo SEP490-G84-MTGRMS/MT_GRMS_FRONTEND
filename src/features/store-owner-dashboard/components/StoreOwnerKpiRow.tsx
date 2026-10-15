@@ -58,31 +58,31 @@ export const StoreOwnerKpiRow: React.FC<StoreOwnerKpiRowProps> = ({ timeFilter }
     <div
       style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-        gap: 18,
+        gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))',
+        gap: 14,
       }}
     >
       {/* Thẻ 1: Doanh thu */}
       <div
         style={{
           backgroundColor: '#ffffff',
-          borderRadius: 24,
-          padding: '20px 22px',
+          borderRadius: 18,
+          padding: '12px 18px',
           border: '1px solid var(--border-light, #EDF2F9)',
-          boxShadow: '0 4px 14px rgba(0, 30, 90, 0.04)',
+          boxShadow: '0 2px 10px rgba(0, 30, 90, 0.03)',
           display: 'flex',
           flexDirection: 'column',
-          gap: 12,
+          gap: 6,
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--text-muted, #64748B)' }}>
+          <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted, #64748B)' }}>
             Doanh thu bán lẻ
           </span>
           <div
             style={{
-              width: 36,
-              height: 36,
+              width: 28,
+              height: 28,
               borderRadius: 'var(--radius-pill, 9999px)',
               backgroundColor: '#F0F6FF',
               display: 'flex',
@@ -91,7 +91,7 @@ export const StoreOwnerKpiRow: React.FC<StoreOwnerKpiRowProps> = ({ timeFilter }
               color: 'var(--blue-primary, #0066FF)',
             }}
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
             </svg>
           </div>
@@ -100,22 +100,23 @@ export const StoreOwnerKpiRow: React.FC<StoreOwnerKpiRowProps> = ({ timeFilter }
         <div>
           <div
             style={{
-              fontSize: '24px',
+              fontSize: '18px',
               fontWeight: 800,
               color: 'var(--text-main, #0F172A)',
               fontFamily: "'JetBrains Mono', Consolas, monospace",
               fontVariantNumeric: 'tabular-nums',
               letterSpacing: '-0.02em',
+              lineHeight: 1.2,
             }}
           >
             {kpiData.revenue}
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
             <span
               style={{
-                fontSize: '11.5px',
+                fontSize: '10.5px',
                 fontWeight: 700,
-                padding: '2px 8px',
+                padding: '1px 6px',
                 borderRadius: 'var(--radius-pill, 9999px)',
                 backgroundColor: kpiData.revPercent >= 0 ? '#E8F9EE' : '#FFF0F0',
                 color: kpiData.revPercent >= 0 ? '#008738' : '#FF3B30',
@@ -123,7 +124,7 @@ export const StoreOwnerKpiRow: React.FC<StoreOwnerKpiRowProps> = ({ timeFilter }
             >
               {kpiData.revPercent >= 0 ? `+${kpiData.revPercent}%` : `${kpiData.revPercent}%`}
             </span>
-            <span style={{ fontSize: '12px', color: '#94A3B8' }}>{kpiData.revSubText}</span>
+            <span style={{ fontSize: '11px', color: '#94A3B8' }}>{kpiData.revSubText}</span>
           </div>
         </div>
       </div>
@@ -132,23 +133,23 @@ export const StoreOwnerKpiRow: React.FC<StoreOwnerKpiRowProps> = ({ timeFilter }
       <div
         style={{
           backgroundColor: '#ffffff',
-          borderRadius: 24,
-          padding: '20px 22px',
+          borderRadius: 18,
+          padding: '12px 18px',
           border: '1px solid var(--border-light, #EDF2F9)',
-          boxShadow: '0 4px 14px rgba(0, 30, 90, 0.04)',
+          boxShadow: '0 2px 10px rgba(0, 30, 90, 0.03)',
           display: 'flex',
           flexDirection: 'column',
-          gap: 12,
+          gap: 6,
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--text-muted, #64748B)' }}>
+          <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted, #64748B)' }}>
             Hóa đơn xuất quầy
           </span>
           <div
             style={{
-              width: 36,
-              height: 36,
+              width: 28,
+              height: 28,
               borderRadius: 'var(--radius-pill, 9999px)',
               backgroundColor: '#F1F5F9',
               display: 'flex',
@@ -157,7 +158,7 @@ export const StoreOwnerKpiRow: React.FC<StoreOwnerKpiRowProps> = ({ timeFilter }
               color: '#475569',
             }}
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
               <polyline points="14 2 14 8 20 8" />
               <line x1="16" y1="13" x2="8" y2="13" />
@@ -169,18 +170,19 @@ export const StoreOwnerKpiRow: React.FC<StoreOwnerKpiRowProps> = ({ timeFilter }
         <div>
           <div
             style={{
-              fontSize: '24px',
+              fontSize: '18px',
               fontWeight: 800,
               color: 'var(--text-main, #0F172A)',
               fontFamily: "'JetBrains Mono', Consolas, monospace",
               fontVariantNumeric: 'tabular-nums',
               letterSpacing: '-0.02em',
+              lineHeight: 1.2,
             }}
           >
-            {kpiData.orders} <span style={{ fontSize: '15px', fontWeight: 600, color: '#64748B' }}>đơn</span>
+            {kpiData.orders} <span style={{ fontSize: '13px', fontWeight: 600, color: '#64748B' }}>đơn</span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
-            <span style={{ fontSize: '12.5px', fontWeight: 600, color: '#64748B' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
+            <span style={{ fontSize: '11px', fontWeight: 600, color: '#64748B' }}>
               {kpiData.ordersAvg}
             </span>
           </div>
@@ -191,23 +193,23 @@ export const StoreOwnerKpiRow: React.FC<StoreOwnerKpiRowProps> = ({ timeFilter }
       <div
         style={{
           backgroundColor: '#ffffff',
-          borderRadius: 24,
-          padding: '20px 22px',
+          borderRadius: 18,
+          padding: '12px 18px',
           border: '1px solid var(--border-light, #EDF2F9)',
-          boxShadow: '0 4px 14px rgba(0, 30, 90, 0.04)',
+          boxShadow: '0 2px 10px rgba(0, 30, 90, 0.03)',
           display: 'flex',
           flexDirection: 'column',
-          gap: 10,
+          gap: 6,
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--text-muted, #64748B)' }}>
+          <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted, #64748B)' }}>
             Dòng tiền quầy thu ngân
           </span>
           <div
             style={{
-              width: 36,
-              height: 36,
+              width: 28,
+              height: 28,
               borderRadius: 'var(--radius-pill, 9999px)',
               backgroundColor: '#ECFDF5',
               display: 'flex',
@@ -216,19 +218,19 @@ export const StoreOwnerKpiRow: React.FC<StoreOwnerKpiRowProps> = ({ timeFilter }
               color: '#059669',
             }}
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <rect x="2" y="5" width="20" height="14" rx="2" />
               <line x1="2" y1="10" x2="22" y2="10" />
             </svg>
           </div>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 2 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 3, marginTop: 1 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '13px', color: '#64748B' }}>Tiền mặt tại két:</span>
+            <span style={{ fontSize: '11.5px', color: '#64748B' }}>Tiền mặt tại két:</span>
             <span
               style={{
-                fontSize: '14px',
+                fontSize: '12.5px',
                 fontWeight: 700,
                 color: '#1E293B',
                 fontFamily: "'JetBrains Mono', Consolas, monospace",
@@ -239,10 +241,10 @@ export const StoreOwnerKpiRow: React.FC<StoreOwnerKpiRowProps> = ({ timeFilter }
             </span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '13px', color: '#64748B' }}>VietQR Chuyển khoản:</span>
+            <span style={{ fontSize: '11.5px', color: '#64748B' }}>VietQR Chuyển khoản:</span>
             <span
               style={{
-                fontSize: '14px',
+                fontSize: '12.5px',
                 fontWeight: 700,
                 color: 'var(--blue-primary, #0066FF)',
                 fontFamily: "'JetBrains Mono', Consolas, monospace",
@@ -259,23 +261,23 @@ export const StoreOwnerKpiRow: React.FC<StoreOwnerKpiRowProps> = ({ timeFilter }
       <div
         style={{
           backgroundColor: '#ffffff',
-          borderRadius: 24,
-          padding: '20px 22px',
+          borderRadius: 18,
+          padding: '12px 18px',
           border: '1px solid var(--border-light, #EDF2F9)',
-          boxShadow: '0 4px 14px rgba(0, 30, 90, 0.04)',
+          boxShadow: '0 2px 10px rgba(0, 30, 90, 0.03)',
           display: 'flex',
           flexDirection: 'column',
-          gap: 12,
+          gap: 6,
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--text-muted, #64748B)' }}>
+          <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted, #64748B)' }}>
             Sổ nợ khách quen
           </span>
           <div
             style={{
-              width: 36,
-              height: 36,
+              width: 28,
+              height: 28,
               borderRadius: 'var(--radius-pill, 9999px)',
               backgroundColor: '#FFF8EB',
               display: 'flex',
@@ -284,7 +286,7 @@ export const StoreOwnerKpiRow: React.FC<StoreOwnerKpiRowProps> = ({ timeFilter }
               color: '#D97706',
             }}
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
               <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
             </svg>
@@ -294,18 +296,19 @@ export const StoreOwnerKpiRow: React.FC<StoreOwnerKpiRowProps> = ({ timeFilter }
         <div>
           <div
             style={{
-              fontSize: '24px',
+              fontSize: '18px',
               fontWeight: 800,
               color: '#D97706',
               fontFamily: "'JetBrains Mono', Consolas, monospace",
               fontVariantNumeric: 'tabular-nums',
               letterSpacing: '-0.02em',
+              lineHeight: 1.2,
             }}
           >
             {kpiData.debt}
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
-            <span style={{ fontSize: '12px', fontWeight: 600, color: '#64748B' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
+            <span style={{ fontSize: '11px', fontWeight: 600, color: '#64748B' }}>
               {kpiData.debtCount}
             </span>
           </div>

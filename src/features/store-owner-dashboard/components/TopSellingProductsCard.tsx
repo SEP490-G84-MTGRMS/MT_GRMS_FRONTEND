@@ -86,82 +86,122 @@ export const TopSellingProductsCard: React.FC = () => {
       style={{
         backgroundColor: '#ffffff',
         borderRadius: 24,
-        padding: '24px 26px',
+        padding: '22px 24px',
         border: '1px solid var(--border-light, #EDF2F9)',
         boxShadow: '0 4px 14px rgba(0, 30, 90, 0.04)',
         display: 'flex',
         flexDirection: 'column',
         gap: 16,
+        height: '100%',
+        boxSizing: 'border-box',
       }}
     >
-      <div>
-        <h2
-          style={{
-            fontSize: '17px',
-            fontWeight: 800,
-            color: 'var(--text-main, #0F172A)',
-            margin: 0,
-            letterSpacing: '-0.01em',
-          }}
-        >
-          Top Mặt hàng Bán chạy
-        </h2>
-        <div style={{ fontSize: '13px', color: 'var(--text-muted, #64748B)', marginTop: 4 }}>
-          Xếp hạng theo tổng doanh số xuất bán hôm nay
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <h2
+              style={{
+                fontSize: '16.5px',
+                fontWeight: 800,
+                color: 'var(--text-main, #0F172A)',
+                margin: 0,
+                letterSpacing: '-0.01em',
+              }}
+            >
+              Top Hàng Bán Chạy
+            </h2>
+            <span
+              style={{
+                fontSize: '11px',
+                fontWeight: 700,
+                padding: '2px 8px',
+                borderRadius: 'var(--radius-pill, 9999px)',
+                backgroundColor: '#E8F9EE',
+                color: '#008738',
+              }}
+            >
+              Hôm nay
+            </span>
+          </div>
+          <div style={{ fontSize: '12px', color: 'var(--text-muted, #64748B)', marginTop: 3 }}>
+            Xếp hạng theo tổng doanh thu xuất quầy
+          </div>
         </div>
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {topProducts.map((p) => (
+        {topProducts.slice(0, 4).map((p) => (
           <div
             key={p.id}
             style={{
               display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: 12,
-              padding: '10px 14px',
+              flexDirection: 'column',
+              gap: 8,
+              padding: '11px 13px',
               borderRadius: 14,
               backgroundColor: '#FAFAFA',
               border: '1px solid #F1F5F9',
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, minWidth: 0 }}>
-              {getRankBadge(p.rank)}
-              <div style={{ minWidth: 0, flex: 1 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
+                {getRankBadge(p.rank)}
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div
+                    style={{
+                      fontSize: '13px',
+                      fontWeight: 700,
+                      color: 'var(--text-main, #0F172A)',
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                    }}
+                    title={p.productName}
+                  >
+                    {p.productName}
+                  </div>
+                  <div style={{ fontSize: '11.5px', color: '#64748B', marginTop: 1 }}>
+                    Đã bán: <strong style={{ color: '#0F172A' }}>{p.soldQty}</strong> {p.unit}
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ textAlign: 'right', flexShrink: 0 }}>
                 <div
                   style={{
-                    fontSize: '13.5px',
-                    fontWeight: 700,
-                    color: 'var(--text-main, #0F172A)',
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
+                    fontSize: '13px',
+                    fontWeight: 800,
+                    color: 'var(--blue-primary, #0066FF)',
+                    fontFamily: "'JetBrains Mono', monospace",
+                    fontVariantNumeric: 'tabular-nums',
                   }}
                 >
-                  {p.productName}
+                  {p.totalRevenue.toLocaleString('vi-VN')} đ
                 </div>
-                <div style={{ fontSize: '11.5px', color: '#64748B', marginTop: 1 }}>
-                  Đã bán: <strong style={{ color: '#0F172A' }}>{p.soldQty}</strong> {p.unit}
+                <div style={{ fontSize: '10.5px', color: '#64748B', marginTop: 1 }}>
+                  {p.revenueSharePercent}% doanh số
                 </div>
               </div>
             </div>
 
-            <div style={{ textAlign: 'right', flexShrink: 0 }}>
+            {/* Mini Progress Bar tỉ lệ doanh số chuẩn KiotViet */}
+            <div
+              style={{
+                width: '100%',
+                height: 4,
+                backgroundColor: '#E2E8F0',
+                borderRadius: 'var(--radius-pill, 9999px)',
+                overflow: 'hidden',
+              }}
+            >
               <div
                 style={{
-                  fontSize: '13.5px',
-                  fontWeight: 800,
-                  color: 'var(--text-main, #0F172A)',
-                  fontFamily: "'JetBrains Mono', monospace",
-                  fontVariantNumeric: 'tabular-nums',
+                  width: `${Math.min(100, p.revenueSharePercent * 4)}%`,
+                  height: '100%',
+                  backgroundColor: p.rank === 1 ? 'var(--blue-primary, #0066FF)' : p.rank === 2 ? '#00C2FF' : '#94A3B8',
+                  borderRadius: 'var(--radius-pill, 9999px)',
                 }}
-              >
-                {p.totalRevenue.toLocaleString('vi-VN')} đ
-              </div>
-              <div style={{ fontSize: '11px', color: '#64748B', marginTop: 1 }}>
-                {p.revenueSharePercent}% doanh số
-              </div>
+              />
             </div>
           </div>
         ))}

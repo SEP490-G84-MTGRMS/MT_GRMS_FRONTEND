@@ -38,28 +38,21 @@ export const StoreOwnerDashboardPage: React.FC = () => {
         <StoreRevenueChartCard />
       </div>
 
-      {/* 4. Hàng 2 cột: Cảnh báo FEFO & Cảnh báo Tồn kho tối thiểu */}
+      {/* 4. Dải phím tắt thao tác nhanh tinh gọn */}
+      <StoreQuickActionsCard />
+
+      {/* 5. Hàng 3 cột cân đối: Cảnh báo FEFO | Cảnh báo Tồn tối thiểu | Top Hàng Bán Chạy */}
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))',
           gap: 20,
+          alignItems: 'stretch',
         }}
       >
         <FefoWarningCard />
         <LowStockWarningCard />
-      </div>
-
-      {/* 5. Hàng 2 cột: Top mặt hàng bán chạy & Phím tắt Thao tác nhanh */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))',
-          gap: 20,
-        }}
-      >
         <TopSellingProductsCard />
-        <StoreQuickActionsCard />
       </div>
     </div>
   );

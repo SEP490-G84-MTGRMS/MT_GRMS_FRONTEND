@@ -921,398 +921,392 @@ export const AppTopNav: FC = () => {
 
   return (
     <>
-      {/* ── Row 1: Global Header ── */}
-      <div
-        onMouseEnter={() => {
-          clearCloseTimer();
-          setOpenMenu(null);
-        }}
-        style={{
-          height: 56,
-          backgroundColor: "#ffffff",
-          borderBottom: "1px solid var(--border-light)",
-          display: "flex",
-          alignItems: "center",
-          padding: "0 24px",
-          gap: 16,
-          boxShadow: "0 1px 4px rgba(0, 40, 120, 0.04)",
-          position: "sticky",
-          top: 0,
-          zIndex: 200,
-        }}
-      >
-        {/* Brand */}
-        <Link
-          to={
-            location.pathname.startsWith("/store-owner")
-              ? "/store-owner/dashboard"
-              : "/admin/dashboard"
-          }
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 10,
-            textDecoration: "none",
-            flexShrink: 0,
-          }}
-        >
-          <BrandLogo />
-          <div>
-            <div
-              style={{
-                fontSize: 16,
-                fontWeight: 800,
-                color: "var(--text-main)",
-                letterSpacing: "-0.02em",
-                lineHeight: 1.15,
-              }}
-            >
-              MT-GRMS
-            </div>
-            <div
-              style={{
-                fontSize: 10,
-                fontWeight: 700,
-                color: "var(--blue-primary)",
-                textTransform: "uppercase",
-                letterSpacing: "0.06em",
-                lineHeight: 1,
-              }}
-            >
-              Quản lý Chuỗi Tạp Hóa
-            </div>
-          </div>
-        </Link>
-
-        {/* Right actions */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 10,
-            marginLeft: "auto",
-            flexShrink: 0,
-          }}
-        >
-          {/* Tenant badge */}
-          <div
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 7,
-              height: 36,
-              padding: "0 14px",
-              borderRadius: "var(--radius-pill)",
-              backgroundColor: "var(--bg-soft-blue)",
-              border: "1px solid var(--border-light)",
-              fontSize: "12.5px",
-              fontWeight: 600,
-              color: "var(--text-muted)",
-              whiteSpace: "nowrap",
-              boxSizing: "border-box",
-            }}
-          >
-            <StoreIcon size={14} color="var(--blue-primary)" />
-            <span>Mini Minh Đức</span>
-            <span
-              style={{
-                width: 6,
-                height: 6,
-                borderRadius: "50%",
-                backgroundColor: "var(--green-money)",
-                display: "inline-block",
-              }}
-            />
-          </div>
-
-          {/* Bell */}
-          <button
-            type="button"
-            style={{
-              width: 36,
-              height: 36,
-              borderRadius: "50%",
-              border: "1px solid var(--border-light)",
-              backgroundColor: "var(--bg-soft-blue)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              cursor: "pointer",
-              position: "relative",
-              color: "var(--text-muted)",
-              flexShrink: 0,
-              boxSizing: "border-box",
-              transition: "all 0.15s ease",
-            }}
-            title="Thông báo"
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = "var(--blue-light)";
-              e.currentTarget.style.color = "var(--blue-primary)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = "var(--bg-soft-blue)";
-              e.currentTarget.style.color = "var(--text-muted)";
-            }}
-          >
-            <BellIcon size={16} />
-            <span
-              style={{
-                position: "absolute",
-                top: 7,
-                right: 7,
-                width: 7,
-                height: 7,
-                borderRadius: "50%",
-                backgroundColor: "var(--red-accent)",
-                border: "1.5px solid #fff",
-              }}
-            />
-          </button>
-
-          {/* Profile */}
-          <div
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 8,
-              height: 36,
-              padding: "0 12px 0 4px",
-              borderRadius: "var(--radius-pill)",
-              border: "1px solid var(--border-light)",
-              backgroundColor: "#fff",
-              cursor: "pointer",
-              flexShrink: 0,
-              boxSizing: "border-box",
-              transition: "background-color 0.15s ease",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = "var(--bg-soft-blue)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = "#fff";
-            }}
-          >
-            <div
-              style={{
-                width: 28,
-                height: 28,
-                borderRadius: "50%",
-                background: "linear-gradient(135deg, #0F766E, #14B8A6)",
-                color: "#fff",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: 11,
-                fontWeight: 800,
-              }}
-            >
-              SO
-            </div>
-            <div style={{ display: "flex", flexDirection: "column" }}>
-              <span
-                style={{
-                  fontSize: 12.5,
-                  fontWeight: 700,
-                  color: "var(--text-main)",
-                  lineHeight: 1.15,
-                }}
-              >
-                Minh Đức
-              </span>
-              <span
-                style={{
-                  fontSize: 10,
-                  color: "var(--blue-primary)",
-                  fontWeight: 600,
-                  lineHeight: 1,
-                }}
-              >
-                Store Owner
-              </span>
-            </div>
-          </div>
-
-          {/* Mobile hamburger */}
-          <button
-            type="button"
-            onClick={() => setMobileOpen((v) => !v)}
-            style={{
-              display: "none",
-              width: 36,
-              height: 36,
-              borderRadius: "var(--radius-pill)",
-              border: "1px solid var(--border-light)",
-              backgroundColor: "var(--bg-soft-blue)",
-              alignItems: "center",
-              justifyContent: "center",
-              cursor: "pointer",
-              color: "var(--text-muted)",
-              flexShrink: 0,
-              boxSizing: "border-box",
-            }}
-            className="topnav-hamburger"
-            title="Menu"
-          >
-            <MenuIcon size={18} />
-          </button>
-        </div>
-      </div>
-
-      {/* ── Row 2: Primary Navigation bar ── */}
+      {/* ── Single Unified Top Navigation Bar (Merged Header & Navigation) ── */}
       <nav
         className="topnav-primary"
         style={{
           backgroundColor: "var(--blue-primary)",
           borderBottom: "1px solid var(--blue-dark)",
           position: "sticky",
-          top: 56,
-          zIndex: 190,
-          boxShadow: "0 2px 8px rgba(0, 50, 150, 0.15)",
+          top: 0,
+          zIndex: 200,
+          boxShadow: "0 2px 10px rgba(0, 50, 150, 0.18)",
         }}
         aria-label="Điều hướng chính"
       >
         <div
           style={{
             display: "flex",
-            alignItems: "stretch",
-            height: 44,
-            padding: "0 24px",
-            gap: 4,
-            overflowX: "auto",
-            scrollbarWidth: "none",
+            alignItems: "center",
+            height: 50,
+            padding: "0 20px",
+            gap: 12,
+            boxSizing: "border-box",
           }}
         >
-          {NAV_GROUPS.map((group) => {
-            const active = isGroupActive(group);
-            const isOpen = openMenu === group.id;
-            const ref = getAnchorRef(group.id);
-
-            if (group.to) {
-              const targetTo =
-                group.id === "overview" &&
-                location.pathname.startsWith("/store-owner")
-                  ? "/store-owner/dashboard"
-                  : group.to;
-              // Direct link (no dropdown)
-              return (
-                <NavLink
-                  key={group.id}
-                  to={targetTo}
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 8,
-                    padding: "0 16px",
-                    height: "100%",
-                    textDecoration: "none",
-                    fontSize: 13.5,
-                    fontFamily: "var(--font-sans)",
-                    fontWeight: active ? 700 : 500,
-                    color: "#ffffff",
-                    backgroundColor: active ? "rgba(0,0,0,0.2)" : "transparent",
-                    borderRadius: 0,
-                    borderBottom: active
-                      ? "3px solid #ffffff"
-                      : "3px solid transparent",
-                    transition: "all 0.15s ease",
-                    whiteSpace: "nowrap",
-                    flexShrink: 0,
-                    boxSizing: "border-box",
-                  }}
-                  onMouseEnter={(e) => {
-                    clearCloseTimer();
-                    setOpenMenu(null);
-                    if (!active)
-                      e.currentTarget.style.backgroundColor =
-                        "rgba(255,255,255,0.12)";
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!active)
-                      e.currentTarget.style.backgroundColor = "transparent";
-                  }}
-                >
-                  <group.icon size={16} color="currentColor" />
-                  <span>{group.label}</span>
-                </NavLink>
-              );
+          {/* Brand Logo & Name */}
+          <Link
+            to={
+              location.pathname.startsWith("/store-owner")
+                ? "/store-owner/dashboard"
+                : "/admin/dashboard"
             }
-
-            // Dropdown trigger
-            return (
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 9,
+              textDecoration: "none",
+              flexShrink: 0,
+              marginRight: 10,
+            }}
+          >
+            <BrandLogo />
+            <div>
               <div
-                key={group.id}
-                id={`nav-group-${group.id}`}
-                ref={(el) => {
-                  ref.current = el;
-                }}
-                className="topnav-group"
                 style={{
-                  position: "relative",
-                  display: "flex",
-                  alignItems: "stretch",
-                  height: "100%",
-                  flexShrink: 0,
+                  fontSize: 15.5,
+                  fontWeight: 800,
+                  color: "#ffffff",
+                  letterSpacing: "-0.02em",
+                  lineHeight: 1.15,
+                  whiteSpace: "nowrap",
                 }}
-                onMouseEnter={() => handleMenuEnter(group.id)}
-                onMouseOver={() => handleMenuEnter(group.id)}
-                onMouseLeave={handleMenuLeave}
               >
-                <button
-                  type="button"
-                  id={`nav-btn-${group.id}`}
-                  className={`topnav-group-btn ${isOpen ? "is-open" : ""}`}
-                  onClick={() => toggleMenu(group.id)}
-                  onMouseEnter={() => handleMenuEnter(group.id)}
-                  onMouseOver={() => handleMenuEnter(group.id)}
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 8,
-                    padding: "0 16px",
-                    height: "100%",
-                    background: "none",
-                    border: "none",
-                    borderBottom:
-                      active || isOpen
+                MT-GRMS
+              </div>
+              <div
+                style={{
+                  fontSize: 9.5,
+                  fontWeight: 700,
+                  color: "rgba(255, 255, 255, 0.8)",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.06em",
+                  lineHeight: 1,
+                  whiteSpace: "nowrap",
+                }}
+              >
+                Quản lý Tạp Hóa
+              </div>
+            </div>
+          </Link>
+
+          {/* Menus List */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "stretch",
+              height: 50,
+              gap: 2,
+              overflowX: "auto",
+              scrollbarWidth: "none",
+              flex: 1,
+            }}
+          >
+            {NAV_GROUPS.map((group) => {
+              const active = isGroupActive(group);
+              const isOpen = openMenu === group.id;
+              const ref = getAnchorRef(group.id);
+
+              if (group.to) {
+                const targetTo =
+                  group.id === "overview" &&
+                  location.pathname.startsWith("/store-owner")
+                    ? "/store-owner/dashboard"
+                    : group.to;
+                // Direct link (no dropdown)
+                return (
+                  <NavLink
+                    key={group.id}
+                    to={targetTo}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 7,
+                      padding: "0 14px",
+                      height: "100%",
+                      textDecoration: "none",
+                      fontSize: 13.5,
+                      fontFamily: "var(--font-sans)",
+                      fontWeight: active ? 700 : 500,
+                      color: "#ffffff",
+                      backgroundColor: active ? "rgba(0,0,0,0.2)" : "transparent",
+                      borderRadius: 0,
+                      borderBottom: active
                         ? "3px solid #ffffff"
                         : "3px solid transparent",
-                    backgroundColor:
-                      active || isOpen ? "rgba(0,0,0,0.2)" : "transparent",
-                    color: "#ffffff",
-                    fontSize: 13.5,
-                    fontWeight: active || isOpen ? 700 : 500,
-                    cursor: "pointer",
-                    fontFamily: "var(--font-sans)",
-                    transition: "all 0.15s ease",
-                    whiteSpace: "nowrap",
-                    boxSizing: "border-box",
-                  }}
-                  aria-expanded={isOpen}
-                  aria-haspopup="true"
-                >
-                  <group.icon size={16} color="currentColor" />
-                  <span>{group.label}</span>
-                  <ChevronDown open={isOpen} />
-                </button>
-
-                {(group.children || group.sections) && (
-                  <NavDropdown
-                    items={group.children}
-                    sections={group.sections}
-                    isOpen={isOpen}
-                    anchorRef={ref}
-                    onClose={() => {
+                      transition: "all 0.15s ease",
+                      whiteSpace: "nowrap",
+                      flexShrink: 0,
+                      boxSizing: "border-box",
+                    }}
+                    onMouseEnter={(e) => {
                       clearCloseTimer();
                       setOpenMenu(null);
+                      if (!active)
+                        e.currentTarget.style.backgroundColor =
+                          "rgba(255,255,255,0.12)";
                     }}
-                    onMouseEnter={clearCloseTimer}
-                    onMouseLeave={handleMenuLeave}
-                    currentPath={location.pathname + location.search}
-                  />
-                )}
+                    onMouseLeave={(e) => {
+                      if (!active)
+                        e.currentTarget.style.backgroundColor = "transparent";
+                    }}
+                  >
+                    <group.icon size={16} color="currentColor" />
+                    <span>{group.label}</span>
+                  </NavLink>
+                );
+              }
+
+              // Dropdown trigger
+              return (
+                <div
+                  key={group.id}
+                  id={`nav-group-${group.id}`}
+                  ref={(el) => {
+                    ref.current = el;
+                  }}
+                  className="topnav-group"
+                  style={{
+                    position: "relative",
+                    display: "flex",
+                    alignItems: "stretch",
+                    height: "100%",
+                    flexShrink: 0,
+                  }}
+                  onMouseEnter={() => handleMenuEnter(group.id)}
+                  onMouseOver={() => handleMenuEnter(group.id)}
+                  onMouseLeave={handleMenuLeave}
+                >
+                  <button
+                    type="button"
+                    id={`nav-btn-${group.id}`}
+                    className={`topnav-group-btn ${isOpen ? "is-open" : ""}`}
+                    onClick={() => toggleMenu(group.id)}
+                    onMouseEnter={() => handleMenuEnter(group.id)}
+                    onMouseOver={() => handleMenuEnter(group.id)}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 7,
+                      padding: "0 14px",
+                      height: "100%",
+                      background: "none",
+                      border: "none",
+                      borderBottom:
+                        active || isOpen
+                          ? "3px solid #ffffff"
+                          : "3px solid transparent",
+                      backgroundColor:
+                        active || isOpen ? "rgba(0,0,0,0.2)" : "transparent",
+                      color: "#ffffff",
+                      fontSize: 13.5,
+                      fontWeight: active || isOpen ? 700 : 500,
+                      cursor: "pointer",
+                      fontFamily: "var(--font-sans)",
+                      transition: "all 0.15s ease",
+                      whiteSpace: "nowrap",
+                      boxSizing: "border-box",
+                    }}
+                    aria-expanded={isOpen}
+                    aria-haspopup="true"
+                  >
+                    <group.icon size={16} color="currentColor" />
+                    <span>{group.label}</span>
+                    <ChevronDown open={isOpen} />
+                  </button>
+
+                  {(group.children || group.sections) && (
+                    <NavDropdown
+                      items={group.children}
+                      sections={group.sections}
+                      isOpen={isOpen}
+                      anchorRef={ref}
+                      onClose={() => {
+                        clearCloseTimer();
+                        setOpenMenu(null);
+                      }}
+                      onMouseEnter={clearCloseTimer}
+                      onMouseLeave={handleMenuLeave}
+                      currentPath={location.pathname + location.search}
+                    />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Right actions: Chi nhánh + Thông báo + Profile */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              marginLeft: "auto",
+              flexShrink: 0,
+            }}
+          >
+            {/* Tenant badge */}
+            <div
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 7,
+                height: 32,
+                padding: "0 12px",
+                borderRadius: "var(--radius-pill)",
+                backgroundColor: "rgba(255, 255, 255, 0.14)",
+                border: "1px solid rgba(255, 255, 255, 0.22)",
+                fontSize: "12px",
+                fontWeight: 600,
+                color: "#ffffff",
+                whiteSpace: "nowrap",
+                boxSizing: "border-box",
+              }}
+            >
+              <StoreIcon size={13} color="#ffffff" />
+              <span>Mini Minh Đức</span>
+              <span
+                style={{
+                  width: 6,
+                  height: 6,
+                  borderRadius: "50%",
+                  backgroundColor: "#4ADE80",
+                  display: "inline-block",
+                }}
+              />
+            </div>
+
+            {/* Bell notification */}
+            <button
+              type="button"
+              style={{
+                width: 32,
+                height: 32,
+                borderRadius: "50%",
+                border: "1px solid rgba(255, 255, 255, 0.22)",
+                backgroundColor: "rgba(255, 255, 255, 0.14)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: "pointer",
+                position: "relative",
+                color: "#ffffff",
+                flexShrink: 0,
+                boxSizing: "border-box",
+                transition: "all 0.15s ease",
+              }}
+              title="Thông báo"
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.25)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.14)";
+              }}
+            >
+              <BellIcon size={15} />
+              <span
+                style={{
+                  position: "absolute",
+                  top: 5,
+                  right: 5,
+                  width: 7,
+                  height: 7,
+                  borderRadius: "50%",
+                  backgroundColor: "#FF3B30",
+                  border: "1.5px solid #fff",
+                }}
+              />
+            </button>
+
+            {/* Profile User */}
+            <div
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 7,
+                height: 32,
+                padding: "0 10px 0 4px",
+                borderRadius: "var(--radius-pill)",
+                border: "1px solid rgba(255, 255, 255, 0.22)",
+                backgroundColor: "rgba(255, 255, 255, 0.14)",
+                cursor: "pointer",
+                flexShrink: 0,
+                boxSizing: "border-box",
+                transition: "background-color 0.15s ease",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.25)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.14)";
+              }}
+            >
+              <div
+                style={{
+                  width: 24,
+                  height: 24,
+                  borderRadius: "50%",
+                  background: "#ffffff",
+                  color: "var(--blue-primary, #0066FF)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: 10,
+                  fontWeight: 800,
+                }}
+              >
+                SO
               </div>
-            );
-          })}
+              <div style={{ display: "flex", flexDirection: "column" }}>
+                <span
+                  style={{
+                    fontSize: 11.5,
+                    fontWeight: 700,
+                    color: "#ffffff",
+                    lineHeight: 1.15,
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  Minh Đức
+                </span>
+                <span
+                  style={{
+                    fontSize: 9,
+                    color: "rgba(255, 255, 255, 0.8)",
+                    fontWeight: 600,
+                    lineHeight: 1,
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  Store Owner
+                </span>
+              </div>
+            </div>
+
+            {/* Mobile hamburger */}
+            <button
+              type="button"
+              onClick={() => setMobileOpen((v) => !v)}
+              style={{
+                display: "none",
+                width: 32,
+                height: 32,
+                borderRadius: "var(--radius-pill)",
+                border: "1px solid rgba(255, 255, 255, 0.22)",
+                backgroundColor: "rgba(255, 255, 255, 0.14)",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: "pointer",
+                color: "#ffffff",
+                flexShrink: 0,
+                boxSizing: "border-box",
+              }}
+              className="topnav-hamburger"
+              title="Menu"
+            >
+              <MenuIcon size={16} />
+            </button>
+          </div>
         </div>
       </nav>
 
