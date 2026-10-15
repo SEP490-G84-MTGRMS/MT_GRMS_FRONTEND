@@ -53,3 +53,48 @@ export interface GrnFilterState {
 }
 
 export type UserRole = 'store_owner' | 'employee';
+
+export type PaymentTerm = '0' | '15' | '30';
+export type PaymentMethod = 'Credit' | 'Cash' | 'Bank';
+
+export interface PoLookupOption {
+  poCode: string;
+  branchId: string;
+  branchName: string;
+  supplierId: string;
+  supplierName: string;
+  supplierCode: string;
+  orderDate: string;
+  expectedDeliveryDate: string;
+  items: GrnItemDetail[];
+  notes?: string;
+}
+
+export interface GrnCostSummary {
+  goodsTotal: number;
+  landedCost: number;
+  discountAmount: number;
+  vatPercent: number;
+  vatAmount: number;
+  grandTotal: number;
+}
+
+export interface GrnFormData {
+  id?: string;
+  grnNo: string;
+  branchId: string;
+  branchName: string;
+  poReference: string;
+  supplierId: string;
+  supplierName: string;
+  supplierCode: string;
+  receiptTime: string;
+  invoiceNo: string;
+  createdBy: string;
+  paymentTerm: PaymentTerm;
+  paymentMethod: PaymentMethod;
+  notes: string;
+  items: GrnItemDetail[];
+  costs: GrnCostSummary;
+  status: GrnStatus;
+}

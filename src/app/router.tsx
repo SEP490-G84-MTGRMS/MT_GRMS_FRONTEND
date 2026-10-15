@@ -23,7 +23,7 @@ import {
 } from '../features/purchase-order';
 
 // 2b. Goods Receipt Feature (FE-05 / UI-05-03)
-import { GoodsReceiptListPage } from '../features/goods-receipt';
+import { GoodsReceiptListPage, GoodsReceiptFormPage } from '../features/goods-receipt';
 
 // 3. Service Expenses Feature (FE-07)
 import { ServiceExpensesPage } from '../features/service-expenses/pages/ServiceExpensesPage';
@@ -204,6 +204,14 @@ export const router = createBrowserRouter([
         element: <GoodsReceiptListPage defaultRole="store_owner" />,
       },
       {
+        path: 'goods-receipts/create',
+        element: <GoodsReceiptFormPage defaultRole="store_owner" />,
+      },
+      {
+        path: 'goods-receipts/:id',
+        element: <GoodsReceiptFormPage defaultRole="store_owner" />,
+      },
+      {
         path: 'purchase-orders/receipts',
         element: <GoodsReceiptListPage defaultRole="store_owner" />,
       },
@@ -346,6 +354,14 @@ export const router = createBrowserRouter([
       {
         path: 'goods-receipts',
         element: <GoodsReceiptListPage defaultRole="store_owner" />,
+      },
+      {
+        path: 'goods-receipts/create',
+        element: <GoodsReceiptFormPage defaultRole="store_owner" />,
+      },
+      {
+        path: 'goods-receipts/:id',
+        element: <GoodsReceiptFormPage defaultRole="store_owner" />,
       },
       {
         path: 'purchase-orders/receipts',
@@ -809,6 +825,14 @@ export const router = createBrowserRouter([
         path: 'goods-receipts',
         element: <GoodsReceiptListPage defaultRole="employee" />,
       },
+      {
+        path: 'goods-receipts/create',
+        element: <GoodsReceiptFormPage defaultRole="employee" />,
+      },
+      {
+        path: 'goods-receipts/:id',
+        element: <GoodsReceiptFormPage defaultRole="employee" />,
+      },
     ],
   },
 
@@ -821,6 +845,14 @@ export const router = createBrowserRouter([
         index: true,
         element: <GoodsReceiptListPage defaultRole="store_owner" />,
       },
+      {
+        path: 'create',
+        element: <GoodsReceiptFormPage defaultRole="store_owner" />,
+      },
+      {
+        path: ':id',
+        element: <GoodsReceiptFormPage defaultRole="store_owner" />,
+      },
     ],
   },
   {
@@ -830,6 +862,14 @@ export const router = createBrowserRouter([
       {
         index: true,
         element: <GoodsReceiptListPage defaultRole="employee" />,
+      },
+      {
+        path: 'create',
+        element: <GoodsReceiptFormPage defaultRole="employee" />,
+      },
+      {
+        path: ':id',
+        element: <GoodsReceiptFormPage defaultRole="employee" />,
       },
     ],
   },
