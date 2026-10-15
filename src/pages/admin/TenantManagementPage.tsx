@@ -1,11 +1,11 @@
 import { useState, useMemo, useRef } from 'react';
 import type { FC } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { mockTenants } from '../../features/admin/data/mockAdminData';
 import {
   type FilterTabType,
   TenantSearchToolbar,
   TenantDataTable,
-  TenantDetailModal,
   ExtendGraceModal,
   ApplyLockModal,
   AdminToast,
@@ -16,13 +16,13 @@ import {
 import type { Tenant, PlanType, LockType } from '../../features/admin/types/admin.types';
 
 export const TenantManagementPage: FC = () => {
+  const navigate = useNavigate();
   const [tenants, setTenants] = useState<Tenant[]>(mockTenants);
   const [activeTab, setActiveTab] = useState<FilterTabType>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedPlan, setSelectedPlan] = useState<'all' | PlanType>('all');
 
   const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
-  const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [isGraceOpen, setIsGraceOpen] = useState(false);
   const [isLockOpen, setIsLockOpen] = useState(false);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -75,8 +75,7 @@ export const TenantManagementPage: FC = () => {
 
   // Handlers
   const handleDetail = (tenant: Tenant) => {
-    setSelectedTenant(tenant);
-    setIsDetailOpen(true);
+    navigate(`/admin/tenants/${tenant.id}`);
   };
 
   const handleLock = (tenant: Tenant) => {
@@ -180,19 +179,6 @@ export const TenantManagementPage: FC = () => {
       />
 
       {/* Modals */}
-      <TenantDetailModal
-        tenant={selectedTenant}
-        isOpen={isDetailOpen}
-        onClose={() => setIsDetailOpen(false)}
-        onExtendGrace={(t) => {
-          setSelectedTenant(t);
-          setIsGraceOpen(true);
-        }}
-        onLock={(t) => {
-          setSelectedTenant(t);
-          setIsLockOpen(true);
-        }}
-      />
 
       <ExtendGraceModal
         tenant={selectedTenant}

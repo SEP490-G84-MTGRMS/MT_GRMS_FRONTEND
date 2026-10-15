@@ -86,14 +86,15 @@ export const TopSellingProductsCard: React.FC = () => {
       style={{
         backgroundColor: '#ffffff',
         borderRadius: 24,
-        padding: '22px 24px',
+        padding: '20px 22px',
         border: '1px solid var(--border-light, #EDF2F9)',
         boxShadow: '0 4px 14px rgba(0, 30, 90, 0.04)',
         display: 'flex',
         flexDirection: 'column',
-        gap: 16,
+        gap: 14,
         height: '100%',
         boxSizing: 'border-box',
+        minWidth: 0,
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>

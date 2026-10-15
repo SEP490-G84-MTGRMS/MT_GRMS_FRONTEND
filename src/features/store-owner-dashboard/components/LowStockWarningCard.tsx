@@ -53,45 +53,50 @@ export const LowStockWarningCard: React.FC = () => {
       style={{
         backgroundColor: '#ffffff',
         borderRadius: 24,
-        padding: '22px 24px',
+        padding: '20px 22px',
         border: '1px solid var(--border-light, #EDF2F9)',
         boxShadow: '0 4px 14px rgba(0, 30, 90, 0.04)',
         display: 'flex',
         flexDirection: 'column',
-        gap: 16,
+        gap: 14,
         height: '100%',
         boxSizing: 'border-box',
+        minWidth: 0,
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             <h2
               style={{
-                fontSize: '17px',
+                fontSize: '16px',
                 fontWeight: 800,
                 color: 'var(--text-main, #0F172A)',
                 margin: 0,
                 letterSpacing: '-0.01em',
+                whiteSpace: 'nowrap',
               }}
             >
-              Cảnh báo Chạm mức Tồn tối thiểu
+              Cảnh báo Tồn tối thiểu
             </h2>
             <span
               style={{
-                fontSize: '11.5px',
+                fontSize: '11px',
                 fontWeight: 700,
                 padding: '2px 8px',
                 borderRadius: 'var(--radius-pill, 9999px)',
                 backgroundColor: '#FFF8EB',
                 color: '#D97706',
+                border: '1px solid #FFE8CC',
+                whiteSpace: 'nowrap',
               }}
             >
               4 mặt hàng
             </span>
           </div>
-          <div style={{ fontSize: '13px', color: 'var(--text-muted, #64748B)', marginTop: 4 }}>
-            Cần lên đơn nhập hàng với nhà cung cấp để tránh đứt gãy nguồn hàng
+          <div style={{ fontSize: '12px', color: 'var(--text-muted, #64748B)', marginTop: 3, lineHeight: 1.4 }}>
+            Cần lên đơn nhập hàng để tránh đứt gãy nguồn cung
           </div>
         </div>
 
@@ -99,36 +104,49 @@ export const LowStockWarningCard: React.FC = () => {
           type="button"
           onClick={() => navigate('/store-owner/purchase-orders/branches')}
           style={{
-            fontSize: '13px',
+            fontSize: '12.5px',
             fontWeight: 700,
             color: 'var(--blue-primary, #0066FF)',
-            backgroundColor: 'transparent',
-            border: 'none',
+            backgroundColor: '#EFF6FF',
+            border: '1px solid #DBEAFE',
             cursor: 'pointer',
-            padding: '4px 8px',
+            padding: '5px 12px',
             borderRadius: 'var(--radius-pill, 9999px)',
+            whiteSpace: 'nowrap',
+            flexShrink: 0,
+            transition: 'all 0.15s ease',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = '#0066FF';
+            e.currentTarget.style.color = '#ffffff';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = '#EFF6FF';
+            e.currentTarget.style.color = '#0066FF';
           }}
         >
           Tạo đơn nhập →
         </button>
       </div>
 
+      {/* Danh sách mặt hàng cảnh báo chạm mức tồn */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {lowStockList.map((item) => (
           <div
             key={item.id}
             style={{
               display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: 12,
+              flexDirection: 'column',
+              gap: 8,
               padding: '12px 14px',
               borderRadius: 14,
               backgroundColor: '#FAFAFA',
               border: '1px solid #F1F5F9',
+              transition: 'border-color 0.15s ease',
             }}
           >
-            <div style={{ flex: 1, minWidth: 0 }}>
+            {/* Hàng 1: Tên sản phẩm + Badge tồn kho */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
               <div
                 style={{
                   fontSize: '13.5px',
@@ -137,57 +155,92 @@ export const LowStockWarningCard: React.FC = () => {
                   whiteSpace: 'nowrap',
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
+                  flex: 1,
+                  minWidth: 0,
                 }}
+                title={item.productName}
               >
                 {item.productName}
               </div>
-              <div style={{ fontSize: '12px', color: '#64748B', marginTop: 2 }}>
-                NCC: <span style={{ color: '#475569' }}>{item.supplierName}</span>
+
+              <div
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  padding: '2px 8px',
+                  borderRadius: '9999px',
+                  backgroundColor: '#FFF0F0',
+                  border: '1px solid #FFD6D6',
+                  color: '#DC2626',
+                  fontSize: '12px',
+                  fontWeight: 800,
+                  fontFamily: "'JetBrains Mono', monospace",
+                  fontVariantNumeric: 'tabular-nums',
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0,
+                }}
+              >
+                <span>Còn {item.currentStock} {item.unit}</span>
               </div>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexShrink: 0 }}>
-              <div style={{ textAlign: 'right' }}>
-                <div
+            {/* Hàng 2: Nhà cung cấp & Định mức + Nút Nhập Hàng */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, paddingTop: 2 }}>
+              <div
+                style={{
+                  fontSize: '12px',
+                  color: '#64748B',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  flex: 1,
+                  minWidth: 0,
+                }}
+              >
+                <span style={{ color: '#475569', fontWeight: 600 }}>
+                  Định mức: {item.minStockThreshold} {item.unit}
+                </span>
+                <span>•</span>
+                <span
                   style={{
-                    fontSize: '14px',
-                    fontWeight: 800,
-                    color: '#FF3B30',
-                    fontFamily: "'JetBrains Mono', monospace",
-                    fontVariantNumeric: 'tabular-nums',
+                    color: '#64748B',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
                   }}
+                  title={item.supplierName}
                 >
-                  Còn {item.currentStock}{' '}
-                  <span style={{ fontSize: '12px', fontWeight: 500, color: '#64748B' }}>
-                    {item.unit}
-                  </span>
-                </div>
-                <div style={{ fontSize: '11px', color: '#94A3B8' }}>
-                  Định mức: {item.minStockThreshold}
-                </div>
+                  {item.supplierName}
+                </span>
               </div>
 
               <button
                 type="button"
                 onClick={() => navigate('/store-owner/purchase-orders/create-matrix')}
                 style={{
-                  padding: '5px 12px',
+                  padding: '4px 12px',
                   borderRadius: 'var(--radius-pill, 9999px)',
-                  backgroundColor: '#F0F6FF',
+                  backgroundColor: '#FFFFFF',
                   color: 'var(--blue-primary, #0066FF)',
-                  fontSize: '12px',
+                  fontSize: '11.5px',
                   fontWeight: 700,
                   border: '1px solid #DBEAFE',
                   cursor: 'pointer',
                   whiteSpace: 'nowrap',
+                  flexShrink: 0,
                   transition: 'all 0.15s ease',
+                  boxShadow: '0 1px 2px rgba(0, 102, 255, 0.05)',
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.backgroundColor = 'var(--blue-primary, #0066FF)';
                   e.currentTarget.style.color = '#ffffff';
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = '#F0F6FF';
+                  e.currentTarget.style.backgroundColor = '#FFFFFF';
                   e.currentTarget.style.color = 'var(--blue-primary, #0066FF)';
                 }}
               >

@@ -67,6 +67,7 @@ import { SubscriptionPlanPage } from '../pages/admin/SubscriptionPlanPage';
 import { SubscriptionPlanDetailPage } from '../pages/admin/SubscriptionPlanDetailPage';
 import { SubscriptionPlanCreatePage } from '../pages/admin/SubscriptionPlanCreatePage';
 import { SubscriptionPlanEditPage } from '../pages/admin/SubscriptionPlanEditPage';
+import { TenantDetailPage } from '../pages/admin/TenantDetailPage';
 import { LoginPage, RegisterPage, ForgotPasswordPage } from '../pages/auth';
 
 export const router = createBrowserRouter([
@@ -91,6 +92,10 @@ export const router = createBrowserRouter([
       {
         path: 'tenants',
         element: <TenantManagementPage />,
+      },
+      {
+        path: 'tenants/:id',
+        element: <TenantDetailPage />,
       },
       // ─── Chuyển hướng các nghiệp vụ bán lẻ cửa hàng sang /store-owner ───
       {
@@ -231,11 +236,11 @@ export const router = createBrowserRouter([
       },
       {
         path: 'subscriptions',
-        element: <SubscriptionPlanPage />,
+        element: <Navigate to="/store-owner/dashboard" replace />,
       },
       {
-        path: 'subscriptions/:id',
-        element: <SubscriptionPlanDetailPage />,
+        path: 'subscriptions/*',
+        element: <Navigate to="/store-owner/dashboard" replace />,
       },
       {
         path: 'suppliers',

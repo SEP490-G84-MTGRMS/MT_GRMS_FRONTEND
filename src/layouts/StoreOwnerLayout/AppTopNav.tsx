@@ -9,7 +9,6 @@ import {
   ChevronRightIcon,
   MenuIcon,
   TrendingUpIcon,
-  SubscriptionPlanIcon,
 } from "../../features/admin/components";
 import { Gift } from "lucide-react";
 
@@ -80,12 +79,13 @@ const NAV_GROUPS: NavGroup[] = [
           {
             label: "Danh mục hàng hóa",
             to: "/store-owner/products",
-            badge: "FE-01",
+            badge: "",
           },
           {
             label: "Sản phẩm theo NCC",
             to: "/store-owner/suppliers/products",
-            badge: "Master",
+            badge: "",
+            badgeType: "blue",
           },
           {
             label: "Thiết lập bảng giá",
@@ -103,7 +103,8 @@ const NAV_GROUPS: NavGroup[] = [
           {
             label: "Chuyển hàng liên kho",
             to: "/store-owner/transfers",
-            badge: "FE-15",
+            badge: "",
+            badgeType: "blue",
           },
         ],
       },
@@ -325,12 +326,6 @@ const NAV_GROUPS: NavGroup[] = [
         ],
       },
     ],
-  },
-  {
-    id: "subscriptions",
-    label: "Gói dịch vụ",
-    icon: SubscriptionPlanIcon,
-    to: "/store-owner/subscriptions",
   },
 ];
 
@@ -885,16 +880,6 @@ export const AppTopNav: FC = () => {
         location.pathname.startsWith("/store-owner/customers/") ||
         location.pathname === "/customers" ||
         location.pathname.startsWith("/customers/")
-      );
-    }
-    if (group.id === "subscriptions") {
-      return (
-        location.pathname === "/admin/subscriptions" ||
-        location.pathname.startsWith("/admin/subscriptions/") ||
-        location.pathname === "/admin/plans" ||
-        location.pathname.startsWith("/admin/plans/") ||
-        location.pathname === "/store-owner/subscriptions" ||
-        location.pathname.startsWith("/store-owner/subscriptions/")
       );
     }
     if (group.to)
