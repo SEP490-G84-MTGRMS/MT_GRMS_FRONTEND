@@ -17,9 +17,11 @@ import {
 
 interface OrderMatrixFilterBarProps {
   // Scope selectors
-  branches: BranchOption[];
+  branches?: BranchOption[];
   selectedBranchId: string;
-  onSelectBranch: (branchId: string) => void;
+  onSelectBranch?: (branchId: string) => void;
+  hideBranchSelect?: boolean;
+  fixedBranchLabel?: string;
 
   suppliers: SupplierOption[];
   selectedSupplierId: string;
@@ -63,9 +65,11 @@ interface OrderMatrixFilterBarProps {
 }
 
 export const OrderMatrixFilterBar: FC<OrderMatrixFilterBarProps> = ({
-  branches,
+  branches = [],
   selectedBranchId,
   onSelectBranch,
+  hideBranchSelect = false,
+  fixedBranchLabel,
   suppliers,
   selectedSupplierId,
   onSelectSupplier,
@@ -108,7 +112,7 @@ export const OrderMatrixFilterBar: FC<OrderMatrixFilterBarProps> = ({
       const ok = window.confirm('Bạn có số lượng chưa lưu! Chuyển Chi nhánh sẽ làm mới ma trận. Tiếp tục?');
       if (!ok) return;
     }
-    onSelectBranch(newId);
+    onSelectBranch?.(newId);
   };
 
   const handleSupplierChange = (newId: string) => {
@@ -140,19 +144,44 @@ export const OrderMatrixFilterBar: FC<OrderMatrixFilterBarProps> = ({
     <div className="po-unified-bar">
       {/* ── Left group: Chi nhánh + NCC ── */}
       <div className="po-bar-group">
-        <select
-          className="po-ctrl-select"
-          style={{ width: 132, fontWeight: 600 }}
-          value={selectedBranchId}
-          onChange={(e) => handleBranchChange(e.target.value)}
-          title="Chọn Chi Nhánh"
-        >
-          {branches.map((b) => (
-            <option key={b.id} value={b.id}>
-              CN: {b.name}
-            </option>
-          ))}
-        </select>
+        {!hideBranchSelect && (
+          <select
+            className="po-ctrl-select"
+            style={{ width: 132, fontWeight: 600 }}
+            value={selectedBranchId}
+            onChange={(e) => handleBranchChange(e.target.value)}
+            title="Chọn Chi Nhánh"
+          >
+            {branches.map((b) => (
+              <option key={b.id} value={b.id}>
+                CN: {b.name}
+              </option>
+            ))}
+          </select>
+        )}
+        {hideBranchSelect && fixedBranchLabel && (
+          <div
+            className="po-fixed-branch-chip"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '0 10px',
+              height: 32,
+              background: '#f8fafc',
+              border: '1px solid #cbd5e1',
+              borderRadius: 4,
+              fontSize: 12,
+              fontWeight: 600,
+              color: '#334155',
+              whiteSpace: 'nowrap',
+            }}
+            title={`Chi nhánh làm việc: ${fixedBranchLabel}`}
+          >
+            <span style={{ color: '#0d9488' }}>🏪</span>
+            <span>CN: {fixedBranchLabel}</span>
+          </div>
+        )}
 
         <select
           className="po-ctrl-select"

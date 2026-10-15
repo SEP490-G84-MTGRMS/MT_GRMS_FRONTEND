@@ -43,7 +43,7 @@ export const SupplierFilterBar: FC<Props> = ({
   };
 
   return (
-    <div className="admin-toolbar-card">
+    <div className="admin-toolbar-card" style={{ border: '1px solid #cbd5e1', borderRadius: 10 }}>
       <form
         onSubmit={handleSubmit}
         className="admin-search-row"
@@ -54,7 +54,7 @@ export const SupplierFilterBar: FC<Props> = ({
             <input
               type="text"
               className="admin-search-input"
-              style={{ paddingLeft: 16, width: '100%', boxSizing: 'border-box' }}
+              style={{ paddingLeft: 16, width: '100%', boxSizing: 'border-box', border: '1px solid #cbd5e1', borderRadius: 8 }}
               placeholder="Tìm theo Mã NCC (SUP-...), tên NCC, MST, người liên hệ, SĐT..."
               value={draftFilters.searchTerm}
               onChange={(e) => setDraftFilters((prev) => ({ ...prev, searchTerm: e.target.value }))}
@@ -68,8 +68,8 @@ export const SupplierFilterBar: FC<Props> = ({
             style={{
               height: 40,
               padding: '0 28px 0 12px',
-              borderRadius: 'var(--radius-pill)',
-              border: '1px solid var(--border-light)',
+              borderRadius: 8,
+              border: '1px solid #cbd5e1',
               backgroundColor: 'var(--bg-soft-blue)',
               fontFamily: 'inherit',
               fontSize: 13,
@@ -91,8 +91,8 @@ export const SupplierFilterBar: FC<Props> = ({
             style={{
               height: 40,
               padding: '0 28px 0 12px',
-              borderRadius: 'var(--radius-pill)',
-              border: '1px solid var(--border-light)',
+              borderRadius: 8,
+              border: '1px solid #cbd5e1',
               backgroundColor: 'var(--bg-soft-blue)',
               fontFamily: 'inherit',
               fontSize: 13,
@@ -117,8 +117,8 @@ export const SupplierFilterBar: FC<Props> = ({
             style={{
               height: 40,
               padding: '0 28px 0 12px',
-              borderRadius: 'var(--radius-pill)',
-              border: '1px solid var(--border-light)',
+              borderRadius: 8,
+              border: '1px solid #cbd5e1',
               backgroundColor: 'var(--bg-soft-blue)',
               fontFamily: 'inherit',
               fontSize: 13,
@@ -137,7 +137,7 @@ export const SupplierFilterBar: FC<Props> = ({
           <button
             type="submit"
             className="admin-btn admin-btn-primary"
-            style={{ height: 40, padding: '0 16px', gap: 6, cursor: 'pointer' }}
+            style={{ height: 40, padding: '0 16px', gap: 6, cursor: 'pointer', borderRadius: 8 }}
           >
             <Search size={14} />
             <span>Tìm kiếm</span>
@@ -147,7 +147,7 @@ export const SupplierFilterBar: FC<Props> = ({
           <button
             type="button"
             className="admin-btn admin-btn-secondary"
-            style={{ height: 40, padding: '0 14px', gap: 6, cursor: 'pointer' }}
+            style={{ height: 40, padding: '0 14px', gap: 6, cursor: 'pointer', border: '1px solid #cbd5e1', borderRadius: 8 }}
             onClick={handleResetClick}
           >
             <RotateCcw size={14} />

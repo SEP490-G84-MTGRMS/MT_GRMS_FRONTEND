@@ -1,7 +1,7 @@
 import type { FC } from 'react';
 import type { SupplierSummary } from '../types/supplier.types';
 import { SupplierCategoryBadge, SupplierStatusBadge } from './SupplierStatusBadge';
-import { CreditCard, Eye, Edit3 } from 'lucide-react';
+import { CreditCard, Edit3 } from 'lucide-react';
 
 interface Props {
   supplier: SupplierSummary;
@@ -55,7 +55,7 @@ export const SupplierTableRow: FC<Props> = ({
 
 
       {/* Phân loại */}
-      <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
+      <td style={{ whiteSpace: 'nowrap' }}>
         <SupplierCategoryBadge category={supplier.category} />
       </td>
 
@@ -68,11 +68,8 @@ export const SupplierTableRow: FC<Props> = ({
       </td>
 
       {/* Hạn nợ */}
-      <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
-        <span
-          className="admin-badge"
-          style={{ background: 'var(--bg-soft-blue)', color: 'var(--blue-primary)', border: '1px solid var(--blue-border)', fontSize: 11, padding: '2px 7px' }}
-        >
+      <td style={{ whiteSpace: 'nowrap' }}>
+        <span style={{ fontSize: '12.5px', fontWeight: 500, color: '#374151' }}>
           {supplier.paymentTermDays === 0 ? 'Tiền mặt' : `${supplier.paymentTermDays}d`}
         </span>
       </td>
@@ -96,18 +93,17 @@ export const SupplierTableRow: FC<Props> = ({
       </td>
 
       {/* Trạng thái */}
-      <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
+      <td style={{ whiteSpace: 'nowrap' }}>
         <SupplierStatusBadge status={supplier.status} />
       </td>
 
       {/* Thao tác */}
       <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-        <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4 }}>
+        <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-end', gap: 6 }}>
           {supplier.currentDebt > 0 && (
             <button
               type="button"
-              className="admin-btn admin-btn-sm admin-btn-success"
-              style={{ padding: '3px 6px', fontSize: 11 }}
+              className="admin-table-btn"
               onClick={() => onPayDebt(supplier)}
               title="Lập phiếu chi trả nợ"
             >
@@ -118,23 +114,20 @@ export const SupplierTableRow: FC<Props> = ({
 
           <button
             type="button"
-            className="admin-btn admin-btn-sm admin-btn-secondary"
-            style={{ padding: '3px 6px', fontSize: 11 }}
+            className="admin-table-btn"
             onClick={() => onEdit(supplier)}
             title="Chỉnh sửa thông tin"
           >
-            <Edit3 size={12} />
+            <Edit3 size={13} />
           </button>
 
           <button
             type="button"
-            className="admin-btn admin-btn-sm admin-btn-primary"
-            style={{ padding: '3px 7px', fontSize: 11 }}
+            className="admin-table-btn admin-table-btn-primary"
             onClick={() => onViewDetail(supplier)}
             title="Xem chi tiết"
           >
-            <Eye size={12} />
-            <span>Chi tiết</span>
+            Chi tiết
           </button>
         </div>
       </td>

@@ -441,3 +441,24 @@ export const UploadIcon: FC<IconProps> = ({ size = defaultProps.size, className,
     <line x1="12" y1="3" x2="12" y2="15" />
   </svg>
 );
+
+/** 📑 Gói cước SaaS & Dịch vụ (Subscription Plans) */
+export const SubscriptionPlanIcon: FC<IconProps> = ({ size = defaultProps.size, className, color = 'currentColor', style }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke={color}
+    strokeWidth={defaultProps.strokeWidth}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+    style={style}
+  >
+    <polygon points="12 2 2 7 12 12 22 7 12 2" />
+    <polyline points="2 17 12 22 22 17" />
+    <polyline points="2 12 12 17 22 12" />
+  </svg>
+);
+

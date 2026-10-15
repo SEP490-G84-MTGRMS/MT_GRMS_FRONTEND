@@ -1,11 +1,20 @@
 import type { FC } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { SearchIcon, BellIcon } from '../../features/admin/components';
+import { useAuthStore } from '../../stores/useAuthStore';
 
 interface AdminTopbarProps {
   onSearch?: (query: string) => void;
 }
 
 export const AdminTopbar: FC<AdminTopbarProps> = ({ onSearch }) => {
+  const navigate = useNavigate();
+  const { logout } = useAuthStore();
+
+  const handleLogout = () => {
+    logout();
+    navigate('/auth/login');
+  };
   return (
     <header className="admin-topbar">
       <div style={{ display: 'flex', alignItems: 'center', flex: 1, maxWidth: 480 }}>
@@ -66,6 +75,43 @@ export const AdminTopbar: FC<AdminTopbarProps> = ({ onSearch }) => {
             </span>
           </div>
         </div>
+
+        <button
+          type="button"
+          onClick={handleLogout}
+          style={{
+            height: 38,
+            padding: '0 14px',
+            borderRadius: '9999px',
+            background: '#FFF0F0',
+            border: '1px solid #FFD6D6',
+            color: '#FF3B30',
+            fontSize: 12.5,
+            fontWeight: 600,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            cursor: 'pointer',
+            transition: 'background 0.15s ease',
+          }}
+          title="Đăng xuất khỏi hệ thống"
+        >
+          <svg
+            width="15"
+            height="15"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+            <polyline points="16 17 21 12 16 7" />
+            <line x1="21" y1="12" x2="9" y2="12" />
+          </svg>
+          <span>Đăng xuất</span>
+        </button>
       </div>
     </header>
   );

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { FC } from 'react';
 import {
   EyeIcon,
@@ -44,6 +45,21 @@ export const ExpenseTable: FC<ExpenseTableProps> = ({
   onPay,
   onCancel,
 }) => {
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+
+  const toggleSelectAll = () => {
+    if (selectedIds.length === data.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(data.map((item) => item.expenseId));
+    }
+  };
+
+  const toggleSelectOne = (id: string) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
 
   if (isLoading) {
     return (
@@ -106,24 +122,38 @@ export const ExpenseTable: FC<ExpenseTableProps> = ({
   }
 
   return (
-    <div className="expense-table-container">
+    <div className="admin-table-card">
       <div style={{ overflowX: 'auto' }}>
-        <table className="expense-table">
+        <table className="admin-data-table expense-table">
           <thead>
             <tr>
-              <th style={{ width: '15%' }}>Mã & Ngày</th>
+              <th style={{ width: 30, textAlign: 'center', padding: '10px 4px' }}>
+                <input
+                  type="checkbox"
+                  checked={data.length > 0 && selectedIds.length === data.length}
+                  onChange={toggleSelectAll}
+                />
+              </th>
+              <th style={{ width: '14%' }}>Mã & Ngày</th>
               <th style={{ width: '13%' }}>Danh mục</th>
-              <th style={{ width: '15%' }}>Chi nhánh</th>
-              <th style={{ width: '21%' }}>Nhà cung cấp / Nội dung</th>
+              <th style={{ width: '14%' }}>Chi nhánh</th>
+              <th style={{ width: '20%' }}>Nhà cung cấp / Nội dung</th>
               <th style={{ width: '11%' }}>Hạn thanh toán</th>
               <th style={{ width: '12%', textAlign: 'right' }}>Số tiền</th>
-              <th style={{ width: '13%', textAlign: 'center' }}>Trạng thái</th>
+              <th style={{ width: '13%', textAlign: 'left' }}>Trạng thái</th>
               <th style={{ width: '10%', textAlign: 'right' }}>Thao tác</th>
             </tr>
           </thead>
           <tbody>
             {data.map((item) => (
               <tr key={item.expenseId}>
+                <td style={{ textAlign: 'center', padding: '10px 4px' }}>
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.includes(item.expenseId)}
+                    onChange={() => toggleSelectOne(item.expenseId)}
+                  />
+                </td>
                 <td>
                   <div className="expense-table-code">{item.expenseId}</div>
                   <div style={{ fontSize: '0.74rem', color: '#94a3b8' }}>
@@ -182,10 +212,10 @@ export const ExpenseTable: FC<ExpenseTableProps> = ({
                 <td className="expense-table-amount">
                   {formatCurrency(item.amount)}
                 </td>
-                <td style={{ textAlign: 'center' }}>
+                <td style={{ textAlign: 'left' }}>
                   <ExpenseStatusBadge status={item.status} dueDate={item.dueDate} />
                 </td>
-                <td>
+                <td style={{ textAlign: 'right' }}>
                   <div className="table-action-group" style={{ justifyContent: 'flex-end' }}>
                     {item.attachedBillUrl && (
                       <button
@@ -197,9 +227,10 @@ export const ExpenseTable: FC<ExpenseTableProps> = ({
                           )
                         }
                         title="Xem hóa đơn đính kèm"
-                        className="action-icon-btn"
+                        className="admin-table-btn"
                       >
-                        <EyeIcon size={14} color="currentColor" />
+                        <EyeIcon size={12} color="currentColor" />
+                        <span>Hóa đơn</span>
                       </button>
                     )}
 
@@ -207,19 +238,21 @@ export const ExpenseTable: FC<ExpenseTableProps> = ({
                       <>
                         <button
                           type="button"
-                          onClick={() => onPay(item)}
-                          className="action-btn-pay"
-                          title="Xác nhận thanh toán khoản chi này"
+                          onClick={() => onCancel(item)}
+                          title="Hủy khoản chi"
+                          className="admin-table-btn"
+                          style={{ color: '#dc2626' }}
                         >
-                          Thanh toán
+                          <CloseIcon size={12} color="currentColor" />
+                          <span>Hủy</span>
                         </button>
                         <button
                           type="button"
-                          onClick={() => onCancel(item)}
-                          title="Hủy khoản chi"
-                          className="action-icon-btn danger"
+                          onClick={() => onPay(item)}
+                          className="admin-table-btn admin-table-btn-primary"
+                          title="Xác nhận thanh toán khoản chi này"
                         >
-                          <CloseIcon size={13} color="currentColor" />
+                          <span>Thanh toán</span>
                         </button>
                       </>
                     )}

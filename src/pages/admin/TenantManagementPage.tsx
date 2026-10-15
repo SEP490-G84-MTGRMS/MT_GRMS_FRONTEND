@@ -2,7 +2,6 @@ import { useState, useMemo, useRef } from 'react';
 import type { FC } from 'react';
 import { mockTenants } from '../../features/admin/data/mockAdminData';
 import {
-  TenantFilterTabs,
   type FilterTabType,
   TenantSearchToolbar,
   TenantDataTable,
@@ -156,16 +155,14 @@ export const TenantManagementPage: FC = () => {
         </div>
       </div>
 
-      {/* Filter Tabs & Search Toolbar */}
-      <div className="admin-toolbar-card">
-        <TenantFilterTabs
-          activeTab={activeTab}
-          onSelectTab={setActiveTab}
-          counts={tabCounts}
-        />
+      {/* Filter & Search Toolbar */}
+      <div className="admin-toolbar-card" style={{ border: '1px solid #cbd5e1', borderRadius: 10 }}>
         <TenantSearchToolbar
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
+          selectedStatus={activeTab}
+          onStatusChange={setActiveTab}
+          statusCounts={tabCounts}
           selectedPlan={selectedPlan}
           onPlanChange={setSelectedPlan}
           visibleCount={filteredTenants.length}

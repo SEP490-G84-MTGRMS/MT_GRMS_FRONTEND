@@ -1,5 +1,6 @@
 import type { FC } from "react";
 import { NavLink, Link } from "react-router-dom";
+import { Layers } from "lucide-react";
 import {
   DashboardIcon,
   StoreIcon,
@@ -104,6 +105,20 @@ export const AdminSidebar: FC<AdminSidebarProps> = ({ isOpen = true, onToggle })
           <StoreIcon size={19} />
           <span className="admin-nav-label">Khách hàng thuê</span>
           <span className="nav-badge">128</span>
+        </NavLink>
+
+        <NavLink
+          to="/admin/subscriptions"
+          title="Gói dịch vụ & Biểu phí SaaS"
+          className={({ isActive }) =>
+            `admin-nav-item ${isActive ? "active" : ""}`
+          }
+        >
+          <Layers size={19} />
+          <span className="admin-nav-label">Gói dịch vụ SaaS</span>
+          <span className="nav-badge" style={{ background: "var(--blue-light)", color: "var(--blue-primary)" }}>
+            4 gói
+          </span>
         </NavLink>
 
         <div className="admin-nav-section-title" style={{ marginTop: 14 }}>

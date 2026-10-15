@@ -73,7 +73,7 @@ export const SupplierProductFilterBar: FC<SupplierProductFilterBarProps> = ({
     (statusFilter !== 'ALL' ? 1 : 0);
 
   return (
-    <div className="admin-toolbar-card" style={{ marginBottom: 20 }}>
+    <div className="admin-toolbar-card" style={{ marginBottom: 20, border: '1px solid #cbd5e1', borderRadius: 10 }}>
       <form onSubmit={handleSubmit}>
         <div
           style={{
@@ -118,8 +118,8 @@ export const SupplierProductFilterBar: FC<SupplierProductFilterBarProps> = ({
                   height: 38,
                   paddingLeft: 36,
                   paddingRight: 12,
-                  borderRadius: 'var(--radius-pill)',
-                  border: '1px solid var(--border-mid)',
+                  borderRadius: 8,
+                  border: '1px solid #cbd5e1',
                   fontSize: '13px',
                   color: 'var(--text-main)',
                   outline: 'none',
@@ -134,7 +134,7 @@ export const SupplierProductFilterBar: FC<SupplierProductFilterBarProps> = ({
                   e.target.style.boxShadow = '0 0 0 3px rgba(15, 118, 110, 0.1)';
                 }}
                 onBlur={(e) => {
-                  e.target.style.borderColor = 'var(--border-mid)';
+                  e.target.style.borderColor = '#cbd5e1';
                   e.target.style.backgroundColor = 'var(--bg-soft-blue)';
                   e.target.style.boxShadow = 'none';
                 }}
@@ -151,9 +151,9 @@ export const SupplierProductFilterBar: FC<SupplierProductFilterBarProps> = ({
                 gap: 6,
                 height: 38,
                 padding: '0 14px',
-                borderRadius: 'var(--radius-pill)',
+                borderRadius: 8,
                 backgroundColor: isMobilePanelOpen ? 'var(--blue-light)' : '#ffffff',
-                border: '1px solid var(--border-mid)',
+                border: '1px solid #cbd5e1',
                 color: isMobilePanelOpen ? 'var(--blue-primary)' : 'var(--text-main)',
                 fontSize: '13px',
                 fontWeight: 600,
@@ -203,8 +203,8 @@ export const SupplierProductFilterBar: FC<SupplierProductFilterBarProps> = ({
                     height: 38,
                     paddingLeft: 35,
                     paddingRight: 14,
-                    borderRadius: 'var(--radius-pill)',
-                    border: '1px solid var(--border-mid)',
+                    borderRadius: 8,
+                    border: '1px solid #cbd5e1',
                     fontSize: '13px',
                     color: 'var(--text-main)',
                     backgroundColor: '#ffffff',
@@ -220,7 +220,7 @@ export const SupplierProductFilterBar: FC<SupplierProductFilterBarProps> = ({
                     e.target.style.boxShadow = '0 0 0 3px rgba(15, 118, 110, 0.1)';
                   }}
                   onBlur={(e) => {
-                    e.target.style.borderColor = 'var(--border-mid)';
+                    e.target.style.borderColor = '#cbd5e1';
                     e.target.style.boxShadow = 'none';
                   }}
                 >
@@ -254,8 +254,8 @@ export const SupplierProductFilterBar: FC<SupplierProductFilterBarProps> = ({
                     height: 38,
                     paddingLeft: 35,
                     paddingRight: 14,
-                    borderRadius: 'var(--radius-pill)',
-                    border: '1px solid var(--border-mid)',
+                    borderRadius: 8,
+                    border: '1px solid #cbd5e1',
                     fontSize: '13px',
                     color: 'var(--text-main)',
                     backgroundColor: '#ffffff',
@@ -271,7 +271,7 @@ export const SupplierProductFilterBar: FC<SupplierProductFilterBarProps> = ({
                     e.target.style.boxShadow = '0 0 0 3px rgba(15, 118, 110, 0.1)';
                   }}
                   onBlur={(e) => {
-                    e.target.style.borderColor = 'var(--border-mid)';
+                    e.target.style.borderColor = '#cbd5e1';
                     e.target.style.boxShadow = 'none';
                   }}
                 >
@@ -305,8 +305,8 @@ export const SupplierProductFilterBar: FC<SupplierProductFilterBarProps> = ({
                     height: 38,
                     paddingLeft: 35,
                     paddingRight: 14,
-                    borderRadius: 'var(--radius-pill)',
-                    border: '1px solid var(--border-mid)',
+                    borderRadius: 8,
+                    border: '1px solid #cbd5e1',
                     fontSize: '13px',
                     color: 'var(--text-main)',
                     backgroundColor: '#ffffff',
@@ -322,7 +322,7 @@ export const SupplierProductFilterBar: FC<SupplierProductFilterBarProps> = ({
                     e.target.style.boxShadow = '0 0 0 3px rgba(15, 118, 110, 0.1)';
                   }}
                   onBlur={(e) => {
-                    e.target.style.borderColor = 'var(--border-mid)';
+                    e.target.style.borderColor = '#cbd5e1';
                     e.target.style.boxShadow = 'none';
                   }}
                 >
@@ -343,7 +343,7 @@ export const SupplierProductFilterBar: FC<SupplierProductFilterBarProps> = ({
                 gap: 6,
                 height: 38,
                 padding: '0 18px',
-                borderRadius: 'var(--radius-pill)',
+                borderRadius: 8,
                 backgroundColor: 'var(--blue-primary)',
                 color: '#ffffff',
                 border: 'none',
@@ -373,7 +373,7 @@ export const SupplierProductFilterBar: FC<SupplierProductFilterBarProps> = ({
                   gap: 6,
                   height: 38,
                   padding: '0 14px',
-                  borderRadius: 'var(--radius-pill)',
+                  borderRadius: 8,
                   backgroundColor: '#ffffff',
                   color: '#ef4444',
                   border: '1px solid #fecaca',
