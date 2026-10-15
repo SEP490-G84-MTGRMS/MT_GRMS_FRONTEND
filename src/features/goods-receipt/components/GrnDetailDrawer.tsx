@@ -154,7 +154,7 @@ export const GrnDetailDrawer: FC<GrnDetailDrawerProps> = ({
                 </span>
               </div>
               <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
-                Loại: <b>{receipt.typeLabel}</b> • Ngày: {receipt.receiveDate}
+                Hình thức: <b>Nhập từ PO ({receipt.poReference})</b> • Ngày: {receipt.receiveDate}
               </div>
             </div>
           </div>

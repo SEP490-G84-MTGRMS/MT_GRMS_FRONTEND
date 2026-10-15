@@ -4,7 +4,6 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   PackageCheck,
   Plus,
-  FilePlus,
   ShieldCheck,
   UserCheck,
   Layers,
@@ -337,7 +336,7 @@ export const GoodsReceiptListPage: FC<{ defaultRole?: UserRole }> = ({
             <span>Đơn mua hàng PO</span>
           </button>
 
-          {/* Action buttons */}
+          {/* Action button */}
           <button
             type="button"
             onClick={() => showToast('Mở màn hình Nhập kho từ đơn đặt hàng PO (grn_form.html?type=po)', 'info')}
@@ -346,16 +345,6 @@ export const GoodsReceiptListPage: FC<{ defaultRole?: UserRole }> = ({
           >
             <Plus size={14} />
             <span>+ Nhập kho từ PO</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => showToast('Mở màn hình Tạo phiếu nhập kho trực tiếp (grn_form.html?type=direct)', 'info')}
-            className="po-btn po-btn-outline"
-            style={{ height: 32, padding: '0 12px' }}
-          >
-            <FilePlus size={14} />
-            <span>+ Tạo GRN trực tiếp</span>
           </button>
         </div>
       </div>

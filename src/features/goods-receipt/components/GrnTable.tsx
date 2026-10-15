@@ -246,17 +246,16 @@ export const GrnTable: FC<GrnTableProps> = ({
         >
           {/* Column widths */}
           <colgroup>
-            <col style={{ width: '15%' }} />
-            <col style={{ width: '9%' }} />
-            <col style={{ width: '14%' }} />
-            <col style={{ width: '14%' }} />
-            <col style={{ width: '12%' }} />
-            <col style={{ width: '10%' }} />
-            <col style={{ width: '7%' }} />
-            <col style={{ width: '10%' }} />
+            <col style={{ width: '13%' }} />
             <col style={{ width: '12%' }} />
             <col style={{ width: '11%' }} />
-            <col style={{ width: '14%' }} />
+            <col style={{ width: '13%' }} />
+            <col style={{ width: '10%' }} />
+            <col style={{ width: '7%' }} />
+            <col style={{ width: '11%' }} />
+            <col style={{ width: '11%' }} />
+            <col style={{ width: '10%' }} />
+            <col style={{ width: '12%' }} />
           </colgroup>
 
           {/* Sticky Header */}
@@ -275,7 +274,7 @@ export const GrnTable: FC<GrnTableProps> = ({
                 letterSpacing: 0.4,
               }}
             >
-              {/* 1. Mã GRN / Mã PO */}
+              {/* 1. Mã GRN */}
               <th
                 onClick={() => handleSort('code')}
                 style={{
@@ -286,17 +285,12 @@ export const GrnTable: FC<GrnTableProps> = ({
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span>MÃ GRN / PO</span>
+                  <span>MÃ PHIẾU GRN</span>
                   <ArrowUpDown size={12} color="#94a3b8" />
                 </div>
               </th>
 
-              {/* 2. Loại */}
-              <th style={{ padding: '10px 10px', borderBottom: '1px solid #cbd5e1' }}>
-                LOẠI
-              </th>
-
-              {/* 3. Ngày nhận / Dự kiến */}
+              {/* 2. Ngày nhận / Dự kiến */}
               <th
                 onClick={() => handleSort('receiveDate')}
                 style={{
@@ -404,7 +398,7 @@ export const GrnTable: FC<GrnTableProps> = ({
           <tbody>
             {sortedReceipts.length === 0 ? (
               <tr>
-                <td colSpan={11} style={{ padding: '50px 20px', textAlign: 'center', color: '#64748b' }}>
+                <td colSpan={10} style={{ padding: '50px 20px', textAlign: 'center', color: '#64748b' }}>
                   <div
                     style={{
                       display: 'flex',
@@ -501,12 +495,7 @@ export const GrnTable: FC<GrnTableProps> = ({
                       </button>
                     </td>
 
-                    {/* 2. Loại */}
-                    <td style={{ padding: '11px 10px', fontSize: 12, color: '#475569', borderBottom: '1px solid #f1f5f9' }}>
-                      {row.typeLabel}
-                    </td>
-
-                    {/* 3. Ngày nhận / Dự kiến */}
+                    {/* 2. Ngày nhận / Dự kiến */}
                     <td style={{ padding: '11px 12px', fontSize: 12, borderBottom: '1px solid #f1f5f9' }}>
                       <span style={{ fontWeight: isToday ? 700 : 500, color: isToday ? '#0369a1' : '#1e293b' }}>
                         {row.receiveDate}
