@@ -5,3 +5,4 @@ export * from './components/GrnFilterBar';
 export * from './components/GrnTable';
 export * from './components/GrnDetailDrawer';
 export * from './pages/GoodsReceiptListPage';
+export * from './pages/GoodsReceiptFormPage';

@@ -205,22 +205,28 @@ export const GoodsReceiptListPage: FC<{ defaultRole?: UserRole }> = ({
   // Action handlers
   const handleActionClick = (action: string, receipt: GoodsReceiptListItem) => {
     if (action === 'RECEIVE_NOW') {
-      setSelectedReceipt(receipt);
-      setIsDrawerOpen(true);
-      showToast(`Bắt đầu tiếp nhận đơn ${receipt.code} tại chi nhánh. Mở phiếu kiểm đếm...`, 'info');
+      const targetUrl =
+        role === 'employee'
+          ? `/employee/goods-receipts/create?poCode=${receipt.poReference}&branch=${employeeBranchId}&role=employee`
+          : `/store-owner/goods-receipts/create?poCode=${receipt.poReference}`;
+      navigate(targetUrl);
     } else if (action === 'APPROVE_DRAFT') {
       setReceipts((prev) =>
         prev.map((r) => (r.id === receipt.id ? { ...r, status: 'CONFIRMED' } : r))
       );
       showToast(`Đã duyệt hoàn tất phiếu ${receipt.code}. Cập nhật tồn kho theo lô FEFO thành công!`, 'success');
     } else if (action === 'EDIT_DRAFT') {
-      setSelectedReceipt(receipt);
-      setIsDrawerOpen(true);
-      showToast(`Mở giao diện sửa phiếu kiểm đếm ${receipt.code}`, 'info');
+      const targetUrl =
+        role === 'employee'
+          ? `/employee/goods-receipts/${receipt.id}?branch=${employeeBranchId}&role=employee`
+          : `/store-owner/goods-receipts/${receipt.id}`;
+      navigate(targetUrl);
     } else if (action === 'RESOLVE_MISMATCH') {
-      setSelectedReceipt(receipt);
-      setIsDrawerOpen(true);
-      showToast(`Mở biên bản đối soát và xử lý lệch cho phiếu ${receipt.code}`, 'warning');
+      const targetUrl =
+        role === 'employee'
+          ? `/employee/goods-receipts/${receipt.id}?branch=${employeeBranchId}&role=employee`
+          : `/store-owner/goods-receipts/${receipt.id}`;
+      navigate(targetUrl);
     } else if (action === 'VIEW_BATCH') {
       setSelectedReceipt(receipt);
       setIsDrawerOpen(true);
@@ -339,7 +345,13 @@ export const GoodsReceiptListPage: FC<{ defaultRole?: UserRole }> = ({
           {/* Action button */}
           <button
             type="button"
-            onClick={() => showToast('Mở màn hình Nhập kho từ đơn đặt hàng PO (grn_form.html?type=po)', 'info')}
+            onClick={() =>
+              navigate(
+                role === 'employee'
+                  ? `/employee/goods-receipts/create?branch=${employeeBranchId}&role=employee`
+                  : '/store-owner/goods-receipts/create'
+              )
+            }
             className="po-btn po-btn-secondary"
             style={{ height: 32, padding: '0 12px' }}
           >
