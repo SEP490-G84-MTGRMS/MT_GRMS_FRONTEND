@@ -7,9 +7,29 @@ export type CashAccountType = 'CASH' | 'BANK';
 
 export type TransactionType = 'RECEIPT' | 'PAYMENT' | 'ADJUSTMENT';
 
-export type CounterpartyType = 'CUSTOMER' | 'SUPPLIER' | 'EMPLOYEE' | 'OTHER';
+export type CounterpartyType = 'CUSTOMER' | 'SUPPLIER' | 'EMPLOYEE' | 'TAX_AUTHORITY' | 'INTERNAL' | 'OTHER';
 
-export type ReferenceDocType = 'POS_ORDER' | 'SERVICE_EXPENSE' | 'PURCHASE_ORDER' | 'MANUAL' | 'AUDIT';
+export type ReferenceDocType =
+  | 'POS_ORDER'
+  | 'SERVICE_EXPENSE'
+  | 'PURCHASE_ORDER'
+  | 'DEBT_PAYMENT'
+  | 'TAX_PAYMENT'
+  | 'INTERNAL_TRANSFER'
+  | 'MANUAL'
+  | 'AUDIT';
+
+export type SourceModuleName =
+  | 'POS'
+  | 'POS_RETAIL'
+  | 'CRM_DEBT'
+  | 'SERVICE_OPEX'
+  | 'TAX_SNAPSHOT'
+  | 'INTERNAL_TRANSFER'
+  | 'SUPPLIER_PO'
+  | 'PAYROLL'
+  | 'MANUAL'
+  | 'CASHBOOK_MANUAL';
 
 export interface CashAccount {
   id: string;
@@ -40,6 +60,8 @@ export interface LedgerTransaction {
   description: string;
   referenceDocType: ReferenceDocType;
   referenceDocId?: string;
+  sourceModuleName?: SourceModuleName;
+  linkedTransactionId?: string;
   isAutomated: boolean;
   createdBy: string;
   createdAt: string; // ISO string
@@ -62,7 +84,10 @@ export interface CreateReceiptDTO {
   counterpartyType: CounterpartyType;
   counterpartyName: string;
   description: string;
+  referenceDocType?: ReferenceDocType;
   referenceDocId?: string;
+  sourceModuleName?: SourceModuleName;
+  isAutomated?: boolean;
 }
 
 export interface CreatePaymentDTO {
@@ -72,7 +97,19 @@ export interface CreatePaymentDTO {
   counterpartyType: CounterpartyType;
   counterpartyName: string;
   description: string;
+  referenceDocType?: ReferenceDocType;
   referenceDocId?: string;
+  sourceModuleName?: SourceModuleName;
+  isAutomated?: boolean;
+}
+
+export interface FundTransferDTO {
+  fromAccountId: string;
+  toAccountId: string;
+  amount: number;
+  transferFee?: number;
+  note?: string;
+  performedBy?: string;
 }
 
 export interface CashReconciliationDTO {

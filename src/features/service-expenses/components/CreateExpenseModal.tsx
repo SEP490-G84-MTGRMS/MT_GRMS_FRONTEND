@@ -29,6 +29,8 @@ export const CreateExpenseModal: FC<CreateExpenseModalProps> = ({
       .toISOString()
       .split('T')[0],
     vendorName: '',
+    isRecurring: false,
+    recurringDayOfMonth: 1,
     attachedBillUrl: '',
     note: '',
   }));
@@ -77,7 +79,7 @@ export const CreateExpenseModal: FC<CreateExpenseModalProps> = ({
     setUploadedFile(null);
   };
 
-  const handleChange = (field: string, value: string) => {
+  const handleChange = (field: string, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
     if (errors[field]) {
       setErrors((prev) => {
@@ -392,6 +394,60 @@ export const CreateExpenseModal: FC<CreateExpenseModalProps> = ({
 
               {errors.attachedBillUrl && (
                 <p className="form-error">{errors.attachedBillUrl}</p>
+              )}
+            </div>
+
+            
+            {/* Recurring Expense Section */}
+            <div
+              style={{
+                padding: '12px 14px',
+                borderRadius: '12px',
+                border: '1px solid #E2E8F0',
+                background: formData.isRecurring ? '#F5F3FF' : '#F8FAFC',
+                transition: 'all 0.2s ease',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', margin: 0, fontWeight: 600, fontSize: '0.84rem', color: formData.isRecurring ? '#6D28D9' : '#334155' }}>
+                  <input
+                    type="checkbox"
+                    checked={formData.isRecurring}
+                    onChange={(e) => handleChange('isRecurring', e.target.checked)}
+                    style={{ width: '16px', height: '16px', accentColor: '#7C3AED', cursor: 'pointer' }}
+                  />
+                  <span>🔁 Chi phí lặp lại định kỳ hàng tháng</span>
+                </label>
+                {formData.isRecurring && (
+                  <span style={{ fontSize: '0.72rem', background: '#EDE9FE', color: '#6D28D9', padding: '2px 8px', borderRadius: '9999px', fontWeight: 700 }}>
+                    Định kỳ
+                  </span>
+                )}
+              </div>
+
+              {formData.isRecurring && (
+                <div style={{ marginTop: '12px', paddingTop: '10px', borderTop: '1px dashed #DDD6FE' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <label style={{ fontSize: '0.78rem', color: '#5B21B6', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                      Ngày chốt chi phí trong tháng:
+                    </label>
+                    <select
+                      value={formData.recurringDayOfMonth}
+                      onChange={(e) => handleChange('recurringDayOfMonth', Number(e.target.value))}
+                      className="form-select"
+                      style={{ maxWidth: '140px', padding: '6px 10px', fontSize: '0.82rem' }}
+                    >
+                      {Array.from({ length: 28 }, (_, i) => i + 1).map((d) => (
+                        <option key={d} value={d}>
+                          Ngày {d} hàng tháng
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <p style={{ margin: '6px 0 0', fontSize: '0.74rem', color: '#7C3AED' }}>
+                    💡 Thích hợp cho chi phí cố định: Thuê mặt bằng, Internet, Phần mềm, Vệ sinh môi trường...
+                  </p>
+                </div>
               )}
             </div>
 

@@ -1,3 +1,4 @@
+import { cashbookService } from '../../cashbook/services/cashbookService';
 import type {
   TaxSnapshot,
   TaxSnapshotDetail,
@@ -167,6 +168,31 @@ export const taxSnapshotApi = {
     if (idx === -1) throw new Error('Không tìm thấy kỳ tính thuế tương ứng.');
 
     const current = snapshotsStore[idx];
+
+    // Auto-Journal Tax Payment into Cashbook (FE-17) when status changes to Paid
+    if (status === 'Paid' && current.status !== 'Paid') {
+      try {
+        const accounts = await cashbookService.getCashAccounts();
+        const bankAccount = accounts.find((a) => a.accountType === 'BANK') || accounts[0];
+        if (bankAccount) {
+          await cashbookService.createPayment({
+            accountId: bankAccount.id,
+            amount: current.totalTaxAmount,
+            category: 'Nộp thuế Nhà nước (TT 40)',
+            counterpartyType: 'TAX_AUTHORITY',
+            counterpartyName: 'Chi cục Thuế / Kho bạc Nhà nước',
+            description: `Nộp thuế GTGT & TNCN Quý ${current.quarter}/${current.year} (${current.id}) theo Thông tư 40/2021/TT-BTC`,
+            referenceDocId: current.id,
+            referenceDocType: 'TAX_PAYMENT',
+            sourceModuleName: 'TAX_SNAPSHOT',
+            isAutomated: true,
+          });
+        }
+      } catch (err) {
+        console.warn('Failed to auto-journal tax payment into cashbook:', err);
+      }
+    }
+
     const updated: TaxSnapshot = {
       ...current,
       status,

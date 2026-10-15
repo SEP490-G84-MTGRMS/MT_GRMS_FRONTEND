@@ -4,6 +4,7 @@ import type {
   CashbookFilterParams,
   CreateReceiptDTO,
   CreatePaymentDTO,
+  FundTransferDTO,
   CashReconciliationDTO,
   CashbookSummaryKPI,
 } from '../types/cashbook.types';
@@ -291,9 +292,10 @@ export const cashbookService = {
       counterpartyType: dto.counterpartyType,
       counterpartyName: dto.counterpartyName,
       description: dto.description,
-      referenceDocType: 'MANUAL',
+      referenceDocType: dto.referenceDocType || 'MANUAL',
       referenceDocId: dto.referenceDocId,
-      isAutomated: false,
+      sourceModuleName: dto.sourceModuleName || 'MANUAL',
+      isAutomated: dto.isAutomated ?? false,
       createdBy: 'Nguyễn Trường An',
       createdAt: now.toISOString(),
     };
@@ -351,9 +353,10 @@ export const cashbookService = {
       counterpartyType: dto.counterpartyType,
       counterpartyName: dto.counterpartyName,
       description: dto.description,
-      referenceDocType: 'MANUAL',
+      referenceDocType: dto.referenceDocType || 'MANUAL',
       referenceDocId: dto.referenceDocId,
-      isAutomated: false,
+      sourceModuleName: dto.sourceModuleName || 'MANUAL',
+      isAutomated: dto.isAutomated ?? false,
       createdBy: 'Nguyễn Trường An',
       createdAt: now.toISOString(),
     };
@@ -363,6 +366,103 @@ export const cashbookService = {
     saveState(STORAGE_KEYS.TRANSACTIONS, transactions);
 
     return newTx;
+  },
+
+  /**
+   * Transfers funds between two cash/bank accounts (Chuyển tiền nội bộ)
+   */
+  async transferFunds(dto: FundTransferDTO): Promise<{ payment: LedgerTransaction; receipt: LedgerTransaction }> {
+    if (dto.amount <= 0) {
+      throw new Error('Số tiền chuyển quỹ phải lớn hơn 0');
+    }
+    if (dto.fromAccountId === dto.toAccountId) {
+      throw new Error('Tài khoản nguồn và tài khoản đích không được trùng nhau');
+    }
+
+    const accounts = loadState<CashAccount[]>(STORAGE_KEYS.ACCOUNTS, INITIAL_ACCOUNTS);
+    const fromIndex = accounts.findIndex((a) => a.id === dto.fromAccountId);
+    const toIndex = accounts.findIndex((a) => a.id === dto.toAccountId);
+
+    if (fromIndex === -1) throw new Error('Tài khoản chuyển tiền không tồn tại');
+    if (toIndex === -1) throw new Error('Tài khoản nhận tiền không tồn tại');
+
+    const fromAcc = accounts[fromIndex];
+    const toAcc = accounts[toIndex];
+
+    // Chặn âm quỹ nếu là két tiền mặt
+    if (fromAcc.accountType === 'CASH' && dto.amount > fromAcc.currentBalance) {
+      throw new Error(
+        `Số tiền chuyển (${dto.amount.toLocaleString('vi-VN')} đ) vượt quá số dư két hiện có (${fromAcc.currentBalance.toLocaleString('vi-VN')} đ).`
+      );
+    }
+
+    // Cập nhật số dư
+    fromAcc.currentBalance -= dto.amount;
+    toAcc.currentBalance += dto.amount;
+    accounts[fromIndex] = fromAcc;
+    accounts[toIndex] = toAcc;
+    saveState(STORAGE_KEYS.ACCOUNTS, accounts);
+
+    const now = new Date();
+    const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
+    const randCode = Math.floor(100 + Math.random() * 900);
+    const payTxId = `TX-PAY-${Date.now()}`;
+    const recTxId = `TX-REC-${Date.now() + 1}`;
+
+    const noteText = dto.note || `Chuyển tiền từ ${fromAcc.accountName} sang ${toAcc.accountName}`;
+
+    // 1. Phiếu Chi tại tài khoản nguồn
+    const payTx: LedgerTransaction = {
+      id: payTxId,
+      transactionCode: `PC-TRF-${dateStr}-${randCode}`,
+      accountId: fromAcc.id,
+      accountName: fromAcc.accountName,
+      branchId: fromAcc.branchId,
+      transactionType: 'PAYMENT',
+      category: 'Chuyển quỹ nội bộ',
+      amount: dto.amount,
+      balanceAfter: fromAcc.currentBalance,
+      counterpartyType: 'INTERNAL',
+      counterpartyName: toAcc.accountName,
+      description: noteText,
+      referenceDocType: 'INTERNAL_TRANSFER',
+      referenceDocId: recTxId,
+      sourceModuleName: 'INTERNAL_TRANSFER',
+      linkedTransactionId: recTxId,
+      isAutomated: true,
+      createdBy: dto.performedBy || 'Nguyễn Trường An',
+      createdAt: now.toISOString(),
+    };
+
+    // 2. Phiếu Thu tại tài khoản đích
+    const recTx: LedgerTransaction = {
+      id: recTxId,
+      transactionCode: `PT-TRF-${dateStr}-${randCode}`,
+      accountId: toAcc.id,
+      accountName: toAcc.accountName,
+      branchId: toAcc.branchId,
+      transactionType: 'RECEIPT',
+      category: 'Chuyển quỹ nội bộ',
+      amount: dto.amount,
+      balanceAfter: toAcc.currentBalance,
+      counterpartyType: 'INTERNAL',
+      counterpartyName: fromAcc.accountName,
+      description: noteText,
+      referenceDocType: 'INTERNAL_TRANSFER',
+      referenceDocId: payTxId,
+      sourceModuleName: 'INTERNAL_TRANSFER',
+      linkedTransactionId: payTxId,
+      isAutomated: true,
+      createdBy: dto.performedBy || 'Nguyễn Trường An',
+      createdAt: now.toISOString(),
+    };
+
+    const transactions = loadState<LedgerTransaction[]>(STORAGE_KEYS.TRANSACTIONS, INITIAL_TRANSACTIONS);
+    transactions.unshift(recTx);
+    transactions.unshift(payTx);
+    saveState(STORAGE_KEYS.TRANSACTIONS, transactions);
+
+    return { payment: payTx, receipt: recTx };
   },
 
   /**

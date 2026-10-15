@@ -31,22 +31,19 @@ export const TaxSnapshotTable: FC<Props> = ({
 
   if (isLoading) {
     return (
-      <div className="bg-white rounded-2xl border border-gray-200 p-8 text-center">
-        <div className="animate-spin w-8 h-8 border-4 border-teal-600 border-t-transparent rounded-full mx-auto mb-3" />
-        <p className="text-sm text-gray-500">Đang tải danh sách kỳ tính thuế...</p>
+      <div className="tax-table-card" style={{ padding: 48, textAlign: 'center' }}>
+        <p style={{ color: '#0F766E', fontWeight: 600 }}>Đang tải danh sách kỳ tính thuế...</p>
       </div>
     );
   }
 
   if (snapshots.length === 0) {
     return (
-      <div className="bg-white rounded-2xl border border-gray-200 p-12 text-center">
-        <div className="w-12 h-12 rounded-full bg-teal-50 flex items-center justify-center text-teal-600 mx-auto mb-3">
-          <FileCheck className="w-6 h-6" />
-        </div>
-        <h3 className="text-base font-semibold text-gray-900">Chưa có kỳ tính thuế nào</h3>
-        <p className="text-sm text-gray-500 mt-1 max-w-sm mx-auto">
-          Bấm "Tạo kỳ tính thuế" để bắt đầu quét doanh thu và chốt số liệu thuế Quý theo Thông tư 40.
+      <div className="tax-table-card" style={{ padding: 64, textAlign: 'center' }}>
+        <FileCheck size={48} style={{ color: '#0F766E', margin: '0 auto 16px auto', display: 'block' }} />
+        <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#111827', margin: 0 }}>Chưa có kỳ tính thuế nào</h3>
+        <p style={{ fontSize: '0.82rem', color: '#64748B', marginTop: 6 }}>
+          Bấm "Tạo kỳ tính thuế mới" để hệ thống quét doanh thu và tính thuế tự động theo TT 40.
         </p>
       </div>
     );
@@ -57,74 +54,75 @@ export const TaxSnapshotTable: FC<Props> = ({
   const paginatedSnapshots = snapshots.slice(startIndex, startIndex + pageSize);
 
   return (
-    <div className="tax-table-container">
-      <div className="overflow-x-auto">
-        <table className="w-full text-left border-collapse text-sm tax-table">
+    <div className="tax-table-card">
+      <div className="tax-table-wrapper">
+        <table className="tax-table">
           <thead>
             <tr>
               <th>Kỳ tính thuế</th>
-              <th>Doanh thu chịu thuế</th>
-              <th>VAT (1%)</th>
-              <th>PIT (0.5%)</th>
-              <th>Tổng thuế (1.5%)</th>
-              <th>Số hóa đơn</th>
+              <th style={{ textAlign: 'right' }}>Doanh thu chịu thuế</th>
+              <th style={{ textAlign: 'right' }}>VAT (1%)</th>
+              <th style={{ textAlign: 'right' }}>PIT (0.5%)</th>
+              <th style={{ textAlign: 'right' }}>Tổng thuế (1.5%)</th>
+              <th style={{ textAlign: 'center' }}>Số hóa đơn</th>
               <th>Trạng thái</th>
               <th>Ngày tạo / Chốt</th>
-              <th className="text-right">Thao tác</th>
+              <th style={{ textAlign: 'right' }}>Thao tác</th>
             </tr>
           </thead>
           <tbody>
             {paginatedSnapshots.map((s) => (
-              <tr key={s.id} className="transition-colors">
-                <td className="font-semibold text-gray-900">
+              <tr key={s.id}>
+                <td style={{ fontWeight: 700, color: '#111827' }}>
                   Quý {s.quarter}/{s.year}
                 </td>
-                <td className="font-medium text-gray-900">
+                <td style={{ textAlign: 'right', fontWeight: 600 }}>
                   {formatVND(s.taxableRevenue)}
                 </td>
-                <td className="text-teal-700 font-medium">
+                <td style={{ textAlign: 'right', color: '#0F766E', fontWeight: 600 }}>
                   {formatVND(s.vatAmount)}
                 </td>
-                <td className="text-emerald-700 font-medium">
+                <td style={{ textAlign: 'right', color: '#7C3AED', fontWeight: 600 }}>
                   {formatVND(s.pitAmount)}
                 </td>
-                <td className="text-gray-900 font-bold">
+                <td style={{ textAlign: 'right', fontWeight: 800, color: '#0F172A' }}>
                   {formatVND(s.totalTaxAmount)}
                 </td>
-                <td className="text-gray-600">
+                <td style={{ textAlign: 'center', color: '#64748B' }}>
                   {s.ordersCount.toLocaleString('vi-VN')} đơn
                 </td>
                 <td>
                   <TaxSnapshotStatusBadge status={s.status} />
                 </td>
-                <td className="text-xs text-gray-500">
+                <td style={{ fontSize: '0.78rem', color: '#64748B' }}>
                   {new Date(s.generatedAt).toLocaleDateString('vi-VN')}
                 </td>
-                <td className="text-right">
-                  <div className="flex items-center justify-end gap-1.5">
+                <td style={{ textAlign: 'right' }}>
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                     <button
                       onClick={() => onViewDetail(s)}
-                      className="p-1.5 text-gray-500 hover:text-teal-700 hover:bg-teal-50 rounded-lg transition-colors cursor-pointer"
+                      className="tax-action-btn"
                       title="Xem chi tiết & bảng kê"
                     >
-                      <Eye className="w-4 h-4" />
+                      <Eye size={15} />
                     </button>
 
                     {s.status === 'Draft' && (
                       <>
                         <button
                           onClick={() => onFinalize(s)}
-                          className="p-1.5 text-teal-700 hover:bg-teal-50 rounded-lg transition-colors cursor-pointer"
+                          className="tax-action-btn"
+                          style={{ color: '#0F766E' }}
                           title="Chốt số liệu kỳ thuế"
                         >
-                          <FileCheck className="w-4 h-4" />
+                          <FileCheck size={15} />
                         </button>
                         <button
                           onClick={() => onDelete(s)}
-                          className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                          className="tax-action-btn delete"
                           title="Xóa nháp"
                         >
-                          <Trash2 className="w-4 h-4" />
+                          <Trash2 size={15} />
                         </button>
                       </>
                     )}
@@ -132,10 +130,11 @@ export const TaxSnapshotTable: FC<Props> = ({
                     {s.status === 'Submitted' && (
                       <button
                         onClick={() => onMarkPaid(s)}
-                        className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer"
+                        className="tax-action-btn"
+                        style={{ color: '#059669' }}
                         title="Xác nhận đã hoàn thành nộp thuế"
                       >
-                        <CheckCircle2 className="w-4 h-4" />
+                        <CheckCircle2 size={15} />
                       </button>
                     )}
                   </div>

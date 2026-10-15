@@ -1,3 +1,5 @@
+import { cashbookService } from '../../cashbook/services/cashbookService';
+import type { CashAccount } from '../../cashbook/types/cashbook.types';
 import { useState, useEffect } from 'react';
 import type { FC, FormEvent } from 'react';
 import { X, DollarSign, QrCode, Banknote, CheckCircle, AlertTriangle } from 'lucide-react';
@@ -13,6 +15,7 @@ interface DebtCollectionModalProps {
     customerId: string;
     amount: number;
     method: 'Cash' | 'VietQR';
+    targetAccountId?: string;
     note?: string;
   }) => Promise<void>;
   isSubmitting: boolean;
@@ -38,6 +41,16 @@ export const DebtCollectionModal: FC<DebtCollectionModalProps> = ({
   const [method, setMethod] = useState<'Cash' | 'VietQR'>('VietQR');
   const [note, setNote] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
+  const [cashAccounts, setCashAccounts] = useState<CashAccount[]>([]);
+  const [selectedAccountId, setSelectedAccountId] = useState<string>('');
+
+  useEffect(() => {
+    cashbookService.getCashAccounts().then((accs) => {
+      setCashAccounts(accs);
+      const matched = accs.find((a) => (method === 'Cash' ? a.accountType === 'CASH' : a.accountType === 'BANK'));
+      if (matched) setSelectedAccountId(matched.id);
+    });
+  }, [method]);
 
   useEffect(() => {
     if (customer) {
@@ -81,6 +94,7 @@ export const DebtCollectionModal: FC<DebtCollectionModalProps> = ({
         customerId: customer.id,
         amount,
         method,
+        targetAccountId: selectedAccountId || undefined,
         note: note.trim() || undefined,
       });
     } catch (err: any) {
@@ -188,9 +202,9 @@ export const DebtCollectionModal: FC<DebtCollectionModalProps> = ({
                 <DollarSign className="w-4 h-4 customer-search-icon" />
                 <input
                   type="number"
-                  min="1000"
+                  min="0"
                   max={customer.currentDebtAR}
-                  step="10000"
+                  step="1000"
                   required
                   value={amount}
                   onChange={(e) => setAmount(Number(e.target.value))}
@@ -203,6 +217,30 @@ export const DebtCollectionModal: FC<DebtCollectionModalProps> = ({
                   }}
                 />
               </div>
+            </div>
+
+            {/* Cash Account Selector */}
+            <div style={{ marginBottom: '14px' }}>
+              <label className="form-label">
+                Tài khoản quỹ thụ hưởng Sổ quỹ (FE-17) <span style={{ color: '#ef4444' }}>*</span>
+              </label>
+              <select
+                value={selectedAccountId}
+                onChange={(e) => setSelectedAccountId(e.target.value)}
+                className="form-input"
+                style={{ fontWeight: 600, color: '#0F766E', width: '100%', padding: '10px 12px', borderRadius: '12px', border: '1px solid #E2E8F0' }}
+              >
+                {cashAccounts
+                  .filter((a) => (method === 'Cash' ? a.accountType === 'CASH' : a.accountType === 'BANK'))
+                  .map((acc) => (
+                    <option key={acc.id} value={acc.id}>
+                      {acc.accountName} (Số dư: {acc.currentBalance.toLocaleString('vi-VN')} đ)
+                    </option>
+                  ))}
+              </select>
+              <span style={{ fontSize: '0.72rem', color: '#64748B', marginTop: 4, display: 'block' }}>
+                ✓ Hệ thống tự động tăng số dư và tạo Phiếu Thu trong Sổ quỹ cho tài khoản này
+              </span>
             </div>
 
             {/* Payment Method Selector */}

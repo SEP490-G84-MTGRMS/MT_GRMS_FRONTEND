@@ -19,18 +19,18 @@ export const TaxSnapshotFilterBar: FC<Props> = ({
   const years = AVAILABLE_YEARS;
 
   return (
-    <div className="tax-filter-wrapper flex flex-wrap items-center justify-between gap-3">
+    <div className="tax-filter-bar">
       {/* Left: Filter options */}
-      <div className="flex flex-wrap items-center gap-3 flex-1">
+      <div className="tax-filter-left">
         {/* Search Input */}
-        <div className="relative min-w-[220px] max-w-xs">
-          <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+        <div className="tax-search-box">
+          <Search size={16} style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: '#94A3B8' }} />
           <input
             type="text"
             placeholder="Tìm theo ghi chú, mã kỳ..."
             value={filterParams.keyword || ''}
             onChange={(e) => onFilterChange({ keyword: e.target.value })}
-            className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-teal-500/20 focus:border-teal-600 bg-white"
+            className="tax-search-input"
           />
         </div>
 
@@ -39,7 +39,7 @@ export const TaxSnapshotFilterBar: FC<Props> = ({
           value={filterParams.year || CURRENT_YEAR}
           onChange={(e) => onFilterChange({ year: Number(e.target.value) })}
           aria-label="Chọn năm tài chính"
-          className="px-3.5 py-2 text-sm border border-gray-200 rounded-xl bg-white text-gray-700 focus:outline-hidden focus:ring-2 focus:ring-teal-500/20 focus:border-teal-600"
+          className="tax-select"
         >
           {years.map((y) => (
             <option key={y} value={y}>
@@ -53,7 +53,7 @@ export const TaxSnapshotFilterBar: FC<Props> = ({
           value={filterParams.quarter || ''}
           onChange={(e) => onFilterChange({ quarter: e.target.value ? Number(e.target.value) : undefined })}
           aria-label="Chọn quý kê khai"
-          className="px-3.5 py-2 text-sm border border-gray-200 rounded-xl bg-white text-gray-700 focus:outline-hidden focus:ring-2 focus:ring-teal-500/20 focus:border-teal-600"
+          className="tax-select"
         >
           <option value="">Tất cả các quý</option>
           <option value="1">Quý 1 (T1 - T3)</option>
@@ -67,7 +67,7 @@ export const TaxSnapshotFilterBar: FC<Props> = ({
           value={filterParams.status || 'ALL'}
           onChange={(e) => onFilterChange({ status: e.target.value as TaxSnapshotStatus | 'ALL' })}
           aria-label="Lọc theo trạng thái tờ khai"
-          className="px-3.5 py-2 text-sm border border-gray-200 rounded-xl bg-white text-gray-700 focus:outline-hidden focus:ring-2 focus:ring-teal-500/20 focus:border-teal-600"
+          className="tax-select"
         >
           <option value="ALL">Tất cả trạng thái</option>
           <option value="Draft">Nháp (Draft)</option>
@@ -80,8 +80,8 @@ export const TaxSnapshotFilterBar: FC<Props> = ({
       {/* Right: Actions */}
       <div>
         <button onClick={onOpenCreateModal} className="btn-primary-pill">
-          <Plus className="w-4 h-4" />
-          <span>Tạo kỳ tính thuế</span>
+          <Plus size={16} />
+          <span>Tạo kỳ tính thuế mới</span>
         </button>
       </div>
     </div>

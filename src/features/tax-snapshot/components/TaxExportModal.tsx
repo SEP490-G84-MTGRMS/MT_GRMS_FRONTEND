@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { FC } from 'react';
-import { X, FileSpreadsheet, Code, CheckCircle } from 'lucide-react';
+import { X, FileSpreadsheet, Code, CheckCircle, Download } from 'lucide-react';
 import type { TaxSnapshot } from '../types/taxSnapshot';
 
 interface Props {
@@ -19,11 +19,10 @@ export const TaxExportModal: FC<Props> = ({ snapshot, isOpen, onClose }) => {
   const handleExport = () => {
     setIsExporting(true);
     setTimeout(() => {
-      // Simulate file download
       const filename =
         exportType === 'excel'
-          ? `To_Khai_Thue_HKD_Q${snapshot.quarter}_${snapshot.year}.xlsx`
-          : `To_Khai_Form_01_CNKD_Q${snapshot.quarter}_${snapshot.year}.xml`;
+          ? 'To_Khai_Thue_HKD_Q' + snapshot.quarter + '_' + snapshot.year + '.xlsx'
+          : 'To_Khai_Form_01_CNKD_Q' + snapshot.quarter + '_' + snapshot.year + '.xml';
 
       const dummyContent = exportType === 'excel' ? 'DATA_EXCEL_PLACEHOLDER' : '<?xml version="1.0"?><TaxReport></TaxReport>';
       const blob = new Blob([dummyContent], { type: 'application/octet-stream' });
@@ -42,79 +41,90 @@ export const TaxExportModal: FC<Props> = ({ snapshot, isOpen, onClose }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
-      <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl border border-gray-100 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-          <h3 className="text-base font-bold text-gray-900">Xuất hồ sơ khai thuế</h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1.5 rounded-lg hover:bg-gray-100 cursor-pointer">
-            <X className="w-5 h-5" />
+    <div className="tax-modal-backdrop" onClick={onClose}>
+      <div className="tax-modal-card" onClick={(e) => e.stopPropagation()}>
+        <div className="tax-modal-header">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ width: 38, height: 38, borderRadius: 10, background: 'rgba(15, 118, 110, 0.1)', color: '#0F766E', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Download size={18} />
+            </div>
+            <div>
+              <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0F172A', margin: 0 }}>
+                Xuất hồ sơ khai thuế
+              </h3>
+              <p style={{ fontSize: '0.78rem', color: '#64748B', margin: '2px 0 0 0' }}>
+                Hồ sơ Quý {snapshot.quarter}/{snapshot.year} (Thông tư 40/2021/TT-BTC)
+              </p>
+            </div>
+          </div>
+          <button onClick={onClose} className="tax-drawer-close-btn">
+            <X size={18} />
           </button>
         </div>
 
-        <div className="p-6 space-y-4">
-          <p className="text-xs text-gray-600">
-            Hồ sơ kỳ: <strong>Quý {snapshot.quarter}/{snapshot.year}</strong> (Thông tư 40/2021/TT-BTC)
-          </p>
-
-          <div className="space-y-3">
+        <div className="tax-modal-body">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <label
-              className={`flex items-center gap-3 p-3.5 border rounded-xl cursor-pointer transition-colors ${
-                exportType === 'excel' ? 'border-blue-600 bg-blue-50/30' : 'border-gray-200 hover:bg-gray-50'
-              }`}
+              className={'tax-radio-option ' + (exportType === 'excel' ? 'selected' : '')}
+              onClick={() => setExportType('excel')}
             >
               <input
                 type="radio"
                 name="exportType"
                 checked={exportType === 'excel'}
                 onChange={() => setExportType('excel')}
-                className="w-4 h-4 text-blue-600"
+                style={{ accentColor: '#0F766E', width: 16, height: 16 }}
               />
-              <FileSpreadsheet className="w-5 h-5 text-emerald-600" />
+              <FileSpreadsheet size={24} color="#059669" />
               <div>
-                <div className="text-sm font-semibold text-gray-900">Bảng kê Excel (Kèm hóa đơn chi tiết)</div>
-                <div className="text-xs text-gray-500">Phù hợp in ấn, lưu trữ hồ sơ nội bộ cửa hàng</div>
+                <div style={{ fontSize: '0.92rem', fontWeight: 700, color: '#0F172A' }}>
+                  Bảng kê Excel (Kèm hóa đơn chi tiết)
+                </div>
+                <div style={{ fontSize: '0.78rem', color: '#64748B', marginTop: 2 }}>
+                  Phù hợp in ấn, lưu trữ hồ sơ kế toán nội bộ cửa hàng
+                </div>
               </div>
             </label>
 
             <label
-              className={`flex items-center gap-3 p-3.5 border rounded-xl cursor-pointer transition-colors ${
-                exportType === 'xml' ? 'border-blue-600 bg-blue-50/30' : 'border-gray-200 hover:bg-gray-50'
-              }`}
+              className={'tax-radio-option ' + (exportType === 'xml' ? 'selected' : '')}
+              onClick={() => setExportType('xml')}
             >
               <input
                 type="radio"
                 name="exportType"
                 checked={exportType === 'xml'}
                 onChange={() => setExportType('xml')}
-                className="w-4 h-4 text-blue-600"
+                style={{ accentColor: '#0F766E', width: 16, height: 16 }}
               />
-              <Code className="w-5 h-5 text-indigo-600" />
+              <Code size={24} color="#4F46E5" />
               <div>
-                <div className="text-sm font-semibold text-gray-900">File XML chuẩn TCT (Mẫu 01/CNKD)</div>
-                <div className="text-xs text-gray-500">Dùng nộp trực tiếp trên cổng Thuedientu.gdt.gov.vn</div>
+                <div style={{ fontSize: '0.92rem', fontWeight: 700, color: '#0F172A' }}>
+                  File XML chuẩn TCT (Mẫu 01/CNKD)
+                </div>
+                <div style={{ fontSize: '0.78rem', color: '#64748B', marginTop: 2 }}>
+                  Dùng nộp tờ khai trực tiếp lên cổng Thuedientu.gdt.gov.vn
+                </div>
               </div>
             </label>
           </div>
 
           {isDone && (
-            <div className="p-3 bg-emerald-50 text-emerald-800 rounded-lg text-xs flex items-center gap-2 border border-emerald-200">
-              <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
+            <div style={{ padding: '12px 14px', borderRadius: 12, background: '#ECFDF5', border: '1px solid #A7F3D0', color: '#065F46', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <CheckCircle size={18} color="#059669" />
               <span>Đã kết xuất và tải tệp tin thành công!</span>
             </div>
           )}
         </div>
 
-        <div className="flex items-center justify-end gap-2 px-6 py-4 bg-gray-50 border-t border-gray-100">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
-          >
+        <div className="tax-modal-footer">
+          <button onClick={onClose} className="btn-secondary-pill">
             Đóng
           </button>
           <button
             onClick={handleExport}
             disabled={isExporting}
-            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-xs transition-colors cursor-pointer disabled:opacity-50"
+            className="btn-primary-pill"
           >
             {isExporting ? 'Đang xuất file...' : 'Tải về ngay'}
           </button>

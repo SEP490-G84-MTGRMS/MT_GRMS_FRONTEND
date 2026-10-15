@@ -1,4 +1,6 @@
-import { type FC, useState } from 'react';
+import { cashbookService } from '../../cashbook/services/cashbookService';
+import type { CashAccount } from '../../cashbook/types/cashbook.types';
+import { type FC, useState, useEffect } from 'react';
 import { CloseIcon, TrendingUpIcon } from '../../admin/components';
 import {
   EXPENSE_CATEGORY_LABELS,
@@ -38,6 +40,25 @@ export const PayExpenseModal: FC<PayExpenseModalProps> = ({
     new Date().toISOString().split('T')[0]
   );
   const [note, setNote] = useState('');
+  const [cashAccounts, setCashAccounts] = useState<CashAccount[]>([]);
+  const [selectedAccountId, setSelectedAccountId] = useState('');
+
+  useEffect(() => {
+    if (isOpen) {
+      void cashbookService.getCashAccounts().then((accounts) => {
+        setCashAccounts(accounts);
+        const filtered = accounts.filter((a) =>
+          paymentMethod === 'Cash' ? a.accountType === 'CASH' : a.accountType === 'BANK'
+        );
+        if (filtered.length > 0) {
+          setSelectedAccountId(filtered[0].id);
+        } else if (accounts.length > 0) {
+          setSelectedAccountId(accounts[0].id);
+        }
+      });
+    }
+  }, [isOpen, paymentMethod]);
+
 
   if (!isOpen || !item) return null;
 
@@ -48,6 +69,7 @@ export const PayExpenseModal: FC<PayExpenseModalProps> = ({
     try {
       await onSubmit(item.expenseId, {
         paymentMethod,
+        paidFromAccountId: selectedAccountId || undefined,
         createCashBookEntry,
         paymentDate,
         note: note.trim() || undefined,
@@ -184,6 +206,32 @@ export const PayExpenseModal: FC<PayExpenseModalProps> = ({
                 </button>
               </div>
             </div>
+
+                        {/* Cash Account Selector */}
+            {createCashBookEntry && (
+              <div className="form-group">
+                <label className="form-label">
+                  Tài khoản nguồn chi tiền <span style={{ color: '#ef4444' }}>*</span>
+                </label>
+                <select
+                  value={selectedAccountId}
+                  onChange={(e) => setSelectedAccountId(e.target.value)}
+                  className="form-input"
+                  style={{ fontWeight: 600, color: '#0F766E' }}
+                >
+                  {cashAccounts
+                    .filter((a) => (paymentMethod === 'Cash' ? a.accountType === 'CASH' : a.accountType === 'BANK'))
+                    .map((acc) => (
+                      <option key={acc.id} value={acc.id}>
+                        {acc.accountName} (Khả dụng: {acc.currentBalance.toLocaleString('vi-VN')} đ)
+                      </option>
+                    ))}
+                </select>
+                <span style={{ fontSize: '0.72rem', color: '#64748B', marginTop: 4, display: 'block' }}>
+                  ✓ Số dư tài khoản này sẽ tự động giảm và đồng bộ vào Sổ quỹ (FE-17)
+                </span>
+              </div>
+            )}
 
             {/* Cashbook Integration Checkbox */}
             <div

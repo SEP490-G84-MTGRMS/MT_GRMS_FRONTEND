@@ -7,6 +7,7 @@ import type {
   CashbookSummaryKPI,
   CreateReceiptDTO,
   CreatePaymentDTO,
+  FundTransferDTO,
   CashReconciliationDTO,
 } from '../types/cashbook.types';
 import { cashbookService } from '../services/cashbookService';
@@ -15,6 +16,7 @@ import { CashbookFilterToolbar } from '../components/CashbookFilterToolbar';
 import { CashbookLedgerTable } from '../components/CashbookLedgerTable';
 import { CreateReceiptModal } from '../components/CreateReceiptModal';
 import { CreatePaymentModal } from '../components/CreatePaymentModal';
+import { InternalTransferModal } from '../components/InternalTransferModal';
 import { CashReconciliationModal } from '../components/CashReconciliationModal';
 import { CashbookExportModal } from '../components/CashbookExportModal';
 import { AdminToast, type ToastState } from '../../admin/components/common/AdminToast';
@@ -48,6 +50,7 @@ export const CashbookPage: FC = () => {
   // Modal States
   const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
   const [isReconcileModalOpen, setIsReconcileModalOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [accountToReconcile, setAccountToReconcile] = useState<CashAccount | null>(null);
@@ -114,6 +117,16 @@ export const CashbookPage: FC = () => {
     void loadData();
   };
 
+  
+  const handleTransferFunds = async (dto: FundTransferDTO) => {
+    await cashbookService.transferFunds(dto);
+    showToast(
+      `Đã điều chuyển ${dto.amount.toLocaleString('vi-VN')} đ giữa các quỹ thành công!`,
+      'success'
+    );
+    void loadData();
+  };
+
   const handleCreatePayment = async (dto: CreatePaymentDTO) => {
     await cashbookService.createPayment(dto);
     showToast(`Đã lập Phiếu Chi thành công (-${dto.amount.toLocaleString('vi-VN')} đ)`, 'success');
@@ -169,6 +182,21 @@ export const CashbookPage: FC = () => {
             onClick={() => setIsPaymentModalOpen(true)}
           >
             ➖ Lập Phiếu Chi
+          </button>
+          <button
+            type="button"
+            className="cb-btn"
+            style={{
+              backgroundColor: '#6366F1',
+              color: '#ffffff',
+              borderColor: '#6366F1',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+            }}
+            onClick={() => setIsTransferModalOpen(true)}
+          >
+            <span>⇄</span> Chuyển Quỹ Nội Bộ
           </button>
           <button
             type="button"
@@ -256,6 +284,16 @@ export const CashbookPage: FC = () => {
           accounts={accounts}
           onClose={() => setIsReceiptModalOpen(false)}
           onSubmit={handleCreateReceipt}
+        />
+      )}
+
+      
+      {isTransferModalOpen && (
+        <InternalTransferModal
+          isOpen={isTransferModalOpen}
+          accounts={accounts}
+          onClose={() => setIsTransferModalOpen(false)}
+          onSubmit={handleTransferFunds}
         />
       )}
 

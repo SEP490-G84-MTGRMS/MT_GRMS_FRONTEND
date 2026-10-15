@@ -9,4 +9,7 @@ export * from './components/TaxSnapshotTable';
 export * from './components/CreateTaxSnapshotModal';
 export * from './components/TaxSnapshotDetailDrawer';
 export * from './components/TaxExportModal';
+export * from './components/TaxDeclarationFormView';
+export * from './components/TaxAnalyticsSection';
+export * from './components/TaxRateSettingsView';
 export * from './pages/TaxSnapshotPage';

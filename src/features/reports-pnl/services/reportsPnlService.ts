@@ -191,11 +191,49 @@ function buildMockPnlTree(kpi: KpiSummaryData): PnlLineItem[] {
     },
     {
       id: 'total-net-profit',
-      code: 'NP',
-      title: 'LỢI NHUẬN RÒNG TRƯỚC THUẾ (LÃI GỘP - CHI PHÍ VẬN HÀNH)',
+      code: 'EBT',
+      title: 'III. LỢI NHUẬN VẬN HÀNH TRƯỚC THUẾ (LÃI GỘP - CHI PHÍ VẬN HÀNH)',
       level: 1,
       amount: kpi.netProfit,
       percentageOfNetRevenue: kpi.netMarginPct,
+      isTotal: true,
+    },
+    {
+      id: 'sec-4-tax',
+      code: 'IV',
+      title: 'IV. NGHĨA VỤ THUẾ HỘ KINH DOANH (THÔNG TƯ 40/2021/TT-BTC)',
+      level: 1,
+      amount: Math.round(rev * 0.015),
+      percentageOfNetRevenue: 1.5,
+      isNegative: true,
+      children: [
+        {
+          id: 'item-4-1',
+          code: '4.1',
+          title: 'Thuế Giá trị gia tăng (VAT 1.0% phân phối hàng hóa)',
+          level: 2,
+          amount: Math.round(rev * 0.01),
+          percentageOfNetRevenue: 1.0,
+          isNegative: true,
+        },
+        {
+          id: 'item-4-2',
+          code: '4.2',
+          title: 'Thuế Thu nhập cá nhân (PIT 0.5% hộ kinh doanh)',
+          level: 2,
+          amount: Math.round(rev * 0.005),
+          percentageOfNetRevenue: 0.5,
+          isNegative: true,
+        },
+      ],
+    },
+    {
+      id: 'total-final-net-profit',
+      code: 'NP-AT',
+      title: 'V. LỢI NHUẬN RÒNG SAU THUẾ THỰC NHẬN CỦA CHỦ TIỆM',
+      level: 1,
+      amount: kpi.netProfit - Math.round(rev * 0.015),
+      percentageOfNetRevenue: calculateMarginPct(kpi.netProfit - Math.round(rev * 0.015), rev),
       isTotal: true,
     },
   ];
@@ -448,6 +486,10 @@ export const reportsPnlService = {
     const totalOrders = Math.round(netRevenue / 285000);
     const averageOrderValue = totalOrders > 0 ? Math.round(netRevenue / totalOrders) : 0;
 
+        const estimatedTaxAmount = Math.round(netRevenue * 0.015);
+    const netProfitAfterTax = netProfit - estimatedTaxAmount;
+    const netProfitAfterTaxMarginPct = calculateMarginPct(netProfitAfterTax, netRevenue);
+
     const kpiSummary: KpiSummaryData = {
       grossSales,
       discounts,
@@ -468,6 +510,9 @@ export const reportsPnlService = {
       expensesGrowthPct: -3.4,
       ordersGrowthPct: 8.6,
       aovGrowthPct: 3.9,
+      estimatedTaxAmount,
+      netProfitAfterTax,
+      netProfitAfterTaxMarginPct,
     };
 
     const pnlTree = buildMockPnlTree(kpiSummary);

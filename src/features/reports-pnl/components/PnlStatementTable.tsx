@@ -239,6 +239,71 @@ export const PnlStatementTable: React.FC<PnlStatementTableProps> = ({
         </table>
       </div>
 
+
+      {/* FE-19 Tax Reconciliation Linkage Callout */}
+      <div
+        style={{
+          margin: '16px 20px',
+          padding: '14px 18px',
+          borderRadius: '14px',
+          background: 'linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%)',
+          border: '1px solid #FDE68A',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '16px',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div
+            style={{
+              width: '40px',
+              height: '40px',
+              borderRadius: '10px',
+              background: '#D97706',
+              color: '#ffffff',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontWeight: 800,
+              fontSize: '18px',
+              flexShrink: 0,
+            }}
+          >
+            🏛️
+          </div>
+          <div>
+            <div style={{ fontSize: '0.88rem', fontWeight: 800, color: '#92400E' }}>
+              Liên thông Đối soát Kê khai & Nộp thuế HKD (FE-19)
+            </div>
+            <p style={{ margin: '3px 0 0', fontSize: '0.78rem', color: '#B45309', lineHeight: 1.45 }}>
+              Nghĩa vụ thuế 1.5% (<strong>8.412.900 đ</strong>) được trích lập tự động từ Doanh thu bán lẻ. Sau khi xác nhận nộp thuế tại FE-19, hệ thống sẽ tự động hạch toán Phiếu Chi sang Sổ quỹ FE-17, bảo đảm đối soát ba bên tuyệt đối.
+            </p>
+          </div>
+        </div>
+
+        <a
+          href="/store-owner/tax-snapshots"
+          style={{
+            whiteSpace: 'nowrap',
+            padding: '8px 16px',
+            borderRadius: '9999px',
+            backgroundColor: '#D97706',
+            color: '#ffffff',
+            fontWeight: 700,
+            fontSize: '0.8rem',
+            textDecoration: 'none',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+            boxShadow: '0 2px 8px rgba(217, 119, 6, 0.25)',
+          }}
+        >
+          <span>Xem tờ khai FE-19</span>
+          <span>➔</span>
+        </a>
+      </div>
+
       {/* Table Footer Notes */}
       <div style={{ padding: '12px 20px', background: '#F8FAFC', borderTop: '1px solid var(--border-subtle, #e5edf8)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.72rem', color: 'var(--text-muted, #4b5563)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>

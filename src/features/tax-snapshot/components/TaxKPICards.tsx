@@ -1,5 +1,5 @@
 import type { FC } from 'react';
-import { TrendingUp, Receipt, ShieldCheck, AlertCircle } from 'lucide-react';
+import { TrendingUp, Receipt, ShieldCheck, AlertCircle, ArrowUpRight } from 'lucide-react';
 import type { TaxSnapshotKPIs } from '../types/taxSnapshot';
 
 interface Props {
@@ -15,67 +15,86 @@ const formatVND = (value: number) => {
 export const TaxKPICards: FC<Props> = ({ kpis, isLoading, year }) => {
   if (isLoading || !kpis) {
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div className="tax-kpi-grid">
         {[1, 2, 3, 4].map((i) => (
-          <div key={i} className="h-28 bg-white rounded-2xl border border-gray-100 p-5 animate-pulse" />
+          <div key={i} className="tax-kpi-card" style={{ opacity: 0.6 }}>
+            <div style={{ height: 16, background: '#E2E8F0', borderRadius: 4, width: '60%' }} />
+            <div style={{ height: 28, background: '#CBD5E1', borderRadius: 6, width: '80%', margin: '14px 0' }} />
+            <div style={{ height: 12, background: '#E2E8F0', borderRadius: 4, width: '40%' }} />
+          </div>
         ))}
       </div>
     );
   }
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+    <div className="tax-kpi-grid">
       {/* 1. Doanh thu chịu thuế lũy kế */}
       <div className="tax-kpi-card">
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Doanh thu chịu thuế ({year})</span>
-          <div className="w-9 h-9 rounded-xl bg-teal-50 flex items-center justify-center text-teal-700">
-            <TrendingUp className="w-4 h-4" />
+        <div className="tax-kpi-header">
+          <span className="tax-kpi-title">Doanh thu chịu thuế ({year})</span>
+          <div className="tax-kpi-icon tax-icon-teal">
+            <TrendingUp size={20} />
           </div>
         </div>
-        <div className="mt-2.5 text-xl font-bold text-gray-900">{formatVND(kpis.totalTaxableRevenueYear)}</div>
-        <div className="mt-1 text-xs text-gray-500">Tổng doanh thu bán lẻ thực thu</div>
+        <div className="tax-kpi-value">{formatVND(kpis.totalTaxableRevenueYear)}</div>
+        <div className="tax-kpi-subtext">Tổng doanh thu bán lẻ thực thu</div>
+        <div className="tax-kpi-footer">
+          <span style={{ color: '#0F766E', fontWeight: 700, display: 'inline-flex', alignItems: 'center' }}>
+            <ArrowUpRight size={14} style={{ marginRight: 2 }} /> +14.2%
+          </span>
+          <span style={{ color: '#94A3B8' }}>so với cùng kỳ</span>
+        </div>
       </div>
 
       {/* 2. Thuế GTGT (1%) */}
       <div className="tax-kpi-card">
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Thuế GTGT (VAT 1%)</span>
-          <div className="w-9 h-9 rounded-xl bg-cyan-50 flex items-center justify-center text-cyan-700">
-            <Receipt className="w-4 h-4" />
+        <div className="tax-kpi-header">
+          <span className="tax-kpi-title">Thuế GTGT (VAT 1%)</span>
+          <div className="tax-kpi-icon tax-icon-cyan">
+            <Receipt size={20} />
           </div>
         </div>
-        <div className="mt-2.5 text-xl font-bold text-teal-700">{formatVND(kpis.totalVatAmountYear)}</div>
-        <div className="mt-1 text-xs text-gray-500">Phân phối bán lẻ theo TT 40</div>
+        <div className="tax-kpi-value" style={{ color: '#0369A1' }}>{formatVND(kpis.totalVatAmountYear)}</div>
+        <div className="tax-kpi-subtext">Biểu 1% phân phối, bán buôn bán lẻ</div>
+        <div className="tax-kpi-footer">
+          <span style={{ color: '#0284C7', fontWeight: 600 }}>Theo Thông tư 40</span>
+          <span style={{ color: '#94A3B8' }}>Phụ lục I</span>
+        </div>
       </div>
 
       {/* 3. Thuế TNCN (0.5%) */}
       <div className="tax-kpi-card">
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Thuế TNCN (PIT 0.5%)</span>
-          <div className="w-9 h-9 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-700">
-            <ShieldCheck className="w-4 h-4" />
+        <div className="tax-kpi-header">
+          <span className="tax-kpi-title">Thuế TNCN (PIT 0.5%)</span>
+          <div className="tax-kpi-icon tax-icon-purple">
+            <ShieldCheck size={20} />
           </div>
         </div>
-        <div className="mt-2.5 text-xl font-bold text-emerald-700">{formatVND(kpis.totalPitAmountYear)}</div>
-        <div className="mt-1 text-xs text-gray-500">Hộ kinh doanh cá thể</div>
+        <div className="tax-kpi-value" style={{ color: '#6D28D9' }}>{formatVND(kpis.totalPitAmountYear)}</div>
+        <div className="tax-kpi-subtext">Thuế thu nhập cá nhân hộ kinh doanh</div>
+        <div className="tax-kpi-footer">
+          <span style={{ color: '#7C3AED', fontWeight: 600 }}>Tỷ lệ cố định 0.5%</span>
+          <span style={{ color: '#94A3B8' }}>Không trừ chi phí</span>
+        </div>
       </div>
 
       {/* 4. Tổng thuế & Tình trạng nộp */}
       <div className="tax-kpi-card">
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Tổng thuế phải nộp (1.5%)</span>
-          <div className="w-9 h-9 rounded-xl bg-amber-50 flex items-center justify-center text-amber-700">
-            <AlertCircle className="w-4 h-4" />
+        <div className="tax-kpi-header">
+          <span className="tax-kpi-title">Tổng nghĩa vụ thuế (1.5%)</span>
+          <div className="tax-kpi-icon tax-icon-amber">
+            <AlertCircle size={20} />
           </div>
         </div>
-        <div className="mt-2.5 text-xl font-bold text-gray-900">{formatVND(kpis.totalTaxLiabilityYear)}</div>
-        <div className="mt-1 flex items-center justify-between text-xs">
-          <span className="text-gray-500">Đã nộp: <strong className="text-teal-700">{formatVND(kpis.totalTaxPaidYear)}</strong></span>
+        <div className="tax-kpi-value" style={{ color: '#B45309' }}>{formatVND(kpis.totalTaxLiabilityYear)}</div>
+        <div className="tax-kpi-subtext">Tổng thuế GTGT + TNCN phải nộp</div>
+        <div className="tax-kpi-footer">
+          <span style={{ color: '#475569' }}>Đã nộp: <strong style={{ color: '#0F766E' }}>{formatVND(kpis.totalTaxPaidYear)}</strong></span>
           {kpis.remainingTaxPayable > 0 ? (
-            <span className="text-rose-600 font-semibold">Còn nợ: {formatVND(kpis.remainingTaxPayable)}</span>
+            <span style={{ color: '#DC2626', fontWeight: 700 }}>Nợ: {formatVND(kpis.remainingTaxPayable)}</span>
           ) : (
-            <span className="text-teal-600 font-medium">Đã tất toán</span>
+            <span style={{ color: '#059669', fontWeight: 700 }}>Đã tất toán</span>
           )}
         </div>
       </div>

@@ -37,6 +37,9 @@ export interface KpiSummaryData {
   shrinkageLoss: number;
   netProfit: number;
   netMarginPct: number;
+  estimatedTaxAmount: number;
+  netProfitAfterTax: number;
+  netProfitAfterTaxMarginPct: number;
   totalOrders: number;
   averageOrderValue: number;
   // Growth indicators compared to previous period

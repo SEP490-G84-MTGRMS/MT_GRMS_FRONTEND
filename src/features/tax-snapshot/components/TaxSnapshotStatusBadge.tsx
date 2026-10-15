@@ -1,4 +1,5 @@
 import type { FC } from 'react';
+import { CheckCircle2, Clock, FileCheck, Send } from 'lucide-react';
 import type { TaxSnapshotStatus } from '../types/taxSnapshot';
 
 interface Props {
@@ -9,26 +10,30 @@ export const TaxSnapshotStatusBadge: FC<Props> = ({ status }) => {
   switch (status) {
     case 'Draft':
       return (
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700 border border-gray-200">
-          Nháp (Draft)
+        <span className="tax-badge tax-badge-draft">
+          <Clock size={13} />
+          <span>Nháp (Draft)</span>
         </span>
       );
     case 'Finalized':
       return (
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
-          Đã chốt số liệu
+        <span className="tax-badge tax-badge-finalized">
+          <FileCheck size={13} />
+          <span>Đã chốt số liệu</span>
         </span>
       );
     case 'Submitted':
       return (
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-50 text-purple-700 border border-purple-200">
-          Đã nộp tờ khai
+        <span className="tax-badge tax-badge-submitted">
+          <Send size={13} />
+          <span>Đã nộp tờ khai</span>
         </span>
       );
     case 'Paid':
       return (
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
-          Đã nộp thuế
+        <span className="tax-badge tax-badge-paid">
+          <CheckCircle2 size={13} />
+          <span>Đã nộp thuế</span>
         </span>
       );
     default:

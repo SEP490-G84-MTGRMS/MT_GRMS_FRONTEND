@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { FC } from 'react';
-import { X, FileCheck, CheckCircle2, Download, Receipt, ArrowRight } from 'lucide-react';
+import { X, FileCheck, CheckCircle2, Download, Receipt, ArrowRight, Layers, Calendar, Hash } from 'lucide-react';
 import type { TaxSnapshot, TaxSnapshotStatus } from '../types/taxSnapshot';
 import { TaxSnapshotStatusBadge } from './TaxSnapshotStatusBadge';
 import { mockOrdersPool } from '../api/mockTaxData';
@@ -47,151 +47,173 @@ export const TaxSnapshotDetailDrawer: FC<Props> = ({
   );
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-xs">
-      <div className="bg-white w-full max-w-2xl h-full shadow-2xl flex flex-col animate-in slide-in-from-right duration-200">
+    <div className="tax-drawer-backdrop" onClick={onClose}>
+      <div className="tax-drawer-panel" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-5 border-b border-gray-200">
+        <div className="tax-drawer-header">
           <div>
-            <div className="flex items-center gap-3">
-              <h2 className="text-lg font-bold text-gray-900">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0F172A', margin: 0, letterSpacing: '-0.02em' }}>
                 Kỳ tính thuế Quý {snapshot.quarter}/{snapshot.year}
               </h2>
               <TaxSnapshotStatusBadge status={snapshot.status} />
             </div>
-            <p className="text-xs text-gray-500 mt-1">Mã tham chiếu: {snapshot.id}</p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.78rem', color: '#64748B', marginTop: 4 }}>
+              <Hash size={13} />
+              <span>Mã tham chiếu:</span>
+              <code style={{ background: '#F1F5F9', padding: '2px 6px', borderRadius: 6, color: '#0F766E', fontWeight: 700 }}>
+                {snapshot.id}
+              </code>
+            </div>
           </div>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 p-1.5 rounded-lg hover:bg-gray-100 cursor-pointer"
-          >
-            <X className="w-5 h-5" />
+
+          <button onClick={onClose} className="tax-drawer-close-btn" title="Đóng cửa sổ">
+            <X size={18} />
           </button>
         </div>
 
         {/* Tab Navigation */}
-        <div className="flex border-b border-gray-200 px-6">
+        <div className="tax-drawer-tabs">
           <button
             onClick={() => setActiveTab('summary')}
-            className={`py-3 px-4 text-sm font-semibold border-b-2 cursor-pointer transition-colors ${
-              activeTab === 'summary'
-                ? 'border-teal-600 text-teal-700'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
+            className={'tax-drawer-tab-btn ' + (activeTab === 'summary' ? 'active' : '')}
           >
-            Tổng quan nghĩa vụ thuế
+            <Receipt size={16} />
+            <span>Tổng quan nghĩa vụ thuế</span>
           </button>
+
           <button
             onClick={() => setActiveTab('orders')}
-            className={`py-3 px-4 text-sm font-semibold border-b-2 cursor-pointer transition-colors ${
-              activeTab === 'orders'
-                ? 'border-teal-600 text-teal-700'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
+            className={'tax-drawer-tab-btn ' + (activeTab === 'orders' ? 'active' : '')}
           >
-            Bảng kê hóa đơn ({snapshot.ordersCount})
+            <Layers size={16} />
+            <span>Bảng kê hóa đơn ({mockOrdersPool.length})</span>
           </button>
         </div>
 
         {/* Content Body */}
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="tax-drawer-body">
           {activeTab === 'summary' ? (
-            <div className="space-y-6">
-              {/* Formula Card */}
-              <div className="bg-teal-50/60 rounded-2xl p-4 border border-teal-100">
-                <div className="flex items-center gap-2 text-xs font-semibold text-teal-900 uppercase">
-                  <Receipt className="w-4 h-4 text-teal-700" />
+            <>
+              {/* Formula Policy Box */}
+              <div className="tax-info-box-teal">
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.8rem', fontWeight: 800, textTransform: 'uppercase', color: '#0F766E' }}>
+                  <Receipt size={16} />
                   <span>Quy định biểu thuế Hộ kinh doanh (Thông tư 40/2021/TT-BTC)</span>
                 </div>
-                <p className="text-xs text-teal-800 mt-2 leading-relaxed">
-                  Ngành nghề: <strong>Phân phối, cung cấp hàng hóa (bán buôn, bán lẻ tạp hóa)</strong>
+                <div style={{ fontSize: '0.82rem', marginTop: 8, lineHeight: 1.6, color: '#134E4A' }}>
+                  Ngành nghề: <strong>Phân phối, cung cấp hàng hóa (bán buôn, bán lẻ tiệm tạp hóa)</strong>
                   <br />
-                  - Tỷ lệ thuế GTGT: <strong>1.0%</strong> trên doanh thu thực tế
+                  • Thuế GTGT: <strong style={{ color: '#0F766E' }}>1.0%</strong> trên tổng doanh thu thực tế phát sinh
                   <br />
-                  - Tỷ lệ thuế TNCN: <strong>0.5%</strong> trên doanh thu thực tế
+                  • Thuế TNCN: <strong style={{ color: '#8B5CF6' }}>0.5%</strong> trên tổng doanh thu thực tế phát sinh
                   <br />
-                  - Tổng thuế phải nộp: <strong>1.5%</strong> doanh thu chịu thuế
-                </p>
+                  • Tổng thuế nộp: <strong style={{ color: '#0F766E' }}>1.5%</strong> doanh thu chịu thuế
+                </div>
               </div>
 
-              {/* Number Details */}
-              <div className="bg-white rounded-2xl border border-gray-200 p-5 space-y-4">
-                <div className="flex justify-between items-center pb-3 border-b border-gray-100">
-                  <span className="text-sm text-gray-600">Tổng doanh thu bán lẻ chịu thuế</span>
-                  <span className="text-base font-bold text-gray-900">
+              {/* Number Details Calculation Card */}
+              <div className="tax-calc-card">
+                <div className="tax-calc-row bordered-bottom">
+                  <span style={{ color: '#475569', fontWeight: 600 }}>Tổng doanh thu bán lẻ chịu thuế</span>
+                  <span style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0F172A' }}>
                     {formatVND(snapshot.taxableRevenue)}
                   </span>
                 </div>
-                <div className="flex justify-between items-center text-sm">
-                  <span className="text-gray-600">Thuế GTGT phải nộp (1%)</span>
-                  <span className="font-semibold text-teal-700">{formatVND(snapshot.vatAmount)}</span>
+
+                <div className="tax-calc-row">
+                  <span style={{ color: '#64748B' }}>Thuế GTGT phải nộp (1%)</span>
+                  <span style={{ fontWeight: 700, color: '#0D9488', fontSize: '0.98rem' }}>
+                    {formatVND(snapshot.vatAmount)}
+                  </span>
                 </div>
-                <div className="flex justify-between items-center text-sm">
-                  <span className="text-gray-600">Thuế TNCN phải nộp (0.5%)</span>
-                  <span className="font-semibold text-emerald-700">{formatVND(snapshot.pitAmount)}</span>
+
+                <div className="tax-calc-row">
+                  <span style={{ color: '#64748B' }}>Thuế TNCN phải nộp (0.5%)</span>
+                  <span style={{ fontWeight: 700, color: '#8B5CF6', fontSize: '0.98rem' }}>
+                    {formatVND(snapshot.pitAmount)}
+                  </span>
                 </div>
-                <div className="flex justify-between items-center pt-3 border-t border-gray-100">
-                  <span className="text-base font-bold text-gray-900">Tổng tiền thuế phải nộp</span>
-                  <span className="text-xl font-bold text-teal-800">
+
+                <div className="tax-calc-row bordered-top">
+                  <div>
+                    <span style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0F172A' }}>
+                      Tổng tiền thuế phải nộp
+                    </span>
+                    <div style={{ fontSize: '0.74rem', color: '#64748B' }}>Đã bao gồm 1% VAT + 0.5% TNCN</div>
+                  </div>
+                  <span style={{ fontSize: '1.35rem', fontWeight: 900, color: '#0F766E' }}>
                     {formatVND(snapshot.totalTaxAmount)}
                   </span>
                 </div>
               </div>
 
-              {/* Timestamps & Audit */}
-              <div className="bg-gray-50 rounded-2xl p-4 border border-gray-200 text-xs text-gray-600 space-y-2">
-                <div className="flex justify-between">
-                  <span>Ngày chốt số liệu:</span>
-                  <span className="font-medium text-gray-900">
-                    {new Date(snapshot.generatedAt).toLocaleString('vi-VN')}
+              {/* Timestamps & Audit Trail */}
+              <div className="tax-audit-card">
+                <div className="tax-audit-row">
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <Calendar size={13} />
+                    <span>Ngày chốt số liệu:</span>
                   </span>
+                  <strong style={{ color: '#0F172A' }}>
+                    {new Date(snapshot.generatedAt).toLocaleString('vi-VN')}
+                  </strong>
                 </div>
+
                 {snapshot.submittedAt && (
-                  <div className="flex justify-between">
+                  <div className="tax-audit-row">
                     <span>Ngày nộp tờ khai:</span>
-                    <span className="font-medium text-gray-900">
+                    <strong style={{ color: '#0F172A' }}>
                       {new Date(snapshot.submittedAt).toLocaleString('vi-VN')}
-                    </span>
+                    </strong>
                   </div>
                 )}
+
                 {snapshot.paidAt && (
-                  <div className="flex justify-between">
+                  <div className="tax-audit-row">
                     <span>Ngày hoàn tất nộp thuế:</span>
-                    <span className="font-medium text-emerald-700">
+                    <strong style={{ color: '#059669' }}>
                       {new Date(snapshot.paidAt).toLocaleString('vi-VN')}
-                    </span>
+                    </strong>
                   </div>
                 )}
+
                 {snapshot.note && (
-                  <div className="pt-2 border-t border-gray-200">
-                    <span className="font-medium text-gray-700">Ghi chú:</span> {snapshot.note}
+                  <div style={{ paddingTop: 8, borderTop: '1px solid #E2E8F0', marginTop: 2 }}>
+                    <span style={{ fontWeight: 600, color: '#334155' }}>Ghi chú:</span> {snapshot.note}
                   </div>
                 )}
               </div>
-            </div>
+            </>
           ) : (
-            <div className="space-y-4">
-              <div className="text-xs text-gray-500">
-                Hiển thị các hóa đơn bán lẻ POS cấu thành doanh thu Quý {snapshot.quarter}:
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div style={{ fontSize: '0.82rem', color: '#64748B' }}>
+                Hiển thị các hóa đơn bán lẻ POS cấu thành doanh thu Quý {snapshot.quarter}/{snapshot.year}:
               </div>
-              <div className="border border-gray-200 rounded-xl overflow-hidden">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-gray-50 border-b border-gray-200 text-gray-600 uppercase">
+
+              <div className="tax-table-wrapper">
+                <table className="tax-table">
+                  <thead>
                     <tr>
-                      <th className="py-2.5 px-3">Mã hóa đơn</th>
-                      <th className="py-2.5 px-3">Thời gian</th>
-                      <th className="py-2.5 px-3">Khách hàng</th>
-                      <th className="py-2.5 px-3">PTTT</th>
-                      <th className="py-2.5 px-3 text-right">Số tiền</th>
+                      <th>MÃ HÓA ĐƠN</th>
+                      <th>THỜI GIAN</th>
+                      <th>KHÁCH HÀNG</th>
+                      <th>PTTT</th>
+                      <th style={{ textAlign: 'right' }}>SỐ TIỀN</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-100">
+                  <tbody>
                     {paginatedOrders.map((ord) => (
-                      <tr key={ord.orderId} className="hover:bg-teal-50/30">
-                        <td className="py-2.5 px-3 font-semibold text-gray-900">{ord.orderCode}</td>
-                        <td className="py-2.5 px-3 text-gray-500">{ord.orderDate}</td>
-                        <td className="py-2.5 px-3 text-gray-700">{ord.customerName}</td>
-                        <td className="py-2.5 px-3 text-gray-500">{ord.paymentMethod}</td>
-                        <td className="py-2.5 px-3 font-semibold text-teal-800 text-right">
+                      <tr key={ord.orderId}>
+                        <td style={{ fontWeight: 700, color: '#0F766E' }}>{ord.orderCode}</td>
+                        <td style={{ color: '#64748B', fontSize: '0.78rem' }}>{ord.orderDate}</td>
+                        <td style={{ fontWeight: 600, color: '#1E293B' }}>{ord.customerName}</td>
+                        <td>
+                          <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: 6, background: '#F1F5F9', fontSize: '0.72rem', fontWeight: 600, color: '#475569' }}>
+                            {ord.paymentMethod}
+                          </span>
+                        </td>
+                        <td style={{ textAlign: 'right', fontWeight: 800, color: '#0F172A' }}>
                           {formatVND(ord.finalAmount)}
                         </td>
                       </tr>
@@ -200,7 +222,7 @@ export const TaxSnapshotDetailDrawer: FC<Props> = ({
                 </table>
               </div>
 
-              {/* TablePagination for Orders */}
+              {/* TablePagination */}
               <TablePagination
                 currentPage={orderPage}
                 pageSize={orderPageSize}
@@ -218,20 +240,23 @@ export const TaxSnapshotDetailDrawer: FC<Props> = ({
         </div>
 
         {/* Footer Actions */}
-        <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
-          <button onClick={() => onOpenExportModal(snapshot)} className="btn-secondary-pill">
-            <Download className="w-4 h-4" />
+        <div className="tax-drawer-footer">
+          <button
+            onClick={() => onOpenExportModal(snapshot)}
+            className="btn-secondary-pill"
+          >
+            <Download size={16} />
             <span>Xuất tờ khai Form 01</span>
           </button>
 
-          <div className="flex items-center gap-2">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             {snapshot.status === 'Draft' && (
               <button
                 disabled={isUpdating}
                 onClick={() => handleStatusChange('Finalized')}
-                className="btn-primary-pill disabled:opacity-50"
+                className="btn-primary-pill"
               >
-                <FileCheck className="w-4 h-4" />
+                <FileCheck size={16} />
                 <span>Chốt số liệu</span>
               </button>
             )}
@@ -240,10 +265,10 @@ export const TaxSnapshotDetailDrawer: FC<Props> = ({
               <button
                 disabled={isUpdating}
                 onClick={() => handleStatusChange('Submitted')}
-                className="btn-primary-pill disabled:opacity-50"
+                className="btn-primary-pill"
               >
                 <span>Đánh dấu Đã nộp tờ khai</span>
-                <ArrowRight className="w-4 h-4" />
+                <ArrowRight size={16} />
               </button>
             )}
 
@@ -251,9 +276,10 @@ export const TaxSnapshotDetailDrawer: FC<Props> = ({
               <button
                 disabled={isUpdating}
                 onClick={() => handleStatusChange('Paid')}
-                className="btn-primary-pill disabled:opacity-50"
+                className="btn-primary-pill"
+                style={{ background: 'linear-gradient(135deg, #059669 0%, #047857 100%)' }}
               >
-                <CheckCircle2 className="w-4 h-4" />
+                <CheckCircle2 size={16} />
                 <span>Xác nhận Đã nộp thuế</span>
               </button>
             )}

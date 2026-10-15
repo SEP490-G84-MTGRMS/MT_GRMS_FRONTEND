@@ -10,6 +10,7 @@ import {
   QrCode,
   Edit2,
   ShieldAlert,
+  History,
 } from 'lucide-react';
 import type { CustomerDto } from '../types/customer.types';
 
@@ -18,6 +19,7 @@ interface CustomerDrawerDetailProps {
   onClose: () => void;
   onOpenEdit: (customer: CustomerDto) => void;
   onOpenCollect: (customer: CustomerDto) => void;
+  onViewLedger?: (customer: CustomerDto) => void;
 }
 
 const formatCurrency = (val?: number): string => {
@@ -34,6 +36,7 @@ export const CustomerDrawerDetail: FC<CustomerDrawerDetailProps> = ({
   onClose,
   onOpenEdit,
   onOpenCollect,
+  onViewLedger,
 }) => {
   const [activeTab, setActiveTab] = useState<'info' | 'invoices' | 'payments'>('info');
 
@@ -114,6 +117,29 @@ export const CustomerDrawerDetail: FC<CustomerDrawerDetailProps> = ({
                     style={{ width: `${debtPercent}%` }}
                   />
                 </div>
+                {onViewLedger && (
+                  <button
+                    type="button"
+                    onClick={() => onViewLedger(customer)}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      marginTop: '10px',
+                      padding: '4px 10px',
+                      borderRadius: '8px',
+                      border: '1px solid #0F766E',
+                      background: '#F0FDFA',
+                      color: '#0F766E',
+                      fontSize: '0.74rem',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <History className="w-3.5 h-3.5" />
+                    <span>Xem sổ công nợ chi tiết</span>
+                  </button>
+                )}
               </div>
             </div>
 

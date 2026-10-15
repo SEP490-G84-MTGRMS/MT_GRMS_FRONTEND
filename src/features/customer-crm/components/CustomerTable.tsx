@@ -1,5 +1,5 @@
 import type { FC } from 'react';
-import { Eye, Edit2, QrCode, AlertCircle, CheckCircle, ShieldAlert } from 'lucide-react';
+import { Eye, Edit2, History, QrCode, AlertCircle, CheckCircle, ShieldAlert } from 'lucide-react';
 import { TablePagination } from '../../../components/common';
 import type { CustomerDto, MembershipTier } from '../types/customer.types';
 
@@ -9,6 +9,7 @@ export interface CustomerTableProps {
   onSelect: (customer: CustomerDto) => void;
   onEdit: (customer: CustomerDto) => void;
   onCollect: (customer: CustomerDto) => void;
+  onViewLedger?: (customer: CustomerDto) => void;
   currentPage?: number;
   pageSize?: number;
   onPageChange?: (page: number) => void;
@@ -59,6 +60,7 @@ export const CustomerTable: FC<CustomerTableProps> = ({
   onSelect,
   onEdit,
   onCollect,
+  onViewLedger,
   currentPage = 1,
   pageSize = 10,
   onPageChange,
@@ -254,6 +256,19 @@ export const CustomerTable: FC<CustomerTableProps> = ({
                         >
                           <QrCode className="w-3.5 h-3.5" />
                           <span>Thu nợ</span>
+                        </button>
+                      )}
+
+                      
+                      {/* Nút Xem Sổ Biến Động Công Nợ */}
+                      {onViewLedger && (
+                        <button
+                          onClick={() => onViewLedger(c)}
+                          title="Xem sổ biến động công nợ"
+                          className="action-icon-btn"
+                          style={{ color: '#0F766E' }}
+                        >
+                          <History className="w-4 h-4" />
                         </button>
                       )}
 
