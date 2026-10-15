@@ -1,5 +1,5 @@
 import type { FC } from 'react';
-import { Search, RotateCcw, Filter, Calendar, Truck, Clock, AlertTriangle, Layers } from 'lucide-react';
+import { Search, RotateCcw, Filter, Calendar, Layers } from 'lucide-react';
 import type { GrnFilterState, GrnFilterTab, UserRole } from '../types/grn.types';
 import { MOCK_GRN_BRANCHES, MOCK_GRN_SUPPLIERS } from '../lib/mockGrnData';
 
@@ -245,151 +245,44 @@ export const GrnFilterBar: FC<GrnFilterBarProps> = ({
           borderTop: '1px dashed #f1f5f9',
         }}
       >
-        {/* Quick View Tabs Pill Buttons */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-          <span style={{ fontSize: 12, fontWeight: 600, color: '#64748b', display: 'flex', alignItems: 'center', gap: 4, marginRight: 2 }}>
-            <Layers size={13} />
-            Xem nhanh:
-          </span>
-
-          {/* Tất cả */}
-          <button
-            type="button"
-            onClick={() => onTabChange('ALL')}
+        {/* Xem nhanh: Dạng Select Box */}
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+          <label
             style={{
-              height: 28,
-              padding: '0 9px',
-              fontSize: 11.5,
-              fontWeight: activeTab === 'ALL' ? 700 : 500,
-              borderRadius: 5,
-              border: activeTab === 'ALL' ? '1px solid #0f766e' : '1px solid #cbd5e1',
-              backgroundColor: activeTab === 'ALL' ? '#f0fdfa' : '#ffffff',
-              color: activeTab === 'ALL' ? '#0f766e' : '#475569',
-              cursor: 'pointer',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 5,
-            }}
-          >
-            <span>Tất cả</span>
-            <span
-              style={{
-                padding: '0 5px',
-                fontSize: 10.5,
-                borderRadius: 8,
-                backgroundColor: activeTab === 'ALL' ? '#ccfbf1' : '#f1f5f9',
-                color: activeTab === 'ALL' ? '#0f766e' : '#64748b',
-                fontWeight: 700,
-              }}
-            >
-              {tabCounts.all}
-            </span>
-          </button>
-
-          {/* Hôm nay */}
-          <button
-            type="button"
-            onClick={() => onTabChange('TODAY')}
-            style={{
-              height: 28,
-              padding: '0 9px',
-              fontSize: 11.5,
-              fontWeight: 700,
-              borderRadius: 5,
-              border: activeTab === 'TODAY' ? '1.5px solid #0284c7' : '1px solid #bae6fd',
-              backgroundColor: activeTab === 'TODAY' ? '#e0f2fe' : '#f0f9ff',
-              color: '#0369a1',
-              cursor: 'pointer',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 5,
-            }}
-          >
-            <Truck size={12} />
-            <span>Hôm nay</span>
-            <span
-              style={{
-                padding: '0 5px',
-                fontSize: 10.5,
-                borderRadius: 8,
-                backgroundColor: '#bae6fd',
-                color: '#0369a1',
-                fontWeight: 800,
-              }}
-            >
-              {tabCounts.today}
-            </span>
-          </button>
-
-          {/* Chờ duyệt (Draft) */}
-          <button
-            type="button"
-            onClick={() => onTabChange('DRAFT')}
-            style={{
-              height: 28,
-              padding: '0 9px',
-              fontSize: 11.5,
+              fontSize: 12,
               fontWeight: 600,
-              borderRadius: 5,
-              border: activeTab === 'DRAFT' ? '1.5px solid #d97706' : '1px solid #fde68a',
-              backgroundColor: activeTab === 'DRAFT' ? '#fef3c7' : '#fffdf5',
-              color: '#b45309',
-              cursor: 'pointer',
+              color: '#475569',
+              whiteSpace: 'nowrap',
               display: 'inline-flex',
               alignItems: 'center',
-              gap: 5,
+              gap: 4,
             }}
           >
-            <Clock size={12} />
-            <span>Chờ duyệt</span>
-            <span
-              style={{
-                padding: '0 5px',
-                fontSize: 10.5,
-                borderRadius: 8,
-                backgroundColor: '#fde68a',
-                color: '#b45309',
-                fontWeight: 700,
-              }}
-            >
-              {tabCounts.draft}
-            </span>
-          </button>
-
-          {/* Lệch hàng (Mismatch) */}
-          <button
-            type="button"
-            onClick={() => onTabChange('MISMATCH')}
+            <Layers size={13} color="#64748b" />
+            <span>Xem nhanh:</span>
+          </label>
+          <select
+            value={activeTab}
+            onChange={(e) => onTabChange(e.target.value as GrnFilterTab)}
             style={{
-              height: 28,
-              padding: '0 9px',
-              fontSize: 11.5,
-              fontWeight: 700,
-              borderRadius: 5,
-              border: activeTab === 'MISMATCH' ? '1.5px solid #dc2626' : '1px solid #fca5a5',
-              backgroundColor: activeTab === 'MISMATCH' ? '#fee2e2' : '#fff5f5',
-              color: '#dc2626',
+              height: 32,
+              padding: '0 10px',
+              borderRadius: 6,
+              border: activeTab !== 'ALL' ? '1px solid #0d9488' : '1px solid #cbd5e1',
+              fontSize: 12,
+              fontWeight: 600,
+              color: activeTab !== 'ALL' ? '#0f766e' : '#334155',
+              backgroundColor: activeTab !== 'ALL' ? '#f0fdfa' : '#ffffff',
               cursor: 'pointer',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 5,
+              outline: 'none',
+              minWidth: 175,
             }}
           >
-            <AlertTriangle size={12} />
-            <span>Lệch hàng</span>
-            <span
-              style={{
-                padding: '0 5px',
-                fontSize: 10.5,
-                borderRadius: 8,
-                backgroundColor: '#fca5a5',
-                color: '#991b1b',
-                fontWeight: 800,
-              }}
-            >
-              {tabCounts.mismatch}
-            </span>
-          </button>
+            <option value="ALL">Tất cả ({tabCounts.all})</option>
+            <option value="TODAY">Lịch nhận hôm nay ({tabCounts.today})</option>
+            <option value="DRAFT">Chờ duyệt ({tabCounts.draft})</option>
+            <option value="MISMATCH">Lệch hàng ({tabCounts.mismatch})</option>
+          </select>
         </div>
 
         {/* Center/Right: Date range + Search & Reset */}
