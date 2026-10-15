@@ -6,3 +6,4 @@ export * from './components/GrnTable';
 export * from './components/GrnDetailDrawer';
 export * from './pages/GoodsReceiptListPage';
 export * from './pages/GoodsReceiptFormPage';
+export * from './pages/GoodsReceiptDetailPage';

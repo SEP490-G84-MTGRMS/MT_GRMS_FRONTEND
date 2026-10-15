@@ -45,7 +45,7 @@ export const GoodsReceiptListPage: FC<{ defaultRole?: UserRole }> = ({
   const employeeBranchId = searchParams.get('branch') || 'BR-01';
 
   // Master State
-  const [receipts, setReceipts] = useState<GoodsReceiptListItem[]>(MOCK_GOODS_RECEIPTS);
+  const [receipts] = useState<GoodsReceiptListItem[]>(MOCK_GOODS_RECEIPTS);
   const [activeTab, setActiveTab] = useState<GrnFilterTab>('ALL');
   const [filterInputs, setFilterInputs] = useState<GrnFilterState>(DEFAULT_FILTERS);
   const [appliedFilters, setAppliedFilters] = useState<GrnFilterState>(DEFAULT_FILTERS);
@@ -211,10 +211,17 @@ export const GoodsReceiptListPage: FC<{ defaultRole?: UserRole }> = ({
           : `/store-owner/goods-receipts/create?poCode=${receipt.poReference}`;
       navigate(targetUrl);
     } else if (action === 'APPROVE_DRAFT') {
-      setReceipts((prev) =>
-        prev.map((r) => (r.id === receipt.id ? { ...r, status: 'CONFIRMED' } : r))
-      );
-      showToast(`Đã duyệt hoàn tất phiếu ${receipt.code}. Cập nhật tồn kho theo lô FEFO thành công!`, 'success');
+      const targetUrl =
+        role === 'employee'
+          ? `/employee/goods-receipts/${receipt.id}/confirm?branch=${employeeBranchId}&role=employee`
+          : `/store-owner/goods-receipts/${receipt.id}/confirm`;
+      navigate(targetUrl);
+    } else if (action === 'VIEW_DETAIL') {
+      const targetUrl =
+        role === 'employee'
+          ? `/employee/goods-receipts/${receipt.id}?branch=${employeeBranchId}&role=employee`
+          : `/store-owner/goods-receipts/${receipt.id}`;
+      navigate(targetUrl);
     } else if (action === 'EDIT_DRAFT') {
       const targetUrl =
         role === 'employee'
