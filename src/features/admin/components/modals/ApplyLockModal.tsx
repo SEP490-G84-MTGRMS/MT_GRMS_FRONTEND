@@ -1,15 +1,6 @@
 import { useState, useId } from "react";
 import type { FC, FormEvent } from "react";
-import {
-  Lock,
-  ShieldAlert,
-  AlertOctagon,
-  X,
-  Store,
-  FileText,
-  AlertTriangle,
-  Info,
-} from "lucide-react";
+import { X } from "lucide-react";
 import type { Tenant, LockType } from "../../types/admin.types";
 
 interface ApplyLockModalProps {
@@ -36,7 +27,6 @@ export const ApplyLockModal: FC<ApplyLockModalProps> = ({
   const [reason, setReason] = useState("");
   const [isConfirmed, setIsConfirmed] = useState(false);
   const reasonInputId = useId();
-  const confirmCheckboxId = useId();
 
   if (!isOpen || !tenant) return null;
 
@@ -57,10 +47,10 @@ export const ApplyLockModal: FC<ApplyLockModalProps> = ({
 
   const planLabel =
     tenant.plan === "enterprise"
-      ? "Gói Doanh Nghiệp"
+      ? "Doanh Nghiệp"
       : tenant.plan === "advanced"
-        ? "Gói Nâng Cao"
-        : "Gói Cơ Bản";
+        ? "Nâng Cao"
+        : "Cơ Bản";
 
   return (
     <div
@@ -73,8 +63,8 @@ export const ApplyLockModal: FC<ApplyLockModalProps> = ({
         alignItems: "center",
         justifyContent: "center",
         padding: "16px",
-        backgroundColor: "rgba(15, 23, 42, 0.65)",
-        backdropFilter: "blur(6px)",
+        backgroundColor: "rgba(15, 23, 42, 0.45)",
+        backdropFilter: "blur(3px)",
       }}
     >
       <div
@@ -82,9 +72,9 @@ export const ApplyLockModal: FC<ApplyLockModalProps> = ({
         onClick={(e) => e.stopPropagation()}
         style={{
           width: "100%",
-          maxWidth: "960px",
-          borderRadius: "24px",
-          boxShadow: "0 25px 65px -12px rgba(15, 23, 42, 0.28)",
+          maxWidth: "860px",
+          borderRadius: "20px",
+          boxShadow: "0 20px 45px -10px rgba(0, 0, 0, 0.15)",
           border: "1px solid #E2E8F0",
           overflow: "hidden",
           display: "flex",
@@ -92,55 +82,49 @@ export const ApplyLockModal: FC<ApplyLockModalProps> = ({
           backgroundColor: "#FFFFFF",
         }}
       >
-        {/* Header */}
+        {/* Header - Phong cách hệt như ảnh tham khảo */}
         <div
           style={{
-            padding: "16px 24px",
+            padding: "20px 24px 16px 24px",
             borderBottom: "1px solid #F1F5F9",
             display: "flex",
-            alignItems: "center",
+            alignItems: "flex-start",
             justifyContent: "space-between",
-            background: "linear-gradient(180deg, #FFFFFF 0%, #FAFCFF 100%)",
+            backgroundColor: "#FFFFFF",
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <div
+          <div>
+            <h2
               style={{
-                width: 40,
-                height: 40,
-                borderRadius: "50%",
-                backgroundColor: "#FEF2F2",
-                border: "1px solid #FEE2E2",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: "#DC2626",
-                flexShrink: 0,
+                margin: 0,
+                fontSize: "18px",
+                fontWeight: 700,
+                color: "#0F172A",
+                letterSpacing: "-0.015em",
               }}
             >
-              <Lock size={20} strokeWidth={2} />
-            </div>
-            <div>
-              <h2
-                style={{
-                  margin: 0,
-                  fontSize: "16.5px",
-                  fontWeight: 800,
-                  color: "#0F172A",
-                  letterSpacing: "-0.01em",
-                }}
-              >
-                Áp dụng Lệnh Khóa Khách Hàng (Tenant Lockout)
-              </h2>
-              <p
-                style={{
-                  margin: "2px 0 0 0",
-                  fontSize: "12.5px",
-                  color: "#64748B",
-                }}
-              >
-                Cưỡng chế thu hồi quyền truy cập hoặc giới hạn quyền kinh doanh theo quy chế
-              </p>
+              Áp dụng lệnh khóa khách hàng
+            </h2>
+            <div
+              style={{
+                margin: "4px 0 0 0",
+                fontSize: "13px",
+                color: "#64748B",
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                flexWrap: "wrap",
+              }}
+            >
+              <span style={{ fontWeight: 600, color: "#334155" }}>
+                {tenant.name}
+              </span>
+              <span style={{ color: "#CBD5E1" }}>|</span>
+              <span style={{ fontFamily: "var(--font-mono, monospace)" }}>
+                {tenant.subdomain}.mtgrms.vn
+              </span>
+              <span style={{ color: "#CBD5E1" }}>|</span>
+              <span>Gói {planLabel}</span>
             </div>
           </div>
 
@@ -149,167 +133,163 @@ export const ApplyLockModal: FC<ApplyLockModalProps> = ({
             onClick={onClose}
             aria-label="Đóng cửa sổ"
             style={{
-              width: 32,
-              height: 32,
-              borderRadius: "50%",
-              border: "1px solid #E2E8F0",
-              backgroundColor: "#FFFFFF",
-              color: "#64748B",
+              background: "transparent",
+              border: "none",
+              color: "#94A3B8",
               cursor: "pointer",
+              padding: "4px",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              transition: "all 0.15s ease",
+              borderRadius: "4px",
+              transition: "color 0.15s ease",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = "#0F172A";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = "#94A3B8";
             }}
           >
-            <X size={17} />
+            <X size={18} />
           </button>
         </div>
 
-        {/* Form Body - Bố cục Ngang 2 Cột (2-Column Horizontal Layout) */}
-        <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column" }}>
+        {/* Body - Bố cục Ngang 2 Cột (Horizontal Layout) giữ trọn vẹn style ảnh mẫu */}
+        <form
+          onSubmit={handleSubmit}
+          style={{ display: "flex", flexDirection: "column" }}
+        >
           <div
             style={{
               padding: "20px 24px",
-              display: "grid",
-              gridTemplateColumns: "1.05fr 1fr",
-              gap: "20px",
-              alignItems: "start",
+              display: "flex",
+              flexDirection: "column",
+              gap: "18px",
             }}
           >
-            {/* ═══ CỘT TRÁI: Hồ sơ khách hàng & Hình thức khóa ═══ */}
-            <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
-              {/* Thẻ hồ sơ Tenant */}
+            {/* Hàng trên: Bố cục 2 Cột ngang */}
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1.1fr",
+                gap: "24px",
+                alignItems: "stretch",
+              }}
+            >
+              {/* ═══ CỘT TRÁI: Chọn hình thức khóa (Dài xuống ngang bằng cột phải) ═══ */}
               <div
                 style={{
-                  padding: "12px 14px",
-                  borderRadius: "14px",
-                  backgroundColor: "#F8FAFC",
-                  border: "1px solid #E2E8F0",
                   display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  gap: 10,
+                  flexDirection: "column",
+                  height: "100%",
                 }}
               >
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <div
-                    style={{
-                      width: 36,
-                      height: 36,
-                      borderRadius: "10px",
-                      backgroundColor: "#EEF2F6",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      color: "#334155",
-                      flexShrink: 0,
-                    }}
-                  >
-                    <Store size={18} />
-                  </div>
-                  <div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-                      <span style={{ fontSize: "14px", fontWeight: 700, color: "#0F172A" }}>
-                        {tenant.name}
-                      </span>
-                      <span
-                        style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          padding: "1px 7px",
-                          borderRadius: "9999px",
-                          backgroundColor: "#EFF6FF",
-                          border: "1px solid #DBEAFE",
-                          color: "#1D4ED8",
-                          fontSize: "11px",
-                          fontWeight: 600,
-                          fontFamily: "var(--font-mono, monospace)",
-                        }}
-                      >
-                        {tenant.subdomain}.mtgrms.vn
-                      </span>
-                    </div>
-                    <div style={{ fontSize: "12px", color: "#64748B", marginTop: 2 }}>
-                      Chủ chuỗi: <b style={{ color: "#334155" }}>{tenant.ownerName}</b> • MST:{" "}
-                      <span style={{ fontFamily: "var(--font-mono, monospace)" }}>
-                        {tenant.taxCode}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                <span
-                  style={{
-                    padding: "3px 9px",
-                    borderRadius: "9999px",
-                    backgroundColor: "#FFFFFF",
-                    border: "1px solid #E2E8F0",
-                    color: "#475569",
-                    fontSize: "11.5px",
-                    fontWeight: 600,
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {planLabel}
-                </span>
-              </div>
-
-              {/* Lựa chọn hình thức khóa (2 Thẻ xếp dọc nhau) */}
-              <div>
                 <label
                   style={{
                     display: "block",
-                    fontSize: "12.5px",
+                    fontSize: "13.5px",
                     fontWeight: 700,
-                    color: "#1E293B",
-                    marginBottom: 8,
+                    color: "#0F172A",
+                    marginBottom: "10px",
                   }}
                 >
-                  Hình thức khóa tài khoản <span style={{ color: "#DC2626" }}>*</span>
+                  Chọn hình thức khóa
                 </label>
 
-                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                  {/* Option 1: Soft-Lock */}
+                <div
+                  style={{
+                    flex: 1,
+                    display: "flex",
+                    flexDirection: "column",
+                    borderRadius: "12px",
+                    border: "1px solid #DCE6F1",
+                    overflow: "hidden",
+                    backgroundColor: "#FFFFFF",
+                  }}
+                >
+                  {/* Row 1: Khóa Mềm (Soft-Lock) */}
                   <div
                     onClick={() => setLockType("soft")}
                     style={{
-                      padding: "12px 14px",
-                      borderRadius: "14px",
-                      cursor: "pointer",
-                      transition: "all 0.15s ease",
-                      border:
-                        lockType === "soft"
-                          ? "2px solid #F59E0B"
-                          : "1px solid #E2E8F0",
-                      backgroundColor:
-                        lockType === "soft" ? "#FFFBEB" : "#FFFFFF",
+                      flex: 1,
+                      padding: "16px 18px",
                       display: "flex",
-                      flexDirection: "column",
-                      gap: 4,
+                      alignItems: "flex-start",
+                      gap: "12px",
+                      cursor: "pointer",
+                      backgroundColor:
+                        lockType === "soft" ? "#F0F5FF" : "#FFFFFF",
+                      borderBottom: "1px solid #E2E8F0",
+                      transition: "background-color 0.15s ease",
+                      justifyContent: "center",
+                      flexDirection: "row",
                     }}
                   >
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <div
+                      style={{
+                        width: 18,
+                        height: 18,
+                        borderRadius: "4px",
+                        backgroundColor:
+                          lockType === "soft" ? "#2563EB" : "#FFFFFF",
+                        border:
+                          lockType === "soft"
+                            ? "1px solid #2563EB"
+                            : "1.5px solid #94A3B8",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        color: "#FFFFFF",
+                        marginTop: 2,
+                        flexShrink: 0,
+                        transition: "all 0.15s ease",
+                      }}
+                    >
+                      {lockType === "soft" && (
+                        <svg
+                          width="12"
+                          height="12"
+                          viewBox="0 0 12 12"
+                          fill="none"
+                        >
+                          <path
+                            d="M10 3L4.5 8.5L2 6"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                      )}
+                    </div>
+                    <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center" }}>
                       <div
                         style={{
-                          display: "inline-flex",
+                          display: "flex",
                           alignItems: "center",
                           gap: 6,
-                          color: lockType === "soft" ? "#B45309" : "#64748B",
+                          flexWrap: "wrap",
                         }}
                       >
-                        <ShieldAlert size={16} />
-                        <span style={{ fontSize: "13.5px", fontWeight: 700, color: "#1E293B" }}>
-                          Khóa Mềm (Soft-Lock)
+                        <span
+                          style={{
+                            fontSize: "13.5px",
+                            fontWeight: 700,
+                            color: lockType === "soft" ? "#1D4ED8" : "#0F172A",
+                          }}
+                        >
+                          Khóa mềm (Soft-Lock)
                         </span>
                         <span
                           style={{
-                            fontSize: "10.5px",
-                            padding: "1px 6px",
-                            borderRadius: "9999px",
-                            backgroundColor: "rgba(245, 158, 11, 0.15)",
-                            color: "#B45309",
+                            fontSize: "11px",
                             fontWeight: 600,
+                            padding: "1px 6px",
+                            borderRadius: "4px",
+                            backgroundColor:
+                              lockType === "soft" ? "#DBEAFE" : "#F1F5F9",
+                            color: lockType === "soft" ? "#1E40AF" : "#64748B",
                           }}
                         >
                           Chỉ đọc dữ liệu
@@ -317,63 +297,99 @@ export const ApplyLockModal: FC<ApplyLockModalProps> = ({
                       </div>
                       <div
                         style={{
-                          width: 16,
-                          height: 16,
-                          borderRadius: "50%",
-                          border:
-                            lockType === "soft"
-                              ? "5px solid #F59E0B"
-                              : "2px solid #CBD5E1",
-                          backgroundColor: "#FFFFFF",
-                          flexShrink: 0,
+                          margin: "6px 0 0 0",
+                          fontSize: "12px",
+                          color: "#64748B",
+                          lineHeight: 1.5,
                         }}
-                      />
+                      >
+                        Chuyển sang chế độ chỉ đọc. Vẫn tra cứu dữ liệu nhưng
+                        chặn toàn bộ bán hàng mới tại POS.
+                      </div>
                     </div>
-                    <p style={{ margin: 0, fontSize: "12px", color: "#475569", lineHeight: 1.4 }}>
-                      Chuyển tenant sang chế độ <b>Chỉ đọc (Read-Only)</b>. Vẫn tra cứu dữ liệu nhưng chặn toàn bộ bán hàng mới tại POS.
-                    </p>
                   </div>
 
-                  {/* Option 2: Hard-Lock */}
+                  {/* Row 2: Khóa Cứng (Hard-Lock) */}
                   <div
                     onClick={() => setLockType("hard")}
                     style={{
-                      padding: "12px 14px",
-                      borderRadius: "14px",
+                      flex: 1,
+                      padding: "16px 18px",
+                      display: "flex",
+                      alignItems: "flex-start",
+                      gap: "12px",
                       cursor: "pointer",
-                      transition: "all 0.15s ease",
-                      border:
-                        lockType === "hard"
-                          ? "2px solid #DC2626"
-                          : "1px solid #E2E8F0",
                       backgroundColor:
                         lockType === "hard" ? "#FEF2F2" : "#FFFFFF",
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: 4,
+                      transition: "background-color 0.15s ease",
+                      justifyContent: "center",
+                      flexDirection: "row",
                     }}
                   >
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <div
+                      style={{
+                        width: 18,
+                        height: 18,
+                        borderRadius: "4px",
+                        backgroundColor:
+                          lockType === "hard" ? "#DC2626" : "#FFFFFF",
+                        border:
+                          lockType === "hard"
+                            ? "1px solid #DC2626"
+                            : "1.5px solid #94A3B8",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        color: "#FFFFFF",
+                        marginTop: 2,
+                        flexShrink: 0,
+                        transition: "all 0.15s ease",
+                      }}
+                    >
+                      {lockType === "hard" && (
+                        <svg
+                          width="12"
+                          height="12"
+                          viewBox="0 0 12 12"
+                          fill="none"
+                        >
+                          <path
+                            d="M10 3L4.5 8.5L2 6"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                      )}
+                    </div>
+                    <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center" }}>
                       <div
                         style={{
-                          display: "inline-flex",
+                          display: "flex",
                           alignItems: "center",
                           gap: 6,
-                          color: lockType === "hard" ? "#DC2626" : "#64748B",
+                          flexWrap: "wrap",
                         }}
                       >
-                        <AlertOctagon size={16} />
-                        <span style={{ fontSize: "13.5px", fontWeight: 700, color: "#1E293B" }}>
-                          Khóa Cứng (Hard-Lock)
+                        <span
+                          style={{
+                            fontSize: "13.5px",
+                            fontWeight: 700,
+                            color: lockType === "hard" ? "#DC2626" : "#0F172A",
+                          }}
+                        >
+                          Khóa cứng (Hard-Lock)
                         </span>
                         <span
                           style={{
-                            fontSize: "10.5px",
-                            padding: "1px 6px",
-                            borderRadius: "9999px",
-                            backgroundColor: "rgba(220, 38, 38, 0.15)",
-                            color: "#DC2626",
+                            fontSize: "11px",
                             fontWeight: 600,
+                            padding: "1px 6px",
+                            borderRadius: "4px",
+                            backgroundColor:
+                              lockType === "hard" ? "#FEE2E2" : "#F1F5F9",
+                            color: lockType === "hard" ? "#B91C1C" : "#64748B",
                           }}
                         >
                           Cấm truy cập
@@ -381,211 +397,195 @@ export const ApplyLockModal: FC<ApplyLockModalProps> = ({
                       </div>
                       <div
                         style={{
-                          width: 16,
-                          height: 16,
-                          borderRadius: "50%",
-                          border:
-                            lockType === "hard"
-                              ? "5px solid #DC2626"
-                              : "2px solid #CBD5E1",
-                          backgroundColor: "#FFFFFF",
-                          flexShrink: 0,
+                          margin: "6px 0 0 0",
+                          fontSize: "12px",
+                          color: "#64748B",
+                          lineHeight: 1.5,
                         }}
-                      />
+                      >
+                        Đình chỉ toàn bộ quyền truy cập. Hủy tức thì token đăng
+                        nhập và khóa subdomain.
+                      </div>
                     </div>
-                    <p style={{ margin: 0, fontSize: "12px", color: "#475569", lineHeight: 1.4 }}>
-                      <b>Đình chỉ toàn bộ</b> quyền truy cập. Hủy tức thì mọi token đăng nhập, khóa toàn bộ subdomain của chuỗi.
-                    </p>
                   </div>
                 </div>
               </div>
 
-              {/* Cảnh báo tác động thực tế */}
+              {/* ═══ CỘT PHẢI: Lý do giải trình & Gợi ý nhanh ═══ */}
+              <div
+                style={{ display: "flex", flexDirection: "column", gap: "10px" }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                  }}
+                >
+                  <label
+                    htmlFor={reasonInputId}
+                    style={{
+                      fontSize: "13.5px",
+                      fontWeight: 700,
+                      color: "#0F172A",
+                    }}
+                  >
+                    Lý do giải trình (Audit Log){" "}
+                    <span style={{ color: "#DC2626" }}>*</span>
+                  </label>
+                  <span
+                    style={{
+                      fontSize: "12px",
+                      color: isReasonValid ? "#16A34A" : "#94A3B8",
+                      fontWeight: 500,
+                    }}
+                  >
+                    {reason.trim().length} / {minReasonLength} ký tự
+                  </span>
+                </div>
+                <p
+                  style={{
+                    margin: "0 0 2px 0",
+                    fontSize: "12px",
+                    color: "#64748B",
+                  }}
+                >
+                  Chọn nhanh nguyên nhân khóa hoặc nhập chi tiết phục vụ đối soát:
+                </p>
+
+                {/* Các nút chọn nhanh tương tự các nút Thứ 2..Chủ nhật */}
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                  {QUICK_REASONS.map((item, idx) => {
+                    const isSelected = reason === item;
+                    return (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => handleSelectQuickReason(item)}
+                        style={{
+                          padding: "5px 10px",
+                          borderRadius: "8px",
+                          border: isSelected
+                            ? "1.5px solid #0066FF"
+                            : "1px solid #CBD5E1",
+                          backgroundColor: "#FFFFFF",
+                          color: isSelected ? "#0066FF" : "#334155",
+                          fontWeight: isSelected ? 600 : 400,
+                          fontSize: "11.5px",
+                          cursor: "pointer",
+                          transition: "all 0.15s ease",
+                          textAlign: "left",
+                          lineHeight: 1.35,
+                        }}
+                      >
+                        {item}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <textarea
+                  id={reasonInputId}
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  placeholder="Nhập nội dung giải trình phục vụ đối soát..."
+                  required
+                  minLength={minReasonLength}
+                  rows={4}
+                  style={{
+                    width: "100%",
+                    padding: "10px 12px",
+                    borderRadius: "8px",
+                    border: "1px solid #CBD5E1",
+                    backgroundColor: "#FFFFFF",
+                    fontFamily: "inherit",
+                    fontSize: "13px",
+                    outline: "none",
+                    resize: "vertical",
+                    color: "#0F172A",
+                    boxSizing: "border-box",
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Hàng dưới: Xác nhận thi hành lệnh khóa (Công tắc Toggle Switch kiểu iOS trải rộng một dòng bên dưới) */}
+            <div
+              onClick={() => setIsConfirmed((prev) => !prev)}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: "12px 18px",
+                borderRadius: "12px",
+                border: "1px solid #E2E8F0",
+                backgroundColor: isConfirmed ? "#F0FDF4" : "#F8FAFC",
+                transition: "all 0.15s ease",
+                gap: 16,
+                cursor: "pointer",
+                userSelect: "none",
+              }}
+            >
+              <div>
+                <div
+                  style={{
+                    fontSize: "13.5px",
+                    fontWeight: 700,
+                    color: "#0F172A",
+                  }}
+                >
+                  Xác nhận thi hành lệnh khóa
+                </div>
+                <div
+                  style={{
+                    fontSize: "12px",
+                    color: "#64748B",
+                    marginTop: 2,
+                  }}
+                >
+                  Tôi đã kiểm tra đối soát và chịu trách nhiệm áp dụng lệnh
+                  khóa này trên hệ thống
+                </div>
+              </div>
+
+              {/* iOS Style Toggle Switch */}
               <div
                 style={{
-                  padding: "10px 12px",
-                  borderRadius: "12px",
-                  backgroundColor: lockType === "hard" ? "#FEF2F2" : "#FFFBEB",
-                  border: `1px solid ${lockType === "hard" ? "#FCA5A5" : "#FDE68A"}`,
+                  width: 44,
+                  height: 24,
+                  borderRadius: "9999px",
+                  backgroundColor: isConfirmed ? "#0066FF" : "#CBD5E1",
+                  padding: 2,
                   display: "flex",
-                  alignItems: "flex-start",
-                  gap: 10,
+                  alignItems: "center",
+                  transition: "background-color 0.2s ease",
+                  flexShrink: 0,
+                  pointerEvents: "none",
                 }}
               >
                 <div
                   style={{
-                    color: lockType === "hard" ? "#DC2626" : "#D97706",
-                    marginTop: 1,
-                    flexShrink: 0,
-                  }}
-                >
-                  {lockType === "hard" ? <AlertTriangle size={16} /> : <Info size={16} />}
-                </div>
-                <div style={{ fontSize: "11.5px", lineHeight: 1.45 }}>
-                  {lockType === "hard" ? (
-                    <span style={{ color: "#991B1B" }}>
-                      <b>Cảnh báo nghiêm trọng:</b> Thu hồi toàn bộ phiên làm việc tại quầy POS, chặn truy cập cổng quản trị Store Owner và API VietQR.
-                    </span>
-                  ) : (
-                    <span style={{ color: "#92400E" }}>
-                      <b>Lưu ý vận hành:</b> Cho phép nhân viên đối chiếu hóa đơn nhưng chặn thông báo lỗi <code>403 ReadOnly Lockout</code> khi bán hàng mới.
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* ═══ CỘT PHẢI: Lý do giải trình & Cam kết đối soát ═══ */}
-            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <label
-                  htmlFor={reasonInputId}
-                  style={{
-                    fontSize: "12.5px",
-                    fontWeight: 700,
-                    color: "#1E293B",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 6,
-                  }}
-                >
-                  <FileText size={14} color="#475569" />
-                  Lý do giải trình bắt buộc (Audit Log) <span style={{ color: "#DC2626" }}>*</span>
-                </label>
-                <span
-                  style={{
-                    fontSize: "11.5px",
-                    fontWeight: 600,
-                    color: isReasonValid ? "#16A34A" : "#94A3B8",
-                  }}
-                >
-                  {reason.trim().length} / {minReasonLength} ký tự
-                </span>
-              </div>
-
-              {/* Gợi ý lý do nhanh (Quick Chips) */}
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
-                {QUICK_REASONS.map((item, idx) => (
-                  <button
-                    key={idx}
-                    type="button"
-                    onClick={() => handleSelectQuickReason(item)}
-                    style={{
-                      fontSize: "11px",
-                      padding: "3px 8px",
-                      borderRadius: "9999px",
-                      border: "1px solid #E2E8F0",
-                      backgroundColor: reason === item ? "#EFF6FF" : "#F8FAFC",
-                      color: reason === item ? "#1D4ED8" : "#475569",
-                      borderColor: reason === item ? "#93C5FD" : "#E2E8F0",
-                      cursor: "pointer",
-                      transition: "all 0.15s ease",
-                      fontWeight: reason === item ? 600 : 500,
-                      textAlign: "left",
-                    }}
-                  >
-                    + {item}
-                  </button>
-                ))}
-              </div>
-
-              <textarea
-                id={reasonInputId}
-                value={reason}
-                onChange={(e) => setReason(e.target.value)}
-                placeholder="Nhập chi tiết biên bản / quyết định khóa để phục vụ đối soát kiểm toán hệ thống..."
-                required
-                minLength={minReasonLength}
-                rows={4}
-                style={{
-                  padding: "10px 12px",
-                  borderRadius: "12px",
-                  border: isReasonValid ? "1px solid #CBD5E1" : "1px solid #FCA5A5",
-                  fontFamily: "inherit",
-                  fontSize: "13px",
-                  outline: "none",
-                  resize: "vertical",
-                  lineHeight: 1.45,
-                  transition: "border-color 0.15s ease",
-                }}
-              />
-
-              {/* Checkbox xác nhận trách nhiệm */}
-              <div
-                onClick={() => setIsConfirmed(!isConfirmed)}
-                style={{
-                  display: "flex",
-                  alignItems: "flex-start",
-                  gap: 8,
-                  padding: "10px 12px",
-                  borderRadius: "12px",
-                  backgroundColor: isConfirmed ? "#F0FDF4" : "#F8FAFC",
-                  border: isConfirmed ? "1px solid #BBF7D0" : "1px solid #E2E8F0",
-                  cursor: "pointer",
-                  userSelect: "none",
-                }}
-              >
-                <input
-                  id={confirmCheckboxId}
-                  type="checkbox"
-                  checked={isConfirmed}
-                  onChange={(e) => setIsConfirmed(e.target.checked)}
-                  onClick={(e) => e.stopPropagation()}
-                  style={{
-                    width: 15,
-                    height: 15,
-                    marginTop: 2,
-                    accentColor: "#16A34A",
-                    cursor: "pointer",
-                    flexShrink: 0,
+                    width: 20,
+                    height: 20,
+                    borderRadius: "50%",
+                    backgroundColor: "#FFFFFF",
+                    boxShadow: "0 1px 3px rgba(0, 0, 0, 0.2)",
+                    transform: isConfirmed
+                      ? "translateX(20px)"
+                      : "translateX(0px)",
+                    transition: "transform 0.2s ease",
                   }}
                 />
-                <label
-                  htmlFor={confirmCheckboxId}
-                  style={{
-                    fontSize: "12px",
-                    color: isConfirmed ? "#166534" : "#475569",
-                    cursor: "pointer",
-                    fontWeight: 500,
-                    lineHeight: 1.4,
-                  }}
-                >
-                  Tôi xác nhận đã kiểm tra đối soát và chịu trách nhiệm thi hành lệnh khóa này trên hệ thống.
-                </label>
-              </div>
-
-              {/* Tóm tắt hiệu lực */}
-              <div
-                style={{
-                  padding: "8px 12px",
-                  borderRadius: "10px",
-                  backgroundColor: "#F1F5F9",
-                  fontSize: "11.5px",
-                  color: "#475569",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                }}
-              >
-                <span>
-                  Hiệu lực lệnh: <b>Tức thời</b>
-                </span>
-                <span>
-                  Trạng thái đích:{" "}
-                  <b style={{ color: lockType === "hard" ? "#DC2626" : "#D97706" }}>
-                    {lockType === "hard" ? "Bị Khóa (Hard-Lock)" : "Bị Khóa (Soft-Lock)"}
-                  </b>
-                </span>
               </div>
             </div>
           </div>
 
-          {/* Footer */}
+          {/* Footer - Phong cách nút 'Bỏ qua' và 'Lưu' dạng Pill như trong ảnh */}
           <div
             style={{
-              padding: "14px 24px",
+              padding: "16px 24px",
               borderTop: "1px solid #F1F5F9",
-              backgroundColor: "#FAFCFF",
+              backgroundColor: "#FFFFFF",
               display: "flex",
               alignItems: "center",
               justifyContent: "flex-end",
@@ -594,38 +594,49 @@ export const ApplyLockModal: FC<ApplyLockModalProps> = ({
           >
             <button
               type="button"
-              className="admin-btn admin-btn-secondary"
               onClick={onClose}
               style={{
-                padding: "8px 18px",
+                padding: "8px 22px",
                 borderRadius: "9999px",
-                fontSize: "13px",
-                fontWeight: 600,
+                fontSize: "13.5px",
+                fontWeight: 500,
+                backgroundColor: "#FFFFFF",
+                border: "1px solid #CBD5E1",
+                color: "#334155",
+                cursor: "pointer",
+                transition: "all 0.15s ease",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = "#F8FAFC";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = "#FFFFFF";
               }}
             >
-              Hủy bỏ
+              Bỏ qua
             </button>
             <button
               type="submit"
               disabled={!canSubmit}
               style={{
-                padding: "8px 20px",
+                padding: "8px 26px",
                 borderRadius: "9999px",
                 border: "none",
-                backgroundColor: canSubmit ? "#DC2626" : "#CBD5E1",
-                color: "#FFFFFF",
-                fontSize: "13px",
-                fontWeight: 700,
+                backgroundColor: canSubmit ? "#0D7A68" : "#E2E8F0",
+                color: canSubmit ? "#FFFFFF" : "#94A3B8",
+                fontSize: "13.5px",
+                fontWeight: 600,
                 cursor: canSubmit ? "pointer" : "not-allowed",
                 display: "inline-flex",
                 alignItems: "center",
-                gap: 7,
-                boxShadow: canSubmit ? "0 4px 12px rgba(220, 38, 38, 0.25)" : "none",
+                gap: 6,
+                boxShadow: canSubmit
+                  ? "0 4px 12px rgba(13, 122, 104, 0.25)"
+                  : "none",
                 transition: "all 0.15s ease",
               }}
             >
-              <Lock size={15} />
-              <span>Xác nhận Thi hành Lệnh Khóa</span>
+              <span>Lưu</span>
             </button>
           </div>
         </form>
