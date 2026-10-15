@@ -22,6 +22,9 @@ import {
   StoreOwnerPurchaseOrderListPage,
 } from '../features/purchase-order';
 
+// 2b. Goods Receipt Feature (FE-05 / UI-05-03)
+import { GoodsReceiptListPage } from '../features/goods-receipt';
+
 // 3. Service Expenses Feature (FE-07)
 import { ServiceExpensesPage } from '../features/service-expenses/pages/ServiceExpensesPage';
 
@@ -197,6 +200,14 @@ export const router = createBrowserRouter([
         element: <StoreOwnerPurchaseOrderListPage />,
       },
       {
+        path: 'goods-receipts',
+        element: <GoodsReceiptListPage defaultRole="store_owner" />,
+      },
+      {
+        path: 'purchase-orders/receipts',
+        element: <GoodsReceiptListPage defaultRole="store_owner" />,
+      },
+      {
         path: 'expenses',
         element: <ServiceExpensesPage />,
       },
@@ -331,6 +342,14 @@ export const router = createBrowserRouter([
       {
         path: 'purchase-orders/list',
         element: <StoreOwnerPurchaseOrderListPage />,
+      },
+      {
+        path: 'goods-receipts',
+        element: <GoodsReceiptListPage defaultRole="store_owner" />,
+      },
+      {
+        path: 'purchase-orders/receipts',
+        element: <GoodsReceiptListPage defaultRole="store_owner" />,
       },
       {
         path: 'expenses',
@@ -785,6 +804,32 @@ export const router = createBrowserRouter([
       {
         path: 'purchase-orders/create-matrix',
         element: <EmployeeOrderMatrixPage />,
+      },
+      {
+        path: 'goods-receipts',
+        element: <GoodsReceiptListPage defaultRole="employee" />,
+      },
+    ],
+  },
+
+  // ─── GOODS RECEIPTS SHORTCUTS ───
+  {
+    path: '/goods-receipts',
+    element: <StoreOwnerLayout />,
+    children: [
+      {
+        index: true,
+        element: <GoodsReceiptListPage defaultRole="store_owner" />,
+      },
+    ],
+  },
+  {
+    path: '/employee/goods-receipts',
+    element: <StoreOwnerLayout />,
+    children: [
+      {
+        index: true,
+        element: <GoodsReceiptListPage defaultRole="employee" />,
       },
     ],
   },
