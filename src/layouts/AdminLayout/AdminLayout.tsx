@@ -30,7 +30,10 @@ export const AdminLayout: FC = () => {
 
   return (
     <div className={`admin-shell ${!isSidebarOpen ? 'sidebar-collapsed' : ''}`}>
+      {/* Navbar dọc bên trái (Sidebar) */}
       <AdminSidebar isOpen={isSidebarOpen} onToggle={handleToggleSidebar} />
+
+      {/* Vùng nội dung chính (không dùng topbar trên đầu) */}
       <main className="admin-main">
         <div className="admin-content-area">
           <Outlet />
@@ -41,4 +44,3 @@ export const AdminLayout: FC = () => {
 };
 
 export default AdminLayout;
-

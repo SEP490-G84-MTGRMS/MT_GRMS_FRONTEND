@@ -4,7 +4,9 @@ import { WebStoreLayout } from '../layouts/WebStoreLayout';
 import { AuthLayout } from '../layouts/AuthLayout';
 import { HomePage } from '../pages/HomePage';
 import { StoreOwnerLayout } from '../layouts/StoreOwnerLayout';
+import { AdminLayout } from '../layouts/AdminLayout';
 import { AdminDashboardPage } from '../pages/admin/AdminDashboardPage';
+import { StoreOwnerDashboardPage } from '../features/store-owner-dashboard/pages/StoreOwnerDashboardPage';
 import { TenantManagementPage } from '../pages/admin/TenantManagementPage';
 // 1. Supplier Feature
 import {
@@ -74,6 +76,7 @@ import { SubscriptionPlanPage } from '../pages/admin/SubscriptionPlanPage';
 import { SubscriptionPlanDetailPage } from '../pages/admin/SubscriptionPlanDetailPage';
 import { SubscriptionPlanCreatePage } from '../pages/admin/SubscriptionPlanCreatePage';
 import { SubscriptionPlanEditPage } from '../pages/admin/SubscriptionPlanEditPage';
+import { TenantDetailPage } from '../pages/admin/TenantDetailPage';
 import { LoginPage, RegisterPage, ForgotPasswordPage } from '../pages/auth';
 
 export const router = createBrowserRouter([
@@ -85,7 +88,7 @@ export const router = createBrowserRouter([
   // ─── ADMIN PORTAL (/admin) ───
   {
     path: '/admin',
-    element: <StoreOwnerLayout />,
+    element: <AdminLayout />,
     children: [
       {
         index: true,
@@ -100,24 +103,33 @@ export const router = createBrowserRouter([
         element: <TenantManagementPage />,
       },
       {
-        path: 'products',
-        element: <ProductListPage />,
+        path: 'tenants/:id',
+        element: <TenantDetailPage />,
       },
+      // ─── Chuyển hướng các nghiệp vụ bán lẻ cửa hàng sang /store-owner ───
       {
         path: 'transfers',
-        element: <TransferListPage />,
+        element: <Navigate to="/store-owner/transfers" replace />,
       },
       {
-        path: 'transfers/create',
-        element: <CreateTransferPage />,
+        path: 'transfers/*',
+        element: <Navigate to="/store-owner/transfers" replace />,
       },
       {
-        path: 'transfers/:id',
-        element: <TransferDetailPage />,
+        path: 'suppliers',
+        element: <Navigate to="/store-owner/suppliers" replace />,
       },
       {
-        path: 'transfers/:id/receive',
-        element: <ReceiveTransferPage />,
+        path: 'suppliers/*',
+        element: <Navigate to="/store-owner/suppliers" replace />,
+      },
+      {
+        path: 'products',
+        element: <Navigate to="/store-owner/products" replace />,
+      },
+      {
+        path: 'products/*',
+        element: <Navigate to="/store-owner/products" replace />,
       },
       {
         path: 'subscriptions',
@@ -160,120 +172,48 @@ export const router = createBrowserRouter([
         element: <SubscriptionPlanEditPage />,
       },
       {
-        path: 'suppliers',
-        element: <SupplierListPage />,
+        path: 'purchase-orders/*',
+        element: <Navigate to="/store-owner/purchase-orders/branches" replace />,
       },
       {
-        path: 'suppliers/products',
-        element: <SupplierProductManagementPage />,
+        path: 'goods-receipts/*',
+        element: <Navigate to="/store-owner/goods-receipts" replace />,
       },
       {
-        path: 'suppliers/:id',
-        element: <SupplierDetailPage />,
+        path: 'expenses/*',
+        element: <Navigate to="/store-owner/expenses" replace />,
       },
       {
-        path: 'suppliers/:id/products',
-        element: <SupplierProductManagementPage />,
+        path: 'customers/*',
+        element: <Navigate to="/store-owner/customers" replace />,
       },
       {
-        path: 'purchase-orders',
-        element: <BranchOrderListPage />,
+        path: 'employees/*',
+        element: <Navigate to="/store-owner/employees" replace />,
       },
       {
-        path: 'purchase-orders/branches',
-        element: <BranchOrderListPage />,
+        path: 'promotions/*',
+        element: <Navigate to="/store-owner/promotions" replace />,
       },
       {
-        path: 'purchase-orders/create-matrix',
-        element: <OrderMatrixPage />,
-      },
-      {
-        path: 'purchase-orders/employee-matrix',
-        element: <EmployeeOrderMatrixPage />,
-      },
-      {
-        path: 'purchase-orders/dispatch-hub',
-        element: <SupplierOrderDispatchHubPage />,
-      },
-      {
-        path: 'purchase-orders/cutoff-hub',
-        element: <SupplierOrderDispatchHubPage />,
-      },
-      {
-        path: 'purchase-orders/list',
-        element: <StoreOwnerPurchaseOrderListPage />,
-      },
-      {
-        path: 'goods-receipts',
-        element: <GoodsReceiptListPage defaultRole="store_owner" />,
-      },
-      {
-        path: 'goods-receipts/create',
-        element: <GoodsReceiptFormPage defaultRole="store_owner" />,
-      },
-      {
-        path: 'goods-receipts/:id/edit',
-        element: <GoodsReceiptFormPage defaultRole="store_owner" />,
-      },
-      {
-        path: 'goods-receipts/:id',
-        element: <GoodsReceiptDetailPage defaultRole="store_owner" />,
-      },
-      {
-        path: 'goods-receipts/:id/confirm',
-        element: <GoodsReceiptDetailPage defaultRole="store_owner" />,
-      },
-      {
-        path: 'purchase-orders/receipts',
-        element: <GoodsReceiptListPage defaultRole="store_owner" />,
-      },
-      {
-        path: 'expenses',
-        element: <ServiceExpensesPage />,
-      },
-      {
-        path: 'customers',
-        element: <CustomerManagementPage />,
-      },
-      {
-        path: 'employees',
-        element: <EmployeeListPage />,
-      },
-      {
-        path: 'employees/schedule',
-        element: <WorkSchedulePage />,
-      },
-      {
-        path: 'employees/attendance',
-        element: <AttendancePage />,
-      },
-      {
-        path: 'employees/payroll',
-        element: <PayslipManagementPage />,
-      },
-      {
-        path: 'promotions',
-        element: <PromotionListPage />,
-      },
-      {
-        path: 'vouchers',
-        element: <VoucherListPage />,
+        path: 'vouchers/*',
+        element: <Navigate to="/store-owner/vouchers" replace />,
       },
       {
         path: 'loyalty-config',
-        element: <LoyaltyConfigPage />,
+        element: <Navigate to="/store-owner/loyalty-config" replace />,
       },
       {
         path: 'inventory-lookup',
-        element: <InventoryLookupPage />,
+        element: <Navigate to="/store-owner/inventory-lookup" replace />,
       },
       {
         path: 'orders',
-        element: <InvoiceManagementPage />,
+        element: <Navigate to="/store-owner/invoices" replace />,
       },
       {
         path: 'invoices',
-        element: <InvoiceManagementPage />,
+        element: <Navigate to="/store-owner/invoices" replace />,
       },
     ],
   },
@@ -285,11 +225,11 @@ export const router = createBrowserRouter([
     children: [
       {
         index: true,
-        element: <AdminDashboardPage />,
+        element: <StoreOwnerDashboardPage />,
       },
       {
         path: 'dashboard',
-        element: <AdminDashboardPage />,
+        element: <StoreOwnerDashboardPage />,
       },
       {
         path: 'products',
@@ -313,11 +253,11 @@ export const router = createBrowserRouter([
       },
       {
         path: 'subscriptions',
-        element: <SubscriptionPlanPage />,
+        element: <Navigate to="/store-owner/dashboard" replace />,
       },
       {
-        path: 'subscriptions/:id',
-        element: <SubscriptionPlanDetailPage />,
+        path: 'subscriptions/*',
+        element: <Navigate to="/store-owner/dashboard" replace />,
       },
       {
         path: 'suppliers',

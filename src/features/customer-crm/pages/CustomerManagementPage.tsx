@@ -1,16 +1,19 @@
-import { useState, useRef } from 'react';
-import type { FC } from 'react';
-import { Users } from 'lucide-react';
-import { AdminToast, type ToastState } from '../../admin/components';
-import { useCustomerCrm } from '../hooks/useCustomerCrm';
-import { CustomerKpiCards } from '../components/CustomerKpiCards';
-import { CustomerFilterBar } from '../components/CustomerFilterBar';
-import { CustomerTable } from '../components/CustomerTable';
-import { CustomerDrawerDetail } from '../components/CustomerDrawerDetail';
-import { CustomerFormModal } from '../components/CustomerFormModal';
-import { DebtCollectionModal } from '../components/DebtCollectionModal';
-import type { CreateCustomerInput, UpdateCustomerInput } from '../types/customer.types';
-import '../customer-crm.css';
+import { useState, useRef } from "react";
+import type { FC } from "react";
+import { Users } from "lucide-react";
+import { AdminToast, type ToastState } from "../../admin/components";
+import { useCustomerCrm } from "../hooks/useCustomerCrm";
+import { CustomerKpiCards } from "../components/CustomerKpiCards";
+import { CustomerFilterBar } from "../components/CustomerFilterBar";
+import { CustomerTable } from "../components/CustomerTable";
+import { CustomerDrawerDetail } from "../components/CustomerDrawerDetail";
+import { CustomerFormModal } from "../components/CustomerFormModal";
+import { DebtCollectionModal } from "../components/DebtCollectionModal";
+import type {
+  CreateCustomerInput,
+  UpdateCustomerInput,
+} from "../types/customer.types";
+import "../customer-crm.css";
 
 export const CustomerManagementPage: FC = () => {
   const {
@@ -53,7 +56,7 @@ export const CustomerManagementPage: FC = () => {
   const [toast, setToast] = useState<ToastState | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const showToast = (message: string, type: ToastState['type'] = 'success') => {
+  const showToast = (message: string, type: ToastState["type"] = "success") => {
     if (toastTimerRef.current) {
       clearTimeout(toastTimerRef.current);
     }
@@ -76,7 +79,7 @@ export const CustomerManagementPage: FC = () => {
         showToast(`Thêm mới khách hàng ${data.fullName} thành công!`);
       }
     } catch (err: any) {
-      showToast(err.message || 'Lỗi xử lý dữ liệu khách hàng', 'error');
+      showToast(err.message || "Lỗi xử lý dữ liệu khách hàng", "error");
       throw err;
     }
   };
@@ -85,10 +88,10 @@ export const CustomerManagementPage: FC = () => {
     try {
       await collectDebtMutation.mutateAsync(data);
       showToast(
-        `Đã lập phiếu thu nợ ${data.amount.toLocaleString('vi-VN')} đ qua ${data.method === 'VietQR' ? 'VietQR' : 'Tiền mặt'} và đồng bộ Sổ quỹ thành công!`
+        `Đã lập phiếu thu nợ ${data.amount.toLocaleString("vi-VN")} đ qua ${data.method === "VietQR" ? "VietQR" : "Tiền mặt"} và đồng bộ Sổ quỹ thành công!`,
       );
     } catch (err: any) {
-      showToast(err.message || 'Lỗi khi thu nợ', 'error');
+      showToast(err.message || "Lỗi khi thu nợ", "error");
       throw err;
     }
   };
@@ -115,7 +118,8 @@ export const CustomerManagementPage: FC = () => {
           <div className="customer-topbar-text">
             <h1>Quản Lý Khách Hàng & Công Nợ</h1>
             <p>
-              Phân hệ FE-08 (Customer CRM & Accounts Receivable) · Tích hợp thanh toán VietQR động
+              Phân hệ (Customer CRM & Accounts Receivable) · Tích hợp thanh toán
+              VietQR động
             </p>
           </div>
         </div>
