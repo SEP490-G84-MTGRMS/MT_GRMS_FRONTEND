@@ -153,6 +153,12 @@ const NAV_GROUPS: NavGroup[] = [
             badge: "PO",
             badgeType: "blue",
           },
+          {
+            label: "Phiếu nhập kho (GRN) & Lịch nhận",
+            to: "/store-owner/goods-receipts",
+            badge: "GRN",
+            badgeType: "blue",
+          },
           { label: "Trả hàng nhập", to: "/store-owner/suppliers?view=returns" },
         ],
       },
