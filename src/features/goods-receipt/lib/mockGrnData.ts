@@ -19,7 +19,7 @@ export const MOCK_GOODS_RECEIPTS: GoodsReceiptListItem[] = [
     code: 'PO-20261009-001',
     type: 'TODAY_DELIVERY',
     typeLabel: 'Lịch hôm nay',
-    receiveDate: '09/10/2026 (Hôm nay 08:00)',
+    receiveDate: '09/10/2026 08:00',
     rawDate: '2026-10-09',
     branchId: 'BR-01',
     branchName: 'BR-01 (CH Nguyễn Trãi)',
@@ -30,7 +30,7 @@ export const MOCK_GOODS_RECEIPTS: GoodsReceiptListItem[] = [
     lineCount: 5,
     totalAmount: 3450000,
     status: 'TODAY',
-    receiverName: 'Phân công: NV. Văn A',
+    receiverName: 'NV. Văn A',
     notes: 'Xe dự kiến đến lúc 08:00 sáng. Yêu cầu kiểm nhiệt độ xe lạnh.',
     items: [
       {
@@ -108,7 +108,7 @@ export const MOCK_GOODS_RECEIPTS: GoodsReceiptListItem[] = [
     code: 'PO-20261010-002',
     type: 'TODAY_DELIVERY',
     typeLabel: 'Lịch hôm nay',
-    receiveDate: '09/10/2026 (Hôm nay 10:30)',
+    receiveDate: '09/10/2026 10:30',
     rawDate: '2026-10-09',
     branchId: 'BR-02',
     branchName: 'BR-02 (CH Thủ Đức)',
@@ -119,7 +119,7 @@ export const MOCK_GOODS_RECEIPTS: GoodsReceiptListItem[] = [
     lineCount: 4,
     totalAmount: 8200000,
     status: 'TODAY',
-    receiverName: 'Phân công: NV. Thị B',
+    receiverName: 'NV. Thị B',
     notes: 'Hàng khô bánh kẹo, giao cổng sau kho Thủ Đức.',
     items: [
       {
@@ -469,7 +469,7 @@ export const MOCK_GOODS_RECEIPTS: GoodsReceiptListItem[] = [
     code: 'PO-20261009-007',
     type: 'TODAY_DELIVERY',
     typeLabel: 'Lịch hôm nay',
-    receiveDate: '09/10/2026 (Hôm nay 14:00)',
+    receiveDate: '09/10/2026 14:00',
     rawDate: '2026-10-09',
     branchId: 'DC-01',
     branchName: 'DC-01 (Kho tổng DC1)',
@@ -480,7 +480,7 @@ export const MOCK_GOODS_RECEIPTS: GoodsReceiptListItem[] = [
     lineCount: 3,
     totalAmount: 5600000,
     status: 'TODAY',
-    receiverName: 'Phân công: NV. Hoàng K',
+    receiverName: 'NV. Hoàng K',
     notes: 'Đơn đông lạnh thịt heo CP, giao xe bồn 14:00.',
     items: [
       {

@@ -224,11 +224,11 @@ export const GrnFilterBar: FC<GrnFilterBarProps> = ({
             }}
           >
             <option value="ALL">-- Tất cả trạng thái --</option>
-            <option value="TODAY">🚚 DỰ KIẾN NHẬN HÔM NAY</option>
-            <option value="DRAFT">🟡 Nháp (Đang kiểm hàng)</option>
-            <option value="CONFIRMED">🟢 Đã nhập kho (Confirmed)</option>
-            <option value="MISMATCH">🔴 Lệch PO / Đã lập biên bản</option>
-            <option value="CANCELED">⚪ Đã hủy</option>
+            <option value="TODAY">Scheduled (Lịch nhận)</option>
+            <option value="DRAFT">Draft (Đang kiểm hàng)</option>
+            <option value="CONFIRMED">Confirmed (Đã nhập kho)</option>
+            <option value="MISMATCH">Mismatch (Lệch PO)</option>
+            <option value="CANCELED">Cancelled (Đã hủy)</option>
           </select>
         </div>
       </div>

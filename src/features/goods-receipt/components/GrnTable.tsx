@@ -114,7 +114,6 @@ export const GrnTable: FC<GrnTableProps> = ({
             style={{
               display: 'inline-flex',
               alignItems: 'center',
-              gap: 4,
               padding: '2px 8px',
               borderRadius: 4,
               fontSize: 11.5,
@@ -125,7 +124,7 @@ export const GrnTable: FC<GrnTableProps> = ({
               whiteSpace: 'nowrap',
             }}
           >
-            🚚 Chờ giao hôm nay
+            Scheduled
           </span>
         );
       case 'DRAFT':
@@ -134,7 +133,6 @@ export const GrnTable: FC<GrnTableProps> = ({
             style={{
               display: 'inline-flex',
               alignItems: 'center',
-              gap: 4,
               padding: '2px 8px',
               borderRadius: 4,
               fontSize: 11.5,
@@ -145,7 +143,7 @@ export const GrnTable: FC<GrnTableProps> = ({
               whiteSpace: 'nowrap',
             }}
           >
-            🟡 Draft (Kiểm đếm)
+            Draft
           </span>
         );
       case 'CONFIRMED':
@@ -154,7 +152,6 @@ export const GrnTable: FC<GrnTableProps> = ({
             style={{
               display: 'inline-flex',
               alignItems: 'center',
-              gap: 4,
               padding: '2px 8px',
               borderRadius: 4,
               fontSize: 11.5,
@@ -165,7 +162,7 @@ export const GrnTable: FC<GrnTableProps> = ({
               whiteSpace: 'nowrap',
             }}
           >
-            🟢 Confirmed
+            Confirmed
           </span>
         );
       case 'MISMATCH':
@@ -174,7 +171,6 @@ export const GrnTable: FC<GrnTableProps> = ({
             style={{
               display: 'inline-flex',
               alignItems: 'center',
-              gap: 4,
               padding: '2px 8px',
               borderRadius: 4,
               fontSize: 11.5,
@@ -185,7 +181,7 @@ export const GrnTable: FC<GrnTableProps> = ({
               whiteSpace: 'nowrap',
             }}
           >
-            🔴 Mismatch (Lệch SL)
+            Mismatch
           </span>
         );
       case 'CANCELED':
@@ -194,7 +190,6 @@ export const GrnTable: FC<GrnTableProps> = ({
             style={{
               display: 'inline-flex',
               alignItems: 'center',
-              gap: 4,
               padding: '2px 8px',
               borderRadius: 4,
               fontSize: 11.5,
@@ -205,7 +200,7 @@ export const GrnTable: FC<GrnTableProps> = ({
               whiteSpace: 'nowrap',
             }}
           >
-            ⚪ Đã hủy
+            Cancelled
           </span>
         );
     }
@@ -246,16 +241,16 @@ export const GrnTable: FC<GrnTableProps> = ({
         >
           {/* Column widths */}
           <colgroup>
-            <col style={{ width: '13%' }} />
             <col style={{ width: '12%' }} />
             <col style={{ width: '11%' }} />
             <col style={{ width: '13%' }} />
+            <col style={{ width: '13%' }} />
+            <col style={{ width: '11%' }} />
+            <col style={{ width: '6%' }} />
             <col style={{ width: '10%' }} />
+            <col style={{ width: '8%' }} />
             <col style={{ width: '7%' }} />
-            <col style={{ width: '11%' }} />
-            <col style={{ width: '11%' }} />
-            <col style={{ width: '10%' }} />
-            <col style={{ width: '12%' }} />
+            <col style={{ width: '9%' }} />
           </colgroup>
 
           {/* Sticky Header */}
@@ -278,10 +273,11 @@ export const GrnTable: FC<GrnTableProps> = ({
               <th
                 onClick={() => handleSort('code')}
                 style={{
-                  padding: '10px 12px',
+                  padding: '9px 10px',
                   borderBottom: '1px solid #cbd5e1',
                   cursor: 'pointer',
                   userSelect: 'none',
+                  whiteSpace: 'nowrap',
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -290,30 +286,32 @@ export const GrnTable: FC<GrnTableProps> = ({
                 </div>
               </th>
 
-              {/* 2. Ngày nhận / Dự kiến */}
+              {/* 2. Ngày nhận */}
               <th
                 onClick={() => handleSort('receiveDate')}
                 style={{
-                  padding: '10px 12px',
+                  padding: '9px 10px',
                   borderBottom: '1px solid #cbd5e1',
                   cursor: 'pointer',
                   userSelect: 'none',
+                  whiteSpace: 'nowrap',
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span>NGÀY NHẬN / HẸN</span>
+                  <span>NGÀY NHẬN</span>
                   <ArrowUpDown size={12} color="#94a3b8" />
                 </div>
               </th>
 
-              {/* 4. Chi nhánh */}
+              {/* 3. Chi nhánh */}
               <th
                 onClick={() => handleSort('branchName')}
                 style={{
-                  padding: '10px 12px',
+                  padding: '9px 10px',
                   borderBottom: '1px solid #cbd5e1',
                   cursor: 'pointer',
                   userSelect: 'none',
+                  whiteSpace: 'nowrap',
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -322,14 +320,15 @@ export const GrnTable: FC<GrnTableProps> = ({
                 </div>
               </th>
 
-              {/* 5. Nhà cung cấp */}
+              {/* 4. Nhà cung cấp */}
               <th
                 onClick={() => handleSort('supplierName')}
                 style={{
-                  padding: '10px 12px',
+                  padding: '9px 10px',
                   borderBottom: '1px solid #cbd5e1',
                   cursor: 'pointer',
                   userSelect: 'none',
+                  whiteSpace: 'nowrap',
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -338,25 +337,26 @@ export const GrnTable: FC<GrnTableProps> = ({
                 </div>
               </th>
 
-              {/* 6. Mã PO tham chiếu */}
-              <th style={{ padding: '10px 10px', borderBottom: '1px solid #cbd5e1' }}>
+              {/* 5. Mã PO gốc */}
+              <th style={{ padding: '9px 10px', borderBottom: '1px solid #cbd5e1', whiteSpace: 'nowrap' }}>
                 PO GỐC
               </th>
 
-              {/* 7. Số lượng dòng */}
-              <th style={{ padding: '10px 10px', textAlign: 'right', borderBottom: '1px solid #cbd5e1' }}>
+              {/* 6. Số lượng dòng */}
+              <th style={{ padding: '9px 10px', textAlign: 'center', borderBottom: '1px solid #cbd5e1', whiteSpace: 'nowrap' }}>
                 SỐ DÒNG
               </th>
 
-              {/* 8. Tổng tiền */}
+              {/* 7. Tổng tiền */}
               <th
                 onClick={() => handleSort('totalAmount')}
                 style={{
-                  padding: '10px 12px',
+                  padding: '9px 10px',
                   textAlign: 'right',
                   borderBottom: '1px solid #cbd5e1',
                   cursor: 'pointer',
                   userSelect: 'none',
+                  whiteSpace: 'nowrap',
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 6 }}>
@@ -365,15 +365,16 @@ export const GrnTable: FC<GrnTableProps> = ({
                 </div>
               </th>
 
-              {/* 9. Trạng thái */}
+              {/* 8. Trạng thái */}
               <th
                 onClick={() => handleSort('status')}
                 style={{
-                  padding: '10px 12px',
+                  padding: '9px 10px',
                   textAlign: 'center',
                   borderBottom: '1px solid #cbd5e1',
                   cursor: 'pointer',
                   userSelect: 'none',
+                  whiteSpace: 'nowrap',
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
@@ -382,13 +383,13 @@ export const GrnTable: FC<GrnTableProps> = ({
                 </div>
               </th>
 
-              {/* 10. Thủ kho nhận */}
-              <th style={{ padding: '10px 12px', borderBottom: '1px solid #cbd5e1' }}>
-                THỦ KHO NHẬN
+              {/* 9. Người nhận */}
+              <th style={{ padding: '9px 10px', borderBottom: '1px solid #cbd5e1', whiteSpace: 'nowrap' }}>
+                NGƯỜI NHẬN
               </th>
 
-              {/* 11. Thao tác */}
-              <th style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid #cbd5e1' }}>
+              {/* 10. Thao tác */}
+              <th style={{ padding: '9px 10px', textAlign: 'center', borderBottom: '1px solid #cbd5e1', whiteSpace: 'nowrap' }}>
                 THAO TÁC
               </th>
             </tr>
@@ -468,8 +469,8 @@ export const GrnTable: FC<GrnTableProps> = ({
                         : '#ffffff';
                     }}
                   >
-                    {/* 1. Mã GRN / Mã PO */}
-                    <td style={{ padding: '11px 12px', borderBottom: '1px solid #f1f5f9' }}>
+                    {/* 1. Mã GRN */}
+                    <td style={{ padding: '7px 10px', borderBottom: '1px solid #f1f5f9', whiteSpace: 'nowrap' }}>
                       <button
                         type="button"
                         onClick={() => onSelectReceipt(row)}
@@ -481,79 +482,82 @@ export const GrnTable: FC<GrnTableProps> = ({
                           color: '#0d9488',
                           fontWeight: 700,
                           fontSize: 13,
+                          fontFamily: 'monospace',
                           textAlign: 'left',
                           display: 'inline-flex',
                           alignItems: 'center',
-                          gap: 6,
+                          gap: 5,
                           textDecoration: 'underline',
                           textUnderlineOffset: 3,
+                          whiteSpace: 'nowrap',
                         }}
                         title="Bấm để xem chi tiết đối soát phiếu này"
                       >
                         <FileText size={13} color="#0d9488" />
-                        <span>{isToday ? `[Dự kiến] ${row.code}` : row.code}</span>
+                        <span>{row.code}</span>
                       </button>
                     </td>
 
-                    {/* 2. Ngày nhận / Dự kiến */}
-                    <td style={{ padding: '11px 12px', fontSize: 12, borderBottom: '1px solid #f1f5f9' }}>
-                      <span style={{ fontWeight: isToday ? 700 : 500, color: isToday ? '#0369a1' : '#1e293b' }}>
+                    {/* 2. Ngày nhận */}
+                    <td style={{ padding: '7px 10px', fontSize: 12, borderBottom: '1px solid #f1f5f9', whiteSpace: 'nowrap' }}>
+                      <span style={{ fontWeight: 500, color: isToday ? '#0369a1' : '#1e293b' }}>
                         {row.receiveDate}
                       </span>
                     </td>
 
-                    {/* 4. Chi nhánh */}
-                    <td style={{ padding: '11px 12px', fontSize: 12.5, fontWeight: 600, color: '#1e293b', borderBottom: '1px solid #f1f5f9' }}>
+                    {/* 3. Chi nhánh */}
+                    <td style={{ padding: '7px 10px', fontSize: 12.5, fontWeight: 500, color: '#1e293b', borderBottom: '1px solid #f1f5f9', whiteSpace: 'nowrap' }}>
                       {row.branchName}
                     </td>
 
-                    {/* 5. Nhà cung cấp */}
-                    <td style={{ padding: '11px 12px', fontSize: 12.5, borderBottom: '1px solid #f1f5f9' }}>
-                      <div style={{ fontWeight: 600, color: '#0f172a' }}>{row.supplierName}</div>
-                      <div style={{ fontSize: 11, color: '#64748b' }}>({row.supplierCode})</div>
+                    {/* 4. Nhà cung cấp */}
+                    <td style={{ padding: '7px 10px', fontSize: 12.5, borderBottom: '1px solid #f1f5f9', whiteSpace: 'nowrap' }}>
+                      <span style={{ fontWeight: 600, color: '#0f172a' }}>{row.supplierName}</span>{' '}
+                      <span style={{ fontSize: 11, color: '#64748b' }}>({row.supplierCode})</span>
                     </td>
 
-                    {/* 6. Mã PO tham chiếu */}
-                    <td style={{ padding: '11px 10px', fontSize: 12, borderBottom: '1px solid #f1f5f9' }}>
+                    {/* 5. PO gốc */}
+                    <td style={{ padding: '7px 10px', fontSize: 12, borderBottom: '1px solid #f1f5f9', whiteSpace: 'nowrap' }}>
                       {row.poReference !== '—' && row.poReference !== '-' ? (
-                        <span style={{ color: '#0d9488', fontWeight: 600 }}>{row.poReference}</span>
+                        <span style={{ color: '#0d9488', fontWeight: 600, fontFamily: 'monospace' }}>{row.poReference}</span>
                       ) : (
                         <span style={{ color: '#94a3b8' }}>—</span>
                       )}
                     </td>
 
-                    {/* 7. Số lượng dòng */}
-                    <td style={{ padding: '11px 10px', textAlign: 'right', fontSize: 12.5, color: '#475569', borderBottom: '1px solid #f1f5f9' }}>
+                    {/* 6. Số lượng dòng */}
+                    <td style={{ padding: '7px 10px', textAlign: 'center', fontSize: 12.5, color: '#475569', borderBottom: '1px solid #f1f5f9', whiteSpace: 'nowrap' }}>
                       {row.lineCount} dòng
                     </td>
 
-                    {/* 8. Tổng tiền */}
+                    {/* 7. Tổng tiền */}
                     <td
                       style={{
-                        padding: '11px 12px',
+                        padding: '7px 10px',
                         textAlign: 'right',
                         fontWeight: 700,
                         fontSize: 13,
                         fontFamily: 'monospace',
                         color: '#0f172a',
                         borderBottom: '1px solid #f1f5f9',
+                        whiteSpace: 'nowrap',
                       }}
                     >
                       {formatCurrency(row.totalAmount)}
                     </td>
 
-                    {/* 9. Trạng thái */}
-                    <td style={{ padding: '11px 12px', textAlign: 'center', borderBottom: '1px solid #f1f5f9' }}>
+                    {/* 8. Trạng thái */}
+                    <td style={{ padding: '7px 10px', textAlign: 'center', borderBottom: '1px solid #f1f5f9', whiteSpace: 'nowrap' }}>
                       {renderStatusBadge(row.status)}
                     </td>
 
-                    {/* 10. Thủ kho nhận */}
-                    <td style={{ padding: '11px 12px', fontSize: 12, color: '#475569', borderBottom: '1px solid #f1f5f9' }}>
+                    {/* 9. Người nhận */}
+                    <td style={{ padding: '7px 10px', fontSize: 12, color: '#475569', borderBottom: '1px solid #f1f5f9', whiteSpace: 'nowrap' }}>
                       {row.receiverName}
                     </td>
 
-                    {/* 11. Thao tác */}
-                    <td style={{ padding: '11px 12px', textAlign: 'center', borderBottom: '1px solid #f1f5f9' }}>
+                    {/* 10. Thao tác */}
+                    <td style={{ padding: '7px 10px', textAlign: 'center', borderBottom: '1px solid #f1f5f9', whiteSpace: 'nowrap' }}>
                       <div
                         style={{
                           display: 'inline-flex',
