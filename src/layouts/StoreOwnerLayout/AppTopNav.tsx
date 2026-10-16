@@ -1,16 +1,28 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import type { FC } from 'react';
-import { NavLink, Link, useLocation } from 'react-router-dom';
+import { NavLink, Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   DashboardIcon,
   TruckIcon,
   PackageIcon,
-  BellIcon,
   ChevronRightIcon,
   MenuIcon,
   TrendingUpIcon,
 } from "../../features/admin/components";
-import { Gift } from "lucide-react";
+import {
+  Gift,
+  MessageCircle,
+  SquarePen,
+  Bell,
+  Settings,
+  User,
+  Store,
+  Globe,
+  Palette,
+  LogOut,
+  ChevronRight,
+} from "lucide-react";
+import { useAuthStore } from "../../stores/useAuthStore";
 
 /* ─── Data ─── */
 
@@ -794,8 +806,13 @@ const NavDropdown: FC<DropdownProps> = ({
 /* ─── Main TopNav Component ─── */
 export const AppTopNav: FC = () => {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { user, logout } = useAuthStore();
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  const accountMenuRef = useRef<HTMLDivElement | null>(null);
+  const accountTimerRef = useRef<number | null>(null);
   const anchorRefs = useRef<
     Map<string, React.RefObject<HTMLDivElement | null>>
   >(new Map());
@@ -808,15 +825,61 @@ export const AppTopNav: FC = () => {
     }
   }, []);
 
+  const clearAccountTimer = useCallback(() => {
+    if (accountTimerRef.current !== null) {
+      window.clearTimeout(accountTimerRef.current);
+      accountTimerRef.current = null;
+    }
+  }, []);
+
+  const handleAccountEnter = useCallback(() => {
+    clearAccountTimer();
+    setAccountMenuOpen(true);
+  }, [clearAccountTimer]);
+
+  const handleAccountLeave = useCallback(() => {
+    clearAccountTimer();
+    accountTimerRef.current = window.setTimeout(() => {
+      setAccountMenuOpen(false);
+    }, 220);
+  }, [clearAccountTimer]);
+
   // Close dropdown on route change and cleanup timer
   useEffect(() => {
     clearCloseTimer();
+    clearAccountTimer();
     setOpenMenu(null);
     setMobileOpen(false);
+    setAccountMenuOpen(false);
     return () => {
       clearCloseTimer();
+      clearAccountTimer();
     };
-  }, [location.pathname, clearCloseTimer]);
+  }, [location.pathname, clearCloseTimer, clearAccountTimer]);
+
+  // Close account menu on click outside or Escape
+  useEffect(() => {
+    if (!accountMenuOpen) return;
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        accountMenuRef.current &&
+        !accountMenuRef.current.contains(event.target as Node)
+      ) {
+        setAccountMenuOpen(false);
+      }
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setAccountMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [accountMenuOpen]);
 
   const getAnchorRef = useCallback(
     (id: string): React.RefObject<HTMLDivElement | null> => {
@@ -1150,7 +1213,7 @@ export const AppTopNav: FC = () => {
             })}
           </div>
 
-          {/* Right actions: Chi nhánh + Thông báo + Profile */}
+          {/* Right actions: Hỗ trợ + Góp ý + Divider + Thông báo + Cài đặt + Profile */}
           <div
             style={{
               display: "flex",
@@ -1160,15 +1223,85 @@ export const AppTopNav: FC = () => {
               flexShrink: 0,
             }}
           >
-            {/* Bell notification */}
+            {/* 1. Hỗ trợ */}
+            <button
+              type="button"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                background: "none",
+                border: "none",
+                color: "#ffffff",
+                fontSize: 13,
+                fontWeight: 600,
+                cursor: "pointer",
+                padding: "6px 8px",
+                borderRadius: "var(--radius-pill)",
+                transition: "background-color 0.15s ease",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.14)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = "transparent";
+              }}
+              onClick={() => alert("Tổng đài hỗ trợ MT-GRMS: 1900 6522 (8h00 - 22h00 hàng ngày)")}
+              title="Tổng đài CSKH: 1900 6522"
+            >
+              <MessageCircle size={15} strokeWidth={2} />
+              <span>Hỗ trợ</span>
+            </button>
+
+            {/* 2. Góp ý */}
+            <button
+              type="button"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                background: "none",
+                border: "none",
+                color: "#ffffff",
+                fontSize: 13,
+                fontWeight: 600,
+                cursor: "pointer",
+                padding: "6px 8px",
+                borderRadius: "var(--radius-pill)",
+                transition: "background-color 0.15s ease",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.14)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = "transparent";
+              }}
+              onClick={() => alert("Cảm ơn bạn! Mọi ý kiến góp ý xin gửi về: hotro@mt-grms.vn")}
+              title="Gửi ý kiến đóng góp tính năng"
+            >
+              <SquarePen size={15} strokeWidth={2} />
+              <span>Góp ý</span>
+            </button>
+
+            {/* 3. Divider */}
+            <div
+              style={{
+                width: 1,
+                height: 18,
+                backgroundColor: "rgba(255, 255, 255, 0.25)",
+                margin: "0 2px",
+              }}
+            />
+
+            {/* 4. Bell notification with red badge 3 */}
             <button
               type="button"
               style={{
                 width: 32,
                 height: 32,
                 borderRadius: "50%",
-                border: "1px solid rgba(255, 255, 255, 0.22)",
-                backgroundColor: "rgba(255, 255, 255, 0.14)",
+                border: "none",
+                backgroundColor: "transparent",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -1176,100 +1309,365 @@ export const AppTopNav: FC = () => {
                 position: "relative",
                 color: "#ffffff",
                 flexShrink: 0,
-                boxSizing: "border-box",
-                transition: "all 0.15s ease",
-              }}
-              title="Thông báo"
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor =
-                  "rgba(255, 255, 255, 0.25)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor =
-                  "rgba(255, 255, 255, 0.14)";
-              }}
-            >
-              <BellIcon size={15} />
-              <span
-                style={{
-                  position: "absolute",
-                  top: 5,
-                  right: 5,
-                  width: 7,
-                  height: 7,
-                  borderRadius: "50%",
-                  backgroundColor: "#FF3B30",
-                  border: "1.5px solid #fff",
-                }}
-              />
-            </button>
-
-            {/* Profile User */}
-            <div
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 7,
-                height: 32,
-                padding: "0 10px 0 4px",
-                borderRadius: "var(--radius-pill)",
-                border: "1px solid rgba(255, 255, 255, 0.22)",
-                backgroundColor: "rgba(255, 255, 255, 0.14)",
-                cursor: "pointer",
-                flexShrink: 0,
-                boxSizing: "border-box",
                 transition: "background-color 0.15s ease",
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor =
-                  "rgba(255, 255, 255, 0.25)";
+                e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.14)";
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor =
-                  "rgba(255, 255, 255, 0.14)";
+                e.currentTarget.style.backgroundColor = "transparent";
               }}
+              title="Thông báo hệ thống (3 chưa đọc)"
             >
-              <div
+              <Bell size={17} strokeWidth={2} />
+              <span
                 style={{
-                  width: 24,
-                  height: 24,
-                  borderRadius: "50%",
-                  background: "#ffffff",
-                  color: "var(--blue-primary, #0066FF)",
+                  position: "absolute",
+                  top: 0,
+                  right: 0,
+                  minWidth: 15,
+                  height: 15,
+                  borderRadius: "var(--radius-pill)",
+                  backgroundColor: "#FF3B30",
+                  color: "#ffffff",
+                  fontSize: 9.5,
+                  fontWeight: 800,
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  fontSize: 10,
-                  fontWeight: 800,
+                  padding: "0 2px",
+                  border: "1.5px solid #ffffff",
+                  lineHeight: 1,
                 }}
               >
-                SO
-              </div>
-              <div style={{ display: "flex", flexDirection: "column" }}>
-                <span
+                3
+              </span>
+            </button>
+
+            {/* 5. Settings Gear icon */}
+            <Link
+              to="/store-owner/subscriptions"
+              style={{
+                width: 32,
+                height: 32,
+                borderRadius: "50%",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                color: "#ffffff",
+                textDecoration: "none",
+                transition: "background-color 0.15s ease",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.14)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = "transparent";
+              }}
+              title="Thiết lập gian hàng & Gói dịch vụ"
+            >
+              <Settings size={18} strokeWidth={2} />
+            </Link>
+
+            {/* 6. Profile Avatar User Dropdown */}
+            <div
+              style={{ position: "relative" }}
+              ref={accountMenuRef}
+              onMouseEnter={handleAccountEnter}
+              onMouseLeave={handleAccountLeave}
+            >
+              <button
+                type="button"
+                onClick={() => {
+                  clearAccountTimer();
+                  setAccountMenuOpen((v) => !v);
+                }}
+                style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: "50%",
+                  backgroundColor: accountMenuOpen
+                    ? "rgba(255, 255, 255, 0.4)"
+                    : "rgba(255, 255, 255, 0.2)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: "#ffffff",
+                  border: "none",
+                  cursor: "pointer",
+                  transition: "all 0.15s ease",
+                  marginLeft: 2,
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.35)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = accountMenuOpen
+                    ? "rgba(255, 255, 255, 0.4)"
+                    : "rgba(255, 255, 255, 0.2)";
+                }}
+                title="Tài khoản cá nhân"
+                aria-expanded={accountMenuOpen}
+                aria-haspopup="true"
+              >
+                <User size={18} strokeWidth={2} />
+              </button>
+
+              {accountMenuOpen && (
+                <div
                   style={{
-                    fontSize: 11.5,
-                    fontWeight: 700,
-                    color: "#ffffff",
-                    lineHeight: 1.15,
-                    whiteSpace: "nowrap",
+                    position: "absolute",
+                    top: "100%",
+                    right: 0,
+                    paddingTop: 8,
+                    zIndex: 1000,
                   }}
+                  onMouseEnter={handleAccountEnter}
+                  onMouseLeave={handleAccountLeave}
                 >
-                  Minh Đức
-                </span>
-                <span
-                  style={{
-                    fontSize: 9,
-                    color: "rgba(255, 255, 255, 0.8)",
-                    fontWeight: 600,
-                    lineHeight: 1,
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  Store Owner
-                </span>
-              </div>
+                  <div
+                    style={{
+                      width: 260,
+                      backgroundColor: "#ffffff",
+                      borderRadius: 14,
+                      boxShadow:
+                        "0 12px 32px rgba(0, 0, 0, 0.16), 0 2px 8px rgba(0, 0, 0, 0.08)",
+                      border: "1px solid #E2E8F0",
+                      overflow: "hidden",
+                      display: "flex",
+                      flexDirection: "column",
+                      fontFamily: "var(--font-sans)",
+                    }}
+                  >
+                  {/* Row 1: Profile Summary */}
+                  <Link
+                    to="/store-owner/subscriptions?tab=account-profile"
+                    onClick={() => setAccountMenuOpen(false)}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 12,
+                      padding: "14px 16px",
+                      textDecoration: "none",
+                      color: "inherit",
+                      backgroundColor: "#ffffff",
+                      transition: "background-color 0.15s ease",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = "#F8FAFC";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = "#ffffff";
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: 44,
+                        height: 44,
+                        borderRadius: "50%",
+                        backgroundColor: "#EDF2F7",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        flexShrink: 0,
+                        color: "#64748B",
+                      }}
+                    >
+                      <User size={22} strokeWidth={2} />
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div
+                        style={{
+                          fontSize: 14.5,
+                          fontWeight: 700,
+                          color: "#1E293B",
+                          lineHeight: 1.3,
+                          whiteSpace: "nowrap",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                        }}
+                      >
+                        {user?.phone || user?.fullName || "0369880798"}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: 12,
+                          fontWeight: 500,
+                          color: "#EF4444",
+                          marginTop: 2,
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        Chưa bật xác thực 2 lớp
+                      </div>
+                    </div>
+                    <ChevronRight size={16} color="#94A3B8" />
+                  </Link>
+
+                  <div style={{ height: 1, backgroundColor: "#F1F5F9" }} />
+
+                  {/* Row 2: Hồ sơ cửa hàng */}
+                  <Link
+                    to="/store-owner/subscriptions?tab=store-info"
+                    onClick={() => setAccountMenuOpen(false)}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 12,
+                      padding: "12px 16px",
+                      textDecoration: "none",
+                      color: "#334155",
+                      transition: "background-color 0.15s ease",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = "#F8FAFC";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = "transparent";
+                    }}
+                  >
+                    <Store size={18} strokeWidth={1.9} color="#334155" />
+                    <span
+                      style={{
+                        flex: 1,
+                        fontSize: 13.5,
+                        fontWeight: 500,
+                        color: "#1E293B",
+                      }}
+                    >
+                      Hồ sơ cửa hàng
+                    </span>
+                    <ChevronRight size={16} color="#94A3B8" />
+                  </Link>
+
+                  <div style={{ height: 1, backgroundColor: "#F1F5F9" }} />
+
+                  {/* Row 3: Tiếng Việt */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      alert("Hệ thống đang hoạt động với ngôn ngữ Tiếng Việt.");
+                      setAccountMenuOpen(false);
+                    }}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 12,
+                      padding: "12px 16px",
+                      border: "none",
+                      background: "none",
+                      width: "100%",
+                      cursor: "pointer",
+                      textAlign: "left",
+                      transition: "background-color 0.15s ease",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = "#F8FAFC";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = "transparent";
+                    }}
+                  >
+                    <Globe size={18} strokeWidth={1.9} color="#334155" />
+                    <span
+                      style={{
+                        flex: 1,
+                        fontSize: 13.5,
+                        fontWeight: 500,
+                        color: "#1E293B",
+                      }}
+                    >
+                      Tiếng Việt
+                    </span>
+                  </button>
+
+                  <div style={{ height: 1, backgroundColor: "#F1F5F9" }} />
+
+                  {/* Row 4: Chủ đề */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      alert("Giao diện chuẩn KiotViet phong cách sáng (Light mode).");
+                      setAccountMenuOpen(false);
+                    }}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 12,
+                      padding: "12px 16px",
+                      border: "none",
+                      background: "none",
+                      width: "100%",
+                      cursor: "pointer",
+                      textAlign: "left",
+                      transition: "background-color 0.15s ease",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = "#F8FAFC";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = "transparent";
+                    }}
+                  >
+                    <Palette size={18} strokeWidth={1.9} color="#334155" />
+                    <span
+                      style={{
+                        flex: 1,
+                        fontSize: 13.5,
+                        fontWeight: 500,
+                        color: "#1E293B",
+                      }}
+                    >
+                      Chủ đề
+                    </span>
+                  </button>
+
+                  <div style={{ height: 1, backgroundColor: "#F1F5F9" }} />
+
+                  {/* Row 5: Đăng xuất */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAccountMenuOpen(false);
+                      logout();
+                      navigate("/login");
+                    }}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 12,
+                      padding: "12px 16px",
+                      border: "none",
+                      background: "none",
+                      width: "100%",
+                      cursor: "pointer",
+                      textAlign: "left",
+                      transition: "background-color 0.15s ease",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = "#FEF2F2";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = "transparent";
+                    }}
+                  >
+                    <LogOut size={18} strokeWidth={1.9} color="#EF4444" />
+                    <span
+                      style={{
+                        flex: 1,
+                        fontSize: 13.5,
+                        fontWeight: 600,
+                        color: "#EF4444",
+                      }}
+                    >
+                      Đăng xuất
+                    </span>
+                  </button>
+                  </div>
+                </div>
+              )}
             </div>
+          </div>
 
             {/* Mobile hamburger */}
             <button
@@ -1294,7 +1692,6 @@ export const AppTopNav: FC = () => {
             >
               <MenuIcon size={16} />
             </button>
-          </div>
         </div>
       </nav>
 
