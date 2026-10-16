@@ -199,10 +199,11 @@ export const StoreOwnerTopbar: FC = () => {
         </nav>
       </div>
 
-      {/* Right: Tenant Pill + Status + User Profile + Home button */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-        {/* Tenant Info Pill */}
-        <div
+      {/* Right: Tenant Pill + Status + Subscriptions Badge + User Profile + Home button */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        {/* Tenant Info Pill Link */}
+        <Link
+          to="/store-owner/subscriptions?tab=store-info"
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -214,9 +215,18 @@ export const StoreOwnerTopbar: FC = () => {
             fontSize: 12.5,
             fontWeight: 600,
             color: 'var(--text-main)',
+            textDecoration: 'none',
+            transition: 'border-color 0.15s ease',
           }}
+          title="Xem & chỉnh sửa thông tin gian hàng"
         >
-          <span style={{ fontSize: 14 }}>🏪</span>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--blue-primary)' }}>
+            <path d="m2 7 4.41-4.41A2 2 0 0 1 7.83 2h8.34a2 2 0 0 1 1.42.59L22 7" />
+            <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+            <path d="M15 22v-4a2 2 0 0 0-2-2h-2a2 2 0 0 0-2 2v4" />
+            <path d="M2 7h20" />
+            <path d="M22 7v3a2 2 0 0 1-2 2v0a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 16 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 12 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 8 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 4 12v0a2 2 0 0 1-2-2V7" />
+          </svg>
           <span>Chuỗi Siêu thị Mini Minh Đức</span>
           <span
             style={{
@@ -228,7 +238,28 @@ export const StoreOwnerTopbar: FC = () => {
             }}
             title="Đang hoạt động"
           />
-        </div>
+        </Link>
+
+        {/* Subscription Plan & Expiry Pill */}
+        <Link
+          to="/store-owner/subscriptions"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            padding: '5px 12px',
+            borderRadius: 'var(--radius-pill)',
+            backgroundColor: '#FFF0F0',
+            border: '1px solid #FFD6D6',
+            color: '#FF3B30',
+            fontSize: 12,
+            fontWeight: 700,
+            textDecoration: 'none',
+          }}
+          title="Gói dịch vụ: Còn 3 ngày dùng thử. Bấm để nâng cấp!"
+        >
+          <span>Gói dùng thử: 3 ngày</span>
+        </Link>
 
         {/* Notification Bell */}
         <button
@@ -263,23 +294,28 @@ export const StoreOwnerTopbar: FC = () => {
           />
         </button>
 
-        {/* Profile Pill */}
-        <div className="admin-profile-pill">
+        {/* Profile Pill Link */}
+        <Link
+          to="/store-owner/subscriptions?tab=account-profile"
+          className="admin-profile-pill"
+          style={{ textDecoration: 'none', cursor: 'pointer' }}
+          title="Tài khoản cá nhân"
+        >
           <div
             className="admin-avatar"
             style={{ background: 'linear-gradient(135deg, #0066FF, #00C2FF)' }}
           >
-            SO
+            NL
           </div>
           <div style={{ display: 'flex', flexDirection: 'column' }}>
             <span style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-main)', lineHeight: 1.2 }}>
-              Minh Đức
+              Nhật Long
             </span>
             <span style={{ fontSize: 11, color: 'var(--blue-primary)', fontWeight: 600 }}>
-              Store Owner
+              Admin Chuỗi
             </span>
           </div>
-        </div>
+        </Link>
 
         {/* Return to Home link */}
         <Link
