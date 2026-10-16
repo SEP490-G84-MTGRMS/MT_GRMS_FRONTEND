@@ -65,7 +65,7 @@ export const SubscriptionPricingCards: FC<SubscriptionPricingCardsProps> = ({
                     <Check
                       size={17}
                       strokeWidth={2.2}
-                      color="#0066FF"
+                      color="var(--blue-primary)"
                       style={{ flexShrink: 0, marginTop: 2 }}
                     />
                     <span>{feat}</span>

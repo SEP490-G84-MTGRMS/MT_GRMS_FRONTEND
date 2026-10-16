@@ -1,55 +1,55 @@
 // src/pages/store/StoreSettingsHubPage.tsx
 import { useState, useEffect, type FC } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, Navigate } from 'react-router-dom';
 import {
   INITIAL_STORE_INFO,
-  INITIAL_USER_PROFILE,
-  INITIAL_SESSIONS,
-  INITIAL_TRANSACTIONS,
   type StoreInfo,
-  type UserProfile,
-  type UserSessionItem,
   type WalletTransaction,
   type SubscriptionPlanItem,
+  INITIAL_TRANSACTIONS,
 } from './storeData';
-import { StoreSidebarNav, type StoreHubTabKey } from './components/StoreSidebarNav';
+import type { StoreHubTabKey } from './components/StoreSidebarNav';
 import { StoreTopStatusBar } from './components/StoreTopStatusBar';
 import { SubscriptionPricingCards } from './components/SubscriptionPricingCards';
 import { SubscriptionCheckoutModal } from './components/SubscriptionCheckoutModal';
 import { StoreWalletTopupModal } from './components/StoreWalletTopupModal';
 import { StoreInfoTab } from './components/StoreInfoTab';
-import { WalletLedgerTab } from './components/WalletLedgerTab';
-import { AccountProfileTab } from './components/AccountProfileTab';
 import { OrderHistoryTab } from './components/OrderHistoryTab';
-import { TermsOfServiceTab } from './components/TermsOfServiceTab';
 
 export const StoreSettingsHubPage: FC = () => {
-  const [searchParams, setSearchParams] = useSearchParams();
-  const tabParam = searchParams.get('tab') as StoreHubTabKey | null;
+  const [searchParams] = useSearchParams();
+  const rawTab = searchParams.get('tab');
+
+  // Nếu người dùng truy cập tab tài khoản cũ, chuyển hướng sang trang Quản lý tài khoản riêng
+  if (rawTab === 'account-profile' || rawTab === 'wallet' || rawTab === 'terms') {
+    return <Navigate to={`/store-owner/account?tab=${rawTab}`} replace />;
+  }
+
+  const tabParam = rawTab as StoreHubTabKey | null;
 
   const [activeTab, setActiveTab] = useState<StoreHubTabKey>(
-    tabParam || 'subscriptions'
+    tabParam && ['store-info', 'subscriptions', 'order-history', 'service-confirm'].includes(tabParam)
+      ? tabParam
+      : 'subscriptions'
   );
 
   const [storeInfo, setStoreInfo] = useState<StoreInfo>(INITIAL_STORE_INFO);
-  const [userProfile, setUserProfile] = useState<UserProfile>(INITIAL_USER_PROFILE);
-  const [sessions, setSessions] = useState<UserSessionItem[]>(INITIAL_SESSIONS);
-  const [transactions, setTransactions] = useState<WalletTransaction[]>(INITIAL_TRANSACTIONS);
+  const [, setTransactions] = useState<WalletTransaction[]>(INITIAL_TRANSACTIONS);
 
   const [selectedPlanForCheckout, setSelectedPlanForCheckout] =
     useState<SubscriptionPlanItem | null>(null);
   const [showTopupModal, setShowTopupModal] = useState<boolean>(false);
 
   useEffect(() => {
-    if (tabParam && tabParam !== activeTab) {
+    if (
+      tabParam &&
+      tabParam !== activeTab &&
+      ['store-info', 'subscriptions', 'order-history', 'service-confirm'].includes(tabParam)
+    ) {
       setActiveTab(tabParam);
     }
-  }, [tabParam]);
+  }, [tabParam, activeTab]);
 
-  const handleSelectTab = (tab: StoreHubTabKey) => {
-    setActiveTab(tab);
-    setSearchParams({ tab });
-  };
 
   // Nạp tiền ví
   const handleTopupSuccess = (amount: number) => {
@@ -122,33 +122,16 @@ export const StoreSettingsHubPage: FC = () => {
     setStoreInfo((prev) => ({ ...prev, ...updated }));
   };
 
-  // Cập nhật thông tin user
-  const handleUpdateUserProfile = (updated: Partial<UserProfile>) => {
-    setUserProfile((prev) => ({ ...prev, ...updated }));
-  };
-
-  // Đăng xuất session
-  const handleTerminateSession = (sessionId: string) => {
-    setSessions((prev) => prev.filter((s) => s.id !== sessionId));
-  };
-
   return (
     <div className="store-hub-container">
-      {/* Sidebar navigation */}
-      <StoreSidebarNav
-        activeTab={activeTab}
-        onSelectTab={handleSelectTab}
-      />
 
       {/* Main Workspace */}
       <main className="store-hub-main">
-        {/* Top Status Bar is shown on all tabs except Account Profile (to strictly match KiotViet Account screenshot) */}
-        {activeTab !== 'account-profile' && (
-          <StoreTopStatusBar
-            storeInfo={storeInfo}
-            onOpenTopupModal={() => setShowTopupModal(true)}
-          />
-        )}
+        {/* Top Status Bar */}
+        <StoreTopStatusBar
+          storeInfo={storeInfo}
+          onOpenTopupModal={() => setShowTopupModal(true)}
+        />
 
         {/* Tab 1: Gói dịch vụ */}
         {activeTab === 'subscriptions' && (
@@ -175,37 +158,15 @@ export const StoreSettingsHubPage: FC = () => {
           />
         )}
 
-        {/* Tab 3: Tài khoản người dùng (Profile) */}
-        {activeTab === 'account-profile' && (
-          <AccountProfileTab
-            userProfile={userProfile}
-            sessions={sessions}
-            onUpdateProfile={handleUpdateUserProfile}
-            onTerminateSession={handleTerminateSession}
-          />
-        )}
-
-        {/* Tab 4: Ví tiền & Thanh toán */}
-        {activeTab === 'wallet' && (
-          <WalletLedgerTab
-            storeInfo={storeInfo}
-            transactions={transactions}
-            onOpenTopupModal={() => setShowTopupModal(true)}
-          />
-        )}
-
-        {/* Tab 5: Lịch sử mua hàng */}
+        {/* Tab 3: Lịch sử mua hàng */}
         {activeTab === 'order-history' && (
           <OrderHistoryTab isServiceConfirmation={false} />
         )}
 
-        {/* Tab 6: Bản xác nhận dịch vụ */}
+        {/* Tab 4: Bản xác nhận dịch vụ */}
         {activeTab === 'service-confirm' && (
           <OrderHistoryTab isServiceConfirmation={true} />
         )}
-
-        {/* Tab 7: Điều khoản sử dụng */}
-        {activeTab === 'terms' && <TermsOfServiceTab />}
       </main>
 
       {/* Modal Checkout */}

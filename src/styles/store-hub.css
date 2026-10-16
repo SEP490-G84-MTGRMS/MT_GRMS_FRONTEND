@@ -3,26 +3,21 @@
 
 .store-hub-container {
   display: flex;
-  width: 100%;
-  background-color: transparent;
+  min-height: calc(100vh - 68px);
+  background-color: #F8FAFC;
   font-family: var(--font-sans);
-  gap: 28px;
-  align-items: flex-start;
 }
 
 /* Sidebar */
 .store-hub-sidebar {
   width: 250px;
   background-color: #FFFFFF;
-  border: 1px solid #EDF2F9;
-  border-radius: 20px;
-  padding: 20px 14px;
+  border-right: 1px solid #EDF2F9;
+  padding: 24px 16px;
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 28px;
   flex-shrink: 0;
-  height: fit-content;
-  box-shadow: 0 4px 16px rgba(0, 30, 90, 0.03);
 }
 
 .store-sidebar-group {
@@ -82,8 +77,8 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  padding: 0;
-  min-width: 0;
+  padding: 28px 36px 60px 36px;
+  overflow-y: auto;
 }
 
 /* Top Status Bar matching KiotViet screenshot */
@@ -149,6 +144,10 @@
   display: flex;
   align-items: center;
   gap: 12px;
+  padding: 8px 16px;
+  background-color: #F0FDF4;
+  border: 1px solid #BBF7D0;
+  border-radius: var(--radius-pill);
 }
 
 .store-wallet-amount {
@@ -278,7 +277,7 @@
   display: flex;
   flex-direction: column;
   gap: 24px;
-  width: 100%;
+  max-width: 900px;
 }
 
 .profile-card {

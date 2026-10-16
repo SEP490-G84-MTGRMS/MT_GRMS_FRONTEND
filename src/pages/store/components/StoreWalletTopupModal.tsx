@@ -135,10 +135,10 @@ export const StoreWalletTopupModal: FC<StoreWalletTopupModalProps> = ({
                           padding: '12px 6px',
                           borderRadius: 14,
                           border: isSelected
-                            ? '2px solid #0066FF'
+                            ? '2px solid var(--blue-primary)'
                             : '1px solid #CBD5E1',
-                          backgroundColor: isSelected ? '#F0F6FF' : '#FFFFFF',
-                          color: isSelected ? '#0066FF' : '#1E293B',
+                          backgroundColor: isSelected ? 'var(--blue-light)' : '#FFFFFF',
+                          color: isSelected ? 'var(--blue-primary)' : '#1E293B',
                           fontSize: 13,
                           fontWeight: 700,
                           cursor: 'pointer',
@@ -363,12 +363,20 @@ export const StoreWalletTopupModal: FC<StoreWalletTopupModalProps> = ({
                 gap: 8,
                 padding: '10px 22px',
                 borderRadius: 'var(--radius-pill)',
-                backgroundColor: '#0066FF',
+                backgroundColor: 'var(--blue-primary)',
                 color: '#FFFFFF',
                 border: 'none',
                 fontSize: 14,
                 fontWeight: 700,
                 cursor: 'pointer',
+                boxShadow: '0 4px 14px rgba(15, 118, 110, 0.28)',
+                transition: 'background-color 0.15s ease',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = 'var(--blue-hover)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'var(--blue-primary)';
               }}
             >
               <span>{isProcessing ? 'Đang kiểm tra giao dịch...' : 'Xác nhận đã chuyển khoản'}</span>

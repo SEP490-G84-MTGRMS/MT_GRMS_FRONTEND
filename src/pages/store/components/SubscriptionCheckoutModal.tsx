@@ -554,7 +554,7 @@ export const SubscriptionCheckoutModal: FC<SubscriptionCheckoutModalProps> = ({
               style={{
                 padding: '10px 24px',
                 borderRadius: 'var(--radius-pill)',
-                backgroundColor: '#0066FF',
+                backgroundColor: 'var(--blue-primary)',
                 color: '#FFFFFF',
                 border: 'none',
                 fontSize: 14,
@@ -565,6 +565,16 @@ export const SubscriptionCheckoutModal: FC<SubscriptionCheckoutModalProps> = ({
                     : 'pointer',
                 opacity:
                   paymentMethod === 'Wallet' && !hasEnoughWalletBalance ? 0.6 : 1,
+                boxShadow: '0 4px 14px rgba(15, 118, 110, 0.28)',
+                transition: 'background-color 0.15s ease',
+              }}
+              onMouseEnter={(e) => {
+                if (paymentMethod !== 'Wallet' || hasEnoughWalletBalance) {
+                  e.currentTarget.style.backgroundColor = 'var(--blue-hover)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'var(--blue-primary)';
               }}
             >
               {isProcessing ? 'Đang kích hoạt...' : 'Xác nhận thanh toán'}

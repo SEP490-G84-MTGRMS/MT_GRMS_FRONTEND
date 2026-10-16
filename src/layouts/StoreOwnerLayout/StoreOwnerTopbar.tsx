@@ -296,7 +296,7 @@ export const StoreOwnerTopbar: FC = () => {
 
         {/* Profile Pill Link */}
         <Link
-          to="/store-owner/subscriptions?tab=account-profile"
+          to="/store-owner/account"
           className="admin-profile-pill"
           style={{ textDecoration: 'none', cursor: 'pointer' }}
           title="Tài khoản cá nhân"

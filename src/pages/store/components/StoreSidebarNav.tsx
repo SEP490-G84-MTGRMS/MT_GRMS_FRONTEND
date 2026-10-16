@@ -5,19 +5,13 @@ import {
   Boxes,
   History,
   FileCheck2,
-  User,
-  Wallet,
-  ShieldCheck,
 } from 'lucide-react';
 
 export type StoreHubTabKey =
   | 'store-info'
   | 'subscriptions'
   | 'order-history'
-  | 'service-confirm'
-  | 'account-profile'
-  | 'wallet'
-  | 'terms';
+  | 'service-confirm';
 
 interface StoreSidebarNavProps {
   activeTab: StoreHubTabKey;
@@ -79,43 +73,6 @@ export const StoreSidebarNav: FC<StoreSidebarNavProps> = ({
             <FileCheck2 size={18} strokeWidth={1.8} />
           </span>
           <span>Bản xác nhận dịch vụ</span>
-        </button>
-      </div>
-
-      {/* Nhóm 3: Khác */}
-      <div className="store-sidebar-group">
-        <div className="store-sidebar-title">Khác & Tài khoản</div>
-        <button
-          type="button"
-          className={`store-sidebar-item ${activeTab === 'account-profile' ? 'active' : ''}`}
-          onClick={() => onSelectTab('account-profile')}
-        >
-          <span className="store-sidebar-icon">
-            <User size={18} strokeWidth={1.8} />
-          </span>
-          <span>Tài khoản người dùng</span>
-        </button>
-
-        <button
-          type="button"
-          className={`store-sidebar-item ${activeTab === 'wallet' ? 'active' : ''}`}
-          onClick={() => onSelectTab('wallet')}
-        >
-          <span className="store-sidebar-icon">
-            <Wallet size={18} strokeWidth={1.8} />
-          </span>
-          <span>Ví tiền & Thanh toán</span>
-        </button>
-
-        <button
-          type="button"
-          className={`store-sidebar-item ${activeTab === 'terms' ? 'active' : ''}`}
-          onClick={() => onSelectTab('terms')}
-        >
-          <span className="store-sidebar-icon">
-            <ShieldCheck size={18} strokeWidth={1.8} />
-          </span>
-          <span>Điều khoản sử dụng</span>
         </button>
       </div>
     </aside>

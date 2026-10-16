@@ -84,14 +84,21 @@ export const StoreTopStatusBar: FC<StoreTopStatusBarProps> = ({
             gap: 6,
             padding: '8px 16px',
             borderRadius: 'var(--radius-pill)',
-            backgroundColor: '#0066FF',
+            backgroundColor: 'var(--blue-primary)',
             color: '#FFFFFF',
             border: 'none',
             fontSize: 13,
             fontWeight: 700,
             cursor: 'pointer',
-            transition: 'background-color 0.15s ease',
+            boxShadow: '0 4px 12px rgba(15, 118, 110, 0.25)',
+            transition: 'all 0.15s ease',
             whiteSpace: 'nowrap',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = 'var(--blue-hover)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = 'var(--blue-primary)';
           }}
           title="Nạp tiền vào ví gian hàng qua VietQR Napas247"
         >

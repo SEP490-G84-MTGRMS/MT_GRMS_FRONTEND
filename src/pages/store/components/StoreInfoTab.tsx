@@ -98,7 +98,7 @@ export const StoreInfoTab: FC<StoreInfoTabProps> = ({
             {/* Tên chuỗi */}
             <div>
               <label style={{ fontSize: 12.5, fontWeight: 700, color: '#334155', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-                <Store size={15} color="#0066FF" />
+                <Store size={15} color="var(--blue-primary)" />
                 <span>Tên chuỗi cửa hàng / Gian hàng *</span>
               </label>
               <input
@@ -120,7 +120,7 @@ export const StoreInfoTab: FC<StoreInfoTabProps> = ({
             {/* Subdomain */}
             <div>
               <label style={{ fontSize: 12.5, fontWeight: 700, color: '#334155', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-                <Globe size={15} color="#0066FF" />
+                <Globe size={15} color="var(--blue-primary)" />
                 <span>Tên miền con (Subdomain) *</span>
               </label>
               <div style={{ display: 'flex', alignItems: 'center' }}>
@@ -161,7 +161,7 @@ export const StoreInfoTab: FC<StoreInfoTabProps> = ({
             {/* Mã số thuế */}
             <div>
               <label style={{ fontSize: 12.5, fontWeight: 700, color: '#334155', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-                <Building size={15} color="#0066FF" />
+                <Building size={15} color="var(--blue-primary)" />
                 <span>Mã số thuế (MST)</span>
               </label>
               <input
@@ -183,7 +183,7 @@ export const StoreInfoTab: FC<StoreInfoTabProps> = ({
             {/* Hotline */}
             <div>
               <label style={{ fontSize: 12.5, fontWeight: 700, color: '#334155', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-                <Phone size={15} color="#0066FF" />
+                <Phone size={15} color="var(--blue-primary)" />
                 <span>Hotline liên hệ / Chăm sóc khách hàng</span>
               </label>
               <input
@@ -205,7 +205,7 @@ export const StoreInfoTab: FC<StoreInfoTabProps> = ({
             {/* Email hóa đơn */}
             <div>
               <label style={{ fontSize: 12.5, fontWeight: 700, color: '#334155', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-                <Mail size={15} color="#0066FF" />
+                <Mail size={15} color="var(--blue-primary)" />
                 <span>Email tiếp nhận thông báo & hóa đơn điện tử</span>
               </label>
               <input
@@ -226,7 +226,7 @@ export const StoreInfoTab: FC<StoreInfoTabProps> = ({
             {/* Tỉnh / Thành phố */}
             <div>
               <label style={{ fontSize: 12.5, fontWeight: 700, color: '#334155', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-                <MapPin size={15} color="#0066FF" />
+                <MapPin size={15} color="var(--blue-primary)" />
                 <span>Tỉnh / Thành phố</span>
               </label>
               <input
@@ -247,7 +247,7 @@ export const StoreInfoTab: FC<StoreInfoTabProps> = ({
             {/* Địa chỉ trụ sở chính */}
             <div style={{ gridColumn: '1 / -1' }}>
               <label style={{ fontSize: 12.5, fontWeight: 700, color: '#334155', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-                <MapPin size={15} color="#0066FF" />
+                <MapPin size={15} color="var(--blue-primary)" />
                 <span>Địa chỉ trụ sở chính</span>
               </label>
               <input
@@ -291,7 +291,7 @@ export const StoreInfoTab: FC<StoreInfoTabProps> = ({
             <div className="profile-info-item">
               <span className="profile-info-label">Gói thuê bao hiện tại</span>
               <div className="profile-info-value" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <Layers size={16} color="#0066FF" />
+                <Layers size={16} color="var(--blue-primary)" />
                 <span>{storeInfo.currentPlan}</span>
               </div>
             </div>
@@ -316,13 +316,20 @@ export const StoreInfoTab: FC<StoreInfoTabProps> = ({
               gap: 8,
               padding: '12px 28px',
               borderRadius: 'var(--radius-pill)',
-              backgroundColor: '#0066FF',
+              backgroundColor: 'var(--blue-primary)',
               color: '#FFFFFF',
               border: 'none',
               fontSize: 14,
               fontWeight: 700,
               cursor: 'pointer',
-              boxShadow: '0 4px 14px rgba(0, 102, 255, 0.25)',
+              boxShadow: '0 4px 14px rgba(15, 118, 110, 0.28)',
+              transition: 'all 0.15s ease',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = 'var(--blue-hover)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'var(--blue-primary)';
             }}
           >
             <Save size={16} />
