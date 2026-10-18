@@ -31,6 +31,9 @@ import {
   GoodsReceiptDetailPage,
 } from '../features/goods-receipt';
 
+// 2c. Batch & Expiry Feature (FE-02 / UI-02-01)
+import { BatchListPage } from '../features/batch';
+
 // 3. Service Expenses Feature (FE-07)
 import { ServiceExpensesPage } from '../features/service-expenses/pages/ServiceExpensesPage';
 
@@ -183,6 +186,14 @@ export const router = createBrowserRouter([
       {
         path: 'goods-receipts/*',
         element: <Navigate to="/store-owner/goods-receipts" replace />,
+      },
+      {
+        path: 'batches/*',
+        element: <Navigate to="/store-owner/batches" replace />,
+      },
+      {
+        path: 'expiry/*',
+        element: <Navigate to="/store-owner/batches" replace />,
       },
       {
         path: 'expenses/*',
@@ -351,6 +362,14 @@ export const router = createBrowserRouter([
       {
         path: 'purchase-orders/receipts',
         element: <GoodsReceiptListPage defaultRole="store_owner" />,
+      },
+      {
+        path: 'batches',
+        element: <BatchListPage defaultRole="store_owner" />,
+      },
+      {
+        path: 'expiry',
+        element: <BatchListPage defaultRole="store_owner" />,
       },
       {
         path: 'expenses',
@@ -919,6 +938,38 @@ export const router = createBrowserRouter([
       {
         path: ':id/confirm',
         element: <GoodsReceiptDetailPage defaultRole="employee" />,
+      },
+    ],
+  },
+
+  // ─── BATCH & EXPIRY MANAGEMENT SHORTCUTS (FE-02) ───
+  {
+    path: '/batches',
+    element: <StoreOwnerLayout />,
+    children: [
+      {
+        index: true,
+        element: <BatchListPage defaultRole="store_owner" />,
+      },
+    ],
+  },
+  {
+    path: '/expiry',
+    element: <StoreOwnerLayout />,
+    children: [
+      {
+        index: true,
+        element: <BatchListPage defaultRole="store_owner" />,
+      },
+    ],
+  },
+  {
+    path: '/employee/batches',
+    element: <StoreOwnerLayout />,
+    children: [
+      {
+        index: true,
+        element: <BatchListPage defaultRole="employee" />,
       },
     ],
   },

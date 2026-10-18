@@ -97,6 +97,12 @@ const NAV_GROUPS: NavGroup[] = [
         title: "Kho & Hạn dùng (FEFO)",
         items: [
           {
+            label: "Quản lý lô & Hạn sử dụng",
+            to: "/store-owner/batches",
+            badge: "FEFO",
+            badgeType: "blue",
+          },
+          {
             label: "Kiểm kho & Cân đối",
             to: "/store-owner/suppliers/products?view=inventory",
           },
