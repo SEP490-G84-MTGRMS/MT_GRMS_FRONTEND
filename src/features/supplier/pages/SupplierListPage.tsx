@@ -1,22 +1,19 @@
-import { useState, useMemo, useRef } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import type { FC } from 'react';
 import { Link } from 'react-router-dom';
+import { Building2, Package, Download, Plus, Loader2 } from 'lucide-react';
 import type {
   SupplierSummary,
   SupplierFilterState,
   CreateSupplierInput,
 } from '../types/supplier.types';
-import { INITIAL_SUPPLIERS } from '../lib/mockData';
 import { SupplierFilterBar } from '../components/SupplierFilterBar';
 import { SupplierTable } from '../components/SupplierTable';
 import { SupplierFormModal } from '../components/SupplierFormModal';
 import { SupplierDetailPage } from './SupplierDetailPage';
-import {
-  AdminToast,
-  type ToastState,
-  ExportIcon,
-  PlusIcon,
-} from '../../admin/components';
+import { AdminToast, type ToastState } from '../../admin/components';
+import { supplierApi } from '../api/supplierApi';
+import '../../purchase-order/purchase-order.css';
 import '../supplier.css';
 
 const DEFAULT_FILTERS: SupplierFilterState = {
@@ -31,7 +28,9 @@ const DEFAULT_FILTERS: SupplierFilterState = {
 };
 
 export const SupplierListPage: FC = () => {
-  const [suppliers, setSuppliers] = useState<SupplierSummary[]>(INITIAL_SUPPLIERS);
+  const [suppliers, setSuppliers] = useState<SupplierSummary[]>([]);
+  const [totalCount, setTotalCount] = useState<number>(0);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
   // Filters are only applied when user clicks "Tìm kiếm" or "Đặt lại"
   const [appliedFilters, setAppliedFilters] = useState<SupplierFilterState>(DEFAULT_FILTERS);
@@ -50,42 +49,25 @@ export const SupplierListPage: FC = () => {
     setToast({ id: Date.now().toString(), message, type });
     toastTimerRef.current = setTimeout(() => {
       setToast(null);
-    }, 2800);
+    }, 3200);
   };
 
-  const filteredSuppliers = useMemo(() => {
-    return suppliers.filter((item) => {
-      // Search term
-      if (appliedFilters.searchTerm) {
-        const kw = appliedFilters.searchTerm.trim().toLowerCase();
-        const match =
-          item.code.toLowerCase().includes(kw) ||
-          item.name.toLowerCase().includes(kw) ||
-          item.phone.toLowerCase().includes(kw) ||
-          item.contactPerson.toLowerCase().includes(kw) ||
-          (item.taxCode || '').toLowerCase().includes(kw);
-        if (!match) return false;
-      }
+  const fetchSuppliers = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const res = await supplierApi.getSuppliers(appliedFilters);
+      setSuppliers(res.items);
+      setTotalCount(res.total);
+    } catch (err: any) {
+      showToast(err.message || 'Không thể tải danh sách nhà cung cấp từ máy chủ.', 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [appliedFilters]);
 
-      // Dropdown filter: Loại hình (Goods / Service / Both)
-      if (appliedFilters.supplierType && item.supplierType !== appliedFilters.supplierType) return false;
-
-      // Dropdown filter: Phân loại (FRESH / AMBIENT / ...)
-      if (appliedFilters.category && item.category !== appliedFilters.category) return false;
-
-      // Dropdown filter: Trạng thái công nợ
-      if (appliedFilters.debtStatus === 'has_debt' && item.currentDebt <= 0) return false;
-      if (appliedFilters.debtStatus === 'overdue' && item.overdueDebt <= 0) return false;
-      if (appliedFilters.debtStatus === 'no_debt' && item.currentDebt > 0) return false;
-
-      return true;
-    });
-  }, [suppliers, appliedFilters]);
-
-  const pagedSuppliers = useMemo(() => {
-    const start = (appliedFilters.pageIndex - 1) * appliedFilters.pageSize;
-    return filteredSuppliers.slice(start, start + appliedFilters.pageSize);
-  }, [filteredSuppliers, appliedFilters.pageIndex, appliedFilters.pageSize]);
+  useEffect(() => {
+    fetchSuppliers();
+  }, [fetchSuppliers]);
 
   const handleSearch = (newFilters: SupplierFilterState) => {
     setAppliedFilters(newFilters);
@@ -103,49 +85,20 @@ export const SupplierListPage: FC = () => {
     setAppliedFilters((prev) => ({ ...prev, pageSize: size, pageIndex: 1 }));
   };
 
-  const handleSaveSupplier = (input: CreateSupplierInput & { id?: string }) => {
-    if (input.id) {
-      setSuppliers((prev) =>
-        prev.map((item) =>
-          item.id === input.id ? { ...item, ...input, code: input.code || item.code } : item
-        )
-      );
-      setSelectedSupplier((prev) =>
-        prev && prev.id === input.id ? { ...prev, ...input, code: input.code || prev.code } : prev
-      );
-      showToast(`Đã cập nhật thông tin nhà cung cấp ${input.name} thành công!`, 'success');
-    } else {
-      const nextCode = input.code || `SUP-${String(suppliers.length + 1).padStart(3, '0')}`;
-      const newSupp: SupplierSummary = {
-        id: `supp-${Date.now()}`,
-        code: nextCode,
-        name: input.name,
-        tradeName: input.tradeName,
-        supplierType: input.supplierType,
-        category: input.category,
-        contactPerson: input.contactPerson,
-        phone: input.phone,
-        email: input.email,
-        address: input.address,
-        paymentTermDays: input.paymentTermDays,
-        creditLimit: input.creditLimit,
-        currentDebt: 0,
-        overdueDebt: 0,
-        rating: 5.0,
-        status: 'Active',
-        taxCode: input.taxCode,
-        companyName: input.companyName,
-        invoiceAddress: input.invoiceAddress,
-        bankName: input.bankName,
-        bankAccount: input.bankAccount,
-        accountHolder: input.accountHolder,
-        note: input.note,
-        createdAt: new Date().toISOString(),
-      };
-      setSuppliers((prev) => [newSupp, ...prev]);
-      showToast(`Đã thêm mới nhà cung cấp ${input.name} (${nextCode}) thành công!`, 'success');
+  const handleSaveSupplier = async (input: CreateSupplierInput & { id?: string }) => {
+    try {
+      if (input.id) {
+        await supplierApi.updateSupplier(input.id, { ...input, id: input.id });
+        showToast(`Đã cập nhật thông tin nhà cung cấp ${input.name} thành công!`, 'success');
+      } else {
+        const created = await supplierApi.createSupplier(input);
+        showToast(`Đã thêm mới nhà cung cấp ${created.name} (${created.code}) thành công!`, 'success');
+      }
+      setIsFormModalOpen(false);
+      await fetchSuppliers();
+    } catch (err: any) {
+      showToast(err.message || 'Thao tác không thành công.', 'error');
     }
-    setIsFormModalOpen(false);
   };
 
   const handlePayDebt = (supplier: SupplierSummary) => {
@@ -153,35 +106,50 @@ export const SupplierListPage: FC = () => {
     showToast(`Đã lập lệnh chi trả nợ ${amount} cho NCC ${supplier.name} (${supplier.code})`, 'success');
   };
 
-  const handleToggleStatus = (supplier: SupplierSummary) => {
+  const handleToggleStatus = async (supplier: SupplierSummary) => {
     const newStatus = supplier.status === 'Active' ? 'Inactive' : 'Active';
     if (newStatus === 'Inactive' && supplier.currentDebt > 0) {
       showToast(`Không thể tạm ngưng ${supplier.name}! Đang có dư nợ AP chưa thanh toán.`, 'warning');
       return;
     }
-    setSuppliers((prev) =>
-      prev.map((item) => (item.id === supplier.id ? { ...item, status: newStatus } : item))
-    );
-    setSelectedSupplier((prev) => (prev ? { ...prev, status: newStatus } : null));
-    showToast(`Đã chuyển trạng thái ${supplier.name} sang [${newStatus}]!`, 'success');
+    try {
+      await supplierApi.updateSupplierStatus(supplier.id, newStatus);
+      showToast(`Đã chuyển trạng thái ${supplier.name} sang [${newStatus}]!`, 'success');
+      await fetchSuppliers();
+      if (selectedSupplier && selectedSupplier.id === supplier.id) {
+        setSelectedSupplier((prev) => (prev ? { ...prev, status: newStatus } : null));
+      }
+    } catch (err: any) {
+      showToast(err.message || 'Không thể đổi trạng thái nhà cung cấp.', 'error');
+    }
   };
 
-  const handleDeleteSupplier = (supplier: SupplierSummary) => {
+  const handleDeleteSupplier = async (supplier: SupplierSummary) => {
     if (supplier.currentDebt > 0) {
       showToast(`Không thể xóa ${supplier.name}! Đã phát sinh dư nợ AP.`, 'warning');
       return;
     }
-    setSuppliers((prev) => prev.filter((item) => item.id !== supplier.id));
-    setSelectedSupplier(null);
-    showToast(`Đã xóa nhà cung cấp ${supplier.name}!`, 'success');
+    try {
+      await supplierApi.deleteSupplier(supplier.id);
+      showToast(`Đã xóa nhà cung cấp ${supplier.name}!`, 'success');
+      setSelectedSupplier(null);
+      await fetchSuppliers();
+    } catch (err: any) {
+      showToast(err.message || 'Không thể xóa nhà cung cấp.', 'error');
+    }
   };
 
-  const handleLinkCustomer = (supplierId: string, customerId: string) => {
-    setSuppliers((prev) =>
-      prev.map((item) => (item.id === supplierId ? { ...item, linkedCustomerId: customerId } : item))
-    );
-    setSelectedSupplier((prev) => (prev ? { ...prev, linkedCustomerId: customerId } : null));
-    showToast(`Đã liên kết thành công Khách hàng ${customerId} cho NCC!`, 'success');
+  const handleLinkCustomer = async (supplierId: string, customerId: string) => {
+    try {
+      await supplierApi.linkCustomer(supplierId, customerId);
+      showToast(`Đã liên kết thành công Khách hàng cho Nhà cung cấp!`, 'success');
+      await fetchSuppliers();
+      if (selectedSupplier && selectedSupplier.id === supplierId) {
+        setSelectedSupplier((prev) => (prev ? { ...prev, linkedCustomerId: customerId } : null));
+      }
+    } catch (err: any) {
+      showToast(err.message || 'Không thể liên kết khách hàng.', 'error');
+    }
   };
 
   // Khi chọn xem chi tiết NCC, hiển thị giao diện SupplierDetailPage toàn màn hình
@@ -191,7 +159,10 @@ export const SupplierListPage: FC = () => {
         <AdminToast toast={toast} onClose={() => setToast(null)} />
         <SupplierDetailPage
           supplier={selectedSupplier}
-          onBack={() => setSelectedSupplier(null)}
+          onBack={() => {
+            setSelectedSupplier(null);
+            fetchSuppliers();
+          }}
           onEdit={(s) => {
             setEditingSupplier(s);
             setIsFormModalOpen(true);
@@ -212,57 +183,100 @@ export const SupplierListPage: FC = () => {
   }
 
   return (
-    <div>
+    <div
+      className="po-matrix-container"
+      style={{
+        width: '100%',
+        height: '100%',
+        maxHeight: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        minHeight: 0,
+        flex: 1,
+        overflow: 'hidden',
+      }}
+    >
       {/* Toast Notification */}
       <AdminToast toast={toast} onClose={() => setToast(null)} />
 
-      {/* Page Header */}
-      <div className="admin-page-header">
+      {/* ── Page Header theo chuẩn PoList ── */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: 12,
+          marginBottom: 8,
+          flexShrink: 0,
+        }}
+      >
         <div>
-          <h1 style={{ margin: 0, lineHeight: 1.25 }}>Quản lý Nhà Cung Cấp</h1>
+          <h1
+            style={{
+              fontSize: 20,
+              fontWeight: 800,
+              color: 'var(--text-main)',
+              margin: 0,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+            }}
+          >
+            <Building2 size={22} color="var(--blue-primary, #0f766e)" />
+            <span>Quản lý Nhà Cung Cấp</span>
+            {isLoading && <Loader2 size={16} className="animate-spin" style={{ color: 'var(--blue-primary, #0f766e)' }} />}
+          </h1>
         </div>
+
+        {/* Action buttons */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <Link
             to="/store-owner/suppliers/products"
-            className="admin-btn admin-btn-secondary"
-            style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 6 }}
+            className="po-btn po-btn-secondary"
+            style={{ height: 32, padding: '0 14px', textDecoration: 'none' }}
             title="Quản lý danh mục sản phẩm theo từng Nhà cung cấp"
           >
+            <Package size={14} />
             <span>Sản phẩm theo NCC</span>
           </Link>
           <button
             type="button"
-            className="admin-btn admin-btn-secondary"
-            onClick={() => showToast('Đang kết xuất danh sách NCC ra tệp Excel (.xlsx)...')}
+            className="po-btn po-btn-secondary"
+            style={{ height: 32, padding: '0 14px' }}
+            onClick={() => showToast('Đang kết xuất danh sách NCC ra tệp Excel (.xlsx)...', 'info')}
           >
-            <ExportIcon size={14} />
+            <Download size={14} />
             <span>Xuất Excel</span>
           </button>
           <button
             type="button"
-            className="admin-btn admin-btn-primary"
+            className="po-btn po-btn-primary"
+            style={{ height: 32, padding: '0 14px' }}
             onClick={() => {
               setEditingSupplier(null);
               setIsFormModalOpen(true);
             }}
           >
-            <PlusIcon size={14} />
+            <Plus size={14} />
             <span>Thêm Nhà Cung Cấp</span>
           </button>
         </div>
       </div>
 
-      {/* Filter Toolbar Card with Search and Reset buttons */}
-      <SupplierFilterBar
-        filters={appliedFilters}
-        onSearch={handleSearch}
-        onReset={handleReset}
-      />
+      {/* ── UNIFIED FILTER BAR ── */}
+      <div style={{ flexShrink: 0, marginBottom: 8 }}>
+        <SupplierFilterBar
+          filters={appliedFilters}
+          onSearch={handleSearch}
+          onReset={handleReset}
+        />
+      </div>
 
-      {/* Supplier Data Table (without Loại column) */}
+      {/* ── MAIN DATA TABLE WITH PAGING ── */}
       <SupplierTable
-        suppliers={pagedSuppliers}
-        totalCount={filteredSuppliers.length}
+        suppliers={suppliers}
+        totalCount={totalCount}
         pageIndex={appliedFilters.pageIndex}
         pageSize={appliedFilters.pageSize}
         onPageChange={handlePageChange}

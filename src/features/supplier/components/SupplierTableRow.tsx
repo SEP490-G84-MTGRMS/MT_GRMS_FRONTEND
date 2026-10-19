@@ -1,15 +1,13 @@
 import type { FC } from 'react';
 import type { SupplierSummary } from '../types/supplier.types';
 import { SupplierCategoryBadge, SupplierStatusBadge } from './SupplierStatusBadge';
-import { CreditCard, Edit3 } from 'lucide-react';
+import { CreditCard, Edit3, Eye } from 'lucide-react';
 
 interface Props {
   supplier: SupplierSummary;
   onViewDetail: (supplier: SupplierSummary) => void;
   onEdit: (supplier: SupplierSummary) => void;
   onPayDebt: (supplier: SupplierSummary) => void;
-  isSelected?: boolean;
-  onToggleSelect?: (id: string) => void;
 }
 
 export const SupplierTableRow: FC<Props> = ({
@@ -17,94 +15,130 @@ export const SupplierTableRow: FC<Props> = ({
   onViewDetail,
   onEdit,
   onPayDebt,
-  isSelected = false,
-  onToggleSelect,
 }) => {
   const fmt = (val: number) => new Intl.NumberFormat('vi-VN').format(val) + ' đ';
 
   return (
-    <tr>
-      {/* Checkbox */}
-      <td style={{ textAlign: 'center' }}>
-        <input
-          type="checkbox"
-          checked={isSelected}
-          onChange={() => onToggleSelect?.(supplier.id)}
-        />
-      </td>
+    <tr
+      style={{
+        borderBottom: '1px solid #f1f5f9',
+        backgroundColor: '#ffffff',
+        transition: 'background-color 0.12s ease',
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.backgroundColor = '#f8fafc';
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.backgroundColor = '#ffffff';
+      }}
+    >
 
       {/* Mã NCC */}
-      <td>
+      <td style={{ padding: '10px 12px', borderBottom: '1px solid #f1f5f9' }}>
         <span
-          className="admin-subdomain-tag"
-          style={{ fontFamily: 'var(--font-mono)' }}
+          style={{
+            fontFamily: 'var(--font-mono, monospace)',
+            fontWeight: 700,
+            color: '#0f766e',
+            backgroundColor: '#f0fdfa',
+            padding: '2px 6px',
+            borderRadius: 4,
+            border: '1px solid #ccfbf1',
+            fontSize: 12,
+            whiteSpace: 'nowrap',
+          }}
         >
           {supplier.code}
         </span>
       </td>
 
       {/* Tên NCC */}
-      <td>
-        <b style={{ display: 'block', lineHeight: 1.3 }}>{supplier.name}</b>
+      <td style={{ padding: '10px 12px', borderBottom: '1px solid #f1f5f9' }}>
+        <div style={{ fontWeight: 600, color: '#0f172a', lineHeight: 1.35 }}>
+          {supplier.name}
+        </div>
         {supplier.tradeName && (
-          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+          <div style={{ fontSize: 11, color: '#64748b', marginTop: 1 }}>
             ({supplier.tradeName})
           </div>
         )}
       </td>
 
-
       {/* Phân loại */}
-      <td style={{ whiteSpace: 'nowrap' }}>
+      <td style={{ padding: '10px 12px', whiteSpace: 'nowrap', borderBottom: '1px solid #f1f5f9' }}>
         <SupplierCategoryBadge category={supplier.category} />
       </td>
 
       {/* Người liên hệ */}
-      <td>
-        <div style={{ fontWeight: 600, fontSize: 12.5, lineHeight: 1.3 }}>{supplier.contactPerson}</div>
-        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+      <td style={{ padding: '10px 12px', borderBottom: '1px solid #f1f5f9' }}>
+        <div style={{ fontWeight: 600, fontSize: 12.5, color: '#1e293b', lineHeight: 1.3 }}>
+          {supplier.contactPerson}
+        </div>
+        <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
           {supplier.phone}
         </div>
       </td>
 
       {/* Hạn nợ */}
-      <td style={{ whiteSpace: 'nowrap' }}>
-        <span style={{ fontSize: '12.5px', fontWeight: 500, color: '#374151' }}>
-          {supplier.paymentTermDays === 0 ? 'Tiền mặt' : `${supplier.paymentTermDays}d`}
+      <td style={{ padding: '10px 12px', whiteSpace: 'nowrap', borderBottom: '1px solid #f1f5f9' }}>
+        <span style={{ fontSize: 12, fontWeight: 500, color: '#475569' }}>
+          {supplier.paymentTermDays === 0 ? 'Tiền mặt' : `${supplier.paymentTermDays} ngày`}
         </span>
       </td>
 
       {/* Đang nợ */}
-      <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap', fontSize: 12 }}>
+      <td style={{ padding: '10px 12px', textAlign: 'right', fontFamily: 'var(--font-mono, monospace)', whiteSpace: 'nowrap', fontSize: 12.5, borderBottom: '1px solid #f1f5f9' }}>
         {supplier.currentDebt > 0 ? (
-          <b style={{ color: '#111827' }}>{fmt(supplier.currentDebt)}</b>
+          <b style={{ color: '#0f172a' }}>{fmt(supplier.currentDebt)}</b>
         ) : (
-          <span style={{ color: 'var(--text-faint)' }}>0 đ</span>
+          <span style={{ color: '#94a3b8' }}>0 đ</span>
         )}
       </td>
 
       {/* Quá hạn */}
-      <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap', fontSize: 12 }}>
+      <td style={{ padding: '10px 12px', textAlign: 'right', fontFamily: 'var(--font-mono, monospace)', whiteSpace: 'nowrap', fontSize: 12.5, borderBottom: '1px solid #f1f5f9' }}>
         {supplier.overdueDebt > 0 ? (
-          <b style={{ color: 'var(--red-accent)' }}>{fmt(supplier.overdueDebt)}</b>
+          <b style={{ color: '#dc2626' }}>{fmt(supplier.overdueDebt)}</b>
         ) : (
-          <span style={{ color: 'var(--text-faint)' }}>--</span>
+          <span style={{ color: '#94a3b8' }}>--</span>
         )}
       </td>
 
       {/* Trạng thái */}
-      <td style={{ whiteSpace: 'nowrap' }}>
+      <td style={{ padding: '10px 12px', whiteSpace: 'nowrap', textAlign: 'center', borderBottom: '1px solid #f1f5f9' }}>
         <SupplierStatusBadge status={supplier.status} />
       </td>
 
       {/* Thao tác */}
-      <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+      <td style={{ padding: '10px 12px', textAlign: 'right', whiteSpace: 'nowrap', borderBottom: '1px solid #f1f5f9' }}>
         <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-end', gap: 6 }}>
           {supplier.currentDebt > 0 && (
             <button
               type="button"
-              className="admin-table-btn"
               onClick={() => onPayDebt(supplier)}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 4,
+                height: 28,
+                padding: '0 8px',
+                borderRadius: 6,
+                fontSize: 12,
+                fontWeight: 600,
+                backgroundColor: '#fffbeb',
+                border: '1px solid #fde68a',
+                color: '#b45309',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = '#fef3c7';
+                e.currentTarget.style.borderColor = '#f59e0b';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = '#fffbeb';
+                e.currentTarget.style.borderColor = '#fde68a';
+              }}
               title="Lập phiếu chi trả nợ"
             >
               <CreditCard size={12} />
@@ -114,20 +148,68 @@ export const SupplierTableRow: FC<Props> = ({
 
           <button
             type="button"
-            className="admin-table-btn"
             onClick={() => onEdit(supplier)}
-            title="Chỉnh sửa thông tin"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: 28,
+              height: 28,
+              borderRadius: 6,
+              fontSize: 12,
+              backgroundColor: '#ffffff',
+              border: '1px solid #cbd5e1',
+              color: '#64748b',
+              cursor: 'pointer',
+              transition: 'all 0.15s ease',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.borderColor = '#0284c7';
+              e.currentTarget.style.color = '#0284c7';
+              e.currentTarget.style.backgroundColor = '#f0f9ff';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.borderColor = '#cbd5e1';
+              e.currentTarget.style.color = '#64748b';
+              e.currentTarget.style.backgroundColor = '#ffffff';
+            }}
+            title="Chỉnh sửa thông tin nhà cung cấp"
           >
-            <Edit3 size={13} />
+            <Edit3 size={12} />
           </button>
 
           <button
             type="button"
-            className="admin-table-btn admin-table-btn-primary"
             onClick={() => onViewDetail(supplier)}
-            title="Xem chi tiết"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 4,
+              height: 28,
+              padding: '0 10px',
+              borderRadius: 6,
+              fontSize: 12,
+              fontWeight: 600,
+              backgroundColor: '#ffffff',
+              border: '1px solid #cbd5e1',
+              color: '#334155',
+              cursor: 'pointer',
+              transition: 'all 0.15s ease',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.borderColor = '#0f766e';
+              e.currentTarget.style.color = '#0f766e';
+              e.currentTarget.style.backgroundColor = '#f0fdfa';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.borderColor = '#cbd5e1';
+              e.currentTarget.style.color = '#334155';
+              e.currentTarget.style.backgroundColor = '#ffffff';
+            }}
+            title="Xem chi tiết nhà cung cấp"
           >
-            Chi tiết
+            <Eye size={12} />
+            <span>Chi tiết</span>
           </button>
         </div>
       </td>

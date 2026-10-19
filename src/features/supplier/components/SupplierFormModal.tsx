@@ -103,7 +103,7 @@ export const SupplierFormModal: FC<Props> = ({ isOpen, editingSupplier, onClose,
                 <div className="form-grid-2">
                   <div className="form-group">
                     <label className="form-label">
-                      Mã Nhà Cung Cấp <span style={{ color: '#9ca3af', fontWeight: 400 }}>(Tự sinh nếu bỏ trống)</span>
+                      Mã Nhà Cung Cấp
                     </label>
                     <input type="text" placeholder="VD: SUP-001" disabled={!!editingSupplier}
                       value={formData.code} onChange={e => set({ code: e.target.value })}

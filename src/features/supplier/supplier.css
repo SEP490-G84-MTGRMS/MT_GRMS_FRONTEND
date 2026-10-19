@@ -64,6 +64,35 @@
   min-width: 0 !important;
 }
 
+/* ── Custom Sleek Thin Scrollbar cho Bảng Nhà Cung Cấp ── */
+.supplier-table-scroll-container {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+.supplier-table-scroll-container::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.supplier-table-scroll-container::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.supplier-table-scroll-container::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+  transition: background-color 0.15s ease;
+}
+
+.supplier-table-scroll-container::-webkit-scrollbar-thumb:hover {
+  background: #0f766e;
+}
+
+.supplier-table-scroll-container::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
 
 /* ── Top Bar ── */
 .supplier-topbar {
