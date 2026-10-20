@@ -8,10 +8,12 @@ export const StoreOwnerLayout: FC = () => {
       style={{
         display: 'flex',
         flexDirection: 'column',
-        minHeight: '100vh',
+        height: '100vh',
+        maxHeight: '100vh',
         width: '100%',
         backgroundColor: '#ffffff',
         color: 'var(--text-main)',
+        overflow: 'hidden',
       }}
     >
       {/* Two-row sticky topbar */}
@@ -22,10 +24,13 @@ export const StoreOwnerLayout: FC = () => {
         style={{
           flex: 1,
           width: '100%',
-          boxSizing: 'border-box',
           padding: '16px 32px 20px 32px',
           maxWidth: '100%',
           overflowX: 'hidden',
+          overflowY: 'auto',
+          display: 'flex',
+          flexDirection: 'column',
+          minHeight: 0,
         }}
       >
         <Outlet />
