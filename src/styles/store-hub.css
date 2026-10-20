@@ -1,0 +1,433 @@
+/* src/styles/store-hub.css */
+/* Styles for Store Information, Subscriptions, Wallet & User Profile Hub */
+
+.store-hub-container {
+  display: flex;
+  width: 100%;
+  font-family: var(--font-sans);
+}
+
+/* Sidebar */
+.store-hub-sidebar {
+  width: 250px;
+  background-color: #FFFFFF;
+  border-right: 1px solid #EDF2F9;
+  padding: 24px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  flex-shrink: 0;
+}
+
+.store-sidebar-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.store-sidebar-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #94A3B8;
+  padding-left: 14px;
+  margin-bottom: 4px;
+}
+
+.store-sidebar-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: var(--radius-pill);
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #475569;
+  text-decoration: none;
+  background-color: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  width: 100%;
+  text-align: left;
+}
+
+.store-sidebar-item:hover {
+  background-color: #F1F5F9;
+  color: #0F172A;
+}
+
+.store-sidebar-item.active {
+  background-color: #E8F1FF;
+  color: #0066FF;
+  font-weight: 700;
+}
+
+.store-sidebar-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: currentColor;
+}
+
+/* Main Content Area */
+.store-hub-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+}
+
+/* Top Status Bar matching KiotViet screenshot */
+.store-top-status-bar {
+  background-color: #FFFFFF;
+  border: 1px solid #EDF2F9;
+  border-radius: 20px;
+  padding: 12px 24px;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr) auto;
+  align-items: center;
+  gap: 20px;
+  box-shadow: 0 4px 16px rgba(0, 30, 90, 0.03);
+  margin-bottom: 16px;
+}
+
+.store-status-col {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.store-status-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748B;
+}
+
+.store-status-value {
+  font-size: 15px;
+  font-weight: 700;
+  color: #0F172A;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.store-badge-trial {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 14px;
+  border-radius: var(--radius-pill);
+  background-color: #F1F5F9;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 700;
+  border: 1px solid #E2E8F0;
+}
+
+.store-badge-warning-red {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 14px;
+  border-radius: var(--radius-pill);
+  background-color: #FFF0F0;
+  color: #FF3B30;
+  font-size: 13px;
+  font-weight: 800;
+  border: 1px solid #FFD6D6;
+}
+
+.store-status-wallet-pill {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  background-color: #F0FDF4;
+  border: 1px solid #BBF7D0;
+  border-radius: var(--radius-pill);
+}
+
+.store-wallet-amount {
+  font-family: var(--font-mono);
+  font-size: 16px;
+  font-weight: 800;
+  color: #15803D;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Pricing Grid */
+.pricing-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+  margin-top: 8px;
+}
+
+.pricing-card {
+  background-color: #FFFFFF;
+  border: 1px solid #EDF2F9;
+  border-radius: 24px;
+  padding: 32px 28px 28px 28px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  box-shadow: 0 6px 20px rgba(0, 30, 90, 0.04);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  position: relative;
+}
+
+.pricing-card:hover {
+  border-color: #CBD5E1;
+  box-shadow: 0 12px 32px rgba(0, 30, 90, 0.08);
+}
+
+.pricing-card.highlighted {
+  border: 2px solid #0066FF;
+  box-shadow: 0 12px 36px rgba(0, 102, 255, 0.12);
+}
+
+.pricing-card-title {
+  font-size: 20px;
+  font-weight: 800;
+  color: #0F172A;
+  margin-bottom: 14px;
+}
+
+.pricing-card-price-row {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.pricing-card-price {
+  font-family: var(--font-sans);
+  font-size: 34px;
+  font-weight: 800;
+  color: #0F172A;
+  letter-spacing: -0.03em;
+}
+
+.pricing-card-currency {
+  font-size: 16px;
+  font-weight: 700;
+  color: #64748B;
+  vertical-align: super;
+}
+
+.pricing-card-tagline {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: #64748B;
+  font-style: italic;
+  min-height: 40px;
+  margin-bottom: 16px;
+}
+
+.pricing-addon-note {
+  font-size: 13px;
+  font-weight: 700;
+  color: #1E293B;
+  margin-bottom: 6px;
+}
+
+.pricing-feature-list {
+  list-style: none;
+  padding: 0;
+  margin: 20px 0 24px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.pricing-feature-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 13.5px;
+  color: #334155;
+  line-height: 1.45;
+}
+
+.pricing-cta-button {
+  width: 100%;
+  padding: 13px 20px;
+  border-radius: var(--radius-pill);
+  font-size: 15px;
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.15s ease, filter 0.15s ease;
+  text-decoration: none;
+}
+
+.pricing-cta-button:hover {
+  opacity: 0.92;
+  filter: brightness(0.97);
+}
+
+/* User Profile Styles matching KiotViet screenshot */
+.profile-screen-container {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  width: 100%;
+}
+
+.profile-card {
+  background-color: #FFFFFF;
+  border: 1px solid #EDF2F9;
+  border-radius: 20px;
+  padding: 18px 24px;
+  box-shadow: 0 4px 16px rgba(0, 30, 90, 0.03);
+}
+
+.profile-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.profile-card-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: #0F172A;
+}
+
+.profile-info-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  row-gap: 18px;
+  column-gap: 24px;
+}
+
+.profile-info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #F1F5F9;
+}
+
+.profile-info-item.full-width {
+  grid-column: 1 / -1;
+}
+
+.profile-info-label {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: #64748B;
+}
+
+.profile-info-value {
+  font-size: 14.5px;
+  font-weight: 600;
+  color: #0F172A;
+}
+
+.profile-info-value.muted {
+  color: #94A3B8;
+  font-weight: 500;
+}
+
+/* Security Card Rows */
+.security-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 0;
+  border-bottom: 1px solid #F1F5F9;
+  gap: 20px;
+}
+
+.security-row:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.security-row-left {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.security-row-title {
+  font-size: 14.5px;
+  font-weight: 700;
+  color: #0F172A;
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.security-row-desc {
+  font-size: 12.5px;
+  color: #64748B;
+  line-height: 1.45;
+}
+
+/* Modal Backdrop & Dialog */
+.store-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+  padding: 20px;
+}
+
+.store-modal-dialog {
+  background-color: #FFFFFF;
+  border-radius: 24px;
+  width: 100%;
+  max-width: 620px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.16);
+  display: flex;
+  flex-direction: column;
+}
+
+.store-modal-header {
+  padding: 20px 24px;
+  border-bottom: 1px solid #EDF2F9;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.store-modal-title {
+  font-size: 18px;
+  font-weight: 800;
+  color: #0F172A;
+}
+
+.store-modal-body {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.store-modal-footer {
+  padding: 18px 24px;
+  border-top: 1px solid #EDF2F9;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  background-color: #F8FAFC;
+  border-bottom-left-radius: 24px;
+  border-bottom-right-radius: 24px;
+}

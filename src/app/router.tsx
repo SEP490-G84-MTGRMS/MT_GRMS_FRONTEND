@@ -86,6 +86,8 @@ import { LoginPage, RegisterPage, ForgotPasswordPage } from '../pages/auth';
 import { ReportsPnlDashboardPage } from '../features/reports-pnl';
 import { CashbookPage } from '../features/cashbook';
 import { TaxSnapshotPage } from '../features/tax-snapshot';
+import { StoreSettingsHubPage } from '../pages/store/StoreSettingsHubPage';
+import { AccountManagementPage } from '../pages/store/AccountManagementPage';
 
 export const router = createBrowserRouter([
   {
@@ -289,11 +291,31 @@ export const router = createBrowserRouter([
       },
       {
         path: 'subscriptions',
-        element: <Navigate to="/store-owner/dashboard" replace />,
+        element: <StoreSettingsHubPage />,
       },
       {
         path: 'subscriptions/*',
-        element: <Navigate to="/store-owner/dashboard" replace />,
+        element: <StoreSettingsHubPage />,
+      },
+      {
+        path: 'settings',
+        element: <StoreSettingsHubPage />,
+      },
+      {
+        path: 'settings/*',
+        element: <StoreSettingsHubPage />,
+      },
+      {
+        path: 'account',
+        element: <AccountManagementPage />,
+      },
+      {
+        path: 'account/*',
+        element: <AccountManagementPage />,
+      },
+      {
+        path: 'profile',
+        element: <Navigate to="/store-owner/account?tab=account-profile" replace />,
       },
       {
         path: 'suppliers',
