@@ -1,16 +1,20 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+﻿import { useState, useRef, useEffect, useCallback } from 'react';
 import type { FC } from 'react';
 import { NavLink, Link, useLocation } from 'react-router-dom';
 import {
   DashboardIcon,
   TruckIcon,
   PackageIcon,
-  BellIcon,
   ChevronRightIcon,
   MenuIcon,
   TrendingUpIcon,
 } from "../../features/admin/components";
 import { Gift } from "lucide-react";
+import {
+  NotificationBadge,
+  NotificationPopover,
+  NotificationDrawer,
+} from "../../features/notifications";
 
 /* ─── Data ─── */
 
@@ -1161,48 +1165,10 @@ export const AppTopNav: FC = () => {
             }}
           >
             {/* Bell notification */}
-            <button
-              type="button"
-              style={{
-                width: 32,
-                height: 32,
-                borderRadius: "50%",
-                border: "1px solid rgba(255, 255, 255, 0.22)",
-                backgroundColor: "rgba(255, 255, 255, 0.14)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                cursor: "pointer",
-                position: "relative",
-                color: "#ffffff",
-                flexShrink: 0,
-                boxSizing: "border-box",
-                transition: "all 0.15s ease",
-              }}
-              title="Thông báo"
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor =
-                  "rgba(255, 255, 255, 0.25)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor =
-                  "rgba(255, 255, 255, 0.14)";
-              }}
-            >
-              <BellIcon size={15} />
-              <span
-                style={{
-                  position: "absolute",
-                  top: 5,
-                  right: 5,
-                  width: 7,
-                  height: 7,
-                  borderRadius: "50%",
-                  backgroundColor: "#FF3B30",
-                  border: "1.5px solid #fff",
-                }}
-              />
-            </button>
+            <div style={{ position: "relative" }}>
+              <NotificationBadge />
+              <NotificationPopover />
+            </div>
 
             {/* Profile User */}
             <div
@@ -1563,6 +1529,8 @@ export const AppTopNav: FC = () => {
           </div>
         </div>
       )}
+      {/* Extended Global Notification Drawer */}
+      <NotificationDrawer />
     </>
   );
 };
