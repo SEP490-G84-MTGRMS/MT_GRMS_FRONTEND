@@ -1,12 +1,12 @@
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import type { FC } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import {
   INITIAL_SUPPLIERS,
   MASTER_PRODUCTS,
-  MOCK_SUPPLIER_PRODUCTS,
 } from '../lib/mockData';
 import type {
+  SupplierSummary,
   SupplierProductItem,
   AssignProductInput,
   EditSupplierProductInput,
@@ -19,36 +19,41 @@ import {
 import { SupplierProductTable } from '../components/products/SupplierProductTable';
 import { AssignProductModal } from '../components/products/AssignProductModal';
 import { EditSupplierProductModal } from '../components/products/EditSupplierProductModal';
-import { AdminToast, type ToastState, PlusIcon } from '../../admin/components';
-import { Layers } from 'lucide-react';
+import { AdminToast, type ToastState } from '../../admin/components';
+import { supplierProductApi } from '../api/supplierProductApi';
+import { supplierApi } from '../api/supplierApi';
+import { Building2, Download, Plus, Layers, Loader2 } from 'lucide-react';
+import '../../purchase-order/purchase-order.css';
 import '../supplier.css';
+
+export interface ProductFilterState extends SupplierProductFilterValues {
+  pageIndex: number;
+  pageSize: number;
+}
+
+const DEFAULT_FILTERS: ProductFilterState = {
+  searchTerm: '',
+  supplierId: 'ALL',
+  categoryFilter: 'ALL',
+  statusFilter: 'ALL',
+  pageIndex: 1,
+  pageSize: 10,
+};
 
 export const SupplierProductManagementPage: FC = () => {
   const { id: paramSupplierId } = useParams<{ id?: string }>();
 
-  // Suppliers state
-  const suppliers = INITIAL_SUPPLIERS;
-
-  // Products state mapped by supplierId
-  const [supplierProductsCatalog, setSupplierProductsCatalog] = useState<
-    Record<string, SupplierProductItem[]>
-  >(MOCK_SUPPLIER_PRODUCTS);
+  // Suppliers state (fetched from API with fallback to mock)
+  const [suppliers, setSuppliers] = useState<SupplierSummary[]>(INITIAL_SUPPLIERS);
+  const [products, setProducts] = useState<SupplierProductItem[]>([]);
+  const [totalCount, setTotalCount] = useState<number>(0);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
   // Applied filter criteria state - Only updated when clicking "Tìm kiếm" or reset
-  const [appliedFilters, setAppliedFilters] = useState<SupplierProductFilterValues>({
-    searchTerm: '',
-    supplierId: paramSupplierId && suppliers.some((s) => s.id === paramSupplierId) ? paramSupplierId : 'ALL',
-    categoryFilter: 'ALL',
-    statusFilter: 'ALL',
-  });
-
-  // Current active supplier (if a single supplier is selected)
-  const currentSupplier = useMemo(() => {
-    if (appliedFilters.supplierId !== 'ALL') {
-      return suppliers.find((s) => s.id === appliedFilters.supplierId) || suppliers[0];
-    }
-    return suppliers[0];
-  }, [suppliers, appliedFilters.supplierId]);
+  const [appliedFilters, setAppliedFilters] = useState<ProductFilterState>(() => ({
+    ...DEFAULT_FILTERS,
+    supplierId: paramSupplierId || 'ALL',
+  }));
 
   // Modals state
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
@@ -61,216 +66,256 @@ export const SupplierProductManagementPage: FC = () => {
   const showToast = (message: string, type: ToastState['type'] = 'success') => {
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     setToast({ id: Date.now().toString(), message, type });
-    toastTimerRef.current = setTimeout(() => setToast(null), 2800);
+    toastTimerRef.current = setTimeout(() => setToast(null), 3000);
   };
 
-  // Flattened all products across all suppliers
-  const allProducts = useMemo(() => {
-    return Object.values(supplierProductsCatalog).flat();
-  }, [supplierProductsCatalog]);
+  // Fetch real suppliers list for filter dropdowns
+  useEffect(() => {
+    const loadSuppliers = async () => {
+      try {
+        const res = await supplierApi.getSuppliers({ pageIndex: 1, pageSize: 100 });
+        if (res.items && res.items.length > 0) {
+          setSuppliers(res.items);
+        }
+      } catch {
+        // Keep initial suppliers fallback
+      }
+    };
+    loadSuppliers();
+  }, []);
 
-  // Products scope based on applied supplierId filter
-  const rawProducts = useMemo(() => {
-    if (appliedFilters.supplierId === 'ALL') {
-      return allProducts;
+  // Fetch supplier products based on applied filters & pagination
+  const fetchProducts = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const res = await supplierProductApi.getSupplierProducts(
+        appliedFilters.supplierId,
+        appliedFilters
+      );
+      setProducts(res.items);
+      setTotalCount(res.total);
+    } catch (err: any) {
+      showToast(err.message || 'Không thể tải danh sách sản phẩm.', 'error');
+    } finally {
+      setIsLoading(false);
     }
-    return supplierProductsCatalog[appliedFilters.supplierId] || [];
-  }, [allProducts, supplierProductsCatalog, appliedFilters.supplierId]);
+  }, [appliedFilters]);
 
-  // Available categories across all products
+  useEffect(() => {
+    fetchProducts();
+  }, [fetchProducts]);
+
+  // Current active supplier (if a single supplier is selected)
+  const currentSupplier = useMemo(() => {
+    if (appliedFilters.supplierId !== 'ALL') {
+      return suppliers.find((s) => s.id === appliedFilters.supplierId) || suppliers[0];
+    }
+    return suppliers[0];
+  }, [suppliers, appliedFilters.supplierId]);
+
+  // Available categories across master products
   const availableCategories = useMemo(() => {
     const set = new Set<string>();
-    allProducts.forEach((p) => {
+    MASTER_PRODUCTS.forEach((p) => {
       if (p.categoryName) set.add(p.categoryName);
     });
     return Array.from(set);
-  }, [allProducts]);
-
-  // Filtered products list - Strictly dependent on appliedFilters
-  const filteredProducts = useMemo(() => {
-    return rawProducts.filter((p) => {
-      if (appliedFilters.searchTerm.trim()) {
-        const term = appliedFilters.searchTerm.toLowerCase();
-        const matchName = p.name.toLowerCase().includes(term);
-        const matchBarcode = p.barcode.toLowerCase().includes(term);
-        const matchSku = p.sku.toLowerCase().includes(term);
-        const matchSuppCode = p.supplierProductCode?.toLowerCase().includes(term) ?? false;
-        if (!matchName && !matchBarcode && !matchSku && !matchSuppCode) return false;
-      }
-      if (appliedFilters.categoryFilter !== 'ALL' && p.categoryName !== appliedFilters.categoryFilter) {
-        return false;
-      }
-      if (appliedFilters.statusFilter !== 'ALL' && p.status !== appliedFilters.statusFilter) {
-        return false;
-      }
-      return true;
-    });
-  }, [rawProducts, appliedFilters]);
+  }, []);
 
   // Filter Search & Reset Handlers
   const handleApplySearch = (newValues: SupplierProductFilterValues) => {
-    setAppliedFilters(newValues);
+    setAppliedFilters((prev) => ({
+      ...prev,
+      ...newValues,
+      pageIndex: 1,
+    }));
   };
 
   const handleResetFilters = () => {
-    setAppliedFilters({
-      searchTerm: '',
-      supplierId: 'ALL',
-      categoryFilter: 'ALL',
-      statusFilter: 'ALL',
-    });
+    setAppliedFilters(DEFAULT_FILTERS);
+  };
+
+  const handlePageChange = (page: number) => {
+    setAppliedFilters((prev) => ({ ...prev, pageIndex: page }));
+  };
+
+  const handlePageSizeChange = (size: number) => {
+    setAppliedFilters((prev) => ({ ...prev, pageSize: size, pageIndex: 1 }));
   };
 
   // Item Handlers
-  const handleAssignProduct = (input: AssignProductInput) => {
-    const master = MASTER_PRODUCTS.find((p) => p.id === input.productId);
-    if (!master) return;
-
-    const targetSupplierId = input.supplierId || currentSupplier.id;
-
-    const newItem: SupplierProductItem = {
-      id: `sp-${Date.now()}`,
-      supplierId: targetSupplierId,
-      productId: input.productId,
-      barcode: master.barcode,
-      sku: master.sku,
-      name: master.name,
-      categoryName: master.categoryName,
-      deliveryUoM: input.deliveryUoM,
-      baseUoM: master.baseUoM,
-      agreedPrice: input.agreedPrice,
-      importPrice: input.agreedPrice,
-      unit: input.deliveryUoM,
-      moq: input.moq,
-      isPrimary: input.isPrimary ?? false,
-      supplierProductCode: input.supplierProductCode,
-      effectiveDate: new Date().toISOString().split('T')[0],
-      status: 'Active',
-    };
-
-    setSupplierProductsCatalog((prev) => {
-      const existing = prev[targetSupplierId] || [];
-      const updated = [newItem, ...existing];
-      return { ...prev, [targetSupplierId]: updated };
-    });
-
-    showToast(`Đã gán thành công sản phẩm "${master.name}" cho nhà cung cấp.`);
+  const handleAssignProduct = async (input: AssignProductInput) => {
+    try {
+      await supplierProductApi.assignProduct(input);
+      showToast('Đã gán thành công sản phẩm cho nhà cung cấp.');
+      setIsAssignModalOpen(false);
+      await fetchProducts();
+    } catch (err: any) {
+      showToast(err.message || 'Thao tác gán sản phẩm không thành công.', 'error');
+    }
   };
 
-  const handleSaveEdit = (input: EditSupplierProductInput) => {
+  const handleSaveEdit = async (input: EditSupplierProductInput) => {
     if (!editingItem) return;
-    const suppId = editingItem.supplierId;
-
-    setSupplierProductsCatalog((prev) => {
-      const existing = prev[suppId] || [];
-      const updated = existing.map((item) => {
-        if (item.id === input.id) {
-          return {
-            ...item,
-            deliveryUoM: input.deliveryUoM,
-            unit: input.deliveryUoM,
-            agreedPrice: input.agreedPrice,
-            importPrice: input.agreedPrice,
-            moq: input.moq,
-            isPrimary: input.isPrimary,
-            supplierProductCode: input.supplierProductCode,
-          };
-        }
-        return item;
-      });
-      return { ...prev, [suppId]: updated };
-    });
-    showToast('Đã cập nhật thành công giá nhập sỉ thỏa thuận và số lượng tối thiểu.');
+    try {
+      await supplierProductApi.updateProduct(editingItem.supplierId, editingItem.productId, input);
+      showToast('Đã cập nhật thành công giá nhập sỉ và số lượng tối thiểu (MOQ).');
+      setEditingItem(null);
+      await fetchProducts();
+    } catch (err: any) {
+      showToast(err.message || 'Không thể cập nhật sản phẩm.', 'error');
+    }
   };
 
-  const handleToggleStatus = (item: SupplierProductItem) => {
+  const handleToggleStatus = async (item: SupplierProductItem) => {
     const nextStatus = item.status === 'Active' ? 'Inactive' : 'Active';
-    setSupplierProductsCatalog((prev) => {
-      const existing = prev[item.supplierId] || [];
-      return {
-        ...prev,
-        [item.supplierId]: existing.map((p) =>
-          p.id === item.id ? { ...p, status: nextStatus } : p
-        ),
-      };
-    });
-    showToast(
-      nextStatus === 'Active'
-        ? `Đã kích hoạt lại mặt hàng "${item.name}".`
-        : `Đã tạm ngưng cung ứng mặt hàng "${item.name}".`
-    );
+    try {
+      await supplierProductApi.toggleStatus(item.supplierId, item.productId, nextStatus);
+      showToast(
+        nextStatus === 'Active'
+          ? `Đã kích hoạt lại mặt hàng "${item.name}".`
+          : `Đã tạm ngưng cung ứng mặt hàng "${item.name}".`
+      );
+      await fetchProducts();
+    } catch (err: any) {
+      showToast(err.message || 'Không thể đổi trạng thái sản phẩm.', 'error');
+    }
+  };
+
+  const handleSetPrimary = async (item: SupplierProductItem) => {
+    try {
+      await supplierProductApi.setPrimarySupplier(item.supplierId, item.productId, true);
+      showToast(`Đã đặt "${suppliers.find(s => s.id === item.supplierId)?.name || 'NCC'}" làm Nhà cung cấp chính cho sản phẩm "${item.name}".`);
+      await fetchProducts();
+    } catch (err: any) {
+      showToast(err.message || 'Không thể đặt NCC chính.', 'error');
+    }
   };
 
   const assignedProductIds = useMemo(
-    () => rawProducts.map((p) => p.productId),
-    [rawProducts]
+    () => products.map((p) => p.productId),
+    [products]
   );
 
   return (
-    <div>
+    <div
+      className="po-matrix-container"
+      style={{
+        width: '100%',
+        height: '100%',
+        maxHeight: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        minHeight: 0,
+        flex: 1,
+        overflow: 'hidden',
+      }}
+    >
       {/* Toast Notification */}
       <AdminToast toast={toast} onClose={() => setToast(null)} />
 
-      {/* Page Header */}
-      <div className="admin-page-header">
+      {/* ── Page Header theo chuẩn PoList / SupplierListPage ── */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: 12,
+          marginBottom: 8,
+          flexShrink: 0,
+        }}
+      >
         <div>
-          <h1 style={{ display: 'flex', alignItems: 'center', margin: 0, lineHeight: 1.25 }}>
-            <Layers size={20} style={{ verticalAlign: 'middle', marginRight: 8, color: 'var(--blue-primary)' }} />
-            Sản Phẩm Theo Nhà Cung Cấp
+          <h1
+            style={{
+              fontSize: 20,
+              fontWeight: 800,
+              color: 'var(--text-main)',
+              margin: 0,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+            }}
+          >
+            <Layers size={22} color="var(--blue-primary, #0f766e)" />
+            <span>Sản Phẩm Theo Nhà Cung Cấp</span>
+            {isLoading && <Loader2 size={16} className="animate-spin" style={{ color: 'var(--blue-primary, #0f766e)' }} />}
           </h1>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+
+        {/* Action buttons */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <Link
+            to="/store-owner/suppliers"
+            className="po-btn po-btn-secondary"
+            style={{ height: 32, padding: '0 14px', textDecoration: 'none' }}
+            title="Quay lại danh sách nhà cung cấp"
+          >
+            <Building2 size={14} />
+            <span>Danh sách NCC</span>
+          </Link>
+          <button
+            type="button"
+            className="po-btn po-btn-secondary"
+            style={{ height: 32, padding: '0 14px' }}
+            onClick={() => showToast('Đang kết xuất danh mục mặt hàng NCC ra tệp Excel (.xlsx)...', 'info')}
+          >
+            <Download size={14} />
+            <span>Xuất Excel</span>
+          </button>
           <button
             type="button"
             id="btnOpenAssignProductModal"
-            className="admin-btn admin-btn-primary"
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6,
-              height: 38,
-              padding: '0 18px',
-              borderRadius: 'var(--radius-pill)',
-              whiteSpace: 'nowrap',
-              boxSizing: 'border-box',
-            }}
+            className="po-btn po-btn-primary"
+            style={{ height: 32, padding: '0 14px' }}
             onClick={() => setIsAssignModalOpen(true)}
           >
-            <PlusIcon size={14} />
+            <Plus size={14} />
             <span>Gán sản phẩm mới</span>
           </button>
         </div>
       </div>
 
-      {/* Context Card: Only displayed when a specific supplier is filtered */}
+      {/* ── Context Card: Hiển thị khi lọc theo 1 NCC cụ thể ── */}
       {appliedFilters.supplierId !== 'ALL' && (
-        <SupplierContextCard
-          supplier={currentSupplier}
-          suppliers={suppliers}
-          onSelectSupplier={(newId) =>
-            setAppliedFilters((prev) => ({ ...prev, supplierId: newId }))
-          }
-          productCount={rawProducts.length}
-        />
+        <div style={{ flexShrink: 0, marginBottom: 8 }}>
+          <SupplierContextCard
+            supplier={currentSupplier}
+            suppliers={suppliers}
+            onSelectSupplier={(newId) =>
+              setAppliedFilters((prev) => ({ ...prev, supplierId: newId, pageIndex: 1 }))
+            }
+            productCount={totalCount}
+          />
+        </div>
       )}
 
-      {/* Unified Filters & Search Component - All filters in ONE component and requires clicking search */}
-      <SupplierProductFilterBar
-        initialValues={appliedFilters}
-        suppliers={suppliers}
-        categories={availableCategories}
-        totalCount={rawProducts.length}
-        filteredCount={filteredProducts.length}
-        onSearch={handleApplySearch}
-        onReset={handleResetFilters}
-      />
+      {/* ── UNIFIED FILTER BAR THEO CHUẨN SUPPLIER LIST ── */}
+      <div style={{ flexShrink: 0, marginBottom: 8 }}>
+        <SupplierProductFilterBar
+          initialValues={appliedFilters}
+          suppliers={suppliers}
+          categories={availableCategories}
+          totalCount={totalCount}
+          filteredCount={products.length}
+          onSearch={handleApplySearch}
+          onReset={handleResetFilters}
+        />
+      </div>
 
-      {/* Data Table */}
+      {/* ── MAIN DATA TABLE WITH FIXED HEADER & INTEGRATED PAGING ── */}
       <SupplierProductTable
-        products={filteredProducts}
+        products={products}
         suppliers={suppliers}
+        totalCount={totalCount}
+        pageIndex={appliedFilters.pageIndex}
+        pageSize={appliedFilters.pageSize}
+        onPageChange={handlePageChange}
+        onPageSizeChange={handlePageSizeChange}
         onEdit={(item) => setEditingItem(item)}
         onToggleStatus={handleToggleStatus}
+        onSetPrimary={handleSetPrimary}
         onOpenAssignModal={() => setIsAssignModalOpen(true)}
       />
 
@@ -297,3 +342,5 @@ export const SupplierProductManagementPage: FC = () => {
     </div>
   );
 };
+
+export default SupplierProductManagementPage;

@@ -7,6 +7,7 @@
 @import "./styles/admin.css";
 @import "./styles/auth.css";
 @import "./styles/dashboard.css";
+@import "./styles/store-hub.css";
 
 :root {
   /* Brand Deep Teal Palette - MÃ MÀU CHỦ ĐẠO TOÀN DỰ ÁN (#0F766E) */
@@ -104,4 +105,33 @@ textarea {
 .font-mono,
 .tabular-nums.font-mono {
   font-family: var(--font-mono) !important;
+}
+
+/* ── Custom Sleek Thin Scrollbar toàn dự án ── */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+  transition: background-color 0.15s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
 }

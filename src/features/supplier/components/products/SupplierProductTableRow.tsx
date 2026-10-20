@@ -1,16 +1,15 @@
 import type { FC } from 'react';
 import type { SupplierProductItem } from '../../types/supplier.types';
-import { Edit2, Power } from 'lucide-react';
+import { Edit2, Power, Star } from 'lucide-react';
 
 interface SupplierProductTableRowProps {
   index: number;
   item: SupplierProductItem;
   supplierCode?: string;
   supplierName?: string;
-  isSelected?: boolean;
-  onToggleSelect?: (id: string) => void;
   onEdit: (item: SupplierProductItem) => void;
   onToggleStatus: (item: SupplierProductItem) => void;
+  onSetPrimary?: (item: SupplierProductItem) => void;
 }
 
 export const SupplierProductTableRow: FC<SupplierProductTableRowProps> = ({
@@ -18,10 +17,9 @@ export const SupplierProductTableRow: FC<SupplierProductTableRowProps> = ({
   item,
   supplierCode,
   supplierName,
-  isSelected = false,
-  onToggleSelect,
   onEdit,
   onToggleStatus,
+  onSetPrimary,
 }) => {
   const fmtCurrency = (val: number) => new Intl.NumberFormat('vi-VN').format(val) + ' đ';
 
@@ -29,72 +27,91 @@ export const SupplierProductTableRow: FC<SupplierProductTableRowProps> = ({
     <tr
       style={{
         borderBottom: '1px solid #f1f5f9',
-        transition: 'background-color 0.15s ease',
+        backgroundColor: '#ffffff',
+        transition: 'background-color 0.12s ease',
         opacity: item.status === 'Inactive' ? 0.65 : 1,
       }}
       onMouseEnter={(e) => {
         e.currentTarget.style.backgroundColor = '#f8fafc';
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.backgroundColor = 'transparent';
+        e.currentTarget.style.backgroundColor = '#ffffff';
       }}
     >
-      {/* Checkbox */}
-      <td style={{ textAlign: 'center', padding: '10px 4px' }}>
-        <input
-          type="checkbox"
-          checked={isSelected}
-          onChange={() => onToggleSelect?.(item.id)}
-        />
-      </td>
-
       {/* 1. STT */}
-      <td style={{ padding: '12px 14px', textAlign: 'center', fontSize: '0.8rem', color: '#94a3b8' }}>
+      <td style={{ padding: '10px 12px', textAlign: 'center', fontSize: 12, color: '#94a3b8' }}>
         {index}
       </td>
 
       {/* 2. Barcode */}
-      <td style={{ padding: '12px 14px', whiteSpace: 'nowrap' }}>
+      <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>
         <span
           style={{
-            fontFamily: 'var(--font-mono)',
-            fontSize: '0.82rem',
-            fontWeight: 500,
+            fontFamily: 'var(--font-mono, monospace)',
+            fontSize: 12,
+            fontWeight: 600,
             color: '#334155',
           }}
         >
-          {item.barcode}
+          {item.barcode || '---'}
         </span>
       </td>
 
-      {/* 3. Tách cột Mã SKU riêng */}
-      <td style={{ padding: '12px 14px', whiteSpace: 'nowrap' }}>
+      {/* 3. SKU */}
+      <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>
         <span
           style={{
-            fontFamily: 'var(--font-mono)',
-            fontSize: '0.82rem',
-            fontWeight: 600,
-            color: 'var(--blue-primary)',
+            fontFamily: 'var(--font-mono, monospace)',
+            fontSize: 12,
+            fontWeight: 700,
+            color: '#0f766e',
+            backgroundColor: '#f0fdfa',
+            padding: '2px 6px',
+            borderRadius: 4,
+            border: '1px solid #ccfbf1',
           }}
         >
           {item.sku}
         </span>
       </td>
 
-      {/* 4. Tách cột Tên Sản Phẩm riêng */}
-      <td style={{ padding: '12px 14px' }}>
-        <div style={{ fontWeight: 600, color: '#0f172a', fontSize: '0.88rem' }}>
-          {item.name}
+      {/* 4. Tên Sản Phẩm + Primary Badge */}
+      <td style={{ padding: '10px 12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+          <span style={{ fontWeight: 600, color: '#0f172a', fontSize: 13, lineHeight: 1.35 }}>
+            {item.name}
+          </span>
+          {item.isPrimary && (
+            <span
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 3,
+                fontSize: 10.5,
+                fontWeight: 700,
+                color: '#b45309',
+                backgroundColor: '#fef3c7',
+                border: '1px solid #fde68a',
+                padding: '1px 6px',
+                borderRadius: 4,
+                whiteSpace: 'nowrap',
+              }}
+              title="Nhà cung cấp chính cho mặt hàng này"
+            >
+              <Star size={10} fill="#b45309" color="#b45309" />
+              <span>NCC Chính</span>
+            </span>
+          )}
         </div>
       </td>
 
-      {/* 5. Tách cột Mã Nhà Cung Cấp riêng */}
-      <td style={{ padding: '12px 14px', whiteSpace: 'nowrap' }}>
+      {/* 5. Mã NCC */}
+      <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>
         <div>
           <span
             style={{
-              fontFamily: 'var(--font-mono)',
-              fontSize: '0.82rem',
+              fontFamily: 'var(--font-mono, monospace)',
+              fontSize: 12,
               fontWeight: 600,
               color: '#475569',
             }}
@@ -104,10 +121,10 @@ export const SupplierProductTableRow: FC<SupplierProductTableRowProps> = ({
           {item.supplierProductCode && (
             <div
               style={{
-                fontSize: '0.72rem',
+                fontSize: 11,
                 color: '#94a3b8',
-                marginTop: 3,
-                fontFamily: 'var(--font-mono)',
+                marginTop: 2,
+                fontFamily: 'var(--font-mono, monospace)',
               }}
               title="Mã sản phẩm của Nhà cung cấp"
             >
@@ -117,41 +134,44 @@ export const SupplierProductTableRow: FC<SupplierProductTableRowProps> = ({
         </div>
       </td>
 
-      {/* 6. Tách cột Tên Nhà Cung Cấp riêng */}
-      <td style={{ padding: '12px 14px' }}>
-        <div style={{ fontSize: '0.85rem', fontWeight: 500, color: '#1e293b' }}>
+      {/* 6. Tên Nhà Cung Cấp */}
+      <td style={{ padding: '10px 12px' }}>
+        <div style={{ fontSize: 12.5, fontWeight: 500, color: '#1e293b' }}>
           {supplierName || '---'}
         </div>
       </td>
 
       {/* 7. Ngành Hàng */}
-      <td style={{ padding: '12px 14px', whiteSpace: 'nowrap' }}>
+      <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>
         <span
           style={{
-            fontSize: '0.82rem',
+            fontSize: 12,
             color: '#475569',
             fontWeight: 500,
+            backgroundColor: '#f1f5f9',
+            padding: '2px 8px',
+            borderRadius: 4,
           }}
         >
           {item.categoryName || 'Chung'}
         </span>
       </td>
 
-      {/* 8. Delivery UoM */}
-      <td style={{ padding: '12px 14px', textAlign: 'center', whiteSpace: 'nowrap' }}>
-        <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#1e293b' }}>
+      {/* 8. ĐVT */}
+      <td style={{ padding: '10px 12px', textAlign: 'center', whiteSpace: 'nowrap' }}>
+        <span style={{ fontSize: 12, fontWeight: 600, color: '#1e293b' }}>
           {item.deliveryUoM}
         </span>
       </td>
 
-      {/* 9. Agreed Wholesale Price */}
-      <td style={{ padding: '12px 14px', textAlign: 'right', whiteSpace: 'nowrap' }}>
+      {/* 9. Giá Nhập Sỉ */}
+      <td style={{ padding: '10px 12px', textAlign: 'right', whiteSpace: 'nowrap' }}>
         <span
           style={{
-            fontFamily: 'var(--font-mono)',
-            fontSize: '0.92rem',
+            fontFamily: 'var(--font-mono, monospace)',
+            fontSize: 12.5,
             fontWeight: 700,
-            color: 'var(--blue-primary)',
+            color: '#0f766e',
           }}
         >
           {fmtCurrency(item.agreedPrice)}
@@ -159,11 +179,11 @@ export const SupplierProductTableRow: FC<SupplierProductTableRowProps> = ({
       </td>
 
       {/* 10. MOQ */}
-      <td style={{ padding: '12px 14px', textAlign: 'right', whiteSpace: 'nowrap' }}>
+      <td style={{ padding: '10px 12px', textAlign: 'right', whiteSpace: 'nowrap' }}>
         <span
           style={{
-            fontFamily: 'var(--font-mono)',
-            fontSize: '0.85rem',
+            fontFamily: 'var(--font-mono, monospace)',
+            fontSize: 12,
             color: '#475569',
           }}
         >
@@ -171,43 +191,94 @@ export const SupplierProductTableRow: FC<SupplierProductTableRowProps> = ({
         </span>
       </td>
 
-      {/* 11. Status */}
-      <td style={{ padding: '12px 14px', textAlign: 'left', whiteSpace: 'nowrap' }}>
+      {/* 11. Trạng Thái */}
+      <td style={{ padding: '10px 12px', textAlign: 'center', whiteSpace: 'nowrap' }}>
         <span
           style={{
             display: 'inline-flex',
             alignItems: 'center',
-            fontSize: 13,
-            fontWeight: 500,
-            color: item.status === 'Active' ? '#16a34a' : '#64748b',
+            fontSize: 11.5,
+            fontWeight: 600,
+            padding: '2px 8px',
+            borderRadius: 12,
+            color: item.status === 'Active' ? '#0f766e' : '#64748b',
+            backgroundColor: item.status === 'Active' ? '#f0fdfa' : '#f1f5f9',
+            border: item.status === 'Active' ? '1px solid #ccfbf1' : '1px solid #e2e8f0',
           }}
         >
-          {item.status === 'Active' ? 'Hoạt động' : 'Tạm ngưng'}
+          {item.status === 'Active' ? '🟢 Hoạt động' : '⚪ Tạm ngưng'}
         </span>
       </td>
 
-      {/* 12. Actions */}
-      <td style={{ padding: '12px 14px', textAlign: 'right', whiteSpace: 'nowrap' }}>
+      {/* 12. Thao Tác */}
+      <td style={{ padding: '10px 12px', textAlign: 'right', whiteSpace: 'nowrap' }}>
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+          {onSetPrimary && !item.isPrimary && item.status === 'Active' && (
+            <button
+              type="button"
+              onClick={() => onSetPrimary(item)}
+              title="Đặt làm Nhà cung cấp chính (Primary Supplier)"
+              style={{
+                height: 26,
+                padding: '0 6px',
+                borderRadius: 4,
+                border: '1px solid #fde68a',
+                backgroundColor: '#fef3c7',
+                color: '#b45309',
+                fontSize: 11.5,
+                fontWeight: 600,
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 3,
+              }}
+            >
+              <Star size={11} /> Primary
+            </button>
+          )}
+
           <button
             type="button"
             onClick={() => onEdit(item)}
-            title="Sửa giá & số lượng tối thiểu"
-            className="admin-table-btn"
+            title="Sửa giá sỉ thỏa thuận & MOQ"
+            style={{
+              height: 26,
+              padding: '0 8px',
+              borderRadius: 4,
+              border: '1px solid #cbd5e1',
+              backgroundColor: '#ffffff',
+              color: '#334155',
+              fontSize: 11.5,
+              fontWeight: 600,
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 4,
+            }}
           >
-            <Edit2 size={12} /> Sửa
+            <Edit2 size={11} /> Sửa
           </button>
 
           <button
             type="button"
             onClick={() => onToggleStatus(item)}
-            title={item.status === 'Active' ? 'Tạm ngưng phân phối' : 'Kích hoạt lại'}
-            className="admin-table-btn"
+            title={item.status === 'Active' ? 'Tạm ngưng cung ứng mặt hàng này' : 'Kích hoạt lại'}
             style={{
+              height: 26,
+              padding: '0 8px',
+              borderRadius: 4,
+              border: item.status === 'Active' ? '1px solid #fecaca' : '1px solid #bbf7d0',
+              backgroundColor: item.status === 'Active' ? '#fef2f2' : '#f0fdf4',
               color: item.status === 'Active' ? '#dc2626' : '#16a34a',
+              fontSize: 11.5,
+              fontWeight: 600,
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 4,
             }}
           >
-            <Power size={12} /> {item.status === 'Active' ? 'Ngưng' : 'Bật'}
+            <Power size={11} /> {item.status === 'Active' ? 'Ngưng' : 'Bật'}
           </button>
         </div>
       </td>

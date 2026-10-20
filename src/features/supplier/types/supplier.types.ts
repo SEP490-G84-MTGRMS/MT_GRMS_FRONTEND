@@ -83,6 +83,7 @@ export interface CreateSupplierInput {
   bankAccount?: string;
   accountHolder?: string;
   note?: string;
+  linkedCustomerId?: string;
 }
 
 export type UpdateSupplierInput = Partial<CreateSupplierInput> & { id: string };
