@@ -126,7 +126,7 @@ export const StoreSettingsHubPage: FC = () => {
     <div className="store-hub-container">
 
       {/* Main Workspace */}
-      <main className="store-hub-main">
+      <div className="store-hub-main">
         {/* Top Status Bar */}
         <StoreTopStatusBar
           storeInfo={storeInfo}
@@ -167,7 +167,7 @@ export const StoreSettingsHubPage: FC = () => {
         {activeTab === 'service-confirm' && (
           <OrderHistoryTab isServiceConfirmation={true} />
         )}
-      </main>
+      </div>
 
       {/* Modal Checkout */}
       {selectedPlanForCheckout && (

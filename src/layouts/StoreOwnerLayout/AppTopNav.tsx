@@ -21,6 +21,9 @@ import {
   Palette,
   LogOut,
   ChevronRight,
+  Wallet,
+  QrCode,
+  FileText,
 } from "lucide-react";
 import { useAuthStore } from "../../stores/useAuthStore";
 
@@ -122,23 +125,6 @@ const NAV_GROUPS: NavGroup[] = [
           {
             label: "Bản xác nhận dịch vụ",
             to: "/store-owner/subscriptions?tab=service-confirm",
-          },
-        ],
-      },
-      {
-        title: "Ví gian hàng & Hợp đồng",
-        items: [
-          {
-            label: "Sổ quỹ ví gian hàng",
-            to: "/store-owner/account?tab=wallet",
-          },
-          {
-            label: "Nạp tiền ví VietQR",
-            to: "/store-owner/account?tab=wallet&action=topup",
-          },
-          {
-            label: "Điều khoản & Hợp đồng",
-            to: "/store-owner/account?tab=terms",
           },
         ],
       },
@@ -675,7 +661,11 @@ const NavDropdown: FC<DropdownProps> = ({
             "0 12px 36px rgba(0, 30, 90, 0.15), 0 2px 8px rgba(0, 30, 90, 0.06)",
           border: "1px solid var(--border-light)",
           padding: isMega ? "18px 24px" : "8px 0",
-          minWidth: isMega ? 680 : 210,
+          minWidth: isMega
+            ? sections && sections.length <= 2
+              ? 460
+              : 680
+            : 210,
           overflow: "hidden",
           display: isMega ? "flex" : "block",
           gap: isMega ? 20 : 0,
@@ -809,7 +799,9 @@ const NavDropdown: FC<DropdownProps> = ({
                     textDecoration: "none",
                     fontSize: "13.5px",
                     fontWeight: isActive ? 700 : 500,
-                    color: isActive ? "var(--blue-primary)" : "var(--text-muted)",
+                    color: isActive
+                      ? "var(--blue-primary)"
+                      : "var(--text-muted)",
                     backgroundColor: isActive
                       ? "var(--blue-light)"
                       : "transparent",
@@ -817,74 +809,74 @@ const NavDropdown: FC<DropdownProps> = ({
                     position: "relative",
                     whiteSpace: "nowrap",
                   }}
-                onMouseEnter={(e) => {
-                  if (!isActive) {
-                    e.currentTarget.style.backgroundColor =
-                      "var(--bg-soft-blue)";
-                    e.currentTarget.style.color = "var(--text-main)";
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isActive) {
-                    e.currentTarget.style.backgroundColor = "transparent";
-                    e.currentTarget.style.color = "var(--text-muted)";
-                  }
-                }}
-              >
-                {isActive && (
-                  <span
-                    style={{
-                      position: "absolute",
-                      left: 0,
-                      top: "50%",
-                      transform: "translateY(-50%)",
-                      width: 3,
-                      height: 18,
-                      borderRadius: "0 3px 3px 0",
-                      backgroundColor: "var(--blue-primary)",
-                    }}
+                  onMouseEnter={(e) => {
+                    if (!isActive) {
+                      e.currentTarget.style.backgroundColor =
+                        "var(--bg-soft-blue)";
+                      e.currentTarget.style.color = "var(--text-main)";
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isActive) {
+                      e.currentTarget.style.backgroundColor = "transparent";
+                      e.currentTarget.style.color = "var(--text-muted)";
+                    }
+                  }}
+                >
+                  {isActive && (
+                    <span
+                      style={{
+                        position: "absolute",
+                        left: 0,
+                        top: "50%",
+                        transform: "translateY(-50%)",
+                        width: 3,
+                        height: 18,
+                        borderRadius: "0 3px 3px 0",
+                        backgroundColor: "var(--blue-primary)",
+                      }}
+                    />
+                  )}
+                  <ChevronRightIcon
+                    size={13}
+                    color={isActive ? "var(--blue-primary)" : "#bbb"}
+                    style={{ flexShrink: 0 }}
                   />
-                )}
-                <ChevronRightIcon
-                  size={13}
-                  color={isActive ? "var(--blue-primary)" : "#bbb"}
-                  style={{ flexShrink: 0 }}
-                />
-                <span style={{ flex: 1, whiteSpace: "nowrap" }}>
-                  {item.label}
-                </span>
-                {item.badge && (
-                  <span
-                    style={{
-                      fontSize: 10,
-                      fontWeight: 700,
-                      padding: "1px 7px",
-                      borderRadius: "var(--radius-pill)",
-                      backgroundColor:
-                        item.badgeType === "red"
-                          ? "#FF3B30"
-                          : isActive
-                            ? "rgba(15,118,110,0.15)"
-                            : "var(--blue-light)",
-                      color:
-                        item.badgeType === "red"
-                          ? "#ffffff"
-                          : "var(--blue-primary)",
-                      fontFamily:
-                        item.badgeType === "red"
-                          ? "var(--font-sans)"
-                          : "var(--font-mono)",
-                      flexShrink: 0,
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {item.badge}
+                  <span style={{ flex: 1, whiteSpace: "nowrap" }}>
+                    {item.label}
                   </span>
-                )}
-              </NavLink>
-            </Fragment>
-          );
-        })}
+                  {item.badge && (
+                    <span
+                      style={{
+                        fontSize: 10,
+                        fontWeight: 700,
+                        padding: "1px 7px",
+                        borderRadius: "var(--radius-pill)",
+                        backgroundColor:
+                          item.badgeType === "red"
+                            ? "#FF3B30"
+                            : isActive
+                              ? "rgba(15,118,110,0.15)"
+                              : "var(--blue-light)",
+                        color:
+                          item.badgeType === "red"
+                            ? "#ffffff"
+                            : "var(--blue-primary)",
+                        fontFamily:
+                          item.badgeType === "red"
+                            ? "var(--font-sans)"
+                            : "var(--font-mono)",
+                        flexShrink: 0,
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {item.badge}
+                    </span>
+                  )}
+                </NavLink>
+              </Fragment>
+            );
+          })}
       </div>
     </div>
   );
@@ -1535,7 +1527,7 @@ export const AppTopNav: FC = () => {
                 >
                   <div
                     style={{
-                      width: 260,
+                      width: 270,
                       backgroundColor: "#ffffff",
                       borderRadius: 14,
                       boxShadow:
@@ -1549,7 +1541,7 @@ export const AppTopNav: FC = () => {
                   >
                     {/* Row 1: Profile Summary */}
                     <Link
-                      to="/store-owner/account"
+                      to="/store-owner/account?tab=account-profile"
                       onClick={() => setAccountMenuOpen(false)}
                       style={{
                         display: "flex",
@@ -1614,25 +1606,18 @@ export const AppTopNav: FC = () => {
 
                     <div style={{ height: 1, backgroundColor: "#F1F5F9" }} />
 
-                    {/* Row 2: Tiếng Việt */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        alert(
-                          "Hệ thống đang hoạt động với ngôn ngữ Tiếng Việt.",
-                        );
-                        setAccountMenuOpen(false);
-                      }}
+                    {/* Ví gian hàng & Hợp đồng */}
+                    <Link
+                      to="/store-owner/account?tab=wallet"
+                      onClick={() => setAccountMenuOpen(false)}
                       style={{
                         display: "flex",
                         alignItems: "center",
                         gap: 12,
-                        padding: "12px 16px",
-                        border: "none",
-                        background: "none",
-                        width: "100%",
-                        cursor: "pointer",
-                        textAlign: "left",
+                        padding: "11px 16px",
+                        textDecoration: "none",
+                        color: "#1E293B",
+                        backgroundColor: "transparent",
                         transition: "background-color 0.15s ease",
                       }}
                       onMouseEnter={(e) => {
@@ -1642,7 +1627,7 @@ export const AppTopNav: FC = () => {
                         e.currentTarget.style.backgroundColor = "transparent";
                       }}
                     >
-                      <Globe size={18} strokeWidth={1.9} color="#334155" />
+                      <Wallet size={18} strokeWidth={1.9} color="#334155" />
                       <span
                         style={{
                           flex: 1,
@@ -1651,31 +1636,21 @@ export const AppTopNav: FC = () => {
                           color: "#1E293B",
                         }}
                       >
-                        Tiếng Việt
+                        Ví tiền
                       </span>
-                    </button>
+                    </Link>
 
-                    <div style={{ height: 1, backgroundColor: "#F1F5F9" }} />
-
-                    {/* Row 4: Chủ đề */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        alert(
-                          "Giao diện chuẩn KiotViet phong cách sáng (Light mode).",
-                        );
-                        setAccountMenuOpen(false);
-                      }}
+                    <Link
+                      to="/store-owner/account?tab=terms"
+                      onClick={() => setAccountMenuOpen(false)}
                       style={{
                         display: "flex",
                         alignItems: "center",
                         gap: 12,
-                        padding: "12px 16px",
-                        border: "none",
-                        background: "none",
-                        width: "100%",
-                        cursor: "pointer",
-                        textAlign: "left",
+                        padding: "11px 16px",
+                        textDecoration: "none",
+                        color: "#1E293B",
+                        backgroundColor: "transparent",
                         transition: "background-color 0.15s ease",
                       }}
                       onMouseEnter={(e) => {
@@ -1685,7 +1660,7 @@ export const AppTopNav: FC = () => {
                         e.currentTarget.style.backgroundColor = "transparent";
                       }}
                     >
-                      <Palette size={18} strokeWidth={1.9} color="#334155" />
+                      <FileText size={18} strokeWidth={1.9} color="#334155" />
                       <span
                         style={{
                           flex: 1,
@@ -1694,9 +1669,9 @@ export const AppTopNav: FC = () => {
                           color: "#1E293B",
                         }}
                       >
-                        Chủ đề
+                        Điều khoản & Hợp đồng
                       </span>
-                    </button>
+                    </Link>
 
                     <div style={{ height: 1, backgroundColor: "#F1F5F9" }} />
 

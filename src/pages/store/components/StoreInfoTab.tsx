@@ -43,7 +43,7 @@ export const StoreInfoTab: FC<StoreInfoTabProps> = ({
   };
 
   return (
-    <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 24 }}>
+    <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 14 }}>
       {/* Header Bar */}
       <div
         style={{
@@ -81,7 +81,7 @@ export const StoreInfoTab: FC<StoreInfoTabProps> = ({
         )}
       </div>
 
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         {/* Card 1: Thông tin pháp lý & Nhận diện */}
         <div className="profile-card">
           <div className="profile-card-header">
@@ -92,12 +92,12 @@ export const StoreInfoTab: FC<StoreInfoTabProps> = ({
             style={{
               display: 'grid',
               gridTemplateColumns: 'repeat(2, 1fr)',
-              gap: 20,
+              gap: 12,
             }}
           >
             {/* Tên chuỗi */}
             <div>
-              <label style={{ fontSize: 12.5, fontWeight: 700, color: '#334155', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+              <label style={{ fontSize: 12.5, fontWeight: 700, color: '#334155', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
                 <Store size={15} color="var(--blue-primary)" />
                 <span>Tên chuỗi cửa hàng / Gian hàng *</span>
               </label>
@@ -108,10 +108,10 @@ export const StoreInfoTab: FC<StoreInfoTabProps> = ({
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 style={{
                   width: '100%',
-                  padding: '10px 14px',
+                  padding: '8px 14px',
                   borderRadius: 'var(--radius-pill)',
                   border: '1px solid #CBD5E1',
-                  fontSize: 14,
+                  fontSize: 13.5,
                   boxSizing: 'border-box',
                 }}
               />
@@ -119,7 +119,7 @@ export const StoreInfoTab: FC<StoreInfoTabProps> = ({
 
             {/* Subdomain */}
             <div>
-              <label style={{ fontSize: 12.5, fontWeight: 700, color: '#334155', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+              <label style={{ fontSize: 12.5, fontWeight: 700, color: '#334155', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
                 <Globe size={15} color="var(--blue-primary)" />
                 <span>Tên miền con (Subdomain) *</span>
               </label>
@@ -131,11 +131,11 @@ export const StoreInfoTab: FC<StoreInfoTabProps> = ({
                   onChange={(e) => setFormData({ ...formData, subdomain: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') })}
                   style={{
                     flex: 1,
-                    padding: '10px 14px',
+                    padding: '8px 14px',
                     borderTopLeftRadius: 'var(--radius-pill)',
                     borderBottomLeftRadius: 'var(--radius-pill)',
                     border: '1px solid #CBD5E1',
-                    fontSize: 14,
+                    fontSize: 13.5,
                     boxSizing: 'border-box',
                     fontFamily: 'var(--font-mono)',
                   }}
@@ -145,7 +145,7 @@ export const StoreInfoTab: FC<StoreInfoTabProps> = ({
                     backgroundColor: '#F1F5F9',
                     border: '1px solid #CBD5E1',
                     borderLeft: 'none',
-                    padding: '10px 14px',
+                    padding: '8px 14px',
                     borderTopRightRadius: 'var(--radius-pill)',
                     borderBottomRightRadius: 'var(--radius-pill)',
                     fontSize: 13,
@@ -160,7 +160,7 @@ export const StoreInfoTab: FC<StoreInfoTabProps> = ({
 
             {/* Mã số thuế */}
             <div>
-              <label style={{ fontSize: 12.5, fontWeight: 700, color: '#334155', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+              <label style={{ fontSize: 12.5, fontWeight: 700, color: '#334155', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
                 <Building size={15} color="var(--blue-primary)" />
                 <span>Mã số thuế (MST)</span>
               </label>
@@ -170,10 +170,10 @@ export const StoreInfoTab: FC<StoreInfoTabProps> = ({
                 onChange={(e) => setFormData({ ...formData, taxCode: e.target.value })}
                 style={{
                   width: '100%',
-                  padding: '10px 14px',
+                  padding: '8px 14px',
                   borderRadius: 'var(--radius-pill)',
                   border: '1px solid #CBD5E1',
-                  fontSize: 14,
+                  fontSize: 13.5,
                   boxSizing: 'border-box',
                   fontFamily: 'var(--font-mono)',
                 }}
@@ -182,7 +182,7 @@ export const StoreInfoTab: FC<StoreInfoTabProps> = ({
 
             {/* Hotline */}
             <div>
-              <label style={{ fontSize: 12.5, fontWeight: 700, color: '#334155', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+              <label style={{ fontSize: 12.5, fontWeight: 700, color: '#334155', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
                 <Phone size={15} color="var(--blue-primary)" />
                 <span>Hotline liên hệ / Chăm sóc khách hàng</span>
               </label>
@@ -192,10 +192,10 @@ export const StoreInfoTab: FC<StoreInfoTabProps> = ({
                 onChange={(e) => setFormData({ ...formData, hotline: e.target.value })}
                 style={{
                   width: '100%',
-                  padding: '10px 14px',
+                  padding: '8px 14px',
                   borderRadius: 'var(--radius-pill)',
                   border: '1px solid #CBD5E1',
-                  fontSize: 14,
+                  fontSize: 13.5,
                   boxSizing: 'border-box',
                   fontFamily: 'var(--font-mono)',
                 }}
@@ -204,7 +204,7 @@ export const StoreInfoTab: FC<StoreInfoTabProps> = ({
 
             {/* Email hóa đơn */}
             <div>
-              <label style={{ fontSize: 12.5, fontWeight: 700, color: '#334155', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+              <label style={{ fontSize: 12.5, fontWeight: 700, color: '#334155', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
                 <Mail size={15} color="var(--blue-primary)" />
                 <span>Email tiếp nhận thông báo & hóa đơn điện tử</span>
               </label>
@@ -214,10 +214,10 @@ export const StoreInfoTab: FC<StoreInfoTabProps> = ({
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                 style={{
                   width: '100%',
-                  padding: '10px 14px',
+                  padding: '8px 14px',
                   borderRadius: 'var(--radius-pill)',
                   border: '1px solid #CBD5E1',
-                  fontSize: 14,
+                  fontSize: 13.5,
                   boxSizing: 'border-box',
                 }}
               />
@@ -225,7 +225,7 @@ export const StoreInfoTab: FC<StoreInfoTabProps> = ({
 
             {/* Tỉnh / Thành phố */}
             <div>
-              <label style={{ fontSize: 12.5, fontWeight: 700, color: '#334155', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+              <label style={{ fontSize: 12.5, fontWeight: 700, color: '#334155', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
                 <MapPin size={15} color="var(--blue-primary)" />
                 <span>Tỉnh / Thành phố</span>
               </label>
@@ -235,10 +235,10 @@ export const StoreInfoTab: FC<StoreInfoTabProps> = ({
                 onChange={(e) => setFormData({ ...formData, city: e.target.value })}
                 style={{
                   width: '100%',
-                  padding: '10px 14px',
+                  padding: '8px 14px',
                   borderRadius: 'var(--radius-pill)',
                   border: '1px solid #CBD5E1',
-                  fontSize: 14,
+                  fontSize: 13.5,
                   boxSizing: 'border-box',
                 }}
               />
@@ -246,7 +246,7 @@ export const StoreInfoTab: FC<StoreInfoTabProps> = ({
 
             {/* Địa chỉ trụ sở chính */}
             <div style={{ gridColumn: '1 / -1' }}>
-              <label style={{ fontSize: 12.5, fontWeight: 700, color: '#334155', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+              <label style={{ fontSize: 12.5, fontWeight: 700, color: '#334155', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
                 <MapPin size={15} color="var(--blue-primary)" />
                 <span>Địa chỉ trụ sở chính</span>
               </label>
@@ -256,10 +256,10 @@ export const StoreInfoTab: FC<StoreInfoTabProps> = ({
                 onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                 style={{
                   width: '100%',
-                  padding: '10px 14px',
+                  padding: '8px 14px',
                   borderRadius: 'var(--radius-pill)',
                   border: '1px solid #CBD5E1',
-                  fontSize: 14,
+                  fontSize: 13.5,
                   boxSizing: 'border-box',
                 }}
               />
@@ -277,7 +277,7 @@ export const StoreInfoTab: FC<StoreInfoTabProps> = ({
             style={{
               display: 'grid',
               gridTemplateColumns: 'repeat(3, 1fr)',
-              gap: 20,
+              gap: 16,
             }}
           >
             <div className="profile-info-item">
@@ -314,7 +314,7 @@ export const StoreInfoTab: FC<StoreInfoTabProps> = ({
               display: 'inline-flex',
               alignItems: 'center',
               gap: 8,
-              padding: '12px 28px',
+              padding: '10px 24px',
               borderRadius: 'var(--radius-pill)',
               backgroundColor: 'var(--blue-primary)',
               color: '#FFFFFF',

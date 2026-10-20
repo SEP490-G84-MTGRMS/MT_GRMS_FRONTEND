@@ -23,7 +23,7 @@ export const StoreOwnerLayout: FC = () => {
           flex: 1,
           width: '100%',
           boxSizing: 'border-box',
-          padding: '28px 32px 48px 32px',
+          padding: '16px 32px 20px 32px',
           maxWidth: '100%',
           overflowX: 'hidden',
         }}

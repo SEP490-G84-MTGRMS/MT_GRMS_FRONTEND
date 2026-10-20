@@ -3,8 +3,7 @@
 
 .store-hub-container {
   display: flex;
-  min-height: calc(100vh - 68px);
-  background-color: #F8FAFC;
+  width: 100%;
   font-family: var(--font-sans);
 }
 
@@ -77,8 +76,9 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  padding: 28px 36px 60px 36px;
-  overflow-y: auto;
+  width: 100%;
+  min-width: 0;
+  padding: 0;
 }
 
 /* Top Status Bar matching KiotViet screenshot */
@@ -86,13 +86,13 @@
   background-color: #FFFFFF;
   border: 1px solid #EDF2F9;
   border-radius: 20px;
-  padding: 18px 28px;
+  padding: 12px 24px;
   display: grid;
   grid-template-columns: repeat(4, 1fr) auto;
   align-items: center;
-  gap: 24px;
+  gap: 20px;
   box-shadow: 0 4px 16px rgba(0, 30, 90, 0.03);
-  margin-bottom: 28px;
+  margin-bottom: 16px;
 }
 
 .store-status-col {
@@ -276,15 +276,15 @@
 .profile-screen-container {
   display: flex;
   flex-direction: column;
-  gap: 24px;
-  max-width: 900px;
+  gap: 20px;
+  width: 100%;
 }
 
 .profile-card {
   background-color: #FFFFFF;
   border: 1px solid #EDF2F9;
   border-radius: 20px;
-  padding: 24px 28px;
+  padding: 18px 24px;
   box-shadow: 0 4px 16px rgba(0, 30, 90, 0.03);
 }
 
@@ -292,7 +292,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 20px;
+  margin-bottom: 14px;
 }
 
 .profile-card-title {

@@ -11,14 +11,14 @@ import {
   type UserSessionItem,
   type WalletTransaction,
 } from './storeData';
-import { AccountSidebarNav, type AccountTabKey } from './components/AccountSidebarNav';
+import type { AccountTabKey } from './components/AccountSidebarNav';
 import { AccountProfileTab } from './components/AccountProfileTab';
 import { WalletLedgerTab } from './components/WalletLedgerTab';
 import { TermsOfServiceTab } from './components/TermsOfServiceTab';
 import { StoreWalletTopupModal } from './components/StoreWalletTopupModal';
 
 export const AccountManagementPage: FC = () => {
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
   const tabParam = searchParams.get('tab') as AccountTabKey | null;
 
   const [activeTab, setActiveTab] = useState<AccountTabKey>(
@@ -39,10 +39,11 @@ export const AccountManagementPage: FC = () => {
     }
   }, [tabParam, activeTab]);
 
-  const handleSelectTab = (tab: AccountTabKey) => {
-    setActiveTab(tab);
-    setSearchParams({ tab });
-  };
+  useEffect(() => {
+    if (searchParams.get('action') === 'topup') {
+      setShowTopupModal(true);
+    }
+  }, [searchParams]);
 
   const handleUpdateUserProfile = (updated: Partial<UserProfile>) => {
     setUserProfile((prev) => ({ ...prev, ...updated }));
@@ -78,11 +79,8 @@ export const AccountManagementPage: FC = () => {
 
   return (
     <div className="store-hub-container">
-      {/* Sidebar điều hướng tài khoản */}
-      <AccountSidebarNav activeTab={activeTab} onSelectTab={handleSelectTab} />
-
       {/* Nội dung chính tương ứng từng tab */}
-      <main style={{ flex: 1, minWidth: 0 }}>
+      <div style={{ width: '100%', minWidth: 0 }}>
         {activeTab === 'account-profile' && (
           <AccountProfileTab
             userProfile={userProfile}
@@ -101,7 +99,7 @@ export const AccountManagementPage: FC = () => {
         )}
 
         {activeTab === 'terms' && <TermsOfServiceTab />}
-      </main>
+      </div>
 
       {/* Modal Nạp ví VietQR */}
       {showTopupModal && (
