@@ -49,6 +49,19 @@ export const mapBackendBranchToListItem = (item: BranchBackendDto): BranchListIt
   };
 };
 
+const parseDateString = (dateStr: string): Date | null => {
+  if (!dateStr || dateStr === '—') return null;
+  const parts = dateStr.trim().split(' ');
+  if (!parts[0]) return null;
+  const dmy = parts[0].split('/');
+  if (dmy.length !== 3) return null;
+  const day = parseInt(dmy[0], 10);
+  const month = parseInt(dmy[1], 10) - 1;
+  const year = parseInt(dmy[2], 10);
+  if (isNaN(day) || isNaN(month) || isNaN(year)) return null;
+  return new Date(year, month, day);
+};
+
 export const branchApi = {
   /**
    * Truy vấn danh sách chi nhánh có phân trang và bộ lọc (REQ-BR-01, REQ-BR-03)
@@ -102,6 +115,20 @@ export const branchApi = {
 
       if (filter.status && filter.status !== 'all' && b.status !== filter.status) {
         return false;
+      }
+
+      if (filter.dateFrom) {
+        const from = new Date(filter.dateFrom);
+        from.setHours(0, 0, 0, 0);
+        const itemDate = parseDateString(b.lastUpdated);
+        if (!itemDate || itemDate < from) return false;
+      }
+
+      if (filter.dateTo) {
+        const to = new Date(filter.dateTo);
+        to.setHours(23, 59, 59, 999);
+        const itemDate = parseDateString(b.lastUpdated);
+        if (!itemDate || itemDate > to) return false;
       }
 
       return true;

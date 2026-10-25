@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import type { FC } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Building2, History, Download, Loader2 } from 'lucide-react';
+import { Building2, History, Download, Plus, Loader2 } from 'lucide-react';
 import type { BranchListItem, BranchFilterState } from '../types/po.types';
 import { BranchFilterBar } from '../components/branch/BranchFilterBar';
 import { BranchOrderTable } from '../components/branch/BranchOrderTable';
@@ -9,6 +9,7 @@ import { BranchDetailModal } from '../components/branch/BranchDetailModal';
 import { AdminToast, type ToastState } from '../../admin/components';
 import { branchApi } from '../api/branchApi';
 import '../purchase-order.css';
+import '../../supplier/supplier.css';
 
 const DEFAULT_FILTERS: BranchFilterState = {
   keyword: '',
@@ -52,6 +53,8 @@ export const BranchOrderListPage: FC = () => {
         keyword: appliedFilters.keyword,
         branchCode: appliedFilters.branchCode,
         status: appliedFilters.status,
+        dateFrom: appliedFilters.dateFrom,
+        dateTo: appliedFilters.dateTo,
         pageIndex: appliedFilters.pageIndex,
         pageSize: appliedFilters.pageSize,
       });
@@ -152,7 +155,7 @@ export const BranchOrderListPage: FC = () => {
           </h1>
         </div>
 
-        {/* Action buttons */}
+        {/* Action buttons đồng bộ chuẩn SupplierListPage */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <Link
             to="/store-owner/purchase-orders/list"
@@ -173,6 +176,16 @@ export const BranchOrderListPage: FC = () => {
             <Download size={14} />
             <span>Xuất Excel</span>
           </button>
+
+          <Link
+            to="/store-owner/purchase-orders/create-matrix"
+            className="po-btn po-btn-primary"
+            style={{ height: 32, padding: '0 14px', textDecoration: 'none' }}
+            title="Tạo mới ma trận đặt hàng mua từ nhà cung cấp"
+          >
+            <Plus size={14} />
+            <span>Tạo đơn đặt hàng</span>
+          </Link>
         </div>
       </div>
 

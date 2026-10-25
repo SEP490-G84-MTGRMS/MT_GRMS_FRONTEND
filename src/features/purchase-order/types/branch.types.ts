@@ -4,6 +4,8 @@ export interface BranchFilterParams {
   keyword?: string;
   branchCode?: string;
   status?: 'all' | 'active' | 'inactive';
+  dateFrom?: string;
+  dateTo?: string;
   pageIndex?: number;
   pageSize?: number;
 }

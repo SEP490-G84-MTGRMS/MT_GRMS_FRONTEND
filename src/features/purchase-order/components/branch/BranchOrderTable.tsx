@@ -133,13 +133,13 @@ export const BranchOrderTable: FC<BranchOrderTableProps> = ({
 
   const tableColGroup = (
     <colgroup>
-      <col style={{ width: '10%' }} />
-      <col style={{ width: '28%' }} />
-      <col style={{ width: '18%' }} />
-      <col style={{ width: '14%' }} />
-      <col style={{ width: '13%' }} />
       <col style={{ width: '9%' }} />
-      <col style={{ width: '8%' }} />
+      <col style={{ width: '27%' }} />
+      <col style={{ width: '18%' }} />
+      <col style={{ width: '13%' }} />
+      <col style={{ width: '12%' }} />
+      <col style={{ width: '10%' }} />
+      <col style={{ width: '11%' }} />
     </colgroup>
   );
 
@@ -162,7 +162,8 @@ export const BranchOrderTable: FC<BranchOrderTableProps> = ({
           style={{
             display: 'inline-flex',
             alignItems: 'center',
-            padding: '3px 9px',
+            gap: 5,
+            padding: '3px 10px',
             borderRadius: 12,
             fontSize: 12,
             fontWeight: 600,
@@ -171,7 +172,8 @@ export const BranchOrderTable: FC<BranchOrderTableProps> = ({
             whiteSpace: 'nowrap',
           }}
         >
-          Hoạt động
+          <span style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: '#16a34a' }} />
+          <span>Hoạt động</span>
         </span>
       );
     }
@@ -180,7 +182,8 @@ export const BranchOrderTable: FC<BranchOrderTableProps> = ({
         style={{
           display: 'inline-flex',
           alignItems: 'center',
-          padding: '3px 9px',
+          gap: 5,
+          padding: '3px 10px',
           borderRadius: 12,
           fontSize: 12,
           fontWeight: 600,
@@ -189,7 +192,8 @@ export const BranchOrderTable: FC<BranchOrderTableProps> = ({
           whiteSpace: 'nowrap',
         }}
       >
-        Ngừng hoạt động
+        <span style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: '#94a3b8' }} />
+        <span>Ngừng hoạt động</span>
       </span>
     );
   };
@@ -225,7 +229,7 @@ export const BranchOrderTable: FC<BranchOrderTableProps> = ({
         <table
           style={{
             width: '100%',
-            minWidth: 980,
+            minWidth: 1000,
             tableLayout: 'fixed',
             borderCollapse: 'separate',
             borderSpacing: 0,
@@ -328,13 +332,14 @@ export const BranchOrderTable: FC<BranchOrderTableProps> = ({
         </table>
       </div>
 
-      {/* ── Table Body (Independently Scrollable Container) ── */}
+      {/* ── Table Body Scroll Container (Sleek scrollbar matching SupplierTable) ── */}
       <div
         ref={bodyRef}
+        className="supplier-table-scroll-container"
         onScroll={handleBodyScroll}
         style={{
           width: '100%',
-          flex: 1,
+          flex: '1 1 auto',
           overflowY: 'auto',
           overflowX: 'auto',
           minHeight: 0,
@@ -343,7 +348,7 @@ export const BranchOrderTable: FC<BranchOrderTableProps> = ({
         <table
           style={{
             width: '100%',
-            minWidth: 980,
+            minWidth: 1000,
             tableLayout: 'fixed',
             borderCollapse: 'separate',
             borderSpacing: 0,
@@ -364,8 +369,12 @@ export const BranchOrderTable: FC<BranchOrderTableProps> = ({
                   }}
                 >
                   <Building2 size={36} style={{ margin: '0 auto 12px', opacity: 0.4 }} />
-                  <div style={{ fontSize: 14, fontWeight: 500 }}>Không tìm thấy chi nhánh nào phù hợp</div>
-                  <div style={{ fontSize: 12, marginTop: 4 }}>Hãy thử thay đổi từ khóa hoặc điều kiện bộ lọc</div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: '#475569' }}>
+                    Không tìm thấy chi nhánh nào phù hợp
+                  </div>
+                  <div style={{ fontSize: 12, marginTop: 4, color: '#94a3b8' }}>
+                    Hãy thử thay đổi từ khóa hoặc điều kiện bộ lọc
+                  </div>
                 </td>
               </tr>
             ) : (
@@ -374,7 +383,8 @@ export const BranchOrderTable: FC<BranchOrderTableProps> = ({
                   key={b.id}
                   style={{
                     borderBottom: '1px solid #f1f5f9',
-                    transition: 'background-color 0.15s ease',
+                    backgroundColor: '#ffffff',
+                    transition: 'background-color 0.12s ease',
                   }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.backgroundColor = '#f8fafc';
@@ -384,17 +394,18 @@ export const BranchOrderTable: FC<BranchOrderTableProps> = ({
                   }}
                 >
                   {/* 1. Mã CN */}
-                  <td style={{ padding: '10px 12px', verticalAlign: 'middle' }}>
+                  <td style={{ padding: '10px 12px', verticalAlign: 'middle', borderBottom: '1px solid #f1f5f9' }}>
                     <span
                       style={{
-                        fontFamily: 'monospace',
+                        fontFamily: 'var(--font-mono, monospace)',
                         fontWeight: 700,
-                        color: 'var(--blue-primary, #0f766e)',
+                        color: '#0f766e',
                         backgroundColor: '#f0fdfa',
                         padding: '3px 8px',
                         borderRadius: 4,
                         border: '1px solid #ccfbf1',
                         fontSize: 12,
+                        whiteSpace: 'nowrap',
                       }}
                     >
                       {b.code}
@@ -402,8 +413,8 @@ export const BranchOrderTable: FC<BranchOrderTableProps> = ({
                   </td>
 
                   {/* 2. Tên & Địa chỉ */}
-                  <td style={{ padding: '10px 12px', verticalAlign: 'middle' }}>
-                    <div style={{ fontWeight: 600, color: '#0f172a', fontSize: 13, marginBottom: 2 }}>
+                  <td style={{ padding: '10px 12px', verticalAlign: 'middle', borderBottom: '1px solid #f1f5f9' }}>
+                    <div style={{ fontWeight: 600, color: '#0f172a', fontSize: 13, lineHeight: 1.35 }}>
                       {b.name}
                     </div>
                     <div
@@ -413,6 +424,7 @@ export const BranchOrderTable: FC<BranchOrderTableProps> = ({
                         gap: 4,
                         color: '#64748b',
                         fontSize: 11.5,
+                        marginTop: 2,
                       }}
                     >
                       <MapPin size={11} style={{ flexShrink: 0, color: '#94a3b8' }} />
@@ -430,12 +442,21 @@ export const BranchOrderTable: FC<BranchOrderTableProps> = ({
                   </td>
 
                   {/* 3. Người quản lý & SĐT */}
-                  <td style={{ padding: '10px 12px', verticalAlign: 'middle' }}>
-                    <div style={{ fontWeight: 500, color: '#1e293b', fontSize: 12.5, marginBottom: 2 }}>
+                  <td style={{ padding: '10px 12px', verticalAlign: 'middle', borderBottom: '1px solid #f1f5f9' }}>
+                    <div style={{ fontWeight: 600, color: '#1e293b', fontSize: 12.5, lineHeight: 1.3 }}>
                       {b.managerName || '—'}
                     </div>
                     {b.managerPhone && b.managerPhone !== '—' && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#64748b', fontSize: 11.5 }}>
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 4,
+                          color: '#64748b',
+                          fontSize: 11.5,
+                          marginTop: 2,
+                        }}
+                      >
                         <Phone size={11} style={{ flexShrink: 0, color: '#94a3b8' }} />
                         <span>{b.managerPhone}</span>
                       </div>
@@ -443,21 +464,22 @@ export const BranchOrderTable: FC<BranchOrderTableProps> = ({
                   </td>
 
                   {/* 4. Đơn PO đang chờ */}
-                  <td style={{ padding: '10px 12px', verticalAlign: 'middle' }}>
+                  <td style={{ padding: '10px 12px', verticalAlign: 'middle', borderBottom: '1px solid #f1f5f9' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       <span
                         style={{
                           display: 'inline-flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          minWidth: 24,
+                          minWidth: 26,
                           height: 22,
-                          padding: '0 6px',
+                          padding: '0 8px',
                           borderRadius: 11,
                           fontSize: 12,
                           fontWeight: 700,
                           backgroundColor: (b.pendingCount ?? 0) > 0 ? '#fef3c7' : '#f1f5f9',
                           color: (b.pendingCount ?? 0) > 0 ? '#b45309' : '#64748b',
+                          border: (b.pendingCount ?? 0) > 0 ? '1px solid #fde68a' : '1px solid #e2e8f0',
                         }}
                       >
                         {b.pendingCount ?? 0}
@@ -467,18 +489,18 @@ export const BranchOrderTable: FC<BranchOrderTableProps> = ({
                   </td>
 
                   {/* 5. Cập nhật cuối */}
-                  <td style={{ padding: '10px 12px', verticalAlign: 'middle', color: '#64748b', fontSize: 12 }}>
+                  <td style={{ padding: '10px 12px', verticalAlign: 'middle', color: '#64748b', fontSize: 12, borderBottom: '1px solid #f1f5f9' }}>
                     {b.lastUpdated || '—'}
                   </td>
 
                   {/* 6. Trạng thái */}
-                  <td style={{ padding: '10px 12px', verticalAlign: 'middle' }}>
+                  <td style={{ padding: '10px 12px', verticalAlign: 'middle', borderBottom: '1px solid #f1f5f9' }}>
                     {renderStatusBadge(b.status)}
                   </td>
 
                   {/* 7. Thao tác */}
-                  <td style={{ padding: '10px 12px', verticalAlign: 'middle', textAlign: 'center' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                  <td style={{ padding: '10px 12px', verticalAlign: 'middle', textAlign: 'center', borderBottom: '1px solid #f1f5f9' }}>
+                    <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
                       <button
                         type="button"
                         onClick={() => onOrder(b.id)}
@@ -488,6 +510,7 @@ export const BranchOrderTable: FC<BranchOrderTableProps> = ({
                           padding: '0 10px',
                           fontSize: 11.5,
                           gap: 4,
+                          boxShadow: '0 1px 2px rgba(15, 118, 110, 0.15)',
                         }}
                         title="Tạo ma trận đặt hàng cho chi nhánh này"
                       >
@@ -499,20 +522,34 @@ export const BranchOrderTable: FC<BranchOrderTableProps> = ({
                         type="button"
                         onClick={() => onViewDetail(b)}
                         style={{
-                          height: 28,
-                          width: 28,
-                          borderRadius: 6,
-                          border: '1px solid #cbd5e1',
-                          backgroundColor: '#ffffff',
-                          color: '#475569',
-                          cursor: 'pointer',
-                          display: 'flex',
+                          display: 'inline-flex',
                           alignItems: 'center',
-                          justifyContent: 'center',
+                          gap: 4,
+                          height: 28,
+                          padding: '0 10px',
+                          borderRadius: 6,
+                          fontSize: 12,
+                          fontWeight: 600,
+                          backgroundColor: '#ffffff',
+                          border: '1px solid #cbd5e1',
+                          color: '#334155',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease',
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.borderColor = '#0f766e';
+                          e.currentTarget.style.color = '#0f766e';
+                          e.currentTarget.style.backgroundColor = '#f0fdfa';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.borderColor = '#cbd5e1';
+                          e.currentTarget.style.color = '#334155';
+                          e.currentTarget.style.backgroundColor = '#ffffff';
                         }}
                         title="Xem chi tiết chi nhánh"
                       >
-                        <Eye size={13} />
+                        <Eye size={12} />
+                        <span>Chi tiết</span>
                       </button>
                     </div>
                   </td>
