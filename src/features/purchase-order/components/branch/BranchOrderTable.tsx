@@ -133,13 +133,13 @@ export const BranchOrderTable: FC<BranchOrderTableProps> = ({
 
   const tableColGroup = (
     <colgroup>
-      <col style={{ width: '9%' }} />
-      <col style={{ width: '27%' }} />
-      <col style={{ width: '18%' }} />
-      <col style={{ width: '13%' }} />
+      <col style={{ width: '8%' }} />
+      <col style={{ width: '25%' }} />
+      <col style={{ width: '16%' }} />
+      <col style={{ width: '11%' }} />
       <col style={{ width: '12%' }} />
       <col style={{ width: '10%' }} />
-      <col style={{ width: '11%' }} />
+      <col style={{ width: '18%' }} />
     </colgroup>
   );
 
@@ -229,7 +229,7 @@ export const BranchOrderTable: FC<BranchOrderTableProps> = ({
         <table
           style={{
             width: '100%',
-            minWidth: 1000,
+            minWidth: 1080,
             tableLayout: 'fixed',
             borderCollapse: 'separate',
             borderSpacing: 0,
@@ -348,7 +348,7 @@ export const BranchOrderTable: FC<BranchOrderTableProps> = ({
         <table
           style={{
             width: '100%',
-            minWidth: 1000,
+            minWidth: 1080,
             tableLayout: 'fixed',
             borderCollapse: 'separate',
             borderSpacing: 0,
@@ -500,7 +500,7 @@ export const BranchOrderTable: FC<BranchOrderTableProps> = ({
 
                   {/* 7. Thao tác */}
                   <td style={{ padding: '10px 12px', verticalAlign: 'middle', textAlign: 'center', borderBottom: '1px solid #f1f5f9' }}>
-                    <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                    <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, flexWrap: 'nowrap' }}>
                       <button
                         type="button"
                         onClick={() => onOrder(b.id)}
@@ -510,30 +510,35 @@ export const BranchOrderTable: FC<BranchOrderTableProps> = ({
                           padding: '0 10px',
                           fontSize: 11.5,
                           gap: 4,
+                          whiteSpace: 'nowrap',
+                          flexShrink: 0,
                           boxShadow: '0 1px 2px rgba(15, 118, 110, 0.15)',
                         }}
                         title="Tạo ma trận đặt hàng cho chi nhánh này"
                       >
-                        <ShoppingCart size={12} />
+                        <ShoppingCart size={12} style={{ flexShrink: 0 }} />
                         <span>Đặt hàng</span>
                       </button>
 
                       <button
                         type="button"
                         onClick={() => onViewDetail(b)}
+                        className="po-btn po-btn-secondary"
                         style={{
                           display: 'inline-flex',
                           alignItems: 'center',
                           gap: 4,
                           height: 28,
                           padding: '0 10px',
-                          borderRadius: 6,
-                          fontSize: 12,
+                          borderRadius: 'var(--radius-pill)',
+                          fontSize: 11.5,
                           fontWeight: 600,
                           backgroundColor: '#ffffff',
                           border: '1px solid #cbd5e1',
                           color: '#334155',
                           cursor: 'pointer',
+                          whiteSpace: 'nowrap',
+                          flexShrink: 0,
                           transition: 'all 0.15s ease',
                         }}
                         onMouseEnter={(e) => {
@@ -548,7 +553,7 @@ export const BranchOrderTable: FC<BranchOrderTableProps> = ({
                         }}
                         title="Xem chi tiết chi nhánh"
                       >
-                        <Eye size={12} />
+                        <Eye size={12} style={{ flexShrink: 0 }} />
                         <span>Chi tiết</span>
                       </button>
                     </div>
