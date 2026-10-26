@@ -1,14 +1,16 @@
-import { useState } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import type { FC } from 'react';
-import type { BranchListItem } from '../../types/po.types';
 import {
+  Building2,
   MapPin,
   Phone,
   Eye,
   ShoppingCart,
   ChevronLeft,
   ChevronRight,
+  ArrowUpDown,
 } from 'lucide-react';
+import type { BranchListItem } from '../../types/po.types';
 
 interface BranchOrderTableProps {
   branches: BranchListItem[];
@@ -21,6 +23,9 @@ interface BranchOrderTableProps {
   onOrder: (branchId: string) => void;
 }
 
+type SortField = 'code' | 'name' | 'managerName' | 'pendingCount' | 'status' | 'lastUpdated';
+type SortDirection = 'asc' | 'desc';
+
 export const BranchOrderTable: FC<BranchOrderTableProps> = ({
   branches,
   totalCount,
@@ -31,24 +36,124 @@ export const BranchOrderTable: FC<BranchOrderTableProps> = ({
   onViewDetail,
   onOrder,
 }) => {
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [sortField, setSortField] = useState<SortField | null>(null);
+  const [sortDir, setSortDir] = useState<SortDirection>('asc');
 
-  const toggleSelectAll = () => {
-    if (selectedIds.length === branches.length) {
-      setSelectedIds([]);
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      if (sortDir === 'asc') {
+        setSortDir('desc');
+      } else {
+        setSortField(null);
+        setSortDir('asc');
+      }
     } else {
-      setSelectedIds(branches.map((b) => b.id));
+      setSortField(field);
+      setSortDir('asc');
     }
   };
 
-  const toggleSelectOne = (id: string) => {
-    setSelectedIds((prev) =>
-      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
-    );
-  };
+  const sortedBranches = useMemo(() => {
+    if (!sortField) return branches;
+
+    return [...branches].sort((a, b) => {
+      let valA: string | number = '';
+      let valB: string | number = '';
+
+      switch (sortField) {
+        case 'code':
+          valA = a.code.toLowerCase();
+          valB = b.code.toLowerCase();
+          break;
+        case 'name':
+          valA = a.name.toLowerCase();
+          valB = b.name.toLowerCase();
+          break;
+        case 'managerName':
+          valA = a.managerName.toLowerCase();
+          valB = b.managerName.toLowerCase();
+          break;
+        case 'pendingCount':
+          valA = a.pendingCount ?? 0;
+          valB = b.pendingCount ?? 0;
+          break;
+        case 'status':
+          valA = a.status;
+          valB = b.status;
+          break;
+        case 'lastUpdated':
+          valA = a.lastUpdated || '';
+          valB = b.lastUpdated || '';
+          break;
+      }
+
+      if (valA < valB) return sortDir === 'asc' ? -1 : 1;
+      if (valA > valB) return sortDir === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [branches, sortField, sortDir]);
 
   const totalPages = Math.ceil(totalCount / pageSize) || 1;
-  const fmt = (n: number) => new Intl.NumberFormat('vi-VN').format(n);
+  const startItem = totalCount === 0 ? 0 : (pageIndex - 1) * pageSize + 1;
+  const endItem = Math.min(pageIndex * pageSize, totalCount);
+
+  const headerRef = useRef<HTMLDivElement>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const [hasScrollY, setHasScrollY] = useState(false);
+
+  useEffect(() => {
+    const updateScrollState = () => {
+      if (bodyRef.current) {
+        setHasScrollY(bodyRef.current.scrollHeight > bodyRef.current.clientHeight);
+      }
+    };
+
+    updateScrollState();
+
+    let observer: ResizeObserver | null = null;
+    if (bodyRef.current && typeof ResizeObserver !== 'undefined') {
+      observer = new ResizeObserver(() => {
+        updateScrollState();
+      });
+      observer.observe(bodyRef.current);
+    }
+
+    window.addEventListener('resize', updateScrollState);
+    return () => {
+      window.removeEventListener('resize', updateScrollState);
+      if (observer) observer.disconnect();
+    };
+  }, [sortedBranches, pageSize]);
+
+  const handleBodyScroll = () => {
+    if (headerRef.current && bodyRef.current) {
+      headerRef.current.scrollLeft = bodyRef.current.scrollLeft;
+    }
+  };
+
+  const tableColGroup = (
+    <colgroup>
+      <col style={{ width: '8%' }} />
+      <col style={{ width: '25%' }} />
+      <col style={{ width: '16%' }} />
+      <col style={{ width: '11%' }} />
+      <col style={{ width: '12%' }} />
+      <col style={{ width: '10%' }} />
+      <col style={{ width: '18%' }} />
+    </colgroup>
+  );
+
+  const thBaseStyle: React.CSSProperties = {
+    backgroundColor: '#f8fafc',
+    padding: '10px 12px',
+    fontSize: 12,
+    fontWeight: 700,
+    color: '#334155',
+    textTransform: 'uppercase',
+    letterSpacing: '0.03em',
+    whiteSpace: 'nowrap',
+    boxSizing: 'border-box',
+  };
 
   const renderStatusBadge = (status: BranchListItem['status']) => {
     if (status === 'active') {
@@ -57,13 +162,18 @@ export const BranchOrderTable: FC<BranchOrderTableProps> = ({
           style={{
             display: 'inline-flex',
             alignItems: 'center',
-            fontSize: 13,
-            fontWeight: 500,
-            color: '#16a34a',
+            gap: 5,
+            padding: '3px 10px',
+            borderRadius: 12,
+            fontSize: 12,
+            fontWeight: 600,
+            backgroundColor: '#dcfce7',
+            color: '#15803d',
             whiteSpace: 'nowrap',
           }}
         >
-          Hoạt động
+          <span style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: '#16a34a' }} />
+          <span>Hoạt động</span>
         </span>
       );
     }
@@ -72,329 +182,495 @@ export const BranchOrderTable: FC<BranchOrderTableProps> = ({
         style={{
           display: 'inline-flex',
           alignItems: 'center',
-          fontSize: 13,
-          fontWeight: 500,
+          gap: 5,
+          padding: '3px 10px',
+          borderRadius: 12,
+          fontSize: 12,
+          fontWeight: 600,
+          backgroundColor: '#f1f5f9',
           color: '#64748b',
           whiteSpace: 'nowrap',
         }}
       >
-        Ngừng hoạt động
+        <span style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: '#94a3b8' }} />
+        <span>Ngừng hoạt động</span>
       </span>
     );
   };
 
   return (
-    <div className="po-branch-container">
-      {/* ── Scrollable Table Wrapper (Single table with sticky header) ── */}
-      <div className="po-branch-table-wrapper">
-        <table className="po-branch-table">
-          <colgroup>
-            <col style={{ width: '3%' }} />
-            <col style={{ width: '9%' }} />
-            <col style={{ width: '22%' }} />
-            <col style={{ width: '15%' }} />
-            <col style={{ width: '10%' }} />
-            <col style={{ width: '8%' }} />
-            <col style={{ width: '11%' }} />
-            <col style={{ width: '10%' }} />
-            <col style={{ width: 190 }} />
-          </colgroup>
+    <div
+      style={{
+        backgroundColor: '#ffffff',
+        borderRadius: 8,
+        border: '1px solid #e2e8f0',
+        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
+        overflow: 'hidden',
+        display: 'flex',
+        flexDirection: 'column',
+        flex: 1,
+        minHeight: 0,
+        width: '100%',
+      }}
+    >
+      {/* ── Table Header (Fixed at top, strictly outside vertical scroll) ── */}
+      <div
+        ref={headerRef}
+        style={{
+          width: '100%',
+          overflowX: 'hidden',
+          backgroundColor: '#f8fafc',
+          borderBottom: '1px solid #cbd5e1',
+          flexShrink: 0,
+          boxSizing: 'border-box',
+          paddingRight: hasScrollY ? 6 : 0,
+        }}
+      >
+        <table
+          style={{
+            width: '100%',
+            minWidth: 1080,
+            tableLayout: 'fixed',
+            borderCollapse: 'separate',
+            borderSpacing: 0,
+            textAlign: 'left',
+            fontSize: 12.5,
+          }}
+        >
+          {tableColGroup}
           <thead>
             <tr>
-              <th style={{ width: '3%', textAlign: 'center', padding: '10px 4px' }}>
-                <input
-                  type="checkbox"
-                  checked={branches.length > 0 && selectedIds.length === branches.length}
-                  onChange={toggleSelectAll}
-                />
+              <th
+                onClick={() => handleSort('code')}
+                style={{
+                  ...thBaseStyle,
+                  cursor: 'pointer',
+                  userSelect: 'none',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span>Mã CN</span>
+                  <ArrowUpDown size={12} color={sortField === 'code' ? '#0f766e' : '#94a3b8'} />
+                </div>
               </th>
-              <th>Mã chi nhánh</th>
-              <th>Tên chi nhánh</th>
-              <th>Người phụ trách</th>
-              <th style={{ textAlign: 'right' }}>Tồn kho thực tế</th>
-              <th style={{ textAlign: 'right' }}>SL đặt hàng</th>
-              <th style={{ textAlign: 'center' }}>Trạng thái</th>
-              <th style={{ textAlign: 'center' }}>Cập nhật gần nhất</th>
-              <th style={{ textAlign: 'right', paddingRight: 14 }}>Thao tác</th>
+
+              <th
+                onClick={() => handleSort('name')}
+                style={{
+                  ...thBaseStyle,
+                  cursor: 'pointer',
+                  userSelect: 'none',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span>Tên Chi Nhánh & Địa Chỉ</span>
+                  <ArrowUpDown size={12} color={sortField === 'name' ? '#0f766e' : '#94a3b8'} />
+                </div>
+              </th>
+
+              <th
+                onClick={() => handleSort('managerName')}
+                style={{
+                  ...thBaseStyle,
+                  cursor: 'pointer',
+                  userSelect: 'none',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span>Người Quản Lý</span>
+                  <ArrowUpDown size={12} color={sortField === 'managerName' ? '#0f766e' : '#94a3b8'} />
+                </div>
+              </th>
+
+              <th
+                onClick={() => handleSort('pendingCount')}
+                style={{
+                  ...thBaseStyle,
+                  cursor: 'pointer',
+                  userSelect: 'none',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span>Đơn PO Đang Chờ</span>
+                  <ArrowUpDown size={12} color={sortField === 'pendingCount' ? '#0f766e' : '#94a3b8'} />
+                </div>
+              </th>
+
+              <th
+                onClick={() => handleSort('lastUpdated')}
+                style={{
+                  ...thBaseStyle,
+                  cursor: 'pointer',
+                  userSelect: 'none',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span>Cập Nhật Cuối</span>
+                  <ArrowUpDown size={12} color={sortField === 'lastUpdated' ? '#0f766e' : '#94a3b8'} />
+                </div>
+              </th>
+
+              <th
+                onClick={() => handleSort('status')}
+                style={{
+                  ...thBaseStyle,
+                  cursor: 'pointer',
+                  userSelect: 'none',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span>Trạng Thái</span>
+                  <ArrowUpDown size={12} color={sortField === 'status' ? '#0f766e' : '#94a3b8'} />
+                </div>
+              </th>
+
+              <th style={{ ...thBaseStyle, textAlign: 'center' }}>
+                <span>Thao Tác</span>
+              </th>
             </tr>
           </thead>
+        </table>
+      </div>
+
+      {/* ── Table Body Scroll Container (Sleek scrollbar matching SupplierTable) ── */}
+      <div
+        ref={bodyRef}
+        className="supplier-table-scroll-container"
+        onScroll={handleBodyScroll}
+        style={{
+          width: '100%',
+          flex: '1 1 auto',
+          overflowY: 'auto',
+          overflowX: 'auto',
+          minHeight: 0,
+        }}
+      >
+        <table
+          style={{
+            width: '100%',
+            minWidth: 1080,
+            tableLayout: 'fixed',
+            borderCollapse: 'separate',
+            borderSpacing: 0,
+            textAlign: 'left',
+            fontSize: 12.5,
+          }}
+        >
+          {tableColGroup}
           <tbody>
-            {branches.length > 0 ? (
-              branches.map((branch) => {
-                const isInactive = branch.status === 'inactive';
-                return (
-                  <tr key={branch.id}>
-                    {/* Checkbox */}
-                    <td style={{ textAlign: 'center', padding: '10px 4px' }}>
-                      <input
-                        type="checkbox"
-                        checked={selectedIds.includes(branch.id)}
-                        onChange={() => toggleSelectOne(branch.id)}
-                      />
-                    </td>
-
-                    {/* 1. Mã chi nhánh */}
-                    <td>
-                      <span
-                        style={{
-                          fontFamily: 'var(--font-mono, monospace)',
-                          fontSize: 12.5,
-                          fontWeight: 600,
-                          color: '#334155',
-                          display: 'inline-block',
-                          whiteSpace: 'nowrap',
-                        }}
-                      >
-                        {branch.code}
-                      </span>
-                    </td>
-
-                    {/* 2. Tên chi nhánh (Name on line 1, Address on line 2) */}
-                    <td>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 }}>
-                        <span
-                          title={branch.name}
-                          style={{
-                            fontWeight: 700,
-                            color: '#0f172a',
-                            fontSize: 13,
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap',
-                          }}
-                        >
-                          {branch.name}
-                        </span>
-                        <div
-                          title={branch.address}
-                          style={{
-                            fontSize: 11.5,
-                            color: '#64748b',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 4,
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap',
-                          }}
-                        >
-                          <MapPin size={11} style={{ flexShrink: 0, color: '#94a3b8' }} />
-                          <span
-                            style={{
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap',
-                            }}
-                          >
-                            {branch.address}
-                          </span>
-                        </div>
-                      </div>
-                    </td>
-
-                    {/* 3. Người phụ trách (Name on line 1, Phone on line 2) */}
-                    <td>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
-                        <span
-                          style={{
-                            fontWeight: 600,
-                            color: '#1e293b',
-                            fontSize: 12.5,
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap',
-                          }}
-                        >
-                          {branch.managerName || '—'}
-                        </span>
-                        <div
-                          style={{
-                            fontSize: 11,
-                            color: '#64748b',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 4,
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap',
-                          }}
-                        >
-                          <Phone size={11} style={{ flexShrink: 0, color: '#94a3b8' }} />
-                          <span>{branch.managerPhone || '—'}</span>
-                        </div>
-                      </div>
-                    </td>
-
-                    {/* 4. Tồn kho thực tế (Pure numeric, right aligned, tabular) */}
-                    <td className="po-branch-num-cell" style={{ color: '#0f172a' }}>
-                      {fmt(branch.stockQty)}
-                    </td>
-
-                    {/* 5. SL đặt hàng (Pure numeric, right aligned, tabular) */}
-                    <td
-                      className="po-branch-num-cell"
-                      style={{
-                        color: branch.orderQty > 0 ? 'var(--blue-primary, #0f766e)' : '#94a3b8',
-                      }}
-                    >
-                      {fmt(branch.orderQty)}
-                    </td>
-
-                    {/* 6. Trạng thái */}
-                    <td style={{ textAlign: 'center' }}>
-                      {renderStatusBadge(branch.status)}
-                    </td>
-
-                    {/* 7. Cập nhật gần nhất */}
-                    <td style={{ textAlign: 'center' }}>
-                      <span style={{ fontSize: 11.5, color: '#64748b', whiteSpace: 'nowrap' }}>
-                        {branch.lastUpdated || '—'}
-                      </span>
-                    </td>
-
-                    {/* 8. Thao tác */}
-                    <td className="po-branch-action-cell">
-                      <div className="po-branch-action-btn-group">
-                        <button
-                          type="button"
-                          onClick={() => onViewDetail(branch)}
-                          className="po-branch-btn-view"
-                          title="Xem chi tiết số lượng đặt hàng theo bảng grid"
-                        >
-                          <Eye size={12} />
-                          <span>Chi tiết</span>
-                        </button>
-
-                        <button
-                          type="button"
-                          disabled={isInactive}
-                          onClick={() => onOrder(branch.id)}
-                          className="po-branch-btn-order"
-                          title={
-                            isInactive
-                              ? 'Chi nhánh đã ngừng hoạt động, không thể tạo đơn đặt hàng'
-                              : `Tạo đơn mua hàng ma trận cho ${branch.name}`
-                          }
-                        >
-                          <ShoppingCart size={12} />
-                          <span>Đặt hàng</span>
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })
-            ) : (
+            {sortedBranches.length === 0 ? (
               <tr>
-                <td colSpan={9} style={{ textAlign: 'center', padding: '40px 20px', color: '#64748b' }}>
-                  🔍 Không tìm thấy chi nhánh nào phù hợp với bộ lọc tìm kiếm.
+                <td
+                  colSpan={7}
+                  style={{
+                    padding: '48px 16px',
+                    textAlign: 'center',
+                    color: '#94a3b8',
+                  }}
+                >
+                  <Building2 size={36} style={{ margin: '0 auto 12px', opacity: 0.4 }} />
+                  <div style={{ fontSize: 14, fontWeight: 600, color: '#475569' }}>
+                    Không tìm thấy chi nhánh nào phù hợp
+                  </div>
+                  <div style={{ fontSize: 12, marginTop: 4, color: '#94a3b8' }}>
+                    Hãy thử thay đổi từ khóa hoặc điều kiện bộ lọc
+                  </div>
                 </td>
               </tr>
+            ) : (
+              sortedBranches.map((b) => (
+                <tr
+                  key={b.id}
+                  style={{
+                    borderBottom: '1px solid #f1f5f9',
+                    backgroundColor: '#ffffff',
+                    transition: 'background-color 0.12s ease',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#f8fafc';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = '#ffffff';
+                  }}
+                >
+                  {/* 1. Mã CN */}
+                  <td style={{ padding: '10px 12px', verticalAlign: 'middle', borderBottom: '1px solid #f1f5f9' }}>
+                    <span
+                      style={{
+                        fontFamily: 'var(--font-mono, monospace)',
+                        fontWeight: 700,
+                        color: '#0f766e',
+                        backgroundColor: '#f0fdfa',
+                        padding: '3px 8px',
+                        borderRadius: 4,
+                        border: '1px solid #ccfbf1',
+                        fontSize: 12,
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {b.code}
+                    </span>
+                  </td>
+
+                  {/* 2. Tên & Địa chỉ */}
+                  <td style={{ padding: '10px 12px', verticalAlign: 'middle', borderBottom: '1px solid #f1f5f9' }}>
+                    <div style={{ fontWeight: 600, color: '#0f172a', fontSize: 13, lineHeight: 1.35 }}>
+                      {b.name}
+                    </div>
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 4,
+                        color: '#64748b',
+                        fontSize: 11.5,
+                        marginTop: 2,
+                      }}
+                    >
+                      <MapPin size={11} style={{ flexShrink: 0, color: '#94a3b8' }} />
+                      <span
+                        style={{
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}
+                        title={b.address}
+                      >
+                        {b.address}
+                      </span>
+                    </div>
+                  </td>
+
+                  {/* 3. Người quản lý & SĐT */}
+                  <td style={{ padding: '10px 12px', verticalAlign: 'middle', borderBottom: '1px solid #f1f5f9' }}>
+                    <div style={{ fontWeight: 600, color: '#1e293b', fontSize: 12.5, lineHeight: 1.3 }}>
+                      {b.managerName || '—'}
+                    </div>
+                    {b.managerPhone && b.managerPhone !== '—' && (
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 4,
+                          color: '#64748b',
+                          fontSize: 11.5,
+                          marginTop: 2,
+                        }}
+                      >
+                        <Phone size={11} style={{ flexShrink: 0, color: '#94a3b8' }} />
+                        <span>{b.managerPhone}</span>
+                      </div>
+                    )}
+                  </td>
+
+                  {/* 4. Đơn PO đang chờ */}
+                  <td style={{ padding: '10px 12px', verticalAlign: 'middle', borderBottom: '1px solid #f1f5f9' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          minWidth: 26,
+                          height: 22,
+                          padding: '0 8px',
+                          borderRadius: 11,
+                          fontSize: 12,
+                          fontWeight: 700,
+                          backgroundColor: (b.pendingCount ?? 0) > 0 ? '#fef3c7' : '#f1f5f9',
+                          color: (b.pendingCount ?? 0) > 0 ? '#b45309' : '#64748b',
+                          border: (b.pendingCount ?? 0) > 0 ? '1px solid #fde68a' : '1px solid #e2e8f0',
+                        }}
+                      >
+                        {b.pendingCount ?? 0}
+                      </span>
+                      <span style={{ fontSize: 11.5, color: '#64748b' }}>đơn chờ</span>
+                    </div>
+                  </td>
+
+                  {/* 5. Cập nhật cuối */}
+                  <td style={{ padding: '10px 12px', verticalAlign: 'middle', color: '#64748b', fontSize: 12, borderBottom: '1px solid #f1f5f9' }}>
+                    {b.lastUpdated || '—'}
+                  </td>
+
+                  {/* 6. Trạng thái */}
+                  <td style={{ padding: '10px 12px', verticalAlign: 'middle', borderBottom: '1px solid #f1f5f9' }}>
+                    {renderStatusBadge(b.status)}
+                  </td>
+
+                  {/* 7. Thao tác */}
+                  <td style={{ padding: '10px 12px', verticalAlign: 'middle', textAlign: 'center', borderBottom: '1px solid #f1f5f9' }}>
+                    <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, flexWrap: 'nowrap' }}>
+                      <button
+                        type="button"
+                        onClick={() => onOrder(b.id)}
+                        className="po-btn po-btn-primary"
+                        style={{
+                          height: 28,
+                          padding: '0 10px',
+                          fontSize: 11.5,
+                          gap: 4,
+                          whiteSpace: 'nowrap',
+                          flexShrink: 0,
+                          boxShadow: '0 1px 2px rgba(15, 118, 110, 0.15)',
+                        }}
+                        title="Tạo ma trận đặt hàng cho chi nhánh này"
+                      >
+                        <ShoppingCart size={12} style={{ flexShrink: 0 }} />
+                        <span>Đặt hàng</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => onViewDetail(b)}
+                        className="po-btn po-btn-secondary"
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 4,
+                          height: 28,
+                          padding: '0 10px',
+                          borderRadius: 'var(--radius-pill)',
+                          fontSize: 11.5,
+                          fontWeight: 600,
+                          backgroundColor: '#ffffff',
+                          border: '1px solid #cbd5e1',
+                          color: '#334155',
+                          cursor: 'pointer',
+                          whiteSpace: 'nowrap',
+                          flexShrink: 0,
+                          transition: 'all 0.15s ease',
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.borderColor = '#0f766e';
+                          e.currentTarget.style.color = '#0f766e';
+                          e.currentTarget.style.backgroundColor = '#f0fdfa';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.borderColor = '#cbd5e1';
+                          e.currentTarget.style.color = '#334155';
+                          e.currentTarget.style.backgroundColor = '#ffffff';
+                        }}
+                        title="Xem chi tiết chi nhánh"
+                      >
+                        <Eye size={12} style={{ flexShrink: 0 }} />
+                        <span>Chi tiết</span>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))
             )}
           </tbody>
         </table>
       </div>
 
-      {/* ── Pagination Footer (luôn hiển thị khi có dữ liệu) ── */}
-      {totalCount > 0 && (
-        <div
-          style={{
-            padding: '9px 16px',
-            borderTop: '1px solid #e2e8f0',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            fontSize: 12,
-            color: '#64748b',
-            backgroundColor: '#ffffff',
-            flexWrap: 'wrap',
-            gap: 10,
-          }}
-        >
-          {/* Bên trái: Thông tin số lượng & Chọn số bản ghi / trang */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
-            <div>
-              Hiển thị <b>{(pageIndex - 1) * pageSize + 1}</b> -{' '}
-              <b>{Math.min(pageIndex * pageSize, totalCount)}</b> trên <b>{totalCount}</b> chi nhánh
+      {/* ── Footer Phân trang (Paging) tích hợp theo chuẩn SupplierTable ── */}
+      <div
+        style={{
+          padding: '10px 16px',
+          borderTop: '1px solid #e2e8f0',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          fontSize: 12,
+          color: '#64748b',
+          backgroundColor: '#ffffff',
+          flexWrap: 'wrap',
+          gap: 10,
+          flexShrink: 0,
+          zIndex: 15,
+        }}
+      >
+        {/* Bên trái: Thông tin số lượng & Chọn số bản ghi / trang */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+          <div>
+            Hiển thị <b>{startItem}</b> - <b>{endItem}</b> trên <b>{totalCount}</b> chi nhánh
+          </div>
+
+          {onPageSizeChange && (
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ color: '#64748b' }}>Bản ghi/trang:</span>
+              <select
+                value={pageSize}
+                onChange={(e) => onPageSizeChange(Number(e.target.value))}
+                style={{
+                  height: 28,
+                  padding: '0 8px',
+                  borderRadius: 5,
+                  border: '1px solid #cbd5e1',
+                  backgroundColor: '#ffffff',
+                  color: '#0f172a',
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  outline: 'none',
+                }}
+              >
+                <option value={10}>10</option>
+                <option value={20}>20</option>
+                <option value={30}>30</option>
+                <option value={50}>50</option>
+              </select>
             </div>
-
-            {onPageSizeChange && (
-              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ color: '#64748b' }}>Bản ghi/trang:</span>
-                <select
-                  value={pageSize}
-                  onChange={(e) => onPageSizeChange(Number(e.target.value))}
-                  style={{
-                    height: 28,
-                    padding: '0 8px',
-                    borderRadius: 5,
-                    border: '1px solid #cbd5e1',
-                    backgroundColor: '#ffffff',
-                    color: '#0f172a',
-                    fontSize: 12,
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    outline: 'none',
-                  }}
-                >
-                  <option value={10}>10</option>
-                  <option value={20}>20</option>
-                  <option value={30}>30</option>
-                  <option value={50}>50</option>
-                </select>
-              </div>
-            )}
-          </div>
-
-          {/* Bên phải: Nút Trước / Trang x / y / Sau */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <button
-              type="button"
-              disabled={pageIndex <= 1}
-              onClick={() => onPageChange(pageIndex - 1)}
-              style={{
-                height: 28,
-                padding: '0 8px',
-                borderRadius: 6,
-                border: '1px solid #cbd5e1',
-                backgroundColor: '#ffffff',
-                cursor: pageIndex <= 1 ? 'not-allowed' : 'pointer',
-                opacity: pageIndex <= 1 ? 0.4 : 1,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 4,
-              }}
-            >
-              <ChevronLeft size={13} />
-              <span>Trước</span>
-            </button>
-            <span style={{ padding: '0 8px', fontWeight: 600, color: '#0f172a' }}>
-              Trang {pageIndex} / {totalPages}
-            </span>
-            <button
-              type="button"
-              disabled={pageIndex >= totalPages}
-              onClick={() => onPageChange(pageIndex + 1)}
-              style={{
-                height: 28,
-                padding: '0 8px',
-                borderRadius: 6,
-                border: '1px solid #cbd5e1',
-                backgroundColor: '#ffffff',
-                cursor: pageIndex >= totalPages ? 'not-allowed' : 'pointer',
-                opacity: pageIndex >= totalPages ? 0.4 : 1,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 4,
-              }}
-            >
-              <span>Sau</span>
-              <ChevronRight size={13} />
-            </button>
-          </div>
+          )}
         </div>
-      )}
+
+        {/* Bên phải: Nút Trước / Trang x / y / Sau */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <button
+            type="button"
+            disabled={pageIndex <= 1}
+            onClick={() => onPageChange(pageIndex - 1)}
+            style={{
+              height: 28,
+              padding: '0 8px',
+              borderRadius: 6,
+              border: '1px solid #cbd5e1',
+              backgroundColor: '#ffffff',
+              color: pageIndex <= 1 ? '#94a3b8' : '#334155',
+              cursor: pageIndex <= 1 ? 'not-allowed' : 'pointer',
+              opacity: pageIndex <= 1 ? 0.45 : 1,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4,
+              fontSize: 12,
+              fontWeight: 600,
+            }}
+          >
+            <ChevronLeft size={13} />
+            <span>Trước</span>
+          </button>
+
+          <span style={{ padding: '0 8px', fontWeight: 600, color: '#0f172a' }}>
+            Trang {pageIndex} / {totalPages}
+          </span>
+
+          <button
+            type="button"
+            disabled={pageIndex >= totalPages}
+            onClick={() => onPageChange(pageIndex + 1)}
+            style={{
+              height: 28,
+              padding: '0 8px',
+              borderRadius: 6,
+              border: '1px solid #cbd5e1',
+              backgroundColor: '#ffffff',
+              color: pageIndex >= totalPages ? '#94a3b8' : '#334155',
+              cursor: pageIndex >= totalPages ? 'not-allowed' : 'pointer',
+              opacity: pageIndex >= totalPages ? 0.45 : 1,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4,
+              fontSize: 12,
+              fontWeight: 600,
+            }}
+          >
+            <span>Sau</span>
+            <ChevronRight size={13} />
+          </button>
+        </div>
+      </div>
     </div>
   );
 };
-
