@@ -633,13 +633,13 @@
 
 .modal-box {
   background: #ffffff;
-  border-radius: 28px;
+  border-radius: 16px;
   width: 100%;
-  max-width: 680px;
+  max-width: 620px;
   max-height: 90vh;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.18);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.15);
   overflow: hidden;
 }
 
@@ -1057,22 +1057,22 @@
 
 .supplier-detail-header-card {
   background: #ffffff;
-  border-radius: 24px;
-  padding: 20px 24px;
+  border-radius: 12px;
+  padding: 12px 18px;
   border: 1px solid #e5e7eb;
-  box-shadow: 0 2px 8px rgba(0, 50, 150, 0.03);
-  margin-bottom: 20px;
+  box-shadow: 0 1px 4px rgba(0, 50, 150, 0.03);
+  margin-bottom: 12px;
 }
 
 .supplier-detail-breadcrumb {
-  margin-bottom: 14px;
+  margin-bottom: 6px;
 }
 
 .supplier-detail-back-btn {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  font-size: 13.5px;
+  gap: 5px;
+  font-size: 12.5px;
   font-weight: 600;
   color: var(--text-muted);
   background: none;
@@ -1091,19 +1091,19 @@
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: 16px;
+  gap: 12px;
 }
 
 .supplier-detail-profile-info {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
 }
 
 .supplier-detail-avatar {
-  width: 54px;
-  height: 54px;
-  border-radius: 16px;
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
   background-color: var(--blue-light);
   border: 1px solid var(--blue-border);
   display: flex;
@@ -1113,18 +1113,18 @@
 }
 
 .supplier-detail-title {
-  font-size: 1.45rem;
+  font-size: 1.25rem;
   font-weight: 700;
   color: #111827;
-  letter-spacing: -0.02em;
-  margin: 0 0 4px 0;
+  letter-spacing: -0.01em;
+  margin: 0 0 2px 0;
 }
 
 .supplier-detail-meta {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 13px;
+  gap: 6px;
+  font-size: 12px;
   color: var(--text-muted);
   flex-wrap: wrap;
 }
@@ -1142,7 +1142,7 @@
 .supplier-detail-actions {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
 }
 
 /* Stat Grid: 4 columns on desktop, 2 on tablet, 1 on mobile */
@@ -1222,7 +1222,7 @@
   text-transform: uppercase;
   color: var(--text-muted);
   letter-spacing: 0.06em;
-  margin: 8px 0 12px 0;
+  margin: 4px 0 8px 0;
 }
 
 /* Tabs Bar */
@@ -1230,7 +1230,7 @@
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
-  margin-bottom: 20px;
+  margin-bottom: 14px;
 }
 
 .supplier-detail-tab-pill {

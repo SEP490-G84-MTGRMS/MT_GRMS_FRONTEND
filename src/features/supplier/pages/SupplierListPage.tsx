@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import type { FC } from 'react';
 import { Link } from 'react-router-dom';
-import { Building2, Package, Download, Plus, Loader2 } from 'lucide-react';
+import { Building2, Package, Plus, Loader2 } from 'lucide-react';
+import { useAuthStore } from '../../../stores/useAuthStore';
 import type {
   SupplierSummary,
   SupplierFilterState,
@@ -18,16 +19,23 @@ import '../supplier.css';
 
 const DEFAULT_FILTERS: SupplierFilterState = {
   searchTerm: '',
+  code: '',
+  name: '',
+  contactPerson: '',
+  phone: '',
   supplierType: '',
   category: '',
   debtStatus: '',
   ratingFilter: '',
   status: '',
   pageIndex: 1,
-  pageSize: 10,
+  pageSize: 12,
 };
 
 export const SupplierListPage: FC = () => {
+  const role = useAuthStore((s) => s.user?.role);
+  const isStoreOwner = role === 'STORE_OWNER' || role === 'ADMIN' || !role;
+
   const [suppliers, setSuppliers] = useState<SupplierSummary[]>([]);
   const [totalCount, setTotalCount] = useState<number>(0);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -37,6 +45,7 @@ export const SupplierListPage: FC = () => {
 
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<SupplierSummary | null>(null);
+  const [modalTab, setModalTab] = useState<'basic' | 'terms' | 'bank'>('basic');
   const [selectedSupplier, setSelectedSupplier] = useState<SupplierSummary | null>(null);
 
   const [toast, setToast] = useState<ToastState | null>(null);
@@ -101,16 +110,10 @@ export const SupplierListPage: FC = () => {
     }
   };
 
-  const handlePayDebt = (supplier: SupplierSummary) => {
-    const amount = new Intl.NumberFormat('vi-VN').format(supplier.currentDebt) + ' đ';
-    showToast(`Đã lập lệnh chi trả nợ ${amount} cho NCC ${supplier.name} (${supplier.code})`, 'success');
-  };
-
   const handleToggleStatus = async (supplier: SupplierSummary) => {
     const newStatus = supplier.status === 'Active' ? 'Inactive' : 'Active';
     if (newStatus === 'Inactive' && supplier.currentDebt > 0) {
-      showToast(`Không thể tạm ngưng ${supplier.name}! Đang có dư nợ AP chưa thanh toán.`, 'warning');
-      return;
+      showToast(`${supplier.name} vẫn còn dư nợ AP. Hệ thống sẽ ngừng giao dịch mới, không tự hủy đơn đã xác nhận.`, 'warning');
     }
     try {
       await supplierApi.updateSupplierStatus(supplier.id, newStatus);
@@ -125,10 +128,6 @@ export const SupplierListPage: FC = () => {
   };
 
   const handleDeleteSupplier = async (supplier: SupplierSummary) => {
-    if (supplier.currentDebt > 0) {
-      showToast(`Không thể xóa ${supplier.name}! Đã phát sinh dư nợ AP.`, 'warning');
-      return;
-    }
     try {
       await supplierApi.deleteSupplier(supplier.id);
       showToast(`Đã xóa nhà cung cấp ${supplier.name}!`, 'success');
@@ -163,10 +162,11 @@ export const SupplierListPage: FC = () => {
             setSelectedSupplier(null);
             fetchSuppliers();
           }}
-          onEdit={(s) => {
+          onEdit={isStoreOwner ? (s, tab) => {
             setEditingSupplier(s);
+            setModalTab(tab || 'basic');
             setIsFormModalOpen(true);
-          }}
+          } : undefined}
           onToggleStatus={handleToggleStatus}
           onDelete={handleDeleteSupplier}
           onLinkCustomer={handleLinkCustomer}
@@ -175,8 +175,14 @@ export const SupplierListPage: FC = () => {
         <SupplierFormModal
           isOpen={isFormModalOpen}
           editingSupplier={editingSupplier}
+          initialTab={modalTab}
           onClose={() => setIsFormModalOpen(false)}
-          onSubmit={handleSaveSupplier}
+          onSubmit={async (input) => {
+            await handleSaveSupplier(input);
+            if (editingSupplier && selectedSupplier) {
+              setSelectedSupplier(prev => prev ? ({ ...prev, ...input }) : null);
+            }
+          }}
         />
       </div>
     );
@@ -240,27 +246,21 @@ export const SupplierListPage: FC = () => {
             <Package size={14} />
             <span>Sản phẩm theo NCC</span>
           </Link>
-          <button
-            type="button"
-            className="po-btn po-btn-secondary"
-            style={{ height: 32, padding: '0 14px' }}
-            onClick={() => showToast('Đang kết xuất danh sách NCC ra tệp Excel (.xlsx)...', 'info')}
-          >
-            <Download size={14} />
-            <span>Xuất Excel</span>
-          </button>
-          <button
-            type="button"
-            className="po-btn po-btn-primary"
-            style={{ height: 32, padding: '0 14px' }}
-            onClick={() => {
-              setEditingSupplier(null);
-              setIsFormModalOpen(true);
-            }}
-          >
-            <Plus size={14} />
-            <span>Thêm Nhà Cung Cấp</span>
-          </button>
+          {isStoreOwner && (
+            <button
+              type="button"
+              className="po-btn po-btn-primary"
+              style={{ height: 32, padding: '0 14px' }}
+              onClick={() => {
+                setEditingSupplier(null);
+                setModalTab('basic');
+                setIsFormModalOpen(true);
+              }}
+            >
+              <Plus size={14} />
+              <span>Thêm Nhà Cung Cấp</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -286,15 +286,17 @@ export const SupplierListPage: FC = () => {
         }}
         onEdit={(s) => {
           setEditingSupplier(s);
+          setModalTab('basic');
           setIsFormModalOpen(true);
         }}
-        onPayDebt={handlePayDebt}
+        canEdit={isStoreOwner}
       />
 
       {/* Modals */}
       <SupplierFormModal
         isOpen={isFormModalOpen}
         editingSupplier={editingSupplier}
+        initialTab={modalTab}
         onClose={() => setIsFormModalOpen(false)}
         onSubmit={handleSaveSupplier}
       />

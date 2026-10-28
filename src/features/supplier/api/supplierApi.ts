@@ -9,7 +9,6 @@ import type {
   SupplierType,
   APLedgerEntry,
 } from '../types/supplier.types';
-import { INITIAL_SUPPLIERS } from '../lib/mockData';
 
 // Map enums between Frontend and Backend
 const typeMapFrontendToBackend = (type?: string): number | undefined => {
@@ -81,10 +80,14 @@ export const supplierApi = {
     try {
       const params: Record<string, any> = {
         searchTerm: filter?.searchTerm || undefined,
+        code: filter?.code || undefined,
+        name: filter?.name || undefined,
+        contactPerson: filter?.contactPerson || undefined,
+        phone: filter?.phone || undefined,
         supplierType: typeMapFrontendToBackend(filter?.supplierType),
         status: statusMapFrontendToBackend(filter?.status),
         pageIndex: filter?.pageIndex || 1,
-        pageSize: filter?.pageSize || 10,
+        pageSize: filter?.pageSize || 12,
       };
 
       const res = await httpClient.get<ApiResponse<PagedResult<any>>>('/suppliers', { params });
@@ -95,20 +98,13 @@ export const supplierApi = {
           items,
           total: paged.totalItems || items.length,
           page: paged.page || 1,
-          pageSize: paged.pageSize || 10,
+          pageSize: paged.pageSize || 12,
         };
       }
-    } catch (err) {
-      console.warn('Backend API /suppliers unavailable, falling back to local dataset:', err);
+      throw new Error(res.data?.message || 'Không thể tải danh sách nhà cung cấp.');
+    } catch (err: any) {
+      throw new Error(err?.response?.data?.message || err.message || 'Không thể tải danh sách nhà cung cấp.');
     }
-
-    // Fallback nếu backend đang rỗng hoặc chưa kết nối
-    return {
-      items: INITIAL_SUPPLIERS,
-      total: INITIAL_SUPPLIERS.length,
-      page: 1,
-      pageSize: 10,
-    };
   },
 
   /**
@@ -120,10 +116,10 @@ export const supplierApi = {
       if (res.data?.success && res.data.data) {
         return mapBackendSupplierToFrontend(res.data.data);
       }
-    } catch (err) {
-      console.warn(`Backend API /suppliers/${id} failed, using local match:`, err);
+      return null;
+    } catch {
+      return null;
     }
-    return INITIAL_SUPPLIERS.find((s) => s.id === id) || null;
   },
 
   /**

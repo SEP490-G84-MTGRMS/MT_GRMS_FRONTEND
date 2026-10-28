@@ -9,11 +9,14 @@ import { MOCK_SUPPLIER_PRODUCTS } from '../lib/mockData';
 
 export interface SupplierProductFilterParams {
   searchTerm?: string;
+  productSearch?: string;
+  supplierSearch?: string;
   supplierId?: string;
   categoryFilter?: string;
   statusFilter?: string;
   pageIndex?: number;
   pageSize?: number;
+  suppliers?: Array<{ id: string; code: string; name: string }>;
 }
 
 export const supplierProductApi = {
@@ -30,7 +33,7 @@ export const supplierProductApi = {
           `/suppliers/${supplierId}/products`,
           {
             params: {
-              SearchTerm: filter.searchTerm || undefined,
+              SearchTerm: filter.productSearch || filter.searchTerm || undefined,
               Status:
                 filter.statusFilter === 'Active'
                   ? 1
@@ -77,13 +80,29 @@ export const supplierProductApi = {
         : Object.values(MOCK_SUPPLIER_PRODUCTS).flat();
 
     const filtered = allItems.filter((p) => {
-      if (filter.searchTerm?.trim()) {
-        const term = filter.searchTerm.toLowerCase();
-        const matchName = p.name.toLowerCase().includes(term);
-        const matchBarcode = p.barcode.toLowerCase().includes(term);
-        const matchSku = p.sku.toLowerCase().includes(term);
-        const matchCode = p.supplierProductCode?.toLowerCase().includes(term) ?? false;
+      // 1. Lọc theo Tên sản phẩm, Barcode, SKU
+      const productQuery = (filter.productSearch || filter.searchTerm || '').trim().toLowerCase();
+      if (productQuery) {
+        const matchName = p.name.toLowerCase().includes(productQuery);
+        const matchBarcode = p.barcode.toLowerCase().includes(productQuery);
+        const matchSku = p.sku.toLowerCase().includes(productQuery);
+        const matchCode = p.supplierProductCode?.toLowerCase().includes(productQuery) ?? false;
         if (!matchName && !matchBarcode && !matchSku && !matchCode) return false;
+      }
+
+      // 2. Lọc theo Nhà cung cấp (mã NCC hoặc tên NCC)
+      const supplierQuery = (filter.supplierSearch || '').trim().toLowerCase();
+      if (supplierQuery) {
+        const supp = filter.suppliers?.find((s) => s.id === p.supplierId);
+        const suppCode = (supp?.code || p.supplierId || '').toLowerCase();
+        const suppName = (supp?.name || '').toLowerCase();
+        if (!suppCode.includes(supplierQuery) && !suppName.includes(supplierQuery)) {
+          return false;
+        }
+      }
+
+      if (filter.supplierId && filter.supplierId !== 'ALL' && p.supplierId !== filter.supplierId) {
+        return false;
       }
       if (filter.categoryFilter && filter.categoryFilter !== 'ALL' && p.categoryName !== filter.categoryFilter) {
         return false;

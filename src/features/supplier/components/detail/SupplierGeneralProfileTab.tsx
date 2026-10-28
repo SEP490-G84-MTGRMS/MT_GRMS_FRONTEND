@@ -1,14 +1,15 @@
 import { useState } from 'react';
 import type { FC } from 'react';
 import type { SupplierSummary } from '../../types/supplier.types';
-import { Copy, Check, QrCode, UserCheck } from 'lucide-react';
+import { Copy, Check, QrCode, UserCheck, Edit3 } from 'lucide-react';
 
 interface Props {
   supplier: SupplierSummary;
   onLinkCustomer: (supplierId: string, customerId: string) => void;
+  onEdit?: (tab?: 'basic' | 'terms' | 'bank') => void;
 }
 
-export const SupplierGeneralProfileTab: FC<Props> = ({ supplier, onLinkCustomer }) => {
+export const SupplierGeneralProfileTab: FC<Props> = ({ supplier, onLinkCustomer, onEdit }) => {
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [customerIdInput, setCustomerIdInput] = useState('');
 
@@ -20,9 +21,22 @@ export const SupplierGeneralProfileTab: FC<Props> = ({ supplier, onLinkCustomer 
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      {/* Card 1: Thông tin liên hệ (matching screenshot exactly) */}
+      {/* Card 1: Thông tin liên hệ */}
       <div className="supplier-detail-card">
-        <h2 className="supplier-detail-card-title">Thông tin liên hệ</h2>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <h2 className="supplier-detail-card-title" style={{ margin: 0 }}>Thông tin liên hệ</h2>
+          {onEdit && (
+            <button
+              type="button"
+              onClick={() => onEdit('basic')}
+              className="admin-btn admin-btn-secondary"
+              style={{ height: 28, fontSize: 11.5, padding: '0 10px', gap: 4 }}
+            >
+              <Edit3 size={12} />
+              <span>Sửa liên hệ</span>
+            </button>
+          )}
+        </div>
 
         <div className="supplier-contact-grid">
           {/* Người liên hệ */}
@@ -89,7 +103,31 @@ export const SupplierGeneralProfileTab: FC<Props> = ({ supplier, onLinkCustomer 
 
       {/* Card 2: Tài khoản ngân hàng & Hóa đơn GTGT */}
       <div className="supplier-detail-card">
-        <h2 className="supplier-detail-card-title">Tài khoản ngân hàng & Hóa đơn</h2>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <h2 className="supplier-detail-card-title" style={{ margin: 0 }}>Tài khoản ngân hàng & Hóa đơn</h2>
+          {onEdit && (
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button
+                type="button"
+                onClick={() => onEdit('bank')}
+                className="admin-btn admin-btn-secondary"
+                style={{ height: 28, fontSize: 11.5, padding: '0 10px', gap: 4 }}
+              >
+                <Edit3 size={12} />
+                <span>{supplier.bankAccount ? 'Sửa ngân hàng' : '+ Thêm ngân hàng'}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => onEdit('terms')}
+                className="admin-btn admin-btn-secondary"
+                style={{ height: 28, fontSize: 11.5, padding: '0 10px', gap: 4 }}
+              >
+                <Edit3 size={12} />
+                <span>{supplier.companyName ? 'Sửa hóa đơn VAT' : '+ Thêm VAT'}</span>
+              </button>
+            </div>
+          )}
+        </div>
 
         {supplier.bankAccount ? (
           <div className="supplier-bank-box">
@@ -118,13 +156,23 @@ export const SupplierGeneralProfileTab: FC<Props> = ({ supplier, onLinkCustomer 
             </div>
           </div>
         ) : (
-          <div style={{ padding: '16px', textAlign: 'center', color: 'var(--text-muted)', background: 'var(--bg-soft-blue)', borderRadius: 16 }}>
-            Chưa cập nhật thông tin tài khoản ngân hàng.
+          <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)', background: 'var(--bg-soft-blue)', borderRadius: 16 }}>
+            <p style={{ margin: '0 0 10px 0', fontSize: 13 }}>Chưa cập nhật thông tin tài khoản ngân hàng.</p>
+            {onEdit && (
+              <button
+                type="button"
+                onClick={() => onEdit('bank')}
+                className="admin-btn admin-btn-primary"
+                style={{ height: 30, fontSize: 12, padding: '0 14px' }}
+              >
+                + Cập nhật tài khoản ngân hàng
+              </button>
+            )}
           </div>
         )}
 
         {/* Hóa đơn GTGT */}
-        {supplier.companyName && (
+        {supplier.companyName ? (
           <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--border-light)' }}>
             <div className="supplier-contact-grid">
               <div className="supplier-contact-field">
@@ -137,7 +185,19 @@ export const SupplierGeneralProfileTab: FC<Props> = ({ supplier, onLinkCustomer 
               </div>
             </div>
           </div>
-        )}
+        ) : onEdit ? (
+          <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: 12.5, color: '#64748b' }}>Chưa có thông tin xuất hóa đơn VAT (Tên công ty, MST, địa chỉ).</span>
+            <button
+              type="button"
+              onClick={() => onEdit('terms')}
+              className="admin-btn admin-btn-secondary"
+              style={{ height: 28, fontSize: 11.5, padding: '0 10px' }}
+            >
+              + Thêm hóa đơn VAT
+            </button>
+          </div>
+        ) : null}
       </div>
 
       {/* Card 3: Đối tác kép & Ghi chú nghiệp vụ */}

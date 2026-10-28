@@ -1,6 +1,6 @@
 import type { FC } from 'react';
 import type { SupplierProductItem } from '../../types/supplier.types';
-import { Edit2, Power, Star } from 'lucide-react';
+import { Edit2, Power } from 'lucide-react';
 
 interface SupplierProductTableRowProps {
   index: number;
@@ -19,7 +19,7 @@ export const SupplierProductTableRow: FC<SupplierProductTableRowProps> = ({
   supplierName,
   onEdit,
   onToggleStatus,
-  onSetPrimary,
+  onSetPrimary: _onSetPrimary,
 }) => {
   const fmtCurrency = (val: number) => new Intl.NumberFormat('vi-VN').format(val) + ' đ';
 
@@ -75,33 +75,12 @@ export const SupplierProductTableRow: FC<SupplierProductTableRowProps> = ({
         </span>
       </td>
 
-      {/* 4. Tên Sản Phẩm + Primary Badge */}
+      {/* 4. Tên Sản Phẩm */}
       <td style={{ padding: '10px 12px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
           <span style={{ fontWeight: 600, color: '#0f172a', fontSize: 13, lineHeight: 1.35 }}>
             {item.name}
           </span>
-          {item.isPrimary && (
-            <span
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 3,
-                fontSize: 10.5,
-                fontWeight: 700,
-                color: '#b45309',
-                backgroundColor: '#fef3c7',
-                border: '1px solid #fde68a',
-                padding: '1px 6px',
-                borderRadius: 4,
-                whiteSpace: 'nowrap',
-              }}
-              title="Nhà cung cấp chính cho mặt hàng này"
-            >
-              <Star size={10} fill="#b45309" color="#b45309" />
-              <span>NCC Chính</span>
-            </span>
-          )}
         </div>
       </td>
 
@@ -213,30 +192,6 @@ export const SupplierProductTableRow: FC<SupplierProductTableRowProps> = ({
       {/* 12. Thao Tác */}
       <td style={{ padding: '10px 12px', textAlign: 'right', whiteSpace: 'nowrap' }}>
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-          {onSetPrimary && !item.isPrimary && item.status === 'Active' && (
-            <button
-              type="button"
-              onClick={() => onSetPrimary(item)}
-              title="Đặt làm Nhà cung cấp chính (Primary Supplier)"
-              style={{
-                height: 26,
-                padding: '0 6px',
-                borderRadius: 4,
-                border: '1px solid #fde68a',
-                backgroundColor: '#fef3c7',
-                color: '#b45309',
-                fontSize: 11.5,
-                fontWeight: 600,
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 3,
-              }}
-            >
-              <Star size={11} /> Primary
-            </button>
-          )}
-
           <button
             type="button"
             onClick={() => onEdit(item)}
