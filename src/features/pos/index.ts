@@ -2,6 +2,7 @@ export * from './types/pos.types';
 export * from './types/inventory.types';
 export * from './pages/PosCheckoutPage';
 export * from './pages/PosShiftPage';
+export * from './pages/CashierShiftDashboardPage';
 export * from './pages/InventoryLookupPage';
 export * from './pages/InvoiceManagementPage';
 export * from './mock/inventoryMockData';
@@ -23,5 +24,3 @@ export * from './components/modals/ZReportModal';
 export * from './components/modals/EditFloatModal';
 export * from './components/modals/DebtLimitWarningModal';
 export * from './components/modals/CollectDebtModal';
-
-

@@ -213,7 +213,7 @@ export const customerApi = {
       payments: [newPayment, ...(current.payments || [])],
     };
 
-    // Auto-sync to Cashbook (FE-17)
+    // Auto-sync to Cashbook
     let receiptCode = `REC-${Date.now().toString().slice(-4)}`;
     try {
       const accounts = await cashbookService.getCashAccounts();

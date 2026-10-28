@@ -81,7 +81,7 @@ export const PnlKpiCardsSection: React.FC<PnlKpiCardsSectionProps> = ({
 
       {/* 4. Chi phí dịch vụ ngoài */}
       <PnlKpiCard
-        title="Chi phí dịch vụ (FE-07)"
+        title="Chi phí dịch vụ"
         value={formatVnd(kpi.operatingExpenses)}
         subValue={`Hao hụt kho: ${formatVnd(kpi.shrinkageLoss)}`}
         growthPct={kpi.expensesGrowthPct}

@@ -96,7 +96,8 @@ export const CustomerManagementPage: FC = () => {
   };
 
   return (
-    <div className="customer-page">
+    <div className="min-h-screen bg-[#F7F8F7] font-finance">
+      <div className="customer-page">
       {/* Toast Notification chuẩn của dự án */}
       {toast && (
         <AdminToast
@@ -115,9 +116,9 @@ export const CustomerManagementPage: FC = () => {
             <Users size={22} color="#ffffff" />
           </div>
           <div className="customer-topbar-text">
-            <h1>Quản Lý Khách Hàng & Công Nợ</h1>
+            <h1>Khách nợ</h1>
             <p>
-              Phân hệ (Customer CRM & Accounts Receivable) · Tích hợp thanh toán
+              Sổ theo dõi nợ và thu hồi công nợ · Tích hợp thanh toán
               VietQR động
             </p>
           </div>
@@ -188,6 +189,7 @@ export const CustomerManagementPage: FC = () => {
         onClose={() => setLedgerCustomer(null)}
         onOpenCollect={handleOpenCollectModal}
       />
+    </div>
     </div>
   );
 };

@@ -143,7 +143,7 @@ function buildMockPnlTree(kpi: KpiSummaryData): PnlLineItem[] {
         {
           id: 'item-3-2',
           code: '3.2',
-          title: 'Chi phí dịch vụ vận hành ngoài (FE-07)',
+          title: 'Chi phí dịch vụ vận hành ngoài',
           level: 2,
           amount: kpi.operatingExpenses,
           percentageOfNetRevenue: calculateMarginPct(kpi.operatingExpenses, rev),
