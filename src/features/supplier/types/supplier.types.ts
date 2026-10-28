@@ -54,7 +54,11 @@ export interface SupplierStats {
 }
 
 export interface SupplierFilterState {
-  searchTerm: string;
+  searchTerm?: string;
+  code?: string;
+  name?: string;
+  contactPerson?: string;
+  phone?: string;
   supplierType: string;
   category: string;
   debtStatus: string;

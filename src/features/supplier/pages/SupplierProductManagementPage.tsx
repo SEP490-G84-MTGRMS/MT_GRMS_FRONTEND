@@ -32,6 +32,8 @@ export interface ProductFilterState extends SupplierProductFilterValues {
 }
 
 const DEFAULT_FILTERS: ProductFilterState = {
+  productSearch: '',
+  supplierSearch: '',
   searchTerm: '',
   supplierId: 'ALL',
   categoryFilter: 'ALL',
@@ -90,7 +92,10 @@ export const SupplierProductManagementPage: FC = () => {
     try {
       const res = await supplierProductApi.getSupplierProducts(
         appliedFilters.supplierId,
-        appliedFilters
+        {
+          ...appliedFilters,
+          suppliers,
+        }
       );
       setProducts(res.items);
       setTotalCount(res.total);
@@ -99,7 +104,7 @@ export const SupplierProductManagementPage: FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [appliedFilters]);
+  }, [appliedFilters, suppliers]);
 
   useEffect(() => {
     fetchProducts();
