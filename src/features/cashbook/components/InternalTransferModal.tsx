@@ -96,7 +96,7 @@ export const InternalTransferModal: FC<InternalTransferModalProps> = ({
               <span>⇄</span> Chuyển Tiền Quỹ Nội Bộ
             </h2>
             <p className="cb-modal-subtitle">
-              Điều chuyển thanh khoản giữa két tiền mặt và tài khoản ngân hàng (FE-17)
+              Điều chuyển thanh khoản giữa két tiền mặt và tài khoản ngân hàng
             </p>
           </div>
           <button type="button" className="cb-modal-close-btn" onClick={onClose}>

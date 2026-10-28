@@ -28,7 +28,7 @@ export const CreateReceiptModal: FC<CreateReceiptModalProps> = ({
 
   const categories = [
     'Thu bán lẻ khác',
-    'Thu nợ khách hàng (FE-08)',
+    'Thu nợ khách hàng',
     'Hoàn ứng nội bộ',
     'Thu lãi tiền gửi ngân hàng',
     'Thu khác',

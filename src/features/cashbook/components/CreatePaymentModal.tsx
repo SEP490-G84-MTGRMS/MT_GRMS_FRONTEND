@@ -17,7 +17,7 @@ export const CreatePaymentModal: FC<CreatePaymentModalProps> = ({
 }) => {
   const [accountId, setAccountId] = useState(accounts[0]?.id || '');
   const [amountStr, setAmountStr] = useState('');
-  const [category, setCategory] = useState('Chi phí vận hành (FE-07)');
+  const [category, setCategory] = useState('Chi phí vận hành');
   const [counterpartyType, setCounterpartyType] = useState<CounterpartyType>('SUPPLIER');
   const [counterpartyName, setCounterpartyName] = useState('');
   const [description, setDescription] = useState('');
@@ -27,7 +27,7 @@ export const CreatePaymentModal: FC<CreatePaymentModalProps> = ({
   if (!isOpen) return null;
 
   const categories = [
-    'Chi phí vận hành (FE-07)',
+    'Chi phí vận hành',
     'Trả tiền hàng NCC (FE-06)',
     'Tạm ứng lương nhân viên',
     'Mua sắm trang thiết bị',

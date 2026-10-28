@@ -7,6 +7,7 @@ import type {
   FundTransferDTO,
   CashReconciliationDTO,
   CashbookSummaryKPI,
+  CashTransitItem,
 } from '../types/cashbook.types';
 
 const INITIAL_ACCOUNTS: CashAccount[] = [
@@ -14,23 +15,37 @@ const INITIAL_ACCOUNTS: CashAccount[] = [
     id: 'ACC-01',
     branchId: 'BR-01',
     branchName: 'Chi nhánh Quận 1 (Cửa hàng chính)',
-    accountName: 'Két tiền mặt Q1',
+    accountName: 'Két tiền mặt quầy Q1',
     accountType: 'CASH',
     currentBalance: 12500000,
     initialBalance: 10000000,
     isActive: true,
     currency: 'VND',
+    isSafeDeposit: false,
   },
   {
     id: 'ACC-02',
     branchId: 'BR-02',
     branchName: 'Chi nhánh Quận 7',
-    accountName: 'Két tiền mặt Q7',
+    accountName: 'Két tiền mặt quầy Q7',
     accountType: 'CASH',
     currentBalance: 8200000,
     initialBalance: 5000000,
     isActive: true,
     currency: 'VND',
+    isSafeDeposit: false,
+  },
+  {
+    id: 'ACC-SAFE',
+    branchId: 'ALL',
+    branchName: 'Toàn hệ thống (Chủ cửa hàng)',
+    accountName: 'Két sắt của chủ shop (Safe Deposit)',
+    accountType: 'CASH',
+    currentBalance: 150000000,
+    initialBalance: 120000000,
+    isActive: true,
+    currency: 'VND',
+    isSafeDeposit: true,
   },
   {
     id: 'ACC-03',
@@ -60,12 +75,28 @@ const INITIAL_ACCOUNTS: CashAccount[] = [
   },
 ];
 
+const INITIAL_TRANSITS: CashTransitItem[] = [
+  {
+    id: 'TR-001',
+    transferCode: 'TRANSIT-20261027-01',
+    fromAccountId: 'ACC-01',
+    fromAccountName: 'Két tiền mặt quầy Q1',
+    toAccountId: 'ACC-SAFE',
+    toAccountName: 'Két sắt của chủ shop',
+    amount: 10350000,
+    senderName: 'Thu ngân Ca sáng (Trần Thị Lan)',
+    sentAt: '2026-10-27T04:30:00Z',
+    status: 'PENDING',
+    note: 'Nộp tiền mặt doanh thu bán hàng ca sáng về két sắt chủ shop',
+  },
+];
+
 const INITIAL_TRANSACTIONS: LedgerTransaction[] = [
   {
     id: 'TX-001',
     transactionCode: 'PT-20261014-001',
     accountId: 'ACC-01',
-    accountName: 'Két tiền mặt Q1',
+    accountName: 'Két tiền mặt quầy Q1',
     branchId: 'BR-01',
     transactionType: 'RECEIPT',
     category: 'Doanh thu bán hàng POS',
@@ -84,10 +115,10 @@ const INITIAL_TRANSACTIONS: LedgerTransaction[] = [
     id: 'TX-002',
     transactionCode: 'PC-20261013-004',
     accountId: 'ACC-01',
-    accountName: 'Két tiền mặt Q1',
+    accountName: 'Két tiền mặt quầy Q1',
     branchId: 'BR-01',
     transactionType: 'PAYMENT',
-    category: 'Chi phí vận hành (FE-07)',
+    category: 'Chi phí vận hành',
     amount: 350000,
     balanceAfter: 11050000,
     counterpartyType: 'SUPPLIER',
@@ -106,7 +137,7 @@ const INITIAL_TRANSACTIONS: LedgerTransaction[] = [
     accountName: 'Vietcombank - TK Thu Bán Hàng',
     branchId: 'ALL',
     transactionType: 'RECEIPT',
-    category: 'Thu nợ khách hàng (FE-08)',
+    category: 'Thu nợ khách hàng',
     amount: 15000000,
     balanceAfter: 145800000,
     counterpartyType: 'CUSTOMER',
@@ -125,7 +156,7 @@ const INITIAL_TRANSACTIONS: LedgerTransaction[] = [
     branchId: 'ALL',
     transactionType: 'PAYMENT',
     category: 'Thanh toán nhập hàng NCC',
-    amount: 18500000,
+    amount: 1850000,
     balanceAfter: 32450000,
     counterpartyType: 'SUPPLIER',
     counterpartyName: 'Công ty Cổ phần Vinamilk',
@@ -140,7 +171,7 @@ const INITIAL_TRANSACTIONS: LedgerTransaction[] = [
     id: 'TX-005',
     transactionCode: 'KK-20261011-001',
     accountId: 'ACC-02',
-    accountName: 'Két tiền mặt Q7',
+    accountName: 'Két tiền mặt quầy Q7',
     branchId: 'BR-02',
     transactionType: 'ADJUSTMENT',
     category: 'Kiểm kê chênh lệch két',
@@ -157,13 +188,11 @@ const INITIAL_TRANSACTIONS: LedgerTransaction[] = [
 ];
 
 const STORAGE_KEYS = {
-  ACCOUNTS: 'mt_grms_cash_accounts_v1',
-  TRANSACTIONS: 'mt_grms_cash_transactions_v1',
+  ACCOUNTS: 'mt_grms_cash_accounts_v2',
+  TRANSACTIONS: 'mt_grms_cash_transactions_v2',
+  TRANSITS: 'mt_grms_cash_transits_v2',
 };
 
-/**
- * Helper to get state from localStorage or fallback
- */
 function loadState<T>(key: string, defaultValue: T): T {
   try {
     const raw = localStorage.getItem(key);
@@ -175,9 +204,6 @@ function loadState<T>(key: string, defaultValue: T): T {
   }
 }
 
-/**
- * Helper to save state into localStorage
- */
 function saveState<T>(key: string, value: T): void {
   try {
     localStorage.setItem(key, JSON.stringify(value));
@@ -186,12 +212,9 @@ function saveState<T>(key: string, value: T): void {
   }
 }
 
-/**
- * Cashbook Service implementation adhering to MT-GRMS architecture
- */
 export const cashbookService = {
   /**
-   * Retrieves all cash and bank accounts, optional filtering by branch
+   * Retrieves all cash, safe, and bank accounts, optional filtering by branch
    */
   async getCashAccounts(branchId?: string): Promise<CashAccount[]> {
     const accounts = loadState<CashAccount[]>(STORAGE_KEYS.ACCOUNTS, INITIAL_ACCOUNTS);
@@ -207,6 +230,54 @@ export const cashbookService = {
   async getCashAccountById(id: string): Promise<CashAccount | undefined> {
     const accounts = await this.getCashAccounts();
     return accounts.find((acc) => acc.id === id);
+  },
+
+  /**
+   * Retrieves Cash Transit transfers (Tiền đang chuyển về két sắt)
+   */
+  async getCashTransits(): Promise<CashTransitItem[]> {
+    return loadState<CashTransitItem[]>(STORAGE_KEYS.TRANSITS, INITIAL_TRANSITS);
+  },
+
+  /**
+   * Confirms a Cash Transit has been received into the Safe Deposit
+   */
+  async confirmTransitReceived(transitId: string, performedBy = 'Chủ shop'): Promise<void> {
+    const transits = await this.getCashTransits();
+    const tIndex = transits.findIndex((t) => t.id === transitId);
+    if (tIndex === -1) throw new Error('Không tìm thấy khoản chuyển tiền');
+
+    const transit = transits[tIndex];
+    transit.status = 'RECEIVED';
+    transits[tIndex] = transit;
+    saveState(STORAGE_KEYS.TRANSITS, transits);
+
+    // Record receipt into Safe Deposit
+    await this.createReceipt({
+      accountId: transit.toAccountId,
+      amount: transit.amount,
+      category: 'Tiền mặt chuyển về két sắt',
+      counterpartyType: 'INTERNAL',
+      counterpartyName: transit.fromAccountName,
+      description: `[ĐÃ NHẬN ĐỦ KÉT SẮT] Bởi ${performedBy} từ ${transit.fromAccountName} (Mã chuyển: ${transit.transferCode})`,
+      referenceDocType: 'CASH_TRANSIT',
+      referenceDocId: transit.id,
+      sourceModuleName: 'INTERNAL_TRANSFER',
+      isAutomated: true,
+    });
+  },
+
+  /**
+   * Reports a discrepancy in cash transit
+   */
+  async reportTransitDiscrepancy(transitId: string, note: string): Promise<void> {
+    const transits = await this.getCashTransits();
+    const tIndex = transits.findIndex((t) => t.id === transitId);
+    if (tIndex === -1) throw new Error('Không tìm thấy khoản chuyển tiền');
+
+    transits[tIndex].status = 'DISCREPANCY';
+    transits[tIndex].note = note;
+    saveState(STORAGE_KEYS.TRANSITS, transits);
   },
 
   /**
@@ -327,7 +398,7 @@ export const cashbookService = {
     // Business Rule GBR-CSH-03: Chặn âm quỹ két tiền mặt
     if (targetAccount.accountType === 'CASH' && dto.amount > targetAccount.currentBalance) {
       throw new Error(
-        `Số tiền chi (${dto.amount.toLocaleString('vi-VN')} đ) vượt quá số dư két hiện có (${targetAccount.currentBalance.toLocaleString('vi-VN')} đ). Quy tắc GBR-CSH-03 không cho phép âm két tiền mặt.`
+        `Số tiền chi (${dto.amount.toLocaleString('vi-VN')} đ) vượt quá số dư két hiện có (${targetAccount.currentBalance.toLocaleString('vi-VN')} đ). Quy tắc Poka-yoke GBR-CSH-03 không cho phép âm két tiền mặt.`
       );
     }
 
@@ -369,6 +440,99 @@ export const cashbookService = {
   },
 
   /**
+   * Voids an existing ledger entry by creating an opposite Compensating Entry
+   * Adheres strictly to Immutable Ledger Principle (No DB UPDATE/DELETE)
+   */
+  async voidTransaction(
+    transactionId: string,
+    reason: string,
+    performedBy = 'Nguyễn Trường An'
+  ): Promise<LedgerTransaction> {
+    const transactions = loadState<LedgerTransaction[]>(STORAGE_KEYS.TRANSACTIONS, INITIAL_TRANSACTIONS);
+    const origIndex = transactions.findIndex((tx) => tx.id === transactionId);
+
+    if (origIndex === -1) {
+      throw new Error('Không tìm thấy bút toán cần hủy');
+    }
+
+    const origTx = transactions[origIndex];
+    if (origTx.isVoided) {
+      throw new Error('Bút toán này đã được gạch bỏ trước đó');
+    }
+
+    const accounts = loadState<CashAccount[]>(STORAGE_KEYS.ACCOUNTS, INITIAL_ACCOUNTS);
+    const accIndex = accounts.findIndex((a) => a.id === origTx.accountId);
+    if (accIndex === -1) {
+      throw new Error('Tài khoản sổ cái liên kết không tồn tại');
+    }
+
+    const targetAccount = accounts[accIndex];
+
+    // Determine reverse amount impact on account balance
+    let balanceDelta = 0;
+    let compType: LedgerTransaction['transactionType'] = 'PAYMENT';
+
+    if (origTx.transactionType === 'PAYMENT') {
+      // Reversing a payment adds money back
+      balanceDelta = origTx.amount;
+      compType = 'RECEIPT';
+    } else if (origTx.transactionType === 'RECEIPT') {
+      // Reversing a receipt subtracts money
+      if (targetAccount.accountType === 'CASH' && targetAccount.currentBalance < origTx.amount) {
+        throw new Error('Không thể hủy phiếu thu: Số dư hiện tại không đủ để hoàn lại!');
+      }
+      balanceDelta = -origTx.amount;
+      compType = 'PAYMENT';
+    } else {
+      balanceDelta = -origTx.amount;
+      compType = 'ADJUSTMENT';
+    }
+
+    targetAccount.currentBalance += balanceDelta;
+    accounts[accIndex] = targetAccount;
+    saveState(STORAGE_KEYS.ACCOUNTS, accounts);
+
+    // Mark original as voided
+    origTx.isVoided = true;
+    origTx.voidReason = reason;
+    transactions[origIndex] = origTx;
+
+    // Create Compensating Entry
+    const now = new Date();
+    const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
+    const randCode = Math.floor(100 + Math.random() * 900);
+
+    const compTx: LedgerTransaction = {
+      id: `TX-COMP-${Date.now()}`,
+      transactionCode: `GB-${dateStr}-${randCode}`,
+      accountId: targetAccount.id,
+      accountName: targetAccount.accountName,
+      branchId: targetAccount.branchId,
+      transactionType: compType,
+      category: `Gạch bỏ [${origTx.transactionCode}]`,
+      amount: origTx.amount,
+      balanceAfter: targetAccount.currentBalance,
+      counterpartyType: origTx.counterpartyType,
+      counterpartyName: origTx.counterpartyName,
+      description: `[BÚT TOÁN GẠCH BỎ] Lý do: ${reason}. Bù trừ cho phiếu gốc ${origTx.transactionCode}`,
+      referenceDocType: 'COMPENSATING',
+      referenceDocId: origTx.id,
+      sourceModuleName: origTx.sourceModuleName,
+      linkedTransactionId: origTx.id,
+      isAutomated: false,
+      isCompensating: true,
+      originalEntryId: origTx.id,
+      createdBy: performedBy,
+      createdAt: now.toISOString(),
+    };
+
+    transactions.unshift(compTx);
+    saveState(STORAGE_KEYS.TRANSACTIONS, transactions);
+
+    return compTx;
+  },
+
+  /**
    * Transfers funds between two cash/bank accounts (Chuyển tiền nội bộ)
    */
   async transferFunds(dto: FundTransferDTO): Promise<{ payment: LedgerTransaction; receipt: LedgerTransaction }> {
@@ -389,14 +553,12 @@ export const cashbookService = {
     const fromAcc = accounts[fromIndex];
     const toAcc = accounts[toIndex];
 
-    // Chặn âm quỹ nếu là két tiền mặt
     if (fromAcc.accountType === 'CASH' && dto.amount > fromAcc.currentBalance) {
       throw new Error(
-        `Số tiền chuyển (${dto.amount.toLocaleString('vi-VN')} đ) vượt quá số dư két hiện có (${fromAcc.currentBalance.toLocaleString('vi-VN')} đ).`
+        `Số tiền chuyển (${dto.amount.toLocaleString('vi-VN')} đ) vượt quá số dư hiện có (${fromAcc.currentBalance.toLocaleString('vi-VN')} đ).`
       );
     }
 
-    // Cập nhật số dư
     fromAcc.currentBalance -= dto.amount;
     toAcc.currentBalance += dto.amount;
     accounts[fromIndex] = fromAcc;
@@ -411,7 +573,6 @@ export const cashbookService = {
 
     const noteText = dto.note || `Chuyển tiền từ ${fromAcc.accountName} sang ${toAcc.accountName}`;
 
-    // 1. Phiếu Chi tại tài khoản nguồn
     const payTx: LedgerTransaction = {
       id: payTxId,
       transactionCode: `PC-TRF-${dateStr}-${randCode}`,
@@ -434,7 +595,6 @@ export const cashbookService = {
       createdAt: now.toISOString(),
     };
 
-    // 2. Phiếu Thu tại tài khoản đích
     const recTx: LedgerTransaction = {
       id: recTxId,
       transactionCode: `PT-TRF-${dateStr}-${randCode}`,
@@ -466,12 +626,11 @@ export const cashbookService = {
   },
 
   /**
-   * Reconciles cash drawer against physical count (UC-17.4 & Rule GBR-CSH-04)
+   * Reconciles cash drawer against physical count (Blind Cash Count - Kiểm quỹ mù 3 bước)
    */
   async reconcileCashAccount(dto: CashReconciliationDTO): Promise<LedgerTransaction | null> {
     const diff = dto.actualCountedBalance - dto.systemBalance;
 
-    // Business Rule GBR-CSH-04: Bắt buộc giải trình nếu có chênh lệch
     if (diff !== 0 && (!dto.reason || !dto.reason.trim())) {
       throw new Error('Chênh lệch kiểm kê bắt buộc phải có lý do giải trình cụ thể theo quy tắc GBR-CSH-04');
     }
@@ -489,7 +648,6 @@ export const cashbookService = {
     saveState(STORAGE_KEYS.ACCOUNTS, accounts);
 
     if (diff === 0) {
-      // Khớp hoàn toàn, không cần bút toán điều chỉnh
       return null;
     }
 
@@ -509,7 +667,7 @@ export const cashbookService = {
       balanceAfter: dto.actualCountedBalance,
       counterpartyType: 'OTHER',
       counterpartyName: 'Hội đồng kiểm kê',
-      description: `Điều chỉnh kiểm kê: ${dto.reason.trim()} (Chênh lệch: ${diff > 0 ? '+' : ''}${diff.toLocaleString('vi-VN')} đ)`,
+      description: `Điều chỉnh kiểm kê kết ca: ${dto.reason.trim()} (Chênh lệch: ${diff > 0 ? '+' : ''}${diff.toLocaleString('vi-VN')} đ)`,
       referenceDocType: 'AUDIT',
       isAutomated: false,
       createdBy: dto.auditedBy || 'Nguyễn Trường An',
@@ -532,9 +690,12 @@ export const cashbookService = {
 
     let totalCashInDrawers = 0;
     let totalBankDeposits = 0;
+    let totalSafeDepositBalance = 0;
 
     accounts.forEach((acc) => {
-      if (acc.accountType === 'CASH') {
+      if (acc.isSafeDeposit) {
+        totalSafeDepositBalance += acc.currentBalance;
+      } else if (acc.accountType === 'CASH') {
         totalCashInDrawers += acc.currentBalance;
       } else {
         totalBankDeposits += acc.currentBalance;
@@ -545,6 +706,7 @@ export const cashbookService = {
     let totalPayments = 0;
 
     transactions.forEach((tx) => {
+      if (tx.isVoided) return; // Skip voided entries in active cash flow
       if (tx.transactionType === 'RECEIPT') {
         totalReceipts += tx.amount;
       } else if (tx.transactionType === 'PAYMENT') {
@@ -552,7 +714,7 @@ export const cashbookService = {
       }
     });
 
-    const totalClosingBalance = totalCashInDrawers + totalBankDeposits;
+    const totalClosingBalance = totalCashInDrawers + totalBankDeposits + totalSafeDepositBalance;
     const totalOpeningBalance = totalClosingBalance - totalReceipts + totalPayments;
 
     return {
@@ -562,6 +724,7 @@ export const cashbookService = {
       totalClosingBalance,
       totalCashInDrawers,
       totalBankDeposits,
+      totalSafeDepositBalance,
     };
   },
 
@@ -580,6 +743,7 @@ export const cashbookService = {
       'Chi (VNĐ)',
       'Số dư sau GD (VNĐ)',
       'Diễn giải',
+      'Trạng thái',
       'Nguồn giao dịch',
     ];
 
@@ -601,12 +765,12 @@ export const cashbookService = {
         thuAmount,
         chiAmount,
         tx.balanceAfter,
-        `"${(tx.description || '').replace(/"/g, '""')}"`,
-        `"${tx.isAutomated ? 'Tự động từ hệ thống' : 'Thủ công'}"`,
+        `"${tx.description.replace(/"/g, '""')}"`,
+        `"${tx.isVoided ? 'Đã gạch bỏ' : tx.isCompensating ? 'Phiếu bù trừ' : 'Hợp lệ'}"`,
+        `"${tx.sourceModuleName || 'MANUAL'}"`,
       ].join(',');
     });
 
-    // Thêm UTF-8 BOM \uFEFF chống vỡ font tiếng Việt
     return '\uFEFF' + [headers.join(','), ...rows].join('\r\n');
   },
 };

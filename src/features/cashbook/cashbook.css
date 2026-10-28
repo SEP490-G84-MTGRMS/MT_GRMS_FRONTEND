@@ -613,3 +613,82 @@
     color: #000000;
   }
 }
+
+/* ==========================================================================
+   CASHBOOK EQUATION STRIP & COMMON RESPONSIVE COMPONENTS
+   ========================================================================== */
+.cashbook-summary-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #ffffff;
+  border: 1px solid #E2E8F0;
+  border-radius: 16px;
+  padding: 14px 24px;
+  margin-bottom: 24px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
+  overflow-x: auto;
+}
+
+.cb-summary-item {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.cb-summary-operator {
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: #94A3B8;
+  padding: 0 4px;
+  user-select: none;
+}
+
+.cb-summary-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #64748B;
+}
+
+.cb-summary-value {
+  font-size: 1.15rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.cb-summary-value.balance-value {
+  color: #0F172A;
+}
+
+.cb-summary-value.income-value {
+  color: #059669;
+}
+
+.cb-summary-value.expense-value {
+  color: #DC2626;
+}
+
+@media (max-width: 768px) {
+  .cashbook-summary-bar {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    padding: 16px;
+  }
+  .cb-summary-operator {
+    display: none;
+  }
+  .cb-summary-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+  }
+}
+
+@media (max-width: 480px) {
+  .cashbook-summary-bar {
+    grid-template-columns: 1fr;
+  }
+}
+
