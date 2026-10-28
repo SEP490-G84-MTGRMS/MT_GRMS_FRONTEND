@@ -1,6 +1,7 @@
-import { useState, useRef, useEffect, useCallback, Fragment } from "react";
+﻿import { useState, useRef, useEffect, useCallback, Fragment } from "react";
 import type { FC } from "react";
-import { NavLink, Link, useLocation, useNavigate } from "react-router-dom";import {
+import { NavLink, Link, useLocation, useNavigate } from "react-router-dom";
+import {
   DashboardIcon,
   TruckIcon,
   PackageIcon,
@@ -1465,15 +1466,12 @@ export const AppTopNav: FC = () => {
                       backgroundColor: "#ffffff",
                       borderRadius: 14,
                       boxShadow:
-                        "0 12px 32px rgba(0, 0, 0, 0.16), 0 2px 8px rgba(0, 0, 0, 0.08)",
+                        "0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)",
                       border: "1px solid #E2E8F0",
                       overflow: "hidden",
-                      display: "flex",
-                      flexDirection: "column",
-                      fontFamily: "var(--font-sans)",
                     }}
                   >
-                    {/* Row 1: Profile Summary */}
+                    {/* Header info tài khoản */}
                     <Link
                       to="/store-owner/account?tab=account-profile"
                       onClick={() => setAccountMenuOpen(false)}
@@ -1481,17 +1479,17 @@ export const AppTopNav: FC = () => {
                         display: "flex",
                         alignItems: "center",
                         gap: 12,
-                        padding: "14px 16px",
+                        padding: "16px",
                         textDecoration: "none",
-                        color: "inherit",
-                        backgroundColor: "#ffffff",
+                        backgroundColor: "#F8FAFC",
+                        borderBottom: "1px solid #E2E8F0",
                         transition: "background-color 0.15s ease",
                       }}
                       onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = "#F8FAFC";
+                        e.currentTarget.style.backgroundColor = "#F1F5F9";
                       }}
                       onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = "#ffffff";
+                        e.currentTarget.style.backgroundColor = "#F8FAFC";
                       }}
                     >
                       <div
