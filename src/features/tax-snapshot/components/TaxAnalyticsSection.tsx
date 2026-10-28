@@ -13,7 +13,10 @@ const formatVND = (value: number) => {
 
 export const TaxAnalyticsSection: FC<Props> = ({ snapshots, year }) => {
   const quarters = [1, 2, 3, 4];
-  const maxRevenue = Math.max(...snapshots.map((s) => s.taxableRevenue), 600000000);
+  const maxRevenue = Math.max(
+    ...snapshots.map((s) => s.taxableRevenue ?? s.taxableRevenueInPeriod ?? 0),
+    600000000
+  );
 
   return (
     <div className="tax-table-card" style={{ padding: 28 }}>
@@ -35,15 +38,15 @@ export const TaxAnalyticsSection: FC<Props> = ({ snapshots, year }) => {
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <span style={{ width: 12, height: 12, borderRadius: 3, background: '#D97706', display: 'inline-block' }} />
-            <span style={{ color: '#475569' }}>Tổng thuế nộp (1.5%)</span>
+            <span style={{ color: '#475569' }}>Tổng thuế nộp</span>
           </div>
         </div>
       </div>
 
       <div className="tax-analytics-grid">
         {quarters.map((q) => {
-          const snapshot = snapshots.find((s) => s.quarter === q);
-          const revenue = snapshot?.taxableRevenue || 0;
+          const snapshot = snapshots.find((s) => (s.quarter ?? s.periodNumber) === q);
+          const revenue = snapshot?.taxableRevenue ?? snapshot?.taxableRevenueInPeriod ?? 0;
           const tax = snapshot?.totalTaxAmount || 0;
           const heightPercent = Math.min(100, Math.round((revenue / maxRevenue) * 100));
 
@@ -53,7 +56,7 @@ export const TaxAnalyticsSection: FC<Props> = ({ snapshots, year }) => {
                 <span style={{ fontWeight: 800, fontSize: '0.9rem', color: '#0F172A' }}>Quý {q}/{year}</span>
                 {snapshot ? (
                   <span className="tax-badge tax-badge-finalized" style={{ padding: '2px 8px', fontSize: '0.7rem' }}>
-                    {snapshot.status}
+                    {snapshot.status || 'Đã chốt'}
                   </span>
                 ) : (
                   <span style={{ fontSize: '0.7rem', color: '#94A3B8', background: '#E2E8F0', padding: '2px 8px', borderRadius: 9999 }}>
@@ -92,7 +95,7 @@ export const TaxAnalyticsSection: FC<Props> = ({ snapshots, year }) => {
                   <strong style={{ color: '#0F172A' }}>{revenue > 0 ? formatVND(revenue) : '—'}</strong>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: '#64748B' }}>Thuế 1.5%:</span>
+                  <span style={{ color: '#64748B' }}>Thuế nộp:</span>
                   <strong style={{ color: '#B45309' }}>{tax > 0 ? formatVND(tax) : '—'}</strong>
                 </div>
               </div>

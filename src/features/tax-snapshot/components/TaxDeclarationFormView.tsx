@@ -1,178 +1,416 @@
-import type { FC } from 'react';
-import { FileSpreadsheet, Building2, ShieldCheck } from 'lucide-react';
-import type { TaxSnapshot } from '../types/taxSnapshot';
+import React, { useState } from 'react';
+import {
+  Calculator,
+  Scale,
+  Building2,
+  FileSpreadsheet,
+  CheckCircle,
+  AlertCircle,
+  ChevronDown,
+  ChevronUp,
+  Clock,
+} from 'lucide-react';
+import {
+  TaxCalculationMethod,
+  HouseholdTaxGroup,
+  type HouseholdTaxSummaryDto,
+} from '../types/taxSnapshot';
+import { formatMoney } from '../../finance/utils/formatters';
 
-interface Props {
-  latestSnapshot?: TaxSnapshot;
-  onOpenCreateModal: () => void;
-  onOpenExportModal: (snapshot: TaxSnapshot) => void;
+interface TaxDeclarationFormViewProps {
+  summary?: HouseholdTaxSummaryDto;
+  calculationMethod: TaxCalculationMethod;
+  onSelectCalculationMethod: (method: TaxCalculationMethod) => void;
+  applyVatReduction: boolean;
+  onToggleVatReduction: (applied: boolean) => void;
+  isLoading?: boolean;
 }
 
-const formatVND = (value: number) => {
-  return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(value);
-};
-
-export const TaxDeclarationFormView: FC<Props> = ({
-  latestSnapshot,
-  onOpenCreateModal,
-  onOpenExportModal,
+export const TaxDeclarationFormView: React.FC<TaxDeclarationFormViewProps> = ({
+  summary,
+  calculationMethod,
+  onSelectCalculationMethod,
+  applyVatReduction,
+  onToggleVatReduction,
+  isLoading,
 }) => {
-  if (!latestSnapshot) {
+  const [showAccountantDetails, setShowAccountantDetails] = useState<boolean>(false);
+
+  if (isLoading || !summary) {
     return (
-      <div className="tax-declaration-card" style={{ padding: 64, textAlign: 'center' }}>
-        <Building2 size={48} style={{ color: '#0F766E', margin: '0 auto 16px auto', display: 'block' }} />
-        <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: '#111827' }}>Chưa có kỳ tính thuế để lập tờ khai</h3>
-        <p style={{ fontSize: '0.85rem', color: '#64748B', maxWidth: 460, margin: '8px auto 20px auto' }}>
-          Bấm nút bên dưới để hệ thống quét doanh thu các hóa đơn POS và lập tờ khai Form 01/CNKD tự động.
-        </p>
-        <button onClick={onOpenCreateModal} className="btn-primary-pill">
-          Tạo kỳ tính thuế ngay
-        </button>
+      <div className="tax-declaration-card" style={{ padding: 48, textAlign: 'center' }}>
+        <p style={{ color: '#0F766E', fontWeight: 600 }}>Đang tổng hợp số liệu tờ khai...</p>
       </div>
     );
   }
 
+  const isDeclaration = calculationMethod === TaxCalculationMethod.DeclarationBased;
+  const isExempt = summary.isTaxExempt;
+
+  const periodLabel =
+    summary.periodType === 1
+      ? `Tháng ${summary.periodNumber}/${summary.year}`
+      : summary.periodType === 2
+      ? `Quý ${summary.periodNumber}/${summary.year}`
+      : `Cả năm ${summary.year}`;
+
   return (
     <div className="tax-declaration-card">
-      {/* Official Form Header */}
+      {/* Top Banner: Form Title */}
       <div className="tax-declaration-header">
         <div>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 12px', borderRadius: 9999, background: 'rgba(255,255,255,0.15)', fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 8 }}>
-            <ShieldCheck size={14} />
-            Mẫu Tờ Khai 01/CNKD (Ban hành kèm Thông tư số 40/2021/TT-BTC)
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <FileSpreadsheet size={22} />
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 800, margin: 0, letterSpacing: '-0.02em' }}>
+              Tờ Khai Thuế Hộ Kinh Doanh (Mẫu 01/CNKD)
+            </h2>
           </div>
-          <h2 style={{ fontSize: '1.6rem', fontWeight: 800, margin: 0, letterSpacing: '-0.02em' }}>
-            TỜ KHAI THUẾ HỘ KINH DOANH — QUÝ {latestSnapshot.quarter}/{latestSnapshot.year}
-          </h2>
-          <p style={{ fontSize: '0.82rem', opacity: 0.9, margin: '6px 0 0 0' }}>
-            Phương pháp: Kê khai tỷ lệ tính thuế trên doanh thu thực tế phát sinh
+          <p style={{ margin: '6px 0 0 0', fontSize: '0.82rem', opacity: 0.9 }}>
+            Kỳ tính thuế: <strong>{periodLabel}</strong> • Hộ kinh doanh: <strong>Tiệm Tạp Hóa Cô Ba</strong>
           </p>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <button
-            onClick={() => onOpenExportModal(latestSnapshot)}
-            className="btn-export-white"
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <span
+            style={{
+              padding: '6px 14px',
+              borderRadius: 9999,
+              background: 'rgba(255, 255, 255, 0.2)',
+              fontSize: '0.78rem',
+              fontWeight: 700,
+              border: '1px solid rgba(255, 255, 255, 0.3)',
+            }}
           >
-            <FileSpreadsheet size={16} />
-            <span>Kết xuất XML / Excel</span>
-          </button>
+            Chế độ tự động tính theo quy định
+          </span>
         </div>
       </div>
 
-      {/* Taxpayer Meta Information */}
       <div className="tax-declaration-body">
-        <div className="tax-taxpayer-meta">
-          <div>
-            <span style={{ color: '#64748B', display: 'block', fontSize: '0.75rem' }}>Người nộp thuế:</span>
-            <strong style={{ color: '#0F172A', fontSize: '0.95rem' }}>HỘ KINH DOANH TIỆM TẠP HÓA MINH ĐỨC</strong>
+        {/* Method Switcher Banner */}
+        <div
+          style={{
+            background: '#F8FAFC',
+            border: '1px solid #E2E8F0',
+            borderRadius: 14,
+            padding: '16px 20px',
+            marginBottom: 20,
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 12 }}>
+            <div>
+              <strong style={{ fontSize: '0.92rem', color: '#0F172A', display: 'block' }}>
+                Phương pháp tính thuế áp dụng
+              </strong>
+              <span style={{ fontSize: '0.8rem', color: '#64748B' }}>
+                Quy định theo nhóm doanh thu: <strong>Nhóm 2: Doanh thu 1 - 3 tỷ/năm (Chịu thuế phần vượt 1 tỷ)</strong>
+              </span>
+            </div>
+
+            {summary.householdGroup >= HouseholdTaxGroup.Group3_3BTo50B && (
+              <div
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  padding: '4px 10px',
+                  borderRadius: 8,
+                  background: '#FEF3C7',
+                  border: '1px solid #FCD34D',
+                  fontSize: '0.78rem',
+                  color: '#92400E',
+                  fontWeight: 700,
+                }}
+              >
+                <AlertCircle size={14} />
+                <span>Hộ quy mô lớn: Khuyến nghị kê khai theo doanh thu - chi phí thực tế</span>
+              </div>
+            )}
           </div>
-          <div>
-            <span style={{ color: '#64748B', display: 'block', fontSize: '0.75rem' }}>Mã số thuế (MST):</span>
-            <strong style={{ color: '#0F766E', fontSize: '0.95rem', fontFamily: 'monospace' }}>0108923456-001</strong>
+
+          {/* Method Segmented Selector */}
+          <div
+            className="tax-method-segmented"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              background: '#F1F5F9',
+              padding: '4px',
+              borderRadius: '12px',
+              gap: '6px',
+              border: '1px solid #E2E8F0',
+              boxShadow: 'inset 0 1px 2px rgba(0, 0, 0, 0.04)',
+            }}
+          >
+            <button
+              type="button"
+              className={`tax-method-pill ${!isDeclaration ? 'active' : ''}`}
+              onClick={() => onSelectCalculationMethod(TaxCalculationMethod.RevenuePercentage)}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '9px 18px',
+                borderRadius: '9px',
+                fontSize: '0.84rem',
+                fontWeight: !isDeclaration ? 700 : 600,
+                cursor: 'pointer',
+                border: !isDeclaration ? '1px solid #0F766E' : '1px solid transparent',
+                background: !isDeclaration ? '#0F766E' : 'transparent',
+                color: !isDeclaration ? '#ffffff' : '#475569',
+                boxShadow: !isDeclaration ? '0 2px 8px rgba(15, 118, 110, 0.28)' : 'none',
+                transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
+                outline: 'none',
+              }}
+            >
+              <Calculator size={16} />
+              <span>Theo tỷ lệ % doanh thu (Thuế khoán / Trực tiếp)</span>
+            </button>
+            <button
+              type="button"
+              className={`tax-method-pill ${isDeclaration ? 'active' : ''}`}
+              onClick={() => onSelectCalculationMethod(TaxCalculationMethod.DeclarationBased)}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '9px 18px',
+                borderRadius: '9px',
+                fontSize: '0.84rem',
+                fontWeight: isDeclaration ? 700 : 600,
+                cursor: 'pointer',
+                border: isDeclaration ? '1px solid #0F766E' : '1px solid transparent',
+                background: isDeclaration ? '#0F766E' : 'transparent',
+                color: isDeclaration ? '#ffffff' : '#475569',
+                boxShadow: isDeclaration ? '0 2px 8px rgba(15, 118, 110, 0.28)' : 'none',
+                transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
+                outline: 'none',
+              }}
+            >
+              <Scale size={16} />
+              <span>Theo Kê khai (Doanh thu - Chi phí hợp lý)</span>
+            </button>
           </div>
-          <div>
-            <span style={{ color: '#64748B', display: 'block', fontSize: '0.75rem' }}>Cơ quan thuế quản lý:</span>
-            <strong style={{ color: '#0F172A', fontSize: '0.95rem' }}>Chi cục Thuế Quận Cầu Giấy — TP. Hà Nội</strong>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 10, fontSize: '0.76rem', color: '#64748B' }}>
+            <Clock size={12} />
+            <span>Đang xem thử, chưa lưu. Phương pháp được ghi chính thức khi chốt kỳ.</span>
           </div>
         </div>
 
-        {/* Section 1: Revenue & Tax Calculation */}
-        <div style={{ marginBottom: 30 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-            <h3 style={{ fontSize: '0.88rem', fontWeight: 800, color: '#0F172A', textTransform: 'uppercase', letterSpacing: '0.03em', margin: 0 }}>
-              1. Xác định Doanh thu tính thuế GTGT và Thuế TNCN trong kỳ
-            </h3>
-            <span style={{ fontSize: '0.75rem', color: '#64748B', fontStyle: 'italic' }}>Đơn vị tính: VNĐ</span>
-          </div>
+        {/* Main Conclusion Banner */}
+        <div
+          style={{
+            background: isExempt
+              ? 'linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%)'
+              : 'linear-gradient(135deg, #F0FDFA 0%, #CCFBF1 100%)',
+            border: isExempt ? '1px solid #A7F3D0' : '1px solid #99F6E4',
+            borderRadius: 16,
+            padding: '24px',
+            marginBottom: 24,
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                {isExempt ? (
+                  <CheckCircle size={22} style={{ color: '#059669' }} />
+                ) : (
+                  <Scale size={22} style={{ color: '#0F766E' }} />
+                )}
+                <h3 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0, color: '#0F172A' }}>
+                  {isExempt
+                    ? 'Kỳ tính thuế thuộc diện Miễn Thuế 100%'
+                    : `Tổng nghĩa vụ thuế ${periodLabel} phải nộp: ${formatMoney(summary.totalTaxAmount)}`}
+                </h3>
+              </div>
 
-          <div style={{ border: '1px solid #E2E8F0', borderRadius: 18, overflow: 'hidden' }}>
-            <table className="tax-table">
-              <thead>
-                <tr>
-                  <th>Ngành nghề kinh doanh (Theo biểu thuế TT 40)</th>
-                  <th style={{ textAlign: 'right' }}>Doanh thu chịu thuế</th>
-                  <th style={{ textAlign: 'center' }}>Thuế suất GTGT</th>
-                  <th style={{ textAlign: 'right' }}>Thuế GTGT</th>
-                  <th style={{ textAlign: 'center' }}>Thuế suất TNCN</th>
-                  <th style={{ textAlign: 'right' }}>Thuế TNCN</th>
-                  <th style={{ textAlign: 'right' }}>Tổng thuế phải nộp</th>
-                </tr>
-              </thead>
+              <p style={{ margin: '8px 0 0 0', fontSize: '0.84rem', color: '#334155', lineHeight: 1.6 }}>
+                {isExempt ? (
+                  <>
+                    Doanh thu lũy kế cả năm của hộ kinh doanh tính đến hết kỳ này là{' '}
+                    <strong>{formatMoney(summary.annualAccumulatedRevenue)}</strong> (chưa vượt hạn mức miễn thuế{' '}
+                    <strong>1.000.000.000 VND</strong> theo quy định). Hộ kinh doanh không phải nộp thuế GTGT và TNCN.
+                  </>
+                ) : (
+                  <>
+                    Doanh thu phát sinh kỳ này: <strong>{formatMoney(summary.taxableRevenueInPeriod)}</strong>.
+                    Lũy kế năm {summary.year} đạt <strong>{formatMoney(summary.annualAccumulatedRevenue)}</strong> (đã vượt hạn mức 1 tỷ).{' '}
+                    Số thuế Quý 3 bao gồm thuế GTGT ({formatMoney(summary.vatAmount)}) và thuế TNCN tính trên phần vượt ({formatMoney(summary.pitAmount)}).
+                  </>
+                )}
+              </p>
+            </div>
+
+            <div style={{ textAlign: 'right' }}>
+              <span style={{ fontSize: '0.78rem', color: '#64748B', display: 'block' }}>Tổng số thuế phải nộp ({periodLabel})</span>
+              <span style={{ fontSize: '1.75rem', fontWeight: 900, color: isExempt ? '#059669' : '#0F766E' }}>
+                {formatMoney(summary.totalTaxAmount)}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Detailed Breakdown Table */}
+        {isDeclaration ? (
+          /* DECLARATION METHOD (REVENUE - EXPENSES) */
+          <div style={{ marginBottom: 24 }}>
+            <h4 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0F172A', marginBottom: 12 }}>
+              Bảng Kê Khai Xác Định Thu Nhập Chịu Thuế (Phương Pháp Kê Khai)
+            </h4>
+
+            <div style={{ border: '1px solid #E2E8F0', borderRadius: 12, overflow: 'hidden' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                <tbody>
+                  <tr style={{ borderBottom: '1px solid #F1F5F9' }}>
+                    <td style={{ padding: '12px 16px', color: '#475569', fontWeight: 600 }}>Doanh thu phát sinh kỳ ({periodLabel}):</td>
+                    <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 800, color: '#0F172A' }}>
+                      {formatMoney(summary.taxableRevenueInPeriod)}
+                    </td>
+                  </tr>
+                  <tr style={{ borderBottom: '1px solid #F1F5F9' }}>
+                    <td style={{ padding: '12px 16px', color: '#475569', fontWeight: 600 }}>Chi phí hợp lý được trừ (S2c):</td>
+                    <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 800, color: '#0F766E' }}>
+                      - {formatMoney(summary.deductibleExpensesInPeriod)}
+                    </td>
+                  </tr>
+                  <tr style={{ borderBottom: '1px solid #F1F5F9', background: '#F8FAFC' }}>
+                    <td style={{ padding: '12px 16px', color: '#0F172A', fontWeight: 700 }}>Thu nhập tính thuế TNCN (Lợi nhuận):</td>
+                    <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 800, color: '#B45309' }}>
+                      {formatMoney(summary.taxableIncomeDeclaration)}
+                    </td>
+                  </tr>
+                  <tr style={{ borderBottom: '1px solid #F1F5F9' }}>
+                    <td style={{ padding: '12px 16px', color: '#475569' }}>Thuế GTGT ({summary.vatRate}% doanh thu):</td>
+                    <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: '#0F766E' }}>
+                      {formatMoney(summary.vatAmount)}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style={{ padding: '12px 16px', color: '#475569' }}>Thuế TNCN ({summary.pitRate}% thu nhập tính thuế):</td>
+                    <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: '#7C3AED' }}>
+                      {formatMoney(summary.pitAmount)}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : (
+          /* REVENUE PERCENTAGE METHOD */
+          <div style={{ marginBottom: 24, border: '1px solid #E2E8F0', borderRadius: 12, overflow: 'hidden' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
               <tbody>
-                <tr>
-                  <td>
-                    <div style={{ fontWeight: 800, color: '#0F172A' }}>1. Phân phối, cung cấp hàng hóa</div>
-                    <div style={{ fontSize: '0.74rem', color: '#64748B' }}>Bán buôn, bán lẻ tạp hóa tiêu dùng qua quầy POS</div>
+                <tr style={{ borderBottom: '1px solid #F1F5F9' }}>
+                  <td style={{ padding: '12px 16px', color: '#475569', fontWeight: 600 }}>Doanh thu phát sinh kỳ ({periodLabel}):</td>
+                  <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 800, color: '#0F172A' }}>
+                    {formatMoney(summary.taxableRevenueInPeriod)}
                   </td>
-                  <td style={{ textAlign: 'right', fontWeight: 700 }}>{formatVND(latestSnapshot.taxableRevenue)}</td>
-                  <td style={{ textAlign: 'center', fontWeight: 700, color: '#0F766E' }}>1.0%</td>
-                  <td style={{ textAlign: 'right', fontWeight: 700, color: '#0F766E' }}>{formatVND(latestSnapshot.vatAmount)}</td>
-                  <td style={{ textAlign: 'center', fontWeight: 700, color: '#7C3AED' }}>0.5%</td>
-                  <td style={{ textAlign: 'right', fontWeight: 700, color: '#7C3AED' }}>{formatVND(latestSnapshot.pitAmount)}</td>
-                  <td style={{ textAlign: 'right', fontWeight: 800, color: '#0F766E' }}>{formatVND(latestSnapshot.totalTaxAmount)}</td>
                 </tr>
-                <tr>
-                  <td>
-                    <div style={{ fontWeight: 600, color: '#64748B' }}>2. Dịch vụ, xây dựng không bao thầu NVL</div>
-                    <div style={{ fontSize: '0.74rem', color: '#94A3B8' }}>Sơ chế, đóng gói quà tết, dịch vụ vận chuyển phụ trợ</div>
+                <tr style={{ borderBottom: '1px solid #F1F5F9' }}>
+                  <td style={{ padding: '12px 16px', color: '#475569' }}>Thuế GTGT ({summary.vatRate}% trên doanh thu):</td>
+                  <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: '#0F766E' }}>
+                    {formatMoney(summary.vatAmount)}
                   </td>
-                  <td style={{ textAlign: 'right', color: '#94A3B8' }}>0 đ</td>
-                  <td style={{ textAlign: 'center', color: '#94A3B8' }}>5.0%</td>
-                  <td style={{ textAlign: 'right', color: '#94A3B8' }}>0 đ</td>
-                  <td style={{ textAlign: 'center', color: '#94A3B8' }}>2.0%</td>
-                  <td style={{ textAlign: 'right', color: '#94A3B8' }}>0 đ</td>
-                  <td style={{ textAlign: 'right', color: '#94A3B8' }}>0 đ</td>
+                </tr>
+                <tr style={{ borderBottom: '1px solid #F1F5F9' }}>
+                  <td style={{ padding: '12px 16px', color: '#475569' }}>
+                    Thuế TNCN ({summary.pitRate}% trên phần doanh thu lũy kế vượt 1 tỷ):
+                  </td>
+                  <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: '#7C3AED' }}>
+                    {formatMoney(summary.pitAmount)}
+                  </td>
+                </tr>
+                <tr style={{ background: '#F8FAFC' }}>
+                  <td style={{ padding: '14px 16px', fontWeight: 800, color: '#0F172A' }}>Tổng số thuế phải nộp ({periodLabel}):</td>
+                  <td style={{ padding: '14px 16px', textAlign: 'right', fontWeight: 900, color: '#0F766E', fontSize: '1.15rem' }}>
+                    {formatMoney(summary.totalTaxAmount)}
+                  </td>
                 </tr>
               </tbody>
-              <tfoot>
-                <tr style={{ background: '#F0FDFA', borderTop: '2px solid #99F6E4' }}>
-                  <td style={{ fontWeight: 800, color: '#0F172A', textTransform: 'uppercase' }}>TỔNG CỘNG NGHĨA VỤ THUẾ PHẢI NỘP:</td>
-                  <td style={{ textAlign: 'right', fontWeight: 800 }}>{formatVND(latestSnapshot.taxableRevenue)}</td>
-                  <td style={{ textAlign: 'center', color: '#94A3B8' }}>—</td>
-                  <td style={{ textAlign: 'right', fontWeight: 800, color: '#0F766E' }}>{formatVND(latestSnapshot.vatAmount)}</td>
-                  <td style={{ textAlign: 'center', color: '#94A3B8' }}>—</td>
-                  <td style={{ textAlign: 'right', fontWeight: 800, color: '#7C3AED' }}>{formatVND(latestSnapshot.pitAmount)}</td>
-                  <td style={{ textAlign: 'right', fontWeight: 900, fontSize: '1.05rem', color: '#0F766E' }}>
-                    {formatVND(latestSnapshot.totalTaxAmount)}
-                  </td>
-                </tr>
-              </tfoot>
             </table>
           </div>
-        </div>
+        )}
 
-        {/* Section 2: Reference Cross-Module Audit (FE-07, FE-10, FE-17) */}
-        <div>
-          <h3 style={{ fontSize: '0.88rem', fontWeight: 800, color: '#0F172A', textTransform: 'uppercase', letterSpacing: '0.03em', marginBottom: 12 }}>
-            2. Số liệu liên thông kiểm soát nội bộ (Tích hợp phân hệ FE-07, FE-10, FE-17)
-          </h3>
+        {/* Accountant & Policy Options Section (Collapsible Footer) */}
+        <div
+          style={{
+            borderTop: '1px solid #E2E8F0',
+            paddingTop: 16,
+            marginTop: 16,
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => setShowAccountantDetails(!showAccountantDetails)}
+            style={{
+              background: '#F8FAFC',
+              border: '1px solid #CBD5E1',
+              borderRadius: '8px',
+              color: '#0F766E',
+              fontSize: '0.84rem',
+              fontWeight: 700,
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '8px 16px',
+              marginBottom: showAccountantDetails ? 16 : 0,
+              transition: 'all 0.15s ease',
+              boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
+            }}
+          >
+            <Building2 size={16} />
+            <span>Dành cho kế toán & Tùy chọn chính sách</span>
+            {showAccountantDetails ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+          </button>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
-            <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 16, padding: 18 }}>
-              <span style={{ fontSize: '0.74rem', color: '#64748B', display: 'block' }}>Giá vốn hàng bán (COGS - FE-10)</span>
-              <strong style={{ fontSize: '1.2rem', fontWeight: 800, color: '#111827', display: 'block', marginTop: 4 }}>
-                {formatVND(Math.round(latestSnapshot.taxableRevenue * 0.74))}
-              </strong>
-              <span style={{ fontSize: '0.72rem', color: '#94A3B8', marginTop: 2, display: 'block' }}>Thuật toán FEFO lô hàng</span>
+          {showAccountantDetails && (
+            <div
+              style={{
+                padding: '16px 20px',
+                borderRadius: 12,
+                background: '#F8FAFC',
+                border: '1px solid #CBD5E1',
+                animation: 'fadeIn 0.2s ease-out',
+              }}
+            >
+              {/* VAT Reduction Toggle */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                <div>
+                  <strong style={{ fontSize: '0.85rem', color: '#0F172A' }}>Chính sách giảm 20% mức thuế suất GTGT (Nghị quyết 204/2025/QH15)</strong>
+                  <p style={{ fontSize: '0.78rem', color: '#64748B', margin: '2px 0 0 0' }}>
+                    Áp dụng giảm 20% mức tỷ lệ tính thuế GTGT (1% → 0.8%) cho nhóm hàng hóa thuộc diện hỗ trợ. Kế toán cần thẩm định danh mục mặt hàng trước khi nộp tờ khai.
+                  </p>
+                </div>
+                <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={applyVatReduction}
+                    onChange={(e) => onToggleVatReduction(e.target.checked)}
+                    style={{ width: 18, height: 18, accentColor: '#0F766E', cursor: 'pointer' }}
+                  />
+                  <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#334155' }}>
+                    {applyVatReduction ? 'Đang bật (Giảm 20%)' : 'Đang tắt'}
+                  </span>
+                </label>
+              </div>
+
+              {/* Retroactive VAT Analysis for Accountants */}
+              <div style={{ borderTop: '1px solid #E2E8F0', paddingTop: 12, marginBottom: 12 }}>
+                <strong style={{ fontSize: '0.82rem', color: '#0F172A' }}>Đối soát nghĩa vụ thuế lũy kế cả năm:</strong>
+                <div style={{ marginTop: 6, fontSize: '0.78rem', color: '#475569', lineHeight: 1.6 }}>
+                  <div>• <strong>Kịch bản chuẩn (Thực tế áp dụng):</strong> Quý 3 phát sinh <strong>{formatMoney(summary.totalTaxAmount)}</strong>. Hai quý đầu (Q1+Q2 doanh thu 950tr ≤ 1 tỷ) được miễn thuế 0đ. Tổng thuế phát sinh lũy kế hết Quý 3 là <strong>{formatMoney(summary.totalTaxAmount)}</strong>.</div>
+                  <div>• <strong>Kịch bản dự phòng (Truy thu hồi tố GTGT):</strong> Nếu cơ quan thuế yêu cầu nộp bù 1% GTGT của 950tr hai quý đầu (9.500.000đ), tổng thuế cả năm sẽ là <strong>16.262.500đ</strong>. Đang chờ ý kiến thẩm định từ Kế toán trưởng.</div>
+                </div>
+              </div>
+
+              {/* COGS Notice for Declaration Method */}
+              <div style={{ borderTop: '1px solid #E2E8F0', paddingTop: 10, fontSize: '0.76rem', color: '#64748B', lineHeight: 1.5 }}>
+                <strong>Lưu ý về Giá vốn hàng bán (COGS):</strong> Theo quy định, phương pháp Kê khai tính thuế trên Lợi nhuận = Doanh thu - Giá vốn hàng bán - Chi phí hợp lý. Cần máy chủ Backend hỗ trợ tính trừ Giá vốn hàng bán vào chi phí được trừ khi đồng bộ hóa dữ liệu kho.
+              </div>
             </div>
-
-            <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 16, padding: 18 }}>
-              <span style={{ fontSize: '0.74rem', color: '#64748B', display: 'block' }}>Chi phí vận hành dịch vụ (FE-07)</span>
-              <strong style={{ fontSize: '1.2rem', fontWeight: 800, color: '#111827', display: 'block', marginTop: 4 }}>
-                {formatVND(25400000)}
-              </strong>
-              <span style={{ fontSize: '0.72rem', color: '#94A3B8', marginTop: 2, display: 'block' }}>Điện nước, viễn thông, mặt bằng</span>
-            </div>
-
-            <div style={{ background: '#F0FDFA', border: '1px solid #99F6E4', borderRadius: 16, padding: 18 }}>
-              <span style={{ fontSize: '0.74rem', color: '#0F766E', display: 'block' }}>Số dư quỹ tiền mặt khả dụng (FE-17)</span>
-              <strong style={{ fontSize: '1.2rem', fontWeight: 800, color: '#0F766E', display: 'block', marginTop: 4 }}>
-                {formatVND(186500000)}
-              </strong>
-              <span style={{ fontSize: '0.72rem', color: '#059669', marginTop: 2, display: 'block', fontWeight: 600 }}>✓ Đủ thanh khoản nộp thuế</span>
-            </div>
-          </div>
+          )}
         </div>
       </div>
     </div>

@@ -53,7 +53,7 @@ export const TaxExportModal: FC<Props> = ({ snapshot, isOpen, onClose }) => {
                 Xuất hồ sơ khai thuế
               </h3>
               <p style={{ fontSize: '0.78rem', color: '#64748B', margin: '2px 0 0 0' }}>
-                Hồ sơ Quý {snapshot.quarter}/{snapshot.year} (Thông tư 40/2021/TT-BTC)
+                Hồ sơ Quý {snapshot.quarter}/{snapshot.year} (Hồ sơ kê khai theo quý)
               </p>
             </div>
           </div>

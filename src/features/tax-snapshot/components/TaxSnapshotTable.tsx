@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { FC } from 'react';
-import { Eye, FileCheck, CheckCircle2, Trash2 } from 'lucide-react';
+import { Eye, FileCheck, CheckCircle2, Trash2, FileSpreadsheet } from 'lucide-react';
 import type { TaxSnapshot } from '../types/taxSnapshot';
 import { TaxSnapshotStatusBadge } from './TaxSnapshotStatusBadge';
 import { TablePagination } from '../../../components/common/TablePagination';
@@ -12,6 +12,7 @@ interface Props {
   onFinalize: (snapshot: TaxSnapshot) => void;
   onMarkPaid: (snapshot: TaxSnapshot) => void;
   onDelete: (snapshot: TaxSnapshot) => void;
+  onExport?: (snapshot: TaxSnapshot) => void;
 }
 
 const formatVND = (value: number) => {
@@ -25,6 +26,7 @@ export const TaxSnapshotTable: FC<Props> = ({
   onFinalize,
   onMarkPaid,
   onDelete,
+  onExport,
 }) => {
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [pageSize, setPageSize] = useState<number>(10);
@@ -43,7 +45,7 @@ export const TaxSnapshotTable: FC<Props> = ({
         <FileCheck size={48} style={{ color: '#0F766E', margin: '0 auto 16px auto', display: 'block' }} />
         <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#111827', margin: 0 }}>Chưa có kỳ tính thuế nào</h3>
         <p style={{ fontSize: '0.82rem', color: '#64748B', marginTop: 6 }}>
-          Bấm "Tạo kỳ tính thuế mới" để hệ thống quét doanh thu và tính thuế tự động theo TT 40.
+          Bấm "Chốt sổ kỳ tính thuế" để hệ thống quét doanh thu và lưu trữ biên bản thuế tự động.
         </p>
       </div>
     );
@@ -60,10 +62,10 @@ export const TaxSnapshotTable: FC<Props> = ({
           <thead>
             <tr>
               <th>Kỳ tính thuế</th>
-              <th style={{ textAlign: 'right' }}>Doanh thu chịu thuế</th>
+              <th style={{ textAlign: 'right' }}>Doanh thu quý</th>
               <th style={{ textAlign: 'right' }}>VAT (1%)</th>
               <th style={{ textAlign: 'right' }}>PIT (0.5%)</th>
-              <th style={{ textAlign: 'right' }}>Tổng thuế (1.5%)</th>
+              <th style={{ textAlign: 'right' }}>Tổng thuế phải nộp</th>
               <th style={{ textAlign: 'center' }}>Số hóa đơn</th>
               <th>Trạng thái</th>
               <th>Ngày tạo / Chốt</th>
@@ -74,10 +76,10 @@ export const TaxSnapshotTable: FC<Props> = ({
             {paginatedSnapshots.map((s) => (
               <tr key={s.id}>
                 <td style={{ fontWeight: 700, color: '#111827' }}>
-                  Quý {s.quarter}/{s.year}
+                  Quý {s.quarter ?? s.periodNumber}/{s.year}
                 </td>
                 <td style={{ textAlign: 'right', fontWeight: 600 }}>
-                  {formatVND(s.taxableRevenue)}
+                  {formatVND(s.taxableRevenue ?? s.taxableRevenueInPeriod ?? 0)}
                 </td>
                 <td style={{ textAlign: 'right', color: '#0F766E', fontWeight: 600 }}>
                   {formatVND(s.vatAmount)}
@@ -89,13 +91,13 @@ export const TaxSnapshotTable: FC<Props> = ({
                   {formatVND(s.totalTaxAmount)}
                 </td>
                 <td style={{ textAlign: 'center', color: '#64748B' }}>
-                  {s.ordersCount.toLocaleString('vi-VN')} đơn
+                  {(s.ordersCount ?? 0).toLocaleString('vi-VN')} đơn
                 </td>
                 <td>
-                  <TaxSnapshotStatusBadge status={s.status} />
+                  <TaxSnapshotStatusBadge status={s.status || 'draft'} />
                 </td>
                 <td style={{ fontSize: '0.78rem', color: '#64748B' }}>
-                  {new Date(s.generatedAt).toLocaleDateString('vi-VN')}
+                  {new Date(s.generatedAt || s.finalizedAtUtc || Date.now()).toLocaleDateString('vi-VN')}
                 </td>
                 <td style={{ textAlign: 'right' }}>
                   <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
@@ -106,6 +108,17 @@ export const TaxSnapshotTable: FC<Props> = ({
                     >
                       <Eye size={15} />
                     </button>
+
+                    {onExport && (
+                      <button
+                        onClick={() => onExport(s)}
+                        className="tax-action-btn"
+                        style={{ color: '#0F766E' }}
+                        title="Kết xuất XML/Excel"
+                      >
+                        <FileSpreadsheet size={15} />
+                      </button>
+                    )}
 
                     {s.status === 'Draft' && (
                       <>
