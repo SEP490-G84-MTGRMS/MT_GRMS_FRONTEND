@@ -1,4 +1,4 @@
-﻿import { useState, useRef, useEffect, useCallback, Fragment } from "react";
+import { useState, useRef, useEffect, useCallback, Fragment } from "react";
 import type { FC } from "react";
 import { NavLink, Link, useLocation, useNavigate } from "react-router-dom";import {
   DashboardIcon,
@@ -261,50 +261,24 @@ const NAV_GROUPS: NavGroup[] = [
     icon: TrendingUpIcon,
     sections: [
       {
-        title: "Chi phí & Vận hành",
+        title: "Dòng tiền & Chi tiêu",
         items: [
-          {
-            label: "Chi phí vận hành (FE-07)",
-            to: "/store-owner/expenses",
-            badge: "FE-07",
-            badgeType: "red",
-          },
-          {
-            label: "Sổ quỹ & Dòng tiền (FE-17)",
-            to: "/store-owner/cashbook",
-            badge: "FE-17",
-          },
+          { label: "Tổng quan tài chính", to: "/store-owner/finance" },
+          { label: "Tiền của tôi", to: "/store-owner/cashbook" },
+          { label: "Phải trả", to: "/store-owner/expenses" },
         ],
       },
       {
-        title: "Khách hàng & Công nợ",
+        title: "Công nợ & Khách hàng",
         items: [
-          {
-            label: "Khách hàng & Sổ nợ (FE-08)",
-            to: "/store-owner/customers",
-            badge: "FE-08",
-            badgeType: "blue",
-          },
-          {
-            label: "Công nợ nhà cung cấp",
-            to: "/store-owner/suppliers?view=debt",
-          },
+          { label: "Khách nợ", to: "/store-owner/customers" },
         ],
       },
       {
-        title: "Báo cáo tài chính & Thuế",
+        title: "Báo cáo & Thuế",
         items: [
-          { label: "Báo cáo kết quả kinh doanh", to: "/store-owner/dashboard" },
-          {
-            label: "Báo cáo Lãi / Lỗ & KPIs (FE-10)",
-            to: "/store-owner/reports/pnl",
-            badge: "FE-10",
-          },
-          {
-            label: "Kê khai thuế HKD (FE-19)",
-            to: "/store-owner/tax-snapshots",
-            badge: "FE-19",
-          },
+          { label: "Lãi lỗ", to: "/store-owner/reports/pnl" },
+          { label: "Thuế", to: "/store-owner/tax-snapshots" },
         ],
       },
     ],
