@@ -170,3 +170,33 @@ export interface PurchaseOrderItem {
   totalAmount: number;
   status: 'PENDING' | 'CONFIRMED' | 'PARTIALLY_RECEIVED' | 'COMPLETED' | 'CANCELLED';
 }
+
+export interface SupplierBranchAssignmentItem {
+  id: string;
+  supplierId: string;
+  supplierCode: string;
+  supplierName: string;
+  supplierType: SupplierType;
+  branchId: string;
+  branchCode: string;
+  branchName: string;
+  branchAddress: string;
+  assignedAt: string;
+  status: 'Active' | 'Inactive';
+}
+
+export interface SupplierBranchFilterState {
+  supplierSearch: string;
+  branchSearch: string;
+  supplierId: string;
+  branchId: string;
+  status: string;
+  pageIndex: number;
+  pageSize: number;
+}
+
+export interface AssignSupplierToBranchesInput {
+  supplierId: string;
+  branchIds: string[];
+}
+

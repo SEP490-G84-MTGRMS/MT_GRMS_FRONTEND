@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import type { FC } from 'react';
 import { Link } from 'react-router-dom';
-import { Building2, Package, Plus, Loader2 } from 'lucide-react';
+import { Building2, Package, Store, Plus, Loader2 } from 'lucide-react';
 import { useAuthStore } from '../../../stores/useAuthStore';
 import type {
   SupplierSummary,
@@ -245,6 +245,15 @@ export const SupplierListPage: FC = () => {
           >
             <Package size={14} />
             <span>Sản phẩm theo NCC</span>
+          </Link>
+          <Link
+            to="/store-owner/suppliers/branches"
+            className="po-btn po-btn-secondary"
+            style={{ height: 32, padding: '0 14px', textDecoration: 'none' }}
+            title="Gán nhà cung cấp phân bổ tới các cửa hàng / chi nhánh"
+          >
+            <Store size={14} />
+            <span>Gán NCC với Cửa hàng</span>
           </Link>
           {isStoreOwner && (
             <button

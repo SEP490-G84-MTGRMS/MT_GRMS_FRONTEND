@@ -13,6 +13,7 @@ import {
   SupplierListPage,
   SupplierDetailPage,
   SupplierProductManagementPage,
+  SupplierBranchManagementPage,
 } from '../features/supplier';
 
 // 2. Purchase Orders Feature
@@ -41,7 +42,7 @@ import { ServiceExpensesPage } from '../features/service-expenses/pages/ServiceE
 import { CustomerManagementPage } from '../features/customer-crm';
 
 // 5. Product Management Feature (FE-01)
-import { ProductListPage } from '../features/product';
+import { ProductListPage, StoreProductManagementPage } from '../features/product';
 
 // 6. Transfer Feature (FE-15)
 import {
@@ -326,12 +327,32 @@ export const router = createBrowserRouter([
         element: <SupplierProductManagementPage />,
       },
       {
+        path: 'suppliers/branches',
+        element: <SupplierBranchManagementPage />,
+      },
+      {
         path: 'suppliers/:id',
         element: <SupplierDetailPage />,
       },
       {
         path: 'suppliers/:id/products',
         element: <SupplierProductManagementPage />,
+      },
+      {
+        path: 'suppliers/:id/branches',
+        element: <SupplierBranchManagementPage />,
+      },
+      {
+        path: 'stores/products',
+        element: <StoreProductManagementPage />,
+      },
+      {
+        path: 'stores/:id/products',
+        element: <StoreProductManagementPage />,
+      },
+      {
+        path: 'branches/products',
+        element: <StoreProductManagementPage />,
       },
       {
         path: 'purchase-orders',
@@ -498,12 +519,20 @@ export const router = createBrowserRouter([
         element: <SupplierProductManagementPage />,
       },
       {
+        path: 'suppliers/branches',
+        element: <SupplierBranchManagementPage />,
+      },
+      {
         path: 'suppliers/:id',
         element: <SupplierDetailPage />,
       },
       {
         path: 'suppliers/:id/products',
         element: <SupplierProductManagementPage />,
+      },
+      {
+        path: 'suppliers/:id/branches',
+        element: <SupplierBranchManagementPage />,
       },
       {
         path: 'purchase-orders',
@@ -659,12 +688,20 @@ export const router = createBrowserRouter([
         element: <SupplierProductManagementPage />,
       },
       {
+        path: 'branches',
+        element: <SupplierBranchManagementPage />,
+      },
+      {
         path: ':id',
         element: <SupplierDetailPage />,
       },
       {
         path: ':id/products',
         element: <SupplierProductManagementPage />,
+      },
+      {
+        path: ':id/branches',
+        element: <SupplierBranchManagementPage />,
       },
     ],
   },

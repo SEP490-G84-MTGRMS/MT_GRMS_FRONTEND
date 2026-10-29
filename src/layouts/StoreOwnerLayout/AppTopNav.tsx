@@ -17,12 +17,9 @@ import {
   Settings,
   User,
   Store,
-  Globe,
-  Palette,
   LogOut,
   ChevronRight,
   Wallet,
-  QrCode,
   FileText,
 } from "lucide-react";
 import { useAuthStore } from "../../stores/useAuthStore";
@@ -147,6 +144,12 @@ const NAV_GROUPS: NavGroup[] = [
             label: "Sản phẩm theo NCC",
             to: "/store-owner/suppliers/products",
             badge: "",
+            badgeType: "blue",
+          },
+          {
+            label: "Sản phẩm theo Cửa hàng",
+            to: "/store-owner/stores/products",
+            badge: "Mới",
             badgeType: "blue",
           },
           {

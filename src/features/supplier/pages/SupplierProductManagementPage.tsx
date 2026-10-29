@@ -22,7 +22,7 @@ import { EditSupplierProductModal } from '../components/products/EditSupplierPro
 import { AdminToast, type ToastState } from '../../admin/components';
 import { supplierProductApi } from '../api/supplierProductApi';
 import { supplierApi } from '../api/supplierApi';
-import { Building2, Download, Plus, Layers, Loader2 } from 'lucide-react';
+import { Building2, Download, Plus, Layers, Store, Loader2 } from 'lucide-react';
 import '../../purchase-order/purchase-order.css';
 import '../supplier.css';
 
@@ -259,6 +259,15 @@ export const SupplierProductManagementPage: FC = () => {
           >
             <Building2 size={14} />
             <span>Danh sách NCC</span>
+          </Link>
+          <Link
+            to="/store-owner/suppliers/branches"
+            className="po-btn po-btn-secondary"
+            style={{ height: 32, padding: '0 14px', textDecoration: 'none' }}
+            title="Gán nhà cung cấp phân bổ tới các cửa hàng / chi nhánh"
+          >
+            <Store size={14} />
+            <span>Gán NCC với Cửa hàng</span>
           </Link>
           <button
             type="button"
