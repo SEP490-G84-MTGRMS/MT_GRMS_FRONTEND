@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import { productApi } from '../api/productApi';
 import {
   Plus,
   Download,
@@ -9,19 +10,24 @@ import {
   Package,
 } from 'lucide-react';
 import type { ProductItem, Category } from '../types';
-import { INITIAL_CATEGORIES, INITIAL_PRODUCTS } from '../services/mockData';
+import { categoryApi } from '../api/categoryApi';
 import { CategorySidebar } from '../components/CategorySidebar';
 import { CategoryModal } from '../components/CategoryModal';
 import { ProductFormModal } from '../components/ProductFormModal';
 import { ComboFormModal } from '../components/ComboFormModal';
 import { ProductDetailModal } from '../components/ProductDetailModal';
+import { TablePagination } from '../../../components/common';
 import { AdminToast, type ToastState } from '../../admin/components';
 import '../product.css';
 
 export const ProductListPage: React.FC = () => {
   // State
-  const [products, setProducts] = useState<ProductItem[]>(INITIAL_PRODUCTS);
-  const [categories, setCategories] = useState<Category[]>(INITIAL_CATEGORIES);
+  const [products, setProducts] = useState<ProductItem[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [pageIndex, setPageIndex] = useState<number>(1);
+  const [pageSize, setPageSize] = useState<number>(20);
+  const [totalCount, setTotalCount] = useState<number>(0);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
 
   // RBAC switch (StoreOwner vs Cashier) for BR-SEC-01 verification
   const [userRole, setUserRole] = useState<'StoreOwner' | 'Cashier'>('StoreOwner');
@@ -33,6 +39,80 @@ export const ProductListPage: React.FC = () => {
   const [createdTime, setCreatedTime] = useState<'all' | 'custom'>('all');
   const [customDate, setCustomDate] = useState<string>('');
   const [supplierFilter, setSupplierFilter] = useState('');
+
+  
+  // 1. Tải danh mục thực tế từ backend
+  const fetchCategories = useCallback(async () => {
+    try {
+      const catList = await categoryApi.getCategories();
+      const mapped: Category[] = catList.map((c) => ({
+        id: c.id,
+        code: c.categoryCode,
+        name: c.name,
+        productCount: c.productCount,
+        depth: 0,
+      }));
+      setCategories(mapped);
+    } catch (err) {
+      console.error('Lỗi khi tải danh mục từ backend:', err);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchCategories();
+  }, [fetchCategories]);
+
+  // 2. Tải danh sách sản phẩm thực tế từ backend
+  const fetchProducts = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const catId = selectedCategoryIds.length === 1 ? selectedCategoryIds[0] : undefined;
+      const res = await productApi.getProductsPaged({
+        pageIndex,
+        pageSize,
+        searchTerm: searchTerm.trim() || undefined,
+        categoryId: catId,
+      });
+      if (res && res.items) {
+        const mapped: ProductItem[] = res.items.map((p) => ({
+          id: p.id,
+          productCode: p.productCode || p.barcode,
+          barcode: p.barcode || '',
+          productName: p.name,
+          categoryId: p.categoryId,
+          categoryName: p.categoryName || 'Chung',
+          baseUnit: p.baseUnit || 'Cái',
+          sellingPrice: p.sellingPrice,
+          costPrice: p.costPrice,
+          onHand: 0,
+          committed: 0,
+          status: (p.status === 'Active' ? 'Active' : 'Discontinued') as 'Active' | 'Discontinued',
+          createdAt: p.createdAt ? new Date(p.createdAt).toLocaleDateString('vi-VN') : '',
+          updatedAt: p.updatedAt ? new Date(p.updatedAt).toLocaleDateString('vi-VN') : '',
+          imageUrl: p.imageUrl ?? undefined,
+          minStock: p.minStock,
+          maxStock: p.maxStock,
+          vatRate: p.vatRate,
+          isFavorite: p.isFavorite,
+        }));
+        setProducts(mapped);
+        setTotalCount(res.totalCount);
+      } else {
+        setProducts([]);
+        setTotalCount(0);
+      }
+    } catch (err) {
+      console.error('Lỗi khi tải danh sách sản phẩm qua axios:', err);
+      setProducts([]);
+      setTotalCount(0);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [pageIndex, pageSize, searchTerm, selectedCategoryIds]);
+
+  useEffect(() => {
+    fetchProducts();
+  }, [fetchProducts]);
 
   // Modals state
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
@@ -584,6 +664,21 @@ export const ProductListPage: React.FC = () => {
               </tbody>
             </table>
           </div>
+
+          {/* Enterprise Standard TablePagination */}
+          <TablePagination
+            currentPage={pageIndex}
+            pageSize={pageSize}
+            totalItems={totalCount}
+            pageSizeOptions={[10, 20, 50]}
+            onPageChange={(page) => setPageIndex(page)}
+            onPageSizeChange={(newSize) => {
+              setPageSize(newSize);
+              setPageIndex(1);
+            }}
+            itemLabel="hàng hóa"
+            isLoading={isLoading}
+          />
         </div>
       </div>
 

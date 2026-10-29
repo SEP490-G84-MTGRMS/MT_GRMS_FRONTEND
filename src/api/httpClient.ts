@@ -12,6 +12,25 @@ httpClient.interceptors.request.use((config) => {
   if (token && config.headers) {
     config.headers.Authorization = `Bearer ${token}`;
   }
+
+  // Tự động gắn Tenant ID chuẩn của hệ thống để đồng bộ dữ liệu đa người thuê
+  let tenantId = 'tenant_mt_mart_01';
+  const storedUser = localStorage.getItem('auth_user');
+  if (storedUser) {
+    try {
+      const user = JSON.parse(storedUser);
+      if (user.tenantId && user.tenantId !== 'TENANT-DEFAULT' && user.tenantId !== 'TENANT-HCM-01') {
+        tenantId = user.tenantId;
+      }
+    } catch {
+      // fallback tenantId
+    }
+  }
+
+  if (config.headers) {
+    config.headers['X-Tenant-Id'] = tenantId;
+  }
+
   return config;
 });
 

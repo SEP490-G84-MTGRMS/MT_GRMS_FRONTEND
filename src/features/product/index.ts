@@ -1,4 +1,6 @@
 export * from './types';
+export * from './api/productApi';
+export * from './api/categoryApi';
 export * from './services/mockData';
 export * from './components/CategorySidebar';
 export * from './components/CategoryModal';
