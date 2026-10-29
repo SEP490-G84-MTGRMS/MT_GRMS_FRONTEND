@@ -1,7 +1,80 @@
+/**
+ * Product Catalog Management Types (MT-GRMS Frontend)
+ * Synchronized with Backend .NET 8 Clean Architecture DTOs
+ */
+
+// ==========================================
+// 1. Core Backend DTOs (Tiểu cụm 1.1 & 1.2)
+// ==========================================
+
+export interface ProductResponse {
+  id: string;
+  productCode: string;
+  barcode: string;
+  name: string;
+  categoryId: string;
+  categoryName: string;
+  baseUnit: string;
+  sellingPrice: number;
+  costPrice: number | null; // Ẩn với Cashier/Staff theo BR-SEC-01
+  minStock: number;
+  maxStock: number;
+  vatRate: number;
+  productType: string;
+  status: string; // "Active" | "Discontinued"
+  imageUrl?: string | null;
+  description?: string | null;
+  internalNote?: string | null;
+  hasBatches: boolean;
+  isFavorite: boolean;
+  createdAt: string;
+  updatedAt?: string | null;
+}
+
+export interface ProductQueryFilter {
+  searchTerm?: string;
+  categoryId?: string;
+  status?: string;
+  pageIndex?: number;
+  pageSize?: number;
+}
+
+export interface PagedResult<T> {
+  items: T[];
+  pageIndex: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+  hasPreviousPage: boolean;
+  hasNextPage: boolean;
+}
+
+export interface CategoryDto {
+  id: string;
+  categoryCode: string;
+  name: string;
+  description?: string | null;
+  displayOrder: number;
+  productCount: number;
+}
+
+// ==========================================
+// 2. Backward Compatibility Types
+// ==========================================
+
+export interface Category {
+  id: string;
+  code: string;
+  name: string;
+  parentId?: string | null;
+  productCount: number;
+  depth?: number;
+}
+
 export interface UomConversion {
   id: string;
   unitName: string;
-  conversionRate: number; // e.g. 1 Thùng = 24 Lon (rate = 24)
+  conversionRate: number;
   barcode?: string;
   price: number;
 }
@@ -19,10 +92,10 @@ export interface ComboComponent {
 export interface StockLedgerEntry {
   id: string;
   timestamp: string;
-  documentCode: string; // e.g. KK000001, PN00012, HD0098
-  method: string; // "Kiểm kho khởi tạo", "Nhập hàng từ NCC", "Bán hàng POS", "Điều chuyển kho"
+  documentCode: string;
+  method: string;
   branchName: string;
-  quantityChange: number; // + hoặc -
+  quantityChange: number;
   balance: number;
 }
 
@@ -34,27 +107,18 @@ export interface BranchStock {
   committed?: number;
 }
 
-export interface Category {
-  id: string;
-  code: string; // CAT-xxx
-  name: string;
-  parentId?: string | null;
-  productCount: number;
-  depth?: number;
-}
-
 export interface ProductItem {
   id: string;
-  productCode: string; // SPxxxxxx hoặc mã barcode
+  productCode: string;
   barcode: string;
   productName: string;
   categoryId: string;
   categoryName: string;
   baseUnit: string;
   sellingPrice: number;
-  costPrice: number | null; // che giấu nếu là Cashier/Employee (BR-SEC-01)
+  costPrice: number | null;
   onHand: number;
-  committed: number; // Khách đặt
+  committed: number;
   isFavorite?: boolean;
   isCombo?: boolean;
   status: 'Active' | 'Discontinued';
@@ -63,10 +127,10 @@ export interface ProductItem {
   imageUrl?: string;
   minStock?: number;
   maxStock?: number;
-  vatRate?: number; // 0, 5, 8, 10
+  vatRate?: number;
   description?: string;
   internalNote?: string;
-  hasTransactions?: boolean; // Khóa Base UOM nếu true (BR-PROD-01)
+  hasTransactions?: boolean;
   uomConversions?: UomConversion[];
   comboComponents?: ComboComponent[];
   stockLedger?: StockLedgerEntry[];

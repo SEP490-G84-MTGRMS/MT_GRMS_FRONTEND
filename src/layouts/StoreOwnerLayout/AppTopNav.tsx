@@ -17,13 +17,10 @@ import {
   Settings,
   User,
   Store,
-  Globe,
-  Palette,
-  LogOut,
+      LogOut,
   ChevronRight,
   Wallet,
-  QrCode,
-  FileText,
+    FileText,
 } from "lucide-react";
 import { useAuthStore } from "../../stores/useAuthStore";
 
