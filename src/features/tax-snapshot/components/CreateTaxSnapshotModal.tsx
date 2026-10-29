@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import {
   X,
   Lock,
@@ -253,6 +253,26 @@ export const CreateTaxSnapshotModal: React.FC<CreateTaxSnapshotModalProps> = ({
                   </p>
                 </div>
               </div>
+
+              {summary.isCogsEstimated && (
+                <div
+                  style={{
+                    padding: 12,
+                    borderRadius: 10,
+                    background: '#FEF2F2',
+                    border: '1px solid #FCA5A5',
+                    marginBottom: 16,
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: 10,
+                  }}
+                >
+                  <AlertTriangle size={18} style={{ color: '#DC2626', flexShrink: 0, marginTop: 2 }} />
+                  <span style={{ fontSize: '0.8rem', color: '#991B1B', lineHeight: 1.45 }}>
+                    <strong>Cảnh báo Giá vốn ước tính (70%):</strong> Kỳ tính thuế này đang dùng số ước tính do thiếu hóa đơn chứng từ đầu vào. Bắt buộc cam kết tự chịu trách nhiệm pháp lý khi quyết toán thuế.
+                  </span>
+                </div>
+              )}
 
               <label
                 style={{

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import type { FC } from 'react';
 import { X, FileCheck, CheckCircle2, Download, Receipt, ArrowRight, Layers, Calendar, Hash } from 'lucide-react';
 import type { TaxSnapshot, TaxSnapshotStatus } from '../types/taxSnapshot';
@@ -193,6 +193,17 @@ export const TaxSnapshotDetailDrawer: FC<Props> = ({
                     <strong style={{ color: '#059669' }}>
                       {new Date(snapshot.paidAt).toLocaleString('vi-VN')}
                     </strong>
+                  </div>
+                )}
+
+                {snapshot.auditSignatureHash && (
+                  <div className="tax-audit-row" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 4 }}>
+                    <span style={{ fontSize: '0.78rem', color: '#64748B' }}>
+                      Mã kiểm tra toàn vẹn dữ liệu nội bộ (HMAC-SHA256):
+                    </span>
+                    <code style={{ fontSize: '0.72rem', background: '#F8FAFC', padding: '4px 8px', borderRadius: 6, wordBreak: 'break-all', color: '#0F766E', width: '100%', boxSizing: 'border-box' }}>
+                      {snapshot.auditSignatureHash}
+                    </code>
                   </div>
                 )}
 

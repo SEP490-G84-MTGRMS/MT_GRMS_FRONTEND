@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import {
   TrendingUp,
   Percent,
@@ -40,7 +40,20 @@ export const TaxKPICards: React.FC<TaxKPICardsProps> = ({ summary, isLoading }) 
   const deadline = getTaxFilingDeadline(summary.periodType, summary.periodNumber, summary.year);
 
   return (
-    <div className="tax-kpi-grid">
+    <>
+      {summary.isApproachingGroup4Threshold && (
+        <div style={{ background: '#FFFBEB', border: '1px solid #FDE68A', color: '#92400E', padding: '10px 14px', borderRadius: 10, fontSize: '0.82rem', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span>⚠️</span>
+          <span><strong>Cảnh báo doanh thu tiến sát ngưỡng:</strong> Doanh thu năm đạt {formatMoney(summary.annualAccumulatedRevenue)} (tiến sát ngưỡng 50 tỷ). Chủ hộ cần chuẩn bị chuyển sang kỳ kê khai theo Tháng hoặc chuyển đổi mô hình Doanh nghiệp từ năm sau.</span>
+        </div>
+      )}
+      {summary.isExceedingGroup4Threshold && (
+        <div style={{ background: '#FEF2F2', border: '1px solid #FCA5A5', color: '#991B1B', padding: '10px 14px', borderRadius: 10, fontSize: '0.82rem', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span>🚨</span>
+          <span><strong>Doanh thu vượt ngưỡng 50 tỷ:</strong> Theo quy định pháp luật, hộ kinh doanh đạt quy mô trên 50 tỷ/năm phải áp dụng chế độ kế toán doanh nghiệp đầy đủ hoặc chuyển đổi sang Công ty.</span>
+        </div>
+      )}
+      <div className="tax-kpi-grid">
       {/* KPI 1: Doanh thu phát sinh trong kỳ */}
       <div className="tax-kpi-card">
         <div className="tax-kpi-header">
@@ -151,5 +164,6 @@ export const TaxKPICards: React.FC<TaxKPICardsProps> = ({ summary, isLoading }) 
         </div>
       </div>
     </div>
+    </>
   );
 };

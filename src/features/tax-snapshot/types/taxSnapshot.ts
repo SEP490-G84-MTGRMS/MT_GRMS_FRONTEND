@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Tax Period Object & Type compatible with erasableSyntaxOnly
  */
 export const TaxPeriodType = {
@@ -59,6 +59,17 @@ export type TaxSnapshotStatus =
   | 'Paid';
 
 /**
+ * Chi tiết phân rã thuế GTGT theo từng nhóm thuế suất
+ */
+export interface VatBreakdown {
+  revenueStandardRate10: number;
+  taxAmountStandardRate10: number;
+  revenueReducedRate08: number;
+  taxAmountReducedRate08: number;
+  effectiveVatRate: number;
+}
+
+/**
  * Filter Parameters for Tax Summary Calculation
  */
 export interface HouseholdTaxFilterDto {
@@ -67,7 +78,10 @@ export interface HouseholdTaxFilterDto {
   periodNumber: number;
   branchId?: string;
   calculationMethod: TaxCalculationMethod;
+  tier2Method?: 'REVENUE_EXCESS' | 'PROFIT_15';
   applyVatReduction2026?: boolean;
+  reducedVatRevenueInPeriod?: number;
+  standardVatRevenueInPeriod?: number;
   customVatRate?: number;
   customPitRate?: number;
   priorDeclaredPitTaxOverride?: number;
@@ -101,8 +115,13 @@ export interface HouseholdTaxSummaryDto {
   householdGroup: HouseholdTaxGroup;
   householdGroupName: string;
   calculationMethod: TaxCalculationMethod;
+  tier2Method?: 'REVENUE_EXCESS' | 'PROFIT_15';
   isTaxExempt: boolean;
   taxExemptionThreshold: number; // 1.000.000.000 VND
+
+  // Cảnh báo ngưỡng Nhóm 4 (toàn chuỗi Tenant)
+  isApproachingGroup4Threshold?: boolean;
+  isExceedingGroup4Threshold?: boolean;
 
   // In-period Gross and Net Revenue
   grossRevenueInPeriod: number;
@@ -110,18 +129,22 @@ export interface HouseholdTaxSummaryDto {
   returnAmountInPeriod: number;
   taxableRevenueInPeriod: number;
 
-  // VAT
-  vatRate: number; // 1.0% or 0.8% if reduced
+  // VAT & Effective Rate
+  vatRate: number; // Effective VAT rate
   isVatReduced: boolean;
   vatTaxableRevenue: number;
   vatAmount: number;
+  vatBreakdown?: VatBreakdown;
 
   // PIT
-  pitRate: number; // 0.5% (percentage) or effective rate (declaration)
+  pitRate: number;
   pitTaxableRevenue: number;
   pitAmount: number;
 
   // Declaration-based YTD Fields
+  isCogsEstimated?: boolean;
+  cogsAmount?: number;
+  opexAmount?: number;
   deductibleExpensesInPeriod: number;
   ytdRevenue: number;
   ytdExpenses: number;
@@ -168,7 +191,10 @@ export interface CreateTaxSnapshotRequest {
   periodNumber: number;
   branchId?: string;
   calculationMethod: TaxCalculationMethod;
+  tier2Method?: 'REVENUE_EXCESS' | 'PROFIT_15';
   applyVatReduction2026: boolean;
+  confirmEstimatedCogsResponsible?: boolean;
+  estimatedCogsConfirmationStatement?: string;
   pin: string;
   notes?: string;
 }
@@ -185,14 +211,19 @@ export interface HouseholdTaxSnapshotDto {
   annualAccumulatedRevenue: number;
   householdGroup: HouseholdTaxGroup;
   calculationMethod: TaxCalculationMethod;
+  tier2Method?: 'REVENUE_EXCESS' | 'PROFIT_15';
   applyVatReduction2026?: boolean;
   isTaxExempt: boolean;
   taxableRevenueInPeriod: number;
   vatRate: number;
   vatAmount: number;
+  vatBreakdown?: VatBreakdown;
   pitRate: number;
   pitAmount: number;
   totalTaxAmount: number;
+  isCogsEstimated?: boolean;
+  auditSignatureHash?: string;
+  isIntegrityValid?: boolean;
   finalizedBy: string;
   finalizedAtUtc: string;
   notes?: string;
