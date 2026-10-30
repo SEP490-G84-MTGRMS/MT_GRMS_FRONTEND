@@ -5,6 +5,10 @@ export const httpClient = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  // Tuân thủ chuẩn ASP.NET Core Model Binding cho mảng: CategoryIds=id1&CategoryIds=id2 (thay vì CategoryIds[]=id1)
+  paramsSerializer: {
+    indexes: null,
+  },
 });
 
 httpClient.interceptors.request.use((config) => {

@@ -17,7 +17,9 @@ export const productApi = {
       params.SearchTerm = filter.searchTerm.trim();
     }
 
-    if (filter.categoryId && filter.categoryId.trim() !== '' && filter.categoryId !== 'ALL') {
+    if (filter.categoryIds && filter.categoryIds.length > 0) {
+      params.CategoryIds = filter.categoryIds;
+    } else if (filter.categoryId && filter.categoryId.trim() !== '' && filter.categoryId !== 'ALL') {
       params.CategoryId = filter.categoryId;
     }
 

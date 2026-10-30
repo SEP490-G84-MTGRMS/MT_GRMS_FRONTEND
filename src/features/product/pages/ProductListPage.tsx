@@ -17,6 +17,7 @@ import { ProductFormModal } from '../components/ProductFormModal';
 import { ComboFormModal } from '../components/ComboFormModal';
 import { ProductDetailModal } from '../components/ProductDetailModal';
 import { TablePagination } from '../../../components/common';
+import { useAuthStore } from '../../../stores/useAuthStore';
 import { AdminToast, type ToastState } from '../../admin/components';
 import '../product.css';
 
@@ -30,7 +31,23 @@ export const ProductListPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
   // RBAC switch (StoreOwner vs Cashier) for BR-SEC-01 verification
-  const [userRole, setUserRole] = useState<'StoreOwner' | 'Cashier'>('StoreOwner');
+  const currentUser = useAuthStore((state) => state.user);
+  const initialRole: 'StoreOwner' | 'Cashier' =
+    currentUser?.role === 'CASHIER' ? 'Cashier' : 'StoreOwner';
+  const [userRole, setUserRole] = useState<'StoreOwner' | 'Cashier'>(initialRole);
+
+  // Sync role if auth state changes
+  useEffect(() => {
+    if (currentUser?.role === 'CASHIER') {
+      setUserRole('Cashier');
+    } else if (
+      currentUser?.role === 'ADMIN' ||
+      currentUser?.role === 'STORE_OWNER' ||
+      currentUser?.role === 'MANAGER'
+    ) {
+      setUserRole('StoreOwner');
+    }
+  }, [currentUser?.role]);
 
   // Filter state
   const [searchTerm, setSearchTerm] = useState('');
@@ -66,12 +83,12 @@ export const ProductListPage: React.FC = () => {
   const fetchProducts = useCallback(async () => {
     setIsLoading(true);
     try {
-      const catId = selectedCategoryIds.length === 1 ? selectedCategoryIds[0] : undefined;
       const res = await productApi.getProductsPaged({
         pageIndex,
         pageSize,
         searchTerm: searchTerm.trim() || undefined,
-        categoryId: catId,
+        categoryId: selectedCategoryIds.length === 1 ? selectedCategoryIds[0] : undefined,
+        categoryIds: selectedCategoryIds.length > 1 ? selectedCategoryIds : undefined,
       });
       if (res && res.items) {
         const mapped: ProductItem[] = res.items.map((p) => ({
@@ -139,6 +156,7 @@ export const ProductListPage: React.FC = () => {
 
   // Category Actions
   const handleToggleCategory = (id: string) => {
+    setPageIndex(1);
     if (selectedCategoryIds.includes(id)) {
       setSelectedCategoryIds(selectedCategoryIds.filter((cid) => cid !== id));
     } else {
@@ -147,6 +165,7 @@ export const ProductListPage: React.FC = () => {
   };
 
   const handleSelectAllCategories = () => {
+    setPageIndex(1);
     if (selectedCategoryIds.length === categories.length) {
       setSelectedCategoryIds([]);
     } else {
@@ -356,9 +375,29 @@ export const ProductListPage: React.FC = () => {
       if (stockCriteria === 'below_min' && item.onHand >= (item.minStock || 0)) return false;
       if (stockCriteria === 'negative' && item.onHand >= 0) return false;
 
+      // Filter theo Thời gian tạo (Toàn thời gian vs Tùy chỉnh ngày)
+      if (createdTime === 'custom' && customDate) {
+        if (!item.createdAt) return false;
+        // Chuẩn hóa item.createdAt (đã format vi-VN dd/mm/yyyy hoặc ISO yyyy-mm-dd)
+        let itemDateStr = '';
+        if (item.createdAt.includes('/')) {
+          const parts = item.createdAt.split('/');
+          if (parts.length === 3) {
+            // dd/mm/yyyy -> yyyy-mm-dd
+            itemDateStr = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+          }
+        } else if (item.createdAt.includes('-')) {
+          itemDateStr = item.createdAt.split('T')[0];
+        }
+
+        if (itemDateStr && itemDateStr !== customDate) {
+          return false;
+        }
+      }
+
       return true;
     });
-  }, [products, searchTerm, selectedCategoryIds, stockCriteria]);
+  }, [products, searchTerm, selectedCategoryIds, stockCriteria, createdTime, customDate]);
 
   // Totals
   const totalStock = filteredProducts.reduce((sum, p) => sum + p.onHand, 0);
@@ -484,6 +523,7 @@ export const ProductListPage: React.FC = () => {
           selectedCategoryIds={selectedCategoryIds}
           onToggleCategory={handleToggleCategory}
           onSelectAll={handleSelectAllCategories}
+          onClearAll={() => { setSelectedCategoryIds([]); setPageIndex(1); }}
           onOpenCreateModal={() => {
             setCategoryToEdit(null);
             setIsCategoryModalOpen(true);
@@ -669,7 +709,7 @@ export const ProductListPage: React.FC = () => {
           <TablePagination
             currentPage={pageIndex}
             pageSize={pageSize}
-            totalItems={totalCount}
+            totalItems={selectedCategoryIds.length > 1 ? filteredProducts.length : totalCount}
             pageSizeOptions={[10, 20, 50]}
             onPageChange={(page) => setPageIndex(page)}
             onPageSizeChange={(newSize) => {

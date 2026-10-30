@@ -130,7 +130,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 10px;
+  padding: 6px 8px;
   border-radius: var(--radius-sm, 12px);
   transition: background 0.15s ease;
 }
@@ -145,15 +145,15 @@
   gap: 8px;
   cursor: pointer;
   flex: 1;
-  font-size: 13.5px;
+  font-size: 12.5px;
   color: #334155;
   user-select: none;
 }
 
 .category-item-left input[type="checkbox"] {
   accent-color: var(--blue-primary, #0F766E);
-  width: 15px;
-  height: 15px;
+  width: 14px;
+  height: 14px;
   cursor: pointer;
 }
 

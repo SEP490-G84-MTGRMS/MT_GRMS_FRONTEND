@@ -7,6 +7,7 @@ interface CategorySidebarProps {
   selectedCategoryIds: string[];
   onToggleCategory: (id: string) => void;
   onSelectAll: () => void;
+  onClearAll?: () => void;
   onOpenCreateModal: () => void;
   onOpenEditModal: (category: Category) => void;
   stockCriteria: 'all' | 'in_stock' | 'out_of_stock' | 'below_min' | 'negative';
@@ -63,7 +64,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
           <input
             type="text"
             className="category-search-input"
-            placeholder="🔍 Tìm kiếm nhóm hàng..."
+            placeholder="Tìm kiếm nhóm hàng..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -81,8 +82,8 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                     checked={isChecked}
                     onChange={() => onToggleCategory(cat.id)}
                   />
-                  <span>
-                    {cat.name} ({cat.productCount})
+                  <span style={{ fontSize: 12.5, fontWeight: isChecked ? 600 : 400, color: isChecked ? "#0F766E" : "#334155" }}>
+                    {cat.name} <span style={{ color: "#94A3B8", fontSize: 11.5, fontWeight: 400 }}>({cat.productCount})</span>
                   </span>
                 </label>
                 <button

@@ -134,6 +134,10 @@ export const authService = {
   /**
    * Đặt lại mật khẩu với mã OTP
    */
+  async confirmPasswordReset(payload: ResetPasswordPayload): Promise<{ success: boolean; message: string }> {
+    return this.resetPassword(payload);
+  },
+
   async resetPassword(payload: ResetPasswordPayload): Promise<{ success: boolean; message: string }> {
     try {
       const response = await httpClient.post<{ success: boolean; message: string }>(

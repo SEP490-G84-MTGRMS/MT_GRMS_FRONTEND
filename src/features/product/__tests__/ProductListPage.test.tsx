@@ -3,6 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { ProductListPage } from '../pages/ProductListPage';
 import { productApi } from '../api/productApi';
 import { categoryApi } from '../api/categoryApi';
+import { useAuthStore } from '../../../stores/useAuthStore';
 
 vi.mock('../api/productApi', () => ({
   productApi: {
@@ -16,9 +17,40 @@ vi.mock('../api/categoryApi', () => ({
   },
 }));
 
+const mockSampleProduct = {
+  id: 'p-1',
+  productCode: 'SP000001',
+  barcode: '8930000000001',
+  name: 'Nước suối Aquafina 500ml',
+  categoryId: 'cat-1',
+  categoryName: 'Nước uống',
+  baseUnit: 'Chai',
+  sellingPrice: 5000,
+  costPrice: 3500,
+  minStock: 10,
+  maxStock: 100,
+  vatRate: 0,
+  productType: 'STANDARD',
+  status: 'Active',
+  hasBatches: false,
+  isFavorite: false,
+  createdAt: '2026-10-30T00:00:00Z',
+};
+
 describe('ProductListPage - Task T3 Server-side Table & Pagination Integration', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    useAuthStore.setState({
+      user: {
+        id: 'usr-1',
+        email: 'owner@mtgrms.vn',
+        fullName: 'Chủ Cửa Hàng',
+        role: 'STORE_OWNER',
+        tenantId: 'tenant_mt_mart_01',
+      },
+      token: 'mock-token',
+      isAuthenticated: true,
+    });
   });
 
   it('render thành công tiêu đề và gọi API lấy danh sách trang đầu tiên', async () => {
@@ -32,27 +64,7 @@ describe('ProductListPage - Task T3 Server-side Table & Pagination Integration',
     ]);
 
     (productApi.getProductsPaged as any).mockResolvedValueOnce({
-      items: [
-        {
-          id: 'p-1',
-          productCode: 'SP000001',
-          barcode: '8930000000001',
-          name: 'Nước suối Aquafina 500ml',
-          categoryId: 'cat-1',
-          categoryName: 'Nước uống',
-          baseUnit: 'Chai',
-          sellingPrice: 5000,
-          costPrice: 3500,
-          minStock: 10,
-          maxStock: 100,
-          vatRate: 0,
-          productType: 'STANDARD',
-          status: 'Active',
-          hasBatches: false,
-          isFavorite: false,
-          createdAt: '2026-10-30T00:00:00Z',
-        },
-      ],
+      items: [mockSampleProduct],
       pageIndex: 1,
       pageSize: 20,
       totalCount: 45,
@@ -79,5 +91,88 @@ describe('ProductListPage - Task T3 Server-side Table & Pagination Integration',
     // Kiểm tra TablePagination component được hiển thị
     expect(screen.getByText(/Hiển thị/)).toBeDefined();
     expect(screen.getAllByText(/hàng hóa/).length).toBeGreaterThan(0);
+  });
+});
+
+describe('ProductListPage - Task T6 BR-SEC-01 Phân quyền Giá vốn theo Vai trò', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('Hiển thị cột "Giá vốn" và giá trị khi vai trò người dùng là STORE_OWNER / StoreOwner', async () => {
+    useAuthStore.setState({
+      user: {
+        id: 'usr-owner',
+        email: 'owner@mtgrms.vn',
+        fullName: 'Chủ Cửa Hàng',
+        role: 'STORE_OWNER',
+        tenantId: 'tenant_mt_mart_01',
+      },
+      token: 'mock-token',
+      isAuthenticated: true,
+    });
+
+    (categoryApi.getCategories as any).mockResolvedValueOnce([]);
+    (productApi.getProductsPaged as any).mockResolvedValueOnce({
+      items: [mockSampleProduct],
+      pageIndex: 1,
+      pageSize: 20,
+      totalCount: 1,
+      totalPages: 1,
+      hasPreviousPage: false,
+      hasNextPage: false,
+    });
+
+    render(<ProductListPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Nước suối Aquafina 500ml')).toBeDefined();
+    });
+
+    // Phải nhìn thấy header cột "Giá vốn"
+    expect(screen.getByRole('columnheader', { name: 'Giá vốn' })).toBeDefined();
+    // Phải nhìn thấy giá trị giá vốn formatted (3,500 đ hoặc 3.500 đ)
+    const costPriceRegex = /3[.,]500\s*đ/;
+    expect(screen.getByText(costPriceRegex)).toBeDefined();
+  });
+
+  it('Ẩn hoàn toàn cột "Giá vốn" (cả th và td) khi vai trò người dùng là CASHIER / Cashier', async () => {
+    useAuthStore.setState({
+      user: {
+        id: 'usr-cashier',
+        email: 'cashier@mtgrms.vn',
+        fullName: 'Thu Ngân Quầy',
+        role: 'CASHIER',
+        tenantId: 'tenant_mt_mart_01',
+      },
+      token: 'mock-token',
+      isAuthenticated: true,
+    });
+
+    (categoryApi.getCategories as any).mockResolvedValueOnce([]);
+    (productApi.getProductsPaged as any).mockResolvedValueOnce({
+      items: [mockSampleProduct],
+      pageIndex: 1,
+      pageSize: 20,
+      totalCount: 1,
+      totalPages: 1,
+      hasPreviousPage: false,
+      hasNextPage: false,
+    });
+
+    render(<ProductListPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Nước suối Aquafina 500ml')).toBeDefined();
+    });
+
+    // KHÔNG được có header cột "Giá vốn" trong DOM
+    expect(screen.queryByRole('columnheader', { name: 'Giá vốn' })).toBeNull();
+    // KHÔNG được hiển thị giá trị giá vốn trong DOM
+    const costPriceRegex = /3[.,]500\s*đ/;
+    expect(screen.queryByText(costPriceRegex)).toBeNull();
+    // Vẫn hiển thị giá bán bình thường
+    const sellingPriceRegex = /5[.,]000\s*đ/;
+    expect(screen.getByText(sellingPriceRegex)).toBeDefined();
   });
 });

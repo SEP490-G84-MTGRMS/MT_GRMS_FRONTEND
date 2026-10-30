@@ -108,6 +108,34 @@ describe('productApi.getProductsPaged', () => {
     expect(result.hasNextPage).toBe(false);
   });
 
+  it('gửi CategoryIds khi tìm kiếm theo nhiều danh mục cùng lúc', async () => {
+    (httpClient.get as any).mockResolvedValueOnce({
+      data: {
+        success: true,
+        data: {
+          items: [],
+          pageIndex: 1,
+          pageSize: 20,
+          totalCount: 0,
+        },
+      },
+    });
+
+    await productApi.getProductsPaged({
+      categoryIds: ['cat-01', 'cat-02'],
+      pageIndex: 1,
+      pageSize: 20,
+    });
+
+    expect(httpClient.get).toHaveBeenCalledWith('/products', {
+      params: {
+        PageIndex: 1,
+        PageSize: 20,
+        CategoryIds: ['cat-01', 'cat-02'],
+      },
+    });
+  });
+
   it('xử lý an toàn khi API trả về rỗng hoặc lỗi', async () => {
     (httpClient.get as any).mockResolvedValueOnce({
       data: {

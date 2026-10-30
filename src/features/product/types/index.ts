@@ -34,6 +34,7 @@ export interface ProductResponse {
 export interface ProductQueryFilter {
   searchTerm?: string;
   categoryId?: string;
+  categoryIds?: string[];
   status?: string;
   pageIndex?: number;
   pageSize?: number;
