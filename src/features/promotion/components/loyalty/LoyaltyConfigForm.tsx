@@ -1,5 +1,5 @@
 import type { FC } from 'react';
-import { Save, Settings, Award } from 'lucide-react';
+import { Award, Coins, ArrowDownLeft, Sparkles, AlertCircle } from 'lucide-react';
 import type { LoyaltySystemConfig } from '../../types/promotion.types';
 
 interface LoyaltyConfigFormProps {
@@ -11,12 +11,7 @@ interface LoyaltyConfigFormProps {
 export const LoyaltyConfigForm: FC<LoyaltyConfigFormProps> = ({
   config,
   onChange,
-  onSave,
 }) => {
-  const handleToggleEnable = () => {
-    onChange({ ...config, isEnabled: !config.isEnabled });
-  };
-
   const handleUpdateField = (field: keyof LoyaltySystemConfig, value: unknown) => {
     onChange({ ...config, [field]: value });
   };
@@ -34,185 +29,234 @@ export const LoyaltyConfigForm: FC<LoyaltyConfigFormProps> = ({
   };
 
   return (
-    <div className="promotion-card" style={{ height: 'fit-content' }}>
-      <div className="promotion-card-header">
-        <h3 className="promotion-card-title">
-          <Settings size={18} color="#0F766E" />
-          <span>Cấu hình tích điểm & Hạng thành viên</span>
-        </h3>
-
-        <div
-          className="switch-container"
-          onClick={handleToggleEnable}
-          title={config.isEnabled ? 'Tắt tính năng tích điểm' : 'Bật tính năng tích điểm'}
-        >
-          <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#475569' }}>
-            {config.isEnabled ? 'Đang kích hoạt' : 'Đang tạm tắt'}
+    <div className="loyalty-config-container">
+      {/* Alert Notice if loyalty is disabled */}
+      {!config.isEnabled && (
+        <div className="loyalty-disabled-notice">
+          <AlertCircle size={18} className="flex-shrink-0" />
+          <span>
+            Tính năng tích điểm đang <strong>tạm tắt</strong>. Mọi đơn thanh toán tại POS sẽ không cộng hoặc trừ điểm. Bấm nút <strong>&quot;Tích điểm: Tắt&quot;</strong> ở góc trên bên phải để kích hoạt lại.
           </span>
-          <div className={`switch-track ${config.isEnabled ? 'switch-active' : ''}`}>
-            <div className="switch-thumb" />
+        </div>
+      )}
+
+      {/* 2-Column Grid: Cộng điểm (Trái) & Tiêu điểm (Phải) */}
+      <div className="loyalty-rules-grid">
+        {/* Card 1: Quy tắc cộng điểm từ đơn hàng */}
+        <div className="promotion-card loyalty-card">
+          <div className="promotion-card-header loyalty-card-header-compact">
+            <div className="flex items-center gap-2">
+              <Coins size={18} color="#0F766E" />
+              <h3 className="loyalty-card-title">1. Quy tắc cộng điểm từ đơn hàng</h3>
+            </div>
+          </div>
+
+          <div className="loyalty-card-body">
+            <div className="loyalty-fields-2col">
+              {/* Field 1 */}
+              <div className="loyalty-rule-field">
+                <label className="loyalty-rule-label">Số tiền chi tiêu nhận 1 điểm</label>
+                <div className="loyalty-input-wrapper">
+                  <input
+                    type="number"
+                    value={config.earningRateAmount}
+                    onChange={(e) => handleUpdateField('earningRateAmount', Number(e.target.value))}
+                    className="loyalty-input-field font-bold"
+                    disabled={!config.isEnabled}
+                    min={1000}
+                    step={1000}
+                  />
+                  <span className="loyalty-input-addon">đ = 1 điểm</span>
+                </div>
+                <span className="loyalty-rule-hint">Mặc định: 10.000 đ = 1 điểm tích lũy</span>
+              </div>
+
+              {/* Field 2 */}
+              <div className="loyalty-rule-field">
+                <label className="loyalty-rule-label">Thời hạn sử dụng điểm</label>
+                <div className="loyalty-input-wrapper">
+                  <input
+                    type="number"
+                    value={config.pointsExpiryMonths}
+                    onChange={(e) => handleUpdateField('pointsExpiryMonths', Number(e.target.value))}
+                    className="loyalty-input-field font-bold"
+                    disabled={!config.isEnabled}
+                    min={0}
+                    step={1}
+                  />
+                  <span className="loyalty-input-addon">tháng</span>
+                </div>
+                <span className="loyalty-rule-hint">Nhập 0 nếu điểm có hiệu lực vĩnh viễn</span>
+              </div>
+            </div>
+
+            {/* Example Box */}
+            <div className="loyalty-example-box">
+              <Sparkles size={15} className="example-box-icon" />
+              <div className="example-box-text">
+                <strong>Minh họa tích điểm:</strong> Đơn <strong>200.000 đ</strong> của khách sẽ được tích lũy{' '}
+                <strong className="text-teal-700 font-bold">
+                  +{Math.floor(200000 / (config.earningRateAmount || 10000))} điểm
+                </strong> (hệ số chuẩn 1.0x).
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Card 2: Quy tắc tiêu điểm / Đổi thưởng tại POS */}
+        <div className="promotion-card loyalty-card">
+          <div className="promotion-card-header loyalty-card-header-compact">
+            <div className="flex items-center gap-2">
+              <ArrowDownLeft size={18} color="#0F766E" />
+              <h3 className="loyalty-card-title">2. Quy tắc tiêu điểm / Đổi thưởng tại POS</h3>
+            </div>
+          </div>
+
+          <div className="loyalty-card-body">
+            <div className="loyalty-fields-2col">
+              {/* Field 1 */}
+              <div className="loyalty-rule-field">
+                <label className="loyalty-rule-label">Giá trị quy đổi tiền mặt</label>
+                <div className="loyalty-input-wrapper">
+                  <input
+                    type="number"
+                    value={config.redemptionRateAmount}
+                    onChange={(e) => handleUpdateField('redemptionRateAmount', Number(e.target.value))}
+                    className="loyalty-input-field font-bold text-teal-700"
+                    disabled={!config.isEnabled}
+                    min={100}
+                    step={100}
+                  />
+                  <span className="loyalty-input-addon">VNĐ / 1 điểm</span>
+                </div>
+                <span className="loyalty-rule-hint">1 điểm trừ trực tiếp vào bill thanh toán</span>
+              </div>
+
+              {/* Field 2 */}
+              <div className="loyalty-rule-field">
+                <label className="loyalty-rule-label">Mức điểm tối thiểu để đổi</label>
+                <div className="loyalty-input-wrapper">
+                  <input
+                    type="number"
+                    value={config.minRedemptionPoints}
+                    onChange={(e) => handleUpdateField('minRedemptionPoints', Number(e.target.value))}
+                    className="loyalty-input-field font-bold"
+                    disabled={!config.isEnabled}
+                    min={1}
+                    step={1}
+                  />
+                  <span className="loyalty-input-addon">điểm</span>
+                </div>
+                <span className="loyalty-rule-hint">Tối thiểu {config.minRedemptionPoints} điểm mới được cấn trừ</span>
+              </div>
+            </div>
+
+            {/* Checkbox Box */}
+            <div className="loyalty-checkbox-box">
+              <label className="loyalty-checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={config.allowPointsWithPromotions}
+                  onChange={(e) => handleUpdateField('allowPointsWithPromotions', e.target.checked)}
+                  disabled={!config.isEnabled}
+                  className="loyalty-custom-checkbox"
+                />
+                <span>Cho phép tiêu điểm song song với các Voucher &amp; CTKM khác</span>
+              </label>
+            </div>
           </div>
         </div>
       </div>
 
-      <div style={{ padding: '20px' }}>
-        {/* 1. Quy tắc tích lũy */}
-        <div style={{ marginBottom: 20 }}>
-          <h4 className="loyalty-section-title">
-            1. Quy tắc cộng điểm từ đơn hàng
-          </h4>
-          <div className="form-grid-2">
+      {/* Card 3: Khối 4 Hạng thẻ thành viên */}
+      <div className="promotion-card loyalty-card" id="membership-tiers-section">
+        <div className="promotion-card-header loyalty-card-header-compact">
+          <div className="flex items-center gap-2">
+            <Award size={18} color="#0F766E" />
             <div>
-              <label className="form-label" style={{ fontSize: '0.82rem' }}>
-                Chi tiêu để nhận 1 điểm (VNĐ)
-              </label>
-              <input
-                type="number"
-                value={config.earningRateAmount}
-                onChange={(e) => handleUpdateField('earningRateAmount', Number(e.target.value))}
-                className="form-input"
-                style={{ fontWeight: 600, fontSize: '0.88rem' }}
-                disabled={!config.isEnabled}
-              />
-              <span style={{ fontSize: '0.74rem', color: '#64748b', display: 'block', marginTop: 4 }}>
-                Mặc định: 10,000 đ = 1 điểm tích lũy
-              </span>
-            </div>
-
-            <div>
-              <label className="form-label" style={{ fontSize: '0.82rem' }}>
-                Thời hạn sử dụng điểm (Tháng)
-              </label>
-              <input
-                type="number"
-                value={config.pointsExpiryMonths}
-                onChange={(e) => handleUpdateField('pointsExpiryMonths', Number(e.target.value))}
-                className="form-input"
-                style={{ fontWeight: 600, fontSize: '0.88rem' }}
-                disabled={!config.isEnabled}
-              />
-              <span style={{ fontSize: '0.74rem', color: '#64748b', display: 'block', marginTop: 4 }}>
-                Nhập 0 nếu điểm không bao giờ hết hạn
-              </span>
+              <h3 className="loyalty-card-title">
+                3. Chính sách 4 Hạng thẻ thành viên &amp; Hệ số nhân điểm
+              </h3>
+              <p className="loyalty-card-subtitle">
+                Khách hàng tự động thăng hạng khi đạt mốc chi tiêu tích lũy. Hạng thẻ cao hơn được nhân hệ số tích điểm nhanh hơn.
+              </p>
             </div>
           </div>
         </div>
 
-        {/* 2. Quy tắc tiêu điểm */}
-        <div style={{ marginBottom: 20, paddingTop: 16, borderTop: '1px solid #e2e8f0' }}>
-          <h4 className="loyalty-section-title">
-            2. Quy tắc tiêu điểm / Đổi thưởng tại quầy
-          </h4>
-          <div className="form-grid-2">
-            <div>
-              <label className="form-label" style={{ fontSize: '0.82rem' }}>
-                Giá trị quy đổi (1 điểm = VNĐ)
-              </label>
-              <input
-                type="number"
-                value={config.redemptionRateAmount}
-                onChange={(e) => handleUpdateField('redemptionRateAmount', Number(e.target.value))}
-                className="form-input"
-                style={{ fontWeight: 700, fontSize: '0.88rem', color: '#0F766E' }}
-                disabled={!config.isEnabled}
-              />
-              <span style={{ fontSize: '0.74rem', color: '#64748b', display: 'block', marginTop: 4 }}>
-                Mặc định: 1 điểm trừ 1,000 đ vào hóa đơn
-              </span>
-            </div>
+        <div className="loyalty-card-body p-0">
+          <div className="table-responsive">
+            <table className="promotion-table loyalty-tiers-table">
+              <thead>
+                <tr>
+                  <th style={{ width: 190 }}>Hạng thành viên</th>
+                  <th style={{ width: 250 }}>Mốc chi tiêu tích lũy</th>
+                  <th style={{ width: 160 }}>Hệ số nhân điểm</th>
+                  <th>Quyền lợi &amp; Ưu đãi áp dụng</th>
+                </tr>
+              </thead>
+              <tbody>
+                {config.tiers.map((tier, idx) => (
+                  <tr key={tier.id}>
+                    <td>
+                      <div
+                        className="loyalty-tier-badge"
+                        style={{ backgroundColor: `${tier.colorHex}18`, color: tier.colorHex }}
+                      >
+                        <div className="loyalty-tier-dot" style={{ backgroundColor: tier.colorHex }} />
+                        <span>{tier.tierName}</span>
+                      </div>
+                    </td>
 
-            <div>
-              <label className="form-label" style={{ fontSize: '0.82rem' }}>
-                Điểm tối thiểu để tiêu điểm
-              </label>
-              <input
-                type="number"
-                value={config.minRedemptionPoints}
-                onChange={(e) => handleUpdateField('minRedemptionPoints', Number(e.target.value))}
-                className="form-input"
-                style={{ fontWeight: 600, fontSize: '0.88rem' }}
-                disabled={!config.isEnabled}
-              />
-              <span style={{ fontSize: '0.74rem', color: '#64748b', display: 'block', marginTop: 4 }}>
-                Khách cần đạt từ {config.minRedemptionPoints} điểm để thanh toán
-              </span>
-            </div>
+                    <td>
+                      {idx === 0 ? (
+                        <div className="tier-default-spending">
+                          <span className="font-bold text-slate-800 text-sm">0 đ</span>
+                          <span className="text-xs text-teal-600 font-medium">(Mặc định khi đăng ký)</span>
+                        </div>
+                      ) : (
+                        <div className="loyalty-input-wrapper" style={{ maxWidth: 190 }}>
+                          <input
+                            type="number"
+                            value={tier.minSpending}
+                            onChange={(e) => handleUpdateTierMinSpending(idx, Number(e.target.value))}
+                            className="loyalty-input-field text-right font-bold text-slate-800"
+                            disabled={!config.isEnabled}
+                            step={500000}
+                            min={0}
+                          />
+                          <span className="loyalty-input-addon">đ</span>
+                        </div>
+                      )}
+                    </td>
+
+                    <td>
+                      <div className="loyalty-input-wrapper" style={{ maxWidth: 130 }}>
+                        <input
+                          type="number"
+                          step="0.1"
+                          min="1"
+                          max="5"
+                          value={tier.pointMultiplier}
+                          onChange={(e) => handleUpdateTierMultiplier(idx, Number(e.target.value))}
+                          className="loyalty-input-field text-center font-bold text-sm"
+                          style={{ color: tier.colorHex }}
+                          disabled={!config.isEnabled}
+                        />
+                        <span className="loyalty-input-addon">lần</span>
+                      </div>
+                    </td>
+
+                    <td>
+                      <span className="tier-benefits-desc">
+                        {tier.benefitsDescription}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-
-          <div style={{ marginTop: 12 }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: '0.8rem', color: '#334155' }}>
-              <input
-                type="checkbox"
-                checked={config.allowPointsWithPromotions}
-                onChange={(e) => handleUpdateField('allowPointsWithPromotions', e.target.checked)}
-                disabled={!config.isEnabled}
-                style={{ width: 16, height: 16, accentColor: '#0F766E' }}
-              />
-              <span>Cho phép tiêu điểm song song với các chương trình khuyến mãi khác</span>
-            </label>
-          </div>
-        </div>
-
-        {/* 3. Thiết lập 4 hạng thẻ */}
-        <div style={{ paddingTop: 16, borderTop: '1px solid #e2e8f0', marginBottom: 20 }}>
-          <h4 className="loyalty-section-title">
-            <Award size={15} color="#0F766E" />
-            <span>3. Thiết lập hệ số nhân điểm theo hạng thẻ</span>
-          </h4>
-
-          <div>
-            {config.tiers.map((tier, idx) => (
-              <div key={tier.id} className="loyalty-tier-row">
-                <div className="loyalty-tier-tag">
-                  <div
-                    className="loyalty-tier-dot"
-                    style={{ backgroundColor: tier.colorHex }}
-                  />
-                  <span>{tier.tierName}</span>
-                </div>
-
-                <div className="loyalty-tier-inputs">
-                  <div className="loyalty-input-group">
-                    <span>Chi tiêu từ:</span>
-                    <input
-                      type="number"
-                      value={tier.minSpending}
-                      onChange={(e) => handleUpdateTierMinSpending(idx, Number(e.target.value))}
-                      className="loyalty-input-spending"
-                      disabled={!config.isEnabled || idx === 0}
-                    />
-                    <span>đ</span>
-                  </div>
-
-                  <div className="loyalty-input-group">
-                    <span>Nhân:</span>
-                    <input
-                      type="number"
-                      step="0.1"
-                      value={tier.pointMultiplier}
-                      onChange={(e) => handleUpdateTierMultiplier(idx, Number(e.target.value))}
-                      className="loyalty-input-multiplier"
-                      disabled={!config.isEnabled}
-                    />
-                    <span>lần</span>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Action Button */}
-        <div>
-          <button
-            onClick={onSave}
-            className="btn-primary-pill"
-            style={{ width: '100%', justifyContent: 'center' }}
-            disabled={!config.isEnabled}
-          >
-            <Save size={16} />
-            <span>Lưu thiết lập chính sách tích điểm</span>
-          </button>
         </div>
       </div>
     </div>

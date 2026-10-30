@@ -1,7 +1,7 @@
-import { useState, useMemo, useRef, type FC } from 'react';
-import { Award, Coins, Sparkles, TrendingUp, Users } from 'lucide-react';
+import { useState, useRef, useEffect, type FC } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { Award, Settings, History, Save } from 'lucide-react';
 import { AdminToast, type ToastState } from '../../admin/components';
-import { PromotionKpiCards, type KpiCardItem } from '../components/common/PromotionKpiCards';
 import { LoyaltyConfigForm } from '../components/loyalty/LoyaltyConfigForm';
 import { LoyaltyLedgerTable } from '../components/loyalty/LoyaltyLedgerTable';
 import { AdjustPointsModal } from '../components/loyalty/AdjustPointsModal';
@@ -16,9 +16,15 @@ import type {
 import '../promotion.css';
 
 export const LoyaltyConfigPage: FC = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [config, setConfig] = useState<LoyaltySystemConfig>(INITIAL_LOYALTY_CONFIG);
   const [ledger, setLedger] = useState<PointLedgerItem[]>(INITIAL_POINT_LEDGER);
   const [isAdjustModalOpen, setIsAdjustModalOpen] = useState(false);
+
+  // Active Tab from query param or default to 'config'
+  const tabParam = searchParams.get('tab');
+  const viewParam = searchParams.get('view');
+  const activeTab: 'config' | 'ledger' = tabParam === 'ledger' ? 'ledger' : 'config';
 
   const [toast, setToast] = useState<ToastState | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -33,47 +39,30 @@ export const LoyaltyConfigPage: FC = () => {
     }, 3500);
   };
 
-  // KPI calculations
-  const kpiCards: KpiCardItem[] = useMemo(() => {
-    const totalCirculating = 8450; // Mock total points in system
-    const redeemedThisMonth = 1250;
-    const activeMembers = 342;
+  const handleTabChange = (tab: 'config' | 'ledger') => {
+    setSearchParams({ tab });
+  };
 
-    return [
-      {
-        id: 'kpi-l1',
-        title: 'Điểm đang lưu hành',
-        value: totalCirculating.toLocaleString('vi-VN'),
-        subText: 'Quy đổi ~ 8,450,000 đ quỹ thưởng',
-        icon: <Coins className="w-5 h-5" />,
-        colorClass: 'kpi-icon-teal',
-      },
-      {
-        id: 'kpi-l2',
-        title: 'Đã tiêu trong tháng',
-        value: redeemedThisMonth.toLocaleString('vi-VN'),
-        subText: 'Trừ tương ứng 1.25M đ vào hóa đơn',
-        icon: <TrendingUp className="w-5 h-5" />,
-        colorClass: 'kpi-icon-blue',
-      },
-      {
-        id: 'kpi-l3',
-        title: 'Khách hàng có điểm',
-        value: activeMembers,
-        subText: 'Đã tham gia tích lũy thành công',
-        icon: <Users className="w-5 h-5" />,
-        colorClass: 'kpi-icon-amber',
-      },
-      {
-        id: 'kpi-l4',
-        title: 'Trạng thái tích điểm',
-        value: config.isEnabled ? 'Đang kích hoạt' : 'Tạm tắt',
-        subText: `10k đ = 1đ | 1đ = ${config.redemptionRateAmount} đ`,
-        icon: <Sparkles className="w-5 h-5" />,
-        colorClass: 'kpi-icon-purple',
-      },
-    ];
-  }, [config]);
+  const handleToggleEnable = () => {
+    const nextState = !config.isEnabled;
+    setConfig((prev) => ({ ...prev, isEnabled: nextState }));
+    showToast(
+      nextState
+        ? 'Đã kích hoạt hệ thống tích điểm & đổi thưởng!'
+        : 'Đã tạm ngưng tích điểm tại toàn bộ chuỗi!',
+      nextState ? 'success' : 'info'
+    );
+  };
+
+  // Scroll to membership tiers if ?view=tiers
+  useEffect(() => {
+    if (viewParam === 'tiers') {
+      const el = document.getElementById('membership-tiers-section');
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }
+  }, [viewParam, activeTab]);
 
   const handleSaveConfig = () => {
     showToast('Đã lưu thành công chính sách tích điểm & hạng thẻ!');
@@ -112,21 +101,70 @@ export const LoyaltyConfigPage: FC = () => {
         </div>
       </div>
 
-      {/* KPI Cards */}
-      <PromotionKpiCards cards={kpiCards} />
+      {/* Centered Page Wrapper */}
+      <div className="loyalty-page-wrapper">
+        {/* Navigation & Action Bar on a Single Row to Prevent Overflow */}
+        <div className="loyalty-header-action-bar">
+          <div className="loyalty-nav-tabs">
+            <button
+              onClick={() => handleTabChange('config')}
+              className={`loyalty-nav-tab-btn ${activeTab === 'config' ? 'active' : ''}`}
+            >
+              <Settings className="w-4 h-4" />
+              <span>Cấu hình tích điểm & Hạng thẻ</span>
+            </button>
 
-      {/* 2-Column Split: Config on Left, Ledger Table on Right */}
-      <div className="loyalty-grid-layout">
-        <LoyaltyConfigForm
-          config={config}
-          onChange={setConfig}
-          onSave={handleSaveConfig}
-        />
+            <button
+              onClick={() => handleTabChange('ledger')}
+              className={`loyalty-nav-tab-btn ${activeTab === 'ledger' ? 'active' : ''}`}
+            >
+              <History className="w-4 h-4" />
+              <span>Sổ cái lịch sử biến động điểm</span>
+              <span className="loyalty-tab-count">{ledger.length}</span>
+            </button>
+          </div>
 
-        <LoyaltyLedgerTable
-          ledger={ledger}
-          onOpenAdjustModal={() => setIsAdjustModalOpen(true)}
-        />
+          {/* Quick Controls in Header (Zero Scroll Needed) */}
+          {activeTab === 'config' && (
+            <div className="loyalty-header-right-actions">
+              <div
+                className={`loyalty-switch-pill ${config.isEnabled ? 'active' : 'inactive'}`}
+                onClick={handleToggleEnable}
+                title={config.isEnabled ? 'Nhấp để tạm ngưng tích điểm' : 'Nhấp để kích hoạt tích điểm'}
+              >
+                <span className="loyalty-switch-status-text">
+                  {config.isEnabled ? '● Tích điểm: Đang bật' : '⏸ Tích điểm: Tắt'}
+                </span>
+                <div className={`switch-track switch-track-sm ${config.isEnabled ? 'switch-active' : ''}`}>
+                  <div className="switch-thumb switch-thumb-sm" />
+                </div>
+              </div>
+
+              <button
+                onClick={handleSaveConfig}
+                className="btn-primary-pill loyalty-save-btn-top"
+                disabled={!config.isEnabled}
+              >
+                <Save size={15} />
+                <span>Lưu thiết lập</span>
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Main Content Area based on Tab */}
+        {activeTab === 'config' ? (
+          <LoyaltyConfigForm
+            config={config}
+            onChange={setConfig}
+            onSave={handleSaveConfig}
+          />
+        ) : (
+          <LoyaltyLedgerTable
+            ledger={ledger}
+            onOpenAdjustModal={() => setIsAdjustModalOpen(true)}
+          />
+        )}
       </div>
 
       {/* Adjust Points Modal */}

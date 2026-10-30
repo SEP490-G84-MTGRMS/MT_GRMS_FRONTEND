@@ -10,8 +10,8 @@ import {
 } from '../mock/posMockData';
 import { PosHeader } from '../components/PosHeader';
 import { PosCartTable } from '../components/PosCartTable';
-import { PosCatalogGrid } from '../components/PosCatalogGrid';
 import { PosPaymentPanel } from '../components/PosPaymentPanel';
+import { PosCatalogModal } from '../components/modals/PosCatalogModal';
 import { AddCustomerModal } from '../components/modals/AddCustomerModal';
 import { VietQrModal } from '../components/modals/VietQrModal';
 import { QuickAddProductModal } from '../components/modals/QuickAddProductModal';
@@ -61,8 +61,8 @@ export const PosCheckoutPage: FC = () => {
   ]);
   const [activeTabId, setActiveTabId] = useState<number>(1);
 
-  // Chế độ bán hàng (fast vs normal)
-  const [salesMode, setSalesMode] = useState<'fast' | 'normal'>('fast');
+  // Chế độ bán hàng (fast vs normal) & Modal danh mục sản phẩm cảm ứng (F3)
+  const [isCatalogModalOpen, setIsCatalogModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
   // Modals state
@@ -97,7 +97,7 @@ export const PosCheckoutPage: FC = () => {
         searchInput?.focus();
       } else if (e.key === 'F3') {
         e.preventDefault();
-        setSalesMode((prev) => (prev === 'fast' ? 'normal' : 'fast'));
+        setIsCatalogModalOpen((prev) => !prev);
       } else if (e.key === 'F4') {
         e.preventDefault();
         const custSearch = document.getElementById('customer_search');
@@ -106,6 +106,7 @@ export const PosCheckoutPage: FC = () => {
         e.preventDefault();
         updateCurrentTab({ paymentMethod: 'cash' });
       } else if (e.key === 'Escape') {
+        setIsCatalogModalOpen(false);
         setIsAddCustomerOpen(false);
         setIsVietQrOpen(false);
         setIsQuickAddProductOpen(false);
@@ -372,8 +373,8 @@ export const PosCheckoutPage: FC = () => {
         onSelectTab={setActiveTabId}
         onCloseTab={handleCloseTab}
         onAddTab={handleAddTab}
-        salesMode={salesMode}
-        onToggleSalesMode={setSalesMode}
+        salesMode={isCatalogModalOpen ? 'normal' : 'fast'}
+        onToggleSalesMode={(mode) => setIsCatalogModalOpen(mode === 'normal')}
         onHoldOrder={handleHoldOrder}
         onPrintRecent={handlePrintRecent}
         onCloseShift={() => {
@@ -393,18 +394,10 @@ export const PosCheckoutPage: FC = () => {
             onUpdateItemDiscount={handleUpdateItemDiscount}
             onOpenQuickAddProduct={() => setIsQuickAddProductOpen(true)}
             onOpenBelowCostWarning={(item) => setBelowCostWarningItem(item)}
+            onOpenCatalogModal={() => setIsCatalogModalOpen(true)}
             orderNote={currentTab.note}
             onOrderNoteChange={(note) => updateCurrentTab({ note })}
           />
-
-          {/* Catalog sản phẩm cảm ứng khi ở chế độ Bán thường */}
-          {salesMode === 'normal' && (
-            <PosCatalogGrid
-              products={products}
-              categories={initialCategories}
-              onAddToCart={handleAddToCart}
-            />
-          )}
         </div>
 
         {/* Cột phải: Khách hàng & Thanh toán */}
@@ -432,6 +425,14 @@ export const PosCheckoutPage: FC = () => {
       </div>
 
       {/* 3. Các Modals Nghiệp Vụ */}
+      <PosCatalogModal
+        isOpen={isCatalogModalOpen}
+        onClose={() => setIsCatalogModalOpen(false)}
+        products={products}
+        categories={initialCategories}
+        onAddToCart={handleAddToCart}
+      />
+
       <AddCustomerModal
         isOpen={isAddCustomerOpen}
         onClose={() => setIsAddCustomerOpen(false)}

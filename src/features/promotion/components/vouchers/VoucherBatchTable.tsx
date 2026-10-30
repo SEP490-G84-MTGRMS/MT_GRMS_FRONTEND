@@ -122,14 +122,14 @@ export const VoucherBatchTable: FC<VoucherBatchTableProps> = ({
           <thead>
             <tr>
               <th style={{ width: 44 }}></th>
-              <th style={{ minWidth: 120 }}>Mã đợt</th>
-              <th style={{ minWidth: 220 }}>Tên đợt Voucher / Coupon</th>
-              <th style={{ minWidth: 150 }}>Loại ưu đãi</th>
-              <th style={{ minWidth: 180 }}>Điều kiện áp dụng</th>
-              <th style={{ minWidth: 150 }}>Đã dùng / Phát hành</th>
-              <th style={{ minWidth: 200 }}>Thời gian hiệu lực</th>
-              <th style={{ minWidth: 160 }}>Trạng thái</th>
-              <th style={{ minWidth: 120, textAlign: 'right' }}>Thao tác</th>
+              <th style={{ width: 120 }}>Mã đợt</th>
+              <th style={{ minWidth: 200 }}>Tên đợt Voucher / Coupon</th>
+              <th style={{ width: 140 }}>Loại ưu đãi</th>
+              <th style={{ width: 170 }}>Điều kiện áp dụng</th>
+              <th style={{ width: 140 }}>Đã dùng / Phát hành</th>
+              <th style={{ width: 180 }}>Thời gian hiệu lực</th>
+              <th style={{ width: 140 }}>Trạng thái</th>
+              <th style={{ width: 110, textAlign: 'right' }}>Thao tác</th>
             </tr>
           </thead>
           <tbody>

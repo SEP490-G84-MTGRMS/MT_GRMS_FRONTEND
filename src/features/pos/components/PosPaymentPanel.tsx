@@ -66,7 +66,9 @@ export const PosPaymentPanel: FC<Props> = ({
 
   return (
     <div className="pos-payment-panel">
-      {/* Header Quầy */}
+      {/* Vùng cuộn thông tin thanh toán (nếu màn hình thấp) */}
+      <div className="pos-payment-scroll-area">
+        {/* Header Quầy */}
       <div className="pos-panel-top-row">
         <div>
           <b>Quầy #01</b>
@@ -263,8 +265,8 @@ export const PosPaymentPanel: FC<Props> = ({
           <b>Hình thức thanh toán</b>
         </legend>
 
-        <div style={{ display: 'flex', gap: 12, marginBottom: 8, fontSize: 13, flexWrap: 'wrap' }}>
-          <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+        <div style={{ display: 'flex', gap: 10, marginBottom: 6, fontSize: 12.5, flexWrap: 'wrap' }}>
+          <label style={{ display: 'inline-flex', alignItems: 'center', gap: 5, cursor: 'pointer' }}>
             <input
               type="radio"
               name="pay_method"
@@ -273,7 +275,7 @@ export const PosPaymentPanel: FC<Props> = ({
             />
             <b>Tiền mặt (F8)</b>
           </label>
-          <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+          <label style={{ display: 'inline-flex', alignItems: 'center', gap: 5, cursor: 'pointer' }}>
             <input
               type="radio"
               name="pay_method"
@@ -285,7 +287,7 @@ export const PosPaymentPanel: FC<Props> = ({
             />
             <b>Chuyển khoản VietQR</b>
           </label>
-          <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+          <label style={{ display: 'inline-flex', alignItems: 'center', gap: 5, cursor: 'pointer' }}>
             <input
               type="radio"
               name="pay_method"
@@ -300,7 +302,7 @@ export const PosPaymentPanel: FC<Props> = ({
 
         {/* Nhập tiền khách đưa & tiền thừa (ở chế độ tiền mặt) */}
         {paymentMethod === 'cash' && (
-          <table className="pos-calc-table" style={{ marginTop: 8 }}>
+          <table className="pos-calc-table" style={{ marginTop: 4 }}>
             <tbody>
               <tr>
                 <td>Tiền khách đưa:</td>
@@ -314,7 +316,8 @@ export const PosPaymentPanel: FC<Props> = ({
                       width: 120,
                       textAlign: 'right',
                       fontWeight: 800,
-                      fontSize: 15,
+                      fontSize: 14,
+                      padding: '3px 8px',
                     }}
                   />{' '}
                   đ
@@ -322,7 +325,7 @@ export const PosPaymentPanel: FC<Props> = ({
               </tr>
               <tr style={{ backgroundColor: '#f8fafc' }}>
                 <td><b>Tiền thừa trả khách:</b></td>
-                <td style={{ textAlign: 'right', fontWeight: 800, fontSize: 15, color: '#16a34a' }}>
+                <td style={{ textAlign: 'right', fontWeight: 800, fontSize: 14, color: '#16a34a' }}>
                   {changeAmount.toLocaleString('vi-VN')} đ
                 </td>
               </tr>
@@ -375,8 +378,9 @@ export const PosPaymentPanel: FC<Props> = ({
           </div>
         )}
       </fieldset>
+      </div>
 
-      {/* NÚT THANH TOÁN TO TOÀN CHIỀU RỘNG */}
+      {/* NÚT THANH TOÁN TO TOÀN CHIỀU RỘNG (Luôn cố định đáy) */}
       <button
         type="button"
         className={`pos-checkout-big-btn ${paymentMethod === 'debt' ? 'pos-btn-debt' : ''}`}
