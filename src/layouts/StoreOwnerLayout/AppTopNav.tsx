@@ -162,7 +162,13 @@ const NAV_GROUPS: NavGroup[] = [
         title: "Kho & Hạn dùng (FEFO)",
         items: [
           {
-            label: "Quản lý lô & Hạn sử dụng",
+            label: "Tồn kho cửa hàng",
+            to: "/store-owner/inventory",
+            badge: "FE-04",
+            badgeType: "blue",
+          },
+          {
+            label: "Chi tiết lô & Hạn sử dụng",
             to: "/store-owner/batches",
             badge: "FEFO",
             badgeType: "blue",
@@ -242,7 +248,12 @@ const NAV_GROUPS: NavGroup[] = [
             badge: "GRN",
             badgeType: "blue",
           },
-          { label: "Trả hàng nhập", to: "/store-owner/suppliers?view=returns" },
+          {
+            label: "Trả hàng nhà cung cấp (RTV)",
+            to: "/store-owner/supplier-returns",
+            badge: "RTV",
+            badgeType: "blue",
+          },
         ],
       },
       {
