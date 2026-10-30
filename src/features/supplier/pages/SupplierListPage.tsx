@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import type { FC } from 'react';
 import { Link } from 'react-router-dom';
-import { Building2, Package, Store, Plus, Loader2 } from 'lucide-react';
+import { Building2, Package, Store, Plus, Loader2, Download } from 'lucide-react';
 import { useAuthStore } from '../../../stores/useAuthStore';
 import type {
   SupplierSummary,
@@ -49,6 +49,7 @@ export const SupplierListPage: FC = () => {
   const [selectedSupplier, setSelectedSupplier] = useState<SupplierSummary | null>(null);
 
   const [toast, setToast] = useState<ToastState | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const showToast = (message: string, type: ToastState['type'] = 'success') => {
@@ -135,6 +136,70 @@ export const SupplierListPage: FC = () => {
       await fetchSuppliers();
     } catch (err: any) {
       showToast(err.message || 'Không thể xóa nhà cung cấp.', 'error');
+    }
+  };
+
+  const handleExportExcel = async () => {
+    setIsExporting(true);
+    try {
+      const res = await supplierApi.getSuppliers({
+        ...appliedFilters,
+        pageIndex: 1,
+        pageSize: Math.max(totalCount, appliedFilters.pageSize, 12),
+      });
+      if (res.items.length === 0) {
+        showToast('Không có nhà cung cấp để xuất file.', 'warning');
+        return;
+      }
+
+      const csvCell = (value: string | number | undefined) =>
+        `"${String(value ?? '').replace(/"/g, '""')}"`;
+
+      const headers = [
+        'STT',
+        'Mã NCC',
+        'Tên nhà cung cấp',
+        'Người liên hệ',
+        'Số điện thoại',
+        'Email',
+        'Trạng thái',
+        'MST',
+        'Hạn thanh toán (ngày)',
+        'Hạn mức công nợ',
+        'Dư nợ hiện tại',
+      ];
+
+      const rows = res.items.map((item, idx) => [
+        idx + 1,
+        csvCell(item.code),
+        csvCell(item.name),
+        csvCell(item.contactPerson),
+        csvCell(item.phone),
+        csvCell(item.email),
+        csvCell(item.status === 'Active' ? 'Hoạt động' : 'Tạm ngưng'),
+        csvCell(item.taxCode),
+        item.paymentTermDays,
+        item.creditLimit,
+        item.currentDebt,
+      ]);
+
+      const csvContent = '\uFEFF' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\r\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `Danh_sach_NCC_${new Date().toISOString().slice(0, 10)}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      showToast(`Đã xuất ${res.items.length} nhà cung cấp ra tệp Excel (.csv).`, 'success');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Không thể xuất danh sách nhà cung cấp.';
+      showToast(msg, 'error');
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -255,6 +320,17 @@ export const SupplierListPage: FC = () => {
             <Store size={14} />
             <span>Gán NCC với Cửa hàng</span>
           </Link>
+          <button
+            type="button"
+            className="po-btn po-btn-secondary"
+            style={{ height: 32, padding: '0 14px' }}
+            onClick={handleExportExcel}
+            disabled={isExporting || isLoading}
+            title="Xuất danh sách nhà cung cấp ra Excel"
+          >
+            {isExporting ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+            <span>Xuất Excel</span>
+          </button>
           {isStoreOwner && (
             <button
               type="button"
