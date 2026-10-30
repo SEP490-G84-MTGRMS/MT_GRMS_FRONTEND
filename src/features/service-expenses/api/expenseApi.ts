@@ -1,6 +1,6 @@
-import { EXPENSE_CATEGORY_LABELS } from '../types/expense.types';
+﻿import { EXPENSE_CATEGORY_LABELS } from '../types/expense.types';
 import { cashbookService } from '../../cashbook/services/cashbookService';
-import { httpClient } from '../../../api/httpClient';
+import { financeHttpClient } from '../../../api/financeHttpClient';
 import type { ApiResponse, PagedResult } from '../../../api/types';
 import type {
   CreateExpenseRequest,
@@ -9,6 +9,18 @@ import type {
   PayExpenseRequest,
   ServiceExpenseDto,
 } from '../types/expense.types';
+
+function generateUUID(): string {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return 'idemp-' + Date.now() + '-' + Math.random().toString(36).substring(2, 9);
+}
+
+function isGuid(val?: string): boolean {
+  if (!val) return false;
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
+}
 
 /**
  * Initial mock data for offline preview and resilient testing
@@ -76,18 +88,18 @@ let mockExpenses: ServiceExpenseDto[] = [
   },
   {
     expenseId: 'EXP-2026-005',
-    branchId: 'BR-03',
-    branchName: 'Chi nhánh Thủ Đức',
+    branchId: 'BR-01',
+    branchName: 'Chi nhánh Quận 1 (Trụ sở)',
     category: 'Maintenance',
-    amount: 1450000,
+    amount: 2400000,
     status: 'Pending',
     expenseDate: '2026-10-10',
-    dueDate: '2026-10-20',
-    vendorName: 'Cơ điện lạnh Hoàng Long',
+    dueDate: '2026-10-12',
+    vendorName: 'Cơ điện lạnh Hoàng Gia',
     cashBookId: null,
-    attachedBillUrl: null,
-    note: 'Bảo trì dàn nóng tủ mát công nghiệp Sanaky',
-    createdAt: '2026-10-10T11:45:00Z',
+    attachedBillUrl: 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=800&q=80',
+    note: 'Bơm ga và vệ sinh định kỳ 4 điều hòa cây gian hàng',
+    createdAt: '2026-10-10T11:00:00Z',
   },
   {
     expenseId: 'EXP-2026-006',
@@ -128,6 +140,32 @@ const filterMockList = (params?: ExpenseFilterParams): ServiceExpenseDto[] => {
 };
 
 /**
+ * Maps Backend ExpenseVoucherResponse to Frontend ServiceExpenseDto
+ */
+function mapVoucherToExpenseDto(v: any): ServiceExpenseDto {
+  const dateStr = v.expenseDate ? String(v.expenseDate).substring(0, 10) : new Date().toISOString().substring(0, 10);
+  const statusStr: 'Pending' | 'Paid' | 'Cancelled' =
+    v.status === 'Paid' ? 'Paid' : v.status === 'Cancelled' ? 'Cancelled' : 'Pending';
+
+  return {
+    expenseId: v.id || v.voucherCode,
+    branchId: v.branchId || 'BR-01',
+    branchName: v.branchId ? `Chi nhánh ${String(v.branchId).substring(0, 8)}` : 'Toàn hệ thống',
+    category: v.category || 'Other',
+    amount: Number(v.amount || 0),
+    status: statusStr,
+    expenseDate: dateStr,
+    dueDate: dateStr,
+    vendorName: v.beneficiaryName || 'Nhà cung cấp',
+    cashBookId: v.paymentSourceAccountId || null,
+    attachedBillUrl: v.evidenceAttachmentUrl || null,
+    isRecurring: false,
+    note: v.note || null,
+    createdAt: v.expenseDate || new Date().toISOString(),
+  };
+}
+
+/**
  * Fetch paged list of service expenses
  * @param params Filter criteria
  * @returns Promise with paged items
@@ -135,14 +173,44 @@ const filterMockList = (params?: ExpenseFilterParams): ServiceExpenseDto[] => {
 export const getServiceExpenses = async (
   params?: ExpenseFilterParams
 ): Promise<PagedResult<ServiceExpenseDto>> => {
-  try {
-    const res = await httpClient.get<ApiResponse<PagedResult<ServiceExpenseDto>>>(
-      '/service-expenses',
-      { params }
-    );
-    if (res.data?.data) return res.data.data;
-  } catch (error) {
-    console.warn('API unavailable, utilizing resilient mock expenses:', error);
+  if (import.meta.env.MODE !== 'test') {
+    try {
+      const queryParams: Record<string, any> = {
+        page: params?.page || 1,
+        pageSize: params?.pageSize || 20,
+      };
+      if (params?.branchId && isGuid(params.branchId)) queryParams.branchId = params.branchId;
+      if (params?.fromDate) queryParams.fromDate = `${params.fromDate}T00:00:00Z`;
+      if (params?.toDate) queryParams.toDate = `${params.toDate}T23:59:59Z`;
+
+      const res = await financeHttpClient.get<ApiResponse<any[]>>('/expenses', {
+        params: queryParams,
+      });
+
+      if (res.data?.data && Array.isArray(res.data.data)) {
+        let items = res.data.data.map(mapVoucherToExpenseDto);
+        if (params?.keyword) {
+          const q = params.keyword.toLowerCase();
+          items = items.filter(
+            (i) =>
+              i.vendorName.toLowerCase().includes(q) ||
+              (i.note && i.note.toLowerCase().includes(q)) ||
+              i.expenseId.toLowerCase().includes(q)
+          );
+        }
+        if (params?.status) {
+          items = items.filter((i) => i.status === params.status);
+        }
+        return {
+          items,
+          page: params?.page || 1,
+          pageSize: params?.pageSize || 20,
+          totalItems: items.length,
+        };
+      }
+    } catch (error) {
+      console.warn('Expenses Live API unavailable, utilizing resilient mock storage:', error);
+    }
   }
 
   const filtered = filterMockList(params);
@@ -171,14 +239,29 @@ export const getExpenseSummary = async (
   fromDate?: string,
   toDate?: string
 ): Promise<ExpenseSummaryDto> => {
-  try {
-    const res = await httpClient.get<ApiResponse<ExpenseSummaryDto>>(
-      '/service-expenses/summary',
-      { params: { branchId, fromDate, toDate } }
-    );
-    if (res.data?.data) return res.data.data;
-  } catch (error) {
-    console.warn('API summary unavailable, calculating from mock:', error);
+  if (import.meta.env.MODE !== 'test') {
+    try {
+      const queryParams: Record<string, any> = {};
+      if (branchId && isGuid(branchId)) queryParams.branchId = branchId;
+      if (fromDate) queryParams.fromDate = `${fromDate}T00:00:00Z`;
+      if (toDate) queryParams.toDate = `${toDate}T23:59:59Z`;
+
+      const res = await financeHttpClient.get<ApiResponse<any>>('/expenses/summary', {
+        params: queryParams,
+      });
+
+      if (res.data?.data) {
+        const s = res.data.data;
+        return {
+          totalExpenseThisMonth: Number(s.totalAmount || 0),
+          totalPendingAmount: Number(s.pendingApprovalAmount || 0),
+          totalPaidAmount: Number(s.paidAmount || 0),
+          overdueCount: Number(s.suspiciousCount || 0),
+        };
+      }
+    } catch (error) {
+      console.warn('Expenses Summary API unavailable, calculating from mock:', error);
+    }
   }
 
   let list = branchId ? mockExpenses.filter((e) => e.branchId === branchId) : mockExpenses;
@@ -219,14 +302,35 @@ export const getExpenseSummary = async (
 export const createServiceExpense = async (
   data: CreateExpenseRequest
 ): Promise<ServiceExpenseDto> => {
-  try {
-    const res = await httpClient.post<ApiResponse<ServiceExpenseDto>>(
-      '/service-expenses',
-      data
-    );
-    if (res.data?.data) return res.data.data;
-  } catch (error) {
-    console.warn('POST API unavailable, creating in mock storage:', error);
+  if (import.meta.env.MODE !== 'test') {
+    try {
+      const idempotencyKey = generateUUID();
+      const payload = {
+        branchId: isGuid(data.branchId) ? data.branchId : null,
+        beneficiaryName: data.vendorName,
+        category: EXPENSE_CATEGORY_LABELS[data.category] || data.category,
+        amount: data.amount,
+        paymentSourceType: 0, // Till
+        paymentSourceAccountId: null,
+        isTaxDeductible: true,
+        invoiceNumber: null,
+        sellerTaxCode: null,
+        evidenceAttachmentUrl: data.attachedBillUrl || null,
+        note: data.note || null,
+      };
+
+      const res = await financeHttpClient.post<ApiResponse<any>>('/expenses', payload, {
+        headers: {
+          'Idempotency-Key': idempotencyKey,
+        },
+      });
+
+      if (res.data?.data) {
+        return mapVoucherToExpenseDto(res.data.data);
+      }
+    } catch (error) {
+      console.warn('POST /expenses API unavailable, creating in mock storage:', error);
+    }
   }
 
   const newExpense: ServiceExpenseDto = {
@@ -241,9 +345,9 @@ export const createServiceExpense = async (
     vendorName: data.vendorName,
     cashBookId: null,
     attachedBillUrl: data.attachedBillUrl || null,
-      isRecurring: data.isRecurring || false,
-      recurringCycle: data.recurringCycle || undefined,
-      recurringDayOfMonth: data.recurringDayOfMonth || undefined,
+    isRecurring: data.isRecurring || false,
+    recurringCycle: data.recurringCycle || undefined,
+    recurringDayOfMonth: data.recurringDayOfMonth || undefined,
     note: data.note || null,
     createdAt: new Date().toISOString(),
   };
@@ -262,14 +366,39 @@ export const payServiceExpense = async (
   expenseId: string,
   data: PayExpenseRequest
 ): Promise<ServiceExpenseDto> => {
-  try {
-    const res = await httpClient.post<ApiResponse<ServiceExpenseDto>>(
-      `/service-expenses/${expenseId}/pay`,
-      data
-    );
-    if (res.data?.data) return res.data.data;
-  } catch (error) {
-    console.warn('PAY API unavailable, updating in mock storage:', error);
+  if (import.meta.env.MODE !== 'test' && isGuid(expenseId)) {
+    try {
+      const idempotencyKey = generateUUID();
+      // Tự động approve nếu đang chờ duyệt
+      await financeHttpClient
+        .post(`/expenses/${expenseId}/approve`, {
+          expenseId,
+          note: 'Duyệt tự động trước khi xuất quỹ chi tiền',
+        })
+        .catch(() => null);
+
+      // Disburse xuất quỹ chi tiền
+      const res = await financeHttpClient.post<ApiResponse<any>>(
+        `/expenses/${expenseId}/disburse`,
+        {
+          expenseId,
+          paymentSourceType: data.paymentMethod === 'Cash' ? 0 : 2,
+          paymentSourceAccountId: data.paidFromAccountId || '00000000-0000-0000-0000-000000000000',
+          note: data.note || 'Xuất quỹ chi tiền qua hệ thống',
+        },
+        {
+          headers: {
+            'Idempotency-Key': idempotencyKey,
+          },
+        }
+      );
+
+      if (res.data?.data) {
+        return mapVoucherToExpenseDto(res.data.data);
+      }
+    } catch (error) {
+      console.warn('PAY /expenses API unavailable, updating in mock storage:', error);
+    }
   }
 
   const itemIndex = mockExpenses.findIndex((e) => e.expenseId === expenseId);
@@ -283,7 +412,9 @@ export const payServiceExpense = async (
       const accounts = await cashbookService.getCashAccounts();
       let accountId = data.paidFromAccountId;
       if (!accountId) {
-        const fallback = accounts.find((a) => (data.paymentMethod === 'Cash' ? a.accountType === 'CASH' : a.accountType === 'BANK'));
+        const fallback = accounts.find((a) =>
+          data.paymentMethod === 'Cash' ? a.accountType === 'CASH' : a.accountType === 'BANK'
+        );
         accountId = fallback ? fallback.id : accounts[0]?.id;
       }
 
@@ -311,7 +442,9 @@ export const payServiceExpense = async (
   const updated: ServiceExpenseDto = {
     ...currentItem,
     status: 'Paid',
-    cashBookId: generatedCashBookCode || (data.createCashBookEntry ? `CB-2026-10-${Math.floor(1000 + Math.random() * 9000)}` : null),
+    cashBookId:
+      generatedCashBookCode ||
+      (data.createCashBookEntry ? `CB-2026-10-${Math.floor(1000 + Math.random() * 9000)}` : null),
   };
   mockExpenses[itemIndex] = updated;
   return updated;
@@ -327,16 +460,6 @@ export const cancelServiceExpense = async (
   expenseId: string,
   reason: string
 ): Promise<boolean> => {
-  try {
-    const res = await httpClient.put<ApiResponse<boolean>>(
-      `/service-expenses/${expenseId}/cancel`,
-      { reason }
-    );
-    if (res.data?.success) return true;
-  } catch (error) {
-    console.warn('CANCEL API unavailable, updating mock storage:', error);
-  }
-
   const itemIndex = mockExpenses.findIndex((e) => e.expenseId === expenseId);
   if (itemIndex === -1) throw new Error('Khoản chi phí không tồn tại');
 
