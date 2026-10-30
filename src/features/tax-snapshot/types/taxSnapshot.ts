@@ -119,6 +119,10 @@ export interface HouseholdTaxSummaryDto {
   isTaxExempt: boolean;
   taxExemptionThreshold: number; // 1.000.000.000 VND
 
+  // Cảnh báo vượt ngưỡng miễn thuế 1 tỷ VNĐ giữa năm
+  isThresholdCrossedMidYear?: boolean;
+  thresholdExceededNote?: string;
+
   // Cảnh báo ngưỡng Nhóm 4 (toàn chuỗi Tenant)
   isApproachingGroup4Threshold?: boolean;
   isExceedingGroup4Threshold?: boolean;

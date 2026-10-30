@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Type definitions for FE-10: Dashboard KPIs & Profit and Loss (P&L) Report.
  */
 
@@ -49,6 +49,10 @@ export interface KpiSummaryData {
   expensesGrowthPct: number;
   ordersGrowthPct: number;
   aovGrowthPct: number;
+  // Metadata giá vốn TT152 & Audit Point #1
+  cogsSource?: 'ACTUAL' | 'ESTIMATED_70_PCT' | 'MIXED';
+  cogsEstimatedPercentage?: number;
+  cogsWarningNotice?: string | null;
 }
 
 export interface PnlLineItem {

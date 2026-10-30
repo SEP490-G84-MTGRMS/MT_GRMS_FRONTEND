@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+﻿import { describe, it, expect, beforeEach } from 'vitest';
 import { taxSnapshotApi, taxAuditLogs } from '../api/taxSnapshotApi';
 import {
   TaxPeriodType,
@@ -188,6 +188,20 @@ describe('Stage B-Prime: Tax Method Selection, Dynamic Server Mapping, Security 
           ).toBe(false);
         }
       });
+    });
+
+    it('should set isThresholdCrossedMidYear and provide neutral advisory note when revenue crosses 1B in period', async () => {
+      const summaryQ3 = await taxSnapshotApi.getTaxSummary({
+        year: 2026,
+        periodType: TaxPeriodType.Quarter,
+        periodNumber: 3,
+        calculationMethod: TaxCalculationMethod.RevenuePercentage,
+      });
+
+      expect(summaryQ3.isThresholdCrossedMidYear).toBe(true);
+      expect(summaryQ3.thresholdExceededNote).toBeDefined();
+      expect(summaryQ3.thresholdExceededNote).toContain('tham vấn cơ quan thuế địa bàn');
+      expect(summaryQ3.thresholdExceededNote).not.toContain('nộp bổ sung');
     });
   });
 });

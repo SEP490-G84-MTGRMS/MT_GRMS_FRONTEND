@@ -41,6 +41,12 @@ export const TaxKPICards: React.FC<TaxKPICardsProps> = ({ summary, isLoading }) 
 
   return (
     <>
+      {summary.isThresholdCrossedMidYear && (
+        <div style={{ background: '#FFFBEB', border: '1px solid #F59E0B', color: '#92400E', padding: '10px 14px', borderRadius: 10, fontSize: '0.82rem', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span>🔔</span>
+          <span><strong>Lưu ý vượt ngưỡng miễn thuế giữa năm:</strong> {summary.thresholdExceededNote || 'Doanh thu năm lũy kế đã vượt ngưỡng 1 tỷ VNĐ trong kỳ này. Hệ thống bắt đầu tính nghĩa vụ thuế GTGT và TNCN theo thuế suất ngành nghề đăng ký trên phần doanh thu vượt ngưỡng. Khuyến nghị chủ hộ tham vấn cơ quan thuế địa bàn về quy định kê khai và chính sách áp dụng cho trường hợp vượt ngưỡng giữa năm.'}</span>
+        </div>
+      )}
       {summary.isApproachingGroup4Threshold && (
         <div style={{ background: '#FFFBEB', border: '1px solid #FDE68A', color: '#92400E', padding: '10px 14px', borderRadius: 10, fontSize: '0.82rem', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
           <span>⚠️</span>

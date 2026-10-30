@@ -1,4 +1,4 @@
-import {
+﻿import {
   TaxPeriodType,
   TaxCalculationMethod,
   HouseholdTaxGroup,
@@ -141,6 +141,11 @@ export function generateMockSummary(filter: HouseholdTaxFilterDto): HouseholdTax
 
   const totalTaxAmount = vatAmount + pitAmount;
 
+  const isThresholdCrossedMidYear = priorAccumulated <= 1_000_000_000 && annualAccumulated > 1_000_000_000;
+  const thresholdExceededNote = isThresholdCrossedMidYear
+    ? 'Doanh thu năm lũy kế đã vượt ngưỡng 1 tỷ VNĐ trong kỳ này. Hệ thống bắt đầu tính nghĩa vụ thuế GTGT và TNCN theo thuế suất ngành nghề đăng ký trên phần doanh thu vượt ngưỡng. Khuyến nghị chủ hộ tham vấn cơ quan thuế địa bàn về quy định kê khai và chính sách áp dụng cho trường hợp vượt ngưỡng giữa năm.'
+    : undefined;
+
   return {
     year: filter.year,
     periodType: filter.periodType,
@@ -155,6 +160,8 @@ export function generateMockSummary(filter: HouseholdTaxFilterDto): HouseholdTax
     calculationMethod: filter.calculationMethod,
     isTaxExempt: isExempt,
     taxExemptionThreshold: 1_000_000_000,
+    isThresholdCrossedMidYear,
+    thresholdExceededNote,
 
     grossRevenueInPeriod: inPeriodGross,
     discountAmountInPeriod: 0,
