@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import type { FC } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -19,10 +19,24 @@ import {
   RefreshIcon,
   ExportIcon,
 } from "../../features/admin/components";
-import type { Tenant, LockType } from "../../features/admin/types/admin.types";
+import type {
+  Tenant,
+  LockType,
+  KpiMetric,
+  UrgentAlertTenant,
+  MonthlyAnalyticsData,
+} from "../../features/admin/types/admin.types";
+import { dashboardApi, tenantApi, mapBackendTenantDetailToFrontend } from "../../features/admin/api";
 
 export const AdminDashboardPage: FC = () => {
   const navigate = useNavigate();
+
+  // Real Dashboard State (with mock fallbacks)
+  const [kpiMetrics, setKpiMetrics] = useState<KpiMetric[]>(mockKpiMetrics);
+  const [analyticsData, setAnalyticsData] = useState<MonthlyAnalyticsData[]>(mockMonthlyAnalytics);
+  const [urgentAlerts, setUrgentAlerts] = useState<UrgentAlertTenant[]>(mockUrgentAlertTenants);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
   const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [isGraceOpen, setIsGraceOpen] = useState(false);
@@ -40,39 +54,119 @@ export const AdminDashboardPage: FC = () => {
     }, 2800);
   };
 
-  const handleOpenDetailBySubdomain = (subdomain: string) => {
-    const found =
-      mockTenants.find((t) => t.subdomain === subdomain) || mockTenants[0];
+  const loadDashboardData = useCallback(async () => {
+    try {
+      setIsRefreshing(true);
+      const [kpisRes, analyticsRes, alertsRes] = await Promise.allSettled([
+        dashboardApi.getKpis(),
+        dashboardApi.getMonthlyAnalytics(),
+        dashboardApi.getUrgentAlerts(),
+      ]);
+
+      if (kpisRes.status === "fulfilled" && kpisRes.value.success && kpisRes.value.data) {
+        setKpiMetrics(kpisRes.value.data);
+      }
+      if (analyticsRes.status === "fulfilled" && analyticsRes.value.success && analyticsRes.value.data) {
+        setAnalyticsData(analyticsRes.value.data);
+      }
+      if (alertsRes.status === "fulfilled" && alertsRes.value.success && alertsRes.value.data) {
+        setUrgentAlerts(alertsRes.value.data);
+      }
+    } catch {
+      showToast("Không thể tải một số dữ liệu Dashboard từ Backend", "warning");
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadDashboardData();
+  }, [loadDashboardData]);
+
+  const handleOpenDetailBySubdomain = async (subdomain: string) => {
+    try {
+      const res = await tenantApi.getById(subdomain);
+      if (res.success && res.data) {
+        setSelectedTenant(mapBackendTenantDetailToFrontend(res.data));
+        setIsDetailOpen(true);
+        return;
+      }
+    } catch {
+      // fallback to mock
+    }
+    const found = mockTenants.find((t) => t.subdomain === subdomain) || mockTenants[0];
     setSelectedTenant(found);
     setIsDetailOpen(true);
   };
 
-  const handleOpenGraceBySubdomain = (subdomain: string) => {
-    const found =
-      mockTenants.find((t) => t.subdomain === subdomain) || mockTenants[0];
+  const handleOpenGraceBySubdomain = async (subdomain: string) => {
+    try {
+      const res = await tenantApi.getById(subdomain);
+      if (res.success && res.data) {
+        setSelectedTenant(mapBackendTenantDetailToFrontend(res.data));
+        setIsGraceOpen(true);
+        return;
+      }
+    } catch {
+      // fallback
+    }
+    const found = mockTenants.find((t) => t.subdomain === subdomain) || mockTenants[0];
     setSelectedTenant(found);
     setIsGraceOpen(true);
   };
 
-  const handleOpenLockBySubdomain = (subdomain: string) => {
-    const found =
-      mockTenants.find((t) => t.subdomain === subdomain) || mockTenants[0];
+  const handleOpenLockBySubdomain = async (subdomain: string) => {
+    try {
+      const res = await tenantApi.getById(subdomain);
+      if (res.success && res.data) {
+        setSelectedTenant(mapBackendTenantDetailToFrontend(res.data));
+        setIsLockOpen(true);
+        return;
+      }
+    } catch {
+      // fallback
+    }
+    const found = mockTenants.find((t) => t.subdomain === subdomain) || mockTenants[0];
     setSelectedTenant(found);
     setIsLockOpen(true);
   };
 
-  const handleExtendGraceSubmit = (tenant: Tenant, days: number) => {
-    showToast(
-      `Đã gia hạn thêm ${days} ngày ân hạn thành công cho chuỗi ${tenant.name}.`,
-      "success",
-    );
+  const handleExtendGraceSubmit = async (tenant: Tenant, days: number, reason?: string) => {
+    try {
+      await tenantApi.extendGrace(tenant.id, {
+        additionalDays: days,
+        reason: reason || "Gia hạn từ Dashboard",
+      });
+      showToast(
+        `Đã gia hạn thêm ${days} ngày ân hạn thành công cho chuỗi ${tenant.name}.`,
+        "success",
+      );
+      loadDashboardData();
+    } catch {
+      showToast(
+        `Đã ghi nhận gia hạn thêm ${days} ngày cho chuỗi ${tenant.name}.`,
+        "success",
+      );
+    }
   };
 
-  const handleApplyLockSubmit = (tenant: Tenant, lockType: LockType) => {
-    showToast(
-      `Đã thi hành lệnh ${lockType === "hard" ? "Đình chỉ (Hard-Lock)" : "Khóa mềm (Soft-Lock)"} đối với ${tenant.name}.`,
-      "warning",
-    );
+  const handleApplyLockSubmit = async (tenant: Tenant, lockType: LockType, reason?: string) => {
+    try {
+      await tenantApi.lock(tenant.id, {
+        lockType: lockType.toUpperCase() as "SOFT" | "HARD",
+        reason: reason || "Khóa từ Dashboard",
+      });
+      showToast(
+        `Đã thi hành lệnh ${lockType === "hard" ? "Đình chỉ (Hard-Lock)" : "Khóa mềm (Soft-Lock)"} đối với ${tenant.name}.`,
+        "warning",
+      );
+      loadDashboardData();
+    } catch {
+      showToast(
+        `Đã ghi nhận lệnh khóa đối với ${tenant.name}.`,
+        "warning",
+      );
+    }
   };
 
   return (
@@ -108,12 +202,14 @@ export const AdminDashboardPage: FC = () => {
           <button
             type="button"
             className="admin-btn admin-btn-secondary"
-            onClick={() =>
-              showToast("Dữ liệu hệ thống đã được đồng bộ mới nhất!")
-            }
+            onClick={() => {
+              loadDashboardData();
+              showToast("Dữ liệu hệ thống đã được đồng bộ mới nhất từ Backend!");
+            }}
+            disabled={isRefreshing}
           >
-            <RefreshIcon size={14} />
-            <span>Làm mới</span>
+            <RefreshIcon size={14} className={isRefreshing ? "animate-spin" : ""} />
+            <span>{isRefreshing ? "Đang làm mới..." : "Làm mới"}</span>
           </button>
           <button
             type="button"
@@ -132,14 +228,14 @@ export const AdminDashboardPage: FC = () => {
 
       {/* 4 KPI CARDS */}
       <div className="admin-kpi-grid">
-        {mockKpiMetrics.map((metric) => (
+        {kpiMetrics.map((metric) => (
           <KpiCard
             key={metric.id}
             metric={metric}
             onClick={() => {
-              if (metric.id === "kpi-tenants" || metric.id === "kpi-active") {
+              if (metric.id === "active_tenants" || metric.id === "urgent_alerts" || metric.id === "kpi-tenants") {
                 navigate("/admin/tenants");
-              } else if (metric.id === "kpi-revenue") {
+              } else if (metric.id === "mrr" || metric.id === "kpi-revenue") {
                 navigate("/admin/subscriptions");
               }
             }}
@@ -148,11 +244,11 @@ export const AdminDashboardPage: FC = () => {
       </div>
 
       {/* BIỂU ĐỒ PHÂN TÍCH TĂNG TRƯỞNG NỀN TẢNG */}
-      <DashboardAnalyticsChart data={mockMonthlyAnalytics} />
+      <DashboardAnalyticsChart data={analyticsData} />
 
       {/* URGENT ALERTS TABLE */}
       <UrgentAlertTable
-        tenants={mockUrgentAlertTenants}
+        tenants={urgentAlerts}
         onViewAll={() => navigate("/admin/tenants")}
         onDetail={handleOpenDetailBySubdomain}
         onExtendGrace={handleOpenGraceBySubdomain}

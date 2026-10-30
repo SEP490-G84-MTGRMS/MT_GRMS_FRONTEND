@@ -1,10 +1,15 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import type {
   SubscriptionPlan,
   PlanStatus,
 } from "../../features/admin/types/plan.types";
-import { mockSubscriptionPlans } from "../../features/admin/data/mockPlanData";
+import {
+  planApi,
+  mapBackendPlanToFrontend,
+  type CreatePlanPayload,
+  type UpdatePlanPayload,
+} from "../../features/admin/api";
 import {
   PlanKPIBanner,
   PlanFilterToolbar,
@@ -12,19 +17,18 @@ import {
   CreatePlanModal,
   UpdatePlanModal,
 } from "../../features/admin/components/subscriptions";
-import { CheckCircle2, AlertCircle } from "lucide-react";
+import { CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
 
 export const SubscriptionPlanPage: React.FC = () => {
   const navigate = useNavigate();
-  const [plans, setPlans] = useState<SubscriptionPlan[]>(mockSubscriptionPlans);
+  const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [keyword, setKeyword] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | PlanStatus>("all");
 
   // Modals
   const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [updateTarget, setUpdateTarget] = useState<SubscriptionPlan | null>(
-    null,
-  );
+  const [updateTarget, setUpdateTarget] = useState<SubscriptionPlan | null>(null);
 
   // Toast
   const [toast, setToast] = useState<{
@@ -41,6 +45,28 @@ export const SubscriptionPlanPage: React.FC = () => {
       setToast(null);
     }, 4000);
   };
+
+  // Fetch plans from API
+  const fetchPlans = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      const res = await planApi.getPlans();
+      if (res.success && res.data) {
+        setPlans(res.data.map(mapBackendPlanToFrontend));
+      } else {
+        showToast(res.message || "Không thể tải danh sách gói cước", "warning");
+      }
+    } catch (err: unknown) {
+      const errorMsg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      showToast(errorMsg || "Lỗi khi kết nối với máy chủ Backend", "warning");
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchPlans();
+  }, [fetchPlans]);
 
   // Filtered Plans
   const filteredPlans = useMemo(() => {
@@ -62,57 +88,95 @@ export const SubscriptionPlanPage: React.FC = () => {
   }, [plans, statusFilter, keyword]);
 
   // Handlers
-  const handleToggleStatus = (targetPlan: SubscriptionPlan) => {
-    setPlans((prev) =>
-      prev.map((p) => {
-        if (p.id === targetPlan.id) {
-          const nextStatus = p.status === "Active" ? "Inactive" : "Active";
-          showToast(
-            `Đã chuyển trạng thái gói "${p.name}" sang: ${nextStatus === "Active" ? "Đang hoạt động" : "Tạm dừng"}`,
-          );
-          return {
-            ...p,
-            status: nextStatus,
-            updatedAt: new Date().toISOString().split("T")[0],
-          };
-        }
-        return p;
-      }),
-    );
+  const handleToggleStatus = async (targetPlan: SubscriptionPlan) => {
+    try {
+      const res = await planApi.toggleStatus(targetPlan.id);
+      if (res.success) {
+        const nextStatus: PlanStatus = targetPlan.status === "Active" ? "Inactive" : "Active";
+        setPlans((prev) =>
+          prev.map((p) =>
+            p.id === targetPlan.id
+              ? {
+                  ...p,
+                  status: nextStatus,
+                  updatedAt: new Date().toISOString().split("T")[0],
+                }
+              : p
+          )
+        );
+        showToast(
+          `Đã chuyển trạng thái gói "${targetPlan.name}" sang: ${
+            nextStatus === "Active" ? "Đang hoạt động" : "Tạm dừng"
+          }`
+        );
+      } else {
+        showToast(res.message || "Không thể đổi trạng thái gói cước", "warning");
+      }
+    } catch (err: unknown) {
+      const errorMsg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      showToast(errorMsg || "Lỗi khi cập nhật trạng thái gói cước", "warning");
+    }
   };
 
-  const handleCreatePlan = (
+  const handleCreatePlan = async (
     newPlanData: Omit<
       SubscriptionPlan,
       "id" | "createdAt" | "updatedAt" | "activeTenantCount"
     >,
   ) => {
-    const newPlan: SubscriptionPlan = {
-      ...newPlanData,
-      id: `plan-${Date.now()}`,
-      activeTenantCount: 0,
-      tenants: [],
-      createdAt: new Date().toISOString().split("T")[0],
-      updatedAt: new Date().toISOString().split("T")[0],
-    };
+    try {
+      const payload: CreatePlanPayload = {
+        code: newPlanData.code,
+        name: newPlanData.name,
+        description: newPlanData.description,
+        monthlyPrice: newPlanData.monthlyPrice,
+        yearlyPrice: newPlanData.yearlyPrice,
+        quotas: newPlanData.quotas,
+        features: newPlanData.features,
+      };
 
-    setPlans((prev) => [newPlan, ...prev]);
-    showToast(
-      `Đã khởi tạo gói dịch vụ mới: "${newPlan.name}" (${newPlan.code}) thành công!`,
-    );
+      const res = await planApi.create(payload);
+      if (res.success && res.data) {
+        const created = mapBackendPlanToFrontend(res.data);
+        setPlans((prev) => [created, ...prev]);
+        setIsCreateOpen(false);
+        showToast(`Đã khởi tạo gói dịch vụ mới: "${created.name}" (${created.code}) thành công!`);
+      } else {
+        showToast(res.message || "Không thể tạo gói cước", "warning");
+      }
+    } catch (err: unknown) {
+      const errorMsg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      showToast(errorMsg || "Lỗi khi tạo mới gói cước", "warning");
+    }
   };
 
-  const handleUpdatePlan = (updatedPlan: SubscriptionPlan) => {
-    setPlans((prev) =>
-      prev.map((p) => (p.id === updatedPlan.id ? updatedPlan : p)),
-    );
-    showToast(
-      `Đã cập nhật cấu hình gói dịch vụ "${updatedPlan.name}" thành công!`,
-    );
+  const handleUpdatePlan = async (updatedPlan: SubscriptionPlan) => {
+    try {
+      const payload: UpdatePlanPayload = {
+        name: updatedPlan.name,
+        description: updatedPlan.description,
+        monthlyPrice: updatedPlan.monthlyPrice,
+        yearlyPrice: updatedPlan.yearlyPrice,
+        quotas: updatedPlan.quotas,
+        features: updatedPlan.features,
+      };
+
+      const res = await planApi.update(updatedPlan.id, payload);
+      if (res.success && res.data) {
+        const mapped = mapBackendPlanToFrontend(res.data);
+        setPlans((prev) => prev.map((p) => (p.id === mapped.id ? mapped : p)));
+        setUpdateTarget(null);
+        showToast(`Đã cập nhật cấu hình gói dịch vụ "${mapped.name}" thành công!`);
+      } else {
+        showToast(res.message || "Không thể cập nhật gói cước", "warning");
+      }
+    } catch (err: unknown) {
+      const errorMsg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      showToast(errorMsg || "Lỗi khi cập nhật gói cước", "warning");
+    }
   };
 
   const handleExportExcel = () => {
-    // Generate CSV content
     const headers = [
       "Mã Gói",
       "Tên Gói",
@@ -253,19 +317,39 @@ export const SubscriptionPlanPage: React.FC = () => {
         onKeywordChange={setKeyword}
         statusFilter={statusFilter}
         onStatusFilterChange={setStatusFilter}
-        onOpenCreate={() => navigate('/admin/subscriptions/create')}
+        onOpenCreate={() => navigate("/admin/subscriptions/create")}
         onExportExcel={handleExportExcel}
         visibleCount={filteredPlans.length}
         totalCount={plans.length}
       />
 
-      {/* DATA TABLE */}
-      <PlanDataTable
-        plans={filteredPlans}
-        onDetail={(plan) => navigate(`/admin/subscriptions/${plan.id}`)}
-        onEdit={(plan) => navigate(`/admin/subscriptions/${plan.id}/edit`)}
-        onToggleStatus={handleToggleStatus}
-      />
+      {/* DATA TABLE / LOADING */}
+      {isLoading ? (
+        <div
+          style={{
+            background: "#ffffff",
+            padding: "40px",
+            borderRadius: "12px",
+            textAlign: "center",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: "12px",
+            color: "var(--text-muted)",
+            border: "1px solid var(--border-color, #e2e8f0)",
+          }}
+        >
+          <Loader2 className="animate-spin" size={32} color="var(--blue-primary, #0066ff)" />
+          <span style={{ fontSize: "14px", fontWeight: 500 }}>Đang nạp dữ liệu gói cước từ máy chủ...</span>
+        </div>
+      ) : (
+        <PlanDataTable
+          plans={filteredPlans}
+          onDetail={(plan) => navigate(`/admin/subscriptions/${plan.id}`)}
+          onEdit={(plan) => navigate(`/admin/subscriptions/${plan.id}/edit`)}
+          onToggleStatus={handleToggleStatus}
+        />
+      )}
 
       {/* MODALS */}
       <CreatePlanModal

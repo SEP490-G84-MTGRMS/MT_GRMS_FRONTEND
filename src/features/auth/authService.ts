@@ -15,11 +15,11 @@ export const DEMO_ACCOUNTS = [
     password: 'password123',
     tenantCode: 'TENANT-HCM-01',
     user: {
-      id: 'usr_admin_01',
+      id: 'usr_super_admin',
       email: 'admin@mtgrms.vn',
-      fullName: 'Nguyễn Văn Quản Trị',
+      fullName: 'Hệ Thống Super Admin',
       role: 'ADMIN' as const,
-      tenantId: 'TENANT-HCM-01',
+      tenantId: 'DEFAULT',
       tenantName: 'Chuỗi Bán Lẻ Thực Phẩm Sạch MT',
       branchId: 'BR-001',
       phone: '0901 234 567',
@@ -31,11 +31,11 @@ export const DEMO_ACCOUNTS = [
     password: 'password123',
     tenantCode: 'TENANT-HCM-01',
     user: {
-      id: 'usr_pos_02',
-      email: 'pos.cashier@mtgrms.vn',
-      fullName: 'Trần Thị Thu Ngân',
+      id: 'usr_cashier',
+      email: 'thao.le@mtmart.vn',
+      fullName: 'Lê Thị Thảo (Thu Ngân POS)',
       role: 'CASHIER' as const,
-      tenantId: 'TENANT-HCM-01',
+      tenantId: 'DEFAULT',
       tenantName: 'Chuỗi Bán Lẻ Thực Phẩm Sạch MT',
       branchId: 'BR-001',
       phone: '0988 765 432',
@@ -49,10 +49,54 @@ export const authService = {
    */
   async login(credentials: LoginCredentials): Promise<AuthResponse> {
     try {
-      const response = await httpClient.post<AuthResponse>('/auth/login', credentials);
-      return response.data;
-    } catch {
-      // Fallback giả lập logic xác thực cho môi trường phát triển / kiểm thử UI
+      let usernameOrEmail = credentials.email.trim();
+      let password = credentials.password;
+
+      // Hỗ trợ đăng nhập linh hoạt: map số điện thoại demo / email / username sang tài khoản seed backend
+      const phoneClean = usernameOrEmail.replace(/\s+/g, '');
+      if (
+        (phoneClean === '0901234567' || usernameOrEmail.toLowerCase() === 'admin@mtgrms.vn' || usernameOrEmail.toLowerCase() === 'admin') &&
+        (password === 'password123' || password === 'Admin@123')
+      ) {
+        usernameOrEmail = 'admin';
+        password = 'Admin@123';
+      } else if (
+        (phoneClean === '0912345678' || usernameOrEmail.toLowerCase() === 'cashier01' || usernameOrEmail.toLowerCase() === 'pos.cashier@mtgrms.vn') &&
+        (password === 'password123' || password === 'Cashier@123')
+      ) {
+        usernameOrEmail = 'cashier01';
+        password = 'Cashier@123';
+      }
+
+      const response = await httpClient.post<any>('/auth/login', {
+        usernameOrEmail,
+        password,
+        tenantCode: credentials.tenantCode,
+      });
+
+      const resData = response.data;
+      const loginData = resData?.data || resData;
+
+      if (!loginData?.accessToken) {
+        throw new Error('Dữ liệu phản hồi xác thực không hợp lệ.');
+      }
+
+      return {
+        accessToken: loginData.accessToken,
+        refreshToken: loginData.refreshToken,
+        expiresIn: 7200,
+        user: {
+          id: loginData.user?.id || 'usr_admin',
+          email: loginData.user?.email || 'admin@mtgrms.vn',
+          fullName: loginData.user?.fullName || 'Super Admin',
+          role: (loginData.user?.role || loginData.user?.roleName || 'ADMIN') as UserProfile['role'],
+          tenantId: loginData.user?.tenantId || 'DEFAULT',
+          branchId: loginData.user?.branchId,
+          phone: loginData.user?.phone || phoneClean,
+        },
+      };
+    } catch (err: unknown) {
+      // Nếu API trả về lỗi nhưng là mạng cục bộ / offline dev fallback
       const cleanInput = credentials.email.trim();
       const phoneClean = cleanInput.replace(/\s+/g, '');
       const foundDemo = DEMO_ACCOUNTS.find(

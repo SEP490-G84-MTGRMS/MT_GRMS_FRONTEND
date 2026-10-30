@@ -20,8 +20,13 @@ httpClient.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401) {
       localStorage.removeItem('access_token');
-      if (window.location.pathname !== '/login') {
-        window.location.href = '/login';
+      localStorage.removeItem('auth_user');
+      const isAuthPage =
+        window.location.pathname.startsWith('/auth') ||
+        window.location.pathname === '/login' ||
+        window.location.pathname === '/register';
+      if (!isAuthPage) {
+        window.location.href = '/auth/login';
       }
     }
     return Promise.reject(error);
