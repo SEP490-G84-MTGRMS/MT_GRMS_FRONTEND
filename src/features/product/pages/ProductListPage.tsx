@@ -709,7 +709,7 @@ export const ProductListPage: React.FC = () => {
           <TablePagination
             currentPage={pageIndex}
             pageSize={pageSize}
-            totalItems={selectedCategoryIds.length > 1 ? filteredProducts.length : totalCount}
+            totalItems={totalCount}
             pageSizeOptions={[10, 20, 50]}
             onPageChange={(page) => setPageIndex(page)}
             onPageSizeChange={(newSize) => {
