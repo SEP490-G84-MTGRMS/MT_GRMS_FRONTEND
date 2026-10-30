@@ -2,15 +2,11 @@ import { useState, useMemo, useRef, type FC } from 'react';
 import {
   Ticket,
   Plus,
-  CheckCircle2,
-  Clock,
-  Sparkles,
   Search,
   RotateCw,
   X,
 } from 'lucide-react';
 import { AdminToast, type ToastState } from '../../admin/components';
-import { PromotionKpiCards, type KpiCardItem } from '../components/common/PromotionKpiCards';
 import { VoucherBatchTable } from '../components/vouchers/VoucherBatchTable';
 import { VoucherBatchModal } from '../components/vouchers/VoucherBatchModal';
 import { GenerateCodesModal } from '../components/vouchers/GenerateCodesModal';
@@ -65,49 +61,6 @@ export const VoucherListPage: FC = () => {
       return true;
     });
   }, [batches, filter]);
-
-  // KPI Calculations
-  const kpiCards: KpiCardItem[] = useMemo(() => {
-    const totalBatches = batches.length;
-    const totalVouchers = batches.reduce((acc, b) => acc + b.totalQuantity, 0);
-    const totalUsed = batches.reduce((acc, b) => acc + b.usedQuantity, 0);
-    const avgUsage = totalVouchers > 0 ? Math.round((totalUsed / totalVouchers) * 100) : 0;
-
-    return [
-      {
-        id: 'kpi-v1',
-        title: 'Tổng số đợt phát hành',
-        value: totalBatches,
-        subText: 'Chiến dịch Coupon đang lưu hành',
-        icon: <Ticket className="w-5 h-5" />,
-        colorClass: 'kpi-icon-teal',
-      },
-      {
-        id: 'kpi-v2',
-        title: 'Voucher đã tạo',
-        value: totalVouchers.toLocaleString('vi-VN'),
-        subText: 'Mã số sẵn sàng cho khách hàng',
-        icon: <Sparkles className="w-5 h-5" />,
-        colorClass: 'kpi-icon-blue',
-      },
-      {
-        id: 'kpi-v3',
-        title: 'Đã kích hoạt / Sử dụng',
-        value: totalUsed.toLocaleString('vi-VN'),
-        subText: 'Đã áp dụng tại các đơn hàng POS',
-        icon: <CheckCircle2 className="w-5 h-5" />,
-        colorClass: 'kpi-icon-amber',
-      },
-      {
-        id: 'kpi-v4',
-        title: 'Tỷ lệ quy đổi trung bình',
-        value: `${avgUsage}%`,
-        subText: 'Hiệu quả chuyển đổi voucher',
-        icon: <Clock className="w-5 h-5" />,
-        colorClass: 'kpi-icon-purple',
-      },
-    ];
-  }, [batches]);
 
   const handleToggleBatchStatus = (batchId: string) => {
     setBatches((prev) =>
@@ -211,9 +164,6 @@ export const VoucherListPage: FC = () => {
           </button>
         </div>
       </div>
-
-      {/* KPI Cards */}
-      <PromotionKpiCards cards={kpiCards} />
 
       {/* Filter Bar */}
       <div className="promotion-filter-bar">

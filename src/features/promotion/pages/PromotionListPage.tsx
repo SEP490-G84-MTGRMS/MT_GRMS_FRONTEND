@@ -1,7 +1,6 @@
 import { useState, useMemo, useRef, type FC } from 'react';
-import { Gift, Plus, Tag, Sparkles, CheckCircle2, Clock } from 'lucide-react';
+import { Gift, Plus } from 'lucide-react';
 import { AdminToast, type ToastState } from '../../admin/components';
-import { PromotionKpiCards, type KpiCardItem } from '../components/common/PromotionKpiCards';
 import { PromotionFilterBar } from '../components/promotions/PromotionFilterBar';
 import { PromotionTable } from '../components/promotions/PromotionTable';
 import { PromotionModal } from '../components/promotions/PromotionModal';
@@ -58,49 +57,6 @@ export const PromotionListPage: FC = () => {
       return true;
     });
   }, [promotions, filter]);
-
-  // KPI Calculations
-  const kpiCards: KpiCardItem[] = useMemo(() => {
-    const total = promotions.length;
-    const active = promotions.filter((p) => p.status === 'ACTIVE').length;
-    const upcoming = promotions.filter((p) => p.status === 'UPCOMING').length;
-    const totalDiscount = promotions.reduce((acc, p) => acc + (p.totalDiscountGiven || 0), 0);
-
-    return [
-      {
-        id: 'kpi-1',
-        title: 'Tổng số CTKM',
-        value: total,
-        subText: 'Đang quản lý trên toàn chuỗi',
-        icon: <Tag className="w-5 h-5" />,
-        colorClass: 'kpi-icon-teal',
-      },
-      {
-        id: 'kpi-2',
-        title: 'Đang triển khai',
-        value: active,
-        subText: 'Có hiệu lực tại các quầy thu ngân',
-        icon: <CheckCircle2 className="w-5 h-5" />,
-        colorClass: 'kpi-icon-blue',
-      },
-      {
-        id: 'kpi-3',
-        title: 'Sắp diễn ra',
-        value: upcoming,
-        subText: 'Đã lên lịch trong tháng',
-        icon: <Clock className="w-5 h-5" />,
-        colorClass: 'kpi-icon-amber',
-      },
-      {
-        id: 'kpi-4',
-        title: 'Tổng chiết khấu đã trao',
-        value: `${(totalDiscount / 1000000).toFixed(1)}M đ`,
-        subText: 'Giá trị ưu đãi tích lũy khách nhận',
-        icon: <Sparkles className="w-5 h-5" />,
-        colorClass: 'kpi-icon-purple',
-      },
-    ];
-  }, [promotions]);
 
   // Handlers
   const handleOpenCreate = () => {
@@ -183,9 +139,6 @@ export const PromotionListPage: FC = () => {
           </button>
         </div>
       </div>
-
-      {/* KPI Cards */}
-      <PromotionKpiCards cards={kpiCards} />
 
       {/* Filter Bar */}
       <PromotionFilterBar

@@ -54,9 +54,6 @@ export const PosCatalogGrid: FC<Props> = ({ products, categories, onAddToCart })
               </button>
             ))}
           </div>
-          <div className="pos-category-hint">
-            Bấm vào ảnh hoặc nút <b>[+]</b> để thêm nhanh vào giỏ hàng
-          </div>
         </div>
 
         {/* Lưới sản phẩm */}
@@ -76,7 +73,7 @@ export const PosCatalogGrid: FC<Props> = ({ products, categories, onAddToCart })
               }}
               title={`Nhấp để thêm "${prod.name}" vào hóa đơn`}
             >
-              {/* Vùng Ảnh Sản Phẩm chuẩn tỷ lệ 1:1 */}
+              {/* Vùng Ảnh Sản Phẩm */}
               <div className="pos-product-image-wrap">
                 {prod.imageUrl ? (
                   <img
@@ -114,38 +111,39 @@ export const PosCatalogGrid: FC<Props> = ({ products, categories, onAddToCart })
                     Tồn {prod.quantityOnHand}
                   </span>
                 )}
+
+                {/* Nút Floating Action Button [+] nổi bật ở góc dưới bên phải ảnh */}
+                <button
+                  type="button"
+                  className="pos-product-floating-add-btn"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onAddToCart(prod);
+                  }}
+                  title={`Thêm ${prod.name} vào hóa đơn`}
+                  aria-label={`Thêm ${prod.name} vào hóa đơn`}
+                >
+                  <Plus size={16} strokeWidth={2.6} />
+                </button>
               </div>
 
               {/* Thông tin sản phẩm */}
               <div className="pos-product-info">
-                <div className="pos-product-brand">{prod.spec || prod.category}</div>
                 <div className="pos-product-name" title={prod.name}>
                   {prod.name}
                 </div>
-                <div className="pos-product-meta">
-                  ĐVT: <b>{prod.baseUnit}</b>
-                  {prod.batchCode && (
-                    <span className="pos-product-batch-tag"> &bull; Lô: {prod.batchCode}</span>
-                  )}
-                </div>
-                <div className="pos-product-price">
-                  {prod.basePrice.toLocaleString('vi-VN')} đ
+
+                <div className="pos-product-bottom-row">
+                  <div className="pos-product-price-box">
+                    <span className="pos-product-price">
+                      {prod.basePrice.toLocaleString('vi-VN')} đ
+                    </span>
+                    <span className="pos-product-unit">
+                      / {prod.baseUnit}
+                    </span>
+                  </div>
                 </div>
               </div>
-
-              {/* Nút bấm thêm vào giỏ */}
-              <button
-                type="button"
-                className="pos-product-add-btn"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onAddToCart(prod);
-                }}
-                title={`Thêm ${prod.name} vào hóa đơn`}
-              >
-                <Plus size={13} />
-                <span>Thêm</span>
-              </button>
             </div>
           ))}
         </div>
@@ -163,7 +161,7 @@ export const PosCatalogGrid: FC<Props> = ({ products, categories, onAddToCart })
               setPageSize(newSize);
               setCurrentPage(1);
             }}
-            className="mt-3 rounded-md border border-[#e2e8f0]"
+            className="rounded-md border border-[#e2e8f0]"
           />
         )}
       </fieldset>

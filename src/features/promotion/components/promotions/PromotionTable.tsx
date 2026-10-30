@@ -86,14 +86,14 @@ export const PromotionTable: FC<PromotionTableProps> = ({
           <thead>
             <tr>
               <th style={{ width: 44 }}></th>
-              <th style={{ minWidth: 120 }}>Mã CTKM</th>
-              <th style={{ minWidth: 220 }}>Tên chương trình</th>
-              <th style={{ minWidth: 140 }}>Hình thức</th>
-              <th style={{ minWidth: 200 }}>Thời gian hiệu lực</th>
-              <th style={{ minWidth: 180 }}>Chi nhánh áp dụng</th>
-              <th style={{ minWidth: 120 }}>Lượt áp dụng</th>
-              <th style={{ minWidth: 160 }}>Trạng thái</th>
-              <th style={{ minWidth: 90, textAlign: 'right' }}>Thao tác</th>
+              <th style={{ width: 120 }}>Mã CTKM</th>
+              <th style={{ minWidth: 200 }}>Tên chương trình</th>
+              <th style={{ width: 140 }}>Hình thức</th>
+              <th style={{ width: 185 }}>Thời gian hiệu lực</th>
+              <th style={{ width: 165 }}>Chi nhánh áp dụng</th>
+              <th style={{ width: 110 }}>Lượt áp dụng</th>
+              <th style={{ width: 140 }}>Trạng thái</th>
+              <th style={{ width: 90, textAlign: 'right' }}>Thao tác</th>
             </tr>
           </thead>
           <tbody>
@@ -143,12 +143,24 @@ export const PromotionTable: FC<PromotionTableProps> = ({
                         </div>
                       </td>
                       <td>
-                        <div className="promo-branch-cell">
-                          <MapPin size={13} color="#94a3b8" />
-                          {item.branches.includes('ALL') ? (
+                        <div
+                          className="promo-branch-cell"
+                          title={
+                            item.branches.includes('ALL') || item.branches.length === 0
+                              ? 'Áp dụng trên toàn bộ chuỗi cửa hàng'
+                              : item.branches.join(', ')
+                          }
+                        >
+                          <MapPin size={13} className="promo-branch-icon" />
+                          {item.branches.includes('ALL') || item.branches.length === 0 ? (
                             <span className="promo-branch-all">Toàn hệ thống</span>
+                          ) : item.branches.length === 1 ? (
+                            <span className="promo-branch-single">{item.branches[0]}</span>
                           ) : (
-                            <span>{item.branches.join(', ')}</span>
+                            <div className="promo-branch-multi">
+                              <span className="promo-branch-first">{item.branches[0]}</span>
+                              <span className="promo-branch-count">+{item.branches.length - 1}</span>
+                            </div>
                           )}
                         </div>
                       </td>
