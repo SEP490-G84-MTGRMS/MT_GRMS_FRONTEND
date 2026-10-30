@@ -52,10 +52,11 @@ export interface PagedResult<T> {
 
 export interface CategoryDto {
   id: string;
-  categoryCode: string;
+  categoryCode?: string;
+  code?: string;
   name: string;
   description?: string | null;
-  displayOrder: number;
+  displayOrder?: number;
   productCount: number;
 }
 
@@ -67,6 +68,7 @@ export interface Category {
   id: string;
   code: string;
   name: string;
+  description?: string | null;
   parentId?: string | null;
   productCount: number;
   depth?: number;

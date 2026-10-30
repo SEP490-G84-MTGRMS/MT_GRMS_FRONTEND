@@ -64,9 +64,10 @@ export const ProductListPage: React.FC = () => {
       const catList = await categoryApi.getCategories();
       const mapped: Category[] = catList.map((c) => ({
         id: c.id,
-        code: c.categoryCode,
+        code: c.code || c.categoryCode || '',
         name: c.name,
-        productCount: c.productCount,
+        description: c.description,
+        productCount: c.productCount ?? 0,
         depth: 0,
       }));
       setCategories(mapped);
@@ -88,7 +89,7 @@ export const ProductListPage: React.FC = () => {
         pageSize,
         searchTerm: searchTerm.trim() || undefined,
         categoryId: selectedCategoryIds.length === 1 ? selectedCategoryIds[0] : undefined,
-        categoryIds: selectedCategoryIds.length > 1 ? selectedCategoryIds : undefined,
+        categoryIds: selectedCategoryIds.length > 0 ? selectedCategoryIds : undefined,
       });
       if (res && res.items) {
         const mapped: ProductItem[] = res.items.map((p) => ({
@@ -173,34 +174,75 @@ export const ProductListPage: React.FC = () => {
     }
   };
 
-  const handleSaveCategory = (name: string, id?: string) => {
-    if (id) {
-      // Edit
-      setCategories(
-        categories.map((c) => (c.id === id ? { ...c, name } : c))
-      );
-      showToast(`Đã cập nhật nhóm hàng: ${name}`);
-    } else {
-      // Create new
-      const nextId = String(Date.now());
-      const nextCode = `CAT-${String(categories.length + 1).padStart(3, '0')}`;
-      const newCat: Category = {
-        id: nextId,
-        code: nextCode,
-        name,
-        productCount: 0,
-        depth: 0,
-      };
-      setCategories([...categories, newCat]);
-      showToast(`Đã tạo nhóm hàng mới: ${name} (${nextCode})`);
+  const handleSaveCategory = async (
+    name: string,
+    id?: string,
+    code?: string,
+    description?: string
+  ) => {
+    try {
+      if (id) {
+        // Cập nhật nhóm hàng qua backend API
+        const updatedDto = await categoryApi.updateCategory(id, {
+          name,
+          description,
+        });
+        setCategories((prev) =>
+          prev.map((c) =>
+            c.id === id
+              ? {
+                  ...c,
+                  name: updatedDto.name,
+                  code: updatedDto.code || updatedDto.categoryCode || c.code,
+                  description: updatedDto.description,
+                }
+              : c
+          )
+        );
+        showToast(`Đã cập nhật nhóm hàng: ${name}`);
+      } else {
+        // Tạo mới nhóm hàng trên backend API
+        const createdDto = await categoryApi.createCategory({
+          name,
+          code,
+          description,
+        });
+        const newCat: Category = {
+          id: createdDto.id,
+          code: createdDto.code || createdDto.categoryCode || '',
+          name: createdDto.name,
+          description: createdDto.description,
+          productCount: createdDto.productCount ?? 0,
+          depth: 0,
+        };
+        setCategories((prev) => [newCat, ...prev]);
+        showToast(`Đã tạo nhóm hàng mới: ${createdDto.name} (${newCat.code})`);
+      }
+      // Làm mới danh mục và danh sách sản phẩm từ server
+      await fetchCategories();
+      fetchProducts();
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || err?.message || 'Có lỗi xảy ra khi lưu nhóm hàng.';
+      showToast(msg, 'error');
+      throw new Error(msg);
     }
   };
 
-  const handleDeleteCategory = (id: string) => {
+  const handleDeleteCategory = async (id: string) => {
     const cat = categories.find((c) => c.id === id);
     if (!cat) return;
-    setCategories(categories.filter((c) => c.id !== id));
-    showToast(`Đã xóa nhóm hàng: ${cat.name}`);
+    try {
+      await categoryApi.deleteCategory(id);
+      setCategories((prev) => prev.filter((c) => c.id !== id));
+      setSelectedCategoryIds((prev) => prev.filter((cid) => cid !== id));
+      showToast(`Đã xóa nhóm hàng: ${cat.name}`);
+      await fetchCategories();
+      fetchProducts();
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || err?.message || 'Không thể xóa nhóm hàng.';
+      showToast(msg, 'error');
+      throw new Error(msg);
+    }
   };
 
   // Product CRUD
@@ -366,7 +408,8 @@ export const ProductListPage: React.FC = () => {
 
       // Categories
       if (selectedCategoryIds.length > 0) {
-        if (!selectedCategoryIds.includes(item.categoryId)) return false;
+        const itemCatId = (item.categoryId || '').toLowerCase();
+        if (!selectedCategoryIds.some((cid) => cid.toLowerCase() === itemCatId)) return false;
       }
 
       // Stock criteria
