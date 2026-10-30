@@ -177,10 +177,6 @@ const NAV_GROUPS: NavGroup[] = [
         title: "Quy cách & Đóng gói",
         items: [
           {
-            label: "Combo - Đóng gói",
-            to: "/store-owner/suppliers/products?view=combos",
-          },
-          {
             label: "In mã vạch & Tem giá",
             to: "/store-owner/suppliers/products?view=barcodes",
           },

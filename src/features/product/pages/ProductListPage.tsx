@@ -14,7 +14,6 @@ import { categoryApi } from '../api/categoryApi';
 import { CategorySidebar } from '../components/CategorySidebar';
 import { CategoryModal } from '../components/CategoryModal';
 import { ProductFormModal } from '../components/ProductFormModal';
-import { ComboFormModal } from '../components/ComboFormModal';
 import { ProductDetailModal } from '../components/ProductDetailModal';
 import { TablePagination } from '../../../components/common';
 import { useAuthStore } from '../../../stores/useAuthStore';
@@ -138,8 +137,6 @@ export const ProductListPage: React.FC = () => {
 
   const [isProductFormOpen, setIsProductFormOpen] = useState(false);
   const [productToEdit, setProductToEdit] = useState<ProductItem | null>(null);
-
-  const [isComboFormOpen, setIsComboFormOpen] = useState(false);
 
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<ProductItem | null>(null);
@@ -301,39 +298,6 @@ export const ProductListPage: React.FC = () => {
     if (saveAndAddNew) {
       setProductToEdit(null);
     }
-  };
-
-  const handleSaveCombo = (data: Partial<ProductItem>) => {
-    const newCombo: ProductItem = {
-      id: `prod-cb-${Date.now()}`,
-      productCode: data.productCode || `CB${Math.floor(100000 + Math.random() * 900000)}`,
-      barcode: data.barcode || '',
-      productName: data.productName || '',
-      categoryId: data.categoryId || '',
-      categoryName: data.categoryName || '',
-      baseUnit: data.baseUnit || 'Giỏ quà',
-      sellingPrice: data.sellingPrice || 0,
-      costPrice: data.costPrice ?? null,
-      onHand: data.onHand || 0,
-      committed: 0,
-      status: 'Active',
-      isFavorite: false,
-      isCombo: true,
-      comboComponents: data.comboComponents || [],
-      createdAt: new Date().toLocaleDateString('vi-VN'),
-      updatedAt: new Date().toLocaleDateString('vi-VN'),
-      minStock: data.minStock || 5,
-      maxStock: data.maxStock || 50,
-      vatRate: 8,
-      description: data.description || '',
-      internalNote: data.internalNote || '',
-      branchStocks: [
-        { branchId: 'b-1', branchName: 'Chi nhánh trung tâm', onHand: data.onHand || 0, available: data.onHand || 0, committed: 0 },
-      ],
-      stockLedger: [],
-    };
-    setProducts([newCombo, ...products]);
-    showToast(`Tạo mới gói Combo "${newCombo.productName}" thành công.`);
   };
 
   const handleDeleteProduct = (product: ProductItem) => {
@@ -534,14 +498,6 @@ export const ProductListPage: React.FC = () => {
             }}
           >
             <Plus size={16} /> Thêm hàng hóa
-          </button>
-
-          <button
-            type="button"
-            className="btn-secondary-white"
-            onClick={() => setIsComboFormOpen(true)}
-          >
-            <Plus size={16} /> Thêm combo - đóng gói
           </button>
 
           <button type="button" className="btn-secondary-white" onClick={handleImport} title="Nhập danh mục từ Excel">
@@ -779,20 +735,7 @@ export const ProductListPage: React.FC = () => {
         userRole={userRole}
       />
 
-      {/* 4. Combo Form Modal */}
-      <ComboFormModal
-        isOpen={isComboFormOpen}
-        categories={categories}
-        availableProducts={products}
-        onClose={() => setIsComboFormOpen(false)}
-        onSave={handleSaveCombo}
-        onOpenCreateCategoryModal={() => {
-          setCategoryToEdit(null);
-          setIsCategoryModalOpen(true);
-        }}
-      />
-
-      {/* 5. Product Detail Modal */}
+      {/* 4. Product Detail Modal */}
       <ProductDetailModal
         isOpen={isDetailModalOpen}
         product={selectedProduct}

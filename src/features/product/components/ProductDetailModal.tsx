@@ -72,7 +72,6 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 <span style={{ fontSize: 13, fontWeight: 700, color: '#0F766E' }}>
                   {product.productCode}
                 </span>
-                {product.isCombo && <span className="badge-combo">Combo đóng gói</span>}
                 {isDiscontinued && (
                   <span
                     style={{
@@ -422,63 +421,6 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                   </tbody>
                 </table>
               </div>
-
-              {/* Nếu là Combo, hiển thị các thành phần */}
-              {product.isCombo && product.comboComponents && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: '#0F172A' }}>
-                    Thành phần đóng gói trong Combo
-                  </div>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-                    <thead>
-                      <tr style={{ background: '#F8FAFC', textAlign: 'left' }}>
-                        <th style={{ padding: '8px 12px', borderBottom: '1px solid #E2E8F0', width: 120 }}>
-                          Mã hàng
-                        </th>
-                        <th style={{ padding: '8px 12px', borderBottom: '1px solid #E2E8F0' }}>
-                          Tên hàng thành phần
-                        </th>
-                        <th
-                          style={{
-                            padding: '8px 12px',
-                            borderBottom: '1px solid #E2E8F0',
-                            textAlign: 'center',
-                            width: 100,
-                          }}
-                        >
-                          Số lượng
-                        </th>
-                        <th
-                          style={{
-                            padding: '8px 12px',
-                            borderBottom: '1px solid #E2E8F0',
-                            textAlign: 'right',
-                            width: 120,
-                          }}
-                        >
-                          Giá bán lẻ
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {product.comboComponents.map((comp) => (
-                        <tr key={comp.id} style={{ borderBottom: '1px solid #F1F5F9' }}>
-                          <td style={{ padding: '8px 12px', fontWeight: 700, color: '#0F766E' }}>
-                            {comp.productCode}
-                          </td>
-                          <td style={{ padding: '8px 12px' }}>{comp.productName}</td>
-                          <td style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 700 }}>
-                            {comp.quantity}
-                          </td>
-                          <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 600 }}>
-                            {formatVND(comp.sellingPrice)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
             </div>
           )}
 
