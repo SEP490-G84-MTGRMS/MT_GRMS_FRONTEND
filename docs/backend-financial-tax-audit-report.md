@@ -1,355 +1,182 @@
-# BÁO CÁO ĐÁNH GIÁ KIẾN TRÚC & QUY CHUẨN BACKEND PHÂN HỆ TÀI CHÍNH - THUẾ (MT-GRMS)
-
-> **Mục đích tài liệu:** Cung cấp đầy đủ bối cảnh hệ thống, kiến trúc, quy chuẩn thiết kế SOLID, đánh giá mã nguồn hiện tại và hướng dẫn refactor chi tiết để bất kỳ AI hoặc Lập trình viên mới (chưa có ngữ cảnh từ trước) có thể tiếp nhận, phân tích và triển khai ngay lập tức.
->
-> **Phiên bản:** 1.0 - Ngày kiểm toán: 28/10/2026  
-> **Dự án:** MT-GRMS (Phần mềm Quản lý Tiệm Tạp Hóa Bán Lẻ Đa Chi Nhánh)  
-> **Ngôn ngữ & Nền tảng Backend:** .NET 8 WebAPI, C# 12, Entity Framework Core, PostgreSQL  
+# BÁO CÁO KIỂM TOÁN NỘI BỘ & CHECKLIST NGHIỆM THU KỸ THUẬT (PHIÊN BẢN CHUẨN HÓA TOÀN DIỆN)
+## HỆ THỐNG QUẢN TRỊ BÁN LẺ ĐA TIỆM & ĐA CHI NHÁNH (MT-GRMS)
+**Thời gian rà soát:** 30/10/2026  
+**Tính chất tài liệu:** Báo cáo tự kiểm toán kỹ thuật nội bộ (Internal Engineering Audit). Toàn bộ kết quả kiểm thử hiện tại chạy trên môi trường giả lập bộ nhớ (**Store: `Microsoft.EntityFrameworkCore.InMemory`**), chưa chạy trên engine PostgreSQL thật.
 
 ---
 
-## MỤC LỤC
-1. [Bối cảnh nghiệp vụ & Mô hình dữ liệu chuẩn (Domain Context)](#1-bối-cảnh-nghiệp-vụ--mô-hình-dữ-liệu-chuẩn)
-2. [Hiện trạng cấu trúc mã nguồn Backend phân hệ Tài chính](#2-hiện-trạng-cấu-trúc-mã-nguồn-backend-phân-hệ-tài-chính)
-3. [Đánh giá quy chuẩn SOLID & Dependency Injection (DI)](#3-đánh-giá-quy-chuẩn-solid--dependency-injection-di)
-4. [Đánh giá tính đúng đắn về Logic Tài chính & Thuế](#4-đánh-giá-tính-đúng-đắn-về-logic-tài-chính--thuế)
-5. [Đánh giá Bảo mật, Mã PIN chốt kỳ & Tính bất biến (Immutability)](#5-đánh-giá-bảo-mật-mã-pin-chốt-kỳ--tính-bất-biến-immutability)
-6. [Đánh giá Hệ thống 5 Sổ kế toán HKD](#6-đánh-giá-hệ-thống-5-sổ-kế-toán-hkd)
-7. [Bảng đối soát sai lệch & Rủi ro kỹ thuật](#7-bảng-đối-soát-sai-lệch--rủi-ro-kỹ-thuật)
-8. [Kế hoạch Refactor & Mã nguồn C# chuẩn mẫu](#8-kế-hoạch-refactor--mã-nguồn-c-chuẩn-mẫu)
+### 1. PHÂN TÍCH BẤT CẬP KIẾN TRÚC & HẠ TẦNG
 
----
+#### 1.1. Lỗ Hổng Race Condition Trong Idempotency (Nguy Cơ Chi Tiền Hai Lần)
+- **Cơ chế hiện tại trong [`IdempotencyFilter.cs`](file:///d:/Sourse_code_Do_An/MT_GRMS_BACKEND/src/MT_GRMS.Api/Filters/IdempotencyFilter.cs):**
+  1. Đọc kiểm tra `existingRecord` từ bảng `IdempotencyRecords`.
+  2. Nếu chưa có, thực thi controller: `var executedContext = await next();` (nghiệp vụ chi tiền / trừ két ĐÃ HOÀN TẤT trong cơ sở dữ liệu).
+  3. Sau khi controller chạy xong, filter mới thực hiện: `_context.IdempotencyRecords.Add(record); await _context.SaveChangesAsync();`.
+- **Rủi ro thực tế:**
+  + Cửa sổ race condition kéo dài **toàn bộ thời gian xử lý của request đầu** (300ms - 2000ms tùy mạng và DB).
+  + Khi người dùng bấm đúp hoặc mobile retry do timeout: Cả Request 1 và Request 2 cùng vượt qua bước 1 vì bản ghi chưa tồn tại. Cả hai request đều gọi `next()` $\rightarrow$ **TIỀN BỊ TRỪ / CHI HAI LẦN TRONG KÉT**.
+  + Sau đó, Request 1 INSERT bản ghi thành công (HTTP 200). Request 2 INSERT sau đụng Unique Index $\rightarrow$ ném `DbUpdateException` $\rightarrow$ trả về HTTP 500.
+  + **Hậu quả:** Tiền đã bị thất thoát hai lần trước khi lỗi 500 xuất hiện!
+- **Giải pháp bắt buộc (Ưu tiên 1):**
+  + Chuyển sang mô hình **Two-Phase Idempotency (Stripe Pattern)**: INSERT bản ghi với trạng thái `Status = PENDING` **TRƯỚC KHI** gọi `next()`.
+  + Nếu request thứ 2 đến trong lúc request 1 đang chạy $\rightarrow$ Đụng Unique Index ngay tại bước đầu $\rightarrow$ Trả về ngay HTTP `409 Conflict (IDEMPOTENCY_IN_PROGRESS)`, bảo vệ an toàn dòng tiền tuyệt đối.
+  + Thêm cột `UserId` vật lý vào bảng `IdempotencyRecords` và tạo chỉ mục Unique trên `(TenantId, UserId, Endpoint, Key)` thay vì ghép chuỗi thủ công vào cột `Key`.
 
-## 1. BỐI CẢNH NGHIỆP VỤ & MÔ HÌNH DỮ LIỆU CHUẨN
+#### 1.2. Môi Trường Kiểm Thử Hiện Tại Chưa Kiểm Chứng Được Concurrency & Deadlock
+- **Thực trạng kiểm thử:** Toàn bộ 32 test thuộc dự án `MT_GRMS.IntegrationTests` và 137 unit tests đang chạy trên store **`Microsoft.EntityFrameworkCore.InMemory`** (hoàn tất trong 2.1 giây).
+- **Hạn chế của InMemory Store:**
+  + Không kiểm tra ràng buộc khóa duy nhất (Unique Index).
+  + Không hỗ trợ câu lệnh khóa dòng PostgreSQL `SELECT ... FOR UPDATE` (lệnh này bị EF Core InMemory bỏ qua hoàn toàn).
+  + Không có cơ chế Transaction Isolation (Read Committed / Serializable).
+  + Không thể mô phỏng hay phát hiện Deadlock giữa các luồng đồng thời.
+- **Biện pháp khắc phục:** Cần thiết lập test suite chạy trên PostgreSQL thật (sử dụng Docker Testcontainers hoặc Neon Temporary Branch) để kiểm chứng cơ chế khóa dòng và deadlock.
 
-### 1.1. Bối cảnh Hộ kinh doanh cá thể (HKD)
-- **Cửa hàng mẫu:** Tiệm Tạp Hóa Cô Ba (Bán lẻ bánh kẹo, đồ uống, nhu yếu phẩm tiêu dùng nhanh FMCG).
-- **Quy định phân nhóm hộ kinh doanh:**
-  - **Nhóm 1 (Doanh thu năm $\le$ 1 tỷ đồng):** Miễn thuế GTGT và TNCN. Sử dụng Sổ S1a-HKD.
-  - **Nhóm 2 (Doanh thu năm 1 – 3 tỷ đồng):** Chịu thuế GTGT (1% trên toàn bộ doanh thu phát sinh trong kỳ vượt ngưỡng); chịu thuế TNCN (0.5% tính trên phần doanh thu lũy kế vượt ngưỡng 1 tỷ). Áp dụng Sổ S2a-HKD (hoặc bộ 4 sổ S2b..S2e nếu kê khai).
-  - **Nhóm 3 (Doanh thu năm 3 – 50 tỷ đồng) & Nhóm 4 (> 50 tỷ đồng):** Bắt buộc chuyển sang phương pháp Kê khai (Doanh thu – Chi phí hợp lý) hoặc chế độ kế toán doanh nghiệp siêu nhỏ.
-
-### 1.2. Bộ số đối soát chuẩn năm 2026 (Benchmark Figures)
-| Kỳ tính thuế | Doanh thu phát sinh kỳ | Doanh thu lũy kế YTD | Trạng thái ngưỡng | Thuế GTGT (1%) | Thuế TNCN (0.5%) | Tổng thuế phải nộp |
-| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
-| **Quý 1/2026** | 470.000.000đ | 470.000.000đ | Chưa vượt 1 tỷ | 0đ | 0đ | **0đ** (Đã chốt) |
-| **Quý 2/2026** | 480.000.000đ | 950.000.000đ | Chưa vượt 1 tỷ | 0đ | 0đ | **0đ** (Đã chốt) |
-| **Quý 3/2026** *(Kỳ khảo sát)* | **467.500.000đ** | **1.417.500.000đ** | **VƯỢT TRẦN 417.5tr** | **4.675.000đ** | **2.087.500đ** | **6.762.500đ** |
-
-*Công thức tính Quý 3/2026 chuẩn:*
-- **GTGT Quý 3:** $467.500.000 \times 1\% = 4.675.000đ$ *(nếu áp dụng giảm 20% theo NQ 204 thì là 0.8% = 3.740.000đ)*.
-- **TNCN Quý 3:** $(1.417.500.000 - 1.000.000.000) \times 0.5\% - 0đ = 417.500.000 \times 0.5\% = 2.087.500đ$.
-- **Tổng thuế Quý 3:** $4.675.000 + 2.087.500 = \mathbf{6.762.500đ}$.
-- **Hạn nộp:** 31/10/2026 rơi vào Thứ Bảy $\rightarrow$ Tự động dời sang ngày làm việc tiếp theo: **Thứ Hai, 02/11/2026**.
-
----
-
-## 2. HIỆN TRẠNG CẤU TRÚC MÃ NGUỒN BACKEND PHÂN HỆ TÀI CHÍNH
-
-Hệ thống Backend được tổ chức theo mô hình Layered / Onion Architecture:
-```
-D:\Sourse_code_Do_An\MT_GRMS_BACKEND\
-├── src/
-│   ├── MT_GRMS.Api/                         # Lớp Presentation (REST Controllers)
-│   │   └── Controllers/
-│   │       ├── HouseholdTaxController.cs   # API Tờ khai thuế, 5 sổ HKD, Snapshot
-│   │       ├── CashbookController.cs       # API Sổ quỹ tiền mặt & ngân hàng
-│   │       └── PnLReportController.cs      # API Báo cáo kết quả kinh doanh P&L
-│   ├── MT_GRMS.Application/                 # Lớp Nghiệp vụ (Use Cases, DTOs, Interfaces)
-│   │   ├── Tax/
-│   │   │   ├── IHouseholdTaxService.cs     # Interface dịch vụ thuế
-│   │   │   ├── HouseholdTaxService.cs      # Triển khai tính thuế, chốt kỳ
-│   │   │   ├── IHouseholdTaxRepository.cs  # Interface truy vấn thuế
-│   │   │   └── Dtos/HouseholdTaxDtos.cs    # DTOs tờ khai & snapshot
-│   │   ├── Cashbook/                       # Service & DTOs sổ quỹ
-│   │   └── Reports/                        # Service & DTOs P&L
-│   ├── MT_GRMS.Domain/                      # Lớp Thực thể cốt lõi (Entities & Enums)
-│   │   ├── Entities/Finance/
-│   │   │   ├── HouseholdTaxSnapshot.cs     # Thực thể Snapshot chốt kỳ
-│   │   │   ├── CashbookEntry.cs            # Thực thể bút toán sổ quỹ
-│   │   │   └── CashbookTransaction.cs      # Giao dịch thu/chi
-│   │   └── Enums/TaxEnums.cs               # Enums nhóm thuế, phương pháp
-│   └── MT_GRMS.Infrastructure/              # Lớp Hạ tầng (EF Core & Repositories)
-│       ├── Persistence/AppDbContext.cs     # DbContext kết nối PostgreSQL
-│       └── Repositories/
-│           ├── HouseholdTaxRepository.cs   # Query Orders, ExpenseVouchers, Snapshots
-│           ├── CashbookRepository.cs       # Query Cashbook transactions
-│           └── PnLReportRepository.cs      # Query Revenue & COGS
-```
-
----
-
-## 3. ĐÁNH GIÁ QUY CHUẨN SOLID & DEPENDENCY INJECTION (DI)
-
-### 3.1. Dependency Inversion Principle (D trong SOLID) & Liên kết lỏng (Loose Coupling)
-- **Đánh giá: ĐẠT (9/10).**
-- **Điểm tích cực:**
-  - Controller **HOÀN TOÀN KHÔNG** inject trực tiếp `AppDbContext` hay concrete class. `HouseholdTaxController` chỉ giao tiếp qua `IHouseholdTaxService`.
-  - Service `HouseholdTaxService` **HOÀN TOÀN KHÔNG** phụ thuộc vào EF Core hay DbContext; nó chỉ giao tiếp qua abstraction `IHouseholdTaxRepository`.
-  - Cả `IHouseholdTaxService` và `IHouseholdTaxRepository` đều được đăng ký vòng đời Scoped đúng chuẩn trong `Application/DependencyInjection.cs` và `Infrastructure/DependencyInjection.cs`:
-    ```csharp
-    services.AddScoped<IHouseholdTaxService, HouseholdTaxService>();
-    services.AddScoped<IHouseholdTaxRepository, HouseholdTaxRepository>();
-    ```
-  - Thiết kế này cho phép viết Unit Tests cô lập hoàn toàn (`HouseholdTaxServiceTests.cs` đạt 8/8 tests passed khi mock Repository mà không cần database).
-
-### 3.2. Single Responsibility Principle (S trong SOLID)
-- **Đánh giá: CẦN CẢI THIỆN (6/10).**
-- **Vấn đề tồn tại:**
-  - `HouseholdTaxService` đang gánh vác quá nhiều trách nhiệm (God Service):
-    1. Xác định kỳ và khoảng ngày UTC (`GetDateRangesForPeriod`).
-    2. Xác định nhóm hộ kinh doanh theo ngưỡng doanh thu (`DetermineHouseholdGroup`).
-    3. Tính toán thuế theo tỷ lệ % (GTGT + TNCN lũy kế YTD).
-    4. Tính toán thuế theo phương pháp Kê khai (Doanh thu - Chi phí).
-    5. Kiểm tra tuần tự kỳ thuế để chốt kỳ.
-    6. Serialize dữ liệu chứng từ sổ sách thành JSON để lưu snapshot.
-- **Giải pháp:** Tách logic tính thuế thành một Domain Service / Strategy chuyên biệt (`ITaxCalculationStrategy`), giải phóng Service chỉ còn làm nhiệm vụ Orchestration (Điều phối quy trình).
-
-### 3.3. Open/Closed Principle (O trong SOLID)
-- **Đánh giá: CHƯA ĐẠT (5/10).**
-- **Vấn đề tồn tại:**
-  - Phương pháp tính thuế (`RevenuePercentage` vs `DeclarationBased`) đang được rẽ nhánh bằng khối lệnh `if (isDeclaration) { ... } else { ... }` dài hơn 80 dòng trong `HouseholdTaxService.cs`.
-  - Khi Nhà nước ban hành chính sách mới (ví dụ: phương pháp Thuế khoán cố định, hoặc phương pháp kết hợp), bắt buộc phải mở file `HouseholdTaxService.cs` ra sửa đổi trực tiếp, vi phạm nguyên lý Open for extension, Closed for modification.
-- **Giải pháp:** Áp dụng **Strategy Pattern**:
-  - `ITaxCalculationStrategy` có 2 class triển khai:
-    - `RevenuePercentageStrategy` (Theo tỷ lệ % doanh thu).
-    - `DeclarationBasedStrategy` (Theo doanh thu - chi phí thực tế).
-
-### 3.4. Interface Segregation Principle (I trong SOLID)
-- **Đánh giá: KHÁ (7/10).**
-- `IHouseholdTaxRepository` hiện đang tích hợp cả việc truy vấn doanh thu (`GetPeriodRevenueAsync`), truy vấn chi phí (`GetPeriodDeductibleExpensesAsync`), truy vấn sổ sách (`GetBookEntriesAsync`), và thao tác Snapshot (`AddSnapshotAsync`, `GetSnapshotAsync`).
-- Khuyến nghị: Trong tương lai khi hệ thống mở rộng, nên tách thành `ITaxQueryRepository` (đọc dữ liệu bán hàng & chi phí) và `ITaxSnapshotRepository` (quản lý snapshot chốt kỳ).
-
----
-
-## 4. ĐÁNH GIÁ TÍNH ĐÚNG ĐẮN VỀ LOGIC TÀI CHÍNH & THUẾ
-
-### 4.1. LỖI NGHIÊM TRỌNG: Thiếu Giá Vốn Hàng Bán (COGS) trong Phương pháp Kê khai
-- **Hiện trạng mã nguồn tại [HouseholdTaxRepository.cs](file:///D:/Sourse_code_Do_An/MT_GRMS_BACKEND/src/MT_GRMS.Infrastructure/Repositories/HouseholdTaxRepository.cs#L85-L105):**
+#### 1.3. Cấu Hình Tự Động Retry Cho Npgsql Trong EF Core
+- **Giải pháp thực hành an toàn:** Không cần viết `CustomNpgsqlExecutionStrategy` phức tạp. EF Core cung cấp sẵn tham số `errorCodesToAdd` trong overload của `EnableRetryOnFailure`:
   ```csharp
-  public async Task<decimal> GetPeriodDeductibleExpensesAsync(...)
+  options.UseNpgsql(connectionString, b =>
   {
-      var voucherQuery = _context.ExpenseVouchers.AsQueryable();
-      // ... lọc theo ExpenseDate và Status ...
-      var vouchers = await voucherQuery.ToListAsync(cancellationToken);
-      // Loại trừ vốn chủ sở hữu
-      var validVouchers = vouchers.Where(v => ...);
-      return validVouchers.Sum(v => v.Amount); // CHỈ TỔNG HỢP PHIẾU CHI DỊCH VỤ!
-  }
+      b.EnableRetryOnFailure(
+          maxRetryCount: 5,
+          maxRetryDelay: TimeSpan.FromSeconds(30),
+          errorCodesToAdd: new[] { "40P01" }); // Bổ sung DeadlockDetected (40P01) vào danh sách transient retry
+  });
   ```
-- **Hậu quả nghiệp vụ:**
-  - Đối với cửa hàng tạp hóa, tiền mua hàng đầu vào từ Nhà cung cấp (Giá vốn hàng bán - COGS) chiếm tới **65% - 75%** doanh thu. Chi phí dịch vụ (`ExpenseVouchers`: điện, nước, internet, bao bì...) chỉ chiếm khoảng **3% - 5%** doanh thu.
-  - Khi Backend tính: $\text{Thu nhập chịu thuế} = \text{Doanh thu} - \text{Chi phí hợp lý}$, do bỏ quên COGS, Backend tính ra chi phí chỉ có ~20 triệu $\rightarrow$ Lợi nhuận chịu thuế bị đội lên **447.5 triệu** (thay vì thực tế chỉ khoảng **120 triệu**).
-  - Thuế TNCN phương pháp Kê khai bị nhân lên gấp **gần 4 lần** một cách phi lý!
-  - Trong khi đó, tại [PnLReportRepository.cs](file:///D:/Sourse_code_Do_An/MT_GRMS_BACKEND/src/MT_GRMS.Infrastructure/Repositories/PnLReportRepository.cs#L45-L60), hệ thống đã có sẵn logic tính COGS:
-    ```csharp
-    decimal totalCogs = orders.Sum(o => o.Items.Any()
-        ? o.Items.Sum(i => i.Quantity * i.UnitPrice * 0.70m)
-        : o.SubTotal * 0.70m);
-    ```
-- **Giải pháp bắt buộc:** Cập nhật `GetPeriodDeductibleExpensesAsync` để tính:
-  $$\text{DeductibleExpenses} = \text{COGS (Từ hóa đơn nhập hàng / GRN)} + \text{OPEX (Từ ExpenseVouchers)}$$
-
-### 4.2. Logic lũy kế năm (YTD) và Khấu trừ ngưỡng 1 tỷ
-- **Đánh giá: ĐẠT CHUẨN.**
-- Backend tính đúng: Thuế GTGT tính trên toàn bộ 467.5tr của Quý 3 (vì Quý 3 là kỳ phát sinh doanh thu vượt ngưỡng).
-- Thuế TNCN được khấu trừ phần 1 tỷ: Chỉ tính trên phần vượt $1.417.500.000đ - 1.000.000.000đ = 417.500.000đ$.
-- Đã có cơ chế trừ đi số thuế TNCN đã kê khai ở các kỳ trước (`PriorDeclaredPitTax`).
+  Cách cấu hình này an toàn tuyệt đối trong mọi phiên bản Npgsql (kể cả khi `40P01` đã là transient hay chưa).
+- **Ràng buộc khi có Transaction:** Khi sử dụng execution strategy, mọi khối giao dịch có `BeginTransactionAsync` bắt buộc phải được bọc bên trong `strategy.ExecuteAsync(async () => { using var tx = ... })` để tránh lỗi `InvalidOperationException`.
 
 ---
 
-## 5. ĐÁNH GIÁ BẢO MẬT, MÃ PIN CHỐT KỲ & TÍNH BẤT BIẾN (IMMUTABILITY)
-
-### 5.1. Lỗ hổng: Bỏ qua kiểm tra mã PIN tại Server
-- **Hiện trạng:**
-  - Client gửi lên `CreateTaxSnapshotRequest` có trường `SecurityPin`.
-  - Tại [HouseholdTaxService.FinalizeTaxSnapshotAsync](file:///D:/Sourse_code_Do_An/MT_GRMS_BACKEND/src/MT_GRMS.Application/Tax/HouseholdTaxService.cs#L240), **HOÀN TOÀN KHÔNG CÓ BẤT KỲ DÒNG CODE NÀO KIỂM TRA PIN**!
-  - Client có thể gửi bất kỳ giá trị nào (hoặc bỏ trống) vẫn chốt kỳ thành công.
-- **Yêu cầu bảo mật cấp độ tài chính:**
-  1. Mã PIN của Chủ tiệm (Store Owner) phải được hash bằng thuật toán an toàn (PBKDF2 / BCrypt / SHA-256 + Salt) lưu trong bảng User/Store settings.
-  2. Server phải verify mã PIN trước khi thực thi chốt kỳ.
-  3. Áp dụng Rate-limiting: Nếu nhập sai quá 5 lần liên tiếp trong 15 phút, tạm khóa tài khoản chốt sổ.
-
-### 5.2. Thiếu phân quyền Role-Based Authorization
-- **Hiện trạng:** `HouseholdTaxController` chưa gắn attribute `[Authorize]`. Biến `finalizedBy` đang fallback về:
-  ```csharp
-  var finalizedBy = User?.Identity?.Name ?? "system-accountant";
-  ```
-- **Yêu cầu:** Bắt buộc gắn attribute:
-  ```csharp
-  [Authorize(Roles = "StoreOwner,ChiefAccountant")]
-  ```
-
-### 5.3. Tính bất biến của Snapshot (Snapshot Immutability)
-- **Điểm tốt:**
-  - Backend đã kiểm tra: nếu kỳ đã có Snapshot thì ném lỗi `BusinessException("TAX_PERIOD_LOCKED")`.
-  - Backend đã kiểm tra tính tuần tự: Quý $k$ chỉ được chốt nếu Quý $k-1$ cùng năm đã được chốt.
-- **Điểm cần nâng cao:**
-  - Bổ sung trường `AuditSignatureHash` (SHA-256 của toàn bộ dữ liệu Snapshot kết hợp Secret Key) để phát hiện nếu bản ghi trong database bị sửa trộm từ phía quản trị viên DB.
-
----
-
-## 6. ĐÁNH GIÁ HỆ THỐNG 5 SỔ KẾ TOÁN HKD
-
-| Mã sổ | Tên sổ theo quy định | Trạng thái hiện tại ở Backend | Đánh giá & Hướng xử lý |
-| :---: | :--- | :--- | :--- |
-| **S2a-HKD** | Sổ chi tiết doanh thu bán hàng hóa, dịch vụ | Đã triển khai query từ `_context.Orders` | **ĐẠT.** Dữ liệu khớp với doanh thu bán lẻ từng đơn hàng POS. |
-| **S2c-HKD** | Sổ chi phí sản xuất, kinh doanh | Đã triển khai query từ `_context.ExpenseVouchers` | **ĐẠT.** Đã lọc bỏ chi phí rút vốn chủ sở hữu. |
-| **S2d-HKD** | Sổ chi tiết vật liệu, dụng cụ, sản phẩm, hàng hóa | **CHƯA CÓ** query thực tế từ bảng Kho | **CẦN BỔ SUNG.** Cần query từ bảng `GoodsReceiptNotes` (Phiếu nhập kho) và `OrderItems` (Xuất kho bán lẻ) để hiển thị Nhập - Xuất - Tồn. |
-| **S2e-HKD** | Sổ theo dõi thanh toán tiền mặt & ngân hàng | Đang giả lập qua `CashbookEntryDto` | **CẦN KẾT NỐI.** Cần query trực tiếp từ bảng `CashbookTransactions` của phân hệ Cashbook. |
-| **S3a-HKD** | Sổ theo dõi nghĩa vụ thuế với NSNN | Lấy từ `HouseholdTaxSnapshots` | **ĐẠT.** Thể hiện số thuế đã chốt và ngày nộp. |
-
----
-
-## 7. BẢNG ĐỐI SOÁT SAI LỆCH & RỦI RO KỸ THUẬT
-
-| STT | Vấn đề phát hiện | Mức độ nghiêm trọng | Nguyên nhân gốc rễ (Root Cause) | Rủi ro nếu không xử lý |
-| :-: | :--- | :---: | :--- | :--- |
-| **1** | Bỏ quên Giá vốn hàng bán (COGS) trong thuế kê khai | **CRITICAL** | `GetPeriodDeductibleExpensesAsync` chỉ đọc bảng `ExpenseVouchers`, không đọc COGS nhập hàng. | Lợi nhuận chịu thuế bị đội lên gấp 4 lần, số thuế tính ra sai lệch nghiêm trọng. |
-| **2** | Chưa verify mã PIN tại Server khi chốt kỳ | **HIGH** | `FinalizeTaxSnapshotAsync` không kiểm tra `request.SecurityPin` với mã hash lưu trong CSDL. | Bất kỳ ai gửi request API đều chốt khóa sổ vĩnh viễn được dữ liệu tiệm. |
-| **3** | Thiếu `[Authorize]` trên `HouseholdTaxController` | **HIGH** | Chưa khai báo Policy hoặc Role trên Controller. | Người dùng không có quyền (nhân viên thu ngân, khách) có thể gọi API chốt sổ. |
-| **4** | Vi phạm Open/Closed (O trong SOLID) | **MEDIUM** | Code tính thuế dùng `if/else` thủ công lồng nhau hơn 80 dòng trong Service. | Khó mở rộng khi Nhà nước thay đổi biểu thuế hoặc bổ sung phương pháp tính mới. |
-| **5** | Chưa có DTO và Query cho Sổ kho S2d-HKD | **MEDIUM** | Chưa viết hàm liên kết dữ liệu nhập hàng từ module Kho/PO. | Sổ kế toán HKD bị khuyết 1 sổ quan trọng phục vụ thanh tra thuế. |
-
----
-
-## 8. KẾ HOẠCH REFACTOR & MÃ NGUỒN C# CHUẨN MẪU
-
-> ⚠️ **THÔNG BÁO QUAN TRỌNG:** Kế hoạch thực hiện chi tiết tại mục này đã được nâng cấp và thay thế toàn diện bởi tài liệu [AI_REFACTOR_BRIEF.md](AI_REFACTOR_BRIEF.md) (nằm tại thư mục gốc Backend `MT_GRMS_BACKEND/AI_REFACTOR_BRIEF.md` và `docs/AI_REFACTOR_BRIEF.md`). Lập trình viên / AI hãy thực hiện theo đúng chỉ thị trong **AI_REFACTOR_BRIEF.md**.
-
-
-### 8.1. Thiết kế lại theo Strategy Pattern (Chuẩn SOLID)
+### 2. PHÂN ĐỊNH PHÁP LÝ & CƠ CHẾ SỔ SÁCH - THUẾ CHUẨN XÁC
 
 ```mermaid
-classDiagram
-    class IHouseholdTaxService {
-        <<interface>>
-        +GetTaxSummaryAsync(filter)
-        +FinalizeTaxSnapshotAsync(request, finalizedBy)
-    }
-    class HouseholdTaxService {
-        -IHouseholdTaxRepository _repo
-        -ITaxCalculationStrategyFactory _strategyFactory
-        -IPinVerificationService _pinService
-    }
-    class ITaxCalculationStrategy {
-        <<interface>>
-        +Calculate(context) TaxCalculationResult
-    }
-    class RevenuePercentageTaxStrategy {
-        +Calculate(context) TaxCalculationResult
-    }
-    class DeclarationBasedTaxStrategy {
-        +Calculate(context) TaxCalculationResult
-    }
-
-    IHouseholdTaxService <|.. HouseholdTaxService
-    HouseholdTaxService --> ITaxCalculationStrategy
-    ITaxCalculationStrategy <|.. RevenuePercentageTaxStrategy
-    ITaxCalculationStrategy <|.. DeclarationBasedTaxStrategy
+graph TD
+    A["HỆ THỐNG QUẢN TRỊ HỘ KINH DOANH MT-GRMS"] --> B["CHÍNH SÁCH & QUẢN LÝ THUẾ<br/><b>Nghị định 68/2026/NĐ-CP</b><br/>(Sửa đổi bởi NĐ 141/2026/NĐ-CP ngày 29/04/2026)"]
+    A --> C["CHẾ ĐỘ KẾ TOÁN & SỔ SÁCH<br/><b>Thông tư 152/2025/TT-BTC</b><br/>(Ban hành ngày 31/12/2025, HL 01/01/2026)"]
+    
+    B --> B1["Doanh thu năm từ 1 tỷ đồng trở xuống (<= 1 tỷ):<br/>Không chịu thuế GTGT & TNCN<br/>Chỉ nộp Thông báo doanh thu năm"]
+    B --> B2["Doanh thu trên 1 tỷ đồng/năm:<br/>Tự kê khai nộp thuế (Bỏ thuế khoán)"]
+    
+    C --> C1["Hộ không chịu thuế (<= 1 tỷ):<br/>Sổ chi tiết doanh thu <b>S1a-HKD</b>"]
+    C --> C2["Hộ nộp thuế TNCN theo tỷ lệ % doanh thu:<br/>Sổ doanh thu và chi phí <b>S2a-HKD</b>"]
+    C --> C3["Hộ nộp thuế TNCN theo thu nhập thực tế / > 3 tỷ:<br/>Bộ 5 sổ kế toán chi tiết (S2b, S2c, S2d, S2e, S3a)"]
 ```
 
-### 8.2. Mã nguồn mẫu triển khai Refactor
+#### 2.1. Căn Cứ Pháp Lý & Danh Mục Thuế Suất Theo Ngành Nghề:
+1. **Nghị định 68/2026/NĐ-CP (sửa đổi bởi Nghị định 141/2026/NĐ-CP ngày 29/04/2026):**
+   - Hộ kinh doanh có doanh thu trong năm dương lịch **từ 01 tỷ đồng trở xuống** (`Revenue <= 1_000_000_000`) không phải nộp thuế GTGT và thuế TNCN. Hộ chỉ nộp Thông báo doanh thu, không phải kê khai nộp thuế theo kỳ.
+   - **Xóa bỏ cơ chế thuế khoán:** Toàn bộ hộ kinh doanh chuyển sang cơ chế tự khai, tự nộp.
+2. **Thuế suất đầy đủ theo danh mục ngành nghề (Thông tư 40/2021/TT-BTC & NĐ 68/141):**
+   - Thuế suất không được gán cứng mà phải truy xuất theo ngành nghề kinh doanh đăng ký:
+     + **Phân phối, cung cấp hàng hóa (bán lẻ):** GTGT 1.0%, TNCN 0.5% (tính trên phần doanh thu lũy kế vượt 1 tỷ).
+     + **Dịch vụ, xây dựng không bao thầu NVL:** GTGT 5.0%, TNCN 2.0% (tính trên phần doanh thu lũy kế vượt 1 tỷ).
+     + **Sản xuất, vận tải, dịch vụ có gắn với hàng hóa:** GTGT 3.0%, TNCN 1.5% (tính trên phần doanh thu lũy kế vượt 1 tỷ).
+     + **Cho thuê tài sản, cho thuê bất động sản:** GTGT 5.0%, TNCN 5.0% (tính trên phần doanh thu lũy kế vượt 1 tỷ).
+     + **Hoạt động kinh doanh khác:** GTGT 2.0%, TNCN 1.0% (tính trên phần doanh thu lũy kế vượt 1 tỷ).
+   - **Cảnh báo vượt ngưỡng giữa năm (lời văn trung tính theo ngành):**
+     > *"Doanh thu lũy kế năm đã vượt ngưỡng 1 tỷ VNĐ trong kỳ này. Hệ thống bắt đầu tính nghĩa vụ thuế GTGT và TNCN theo thuế suất ngành nghề đăng ký trên phần doanh thu vượt ngưỡng. Khuyến nghị chủ hộ tham vấn cơ quan thuế địa bàn về quy định kê khai và chính sách áp dụng cho trường hợp vượt ngưỡng giữa năm."*
+3. **Quy Tắc Áp Dụng Phương Án Kê Khai Thu Nhập Thực Tế (`PROFIT_15`):**
+   - Theo Điều 4 Nghị định 68/2026/NĐ-CP: Hộ kinh doanh lựa chọn phương pháp tính thuế theo thu nhập thực tế (doanh thu trừ chi phí) phải **áp dụng ổn định trong thời gian tối thiểu 02 năm liên tục**.
+   - **Quy tắc chuyển đổi phương pháp khi vượt ngưỡng 3 tỷ:** Hộ kinh doanh đang áp dụng phương pháp tỷ lệ % trên doanh thu mà trong năm có tổng doanh thu thực tế vượt quá 3 tỷ đồng thì từ năm tính thuế tiếp theo bắt buộc phải chuyển sang phương pháp tính thuế theo thu nhập thực tế.
+   - Các mức thuế suất theo thu nhập chịu thuế:
+     + *Trên 1 tỷ đến 3 tỷ (Nhóm 2):* Được chọn giữa Tỷ lệ % doanh thu hoặc 15% trên thu nhập chịu thuế.
+     + *Trên 3 tỷ đến 50 tỷ (Nhóm 3):* Bắt buộc phương pháp thu nhập thực tế, thuế suất 17%.
+     + *Trên 50 tỷ (Nhóm 4):* Thuế suất 20% trên thu nhập chịu thuế.
+   - Bắt buộc phân loại chi phí hợp lý được trừ (có hóa đơn, chứng từ hợp pháp) và chi phí không được trừ.
+4. **Quy Tắc Phân Nhóm Sổ Kế Toán Theo Thông Tư 152/2025/TT-BTC:**
+   - **Khóa phân nhóm sổ kế toán chính là Phương Pháp Tính Thuế TNCN Đã Chọn:**
+     + *Hộ từ 1 tỷ trở xuống (không chịu thuế):* Sử dụng sổ chi tiết doanh thu **S1a-HKD** để làm căn cứ nộp Thông báo doanh thu năm.
+     + *Hộ nộp thuế TNCN theo phương pháp Tỷ lệ % doanh thu (dưới 3 tỷ):* Sử dụng sổ doanh thu và chi phí **S2a-HKD**.
+     + *Hộ nộp thuế TNCN theo phương pháp Thu nhập thực tế (`PROFIT_15` hoặc trên 3 tỷ):* Bắt buộc sử dụng bộ sổ kế toán chi tiết:
+       - **S2b-HKD:** Sổ chi tiết chi phí sản xuất, kinh doanh.
+       - **S2c-HKD:** Sổ chi tiết vật liệu, dụng cụ, sản phẩm, hàng hóa.
+       - **S2d-HKD:** Sổ theo dõi tình hình thực hiện nghĩa vụ thuế với NSNN.
+       - **S2e-HKD:** Sổ theo dõi tiền lương và các khoản nộp theo lương.
+       - **S3a-HKD:** Sổ quỹ tiền mặt, tiền gửi ngân hàng.
 
-#### Bước 1: Interface Strategy tính thuế (Open/Closed Principle)
-```csharp
-namespace MT_GRMS.Application.Tax.Strategies;
+---
 
-public interface ITaxCalculationStrategy
-{
-    TaxCalculationMethod Method { get; }
-    TaxCalculationResult Calculate(TaxCalculationContext context);
-}
+### 3. CHECKLIST NGHIỆM THU KỸ THUẬT (CHUẨN HÓA 3 TRẠNG THÁI)
 
-public class TaxCalculationContext
-{
-    public decimal GrossRevenue { get; set; }
-    public decimal NetRevenueInPeriod { get; set; }
-    public decimal AnnualAccumulatedRevenue { get; set; }
-    public decimal DeductibleExpenses { get; set; }
-    public decimal PriorDeclaredPitTax { get; set; }
-    public bool IsVatReduced { get; set; }
-    public HouseholdTaxGroup Group { get; set; }
-}
+**Quy ước 3 trạng thái chuẩn:**
+1. **`[XONG & CÓ TEST]`**: Đã cài đặt hoàn chỉnh + Đã có test kiểm chứng chạy đạt kết quả PASS (ghi rõ tên hàm test và file test).
+2. **`[ĐÃ CODE, CHƯA ĐỦ ĐIỀU KIỆN]`**: Đã viết mã nguồn logic nhưng chưa chạy trên PostgreSQL thật, hoặc tham số còn là const, hoặc mới chặn tầng C# chưa có DB constraint/trigger, hoặc test mới ở mức mock in-memory.
+3. **`[CHƯA LÀM]`**: Hạng mục đã ghi nhận trong yêu cầu nhưng chưa triển khai mã nguồn.
 
-public class TaxCalculationResult
-{
-    public decimal VatRate { get; set; }
-    public decimal VatAmount { get; set; }
-    public decimal PitRate { get; set; }
-    public decimal PitAmount { get; set; }
-    public decimal TaxableIncome { get; set; }
-    public decimal TotalTaxAmount => VatAmount + PitAmount;
-}
-```
+| STT | Hạng Mục Nghiệp Vụ / Kỹ Thuật | Trạng Thái | Bằng Chứng / Tên Test & Mã Nguồn | Loại Khoảng Trống Kỹ Thuật |
+|:---:|:---|:---:|:---|:---|
+| **1** | Công thức thuế NĐ 68/141 (Từ 1 tỷ trở xuống miễn thuế, YTD Excess) | **[ĐÃ CODE, CHƯA ĐỦ ĐIỀU KIỆN]** | `RevenuePercentageTaxStrategyTests.Calculate_WhenRevenueOverThreshold_ShouldCalculateTaxesCorrectly` | Ngưỡng 1 tỷ và thuế suất đang là `const` trong C#, **chưa động hóa bảng DB có `ValidFrom`**. |
+| **2** | Cảnh báo vượt ngưỡng giữa năm (lời văn trung tính theo ngành) | **[XONG & CÓ TEST]** | - BE: `HouseholdTaxServiceTests.GetTaxSummary_WhenThresholdCrossedMidYear_ShouldSetFlagAndNeutralNote`<br/>- FE: `taxSnapshotBPrime.test.ts` (assert neutral note) | Đã chuẩn hóa lời văn theo ngành nghề trung tính, có test ở cả 2 đầu. |
+| **3** | Tùy chọn thuế TNCN 15% lợi nhuận (`PROFIT_15`) | **[ĐÃ CODE, CHƯA ĐỦ ĐIỀU KIỆN]** | `HouseholdTaxServiceTests.GetTaxSummary_Group2_WhenTier2MethodIsProfit15_ShouldUseDeclarationStrategyWith15PercentPit` | Chưa lưu cấu hình phương pháp vào DB; **Chưa có ràng buộc khóa tối thiểu 2 năm liên tiếp** (Điều 4 NĐ 68). |
+| **4** | Sổ cái bất biến (Compensating Ledger) | **[ĐÃ CODE, CHƯA ĐỦ ĐIỀU KIỆN]** | `CashbookServiceTests.VoidTransactionAsync_ShouldCreateCompensatingEntries` | Gạch bỏ tạo phiếu bù trừ `COMPENSATING`; **Chưa có PostgreSQL Trigger và chưa thu hồi quyền UPDATE/DELETE của DB role**. |
+| **5** | Poka-yoke chống âm két tiền mặt (GBR-CSH-03) | **[ĐÃ CODE, CHƯA ĐỦ ĐIỀU KIỆN]** | `CashbookServiceTests.CreatePaymentAsync_WhenInsufficientFunds_ShouldThrowException` | Mới chặn ở tầng C#; **Chưa có ràng buộc DB `CHECK (CurrentBalance >= 0)` và chưa test `SELECT FOR UPDATE` trên Postgres thật**. |
+| **6** | Bắt buộc giải trình kiểm kê chênh lệch (GBR-CSH-04) | **[XONG & CÓ TEST]** | `CashbookServiceTests.ReconcileCashAccountAsync_WhenDiscrepancyWithoutReason_ShouldThrowException` | Chặn lỗi `REASON_REQUIRED` khi chênh lệch != 0. |
+| **7** | Chống Deadlock khi chuyển tiền nội bộ | **[ĐÃ CODE, CHƯA ĐỦ ĐIỀU KIỆN]** | `CashbookService.TransferFundsAsync`<br/>`CashbookServiceTests.TransferFundsAsync_StandardTransfer_ShouldTransferBalancesCorrectly`<br/>`CashbookServiceTests.TransferFundsAsync_WhenFromAndToAccountsAreSame_ShouldThrowBusinessException`<br/>`CashbookServiceTests.TransferFundsAsync_WhenAmountIsZeroOrNegative_ShouldThrowBusinessException` | Đã code khóa `firstId` và `secondId` theo thứ tự ID + Transaction + Chặn From = To và Số tiền <= 0; **Nhưng mới test in-memory, chưa test concurrency đa luồng trên Postgres thật**. |
+| **8** | Idempotency Scope (Tenant + User + Endpoint + Key) | **[XONG & CÓ TEST]** | `IdempotencyFilterTests.OnActionExecutionAsync_ScopeIncludesUserId_DifferentUsersCanUseSameKey` | User khác nhau gửi cùng key không bị nhận nhầm cache (Scope ghép chuỗi `{UserId}:{Key}`). |
+| **9** | Idempotency Tamper Detection (409 Conflict) | **[XONG & CÓ TEST]** | `IdempotencyFilterTests.OnActionExecutionAsync_WhenSameKeyDifferentPayload_ShouldReturn409Conflict` | Bắt lỗi `IDEMPOTENCY_PAYLOAD_MISMATCH` khi cùng key nhưng payload bị sửa. |
+| **10**| Idempotency Không Cache Lỗi 4xx (Cho phép Retry) | **[XONG & CÓ TEST]** | `IdempotencyFilterTests.OnActionExecutionAsync_When4xxStateErrorOccurs_ShouldNotCacheAndAllowRetry` | Gặp lỗi trạng thái (`INSUFFICIENT_FUNDS`), client nạp tiền và retry cùng key thành công 200. |
+| **11**| Idempotency Không Cache Lỗi 5xx (Server Recovery) | **[XONG & CÓ TEST]** | `IdempotencyFilterTests.OnActionExecutionAsync_When5xxServerErrorOccurs_ShouldNotCacheAndAllowRetry` | Server lỗi 500 không bị cache, khi server phục hồi retry cùng key trả về 200. |
+| **12**| Idempotency Two-Phase Xử lý Race Condition (Trạng thái PENDING) | **[XONG & CÓ TEST]** | `IdempotencyFilterTests.OnActionExecutionAsync_WhenConcurrentRequestWhilePending_ShouldReturn409ConflictInProgress`<br/>`IdempotencyFilterTests.OnActionExecutionAsync_WhenPendingRecordExpiredDueToCrash_ShouldReclaimLockAndSucceed`<br/>`IdempotencyFilterTests.OnActionExecutionAsync_WhenUnhandledExceptionOccurs_ShouldRemovePendingRecordAndAllowRetry` | **Đã triển khai Two-Phase Idempotency (Stripe Pattern)**: Ghi bản ghi `Status = PENDING` và `UserId` TRƯỚC KHI gọi `next()`. Request song song bị chặn đứng với 409 `IDEMPOTENCY_IN_PROGRESS`. Tự động xóa PENDING khi lỗi/exception để client retry; Thành công 2xx chuyển `COMPLETED`. Tự dọn dẹp lock treo quá hạn. |
+| **13**| Anti-Splitting Hạn Mức T1 & Tần Suất 60 phút | **[ĐÃ CODE, CHƯA ĐỦ ĐIỀU KIỆN]** | `ExpenseServiceTests.CreateExpenseAsync_WhenThresholdExceeded_ShouldRequireApproval`<br/>`ExpenseServiceTests.CreateExpenseAsync_WhenFrequencyPatternDetected_ShouldFlagSuspiciousSplit` | Đã quét theo thời gian và vendor trong ngày; **Chưa quét đa chiều theo Người thụ hưởng (Beneficiary) và Chi nhánh (Branch)**. |
+| **14**| Quy tắc duyệt chi tiệm 1 chủ solo có cảnh báo | **[ĐÃ CODE, CHƯA ĐỦ ĐIỀU KIỆN]** | `ExpenseServiceTests.ApproveExpenseAsync_WhenFlaggedAsSuspiciousAndNoteIsEmpty_ShouldThrowBusinessException` | Mới bắt buộc nhập Note; **Chưa có bảng Audit Log chuyên biệt lưu vết kiểm toán hệ thống**. |
+| **15**| Dấu toàn vẹn HMAC Snapshot có Key Rotation | **[ĐÃ CODE, CHƯA ĐỦ ĐIỀU KIỆN]** | `TaxSnapshotSignatureTests.VerifySignature_WithKeyRotation_ShouldVerifyHistoricSnapshotsCorrectly` | Đã code KeyId rotation; **Secret key còn nằm trong mã nguồn C# (`_keyStore`), chưa đưa ra biến môi trường / Key Vault**. |
+| **16**| Triệt tiêu N+1 Query trong Báo cáo P&L | **[ĐÃ CODE, CHƯA ĐỦ ĐIỀU KIỆN]** | `PnLReportServiceTests.GetPnLSummaryAsync_StandardCase_ShouldCalculateCorrectMetrics` | Đã gom 4 hàm repo; **Test hiện tại chỉ mock repo và tính margin%, chưa có test assert đếm số lượng câu lệnh SQL thực tế trên DB**. |
+| **17**| Chế độ sổ sách theo Phương pháp TNCN (TT 152) | **[CHƯA LÀM]** | Mới có DTO phân loại trong `HouseholdTaxDtos.cs` | Chưa có giao diện UI xem/kết xuất sổ S1a, S2a, và bộ sổ chi tiết (S2b-S2e, S3a). Cần cấu hình động theo Phương pháp tính thuế TNCN. |
+| **18**| Phân biệt Giá vốn COGS thiếu vs COGS 0đ | **[CHƯA LÀM]** | Đã có metadata `cogsSource` | **Chưa phân biệt trường hợp thiếu giá vốn (`CostPrice == null`) với hàng tặng kèm (`CostPrice == 0`)**, gây rủi ro thổi phồng lợi nhuận và thuế 15%. |
+| **19**| Phân quyền theo vai trò (RBAC Matrix Dòng Tiền) | **[CHƯA LÀM]** | - | **Chưa triển khai** chặn vai trò Thu ngân/Nhân viên duyệt chi hoặc gạch bỏ bút toán sổ cái. |
+| **20**| Cách ly Tenant (Chặn truy cập chéo) | **[CHƯA LÀM]** | - | **Chưa có Integration Test** kiểm chứng chặn truy cập chéo giữa các tenant. |
+| **21**| Quản lý Công nợ khách hàng / NCC theo FIFO | **[CHƯA LÀM]** | - | Chưa triển khai cơ chế phân bổ thanh toán công nợ theo nguyên tắc First-In-First-Out. |
+| **22**| Dashboard Tài chính kết nối API thật | **[CHƯA LÀM]** | Màn hình P&L và Tax đã nối API; Dashboard tổng quan còn dùng `mockFinanceData.ts` | Cần nối endpoint tổng hợp `/api/finance/dashboard/kpi`. |
+| **23**| Contract Test / OpenAPI & Enum Dạng Chuỗi | **[CHƯA LÀM]** | - | Cần chuẩn hóa `JsonStringEnumConverter` trên toàn bộ DTO API để tránh lệch contract giữa C# và TypeScript. |
+| **24**| Guard an toàn cho script smoke test Live DB | **[ĐÃ CODE, CHƯA ĐỦ ĐIỀU KIỆN]** | `smoke_test_stage3.py` (`check_safety_guards`) | Đã viết logic từ chối chạy nếu URL là production hoặc tenant không thuộc tiền tố test; Chưa có test script tự động. |
 
-#### Bước 2: Bổ sung Giá vốn hàng bán (COGS) trong Repository
-```csharp
-// Trong HouseholdTaxRepository.cs
-public async Task<decimal> GetPeriodDeductibleExpensesAsync(
-    DateTime fromDateUtc,
-    DateTime toDateUtc,
-    Guid? branchId,
-    CancellationToken cancellationToken = default)
-{
-    // 1. Chi phí vận hành (OPEX) từ ExpenseVouchers (đã loại trừ vốn chủ sở hữu)
-    var voucherQuery = _context.ExpenseVouchers.AsQueryable();
-    if (branchId.HasValue) voucherQuery = voucherQuery.Where(v => v.BranchId == branchId.Value);
+---
 
-    var validVouchers = await voucherQuery
-        .Where(v => v.ExpenseDate >= fromDateUtc && v.ExpenseDate <= toDateUtc &&
-                   (v.Status == ExpenseVoucherStatus.Paid || v.Status == ExpenseVoucherStatus.Approved))
-        .ToListAsync(cancellationToken);
+### 4. TỔNG HỢP KIỂM THỬ THỰC TẾ TRÊN MÁY DEV
 
-    var opex = validVouchers
-        .Where(v => !IsCapitalWithdrawal(v.Category))
-        .Sum(v => v.Amount);
+```bash
+# Backend (.NET 8) - Store: Microsoft.EntityFrameworkCore.InMemory
+dotnet test MT_GRMS_BACKEND.sln
+# Passed! - Failed: 0, Passed: 169, Skipped: 0, Total: 169 (Duration: 2.1s)
+# Phân rã:
+# - MT_GRMS.UnitTests: 137 passed (đã có test chặn From == To và Amount <= 0 trong TransferFunds)
+# - MT_GRMS.IntegrationTests: 32 passed (chạy trên InMemory)
 
-    // 2. Giá vốn hàng bán (COGS) từ các đơn hàng đã thanh toán trong kỳ (70% doanh thu chuẩn ngành)
-    var orderQuery = _context.Orders.Include(o => o.Items).AsQueryable();
-    if (branchId.HasValue) orderQuery = orderQuery.Where(o => o.StoreId == branchId.Value);
-
-    var orders = await orderQuery
-        .Where(o => o.CreatedAt >= fromDateUtc && o.CreatedAt <= toDateUtc && o.PaymentStatus == PaymentStatus.Paid)
-        .ToListAsync(cancellationToken);
-
-    var cogs = orders.Sum(o => o.Items.Any()
-        ? o.Items.Sum(i => i.Quantity * i.UnitPrice * 0.70m)
-        : o.SubTotal * 0.70m);
-
-    // Tổng chi phí hợp lý được trừ = COGS + OPEX
-    return cogs + opex;
-}
-```
-
-#### Bước 3: Bảo vệ Controller và kiểm tra mã PIN Server-Side
-```csharp
-// Trong HouseholdTaxController.cs
-[Authorize(Roles = "StoreOwner,ChiefAccountant")]
-[HttpPost("snapshots")]
-public async Task<ActionResult<ApiResponse<HouseholdTaxSnapshotDto>>> CreateSnapshot(
-    [FromBody] CreateTaxSnapshotRequest request,
-    CancellationToken ct)
-{
-    var currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-    var finalizedBy = User.Identity?.Name ?? "StoreOwner";
-
-    // 1. Verify PIN qua IPinVerificationService
-    var isPinValid = await _pinService.VerifyStoreOwnerPinAsync(currentUserId, request.SecurityPin, ct);
-    if (!isPinValid)
-    {
-        return BadRequest(ApiResponse<HouseholdTaxSnapshotDto>.Fail("INVALID_SECURITY_PIN", "Mã PIN xác thực chủ tiệm không chính xác hoặc đã bị khóa tạm thời do nhập sai nhiều lần."));
-    }
-
-    // 2. Thực hiện chốt kỳ và khóa sổ bất biến
-    var result = await _taxService.FinalizeTaxSnapshotAsync(request, finalizedBy, ct);
-    return Ok(ApiResponse<HouseholdTaxSnapshotDto>.Ok(result, "Chốt kỳ tính thuế thành công. Số liệu đã được khóa vĩnh viễn."));
-}
+# Frontend (Vite / React 19)
+npm test -- --run
+# Test Files: 12 passed (12), Tests: 87 passed (87) (Duration: 4.16s)
+# Build check: tsc -b && vite build hoàn tất trong 1.22s (0 lỗi TypeScript compile)
 ```
 
 ---
 
-## 9. KẾT LUẬN & ĐỀ XUẤT CHO ĐỘI NGŨ PHÁT TRIỂN
-1. **Về cấu trúc Clean Architecture & DI:** Backend đã xây dựng rất tốt và chuẩn mực về việc phân tách Interface và inject lỏng, đạt tiêu chuẩn chất lượng cao.
-2. **Về nghiệp vụ:** Cần ưu tiên vá ngay **lỗ hổng COGS** trong phương pháp Kê khai để số liệu khớp với thực tế ngành bán lẻ FMCG.
-3. **Về bảo mật:** Bắt buộc kích hoạt verify PIN tại server và gắn attribute `[Authorize]` trên các endpoint chốt kỳ tài chính.
+### 5. TÁI CẤU TRÚC LỘ TRÌNH KỸ THUẬT (THEO NGUYÊN TẮC AN TOÀN DÒNG TIỀN)
+
+Thứ tự ưu tiên được sắp xếp lại dựa trên mức độ rủi ro thất thoát tiền tệ và toàn vẹn dữ liệu:
+
+1. **Ưu tiên 1 (Khắc phục lỗ hổng chi tiền 2 lần do Race Condition Idempotency):**
+   - Triển khai mô hình **Two-Phase Idempotency (Stripe Pattern)**: INSERT bản ghi với trạng thái `Status = PENDING` vào DB *TRƯỚC KHI* thực thi nghiệp vụ chi tiền / trừ két.
+   - Nếu request thứ 2 gửi đến trong cửa sổ xử lý (bấm đúp, timeout retry) $\rightarrow$ Trả về ngay `409 Conflict (IDEMPOTENCY_IN_PROGRESS)`, chặn đứng 100% rủi ro chi tiền hai lần.
+   - Thêm cột `UserId` vật lý vào bảng `IdempotencyRecords` và Index `(TenantId, UserId, Endpoint, Key)`.
+   - Thêm Background Worker tự động dọn dẹp bản ghi hết hạn TTL 24h.
+2. **Ưu tiên 2 (Kiểm soát gian lận dòng tiền & Bảo mật rò rỉ dữ liệu đa Tenant):**
+   - Triển khai phân quyền RBAC: Chặn cứng vai trò Thu ngân / Nhân viên không được duyệt chi (`ApproveExpense`) và không được gạch bỏ bút toán sổ cái (`VoidTransaction`).
+   - Viết Integration Test kiểm tra chặn truy cập chéo tenant (`CrossTenantAccessTests`).
+   - Bảo mật chữ ký HMAC: Đưa Secret Key ra khỏi mã nguồn C#, nạp qua biến môi trường (`ENV_HMAC_SECRET`) hoặc Key Vault.
+3. **Ưu tiên 3 (Kiểm chứng Concurrency & Deadlock trên PostgreSQL Engine thật):**
+   - Xây dựng bộ test Concurrency đa luồng trên PostgreSQL thật (sử dụng Docker Testcontainers hoặc Neon DB Branching tạm thời).
+   - Cấu hình `EnableRetryOnFailure(errorCodesToAdd: new[] { "40P01" })` cho Npgsql và bọc giao dịch qua `executionStrategy.ExecuteAsync()` để tự động retry khi gặp mã lỗi PostgreSQL `40P01` (deadlock_detected) và `40001` (serialization_failure).
+   - Bổ sung ràng buộc `CHECK ("CurrentBalance" >= 0)` hoặc lệnh `UPDATE ... WHERE "CurrentBalance" >= @Amount` ở DB để chặn âm két ở tầng database engine.
+   - Áp dụng triệt để quy tắc sắp thứ tự khóa tài nguyên (Deterministic Resource Ordering) cho mọi luồng liên quan nhiều tài khoản (chi tiền, rút két, trả nợ, nộp ngân hàng).
+4. **Ưu tiên 4 (Động hóa bảng tham số thuế, Đầy đủ các nhóm ngành & Ràng buộc PROFIT_15):**
+   - Tạo Entity `TaxPolicyParameter` trong DB có các cột `ParameterKey`, `ParameterValue`, `ValidFrom`, `ValidTo` thay vì `const` cứng trong C#.
+   - Bổ sung bảng thuế suất theo danh mục các nhóm ngành nghề: Bán lẻ (1%/0.5%), Dịch vụ (5%/2%), Sản xuất/vận tải (3%/1.5%), Cho thuê tài sản (5%/5%), Khác (2%/1%).
+   - Thêm ràng buộc cho phương án `PROFIT_15`: Khóa áp dụng tối thiểu 2 năm liên tiếp theo Điều 4 NĐ 68; quy tắc chuyển đổi bắt buộc sang phương pháp thu nhập nếu doanh thu cuối năm vượt 3 tỷ; kiểm tra phân loại chi phí hợp lệ / không hợp lệ.
+   - Phân biệt rõ trường hợp thiếu giá vốn (`CostPrice == null`) vs hàng khuyến mại tặng kèm (`CostPrice == 0`) để tránh thổi phồng lợi nhuận và thuế 15%.
+   - Thiết kế phân nhóm sổ sách kế toán theo Phương pháp tính thuế TNCN (hộ từ 1 tỷ trở xuống không chịu thuế dùng S1a, hộ nộp theo % doanh thu dùng S2a, hộ nộp theo thu nhập thực tế dùng bộ sổ chi tiết S2b-S2e, S3a).
+   - Chuẩn hóa OpenAPI contract test & Enum dạng chuỗi (`JsonStringEnumConverter`).
+5. **Ưu tiên 5 (Nghiệp vụ Mở Rộng: Quản lý Công nợ FIFO, Sổ sách TT 152 & Dashboard):**
+   - Triển khai phân bổ thanh toán công nợ khách hàng và nhà cung cấp theo nguyên tắc First-In-First-Out.
+   - Xây dựng giao diện xem và kết xuất các nhóm biểu mẫu sổ sách theo TT 152 và tờ khai thuế theo TT 18/TT 50.
+   - Đấu nối Dashboard tài chính với API thật.
+
