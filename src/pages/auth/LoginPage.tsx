@@ -19,8 +19,8 @@ export const LoginPage: FC = () => {
   const navigate = useNavigate();
   const setAuth = useAuthStore((state) => state.setAuth);
 
-  const [phoneOrEmail, setPhoneOrEmail] = useState("0901 234 567");
-  const [password, setPassword] = useState("password123");
+  const [phoneOrEmail, setPhoneOrEmail] = useState("admin@mtgrms.vn");
+  const [password, setPassword] = useState("Admin@123");
   const [rememberMe, setRememberMe] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
 

@@ -1,10 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import type { FC, FormEvent } from 'react';
 import { Search, RotateCcw } from 'lucide-react';
 import type { SupplierSummary } from '../../types/supplier.types';
 
 export interface SupplierProductFilterValues {
-  searchTerm: string;
+  searchTerm?: string;
+  productSearch: string;
+  supplierSearch: string;
   supplierId: string;
   categoryFilter: string;
   statusFilter: string;
@@ -28,10 +30,13 @@ export const SupplierProductFilterBar: FC<SupplierProductFilterBarProps> = ({
   onReset,
 }) => {
   const [draftFilters, setDraftFilters] = useState<SupplierProductFilterValues>(initialValues);
+  const [prevInitial, setPrevInitial] = useState<SupplierProductFilterValues>(initialValues);
 
-  useEffect(() => {
+  // Sync draft state if external initialValues change
+  if (initialValues !== prevInitial) {
+    setPrevInitial(initialValues);
     setDraftFilters(initialValues);
-  }, [initialValues]);
+  }
 
   const handleSubmit = (e?: FormEvent) => {
     if (e) e.preventDefault();
@@ -40,6 +45,8 @@ export const SupplierProductFilterBar: FC<SupplierProductFilterBarProps> = ({
 
   const handleResetClick = () => {
     const emptyValues: SupplierProductFilterValues = {
+      productSearch: '',
+      supplierSearch: '',
       searchTerm: '',
       supplierId: 'ALL',
       categoryFilter: 'ALL',
@@ -50,11 +57,46 @@ export const SupplierProductFilterBar: FC<SupplierProductFilterBarProps> = ({
   };
 
   const hasActiveFilters = Boolean(
-    draftFilters.searchTerm.trim() ||
+    (draftFilters.productSearch || '').trim() ||
+    (draftFilters.supplierSearch || '').trim() ||
     draftFilters.supplierId !== 'ALL' ||
     draftFilters.categoryFilter !== 'ALL' ||
     draftFilters.statusFilter !== 'ALL'
   );
+
+  const labelStyle: React.CSSProperties = {
+    fontSize: 12.5,
+    fontWeight: 600,
+    color: '#475569',
+    whiteSpace: 'nowrap',
+    userSelect: 'none',
+  };
+
+  const inputStyle: React.CSSProperties = {
+    height: 32,
+    padding: '0 10px',
+    borderRadius: 6,
+    border: '1px solid #cbd5e1',
+    fontSize: 12.5,
+    color: '#0f172a',
+    backgroundColor: '#ffffff',
+    outline: 'none',
+    boxSizing: 'border-box',
+    transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
+  };
+
+  const selectStyle = (isActive: boolean): React.CSSProperties => ({
+    height: 32,
+    padding: '0 10px',
+    borderRadius: 6,
+    border: isActive ? '1px solid #0d9488' : '1px solid #cbd5e1',
+    fontSize: 12.5,
+    fontWeight: 600,
+    color: isActive ? '#0f766e' : '#334155',
+    backgroundColor: isActive ? '#f0fdfa' : '#ffffff',
+    cursor: 'pointer',
+    outline: 'none',
+  });
 
   return (
     <div
@@ -67,107 +109,63 @@ export const SupplierProductFilterBar: FC<SupplierProductFilterBarProps> = ({
         boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)',
         display: 'flex',
         flexDirection: 'column',
-        gap: 8,
+        gap: 10,
         flexShrink: 0,
       }}
     >
-      {/* ── Dòng 1: Tìm kiếm + Nhà Cung Cấp + Ngành Hàng + Trạng Thái ── */}
+      {/* ── Dòng 1: Tìm kiếm theo Tên SP & Nhà cung cấp (Tách riêng biệt, rộng rãi) ── */}
       <div
         style={{
           display: 'flex',
           flexWrap: 'wrap',
           alignItems: 'center',
-          gap: 12,
+          gap: '10px 20px',
         }}
       >
-        {/* 1. Keyword search */}
-        <div style={{ position: 'relative', width: 280, minWidth: 220, flex: '1 1 240px' }}>
-          <Search
-            size={14}
-            color="#94a3b8"
-            style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)' }}
-          />
+        {/* 1. Tìm theo Tên Sản Phẩm */}
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+          <label style={labelStyle}>Tên sản phẩm:</label>
           <input
             type="text"
             id="txtProductSearch"
-            value={draftFilters.searchTerm}
-            onChange={(e) => setDraftFilters((prev) => ({ ...prev, searchTerm: e.target.value }))}
+            value={draftFilters.productSearch}
+            onChange={(e) => setDraftFilters((prev) => ({ ...prev, productSearch: e.target.value }))}
             onKeyDown={(e) => {
               if (e.key === 'Enter') handleSubmit();
             }}
-            placeholder="Tìm theo Barcode, SKU, tên sản phẩm, mã NCC..."
-            style={{
-              width: '100%',
-              height: 34,
-              paddingLeft: 32,
-              paddingRight: 10,
-              borderRadius: 6,
-              border: '1px solid #cbd5e1',
-              fontSize: 12.5,
-              color: '#1e293b',
-              outline: 'none',
-              boxSizing: 'border-box',
-              transition: 'border-color 0.15s ease',
-            }}
-            onFocus={(e) => (e.target.style.borderColor = 'var(--blue-primary, #0f766e)')}
+            placeholder="VD: Dưa leo baby, Sữa tươi, SKU, Barcode..."
+            style={{ ...inputStyle, width: 280 }}
+            onFocus={(e) => (e.target.style.borderColor = '#0d9488')}
             onBlur={(e) => (e.target.style.borderColor = '#cbd5e1')}
           />
         </div>
 
-        {/* 2. Nhà cung cấp dropdown */}
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-          <label style={{ fontSize: 12, fontWeight: 600, color: '#475569', whiteSpace: 'nowrap' }}>
-            Nhà cung cấp:
-          </label>
-          <select
-            id="filterSupplier"
-            value={draftFilters.supplierId}
-            onChange={(e) => setDraftFilters((prev) => ({ ...prev, supplierId: e.target.value }))}
-            style={{
-              height: 34,
-              padding: '0 10px',
-              borderRadius: 6,
-              border: draftFilters.supplierId !== 'ALL' ? '1px solid #0d9488' : '1px solid #cbd5e1',
-              fontSize: 12,
-              fontWeight: 600,
-              color: draftFilters.supplierId !== 'ALL' ? '#0f766e' : '#334155',
-              backgroundColor: draftFilters.supplierId !== 'ALL' ? '#f0fdfa' : '#ffffff',
-              cursor: 'pointer',
-              outline: 'none',
-              maxWidth: 240,
+        {/* 2. Tìm theo Nhà Cung Cấp */}
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+          <label style={labelStyle}>Nhà cung cấp:</label>
+          <input
+            type="text"
+            id="txtSupplierSearch"
+            value={draftFilters.supplierSearch}
+            onChange={(e) => setDraftFilters((prev) => ({ ...prev, supplierSearch: e.target.value }))}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleSubmit();
             }}
-          >
-            <option value="ALL">-- Tất cả nhà cung cấp ({suppliers.length}) --</option>
-            {suppliers.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.code} — {s.name}
-              </option>
-            ))}
-          </select>
+            placeholder="VD: supp-001, Vinamilk..."
+            style={{ ...inputStyle, width: 240 }}
+            onFocus={(e) => (e.target.style.borderColor = '#0d9488')}
+            onBlur={(e) => (e.target.style.borderColor = '#cbd5e1')}
+          />
         </div>
 
-        {/* 3. Ngành hàng dropdown */}
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-          <label style={{ fontSize: 12, fontWeight: 600, color: '#475569', whiteSpace: 'nowrap' }}>
-            Ngành hàng:
-          </label>
+        {/* 3. Ngành Hàng */}
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+          <label style={labelStyle}>Ngành hàng:</label>
           <select
             id="filterCategory"
             value={draftFilters.categoryFilter}
             onChange={(e) => setDraftFilters((prev) => ({ ...prev, categoryFilter: e.target.value }))}
-            style={{
-              height: 34,
-              padding: '0 10px',
-              borderRadius: 6,
-              border: draftFilters.categoryFilter !== 'ALL' ? '1px solid #0d9488' : '1px solid #cbd5e1',
-              fontSize: 12,
-              fontWeight: 600,
-              color: draftFilters.categoryFilter !== 'ALL' ? '#0f766e' : '#334155',
-              backgroundColor: draftFilters.categoryFilter !== 'ALL' ? '#f0fdfa' : '#ffffff',
-              cursor: 'pointer',
-              outline: 'none',
-              maxWidth: 200,
-            }}
+            style={{ ...selectStyle(draftFilters.categoryFilter !== 'ALL'), minWidth: 150 }}
           >
             <option value="ALL">-- Tất cả ngành hàng ({categories.length}) --</option>
             {categories.map((c) => (
@@ -178,36 +176,23 @@ export const SupplierProductFilterBar: FC<SupplierProductFilterBarProps> = ({
           </select>
         </div>
 
-        {/* 4. Trạng thái dropdown */}
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-          <label style={{ fontSize: 12, fontWeight: 600, color: '#475569', whiteSpace: 'nowrap' }}>
-            Trạng thái:
-          </label>
+        {/* 4. Trạng Thái */}
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+          <label style={labelStyle}>Trạng thái:</label>
           <select
             id="filterStatus"
             value={draftFilters.statusFilter}
             onChange={(e) => setDraftFilters((prev) => ({ ...prev, statusFilter: e.target.value }))}
-            style={{
-              height: 34,
-              padding: '0 10px',
-              borderRadius: 6,
-              border: draftFilters.statusFilter !== 'ALL' ? '1px solid #0d9488' : '1px solid #cbd5e1',
-              fontSize: 12,
-              fontWeight: 600,
-              color: draftFilters.statusFilter !== 'ALL' ? '#0f766e' : '#334155',
-              backgroundColor: draftFilters.statusFilter !== 'ALL' ? '#f0fdfa' : '#ffffff',
-              cursor: 'pointer',
-              outline: 'none',
-            }}
+            style={{ ...selectStyle(draftFilters.statusFilter !== 'ALL'), minWidth: 140 }}
           >
             <option value="ALL">-- Tất cả trạng thái --</option>
-            <option value="Active">🟢 Đang phân phối (Active)</option>
-            <option value="Inactive">⚪ Tạm ngưng (Inactive)</option>
+            <option value="Active">🟢 Hoạt động</option>
+            <option value="Inactive">⚪ Tạm ngưng</option>
           </select>
         </div>
       </div>
 
-      {/* ── Dòng 2: Phân cách nét đứt + Badge bộ lọc + Nút Tìm kiếm & Đặt lại ── */}
+      {/* ── Dòng 2: Dropdown Chọn NCC nhanh + Badge + Nút Tìm Kiếm & Đặt Lại ── */}
       <div
         style={{
           display: 'flex',
@@ -219,20 +204,42 @@ export const SupplierProductFilterBar: FC<SupplierProductFilterBarProps> = ({
           borderTop: '1px dashed #f1f5f9',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#64748b' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+          {/* Dropdown chọn nhanh NCC theo danh sách */}
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+            <label style={labelStyle}>Chọn NCC nhanh:</label>
+            <select
+              id="filterSupplier"
+              value={draftFilters.supplierId}
+              onChange={(e) => setDraftFilters((prev) => ({ ...prev, supplierId: e.target.value }))}
+              style={{
+                ...selectStyle(draftFilters.supplierId !== 'ALL'),
+                maxWidth: 260,
+              }}
+            >
+              <option value="ALL">-- Tất cả nhà cung cấp ({suppliers.length}) --</option>
+              {suppliers.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.code} — {s.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Badge bộ lọc đang hoạt động */}
           {hasActiveFilters && (
             <span
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: 4,
-                padding: '2px 8px',
+                padding: '3px 10px',
                 borderRadius: 4,
                 backgroundColor: '#f0fdfa',
                 color: '#0f766e',
-                fontSize: 11.5,
+                fontSize: 12,
                 fontWeight: 600,
                 border: '1px solid #ccfbf1',
+                whiteSpace: 'nowrap',
               }}
             >
               Đang áp dụng bộ lọc
@@ -240,18 +247,17 @@ export const SupplierProductFilterBar: FC<SupplierProductFilterBarProps> = ({
           )}
         </div>
 
-        {/* Nút Tìm kiếm & Đặt lại */}
+        {/* Nút Tìm kiếm & Đặt lại (Căn góc phải gọn gàng) */}
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginLeft: 'auto' }}>
           <button
             type="button"
-            id="btnApplySearch"
             onClick={() => handleSubmit()}
             style={{
               display: 'inline-flex',
               alignItems: 'center',
               gap: 6,
               height: 32,
-              padding: '0 16px',
+              padding: '0 18px',
               borderRadius: 6,
               border: 'none',
               backgroundColor: 'var(--blue-primary, #0f766e)',
@@ -261,6 +267,7 @@ export const SupplierProductFilterBar: FC<SupplierProductFilterBarProps> = ({
               cursor: 'pointer',
               whiteSpace: 'nowrap',
               transition: 'all 0.15s ease',
+              boxShadow: '0 1px 2px rgba(15, 118, 110, 0.2)',
             }}
             title="Áp dụng bộ lọc tìm kiếm"
           >
@@ -270,14 +277,13 @@ export const SupplierProductFilterBar: FC<SupplierProductFilterBarProps> = ({
 
           <button
             type="button"
-            id="btnResetFilter"
             onClick={handleResetClick}
             style={{
               display: 'inline-flex',
               alignItems: 'center',
               gap: 5,
               height: 32,
-              padding: '0 12px',
+              padding: '0 14px',
               borderRadius: 6,
               border: '1px solid #cbd5e1',
               backgroundColor: '#ffffff',

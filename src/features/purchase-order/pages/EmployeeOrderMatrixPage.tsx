@@ -75,6 +75,7 @@ function computeDayColumns(
       dateShort: fmtShortStr(d),
       isOff,
       isLocked,
+      cutoffStatus: isLocked ? 'LOCKED' : 'OPEN',
     });
   }
   return list;

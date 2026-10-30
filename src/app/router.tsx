@@ -13,6 +13,7 @@ import {
   SupplierListPage,
   SupplierDetailPage,
   SupplierProductManagementPage,
+  SupplierBranchManagementPage,
 } from '../features/supplier';
 
 // 2. Purchase Orders Feature
@@ -34,6 +35,16 @@ import {
 // 2c. Batch & Expiry Feature (FE-02 / UI-02-01)
 import { BatchListPage } from '../features/batch';
 
+// 2d. Store inventory list (FE-04)
+import { InventoryListPage } from '../features/inventory';
+
+// 2e. Supplier Return Feature (RTV - Return to Vendor)
+import {
+  SupplierReturnListPage,
+  SupplierReturnFormPage,
+  SupplierReturnDetailPage,
+} from '../features/supplier-return';
+
 // 3. Service Expenses Feature (FE-07)
 import { ServiceExpensesPage } from '../features/service-expenses/pages/ServiceExpensesPage';
 
@@ -41,7 +52,7 @@ import { ServiceExpensesPage } from '../features/service-expenses/pages/ServiceE
 import { CustomerManagementPage } from '../features/customer-crm';
 
 // 5. Product Management Feature (FE-01)
-import { ProductListPage } from '../features/product';
+import { ProductListPage, StoreProductManagementPage } from '../features/product';
 
 // 6. Transfer Feature (FE-15)
 import {
@@ -328,12 +339,32 @@ export const router = createBrowserRouter([
         element: <SupplierProductManagementPage />,
       },
       {
+        path: 'suppliers/branches',
+        element: <SupplierBranchManagementPage />,
+      },
+      {
         path: 'suppliers/:id',
         element: <SupplierDetailPage />,
       },
       {
         path: 'suppliers/:id/products',
         element: <SupplierProductManagementPage />,
+      },
+      {
+        path: 'suppliers/:id/branches',
+        element: <SupplierBranchManagementPage />,
+      },
+      {
+        path: 'stores/products',
+        element: <StoreProductManagementPage />,
+      },
+      {
+        path: 'stores/:id/products',
+        element: <StoreProductManagementPage />,
+      },
+      {
+        path: 'branches/products',
+        element: <StoreProductManagementPage />,
       },
       {
         path: 'purchase-orders',
@@ -386,6 +417,22 @@ export const router = createBrowserRouter([
       {
         path: 'purchase-orders/receipts',
         element: <GoodsReceiptListPage defaultRole="store_owner" />,
+      },
+      {
+        path: 'supplier-returns',
+        element: <SupplierReturnListPage />,
+      },
+      {
+        path: 'supplier-returns/create',
+        element: <SupplierReturnFormPage />,
+      },
+      {
+        path: 'supplier-returns/:id',
+        element: <SupplierReturnDetailPage />,
+      },
+      {
+        path: 'inventory',
+        element: <InventoryListPage />,
       },
       {
         path: 'batches',
@@ -508,12 +555,20 @@ export const router = createBrowserRouter([
         element: <SupplierProductManagementPage />,
       },
       {
+        path: 'suppliers/branches',
+        element: <SupplierBranchManagementPage />,
+      },
+      {
         path: 'suppliers/:id',
         element: <SupplierDetailPage />,
       },
       {
         path: 'suppliers/:id/products',
         element: <SupplierProductManagementPage />,
+      },
+      {
+        path: 'suppliers/:id/branches',
+        element: <SupplierBranchManagementPage />,
       },
       {
         path: 'purchase-orders',
@@ -669,12 +724,20 @@ export const router = createBrowserRouter([
         element: <SupplierProductManagementPage />,
       },
       {
+        path: 'branches',
+        element: <SupplierBranchManagementPage />,
+      },
+      {
         path: ':id',
         element: <SupplierDetailPage />,
       },
       {
         path: ':id/products',
         element: <SupplierProductManagementPage />,
+      },
+      {
+        path: ':id/branches',
+        element: <SupplierBranchManagementPage />,
       },
     ],
   },

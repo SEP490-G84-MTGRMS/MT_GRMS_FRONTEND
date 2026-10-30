@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { FC } from 'react';
-import { Plus, X, Tag, AlertTriangle, ShoppingBag, Trash2 } from 'lucide-react';
+import { Plus, X, Tag, AlertTriangle, ShoppingBag, Trash2, LayoutGrid } from 'lucide-react';
 import type { CartItem } from '../types/pos.types';
 
 interface Props {
@@ -10,6 +10,7 @@ interface Props {
   onUpdateItemDiscount: (id: string, discount: number, type: 'vnd' | 'percent') => void;
   onOpenQuickAddProduct: () => void;
   onOpenBelowCostWarning: (item: CartItem) => void;
+  onOpenCatalogModal?: () => void;
   orderNote: string;
   onOrderNoteChange: (note: string) => void;
 }
@@ -21,6 +22,7 @@ export const PosCartTable: FC<Props> = ({
   onUpdateItemDiscount,
   onOpenQuickAddProduct,
   onOpenBelowCostWarning,
+  onOpenCatalogModal,
   orderNote,
   onOrderNoteChange,
 }) => {
@@ -38,16 +40,30 @@ export const PosCartTable: FC<Props> = ({
       {/* Thanh tiêu đề giỏ hàng */}
       <div className="pos-cart-header-bar">
         <b className="pos-cart-heading">DANH SÁCH MẶT HÀNG TRONG ĐƠN HÀNG</b>
-        <button
-          type="button"
-          className="pos-btn-secondary"
-          onClick={onOpenQuickAddProduct}
-          style={{ fontSize: 12.5 }}
-          title="Thêm nhanh hàng hóa mới"
-        >
-          <Plus size={13} />
-          <span>Thêm nhanh mặt hàng mới</span>
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {onOpenCatalogModal && (
+            <button
+              type="button"
+              className="pos-btn-secondary"
+              onClick={onOpenCatalogModal}
+              style={{ fontSize: 12.5, display: 'inline-flex', alignItems: 'center', gap: 5 }}
+              title="Mở danh mục chọn hàng cảm ứng (F3)"
+            >
+              <LayoutGrid size={13} />
+              <span>Bán thường (F3)</span>
+            </button>
+          )}
+          <button
+            type="button"
+            className="pos-btn-secondary"
+            onClick={onOpenQuickAddProduct}
+            style={{ fontSize: 12.5 }}
+            title="Thêm nhanh hàng hóa mới"
+          >
+            <Plus size={13} />
+            <span>Thêm nhanh mặt hàng mới</span>
+          </button>
+        </div>
       </div>
 
       {/* Bảng giỏ hàng */}
@@ -239,28 +255,29 @@ export const PosCartTable: FC<Props> = ({
                 </td>
               </tr>
             )}
-
-            {/* Chân giỏ hàng: Ghi chú đơn & Tổng tiền hàng */}
-            <tr style={{ backgroundColor: '#f8fafc' }}>
-              <td colSpan={5} style={{ padding: '8px 12px' }}>
-                <input
-                  type="text"
-                  value={orderNote}
-                  onChange={(e) => onOrderNoteChange(e.target.value)}
-                  placeholder="Ghi chú đơn hàng (ví dụ: giao giờ hành chính, gọi trước khi đến)..."
-                  className="pos-input"
-                  style={{ width: '100%', maxWidth: 450 }}
-                />
-              </td>
-              <td colSpan={4} style={{ textAlign: 'right', padding: '8px 12px', fontSize: 13 }}>
-                Tổng tiền hàng: <b>{totalQuantity}</b> món &nbsp;|&nbsp;{' '}
-                <b style={{ fontSize: 15, color: '#0f172a' }}>
-                  {totalItemAmount.toLocaleString('vi-VN')} đ
-                </b>
-              </td>
-            </tr>
           </tbody>
         </table>
+      </div>
+
+      {/* Chân giỏ hàng cố định: Ghi chú đơn & Tổng tiền hàng */}
+      <div className="pos-cart-footer-bar">
+        <div className="pos-cart-footer-note">
+          <input
+            type="text"
+            value={orderNote}
+            onChange={(e) => onOrderNoteChange(e.target.value)}
+            placeholder="Ghi chú đơn hàng (ví dụ: giao giờ hành chính, gọi trước khi đến)..."
+            className="pos-input"
+            style={{ width: '100%' }}
+          />
+        </div>
+        <div className="pos-cart-footer-total">
+          <span>Tổng tiền hàng: <b>{totalQuantity}</b> món</span>
+          <span className="pos-cart-footer-divider">|</span>
+          <b className="pos-cart-footer-amount">
+            {totalItemAmount.toLocaleString('vi-VN')} đ
+          </b>
+        </div>
       </div>
     </div>
   );

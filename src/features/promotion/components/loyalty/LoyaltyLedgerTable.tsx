@@ -129,13 +129,13 @@ export const LoyaltyLedgerTable: FC<LoyaltyLedgerTableProps> = ({
         <table className="promotion-table">
           <thead>
             <tr>
-              <th style={{ minWidth: 150 }}>Mã GD</th>
-              <th style={{ minWidth: 160 }}>Khách hàng</th>
-              <th style={{ minWidth: 160 }}>Loại biến động</th>
-              <th style={{ minWidth: 100, textAlign: 'right' }}>Điểm (+/-)</th>
-              <th style={{ minWidth: 100, textAlign: 'right' }}>Số dư sau</th>
-              <th style={{ minWidth: 200 }}>Lý do & Ghi chú</th>
-              <th style={{ minWidth: 140 }}>Thời gian</th>
+              <th style={{ width: 140 }}>Mã GD</th>
+              <th style={{ width: 170 }}>Khách hàng</th>
+              <th style={{ width: 160 }}>Loại biến động</th>
+              <th style={{ width: 100, textAlign: 'right' }}>Điểm (+/-)</th>
+              <th style={{ width: 100, textAlign: 'right' }}>Số dư sau</th>
+              <th>Lý do & Ghi chú</th>
+              <th style={{ width: 140 }}>Thời gian</th>
             </tr>
           </thead>
           <tbody>

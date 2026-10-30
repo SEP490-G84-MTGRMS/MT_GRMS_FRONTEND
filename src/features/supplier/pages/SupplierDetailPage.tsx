@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { FC } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useAuthStore } from '../../../stores/useAuthStore';
 import type {
   SupplierSummary,
   APLedgerEntry,
@@ -8,7 +9,6 @@ import type {
   PurchaseOrderItem,
 } from '../types/supplier.types';
 import { SupplierDetailHeader } from '../components/detail/SupplierDetailHeader';
-import { SupplierDetailStatCards } from '../components/detail/SupplierDetailStatCards';
 import { SupplierGeneralProfileTab } from '../components/detail/SupplierGeneralProfileTab';
 import { SupplierDeliveryConfigTab } from '../components/detail/SupplierDeliveryConfigTab';
 import { SupplierHolidaysTab } from '../components/detail/SupplierHolidaysTab';
@@ -25,7 +25,7 @@ import '../supplier.css';
 interface Props {
   supplier?: SupplierSummary;
   onBack?: () => void;
-  onEdit?: (supplier: SupplierSummary) => void;
+  onEdit?: (supplier: SupplierSummary, initialTab?: 'basic' | 'terms' | 'bank') => void;
   onToggleStatus?: (supplier: SupplierSummary) => void;
   onDelete?: (supplier: SupplierSummary) => void;
   onLinkCustomer?: (supplierId: string, customerId: string) => void;
@@ -33,10 +33,10 @@ interface Props {
 
 type TabKey = 'profile' | 'delivery' | 'holidays' | 'payables' | 'history';
 
-const TABS: { key: TabKey; label: string }[] = [
+const ALL_TABS: { key: TabKey; label: string }[] = [
   { key: 'profile', label: 'Hồ sơ chung' },
-  { key: 'delivery', label: '🚚 Giao hàng & Cutoff' },
-  { key: 'holidays', label: '📅 Ngày nghỉ lễ' },
+  { key: 'delivery', label: 'Giao hàng & Cutoff' },
+  { key: 'holidays', label: 'Ngày nghỉ lễ' },
   { key: 'payables', label: 'Công nợ & thanh toán' },
   { key: 'history', label: 'Lịch sử giao dịch' },
 ];
@@ -51,6 +51,9 @@ export const SupplierDetailPage: FC<Props> = ({
 }) => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const role = useAuthStore((s) => s.user?.role);
+  const isStoreOwner = role === 'STORE_OWNER' || role === 'ADMIN' || !role;
+  const tabs = isStoreOwner ? ALL_TABS : ALL_TABS.filter((t) => t.key !== 'payables');
 
   // Active Tab
   const [activeTab, setActiveTab] = useState<TabKey>('profile');
@@ -86,9 +89,9 @@ export const SupplierDetailPage: FC<Props> = ({
     }
   };
 
-  const handleEdit = () => {
+  const handleEdit = (tab: 'basic' | 'terms' | 'bank' = 'basic') => {
     if (propOnEdit) {
-      propOnEdit(currentSupplier);
+      propOnEdit(currentSupplier, tab);
     } else {
       alert(`Mở hộp thoại chỉnh sửa NCC ${currentSupplier.name}`);
     }
@@ -112,12 +115,7 @@ export const SupplierDetailPage: FC<Props> = ({
         <SupplierDetailHeader
           supplier={currentSupplier}
           onBack={handleBack}
-          onEdit={handleEdit}
-        />
-
-        {/* 4 Stat Cards in 2x2 grid */}
-        <SupplierDetailStatCards
-          supplier={currentSupplier}
+          onEdit={() => handleEdit('basic')}
         />
 
         {/* Section Header */}
@@ -127,7 +125,7 @@ export const SupplierDetailPage: FC<Props> = ({
 
         {/* Tab Navigation Pill Bar */}
         <div className="supplier-detail-tabs-bar">
-          {TABS.map((tab) => (
+          {tabs.map((tab) => (
             <button
               key={tab.key}
               type="button"
@@ -145,6 +143,7 @@ export const SupplierDetailPage: FC<Props> = ({
             <SupplierGeneralProfileTab
               supplier={currentSupplier}
               onLinkCustomer={propOnLinkCustomer || handleLinkCustomer}
+              onEdit={propOnEdit ? handleEdit : undefined}
             />
           )}
 
@@ -164,7 +163,7 @@ export const SupplierDetailPage: FC<Props> = ({
             />
           )}
 
-          {activeTab === 'payables' && (
+          {activeTab === 'payables' && isStoreOwner && (
             <SupplierPayablesTab
               supplier={currentSupplier}
               apLedgers={apLedgers}
@@ -179,10 +178,6 @@ export const SupplierDetailPage: FC<Props> = ({
           )}
         </div>
 
-        {/* Footer Caption matching mockup */}
-        <div className="supplier-detail-footer-note">
-          Minh họa bố cục đề xuất — chuẩn quy trình hệ thống quản lý chuỗi tạp hóa MT-GRMS.
-        </div>
       </div>
     </div>
   );

@@ -1,13 +1,15 @@
 import type { FC } from 'react';
-import { ArrowLeft, Grid, Save } from 'lucide-react';
+import { Grid } from 'lucide-react';
 
 interface OrderMatrixHeaderProps {
   status: string;
   onBack: () => void;
   onSave?: () => void;
   onGoToCutoffHub?: () => void;
+  onOpenSplitModal?: () => void;
   title?: string;
   readOnly?: boolean;
+  isSaving?: boolean;
 }
 
 export const OrderMatrixHeader: FC<OrderMatrixHeaderProps> = ({
@@ -15,8 +17,10 @@ export const OrderMatrixHeader: FC<OrderMatrixHeaderProps> = ({
   onBack,
   onSave,
   onGoToCutoffHub,
+  onOpenSplitModal,
   title,
   readOnly = false,
+  isSaving = false,
 }) => {
   return (
     <div
@@ -47,6 +51,30 @@ export const OrderMatrixHeader: FC<OrderMatrixHeaderProps> = ({
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        {!readOnly && onOpenSplitModal && (
+          <button
+            type="button"
+            onClick={onOpenSplitModal}
+            className="po-btn"
+            style={{
+              height: 32,
+              padding: '0 16px',
+              background: 'linear-gradient(135deg, #2563eb, #1d4ed8)',
+              border: 'none',
+              color: '#ffffff',
+              fontWeight: 700,
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              borderRadius: 6,
+              boxShadow: '0 2px 6px rgba(37, 99, 235, 0.25)',
+            }}
+            title="Chốt đơn & Tách PO theo từng [Chi nhánh + Nhà cung cấp + Ngày giao hàng]"
+          >
+            <span>Chốt Đơn &amp; Tách PO</span>
+          </button>
+        )}
+
         {onGoToCutoffHub && (
           <button
             type="button"
@@ -62,11 +90,10 @@ export const OrderMatrixHeader: FC<OrderMatrixHeaderProps> = ({
               cursor: 'pointer',
               display: 'inline-flex',
               alignItems: 'center',
-              gap: 6,
             }}
             title="Mở Trung tâm Chốt Đơn & Tách PO theo Nhà Cung Cấp"
           >
-            <span>⚡ Chốt đơn (Cutoff Hub)</span>
+            <span>Chốt đơn (Cutoff Hub)</span>
           </button>
         )}
 
@@ -74,12 +101,17 @@ export const OrderMatrixHeader: FC<OrderMatrixHeaderProps> = ({
           <button
             type="button"
             onClick={onSave}
+            disabled={isSaving}
             className="po-btn po-btn-primary"
-            style={{ height: 32, padding: '0 16px' }}
-            title="Lưu bản thảo ma trận đặt hàng"
+            style={{
+              height: 32,
+              padding: '0 16px',
+              opacity: isSaving ? 0.7 : 1,
+              cursor: isSaving ? 'wait' : 'pointer',
+            }}
+            title="Lưu bản thảo ma trận đặt hàng lên hệ thống"
           >
-            <Save size={14} />
-            <span>Lưu</span>
+            <span>{isSaving ? 'Đang lưu...' : 'Lưu'}</span>
           </button>
         )}
 
@@ -117,10 +149,9 @@ export const OrderMatrixHeader: FC<OrderMatrixHeaderProps> = ({
           type="button"
           onClick={onBack}
           className="po-btn po-btn-secondary"
-          style={{ height: 32 }}
+          style={{ height: 32, padding: '0 14px' }}
           title="Quay lại danh sách PO"
         >
-          <ArrowLeft size={14} />
           <span>Quay lại</span>
         </button>
       </div>

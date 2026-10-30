@@ -1,4 +1,5 @@
 import { httpClient } from '../../api/httpClient';
+import type { ApiResponse } from '../../api/types';
 import type {
   AuthResponse,
   LoginCredentials,
@@ -7,38 +8,89 @@ import type {
   UserProfile,
 } from './authTypes';
 
+const SEED_TENANT_ID = 'tenant_mt_mart_01';
+
+type BackendLoginUser = {
+  id: string;
+  username?: string;
+  fullName: string;
+  email: string;
+  roleName?: string;
+  role?: string;
+  branchId?: string | null;
+  tenantId?: string;
+};
+
+type BackendLoginPayload = {
+  accessToken: string;
+  refreshToken?: string;
+  expiresAt?: string;
+  user: BackendLoginUser;
+};
+
+function mapRole(roleName?: string): UserProfile['role'] {
+  const role = (roleName || '').toUpperCase();
+  if (role === 'CASHIER') return 'CASHIER';
+  if (role === 'MANAGER' || role === 'BRANCH_MANAGER') return 'MANAGER';
+  if (role === 'STORE_OWNER') return 'STORE_OWNER';
+  return 'ADMIN';
+}
+
+function mapLoginUser(user: BackendLoginUser): UserProfile {
+  return {
+    id: user.id,
+    email: user.email,
+    fullName: user.fullName,
+    role: mapRole(user.roleName || user.role),
+    tenantId: user.tenantId || SEED_TENANT_ID,
+    branchId: user.branchId || undefined,
+  };
+}
+
+function unwrapLogin(body: ApiResponse<BackendLoginPayload> | BackendLoginPayload | undefined): AuthResponse | null {
+  if (!body) return null;
+  const payload = 'data' in body && body.data ? body.data : (body as BackendLoginPayload);
+  if (!payload?.accessToken || !payload.user) return null;
+  return {
+    accessToken: payload.accessToken,
+    refreshToken: payload.refreshToken,
+    expiresIn: 3600,
+    user: mapLoginUser(payload.user),
+  };
+}
+
 // Danh sách tài khoản demo tiện lợi cho kiểm thử giao diện & nghiệm thu
 export const DEMO_ACCOUNTS = [
   {
     roleLabel: 'Chủ chuỗi / Admin',
     email: 'admin@mtgrms.vn',
-    password: 'password123',
-    tenantCode: 'TENANT-HCM-01',
+    password: 'Admin@123',
+    tenantCode: SEED_TENANT_ID,
     user: {
-      id: 'usr_admin_01',
+      id: 'usr_super_admin',
       email: 'admin@mtgrms.vn',
-      fullName: 'Nguyễn Văn Quản Trị',
+      fullName: 'Hệ Thống Super Admin',
       role: 'ADMIN' as const,
-      tenantId: 'TENANT-HCM-01',
-      tenantName: 'Chuỗi Bán Lẻ Thực Phẩm Sạch MT',
-      branchId: 'BR-001',
-      phone: '0901 234 567',
+      tenantId: SEED_TENANT_ID,
+      tenantName: 'Chuỗi Siêu Thị Thực Phẩm Sạch MT-Mart',
+      branchId: undefined,
+      phone: '0901234567',
     },
   },
   {
     roleLabel: 'Thu ngân quầy POS',
-    email: 'pos.cashier@mtgrms.vn',
-    password: 'password123',
-    tenantCode: 'TENANT-HCM-01',
+    email: 'thao.le@mtmart.vn',
+    password: 'Cashier@123',
+    tenantCode: SEED_TENANT_ID,
     user: {
-      id: 'usr_pos_02',
-      email: 'pos.cashier@mtgrms.vn',
-      fullName: 'Trần Thị Thu Ngân',
+      id: 'usr_cashier',
+      email: 'thao.le@mtmart.vn',
+      fullName: 'Lê Thị Thảo (Thu Ngân POS)',
       role: 'CASHIER' as const,
-      tenantId: 'TENANT-HCM-01',
-      tenantName: 'Chuỗi Bán Lẻ Thực Phẩm Sạch MT',
-      branchId: 'BR-001',
-      phone: '0988 765 432',
+      tenantId: SEED_TENANT_ID,
+      tenantName: 'Chuỗi Siêu Thị Thực Phẩm Sạch MT-Mart',
+      branchId: undefined,
+      phone: '0912345678',
     },
   },
 ];
@@ -49,10 +101,23 @@ export const authService = {
    */
   async login(credentials: LoginCredentials): Promise<AuthResponse> {
     try {
-      const response = await httpClient.post<AuthResponse>('/auth/login', credentials);
-      return response.data;
-    } catch {
-      // Fallback giả lập logic xác thực cho môi trường phát triển / kiểm thử UI
+      const response = await httpClient.post<ApiResponse<BackendLoginPayload>>('/auth/login', {
+        usernameOrEmail: credentials.email,
+        password: credentials.password,
+        tenantCode: credentials.tenantCode || SEED_TENANT_ID,
+      });
+      const mapped = unwrapLogin(response.data);
+      if (!mapped) {
+        throw new Error('Phản hồi đăng nhập không hợp lệ.');
+      }
+      return mapped;
+    } catch (error: unknown) {
+      const axiosError = error as { response?: { data?: { message?: string } }; message?: string };
+      if (axiosError.response) {
+        throw new Error(axiosError.response.data?.message || 'Tài khoản hoặc mật khẩu không chính xác.');
+      }
+
+      // Fallback giả lập logic xác thực khi backend không chạy
       const cleanInput = credentials.email.trim();
       const phoneClean = cleanInput.replace(/\s+/g, '');
       const foundDemo = DEMO_ACCOUNTS.find(
@@ -68,11 +133,10 @@ export const authService = {
             email: cleanInput,
             fullName: cleanInput.includes('@') ? cleanInput.split('@')[0] : 'Chủ Cửa Hàng',
             role: 'STORE_OWNER',
-            tenantId: credentials.tenantCode || 'TENANT-DEFAULT',
+            tenantId: credentials.tenantCode || SEED_TENANT_ID,
             tenantName: 'Cửa hàng MT-GRMS',
           };
 
-      // Mô phỏng độ trễ mạng nhẹ (300ms) để hiện loading button sắc nét
       await new Promise(resolve => setTimeout(resolve, 300));
 
       return {

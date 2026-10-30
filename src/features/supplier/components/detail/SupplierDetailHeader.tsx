@@ -1,7 +1,6 @@
 import type { FC } from 'react';
-import { Link } from 'react-router-dom';
 import type { SupplierSummary } from '../../types/supplier.types';
-import { ArrowLeft, Building2, Edit3, Package } from 'lucide-react';
+import { ArrowLeft, Building2, Edit3 } from 'lucide-react';
 
 interface Props {
   supplier: SupplierSummary;
@@ -27,25 +26,23 @@ const TYPE_LABEL: Record<string, string> = {
 export const SupplierDetailHeader: FC<Props> = ({ supplier, onBack, onEdit }) => {
   return (
     <div className="supplier-detail-header-card">
-      {/* Breadcrumb / Back Navigation */}
-      <div className="supplier-detail-breadcrumb">
-        <button
-          type="button"
-          onClick={onBack}
-          className="supplier-detail-back-btn"
-          title="Quay lại danh sách nhà cung cấp"
-        >
-          <ArrowLeft size={16} />
-          <span>Nhà cung cấp / Chi tiết</span>
-        </button>
-      </div>
-
       {/* Main Header Row */}
       <div className="supplier-detail-header-main">
-        {/* Left: Avatar + Title + Meta */}
+        {/* Left: Back button + Avatar + Title + Meta */}
         <div className="supplier-detail-profile-info">
+          <button
+            type="button"
+            onClick={onBack}
+            className="admin-btn admin-btn-secondary"
+            title="Quay lại danh sách nhà cung cấp"
+            style={{ height: 32, padding: '0 10px', fontSize: 12.5 }}
+          >
+            <ArrowLeft size={15} />
+            <span>Quay lại</span>
+          </button>
+
           <div className="supplier-detail-avatar">
-            <Building2 size={26} color="var(--blue-primary)" />
+            <Building2 size={20} color="var(--blue-primary)" />
           </div>
           <div>
             <h1 className="supplier-detail-title">{supplier.name}</h1>
@@ -64,8 +61,8 @@ export const SupplierDetailHeader: FC<Props> = ({ supplier, onBack, onEdit }) =>
           <span
             className={`admin-badge ${supplier.status === 'Active' ? 'admin-badge-active' : 'admin-badge-inactive'}`}
             style={{
-              padding: '6px 14px',
-              fontSize: '12.5px',
+              padding: '4px 10px',
+              fontSize: '12px',
               fontWeight: 600,
               borderRadius: 'var(--radius-pill)',
               backgroundColor: supplier.status === 'Active' ? '#e6f4ea' : '#f3f4f6',
@@ -76,19 +73,11 @@ export const SupplierDetailHeader: FC<Props> = ({ supplier, onBack, onEdit }) =>
             {supplier.status === 'Active' ? 'Đang hoạt động' : 'Tạm ngưng'}
           </span>
 
-          <Link
-            to={`/store-owner/suppliers/${supplier.id}/products`}
-            className="admin-btn admin-btn-secondary"
-            title="Quản lý danh mục sản phẩm của nhà cung cấp này"
-          >
-            <Package size={14} />
-            <span>Sản phẩm ({supplier.code})</span>
-          </Link>
-
           <button
             type="button"
             className="admin-btn admin-btn-primary"
             onClick={onEdit}
+            style={{ height: 32, padding: '0 12px', fontSize: 12.5 }}
           >
             <Edit3 size={14} />
             <span>Chỉnh sửa</span>

@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import type { FC, FormEvent } from 'react';
 import type { SupplierFilterState } from '../types/supplier.types';
-import { Search, RotateCcw, Filter } from 'lucide-react';
+import { Search, RotateCcw } from 'lucide-react';
 
 interface Props {
   filters: SupplierFilterState;
@@ -16,11 +16,13 @@ export const SupplierFilterBar: FC<Props> = ({
 }) => {
   // Draft filter state: only applied when clicking "Tìm kiếm" or pressing Enter
   const [draftFilters, setDraftFilters] = useState<SupplierFilterState>(filters);
+  const [prevFilters, setPrevFilters] = useState<SupplierFilterState>(filters);
 
   // Sync draft state if external filters change (e.g. from reset)
-  useEffect(() => {
+  if (filters !== prevFilters) {
+    setPrevFilters(filters);
     setDraftFilters(filters);
-  }, [filters]);
+  }
 
   const handleSubmit = (e?: FormEvent) => {
     if (e) e.preventDefault();
@@ -30,24 +32,64 @@ export const SupplierFilterBar: FC<Props> = ({
   const handleResetClick = () => {
     const emptyFilters: SupplierFilterState = {
       searchTerm: '',
+      code: '',
+      name: '',
+      contactPerson: '',
+      phone: '',
       supplierType: '',
       category: '',
       debtStatus: '',
       ratingFilter: '',
       status: '',
       pageIndex: 1,
-      pageSize: filters.pageSize || 10,
+      pageSize: filters.pageSize || 12,
     };
     setDraftFilters(emptyFilters);
     onReset();
   };
 
   const hasActiveFilters = Boolean(
-    draftFilters.searchTerm.trim() ||
-    draftFilters.category ||
-    draftFilters.debtStatus ||
+    (draftFilters.code || '').trim() ||
+    (draftFilters.name || '').trim() ||
+    (draftFilters.contactPerson || '').trim() ||
+    (draftFilters.phone || '').trim() ||
+    (draftFilters.searchTerm || '').trim() ||
     draftFilters.status
   );
+
+  const labelStyle: React.CSSProperties = {
+    fontSize: 12.5,
+    fontWeight: 600,
+    color: '#475569',
+    whiteSpace: 'nowrap',
+    userSelect: 'none',
+  };
+
+  const inputStyle: React.CSSProperties = {
+    height: 32,
+    padding: '0 10px',
+    borderRadius: 6,
+    border: '1px solid #cbd5e1',
+    fontSize: 12.5,
+    color: '#0f172a',
+    backgroundColor: '#ffffff',
+    outline: 'none',
+    boxSizing: 'border-box',
+    transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
+  };
+
+  const selectStyle = (isActive: boolean): React.CSSProperties => ({
+    height: 32,
+    padding: '0 10px',
+    borderRadius: 6,
+    border: isActive ? '1px solid #0d9488' : '1px solid #cbd5e1',
+    fontSize: 12.5,
+    fontWeight: 600,
+    color: isActive ? '#0f766e' : '#334155',
+    backgroundColor: isActive ? '#f0fdfa' : '#ffffff',
+    cursor: 'pointer',
+    outline: 'none',
+  });
 
   return (
     <div
@@ -60,152 +102,89 @@ export const SupplierFilterBar: FC<Props> = ({
         boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)',
         display: 'flex',
         flexDirection: 'column',
-        gap: 8,
+        gap: 10,
         flexShrink: 0,
       }}
     >
-      {/* ── Dòng 1: Tìm kiếm + Loại hình + Phân loại + Công nợ + Trạng thái ── */}
+      {/* ── Dòng 1: 4 ô input tìm kiếm (Text nằm ngang, ô rộng rãi, thoáng đẹp) ── */}
       <div
         style={{
           display: 'flex',
           flexWrap: 'wrap',
           alignItems: 'center',
-          gap: 12,
+          gap: '10px 20px',
         }}
       >
-        {/* 1. Keyword search */}
-        <div style={{ position: 'relative', width: 280, minWidth: 220, flex: '1 1 240px' }}>
-          <Search
-            size={14}
-            color="#94a3b8"
-            style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)' }}
-          />
+        {/* 1. Mã Nhà Cung Cấp */}
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+          <label style={labelStyle}>Mã NCC:</label>
           <input
             type="text"
-            value={draftFilters.searchTerm}
-            onChange={(e) => setDraftFilters((prev) => ({ ...prev, searchTerm: e.target.value }))}
+            value={draftFilters.code || ''}
+            onChange={(e) => setDraftFilters((prev) => ({ ...prev, code: e.target.value }))}
             onKeyDown={(e) => {
               if (e.key === 'Enter') handleSubmit();
             }}
-            placeholder="Tìm theo Mã NCC, tên NCC, SĐT, người liên hệ, MST..."
-            style={{
-              width: '100%',
-              height: 34,
-              paddingLeft: 32,
-              paddingRight: 10,
-              borderRadius: 6,
-              border: '1px solid #cbd5e1',
-              fontSize: 12.5,
-              color: '#1e293b',
-              outline: 'none',
-              boxSizing: 'border-box',
-              transition: 'border-color 0.15s ease',
-            }}
+            placeholder="VD: SUP-001..."
+            style={{ ...inputStyle, width: 150 }}
             onFocus={(e) => (e.target.style.borderColor = '#0d9488')}
             onBlur={(e) => (e.target.style.borderColor = '#cbd5e1')}
           />
         </div>
 
-
-        {/* 3. Phân loại */}
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-          <label style={{ fontSize: 12, fontWeight: 600, color: '#475569', whiteSpace: 'nowrap' }}>
-            Phân loại:
-          </label>
-          <select
-            value={draftFilters.category}
-            onChange={(e) => setDraftFilters((prev) => ({ ...prev, category: e.target.value }))}
-            style={{
-              height: 34,
-              padding: '0 10px',
-              borderRadius: 6,
-              border: draftFilters.category ? '1px solid #0d9488' : '1px solid #cbd5e1',
-              fontSize: 12,
-              fontWeight: 600,
-              color: draftFilters.category ? '#0f766e' : '#334155',
-              backgroundColor: draftFilters.category ? '#f0fdfa' : '#ffffff',
-              cursor: 'pointer',
-              outline: 'none',
+        {/* 2. Tên Nhà Cung Cấp */}
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+          <label style={labelStyle}>Tên NCC:</label>
+          <input
+            type="text"
+            value={draftFilters.name || ''}
+            onChange={(e) => setDraftFilters((prev) => ({ ...prev, name: e.target.value }))}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleSubmit();
             }}
-          >
-            <option value="">-- Tất cả phân loại --</option>
-            <option value="FRESH">Nông sản tươi</option>
-            <option value="AMBIENT">Đồ khô / Gia vị</option>
-            <option value="FROZEN">Hàng đông lạnh</option>
-            <option value="UTILITIES">Tiện ích / Điện nước</option>
-            <option value="RENT">Mặt bằng kho bãi</option>
-            <option value="LOGISTICS">Vận chuyển logistics</option>
-          </select>
+            placeholder="VD: Vinamilk, Khải Anh..."
+            style={{ ...inputStyle, width: 280 }}
+            onFocus={(e) => (e.target.style.borderColor = '#0d9488')}
+            onBlur={(e) => (e.target.style.borderColor = '#cbd5e1')}
+          />
         </div>
 
-        {/* 4. Trạng thái công nợ AP */}
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-          <label
-            style={{
-              fontSize: 12,
-              fontWeight: 600,
-              color: '#475569',
-              whiteSpace: 'nowrap',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 4,
+        {/* 3. Người Liên Hệ */}
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+          <label style={labelStyle}>Người liên hệ:</label>
+          <input
+            type="text"
+            value={draftFilters.contactPerson || ''}
+            onChange={(e) => setDraftFilters((prev) => ({ ...prev, contactPerson: e.target.value }))}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleSubmit();
             }}
-          >
-            <Filter size={12} color="#64748b" />
-            <span>Công nợ AP:</span>
-          </label>
-          <select
-            value={draftFilters.debtStatus}
-            onChange={(e) => setDraftFilters((prev) => ({ ...prev, debtStatus: e.target.value }))}
-            style={{
-              height: 34,
-              padding: '0 10px',
-              borderRadius: 6,
-              border: draftFilters.debtStatus ? '1px solid #0d9488' : '1px solid #cbd5e1',
-              fontSize: 12,
-              fontWeight: 600,
-              color: draftFilters.debtStatus ? '#0f766e' : '#334155',
-              backgroundColor: draftFilters.debtStatus ? '#f0fdfa' : '#ffffff',
-              cursor: 'pointer',
-              outline: 'none',
-            }}
-          >
-            <option value="">-- Tất cả công nợ --</option>
-            <option value="has_debt">🟡 Đang có nợ AP</option>
-            <option value="overdue">🔴 Nợ quá hạn (Overdue)</option>
-            <option value="no_debt">🟢 Không nợ (0 đ)</option>
-          </select>
+            placeholder="VD: Anh Nam, Đại diện..."
+            style={{ ...inputStyle, width: 190 }}
+            onFocus={(e) => (e.target.style.borderColor = '#0d9488')}
+            onBlur={(e) => (e.target.style.borderColor = '#cbd5e1')}
+          />
         </div>
 
-        {/* 5. Trạng thái hoạt động */}
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-          <label style={{ fontSize: 12, fontWeight: 600, color: '#475569', whiteSpace: 'nowrap' }}>
-            Trạng thái:
-          </label>
-          <select
-            value={draftFilters.status || ''}
-            onChange={(e) => setDraftFilters((prev) => ({ ...prev, status: e.target.value }))}
-            style={{
-              height: 34,
-              padding: '0 10px',
-              borderRadius: 6,
-              border: draftFilters.status ? '1px solid #0d9488' : '1px solid #cbd5e1',
-              fontSize: 12,
-              fontWeight: 600,
-              color: draftFilters.status ? '#0f766e' : '#334155',
-              backgroundColor: draftFilters.status ? '#f0fdfa' : '#ffffff',
-              cursor: 'pointer',
-              outline: 'none',
+        {/* 4. Số Điện Thoại */}
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+          <label style={labelStyle}>Số ĐT:</label>
+          <input
+            type="text"
+            value={draftFilters.phone || ''}
+            onChange={(e) => setDraftFilters((prev) => ({ ...prev, phone: e.target.value }))}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleSubmit();
             }}
-          >
-            <option value="">-- Tất cả trạng thái --</option>
-            <option value="Active">🟢 Đang hoạt động</option>
-            <option value="Inactive">⚪ Tạm ngưng</option>
-          </select>
+            placeholder="VD: 0901234567..."
+            style={{ ...inputStyle, width: 150, fontFamily: 'var(--font-mono)' }}
+            onFocus={(e) => (e.target.style.borderColor = '#0d9488')}
+            onBlur={(e) => (e.target.style.borderColor = '#cbd5e1')}
+          />
         </div>
       </div>
 
-      {/* ── Dòng 2: Phân cách nét đứt + Nút Tìm kiếm & Đặt lại ── */}
+      {/* ── Dòng 2: Trạng thái + Nút Tìm Kiếm & Đặt Lại ── */}
       <div
         style={{
           display: 'flex',
@@ -217,20 +196,35 @@ export const SupplierFilterBar: FC<Props> = ({
           borderTop: '1px dashed #f1f5f9',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#64748b' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+          {/* Trạng Thái Hoạt Động */}
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+            <label style={labelStyle}>Trạng thái:</label>
+            <select
+              value={draftFilters.status || ''}
+              onChange={(e) => setDraftFilters((prev) => ({ ...prev, status: e.target.value }))}
+              style={{ ...selectStyle(Boolean(draftFilters.status)), minWidth: 150 }}
+            >
+              <option value="">-- Tất cả trạng thái --</option>
+              <option value="Active">🟢 Hoạt động</option>
+              <option value="Inactive">⚪ Tạm ngưng</option>
+            </select>
+          </div>
+
+          {/* Active Filter Badge */}
           {hasActiveFilters && (
             <span
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: 4,
-                padding: '2px 8px',
+                padding: '3px 10px',
                 borderRadius: 4,
                 backgroundColor: '#f0fdfa',
                 color: '#0f766e',
-                fontSize: 11.5,
+                fontSize: 12,
                 fontWeight: 600,
                 border: '1px solid #ccfbf1',
+                whiteSpace: 'nowrap',
               }}
             >
               Đang áp dụng bộ lọc
@@ -238,7 +232,7 @@ export const SupplierFilterBar: FC<Props> = ({
           )}
         </div>
 
-        {/* Nút Tìm kiếm & Đặt lại */}
+        {/* Nút Tìm kiếm & Đặt lại (Nằm xuống dòng 2, căn góc phải gọn gàng) */}
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginLeft: 'auto' }}>
           <button
             type="button"
@@ -248,7 +242,7 @@ export const SupplierFilterBar: FC<Props> = ({
               alignItems: 'center',
               gap: 6,
               height: 32,
-              padding: '0 16px',
+              padding: '0 18px',
               borderRadius: 6,
               border: 'none',
               backgroundColor: 'var(--blue-primary, #0f766e)',
@@ -258,6 +252,7 @@ export const SupplierFilterBar: FC<Props> = ({
               cursor: 'pointer',
               whiteSpace: 'nowrap',
               transition: 'all 0.15s ease',
+              boxShadow: '0 1px 2px rgba(15, 118, 110, 0.2)',
             }}
             title="Áp dụng bộ lọc tìm kiếm"
           >
@@ -273,7 +268,7 @@ export const SupplierFilterBar: FC<Props> = ({
               alignItems: 'center',
               gap: 5,
               height: 32,
-              padding: '0 12px',
+              padding: '0 14px',
               borderRadius: 6,
               border: '1px solid #cbd5e1',
               backgroundColor: '#ffffff',

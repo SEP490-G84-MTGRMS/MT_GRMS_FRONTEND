@@ -18,17 +18,14 @@ interface Props {
   onPageSizeChange: (pageSize: number) => void;
   onViewDetail: (supplier: SupplierSummary) => void;
   onEdit: (supplier: SupplierSummary) => void;
-  onPayDebt: (supplier: SupplierSummary) => void;
+  canEdit?: boolean;
 }
 
 type SortField =
   | 'code'
   | 'name'
-  | 'category'
   | 'contactPerson'
-  | 'paymentTermDays'
-  | 'currentDebt'
-  | 'overdueDebt'
+  | 'phone'
   | 'status';
 type SortDirection = 'asc' | 'desc';
 
@@ -41,7 +38,7 @@ export const SupplierTable: FC<Props> = ({
   onPageSizeChange,
   onViewDetail,
   onEdit,
-  onPayDebt,
+  canEdit = true,
 }) => {
   const [sortField, setSortField] = useState<SortField | null>(null);
   const [sortDir, setSortDir] = useState<SortDirection>('asc');
@@ -76,25 +73,13 @@ export const SupplierTable: FC<Props> = ({
           valA = a.name.toLowerCase();
           valB = b.name.toLowerCase();
           break;
-        case 'category':
-          valA = a.category;
-          valB = b.category;
-          break;
         case 'contactPerson':
-          valA = a.contactPerson.toLowerCase();
-          valB = b.contactPerson.toLowerCase();
+          valA = (a.contactPerson || '').toLowerCase();
+          valB = (b.contactPerson || '').toLowerCase();
           break;
-        case 'paymentTermDays':
-          valA = a.paymentTermDays;
-          valB = b.paymentTermDays;
-          break;
-        case 'currentDebt':
-          valA = a.currentDebt;
-          valB = b.currentDebt;
-          break;
-        case 'overdueDebt':
-          valA = a.overdueDebt;
-          valB = b.overdueDebt;
+        case 'phone':
+          valA = a.phone || '';
+          valB = b.phone || '';
           break;
         case 'status':
           valA = a.status;
@@ -148,15 +133,12 @@ export const SupplierTable: FC<Props> = ({
 
   const tableColGroup = (
     <colgroup>
-      <col style={{ width: '8%' }} />
-      <col style={{ width: '19%' }} />
-      <col style={{ width: '10%' }} />
-      <col style={{ width: '15%' }} />
-      <col style={{ width: '7%' }} />
-      <col style={{ width: '11%' }} />
-      <col style={{ width: '8%' }} />
-      <col style={{ width: '8%' }} />
+      <col style={{ width: '12%' }} />
+      <col style={{ width: '24%' }} />
+      <col style={{ width: '18%' }} />
+      <col style={{ width: '16%' }} />
       <col style={{ width: '14%' }} />
+      <col style={{ width: '16%' }} />
     </colgroup>
   );
 
@@ -203,7 +185,7 @@ export const SupplierTable: FC<Props> = ({
         <table
           style={{
             width: '100%',
-            minWidth: 1050,
+            minWidth: 880,
             tableLayout: 'fixed',
             borderCollapse: 'separate',
             borderSpacing: 0,
@@ -243,7 +225,7 @@ export const SupplierTable: FC<Props> = ({
               </th>
 
               <th
-                onClick={() => handleSort('category')}
+                onClick={() => handleSort('contactPerson')}
                 style={{
                   ...thBaseStyle,
                   cursor: 'pointer',
@@ -251,21 +233,13 @@ export const SupplierTable: FC<Props> = ({
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <span>Phân loại</span>
-                  <ArrowUpDown size={12} color={sortField === 'category' ? '#0f766e' : '#94a3b8'} />
+                  <span>Người liên hệ</span>
+                  <ArrowUpDown size={12} color={sortField === 'contactPerson' ? '#0f766e' : '#94a3b8'} />
                 </div>
               </th>
 
               <th
-                style={{
-                  ...thBaseStyle,
-                }}
-              >
-                <span>Người liên hệ</span>
-              </th>
-
-              <th
-                onClick={() => handleSort('paymentTermDays')}
+                onClick={() => handleSort('phone')}
                 style={{
                   ...thBaseStyle,
                   cursor: 'pointer',
@@ -273,38 +247,8 @@ export const SupplierTable: FC<Props> = ({
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <span>Hạn nợ</span>
-                  <ArrowUpDown size={12} color={sortField === 'paymentTermDays' ? '#0f766e' : '#94a3b8'} />
-                </div>
-              </th>
-
-              <th
-                onClick={() => handleSort('currentDebt')}
-                style={{
-                  ...thBaseStyle,
-                  textAlign: 'right',
-                  cursor: 'pointer',
-                  userSelect: 'none',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4 }}>
-                  <span>Đang nợ</span>
-                  <ArrowUpDown size={12} color={sortField === 'currentDebt' ? '#0f766e' : '#94a3b8'} />
-                </div>
-              </th>
-
-              <th
-                onClick={() => handleSort('overdueDebt')}
-                style={{
-                  ...thBaseStyle,
-                  textAlign: 'right',
-                  cursor: 'pointer',
-                  userSelect: 'none',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4 }}>
-                  <span>Quá hạn</span>
-                  <ArrowUpDown size={12} color={sortField === 'overdueDebt' ? '#0f766e' : '#94a3b8'} />
+                  <span>Số điện thoại</span>
+                  <ArrowUpDown size={12} color={sortField === 'phone' ? '#0f766e' : '#94a3b8'} />
                 </div>
               </th>
 
@@ -352,7 +296,7 @@ export const SupplierTable: FC<Props> = ({
         <table
           style={{
             width: '100%',
-            minWidth: 1050,
+            minWidth: 880,
             tableLayout: 'fixed',
             borderCollapse: 'separate',
             borderSpacing: 0,
@@ -369,13 +313,13 @@ export const SupplierTable: FC<Props> = ({
                   supplier={supplier}
                   onViewDetail={onViewDetail}
                   onEdit={onEdit}
-                  onPayDebt={onPayDebt}
+                  canEdit={canEdit}
                 />
               ))
             ) : (
               <tr>
                 <td
-                  colSpan={9}
+                  colSpan={6}
                   style={{
                     textAlign: 'center',
                     padding: '48px 16px',
@@ -442,10 +386,10 @@ export const SupplierTable: FC<Props> = ({
                   outline: 'none',
                 }}
               >
-                <option value={10}>10</option>
-                <option value={20}>20</option>
-                <option value={30}>30</option>
-                <option value={50}>50</option>
+                <option value={12}>12</option>
+                <option value={24}>24</option>
+                <option value={36}>36</option>
+                <option value={48}>48</option>
               </select>
             </div>
           )}
