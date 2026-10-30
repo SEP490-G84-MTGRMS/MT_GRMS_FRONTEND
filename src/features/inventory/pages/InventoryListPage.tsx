@@ -1,18 +1,20 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { FC } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Boxes, Hourglass, Download, Printer } from 'lucide-react';
+import { Boxes, Hourglass, Download, Printer, Loader2 } from 'lucide-react';
 import { useAuthStore } from '../../../stores/useAuthStore';
-import type { InventoryFilterState, InventoryItem, InventoryKpiSummary } from '../types/inventory.types';
+import type { InventoryFilterState, InventoryItem } from '../types/inventory.types';
 import { inventoryApi } from '../api/inventoryApi';
-import { InventoryKpiCards } from '../components/InventoryKpiCards';
 import { InventoryFilterBar } from '../components/InventoryFilterBar';
 import { InventoryTable } from '../components/InventoryTable';
-import { InventoryBatchDrawer } from '../components/InventoryBatchDrawer';
 import '../../purchase-order/purchase-order.css';
+import '../../supplier/supplier.css';
 
 const DEFAULT_FILTERS: InventoryFilterState = {
   keyword: '',
+  sku: '',
+  productName: '',
+  branchKeyword: '',
   branchId: '',
   category: '',
   location: '',
@@ -31,25 +33,17 @@ export const InventoryListPage: FC = () => {
   const [draft, setDraft] = useState<InventoryFilterState>({
     ...DEFAULT_FILTERS,
     branchId: lockedBranch,
+    branchKeyword: lockedBranch,
   });
   const [applied, setApplied] = useState<InventoryFilterState>({
     ...DEFAULT_FILTERS,
     branchId: lockedBranch,
+    branchKeyword: lockedBranch,
   });
 
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [totalCount, setTotalCount] = useState(0);
-  const [summary, setSummary] = useState<InventoryKpiSummary>({
-    skuCount: 0,
-    branchCount: 2,
-    totalValue: 0,
-    onOrderUnits: 0,
-    lowCount: 0,
-    outCount: 0,
-    expiryBatchCount: 0,
-  });
   const [isLoading, setIsLoading] = useState(false);
-  const [selectedItemForDrawer, setSelectedItemForDrawer] = useState<InventoryItem | null>(null);
   const [toastMessage, setToastMessage] = useState('');
 
   const loadData = useCallback(async () => {
@@ -58,7 +52,6 @@ export const InventoryListPage: FC = () => {
       const res = await inventoryApi.getStockSummary(applied);
       setItems(res.items);
       setTotalCount(res.totalCount);
-      setSummary(res.kpiSummary);
     } catch {
       // Handled in api
     } finally {
@@ -90,11 +83,11 @@ export const InventoryListPage: FC = () => {
       'Chi nhánh',
       'Vị trí kệ',
       'ĐVT',
-      'Tồn thực tế',
-      'Đã giữ',
-      'Khả dụng',
-      'Đang nhập',
-      'Định mức đặt',
+      'OnHand',
+      'Committed',
+      'Available',
+      'OnOrder',
+      'Reorder',
       'Giá vốn bình quân',
       'Tổng giá trị tồn',
       'Trạng thái',
@@ -141,6 +134,7 @@ export const InventoryListPage: FC = () => {
       style={{
         width: '100%',
         height: '100%',
+        maxHeight: '100%',
         display: 'flex',
         flexDirection: 'column',
         minHeight: 0,
@@ -194,7 +188,9 @@ export const InventoryListPage: FC = () => {
         >
           <Boxes size={22} color="var(--blue-primary, #0f766e)" />
           <span>Tồn kho cửa hàng</span>
-          {isLoading && <span style={{ fontSize: 12, color: '#0f766e', fontWeight: 600 }}>(Đang tải...)</span>}
+          {isLoading && (
+            <Loader2 size={16} className="animate-spin" style={{ color: 'var(--blue-primary, #0f766e)' }} />
+          )}
         </h1>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -230,21 +226,19 @@ export const InventoryListPage: FC = () => {
         </div>
       </div>
 
-      <InventoryKpiCards summary={summary} />
-
-      <InventoryFilterBar
-        draft={draft}
-        totalFiltered={items.length}
-        totalAll={totalCount}
-        lockBranch={Boolean(lockedBranch)}
-        onChange={(patch) => setDraft((prev) => ({ ...prev, ...patch }))}
-        onSearch={() => setApplied({ ...draft, pageIndex: 1 })}
-        onReset={() => {
-          const reset = { ...DEFAULT_FILTERS, branchId: lockedBranch };
-          setDraft(reset);
-          setApplied(reset);
-        }}
-      />
+      <div style={{ flexShrink: 0, marginBottom: 8 }}>
+        <InventoryFilterBar
+          draft={draft}
+          lockBranch={Boolean(lockedBranch)}
+          onChange={(patch) => setDraft((prev) => ({ ...prev, ...patch }))}
+          onSearch={() => setApplied({ ...draft, pageIndex: 1 })}
+          onReset={() => {
+            const reset = { ...DEFAULT_FILTERS, branchId: lockedBranch, branchKeyword: lockedBranch };
+            setDraft(reset);
+            setApplied(reset);
+          }}
+        />
+      </div>
 
       <InventoryTable
         items={items}
@@ -253,17 +247,14 @@ export const InventoryListPage: FC = () => {
         pageSize={applied.pageSize}
         onPageChange={(page) => setApplied((prev) => ({ ...prev, pageIndex: page }))}
         onPageSizeChange={(size) => setApplied((prev) => ({ ...prev, pageSize: size, pageIndex: 1 }))}
-        onViewBatches={(item) => setSelectedItemForDrawer(item)}
+        onViewBatches={(item) => {
+          const params = new URLSearchParams();
+          params.set('sku', item.sku);
+          if (item.branchId) params.set('branch', item.branchId);
+          params.set('from', 'inventory');
+          navigate(`/store-owner/batches?${params.toString()}`);
+        }}
       />
-
-      {/* Slide-over Drawer for FEFO Batches */}
-      {selectedItemForDrawer && (
-        <InventoryBatchDrawer
-          isOpen={Boolean(selectedItemForDrawer)}
-          onClose={() => setSelectedItemForDrawer(null)}
-          item={selectedItemForDrawer}
-        />
-      )}
     </div>
   );
 };

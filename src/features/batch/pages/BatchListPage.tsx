@@ -24,6 +24,10 @@ import '../../purchase-order/purchase-order.css';
 
 const DEFAULT_FILTERS: BatchFilterState = {
   keyword: '',
+  productName: '',
+  sku: '',
+  batchCode: '',
+  supplierName: '',
   branchId: 'ALL',
   status: 'ALL',
   pageIndex: 1,
@@ -70,7 +74,8 @@ export const BatchListPage: FC<{ defaultRole?: UserRole }> = ({
     const branchParam = searchParams.get('branch');
 
     const updated = { ...DEFAULT_FILTERS };
-    if (batchParam && !skuParam) updated.keyword = batchParam;
+    if (skuParam) updated.sku = skuParam;
+    if (batchParam && !skuParam) updated.batchCode = batchParam;
 
     if (statusParam && ['Expired', 'Critical', 'Warning', 'Normal'].includes(statusParam)) {
       updated.status = statusParam;
@@ -164,16 +169,29 @@ export const BatchListPage: FC<{ defaultRole?: UserRole }> = ({
         if (b.branchId !== appliedFilters.branchId) return false;
       }
 
-      // 3. Keyword Filter
+      if (appliedFilters.productName.trim()) {
+        const name = appliedFilters.productName.trim().toLowerCase();
+        if (!b.productName.toLowerCase().includes(name)) return false;
+      }
+      if (appliedFilters.sku.trim()) {
+        const sku = appliedFilters.sku.trim().toLowerCase();
+        if (!b.sku.toLowerCase().includes(sku)) return false;
+      }
+      if (appliedFilters.batchCode.trim()) {
+        const code = appliedFilters.batchCode.trim().toLowerCase();
+        if (!b.batchCode.toLowerCase().includes(code)) return false;
+      }
+      if (appliedFilters.supplierName.trim()) {
+        const ncc = appliedFilters.supplierName.trim().toLowerCase();
+        if (!b.supplierName.toLowerCase().includes(ncc)) return false;
+      }
       if (appliedFilters.keyword.trim()) {
         const kw = appliedFilters.keyword.trim().toLowerCase();
         const match =
           b.productName.toLowerCase().includes(kw) ||
           b.sku.toLowerCase().includes(kw) ||
           b.batchCode.toLowerCase().includes(kw) ||
-          b.supplierName.toLowerCase().includes(kw) ||
-          b.shelfLocation.toLowerCase().includes(kw) ||
-          b.originalGrnNo.toLowerCase().includes(kw);
+          b.supplierName.toLowerCase().includes(kw);
         if (!match) return false;
       }
 
@@ -456,8 +474,6 @@ export const BatchListPage: FC<{ defaultRole?: UserRole }> = ({
         filterInputs={filterInputs}
         role={role}
         employeeBranchId={employeeBranchId}
-        totalFiltered={filteredBatches.length}
-        totalAll={roleScopedBatches.length}
         onFilterChange={handleFilterChange}
         onSearch={handleSearch}
         onReset={handleReset}

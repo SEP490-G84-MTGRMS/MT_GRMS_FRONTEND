@@ -257,7 +257,7 @@ export const BatchTable: FC<BatchTableProps> = ({
         <table
           style={{
             width: '100%',
-            minWidth: 1200,
+            minWidth: 1480,
             borderCollapse: 'separate',
             borderSpacing: 0,
             fontSize: 13,
@@ -276,7 +276,7 @@ export const BatchTable: FC<BatchTableProps> = ({
             <col style={{ width: '7%' }} />  {/* 8. Qty */}
             <col style={{ width: '8%' }} />  {/* 9. Giá vốn */}
             <col style={{ width: '6%' }} />  {/* 10. Trạng thái */}
-            <col style={{ width: '11%' }} /> {/* 11. Thao tác */}
+            <col style={{ width: 240 }} />  {/* 11. Thao tác */}
           </colgroup>
 
           {/* Sticky Header */}
@@ -548,80 +548,97 @@ export const BatchTable: FC<BatchTableProps> = ({
                     </td>
 
                     {/* 11. Thao tác */}
-                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #f1f5f9' }}>
-                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                        {/* Chi tiết */}
+                    <td
+                      style={{
+                        padding: '8px 10px',
+                        textAlign: 'center',
+                        borderBottom: '1px solid #f1f5f9',
+                        minWidth: 240,
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: 'inline-flex',
+                          flexWrap: 'nowrap',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: 6,
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
                         <button
                           type="button"
                           onClick={() => onSelectBatch(row)}
                           style={{
-                            height: 26,
-                            padding: '0 8px',
-                            fontSize: 11.5,
+                            height: 32,
+                            padding: '0 12px',
+                            fontSize: 12.5,
                             fontWeight: 600,
-                            borderRadius: 4,
+                            borderRadius: 6,
                             border: '1px solid #cbd5e1',
                             backgroundColor: '#ffffff',
                             color: '#0d9488',
                             display: 'inline-flex',
                             alignItems: 'center',
-                            gap: 3,
+                            gap: 6,
                             cursor: 'pointer',
+                            whiteSpace: 'nowrap',
                           }}
-                          title="Xem chi tiết lượt hàng"
+                          title="Xem chi tiết lô hàng"
                         >
-                          <Eye size={12} />
+                          <Eye size={14} />
                           <span>Chi tiết</span>
                         </button>
 
-                        {/* Giảm giá FEFO (Chỉ cho phép nếu chưa hết hạn, disabled nếu Expired) */}
                         {row.status === 'Warning' || row.status === 'Critical' ? (
                           <button
                             type="button"
                             onClick={() => onDiscountClick(row)}
                             style={{
-                              height: 26,
-                              padding: '0 8px',
-                              fontSize: 11.5,
+                              height: 32,
+                              padding: '0 12px',
+                              fontSize: 12.5,
                               fontWeight: 700,
-                              borderRadius: 4,
+                              borderRadius: 6,
                               border: '1px solid #bfdbfe',
                               backgroundColor: '#eff6ff',
                               color: '#1d4ed8',
                               display: 'inline-flex',
                               alignItems: 'center',
-                              gap: 3,
+                              gap: 6,
                               cursor: 'pointer',
+                              whiteSpace: 'nowrap',
                             }}
                             title="Áp dụng chiết khấu giảm giá kích cầu FEFO"
                           >
-                            <Tag size={12} />
+                            <Tag size={14} />
                             <span>Giảm giá</span>
                           </button>
                         ) : null}
 
-                        {/* Xuất hủy (Write-off) */}
                         {row.status === 'Expired' || row.status === 'Critical' ? (
                           <button
                             type="button"
                             onClick={() => onWriteOffClick(row)}
                             style={{
-                              height: 26,
-                              padding: '0 8px',
-                              fontSize: 11.5,
+                              height: 32,
+                              padding: '0 12px',
+                              fontSize: 12.5,
                               fontWeight: 700,
-                              borderRadius: 4,
+                              borderRadius: 6,
                               border: 'none',
                               backgroundColor: '#fee2e2',
                               color: '#dc2626',
                               display: 'inline-flex',
                               alignItems: 'center',
-                              gap: 3,
+                              gap: 6,
                               cursor: 'pointer',
+                              whiteSpace: 'nowrap',
                             }}
                             title="Lập phiếu xuất hủy hàng quá hạn / hư hỏng"
                           >
-                            <Trash2 size={12} />
+                            <Trash2 size={14} />
                             <span>Xuất hủy</span>
                           </button>
                         ) : null}

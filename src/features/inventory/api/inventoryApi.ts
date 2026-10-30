@@ -14,7 +14,8 @@ export const inventoryApi = {
   }> {
     try {
       const params = new URLSearchParams();
-      if (filters.keyword) params.append('keyword', filters.keyword);
+      const keyword = [filters.keyword, filters.sku, filters.productName].filter(Boolean).join(' ').trim();
+      if (keyword) params.append('keyword', keyword);
       if (filters.branchId) params.append('branchId', filters.branchId);
       if (filters.category) params.append('category', filters.category);
       if (filters.location) params.append('locationShelf', filters.location);
@@ -68,11 +69,27 @@ export const inventoryApi = {
 
     let scoped = [...MOCK_INVENTORY_ITEMS];
     if (filters.branchId) scoped = scoped.filter((i) => i.branchId === filters.branchId);
+    if (filters.branchKeyword.trim()) {
+      const br = filters.branchKeyword.trim().toLowerCase();
+      scoped = scoped.filter(
+        (i) =>
+          i.branchId.toLowerCase().includes(br) ||
+          i.branchName.toLowerCase().includes(br)
+      );
+    }
     if (filters.category) scoped = scoped.filter((i) => i.category === filters.category);
     if (filters.location) scoped = scoped.filter((i) => i.location === filters.location);
     if (filters.stockStatus) scoped = scoped.filter((i) => i.status === filters.stockStatus);
-    if (filters.keyword) {
-      const kw = filters.keyword.toLowerCase();
+    if (filters.sku.trim()) {
+      const sku = filters.sku.trim().toLowerCase();
+      scoped = scoped.filter((i) => i.sku.toLowerCase().includes(sku));
+    }
+    if (filters.productName.trim()) {
+      const name = filters.productName.trim().toLowerCase();
+      scoped = scoped.filter((i) => i.productName.toLowerCase().includes(name));
+    }
+    if (filters.keyword.trim()) {
+      const kw = filters.keyword.trim().toLowerCase();
       scoped = scoped.filter(
         (i) => i.sku.toLowerCase().includes(kw) || i.productName.toLowerCase().includes(kw)
       );

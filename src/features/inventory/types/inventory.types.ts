@@ -32,6 +32,9 @@ export interface InventoryItem {
 
 export interface InventoryFilterState {
   keyword: string;
+  sku: string;
+  productName: string;
+  branchKeyword: string;
   branchId: string;
   category: string;
   location: string;
