@@ -9,6 +9,49 @@ import type {
   CashbookSummaryKPI,
   CashTransitItem,
 } from '../types/cashbook.types';
+import { financeHttpClient } from '../../../api/financeHttpClient';
+
+export interface BackendCashbookEntryResponse {
+  id: string;
+  entryCode: string;
+  accountId: string;
+  accountType: string;
+  branchId?: string | null;
+  entryType: string;
+  amount: number;
+  balanceAfter: number;
+  sourceType: string;
+  sourceId?: string | null;
+  referenceCode: string;
+  auditHash: string;
+  description: string;
+  occurredAtUtc: string;
+}
+
+export interface BackendCashAccountResponse {
+  id: string;
+  branchId?: string | null;
+  branchName: string;
+  accountName: string;
+  accountType: 'CASH' | 'BANK';
+  bankName?: string;
+  accountNumber?: string;
+  currentBalance: number;
+  initialBalance: number;
+  isActive: boolean;
+  currency: string;
+  isSafeDeposit: boolean;
+}
+
+export interface BackendCashbookSummaryResponse {
+  totalOpeningBalance: number;
+  totalReceipts: number;
+  totalPayments: number;
+  totalClosingBalance: number;
+  totalCashInDrawers: number;
+  totalBankDeposits: number;
+  totalSafeDepositBalance: number;
+}
 
 const INITIAL_ACCOUNTS: CashAccount[] = [
   {
@@ -193,6 +236,13 @@ const STORAGE_KEYS = {
   TRANSITS: 'mt_grms_cash_transits_v2',
 };
 
+/**
+ * Checks if mock mode should be used (Test runner or explicit env flag)
+ */
+function isMockMode(): boolean {
+  return import.meta.env.MODE === 'test' || import.meta.env.VITE_USE_MOCK_DATA === 'true';
+}
+
 function loadState<T>(key: string, defaultValue: T): T {
   try {
     const raw = localStorage.getItem(key);
@@ -212,16 +262,115 @@ function saveState<T>(key: string, value: T): void {
   }
 }
 
+/**
+ * Adapter that maps Backend CashbookEntryResponse to Frontend LedgerTransaction
+ */
+function mapBackendEntryToLedgerTransaction(
+  entry: BackendCashbookEntryResponse,
+  accountNameLookup?: string
+): LedgerTransaction {
+  const isReceipt = entry.entryType.toUpperCase() === 'RECEIPT';
+  const defaultCategory =
+    entry.sourceType === 'POS'
+      ? 'Doanh thu bán hàng POS'
+      : entry.sourceType === 'EXPENSE'
+      ? 'Chi phí vận hành'
+      : entry.sourceType === 'DEBT'
+      ? 'Thu nợ khách hàng'
+      : entry.sourceType === 'CASH_DROP'
+      ? 'Bàn giao tiền sang két sắt'
+      : entry.sourceType === 'BANK_DEPOSIT'
+      ? 'Nộp tiền vào ngân hàng'
+      : entry.sourceType === 'ADJUSTMENT'
+      ? 'Kiểm kê chênh lệch két'
+      : 'Giao dịch thu chi';
+
+  const counterpartyType =
+    entry.sourceType === 'POS'
+      ? 'CUSTOMER'
+      : entry.sourceType === 'EXPENSE'
+      ? 'SUPPLIER'
+      : 'INTERNAL';
+
+  const accountLabel =
+    accountNameLookup ||
+    (entry.accountType === 'Till'
+      ? 'Két thu ngân'
+      : entry.accountType === 'Safe'
+      ? 'Két sắt chủ shop'
+      : 'Tài khoản ngân hàng');
+
+  return {
+    id: entry.id,
+    transactionCode: entry.entryCode,
+    accountId: entry.accountId,
+    accountName: accountLabel,
+    branchId: entry.branchId || 'ALL',
+    transactionType: isReceipt ? 'RECEIPT' : 'PAYMENT',
+    category: defaultCategory,
+    amount: Number(entry.amount),
+    balanceAfter: Number(entry.balanceAfter),
+    counterpartyType: counterpartyType,
+    counterpartyName: entry.referenceCode || entry.sourceType,
+    description: entry.description || '',
+    referenceDocType:
+      entry.sourceType === 'POS'
+        ? 'POS_ORDER'
+        : entry.sourceType === 'EXPENSE'
+        ? 'SERVICE_EXPENSE'
+        : 'INTERNAL_TRANSFER',
+    referenceDocId: entry.sourceId || undefined,
+    sourceModuleName: (entry.sourceType as any) || 'MANUAL',
+    isAutomated: true,
+    createdBy: 'Hệ thống',
+    createdAt: entry.occurredAtUtc,
+  };
+}
+
 export const cashbookService = {
   /**
-   * Retrieves all cash, safe, and bank accounts, optional filtering by branch
+   * Retrieves all cash, safe, and bank accounts from Backend, with local fallback
    */
   async getCashAccounts(branchId?: string): Promise<CashAccount[]> {
-    const accounts = loadState<CashAccount[]>(STORAGE_KEYS.ACCOUNTS, INITIAL_ACCOUNTS);
-    if (!branchId || branchId === 'ALL') {
-      return accounts;
+    if (isMockMode()) {
+      const accounts = loadState<CashAccount[]>(STORAGE_KEYS.ACCOUNTS, INITIAL_ACCOUNTS);
+      if (!branchId || branchId === 'ALL') {
+        return accounts;
+      }
+      return accounts.filter((acc) => acc.branchId === branchId || acc.branchId === 'ALL');
     }
-    return accounts.filter((acc) => acc.branchId === branchId || acc.branchId === 'ALL');
+
+    try {
+      const params = branchId && branchId !== 'ALL' ? { branchId } : {};
+      const res = await financeHttpClient.get<{ data: BackendCashAccountResponse[] }>('/cashbook/accounts', { params });
+      const backendAccounts = res.data?.data || [];
+
+      if (backendAccounts.length > 0) {
+        return backendAccounts.map((b) => ({
+          id: b.id,
+          branchId: b.branchId || 'ALL',
+          branchName: b.branchName,
+          accountName: b.accountName,
+          accountType: b.accountType,
+          bankName: b.bankName,
+          accountNumber: b.accountNumber,
+          currentBalance: Number(b.currentBalance),
+          initialBalance: Number(b.initialBalance),
+          isActive: b.isActive,
+          currency: b.currency || 'VND',
+          isSafeDeposit: b.isSafeDeposit,
+        }));
+      }
+
+      return loadState<CashAccount[]>(STORAGE_KEYS.ACCOUNTS, INITIAL_ACCOUNTS);
+    } catch (err) {
+      console.warn('Backend /cashbook/accounts unreachable, falling back to local storage:', err);
+      const accounts = loadState<CashAccount[]>(STORAGE_KEYS.ACCOUNTS, INITIAL_ACCOUNTS);
+      if (!branchId || branchId === 'ALL') {
+        return accounts;
+      }
+      return accounts.filter((acc) => acc.branchId === branchId || acc.branchId === 'ALL');
+    }
   },
 
   /**
@@ -252,7 +401,6 @@ export const cashbookService = {
     transits[tIndex] = transit;
     saveState(STORAGE_KEYS.TRANSITS, transits);
 
-    // Record receipt into Safe Deposit
     await this.createReceipt({
       accountId: transit.toAccountId,
       amount: transit.amount,
@@ -281,13 +429,13 @@ export const cashbookService = {
   },
 
   /**
-   * Retrieves paginated transactions with flexible filtering
+   * Retrieves paginated transactions from local state (Fallback & Testing)
    */
-  async getTransactions(
+  getTransactionsFromLocal(
     params: CashbookFilterParams = {},
     page = 1,
     pageSize = 10
-  ): Promise<{ items: LedgerTransaction[]; totalItems: number }> {
+  ): { items: LedgerTransaction[]; totalItems: number } {
     const all = loadState<LedgerTransaction[]>(STORAGE_KEYS.TRANSACTIONS, INITIAL_TRANSACTIONS);
 
     let filtered = [...all];
@@ -315,7 +463,6 @@ export const cashbookService = {
       );
     }
 
-    // Sort descending by created date
     filtered.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
     const totalItems = filtered.length;
@@ -326,11 +473,98 @@ export const cashbookService = {
   },
 
   /**
+   * Retrieves paginated transactions with flexible filtering from Backend
+   */
+  async getTransactions(
+    params: CashbookFilterParams = {},
+    page = 1,
+    pageSize = 10
+  ): Promise<{ items: LedgerTransaction[]; totalItems: number }> {
+    if (isMockMode()) {
+      return this.getTransactionsFromLocal(params, page, pageSize);
+    }
+
+    try {
+      const queryParams: Record<string, unknown> = { page, pageSize };
+      if (params.accountId && params.accountId !== 'ALL') queryParams.accountId = params.accountId;
+      if (params.branchId && params.branchId !== 'ALL') queryParams.branchId = params.branchId;
+      if (params.startDate) queryParams.fromDate = params.startDate;
+      if (params.endDate) queryParams.toDate = params.endDate;
+
+      const res = await financeHttpClient.get<{ data: BackendCashbookEntryResponse[] }>('/cashbook/entries', {
+        params: queryParams,
+      });
+      const backendEntries = res.data?.data || [];
+
+      const accounts = await this.getCashAccounts();
+      const accountMap = new Map<string, string>();
+      accounts.forEach((a) => accountMap.set(a.id, a.accountName));
+
+      let mappedItems: LedgerTransaction[] = backendEntries.map((e) =>
+        mapBackendEntryToLedgerTransaction(e, accountMap.get(e.accountId))
+      );
+
+      // Check if user has offline pending transactions in local storage
+      if (mappedItems.length === 0) {
+        const localTx = loadState<LedgerTransaction[]>(STORAGE_KEYS.TRANSACTIONS, []);
+        if (localTx.length > 0) {
+          return this.getTransactionsFromLocal(params, page, pageSize);
+        }
+      }
+
+      if (params.transactionType && params.transactionType !== 'ALL') {
+        mappedItems = mappedItems.filter((tx) => tx.transactionType === params.transactionType);
+      }
+
+      if (params.searchQuery && params.searchQuery.trim()) {
+        const q = params.searchQuery.trim().toLowerCase();
+        mappedItems = mappedItems.filter(
+          (tx) =>
+            tx.transactionCode.toLowerCase().includes(q) ||
+            tx.counterpartyName.toLowerCase().includes(q) ||
+            tx.description.toLowerCase().includes(q) ||
+            tx.category.toLowerCase().includes(q)
+        );
+      }
+
+      return {
+        items: mappedItems,
+        totalItems: mappedItems.length,
+      };
+    } catch (err) {
+      console.warn('Backend /cashbook/entries unreachable, falling back to local storage:', err);
+      return this.getTransactionsFromLocal(params, page, pageSize);
+    }
+  },
+
+  /**
    * Records a manual cash/bank receipt (Phiếu Thu)
    */
   async createReceipt(dto: CreateReceiptDTO): Promise<LedgerTransaction> {
     if (dto.amount <= 0) {
       throw new Error('Số tiền thu phải lớn hơn 0');
+    }
+
+    if (!isMockMode()) {
+      try {
+        const idempotencyKey = crypto.randomUUID();
+        const res = await financeHttpClient.post<{ data: BackendCashbookEntryResponse }>(
+          '/cashbook/receipts',
+          {
+            accountId: dto.accountId,
+            amount: dto.amount,
+            category: dto.category,
+            description: dto.description,
+            referenceCode: dto.referenceDocId,
+          },
+          {
+            headers: { 'Idempotency-Key': idempotencyKey },
+          }
+        );
+        return mapBackendEntryToLedgerTransaction(res.data.data);
+      } catch (err) {
+        console.warn('Backend receipt failed, falling back to local:', err);
+      }
     }
 
     const accounts = loadState<CashAccount[]>(STORAGE_KEYS.ACCOUNTS, INITIAL_ACCOUNTS);
@@ -384,6 +618,33 @@ export const cashbookService = {
   async createPayment(dto: CreatePaymentDTO): Promise<LedgerTransaction> {
     if (dto.amount <= 0) {
       throw new Error('Số tiền chi phải lớn hơn 0');
+    }
+
+    if (!isMockMode()) {
+      try {
+        const idempotencyKey = crypto.randomUUID();
+        const res = await financeHttpClient.post<{ data: BackendCashbookEntryResponse }>(
+          '/cashbook/payments',
+          {
+            accountId: dto.accountId,
+            amount: dto.amount,
+            category: dto.category,
+            description: dto.description,
+            referenceCode: dto.referenceDocId,
+          },
+          {
+            headers: { 'Idempotency-Key': idempotencyKey },
+          }
+        );
+        return mapBackendEntryToLedgerTransaction(res.data.data);
+      } catch (err) {
+        // If error is GBR-CSH-03 insufficient funds, throw directly
+        const msg = err instanceof Error ? err.message : String(err);
+        if (msg.includes('vượt quá số dư') || msg.includes('GBR-CSH-03') || msg.includes('INSUFFICIENT_FUNDS')) {
+          throw err;
+        }
+        console.warn('Backend payment failed, falling back to local:', err);
+      }
     }
 
     const accounts = loadState<CashAccount[]>(STORAGE_KEYS.ACCOUNTS, INITIAL_ACCOUNTS);
@@ -441,13 +702,27 @@ export const cashbookService = {
 
   /**
    * Voids an existing ledger entry by creating an opposite Compensating Entry
-   * Adheres strictly to Immutable Ledger Principle (No DB UPDATE/DELETE)
    */
   async voidTransaction(
     transactionId: string,
     reason: string,
     performedBy = 'Nguyễn Trường An'
   ): Promise<LedgerTransaction> {
+    if (!isMockMode()) {
+      try {
+        const idempotencyKey = crypto.randomUUID();
+        const res = await financeHttpClient.post<{ data: BackendCashbookEntryResponse }>(
+          `/cashbook/entries/${transactionId}/void`,
+          { reason: reason.trim() },
+          {
+            headers: { 'Idempotency-Key': idempotencyKey },
+          }
+        );
+        return mapBackendEntryToLedgerTransaction(res.data.data);
+      } catch (err) {
+        console.warn('Backend void failed, falling back to local:', err);
+      }
+    }
     const transactions = loadState<LedgerTransaction[]>(STORAGE_KEYS.TRANSACTIONS, INITIAL_TRANSACTIONS);
     const origIndex = transactions.findIndex((tx) => tx.id === transactionId);
 
@@ -468,16 +743,13 @@ export const cashbookService = {
 
     const targetAccount = accounts[accIndex];
 
-    // Determine reverse amount impact on account balance
     let balanceDelta = 0;
     let compType: LedgerTransaction['transactionType'] = 'PAYMENT';
 
     if (origTx.transactionType === 'PAYMENT') {
-      // Reversing a payment adds money back
       balanceDelta = origTx.amount;
       compType = 'RECEIPT';
     } else if (origTx.transactionType === 'RECEIPT') {
-      // Reversing a receipt subtracts money
       if (targetAccount.accountType === 'CASH' && targetAccount.currentBalance < origTx.amount) {
         throw new Error('Không thể hủy phiếu thu: Số dư hiện tại không đủ để hoàn lại!');
       }
@@ -492,12 +764,10 @@ export const cashbookService = {
     accounts[accIndex] = targetAccount;
     saveState(STORAGE_KEYS.ACCOUNTS, accounts);
 
-    // Mark original as voided
     origTx.isVoided = true;
     origTx.voidReason = reason;
     transactions[origIndex] = origTx;
 
-    // Create Compensating Entry
     const now = new Date();
     const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
     const randCode = Math.floor(100 + Math.random() * 900);
@@ -541,6 +811,32 @@ export const cashbookService = {
     }
     if (dto.fromAccountId === dto.toAccountId) {
       throw new Error('Tài khoản nguồn và tài khoản đích không được trùng nhau');
+    }
+
+    if (!isMockMode()) {
+      try {
+        const idempotencyKey = crypto.randomUUID();
+        const res = await financeHttpClient.post<{
+          data: { payment: BackendCashbookEntryResponse; receipt: BackendCashbookEntryResponse };
+        }>(
+          '/cashbook/transfers',
+          {
+            fromAccountId: dto.fromAccountId,
+            toAccountId: dto.toAccountId,
+            amount: dto.amount,
+            note: dto.note,
+          },
+          {
+            headers: { 'Idempotency-Key': idempotencyKey },
+          }
+        );
+        return {
+          payment: mapBackendEntryToLedgerTransaction(res.data.data.payment),
+          receipt: mapBackendEntryToLedgerTransaction(res.data.data.receipt),
+        };
+      } catch (err) {
+        console.warn('Backend transfer failed, falling back to local:', err);
+      }
     }
 
     const accounts = loadState<CashAccount[]>(STORAGE_KEYS.ACCOUNTS, INITIAL_ACCOUNTS);
@@ -635,6 +931,27 @@ export const cashbookService = {
       throw new Error('Chênh lệch kiểm kê bắt buộc phải có lý do giải trình cụ thể theo quy tắc GBR-CSH-04');
     }
 
+    if (!isMockMode()) {
+      try {
+        if (diff === 0) return null;
+        const idempotencyKey = crypto.randomUUID();
+        const res = await financeHttpClient.post<{ data: BackendCashbookEntryResponse | null }>(
+          '/cashbook/reconcile',
+          {
+            accountId: dto.accountId,
+            actualCountedBalance: dto.actualCountedBalance,
+            reason: dto.reason.trim(),
+          },
+          {
+            headers: { 'Idempotency-Key': idempotencyKey },
+          }
+        );
+        return res.data.data ? mapBackendEntryToLedgerTransaction(res.data.data) : null;
+      } catch (err) {
+        console.warn('Backend reconcile failed, falling back to local:', err);
+      }
+    }
+
     const accounts = loadState<CashAccount[]>(STORAGE_KEYS.ACCOUNTS, INITIAL_ACCOUNTS);
     const targetAccountIndex = accounts.findIndex((a) => a.id === dto.accountId);
 
@@ -682,11 +999,11 @@ export const cashbookService = {
   },
 
   /**
-   * Computes overall KPI summary for Cashbook
+   * Computes overall KPI summary for Cashbook from local state (Fallback & Testing)
    */
-  async getSummaryKPI(branchId?: string): Promise<CashbookSummaryKPI> {
+  async getSummaryKPIFromLocal(branchId?: string): Promise<CashbookSummaryKPI> {
     const accounts = await this.getCashAccounts(branchId);
-    const { items: transactions } = await this.getTransactions({ branchId }, 1, 1000);
+    const { items: transactions } = this.getTransactionsFromLocal({ branchId }, 1, 1000);
 
     let totalCashInDrawers = 0;
     let totalBankDeposits = 0;
@@ -706,7 +1023,7 @@ export const cashbookService = {
     let totalPayments = 0;
 
     transactions.forEach((tx) => {
-      if (tx.isVoided) return; // Skip voided entries in active cash flow
+      if (tx.isVoided) return;
       if (tx.transactionType === 'RECEIPT') {
         totalReceipts += tx.amount;
       } else if (tx.transactionType === 'PAYMENT') {
@@ -726,6 +1043,36 @@ export const cashbookService = {
       totalBankDeposits,
       totalSafeDepositBalance,
     };
+  },
+
+  /**
+   * Computes overall KPI summary for Cashbook from Backend API
+   */
+  async getSummaryKPI(branchId?: string): Promise<CashbookSummaryKPI> {
+    if (isMockMode()) {
+      return this.getSummaryKPIFromLocal(branchId);
+    }
+
+    try {
+      const params = branchId && branchId !== 'ALL' ? { branchId } : {};
+      const res = await financeHttpClient.get<{ data: BackendCashbookSummaryResponse }>('/cashbook/summary', { params });
+      const s = res.data?.data;
+      if (s) {
+        return {
+          totalOpeningBalance: Number(s.totalOpeningBalance),
+          totalReceipts: Number(s.totalReceipts),
+          totalPayments: Number(s.totalPayments),
+          totalClosingBalance: Number(s.totalClosingBalance),
+          totalCashInDrawers: Number(s.totalCashInDrawers),
+          totalBankDeposits: Number(s.totalBankDeposits),
+          totalSafeDepositBalance: Number(s.totalSafeDepositBalance),
+        };
+      }
+      return this.getSummaryKPIFromLocal(branchId);
+    } catch (err) {
+      console.warn('Backend /cashbook/summary unreachable, falling back to local calculation:', err);
+      return this.getSummaryKPIFromLocal(branchId);
+    }
   },
 
   /**

@@ -1,3 +1,9 @@
+import {
+  checkPendingOfflineData,
+  exportLocalStorageBackup,
+  safeClearFinancialLocalStorage,
+  type OfflineFinancialDataSummary,
+} from '../../../utils/localStorageMigration';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import type { FC } from 'react';
 import { Truck, CheckCircle, Plus, MoreHorizontal, FileSpreadsheet, ArrowRightLeft, X } from 'lucide-react';
@@ -26,6 +32,14 @@ import { formatMoney } from '../../finance/utils/formatters';
 import '../cashbook.css';
 
 export const CashbookPage: FC = () => {
+  const [offlineDataSummary, setOfflineDataSummary] = useState<OfflineFinancialDataSummary | null>(null);
+
+  useEffect(() => {
+    const summary = checkPendingOfflineData();
+    if (summary.hasData) {
+      setOfflineDataSummary(summary);
+    }
+  }, []);
   const [accounts, setAccounts] = useState<CashAccount[]>([]);
   const [transits, setTransits] = useState<CashTransitItem[]>([]);
   const [transactions, setTransactions] = useState<LedgerTransaction[]>([]);
@@ -93,12 +107,7 @@ export const CashbookPage: FC = () => {
 
       setAccounts(accs);
       setTransits(trns);
-      // Reconcile opening balance to 345.05M per Decision D2
-      setSummaryKPI({
-        ...kpis,
-        totalOpeningBalance: 345_050_000,
-        totalClosingBalance: 359_300_000,
-      });
+      setSummaryKPI(kpis);
       setTransactions(txResult.items);
       setTotalItems(txResult.totalItems);
     } catch (err: unknown) {
@@ -255,6 +264,111 @@ export const CashbookPage: FC = () => {
         <AdminToast toast={toast} onClose={closeToast} />
 
         {/* Cash Transit Alert Banner */}
+        {/* Offline LocalStorage Migration Banner */}
+        {offlineDataSummary && offlineDataSummary.hasData && (
+          <div
+            style={{
+              background: '#EFF6FF',
+              border: '1px solid #93C5FD',
+              borderRadius: 14,
+              padding: '14px 20px',
+              marginBottom: 16,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: 12,
+              boxShadow: '0 2px 6px rgba(59, 130, 246, 0.08)',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div
+                style={{
+                  width: 42,
+                  height: 42,
+                  borderRadius: 12,
+                  background: '#2563EB',
+                  color: '#ffffff',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontWeight: 700,
+                  fontSize: '1.1rem',
+                }}
+              >
+                💾
+              </div>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span
+                    style={{
+                      fontSize: '0.72rem',
+                      fontWeight: 800,
+                      color: '#1D4ED8',
+                      background: '#DBEAFE',
+                      padding: '2px 8px',
+                      borderRadius: 6,
+                    }}
+                  >
+                    Đồng bộ máy chủ Live
+                  </span>
+                  <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#1E40AF' }}>
+                    Phát hiện dữ liệu cục bộ trong trình duyệt ({offlineDataSummary.cashTransactionsCount} giao dịch, {offlineDataSummary.cashAccountsCount} tài khoản)
+                  </span>
+                </div>
+                <div style={{ marginTop: 2, fontSize: '0.8rem', color: '#1E3A8A' }}>
+                  Hệ thống đã kết nối trực tiếp với Cơ sở dữ liệu PostgreSQL. Bạn có thể xuất bản sao lưu hoặc dọn dẹp bộ nhớ đệm.
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <button
+                type="button"
+                onClick={() => {
+                  const ok = exportLocalStorageBackup();
+                  if (ok) showToast('Đã tải xuống file sao lưu JSON thành công!', 'success');
+                }}
+                style={{
+                  background: '#FFFFFF',
+                  border: '1px solid #3B82F6',
+                  color: '#1D4ED8',
+                  padding: '7px 14px',
+                  borderRadius: 8,
+                  fontWeight: 600,
+                  fontSize: '0.82rem',
+                  cursor: 'pointer',
+                }}
+              >
+                Xuất file sao lưu (JSON)
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (window.confirm('Bạn có chắc chắn muốn xóa dữ liệu cục bộ cũ trên trình duyệt để chuyển hẳn sang cơ sở dữ liệu máy chủ không?')) {
+                    safeClearFinancialLocalStorage(true);
+                    setOfflineDataSummary(null);
+                    showToast('Đã dọn dẹp cache cục bộ. Đang tải lại dữ liệu từ máy chủ...', 'info');
+                    void loadData();
+                  }
+                }}
+                style={{
+                  background: '#2563EB',
+                  border: 'none',
+                  color: '#ffffff',
+                  padding: '7px 16px',
+                  borderRadius: 8,
+                  fontWeight: 700,
+                  fontSize: '0.82rem',
+                  cursor: 'pointer',
+                }}
+              >
+                Dọn sạch cục bộ
+              </button>
+            </div>
+          </div>
+        )}
+
         {pendingTransit && (
           <div
             style={{
