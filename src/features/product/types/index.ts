@@ -123,6 +123,7 @@ export interface ProductItem {
   onHand: number;
   committed: number;
   isFavorite?: boolean;
+  hasBatches?: boolean;
   isCombo?: boolean;
   status: 'Active' | 'Discontinued';
   createdAt: string;

@@ -2,6 +2,44 @@ import { httpClient } from '../../../api/httpClient';
 import type { ApiResponse } from '../../../api/types';
 import type { ProductResponse, ProductQueryFilter, PagedResult } from '../types';
 
+export interface ProductCreatePayload {
+  name: string;
+  categoryId: string;
+  sellingPrice: number;
+  productCode?: string;
+  barcode?: string;
+  baseUnit?: string;
+  costPrice?: number | null;
+  minStock?: number;
+  maxStock?: number;
+  vatRate?: number;
+  productType?: string;
+  status?: string;
+  imageUrl?: string | null;
+  description?: string | null;
+  internalNote?: string | null;
+  hasBatches?: boolean;
+  isFavorite?: boolean;
+}
+
+export interface ProductUpdatePayload {
+  name: string;
+  categoryId: string;
+  sellingPrice: number;
+  barcode?: string;
+  baseUnit?: string;
+  costPrice?: number | null;
+  minStock?: number;
+  maxStock?: number;
+  vatRate?: number;
+  status?: string;
+  imageUrl?: string | null;
+  description?: string | null;
+  internalNote?: string | null;
+  hasBatches?: boolean;
+  isFavorite?: boolean;
+}
+
 export const productApi = {
   /**
    * Lấy danh sách sản phẩm có phân trang, tìm kiếm đa tiêu chí và lọc theo danh mục
@@ -59,5 +97,43 @@ export const productApi = {
       hasNextPage: false,
     };
   },
+
+  /**
+   * Tạo mới một hàng hóa trên Backend
+   * Endpoint Backend: POST /api/products hoặc POST /api/v1/products
+   */
+  async createProduct(payload: ProductCreatePayload): Promise<ProductResponse> {
+    const res = await httpClient.post<ApiResponse<ProductResponse>>('/products', payload);
+    if (res.data?.success && res.data.data) {
+      return res.data.data;
+    }
+    throw new Error(res.data?.message || 'Không thể tạo hàng hóa.');
+  },
+
+  /**
+   * Cập nhật thông tin hàng hóa trên Backend
+   * Endpoint Backend: PUT /api/products/{id}
+   */
+  async updateProduct(id: string, payload: ProductUpdatePayload): Promise<ProductResponse> {
+    const res = await httpClient.put<ApiResponse<ProductResponse>>(`/products/${id}`, payload);
+    if (res.data?.success && res.data.data) {
+      return res.data.data;
+    }
+    throw new Error(res.data?.message || 'Không thể cập nhật hàng hóa.');
+  },
+
+  /**
+   * Xóa mềm một hàng hóa trên Backend
+   * Endpoint Backend: DELETE /api/products/{id}
+   */
+  async deleteProduct(id: string): Promise<void> {
+    const res = await httpClient.delete<ApiResponse<any>>(`/products/${id}`);
+    if (!res.data?.success) {
+      throw new Error(res.data?.message || 'Không thể xóa hàng hóa.');
+    }
+  },
 };
 
+
+export { uploadImageToCloudinary } from '../../../utils/cloudinary';
+export type { ImageUploadResponse } from '../../../utils/cloudinary';
