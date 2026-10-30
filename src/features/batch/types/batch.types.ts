@@ -42,7 +42,11 @@ export interface BatchItem {
 }
 
 export interface BatchFilterState {
-  keyword: string; // Tìm theo Tên SP, SKU, Mã lô, NCC
+  keyword: string;
+  productName: string;
+  sku: string;
+  batchCode: string;
+  supplierName: string;
   branchId: string; // 'ALL' | 'BR-01' | 'BR-02'
   status: 'ALL' | BatchStatus;
   pageIndex: number;

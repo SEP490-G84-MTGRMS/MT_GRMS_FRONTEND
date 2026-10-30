@@ -54,7 +54,6 @@ export const SupplierFilterBar: FC<Props> = ({
     (draftFilters.contactPerson || '').trim() ||
     (draftFilters.phone || '').trim() ||
     (draftFilters.searchTerm || '').trim() ||
-    draftFilters.supplierType ||
     draftFilters.status
   );
 
@@ -185,7 +184,7 @@ export const SupplierFilterBar: FC<Props> = ({
         </div>
       </div>
 
-      {/* ── Dòng 2: Dropdown Loại NCC + Trạng Thái + Nút Tìm Kiếm & Đặt Lại (Xuống dòng riêng) ── */}
+      {/* ── Dòng 2: Trạng thái + Nút Tìm Kiếm & Đặt Lại ── */}
       <div
         style={{
           display: 'flex',
@@ -198,21 +197,6 @@ export const SupplierFilterBar: FC<Props> = ({
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
-          {/* Loại Nhà Cung Cấp */}
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-            <label style={labelStyle}>Loại NCC:</label>
-            <select
-              value={draftFilters.supplierType}
-              onChange={(e) => setDraftFilters((prev) => ({ ...prev, supplierType: e.target.value }))}
-              style={{ ...selectStyle(Boolean(draftFilters.supplierType)), minWidth: 140 }}
-            >
-              <option value="">-- Tất cả loại --</option>
-              <option value="Goods">Hàng hóa</option>
-              <option value="Service">Dịch vụ</option>
-              <option value="Both">Cả hai</option>
-            </select>
-          </div>
-
           {/* Trạng Thái Hoạt Động */}
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
             <label style={labelStyle}>Trạng thái:</label>

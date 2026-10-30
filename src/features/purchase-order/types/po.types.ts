@@ -39,11 +39,26 @@ export interface OrderMatrixProduct {
   unit: string;
   price: number;
   moq: number;
+  orderMultiple?: number; // Bội số đặt hàng (vd: thùng 6, lốc 4)
   soh: number; // Stock on hand
   sales: number; // Sales per day
+  safetyStock?: number; // Tồn kho an toàn
 }
 
-export type QtyMatrixMap = Record<string, Record<string, number>>; // productId -> (dateKey -> qty)
+export interface MatrixCellData {
+  employeeQty: number; // Số lượng NV chi nhánh đề xuất
+  storeQty: number | null; // Số lượng Store Owner ghi đè (null: chưa sửa; 0: chủ động hủy đặt; >0: số lượng mới)
+  finalQty: number; // Số lượng chốt cuối cùng (storeQty !== null ? storeQty : employeeQty)
+  suggestedQty?: number; // Số lượng hệ thống gợi ý
+  isOwnerOverridden?: boolean;
+  modifiedBy?: 'employee' | 'store_owner';
+  modifiedAt?: string;
+}
+
+export type MatrixCellMap = Record<string, Record<string, MatrixCellData>>; // productId -> (dateKey -> MatrixCellData)
+export type QtyMatrixMap = Record<string, Record<string, number>>; // productId -> (dateKey -> qty) - backward compatible
+
+export type DayCutoffStatus = 'OPEN' | 'CUTOFF_DUE' | 'LOCKED' | 'PO_GENERATED';
 
 export interface DayColInfo {
   date: Date;
@@ -52,6 +67,43 @@ export interface DayColInfo {
   dateShort: string; // MM/DD
   isOff: boolean;
   isLocked: boolean;
+  offReason?: string;
+  cutoffHour?: string;
+  cutoffTimeStr?: string;
+  cutoffStatus: DayCutoffStatus;
+  cutoffLabel?: string;
+  poCode?: string;
+}
+
+export interface SplitPoItem {
+  productId: string;
+  productName: string;
+  sku: string;
+  category: string;
+  unit: string;
+  price: number;
+  moq: number;
+  employeeQty: number;
+  storeQty: number | null;
+  finalQty: number;
+  lineTotal: number;
+}
+
+export interface SplitPoPreview {
+  id: string;
+  supplierId: string;
+  supplierName: string;
+  branchId: string;
+  branchName: string;
+  deliveryDate: string; // YYYY-MM-DD
+  dowName: string;
+  dateShort: string;
+  cutoffStatus: DayCutoffStatus;
+  isCutoffDue: boolean;
+  items: SplitPoItem[];
+  totalQuantity: number;
+  totalAmount: number;
+  status: 'DRAFT' | 'PENDING_APPROVAL' | 'PENDING_CREDIT_APPROVAL';
 }
 
 export interface MatrixCalculationResult {

@@ -3,26 +3,21 @@ import {
   ListChecks,
   CheckCircle2,
   Layers,
-  ArrowRight,
+  AlertTriangle,
+  Info,
 } from 'lucide-react';
-import type { GrnDetailItem, GrnRemainingOption, PoStatusPreview } from '../../types/grn.types';
+import type { GrnDetailItem } from '../../types/grn.types';
 
 interface GrnPoRemainingTableProps {
   poReference: string;
   items: GrnDetailItem[];
-  poStatusPreview: PoStatusPreview;
-  onRemainingOptionChange: (itemId: string, option: GrnRemainingOption) => void;
-  onPoStatusChange: (status: PoStatusPreview) => void;
   readOnly?: boolean;
 }
 
 export const GrnPoRemainingTable: FC<GrnPoRemainingTableProps> = ({
   poReference,
   items,
-  poStatusPreview,
-  onRemainingOptionChange,
-  onPoStatusChange,
-  readOnly = false,
+  readOnly: _readOnly = false,
 }) => {
   return (
     <div
@@ -58,7 +53,7 @@ export const GrnPoRemainingTable: FC<GrnPoRemainingTableProps> = ({
               margin: 0,
             }}
           >
-            Cập nhật trạng thái đơn PO (PO Update After Post)
+            Đối soát số lượng đơn PO gốc &amp; Trạng thái hoàn tất
           </h2>
         </div>
 
@@ -108,18 +103,24 @@ export const GrnPoRemainingTable: FC<GrnPoRemainingTableProps> = ({
               }}
             >
               <th style={{ padding: '9px 12px', width: 140 }}>Mã PO</th>
-              <th style={{ padding: '9px 12px', minWidth: 220 }}>Sản phẩm</th>
-              <th style={{ padding: '9px 12px', textAlign: 'right', width: 110 }}>
+              <th style={{ padding: '9px 12px', minWidth: 200 }}>Sản phẩm</th>
+              <th style={{ padding: '9px 12px', textAlign: 'right', width: 100 }}>
                 Đặt (Ordered)
               </th>
-              <th style={{ padding: '9px 12px', textAlign: 'right', width: 120 }}>
-                + Đã nhận
+              <th style={{ padding: '9px 12px', textAlign: 'right', width: 100 }}>
+                Thực nhận
               </th>
               <th style={{ padding: '9px 12px', textAlign: 'right', width: 110 }}>
-                Còn thiếu
+                Chấp nhận (+)
               </th>
-              <th style={{ padding: '9px 12px', minWidth: 360 }}>
-                Hướng xử lý lượng thiếu (Remaining Handling Options)
+              <th style={{ padding: '9px 12px', textAlign: 'right', width: 95 }}>
+                Từ chối
+              </th>
+              <th style={{ padding: '9px 12px', textAlign: 'right', width: 105 }}>
+                Giao thiếu
+              </th>
+              <th style={{ padding: '9px 12px', minWidth: 250 }}>
+                Ghi chú đối soát &amp; Quy tắc V1
               </th>
             </tr>
           </thead>
@@ -127,9 +128,9 @@ export const GrnPoRemainingTable: FC<GrnPoRemainingTableProps> = ({
             {items.map((item, idx) => {
               const ordered = item.orderedQty || 0;
               const received = item.receivedQty || 0;
-              const diff = received - ordered;
-              const shortage = diff < 0 ? Math.abs(diff) : 0;
-              const selectedOption = item.remainingOption || 'backorder';
+              const accepted = item.acceptedQty !== undefined ? item.acceptedQty : received;
+              const rejected = item.rejectedQty || Math.max(0, received - accepted);
+              const shortage = Math.max(0, ordered - received);
 
               return (
                 <tr
@@ -165,10 +166,20 @@ export const GrnPoRemainingTable: FC<GrnPoRemainingTableProps> = ({
                   </td>
 
                   {/* Received */}
+                  <td style={{ padding: '9px 12px', textAlign: 'right', color: '#334155', fontWeight: 600 }}>
+                    {received} {item.unit}
+                  </td>
+
+                  {/* Accepted */}
                   <td style={{ padding: '9px 12px', textAlign: 'right' }}>
-                    <strong style={{ color: '#0f766e' }}>
-                      {received} {item.unit}
+                    <strong style={{ color: '#0d9488' }}>
+                      {accepted} {item.unit}
                     </strong>
+                  </td>
+
+                  {/* Rejected */}
+                  <td style={{ padding: '9px 12px', textAlign: 'right', color: rejected > 0 ? '#dc2626' : '#94a3b8', fontWeight: 600 }}>
+                    {rejected} {item.unit}
                   </td>
 
                   {/* Shortage */}
@@ -184,78 +195,24 @@ export const GrnPoRemainingTable: FC<GrnPoRemainingTableProps> = ({
                           border: '1px solid #fca5a5',
                         }}
                       >
-                        {shortage} {item.unit}
+                        -{shortage} {item.unit}
                       </span>
-                    ) : diff > 0 ? (
-                      <span style={{ color: '#0284c7', fontWeight: 600 }}>+{diff} (Thừa)</span>
                     ) : (
-                      <span style={{ color: '#94a3b8' }}>0</span>
+                      <span style={{ color: '#16a34a', fontWeight: 600 }}>Đủ</span>
                     )}
                   </td>
 
-                  {/* Handling Options */}
-                  <td style={{ padding: '9px 12px' }}>
+                  {/* Notes & Rule description */}
+                  <td style={{ padding: '9px 12px', fontSize: 12 }}>
                     {shortage > 0 ? (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
-                        <label
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: 6,
-                            cursor: readOnly ? 'default' : 'pointer',
-                            fontSize: 12.5,
-                            fontWeight: selectedOption === 'backorder' ? 700 : 500,
-                            color: selectedOption === 'backorder' ? '#0f766e' : '#475569',
-                          }}
-                        >
-                          <input
-                            type="radio"
-                            name={`rem_option_${item.id}`}
-                            value="backorder"
-                            checked={selectedOption === 'backorder'}
-                            disabled={readOnly}
-                            onChange={() => onRemainingOptionChange(item.id, 'backorder')}
-                            style={{ cursor: readOnly ? 'default' : 'pointer', accentColor: '#0f766e' }}
-                          />
-                          <span>(•) NCC sẽ giao bù đợt sau (PO giữ mở)</span>
-                        </label>
-
-                        <label
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: 6,
-                            cursor: readOnly ? 'default' : 'pointer',
-                            fontSize: 12.5,
-                            fontWeight: selectedOption === 'cancel' ? 700 : 500,
-                            color: selectedOption === 'cancel' ? '#b45309' : '#475569',
-                          }}
-                        >
-                          <input
-                            type="radio"
-                            name={`rem_option_${item.id}`}
-                            value="cancel"
-                            checked={selectedOption === 'cancel'}
-                            disabled={readOnly}
-                            onChange={() => onRemainingOptionChange(item.id, 'cancel')}
-                            style={{ cursor: readOnly ? 'default' : 'pointer', accentColor: '#0f766e' }}
-                          />
-                          <span>(•) Hủy phần thiếu (Đóng dòng)</span>
-                        </label>
-                      </div>
+                      <span style={{ color: '#b45309', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                        <AlertTriangle size={12} color="#d97706" />
+                        Giao thiếu {shortage} — Đóng dòng PO, tính vào nhu cầu đặt đợt sau
+                      </span>
                     ) : (
-                      <span
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: 4,
-                          color: '#16a34a',
-                          fontSize: 12.5,
-                          fontWeight: 600,
-                        }}
-                      >
-                        <CheckCircle2 size={14} />
-                        <span>Đã giao đủ 100%</span>
+                      <span style={{ color: '#16a34a', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                        <CheckCircle2 size={13} />
+                        Giao nhận hoàn tất 100%
                       </span>
                     )}
                   </td>
@@ -266,7 +223,7 @@ export const GrnPoRemainingTable: FC<GrnPoRemainingTableProps> = ({
         </table>
       </div>
 
-      {/* PO Status Preview Callout */}
+      {/* PO Status Preview Callout - Enforcing Section 8.2 */}
       <div
         style={{
           display: 'flex',
@@ -275,68 +232,32 @@ export const GrnPoRemainingTable: FC<GrnPoRemainingTableProps> = ({
           flexWrap: 'wrap',
           gap: 12,
           padding: '12px 18px',
-          backgroundColor: poStatusPreview === 'COMPLETED' ? '#f0fdf4' : '#fffbeb',
+          backgroundColor: '#f0fdf4',
           borderTop: '1px solid #e2e8f0',
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <span style={{ fontSize: 13, fontWeight: 700, color: '#1e293b' }}>
-            Trạng thái PO sau khi duyệt:
+            Trạng thái PO khi hoàn tất:
           </span>
-          {readOnly ? (
-            <span
-              style={{
-                padding: '4px 10px',
-                borderRadius: 6,
-                fontSize: 12,
-                fontWeight: 800,
-                backgroundColor: poStatusPreview === 'COMPLETED' ? '#dcfce7' : '#fef3c7',
-                color: poStatusPreview === 'COMPLETED' ? '#15803d' : '#b45309',
-                border: `1px solid ${poStatusPreview === 'COMPLETED' ? '#86efac' : '#fde68a'}`,
-              }}
-            >
-              {poStatusPreview === 'COMPLETED'
-                ? '✅ COMPLETED (Đã đóng tất cả dòng đơn PO)'
-                : '🚚 PARTIALLY_RECEIVED (Còn thiếu hàng - Đơn PO tiếp tục mở)'}
-            </span>
-          ) : (
-            <select
-              value={poStatusPreview}
-              onChange={(e) => onPoStatusChange(e.target.value as PoStatusPreview)}
-              style={{
-                height: 32,
-                padding: '0 10px',
-                fontSize: 12.5,
-                fontWeight: 700,
-                borderRadius: 6,
-                border: '1px solid #cbd5e1',
-                backgroundColor: '#ffffff',
-                color: poStatusPreview === 'COMPLETED' ? '#15803d' : '#b45309',
-                cursor: 'pointer',
-                outline: 'none',
-              }}
-            >
-              <option value="PARTIALLY_RECEIVED">
-                🚚 PARTIALLY_RECEIVED (Còn thiếu hàng - Đơn PO tiếp tục mở)
-              </option>
-              <option value="COMPLETED">
-                ✅ COMPLETED (Tất cả phần thiếu đã hủy / Đã đóng đơn PO)
-              </option>
-            </select>
-          )}
+          <span
+            style={{
+              padding: '4px 10px',
+              borderRadius: 6,
+              fontSize: 12,
+              fontWeight: 800,
+              backgroundColor: '#dcfce7',
+              color: '#15803d',
+              border: '1px solid #86efac',
+            }}
+          >
+            ✅ COMPLETED (Đóng toàn bộ đơn PO theo chuẩn MT-GRMS V1)
+          </span>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5 }}>
-          <ArrowRight size={14} color="#64748b" />
-          {poStatusPreview === 'COMPLETED' ? (
-            <span style={{ color: '#15803d', fontWeight: 600 }}>
-              Tất cả dòng sản phẩm đã hoàn thành hoặc hủy phần thiếu. Đơn PO sẽ được đóng lại.
-            </span>
-          ) : (
-            <span style={{ color: '#b45309', fontWeight: 600 }}>
-              Đơn PO sẽ được giữ ở trạng thái Chờ giao bổ sung cho lần nhập hàng tiếp theo.
-            </span>
-          )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, color: '#15803d', fontWeight: 600 }}>
+          <Info size={14} />
+          <span>Theo nghiệp vụ V1: Khi Goods Receipt hoàn tất, PO chuyển sang COMPLETED kể cả khi giao thiếu (không backorder).</span>
         </div>
       </div>
     </div>

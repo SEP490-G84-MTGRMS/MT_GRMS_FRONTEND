@@ -119,7 +119,7 @@ export const GrnStockFefoTable: FC<GrnStockFefoTableProps> = ({
               <th style={{ padding: '9px 12px', minWidth: 220 }}>Tên sản phẩm</th>
               <th style={{ padding: '9px 12px', width: 130 }}>Mã Lô (Batch)</th>
               <th style={{ padding: '9px 12px', width: 130 }}>Hạn sử dụng</th>
-              <th style={{ padding: '9px 12px', textAlign: 'right', width: 100 }}>SL nhận</th>
+              <th style={{ padding: '9px 12px', textAlign: 'right', width: 130 }}>SL CHẤP NHẬN (+)</th>
               <th style={{ padding: '9px 12px', textAlign: 'right', width: 105 }}>Phí VC/ĐVT</th>
               <th style={{ padding: '9px 12px', textAlign: 'right', width: 110 }}>Giá vốn mới</th>
               <th style={{ padding: '9px 12px', textAlign: 'right', width: 110 }}>Giá bán lẻ</th>
@@ -134,6 +134,7 @@ export const GrnStockFefoTable: FC<GrnStockFefoTableProps> = ({
               const retail = item.retailPrice || (item.unitPrice ? item.unitPrice * 1.35 : 0);
               const margin = retail > 0 ? ((retail - unitCost) / retail) * 100 : 0;
               const nearExp = isNearExpiry(item.expiryDate);
+              const addQty = item.acceptedQty !== undefined ? item.acceptedQty : item.receivedQty;
 
               return (
                 <tr
@@ -243,10 +244,10 @@ export const GrnStockFefoTable: FC<GrnStockFefoTableProps> = ({
                     </div>
                   </td>
 
-                  {/* Received Qty */}
+                  {/* Accepted Qty (Stock Addition) */}
                   <td style={{ padding: '9px 12px', textAlign: 'right' }}>
-                    <strong style={{ fontSize: 13, color: '#0f172a' }}>
-                      {item.receivedQty} {item.unit}
+                    <strong style={{ fontSize: 13, color: '#0d9488' }}>
+                      {addQty} {item.unit}
                     </strong>
                   </td>
 
