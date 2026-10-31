@@ -1,17 +1,16 @@
 import { useState } from 'react';
 import type { FC } from 'react';
 import type { SupplierSummary } from '../../types/supplier.types';
-import { Copy, Check, QrCode, UserCheck, Edit3 } from 'lucide-react';
+import { Copy, Check, QrCode, Edit3 } from 'lucide-react';
 
 interface Props {
   supplier: SupplierSummary;
-  onLinkCustomer: (supplierId: string, customerId: string) => void;
+  onLinkCustomer?: (supplierId: string, customerId: string) => void;
   onEdit?: (tab?: 'basic' | 'terms' | 'bank') => void;
 }
 
-export const SupplierGeneralProfileTab: FC<Props> = ({ supplier, onLinkCustomer, onEdit }) => {
+export const SupplierGeneralProfileTab: FC<Props> = ({ supplier, onEdit }) => {
   const [copiedField, setCopiedField] = useState<string | null>(null);
-  const [customerIdInput, setCustomerIdInput] = useState('');
 
   const handleCopy = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
@@ -200,83 +199,23 @@ export const SupplierGeneralProfileTab: FC<Props> = ({ supplier, onLinkCustomer,
         ) : null}
       </div>
 
-      {/* Card 3: Đối tác kép & Ghi chú nghiệp vụ */}
-      <div className="supplier-detail-card">
-        <h2 className="supplier-detail-card-title">Đối tác kép (Dual-role) & Ghi chú</h2>
-
-        <div style={{
-          background: '#fffbeb',
-          border: '1px solid #fcd34d',
-          borderRadius: 16,
-          padding: '14px 18px',
-          marginBottom: 16,
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 700, color: '#78350f', fontSize: '0.85rem', marginBottom: 6 }}>
-            <UserCheck size={16} color="#d97706" />
-            <span>Quy Tắc Đối Tác Kép (Dual-role Supplier & Customer)</span>
-          </div>
-          <p style={{ margin: 0, fontSize: '0.8rem', color: '#92400e', lineHeight: 1.6 }}>
-            Nhà cung cấp đồng thời có thể là Khách hàng mua sỉ tại siêu thị tạp hóa.
-            Công nợ <strong>AP (Phải trả NCC)</strong> và <strong>AR (Phải thu Khách hàng)</strong> luôn được duy trì độc lập hoàn toàn, không cấn trừ tự động.
-          </p>
-        </div>
-
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 16 }}>
-          <input
-            type="text"
-            placeholder="Nhập Mã Khách Hàng (VD: CUST-2026-009)"
-            value={customerIdInput || supplier.linkedCustomerId || ''}
-            onChange={(e) => setCustomerIdInput(e.target.value)}
-            className="admin-search-input"
-            style={{ width: 280, height: 40 }}
-          />
-          <button
-            type="button"
-            className="admin-btn admin-btn-primary"
-            style={{ height: 40, padding: '0 18px' }}
-            onClick={() => {
-              if (!customerIdInput) return;
-              onLinkCustomer(supplier.id, customerIdInput);
-            }}
-          >
-            Lưu Liên Kết
-          </button>
-        </div>
-
-        {supplier.linkedCustomerId && (
+      {/* Card 3: Ghi chú nghiệp vụ (nếu có) */}
+      {supplier.note ? (
+        <div className="supplier-detail-card">
+          <h2 className="supplier-detail-card-title">Ghi chú</h2>
           <div style={{
-            background: '#e8f9ee',
-            border: '1px solid #bbf7d0',
+            fontSize: '0.85rem',
+            color: 'var(--text-main)',
+            lineHeight: 1.6,
+            background: 'var(--bg-soft-blue)',
             borderRadius: 14,
-            padding: '10px 16px',
-            fontSize: '0.82rem',
-            fontWeight: 600,
-            color: '#065f46',
-            marginBottom: 16,
+            padding: '12px 16px',
+            border: '1px solid var(--border-light)',
           }}>
-            ✓ Đã liên kết với Khách hàng: <span style={{ fontFamily: 'var(--font-mono)' }}>{supplier.linkedCustomerId}</span>
+            {supplier.note}
           </div>
-        )}
-
-        {/* Ghi chú */}
-        {supplier.note && (
-          <div style={{ marginTop: 12 }}>
-            <span className="supplier-contact-label">Ghi chú nghiệp vụ</span>
-            <div style={{
-              fontSize: '0.85rem',
-              color: 'var(--text-main)',
-              lineHeight: 1.6,
-              background: 'var(--bg-soft-blue)',
-              borderRadius: 14,
-              padding: '12px 16px',
-              border: '1px solid var(--border-light)',
-              marginTop: 6,
-            }}>
-              {supplier.note}
-            </div>
-          </div>
-        )}
-      </div>
+        </div>
+      ) : null}
     </div>
   );
 };
