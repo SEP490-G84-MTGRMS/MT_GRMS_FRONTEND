@@ -42,12 +42,9 @@ describe('ProductFormModal - Quản lý đơn vị tính & Hàng cùng loại (R
     );
 
     // Lấy ô Tên đơn vị cơ bản
-    const baseUnitInput = screen.getByPlaceholderText('chai') as HTMLInputElement;
+    const baseUnitInput = screen.getByPlaceholderText(/Chai/i) as HTMLInputElement;
 
-    // Xóa rỗng đơn vị cơ bản
-    fireEvent.change(baseUnitInput, { target: { value: '' } });
-
-    // Nút "+ Thêm đơn vị" phải bị disabled
+    // Ban đầu chưa nhập đơn vị cơ bản -> Nút "+ Thêm đơn vị" bị disabled
     const addUnitBtn = screen.getByText('+ Thêm đơn vị') as HTMLButtonElement;
     expect(addUnitBtn.disabled).toBe(true);
     expect(screen.getByText('(Cần nhập tên đơn vị cơ bản trước)')).toBeDefined();
@@ -75,7 +72,7 @@ describe('ProductFormModal - Quản lý đơn vị tính & Hàng cùng loại (R
     expect(screen.queryByText('Hàng cùng loại')).toBeNull();
 
     // Nhập đơn vị cơ bản "chai"
-    const baseUnitInput = screen.getByPlaceholderText('chai');
+    const baseUnitInput = screen.getByPlaceholderText(/Chai/i);
     fireEvent.change(baseUnitInput, { target: { value: 'chai' } });
 
     // Click "+ Thêm đơn vị"
@@ -247,5 +244,135 @@ describe('ProductFormModal - Quản lý đơn vị tính & Hàng cùng loại (R
     await waitFor(() => {
       expect(screen.getByDisplayValue('Thùng 24')).toBeDefined();
     });
+  });
+
+  it('REQ-10: Tìm kiếm nhóm hàng hỗ trợ cả tiếng Việt không dấu (vd: "do uong")', async () => {
+    render(
+      <ProductFormModal
+        isOpen={true}
+        categories={[
+          { id: 'cat-1', code: 'DU', name: 'Đồ uống & Nước giải khát', productCount: 10 },
+          { id: 'cat-2', code: 'BK', name: 'Bánh kẹo ăn vặt', productCount: 5 },
+        ]}
+        onClose={vi.fn()}
+        onSave={vi.fn()}
+        onOpenCreateCategoryModal={vi.fn()}
+      />
+    );
+
+    // Mở dropdown nhóm hàng
+    const dropdownTrigger = screen.getByText('Đồ uống & Nước giải khát');
+    fireEvent.click(dropdownTrigger);
+
+    // Ô tìm kiếm nhóm hàng
+    const searchInput = screen.getByPlaceholderText(/Tìm kiếm nhóm hàng/i);
+    // Nhập từ khóa không dấu "banh keo"
+    fireEvent.change(searchInput, { target: { value: 'banh keo' } });
+
+    // Kết quả danh sách dropdown lọc ra "Bánh kẹo ăn vặt" và ẩn "Đồ uống & Nước giải khát"
+    expect(screen.getByTestId('category-option-cat-2')).toBeDefined();
+    expect(screen.queryByTestId('category-option-cat-1')).toBeNull();
+  });
+
+  it('REQ-10: Tự động tính tiền đơn vị quy đổi theo giá bán đơn vị cơ bản khi thay đổi tỷ lệ quy đổi', () => {
+    render(
+      <ProductFormModal
+        isOpen={true}
+        categories={mockCategories}
+        onClose={vi.fn()}
+        onSave={vi.fn()}
+        onOpenCreateCategoryModal={vi.fn()}
+      />
+    );
+
+    // Nhập giá bán đơn vị cơ bản: 10,000 đ
+    const sellingPriceInputs = screen.getAllByPlaceholderText('0');
+    // Ô giá bán
+    fireEvent.change(sellingPriceInputs[1], { target: { value: '10000' } });
+
+    // Nhập đơn vị cơ bản "chai"
+    const baseUnitInput = screen.getByPlaceholderText(/Chai/i);
+    fireEvent.change(baseUnitInput, { target: { value: 'chai' } });
+
+    // Thêm đơn vị quy đổi
+    const addUnitBtn = screen.getByText('+ Thêm đơn vị');
+    fireEvent.click(addUnitBtn);
+
+    // Tìm ô conversionRate trong bảng "Hàng cùng loại" hoặc form
+    const rateInputs = screen.getAllByPlaceholderText('1');
+    // Thay đổi số lượng quy đổi thành 6 (Lốc 6)
+    fireEvent.change(rateInputs[0], { target: { value: '6' } });
+
+    // Giá bán của đơn vị quy đổi phải tự động thành 60,000 đ (6 * 10,000)
+    expect(screen.getAllByDisplayValue('60000').length).toBeGreaterThan(0);
+  });
+
+  it('REQ-10: Hiển thị Validation Popup khi submit thiếu thông tin bắt buộc thay vì banner trên form', () => {
+    render(
+      <ProductFormModal
+        isOpen={true}
+        categories={mockCategories}
+        onClose={vi.fn()}
+        onSave={vi.fn()}
+        onOpenCreateCategoryModal={vi.fn()}
+      />
+    );
+
+    // Nhấn nút "Lưu" mà chưa nhập tên sản phẩm
+    const saveBtn = screen.getByText('Lưu');
+    fireEvent.click(saveBtn);
+
+    // Phải hiển thị modal popup "Thông tin chưa hợp lệ" với nút "Đã hiểu"
+    expect(screen.getByText('Thông tin chưa hợp lệ')).toBeDefined();
+    expect(screen.getByText('Vui lòng nhập tên sản phẩm (Bắt buộc).')).toBeDefined();
+    const dismissBtn = screen.getByText('Đã hiểu');
+    expect(dismissBtn).toBeDefined();
+
+    // Nhấn nút "Đã hiểu" -> popup biến mất
+    fireEvent.click(dismissBtn);
+    expect(screen.queryByText('Thông tin chưa hợp lệ')).toBeNull();
+  });
+
+  it('REQ-10: Nhấn vào ảnh thumbnail hiển thị Popup xem ảnh to hơn (Lightbox)', () => {
+    const mockProductWithImg: any = {
+      id: 'prod-img-1',
+      productCode: 'SP000088',
+      productName: 'Bia Heineken',
+      categoryId: 'cat-1',
+      categoryName: 'Đồ uống',
+      baseUnit: 'Lon',
+      sellingPrice: 20000,
+      costPrice: 15000,
+      onHand: 100,
+      committed: 0,
+      status: 'Active',
+      createdAt: '2026-10-31',
+      updatedAt: '2026-10-31',
+      imageUrl: 'https://res.cloudinary.com/demo/image/upload/sample.jpg',
+      uomConversions: [],
+    };
+
+    render(
+      <ProductFormModal
+        isOpen={true}
+        productToEdit={mockProductWithImg}
+        categories={mockCategories}
+        onClose={vi.fn()}
+        onSave={vi.fn()}
+        onOpenCreateCategoryModal={vi.fn()}
+      />
+    );
+
+    // Tìm nút "Xem to" hoặc click vào thumbnail
+    const enlargeBtn = screen.getByText('Xem to');
+    fireEvent.click(enlargeBtn);
+
+    // Lightbox modal mở ra với nút "Đóng xem ảnh"
+    expect(screen.getByTitle('Đóng xem ảnh')).toBeDefined();
+    expect(screen.getByAltText('Chi tiết ảnh hàng hóa')).toBeDefined();
+
+    // Đóng popup
+    fireEvent.click(screen.getByTitle('Đóng xem ảnh'));
+    expect(screen.queryByTitle('Đóng xem ảnh')).toBeNull();
   });
 });

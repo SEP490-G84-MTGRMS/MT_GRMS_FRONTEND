@@ -73,18 +73,35 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     }
   }, [isOpen]);
 
+  // Tiện ích chuẩn hóa tiếng Việt không dấu để tìm kiếm nhóm hàng
+  const removeVietnameseTones = (str: string): string => {
+    return str
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/đ/g, 'd')
+      .replace(/Đ/g, 'D')
+      .toLowerCase();
+  };
+
   const filteredCategories = categories.filter((c) => {
     const kw = categorySearchKeyword.trim().toLowerCase();
     if (!kw) return true;
-    return (
+    const kwNoTone = removeVietnameseTones(kw);
+    const nameMatch =
       c.name.toLowerCase().includes(kw) ||
-      (c.code && c.code.toLowerCase().includes(kw))
+      removeVietnameseTones(c.name).includes(kwNoTone);
+    const codeMatch = Boolean(
+      c.code &&
+        (c.code.toLowerCase().includes(kw) ||
+          removeVietnameseTones(c.code).includes(kwNoTone))
     );
+    return nameMatch || codeMatch;
   });
 
   const selectedCategory = categories.find((c) => c.id === categoryId);
   const [images, setImages] = useState<string[]>([]);
   const [isUploadingImage, setIsUploadingImage] = useState<boolean>(false);
+  const [previewImageModalUrl, setPreviewImageModalUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // 2. Giá vốn, giá bán & Thuế VAT
@@ -104,7 +121,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
 
   // 4. Đơn vị tính & Quy đổi
   const [isUomExpanded, setIsUomExpanded] = useState<boolean>(true);
-  const [baseUnit, setBaseUnit] = useState('chai');
+  const [baseUnit, setBaseUnit] = useState('');
   const [baseUnitPrice, setBaseUnitPrice] = useState<number>(0);
   const [uomConversions, setUomConversions] = useState<UomConversion[]>([]);
   const [deletedUnitIds, setDeletedUnitIds] = useState<string[]>([]);
@@ -113,9 +130,9 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   const [description, setDescription] = useState('');
   const [internalNote, setInternalNote] = useState('');
 
-  // Alerts
-  const [errorMsg, setErrorMsg] = useState('');
+  // Alerts & Validation Popup
   const [warningMsg, setWarningMsg] = useState('');
+  const [validationPopupMsg, setValidationPopupMsg] = useState<string>('');
 
   const isEditing = Boolean(productToEdit);
   const hasTransactions = productToEdit?.hasTransactions || false;
@@ -140,7 +157,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         setIsFavorite(productToEdit.isFavorite ?? false);
         setIsSubmitting(false);
 
-        setBaseUnit(productToEdit.baseUnit || 'chai');
+        setBaseUnit(productToEdit.baseUnit || '');
         setBaseUnitPrice(productToEdit.sellingPrice || 0);
         setDeletedUnitIds([]);
 
@@ -175,8 +192,8 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         setDescription(productToEdit.description || '');
         setInternalNote(productToEdit.internalNote || '');
 
-        setErrorMsg('');
         setWarningMsg('');
+        setValidationPopupMsg('');
       } else {
         setProductCode('');
         setBarcode('');
@@ -195,7 +212,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         setIsFavorite(false);
         setIsSubmitting(false);
 
-        setBaseUnit('chai');
+        setBaseUnit('');
         setBaseUnitPrice(0);
         setUomConversions([]);
         setDeletedUnitIds([]);
@@ -203,8 +220,9 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         setDescription('');
         setInternalNote('');
 
-        setErrorMsg('');
         setWarningMsg('');
+        setValidationPopupMsg('');
+        setPreviewImageModalUrl(null);
       }
     }
   }, [productToEdit, isOpen]);
@@ -229,19 +247,23 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
 
   if (!isOpen) return null;
 
+  const triggerValidationError = (msg: string) => {
+    setValidationPopupMsg(msg);
+  };
+
   // Add UOM conversion row
   const handleAddUom = () => {
     if (!baseUnit.trim()) {
-      setErrorMsg('Vui lòng nhập tên đơn vị cơ bản trước khi thêm đơn vị quy đổi.');
+      triggerValidationError('Vui lòng nhập tên đơn vị cơ bản trước khi thêm đơn vị quy đổi.');
       return;
     }
-    setErrorMsg('');
+    setValidationPopupMsg('');
     const newUom: UomConversion = {
       id: `uom-${Date.now()}`,
       unitName: '',
       conversionRate: 1,
       barcode: '',
-      price: 0,
+      price: sellingPrice || 0,
       productCode: '',
     };
     setUomConversions([...uomConversions, newUom]);
@@ -249,7 +271,16 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
 
   const handleUpdateUom = (id: string, field: keyof UomConversion, value: any) => {
     setUomConversions(
-      uomConversions.map((u) => (u.id === id ? { ...u, [field]: value } : u))
+      uomConversions.map((u) => {
+        if (u.id !== id) return u;
+        if (field === 'conversionRate') {
+          const newRate = Number(value) || 0;
+          // Tự động tính giá bán theo tỷ lệ quy đổi * giá bán đơn vị cơ bản
+          const autoPrice = newRate > 0 && sellingPrice > 0 ? newRate * sellingPrice : u.price;
+          return { ...u, conversionRate: newRate, price: autoPrice };
+        }
+        return { ...u, [field]: value };
+      })
     );
   };
 
@@ -267,17 +298,17 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
 
     const file = files[0];
     if (file.size > 5 * 1024 * 1024) {
-      setErrorMsg('Kích thước ảnh không được vượt quá 5 MB!');
+      triggerValidationError('Kích thước ảnh không được vượt quá 5 MB!');
       return;
     }
 
     try {
       setIsUploadingImage(true);
-      setErrorMsg('');
+      setValidationPopupMsg('');
       const secureUrl = await uploadImageToCloudinary(file);
       setImages((prev) => [...prev, secureUrl]);
     } catch (err: any) {
-      setErrorMsg(
+      triggerValidationError(
         err?.message || 'Không thể tải ảnh lên Cloudinary. Vui lòng kiểm tra lại kết nối mạng hoặc cấu hình .env.'
       );
     } finally {
@@ -295,31 +326,23 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   // Submit Handler
   const handleSubmit = async (saveAndAddNew: boolean = false) => {
     if (!productName.trim()) {
-      setErrorMsg('Vui lòng nhập tên sản phẩm (Bắt buộc).');
+      triggerValidationError('Vui lòng nhập tên sản phẩm (Bắt buộc).');
       return;
     }
     if (!categoryId) {
-      setErrorMsg('Vui lòng chọn nhóm hàng (Bắt buộc).');
+      triggerValidationError('Vui lòng chọn nhóm hàng (Bắt buộc).');
       return;
     }
     if (!baseUnit.trim()) {
-      setErrorMsg('Vui lòng nhập tên đơn vị cơ bản.');
+      triggerValidationError('Vui lòng nhập tên đơn vị cơ bản (Bắt buộc).');
       return;
     }
     if (minStock < 0) {
-      setErrorMsg('Định mức tồn thấp nhất không được nhỏ hơn 0.');
+      triggerValidationError('Định mức tồn thấp nhất không được nhỏ hơn 0.');
       return;
     }
     if (maxStock < minStock) {
-      setErrorMsg('Định mức tồn cao nhất không được nhỏ hơn định mức tồn thấp nhất.');
-      return;
-    }
-    if (minStock < 0) {
-      setErrorMsg('Định mức tồn thấp nhất không được nhỏ hơn 0.');
-      return;
-    }
-    if (maxStock < minStock) {
-      setErrorMsg('Định mức tồn cao nhất không được nhỏ hơn định mức tồn thấp nhất.');
+      triggerValidationError('Định mức tồn cao nhất không được nhỏ hơn định mức tồn thấp nhất.');
       return;
     }
     if (sellingPrice < costPrice && costPrice > 0 && !warningMsg) {
@@ -329,8 +352,8 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
 
     try {
       setIsSubmitting(true);
-      setErrorMsg('');
       setWarningMsg('');
+      setValidationPopupMsg('');
 
       const selectedCategory = categories.find((c) => c.id === categoryId);
 
@@ -341,7 +364,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         categoryId,
         categoryName: selectedCategory ? selectedCategory.name : 'Khác',
         imageUrl: images[0] || undefined,
-        baseUnit: baseUnit.trim() || 'Cái',
+        baseUnit: baseUnit.trim(),
         sellingPrice,
         costPrice: userRole === 'StoreOwner' ? costPrice : productToEdit?.costPrice ?? 0,
         onHand: initialStock,
@@ -369,7 +392,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         setInitialStock(0);
         setMinStock(0);
         setMaxStock(1000);
-        setBaseUnit('Cái');
+        setBaseUnit('');
         setBaseUnitPrice(0);
         setUomConversions([]);
         setDeletedUnitIds([]);
@@ -378,11 +401,12 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         setHasBatches(false);
         setIsFavorite(false);
         setVatRate(0);
-        setErrorMsg('');
         setWarningMsg('');
+        setValidationPopupMsg('');
+        setPreviewImageModalUrl(null);
       }
     } catch (err: any) {
-      setErrorMsg(err?.message || 'Có lỗi xảy ra khi lưu hàng hóa.');
+      triggerValidationError(err?.message || 'Có lỗi xảy ra khi lưu hàng hóa.');
     } finally {
       setIsSubmitting(false);
     }
@@ -390,7 +414,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
 
   return (
     <div className="custom-modal-backdrop">
-      <div className="custom-modal-box" style={{ maxWidth: 960 }}>
+      <div className="custom-modal-box" style={{ maxWidth: 1160, width: '96vw' }}>
         {/* ========================================================= */}
         {/* HEADER: Tiêu đề & Nút đóng (19)                           */}
         {/* ========================================================= */}
@@ -424,25 +448,6 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
             backgroundColor: '#F8FAFC',
           }}
         >
-          {errorMsg && (
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                padding: '10px 14px',
-                backgroundColor: '#FEE2E2',
-                color: '#DC2626',
-                borderRadius: 10,
-                fontSize: 13,
-                fontWeight: 500,
-              }}
-            >
-              <AlertCircle size={16} />
-              <span>{errorMsg}</span>
-            </div>
-          )}
-
           {warningMsg && (
             <div
               style={{
@@ -788,6 +793,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                             return (
                               <div
                                 key={c.id}
+                                data-testid={`category-option-${c.id}`}
                                 onClick={() => {
                                   setCategoryId(c.id);
                                   setIsCategoryDropdownOpen(false);
@@ -925,7 +931,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                     flexDirection: 'column',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    padding: '14px 10px',
+                    padding: images.length > 0 ? '6px 8px' : '14px 10px',
                     width: '100%',
                     boxSizing: 'border-box',
                   }}
@@ -947,6 +953,73 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                         Vui lòng chờ trong giây lát
                       </span>
                     </>
+                  ) : images.length > 0 ? (
+                    <div
+                      style={{
+                        position: 'relative',
+                        width: '100%',
+                        height: 120,
+                        borderRadius: 8,
+                        overflow: 'hidden',
+                        backgroundColor: '#F8FAFC',
+                        border: '1px solid #E2E8F0',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                      onClick={() => setPreviewImageModalUrl(images[0])}
+                      title="Bấm để xem ảnh phóng to"
+                    >
+                      <img
+                        src={images[0]}
+                        alt="Ảnh hàng hóa chính"
+                        style={{
+                          maxWidth: '100%',
+                          maxHeight: '100%',
+                          objectFit: 'contain',
+                        }}
+                      />
+                      <div
+                        style={{
+                          position: 'absolute',
+                          bottom: 6,
+                          display: 'flex',
+                          gap: 6,
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <button
+                          type="button"
+                          className="btn-secondary-white"
+                          style={{
+                            padding: '3px 8px',
+                            fontSize: 11,
+                            fontWeight: 600,
+                            borderRadius: 6,
+                            boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                          }}
+                          onClick={() => setPreviewImageModalUrl(images[0])}
+                        >
+                          <Search size={12} style={{ marginRight: 4 }} /> Xem to
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-secondary-white"
+                          style={{
+                            padding: '3px 8px',
+                            fontSize: 11,
+                            fontWeight: 600,
+                            borderRadius: 6,
+                            boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                          }}
+                          disabled={isSubmitting}
+                          onClick={() => fileInputRef.current?.click()}
+                        >
+                          <Plus size={12} style={{ marginRight: 4 }} /> Thêm ảnh
+                        </button>
+                      </div>
+                    </div>
                   ) : (
                     <>
                       <Camera size={26} color="#475569" style={{ marginBottom: 8 }} />
@@ -990,14 +1063,18 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                     images.map((img, idx) => (
                       <div
                         key={idx}
+                        onClick={() => setPreviewImageModalUrl(img)}
                         style={{
                           width: 44,
                           height: 44,
                           borderRadius: 6,
-                          border: '1px solid #CBD5E1',
+                          border: '1.5px solid #CBD5E1',
                           overflow: 'hidden',
                           position: 'relative',
+                          cursor: 'pointer',
+                          boxShadow: '0 1px 2px rgba(0,0,0,0.08)',
                         }}
+                        title="Bấm để xem ảnh phóng to"
                       >
                         <img
                           src={img}
@@ -1006,7 +1083,10 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                         />
                         <button
                           type="button"
-                          onClick={() => handleRemoveImage(idx)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRemoveImage(idx);
+                          }}
                           style={{
                             position: 'absolute',
                             top: 0,
@@ -1019,6 +1099,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                             padding: '1px 3px',
                             lineHeight: 1,
                           }}
+                          title="Xóa ảnh"
                         >
                           &times;
                         </button>
@@ -1094,8 +1175,10 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                       type="number"
                       className="filter-input"
                       style={{ paddingRight: 32 }}
-                      value={costPrice}
-                      onChange={(e) => setCostPrice(Number(e.target.value))}
+                      placeholder="0"
+                      value={costPrice === 0 ? '' : costPrice}
+                      onChange={(e) => setCostPrice(e.target.value === '' ? 0 : Math.max(0, Number(e.target.value)))}
+                      onFocus={(e) => e.target.select()}
                       min={0}
                     />
                     <span
@@ -1132,8 +1215,10 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                     type="number"
                     className="filter-input"
                     style={{ paddingRight: 32 }}
-                    value={sellingPrice}
-                    onChange={(e) => handleSellingPriceChange(Number(e.target.value))}
+                    placeholder="0"
+                    value={sellingPrice === 0 ? '' : sellingPrice}
+                    onChange={(e) => handleSellingPriceChange(e.target.value === '' ? 0 : Math.max(0, Number(e.target.value)))}
+                    onFocus={(e) => e.target.select()}
                     min={0}
                     required
                   />
@@ -1165,16 +1250,58 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                 >
                   Thuế suất VAT (%)
                 </label>
-                <select
-                  className="filter-select"
-                  value={vatRate}
-                  onChange={(e) => setVatRate(Number(e.target.value))}
-                >
-                  <option value={0}>0% (Nông sản / Miễn thuế)</option>
-                  <option value={5}>5% (Thực phẩm thiết yếu)</option>
-                  <option value={8}>8% (Ưu đãi theo NĐ 94/2023)</option>
-                  <option value={10}>10% (Tiêu chuẩn)</option>
-                </select>
+                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                  <div style={{ position: 'relative', width: 90 }}>
+                    <input
+                      type="number"
+                      className="filter-input"
+                      style={{ paddingRight: 24, textAlign: 'right' }}
+                      min={0}
+                      max={100}
+                      step={0.5}
+                      value={vatRate === 0 ? '' : vatRate}
+                      placeholder="0"
+                      onChange={(e) =>
+                        setVatRate(e.target.value === '' ? 0 : Math.max(0, Math.min(100, Number(e.target.value))))
+                      }
+                      onFocus={(e) => e.target.select()}
+                    />
+                    <span
+                      style={{
+                        position: 'absolute',
+                        right: 8,
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        fontSize: 13,
+                        color: '#64748B',
+                        pointerEvents: 'none',
+                      }}
+                    >
+                      %
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                    {[0, 5, 8, 10].map((rate) => (
+                      <button
+                        key={rate}
+                        type="button"
+                        onClick={() => setVatRate(rate)}
+                        style={{
+                          padding: '6px 10px',
+                          fontSize: 12,
+                          fontWeight: vatRate === rate ? 700 : 500,
+                          background: vatRate === rate ? '#E6FFFA' : '#F8FAFC',
+                          color: vatRate === rate ? '#0F766E' : '#475569',
+                          border: vatRate === rate ? '1.5px solid #0D9488' : '1px solid #CBD5E1',
+                          borderRadius: 6,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        {rate}%
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -1251,8 +1378,10 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                 <input
                   type="number"
                   className="filter-input"
-                  value={initialStock}
-                  onChange={(e) => setInitialStock(Number(e.target.value))}
+                  placeholder="0"
+                  value={initialStock === 0 ? '' : initialStock}
+                  onChange={(e) => setInitialStock(e.target.value === '' ? 0 : Math.max(0, Number(e.target.value)))}
+                  onFocus={(e) => e.target.select()}
                   min={0}
                 />
               </div>
@@ -1273,8 +1402,10 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                 <input
                   type="number"
                   className="filter-input"
-                  value={minStock}
-                  onChange={(e) => setMinStock(Number(e.target.value))}
+                  placeholder="0"
+                  value={minStock === 0 ? '' : minStock}
+                  onChange={(e) => setMinStock(e.target.value === '' ? 0 : Math.max(0, Number(e.target.value)))}
+                  onFocus={(e) => e.target.select()}
                   min={0}
                 />
               </div>
@@ -1295,8 +1426,10 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                 <input
                   type="number"
                   className="filter-input"
-                  value={maxStock}
-                  onChange={(e) => setMaxStock(Number(e.target.value))}
+                  placeholder="1000"
+                  value={maxStock === 0 ? '' : maxStock}
+                  onChange={(e) => setMaxStock(e.target.value === '' ? 0 : Math.max(0, Number(e.target.value)))}
+                  onFocus={(e) => e.target.select()}
                   min={0}
                 />
               </div>
@@ -1379,7 +1512,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                     <input
                       type="text"
                       className="filter-input"
-                      placeholder="chai"
+                      placeholder="VD: Chai, Lon, Gói, Hộp..."
                       value={baseUnit}
                       disabled={hasTransactions}
                       onChange={(e) => setBaseUnit(e.target.value)}
@@ -1401,8 +1534,10 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                     <input
                       type="number"
                       className="filter-input"
-                      value={baseUnitPrice}
-                      onChange={(e) => setBaseUnitPrice(Number(e.target.value))}
+                      placeholder="0"
+                      value={baseUnitPrice === 0 ? '' : baseUnitPrice}
+                      onChange={(e) => setBaseUnitPrice(e.target.value === '' ? 0 : Math.max(0, Number(e.target.value)))}
+                      onFocus={(e) => e.target.select()}
                       min={0}
                     />
                   </div>
@@ -1437,11 +1572,13 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                       <input
                         type="number"
                         className="filter-input"
-                        value={uom.conversionRate}
+                        placeholder="1"
+                        value={uom.conversionRate === 0 ? '' : uom.conversionRate}
                         onChange={(e) =>
-                          handleUpdateUom(uom.id, 'conversionRate', Number(e.target.value))
+                          handleUpdateUom(uom.id, 'conversionRate', e.target.value === '' ? 0 : Number(e.target.value))
                         }
-                        min={2}
+                        onFocus={(e) => e.target.select()}
+                        min={1}
                       />
                     </div>
 
@@ -1456,10 +1593,11 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                         type="number"
                         className="filter-input"
                         placeholder="Giá bán"
-                        value={uom.price}
+                        value={uom.price === 0 ? '' : uom.price}
                         onChange={(e) =>
-                          handleUpdateUom(uom.id, 'price', Number(e.target.value))
+                          handleUpdateUom(uom.id, 'price', e.target.value === '' ? 0 : Math.max(0, Number(e.target.value)))
                         }
+                        onFocus={(e) => e.target.select()}
                         min={0}
                       />
                     </div>
@@ -1617,8 +1755,10 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                             <td style={{ padding: '8px' }}>
                               <input
                                 type="number"
-                                value={costPrice}
-                                onChange={(e) => setCostPrice(Number(e.target.value))}
+                                placeholder="0"
+                                value={costPrice === 0 ? '' : costPrice}
+                                onChange={(e) => setCostPrice(e.target.value === '' ? 0 : Math.max(0, Number(e.target.value)))}
+                                onFocus={(e) => e.target.select()}
                                 style={{
                                   width: '100%',
                                   padding: '6px 8px',
@@ -1632,8 +1772,10 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                             <td style={{ padding: '8px' }}>
                               <input
                                 type="number"
-                                value={sellingPrice}
-                                onChange={(e) => handleSellingPriceChange(Number(e.target.value))}
+                                placeholder="0"
+                                value={sellingPrice === 0 ? '' : sellingPrice}
+                                onChange={(e) => handleSellingPriceChange(e.target.value === '' ? 0 : Math.max(0, Number(e.target.value)))}
+                                onFocus={(e) => e.target.select()}
                                 style={{
                                   width: '100%',
                                   padding: '6px 8px',
@@ -1647,8 +1789,10 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                             <td style={{ padding: '8px' }}>
                               <input
                                 type="number"
-                                value={initialStock}
-                                onChange={(e) => setInitialStock(Number(e.target.value))}
+                                placeholder="0"
+                                value={initialStock === 0 ? '' : initialStock}
+                                onChange={(e) => setInitialStock(e.target.value === '' ? 0 : Math.max(0, Number(e.target.value)))}
+                                onFocus={(e) => e.target.select()}
                                 style={{
                                   width: '100%',
                                   padding: '6px 8px',
@@ -1694,10 +1838,12 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                                   <input
                                     type="number"
                                     min={1}
-                                    value={uom.conversionRate}
+                                    placeholder="1"
+                                    value={uom.conversionRate === 0 ? '' : uom.conversionRate}
                                     onChange={(e) =>
-                                      handleUpdateUom(uom.id, 'conversionRate', Number(e.target.value))
+                                      handleUpdateUom(uom.id, 'conversionRate', e.target.value === '' ? 0 : Number(e.target.value))
                                     }
+                                    onFocus={(e) => e.target.select()}
                                     style={{
                                       width: '100%',
                                       padding: '6px 8px',
@@ -1758,8 +1904,12 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                                 <td style={{ padding: '8px' }}>
                                   <input
                                     type="number"
-                                    value={uom.price}
-                                    onChange={(e) => handleUpdateUom(uom.id, 'price', Number(e.target.value))}
+                                    placeholder="0"
+                                    value={uom.price === 0 ? '' : uom.price}
+                                    onChange={(e) =>
+                                      handleUpdateUom(uom.id, 'price', e.target.value === '' ? 0 : Math.max(0, Number(e.target.value)))
+                                    }
+                                    onFocus={(e) => e.target.select()}
                                     style={{
                                       width: '100%',
                                       padding: '6px 8px',
@@ -1952,6 +2102,125 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Lightbox Popup Xem Chi Tiết Ảnh Phóng To */}
+      {previewImageModalUrl && (
+        <div
+          className="custom-modal-backdrop"
+          style={{ zIndex: 10002, backgroundColor: 'rgba(15, 23, 42, 0.85)' }}
+          onClick={() => setPreviewImageModalUrl(null)}
+        >
+          <div
+            style={{
+              position: 'relative',
+              maxWidth: '90vw',
+              maxHeight: '90vh',
+              background: '#FFFFFF',
+              borderRadius: 14,
+              padding: 12,
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.4)',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => setPreviewImageModalUrl(null)}
+              style={{
+                position: 'absolute',
+                top: -14,
+                right: -14,
+                background: '#0F172A',
+                color: '#FFFFFF',
+                border: '2px solid #FFFFFF',
+                borderRadius: '50%',
+                width: 32,
+                height: 32,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+              }}
+              title="Đóng xem ảnh"
+            >
+              <X size={18} />
+            </button>
+            <img
+              src={previewImageModalUrl}
+              alt="Chi tiết ảnh hàng hóa"
+              style={{
+                maxWidth: '82vw',
+                maxHeight: '80vh',
+                objectFit: 'contain',
+                borderRadius: 8,
+                display: 'block',
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Validation Alert Popup */}
+      {validationPopupMsg && (
+        <div
+          className="custom-modal-backdrop"
+          style={{ zIndex: 10001, backgroundColor: 'rgba(15, 23, 42, 0.65)' }}
+          onClick={() => setValidationPopupMsg('')}
+        >
+          <div
+            style={{
+              background: '#FFFFFF',
+              borderRadius: 14,
+              padding: '24px 28px',
+              maxWidth: 420,
+              width: '90%',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.25), 0 10px 10px -5px rgba(0, 0, 0, 0.1)',
+              textAlign: 'center',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              style={{
+                width: 52,
+                height: 52,
+                borderRadius: '50%',
+                background: '#FEF2F2',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                margin: '0 auto 14px',
+              }}
+            >
+              <AlertCircle size={28} color="#EF4444" />
+            </div>
+            <h4 style={{ margin: '0 0 8px', fontSize: 17, fontWeight: 700, color: '#0F172A' }}>
+              Thông tin chưa hợp lệ
+            </h4>
+            <p style={{ margin: '0 0 20px', fontSize: 14, color: '#475569', lineHeight: 1.5 }}>
+              {validationPopupMsg}
+            </p>
+            <button
+              type="button"
+              className="btn-primary-teal"
+              style={{
+                width: '100%',
+                padding: '10px 16px',
+                fontWeight: 600,
+                fontSize: 14,
+                borderRadius: 8,
+                justifyContent: 'center',
+              }}
+              onClick={() => setValidationPopupMsg('')}
+              autoFocus
+            >
+              Đã hiểu
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
