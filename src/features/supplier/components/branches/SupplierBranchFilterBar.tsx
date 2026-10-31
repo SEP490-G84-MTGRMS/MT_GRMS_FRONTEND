@@ -386,21 +386,7 @@ export const SupplierBranchFilterBar: FC<SupplierBranchFilterBarProps> = ({
   });
 
   return (
-    <div
-      ref={barRef}
-      style={{
-        backgroundColor: '#ffffff',
-        border: '1px solid #e2e8f0',
-        borderRadius: 8,
-        padding: '10px 14px',
-        marginBottom: 0,
-        boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 10,
-        flexShrink: 0,
-      }}
-    >
+    <div ref={barRef} className="so-list-filter">
       <div
         style={{
           display: 'flex',
@@ -690,27 +676,12 @@ export const SupplierBranchFilterBar: FC<SupplierBranchFilterBarProps> = ({
           )}
         </div>
 
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginLeft: 'auto' }}>
+        <div className="so-list-filter-actions">
           <button
             type="button"
             id="btnBranchSearch"
+            className="so-list-filter-search"
             onClick={() => handleSubmit()}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6,
-              height: 32,
-              padding: '0 18px',
-              borderRadius: 6,
-              border: 'none',
-              backgroundColor: 'var(--blue-primary, #0f766e)',
-              color: '#ffffff',
-              fontSize: 12.5,
-              fontWeight: 600,
-              cursor: 'pointer',
-              whiteSpace: 'nowrap',
-              boxShadow: '0 1px 2px rgba(15, 118, 110, 0.2)',
-            }}
             title="Áp dụng bộ lọc tìm kiếm"
           >
             <Search size={14} />
@@ -720,22 +691,8 @@ export const SupplierBranchFilterBar: FC<SupplierBranchFilterBarProps> = ({
           <button
             type="button"
             id="btnBranchReset"
+            className="so-list-filter-reset"
             onClick={handleResetClick}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 5,
-              height: 32,
-              padding: '0 14px',
-              borderRadius: 6,
-              border: '1px solid #cbd5e1',
-              backgroundColor: '#ffffff',
-              color: '#475569',
-              fontSize: 12.5,
-              fontWeight: 600,
-              cursor: 'pointer',
-              whiteSpace: 'nowrap',
-            }}
             title="Đặt lại toàn bộ tiêu chí lọc"
           >
             <RotateCcw size={13} />

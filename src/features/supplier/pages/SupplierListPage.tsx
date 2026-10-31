@@ -34,7 +34,7 @@ const DEFAULT_FILTERS: SupplierFilterState = {
   ratingFilter: '',
   status: '',
   pageIndex: 1,
-  pageSize: 12,
+  pageSize: 15,
 };
 
 export const SupplierListPage: FC = () => {
@@ -238,42 +238,19 @@ export const SupplierListPage: FC = () => {
       {/* Toast Notification */}
       <AdminToast toast={toast} onClose={() => setToast(null)} />
 
-      {/* ── Page Header theo chuẩn PoList ── */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          flexWrap: 'wrap',
-          gap: 12,
-          marginBottom: 8,
-          flexShrink: 0,
-        }}
-      >
+      <div className="so-list-header">
         <div>
-          <h1
-            style={{
-              fontSize: 20,
-              fontWeight: 800,
-              color: 'var(--text-main)',
-              margin: 0,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-            }}
-          >
+          <h1 className="so-list-title">
             <Building2 size={22} color="var(--blue-primary, #0f766e)" />
             <span>Quản lý Nhà Cung Cấp</span>
             {isLoading && <Loader2 size={16} className="animate-spin" style={{ color: 'var(--blue-primary, #0f766e)' }} />}
           </h1>
         </div>
 
-        {/* Action buttons */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div className="so-list-header-actions">
           <Link
             to="/store-owner/suppliers/products"
             className="po-btn po-btn-secondary"
-            style={{ height: 32, padding: '0 14px', textDecoration: 'none' }}
             title="Quản lý danh mục sản phẩm theo từng Nhà cung cấp"
           >
             <Package size={14} />
@@ -282,7 +259,6 @@ export const SupplierListPage: FC = () => {
           <Link
             to="/store-owner/suppliers/branches"
             className="po-btn po-btn-secondary"
-            style={{ height: 32, padding: '0 14px', textDecoration: 'none' }}
             title="Gán nhà cung cấp phân bổ tới các cửa hàng / chi nhánh"
           >
             <Store size={14} />
@@ -291,7 +267,6 @@ export const SupplierListPage: FC = () => {
           <button
             type="button"
             className="po-btn po-btn-secondary"
-            style={{ height: 32, padding: '0 14px' }}
             onClick={handleExportExcel}
             disabled={isExporting || isLoading}
             title="Xuất danh sách nhà cung cấp ra Excel"
@@ -303,7 +278,6 @@ export const SupplierListPage: FC = () => {
             <button
               type="button"
               className="po-btn po-btn-primary"
-              style={{ height: 32, padding: '0 14px' }}
               onClick={() => {
                 setEditingSupplier(null);
                 setModalTab('basic');

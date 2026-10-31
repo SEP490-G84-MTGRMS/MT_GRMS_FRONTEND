@@ -173,44 +173,13 @@ export const SupplierProductTable: FC<SupplierProductTableProps> = ({
   };
 
   return (
-    <div
-      style={{
-        backgroundColor: '#ffffff',
-        borderRadius: 8,
-        border: '1px solid #e2e8f0',
-        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
-        overflow: 'hidden',
-        display: 'flex',
-        flexDirection: 'column',
-        flex: 1,
-        minHeight: 0,
-        width: '100%',
-      }}
-    >
-      {/* ── Table Header (Fixed at top, strictly outside vertical scroll) ── */}
+    <div className="so-list-table-card">
       <div
         ref={headerRef}
-        style={{
-          width: '100%',
-          overflowX: 'hidden',
-          backgroundColor: '#f8fafc',
-          borderBottom: '1px solid #cbd5e1',
-          flexShrink: 0,
-          boxSizing: 'border-box',
-          paddingRight: hasScrollY ? 6 : 0,
-        }}
+        className="so-list-table-head"
+        style={{ paddingRight: hasScrollY ? 6 : 0 }}
       >
-        <table
-          style={{
-            width: '100%',
-            minWidth: 1000,
-            tableLayout: 'fixed',
-            borderCollapse: 'separate',
-            borderSpacing: 0,
-            textAlign: 'left',
-            fontSize: 12.5,
-          }}
-        >
+        <table className="so-list-table">
           {tableColGroup}
           <thead>
             <tr>
@@ -299,26 +268,10 @@ export const SupplierProductTable: FC<SupplierProductTableProps> = ({
       {/* ── Table Body Scroll Container (Vertical scroll strictly in rows area) ── */}
       <div
         ref={bodyRef}
+        className="so-list-table-body supplier-table-scroll-container"
         onScroll={handleBodyScroll}
-        style={{
-          overflowY: 'auto',
-          overflowX: 'auto',
-          width: '100%',
-          flex: '1 1 auto',
-          minHeight: 0,
-        }}
       >
-        <table
-          style={{
-            width: '100%',
-            minWidth: 1000,
-            tableLayout: 'fixed',
-            borderCollapse: 'separate',
-            borderSpacing: 0,
-            textAlign: 'left',
-            fontSize: 12.5,
-          }}
-        >
+        <table className="so-list-table">
           {tableColGroup}
           <tbody>
             {sortedProducts.length > 0 ? (
@@ -340,7 +293,7 @@ export const SupplierProductTable: FC<SupplierProductTableProps> = ({
             ) : (
               <tr>
                 <td
-                  colSpan={12}
+                  colSpan={11}
                   style={{
                     textAlign: 'center',
                     padding: '48px 16px',
@@ -375,22 +328,7 @@ export const SupplierProductTable: FC<SupplierProductTableProps> = ({
       </div>
 
       {/* ── Footer Phân trang (Paging) tích hợp chuẩn theo SupplierTable ── */}
-      <div
-        style={{
-          padding: '10px 16px',
-          borderTop: '1px solid #e2e8f0',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          fontSize: 12,
-          color: '#64748b',
-          backgroundColor: '#ffffff',
-          flexWrap: 'wrap',
-          gap: 10,
-          flexShrink: 0,
-          zIndex: 15,
-        }}
-      >
+      <div className="so-list-pager">
         {/* Bên trái: Thông tin số lượng & Chọn số bản ghi / trang */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
           <div>
@@ -400,25 +338,14 @@ export const SupplierProductTable: FC<SupplierProductTableProps> = ({
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
             <span style={{ color: '#64748b' }}>Bản ghi/trang:</span>
             <select
+              className="so-list-pager-select"
               value={pageSize}
               onChange={(e) => onPageSizeChange(Number(e.target.value))}
-              style={{
-                height: 28,
-                padding: '0 8px',
-                borderRadius: 5,
-                border: '1px solid #cbd5e1',
-                backgroundColor: '#ffffff',
-                color: '#0f172a',
-                fontSize: 12,
-                fontWeight: 600,
-                cursor: 'pointer',
-                outline: 'none',
-              }}
             >
-              <option value={10}>10</option>
-              <option value={20}>20</option>
-              <option value={30}>30</option>
-              <option value={50}>50</option>
+              <option value={15}>15</option>
+              <option value={24}>24</option>
+              <option value={36}>36</option>
+              <option value={48}>48</option>
             </select>
           </div>
         </div>
@@ -427,23 +354,9 @@ export const SupplierProductTable: FC<SupplierProductTableProps> = ({
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <button
             type="button"
+            className="so-list-pager-btn"
             disabled={pageIndex <= 1}
             onClick={() => onPageChange(pageIndex - 1)}
-            style={{
-              height: 28,
-              padding: '0 8px',
-              borderRadius: 6,
-              border: '1px solid #cbd5e1',
-              backgroundColor: '#ffffff',
-              color: pageIndex <= 1 ? '#94a3b8' : '#334155',
-              cursor: pageIndex <= 1 ? 'not-allowed' : 'pointer',
-              opacity: pageIndex <= 1 ? 0.45 : 1,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 4,
-              fontSize: 12,
-              fontWeight: 600,
-            }}
           >
             <ChevronLeft size={13} />
             <span>Trước</span>
@@ -455,23 +368,9 @@ export const SupplierProductTable: FC<SupplierProductTableProps> = ({
 
           <button
             type="button"
+            className="so-list-pager-btn"
             disabled={pageIndex >= totalPages}
             onClick={() => onPageChange(pageIndex + 1)}
-            style={{
-              height: 28,
-              padding: '0 8px',
-              borderRadius: 6,
-              border: '1px solid #cbd5e1',
-              backgroundColor: '#ffffff',
-              color: pageIndex >= totalPages ? '#94a3b8' : '#334155',
-              cursor: pageIndex >= totalPages ? 'not-allowed' : 'pointer',
-              opacity: pageIndex >= totalPages ? 0.45 : 1,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 4,
-              fontSize: 12,
-              fontWeight: 600,
-            }}
           >
             <span>Sau</span>
             <ChevronRight size={13} />

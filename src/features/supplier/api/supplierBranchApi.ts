@@ -91,7 +91,7 @@ export const supplierBranchApi = {
             supplierId: filter.supplierId && filter.supplierId !== 'ALL' ? filter.supplierId : undefined,
             branchId: filter.branchId && filter.branchId !== 'ALL' ? filter.branchId : undefined,
             pageIndex: filter.pageIndex || 1,
-            pageSize: filter.pageSize || 12,
+            pageSize: filter.pageSize || 15,
             status: filter.status && filter.status !== 'ALL' ? filter.status : undefined,
           },
           paramsSerializer: (p) => {
@@ -173,7 +173,7 @@ export const supplierBranchApi = {
 
     const total = filtered.length;
     const pageIndex = filter.pageIndex || 1;
-    const pageSize = filter.pageSize || 12;
+    const pageSize = filter.pageSize || 15;
     const startIndex = (pageIndex - 1) * pageSize;
     const items = filtered.slice(startIndex, startIndex + pageSize);
 

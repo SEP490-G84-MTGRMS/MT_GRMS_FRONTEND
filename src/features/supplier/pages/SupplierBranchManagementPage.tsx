@@ -34,7 +34,7 @@ const DEFAULT_FILTERS: SupplierBranchFilterState = {
   branchId: 'ALL',
   status: 'ALL',
   pageIndex: 1,
-  pageSize: 12,
+  pageSize: 15,
 };
 
 export const SupplierBranchManagementPage: FC = () => {
@@ -204,30 +204,9 @@ export const SupplierBranchManagementPage: FC = () => {
       {/* Toast Notification */}
       <AdminToast toast={toast} onClose={() => setToast(null)} />
 
-      {/* ── Page Header theo chuẩn PoList / SupplierListPage ── */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          flexWrap: 'wrap',
-          gap: 12,
-          marginBottom: 8,
-          flexShrink: 0,
-        }}
-      >
+      <div className="so-list-header">
         <div>
-          <h1
-            style={{
-              fontSize: 20,
-              fontWeight: 800,
-              color: 'var(--text-main)',
-              margin: 0,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-            }}
-          >
+          <h1 className="so-list-title">
             <Store size={22} color="var(--blue-primary, #0f766e)" />
             <span>Cửa Hàng với nhà cung cấp</span>
             {isLoading && (
@@ -236,12 +215,10 @@ export const SupplierBranchManagementPage: FC = () => {
           </h1>
         </div>
 
-        {/* Action buttons */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div className="so-list-header-actions">
           <Link
             to="/store-owner/suppliers"
             className="po-btn po-btn-secondary"
-            style={{ height: 32, padding: '0 14px', textDecoration: 'none' }}
             title="Quay lại danh sách nhà cung cấp"
           >
             <Building2 size={14} />
@@ -250,7 +227,6 @@ export const SupplierBranchManagementPage: FC = () => {
           <Link
             to="/store-owner/suppliers/products"
             className="po-btn po-btn-secondary"
-            style={{ height: 32, padding: '0 14px', textDecoration: 'none' }}
             title="Quản lý danh mục sản phẩm theo NCC"
           >
             <Package size={14} />
@@ -259,7 +235,6 @@ export const SupplierBranchManagementPage: FC = () => {
           <button
             type="button"
             className="po-btn po-btn-secondary"
-            style={{ height: 32, padding: '0 14px' }}
             onClick={() => showToast('Đang kết xuất danh sách phân bổ ra tệp Excel (.xlsx)...', 'info')}
           >
             <Download size={14} />
@@ -269,7 +244,6 @@ export const SupplierBranchManagementPage: FC = () => {
             type="button"
             id="btnOpenAssignBranchModal"
             className="po-btn po-btn-primary"
-            style={{ height: 32, padding: '0 14px' }}
             onClick={() => setIsAssignModalOpen(true)}
           >
             <Plus size={14} />

@@ -14,12 +14,11 @@ export const SupplierBranchTableRow: FC<SupplierBranchTableRowProps> = ({
 }) => {
   return (
     <tr
+      className="so-list-row"
       style={{
         borderBottom: '1px solid #f1f5f9',
         backgroundColor: '#ffffff',
-        transition: 'background-color 0.12s ease',
         opacity: item.status === 'Inactive' ? 0.75 : 1,
-        height: '44px',
       }}
       onMouseEnter={(e) => {
         e.currentTarget.style.backgroundColor = '#f8fafc';
@@ -48,17 +47,9 @@ export const SupplierBranchTableRow: FC<SupplierBranchTableRowProps> = ({
       </td>
 
       {/* 2. Tên Cửa Hàng / Chi Nhánh */}
-      <td style={{ padding: '8px 14px', borderBottom: '1px solid #f1f5f9' }}>
+      <td className="so-list-td--wrap">
         <div
-          style={{
-            fontWeight: 600,
-            fontSize: 13,
-            color: '#0f172a',
-            lineHeight: 1.35,
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-          }}
+          className="so-list-name"
           title={item.branchAddress ? `${item.branchName} (${item.branchAddress})` : item.branchName}
         >
           {item.branchName}
@@ -85,19 +76,8 @@ export const SupplierBranchTableRow: FC<SupplierBranchTableRowProps> = ({
       </td>
 
       {/* 4. Tên Nhà Cung Cấp */}
-      <td style={{ padding: '8px 14px', borderBottom: '1px solid #f1f5f9' }}>
-        <div
-          style={{
-            fontWeight: 600,
-            fontSize: 13,
-            color: '#0f172a',
-            lineHeight: 1.35,
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-          }}
-          title={item.supplierName}
-        >
+      <td className="so-list-td--wrap">
+        <div className="so-list-name" title={item.supplierName}>
           {item.supplierName}
         </div>
       </td>
@@ -111,35 +91,13 @@ export const SupplierBranchTableRow: FC<SupplierBranchTableRowProps> = ({
       <td style={{ padding: '8px 14px', borderBottom: '1px solid #f1f5f9', textAlign: 'right', whiteSpace: 'nowrap' }}>
         <button
           type="button"
+          className={`so-list-action-btn${item.status === 'Active' ? '' : ' so-list-action-btn--success'}`}
           onClick={() => onToggleStatus(item)}
           title={
             item.status === 'Active'
               ? `Tạm ngưng phân bổ ${item.supplierName} tại ${item.branchName}`
               : `Kích hoạt phân bổ ${item.supplierName} tại ${item.branchName}`
           }
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 5,
-            height: 28,
-            padding: '0 10px',
-            borderRadius: 6,
-            border: item.status === 'Active' ? '1px solid #cbd5e1' : '1px solid #99f6e4',
-            backgroundColor: '#ffffff',
-            color: item.status === 'Active' ? '#475569' : '#0f766e',
-            fontSize: 12,
-            fontWeight: 600,
-            cursor: 'pointer',
-            transition: 'all 0.15s ease',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = item.status === 'Active' ? '#f8fafc' : '#f0fdfa';
-            e.currentTarget.style.borderColor = item.status === 'Active' ? '#94a3b8' : '#0d9488';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = '#ffffff';
-            e.currentTarget.style.borderColor = item.status === 'Active' ? '#cbd5e1' : '#99f6e4';
-          }}
         >
           {item.status === 'Active' ? (
             <>

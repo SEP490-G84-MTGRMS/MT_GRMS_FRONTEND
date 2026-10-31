@@ -371,19 +371,7 @@ export const StoreProductFilterBar: FC<StoreProductFilterBarProps> = ({
   const isFiltered = totalActiveTokens > 0 || status !== 'ALL';
 
   return (
-    <div
-      ref={containerRef}
-      style={{
-        backgroundColor: '#ffffff',
-        borderRadius: 10,
-        border: '1px solid #e2e8f0',
-        padding: '12px 14px',
-        boxShadow: '0 1px 3px rgba(15, 23, 42, 0.04)',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 10,
-      }}
-    >
+    <div ref={containerRef} className="so-list-filter">
       {/* ── ROW 1: 4 ô tìm kiếm chip/token (Text ngang hàng với ô input) ── */}
       <div
         style={{
@@ -441,19 +429,19 @@ export const StoreProductFilterBar: FC<StoreProductFilterBarProps> = ({
 
               <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
                 <div
+                  className="supplier-chip-input so-list-chip-box"
                   onClick={() => inputRefs.current[field.key]?.focus()}
                   style={{
-                    minHeight: 34,
                     display: 'flex',
                     alignItems: 'center',
-                    flexWrap: 'wrap',
+                    flexWrap: 'nowrap',
                     gap: 4,
-                    padding: '3px 26px 3px 8px',
+                    padding: '0 28px 0 6px',
                     borderRadius: 6,
-                    border: '1px solid #cbd5e1',
-                    backgroundColor: '#ffffff',
+                    border: hasValues || isOpen ? '1px solid #0d9488' : '1px solid #cbd5e1',
+                    backgroundColor: hasValues ? '#f0fdfa' : '#ffffff',
                     cursor: 'text',
-                    transition: 'all 0.15s ease',
+                    boxSizing: 'border-box',
                   }}
                 >
                   {fieldTokens.map((token) => (
@@ -661,31 +649,11 @@ export const StoreProductFilterBar: FC<StoreProductFilterBarProps> = ({
           </span>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div className="so-list-filter-actions">
           <button
             type="button"
+            className="so-list-filter-search"
             onClick={handleSubmit}
-            style={{
-              height: 32,
-              padding: '0 16px',
-              borderRadius: 6,
-              border: 'none',
-              backgroundColor: '#0f766e',
-              color: '#ffffff',
-              fontSize: 12.5,
-              fontWeight: 700,
-              cursor: 'pointer',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6,
-              transition: 'background-color 0.15s ease',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = '#115e59';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = '#0f766e';
-            }}
           >
             <Search size={14} />
             <span>Tìm kiếm</span>
@@ -693,28 +661,8 @@ export const StoreProductFilterBar: FC<StoreProductFilterBarProps> = ({
 
           <button
             type="button"
+            className="so-list-filter-reset"
             onClick={handleResetClick}
-            style={{
-              height: 32,
-              padding: '0 12px',
-              borderRadius: 6,
-              border: '1px solid #cbd5e1',
-              backgroundColor: '#ffffff',
-              color: '#475569',
-              fontSize: 12.5,
-              fontWeight: 600,
-              cursor: 'pointer',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6,
-              transition: 'all 0.15s ease',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = '#f8fafc';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = '#ffffff';
-            }}
           >
             <RotateCcw size={13} />
             <span>Đặt lại</span>

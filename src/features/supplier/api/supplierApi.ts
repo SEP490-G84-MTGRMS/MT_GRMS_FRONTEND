@@ -84,7 +84,7 @@ export const supplierApi = {
         supplierType: typeMapFrontendToBackend(filter?.supplierType),
         status: statusMapFrontendToBackend(filter?.status),
         pageIndex: filter?.pageIndex || 1,
-        pageSize: filter?.pageSize || 12,
+        pageSize: filter?.pageSize || 15,
       };
 
       const codes = filter?.codes?.filter(Boolean) ?? [];
@@ -133,7 +133,7 @@ export const supplierApi = {
           items,
           total: paged.totalItems || items.length,
           page: paged.page || 1,
-          pageSize: paged.pageSize || 12,
+          pageSize: paged.pageSize || 15,
         };
       }
       throw new Error(res.data?.message || 'Không thể tải danh sách nhà cung cấp.');
