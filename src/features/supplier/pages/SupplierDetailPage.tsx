@@ -37,6 +37,54 @@ const ALL_TABS: { key: TabKey; label: string }[] = [
   { key: 'history', label: 'Lịch sử giao dịch' },
 ];
 
+const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
+
+function mapDeliveryDaysToJs(days?: string[]): number[] {
+  if (!days?.length) return [1, 2, 3, 4, 5, 6];
+  return days
+    .map((day) => DAY_NAMES.indexOf(day as (typeof DAY_NAMES)[number]))
+    .filter((index) => index >= 0);
+}
+
+function mapJsDaysToNames(days: number[]): string[] {
+  return days.map((day) => DAY_NAMES[day]).filter(Boolean);
+}
+
+function mapApiToDeliveryConfig(data: any, fallback: SupplierDeliveryConfig): SupplierDeliveryConfig {
+  return {
+    ...fallback,
+    leadTimeDays: data.leadTimeDays ?? fallback.leadTimeDays,
+    minOrderQuantity: data.minOrderQuantity ?? 0,
+    cutoffTime: data.orderCutoffTime || data.cutoffTime || fallback.cutoffTime,
+    activeDeliveryDays: mapDeliveryDaysToJs(data.deliveryDays),
+    holidays: Array.isArray(data.blackoutDates)
+      ? data.blackoutDates.map((item: any) => ({
+          id: String(item.id || `hol-${item.startDate}`),
+          fromDate: String(item.startDate || '').slice(0, 10),
+          toDate: String(item.endDate || '').slice(0, 10),
+          reason: item.reason || '',
+        }))
+      : fallback.holidays,
+  };
+}
+
+function mapDeliveryConfigToApi(cfg: SupplierDeliveryConfig) {
+  return {
+    leadTimeHours: Math.max(0, cfg.leadTimeDays * 24),
+    leadTimeDays: cfg.leadTimeDays,
+    cutoffTime: cfg.cutoffTime,
+    orderCutoffTime: cfg.cutoffTime,
+    deliveryDays: mapJsDaysToNames(cfg.activeDeliveryDays),
+    minOrderQuantity: cfg.minOrderQuantity,
+    blackoutDates: cfg.holidays.map((holiday) => ({
+      startDate: holiday.fromDate,
+      endDate: holiday.toDate,
+      reason: holiday.reason,
+      isRecurringAnnual: false,
+    })),
+  };
+}
+
 export const SupplierDetailPage: FC<Props> = ({
   supplier: propSupplier,
   onBack: propOnBack,
@@ -63,6 +111,7 @@ export const SupplierDetailPage: FC<Props> = ({
   const [deliveryConfig, setDeliveryConfig] = useState<SupplierDeliveryConfig>({
     leadTimeDays: 1,
     leadTimeUnit: 'BUSINESS_DAYS',
+    minOrderQuantity: 0,
     activeDeliveryDays: [1, 2, 3, 4, 5, 6],
     cutoffTime: '17:00',
     allowStoreEdit: true,
@@ -123,6 +172,19 @@ export const SupplierDetailPage: FC<Props> = ({
         // empty history
       });
 
+    const deliveryId = propSupplier?.id || id;
+    if (deliveryId) {
+      supplierApi
+        .getDeliveryConfig(deliveryId)
+        .then((data) => {
+          if (!isMounted || !data) return;
+          setDeliveryConfig((prev) => mapApiToDeliveryConfig(data, prev));
+        })
+        .catch(() => {
+          // keep local defaults
+        });
+    }
+
     return () => {
       isMounted = false;
     };
@@ -144,7 +206,12 @@ export const SupplierDetailPage: FC<Props> = ({
     }
   };
 
-  const handleSaveDeliveryConfig = (newCfg: SupplierDeliveryConfig) => {
+  const handleSaveDeliveryConfig = async (newCfg: SupplierDeliveryConfig) => {
+    const supplierId = currentSupplier?.id;
+    if (!supplierId) {
+      throw new Error('Không xác định được nhà cung cấp.');
+    }
+    await supplierApi.updateDeliveryConfig(supplierId, mapDeliveryConfigToApi(newCfg));
     setDeliveryConfig(newCfg);
   };
 

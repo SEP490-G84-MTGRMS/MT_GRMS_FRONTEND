@@ -272,6 +272,7 @@ export const DEFAULT_DELIVERY_CONFIGS: Record<string, SupplierDeliveryConfig> = 
   'supp-001': {
     leadTimeDays: 1,
     leadTimeUnit: 'BUSINESS_DAYS',
+    minOrderQuantity: 0,
     activeDeliveryDays: [1, 2, 3, 4, 5, 6], // Mon - Sat (off Sun)
     cutoffTime: '16:00',
     allowStoreEdit: true,
@@ -287,6 +288,7 @@ export const DEFAULT_DELIVERY_CONFIGS: Record<string, SupplierDeliveryConfig> = 
   'supp-002': {
     leadTimeDays: 2,
     leadTimeUnit: 'BUSINESS_DAYS',
+    minOrderQuantity: 0,
     activeDeliveryDays: [1, 3, 5],
     cutoffTime: '14:00',
     allowStoreEdit: true,

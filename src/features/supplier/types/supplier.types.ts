@@ -124,6 +124,7 @@ export interface HolidayDateRange {
 export interface SupplierDeliveryConfig {
   leadTimeDays: number;
   leadTimeUnit: 'BUSINESS_DAYS' | 'CALENDAR_DAYS';
+  minOrderQuantity: number;
   activeDeliveryDays: number[]; // 0 = Sun, 1 = Mon, ..., 6 = Sat
   cutoffTime: string; // e.g. "14:00" or "16:00"
   allowStoreEdit: boolean;

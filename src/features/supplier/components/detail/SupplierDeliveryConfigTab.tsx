@@ -1,17 +1,18 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { FC } from 'react';
 import type { SupplierSummary, SupplierDeliveryConfig } from '../../types/supplier.types';
-import { Clock, Truck, ShieldCheck, Calculator, CheckCircle2 } from 'lucide-react';
+import { Clock, Truck, ShieldCheck, Package, CheckCircle2 } from 'lucide-react';
 
 interface Props {
   supplier: SupplierSummary;
   initialConfig?: SupplierDeliveryConfig;
-  onSaveConfig?: (cfg: SupplierDeliveryConfig) => void;
+  onSaveConfig?: (cfg: SupplierDeliveryConfig) => void | Promise<void>;
 }
 
 const DEFAULT_CONFIG: SupplierDeliveryConfig = {
   leadTimeDays: 1,
   leadTimeUnit: 'BUSINESS_DAYS',
+  minOrderQuantity: 0,
   activeDeliveryDays: [1, 2, 3, 4, 5, 6],
   cutoffTime: '16:00',
   allowStoreEdit: true,
@@ -38,15 +39,11 @@ export const SupplierDeliveryConfigTab: FC<Props> = ({
 }) => {
   const [config, setConfig] = useState<SupplierDeliveryConfig>(initialConfig || DEFAULT_CONFIG);
   const [saveSuccessMsg, setSaveSuccessMsg] = useState(false);
+  const [saveErrorMsg, setSaveErrorMsg] = useState<string | null>(null);
 
-  const [simOrderDatetime, setSimOrderDatetime] = useState(() => {
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const day = String(now.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}T15:00`;
-  });
-  const [calcResult, setCalcResult] = useState<{ deliveryDate: string; editDeadline: string; note: string } | null>(null);
+  useEffect(() => {
+    if (initialConfig) setConfig(initialConfig);
+  }, [initialConfig]);
 
   const handleToggleWeekday = (dayVal: number) => {
     setConfig((prev) => {
@@ -58,90 +55,16 @@ export const SupplierDeliveryConfigTab: FC<Props> = ({
     });
   };
 
-  const handleRunCalculator = () => {
-    if (!simOrderDatetime) return;
-    const dt = new Date(simOrderDatetime);
-    if (isNaN(dt.getTime())) return;
-
-    const [cutHourStr, cutMinStr] = config.cutoffTime.split(':');
-    const cutoffHour = parseInt(cutHourStr) || 16;
-    const cutoffMin = parseInt(cutMinStr) || 0;
-
-    const isAfterCutoff =
-      dt.getHours() > cutoffHour ||
-      (dt.getHours() === cutoffHour && dt.getMinutes() > cutoffMin);
-
-    const checkHoliday = (d: Date): string | null => {
-      const y = d.getFullYear();
-      const m = String(d.getMonth() + 1).padStart(2, '0');
-      const dayStr = String(d.getDate()).padStart(2, '0');
-      const dateStr = `${y}-${m}-${dayStr}`;
-      for (const hol of config.holidays) {
-        if (dateStr >= hol.fromDate && dateStr <= hol.toDate) return hol.reason;
-      }
-      return null;
-    };
-
-    const targetDate = new Date(dt);
-    if (isAfterCutoff) targetDate.setDate(targetDate.getDate() + 1);
-
-    let addedDays = 0;
-    while (addedDays < config.leadTimeDays) {
-      targetDate.setDate(targetDate.getDate() + 1);
-      if (targetDate.getDay() !== 0 && !checkHoliday(targetDate)) addedDays++;
+  const handleSave = async () => {
+    try {
+      setSaveErrorMsg(null);
+      await onSaveConfig?.(config);
+      setSaveSuccessMsg(true);
+      setTimeout(() => setSaveSuccessMsg(false), 3000);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Không thể lưu cấu hình giao hàng.';
+      setSaveErrorMsg(message);
     }
-
-    let loopCount = 0;
-    let bypassedReason: string | null = null;
-    while (
-      (targetDate.getDay() === 0 ||
-        !config.activeDeliveryDays.includes(targetDate.getDay()) ||
-        checkHoliday(targetDate)) &&
-      loopCount < 30
-    ) {
-      const reason = checkHoliday(targetDate);
-      if (reason && !bypassedReason) bypassedReason = reason;
-      targetDate.setDate(targetDate.getDate() + 1);
-      loopCount++;
-    }
-
-    const dayNames = ['Chủ nhật', 'Thứ hai', 'Thứ ba', 'Thứ tư', 'Thứ năm', 'Thứ sáu', 'Thứ bảy'];
-    const formattedDelDate = `${targetDate.getDate().toString().padStart(2, '0')}/${(targetDate.getMonth() + 1).toString().padStart(2, '0')}/${targetDate.getFullYear()} (${dayNames[targetDate.getDay()]})`;
-
-    let editDeadlineText = '';
-    if (!config.allowStoreEdit) {
-      editDeadlineText = 'Khóa đơn ngay khi đặt (Không cho phép chỉnh sửa PO)';
-    } else if (config.editWindowType === 'BEFORE_CUTOFF') {
-      const cutoffDt = new Date(dt);
-      if (isAfterCutoff) cutoffDt.setDate(cutoffDt.getDate() + 1);
-      editDeadlineText = `${cutoffDt.getDate().toString().padStart(2, '0')}/${(cutoffDt.getMonth() + 1).toString().padStart(2, '0')}/${cutoffDt.getFullYear()} lúc ${config.cutoffTime} (Giờ chốt đơn kế tiếp)`;
-    } else if (config.editWindowType === 'HOURS_BEFORE_DELIVERY') {
-      const bufHours = config.hoursBeforeDelivery || 24;
-      const dl = new Date(targetDate);
-      dl.setHours(dl.getHours() - bufHours);
-      editDeadlineText = `${dl.getDate().toString().padStart(2, '0')}/${(dl.getMonth() + 1).toString().padStart(2, '0')} ${dl.getHours()}:${dl.getMinutes().toString().padStart(2, '0')} (${bufHours} giờ trước ngày giao)`;
-    } else {
-      const fixedHours = config.hoursAfterOrder || 2;
-      const dl = new Date(dt);
-      dl.setHours(dl.getHours() + fixedHours);
-      editDeadlineText = `${dl.getDate().toString().padStart(2, '0')}/${(dl.getMonth() + 1).toString().padStart(2, '0')} ${dl.getHours()}:${dl.getMinutes().toString().padStart(2, '0')} (${fixedHours} giờ sau khi đặt đơn)`;
-    }
-
-    setCalcResult({
-      deliveryDate: formattedDelDate,
-      editDeadline: editDeadlineText,
-      note: bypassedReason
-        ? `Tự động né ngày nghỉ lễ: ${bypassedReason}`
-        : isAfterCutoff
-        ? 'Đơn đặt sau giờ Cutoff — tự động chuyển sang chu kỳ kế tiếp'
-        : 'Chu kỳ giao hàng hợp lệ',
-    });
-  };
-
-  const handleSave = () => {
-    onSaveConfig?.(config);
-    setSaveSuccessMsg(true);
-    setTimeout(() => setSaveSuccessMsg(false), 3000);
   };
 
   return (
@@ -155,6 +78,15 @@ export const SupplierDeliveryConfigTab: FC<Props> = ({
         }}>
           <CheckCircle2 size={18} color="#00c853" />
           <span>Đã lưu cấu hình lịch giao hàng và thời gian Cutoff thành công cho {supplier.name}!</span>
+        </div>
+      )}
+      {saveErrorMsg && (
+        <div style={{
+          background: '#fef2f2', border: '1px solid #fecaca',
+          padding: '12px 18px', borderRadius: 'var(--radius-pill)',
+          color: '#991b1b', fontWeight: 600, fontSize: '0.88rem',
+        }}>
+          {saveErrorMsg}
         </div>
       )}
 
@@ -201,6 +133,24 @@ export const SupplierDeliveryConfigTab: FC<Props> = ({
                 <option value="BUSINESS_DAYS">Ngày làm việc (Business Days)</option>
                 <option value="CALENDAR_DAYS">Ngày dương lịch (Calendar Days)</option>
               </select>
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Package size={14} color="var(--blue-primary)" />
+              <span>Số lượng đặt tối thiểu (MOQ)</span>
+            </label>
+            <input
+              type="number"
+              min="0"
+              value={config.minOrderQuantity}
+              onChange={(e) => setConfig({ ...config, minOrderQuantity: Math.max(0, parseInt(e.target.value) || 0) })}
+              className="admin-search-input"
+              style={{ width: '100%', height: 40, fontFamily: 'var(--font-mono)' }}
+            />
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 4 }}>
+              Đơn đặt hàng phải đạt tối thiểu <b>{config.minOrderQuantity}</b> đơn vị mới được gửi cho nhà cung cấp.
             </div>
           </div>
 
@@ -308,71 +258,6 @@ export const SupplierDeliveryConfigTab: FC<Props> = ({
             <span>Lưu Cấu Hình Giao Hàng &amp; Cutoff</span>
           </button>
         </div>
-      </div>
-
-      {/* Preview Calculator */}
-      <div className="supplier-detail-card" style={{ background: 'linear-gradient(180deg, #f0f6ff 0%, #ffffff 100%)', border: '1px solid var(--blue-border)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-          <div style={{
-            width: 36, height: 36, borderRadius: 'var(--radius-sm)',
-            background: 'var(--blue-primary)', display: 'flex',
-            alignItems: 'center', justifyContent: 'center', color: '#ffffff',
-          }}>
-            <Calculator size={20} />
-          </div>
-          <div>
-            <h2 className="supplier-detail-card-title" style={{ margin: 0, border: 'none', padding: 0, color: 'var(--blue-primary)' }}>
-              Trình Mô Phỏng Tính Toán Giao Hàng (Preview Calculator)
-            </h2>
-            <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-              Thử nghiệm giả lập thuật toán tính ngày giao dự kiến và hạn chót sửa đơn hàng dựa trên giờ Cutoff đã cấu hình.
-            </div>
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', marginBottom: 14 }}>
-          <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-main)' }}>
-            Thời điểm giả lập đặt đơn (Order Time):
-          </label>
-          <input
-            type="datetime-local" value={simOrderDatetime}
-            onChange={(e) => setSimOrderDatetime(e.target.value)}
-            className="admin-search-input"
-            style={{ width: 240, height: 38, fontFamily: 'var(--font-mono)' }}
-          />
-          <button
-            type="button" className="admin-btn admin-btn-primary"
-            onClick={handleRunCalculator}
-            style={{ height: 38, padding: '0 18px', borderRadius: 'var(--radius-pill)', gap: 6 }}
-          >
-            <Calculator size={14} />
-            <span>Tính Toán Ngày Giao</span>
-          </button>
-        </div>
-
-        {calcResult && (
-          <div style={{
-            background: '#ffffff', borderRadius: 16, padding: '16px 20px',
-            border: '1px solid var(--blue-border)', boxShadow: 'var(--shadow-sm)',
-            display: 'flex', flexDirection: 'column', gap: 10,
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.95rem' }}>
-              <span style={{ fontWeight: 700, color: 'var(--text-main)' }}>➔ Ngày giao hàng dự kiến (Delivery Date):</span>
-              <b style={{ color: 'var(--blue-primary)', fontSize: '1.05rem', fontFamily: 'var(--font-mono)' }}>
-                {calcResult.deliveryDate}
-              </b>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.9rem' }}>
-              <span style={{ fontWeight: 700, color: 'var(--text-main)' }}>➔ Hạn chót sửa đơn hàng (CanEditUntil):</span>
-              <span style={{ color: 'var(--red-accent)', fontWeight: 600, fontFamily: 'var(--font-mono)' }}>
-                {calcResult.editDeadline}
-              </span>
-            </div>
-            <div style={{ fontSize: '0.78rem', color: '#059669', fontStyle: 'italic', marginTop: 2 }}>
-              ℹ️ {calcResult.note}
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
