@@ -93,6 +93,22 @@
   background: transparent;
 }
 
+/* Ô chip filter: cố định chiều cao, cuộn ngang khi nhiều giá trị */
+.supplier-chip-input {
+  height: 32px;
+  max-height: 32px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  flex-wrap: nowrap;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.supplier-chip-input::-webkit-scrollbar {
+  display: none;
+  height: 0;
+}
+
 
 /* ── Top Bar ── */
 .supplier-topbar {

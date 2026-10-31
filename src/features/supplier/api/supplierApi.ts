@@ -81,22 +81,51 @@ export const supplierApi = {
     try {
       const params: Record<string, any> = {
         searchTerm: filter?.searchTerm || undefined,
-        code: filter?.code || undefined,
-        name: filter?.name || undefined,
-        contactPerson: filter?.contactPerson || undefined,
-        phone: filter?.phone || undefined,
         supplierType: typeMapFrontendToBackend(filter?.supplierType),
         status: statusMapFrontendToBackend(filter?.status),
         pageIndex: filter?.pageIndex || 1,
         pageSize: filter?.pageSize || 12,
       };
 
+      const codes = filter?.codes?.filter(Boolean) ?? [];
+      const names = filter?.names?.filter(Boolean) ?? [];
+      const contactPersons = filter?.contactPersons?.filter(Boolean) ?? [];
+      const phones = filter?.phones?.filter(Boolean) ?? [];
+
+      if (codes.length) params.codes = codes;
+      else if (filter?.code) params.code = filter.code;
+
+      if (names.length) params.names = names;
+      else if (filter?.name) params.name = filter.name;
+
+      if (contactPersons.length) params.contactPersons = contactPersons;
+      else if (filter?.contactPerson) params.contactPerson = filter.contactPerson;
+
+      if (phones.length) params.phones = phones;
+      else if (filter?.phone) params.phone = filter.phone;
+
       if (filter?.supplierIds?.length) params.supplierIds = filter.supplierIds;
       if (filter?.productIds?.length) params.productIds = filter.productIds;
-      if (filter?.contactPersons?.length) params.contactPersons = filter.contactPersons;
-      if (filter?.phones?.length) params.phones = filter.phones;
 
-      const res = await httpClient.get<ApiResponse<PagedResult<any>>>('/suppliers', { params });
+      const res = await httpClient.get<ApiResponse<PagedResult<any>>>('/suppliers', {
+        params,
+        paramsSerializer: (p) => {
+          const search = new URLSearchParams();
+          Object.entries(p).forEach(([key, value]) => {
+            if (value === undefined || value === null || value === '') return;
+            if (Array.isArray(value)) {
+              value.forEach((item) => {
+                if (item !== undefined && item !== null && String(item).trim() !== '') {
+                  search.append(key, String(item));
+                }
+              });
+              return;
+            }
+            search.append(key, String(value));
+          });
+          return search.toString();
+        },
+      });
       if (res.data?.success && res.data.data) {
         const paged = res.data.data;
         const items = (paged.items || []).map(mapBackendSupplierToFrontend);

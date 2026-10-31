@@ -81,6 +81,8 @@ export interface SupplierFilterState {
   status: string;
   supplierIds?: string[];
   productIds?: string[];
+  codes?: string[];
+  names?: string[];
   contactPersons?: string[];
   phones?: string[];
   tags?: SearchTag[];

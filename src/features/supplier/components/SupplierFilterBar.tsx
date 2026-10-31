@@ -1,22 +1,36 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import type { FC, FormEvent } from 'react';
-import type {
-  SupplierFilterState,
-  SearchTag,
-  SupplierSearchSuggestions,
-} from '../types/supplier.types';
+import type { FC, FormEvent, KeyboardEvent } from 'react';
+import type { SupplierFilterState } from '../types/supplier.types';
 import { supplierApi } from '../api/supplierApi';
-import {
-  Search,
-  RotateCcw,
-  Building2,
-  Package,
-  User,
-  Phone,
-  X,
-  Loader2,
-  Tag,
-} from 'lucide-react';
+import { Search, RotateCcw, X, Loader2 } from 'lucide-react';
+
+type FieldKey = 'code' | 'name' | 'contactPerson' | 'phone';
+type TokenMap = Record<FieldKey, string[]>;
+type QueryMap = Record<FieldKey, string>;
+
+type Suggestion = {
+  id: string;
+  value: string;
+  primary: string;
+  secondary?: string;
+};
+
+interface FieldConfig {
+  key: FieldKey;
+  label: string;
+  placeholder: string;
+  minWidth: number;
+}
+
+const FIELDS: FieldConfig[] = [
+  { key: 'code', label: 'Mã nhà cung cấp', placeholder: 'Nhập mã, Enter để thêm...', minWidth: 240 },
+  { key: 'name', label: 'Tên nhà cung cấp', placeholder: 'Nhập tên, Enter để thêm...', minWidth: 300 },
+  { key: 'contactPerson', label: 'Người liên hệ', placeholder: 'Nhập tên, Enter để thêm...', minWidth: 250 },
+  { key: 'phone', label: 'Số điện thoại', placeholder: 'Nhập SĐT, Enter để thêm...', minWidth: 230 },
+];
+
+const EMPTY_TOKENS: TokenMap = { code: [], name: [], contactPerson: [], phone: [] };
+const EMPTY_QUERIES: QueryMap = { code: '', name: '', contactPerson: '', phone: '' };
 
 interface Props {
   filters: SupplierFilterState;
@@ -24,175 +38,330 @@ interface Props {
   onReset: () => void;
 }
 
-export const SupplierFilterBar: FC<Props> = ({
-  filters,
-  onSearch,
-  onReset,
-}) => {
-  // Draft filter state
+function uniqueTokens(values: string[]): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const raw of values) {
+    const value = raw.trim();
+    if (!value) continue;
+    const key = value.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(value);
+  }
+  return result;
+}
+
+function tokensFromFilters(filters: SupplierFilterState): TokenMap {
+  return {
+    code: uniqueTokens(filters.codes?.length ? filters.codes : filters.code ? [filters.code] : []),
+    name: uniqueTokens(filters.names?.length ? filters.names : filters.name ? [filters.name] : []),
+    contactPerson: uniqueTokens(
+      filters.contactPersons?.length ? filters.contactPersons : filters.contactPerson ? [filters.contactPerson] : []
+    ),
+    phone: uniqueTokens(filters.phones?.length ? filters.phones : filters.phone ? [filters.phone] : []),
+  };
+}
+
+function highlightMatch(text: string, query: string) {
+  if (!text || !query.trim()) return <span>{text}</span>;
+  const q = query.trim();
+  const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const parts = text.split(new RegExp(`(${escaped})`, 'gi'));
+  const qLower = q.toLowerCase();
+
+  return (
+    <span>
+      {parts.map((part, i) =>
+        part.toLowerCase() === qLower ? (
+          <mark
+            key={`${part}-${i}`}
+            style={{
+              backgroundColor: '#ccfbf1',
+              color: '#0f766e',
+              fontWeight: 700,
+              padding: '0 2px',
+              borderRadius: 2,
+            }}
+          >
+            {part}
+          </mark>
+        ) : (
+          <span key={`${part}-${i}`}>{part}</span>
+        )
+      )}
+    </span>
+  );
+}
+
+export const SupplierFilterBar: FC<Props> = ({ filters, onSearch, onReset }) => {
   const [draftFilters, setDraftFilters] = useState<SupplierFilterState>(filters);
   const [prevFilters, setPrevFilters] = useState<SupplierFilterState>(filters);
+  const [tokens, setTokens] = useState<TokenMap>(() => tokensFromFilters(filters));
+  const [queries, setQueries] = useState<QueryMap>(EMPTY_QUERIES);
 
-  // Selected tags for multi-entity filtering
-  const [selectedTags, setSelectedTags] = useState<SearchTag[]>(filters.tags || []);
+  const [openField, setOpenField] = useState<FieldKey | null>(null);
+  const [focusedIndex, setFocusedIndex] = useState(-1);
+  const [loadingField, setLoadingField] = useState<FieldKey | null>(null);
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
 
-  // Autocomplete search state
-  const [searchInputValue, setSearchInputValue] = useState<string>(filters.searchTerm || '');
-  const [isDropdownOpen, setIsDropdownOpen] = useState<boolean>(false);
-  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState<boolean>(false);
-  const [suggestions, setSuggestions] = useState<SupplierSearchSuggestions>({
-    suppliers: [],
-    products: [],
-    contactPersons: [],
-    phones: [],
-  });
+  const barRef = useRef<HTMLDivElement>(null);
+  const inputRefs = useRef<Partial<Record<FieldKey, HTMLInputElement | null>>>({});
+  const chipBoxRefs = useRef<Partial<Record<FieldKey, HTMLDivElement | null>>>({});
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dragRef = useRef<{ field: FieldKey; startX: number; startScroll: number; moved: boolean } | null>(null);
+  const skipFocusRef = useRef(false);
 
-  const searchContainerRef = useRef<HTMLDivElement>(null);
-  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scrollChipBoxToEnd = (field: FieldKey) => {
+    requestAnimationFrame(() => {
+      const el = chipBoxRefs.current[field];
+      if (el) el.scrollLeft = el.scrollWidth;
+    });
+  };
 
-  // Sync draft state if external filters change
   if (filters !== prevFilters) {
     setPrevFilters(filters);
     setDraftFilters(filters);
-    setSelectedTags(filters.tags || []);
-    setSearchInputValue(filters.searchTerm || '');
+    setTokens(tokensFromFilters(filters));
+    setQueries(EMPTY_QUERIES);
   }
 
-  // Handle outside click to close suggestions dropdown
   useEffect(() => {
-    const handleOutsideClick = (e: MouseEvent) => {
-      if (
-        searchContainerRef.current &&
-        !searchContainerRef.current.contains(e.target as Node)
-      ) {
-        setIsDropdownOpen(false);
+    const onOutside = (e: MouseEvent) => {
+      if (barRef.current && !barRef.current.contains(e.target as Node)) {
+        setOpenField(null);
+        setFocusedIndex(-1);
       }
     };
-    document.addEventListener('mousedown', handleOutsideClick);
-    return () => {
-      document.removeEventListener('mousedown', handleOutsideClick);
-    };
+    document.addEventListener('mousedown', onOutside);
+    return () => document.removeEventListener('mousedown', onOutside);
   }, []);
 
-  // Fetch suggestions when searchInputValue changes (debounced)
-  const fetchSuggestions = useCallback(async (query: string) => {
+  useEffect(() => {
+    const cleanups: Array<() => void> = [];
+    (Object.keys(EMPTY_TOKENS) as FieldKey[]).forEach((field) => {
+      const el = chipBoxRefs.current[field];
+      if (!el) return;
+      const onWheel = (event: WheelEvent) => {
+        if (el.scrollWidth <= el.clientWidth) return;
+        event.preventDefault();
+        el.scrollLeft += event.deltaY + event.deltaX;
+      };
+      el.addEventListener('wheel', onWheel, { passive: false });
+      cleanups.push(() => el.removeEventListener('wheel', onWheel));
+    });
+    return () => cleanups.forEach((fn) => fn());
+  }, [tokens]);
+
+  const addTokens = (field: FieldKey, values: string[]) => {
+    const incoming = uniqueTokens(values);
+    if (!incoming.length) return;
+    setTokens((prev) => ({
+      ...prev,
+      [field]: uniqueTokens([...prev[field], ...incoming]),
+    }));
+    setQueries((prev) => ({ ...prev, [field]: '' }));
+    setOpenField(null);
+    setSuggestions([]);
+    setFocusedIndex(-1);
+    scrollChipBoxToEnd(field);
+  };
+
+  const removeToken = (field: FieldKey, value: string) => {
+    setTokens((prev) => ({
+      ...prev,
+      [field]: prev[field].filter((item) => item.toLowerCase() !== value.toLowerCase()),
+    }));
+  };
+
+  const loadSuggestions = useCallback(async (field: FieldKey, query: string, selected: string[]) => {
     const trimmed = query.trim();
     if (!trimmed) {
-      setSuggestions({ suppliers: [], products: [], contactPersons: [], phones: [] });
-      setIsDropdownOpen(false);
-      setIsLoadingSuggestions(false);
+      setSuggestions([]);
+      setOpenField(null);
+      setLoadingField(null);
       return;
     }
 
-    setIsLoadingSuggestions(true);
+    setLoadingField(field);
     try {
-      const data = await supplierApi.getSearchSuggestions(trimmed, 8);
-      setSuggestions(data);
-      const hasAny =
-        data.suppliers.length > 0 ||
-        data.products.length > 0 ||
-        data.contactPersons.length > 0 ||
-        data.phones.length > 0;
-      setIsDropdownOpen(hasAny);
+      const res = await supplierApi.getSuppliers({
+        [field]: trimmed,
+        pageIndex: 1,
+        pageSize: 8,
+        supplierType: '',
+        category: '',
+        debtStatus: '',
+        ratingFilter: '',
+        status: '',
+      });
+
+      const selectedSet = new Set(selected.map((item) => item.toLowerCase()));
+      const mapped: Suggestion[] = [];
+      const seen = new Set<string>();
+      for (const item of res.items) {
+        const value =
+          field === 'code'
+            ? item.code
+            : field === 'name'
+              ? item.name
+              : field === 'contactPerson'
+                ? item.contactPerson
+                : item.phone;
+        if (!value?.trim()) continue;
+        const key = value.toLowerCase();
+        if (selectedSet.has(key) || seen.has(key)) continue;
+        seen.add(key);
+        mapped.push({
+          id: `${field}-${item.id}-${value}`,
+          value,
+          primary: value,
+          secondary:
+            field === 'code'
+              ? item.name
+              : field === 'name'
+                ? item.code
+                : `${item.code} · ${item.name}`,
+        });
+      }
+
+      setSuggestions(mapped);
+      setOpenField(mapped.length > 0 ? field : null);
+      setFocusedIndex(mapped.length > 0 ? 0 : -1);
     } catch {
-      setSuggestions({ suppliers: [], products: [], contactPersons: [], phones: [] });
-      setIsDropdownOpen(false);
+      setSuggestions([]);
+      setOpenField(null);
     } finally {
-      setIsLoadingSuggestions(false);
+      setLoadingField(null);
     }
   }, []);
 
-  const handleSearchInputChange = (val: string) => {
-    setSearchInputValue(val);
-    setDraftFilters((prev) => ({ ...prev, searchTerm: val }));
-
-    if (debounceTimerRef.current) {
-      clearTimeout(debounceTimerRef.current);
-    }
-
-    if (val.trim().length >= 1) {
-      debounceTimerRef.current = setTimeout(() => {
-        fetchSuggestions(val);
+  const scheduleSuggestions = (field: FieldKey, value: string, selected: string[]) => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (value.trim().length >= 1) {
+      debounceRef.current = setTimeout(() => {
+        loadSuggestions(field, value, selected);
       }, 250);
     } else {
-      setIsDropdownOpen(false);
-      setSuggestions({ suppliers: [], products: [], contactPersons: [], phones: [] });
+      setSuggestions([]);
+      setOpenField(null);
     }
   };
 
-  // Add tag selection
-  const handleSelectSuggestion = (tag: SearchTag) => {
-    if (!selectedTags.some((t) => t.id === tag.id)) {
-      const nextTags = [...selectedTags, tag];
-      setSelectedTags(nextTags);
-      applyFilterWithTags(nextTags);
+  const handleFieldChange = (field: FieldKey, value: string) => {
+    if (/[,;]/.test(value)) {
+      const parts = value.split(/[,;]/);
+      const remainder = parts.pop() ?? '';
+      addTokens(field, parts);
+      setQueries((prev) => ({ ...prev, [field]: remainder }));
+      if (remainder.trim()) {
+        scheduleSuggestions(field, remainder, uniqueTokens([...tokens[field], ...parts]));
+      }
+      return;
     }
-    setSearchInputValue('');
-    setIsDropdownOpen(false);
+
+    setQueries((prev) => ({ ...prev, [field]: value }));
+    setFocusedIndex(-1);
+    scheduleSuggestions(field, value, tokens[field]);
   };
 
-  // Remove individual tag
-  const handleRemoveTag = (tagId: string) => {
-    const nextTags = selectedTags.filter((t) => t.id !== tagId);
-    setSelectedTags(nextTags);
-    applyFilterWithTags(nextTags);
+  const handleSelect = (field: FieldKey, value: string) => {
+    addTokens(field, [value]);
   };
 
-  // Clear all tags
-  const handleClearAllTags = () => {
-    setSelectedTags([]);
-    applyFilterWithTags([]);
+  const handleClearField = (field: FieldKey) => {
+    setTokens((prev) => ({ ...prev, [field]: [] }));
+    setQueries((prev) => ({ ...prev, [field]: '' }));
+    if (openField === field) {
+      setOpenField(null);
+      setSuggestions([]);
+      setFocusedIndex(-1);
+    }
   };
 
-  const applyFilterWithTags = (tags: SearchTag[]) => {
-    const supplierIds = tags.filter((t) => t.type === 'supplier').map((t) => t.value);
-    const productIds = tags.filter((t) => t.type === 'product').map((t) => t.value);
-    const contactPersons = tags.filter((t) => t.type === 'contact').map((t) => t.value);
-    const phones = tags.filter((t) => t.type === 'phone').map((t) => t.value);
+  const handleKeyDown = (field: FieldKey, e: KeyboardEvent<HTMLInputElement>) => {
+    const isOpen = openField === field && suggestions.length > 0;
+    const query = queries[field];
 
-    const updated: SupplierFilterState = {
-      ...draftFilters,
-      supplierIds: supplierIds.length ? supplierIds : undefined,
-      productIds: productIds.length ? productIds : undefined,
-      contactPersons: contactPersons.length ? contactPersons : undefined,
-      phones: phones.length ? phones : undefined,
-      tags,
-      pageIndex: 1,
-    };
-    setDraftFilters(updated);
-    onSearch(updated);
+    if (e.key === 'ArrowDown' && isOpen) {
+      e.preventDefault();
+      setFocusedIndex((i) => (i + 1) % suggestions.length);
+      return;
+    }
+    if (e.key === 'ArrowUp' && isOpen) {
+      e.preventDefault();
+      setFocusedIndex((i) => (i <= 0 ? suggestions.length - 1 : i - 1));
+      return;
+    }
+    if (e.key === 'Backspace' && !query && tokens[field].length > 0) {
+      e.preventDefault();
+      setTokens((prev) => ({ ...prev, [field]: prev[field].slice(0, -1) }));
+      return;
+    }
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (isOpen && focusedIndex >= 0 && suggestions[focusedIndex]) {
+        handleSelect(field, suggestions[focusedIndex].value);
+        return;
+      }
+      if (query.trim()) {
+        addTokens(field, [query]);
+        return;
+      }
+      handleSubmit();
+    }
+    if (e.key === 'Escape') {
+      setOpenField(null);
+      setFocusedIndex(-1);
+    }
   };
+
+  const collectTokens = (): TokenMap => ({
+    code: uniqueTokens([...tokens.code, queries.code]),
+    name: uniqueTokens([...tokens.name, queries.name]),
+    contactPerson: uniqueTokens([...tokens.contactPerson, queries.contactPerson]),
+    phone: uniqueTokens([...tokens.phone, queries.phone]),
+  });
 
   const handleSubmit = (e?: FormEvent) => {
     if (e) e.preventDefault();
-    setIsDropdownOpen(false);
-
-    const supplierIds = selectedTags.filter((t) => t.type === 'supplier').map((t) => t.value);
-    const productIds = selectedTags.filter((t) => t.type === 'product').map((t) => t.value);
-    const contactPersons = selectedTags.filter((t) => t.type === 'contact').map((t) => t.value);
-    const phones = selectedTags.filter((t) => t.type === 'phone').map((t) => t.value);
-
+    const next = collectTokens();
+    setTokens(next);
+    setQueries(EMPTY_QUERIES);
+    setOpenField(null);
     onSearch({
       ...draftFilters,
-      supplierIds: supplierIds.length ? supplierIds : undefined,
-      productIds: productIds.length ? productIds : undefined,
-      contactPersons: contactPersons.length ? contactPersons : undefined,
-      phones: phones.length ? phones : undefined,
-      tags: selectedTags,
+      searchTerm: '',
+      code: '',
+      name: '',
+      contactPerson: '',
+      phone: '',
+      codes: next.code,
+      names: next.name,
+      contactPersons: next.contactPerson,
+      phones: next.phone,
+      supplierIds: undefined,
+      productIds: undefined,
+      tags: [],
       pageIndex: 1,
     });
   };
 
   const handleResetClick = () => {
-    setSelectedTags([]);
-    setSearchInputValue('');
-    setIsDropdownOpen(false);
+    setOpenField(null);
+    setSuggestions([]);
+    setTokens(EMPTY_TOKENS);
+    setQueries(EMPTY_QUERIES);
     const emptyFilters: SupplierFilterState = {
       searchTerm: '',
       code: '',
       name: '',
       contactPerson: '',
       phone: '',
+      codes: [],
+      names: [],
+      contactPersons: [],
+      phones: [],
       supplierType: '',
       category: '',
       debtStatus: '',
@@ -200,8 +369,6 @@ export const SupplierFilterBar: FC<Props> = ({
       status: '',
       supplierIds: undefined,
       productIds: undefined,
-      contactPersons: undefined,
-      phones: undefined,
       tags: [],
       pageIndex: 1,
       pageSize: filters.pageSize || 12,
@@ -210,47 +377,17 @@ export const SupplierFilterBar: FC<Props> = ({
     onReset();
   };
 
-  // Helper function to highlight matching text
-  const highlightMatch = (text: string, query: string) => {
-    if (!text || !query.trim()) return <span>{text}</span>;
-    const q = query.trim();
-    const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const regex = new RegExp(`(${escaped})`, 'gi');
-    const parts = text.split(regex);
-
-    return (
-      <span>
-        {parts.map((part, i) =>
-          regex.test(part) ? (
-            <mark
-              key={i}
-              style={{
-                backgroundColor: '#fef08a',
-                color: '#854d0e',
-                fontWeight: 700,
-                padding: '0 2px',
-                borderRadius: 2,
-              }}
-            >
-              {part}
-            </mark>
-          ) : (
-            <span key={i}>{part}</span>
-          )
-        )}
-      </span>
-    );
-  };
-
   const hasActiveFilters = Boolean(
-    selectedTags.length > 0 ||
-    (draftFilters.code || '').trim() ||
-    (draftFilters.name || '').trim() ||
-    (draftFilters.contactPerson || '').trim() ||
-    (draftFilters.phone || '').trim() ||
-    (draftFilters.searchTerm || '').trim() ||
-    draftFilters.supplierType ||
-    draftFilters.status
+    tokens.code.length ||
+      tokens.name.length ||
+      tokens.contactPerson.length ||
+      tokens.phone.length ||
+      queries.code.trim() ||
+      queries.name.trim() ||
+      queries.contactPerson.trim() ||
+      queries.phone.trim() ||
+      draftFilters.supplierType ||
+      draftFilters.status
   );
 
   const labelStyle: React.CSSProperties = {
@@ -265,510 +402,288 @@ export const SupplierFilterBar: FC<Props> = ({
     height: 32,
     padding: '0 10px',
     borderRadius: 6,
-    border: isActive ? '1px solid #0066FF' : '1px solid #cbd5e1',
+    border: isActive ? '1px solid #0d9488' : '1px solid #cbd5e1',
     fontSize: 12.5,
     fontWeight: 600,
-    color: isActive ? '#0066FF' : '#334155',
-    backgroundColor: isActive ? '#eff6ff' : '#ffffff',
+    color: isActive ? '#0f766e' : '#334155',
+    backgroundColor: isActive ? '#f0fdfa' : '#ffffff',
     cursor: 'pointer',
     outline: 'none',
   });
 
   return (
     <div
+      ref={barRef}
       style={{
         backgroundColor: '#ffffff',
         border: '1px solid #e2e8f0',
-        borderRadius: 10,
-        padding: '12px 16px',
+        borderRadius: 8,
+        padding: '10px 14px',
         marginBottom: 0,
-        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)',
+        boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)',
         display: 'flex',
         flexDirection: 'column',
-        gap: 12,
+        gap: 10,
         flexShrink: 0,
       }}
     >
-      {/* ── DÒNG 1: Ô TÌM KIẾM THÔNG MINH AUTOCOMPLETE VỚI TEXT HIGHLIGHTING (REQ-SEARCH-01) ── */}
-      <div style={{ position: 'relative' }} ref={searchContainerRef}>
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            position: 'relative',
-            width: '100%',
-          }}
-        >
-          <div
-            style={{
-              position: 'absolute',
-              left: 12,
-              display: 'flex',
-              alignItems: 'center',
-              pointerEvents: 'none',
-              color: '#64748b',
-            }}
-          >
-            {isLoadingSuggestions ? (
-              <Loader2 size={16} className="animate-spin text-blue-600" />
-            ) : (
-              <Search size={16} />
-            )}
-          </div>
+      <div
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          gap: '10px 20px',
+        }}
+      >
+        {FIELDS.map((field) => {
+          const query = queries[field.key];
+          const fieldTokens = tokens[field.key];
+          const hasValues = fieldTokens.length > 0;
+          const isOpen = openField === field.key && suggestions.length > 0;
 
-          <input
-            type="text"
-            value={searchInputValue}
-            onChange={(e) => handleSearchInputChange(e.target.value)}
-            onFocus={() => {
-              if (
-                searchInputValue.trim() &&
-                (suggestions.suppliers.length > 0 ||
-                  suggestions.products.length > 0 ||
-                  suggestions.contactPersons.length > 0 ||
-                  suggestions.phones.length > 0)
-              ) {
-                setIsDropdownOpen(true);
-              }
-            }}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                handleSubmit();
-              } else if (e.key === 'Escape') {
-                setIsDropdownOpen(false);
-              }
-            }}
-            placeholder="Tìm kiếm đa thực thể: Nhập từ khóa để gợi ý & chọn nhiều NCC, Sản phẩm, Người liên hệ, SĐT..."
-            style={{
-              width: '100%',
-              height: 40,
-              paddingLeft: 38,
-              paddingRight: searchInputValue ? 36 : 14,
-              borderRadius: 8,
-              border: isDropdownOpen ? '2px solid #0066FF' : '1px solid #cbd5e1',
-              fontSize: 13.5,
-              color: '#0f172a',
-              backgroundColor: '#f8fafc',
-              outline: 'none',
-              transition: 'all 0.15s ease',
-              boxShadow: isDropdownOpen ? '0 0 0 3px rgba(0, 102, 255, 0.12)' : 'none',
-            }}
-          />
-
-          {searchInputValue && (
-            <button
-              type="button"
-              onClick={() => {
-                setSearchInputValue('');
-                setIsDropdownOpen(false);
-                setDraftFilters((prev) => ({ ...prev, searchTerm: '' }));
-              }}
-              style={{
-                position: 'absolute',
-                right: 10,
-                border: 'none',
-                background: 'transparent',
-                color: '#94a3b8',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                padding: 4,
-              }}
-              title="Xóa từ khóa"
-            >
-              <X size={16} />
-            </button>
-          )}
-        </div>
-
-        {/* ── DROPDOWN GỢI Ý PHÂN NHÓM KÈM HIGHLIGHT KẾT QUẢ ── */}
-        {isDropdownOpen && (
-          <div
-            style={{
-              position: 'absolute',
-              top: '100%',
-              left: 0,
-              right: 0,
-              marginTop: 4,
-              backgroundColor: '#ffffff',
-              border: '1px solid #cbd5e1',
-              borderRadius: 8,
-              boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
-              zIndex: 50,
-              maxHeight: 420,
-              overflowY: 'auto',
-              padding: '8px 0',
-            }}
-          >
+          return (
             <div
+              key={field.key}
               style={{
-                padding: '4px 12px 6px',
-                fontSize: 11.5,
-                fontWeight: 600,
-                color: '#64748b',
-                textTransform: 'uppercase',
-                borderBottom: '1px solid #f1f5f9',
-                display: 'flex',
+                position: 'relative',
+                display: 'inline-flex',
                 alignItems: 'center',
-                justifyContent: 'space-between',
+                gap: 8,
+                flex: '1 1 320px',
+                minWidth: field.minWidth,
+                maxWidth: 520,
               }}
             >
-              <span>Kết quả gợi ý theo từ khóa "{searchInputValue}"</span>
-              <span style={{ fontSize: 11, fontWeight: 500, color: '#94a3b8' }}>
-                Nhấn để thêm vào bộ lọc đa tiêu chí
-              </span>
+              <label style={labelStyle}>{field.label}:</label>
+              <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
+                <div
+                  ref={(el) => {
+                    chipBoxRefs.current[field.key] = el;
+                  }}
+                  className="supplier-chip-input"
+                  onClick={() => {
+                    if (skipFocusRef.current) {
+                      skipFocusRef.current = false;
+                      return;
+                    }
+                    inputRefs.current[field.key]?.focus();
+                  }}
+                  onWheel={(e) => {
+                    const el = chipBoxRefs.current[field.key];
+                    if (!el || el.scrollWidth <= el.clientWidth) return;
+                    e.preventDefault();
+                    el.scrollLeft += e.deltaY + e.deltaX;
+                  }}
+                  onPointerDown={(e) => {
+                    if ((e.target as HTMLElement).closest('button, input')) return;
+                    const el = chipBoxRefs.current[field.key];
+                    if (!el) return;
+                    dragRef.current = {
+                      field: field.key,
+                      startX: e.clientX,
+                      startScroll: el.scrollLeft,
+                      moved: false,
+                    };
+                    e.currentTarget.setPointerCapture(e.pointerId);
+                  }}
+                  onPointerMove={(e) => {
+                    const drag = dragRef.current;
+                    if (!drag || drag.field !== field.key) return;
+                    const el = chipBoxRefs.current[field.key];
+                    if (!el) return;
+                    const dx = e.clientX - drag.startX;
+                    if (Math.abs(dx) > 3) drag.moved = true;
+                    el.scrollLeft = drag.startScroll - dx;
+                  }}
+                  onPointerUp={() => {
+                    if (dragRef.current?.moved) skipFocusRef.current = true;
+                    dragRef.current = null;
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    flexWrap: 'nowrap',
+                    gap: 4,
+                    height: 32,
+                    maxHeight: 32,
+                    overflowX: 'auto',
+                    overflowY: 'hidden',
+                    padding: '0 28px 0 6px',
+                    borderRadius: 6,
+                    border: hasValues || isOpen ? '1px solid #0d9488' : '1px solid #cbd5e1',
+                    backgroundColor: hasValues ? '#f0fdfa' : '#ffffff',
+                    boxSizing: 'border-box',
+                    boxShadow: isOpen ? '0 0 0 3px rgba(13, 148, 136, 0.12)' : 'none',
+                    cursor: 'text',
+                    userSelect: 'none',
+                  }}
+                >
+                  {fieldTokens.map((token) => (
+                    <span
+                      key={`${field.key}-${token}`}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        flexShrink: 0,
+                        gap: 4,
+                        height: 22,
+                        padding: '0 4px 0 8px',
+                        borderRadius: 4,
+                        backgroundColor: '#ccfbf1',
+                        color: '#0f766e',
+                        fontSize: 12,
+                        fontWeight: 700,
+                        border: '1px solid #99f6e4',
+                      }}
+                    >
+                      <span
+                        style={{
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                          maxWidth: 160,
+                        }}
+                        title={token}
+                      >
+                        {token}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          removeToken(field.key, token);
+                        }}
+                        title="Xóa giá trị"
+                        style={{
+                          width: 16,
+                          height: 16,
+                          border: 'none',
+                          background: 'transparent',
+                          color: '#0f766e',
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          padding: 0,
+                        }}
+                      >
+                        <X size={11} />
+                      </button>
+                    </span>
+                  ))}
+                  <input
+                    ref={(el) => {
+                      inputRefs.current[field.key] = el;
+                    }}
+                    type="text"
+                    value={query}
+                    placeholder={fieldTokens.length ? 'Thêm giá trị...' : field.placeholder}
+                    onChange={(e) => handleFieldChange(field.key, e.target.value)}
+                    onFocus={() => {
+                      if (query.trim()) {
+                        loadSuggestions(field.key, query, fieldTokens);
+                      }
+                    }}
+                    onKeyDown={(e) => handleKeyDown(field.key, e)}
+                    style={{
+                      flex: '0 0 auto',
+                      minWidth: 72,
+                      width: fieldTokens.length ? 88 : '100%',
+                      height: 24,
+                      border: 'none',
+                      outline: 'none',
+                      background: 'transparent',
+                      fontSize: 12.5,
+                      color: '#0f172a',
+                    }}
+                  />
+                </div>
+                {loadingField === field.key ? (
+                  <Loader2
+                    size={13}
+                    className="animate-spin"
+                    style={{ position: 'absolute', right: 8, top: 9, color: '#0f766e' }}
+                  />
+                ) : hasValues || query ? (
+                  <button
+                    type="button"
+                    onClick={() => handleClearField(field.key)}
+                    title="Xóa toàn bộ giá trị của ô này"
+                    style={{
+                      position: 'absolute',
+                      right: 4,
+                      top: 4,
+                      width: 24,
+                      height: 24,
+                      border: 'none',
+                      background: 'transparent',
+                      color: '#94a3b8',
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <X size={13} />
+                  </button>
+                ) : null}
+
+                {isOpen && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: '100%',
+                      left: 0,
+                      minWidth: '100%',
+                      width: Math.max(field.minWidth, 240),
+                      marginTop: 4,
+                      backgroundColor: '#ffffff',
+                      border: '1px solid #cbd5e1',
+                      borderRadius: 8,
+                      boxShadow: '0 10px 25px -5px rgba(15, 23, 42, 0.12)',
+                      zIndex: 80,
+                      maxHeight: 260,
+                      overflowY: 'auto',
+                      padding: '4px 0',
+                    }}
+                  >
+                    {suggestions.map((item, index) => {
+                      const active = index === focusedIndex;
+                      return (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onMouseEnter={() => setFocusedIndex(index)}
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => handleSelect(field.key, item.value)}
+                          style={{
+                            width: '100%',
+                            textAlign: 'left',
+                            border: 'none',
+                            cursor: 'pointer',
+                            padding: '8px 12px',
+                            backgroundColor: active ? '#f0fdfa' : 'transparent',
+                          }}
+                        >
+                          <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a' }}>
+                            {highlightMatch(item.primary, query)}
+                          </div>
+                          {item.secondary && (
+                            <div style={{ fontSize: 11.5, color: '#64748b', marginTop: 2 }}>
+                              {highlightMatch(item.secondary, query)}
+                            </div>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
-
-            {/* 1. Nhóm Nhà cung cấp */}
-            {suggestions.suppliers.length > 0 && (
-              <div style={{ padding: '6px 0' }}>
-                <div
-                  style={{
-                    padding: '4px 12px',
-                    fontSize: 11,
-                    fontWeight: 700,
-                    color: '#0066FF',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 6,
-                    backgroundColor: '#f0f7ff',
-                  }}
-                >
-                  <Building2 size={13} />
-                  <span>NHÀ CUNG CẤP ({suggestions.suppliers.length})</span>
-                </div>
-                {suggestions.suppliers.map((s) => (
-                  <div
-                    key={s.id}
-                    onClick={() =>
-                      handleSelectSuggestion({
-                        id: `supplier-${s.id}`,
-                        type: 'supplier',
-                        value: s.id,
-                        label: s.name,
-                        subLabel: s.code,
-                      })
-                    }
-                    style={{
-                      padding: '8px 14px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      cursor: 'pointer',
-                      borderBottom: '1px solid #f8fafc',
-                      transition: 'background 0.1s ease',
-                    }}
-                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#eff6ff')}
-                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span
-                        style={{
-                          fontSize: 11,
-                          fontFamily: 'var(--font-mono, monospace)',
-                          padding: '1px 6px',
-                          borderRadius: 4,
-                          backgroundColor: '#e0f2fe',
-                          color: '#0284c7',
-                          fontWeight: 600,
-                        }}
-                      >
-                        {highlightMatch(s.code, searchInputValue)}
-                      </span>
-                      <span style={{ fontSize: 13, fontWeight: 600, color: '#0f172a' }}>
-                        {highlightMatch(s.name, searchInputValue)}
-                      </span>
-                    </div>
-                    <span style={{ fontSize: 11.5, color: '#0066FF', fontWeight: 500 }}>+ Chọn NCC</span>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* 2. Nhóm Sản phẩm */}
-            {suggestions.products.length > 0 && (
-              <div style={{ padding: '6px 0', borderTop: '1px solid #f1f5f9' }}>
-                <div
-                  style={{
-                    padding: '4px 12px',
-                    fontSize: 11,
-                    fontWeight: 700,
-                    color: '#7c3aed',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 6,
-                    backgroundColor: '#faf5ff',
-                  }}
-                >
-                  <Package size={13} />
-                  <span>SẢN PHẨM CUNG ỨNG ({suggestions.products.length})</span>
-                </div>
-                {suggestions.products.map((p) => (
-                  <div
-                    key={p.id}
-                    onClick={() =>
-                      handleSelectSuggestion({
-                        id: `product-${p.id}`,
-                        type: 'product',
-                        value: p.id,
-                        label: p.name,
-                        subLabel: `SKU: ${p.sku}`,
-                      })
-                    }
-                    style={{
-                      padding: '8px 14px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      cursor: 'pointer',
-                      borderBottom: '1px solid #f8fafc',
-                      transition: 'background 0.1s ease',
-                    }}
-                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f5f3ff')}
-                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-                  >
-                    <div>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a' }}>
-                        {highlightMatch(p.name, searchInputValue)}
-                      </div>
-                      <div style={{ fontSize: 11.5, color: '#64748b', display: 'flex', gap: 8 }}>
-                        <span>Mã SKU: {highlightMatch(p.sku, searchInputValue)}</span>
-                        <span>•</span>
-                        <span>Cung cấp bởi: <b>{p.supplierName}</b></span>
-                      </div>
-                    </div>
-                    <span style={{ fontSize: 11.5, color: '#7c3aed', fontWeight: 500 }}>+ Chọn SP</span>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* 3. Nhóm Người liên hệ */}
-            {suggestions.contactPersons.length > 0 && (
-              <div style={{ padding: '6px 0', borderTop: '1px solid #f1f5f9' }}>
-                <div
-                  style={{
-                    padding: '4px 12px',
-                    fontSize: 11,
-                    fontWeight: 700,
-                    color: '#059669',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 6,
-                    backgroundColor: '#ecfdf5',
-                  }}
-                >
-                  <User size={13} />
-                  <span>NGƯỜI LIÊN HỆ ({suggestions.contactPersons.length})</span>
-                </div>
-                {suggestions.contactPersons.map((c, idx) => (
-                  <div
-                    key={`${c.supplierId}-${c.name}-${idx}`}
-                    onClick={() =>
-                      handleSelectSuggestion({
-                        id: `contact-${c.name}`,
-                        type: 'contact',
-                        value: c.name,
-                        label: c.name,
-                        subLabel: c.supplierName,
-                      })
-                    }
-                    style={{
-                      padding: '8px 14px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      cursor: 'pointer',
-                      borderBottom: '1px solid #f8fafc',
-                      transition: 'background 0.1s ease',
-                    }}
-                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#ecfdf5')}
-                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-                  >
-                    <div>
-                      <span style={{ fontSize: 13, fontWeight: 600, color: '#0f172a' }}>
-                        {highlightMatch(c.name, searchInputValue)}
-                      </span>
-                      <span style={{ fontSize: 11.5, color: '#64748b', marginLeft: 8 }}>
-                        (NCC: {c.supplierName})
-                      </span>
-                    </div>
-                    <span style={{ fontSize: 11.5, color: '#059669', fontWeight: 500 }}>+ Chọn liên hệ</span>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* 4. Nhóm Số điện thoại */}
-            {suggestions.phones.length > 0 && (
-              <div style={{ padding: '6px 0', borderTop: '1px solid #f1f5f9' }}>
-                <div
-                  style={{
-                    padding: '4px 12px',
-                    fontSize: 11,
-                    fontWeight: 700,
-                    color: '#d97706',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 6,
-                    backgroundColor: '#fffbeb',
-                  }}
-                >
-                  <Phone size={13} />
-                  <span>SỐ ĐIỆN THOẠI ({suggestions.phones.length})</span>
-                </div>
-                {suggestions.phones.map((ph, idx) => (
-                  <div
-                    key={`${ph.supplierId}-${ph.phone}-${idx}`}
-                    onClick={() =>
-                      handleSelectSuggestion({
-                        id: `phone-${ph.phone}`,
-                        type: 'phone',
-                        value: ph.phone,
-                        label: ph.phone,
-                        subLabel: ph.supplierName,
-                      })
-                    }
-                    style={{
-                      padding: '8px 14px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      cursor: 'pointer',
-                      borderBottom: '1px solid #f8fafc',
-                      transition: 'background 0.1s ease',
-                    }}
-                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#fffbeb')}
-                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-                  >
-                    <div>
-                      <span
-                        style={{
-                          fontSize: 13,
-                          fontWeight: 700,
-                          color: '#0f172a',
-                          fontFamily: 'var(--font-mono, monospace)',
-                        }}
-                      >
-                        {highlightMatch(ph.phone, searchInputValue)}
-                      </span>
-                      <span style={{ fontSize: 11.5, color: '#64748b', marginLeft: 8 }}>
-                        (NCC: {ph.supplierName})
-                      </span>
-                    </div>
-                    <span style={{ fontSize: 11.5, color: '#d97706', fontWeight: 500 }}>+ Chọn SĐT</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
+          );
+        })}
       </div>
 
-      {/* ── DÒNG 2: DANH SÁCH CÁC THẺ TAGS / CHIPS ĐÃ CHỌN (MULTI-SELECT TOKENS) ── */}
-      {selectedTags.length > 0 && (
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-            flexWrap: 'wrap',
-            padding: '6px 10px',
-            backgroundColor: '#f1f5f9',
-            borderRadius: 6,
-            border: '1px solid #e2e8f0',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#475569', fontSize: 12, fontWeight: 600 }}>
-            <Tag size={13} />
-            <span>Tiêu chí đang lọc ({selectedTags.length}):</span>
-          </div>
-
-          {selectedTags.map((t) => {
-            let bg = '#eff6ff';
-            let border = '#bfdbfe';
-            let text = '#1d4ed8';
-            let prefix = 'NCC:';
-
-            if (t.type === 'product') {
-              bg = '#f5f3ff';
-              border = '#ddd6fe';
-              text = '#6d28d9';
-              prefix = 'SP:';
-            } else if (t.type === 'contact') {
-              bg = '#ecfdf5';
-              border = '#a7f3d0';
-              text = '#047857';
-              prefix = 'Liên hệ:';
-            } else if (t.type === 'phone') {
-              bg = '#fffbeb';
-              border = '#fde68a';
-              text = '#b45309';
-              prefix = 'SĐT:';
-            }
-
-            return (
-              <span
-                key={t.id}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  padding: '3px 8px',
-                  borderRadius: 20,
-                  backgroundColor: bg,
-                  border: `1px solid ${border}`,
-                  color: text,
-                  fontSize: 12,
-                  fontWeight: 600,
-                  boxShadow: '0 1px 2px rgba(0,0,0,0.02)',
-                }}
-              >
-                <span style={{ fontSize: 10.5, opacity: 0.85, textTransform: 'uppercase' }}>{prefix}</span>
-                <span>{t.label}</span>
-                {t.subLabel && <span style={{ opacity: 0.65, fontSize: 11 }}>({t.subLabel})</span>}
-                <button
-                  type="button"
-                  onClick={() => handleRemoveTag(t.id)}
-                  style={{
-                    border: 'none',
-                    background: 'transparent',
-                    color: text,
-                    cursor: 'pointer',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    padding: 0,
-                    marginLeft: 2,
-                  }}
-                  title="Xóa tiêu chí này"
-                >
-                  <X size={13} />
-                </button>
-              </span>
-            );
-          })}
-
-          <button
-            type="button"
-            onClick={handleClearAllTags}
-            style={{
-              border: 'none',
-              background: 'transparent',
-              color: '#ef4444',
-              cursor: 'pointer',
-              fontSize: 12,
-              fontWeight: 600,
-              padding: '2px 6px',
-              marginLeft: 'auto',
-              textDecoration: 'underline',
-            }}
-          >
-            Xóa tất cả
-          </button>
-        </div>
-      )}
-
-      {/* ── DÒNG 3: BỘ LỌC CƠ BẢN (Loại NCC, Trạng thái) & Nút Thao tác ── */}
       <div
         style={{
           display: 'flex',
@@ -781,7 +696,6 @@ export const SupplierFilterBar: FC<Props> = ({
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
-          {/* Phân Loại NCC */}
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
             <label style={labelStyle}>Phân loại:</label>
             <select
@@ -790,13 +704,12 @@ export const SupplierFilterBar: FC<Props> = ({
               style={{ ...selectStyle(Boolean(draftFilters.supplierType)), minWidth: 150 }}
             >
               <option value="">-- Tất cả phân loại --</option>
-              <option value="Goods">📦 Hàng hóa (Goods)</option>
-              <option value="Service">🛠️ Dịch vụ (Service)</option>
-              <option value="Both">⚡ Cả hai (Both)</option>
+              <option value="Goods">Hàng hóa</option>
+              <option value="Service">Dịch vụ</option>
+              <option value="Both">Cả hai</option>
             </select>
           </div>
 
-          {/* Trạng Thái Hoạt Động */}
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
             <label style={labelStyle}>Trạng thái:</label>
             <select
@@ -805,12 +718,11 @@ export const SupplierFilterBar: FC<Props> = ({
               style={{ ...selectStyle(Boolean(draftFilters.status)), minWidth: 150 }}
             >
               <option value="">-- Tất cả trạng thái --</option>
-              <option value="Active">🟢 Đang hoạt động</option>
-              <option value="Inactive">⚪ Tạm ngưng hoạt động</option>
+              <option value="Active">Hoạt động</option>
+              <option value="Inactive">Tạm ngưng</option>
             </select>
           </div>
 
-          {/* Active Filter Indicator */}
           {hasActiveFilters && (
             <span
               style={{
@@ -818,11 +730,11 @@ export const SupplierFilterBar: FC<Props> = ({
                 alignItems: 'center',
                 padding: '3px 10px',
                 borderRadius: 4,
-                backgroundColor: '#eff6ff',
-                color: '#0066FF',
+                backgroundColor: '#f0fdfa',
+                color: '#0f766e',
                 fontSize: 12,
                 fontWeight: 600,
-                border: '1px solid #bfdbfe',
+                border: '1px solid #ccfbf1',
                 whiteSpace: 'nowrap',
               }}
             >
@@ -831,7 +743,6 @@ export const SupplierFilterBar: FC<Props> = ({
           )}
         </div>
 
-        {/* Nút Tìm kiếm & Đặt lại */}
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginLeft: 'auto' }}>
           <button
             type="button"
@@ -840,18 +751,17 @@ export const SupplierFilterBar: FC<Props> = ({
               display: 'inline-flex',
               alignItems: 'center',
               gap: 6,
-              height: 34,
-              padding: '0 20px',
+              height: 32,
+              padding: '0 18px',
               borderRadius: 6,
               border: 'none',
-              backgroundColor: '#0066FF',
+              backgroundColor: 'var(--blue-primary, #0f766e)',
               color: '#ffffff',
-              fontSize: 13,
+              fontSize: 12.5,
               fontWeight: 600,
               cursor: 'pointer',
               whiteSpace: 'nowrap',
-              transition: 'all 0.15s ease',
-              boxShadow: '0 1px 3px rgba(0, 102, 255, 0.25)',
+              boxShadow: '0 1px 2px rgba(15, 118, 110, 0.2)',
             }}
             title="Áp dụng bộ lọc tìm kiếm"
           >
@@ -866,17 +776,16 @@ export const SupplierFilterBar: FC<Props> = ({
               display: 'inline-flex',
               alignItems: 'center',
               gap: 5,
-              height: 34,
+              height: 32,
               padding: '0 14px',
               borderRadius: 6,
               border: '1px solid #cbd5e1',
               backgroundColor: '#ffffff',
               color: '#475569',
-              fontSize: 13,
+              fontSize: 12.5,
               fontWeight: 600,
               cursor: 'pointer',
               whiteSpace: 'nowrap',
-              transition: 'all 0.15s ease',
             }}
             title="Đặt lại toàn bộ tiêu chí lọc"
           >
