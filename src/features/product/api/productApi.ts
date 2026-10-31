@@ -1,6 +1,12 @@
 import { httpClient } from '../../../api/httpClient';
 import type { ApiResponse } from '../../../api/types';
-import type { ProductResponse, ProductQueryFilter, PagedResult } from '../types';
+import type {
+  ProductResponse,
+  ProductQueryFilter,
+  PagedResult,
+  ProductUnitResponse,
+  ProductUnitCreatePayload,
+} from '../types';
 
 export interface ProductCreatePayload {
   name: string;
@@ -130,6 +136,45 @@ export const productApi = {
     const res = await httpClient.delete<ApiResponse<any>>(`/products/${id}`);
     if (!res.data?.success) {
       throw new Error(res.data?.message || 'Không thể xóa hàng hóa.');
+    }
+  },
+
+  /**
+   * Lấy danh sách đơn vị tính quy đổi của sản phẩm
+   * Endpoint Backend: GET /api/v1/products/{productId}/units
+   */
+  async getProductUnits(productId: string): Promise<ProductUnitResponse[]> {
+    try {
+      const res = await httpClient.get<ApiResponse<ProductUnitResponse[]>>(`/products/${productId}/units`);
+      if (res.data?.success && res.data.data) {
+        return res.data.data;
+      }
+      return [];
+    } catch {
+      return [];
+    }
+  },
+
+  /**
+   * Thêm mới đơn vị tính quy đổi cho một sản phẩm
+   * Endpoint Backend: POST /api/v1/products/{productId}/units
+   */
+  async createProductUnit(productId: string, payload: ProductUnitCreatePayload): Promise<ProductUnitResponse> {
+    const res = await httpClient.post<ApiResponse<ProductUnitResponse>>(`/products/${productId}/units`, payload);
+    if (res.data?.success && res.data.data) {
+      return res.data.data;
+    }
+    throw new Error(res.data?.message || 'Không thể tạo đơn vị tính.');
+  },
+
+  /**
+   * Xóa một đơn vị tính quy đổi
+   * Endpoint Backend: DELETE /api/v1/product-units/{id}
+   */
+  async deleteProductUnit(id: string): Promise<void> {
+    const res = await httpClient.delete<ApiResponse<any>>(`/product-units/${id}`);
+    if (!res.data?.success) {
+      throw new Error(res.data?.message || 'Không thể xóa đơn vị tính.');
     }
   },
 };

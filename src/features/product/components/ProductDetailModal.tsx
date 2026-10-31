@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   X,
   Edit2,
@@ -10,8 +10,10 @@ import {
   Warehouse,
   History,
   Star,
+  CheckCircle,
 } from 'lucide-react';
-import type { ProductItem } from '../types';
+import type { ProductItem, UomConversion } from '../types';
+import { productApi } from '../api/productApi';
 
 interface ProductDetailModalProps {
   isOpen: boolean;
@@ -36,14 +38,80 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'info' | 'notes' | 'ledger' | 'branch'>('info');
 
+  // Đơn vị tính đang chọn và danh sách đơn vị quy đổi (REQ-08)
+  const [selectedUnitName, setSelectedUnitName] = useState<string>(product?.baseUnit || 'Cái');
+  const [units, setUnits] = useState<UomConversion[]>(product?.uomConversions || []);
+
+  useEffect(() => {
+    if (product) {
+      setSelectedUnitName(product.baseUnit || 'Cái');
+      setUnits(product.uomConversions || []);
+    }
+  }, [product]);
+
+  // T17: Nạp đơn vị quy đổi từ API nếu product chưa nạp sẵn
+  useEffect(() => {
+    if (!product?.id) return;
+    const isGuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(product.id);
+    if (isGuid && (!product.uomConversions || product.uomConversions.length === 0)) {
+      productApi
+        .getProductUnits(product.id)
+        .then((res) => {
+          if (res && res.length > 0) {
+            const convs: UomConversion[] = res
+              .filter((u) => !u.isBaseUnit)
+              .map((u) => ({
+                id: u.id,
+                unitName: u.unitName,
+                conversionRate: u.conversionRate,
+                price: u.price,
+                barcode: u.barcode ?? undefined,
+              }));
+            setUnits(convs);
+          }
+        })
+        .catch(() => {
+          // ignore
+        });
+    }
+  }, [product?.id, product?.uomConversions]);
+
   if (!isOpen || !product) return null;
 
   const isDiscontinued = product.status === 'Discontinued';
 
   const formatVND = (num?: number | null) => {
     if (num === undefined || num === null) return '—';
-    return `${num.toLocaleString('vi-VN')} đ`;
+    return `${Number(num).toLocaleString('vi-VN')} đ`;
   };
+
+  // T15: Tính toán các giá trị chuyển đổi theo đơn vị tính đang chọn (REQ-08)
+  const isBaseUnit = selectedUnitName === (product.baseUnit || 'Cái');
+  const currentUom = units.find((u) => u.unitName === selectedUnitName);
+  const conversionRate = isBaseUnit ? 1 : Math.max(1, currentUom?.conversionRate || 1);
+
+  // Mã hàng & Mã vạch
+  const displayCode = (!isBaseUnit && currentUom?.productCode) ? currentUom.productCode : product.productCode;
+  const displayBarcode = (!isBaseUnit && currentUom?.barcode) ? currentUom.barcode : (isBaseUnit ? product.barcode : '—');
+
+  // Giá bán
+  const displaySellingPrice = isBaseUnit ? product.sellingPrice : (currentUom?.price ?? product.sellingPrice);
+
+  // Giá vốn (tuân thủ BR-SEC-01)
+  const displayCostPrice = product.costPrice != null
+    ? (isBaseUnit ? Number(product.costPrice) : Number(product.costPrice) * conversionRate)
+    : null;
+
+  // Tồn kho quy đổi
+  const onHandBase = product.onHand || 0;
+  const displayStock = isBaseUnit ? onHandBase : Math.floor(onHandBase / conversionRate);
+  const remainderStock = isBaseUnit ? 0 : onHandBase % conversionRate;
+
+  // Danh sách toàn bộ đơn vị để hiển thị Selector
+  const allUnitsList = [
+    { unitName: product.baseUnit || 'Cái', isBase: true, conversionRate: 1 },
+    ...units.map((u) => ({ unitName: u.unitName, isBase: false, conversionRate: u.conversionRate })),
+  ];
 
   return (
     <div className="custom-modal-backdrop" style={{ zIndex: 1100 }}>
@@ -70,7 +138,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={{ fontSize: 13, fontWeight: 700, color: '#0F766E' }}>
-                  {product.productCode}
+                  {displayCode}
                 </span>
                 {isDiscontinued && (
                   <span
@@ -88,8 +156,42 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 )}
               </div>
               <span style={{ fontSize: 16, fontWeight: 700, color: '#0F172A' }}>
-                {product.productName}
+                {product.productName} {!isBaseUnit && <span style={{ color: '#0F766E', fontSize: 14 }}>- {selectedUnitName}</span>}
               </span>
+
+              {/* T16: Unit Switcher Segmented Pills trên Header */}
+              {allUnitsList.length > 1 && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 12, color: '#64748B', fontWeight: 600 }}>Xem theo ĐVT:</span>
+                  {allUnitsList.map((u) => {
+                    const isActive = u.unitName === selectedUnitName;
+                    return (
+                      <button
+                        key={u.unitName}
+                        type="button"
+                        onClick={() => setSelectedUnitName(u.unitName)}
+                        style={{
+                          border: isActive ? '1px solid #0F766E' : '1px solid #CBD5E1',
+                          background: isActive ? '#0F766E' : '#FFFFFF',
+                          color: isActive ? '#FFFFFF' : '#334155',
+                          padding: '3px 10px',
+                          borderRadius: 16,
+                          fontSize: 12,
+                          fontWeight: isActive ? 700 : 500,
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 4,
+                        }}
+                      >
+                        {isActive && <CheckCircle size={12} />}
+                        <span>{u.unitName} {u.isBase ? '(Cơ bản)' : `(x${u.conversionRate})`}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
 
@@ -97,7 +199,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             <div style={{ textAlign: 'right' }}>
               <div style={{ fontSize: 11, color: '#64748B' }}>Giá bán</div>
               <div style={{ fontSize: 15, fontWeight: 700, color: '#0F172A' }}>
-                {formatVND(product.sellingPrice)}
+                {formatVND(displaySellingPrice)}
               </div>
             </div>
 
@@ -105,7 +207,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               <div style={{ textAlign: 'right' }}>
                 <div style={{ fontSize: 11, color: '#64748B' }}>Giá vốn</div>
                 <div style={{ fontSize: 14, color: '#475569', fontWeight: 600 }}>
-                  {formatVND(product.costPrice)}
+                  {formatVND(displayCostPrice)}
                 </div>
               </div>
             )}
@@ -116,11 +218,16 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 style={{
                   fontSize: 15,
                   fontWeight: 700,
-                  color: product.onHand <= 0 ? '#EF4444' : '#0F766E',
+                  color: displayStock <= 0 ? '#EF4444' : '#0F766E',
                 }}
               >
-                {product.onHand} {product.baseUnit}
+                {displayStock} {selectedUnitName}
               </div>
+              {!isBaseUnit && remainderStock > 0 && (
+                <div style={{ fontSize: 11, color: '#64748B' }}>
+                  (Dư {remainderStock} {product.baseUnit})
+                </div>
+              )}
             </div>
 
             <button type="button" className="custom-modal-close" onClick={onClose} title="Đóng">
@@ -307,7 +414,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                   <div>
                     <div style={{ fontSize: 12, color: '#64748B', marginBottom: 2 }}>Mã hàng</div>
                     <div style={{ fontSize: 14, fontWeight: 700, color: '#0F172A' }}>
-                      {product.productCode}
+                      {displayCode}
                     </div>
                   </div>
 
@@ -315,7 +422,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                     <div>
                       <div style={{ fontSize: 12, color: '#64748B', marginBottom: 2 }}>Giá vốn</div>
                       <div style={{ fontSize: 14, fontWeight: 700, color: '#0F172A' }}>
-                        {formatVND(product.costPrice)}
+                        {formatVND(displayCostPrice)}
                       </div>
                     </div>
                   )}
@@ -326,14 +433,14 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                   <div>
                     <div style={{ fontSize: 12, color: '#64748B', marginBottom: 2 }}>Mã vạch</div>
                     <div style={{ fontSize: 14, fontWeight: 700, color: '#0F172A' }}>
-                      {product.barcode || '—'}
+                      {displayBarcode || '—'}
                     </div>
                   </div>
 
                   <div>
                     <div style={{ fontSize: 12, color: '#64748B', marginBottom: 2 }}>Giá bán</div>
                     <div style={{ fontSize: 14, fontWeight: 700, color: '#0F766E' }}>
-                      {formatVND(product.sellingPrice)}
+                      {formatVND(displaySellingPrice)}
                     </div>
                   </div>
                 </div>
@@ -341,16 +448,24 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 {/* Cột 3 */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                   <div>
-                    <div style={{ fontSize: 12, color: '#64748B', marginBottom: 2 }}>Đơn vị cơ bản</div>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: '#0F172A' }}>
-                      {product.baseUnit}
+                    <div style={{ fontSize: 12, color: '#64748B', marginBottom: 2 }}>Đơn vị đang xem</div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: '#0F766E' }}>
+                      {selectedUnitName}{' '}
+                      <span style={{ fontSize: 12, fontWeight: 500, color: '#64748B' }}>
+                        {isBaseUnit ? '(Đơn vị cơ bản)' : `(Quy đổi = ${conversionRate} ${product.baseUnit})`}
+                      </span>
                     </div>
                   </div>
 
                   <div>
                     <div style={{ fontSize: 12, color: '#64748B', marginBottom: 2 }}>Tồn kho hiện tại</div>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: '#0F172A' }}>
-                      {product.onHand} {product.baseUnit}
+                    <div style={{ fontSize: 14, fontWeight: 700, color: displayStock <= 0 ? '#EF4444' : '#0F172A' }}>
+                      {displayStock} {selectedUnitName}
+                      {!isBaseUnit && remainderStock > 0 && (
+                        <span style={{ fontSize: 12, fontWeight: 500, color: '#64748B', marginLeft: 4 }}>
+                          (dư {remainderStock} {product.baseUnit})
+                        </span>
+                      )}
                     </div>
                   </div>
 
@@ -366,58 +481,131 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 </div>
               </div>
 
-              {/* Bảng Đơn vị tính & Quy đổi giá */}
+              {/* Bảng Đơn vị tính & Quy đổi giá (Hỗ trợ click để chọn đơn vị tính - REQ-08) */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: '#0F172A' }}>
-                  Đơn vị tính & Quy đổi giá
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: '#0F172A' }}>
+                    Đơn vị tính & Quy đổi giá
+                  </div>
+                  <div style={{ fontSize: 12, color: '#64748B' }}>
+                    (Click vào từng dòng để xem chi tiết theo đơn vị tương ứng)
+                  </div>
                 </div>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                   <thead>
                     <tr style={{ background: '#F8FAFC', textAlign: 'left' }}>
-                      <th style={{ padding: '8px 12px', borderBottom: '1px solid #E2E8F0', width: '40%' }}>
+                      <th style={{ padding: '8px 12px', borderBottom: '1px solid #E2E8F0', width: '35%' }}>
                         Tên đơn vị
                       </th>
-                      <th style={{ padding: '8px 12px', borderBottom: '1px solid #E2E8F0', width: '30%' }}>
+                      <th style={{ padding: '8px 12px', borderBottom: '1px solid #E2E8F0', width: '25%' }}>
                         Giá trị quy đổi
                       </th>
                       <th
                         style={{
                           padding: '8px 12px',
                           borderBottom: '1px solid #E2E8F0',
-                          width: '30%',
+                          width: '25%',
                           textAlign: 'right',
                         }}
                       >
                         Giá bán
                       </th>
+                      <th
+                        style={{
+                          padding: '8px 12px',
+                          borderBottom: '1px solid #E2E8F0',
+                          width: '15%',
+                          textAlign: 'center',
+                        }}
+                      >
+                        Trạng thái
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
                     {/* Hàng 1: Đơn vị cơ bản */}
-                    <tr style={{ borderBottom: '1px solid #F1F5F9' }}>
+                    <tr
+                      onClick={() => setSelectedUnitName(product.baseUnit || 'Cái')}
+                      style={{
+                        borderBottom: '1px solid #F1F5F9',
+                        cursor: 'pointer',
+                        backgroundColor: isBaseUnit ? '#F0FDFA' : undefined,
+                        transition: 'background-color 0.15s ease',
+                      }}
+                    >
                       <td style={{ padding: '8px 12px' }}>
-                        <b>{product.baseUnit}</b>{' '}
+                        <b style={{ color: isBaseUnit ? '#0F766E' : '#1E293B' }}>{product.baseUnit}</b>{' '}
                         <span style={{ fontSize: 12, color: '#64748B' }}>(Đơn vị cơ bản)</span>
                       </td>
                       <td style={{ padding: '8px 12px' }}>1</td>
                       <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 700 }}>
                         {formatVND(product.sellingPrice)}
                       </td>
+                      <td style={{ padding: '8px 12px', textAlign: 'center' }}>
+                        {isBaseUnit ? (
+                          <span
+                            style={{
+                              fontSize: 11,
+                              fontWeight: 700,
+                              color: '#0F766E',
+                              background: '#CCFBF1',
+                              padding: '2px 8px',
+                              borderRadius: 9999,
+                            }}
+                          >
+                            Đang xem
+                          </span>
+                        ) : (
+                          <span style={{ fontSize: 11, color: '#94A3B8' }}>Chọn xem</span>
+                        )}
+                      </td>
                     </tr>
 
                     {/* Hàng quy đổi */}
-                    {product.uomConversions &&
-                      product.uomConversions.map((uom) => (
-                        <tr key={uom.id} style={{ borderBottom: '1px solid #F1F5F9' }}>
-                          <td style={{ padding: '8px 12px', fontWeight: 600 }}>{uom.unitName}</td>
-                          <td style={{ padding: '8px 12px' }}>
-                            {uom.conversionRate} {product.baseUnit}
-                          </td>
-                          <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 700 }}>
-                            {formatVND(uom.price)}
-                          </td>
-                        </tr>
-                      ))}
+                    {units &&
+                      units.map((uom) => {
+                        const isThisSelected = uom.unitName === selectedUnitName;
+                        return (
+                          <tr
+                            key={uom.id}
+                            onClick={() => setSelectedUnitName(uom.unitName)}
+                            style={{
+                              borderBottom: '1px solid #F1F5F9',
+                              cursor: 'pointer',
+                              backgroundColor: isThisSelected ? '#F0FDFA' : undefined,
+                              transition: 'background-color 0.15s ease',
+                            }}
+                          >
+                            <td style={{ padding: '8px 12px', fontWeight: 600, color: isThisSelected ? '#0F766E' : '#1E293B' }}>
+                              {uom.unitName}
+                            </td>
+                            <td style={{ padding: '8px 12px' }}>
+                              {uom.conversionRate} {product.baseUnit}
+                            </td>
+                            <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 700 }}>
+                              {formatVND(uom.price)}
+                            </td>
+                            <td style={{ padding: '8px 12px', textAlign: 'center' }}>
+                              {isThisSelected ? (
+                                <span
+                                  style={{
+                                    fontSize: 11,
+                                    fontWeight: 700,
+                                    color: '#0F766E',
+                                    background: '#CCFBF1',
+                                    padding: '2px 8px',
+                                    borderRadius: 9999,
+                                  }}
+                                >
+                                  Đang xem
+                                </span>
+                              ) : (
+                                <span style={{ fontSize: 11, color: '#94A3B8' }}>Chọn xem</span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
                   </tbody>
                 </table>
               </div>

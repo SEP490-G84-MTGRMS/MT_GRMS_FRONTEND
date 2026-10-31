@@ -83,15 +83,34 @@ export interface UomConversion {
   productCode?: string;
 }
 
+export interface ProductUnitResponse {
+  id: string;
+  productId: string;
+  unitName: string;
+  conversionRate: number;
+  price: number;
+  barcode?: string | null;
+  isBaseUnit: boolean;
+  createdAt: string;
+  updatedAt?: string | null;
+}
+
+export interface ProductUnitCreatePayload {
+  unitName: string;
+  conversionRate: number;
+  price: number;
+  barcode?: string | null;
+  isBaseUnit?: boolean;
+}
+
 export interface ComboComponent {
   id: string;
   productId: string;
-  productCode: string;
+  productCode?: string;
   productName: string;
   quantity: number;
   costPrice: number;
   sellingprice: number;
-  productCode?: string;
 }
 
 export interface StockLedgerEntry {

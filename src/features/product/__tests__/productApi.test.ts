@@ -5,6 +5,9 @@ import { httpClient } from '../../../api/httpClient';
 vi.mock('../../../api/httpClient', () => ({
   httpClient: {
     get: vi.fn(),
+    post: vi.fn(),
+    put: vi.fn(),
+    delete: vi.fn(),
   },
 }));
 
@@ -149,6 +152,96 @@ describe('productApi.getProductsPaged', () => {
     expect(result.items).toEqual([]);
     expect(result.totalCount).toBe(0);
     expect(result.totalPages).toBe(0);
+  });
+});
+
+describe('productApi.createProduct & createProductUnit', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('gọi POST /products để tạo sản phẩm mới thành công', async () => {
+    const mockCreated = {
+      id: 'prod-new-1',
+      productCode: 'SP000001',
+      name: 'Bánh gạo One One',
+      categoryId: 'cat-01',
+      categoryName: 'Bánh kẹo',
+      baseUnit: 'Gói',
+      sellingPrice: 25000,
+      costPrice: 18000,
+      minStock: 5,
+      maxStock: 100,
+      vatRate: 8,
+      productType: 'STANDARD',
+      status: 'Active',
+      hasBatches: false,
+      isFavorite: false,
+      createdAt: '2026-10-31T12:00:00Z',
+    };
+
+    (httpClient.post as any).mockResolvedValueOnce({
+      data: {
+        success: true,
+        data: mockCreated,
+      },
+    });
+
+    const result = await productApi.createProduct({
+      name: 'Bánh gạo One One',
+      categoryId: 'cat-01',
+      sellingPrice: 25000,
+      baseUnit: 'Gói',
+      costPrice: 18000,
+    });
+
+    expect(httpClient.post).toHaveBeenCalledWith('/products', {
+      name: 'Bánh gạo One One',
+      categoryId: 'cat-01',
+      sellingPrice: 25000,
+      baseUnit: 'Gói',
+      costPrice: 18000,
+    });
+    expect(result.id).toBe('prod-new-1');
+    expect(result.productCode).toBe('SP000001');
+  });
+
+  it('gọi POST /products/{productId}/units để tạo đơn vị quy đổi thành công', async () => {
+    const mockCreatedUnit = {
+      id: 'unit-1',
+      productId: 'prod-new-1',
+      unitName: 'Thùng 20 gói',
+      conversionRate: 20,
+      price: 480000,
+      barcode: '89300000020',
+      isBaseUnit: false,
+      createdAt: '2026-10-31T12:00:00Z',
+    };
+
+    (httpClient.post as any).mockResolvedValueOnce({
+      data: {
+        success: true,
+        data: mockCreatedUnit,
+      },
+    });
+
+    const result = await productApi.createProductUnit('prod-new-1', {
+      unitName: 'Thùng 20 gói',
+      conversionRate: 20,
+      price: 480000,
+      barcode: '89300000020',
+      isBaseUnit: false,
+    });
+
+    expect(httpClient.post).toHaveBeenCalledWith('/products/prod-new-1/units', {
+      unitName: 'Thùng 20 gói',
+      conversionRate: 20,
+      price: 480000,
+      barcode: '89300000020',
+      isBaseUnit: false,
+    });
+    expect(result.id).toBe('unit-1');
+    expect(result.conversionRate).toBe(20);
   });
 });
 

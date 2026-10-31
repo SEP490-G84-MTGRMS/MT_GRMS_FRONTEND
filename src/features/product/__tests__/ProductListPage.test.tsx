@@ -8,6 +8,11 @@ import { useAuthStore } from '../../../stores/useAuthStore';
 vi.mock('../api/productApi', () => ({
   productApi: {
     getProductsPaged: vi.fn(),
+    getProductUnits: vi.fn().mockResolvedValue([]),
+    createProduct: vi.fn(),
+    createProductUnit: vi.fn(),
+    updateProduct: vi.fn(),
+    deleteProduct: vi.fn(),
   },
 }));
 

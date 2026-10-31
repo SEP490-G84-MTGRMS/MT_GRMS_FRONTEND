@@ -10,7 +10,7 @@ import {
   Package,
   ChevronDown,
 } from 'lucide-react';
-import type { ProductItem, Category } from '../types';
+import type { ProductItem, Category, UomConversion } from '../types';
 import { categoryApi } from '../api/categoryApi';
 import { CategorySidebar } from '../components/CategorySidebar';
 import { CategoryModal } from '../components/CategoryModal';
@@ -64,14 +64,16 @@ export const ProductListPage: React.FC = () => {
 
   // Đóng popover chọn đơn vị khi click ra ngoài
   useEffect(() => {
-    const handleClickOutside = () => {
-      setActiveUnitDropdownId(null);
+    if (!activeUnitDropdownId) return;
+    const handleDocumentClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('.unit-dropdown-container')) {
+        setActiveUnitDropdownId(null);
+      }
     };
-    if (activeUnitDropdownId) {
-      document.addEventListener('click', handleClickOutside);
-    }
+    document.addEventListener('mousedown', handleDocumentClick);
     return () => {
-      document.removeEventListener('click', handleClickOutside);
+      document.removeEventListener('mousedown', handleDocumentClick);
     };
   }, [activeUnitDropdownId]);
 
@@ -118,28 +120,54 @@ export const ProductListPage: React.FC = () => {
         categoryIds: selectedCategoryIds.length > 0 ? selectedCategoryIds : undefined,
       });
       if (res && res.items) {
-        const mapped: ProductItem[] = res.items.map((p) => ({
-          id: p.id,
-          productCode: p.productCode || p.barcode,
-          barcode: p.barcode || '',
-          productName: p.name,
-          categoryId: p.categoryId,
-          categoryName: p.categoryName || 'Chung',
-          baseUnit: p.baseUnit || 'Cái',
-          sellingPrice: p.sellingPrice,
-          costPrice: p.costPrice,
-          onHand: 0,
-          committed: 0,
-          status: (p.status === 'Active' ? 'Active' : 'Discontinued') as 'Active' | 'Discontinued',
-          createdAt: p.createdAt ? new Date(p.createdAt).toLocaleDateString('vi-VN') : '',
-          updatedAt: p.updatedAt ? new Date(p.updatedAt).toLocaleDateString('vi-VN') : '',
-          imageUrl: p.imageUrl ?? undefined,
-          minStock: p.minStock,
-          maxStock: p.maxStock,
-          vatRate: p.vatRate,
-          isFavorite: p.isFavorite,
-          uomConversions: (p as any).uomConversions || (p as any).units || [],
-        }));
+        const mapped: ProductItem[] = await Promise.all(
+          res.items.map(async (p) => {
+            let uomConversions: UomConversion[] = (p as any).uomConversions || [];
+            if (uomConversions.length === 0 && p.id) {
+              const isGuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(p.id);
+              if (isGuid) {
+                try {
+                  const units = await productApi.getProductUnits(p.id);
+                  if (units && units.length > 0) {
+                    uomConversions = units
+                      .filter((u) => !u.isBaseUnit)
+                      .map((u) => ({
+                        id: u.id,
+                        unitName: u.unitName,
+                        conversionRate: u.conversionRate,
+                        price: u.price,
+                        barcode: u.barcode ?? undefined,
+                      }));
+                  }
+                } catch {
+                  // ignore network or not found
+                }
+              }
+            }
+            return {
+              id: p.id,
+              productCode: p.productCode || (p as any).sku || p.barcode || 'SP000000',
+              barcode: p.barcode || '',
+              productName: p.name || (p as any).productName || '',
+              categoryId: p.categoryId,
+              categoryName: p.categoryName || 'Chung',
+              baseUnit: p.baseUnit || (p as any).unitName || 'Cái',
+              sellingPrice: p.sellingPrice ?? (p as any).basePrice ?? 0,
+              costPrice: p.costPrice != null ? Number(p.costPrice) : null,
+              onHand: 0,
+              committed: 0,
+              status: (p.status === 'Active' ? 'Active' : 'Discontinued') as 'Active' | 'Discontinued',
+              createdAt: p.createdAt ? new Date(p.createdAt).toLocaleDateString('vi-VN') : '',
+              updatedAt: p.updatedAt ? new Date(p.updatedAt).toLocaleDateString('vi-VN') : '',
+              imageUrl: p.imageUrl ?? undefined,
+              minStock: p.minStock ?? 0,
+              maxStock: p.maxStock ?? 1000,
+              vatRate: p.vatRate ?? 0,
+              isFavorite: Boolean(p.isFavorite),
+              uomConversions,
+            };
+          })
+        );
         setProducts(mapped);
         setTotalCount(res.totalCount);
       } else {
@@ -270,82 +298,136 @@ export const ProductListPage: React.FC = () => {
     }
   };
 
-  // Product CRUD
-  const handleSaveProduct = (data: Partial<ProductItem>, saveAndAddNew?: boolean) => {
-    if (productToEdit) {
-      // Update
-      const updated = products.map((p) =>
-        p.id === productToEdit.id ? ({ ...p, ...data, updatedAt: new Date().toLocaleDateString('vi-VN') } as ProductItem) : p
-      );
-      setProducts(updated);
-      showToast(`Cập nhật hàng hóa "${data.productName}" thành công.`);
-      if (selectedProduct && selectedProduct.id === productToEdit.id) {
-        setSelectedProduct({ ...selectedProduct, ...data } as ProductItem);
+  // Product CRUD (kết nối trực tiếp Backend ProductsController & ProductUnitsController)
+  const handleSaveProduct = async (data: Partial<ProductItem>, saveAndAddNew?: boolean) => {
+    try {
+      if (productToEdit) {
+        // Cập nhật sản phẩm qua PUT /api/v1/products/{id}
+        await productApi.updateProduct(productToEdit.id, {
+          name: data.productName || productToEdit.productName,
+          categoryId: data.categoryId || productToEdit.categoryId,
+          sellingPrice: data.sellingPrice ?? productToEdit.sellingPrice,
+          barcode: data.barcode?.trim() || undefined,
+          baseUnit: data.baseUnit?.trim() || productToEdit.baseUnit || 'Cái',
+          costPrice: data.costPrice,
+          minStock: data.minStock ?? productToEdit.minStock,
+          maxStock: data.maxStock ?? productToEdit.maxStock,
+          vatRate: data.vatRate ?? productToEdit.vatRate,
+          status: data.status || productToEdit.status,
+          imageUrl: data.imageUrl,
+          description: data.description,
+          internalNote: data.internalNote,
+          hasBatches: data.hasBatches ?? productToEdit.hasBatches,
+          isFavorite: data.isFavorite ?? productToEdit.isFavorite,
+        });
+
+        // Xử lý thêm các đơn vị quy đổi mới (nếu có)
+        if (data.uomConversions && data.uomConversions.length > 0) {
+          for (const uom of data.uomConversions) {
+            if (uom.id.startsWith('uom-')) {
+              try {
+                await productApi.createProductUnit(productToEdit.id, {
+                  unitName: uom.unitName,
+                  conversionRate: uom.conversionRate,
+                  price: uom.price,
+                  barcode: uom.barcode?.trim() || null,
+                  isBaseUnit: false,
+                });
+              } catch (unitErr) {
+                console.warn('Lỗi khi thêm đơn vị quy đổi:', unitErr);
+              }
+            }
+          }
+        }
+
+        showToast(`Cập nhật hàng hóa "${data.productName}" thành công.`);
+        if (selectedProduct && selectedProduct.id === productToEdit.id) {
+          setSelectedProduct({ ...selectedProduct, ...data } as ProductItem);
+        }
+      } else {
+        // Tạo mới sản phẩm trên Backend qua POST /api/v1/products
+        const created = await productApi.createProduct({
+          name: data.productName!,
+          categoryId: data.categoryId!,
+          sellingPrice: data.sellingPrice || 0,
+          productCode: data.productCode?.trim() || undefined,
+          barcode: data.barcode?.trim() || undefined,
+          baseUnit: data.baseUnit?.trim() || 'Cái',
+          costPrice: data.costPrice,
+          minStock: data.minStock ?? 0,
+          maxStock: data.maxStock ?? 1000,
+          vatRate: data.vatRate ?? 0,
+          imageUrl: data.imageUrl,
+          description: data.description,
+          internalNote: data.internalNote,
+          hasBatches: data.hasBatches ?? false,
+          isFavorite: data.isFavorite ?? false,
+        });
+
+        // Thêm các đơn vị quy đổi cho sản phẩm vừa tạo qua POST /api/v1/products/{id}/units
+        if (data.uomConversions && data.uomConversions.length > 0) {
+          const validUnits = data.uomConversions.filter((u) => u.unitName && u.unitName.trim() !== '');
+          for (const uom of validUnits) {
+            try {
+              await productApi.createProductUnit(created.id, {
+                unitName: uom.unitName.trim(),
+                conversionRate: uom.conversionRate || 1,
+                price: uom.price || 0,
+                barcode: uom.barcode?.trim() || null,
+                isBaseUnit: false,
+              });
+            } catch (unitErr: any) {
+              console.warn('Lỗi khi thêm đơn vị quy đổi:', unitErr);
+              showToast(`Lỗi khi tạo đơn vị tính "${uom.unitName}": ${unitErr?.message || 'Không thành công'}`, 'warning');
+            }
+          }
+        }
+
+        showToast(`Tạo mới hàng hóa "${created.name || data.productName}" thành công.`);
       }
-    } else {
-      // Create
-      const newProd: ProductItem = {
-        id: `prod-${Date.now()}`,
-        productCode: data.productCode || `SP${Math.floor(100000 + Math.random() * 900000)}`,
-        barcode: data.barcode || '',
-        productName: data.productName || '',
-        categoryId: data.categoryId || '',
-        categoryName: data.categoryName || '',
-        baseUnit: data.baseUnit || 'Gói',
-        sellingPrice: data.sellingPrice || 0,
-        costPrice: data.costPrice ?? null,
-        onHand: data.onHand || 0,
-        committed: 0,
-        status: 'Active',
-        isFavorite: false,
-        isCombo: false,
-        createdAt: new Date().toLocaleDateString('vi-VN'),
-        updatedAt: new Date().toLocaleDateString('vi-VN'),
-        minStock: data.minStock || 0,
-        maxStock: data.maxStock || 9999,
-        vatRate: data.vatRate || 8,
-        description: data.description || '',
-        internalNote: data.internalNote || '',
-        uomConversions: data.uomConversions || [],
-        branchStocks: [
-          { branchId: 'b-1', branchName: 'Chi nhánh trung tâm', onHand: 0, available: 0, committed: 0 },
-        ],
-        stockLedger: [],
-      };
-      setProducts([newProd, ...products]);
 
-      // update category count
-      setCategories(
-        categories.map((c) =>
-          c.id === newProd.categoryId ? { ...c, productCount: c.productCount + 1 } : c
-        )
-      );
-      showToast(`Tạo mới hàng hóa "${newProd.productName}" thành công.`);
-    }
+      // Làm mới danh mục và danh sách sản phẩm từ backend
+      await fetchCategories();
+      await fetchProducts();
 
-    if (saveAndAddNew) {
-      setProductToEdit(null);
+      if (saveAndAddNew) {
+        setProductToEdit(null);
+      } else {
+        setIsProductFormOpen(false);
+        setProductToEdit(null);
+      }
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || err?.message || 'Có lỗi xảy ra khi lưu hàng hóa.';
+      showToast(msg, 'error');
+      throw new Error(msg);
     }
   };
 
-  const handleDeleteProduct = (product: ProductItem) => {
-    // BR-DATA-01 Check: If has transactions -> Soft Delete (Discontinued)
-    if (product.hasTransactions) {
-      setProducts(
-        products.map((p) =>
-          p.id === product.id ? { ...p, status: 'Discontinued' } : p
-        )
-      );
-      showToast(
-        `Sản phẩm đã có lịch sử giao dịch. Chuyển trạng thái sang "Ngừng kinh doanh" (Soft Delete theo BR-DATA-01).`,
-        'warning'
-      );
-    } else {
-      // Hard delete
-      setProducts(products.filter((p) => p.id !== product.id));
-      showToast(`Đã xóa sản phẩm "${product.productName}" khỏi danh mục.`);
+  const handleDeleteProduct = async (product: ProductItem) => {
+    try {
+      // BR-DATA-01 Check: If has transactions -> Soft Delete (Discontinued)
+      if (product.hasTransactions) {
+        await productApi.updateProduct(product.id, {
+          name: product.productName,
+          categoryId: product.categoryId,
+          sellingPrice: product.sellingPrice,
+          status: 'Discontinued',
+        });
+        showToast(
+          `Sản phẩm đã có lịch sử giao dịch. Chuyển trạng thái sang "Ngừng kinh doanh" (Soft Delete theo BR-DATA-01).`,
+          'warning'
+        );
+      } else {
+        await productApi.deleteProduct(product.id);
+        showToast(`Đã xóa sản phẩm "${product.productName}" khỏi danh mục.`);
+      }
+      setIsDetailModalOpen(false);
+      await fetchCategories();
+      await fetchProducts();
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || err?.message || 'Có lỗi xảy ra khi xóa sản phẩm.';
+      showToast(msg, 'error');
     }
-    setIsDetailModalOpen(false);
   };
 
   const handleToggleStatus = (product: ProductItem) => {
@@ -392,9 +474,9 @@ export const ProductListPage: React.FC = () => {
       // Search
       if (searchTerm.trim()) {
         const kw = searchTerm.trim().toLowerCase();
-        const matchCode = item.productCode.toLowerCase().includes(kw);
-        const matchBarcode = item.barcode.toLowerCase().includes(kw);
-        const matchName = item.productName.toLowerCase().includes(kw);
+        const matchCode = (item.productCode || '').toLowerCase().includes(kw);
+        const matchBarcode = (item.barcode || '').toLowerCase().includes(kw);
+        const matchName = (item.productName || '').toLowerCase().includes(kw);
         if (!matchCode && !matchBarcode && !matchName) return false;
       }
 
@@ -435,8 +517,8 @@ export const ProductListPage: React.FC = () => {
   }, [products, searchTerm, selectedCategoryIds, stockCriteria, createdTime, customDate]);
 
   // Totals
-  const totalStock = filteredProducts.reduce((sum, p) => sum + p.onHand, 0);
-  const totalCommitted = filteredProducts.reduce((sum, p) => sum + p.committed, 0);
+  const totalStock = filteredProducts.reduce((sum, p) => sum + (p.onHand || 0), 0);
+  const totalCommitted = filteredProducts.reduce((sum, p) => sum + (p.committed || 0), 0);
 
   // Export mock
   const handleExport = () => {
@@ -626,13 +708,14 @@ export const ProductListPage: React.FC = () => {
 
                   // Tính toán đơn vị tính đang chọn và giá tương ứng (Ảnh 2 - REQ-07)
                   const allUnits = [
-                    { unitName: p.baseUnit || 'Cái', price: p.sellingPrice, barcode: p.barcode, productCode: p.productCode },
+                    { unitName: p.baseUnit || 'Cái', price: p.sellingPrice ?? 0, barcode: p.barcode, productCode: p.productCode },
                     ...(p.uomConversions || []),
                   ];
                   const currentUnitName = selectedUnits[p.id] || p.baseUnit || 'Cái';
                   const currentUom = p.uomConversions?.find((u) => u.unitName === currentUnitName);
-                  const displayPrice = currentUom ? currentUom.price : p.sellingPrice;
+                  const displayPrice = currentUom ? currentUom.price : (p.sellingPrice ?? 0);
                   const displayCode = currentUom?.productCode || p.productCode;
+                  const otherUnits = allUnits.filter((u) => u.unitName !== currentUnitName);
 
                   return (
                     <tr
@@ -675,9 +758,35 @@ export const ProductListPage: React.FC = () => {
                         </button>
                       </td>
                       <td>
-                        <span className="product-code-link">
-                          {displayCode}
-                        </span>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                          {p.imageUrl ? (
+                            <img
+                              src={p.imageUrl}
+                              alt=""
+                              style={{ width: 28, height: 28, borderRadius: 4, objectFit: 'cover', border: '1px solid #e2e8f0', flexShrink: 0 }}
+                            />
+                          ) : (
+                            <div
+                              style={{
+                                width: 28,
+                                height: 28,
+                                borderRadius: 4,
+                                backgroundColor: '#f1f5f9',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: 13,
+                                color: '#94a3b8',
+                                flexShrink: 0,
+                              }}
+                            >
+                              📦
+                            </div>
+                          )}
+                          <span className="product-code-link">
+                            {displayCode}
+                          </span>
+                        </div>
                       </td>
                       <td>
                         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
@@ -685,7 +794,7 @@ export const ProductListPage: React.FC = () => {
                             {p.productName}
                           </span>
                           {p.uomConversions && p.uomConversions.length > 0 && (
-                            <div style={{ position: 'relative', display: 'inline-block' }}>
+                            <div className="unit-dropdown-container" style={{ position: 'relative', display: 'inline-block' }}>
                               <button
                                 type="button"
                                 onClick={(e) => {
@@ -711,7 +820,7 @@ export const ProductListPage: React.FC = () => {
                                 <ChevronDown size={14} />
                               </button>
 
-                              {activeUnitDropdownId === p.id && (
+                              {activeUnitDropdownId === p.id && otherUnits.length > 0 && (
                                 <div
                                   onClick={(e) => e.stopPropagation()}
                                   style={{
@@ -720,7 +829,7 @@ export const ProductListPage: React.FC = () => {
                                     left: 0,
                                     zIndex: 50,
                                     marginTop: 4,
-                                    minWidth: 100,
+                                    minWidth: 90,
                                     background: '#ffffff',
                                     borderRadius: 6,
                                     boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
@@ -728,40 +837,38 @@ export const ProductListPage: React.FC = () => {
                                     padding: '4px 0',
                                   }}
                                 >
-                                  {allUnits.map((u) => {
-                                    const isUnitSelected = u.unitName === currentUnitName;
-                                    return (
-                                      <button
-                                        key={u.unitName}
-                                        type="button"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setSelectedUnits((prev) => ({ ...prev, [p.id]: u.unitName }));
-                                          setActiveUnitDropdownId(null);
-                                        }}
-                                        style={{
-                                          display: 'block',
-                                          width: '100%',
-                                          textAlign: 'left',
-                                          padding: '6px 12px',
-                                          fontSize: 12.5,
-                                          background: isUnitSelected ? '#f0fdfa' : 'transparent',
-                                          color: isUnitSelected ? '#0f766e' : '#334155',
-                                          fontWeight: isUnitSelected ? 700 : 500,
-                                          border: 'none',
-                                          cursor: 'pointer',
-                                        }}
-                                        onMouseEnter={(e) => {
-                                          if (!isUnitSelected) (e.currentTarget as HTMLElement).style.background = '#f8fafc';
-                                        }}
-                                        onMouseLeave={(e) => {
-                                          if (!isUnitSelected) (e.currentTarget as HTMLElement).style.background = 'transparent';
-                                        }}
-                                      >
-                                        {u.unitName}
-                                      </button>
-                                    );
-                                  })}
+                                  {otherUnits.map((u) => (
+                                    <button
+                                      key={u.unitName}
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setSelectedUnits((prev) => ({ ...prev, [p.id]: u.unitName }));
+                                        setActiveUnitDropdownId(null);
+                                      }}
+                                      style={{
+                                        display: 'block',
+                                        width: '100%',
+                                        textAlign: 'center',
+                                        padding: '6px 14px',
+                                        fontSize: 12.5,
+                                        background: 'transparent',
+                                        color: '#334155',
+                                        fontWeight: 500,
+                                        border: 'none',
+                                        cursor: 'pointer',
+                                        whiteSpace: 'nowrap',
+                                      }}
+                                      onMouseEnter={(e) => {
+                                        (e.currentTarget as HTMLElement).style.background = '#f8fafc';
+                                      }}
+                                      onMouseLeave={(e) => {
+                                        (e.currentTarget as HTMLElement).style.background = 'transparent';
+                                      }}
+                                    >
+                                      {u.unitName}
+                                    </button>
+                                  ))}
                                 </div>
                               )}
                             </div>
@@ -784,11 +891,11 @@ export const ProductListPage: React.FC = () => {
                         </div>
                       </td>
                       <td style={{ textAlign: 'right', fontWeight: 600 }}>
-                        {displayPrice.toLocaleString()} đ
+                        {(displayPrice ?? 0).toLocaleString('vi-VN')} đ
                       </td>
                       {userRole === 'StoreOwner' && (
                         <td style={{ textAlign: 'right', color: '#64748b' }}>
-                          {p.costPrice != null ? `${p.costPrice.toLocaleString()} đ` : '—'}
+                          {p.costPrice != null ? `${Number(p.costPrice).toLocaleString('vi-VN')} đ` : '—'}
                         </td>
                       )}
                       <td
