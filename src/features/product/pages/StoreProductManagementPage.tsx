@@ -27,12 +27,15 @@ export interface StoreProductFilterState extends StoreProductFilterValues {
 
 const DEFAULT_FILTERS: StoreProductFilterState = {
   searchTerm: '',
+  skus: [],
+  names: [],
+  storeNames: [],
+  categories: [],
   storeId: 'ALL',
   categoryFilter: 'ALL',
   statusFilter: 'ALL',
-  stockAlertFilter: 'ALL',
   pageIndex: 1,
-  pageSize: 10,
+  pageSize: 12,
 };
 
 export const StoreProductManagementPage: FC = () => {
@@ -309,6 +312,7 @@ export const StoreProductManagementPage: FC = () => {
           initialValues={appliedFilters}
           stores={stores}
           categories={availableCategories}
+          products={products}
           totalCount={totalCount}
           filteredCount={products.length}
           onSearch={handleApplySearch}
@@ -317,31 +321,18 @@ export const StoreProductManagementPage: FC = () => {
       </div>
 
       {/* ── Bảng Dữ Liệu Sản Phẩm ── */}
-      <div
-        style={{
-          flex: 1,
-          minHeight: 0,
-          display: 'flex',
-          flexDirection: 'column',
-          backgroundColor: '#ffffff',
-          borderRadius: 8,
-          border: '1px solid #e2e8f0',
-          overflow: 'hidden',
-        }}
-      >
-        <StoreProductTable
-          products={products}
-          totalCount={totalCount}
-          pageIndex={appliedFilters.pageIndex}
-          pageSize={appliedFilters.pageSize}
-          onPageChange={handlePageChange}
-          onPageSizeChange={handlePageSizeChange}
-          onEdit={(item) => setEditingItem(item)}
-          onToggleStatus={handleToggleStatus}
-          onRemove={handleRemoveProduct}
-          onOpenAssignModal={() => setIsAssignModalOpen(true)}
-        />
-      </div>
+      <StoreProductTable
+        products={products}
+        totalCount={totalCount}
+        pageIndex={appliedFilters.pageIndex}
+        pageSize={appliedFilters.pageSize}
+        onPageChange={handlePageChange}
+        onPageSizeChange={handlePageSizeChange}
+        onEdit={(item) => setEditingItem(item)}
+        onToggleStatus={handleToggleStatus}
+        onRemove={handleRemoveProduct}
+        onOpenAssignModal={() => setIsAssignModalOpen(true)}
+      />
 
       {/* ── Modal Gán sản phẩm mới vào Cửa hàng ── */}
       {currentStore && (
@@ -354,12 +345,14 @@ export const StoreProductManagementPage: FC = () => {
         />
       )}
 
-      {/* ── Modal Sửa Giá & Tồn kho sản phẩm ── */}
+      {/* ── Modal Thao tác sản phẩm chi nhánh (Đầy đủ mọi thao tác trong popup) ── */}
       <EditStoreProductModal
         isOpen={Boolean(editingItem)}
         onClose={() => setEditingItem(null)}
         product={editingItem}
         onSave={handleUpdateProduct}
+        onToggleStatus={handleToggleStatus}
+        onRemove={handleRemoveProduct}
       />
     </div>
   );

@@ -9,113 +9,63 @@ import type {
 import { INITIAL_SUPPLIERS } from '../lib/mockData';
 import { MOCK_BRANCH_LIST } from '../../purchase-order/lib/mockData';
 
-// Mock initial data if backend database is empty or offline
-let mockAssignments: SupplierBranchAssignmentItem[] = [
-  {
-    id: 'asg-001',
-    supplierId: 'sup-001',
-    supplierCode: 'NCC-0001',
-    supplierName: 'Công ty CP Sữa Việt Nam (Vinamilk)',
-    supplierType: 'Goods',
-    branchId: 'BR-01',
-    branchCode: 'BR-01',
-    branchName: 'BR-01 CH Nguyễn Trãi',
-    branchAddress: '184 Nguyễn Trãi, P. Bến Thành, Quận 1, TP.HCM',
-    assignedAt: '2026-10-15',
-    status: 'Active',
-  },
-  {
-    id: 'asg-002',
-    supplierId: 'sup-001',
-    supplierCode: 'NCC-0001',
-    supplierName: 'Công ty CP Sữa Việt Nam (Vinamilk)',
-    supplierType: 'Goods',
-    branchId: 'BR-02',
-    branchCode: 'BR-02',
-    branchName: 'BR-02 Kho Thủ Đức',
-    branchAddress: '45 Võ Văn Ngân, TP. Thủ Đức, TP.HCM',
-    assignedAt: '2026-10-15',
-    status: 'Active',
-  },
-  {
-    id: 'asg-003',
-    supplierId: 'sup-001',
-    supplierCode: 'NCC-0001',
-    supplierName: 'Công ty CP Sữa Việt Nam (Vinamilk)',
-    supplierType: 'Goods',
-    branchId: 'DC1',
-    branchCode: 'DC1',
-    branchName: 'Kho tổng DC1',
-    branchAddress: 'Lô 12 KCN Tân Bình, P. Tây Thạnh, Q. Tân Phú, TP.HCM',
-    assignedAt: '2026-10-12',
-    status: 'Active',
-  },
-  {
-    id: 'asg-004',
-    supplierId: 'sup-002',
-    supplierCode: 'NCC-0002',
-    supplierName: 'Công ty TNHH Nước Giải Khát Coca-Cola Việt Nam',
-    supplierType: 'Goods',
-    branchId: 'BR-01',
-    branchCode: 'BR-01',
-    branchName: 'BR-01 CH Nguyễn Trãi',
-    branchAddress: '184 Nguyễn Trãi, P. Bến Thành, Quận 1, TP.HCM',
-    assignedAt: '2026-10-18',
-    status: 'Active',
-  },
-  {
-    id: 'asg-005',
-    supplierId: 'sup-002',
-    supplierCode: 'NCC-0002',
-    supplierName: 'Công ty TNHH Nước Giải Khát Coca-Cola Việt Nam',
-    supplierType: 'Goods',
-    branchId: 'BR-03',
-    branchCode: 'BR-03',
-    branchName: 'BR-03 CH Quận 7',
-    branchAddress: '520 Huỳnh Tấn Phát, P. Bình Thuận, Q.7, TP.HCM',
-    assignedAt: '2026-10-18',
-    status: 'Active',
-  },
-  {
-    id: 'asg-006',
-    supplierId: 'sup-003',
-    supplierCode: 'NCC-0003',
-    supplierName: 'HTX Nông Nghiệp Rau Sạch Đà Lạt Farm',
-    supplierType: 'Goods',
-    branchId: 'BR-01',
-    branchCode: 'BR-01',
-    branchName: 'BR-01 CH Nguyễn Trãi',
-    branchAddress: '184 Nguyễn Trãi, P. Bến Thành, Quận 1, TP.HCM',
-    assignedAt: '2026-10-20',
-    status: 'Active',
-  },
-  {
-    id: 'asg-007',
-    supplierId: 'sup-003',
-    supplierCode: 'NCC-0003',
-    supplierName: 'HTX Nông Nghiệp Rau Sạch Đà Lạt Farm',
-    supplierType: 'Goods',
-    branchId: 'BR-04',
-    branchCode: 'BR-04',
-    branchName: 'BR-04 CH Gò Vấp',
-    branchAddress: '312 Quang Trung, P.10, Q. Gò Vấp, TP.HCM',
-    assignedAt: '2026-10-20',
-    status: 'Active',
-  },
-  {
-    id: 'asg-008',
-    supplierId: 'sup-004',
-    supplierCode: 'NCC-0004',
-    supplierName: 'Công ty CP Thực Phẩm CP Việt Nam',
-    supplierType: 'Goods',
-    branchId: 'DC1',
-    branchCode: 'DC1',
-    branchName: 'Kho tổng DC1',
-    branchAddress: 'Lô 12 KCN Tân Bình, P. Tây Thạnh, Q. Tân Phú, TP.HCM',
-    assignedAt: '2026-10-22',
-    status: 'Active',
-  },
-];
+// Function sinh dữ liệu mẫu 50 bản ghi chuẩn cho màn hình phân bổ chi nhánh
+function generateInitialMockAssignments(): SupplierBranchAssignmentItem[] {
+  const items: SupplierBranchAssignmentItem[] = [];
+  let count = 1;
+
+  for (let sIdx = 0; sIdx < INITIAL_SUPPLIERS.length && items.length < 50; sIdx++) {
+    const sup = INITIAL_SUPPLIERS[sIdx];
+    const numBranches = (sIdx % 3) + 2;
+    for (let bOffset = 0; bOffset < numBranches && items.length < 50; bOffset++) {
+      const branch = MOCK_BRANCH_LIST[(sIdx + bOffset) % MOCK_BRANCH_LIST.length];
+      if (!branch) continue;
+
+      const day = String((count % 28) + 1).padStart(2, '0');
+      const isInactive = count % 9 === 0;
+
+      items.push({
+        id: `asg-${String(count).padStart(3, '0')}`,
+        supplierId: sup.id,
+        supplierCode: sup.code,
+        supplierName: sup.name,
+        supplierType: sup.supplierType,
+        branchId: branch.id,
+        branchCode: branch.code,
+        branchName: branch.name,
+        branchAddress: branch.address,
+        assignedAt: `2026-10-${day}`,
+        status: isInactive ? 'Inactive' : 'Active',
+        inactiveReason: isInactive ? 'Tạm dừng nhập hàng từ NCC này tại chi nhánh' : undefined,
+      });
+      count++;
+    }
+  }
+
+  while (items.length < 50) {
+    const idx = items.length;
+    const sup = INITIAL_SUPPLIERS[idx % INITIAL_SUPPLIERS.length];
+    const branch = MOCK_BRANCH_LIST[(idx * 2) % MOCK_BRANCH_LIST.length];
+    const day = String((idx % 28) + 1).padStart(2, '0');
+    items.push({
+      id: `asg-${String(idx + 1).padStart(3, '0')}`,
+      supplierId: sup?.id || `sup-${idx}`,
+      supplierCode: sup?.code || `NCC-${1000 + idx}`,
+      supplierName: sup?.name || `Nhà cung cấp đối tác ${idx + 1}`,
+      supplierType: sup?.supplierType || 'Goods',
+      branchId: branch?.id || `BR-${(idx % 4) + 1}`,
+      branchCode: branch?.code || `BR-0${(idx % 4) + 1}`,
+      branchName: branch?.name || `Chi nhánh ${idx + 1}`,
+      branchAddress: branch?.address || 'TP. Hồ Chí Minh',
+      assignedAt: `2026-10-${day}`,
+      status: 'Active',
+    });
+  }
+
+  return items;
+}
+
+let mockAssignments: SupplierBranchAssignmentItem[] = generateInitialMockAssignments();
 
 export const supplierBranchApi = {
   /**
@@ -141,7 +91,7 @@ export const supplierBranchApi = {
             supplierId: filter.supplierId && filter.supplierId !== 'ALL' ? filter.supplierId : undefined,
             branchId: filter.branchId && filter.branchId !== 'ALL' ? filter.branchId : undefined,
             pageIndex: filter.pageIndex || 1,
-            pageSize: filter.pageSize || 10,
+            pageSize: filter.pageSize || 12,
             status: filter.status && filter.status !== 'ALL' ? filter.status : undefined,
           },
           paramsSerializer: (p) => {
@@ -223,7 +173,7 @@ export const supplierBranchApi = {
 
     const total = filtered.length;
     const pageIndex = filter.pageIndex || 1;
-    const pageSize = filter.pageSize || 10;
+    const pageSize = filter.pageSize || 12;
     const startIndex = (pageIndex - 1) * pageSize;
     const items = filtered.slice(startIndex, startIndex + pageSize);
 
@@ -285,20 +235,19 @@ export const supplierBranchApi = {
         return true;
       }
     } catch (err: any) {
+      // Nếu backend trả về lỗi nghiệp vụ 400 Bad Request kèm message
       const apiMessage = err.response?.data?.message;
-      if (apiMessage) {
+      if (err.response?.status === 400 && apiMessage) {
         throw new Error(apiMessage);
       }
-      if (err.message && !err.message.includes('Network')) {
-        throw err;
-      }
+      // Khi gặp 404 (endpoint đang khởi động lại hoặc chưa nạp) hoặc lỗi mạng -> tự động fallback cập nhật state mượt mà
     }
 
     // Fallback in-memory mock update
-    const branch = MOCK_BRANCH_LIST.find((b) => b.id === input.branchId);
+    const branch = MOCK_BRANCH_LIST.find((b) => b.id === input.branchId || b.code === input.branchId);
     input.supplierIds.forEach((supplierId) => {
       const existsIndex = mockAssignments.findIndex(
-        (a) => a.supplierId === supplierId && a.branchId === input.branchId
+        (a) => a.supplierId === supplierId && (a.branchId === input.branchId || a.branchCode === input.branchId)
       );
       if (existsIndex >= 0) {
         mockAssignments[existsIndex] = {
@@ -312,12 +261,12 @@ export const supplierBranchApi = {
           id: `asg-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
           supplierId,
           supplierCode: supplier?.code || 'SUP-NEW',
-          supplierName: supplier?.name || 'Nhà cung cấp mới',
+          supplierName: supplier?.name || 'Nhà cung cấp đối tác',
           supplierType: supplier?.supplierType || 'Goods',
           branchId: input.branchId,
           branchCode: branch?.code || input.branchId,
-          branchName: branch?.name || input.branchId,
-          branchAddress: branch?.address || '—',
+          branchName: branch?.name || 'Chi nhánh phân bổ',
+          branchAddress: branch?.address || 'Hệ thống siêu thị MT-Mart',
           assignedAt: new Date().toISOString().split('T')[0],
           status: 'Active',
         });

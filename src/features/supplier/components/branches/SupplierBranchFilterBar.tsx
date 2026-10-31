@@ -220,7 +220,6 @@ export const SupplierBranchFilterBar: FC<SupplierBranchFilterBarProps> = ({
             id: `${field}-${item.id}-${value}`,
             value,
             primary: value,
-            secondary: field === 'supplierCode' ? item.name : item.code,
           });
           if (mapped.length >= 8) break;
         }
@@ -235,7 +234,6 @@ export const SupplierBranchFilterBar: FC<SupplierBranchFilterBarProps> = ({
             id: `${field}-${item.id}-${value}`,
             value,
             primary: value,
-            secondary: field === 'branchCode' ? item.name : item.code,
           });
           if (mapped.length >= 8) break;
         }

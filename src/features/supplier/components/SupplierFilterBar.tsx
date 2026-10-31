@@ -216,12 +216,6 @@ export const SupplierFilterBar: FC<Props> = ({ filters, onSearch, onReset }) => 
           id: `${field}-${item.id}-${value}`,
           value,
           primary: value,
-          secondary:
-            field === 'code'
-              ? item.name
-              : field === 'name'
-                ? item.code
-                : `${item.code} · ${item.name}`,
         });
       }
 

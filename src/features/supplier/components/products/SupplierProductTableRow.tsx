@@ -43,21 +43,7 @@ export const SupplierProductTableRow: FC<SupplierProductTableRowProps> = ({
         {index}
       </td>
 
-      {/* 2. Barcode */}
-      <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>
-        <span
-          style={{
-            fontFamily: 'var(--font-mono, monospace)',
-            fontSize: 12,
-            fontWeight: 600,
-            color: '#334155',
-          }}
-        >
-          {item.barcode || '---'}
-        </span>
-      </td>
-
-      {/* 3. SKU */}
+      {/* 2. SKU */}
       <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>
         <span
           style={{
@@ -84,33 +70,18 @@ export const SupplierProductTableRow: FC<SupplierProductTableRowProps> = ({
         </div>
       </td>
 
-      {/* 5. Mã NCC */}
+      {/* 4. Mã NCC */}
       <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>
-        <div>
-          <span
-            style={{
-              fontFamily: 'var(--font-mono, monospace)',
-              fontSize: 12,
-              fontWeight: 600,
-              color: '#475569',
-            }}
-          >
-            {supplierCode || item.supplierId}
-          </span>
-          {item.supplierProductCode && (
-            <div
-              style={{
-                fontSize: 11,
-                color: '#94a3b8',
-                marginTop: 2,
-                fontFamily: 'var(--font-mono, monospace)',
-              }}
-              title="Mã sản phẩm của Nhà cung cấp"
-            >
-              Mã SP: {item.supplierProductCode}
-            </div>
-          )}
-        </div>
+        <span
+          style={{
+            fontFamily: 'var(--font-mono, monospace)',
+            fontSize: 12,
+            fontWeight: 600,
+            color: '#475569',
+          }}
+        >
+          {supplierCode || item.supplierId}
+        </span>
       </td>
 
       {/* 6. Tên Nhà Cung Cấp */}

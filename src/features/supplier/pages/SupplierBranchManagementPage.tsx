@@ -34,7 +34,7 @@ const DEFAULT_FILTERS: SupplierBranchFilterState = {
   branchId: 'ALL',
   status: 'ALL',
   pageIndex: 1,
-  pageSize: 10,
+  pageSize: 12,
 };
 
 export const SupplierBranchManagementPage: FC = () => {

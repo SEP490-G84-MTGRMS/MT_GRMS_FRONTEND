@@ -19,7 +19,6 @@ interface SupplierProductTableProps {
 }
 
 type SortField =
-  | 'barcode'
   | 'sku'
   | 'name'
   | 'supplierCode'
@@ -72,10 +71,6 @@ export const SupplierProductTable: FC<SupplierProductTableProps> = ({
       let valB: string | number = '';
 
       switch (sortField) {
-        case 'barcode':
-          valA = a.barcode.toLowerCase();
-          valB = b.barcode.toLowerCase();
-          break;
         case 'sku':
           valA = a.sku.toLowerCase();
           valB = b.sku.toLowerCase();
@@ -153,10 +148,9 @@ export const SupplierProductTable: FC<SupplierProductTableProps> = ({
     <colgroup>
       <col style={{ width: '3%' }} />
       <col style={{ width: '10%' }} />
-      <col style={{ width: '9%' }} />
-      <col style={{ width: '19%' }} />
-      <col style={{ width: '9%' }} />
-      <col style={{ width: '14%' }} />
+      <col style={{ width: '22%' }} />
+      <col style={{ width: '10%' }} />
+      <col style={{ width: '16%' }} />
       <col style={{ width: '8%' }} />
       <col style={{ width: '5%' }} />
       <col style={{ width: '9%' }} />
@@ -209,7 +203,7 @@ export const SupplierProductTable: FC<SupplierProductTableProps> = ({
         <table
           style={{
             width: '100%',
-            minWidth: 1100,
+            minWidth: 1000,
             tableLayout: 'fixed',
             borderCollapse: 'separate',
             borderSpacing: 0,
@@ -221,16 +215,6 @@ export const SupplierProductTable: FC<SupplierProductTableProps> = ({
           <thead>
             <tr>
               <th style={{ ...thBaseStyle, textAlign: 'center' }}>#</th>
-
-              <th
-                onClick={() => handleSort('barcode')}
-                style={{ ...thBaseStyle, cursor: 'pointer', userSelect: 'none' }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <span>Mã Vạch</span>
-                  <ArrowUpDown size={12} color={sortField === 'barcode' ? '#0f766e' : '#94a3b8'} />
-                </div>
-              </th>
 
               <th
                 onClick={() => handleSort('sku')}
@@ -327,7 +311,7 @@ export const SupplierProductTable: FC<SupplierProductTableProps> = ({
         <table
           style={{
             width: '100%',
-            minWidth: 1100,
+            minWidth: 1000,
             tableLayout: 'fixed',
             borderCollapse: 'separate',
             borderSpacing: 0,
