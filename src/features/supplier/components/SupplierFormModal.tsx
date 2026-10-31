@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import type { FC } from 'react';
 import type { SupplierSummary, CreateSupplierInput, SupplierType, SupplierCategory } from '../types/supplier.types';
-import { X, Save, Building, FileText, CreditCard, Info, Plus } from 'lucide-react';
+import { X, Save, Building, FileText, CreditCard, Info, Plus, QrCode } from 'lucide-react';
+import { getVietQrUrl, VIETNAM_BANKS } from '../lib/vietQrHelper';
 import '../supplier.css';
 
 interface Props {
@@ -453,13 +454,11 @@ export const SupplierFormModal: FC<Props> = ({
                           onChange={e => set({ bankName: e.target.value })}
                           className="form-select"
                         >
-                          <option value="Vietcombank">Vietcombank</option>
-                          <option value="MB Bank">MB Bank</option>
-                          <option value="Techcombank">Techcombank</option>
-                          <option value="VietinBank">VietinBank</option>
-                          <option value="BIDV">BIDV</option>
-                          <option value="ACB">ACB</option>
-                          <option value="VPBank">VPBank</option>
+                          {VIETNAM_BANKS.map((b) => (
+                            <option key={b.code} value={b.shortName}>
+                              {b.shortName} — {b.name}
+                            </option>
+                          ))}
                         </select>
                       </div>
                       <div className="form-group">
@@ -485,6 +484,69 @@ export const SupplierFormModal: FC<Props> = ({
                         className="form-input"
                         style={{ fontFamily: 'var(--font-mono)', textTransform: 'uppercase' }}
                       />
+                    </div>
+
+                    {/* Preview mã VietQR tự động tạo ngay khi nhập thông tin tài khoản */}
+                    <div style={{
+                      marginTop: 4,
+                      marginBottom: 10,
+                      padding: 14,
+                      background: '#f8fafc',
+                      border: '1px dashed #cbd5e1',
+                      borderRadius: 14,
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700, fontSize: '0.82rem', color: '#0f766e' }}>
+                          <QrCode size={15} />
+                          <span>Mã QR VietQR Tự Động Sinh (Napas 247)</span>
+                        </div>
+                        {formData.bankAccount && formData.bankAccount.trim().length >= 3 && (
+                          <span style={{ fontSize: '0.72rem', color: '#16a34a', fontWeight: 600, background: '#dcfce7', padding: '2px 8px', borderRadius: 9999 }}>
+                            ✓ Đã tạo mã QR
+                          </span>
+                        )}
+                      </div>
+
+                      {formData.bankAccount && formData.bankAccount.trim().length >= 3 ? (
+                        <div style={{ display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'wrap' }}>
+                          <div style={{
+                            width: 120,
+                            height: 140,
+                            background: '#ffffff',
+                            borderRadius: 10,
+                            border: '1px solid #e2e8f0',
+                            overflow: 'hidden',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            padding: 4,
+                            boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                          }}>
+                            <img
+                              src={getVietQrUrl({
+                                bankName: formData.bankName,
+                                accountNo: formData.bankAccount,
+                                accountHolder: formData.accountHolder || formData.name,
+                                template: 'compact2',
+                              })}
+                              alt="VietQR Preview"
+                              style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                            />
+                          </div>
+                          <div style={{ flex: 1, minWidth: 200, fontSize: '0.8rem', color: '#475569', lineHeight: 1.6 }}>
+                            <div><strong>Ngân hàng:</strong> {formData.bankName}</div>
+                            <div><strong>Số tài khoản:</strong> <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: '#0066FF' }}>{formData.bankAccount}</span></div>
+                            <div><strong>Chủ tài khoản:</strong> {(formData.accountHolder || formData.name || '—').toUpperCase()}</div>
+                            <p style={{ margin: '6px 0 0', fontSize: '0.72rem', color: '#059669', fontWeight: 500 }}>
+                              ⚡ Mã QR được tạo tự động tức thì khi bạn nhập hoặc thay đổi số tài khoản/ngân hàng.
+                            </p>
+                          </div>
+                        </div>
+                      ) : (
+                        <div style={{ textAlign: 'center', padding: '8px', fontSize: '0.78rem', color: '#94a3b8' }}>
+                          Nhập số tài khoản ngân hàng để hệ thống tự động tạo mã QR VietQR chuyển khoản.
+                        </div>
+                      )}
                     </div>
 
                     <div className="form-group">

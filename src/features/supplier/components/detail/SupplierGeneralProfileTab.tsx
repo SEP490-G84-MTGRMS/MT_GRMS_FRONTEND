@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { FC } from 'react';
 import type { SupplierSummary } from '../../types/supplier.types';
 import { Copy, Check, QrCode, Edit3 } from 'lucide-react';
+import { SupplierVietQrCard } from './SupplierVietQrCard';
 
 interface Props {
   supplier: SupplierSummary;
@@ -129,30 +130,40 @@ export const SupplierGeneralProfileTab: FC<Props> = ({ supplier, onEdit }) => {
         </div>
 
         {supplier.bankAccount ? (
-          <div className="supplier-bank-box">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-              <span style={{ fontWeight: 700, color: '#1e3a8a', fontSize: '0.85rem' }}>
-                {supplier.bankName || 'Ngân hàng'}
-              </span>
-              <button
-                type="button"
-                onClick={() => handleCopy(supplier.bankAccount!, 'STK')}
-                className="admin-btn admin-btn-secondary"
-                style={{ height: 28, fontSize: 11, padding: '0 10px', gap: 4 }}
-              >
-                {copiedField === 'STK' ? <Check size={12} color="#00c853" /> : <Copy size={12} />}
-                <span>{copiedField === 'STK' ? 'Đã sao chép' : 'Sao chép STK'}</span>
-              </button>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16, alignItems: 'stretch' }}>
+            <div className="supplier-bank-box">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <span style={{ fontWeight: 700, color: '#1e3a8a', fontSize: '0.88rem' }}>
+                  {supplier.bankName || 'Ngân hàng'}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => handleCopy(supplier.bankAccount!, 'STK')}
+                  className="admin-btn admin-btn-secondary"
+                  style={{ height: 28, fontSize: 11, padding: '0 10px', gap: 4 }}
+                >
+                  {copiedField === 'STK' ? <Check size={12} color="#00c853" /> : <Copy size={12} />}
+                  <span>{copiedField === 'STK' ? 'Đã sao chép' : 'Sao chép STK'}</span>
+                </button>
+              </div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: '1.15rem', letterSpacing: 1.5, color: '#111827', marginBottom: 6 }}>
+                {supplier.bankAccount}
+              </div>
+              <div style={{ fontSize: '0.82rem', textTransform: 'uppercase', color: '#4b5563', fontWeight: 600, marginBottom: 12 }}>
+                {supplier.accountHolder || supplier.name}
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.75rem', color: '#1d4ed8', fontWeight: 500 }}>
+                <QrCode size={15} /> Quét mã VietQR chuyển khoản Napas 24/7
+              </div>
             </div>
-            <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: '1.1rem', letterSpacing: 1.5, color: '#111827', marginBottom: 4 }}>
-              {supplier.bankAccount}
-            </div>
-            <div style={{ fontSize: '0.8rem', textTransform: 'uppercase', color: '#4b5563', fontWeight: 600, marginBottom: 8 }}>
-              {supplier.accountHolder || supplier.name}
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.75rem', color: '#1d4ed8', fontWeight: 500 }}>
-              <QrCode size={15} /> Gợi ý quét VietQR chuyển khoản chính xác 100%
-            </div>
+
+            {/* Khối mã QR VietQR tự động sinh */}
+            <SupplierVietQrCard
+              bankName={supplier.bankName}
+              accountNo={supplier.bankAccount}
+              accountHolder={supplier.accountHolder || supplier.name}
+              description={`TT NCC ${supplier.code}`}
+            />
           </div>
         ) : (
           <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)', background: 'var(--bg-soft-blue)', borderRadius: 16 }}>
