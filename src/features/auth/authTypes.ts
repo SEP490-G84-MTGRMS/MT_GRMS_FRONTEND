@@ -2,7 +2,7 @@ export interface UserProfile {
   id: string;
   email: string;
   fullName: string;
-  role: 'ADMIN' | 'MANAGER' | 'CASHIER' | 'STORE_OWNER';
+  role: 'ADMIN' | 'MANAGER' | 'CASHIER' | 'STORE_OWNER' | 'EMPLOYEE';
   tenantId: string;
   tenantName?: string;
   branchId?: string;

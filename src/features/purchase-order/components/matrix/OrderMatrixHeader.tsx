@@ -10,6 +10,8 @@ interface OrderMatrixHeaderProps {
   title?: string;
   readOnly?: boolean;
   isSaving?: boolean;
+  isStoreOwner?: boolean;
+  onToggleRole?: (isOwner: boolean) => void;
 }
 
 export const OrderMatrixHeader: FC<OrderMatrixHeaderProps> = ({
@@ -21,6 +23,8 @@ export const OrderMatrixHeader: FC<OrderMatrixHeaderProps> = ({
   title,
   readOnly = false,
   isSaving = false,
+  isStoreOwner = true,
+  onToggleRole,
 }) => {
   return (
     <div
@@ -33,7 +37,7 @@ export const OrderMatrixHeader: FC<OrderMatrixHeaderProps> = ({
         marginBottom: 4,
       }}
     >
-      <div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
         <h1
           style={{
             fontSize: 22,

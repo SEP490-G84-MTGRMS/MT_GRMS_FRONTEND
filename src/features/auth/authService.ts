@@ -33,7 +33,8 @@ function mapRole(roleName?: string): UserProfile['role'] {
   if (role === 'CASHIER') return 'CASHIER';
   if (role === 'MANAGER' || role === 'BRANCH_MANAGER') return 'MANAGER';
   if (role === 'STORE_OWNER') return 'STORE_OWNER';
-  return 'ADMIN';
+  if (role === 'EMPLOYEE' || role === 'STAFF') return 'EMPLOYEE';
+  return 'STORE_OWNER';
 }
 
 function mapLoginUser(user: BackendLoginUser): UserProfile {
@@ -62,7 +63,39 @@ function unwrapLogin(body: ApiResponse<BackendLoginPayload> | BackendLoginPayloa
 // Danh sách tài khoản demo tiện lợi cho kiểm thử giao diện & nghiệm thu
 export const DEMO_ACCOUNTS = [
   {
-    roleLabel: 'Chủ chuỗi / Admin',
+    roleLabel: '👑 Chủ Cửa Hàng (Store Owner)',
+    email: 'owner@mtgrms.vn',
+    password: 'Owner@123456',
+    tenantCode: SEED_TENANT_ID,
+    user: {
+      id: 'user-owner-001',
+      email: 'owner@mtgrms.vn',
+      fullName: 'Chủ Cửa Hàng (Store Owner)',
+      role: 'STORE_OWNER' as const,
+      tenantId: SEED_TENANT_ID,
+      tenantName: 'Cửa hàng MT-GRMS',
+      branchId: undefined,
+      phone: '0901234567',
+    },
+  },
+  {
+    roleLabel: '👷‍♂️ Nhân Viên Đặt Hàng (Employee)',
+    email: 'employee@mtgrms.vn',
+    password: 'Staff@123456',
+    tenantCode: SEED_TENANT_ID,
+    user: {
+      id: 'user-employee-001',
+      email: 'employee@mtgrms.vn',
+      fullName: 'Nhân Viên Cửa Hàng (Employee)',
+      role: 'EMPLOYEE' as const,
+      tenantId: SEED_TENANT_ID,
+      tenantName: 'Cửa hàng MT-GRMS',
+      branchId: undefined,
+      phone: '0912345678',
+    },
+  },
+  {
+    roleLabel: 'Hệ Thống Admin',
     email: 'admin@mtgrms.vn',
     password: 'Admin@123',
     tenantCode: SEED_TENANT_ID,
@@ -79,12 +112,12 @@ export const DEMO_ACCOUNTS = [
   },
   {
     roleLabel: 'Thu ngân quầy POS',
-    email: 'thao.le@mtmart.vn',
-    password: 'Cashier@123',
+    email: 'cashier@mtgrms.vn',
+    password: 'Staff@123456',
     tenantCode: SEED_TENANT_ID,
     user: {
-      id: 'usr_cashier',
-      email: 'thao.le@mtmart.vn',
+      id: 'user-cashier-001',
+      email: 'cashier@mtgrms.vn',
       fullName: 'Lê Thị Thảo (Thu Ngân POS)',
       role: 'CASHIER' as const,
       tenantId: SEED_TENANT_ID,

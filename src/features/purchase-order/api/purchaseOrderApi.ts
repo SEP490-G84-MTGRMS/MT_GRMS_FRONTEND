@@ -6,9 +6,6 @@ import type {
   SplitPoPreview,
   GeneratedPO,
 } from '../types/po.types';
-import {
-  MOCK_MATRIX_PRODUCTS,
-} from '../lib/mockData';
 
 export interface MatrixBackendResponse {
   branchId: string;
@@ -30,6 +27,18 @@ export interface MatrixBackendResponse {
     soh: number;
     salesPerDay: number;
     safetyStock: number;
+    isProductActive?: boolean;
+    productInactiveReason?: string;
+    isSupplierActive?: boolean;
+    supplierInactiveReason?: string;
+    isSupplierProductActive?: boolean;
+    supplierProductInactiveReason?: string;
+    isSupplierBranchActive?: boolean;
+    supplierBranchInactiveReason?: string;
+    isBranchProductActive?: boolean;
+    branchProductInactiveReason?: string;
+    isRowDisabled?: boolean;
+    rowDisabledReason?: string;
   }>;
   cells: Array<{
     productId: string;
@@ -37,6 +46,18 @@ export interface MatrixBackendResponse {
     employeeQty: number;
     storeQty?: number;
     finalQty: number;
+  }>;
+  supplierConfigs?: Array<{
+    supplierId: string;
+    supplierCode: string;
+    supplierName: string;
+    isActive: boolean;
+    isAssignedToBranch: boolean;
+    inactiveReason?: string;
+    leadTimeDays: number;
+    cutoffTime: string;
+    activeDeliveryDays: number[];
+    blackoutDates: string[];
   }>;
   draftPoId?: string;
   status: string;
@@ -62,7 +83,11 @@ export const purchaseOrderApi = {
     supplierId: string | null,
     viewFrom: string,
     durationDays: number
-  ): Promise<{ products: OrderMatrixProduct[]; cellMap: MatrixCellMap }> {
+  ): Promise<{
+    products: OrderMatrixProduct[];
+    cellMap: MatrixCellMap;
+    supplierConfigs: import('../types/po.types').OrderMatrixSupplierDeliveryConfig[];
+  }> {
     try {
       const res = await httpClient.get<ApiResponse<MatrixBackendResponse>>('/purchase-orders/matrix', {
         params: {
@@ -88,6 +113,18 @@ export const purchaseOrderApi = {
           soh: p.soh,
           sales: p.salesPerDay,
           safetyStock: p.safetyStock,
+          isProductActive: p.isProductActive ?? true,
+          productInactiveReason: p.productInactiveReason,
+          isSupplierActive: p.isSupplierActive ?? true,
+          supplierInactiveReason: p.supplierInactiveReason,
+          isSupplierProductActive: p.isSupplierProductActive ?? true,
+          supplierProductInactiveReason: p.supplierProductInactiveReason,
+          isSupplierBranchActive: p.isSupplierBranchActive ?? true,
+          supplierBranchInactiveReason: p.supplierBranchInactiveReason,
+          isBranchProductActive: p.isBranchProductActive ?? true,
+          branchProductInactiveReason: p.branchProductInactiveReason,
+          isRowDisabled: p.isRowDisabled ?? (!p.isProductActive || !p.isSupplierActive || !p.isSupplierProductActive || !p.isSupplierBranchActive || !p.isBranchProductActive),
+          rowDisabledReason: p.rowDisabledReason,
         }));
 
         const cellMap: MatrixCellMap = {};
@@ -103,19 +140,53 @@ export const purchaseOrderApi = {
           };
         });
 
-        return { products, cellMap };
+        const supplierConfigs = (d.supplierConfigs || []).map((sc) => ({
+          supplierId: sc.supplierId,
+          supplierCode: sc.supplierCode,
+          supplierName: sc.supplierName,
+          isActive: sc.isActive,
+          isAssignedToBranch: sc.isAssignedToBranch,
+          inactiveReason: sc.inactiveReason,
+          leadTimeDays: sc.leadTimeDays || 1,
+          cutoffTime: sc.cutoffTime || '15:00',
+          activeDeliveryDays: sc.activeDeliveryDays || [1, 2, 3, 4, 5, 6],
+          blackoutDates: sc.blackoutDates || [],
+        }));
+
+        // Đồng bộ dữ liệu cellMap từ backend vào localStorage
+        if (Object.keys(cellMap).length > 0) {
+          try {
+            const localKey = `matrix_draft_${branchId}_${supplierId || 'ALL'}`;
+            localStorage.setItem(localKey, JSON.stringify(cellMap));
+          } catch {
+            // ignore
+          }
+        }
+
+        return { products, cellMap, supplierConfigs };
       }
     } catch {
       // Fallback
     }
 
-    // Default mock data
+    // Backend offline hoặc mã Branch mock: Nạp bản thảo đã lưu từ localStorage
+    const localKey = `matrix_draft_${branchId}_${supplierId || 'ALL'}`;
+    let cachedMap: MatrixCellMap = {};
+    try {
+      const raw = localStorage.getItem(localKey);
+      if (raw) {
+        cachedMap = JSON.parse(raw);
+      }
+    } catch {
+      // ignore
+    }
+
     const relevantProducts =
       !supplierId || supplierId === 'ALL'
         ? MOCK_MATRIX_PRODUCTS
         : MOCK_MATRIX_PRODUCTS.filter((p) => p.supplierId === supplierId);
 
-    return { products: relevantProducts, cellMap: {} };
+    return { products: relevantProducts, cellMap: cachedMap, supplierConfigs: [] };
   },
 
   /**
@@ -129,6 +200,15 @@ export const purchaseOrderApi = {
     cellMap: MatrixCellMap,
     note?: string
   ): Promise<void> {
+    // 1. Lưu ngay lập tức vào localStorage để đảm bảo dữ liệu không bao giờ bị mất
+    const localKey = `matrix_draft_${branchId}_${supplierId || 'ALL'}`;
+    try {
+      localStorage.setItem(localKey, JSON.stringify(cellMap));
+    } catch (e) {
+      console.warn('Cannot save to localStorage', e);
+    }
+
+    // 2. Gửi đồng bộ lên Backend API
     try {
       const cells: Array<{
         productId: string;
@@ -161,7 +241,7 @@ export const purchaseOrderApi = {
         cells,
       });
     } catch {
-      // Offline fallback
+      // Offline fallback: Dữ liệu đã được bảo toàn trong localStorage
     }
   },
 

@@ -29,6 +29,19 @@ export interface SupplierOption {
   config: SupplierDeliveryConfig;
 }
 
+export interface OrderMatrixSupplierDeliveryConfig {
+  supplierId: string;
+  supplierCode: string;
+  supplierName: string;
+  isActive: boolean;
+  isAssignedToBranch: boolean;
+  inactiveReason?: string;
+  leadTimeDays: number;
+  cutoffTime: string;
+  activeDeliveryDays: number[]; // 0: CN, 1: T2, ..., 6: T7
+  blackoutDates: string[]; // YYYY-MM-DD
+}
+
 export interface OrderMatrixProduct {
   id: string;
   supplierId: string;
@@ -43,6 +56,20 @@ export interface OrderMatrixProduct {
   soh: number; // Stock on hand
   sales: number; // Sales per day
   safetyStock?: number; // Tồn kho an toàn
+
+  // Trạng thái nghiệp vụ Active / Inactive
+  isProductActive?: boolean;
+  productInactiveReason?: string;
+  isSupplierActive?: boolean;
+  supplierInactiveReason?: string;
+  isSupplierProductActive?: boolean;
+  supplierProductInactiveReason?: string;
+  isSupplierBranchActive?: boolean;
+  supplierBranchInactiveReason?: string;
+  isBranchProductActive?: boolean;
+  branchProductInactiveReason?: string;
+  isRowDisabled?: boolean;
+  rowDisabledReason?: string;
 }
 
 export interface MatrixCellData {
