@@ -11,7 +11,7 @@ interface SupplierBranchTableProps {
   pageSize: number;
   onPageChange: (page: number) => void;
   onPageSizeChange: (pageSize: number) => void;
-  onUnassign: (item: SupplierBranchAssignmentItem) => void;
+  onToggleStatus: (item: SupplierBranchAssignmentItem) => void;
   onOpenAssignModal: () => void;
 }
 
@@ -20,7 +20,6 @@ type SortField =
   | 'supplierName'
   | 'branchCode'
   | 'branchName'
-  | 'assignedAt'
   | 'status';
 type SortDirection = 'asc' | 'desc';
 
@@ -31,7 +30,7 @@ export const SupplierBranchTable: FC<SupplierBranchTableProps> = ({
   pageSize,
   onPageChange,
   onPageSizeChange,
-  onUnassign,
+  onToggleStatus,
   onOpenAssignModal,
 }) => {
   const [sortField, setSortField] = useState<SortField | null>(null);
@@ -74,10 +73,6 @@ export const SupplierBranchTable: FC<SupplierBranchTableProps> = ({
         case 'branchName':
           valA = a.branchName.toLowerCase();
           valB = b.branchName.toLowerCase();
-          break;
-        case 'assignedAt':
-          valA = a.assignedAt || '';
-          valB = b.assignedAt || '';
           break;
         case 'status':
           valA = a.status;
@@ -172,41 +167,10 @@ export const SupplierBranchTable: FC<SupplierBranchTableProps> = ({
               >
                 STT
               </th>
-              {renderSortableHeader('Mã NCC', 'supplierCode')}
-              {renderSortableHeader('Tên Nhà Cung Cấp', 'supplierName')}
-              <th
-                style={{
-                  padding: '10px 12px',
-                  fontSize: 12,
-                  fontWeight: 700,
-                  color: '#475569',
-                  backgroundColor: '#f8fafc',
-                  borderBottom: '2px solid #e2e8f0',
-                  position: 'sticky',
-                  top: 0,
-                  zIndex: 10,
-                }}
-              >
-                Loại NCC
-              </th>
               {renderSortableHeader('Mã CH', 'branchCode')}
               {renderSortableHeader('Tên Cửa Hàng / Chi Nhánh', 'branchName')}
-              <th
-                style={{
-                  padding: '10px 12px',
-                  fontSize: 12,
-                  fontWeight: 700,
-                  color: '#475569',
-                  backgroundColor: '#f8fafc',
-                  borderBottom: '2px solid #e2e8f0',
-                  position: 'sticky',
-                  top: 0,
-                  zIndex: 10,
-                }}
-              >
-                Địa Chỉ
-              </th>
-              {renderSortableHeader('Ngày Gán', 'assignedAt')}
+              {renderSortableHeader('Mã NCC', 'supplierCode')}
+              {renderSortableHeader('Tên Nhà Cung Cấp', 'supplierName')}
               {renderSortableHeader('Trạng Thái', 'status')}
               <th
                 style={{
@@ -233,13 +197,13 @@ export const SupplierBranchTable: FC<SupplierBranchTableProps> = ({
                   key={item.id}
                   index={startItem + idx}
                   item={item}
-                  onUnassign={onUnassign}
+                  onToggleStatus={onToggleStatus}
                 />
               ))
             ) : (
               <tr>
                 <td
-                  colSpan={10}
+                  colSpan={7}
                   style={{
                     textAlign: 'center',
                     padding: '48px 16px',

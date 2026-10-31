@@ -124,39 +124,62 @@ export const supplierBranchApi = {
     filter: SupplierBranchFilterState
   ): Promise<{ items: SupplierBranchAssignmentItem[]; total: number }> {
     try {
+      const supplierCodes = filter.supplierCodes?.filter(Boolean) ?? [];
+      const supplierNames = filter.supplierNames?.filter(Boolean) ?? [];
+      const branchCodes = filter.branchCodes?.filter(Boolean) ?? [];
+      const branchNames = filter.branchNames?.filter(Boolean) ?? [];
+
       const res = await httpClient.get<ApiResponse<PagedResult<any>>>(
         '/suppliers/branch-assignments',
         {
           params: {
-            supplierSearch: filter.supplierSearch || undefined,
-            branchSearch: filter.branchSearch || undefined,
+            supplierCodes: supplierCodes.length ? supplierCodes : undefined,
+            supplierNames: supplierNames.length ? supplierNames : undefined,
+            branchCodes: branchCodes.length ? branchCodes : undefined,
+            branchNames: branchNames.length ? branchNames : undefined,
             supplierId: filter.supplierId && filter.supplierId !== 'ALL' ? filter.supplierId : undefined,
             branchId: filter.branchId && filter.branchId !== 'ALL' ? filter.branchId : undefined,
             pageIndex: filter.pageIndex || 1,
             pageSize: filter.pageSize || 10,
+            status: filter.status && filter.status !== 'ALL' ? filter.status : undefined,
+          },
+          paramsSerializer: (p) => {
+            const search = new URLSearchParams();
+            Object.entries(p).forEach(([key, value]) => {
+              if (value === undefined || value === null || value === '') return;
+              if (Array.isArray(value)) {
+                value.forEach((item) => {
+                  if (item !== undefined && item !== null && String(item).trim() !== '') {
+                    search.append(key, String(item));
+                  }
+                });
+                return;
+              }
+              search.append(key, String(value));
+            });
+            return search.toString();
           },
         }
       );
 
       if (res.data?.success && res.data.data) {
         const paged = res.data.data;
-        if (paged.items && paged.items.length > 0) {
-          const items: SupplierBranchAssignmentItem[] = paged.items.map((item: any) => ({
-            id: item.id,
-            supplierId: item.supplierId,
-            supplierCode: item.supplierCode || '',
-            supplierName: item.supplierName || '',
-            supplierType: (item.supplierType === 1 ? 'Goods' : item.supplierType === 2 ? 'Service' : item.supplierType || 'Goods') as any,
-            branchId: item.branchId,
-            branchCode: item.branchCode || '',
-            branchName: item.branchName || '',
-            branchAddress: item.branchAddress || '',
-            assignedAt: item.assignedAt ? item.assignedAt.split('T')[0] : (item.createdAt ? item.createdAt.split('T')[0] : '—'),
-            status: item.status === 'Active' || item.status === 1 ? 'Active' : 'Inactive',
-          }));
+        const items: SupplierBranchAssignmentItem[] = (paged.items || []).map((item: any) => ({
+          id: item.id,
+          supplierId: item.supplierId,
+          supplierCode: item.supplierCode || '',
+          supplierName: item.supplierName || '',
+          supplierType: (item.supplierType === 1 ? 'Goods' : item.supplierType === 2 ? 'Service' : item.supplierType || 'Goods') as any,
+          branchId: item.branchId,
+          branchCode: item.branchCode || '',
+          branchName: item.branchName || '',
+          branchAddress: item.branchAddress || '',
+          assignedAt: item.assignedAt ? item.assignedAt.split('T')[0] : (item.createdAt ? item.createdAt.split('T')[0] : '—'),
+          status: item.status === 'Active' || item.status === 1 ? 'Active' : 'Inactive',
+          inactiveReason: item.inactiveReason || undefined,
+        }));
 
-          return { items, total: paged.totalItems };
-        }
+        return { items, total: paged.totalItems };
       }
     } catch {
       // Fallback to in-memory mock if backend API is not yet seeded
@@ -173,23 +196,24 @@ export const supplierBranchApi = {
       filtered = filtered.filter((a) => a.branchId === filter.branchId || a.branchCode === filter.branchId);
     }
 
-    if (filter.supplierSearch?.trim()) {
-      const term = filter.supplierSearch.toLowerCase().trim();
-      filtered = filtered.filter(
-        (a) =>
-          a.supplierCode.toLowerCase().includes(term) ||
-          a.supplierName.toLowerCase().includes(term)
-      );
+    if (filter.supplierCodes?.length) {
+      const terms = filter.supplierCodes.map((t) => t.toLowerCase());
+      filtered = filtered.filter((a) => terms.some((t) => a.supplierCode.toLowerCase().includes(t)));
     }
 
-    if (filter.branchSearch?.trim()) {
-      const term = filter.branchSearch.toLowerCase().trim();
-      filtered = filtered.filter(
-        (a) =>
-          a.branchCode.toLowerCase().includes(term) ||
-          a.branchName.toLowerCase().includes(term) ||
-          a.branchAddress.toLowerCase().includes(term)
-      );
+    if (filter.supplierNames?.length) {
+      const terms = filter.supplierNames.map((t) => t.toLowerCase());
+      filtered = filtered.filter((a) => terms.some((t) => a.supplierName.toLowerCase().includes(t)));
+    }
+
+    if (filter.branchCodes?.length) {
+      const terms = filter.branchCodes.map((t) => t.toLowerCase());
+      filtered = filtered.filter((a) => terms.some((t) => a.branchCode.toLowerCase().includes(t)));
+    }
+
+    if (filter.branchNames?.length) {
+      const terms = filter.branchNames.map((t) => t.toLowerCase());
+      filtered = filtered.filter((a) => terms.some((t) => a.branchName.toLowerCase().includes(t)));
     }
 
     if (filter.status && filter.status !== 'ALL') {
@@ -264,6 +288,50 @@ export const supplierBranchApi = {
 
     mockAssignments = mockAssignments.filter(
       (a) => !(a.supplierId === supplierId && a.branchId === branchId)
+    );
+
+    return true;
+  },
+
+  /**
+   * Chuyển trạng thái Active / Inactive. Inactive bắt buộc có lý do.
+   */
+  async updateAssignmentStatus(
+    supplierId: string,
+    branchId: string,
+    status: 'Active' | 'Inactive',
+    reason?: string
+  ): Promise<boolean> {
+    try {
+      const res = await httpClient.patch<ApiResponse<any>>(
+        `/suppliers/${supplierId}/branches/${branchId}/status`,
+        {
+          status: status === 'Active' ? 1 : 2,
+          reason,
+        }
+      );
+      if (res.data?.success) {
+        return true;
+      }
+      throw new Error(res.data?.message || 'Không thể cập nhật trạng thái phân bổ.');
+    } catch (err: any) {
+      const apiMessage = err.response?.data?.message;
+      if (apiMessage) {
+        throw new Error(apiMessage);
+      }
+      if (err.message && !err.message.includes('Network')) {
+        throw err;
+      }
+    }
+
+    mockAssignments = mockAssignments.map((a) =>
+      a.supplierId === supplierId && a.branchId === branchId
+        ? {
+            ...a,
+            status,
+            inactiveReason: status === 'Inactive' ? reason : undefined,
+          }
+        : a
     );
 
     return true;

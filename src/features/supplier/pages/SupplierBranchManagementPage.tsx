@@ -16,6 +16,7 @@ import {
 } from '../components/branches/SupplierBranchFilterBar';
 import { SupplierBranchTable } from '../components/branches/SupplierBranchTable';
 import { AssignBranchModal } from '../components/branches/AssignBranchModal';
+import { AssignmentStatusModal } from '../components/branches/AssignmentStatusModal';
 import { AdminToast, type ToastState } from '../../admin/components';
 import { supplierBranchApi } from '../api/supplierBranchApi';
 import { supplierApi } from '../api/supplierApi';
@@ -25,8 +26,10 @@ import '../../purchase-order/purchase-order.css';
 import '../supplier.css';
 
 const DEFAULT_FILTERS: SupplierBranchFilterState = {
-  supplierSearch: '',
-  branchSearch: '',
+  supplierCodes: [],
+  supplierNames: [],
+  branchCodes: [],
+  branchNames: [],
   supplierId: 'ALL',
   branchId: 'ALL',
   status: 'ALL',
@@ -52,6 +55,8 @@ export const SupplierBranchManagementPage: FC = () => {
 
   // Modals state
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
+  const [statusItem, setStatusItem] = useState<SupplierBranchAssignmentItem | null>(null);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
 
   // Toast notification state
   const [toast, setToast] = useState<ToastState | null>(null);
@@ -152,18 +157,33 @@ export const SupplierBranchManagementPage: FC = () => {
     }
   };
 
-  const handleUnassignBranch = async (item: SupplierBranchAssignmentItem) => {
-    const isConfirmed = window.confirm(
-      `Bạn có chắc chắn muốn hủy phân bổ nhà cung cấp "${item.supplierName}" khỏi chi nhánh "${item.branchName}"?`
-    );
-    if (!isConfirmed) return;
+  const handleToggleStatus = (item: SupplierBranchAssignmentItem) => {
+    setStatusItem(item);
+  };
 
+  const handleConfirmStatus = async (reason?: string) => {
+    if (!statusItem) return;
+
+    const nextStatus = statusItem.status === 'Active' ? 'Inactive' : 'Active';
+    setIsUpdatingStatus(true);
     try {
-      await supplierBranchApi.unassignBranch(item.supplierId, item.branchId);
-      showToast(`Đã hủy phân bổ khỏi chi nhánh "${item.branchName}".`);
+      await supplierBranchApi.updateAssignmentStatus(
+        statusItem.supplierId,
+        statusItem.branchId,
+        nextStatus,
+        reason
+      );
+      showToast(
+        nextStatus === 'Inactive'
+          ? `Đã tạm ngưng phân bổ tại "${statusItem.branchName}".`
+          : `Đã kích hoạt phân bổ tại "${statusItem.branchName}".`
+      );
+      setStatusItem(null);
       await fetchAssignments();
     } catch (err: any) {
-      showToast(err.message || 'Không thể hủy phân bổ.', 'error');
+      showToast(err.message || 'Không thể cập nhật trạng thái phân bổ.', 'error');
+    } finally {
+      setIsUpdatingStatus(false);
     }
   };
 
@@ -218,7 +238,7 @@ export const SupplierBranchManagementPage: FC = () => {
             }}
           >
             <Store size={22} color="var(--blue-primary, #0f766e)" />
-            <span>Gán Nhà Cung Cấp Với Cửa Hàng</span>
+            <span>Cửa Hàng với nhà cung cấp</span>
             {isLoading && (
               <Loader2 size={16} className="animate-spin" style={{ color: 'var(--blue-primary, #0f766e)' }} />
             )}
@@ -362,8 +382,6 @@ export const SupplierBranchManagementPage: FC = () => {
           initialValues={appliedFilters}
           suppliers={suppliers}
           branches={branches}
-          totalCount={totalCount}
-          filteredCount={assignments.length}
           onSearch={handleApplySearch}
           onReset={handleResetFilters}
         />
@@ -377,7 +395,7 @@ export const SupplierBranchManagementPage: FC = () => {
         pageSize={appliedFilters.pageSize}
         onPageChange={handlePageChange}
         onPageSizeChange={handlePageSizeChange}
-        onUnassign={handleUnassignBranch}
+        onToggleStatus={handleToggleStatus}
         onOpenAssignModal={() => setIsAssignModalOpen(true)}
       />
 
@@ -390,6 +408,15 @@ export const SupplierBranchManagementPage: FC = () => {
         branches={branches}
         alreadyAssignedBranchIds={alreadyAssignedBranchIds}
         onAssign={handleAssignBranches}
+      />
+
+      <AssignmentStatusModal
+        item={statusItem}
+        isSubmitting={isUpdatingStatus}
+        onClose={() => {
+          if (!isUpdatingStatus) setStatusItem(null);
+        }}
+        onConfirm={handleConfirmStatus}
       />
     </div>
   );

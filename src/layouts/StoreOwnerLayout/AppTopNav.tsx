@@ -210,6 +210,10 @@ const NAV_GROUPS: NavGroup[] = [
         items: [
           { label: "Danh sách nhà cung cấp", to: "/store-owner/suppliers" },
           {
+            label: "Cửa Hàng với nhà cung cấp",
+            to: "/store-owner/suppliers/branches",
+          },
+          {
             label: "Hóa đơn đầu vào",
             to: "/store-owner/suppliers?view=invoices",
             badge: "Mới",
@@ -581,6 +585,7 @@ const NavDropdown: FC<DropdownProps> = ({
       return (
         (currPath === toPath || currPath.startsWith(toPath + "/")) &&
         !currPath.includes("/products") &&
+        !currPath.includes("/branches") &&
         !hasOtherView
       );
     }
@@ -1890,6 +1895,7 @@ export const AppTopNav: FC = () => {
                                     (currPath === toPath ||
                                       currPath.startsWith(toPath + "/")) &&
                                     !currPath.includes("/products") &&
+                                    !currPath.includes("/branches") &&
                                     !hasOtherView
                                   );
                                 }
@@ -1975,7 +1981,8 @@ export const AppTopNav: FC = () => {
                                   location.pathname.startsWith(
                                     child.to + "/",
                                   )) &&
-                                !location.pathname.includes("/products")
+                                !location.pathname.includes("/products") &&
+                                !location.pathname.includes("/branches")
                               );
                             }
                             return (

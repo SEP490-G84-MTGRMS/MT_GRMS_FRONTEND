@@ -206,11 +206,14 @@ export interface SupplierBranchAssignmentItem {
   branchAddress: string;
   assignedAt: string;
   status: 'Active' | 'Inactive';
+  inactiveReason?: string;
 }
 
 export interface SupplierBranchFilterState {
-  supplierSearch: string;
-  branchSearch: string;
+  supplierCodes: string[];
+  supplierNames: string[];
+  branchCodes: string[];
+  branchNames: string[];
   supplierId: string;
   branchId: string;
   status: string;

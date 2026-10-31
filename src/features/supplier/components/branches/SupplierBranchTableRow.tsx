@@ -1,31 +1,18 @@
 import type { FC } from 'react';
 import type { SupplierBranchAssignmentItem } from '../../types/supplier.types';
-import { Trash2 } from 'lucide-react';
+import { PauseCircle, CheckCircle2 } from 'lucide-react';
 
 interface SupplierBranchTableRowProps {
   index: number;
   item: SupplierBranchAssignmentItem;
-  onUnassign: (item: SupplierBranchAssignmentItem) => void;
+  onToggleStatus: (item: SupplierBranchAssignmentItem) => void;
 }
 
 export const SupplierBranchTableRow: FC<SupplierBranchTableRowProps> = ({
   index,
   item,
-  onUnassign,
+  onToggleStatus,
 }) => {
-  const getSupplierTypeBadge = (type: string) => {
-    switch (type) {
-      case 'Goods':
-        return { label: 'Hàng hóa', bg: '#eff6ff', color: '#1d4ed8', border: '#bfdbfe' };
-      case 'Service':
-        return { label: 'Dịch vụ', bg: '#fdf4ff', color: '#a21caf', border: '#f5d0fe' };
-      default:
-        return { label: 'Hàng & DV', bg: '#f0fdfa', color: '#0f766e', border: '#ccfbf1' };
-    }
-  };
-
-  const typeBadge = getSupplierTypeBadge(item.supplierType);
-
   return (
     <tr
       style={{
@@ -46,56 +33,7 @@ export const SupplierBranchTableRow: FC<SupplierBranchTableRowProps> = ({
         {index}
       </td>
 
-      {/* 2. Mã NCC */}
-      <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>
-        <span
-          style={{
-            fontFamily: 'var(--font-mono, monospace)',
-            fontSize: 12,
-            fontWeight: 700,
-            color: '#0f766e',
-          }}
-        >
-          {item.supplierCode}
-        </span>
-      </td>
-
-      {/* 3. Tên NCC */}
-      <td style={{ padding: '10px 12px', maxWidth: 220 }}>
-        <div
-          style={{
-            fontSize: 13,
-            fontWeight: 600,
-            color: '#0f172a',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-          }}
-          title={item.supplierName}
-        >
-          {item.supplierName}
-        </div>
-      </td>
-
-      {/* 4. Loại NCC */}
-      <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>
-        <span
-          style={{
-            display: 'inline-block',
-            fontSize: 11,
-            fontWeight: 600,
-            padding: '2px 8px',
-            borderRadius: 10,
-            backgroundColor: typeBadge.bg,
-            color: typeBadge.color,
-            border: `1px solid ${typeBadge.border}`,
-          }}
-        >
-          {typeBadge.label}
-        </span>
-      </td>
-
-      {/* 5. Mã Cửa Hàng / Chi Nhánh */}
+      {/* 2. Mã Cửa Hàng */}
       <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>
         <span
           style={{
@@ -114,7 +52,7 @@ export const SupplierBranchTableRow: FC<SupplierBranchTableRowProps> = ({
         </span>
       </td>
 
-      {/* 6. Tên Cửa Hàng */}
+      {/* 3. Tên Cửa Hàng */}
       <td style={{ padding: '10px 12px', maxWidth: 200 }}>
         <div
           style={{
@@ -131,30 +69,41 @@ export const SupplierBranchTableRow: FC<SupplierBranchTableRowProps> = ({
         </div>
       </td>
 
-      {/* 7. Địa Chỉ */}
-      <td style={{ padding: '10px 12px', maxWidth: 240 }}>
+      {/* 4. Mã NCC */}
+      <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>
+        <span
+          style={{
+            fontFamily: 'var(--font-mono, monospace)',
+            fontSize: 12,
+            fontWeight: 700,
+            color: '#0f766e',
+          }}
+        >
+          {item.supplierCode}
+        </span>
+      </td>
+
+      {/* 5. Tên NCC */}
+      <td style={{ padding: '10px 12px', maxWidth: 220 }}>
         <div
           style={{
-            fontSize: 12,
-            color: '#64748b',
+            fontSize: 13,
+            fontWeight: 600,
+            color: '#0f172a',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
             whiteSpace: 'nowrap',
           }}
-          title={item.branchAddress}
+          title={item.supplierName}
         >
-          {item.branchAddress || '—'}
+          {item.supplierName}
         </div>
       </td>
 
-      {/* 8. Ngày Gán */}
-      <td style={{ padding: '10px 12px', whiteSpace: 'nowrap', fontSize: 12, color: '#64748b' }}>
-        {item.assignedAt || '—'}
-      </td>
-
-      {/* 9. Trạng Thái */}
+      {/* 6. Trạng Thái */}
       <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>
         <span
+          title={item.status === 'Inactive' ? item.inactiveReason : undefined}
           style={{
             display: 'inline-block',
             fontSize: 11,
@@ -170,19 +119,23 @@ export const SupplierBranchTableRow: FC<SupplierBranchTableRowProps> = ({
         </span>
       </td>
 
-      {/* 10. Thao Tác */}
+      {/* 7. Thao Tác */}
       <td style={{ padding: '10px 12px', textAlign: 'right', whiteSpace: 'nowrap' }}>
         <button
           type="button"
-          onClick={() => onUnassign(item)}
-          title={`Hủy phân bổ nhà cung cấp ${item.supplierName} khỏi chi nhánh ${item.branchName}`}
+          onClick={() => onToggleStatus(item)}
+          title={
+            item.status === 'Active'
+              ? `Tạm ngưng phân bổ ${item.supplierName} tại ${item.branchName}`
+              : `Kích hoạt phân bổ ${item.supplierName} tại ${item.branchName}`
+          }
           style={{
             height: 26,
             padding: '0 10px',
             borderRadius: 4,
-            border: '1px solid #fecaca',
+            border: item.status === 'Active' ? '1px solid #fde68a' : '1px solid #99f6e4',
             backgroundColor: '#ffffff',
-            color: '#dc2626',
+            color: item.status === 'Active' ? '#d97706' : '#0f766e',
             fontSize: 11.5,
             fontWeight: 600,
             cursor: 'pointer',
@@ -192,13 +145,22 @@ export const SupplierBranchTableRow: FC<SupplierBranchTableRowProps> = ({
             transition: 'all 0.15s ease',
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = '#fef2f2';
+            e.currentTarget.style.backgroundColor =
+              item.status === 'Active' ? '#fffbeb' : '#f0fdfa';
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.backgroundColor = '#ffffff';
           }}
         >
-          <Trash2 size={12} /> Hủy gán
+          {item.status === 'Active' ? (
+            <>
+              <PauseCircle size={12} /> Tạm ngưng
+            </>
+          ) : (
+            <>
+              <CheckCircle2 size={12} /> Kích hoạt
+            </>
+          )}
         </button>
       </td>
     </tr>
