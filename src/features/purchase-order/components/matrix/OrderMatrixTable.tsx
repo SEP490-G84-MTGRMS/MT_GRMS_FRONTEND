@@ -190,7 +190,7 @@ export const OrderMatrixTable: FC<OrderMatrixTableProps> = ({
           {renderColGroup()}
           <thead>
             <tr>
-              <th className="po-th-left">Tên Sản Phẩm (Mã SKU)</th>
+              <th className="po-th-left po-th-product">Tên Sản Phẩm</th>
               <th>ĐVT</th>
               <th>MOQ</th>
               {showSoh && (
@@ -310,11 +310,13 @@ export const OrderMatrixTable: FC<OrderMatrixTableProps> = ({
 
                     return (
                       <tr key={p.id} className={isRowDisabled ? 'po-row-disabled' : ''}>
-                        <td>
+                        <td className="po-cell-product">
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                            <div>
-                              <b style={{ color: isRowDisabled ? '#64748b' : '#0f172a' }}>{p.name}</b>{' '}
-                              <small style={{ color: 'var(--text-muted)' }}>({p.sku})</small>
+                            <div
+                              style={{ whiteSpace: 'normal', wordBreak: 'break-word', overflowWrap: 'break-word', lineHeight: 1.35 }}
+                              title={p.sku ? `Mã SKU: ${p.sku}` : undefined}
+                            >
+                              <b style={{ color: isRowDisabled ? '#64748b' : '#0f172a' }}>{p.name}</b>
                             </div>
                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 1 }}>
                               {p.isProductActive === false && (

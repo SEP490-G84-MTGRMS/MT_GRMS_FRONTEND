@@ -195,22 +195,23 @@ function computeDayColumns(
 }
 
 function buildEmptyCellMap(
-  supplierId: string,
   prodList: OrderMatrixProduct[],
   existing?: MatrixCellMap
 ): MatrixCellMap {
-  const products =
-    supplierId === 'ALL'
-      ? prodList
-      : prodList.filter((p) => p.supplierId === supplierId);
-  const map: MatrixCellMap = {};
-  products.forEach((p) => {
-    map[p.id] = existing?.[p.id] ? { ...existing[p.id] } : {};
+  const map: MatrixCellMap = { ...(existing || {}) };
+  prodList.forEach((p) => {
+    if (!map[p.id]) {
+      map[p.id] = {};
+    }
   });
   return map;
 }
 
-export const OrderMatrixPage: FC = () => {
+export interface OrderMatrixPageProps {
+  forcedRole?: 'STORE_OWNER' | 'EMPLOYEE';
+}
+
+export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
@@ -266,9 +267,17 @@ export const OrderMatrixPage: FC = () => {
   // State: Toast
   const [toast, setToast] = useState<ToastState | null>(null);
 
-  // Role State: Xác định quyền thao tác Store Owner vs Employee theo tài khoản đăng nhập
+  // Role State: Xác định quyền thao tác Store Owner vs Employee
+  // Ưu tiên: 1. forcedRole từ Route, 2. param ?role=, 3. userRole trong AuthStore
+  const roleParam = searchParams.get('role');
   const userRole = useAuthStore((s) => s.user?.role);
-  const isStoreOwner = userRole !== 'EMPLOYEE' && userRole !== 'CASHIER';
+  const isStoreOwner = useMemo(() => {
+    if (forcedRole === 'STORE_OWNER') return true;
+    if (forcedRole === 'EMPLOYEE') return false;
+    if (roleParam === 'employee' || roleParam === 'staff') return false;
+    if (roleParam === 'owner' || roleParam === 'store_owner') return true;
+    return userRole !== 'EMPLOYEE' && userRole !== 'CASHIER';
+  }, [forcedRole, roleParam, userRole]);
 
   const showToast = (message: string, type: ToastState['type'] = 'success') => {
     setToast({ id: Date.now().toString(), message, type });
@@ -287,8 +296,15 @@ export const OrderMatrixPage: FC = () => {
           .map((b) => ({ id: b.id, code: b.code, name: b.name }));
         setBranches(realBranches);
 
+        const authUser = useAuthStore.getState().user;
+        const employeeBranchId = !isStoreOwner ? (authUser?.branchId || '') : '';
+
         const urlBranch =
-          searchParams.get('branchId') || searchParams.get('branch') || searchParams.get('storeId') || '';
+          employeeBranchId ||
+          searchParams.get('branchId') ||
+          searchParams.get('branch') ||
+          searchParams.get('storeId') ||
+          '';
         if (urlBranch && realBranches.some((b) => b.id === urlBranch)) {
           setSelectedBranchId(urlBranch);
         } else {
@@ -312,7 +328,7 @@ export const OrderMatrixPage: FC = () => {
       isMounted = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams]);
+  }, [searchParams, isStoreOwner]);
 
   // Nạp dữ liệu ma trận từ sản phẩm theo chi nhánh
   useEffect(() => {
@@ -326,9 +342,10 @@ export const OrderMatrixPage: FC = () => {
       }
       try {
         setIsLoadingMatrix(true);
+        // Nạp toàn bộ sản phẩm và cấu hình NCC của chi nhánh đã chọn
         const res = await purchaseOrderApi.getOrderMatrix(
           selectedBranchId,
-          selectedSupplierId,
+          undefined,
           fmtDateStr(viewFrom),
           durationDays
         );
@@ -341,7 +358,7 @@ export const OrderMatrixPage: FC = () => {
         let targetCells = res.cellMap || {};
         if (Object.keys(targetCells).length === 0) {
           try {
-            const localKey = `matrix_draft_${selectedBranchId}_${selectedSupplierId || 'ALL'}`;
+            const localKey = `matrix_draft_${selectedBranchId}_ALL`;
             const raw = localStorage.getItem(localKey);
             if (raw) {
               const parsed = JSON.parse(raw);
@@ -354,13 +371,9 @@ export const OrderMatrixPage: FC = () => {
           }
         }
 
-        setCellMap(buildEmptyCellMap(selectedSupplierId, res.products || [], targetCells));
+        setCellMap(buildEmptyCellMap(res.products || [], targetCells));
         const nextSuppliers = suppliersFromMatrix(res.products || [], res.supplierConfigs || []);
-        if (selectedSupplierId === 'ALL') {
-          setSuppliers(nextSuppliers);
-        } else {
-          setSuppliers((prev) => (prev.length > 0 ? prev : nextSuppliers));
-        }
+        setSuppliers(nextSuppliers);
       } catch {
         if (!isMounted) return;
         setMatrixProducts([]);
@@ -376,7 +389,7 @@ export const OrderMatrixPage: FC = () => {
       isMounted = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedBranchId, selectedSupplierId, viewFrom, durationDays]);
+  }, [selectedBranchId, viewFrom, durationDays]);
 
   // Date columns calculated dynamically with supplier configurations
   const dayColumns: DayColInfo[] = useMemo(() => {
@@ -913,6 +926,19 @@ export const OrderMatrixPage: FC = () => {
     }
   };
 
+  const handleSwitchScreen = () => {
+    const params = new URLSearchParams(searchParams);
+    if (selectedBranchId) params.set('branchId', selectedBranchId);
+    if (selectedSupplierId && selectedSupplierId !== 'ALL') params.set('supplier', selectedSupplierId);
+
+    const qs = params.toString() ? `?${params.toString()}` : '';
+    if (isStoreOwner) {
+      navigate(`/store-owner/purchase-orders/employee-matrix${qs}`);
+    } else {
+      navigate(`/store-owner/purchase-orders/create-matrix${qs}`);
+    }
+  };
+
   return (
     <div className="po-matrix-container">
       {/* Toast Notification */}
@@ -931,45 +957,32 @@ export const OrderMatrixPage: FC = () => {
         title={
           isReadOnly
             ? `Chi Tiết Đơn Đặt Hàng — ${branches.find((b) => b.id === selectedBranchId)?.name || ''}`
-            : undefined
+            : isStoreOwner
+            ? '👑 Tạo Đơn Mua Hàng (Chủ Cửa Hàng Duyệt & Tách PO)'
+            : '👤 Đặt Hàng Theo Ma Trận (Nhân Viên Đề Xuất)'
+        }
+        onSwitchScreen={handleSwitchScreen}
+        switchScreenLabel={
+          isStoreOwner
+            ? '👉 Sang Màn Nhân Viên Đặt Hàng'
+            : '👉 Sang Màn Chủ Cửa Hàng Duyệt'
         }
       />
 
-      {/* 2. Unified Filter + Action Bar (1 row) */}
+      {/* 2. Unified Filter + Action Bar (2 rows) */}
       <OrderMatrixFilterBar
         branches={branches}
+        selectedBranchId={selectedBranchId}
         onSelectBranch={(id) => {
           setSelectedBranchId(id);
-          const localKey = `matrix_draft_${id}_${selectedSupplierId || 'ALL'}`;
-          try {
-            const raw = localStorage.getItem(localKey);
-            if (raw) {
-              const parsed = JSON.parse(raw);
-              if (parsed && Object.keys(parsed).length > 0) {
-                setCellMap(parsed);
-              }
-            }
-          } catch {
-            // ignore
-          }
+          setSelectedSupplierId('ALL');
+          setCategoryFilter('');
+          setKeyword('');
         }}
         suppliers={suppliers}
         selectedSupplierId={selectedSupplierId}
         onSelectSupplier={(id) => {
           setSelectedSupplierId(id);
-          const localKey = `matrix_draft_${selectedBranchId}_${id || 'ALL'}`;
-          let cached: MatrixCellMap | undefined = undefined;
-          try {
-            const raw = localStorage.getItem(localKey);
-            if (raw) {
-              const parsed = JSON.parse(raw);
-              if (parsed && Object.keys(parsed).length > 0) cached = parsed;
-            }
-          } catch {
-            // ignore
-          }
-          setCellMap(buildEmptyCellMap(id, matrixProducts, cached || cellMap));
-          setIsDirty(false);
         }}
         dateFrom={dateFromInput}
         dateTo={dateToInput}
@@ -988,7 +1001,7 @@ export const OrderMatrixPage: FC = () => {
         orderedOnly={orderedOnly}
         onOrderedOnlyChange={(checked) => setOrderedOnly(checked)}
         ownerModifiedOnly={ownerModifiedOnly}
-        onOwnerModifiedOnlyChange={(checked) => setOwnerModifiedOnly(checked)}
+        onOwnerModifiedOnlyChange={isStoreOwner ? (checked) => setOwnerModifiedOnly(checked) : undefined}
         ownerModifiedCount={ownerModifiedCount}
         moqFailsCount={moqFails.length}
         showSoh={showSoh}

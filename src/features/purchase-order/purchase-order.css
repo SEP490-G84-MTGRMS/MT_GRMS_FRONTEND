@@ -84,11 +84,11 @@
 .po-filter-box {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   background-color: #ffffff;
   border: 1px solid #cbd5e1;
   border-radius: 10px;
-  padding: 10px 14px;
+  padding: 8px 12px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
   flex-shrink: 0;
 }
@@ -97,24 +97,31 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
+  gap: 8px;
+  flex-wrap: nowrap;
   width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.po-filter-row::-webkit-scrollbar {
+  display: none;
 }
 
 .po-filter-row-left {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
+  gap: 8px;
+  flex-wrap: nowrap;
+  flex-shrink: 0;
 }
 
 .po-filter-row-right {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
+  gap: 6px;
+  flex-wrap: nowrap;
   margin-left: auto;
+  flex-shrink: 0;
 }
 
 .po-filter-field {
@@ -1130,6 +1137,16 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.po-grid-table th.po-th-product,
+.po-grid-table td.po-cell-product {
+  white-space: normal !important;
+  word-break: break-word !important;
+  overflow-wrap: break-word !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  line-height: 1.35;
 }
 
 .po-grid-table thead th {

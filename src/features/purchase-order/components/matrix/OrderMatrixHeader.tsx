@@ -11,7 +11,8 @@ interface OrderMatrixHeaderProps {
   readOnly?: boolean;
   isSaving?: boolean;
   isStoreOwner?: boolean;
-  onToggleRole?: (isOwner: boolean) => void;
+  onSwitchScreen?: () => void;
+  switchScreenLabel?: string;
 }
 
 export const OrderMatrixHeader: FC<OrderMatrixHeaderProps> = ({
@@ -24,7 +25,8 @@ export const OrderMatrixHeader: FC<OrderMatrixHeaderProps> = ({
   readOnly = false,
   isSaving = false,
   isStoreOwner = true,
-  onToggleRole,
+  onSwitchScreen,
+  switchScreenLabel,
 }) => {
   return (
     <div
@@ -50,12 +52,42 @@ export const OrderMatrixHeader: FC<OrderMatrixHeaderProps> = ({
           }}
         >
           <Grid size={22} style={{ color: 'var(--blue-primary)' }} />
-          {title || (readOnly ? 'Chi Tiết Đơn Đặt Hàng' : 'Tạo Đơn Mua Hàng')}
+          {title || (readOnly ? 'Chi Tiết Đơn Đặt Hàng' : isStoreOwner ? 'Tạo Đơn Mua Hàng' : 'Đặt Hàng Theo Ma Trận')}
         </h1>
+
+        {/* Nút chuyển đổi nhanh giữa màn Store Owner và Employee để test không cần login */}
+        {onSwitchScreen && switchScreenLabel && (
+          <button
+            type="button"
+            onClick={onSwitchScreen}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '5px 14px',
+              fontSize: 12,
+              fontWeight: 700,
+              borderRadius: 20,
+              border: isStoreOwner ? '1.5px solid #3b82f6' : '1.5px solid #f59e0b',
+              backgroundColor: isStoreOwner ? '#eff6ff' : '#fffbeb',
+              color: isStoreOwner ? '#1d4ed8' : '#b45309',
+              cursor: 'pointer',
+              boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
+              transition: 'all 0.15s ease',
+            }}
+            title={
+              isStoreOwner
+                ? 'Bấm để chuyển sang màn hình Nhân viên nhập số lượng đề xuất'
+                : 'Bấm để chuyển sang màn hình Chủ cửa hàng xem và điều chỉnh'
+            }
+          >
+            <span>{switchScreenLabel}</span>
+          </button>
+        )}
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        {!readOnly && onOpenSplitModal && (
+        {!readOnly && isStoreOwner && onOpenSplitModal && (
           <button
             type="button"
             onClick={onOpenSplitModal}
@@ -79,7 +111,7 @@ export const OrderMatrixHeader: FC<OrderMatrixHeaderProps> = ({
           </button>
         )}
 
-        {onGoToCutoffHub && (
+        {isStoreOwner && onGoToCutoffHub && (
           <button
             type="button"
             onClick={onGoToCutoffHub}
@@ -113,9 +145,9 @@ export const OrderMatrixHeader: FC<OrderMatrixHeaderProps> = ({
               opacity: isSaving ? 0.7 : 1,
               cursor: isSaving ? 'wait' : 'pointer',
             }}
-            title="Lưu bản thảo ma trận đặt hàng lên hệ thống"
+            title={isStoreOwner ? 'Lưu bản thảo ma trận đặt hàng' : 'Lưu số lượng đề xuất của nhân viên'}
           >
-            <span>{isSaving ? 'Đang lưu...' : 'Lưu'}</span>
+            <span>{isSaving ? 'Đang lưu...' : isStoreOwner ? 'Lưu Bản Thảo' : 'Lưu Đề Xuất'}</span>
           </button>
         )}
 
