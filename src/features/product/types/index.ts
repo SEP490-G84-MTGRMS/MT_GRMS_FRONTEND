@@ -80,6 +80,7 @@ export interface UomConversion {
   conversionRate: number;
   barcode?: string;
   price: number;
+  productCode?: string;
 }
 
 export interface ComboComponent {
@@ -89,7 +90,8 @@ export interface ComboComponent {
   productName: string;
   quantity: number;
   costPrice: number;
-  sellingPrice: number;
+  sellingprice: number;
+  productCode?: string;
 }
 
 export interface StockLedgerEntry {

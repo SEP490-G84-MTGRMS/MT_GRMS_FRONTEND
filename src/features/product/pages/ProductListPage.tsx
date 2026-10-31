@@ -8,6 +8,7 @@ import {
   Printer,
   ShieldCheck,
   Package,
+  ChevronDown,
 } from 'lucide-react';
 import type { ProductItem, Category } from '../types';
 import { categoryApi } from '../api/categoryApi';
@@ -50,13 +51,39 @@ export const ProductListPage: React.FC = () => {
 
   // Filter state
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([]);
   const [stockCriteria, setStockCriteria] = useState<'all' | 'in_stock' | 'out_of_stock' | 'below_min' | 'negative'>('all');
   const [createdTime, setCreatedTime] = useState<'all' | 'custom'>('all');
   const [customDate, setCustomDate] = useState<string>('');
   const [supplierFilter, setSupplierFilter] = useState('');
 
-  
+  // Dropdown đơn vị tính theo dòng sản phẩm (Ảnh 2 - REQ-07)
+  const [selectedUnits, setSelectedUnits] = useState<Record<string, string>>({});
+  const [activeUnitDropdownId, setActiveUnitDropdownId] = useState<string | null>(null);
+
+  // Đóng popover chọn đơn vị khi click ra ngoài
+  useEffect(() => {
+    const handleClickOutside = () => {
+      setActiveUnitDropdownId(null);
+    };
+    if (activeUnitDropdownId) {
+      document.addEventListener('click', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('click', handleClickOutside);
+    };
+  }, [activeUnitDropdownId]);
+
+  // Debounce tìm kiếm 300ms (REQ-02)
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+      setPageIndex(1);
+    }, 300);
+    return () => clearTimeout(handler);
+  }, [searchTerm]);
+
   // 1. Tải danh mục thực tế từ backend
   const fetchCategories = useCallback(async () => {
     try {
@@ -86,7 +113,7 @@ export const ProductListPage: React.FC = () => {
       const res = await productApi.getProductsPaged({
         pageIndex,
         pageSize,
-        searchTerm: searchTerm.trim() || undefined,
+        searchTerm: debouncedSearchTerm.trim() || undefined,
         categoryId: selectedCategoryIds.length === 1 ? selectedCategoryIds[0] : undefined,
         categoryIds: selectedCategoryIds.length > 0 ? selectedCategoryIds : undefined,
       });
@@ -111,6 +138,7 @@ export const ProductListPage: React.FC = () => {
           maxStock: p.maxStock,
           vatRate: p.vatRate,
           isFavorite: p.isFavorite,
+          uomConversions: (p as any).uomConversions || (p as any).units || [],
         }));
         setProducts(mapped);
         setTotalCount(res.totalCount);
@@ -125,7 +153,7 @@ export const ProductListPage: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [pageIndex, pageSize, searchTerm, selectedCategoryIds]);
+  }, [pageIndex, pageSize, debouncedSearchTerm, selectedCategoryIds]);
 
   useEffect(() => {
     fetchProducts();
@@ -595,6 +623,17 @@ export const ProductListPage: React.FC = () => {
                 {filteredProducts.map((p) => {
                   const isChecked = selectedProductIds.includes(p.id);
                   const isSelected = selectedProduct?.id === p.id && isDetailModalOpen;
+
+                  // Tính toán đơn vị tính đang chọn và giá tương ứng (Ảnh 2 - REQ-07)
+                  const allUnits = [
+                    { unitName: p.baseUnit || 'Cái', price: p.sellingPrice, barcode: p.barcode, productCode: p.productCode },
+                    ...(p.uomConversions || []),
+                  ];
+                  const currentUnitName = selectedUnits[p.id] || p.baseUnit || 'Cái';
+                  const currentUom = p.uomConversions?.find((u) => u.unitName === currentUnitName);
+                  const displayPrice = currentUom ? currentUom.price : p.sellingPrice;
+                  const displayCode = currentUom?.productCode || p.productCode;
+
                   return (
                     <tr
                       key={p.id}
@@ -637,34 +676,115 @@ export const ProductListPage: React.FC = () => {
                       </td>
                       <td>
                         <span className="product-code-link">
-                          {p.productCode}
+                          {displayCode}
                         </span>
                       </td>
                       <td>
-                        <span style={{ fontWeight: 600, color: '#1e293b' }}>
-                          {p.productName}
-                        </span>
-                        {p.isCombo && <span className="badge-combo">Combo</span>}
-                        {p.uomConversions && p.uomConversions.length > 0 && (
-                          <span className="badge-uom-tag">+{p.uomConversions.length} ĐVT</span>
-                        )}
-                        {p.status === 'Discontinued' && (
-                          <span
-                            style={{
-                              marginLeft: 6,
-                              fontSize: 11,
-                              color: '#dc2626',
-                              background: '#fee2e2',
-                              padding: '2px 6px',
-                              borderRadius: 4,
-                            }}
-                          >
-                            Ngừng kinh doanh
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                          <span style={{ fontWeight: 600, color: '#1e293b' }}>
+                            {p.productName}
                           </span>
-                        )}
+                          {p.uomConversions && p.uomConversions.length > 0 && (
+                            <div style={{ position: 'relative', display: 'inline-block' }}>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setActiveUnitDropdownId(activeUnitDropdownId === p.id ? null : p.id);
+                                }}
+                                style={{
+                                  background: 'none',
+                                  border: 'none',
+                                  color: '#0284c7',
+                                  fontWeight: 600,
+                                  fontSize: 13,
+                                  cursor: 'pointer',
+                                  padding: '2px 4px',
+                                  borderRadius: 4,
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: 2,
+                                }}
+                                title="Chọn đơn vị tính"
+                              >
+                                <span>- {currentUnitName}</span>
+                                <ChevronDown size={14} />
+                              </button>
+
+                              {activeUnitDropdownId === p.id && (
+                                <div
+                                  onClick={(e) => e.stopPropagation()}
+                                  style={{
+                                    position: 'absolute',
+                                    top: '100%',
+                                    left: 0,
+                                    zIndex: 50,
+                                    marginTop: 4,
+                                    minWidth: 100,
+                                    background: '#ffffff',
+                                    borderRadius: 6,
+                                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                                    border: '1px solid #E2E8F0',
+                                    padding: '4px 0',
+                                  }}
+                                >
+                                  {allUnits.map((u) => {
+                                    const isUnitSelected = u.unitName === currentUnitName;
+                                    return (
+                                      <button
+                                        key={u.unitName}
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setSelectedUnits((prev) => ({ ...prev, [p.id]: u.unitName }));
+                                          setActiveUnitDropdownId(null);
+                                        }}
+                                        style={{
+                                          display: 'block',
+                                          width: '100%',
+                                          textAlign: 'left',
+                                          padding: '6px 12px',
+                                          fontSize: 12.5,
+                                          background: isUnitSelected ? '#f0fdfa' : 'transparent',
+                                          color: isUnitSelected ? '#0f766e' : '#334155',
+                                          fontWeight: isUnitSelected ? 700 : 500,
+                                          border: 'none',
+                                          cursor: 'pointer',
+                                        }}
+                                        onMouseEnter={(e) => {
+                                          if (!isUnitSelected) (e.currentTarget as HTMLElement).style.background = '#f8fafc';
+                                        }}
+                                        onMouseLeave={(e) => {
+                                          if (!isUnitSelected) (e.currentTarget as HTMLElement).style.background = 'transparent';
+                                        }}
+                                      >
+                                        {u.unitName}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                          {p.isCombo && <span className="badge-combo">Combo</span>}
+                          {p.status === 'Discontinued' && (
+                            <span
+                              style={{
+                                marginLeft: 6,
+                                fontSize: 11,
+                                color: '#dc2626',
+                                background: '#fee2e2',
+                                padding: '2px 6px',
+                                borderRadius: 4,
+                              }}
+                            >
+                              Ngừng kinh doanh
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td style={{ textAlign: 'right', fontWeight: 600 }}>
-                        {p.sellingPrice.toLocaleString()} đ
+                        {displayPrice.toLocaleString()} đ
                       </td>
                       {userRole === 'StoreOwner' && (
                         <td style={{ textAlign: 'right', color: '#64748b' }}>

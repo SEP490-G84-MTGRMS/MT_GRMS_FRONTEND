@@ -12,6 +12,7 @@ import {
   Folder,
   Plus,
   Loader2,
+  Tag,
 } from 'lucide-react';
 import type { ProductItem, Category, UomConversion } from '../types';
 import { uploadImageToCloudinary } from '../../../utils/cloudinary';
@@ -199,12 +200,18 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
 
   // Add UOM conversion row
   const handleAddUom = () => {
+    if (!baseUnit.trim()) {
+      setErrorMsg('Vui lòng nhập tên đơn vị cơ bản trước khi thêm đơn vị quy đổi.');
+      return;
+    }
+    setErrorMsg('');
     const newUom: UomConversion = {
       id: `uom-${Date.now()}`,
       unitName: '',
-      conversionRate: 10,
+      conversionRate: 1,
       barcode: '',
-      price: sellingPrice > 0 ? sellingPrice * 10 : 0,
+      price: 0,
+      productCode: '',
     };
     setUomConversions([...uomConversions, newUom]);
   };
@@ -375,10 +382,11 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
           style={{
             maxHeight: 'calc(88vh - 130px)',
             overflowY: 'auto',
-            padding: '20px 28px',
+            padding: '20px 24px',
             display: 'flex',
             flexDirection: 'column',
-            gap: 24,
+            gap: 16,
+            backgroundColor: '#F8FAFC',
           }}
         >
           {errorMsg && (
@@ -390,7 +398,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                 padding: '10px 14px',
                 backgroundColor: '#FEE2E2',
                 color: '#DC2626',
-                borderRadius: 12,
+                borderRadius: 10,
                 fontSize: 13,
                 fontWeight: 500,
               }}
@@ -409,7 +417,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                 padding: '10px 14px',
                 backgroundColor: '#FEF3C7',
                 color: '#B45309',
-                borderRadius: 12,
+                borderRadius: 10,
                 fontSize: 13,
                 fontWeight: 500,
               }}
@@ -422,15 +430,23 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
           {/* ───────────────────────────────────────────────────────── */}
           {/* 1. THÔNG TIN CƠ BẢN (1, 2, 3, 4, 5, 17)                   */}
           {/* ───────────────────────────────────────────────────────── */}
-          <div>
+          <div
+            style={{
+              border: '1px solid #E2E8F0',
+              borderRadius: 10,
+              padding: '18px 20px',
+              backgroundColor: '#FFFFFF',
+              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.02)',
+            }}
+          >
             <h4
               style={{
                 fontSize: 14,
                 fontWeight: 700,
                 color: '#0F172A',
-                margin: '0 0 14px 0',
-                paddingBottom: 6,
-                borderBottom: '1px solid #E2E8F0',
+                margin: '0 0 16px 0',
+                paddingBottom: 8,
+                borderBottom: '1px solid #F1F5F9',
               }}
             >
               Thông tin cơ bản
@@ -913,7 +929,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                         + Thêm ảnh
                       </button>
                       <span style={{ fontSize: 11, color: '#64748B' }}>
-                        Lưu trữ đám mây Cloudinary (Tối đa 5MB)
+                        (Tối đa 5MB)
                       </span>
                     </>
                   )}
@@ -998,15 +1014,23 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
           {/* ───────────────────────────────────────────────────────── */}
           {/* 2. GIÁ VỐN, GIÁ BÁN (6, 7)                                */}
           {/* ───────────────────────────────────────────────────────── */}
-          <div>
+          <div
+            style={{
+              border: '1px solid #E2E8F0',
+              borderRadius: 10,
+              padding: '18px 20px',
+              backgroundColor: '#FFFFFF',
+              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.02)',
+            }}
+          >
             <h4
               style={{
                 fontSize: 14,
                 fontWeight: 700,
                 color: '#0F172A',
-                margin: '0 0 14px 0',
-                paddingBottom: 6,
-                borderBottom: '1px solid #E2E8F0',
+                margin: '0 0 16px 0',
+                paddingBottom: 8,
+                borderBottom: '1px solid #F1F5F9',
               }}
             >
               Giá vốn, giá bán
@@ -1141,7 +1165,15 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
           {/* ───────────────────────────────────────────────────────── */}
           {/* 3. TỒN KHO & ĐỊNH MỨC CẢNH BÁO (11, 10)                     */}
           {/* ───────────────────────────────────────────────────────── */}
-          <div>
+          <div
+            style={{
+              border: '1px solid #E2E8F0',
+              borderRadius: 10,
+              padding: '18px 20px',
+              backgroundColor: '#FFFFFF',
+              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.02)',
+            }}
+          >
             <h4
               style={{
                 fontSize: 14,
@@ -1156,9 +1188,9 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
               style={{
                 fontSize: 12,
                 color: '#64748B',
-                margin: '0 0 14px 0',
-                paddingBottom: 6,
-                borderBottom: '1px solid #E2E8F0',
+                margin: '0 0 16px 0',
+                paddingBottom: 8,
+                borderBottom: '1px solid #F1F5F9',
               }}
             >
               Quản lý số lượng tồn kho và định mức tồn. Khi chạm định mức, hệ thống sẽ gửi cảnh báo nhập hàng.
@@ -1236,16 +1268,24 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
           {/* ───────────────────────────────────────────────────────── */}
           {/* 4. QUẢN LÝ THEO ĐƠN VỊ TÍNH VÀ THUỘC TÍNH (8, 7, 9, 18)   */}
           {/* ───────────────────────────────────────────────────────── */}
-          <div>
+          <div
+            style={{
+              border: '1px solid #E2E8F0',
+              borderRadius: 10,
+              padding: '18px 20px',
+              backgroundColor: '#FFFFFF',
+              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.02)',
+            }}
+          >
             <div
               style={{
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
                 cursor: 'pointer',
-                paddingBottom: 6,
-                borderBottom: '1px solid #E2E8F0',
-                marginBottom: 10,
+                paddingBottom: 8,
+                borderBottom: isUomExpanded ? '1px solid #F1F5F9' : 'none',
+                marginBottom: isUomExpanded ? 14 : 0,
               }}
               onClick={() => setIsUomExpanded(!isUomExpanded)}
             >
@@ -1257,7 +1297,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                   margin: 0,
                 }}
               >
-                Quản lý theo đơn vị tính và thuộc tính^
+                Quản lý theo đơn vị tính và thuộc tính
               </h4>
               <button
                 type="button"
@@ -1411,22 +1451,331 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                   <button
                     type="button"
                     onClick={handleAddUom}
+                    disabled={!baseUnit.trim()}
                     style={{
                       background: 'none',
                       border: 'none',
-                      color: '#0F766E',
+                      color: !baseUnit.trim() ? '#94a3b8' : '#0F766E',
                       fontSize: 13,
                       fontWeight: 700,
-                      cursor: 'pointer',
+                      cursor: !baseUnit.trim() ? 'not-allowed' : 'pointer',
                       padding: '4px 0',
                       display: 'inline-flex',
                       alignItems: 'center',
                       gap: 4,
+                      opacity: !baseUnit.trim() ? 0.6 : 1,
                     }}
+                    title={!baseUnit.trim() ? 'Vui lòng nhập tên đơn vị cơ bản trước khi thêm đơn vị' : '+ Thêm đơn vị'}
                   >
                     + Thêm đơn vị
                   </button>
+                  {!baseUnit.trim() && (
+                    <span style={{ fontSize: 12, color: '#ef4444', marginLeft: 8 }}>
+                      (Cần nhập tên đơn vị cơ bản trước)
+                    </span>
+                  )}
                 </div>
+
+                {/* BẢNG HÀNG CÙNG LOẠI (Hiển thị khi có đơn vị quy đổi) */}
+                {uomConversions.length > 0 && (
+                  <div style={{ marginTop: 16 }}>
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        marginBottom: 10,
+                      }}
+                    >
+                      <h5 style={{ fontSize: 13, fontWeight: 700, color: '#1E293B', margin: 0 }}>
+                        Hàng cùng loại
+                      </h5>
+                      <button
+                        type="button"
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: '#0284c7',
+                          fontSize: 13,
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 4,
+                        }}
+                      >
+                        <Tag size={15} />
+                        <span>Thiết lập giá</span>
+                      </button>
+                    </div>
+
+                    <div style={{ overflowX: 'auto', border: '1px solid #E2E8F0', borderRadius: 8 }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                        <thead>
+                          <tr style={{ background: '#f8fafc', borderBottom: '1px solid #E2E8F0', color: '#475569', fontWeight: 600 }}>
+                            <th style={{ padding: '10px 12px', textAlign: 'left', minWidth: 100 }}>Đơn vị</th>
+                            <th style={{ padding: '10px 8px', textAlign: 'center', width: 90 }}>Quy đổi</th>
+                            <th style={{ padding: '10px 8px', textAlign: 'left', minWidth: 120 }}>Mã hàng</th>
+                            <th style={{ padding: '10px 8px', textAlign: 'left', minWidth: 130 }}>Mã vạch</th>
+                            <th style={{ padding: '10px 8px', textAlign: 'right', minWidth: 110 }}>Giá vốn</th>
+                            <th style={{ padding: '10px 8px', textAlign: 'right', minWidth: 110 }}>Giá bán</th>
+                            <th style={{ padding: '10px 8px', textAlign: 'right', minWidth: 90 }}>Tồn kho</th>
+                            <th style={{ padding: '10px 12px', textAlign: 'center', width: 44 }}></th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {/* Dòng 1: Đơn vị cơ bản */}
+                          <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
+                            <td style={{ padding: '8px 12px', fontWeight: 600, color: '#1E293B' }}>
+                              {baseUnit || 'Đơn vị cơ bản'}
+                            </td>
+                            <td style={{ padding: '8px', textAlign: 'center' }}>
+                              <input
+                                type="text"
+                                disabled
+                                value={1}
+                                style={{
+                                  width: '100%',
+                                  padding: '6px 8px',
+                                  borderRadius: 6,
+                                  border: '1px solid #E2E8F0',
+                                  background: '#f1f5f9',
+                                  color: '#64748b',
+                                  textAlign: 'center',
+                                  fontSize: 13,
+                                }}
+                              />
+                            </td>
+                            <td style={{ padding: '8px' }}>
+                              <input
+                                type="text"
+                                placeholder="Tự động"
+                                value={productCode}
+                                onChange={(e) => setProductCode(e.target.value)}
+                                style={{
+                                  width: '100%',
+                                  padding: '6px 8px',
+                                  borderRadius: 6,
+                                  border: '1px solid #E2E8F0',
+                                  fontSize: 13,
+                                }}
+                              />
+                            </td>
+                            <td style={{ padding: '8px' }}>
+                              <input
+                                type="text"
+                                placeholder=""
+                                value={barcode}
+                                onChange={(e) => setBarcode(e.target.value)}
+                                style={{
+                                  width: '100%',
+                                  padding: '6px 8px',
+                                  borderRadius: 6,
+                                  border: '1px solid #E2E8F0',
+                                  fontSize: 13,
+                                }}
+                              />
+                            </td>
+                            <td style={{ padding: '8px' }}>
+                              <input
+                                type="number"
+                                value={costPrice}
+                                onChange={(e) => setCostPrice(Number(e.target.value))}
+                                style={{
+                                  width: '100%',
+                                  padding: '6px 8px',
+                                  borderRadius: 6,
+                                  border: '1px solid #E2E8F0',
+                                  textAlign: 'right',
+                                  fontSize: 13,
+                                }}
+                              />
+                            </td>
+                            <td style={{ padding: '8px' }}>
+                              <input
+                                type="number"
+                                value={sellingPrice}
+                                onChange={(e) => handleSellingPriceChange(Number(e.target.value))}
+                                style={{
+                                  width: '100%',
+                                  padding: '6px 8px',
+                                  borderRadius: 6,
+                                  border: '1px solid #E2E8F0',
+                                  textAlign: 'right',
+                                  fontSize: 13,
+                                }}
+                              />
+                            </td>
+                            <td style={{ padding: '8px' }}>
+                              <input
+                                type="number"
+                                value={initialStock}
+                                onChange={(e) => setInitialStock(Number(e.target.value))}
+                                style={{
+                                  width: '100%',
+                                  padding: '6px 8px',
+                                  borderRadius: 6,
+                                  border: '1px solid #E2E8F0',
+                                  textAlign: 'right',
+                                  fontSize: 13,
+                                }}
+                              />
+                            </td>
+                            <td style={{ padding: '8px 12px', textAlign: 'center' }}>
+                              <button
+                                type="button"
+                                disabled
+                                style={{
+                                  background: 'none',
+                                  border: 'none',
+                                  color: '#cbd5e1',
+                                  cursor: 'not-allowed',
+                                  padding: 4,
+                                }}
+                                title="Không thể xóa đơn vị cơ bản"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </td>
+                          </tr>
+
+                          {/* Dòng 2 trở đi: Các đơn vị quy đổi */}
+                          {uomConversions.map((uom) => {
+                            const convertedCost = costPrice > 0 ? costPrice * (uom.conversionRate || 1) : 0;
+                            const convertedStock =
+                              initialStock > 0 && (uom.conversionRate || 1) > 0
+                                ? Math.floor(initialStock / uom.conversionRate)
+                                : 0;
+
+                            return (
+                              <tr key={uom.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                <td style={{ padding: '8px 12px', color: '#1E293B', fontWeight: 500 }}>
+                                  {uom.unitName || '(Chưa đặt tên)'}
+                                </td>
+                                <td style={{ padding: '8px', textAlign: 'center' }}>
+                                  <input
+                                    type="number"
+                                    min={1}
+                                    value={uom.conversionRate}
+                                    onChange={(e) =>
+                                      handleUpdateUom(uom.id, 'conversionRate', Number(e.target.value))
+                                    }
+                                    style={{
+                                      width: '100%',
+                                      padding: '6px 8px',
+                                      borderRadius: 6,
+                                      border: '1px solid #E2E8F0',
+                                      textAlign: 'center',
+                                      fontSize: 13,
+                                    }}
+                                  />
+                                </td>
+                                <td style={{ padding: '8px' }}>
+                                  <input
+                                    type="text"
+                                    placeholder="Tự động"
+                                    value={uom.productCode || ''}
+                                    onChange={(e) => handleUpdateUom(uom.id, 'productCode' as any, e.target.value)}
+                                    style={{
+                                      width: '100%',
+                                      padding: '6px 8px',
+                                      borderRadius: 6,
+                                      border: '1px solid #E2E8F0',
+                                      fontSize: 13,
+                                    }}
+                                  />
+                                </td>
+                                <td style={{ padding: '8px' }}>
+                                  <input
+                                    type="text"
+                                    placeholder=""
+                                    value={uom.barcode || ''}
+                                    onChange={(e) => handleUpdateUom(uom.id, 'barcode', e.target.value)}
+                                    style={{
+                                      width: '100%',
+                                      padding: '6px 8px',
+                                      borderRadius: 6,
+                                      border: '1px solid #E2E8F0',
+                                      fontSize: 13,
+                                    }}
+                                  />
+                                </td>
+                                <td style={{ padding: '8px' }}>
+                                  <input
+                                    type="text"
+                                    disabled
+                                    value={convertedCost.toLocaleString('vi-VN')}
+                                    style={{
+                                      width: '100%',
+                                      padding: '6px 8px',
+                                      borderRadius: 6,
+                                      border: '1px solid #E2E8F0',
+                                      background: '#f1f5f9',
+                                      color: '#64748b',
+                                      textAlign: 'right',
+                                      fontSize: 13,
+                                    }}
+                                  />
+                                </td>
+                                <td style={{ padding: '8px' }}>
+                                  <input
+                                    type="number"
+                                    value={uom.price}
+                                    onChange={(e) => handleUpdateUom(uom.id, 'price', Number(e.target.value))}
+                                    style={{
+                                      width: '100%',
+                                      padding: '6px 8px',
+                                      borderRadius: 6,
+                                      border: '1px solid #E2E8F0',
+                                      textAlign: 'right',
+                                      fontSize: 13,
+                                    }}
+                                  />
+                                </td>
+                                <td style={{ padding: '8px' }}>
+                                  <input
+                                    type="text"
+                                    disabled
+                                    value={convertedStock.toLocaleString('vi-VN')}
+                                    style={{
+                                      width: '100%',
+                                      padding: '6px 8px',
+                                      borderRadius: 6,
+                                      border: '1px solid #E2E8F0',
+                                      background: '#f1f5f9',
+                                      color: '#64748b',
+                                      textAlign: 'right',
+                                      fontSize: 13,
+                                    }}
+                                  />
+                                </td>
+                                <td style={{ padding: '8px 12px', textAlign: 'center' }}>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveUom(uom.id)}
+                                    style={{
+                                      background: 'none',
+                                      border: 'none',
+                                      color: '#64748B',
+                                      cursor: 'pointer',
+                                      padding: 4,
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                    }}
+                                    title="Xóa đơn vị quy đổi"
+                                  >
+                                    <Trash2 size={16} />
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -1434,15 +1783,23 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
           {/* ───────────────────────────────────────────────────────── */}
           {/* 5. MÔ TẢ & GHI CHÚ SẢN PHẨM (12, 13)                      */}
           {/* ───────────────────────────────────────────────────────── */}
-          <div>
+          <div
+            style={{
+              border: '1px solid #E2E8F0',
+              borderRadius: 10,
+              padding: '18px 20px',
+              backgroundColor: '#FFFFFF',
+              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.02)',
+            }}
+          >
             <h4
               style={{
                 fontSize: 14,
                 fontWeight: 700,
                 color: '#0F172A',
-                margin: '0 0 14px 0',
-                paddingBottom: 6,
-                borderBottom: '1px solid #E2E8F0',
+                margin: '0 0 16px 0',
+                paddingBottom: 8,
+                borderBottom: '1px solid #F1F5F9',
               }}
             >
               Mô tả & Ghi chú sản phẩm

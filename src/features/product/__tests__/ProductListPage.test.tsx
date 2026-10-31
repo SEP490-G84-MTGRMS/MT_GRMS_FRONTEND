@@ -175,4 +175,74 @@ describe('ProductListPage - Task T6 BR-SEC-01 Phân quyền Giá vốn theo Vai 
     const sellingPriceRegex = /5[.,]000\s*đ/;
     expect(screen.getByText(sellingPriceRegex)).toBeDefined();
   });
+
+  it('hiển thị dropdown đơn vị tính và cập nhật giá bán khi chuyển sang đơn vị quy đổi (REQ-07)', async () => {
+    useAuthStore.setState({
+      user: {
+        id: 'usr-owner',
+        email: 'owner@mtgrms.vn',
+        fullName: 'Chủ Cửa Hàng',
+        role: 'STORE_OWNER',
+        tenantId: 'tenant_mt_mart_01',
+      },
+      token: 'mock-token',
+      isAuthenticated: true,
+    });
+
+    const mockProductWithUnits = {
+      ...mockSampleProduct,
+      id: 'p-units',
+      name: 'Nước ngọt Coca Cola 320ml',
+      baseUnit: 'chai',
+      sellingPrice: 10000,
+      uomConversions: [
+        {
+          id: 'uom-coca-thung',
+          unitName: 'thung',
+          conversionRate: 24,
+          price: 220000,
+        },
+      ],
+    };
+
+    (categoryApi.getCategories as any).mockResolvedValueOnce([]);
+    (productApi.getProductsPaged as any).mockResolvedValueOnce({
+      items: [mockProductWithUnits],
+      pageIndex: 1,
+      pageSize: 20,
+      totalCount: 1,
+      totalPages: 1,
+      hasPreviousPage: false,
+      hasNextPage: false,
+    });
+
+    render(<ProductListPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Nước ngọt Coca Cola 320ml')).toBeDefined();
+    });
+
+    // Ban đầu hiển thị đơn vị cơ bản: "- chai" và giá bán 10,000 đ
+    expect(screen.getByText('- chai')).toBeDefined();
+    expect(screen.getByText(/10[.,]000\s*đ/)).toBeDefined();
+
+    // Click vào dropdown chọn đơn vị tính
+    const unitDropdownBtn = screen.getByTitle('Chọn đơn vị tính');
+    unitDropdownBtn.click();
+
+    // Menu mở ra hiển thị tùy chọn "thung"
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'thung' })).toBeDefined();
+    });
+
+    // Click chọn đơn vị "thung"
+    const thungOption = screen.getByRole('button', { name: 'thung' });
+    thungOption.click();
+
+    // Dropdown chuyển sang hiển thị "- thung" và Giá bán cập nhật thành 220,000 đ
+    await waitFor(() => {
+      expect(screen.getByText('- thung')).toBeDefined();
+      expect(screen.getByText(/220[.,]000\s*đ/)).toBeDefined();
+    });
+  });
 });
