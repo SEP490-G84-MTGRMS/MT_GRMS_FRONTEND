@@ -8,6 +8,7 @@ import type {
   SupplierStatus,
   SupplierType,
   APLedgerEntry,
+  SupplierSearchSuggestions,
 } from '../types/supplier.types';
 
 // Map enums between Frontend and Backend
@@ -80,17 +81,51 @@ export const supplierApi = {
     try {
       const params: Record<string, any> = {
         searchTerm: filter?.searchTerm || undefined,
-        code: filter?.code || undefined,
-        name: filter?.name || undefined,
-        contactPerson: filter?.contactPerson || undefined,
-        phone: filter?.phone || undefined,
         supplierType: typeMapFrontendToBackend(filter?.supplierType),
         status: statusMapFrontendToBackend(filter?.status),
         pageIndex: filter?.pageIndex || 1,
-        pageSize: filter?.pageSize || 12,
+        pageSize: filter?.pageSize || 15,
       };
 
-      const res = await httpClient.get<ApiResponse<PagedResult<any>>>('/suppliers', { params });
+      const codes = filter?.codes?.filter(Boolean) ?? [];
+      const names = filter?.names?.filter(Boolean) ?? [];
+      const contactPersons = filter?.contactPersons?.filter(Boolean) ?? [];
+      const phones = filter?.phones?.filter(Boolean) ?? [];
+
+      if (codes.length) params.codes = codes;
+      else if (filter?.code) params.code = filter.code;
+
+      if (names.length) params.names = names;
+      else if (filter?.name) params.name = filter.name;
+
+      if (contactPersons.length) params.contactPersons = contactPersons;
+      else if (filter?.contactPerson) params.contactPerson = filter.contactPerson;
+
+      if (phones.length) params.phones = phones;
+      else if (filter?.phone) params.phone = filter.phone;
+
+      if (filter?.supplierIds?.length) params.supplierIds = filter.supplierIds;
+      if (filter?.productIds?.length) params.productIds = filter.productIds;
+
+      const res = await httpClient.get<ApiResponse<PagedResult<any>>>('/suppliers', {
+        params,
+        paramsSerializer: (p) => {
+          const search = new URLSearchParams();
+          Object.entries(p).forEach(([key, value]) => {
+            if (value === undefined || value === null || value === '') return;
+            if (Array.isArray(value)) {
+              value.forEach((item) => {
+                if (item !== undefined && item !== null && String(item).trim() !== '') {
+                  search.append(key, String(item));
+                }
+              });
+              return;
+            }
+            search.append(key, String(value));
+          });
+          return search.toString();
+        },
+      });
       if (res.data?.success && res.data.data) {
         const paged = res.data.data;
         const items = (paged.items || []).map(mapBackendSupplierToFrontend);
@@ -98,12 +133,43 @@ export const supplierApi = {
           items,
           total: paged.totalItems || items.length,
           page: paged.page || 1,
-          pageSize: paged.pageSize || 12,
+          pageSize: paged.pageSize || 15,
         };
       }
       throw new Error(res.data?.message || 'Không thể tải danh sách nhà cung cấp.');
     } catch (err: any) {
       throw new Error(err?.response?.data?.message || err.message || 'Không thể tải danh sách nhà cung cấp.');
+    }
+  },
+
+  /**
+   * Gợi ý tìm kiếm nhanh phân nhóm đa thực thể (REQ-SEARCH-01)
+   */
+  async getSearchSuggestions(query: string, limit = 10): Promise<SupplierSearchSuggestions> {
+    try {
+      const res = await httpClient.get<ApiResponse<SupplierSearchSuggestions>>('/suppliers/search-suggestions', {
+        params: { query, limit },
+      });
+      if (res.data?.success && res.data.data) {
+        return res.data.data;
+      }
+      return { suppliers: [], products: [], contactPersons: [], phones: [] };
+    } catch {
+      return { suppliers: [], products: [], contactPersons: [], phones: [] };
+    }
+  },
+
+  /**
+   * Lấy lịch sử giao dịch đơn hàng và nhập kho của nhà cung cấp (REQ-HIST-01)
+   */
+  async getSupplierTransactions(supplierId: string, pageIndex = 1, pageSize = 20): Promise<any> {
+    try {
+      const res = await httpClient.get<ApiResponse<any>>(`/suppliers/${supplierId}/transactions`, {
+        params: { pageIndex, pageSize },
+      });
+      return res.data?.data || { items: [], totalItems: 0 };
+    } catch {
+      return { items: [], totalItems: 0 };
     }
   },
 

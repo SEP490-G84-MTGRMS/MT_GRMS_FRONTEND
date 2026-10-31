@@ -1,6 +1,7 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
 import type { FC } from 'react';
 import type { StoreProductItem } from '../types/storeProduct.types';
+import { SupplierStatusBadge } from '../../supplier/components/SupplierStatusBadge';
 import { ArrowUpDown, ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface StoreProductTableProps {
@@ -11,19 +12,20 @@ interface StoreProductTableProps {
   onPageChange: (page: number) => void;
   onPageSizeChange: (pageSize: number) => void;
   onEdit: (item: StoreProductItem) => void;
-  onToggleStatus: (item: StoreProductItem) => void;
-  onRemove: (item: StoreProductItem) => void;
+  onToggleStatus?: (item: StoreProductItem) => void;
+  onRemove?: (item: StoreProductItem) => void;
   onOpenAssignModal: () => void;
 }
 
 type SortField =
   | 'sku'
-  | 'barcode'
   | 'name'
+  | 'unit'
+  | 'category'
   | 'storeName'
+  | 'costPrice'
   | 'retailPrice'
-  | 'currentStock'
-  | 'minStockLevel'
+  | 'minOrderQuantity'
   | 'status';
 type SortDirection = 'asc' | 'desc';
 
@@ -70,29 +72,33 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
           valA = a.sku.toLowerCase();
           valB = b.sku.toLowerCase();
           break;
-        case 'barcode':
-          valA = a.barcode.toLowerCase();
-          valB = b.barcode.toLowerCase();
-          break;
         case 'name':
           valA = a.name.toLowerCase();
           valB = b.name.toLowerCase();
+          break;
+        case 'unit':
+          valA = a.unit.toLowerCase();
+          valB = b.unit.toLowerCase();
+          break;
+        case 'category':
+          valA = a.category.toLowerCase();
+          valB = b.category.toLowerCase();
           break;
         case 'storeName':
           valA = a.storeName.toLowerCase();
           valB = b.storeName.toLowerCase();
           break;
+        case 'costPrice':
+          valA = a.costPrice;
+          valB = b.costPrice;
+          break;
         case 'retailPrice':
           valA = a.retailPrice;
           valB = b.retailPrice;
           break;
-        case 'currentStock':
-          valA = a.currentStock;
-          valB = b.currentStock;
-          break;
-        case 'minStockLevel':
-          valA = a.minStockLevel;
-          valB = b.minStockLevel;
+        case 'minOrderQuantity':
+          valA = a.minOrderQuantity || 0;
+          valB = b.minOrderQuantity || 0;
           break;
         case 'status':
           valA = a.status;
@@ -110,76 +116,79 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
   const startItem = totalCount === 0 ? 0 : (pageIndex - 1) * pageSize + 1;
   const endItem = Math.min(pageIndex * pageSize, totalCount);
 
-  // Synchronize horizontal scrolling between header and body
+  // Synchronize horizontal scrolling between header and body & detect vertical scroll
   const headerRef = useRef<HTMLDivElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
+  const [hasScrollY, setHasScrollY] = useState(false);
 
   useEffect(() => {
-    const handleScroll = () => {
-      if (headerRef.current && bodyRef.current) {
-        headerRef.current.scrollLeft = bodyRef.current.scrollLeft;
+    const updateScrollState = () => {
+      if (bodyRef.current) {
+        setHasScrollY(bodyRef.current.scrollHeight > bodyRef.current.clientHeight);
       }
     };
-    const bodyEl = bodyRef.current;
-    if (bodyEl) {
-      bodyEl.addEventListener('scroll', handleScroll);
-      return () => bodyEl.removeEventListener('scroll', handleScroll);
+
+    updateScrollState();
+
+    let observer: ResizeObserver | null = null;
+    if (bodyRef.current && typeof ResizeObserver !== 'undefined') {
+      observer = new ResizeObserver(() => {
+        updateScrollState();
+      });
+      observer.observe(bodyRef.current);
     }
-  }, []);
+
+    window.addEventListener('resize', updateScrollState);
+    return () => {
+      window.removeEventListener('resize', updateScrollState);
+      if (observer) observer.disconnect();
+    };
+  }, [sortedProducts, pageSize]);
+
+  const handleBodyScroll = () => {
+    if (headerRef.current && bodyRef.current) {
+      headerRef.current.scrollLeft = bodyRef.current.scrollLeft;
+    }
+  };
 
   const tableColGroup = (
     <colgroup>
-      <col style={{ width: '4%' }} />
-      <col style={{ width: '13%' }} />
-      <col style={{ width: '22%' }} />
-      <col style={{ width: '10%' }} />
-      <col style={{ width: '12%' }} />
-      <col style={{ width: '10%' }} />
-      <col style={{ width: '9%' }} />
-      <col style={{ width: '10%' }} />
-      <col style={{ width: '10%' }} />
+      <col style={{ width: '4%' }} />   {/* STT */}
+      <col style={{ width: '10%' }} />  {/* Mã SKU */}
+      <col style={{ width: '18%' }} />  {/* Tên SP */}
+      <col style={{ width: '5%' }} />   {/* ĐVT */}
+      <col style={{ width: '9%' }} />   {/* Ngành Hàng */}
+      <col style={{ width: '11%' }} />  {/* Cửa Hàng */}
+      <col style={{ width: '9%' }} />   {/* Giá Vốn */}
+      <col style={{ width: '9%' }} />   {/* Giá Bán */}
+      <col style={{ width: '8%' }} />   {/* MOQ */}
+      <col style={{ width: '9%' }} />   {/* Trạng Thái */}
+      <col style={{ width: '8%' }} />   {/* Thao Tác */}
     </colgroup>
   );
 
   const thStyle: React.CSSProperties = {
     backgroundColor: '#f8fafc',
-    padding: '10px 12px',
+    padding: '10px 8px',
     fontSize: 12,
     fontWeight: 700,
-    color: '#475569',
-    textAlign: 'left',
-    borderBottom: '2px solid #e2e8f0',
+    color: '#334155',
+    textTransform: 'uppercase',
+    letterSpacing: '0.03em',
     whiteSpace: 'nowrap',
+    boxSizing: 'border-box',
+    borderBottom: '1px solid #cbd5e1',
     userSelect: 'none',
   };
 
   return (
-    <div
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        width: '100%',
-        flex: 1,
-        minHeight: 0,
-        backgroundColor: '#ffffff',
-        border: '1px solid #cbd5e1',
-        borderRadius: 10,
-        overflow: 'hidden',
-        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
-      }}
-    >
-      {/* ── Fixed Table Header ── */}
+    <div className="so-list-table-card">
       <div
         ref={headerRef}
-        style={{
-          width: '100%',
-          overflowX: 'hidden',
-          backgroundColor: '#f8fafc',
-          borderBottom: '1px solid #e2e8f0',
-          flexShrink: 0,
-        }}
+        className="so-list-table-head"
+        style={{ paddingRight: hasScrollY ? 6 : 0 }}
       >
-        <table style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse' }}>
+        <table className="so-list-table">
           {tableColGroup}
           <thead>
             <tr>
@@ -191,8 +200,8 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
                 title="Sắp xếp theo mã SKU"
               >
                 <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                  <span>Mã SKU / Barcode</span>
-                  <ArrowUpDown size={12} style={{ color: sortField === 'sku' ? '#2563eb' : '#94a3b8' }} />
+                  <span>Mã SKU</span>
+                  <ArrowUpDown size={12} style={{ color: sortField === 'sku' ? '#0f766e' : '#94a3b8' }} />
                 </div>
               </th>
 
@@ -202,12 +211,32 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
                 title="Sắp xếp theo tên sản phẩm"
               >
                 <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                  <span>Tên Sản Phẩm (ĐVT)</span>
-                  <ArrowUpDown size={12} style={{ color: sortField === 'name' ? '#2563eb' : '#94a3b8' }} />
+                  <span>Tên Sản Phẩm</span>
+                  <ArrowUpDown size={12} style={{ color: sortField === 'name' ? '#0f766e' : '#94a3b8' }} />
                 </div>
               </th>
 
-              <th style={thStyle}>Ngành Hàng</th>
+              <th
+                style={{ ...thStyle, textAlign: 'center', cursor: 'pointer' }}
+                onClick={() => handleSort('unit')}
+                title="Sắp xếp theo đơn vị tính"
+              >
+                <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4, width: '100%' }}>
+                  <span>ĐVT</span>
+                  <ArrowUpDown size={12} style={{ color: sortField === 'unit' ? '#0f766e' : '#94a3b8' }} />
+                </div>
+              </th>
+
+              <th
+                style={{ ...thStyle, cursor: 'pointer' }}
+                onClick={() => handleSort('category')}
+                title="Sắp xếp theo ngành hàng"
+              >
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                  <span>Ngành Hàng</span>
+                  <ArrowUpDown size={12} style={{ color: sortField === 'category' ? '#0f766e' : '#94a3b8' }} />
+                </div>
+              </th>
 
               <th
                 style={{ ...thStyle, cursor: 'pointer' }}
@@ -216,7 +245,18 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
               >
                 <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                   <span>Cửa Hàng</span>
-                  <ArrowUpDown size={12} style={{ color: sortField === 'storeName' ? '#2563eb' : '#94a3b8' }} />
+                  <ArrowUpDown size={12} style={{ color: sortField === 'storeName' ? '#0f766e' : '#94a3b8' }} />
+                </div>
+              </th>
+
+              <th
+                style={{ ...thStyle, textAlign: 'right', cursor: 'pointer' }}
+                onClick={() => handleSort('costPrice')}
+                title="Sắp xếp theo giá vốn nhập sỉ"
+              >
+                <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4, width: '100%' }}>
+                  <span>Giá Vốn (đ)</span>
+                  <ArrowUpDown size={12} style={{ color: sortField === 'costPrice' ? '#0f766e' : '#94a3b8' }} />
                 </div>
               </th>
 
@@ -227,18 +267,18 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
               >
                 <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4, width: '100%' }}>
                   <span>Giá Bán Lẻ (đ)</span>
-                  <ArrowUpDown size={12} style={{ color: sortField === 'retailPrice' ? '#2563eb' : '#94a3b8' }} />
+                  <ArrowUpDown size={12} style={{ color: sortField === 'retailPrice' ? '#0f766e' : '#94a3b8' }} />
                 </div>
               </th>
 
               <th
                 style={{ ...thStyle, textAlign: 'center', cursor: 'pointer' }}
-                onClick={() => handleSort('currentStock')}
-                title="Tồn kho thực tế SOH và định mức an toàn"
+                onClick={() => handleSort('minOrderQuantity')}
+                title="Số lượng đặt hàng tối thiểu"
               >
                 <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4, width: '100%' }}>
-                  <span>Tồn / Định mức</span>
-                  <ArrowUpDown size={12} style={{ color: sortField === 'currentStock' ? '#2563eb' : '#94a3b8' }} />
+                  <span>SL Đặt Tối Thiểu</span>
+                  <ArrowUpDown size={12} style={{ color: sortField === 'minOrderQuantity' ? '#0f766e' : '#94a3b8' }} />
                 </div>
               </th>
 
@@ -250,24 +290,19 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
         </table>
       </div>
 
-      {/* ── Scrollable Table Body ── */}
+      {/* ── Scrollable Table Body (Tự động lấp đầy chiều cao cân đối chuẩn 12 dòng như màn suppliers) ── */}
       <div
         ref={bodyRef}
-        style={{
-          width: '100%',
-          flex: '1 1 auto',
-          overflowY: 'auto',
-          overflowX: 'auto',
-          minHeight: 0,
-        }}
+        className="so-list-table-body supplier-table-scroll-container"
+        onScroll={handleBodyScroll}
       >
-        <table style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse' }}>
+        <table className="so-list-table">
           {tableColGroup}
           <tbody>
             {sortedProducts.length === 0 ? (
               <tr>
                 <td
-                  colSpan={9}
+                  colSpan={11}
                   style={{
                     textAlign: 'center',
                     padding: '48px 16px',
@@ -290,223 +325,133 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
             ) : (
               sortedProducts.map((p, idx) => {
                 const rowIndex = (pageIndex - 1) * pageSize + idx + 1;
-                const isOutOfStock = p.currentStock === 0;
-                const isLowStock = p.currentStock > 0 && p.currentStock <= p.minStockLevel;
 
                 return (
                   <tr
                     key={p.id}
+                    className="so-list-row"
                     style={{
                       borderBottom: '1px solid #f1f5f9',
-                      backgroundColor: idx % 2 === 0 ? '#ffffff' : '#fafafa',
-                      transition: 'background-color 0.1s ease',
+                      backgroundColor: '#ffffff',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = '#f8fafc';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = '#ffffff';
                     }}
                   >
-                    {/* STT */}
-                    <td style={{ padding: '8px 6px', textAlign: 'center', fontSize: 12, color: '#64748b' }}>
+                    {/* 1. STT */}
+                    <td style={{ padding: '10px 4px', textAlign: 'center', fontSize: 12, color: '#64748b', verticalAlign: 'middle', borderBottom: '1px solid #f1f5f9' }}>
                       {rowIndex}
                     </td>
 
-                    {/* Mã SKU & Barcode */}
-                    <td style={{ padding: '8px 12px' }}>
-                      <div style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 12, color: '#1e293b' }}>
-                        {p.sku}
-                      </div>
-                      <div style={{ fontFamily: 'monospace', fontSize: 11, color: '#64748b' }}>
-                        {p.barcode}
-                      </div>
-                    </td>
-
-                    {/* Tên Sản phẩm & ĐVT */}
-                    <td style={{ padding: '8px 12px' }}>
-                      <div style={{ fontWeight: 700, fontSize: 13, color: '#0f172a' }}>
-                        {p.name}
-                      </div>
-                      <div style={{ fontSize: 11, color: '#64748b', display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <span>ĐVT: <b>{p.unit}</b></span>
-                        <span>•</span>
-                        <span>NCC: {p.primarySupplierName}</span>
-                      </div>
-                    </td>
-
-                    {/* Ngành Hàng */}
-                    <td style={{ padding: '8px 12px' }}>
+                    {/* 2. Mã SKU (Bỏ Barcode) */}
+                    <td style={{ padding: '10px 8px', verticalAlign: 'middle', borderBottom: '1px solid #f1f5f9' }}>
                       <span
                         style={{
-                          fontSize: 11,
+                          fontFamily: 'var(--font-mono, monospace)',
+                          fontSize: 12,
+                          fontWeight: 700,
+                          color: '#0f766e',
+                          backgroundColor: '#f0fdfa',
+                          padding: '2px 8px',
+                          borderRadius: 4,
+                          border: '1px solid #ccfbf1',
+                          display: 'inline-block',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {p.sku}
+                      </span>
+                    </td>
+
+                    {/* 3. Tên Sản phẩm (Tách riêng, tự động xuống dòng khi dài) */}
+                    <td className="so-list-td--wrap">
+                      <div className="so-list-name">{p.name}</div>
+                    </td>
+
+                    {/* 4. Đơn vị tính (ĐVT) */}
+                    <td style={{ padding: '10px 4px', textAlign: 'center', verticalAlign: 'middle', borderBottom: '1px solid #f1f5f9' }}>
+                      <span
+                        style={{
+                          fontSize: 12,
+                          fontWeight: 600,
+                          color: '#475569',
+                          backgroundColor: '#f8fafc',
+                          padding: '2px 8px',
+                          borderRadius: 4,
+                          border: '1px solid #e2e8f0',
+                          display: 'inline-block',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {p.unit}
+                      </span>
+                    </td>
+
+                    {/* 5. Ngành Hàng (Tự động xuống dòng khi dài) */}
+                    <td style={{ padding: '10px 8px', verticalAlign: 'middle', borderBottom: '1px solid #f1f5f9' }}>
+                      <span
+                        style={{
+                          fontSize: 11.5,
                           fontWeight: 600,
                           padding: '2px 8px',
                           borderRadius: 4,
                           backgroundColor: '#f1f5f9',
                           color: '#475569',
                           border: '1px solid #e2e8f0',
+                          display: 'inline-block',
+                          lineHeight: 1.25,
+                          whiteSpace: 'normal',
+                          wordBreak: 'break-word',
                         }}
                       >
                         {p.category}
                       </span>
                     </td>
 
-                    {/* Cửa Hàng */}
-                    <td style={{ padding: '8px 12px' }}>
-                      <div style={{ fontWeight: 600, fontSize: 12, color: '#334155' }}>
-                        {p.storeName}
-                      </div>
-                      {p.shelfLocation && (
-                        <div style={{ fontSize: 10.5, color: '#0d9488' }}>
-                          Vị trí: {p.shelfLocation}
-                        </div>
-                      )}
+                    {/* 6. Cửa Hàng (Bỏ vị trí, tự động xuống dòng khi dài) */}
+                    <td className="so-list-td--wrap">
+                      <div className="so-list-name">{p.storeName}</div>
                     </td>
 
-                    {/* Giá bán lẻ niêm yết */}
-                    <td style={{ padding: '8px 12px', textAlign: 'right' }}>
-                      <div style={{ fontFamily: 'monospace', fontWeight: 800, fontSize: 13, color: '#059669' }}>
-                        {fmt(p.retailPrice)} đ
-                      </div>
-                      <div style={{ fontSize: 10.5, color: '#94a3b8' }}>
-                        Vốn: {fmt(p.costPrice)} đ
-                      </div>
-                    </td>
-
-                    {/* Tồn kho SOH & Định mức an toàn */}
-                    <td style={{ padding: '8px 12px', textAlign: 'center' }}>
-                      <div
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: 4,
-                          fontFamily: 'monospace',
-                          fontWeight: 700,
-                          fontSize: 12.5,
-                        }}
-                      >
-                        <span
-                          style={{
-                            color: isOutOfStock ? '#dc2626' : isLowStock ? '#d97706' : '#0f172a',
-                          }}
-                        >
-                          {p.currentStock}
-                        </span>
-                        <span style={{ color: '#cbd5e1' }}>/</span>
-                        <span style={{ color: '#64748b' }}>{p.minStockLevel}</span>
-                      </div>
-
-                      {isOutOfStock ? (
-                        <div style={{ fontSize: 10, fontWeight: 700, color: '#dc2626', marginTop: 2 }}>
-                          Hết hàng
-                        </div>
-                      ) : isLowStock ? (
-                        <div style={{ fontSize: 10, fontWeight: 700, color: '#d97706', marginTop: 2 }}>
-                          Cần bổ sung
-                        </div>
-                      ) : null}
-                    </td>
-
-                    {/* Trạng Thái */}
-                    <td style={{ padding: '8px 12px', textAlign: 'center' }}>
-                      <span
-                        style={{
-                          fontSize: 11,
-                          fontWeight: 700,
-                          padding: '3px 8px',
-                          borderRadius: 999,
-                          backgroundColor: p.status === 'Active' ? '#ecfdf5' : '#f1f5f9',
-                          color: p.status === 'Active' ? '#047857' : '#64748b',
-                          border: `1px solid ${p.status === 'Active' ? '#a7f3d0' : '#cbd5e1'}`,
-                        }}
-                      >
-                        {p.status === 'Active' ? 'Đang bán' : 'Tạm ngừng'}
+                    {/* 7. Giá Vốn (đ) (Tách riêng) */}
+                    <td style={{ padding: '10px 8px', textAlign: 'right', verticalAlign: 'middle', whiteSpace: 'nowrap', borderBottom: '1px solid #f1f5f9' }}>
+                      <span style={{ fontFamily: 'var(--font-mono, monospace)', fontWeight: 600, fontSize: 12.5, color: '#64748b' }}>
+                        {fmt(p.costPrice)} đ
                       </span>
                     </td>
 
-                    {/* Thao Tác (Refactored modern pure-text action buttons) */}
-                    <td style={{ padding: '8px 12px', textAlign: 'center' }}>
-                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                        <button
-                          type="button"
-                          onClick={() => onEdit(p)}
-                          className="po-table-action-btn"
-                          style={{
-                            height: 26,
-                            padding: '0 10px',
-                            borderRadius: 6,
-                            backgroundColor: '#ffffff',
-                            border: '1px solid #cbd5e1',
-                            fontSize: 11.5,
-                            fontWeight: 600,
-                            color: '#1d4ed8',
-                            cursor: 'pointer',
-                            transition: 'all 0.15s ease',
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.backgroundColor = '#eff6ff';
-                            e.currentTarget.style.borderColor = '#93c5fd';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.backgroundColor = '#ffffff';
-                            e.currentTarget.style.borderColor = '#cbd5e1';
-                          }}
-                          title="Chỉnh sửa giá bán lẻ và định mức tồn an toàn"
-                        >
-                          Sửa
-                        </button>
+                    {/* 8. Giá Bán Lẻ (đ) (Tách riêng) */}
+                    <td style={{ padding: '10px 8px', textAlign: 'right', verticalAlign: 'middle', whiteSpace: 'nowrap', borderBottom: '1px solid #f1f5f9' }}>
+                      <span style={{ fontFamily: 'var(--font-mono, monospace)', fontWeight: 700, fontSize: 13, color: '#0f766e' }}>
+                        {fmt(p.retailPrice)} đ
+                      </span>
+                    </td>
 
-                        <button
-                          type="button"
-                          onClick={() => onToggleStatus(p)}
-                          className="po-table-action-btn"
-                          style={{
-                            height: 26,
-                            padding: '0 10px',
-                            borderRadius: 6,
-                            backgroundColor: p.status === 'Active' ? '#fffbeb' : '#f0fdf4',
-                            border: `1px solid ${p.status === 'Active' ? '#fde68a' : '#bbf7d0'}`,
-                            fontSize: 11.5,
-                            fontWeight: 600,
-                            color: p.status === 'Active' ? '#b45309' : '#15803d',
-                            cursor: 'pointer',
-                            transition: 'all 0.15s ease',
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.filter = 'brightness(0.96)';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.filter = 'none';
-                          }}
-                          title={p.status === 'Active' ? 'Tạm ngừng kinh doanh sản phẩm tại cửa hàng này' : 'Kích hoạt lại'}
-                        >
-                          {p.status === 'Active' ? 'Tạm ngừng' : 'Kích hoạt'}
-                        </button>
+                    {/* 9. SL Đặt Tối Thiểu (MOQ) */}
+                    <td style={{ padding: '10px 6px', textAlign: 'center', verticalAlign: 'middle', whiteSpace: 'nowrap', borderBottom: '1px solid #f1f5f9' }}>
+                      <span style={{ fontFamily: 'var(--font-mono, monospace)', fontWeight: 700, fontSize: 12.5, color: '#0f172a' }}>
+                        {p.minOrderQuantity ?? 10}
+                      </span>
+                    </td>
 
-                        <button
-                          type="button"
-                          onClick={() => onRemove(p)}
-                          className="po-table-action-btn"
-                          style={{
-                            height: 26,
-                            padding: '0 10px',
-                            borderRadius: 6,
-                            backgroundColor: '#ffffff',
-                            border: '1px solid #fecaca',
-                            fontSize: 11.5,
-                            fontWeight: 600,
-                            color: '#dc2626',
-                            cursor: 'pointer',
-                            transition: 'all 0.15s ease',
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.backgroundColor = '#fef2f2';
-                            e.currentTarget.style.borderColor = '#f87171';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.backgroundColor = '#ffffff';
-                            e.currentTarget.style.borderColor = '#fecaca';
-                          }}
-                          title="Gỡ sản phẩm khỏi danh mục kinh doanh của cửa hàng này"
-                        >
-                          Gỡ
-                        </button>
-                      </div>
+                    {/* 10. Trạng Thái (CSS chuẩn theo http://localhost:5173/store-owner/suppliers/products) */}
+                    <td style={{ textAlign: 'center' }}>
+                      <SupplierStatusBadge status={p.status} />
+                    </td>
+
+                    {/* 11. Thao Tác (1 nút duy nhất mở popup thao tác) */}
+                    <td style={{ padding: '10px 6px', textAlign: 'center', whiteSpace: 'nowrap', verticalAlign: 'middle', borderBottom: '1px solid #f1f5f9' }}>
+                      <button
+                        type="button"
+                        className="so-list-action-btn"
+                        onClick={() => onEdit(p)}
+                        title="Mở popup thao tác sản phẩm"
+                      >
+                        Thao tác
+                      </button>
                     </td>
                   </tr>
                 );
@@ -516,66 +461,56 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
         </table>
       </div>
 
-      {/* ── Pagination Footer ── */}
-      <div
-        style={{
-          padding: '10px 16px',
-          borderTop: '1px solid #e2e8f0',
-          backgroundColor: '#f8fafc',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          flexWrap: 'wrap',
-          gap: 12,
-          flexShrink: 0,
-        }}
-      >
-        <div style={{ fontSize: 12.5, color: '#64748b' }}>
-          Hiển thị từ <b>{startItem}</b> đến <b>{endItem}</b> trong tổng số <b>{totalCount}</b> sản phẩm
+      {/* ── Footer Phân trang (Paging) tích hợp đồng bộ theo chuẩn http://localhost:5173/store-owner/suppliers ── */}
+      <div className="so-list-pager">
+        {/* Bên trái: Thông tin số lượng & Chọn số bản ghi / trang */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+          <div>
+            Hiển thị <b>{startItem}</b> - <b>{endItem}</b> trên <b>{totalCount}</b> sản phẩm
+          </div>
+
+          {onPageSizeChange && (
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ color: '#64748b' }}>Bản ghi/trang:</span>
+              <select
+                className="so-list-pager-select"
+                value={pageSize}
+                onChange={(e) => onPageSizeChange(Number(e.target.value))}
+              >
+                <option value={15}>15</option>
+                <option value={24}>24</option>
+                <option value={36}>36</option>
+                <option value={48}>48</option>
+              </select>
+            </div>
+          )}
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#64748b' }}>
-            <span>Số dòng/trang:</span>
-            <select
-              className="po-ctrl-select"
-              style={{ width: 68, height: 28, fontSize: 12 }}
-              value={pageSize}
-              onChange={(e) => onPageSizeChange(Number(e.target.value))}
-            >
-              <option value={10}>10</option>
-              <option value={20}>20</option>
-              <option value={50}>50</option>
-            </select>
-          </div>
+        {/* Bên phải: Nút Trước / Trang x / y / Sau */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <button
+            type="button"
+            className="so-list-pager-btn"
+            disabled={pageIndex <= 1}
+            onClick={() => onPageChange(pageIndex - 1)}
+          >
+            <ChevronLeft size={13} />
+            <span>Trước</span>
+          </button>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <button
-              type="button"
-              className="po-icon-btn"
-              onClick={() => onPageChange(pageIndex - 1)}
-              disabled={pageIndex <= 1}
-              style={{ opacity: pageIndex <= 1 ? 0.5 : 1, cursor: pageIndex <= 1 ? 'not-allowed' : 'pointer' }}
-              title="Trang trước"
-            >
-              <ChevronLeft size={14} />
-            </button>
+          <span style={{ padding: '0 8px', fontWeight: 600, color: '#0f172a' }}>
+            Trang {pageIndex} / {totalPages}
+          </span>
 
-            <span style={{ fontSize: 12, fontWeight: 700, padding: '0 8px', color: '#1e293b' }}>
-              Trang {pageIndex} / {totalPages}
-            </span>
-
-            <button
-              type="button"
-              className="po-icon-btn"
-              onClick={() => onPageChange(pageIndex + 1)}
-              disabled={pageIndex >= totalPages}
-              style={{ opacity: pageIndex >= totalPages ? 0.5 : 1, cursor: pageIndex >= totalPages ? 'not-allowed' : 'pointer' }}
-              title="Trang sau"
-            >
-              <ChevronRight size={14} />
-            </button>
-          </div>
+          <button
+            type="button"
+            className="so-list-pager-btn"
+            disabled={pageIndex >= totalPages}
+            onClick={() => onPageChange(pageIndex + 1)}
+          >
+            <span>Sau</span>
+            <ChevronRight size={13} />
+          </button>
         </div>
       </div>
     </div>

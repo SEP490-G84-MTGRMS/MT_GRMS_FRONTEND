@@ -7,7 +7,7 @@ import type {
   SupplierSummary,
   SupplierBranchAssignmentItem,
   SupplierBranchFilterState,
-  AssignSupplierToBranchesInput,
+  AssignSuppliersToBranchInput,
 } from '../types/supplier.types';
 import type { BranchListItem } from '../../purchase-order/types/po.types';
 import {
@@ -16,6 +16,7 @@ import {
 } from '../components/branches/SupplierBranchFilterBar';
 import { SupplierBranchTable } from '../components/branches/SupplierBranchTable';
 import { AssignBranchModal } from '../components/branches/AssignBranchModal';
+import { AssignmentStatusModal } from '../components/branches/AssignmentStatusModal';
 import { AdminToast, type ToastState } from '../../admin/components';
 import { supplierBranchApi } from '../api/supplierBranchApi';
 import { supplierApi } from '../api/supplierApi';
@@ -25,13 +26,15 @@ import '../../purchase-order/purchase-order.css';
 import '../supplier.css';
 
 const DEFAULT_FILTERS: SupplierBranchFilterState = {
-  supplierSearch: '',
-  branchSearch: '',
+  supplierCodes: [],
+  supplierNames: [],
+  branchCodes: [],
+  branchNames: [],
   supplierId: 'ALL',
   branchId: 'ALL',
   status: 'ALL',
   pageIndex: 1,
-  pageSize: 10,
+  pageSize: 15,
 };
 
 export const SupplierBranchManagementPage: FC = () => {
@@ -52,6 +55,8 @@ export const SupplierBranchManagementPage: FC = () => {
 
   // Modals state
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
+  const [statusItem, setStatusItem] = useState<SupplierBranchAssignmentItem | null>(null);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
 
   // Toast notification state
   const [toast, setToast] = useState<ToastState | null>(null);
@@ -141,40 +146,46 @@ export const SupplierBranchManagementPage: FC = () => {
   };
 
   // Assign & Unassign Handlers
-  const handleAssignBranches = async (input: AssignSupplierToBranchesInput) => {
+  const handleAssignBranches = async (input: AssignSuppliersToBranchInput) => {
     try {
-      await supplierBranchApi.assignSupplierToBranches(input);
-      showToast('Đã gán thành công nhà cung cấp với các cửa hàng.');
+      await supplierBranchApi.assignSuppliersToBranch(input);
+      showToast(`Đã phân bổ thành công ${input.supplierIds.length} nhà cung cấp cho cửa hàng.`);
       setIsAssignModalOpen(false);
       await fetchAssignments();
     } catch (err: any) {
-      showToast(err.message || 'Không thể thực hiện gán chi nhánh.', 'error');
+      showToast(err.message || 'Không thể thực hiện gán nhà cung cấp cho cửa hàng.', 'error');
     }
   };
 
-  const handleUnassignBranch = async (item: SupplierBranchAssignmentItem) => {
-    const isConfirmed = window.confirm(
-      `Bạn có chắc chắn muốn hủy phân bổ nhà cung cấp "${item.supplierName}" khỏi chi nhánh "${item.branchName}"?`
-    );
-    if (!isConfirmed) return;
+  const handleToggleStatus = (item: SupplierBranchAssignmentItem) => {
+    setStatusItem(item);
+  };
 
+  const handleConfirmStatus = async (reason?: string) => {
+    if (!statusItem) return;
+
+    const nextStatus = statusItem.status === 'Active' ? 'Inactive' : 'Active';
+    setIsUpdatingStatus(true);
     try {
-      await supplierBranchApi.unassignBranch(item.supplierId, item.branchId);
-      showToast(`Đã hủy phân bổ khỏi chi nhánh "${item.branchName}".`);
+      await supplierBranchApi.updateAssignmentStatus(
+        statusItem.supplierId,
+        statusItem.branchId,
+        nextStatus,
+        reason
+      );
+      showToast(
+        nextStatus === 'Inactive'
+          ? `Đã tạm ngưng phân bổ tại "${statusItem.branchName}".`
+          : `Đã kích hoạt phân bổ tại "${statusItem.branchName}".`
+      );
+      setStatusItem(null);
       await fetchAssignments();
     } catch (err: any) {
-      showToast(err.message || 'Không thể hủy phân bổ.', 'error');
+      showToast(err.message || 'Không thể cập nhật trạng thái phân bổ.', 'error');
+    } finally {
+      setIsUpdatingStatus(false);
     }
   };
-
-  const alreadyAssignedBranchIds = useMemo(() => {
-    if (appliedFilters.supplierId !== 'ALL') {
-      return assignments
-        .filter((a) => a.supplierId === appliedFilters.supplierId)
-        .map((a) => a.branchId);
-    }
-    return [];
-  }, [assignments, appliedFilters.supplierId]);
 
   return (
     <div
@@ -193,44 +204,21 @@ export const SupplierBranchManagementPage: FC = () => {
       {/* Toast Notification */}
       <AdminToast toast={toast} onClose={() => setToast(null)} />
 
-      {/* ── Page Header theo chuẩn PoList / SupplierListPage ── */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          flexWrap: 'wrap',
-          gap: 12,
-          marginBottom: 8,
-          flexShrink: 0,
-        }}
-      >
+      <div className="so-list-header">
         <div>
-          <h1
-            style={{
-              fontSize: 20,
-              fontWeight: 800,
-              color: 'var(--text-main)',
-              margin: 0,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-            }}
-          >
+          <h1 className="so-list-title">
             <Store size={22} color="var(--blue-primary, #0f766e)" />
-            <span>Gán Nhà Cung Cấp Với Cửa Hàng</span>
+            <span>Cửa Hàng với nhà cung cấp</span>
             {isLoading && (
               <Loader2 size={16} className="animate-spin" style={{ color: 'var(--blue-primary, #0f766e)' }} />
             )}
           </h1>
         </div>
 
-        {/* Action buttons */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div className="so-list-header-actions">
           <Link
             to="/store-owner/suppliers"
             className="po-btn po-btn-secondary"
-            style={{ height: 32, padding: '0 14px', textDecoration: 'none' }}
             title="Quay lại danh sách nhà cung cấp"
           >
             <Building2 size={14} />
@@ -239,7 +227,6 @@ export const SupplierBranchManagementPage: FC = () => {
           <Link
             to="/store-owner/suppliers/products"
             className="po-btn po-btn-secondary"
-            style={{ height: 32, padding: '0 14px', textDecoration: 'none' }}
             title="Quản lý danh mục sản phẩm theo NCC"
           >
             <Package size={14} />
@@ -248,7 +235,6 @@ export const SupplierBranchManagementPage: FC = () => {
           <button
             type="button"
             className="po-btn po-btn-secondary"
-            style={{ height: 32, padding: '0 14px' }}
             onClick={() => showToast('Đang kết xuất danh sách phân bổ ra tệp Excel (.xlsx)...', 'info')}
           >
             <Download size={14} />
@@ -258,7 +244,6 @@ export const SupplierBranchManagementPage: FC = () => {
             type="button"
             id="btnOpenAssignBranchModal"
             className="po-btn po-btn-primary"
-            style={{ height: 32, padding: '0 14px' }}
             onClick={() => setIsAssignModalOpen(true)}
           >
             <Plus size={14} />
@@ -362,8 +347,6 @@ export const SupplierBranchManagementPage: FC = () => {
           initialValues={appliedFilters}
           suppliers={suppliers}
           branches={branches}
-          totalCount={totalCount}
-          filteredCount={assignments.length}
           onSearch={handleApplySearch}
           onReset={handleResetFilters}
         />
@@ -377,19 +360,28 @@ export const SupplierBranchManagementPage: FC = () => {
         pageSize={appliedFilters.pageSize}
         onPageChange={handlePageChange}
         onPageSizeChange={handlePageSizeChange}
-        onUnassign={handleUnassignBranch}
+        onToggleStatus={handleToggleStatus}
         onOpenAssignModal={() => setIsAssignModalOpen(true)}
       />
 
-      {/* Modal: Gán Nhà Cung Cấp Với Cửa Hàng */}
+      {/* Modal: Thêm nhà cung cấp cho cửa hàng (Refactored Flow) */}
       <AssignBranchModal
         isOpen={isAssignModalOpen}
         onClose={() => setIsAssignModalOpen(false)}
-        supplier={currentSupplier}
-        suppliers={suppliers}
         branches={branches}
-        alreadyAssignedBranchIds={alreadyAssignedBranchIds}
+        suppliers={suppliers}
+        assignments={assignments}
+        initialBranchId={appliedFilters.branchId !== 'ALL' ? appliedFilters.branchId : undefined}
         onAssign={handleAssignBranches}
+      />
+
+      <AssignmentStatusModal
+        item={statusItem}
+        isSubmitting={isUpdatingStatus}
+        onClose={() => {
+          if (!isUpdatingStatus) setStatusItem(null);
+        }}
+        onConfirm={handleConfirmStatus}
       />
     </div>
   );

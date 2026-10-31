@@ -53,6 +53,21 @@ export interface SupplierStats {
   totalActive: number;
 }
 
+export interface SearchTag {
+  id: string;
+  type: 'supplier' | 'product' | 'contact' | 'phone';
+  value: string;
+  label: string;
+  subLabel?: string;
+}
+
+export interface SupplierSearchSuggestions {
+  suppliers: Array<{ id: string; code: string; name: string }>;
+  products: Array<{ id: string; sku: string; name: string; supplierId: string; supplierName: string }>;
+  contactPersons: Array<{ name: string; supplierId: string; supplierName: string }>;
+  phones: Array<{ phone: string; supplierId: string; supplierName: string }>;
+}
+
 export interface SupplierFilterState {
   searchTerm?: string;
   code?: string;
@@ -64,6 +79,13 @@ export interface SupplierFilterState {
   debtStatus: string;
   ratingFilter: string;
   status: string;
+  supplierIds?: string[];
+  productIds?: string[];
+  codes?: string[];
+  names?: string[];
+  contactPersons?: string[];
+  phones?: string[];
+  tags?: SearchTag[];
   pageIndex: number;
   pageSize: number;
 }
@@ -102,6 +124,7 @@ export interface HolidayDateRange {
 export interface SupplierDeliveryConfig {
   leadTimeDays: number;
   leadTimeUnit: 'BUSINESS_DAYS' | 'CALENDAR_DAYS';
+  minOrderQuantity: number;
   activeDeliveryDays: number[]; // 0 = Sun, 1 = Mon, ..., 6 = Sat
   cutoffTime: string; // e.g. "14:00" or "16:00"
   allowStoreEdit: boolean;
@@ -183,11 +206,14 @@ export interface SupplierBranchAssignmentItem {
   branchAddress: string;
   assignedAt: string;
   status: 'Active' | 'Inactive';
+  inactiveReason?: string;
 }
 
 export interface SupplierBranchFilterState {
-  supplierSearch: string;
-  branchSearch: string;
+  supplierCodes: string[];
+  supplierNames: string[];
+  branchCodes: string[];
+  branchNames: string[];
   supplierId: string;
   branchId: string;
   status: string;
@@ -198,5 +224,10 @@ export interface SupplierBranchFilterState {
 export interface AssignSupplierToBranchesInput {
   supplierId: string;
   branchIds: string[];
+}
+
+export interface AssignSuppliersToBranchInput {
+  branchId: string;
+  supplierIds: string[];
 }
 

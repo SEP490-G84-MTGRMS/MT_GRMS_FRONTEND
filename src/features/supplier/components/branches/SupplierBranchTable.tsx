@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import type { FC } from 'react';
 import type { SupplierBranchAssignmentItem } from '../../types/supplier.types';
 import { SupplierBranchTableRow } from './SupplierBranchTableRow';
@@ -11,16 +11,15 @@ interface SupplierBranchTableProps {
   pageSize: number;
   onPageChange: (page: number) => void;
   onPageSizeChange: (pageSize: number) => void;
-  onUnassign: (item: SupplierBranchAssignmentItem) => void;
+  onToggleStatus: (item: SupplierBranchAssignmentItem) => void;
   onOpenAssignModal: () => void;
 }
 
 type SortField =
-  | 'supplierCode'
-  | 'supplierName'
   | 'branchCode'
   | 'branchName'
-  | 'assignedAt'
+  | 'supplierCode'
+  | 'supplierName'
   | 'status';
 type SortDirection = 'asc' | 'desc';
 
@@ -31,11 +30,15 @@ export const SupplierBranchTable: FC<SupplierBranchTableProps> = ({
   pageSize,
   onPageChange,
   onPageSizeChange,
-  onUnassign,
+  onToggleStatus,
   onOpenAssignModal,
 }) => {
   const [sortField, setSortField] = useState<SortField | null>(null);
   const [sortDir, setSortDir] = useState<SortDirection>('asc');
+
+  const headerRef = useRef<HTMLDivElement>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const [hasScrollY, setHasScrollY] = useState(false);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -59,14 +62,6 @@ export const SupplierBranchTable: FC<SupplierBranchTableProps> = ({
       let valB: string = '';
 
       switch (sortField) {
-        case 'supplierCode':
-          valA = a.supplierCode.toLowerCase();
-          valB = b.supplierCode.toLowerCase();
-          break;
-        case 'supplierName':
-          valA = a.supplierName.toLowerCase();
-          valB = b.supplierName.toLowerCase();
-          break;
         case 'branchCode':
           valA = a.branchCode.toLowerCase();
           valB = b.branchCode.toLowerCase();
@@ -75,9 +70,13 @@ export const SupplierBranchTable: FC<SupplierBranchTableProps> = ({
           valA = a.branchName.toLowerCase();
           valB = b.branchName.toLowerCase();
           break;
-        case 'assignedAt':
-          valA = a.assignedAt || '';
-          valB = b.assignedAt || '';
+        case 'supplierCode':
+          valA = a.supplierCode.toLowerCase();
+          valB = b.supplierCode.toLowerCase();
+          break;
+        case 'supplierName':
+          valA = a.supplierName.toLowerCase();
+          valB = b.supplierName.toLowerCase();
           break;
         case 'status':
           valA = a.status;
@@ -96,25 +95,73 @@ export const SupplierBranchTable: FC<SupplierBranchTableProps> = ({
   const startItem = totalCount === 0 ? 0 : (pageIndex - 1) * pageSize + 1;
   const endItem = Math.min(pageIndex * pageSize, totalCount);
 
+  // Synchronize scroll horizontal between header and body
+  const handleBodyScroll = () => {
+    if (headerRef.current && bodyRef.current) {
+      headerRef.current.scrollLeft = bodyRef.current.scrollLeft;
+    }
+  };
+
+  useEffect(() => {
+    const updateScrollState = () => {
+      if (bodyRef.current) {
+        setHasScrollY(bodyRef.current.scrollHeight > bodyRef.current.clientHeight);
+      }
+    };
+
+    updateScrollState();
+
+    let observer: ResizeObserver | null = null;
+    if (bodyRef.current && typeof ResizeObserver !== 'undefined') {
+      observer = new ResizeObserver(() => {
+        updateScrollState();
+      });
+      observer.observe(bodyRef.current);
+    }
+
+    window.addEventListener('resize', updateScrollState);
+    return () => {
+      window.removeEventListener('resize', updateScrollState);
+      if (observer) observer.disconnect();
+    };
+  }, [sortedAssignments, pageSize]);
+
+  // 6 cột đồng bộ 100% tỉ lệ với màn hình Quản lý Nhà Cung Cấp
+  const tableColGroup = (
+    <colgroup>
+      <col style={{ width: '13%' }} /> {/* MÃ CỬA HÀNG */}
+      <col style={{ width: '25%' }} /> {/* TÊN CỬA HÀNG / CHI NHÁNH */}
+      <col style={{ width: '14%' }} /> {/* MÃ NCC */}
+      <col style={{ width: '24%' }} /> {/* TÊN NHÀ CUNG CẤP */}
+      <col style={{ width: '12%' }} /> {/* TRẠNG THÁI */}
+      <col style={{ width: '12%' }} /> {/* THAO TÁC */}
+    </colgroup>
+  );
+
+  const thBaseStyle: React.CSSProperties = {
+    backgroundColor: '#f8fafc',
+    padding: '10px 14px',
+    fontSize: 12,
+    fontWeight: 700,
+    color: '#334155',
+    textTransform: 'uppercase',
+    letterSpacing: '0.03em',
+    whiteSpace: 'nowrap',
+    boxSizing: 'border-box',
+    borderBottom: '1px solid #cbd5e1',
+  };
+
   const renderSortableHeader = (label: string, field: SortField, align: 'left' | 'center' | 'right' = 'left') => {
     const isSorted = sortField === field;
     return (
       <th
         onClick={() => handleSort(field)}
         style={{
-          padding: '10px 12px',
+          ...thBaseStyle,
           textAlign: align,
-          fontSize: 12,
-          fontWeight: 700,
-          color: isSorted ? '#0f766e' : '#475569',
-          backgroundColor: '#f8fafc',
-          borderBottom: '2px solid #e2e8f0',
+          color: isSorted ? '#0f766e' : '#334155',
           cursor: 'pointer',
           userSelect: 'none',
-          whiteSpace: 'nowrap',
-          position: 'sticky',
-          top: 0,
-          zIndex: 10,
         }}
       >
         <div
@@ -137,109 +184,48 @@ export const SupplierBranchTable: FC<SupplierBranchTableProps> = ({
   };
 
   return (
-    <div
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        flex: 1,
-        minHeight: 0,
-        backgroundColor: '#ffffff',
-        borderRadius: 8,
-        border: '1px solid #e2e8f0',
-        overflow: 'hidden',
-        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
-      }}
-    >
-      {/* ── Table Container with Scrollable Body ── */}
-      <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+    <div className="so-list-table-card">
+      <div
+        ref={headerRef}
+        className="so-list-table-head"
+        style={{ paddingRight: hasScrollY ? 6 : 0 }}
+      >
+        <table className="so-list-table">
+          {tableColGroup}
           <thead>
             <tr>
-              <th
-                style={{
-                  width: 48,
-                  padding: '10px 12px',
-                  textAlign: 'center',
-                  fontSize: 12,
-                  fontWeight: 700,
-                  color: '#475569',
-                  backgroundColor: '#f8fafc',
-                  borderBottom: '2px solid #e2e8f0',
-                  position: 'sticky',
-                  top: 0,
-                  zIndex: 10,
-                }}
-              >
-                STT
-              </th>
+              {renderSortableHeader('Mã Cửa Hàng', 'branchCode')}
+              {renderSortableHeader('Tên Cửa Hàng / Chi Nhánh', 'branchName')}
               {renderSortableHeader('Mã NCC', 'supplierCode')}
               {renderSortableHeader('Tên Nhà Cung Cấp', 'supplierName')}
-              <th
-                style={{
-                  padding: '10px 12px',
-                  fontSize: 12,
-                  fontWeight: 700,
-                  color: '#475569',
-                  backgroundColor: '#f8fafc',
-                  borderBottom: '2px solid #e2e8f0',
-                  position: 'sticky',
-                  top: 0,
-                  zIndex: 10,
-                }}
-              >
-                Loại NCC
-              </th>
-              {renderSortableHeader('Mã CH', 'branchCode')}
-              {renderSortableHeader('Tên Cửa Hàng / Chi Nhánh', 'branchName')}
-              <th
-                style={{
-                  padding: '10px 12px',
-                  fontSize: 12,
-                  fontWeight: 700,
-                  color: '#475569',
-                  backgroundColor: '#f8fafc',
-                  borderBottom: '2px solid #e2e8f0',
-                  position: 'sticky',
-                  top: 0,
-                  zIndex: 10,
-                }}
-              >
-                Địa Chỉ
-              </th>
-              {renderSortableHeader('Ngày Gán', 'assignedAt')}
-              {renderSortableHeader('Trạng Thái', 'status')}
-              <th
-                style={{
-                  padding: '10px 12px',
-                  textAlign: 'right',
-                  fontSize: 12,
-                  fontWeight: 700,
-                  color: '#475569',
-                  backgroundColor: '#f8fafc',
-                  borderBottom: '2px solid #e2e8f0',
-                  position: 'sticky',
-                  top: 0,
-                  zIndex: 10,
-                }}
-              >
-                Thao Tác
-              </th>
+              {renderSortableHeader('Trạng Thái', 'status', 'center')}
+              <th style={{ ...thBaseStyle, textAlign: 'right' }}>Thao Tác</th>
             </tr>
           </thead>
+        </table>
+      </div>
+
+      {/* ── Table Body Scroll Container (Tự động lấp đầy chiều cao cân đối) ── */}
+      <div
+        ref={bodyRef}
+        className="so-list-table-body supplier-table-scroll-container"
+        onScroll={handleBodyScroll}
+      >
+        <table className="so-list-table">
+          {tableColGroup}
           <tbody>
             {sortedAssignments.length > 0 ? (
-              sortedAssignments.map((item, idx) => (
+              sortedAssignments.map((item) => (
                 <SupplierBranchTableRow
                   key={item.id}
-                  index={startItem + idx}
                   item={item}
-                  onUnassign={onUnassign}
+                  onToggleStatus={onToggleStatus}
                 />
               ))
             ) : (
               <tr>
                 <td
-                  colSpan={10}
+                  colSpan={6}
                   style={{
                     textAlign: 'center',
                     padding: '48px 16px',
@@ -273,23 +259,8 @@ export const SupplierBranchTable: FC<SupplierBranchTableProps> = ({
         </table>
       </div>
 
-      {/* ── Footer Phân trang chuẩn theo SupplierTable ── */}
-      <div
-        style={{
-          padding: '10px 16px',
-          borderTop: '1px solid #e2e8f0',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          fontSize: 12,
-          color: '#64748b',
-          backgroundColor: '#ffffff',
-          flexWrap: 'wrap',
-          gap: 10,
-          flexShrink: 0,
-          zIndex: 15,
-        }}
-      >
+      {/* ── Footer Phân trang chuẩn 100% theo SupplierTable ── */}
+      <div className="so-list-pager">
         {/* Bên trái: Thông tin số lượng & Bản ghi/trang */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
           <div>
@@ -299,25 +270,14 @@ export const SupplierBranchTable: FC<SupplierBranchTableProps> = ({
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
             <span style={{ color: '#64748b' }}>Bản ghi/trang:</span>
             <select
+              className="so-list-pager-select"
               value={pageSize}
               onChange={(e) => onPageSizeChange(Number(e.target.value))}
-              style={{
-                height: 28,
-                padding: '0 8px',
-                borderRadius: 5,
-                border: '1px solid #cbd5e1',
-                backgroundColor: '#ffffff',
-                color: '#0f172a',
-                fontSize: 12,
-                fontWeight: 600,
-                cursor: 'pointer',
-                outline: 'none',
-              }}
             >
-              <option value={10}>10</option>
-              <option value={20}>20</option>
-              <option value={30}>30</option>
-              <option value={50}>50</option>
+              <option value={15}>15</option>
+              <option value={24}>24</option>
+              <option value={36}>36</option>
+              <option value={48}>48</option>
             </select>
           </div>
         </div>
@@ -326,50 +286,26 @@ export const SupplierBranchTable: FC<SupplierBranchTableProps> = ({
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <button
             type="button"
+            className="so-list-pager-btn"
             disabled={pageIndex <= 1}
             onClick={() => onPageChange(pageIndex - 1)}
-            style={{
-              height: 28,
-              padding: '0 10px',
-              borderRadius: 5,
-              border: '1px solid #cbd5e1',
-              backgroundColor: pageIndex <= 1 ? '#f8fafc' : '#ffffff',
-              color: pageIndex <= 1 ? '#94a3b8' : '#334155',
-              cursor: pageIndex <= 1 ? 'not-allowed' : 'pointer',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 4,
-              fontSize: 12,
-              fontWeight: 600,
-            }}
           >
-            <ChevronLeft size={14} /> Trước
+            <ChevronLeft size={13} />
+            <span>Trước</span>
           </button>
 
-          <span style={{ padding: '0 6px', fontWeight: 600, color: '#0f172a' }}>
+          <span style={{ padding: '0 8px', fontWeight: 600, color: '#0f172a' }}>
             Trang {pageIndex} / {totalPages}
           </span>
 
           <button
             type="button"
+            className="so-list-pager-btn"
             disabled={pageIndex >= totalPages}
             onClick={() => onPageChange(pageIndex + 1)}
-            style={{
-              height: 28,
-              padding: '0 10px',
-              borderRadius: 5,
-              border: '1px solid #cbd5e1',
-              backgroundColor: pageIndex >= totalPages ? '#f8fafc' : '#ffffff',
-              color: pageIndex >= totalPages ? '#94a3b8' : '#334155',
-              cursor: pageIndex >= totalPages ? 'not-allowed' : 'pointer',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 4,
-              fontSize: 12,
-              fontWeight: 600,
-            }}
           >
-            Sau <ChevronRight size={14} />
+            <span>Sau</span>
+            <ChevronRight size={13} />
           </button>
         </div>
       </div>

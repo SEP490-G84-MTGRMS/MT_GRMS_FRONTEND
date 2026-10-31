@@ -16,7 +16,7 @@ import { EditStoreProductModal } from '../components/EditStoreProductModal';
 import { AdminToast, type ToastState } from '../../admin/components';
 import { storeProductApi } from '../api/storeProductApi';
 import { MASTER_PRODUCTS } from '../../supplier/lib/mockData';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Package } from 'lucide-react';
 import '../../purchase-order/purchase-order.css';
 import '../../supplier/supplier.css';
 
@@ -27,12 +27,15 @@ export interface StoreProductFilterState extends StoreProductFilterValues {
 
 const DEFAULT_FILTERS: StoreProductFilterState = {
   searchTerm: '',
+  skus: [],
+  names: [],
+  storeNames: [],
+  categories: [],
   storeId: 'ALL',
   categoryFilter: 'ALL',
   statusFilter: 'ALL',
-  stockAlertFilter: 'ALL',
   pageIndex: 1,
-  pageSize: 10,
+  pageSize: 15,
 };
 
 export const StoreProductManagementPage: FC = () => {
@@ -222,41 +225,19 @@ export const StoreProductManagementPage: FC = () => {
       {/* Toast Notification */}
       <AdminToast toast={toast} onClose={() => setToast(null)} />
 
-      {/* ── Page Header ── */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          flexWrap: 'wrap',
-          gap: 12,
-          marginBottom: 8,
-          flexShrink: 0,
-        }}
-      >
+      <div className="so-list-header">
         <div>
-          <h1
-            style={{
-              fontSize: 20,
-              fontWeight: 800,
-              color: 'var(--text-main)',
-              margin: 0,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-            }}
-          >
+          <h1 className="so-list-title">
+            <Package size={22} color="var(--blue-primary, #0f766e)" />
             <span>Sản Phẩm Theo Cửa Hàng / Chi Nhánh</span>
             {isLoading && <Loader2 size={16} className="animate-spin" style={{ color: 'var(--blue-primary, #0f766e)' }} />}
           </h1>
         </div>
 
-        {/* Action buttons (Pure text, NO icons inside text) */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div className="so-list-header-actions">
           <Link
             to="/store-owner/suppliers/branches"
             className="po-btn po-btn-secondary"
-            style={{ height: 32, padding: '0 14px', textDecoration: 'none' }}
             title="Xem danh sách các cửa hàng chi nhánh"
           >
             <span>Danh sách Cửa hàng</span>
@@ -264,7 +245,6 @@ export const StoreProductManagementPage: FC = () => {
           <Link
             to="/store-owner/suppliers/products"
             className="po-btn po-btn-secondary"
-            style={{ height: 32, padding: '0 14px', textDecoration: 'none' }}
             title="Chuyển sang xem sản phẩm theo Nhà cung cấp"
           >
             <span>Sản phẩm theo NCC</span>
@@ -272,7 +252,6 @@ export const StoreProductManagementPage: FC = () => {
           <button
             type="button"
             className="po-btn po-btn-secondary"
-            style={{ height: 32, padding: '0 14px' }}
             onClick={() => showToast('Đang kết xuất danh mục hàng hóa chi nhánh ra tệp Excel (.xlsx)...', 'info')}
           >
             <span>Xuất Excel</span>
@@ -281,7 +260,6 @@ export const StoreProductManagementPage: FC = () => {
             type="button"
             id="btnOpenAssignProductModal"
             className="po-btn po-btn-primary"
-            style={{ height: 32, padding: '0 14px' }}
             onClick={() => setIsAssignModalOpen(true)}
           >
             <span>Gán sản phẩm mới</span>
@@ -309,6 +287,7 @@ export const StoreProductManagementPage: FC = () => {
           initialValues={appliedFilters}
           stores={stores}
           categories={availableCategories}
+          products={products}
           totalCount={totalCount}
           filteredCount={products.length}
           onSearch={handleApplySearch}
@@ -317,31 +296,18 @@ export const StoreProductManagementPage: FC = () => {
       </div>
 
       {/* ── Bảng Dữ Liệu Sản Phẩm ── */}
-      <div
-        style={{
-          flex: 1,
-          minHeight: 0,
-          display: 'flex',
-          flexDirection: 'column',
-          backgroundColor: '#ffffff',
-          borderRadius: 8,
-          border: '1px solid #e2e8f0',
-          overflow: 'hidden',
-        }}
-      >
-        <StoreProductTable
-          products={products}
-          totalCount={totalCount}
-          pageIndex={appliedFilters.pageIndex}
-          pageSize={appliedFilters.pageSize}
-          onPageChange={handlePageChange}
-          onPageSizeChange={handlePageSizeChange}
-          onEdit={(item) => setEditingItem(item)}
-          onToggleStatus={handleToggleStatus}
-          onRemove={handleRemoveProduct}
-          onOpenAssignModal={() => setIsAssignModalOpen(true)}
-        />
-      </div>
+      <StoreProductTable
+        products={products}
+        totalCount={totalCount}
+        pageIndex={appliedFilters.pageIndex}
+        pageSize={appliedFilters.pageSize}
+        onPageChange={handlePageChange}
+        onPageSizeChange={handlePageSizeChange}
+        onEdit={(item) => setEditingItem(item)}
+        onToggleStatus={handleToggleStatus}
+        onRemove={handleRemoveProduct}
+        onOpenAssignModal={() => setIsAssignModalOpen(true)}
+      />
 
       {/* ── Modal Gán sản phẩm mới vào Cửa hàng ── */}
       {currentStore && (
@@ -354,12 +320,14 @@ export const StoreProductManagementPage: FC = () => {
         />
       )}
 
-      {/* ── Modal Sửa Giá & Tồn kho sản phẩm ── */}
+      {/* ── Modal Thao tác sản phẩm chi nhánh (Đầy đủ mọi thao tác trong popup) ── */}
       <EditStoreProductModal
         isOpen={Boolean(editingItem)}
         onClose={() => setEditingItem(null)}
         product={editingItem}
         onSave={handleUpdateProduct}
+        onToggleStatus={handleToggleStatus}
+        onRemove={handleRemoveProduct}
       />
     </div>
   );

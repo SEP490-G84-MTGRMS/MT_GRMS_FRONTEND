@@ -1,5 +1,6 @@
 import type { FC } from 'react';
 import type { SupplierProductItem } from '../../types/supplier.types';
+import { SupplierStatusBadge } from '../SupplierStatusBadge';
 import { Edit2, Power } from 'lucide-react';
 
 interface SupplierProductTableRowProps {
@@ -25,10 +26,10 @@ export const SupplierProductTableRow: FC<SupplierProductTableRowProps> = ({
 
   return (
     <tr
+      className="so-list-row"
       style={{
         borderBottom: '1px solid #f1f5f9',
         backgroundColor: '#ffffff',
-        transition: 'background-color 0.12s ease',
         opacity: item.status === 'Inactive' ? 0.65 : 1,
       }}
       onMouseEnter={(e) => {
@@ -43,21 +44,7 @@ export const SupplierProductTableRow: FC<SupplierProductTableRowProps> = ({
         {index}
       </td>
 
-      {/* 2. Barcode */}
-      <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>
-        <span
-          style={{
-            fontFamily: 'var(--font-mono, monospace)',
-            fontSize: 12,
-            fontWeight: 600,
-            color: '#334155',
-          }}
-        >
-          {item.barcode || '---'}
-        </span>
-      </td>
-
-      {/* 3. SKU */}
+      {/* 2. SKU */}
       <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>
         <span
           style={{
@@ -76,48 +63,27 @@ export const SupplierProductTableRow: FC<SupplierProductTableRowProps> = ({
       </td>
 
       {/* 4. Tên Sản Phẩm */}
-      <td style={{ padding: '10px 12px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-          <span style={{ fontWeight: 600, color: '#0f172a', fontSize: 13, lineHeight: 1.35 }}>
-            {item.name}
-          </span>
-        </div>
+      <td className="so-list-td--wrap">
+        <div className="so-list-name">{item.name}</div>
       </td>
 
-      {/* 5. Mã NCC */}
+      {/* 4. Mã NCC */}
       <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>
-        <div>
-          <span
-            style={{
-              fontFamily: 'var(--font-mono, monospace)',
-              fontSize: 12,
-              fontWeight: 600,
-              color: '#475569',
-            }}
-          >
-            {supplierCode || item.supplierId}
-          </span>
-          {item.supplierProductCode && (
-            <div
-              style={{
-                fontSize: 11,
-                color: '#94a3b8',
-                marginTop: 2,
-                fontFamily: 'var(--font-mono, monospace)',
-              }}
-              title="Mã sản phẩm của Nhà cung cấp"
-            >
-              Mã SP: {item.supplierProductCode}
-            </div>
-          )}
-        </div>
+        <span
+          style={{
+            fontFamily: 'var(--font-mono, monospace)',
+            fontSize: 12,
+            fontWeight: 600,
+            color: '#475569',
+          }}
+        >
+          {supplierCode || item.supplierId}
+        </span>
       </td>
 
       {/* 6. Tên Nhà Cung Cấp */}
-      <td style={{ padding: '10px 12px' }}>
-        <div style={{ fontSize: 12.5, fontWeight: 500, color: '#1e293b' }}>
-          {supplierName || '---'}
-        </div>
+      <td className="so-list-td--wrap">
+        <div className="so-list-name">{supplierName || '---'}</div>
       </td>
 
       {/* 7. Ngành Hàng */}
@@ -171,69 +137,29 @@ export const SupplierProductTableRow: FC<SupplierProductTableRowProps> = ({
       </td>
 
       {/* 11. Trạng Thái */}
-      <td style={{ padding: '10px 12px', textAlign: 'center', whiteSpace: 'nowrap' }}>
-        <span
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            fontSize: 11.5,
-            fontWeight: 600,
-            padding: '2px 8px',
-            borderRadius: 12,
-            color: item.status === 'Active' ? '#0f766e' : '#64748b',
-            backgroundColor: item.status === 'Active' ? '#f0fdfa' : '#f1f5f9',
-            border: item.status === 'Active' ? '1px solid #ccfbf1' : '1px solid #e2e8f0',
-          }}
-        >
-          {item.status === 'Active' ? '🟢 Hoạt động' : '⚪ Tạm ngưng'}
-        </span>
+      <td style={{ textAlign: 'center' }}>
+        <SupplierStatusBadge status={item.status} />
       </td>
 
       {/* 12. Thao Tác */}
-      <td style={{ padding: '10px 12px', textAlign: 'right', whiteSpace: 'nowrap' }}>
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+      <td style={{ textAlign: 'right' }}>
+        <div className="so-list-actions">
           <button
             type="button"
+            className="so-list-action-btn"
             onClick={() => onEdit(item)}
             title="Sửa giá sỉ thỏa thuận & MOQ"
-            style={{
-              height: 26,
-              padding: '0 8px',
-              borderRadius: 4,
-              border: '1px solid #cbd5e1',
-              backgroundColor: '#ffffff',
-              color: '#334155',
-              fontSize: 11.5,
-              fontWeight: 600,
-              cursor: 'pointer',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 4,
-            }}
           >
-            <Edit2 size={11} /> Sửa
+            <Edit2 size={12} /> Sửa
           </button>
 
           <button
             type="button"
+            className={`so-list-action-btn${item.status === 'Active' ? ' so-list-action-btn--danger' : ' so-list-action-btn--success'}`}
             onClick={() => onToggleStatus(item)}
             title={item.status === 'Active' ? 'Tạm ngưng cung ứng mặt hàng này' : 'Kích hoạt lại'}
-            style={{
-              height: 26,
-              padding: '0 8px',
-              borderRadius: 4,
-              border: item.status === 'Active' ? '1px solid #fecaca' : '1px solid #bbf7d0',
-              backgroundColor: item.status === 'Active' ? '#fef2f2' : '#f0fdf4',
-              color: item.status === 'Active' ? '#dc2626' : '#16a34a',
-              fontSize: 11.5,
-              fontWeight: 600,
-              cursor: 'pointer',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 4,
-            }}
           >
-            <Power size={11} /> {item.status === 'Active' ? 'Ngưng' : 'Bật'}
+            <Power size={12} /> {item.status === 'Active' ? 'Ngưng' : 'Bật'}
           </button>
         </div>
       </td>

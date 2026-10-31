@@ -41,7 +41,7 @@ export const supplierProductApi = {
                   ? 2
                   : undefined,
               PageIndex: filter.pageIndex || 1,
-              PageSize: filter.pageSize || 10,
+              PageSize: filter.pageSize || 15,
             },
           }
         );
@@ -114,7 +114,7 @@ export const supplierProductApi = {
     });
 
     const page = filter.pageIndex || 1;
-    const size = filter.pageSize || 10;
+    const size = filter.pageSize || 15;
     const start = (page - 1) * size;
     const pagedItems = filtered.slice(start, start + size);
 

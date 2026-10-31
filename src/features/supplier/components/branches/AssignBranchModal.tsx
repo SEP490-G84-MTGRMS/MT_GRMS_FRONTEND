@@ -1,137 +1,196 @@
 import { useState, useMemo, useEffect } from 'react';
 import type { FC } from 'react';
-import { X, Check, Store, Search } from 'lucide-react';
-import type { SupplierSummary, AssignSupplierToBranchesInput } from '../../types/supplier.types';
+import { X, Check, Store, Search, Loader2, AlertCircle } from 'lucide-react';
+import type {
+  SupplierSummary,
+  SupplierBranchAssignmentItem,
+  AssignSuppliersToBranchInput,
+} from '../../types/supplier.types';
 import type { BranchListItem } from '../../../purchase-order/types/po.types';
 
 interface AssignBranchModalProps {
   isOpen: boolean;
   onClose: () => void;
-  supplier?: SupplierSummary | null;
-  suppliers: SupplierSummary[];
   branches: BranchListItem[];
-  alreadyAssignedBranchIds?: string[];
-  onAssign: (input: AssignSupplierToBranchesInput) => Promise<void>;
+  suppliers: SupplierSummary[];
+  assignments: SupplierBranchAssignmentItem[];
+  initialBranchId?: string;
+  onAssign: (input: AssignSuppliersToBranchInput) => Promise<void>;
 }
 
 export const AssignBranchModal: FC<AssignBranchModalProps> = ({
   isOpen,
   onClose,
-  supplier,
-  suppliers,
   branches,
-  alreadyAssignedBranchIds = [],
+  suppliers,
+  assignments,
+  initialBranchId,
   onAssign,
 }) => {
-  const [selectedSupplierId, setSelectedSupplierId] = useState<string>('');
-  const [selectedBranchIds, setSelectedBranchIds] = useState<string[]>([]);
-  const [branchSearch, setBranchSearch] = useState<string>('');
+  const [selectedBranchId, setSelectedBranchId] = useState<string>('');
+  const [selectedSupplierIds, setSelectedSupplierIds] = useState<string[]>([]);
+  const [supplierSearch, setSupplierSearch] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string>('');
 
+  // Khởi tạo trạng thái khi mở modal
   useEffect(() => {
     if (isOpen) {
-      setSelectedSupplierId(supplier?.id || (suppliers[0]?.id ?? ''));
-      setSelectedBranchIds([]);
-      setBranchSearch('');
+      const defaultBranchId =
+        initialBranchId && branches.some((b) => b.id === initialBranchId)
+          ? initialBranchId
+          : branches[0]?.id || '';
+
+      setSelectedBranchId(defaultBranchId);
+      setSelectedSupplierIds([]);
+      setSupplierSearch('');
       setErrorMsg('');
       setIsSubmitting(false);
     }
-  }, [isOpen, supplier, suppliers]);
+  }, [isOpen, initialBranchId, branches]);
 
-  // Filter branches by keyword
-  const filteredBranches = useMemo(() => {
-    if (!branchSearch.trim()) return branches;
-    const term = branchSearch.toLowerCase().trim();
-    return branches.filter(
-      (b) =>
-        b.code.toLowerCase().includes(term) ||
-        b.name.toLowerCase().includes(term) ||
-        b.address.toLowerCase().includes(term)
+  // Xử lý đổi chi nhánh: Xóa lựa chọn NCC cũ và reset tìm kiếm (BR-04)
+  const handleBranchChange = (newBranchId: string) => {
+    setSelectedBranchId(newBranchId);
+    setSelectedSupplierIds([]);
+    setSupplierSearch('');
+    setErrorMsg('');
+  };
+
+  // Chi nhánh hiện đang được chọn
+  const currentBranch = useMemo(() => {
+    return branches.find((b) => b.id === selectedBranchId);
+  }, [branches, selectedBranchId]);
+
+  // Tập hợp các ID nhà cung cấp ĐÃ ĐƯỢC GÁN và đang ACTIVE tại chi nhánh được chọn (SUP-02)
+  const activeAssignedSupplierIdsForBranch = useMemo(() => {
+    if (!selectedBranchId) return new Set<string>();
+    return new Set(
+      assignments
+        .filter((a) => a.branchId === selectedBranchId && a.status === 'Active')
+        .map((a) => a.supplierId)
     );
-  }, [branches, branchSearch]);
+  }, [assignments, selectedBranchId]);
+
+  // Danh sách nhà cung cấp khả dụng cho chi nhánh:
+  // - NCC đang hoạt động (Active) trên toàn hệ thống (SUP-03)
+  // - Chưa được gán Active cho chi nhánh đang chọn (SUP-02)
+  // - NCC từng Inactive tại chi nhánh này được phép hiển thị để kích hoạt lại (MAP-06)
+  const availableSuppliers = useMemo(() => {
+    return suppliers.filter((s) => {
+      if (s.status === 'Inactive') return false;
+      if (activeAssignedSupplierIdsForBranch.has(s.id)) return false;
+      return true;
+    });
+  }, [suppliers, activeAssignedSupplierIdsForBranch]);
+
+  // Lọc theo từ khóa tìm kiếm (Mã hoặc Tên NCC không phân biệt hoa/thường)
+  const filteredAvailableSuppliers = useMemo(() => {
+    if (!supplierSearch.trim()) return availableSuppliers;
+    const term = supplierSearch.toLowerCase().trim();
+    return availableSuppliers.filter(
+      (s) =>
+        s.code.toLowerCase().includes(term) ||
+        s.name.toLowerCase().includes(term) ||
+        (s.contactPerson && s.contactPerson.toLowerCase().includes(term)) ||
+        (s.phone && s.phone.includes(term))
+    );
+  }, [availableSuppliers, supplierSearch]);
 
   if (!isOpen) return null;
 
-  const handleToggleBranch = (branchId: string) => {
-    setSelectedBranchIds((prev) =>
-      prev.includes(branchId) ? prev.filter((id) => id !== branchId) : [...prev, branchId]
+  // Toggle chọn một nhà cung cấp
+  const handleToggleSupplier = (supplierId: string) => {
+    setSelectedSupplierIds((prev) =>
+      prev.includes(supplierId) ? prev.filter((id) => id !== supplierId) : [...prev, supplierId]
     );
     setErrorMsg('');
   };
 
+  // Chọn tất cả các NCC đang hiển thị và còn khả dụng
   const handleSelectAll = () => {
-    const selectable = filteredBranches
-      .filter((b) => !alreadyAssignedBranchIds.includes(b.id))
-      .map((b) => b.id);
-    setSelectedBranchIds((prev) => Array.from(new Set([...prev, ...selectable])));
+    const selectableIds = filteredAvailableSuppliers.map((s) => s.id);
+    setSelectedSupplierIds((prev) => Array.from(new Set([...prev, ...selectableIds])));
     setErrorMsg('');
   };
 
+  // Bỏ chọn tất cả
   const handleDeselectAll = () => {
-    setSelectedBranchIds([]);
+    setSelectedSupplierIds([]);
   };
 
+  // Submit form phân bổ
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedSupplierId) {
-      setErrorMsg('Vui lòng chọn Nhà cung cấp.');
+
+    // BR-01: Chưa chọn chi nhánh
+    if (!selectedBranchId) {
+      setErrorMsg('Vui lòng chọn Cửa hàng / Chi nhánh cần phân bổ.');
       return;
     }
-    if (selectedBranchIds.length === 0) {
-      setErrorMsg('Vui lòng tích chọn ít nhất 1 cửa hàng / chi nhánh để gán.');
+
+    // BR-02: Chi nhánh bị vô hiệu hóa
+    if (currentBranch && (currentBranch as any).isActive === false) {
+      setErrorMsg('Chi nhánh này hiện đang bị tạm ngưng, không thể phân bổ nhà cung cấp.');
+      return;
+    }
+
+    // SUP-01: Chưa chọn nhà cung cấp nào
+    if (selectedSupplierIds.length === 0) {
+      setErrorMsg('Vui lòng chọn ít nhất 1 nhà cung cấp để phân bổ cho chi nhánh.');
       return;
     }
 
     try {
       setIsSubmitting(true);
+      setErrorMsg('');
       await onAssign({
-        supplierId: selectedSupplierId,
-        branchIds: selectedBranchIds,
+        branchId: selectedBranchId,
+        supplierIds: selectedSupplierIds,
       });
       onClose();
     } catch (err: any) {
-      setErrorMsg(err.message || 'Có lỗi xảy ra khi gán chi nhánh.');
+      setErrorMsg(err.message || 'Có lỗi xảy ra trong quá trình lưu phân bổ.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const currentSupplier =
-    suppliers.find((s) => s.id === selectedSupplierId) || supplier || suppliers[0];
+  const isAllFilteredSelected =
+    filteredAvailableSuppliers.length > 0 &&
+    filteredAvailableSuppliers.every((s) => selectedSupplierIds.includes(s.id));
 
   return (
     <div
       style={{
         position: 'fixed',
         inset: 0,
-        backgroundColor: 'rgba(15, 23, 42, 0.55)',
+        backgroundColor: 'rgba(15, 23, 42, 0.65)',
         backdropFilter: 'blur(3px)',
+        zIndex: 9999,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        zIndex: 1000,
         padding: 16,
       }}
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
+      onClick={onClose}
     >
       <div
         style={{
           backgroundColor: '#ffffff',
-          borderRadius: 12,
-          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+          borderRadius: 16,
           width: '100%',
-          maxWidth: 680,
+          maxWidth: 620,
           maxHeight: '90vh',
           display: 'flex',
           flexDirection: 'column',
+          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
           overflow: 'hidden',
-          animation: 'fadeInModal 0.18s ease-out',
+          animation: 'modalPopIn 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
         }}
+        onClick={(e) => e.stopPropagation()}
       >
-        {/* ── Modal Header ── */}
+        {/* Header Modal */}
         <div
           style={{
             padding: '16px 20px',
@@ -139,196 +198,152 @@ export const AssignBranchModal: FC<AssignBranchModalProps> = ({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            backgroundColor: '#f8fafc',
+            backgroundColor: '#ffffff',
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div
               style={{
-                width: 34,
-                height: 34,
-                borderRadius: 8,
+                width: 36,
+                height: 36,
+                borderRadius: 10,
                 backgroundColor: '#f0fdfa',
-                color: '#0f766e',
+                border: '1px solid #ccfbf1',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                border: '1px solid #ccfbf1',
               }}
             >
-              <Store size={18} />
+              <Store size={20} color="#0f766e" />
             </div>
             <div>
-              <h2 style={{ fontSize: 16, fontWeight: 700, color: '#0f172a', margin: 0 }}>
-                Gán Nhà Cung Cấp Với Cửa Hàng
+              <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#0f172a' }}>
+                Thêm nhà cung cấp cho cửa hàng
               </h2>
-              <p style={{ fontSize: 12, color: '#64748b', margin: 0 }}>
-                Phân bổ quyền cung ứng mặt hàng cho các chi nhánh trong hệ thống
+              <p style={{ margin: '2px 0 0', fontSize: 12, color: '#64748b' }}>
+                Chọn một chi nhánh và gán danh sách các nhà cung cấp phân phối hàng
               </p>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
+            disabled={isSubmitting}
             style={{
               background: 'none',
               border: 'none',
-              color: '#94a3b8',
               cursor: 'pointer',
-              padding: 4,
+              color: '#94a3b8',
+              padding: 6,
               borderRadius: 6,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
             }}
+            title="Đóng"
           >
             <X size={18} />
           </button>
         </div>
 
-        {/* ── Modal Body ── */}
-        <form
-          onSubmit={handleSubmit}
-          style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}
-        >
-          <div style={{ padding: '16px 20px', overflowY: 'auto', flex: 1 }}>
+        {/* Body Modal */}
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+          <div style={{ padding: '18px 20px', overflowY: 'auto', flex: 1 }}>
+            {/* Error Message */}
             {errorMsg && (
               <div
                 style={{
                   padding: '10px 14px',
-                  borderRadius: 6,
                   backgroundColor: '#fef2f2',
                   border: '1px solid #fecaca',
+                  borderRadius: 8,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
                   color: '#b91c1c',
                   fontSize: 12.5,
-                  marginBottom: 14,
+                  marginBottom: 16,
                 }}
               >
-                {errorMsg}
+                <AlertCircle size={16} />
+                <span>{errorMsg}</span>
               </div>
             )}
 
-            {/* Mục 1: Chọn Nhà Cung Cấp */}
-            <div style={{ marginBottom: 16 }}>
+            {/* Bước 1: Chọn cửa hàng / chi nhánh */}
+            <div style={{ marginBottom: 18 }}>
               <label
                 style={{
                   display: 'block',
-                  fontSize: 12.5,
-                  fontWeight: 600,
-                  color: '#334155',
+                  fontSize: 13,
+                  fontWeight: 700,
+                  color: '#1e293b',
                   marginBottom: 6,
                 }}
               >
-                Nhà cung cấp: <span style={{ color: '#ef4444' }}>*</span>
+                1. Chọn cửa hàng / chi nhánh <span style={{ color: '#ef4444' }}>*</span>
               </label>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <select
-                  value={selectedSupplierId}
-                  onChange={(e) => setSelectedSupplierId(e.target.value)}
-                  style={{
-                    flex: 1,
-                    height: 36,
-                    padding: '0 12px',
-                    borderRadius: 6,
-                    border: '1px solid #cbd5e1',
-                    fontSize: 13,
-                    color: '#0f172a',
-                    backgroundColor: '#ffffff',
-                    fontWeight: 600,
-                    outline: 'none',
-                  }}
-                >
-                  {suppliers.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.code} — {s.name} ({s.supplierType === 'Goods' ? 'Hàng hóa' : s.supplierType === 'Service' ? 'Dịch vụ' : 'Hàng & DV'})
-                    </option>
-                  ))}
-                </select>
-              </div>
-              {currentSupplier && (
-                <div
-                  style={{
-                    marginTop: 6,
-                    padding: '6px 12px',
-                    backgroundColor: '#f8fafc',
-                    borderRadius: 6,
-                    border: '1px solid #e2e8f0',
-                    fontSize: 12,
-                    color: '#64748b',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 12,
-                  }}
-                >
-                  <span>
-                    Mã: <b>{currentSupplier.code}</b>
-                  </span>
-                  <span>
-                    Liên hệ: <b>{currentSupplier.contactPerson || '---'}</b> ({currentSupplier.phone || '---'})
-                  </span>
+              <select
+                value={selectedBranchId}
+                onChange={(e) => handleBranchChange(e.target.value)}
+                disabled={isSubmitting}
+                style={{
+                  width: '100%',
+                  height: 38,
+                  padding: '0 12px',
+                  borderRadius: 8,
+                  border: '1px solid #cbd5e1',
+                  fontSize: 13.5,
+                  fontWeight: 600,
+                  color: '#0f172a',
+                  backgroundColor: '#ffffff',
+                  outline: 'none',
+                  cursor: 'pointer',
+                }}
+              >
+                <option value="" disabled>
+                  -- Chọn chi nhánh / cửa hàng áp dụng --
+                </option>
+                {branches.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.code} – {b.name}
+                  </option>
+                ))}
+              </select>
+
+              {currentBranch && (
+                <div style={{ fontSize: 11.5, color: '#64748b', marginTop: 4 }}>
+                  Địa chỉ: {currentBranch.address || 'Chưa cập nhật địa chỉ'}
                 </div>
               )}
             </div>
 
-            {/* Mục 2: Chọn Chi Nhánh / Cửa Hàng */}
+            {/* Bước 2: Chọn nhà cung cấp */}
             <div>
               <div
                 style={{
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
-                  marginBottom: 8,
-                  flexWrap: 'wrap',
-                  gap: 8,
+                  marginBottom: 6,
                 }}
               >
                 <label
                   style={{
-                    fontSize: 12.5,
-                    fontWeight: 600,
-                    color: '#334155',
+                    fontSize: 13,
+                    fontWeight: 700,
+                    color: '#1e293b',
                     margin: 0,
                   }}
                 >
-                  Chọn các Cửa hàng / Chi nhánh phân bổ:{' '}
-                  <span style={{ color: '#ef4444' }}>*</span>
+                  2. Chọn nhà cung cấp <span style={{ color: '#ef4444' }}>*</span>
                 </label>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <button
-                    type="button"
-                    onClick={handleSelectAll}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      color: '#0f766e',
-                      fontSize: 12,
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                      padding: '2px 4px',
-                    }}
-                  >
-                    Chọn tất cả
-                  </button>
-                  <span style={{ color: '#cbd5e1' }}>|</span>
-                  <button
-                    type="button"
-                    onClick={handleDeselectAll}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      color: '#64748b',
-                      fontSize: 12,
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                      padding: '2px 4px',
-                    }}
-                  >
-                    Bỏ chọn
-                  </button>
-                </div>
+                <span style={{ fontSize: 11.5, color: '#64748b' }}>
+                  {availableSuppliers.length} NCC khả dụng
+                </span>
               </div>
 
-              {/* Ô tìm kiếm nhanh chi nhánh */}
+              {/* Ô tìm kiếm NCC */}
               <div
                 style={{
                   position: 'relative',
@@ -336,161 +351,211 @@ export const AssignBranchModal: FC<AssignBranchModalProps> = ({
                 }}
               >
                 <Search
-                  size={14}
-                  style={{
-                    position: 'absolute',
-                    left: 10,
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    color: '#94a3b8',
-                  }}
+                  size={15}
+                  color="#94a3b8"
+                  style={{ position: 'absolute', left: 12, top: 11 }}
                 />
                 <input
                   type="text"
-                  placeholder="Lọc nhanh chi nhánh theo mã, tên, địa chỉ..."
-                  value={branchSearch}
-                  onChange={(e) => setBranchSearch(e.target.value)}
+                  placeholder="Tìm theo mã hoặc tên nhà cung cấp..."
+                  value={supplierSearch}
+                  onChange={(e) => setSupplierSearch(e.target.value)}
+                  disabled={isSubmitting || !selectedBranchId}
                   style={{
                     width: '100%',
-                    height: 32,
-                    padding: '0 10px 0 32px',
-                    borderRadius: 6,
+                    height: 36,
+                    padding: '0 32px 0 34px',
+                    borderRadius: 8,
                     border: '1px solid #cbd5e1',
-                    fontSize: 12,
-                    boxSizing: 'border-box',
+                    fontSize: 12.5,
                     outline: 'none',
+                    boxSizing: 'border-box',
                   }}
                 />
-              </div>
-
-              {/* Danh sách Checkbox Chi Nhánh */}
-              <div
-                style={{
-                  maxHeight: 250,
-                  overflowY: 'auto',
-                  border: '1px solid #e2e8f0',
-                  borderRadius: 8,
-                  padding: 8,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: 6,
-                  backgroundColor: '#ffffff',
-                }}
-              >
-                {filteredBranches.map((branch) => {
-                  const isChecked = selectedBranchIds.includes(branch.id);
-                  const isAlreadyAssigned = alreadyAssignedBranchIds.includes(branch.id);
-
-                  return (
-                    <div
-                      key={branch.id}
-                      onClick={() => !isAlreadyAssigned && handleToggleBranch(branch.id)}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        padding: '8px 12px',
-                        borderRadius: 6,
-                        border: isChecked ? '1px solid #0d9488' : '1px solid #f1f5f9',
-                        backgroundColor: isChecked ? '#f0fdfa' : isAlreadyAssigned ? '#f8fafc' : '#ffffff',
-                        cursor: isAlreadyAssigned ? 'default' : 'pointer',
-                        opacity: isAlreadyAssigned ? 0.6 : 1,
-                        transition: 'all 0.12s ease',
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <input
-                          type="checkbox"
-                          checked={isChecked || isAlreadyAssigned}
-                          disabled={isAlreadyAssigned}
-                          onChange={() => !isAlreadyAssigned && handleToggleBranch(branch.id)}
-                          style={{ accentColor: '#0f766e', cursor: isAlreadyAssigned ? 'default' : 'pointer' }}
-                        />
-                        <div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <span
-                              style={{
-                                fontFamily: 'monospace',
-                                fontWeight: 700,
-                                fontSize: 11,
-                                color: '#0f766e',
-                                backgroundColor: '#ccfbf1',
-                                padding: '1px 6px',
-                                borderRadius: 4,
-                              }}
-                            >
-                              {branch.code}
-                            </span>
-                            <span style={{ fontSize: 12.5, fontWeight: 600, color: '#0f172a' }}>
-                              {branch.name}
-                            </span>
-                          </div>
-                          <div style={{ fontSize: 11.5, color: '#64748b', marginTop: 2 }}>
-                            {branch.address}
-                          </div>
-                        </div>
-                      </div>
-
-                      {isAlreadyAssigned && (
-                        <span
-                          style={{
-                            fontSize: 11,
-                            fontWeight: 600,
-                            color: '#0f766e',
-                            backgroundColor: '#e6fffa',
-                            padding: '2px 8px',
-                            borderRadius: 4,
-                            whiteSpace: 'nowrap',
-                          }}
-                        >
-                          ✓ Đã gán
-                        </span>
-                      )}
-                    </div>
-                  );
-                })}
-
-                {filteredBranches.length === 0 && (
-                  <div
+                {supplierSearch && (
+                  <button
+                    type="button"
+                    onClick={() => setSupplierSearch('')}
                     style={{
-                      textAlign: 'center',
-                      padding: '20px 0',
+                      position: 'absolute',
+                      right: 10,
+                      top: 10,
+                      background: 'none',
+                      border: 'none',
                       color: '#94a3b8',
-                      fontSize: 12,
+                      cursor: 'pointer',
+                      padding: 0,
                     }}
                   >
-                    Không tìm thấy chi nhánh nào khớp từ khóa "{branchSearch}"
-                  </div>
+                    <X size={14} />
+                  </button>
                 )}
               </div>
 
-              {/* Thông tin số lượng đã chọn */}
+              {/* Danh sách nhà cung cấp khả dụng */}
               <div
                 style={{
-                  marginTop: 8,
-                  fontSize: 12,
-                  color: '#64748b',
-                  display: 'flex',
-                  justifyContent: 'space-between',
+                  maxHeight: 280,
+                  overflowY: 'auto',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: 10,
+                  backgroundColor: '#ffffff',
                 }}
               >
-                <span>
-                  Đã chọn: <b style={{ color: '#0f766e' }}>{selectedBranchIds.length}</b> / {branches.length} chi nhánh
-                </span>
+                {!selectedBranchId ? (
+                  <div style={{ padding: '30px 16px', textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>
+                    Vui lòng chọn cửa hàng / chi nhánh ở bước 1 để tải danh sách nhà cung cấp.
+                  </div>
+                ) : availableSuppliers.length === 0 ? (
+                  <div style={{ padding: '30px 16px', textAlign: 'center', color: '#64748b', fontSize: 13 }}>
+                    <Check size={24} color="#10b981" style={{ margin: '0 auto 8px' }} />
+                    <div style={{ fontWeight: 600, color: '#0f172a' }}>Đã phân bổ toàn bộ</div>
+                    <div>Tất cả nhà cung cấp đang hoạt động đã được gán cho chi nhánh này.</div>
+                  </div>
+                ) : filteredAvailableSuppliers.length === 0 ? (
+                  <div style={{ padding: '30px 16px', textAlign: 'center', color: '#64748b', fontSize: 13 }}>
+                    Không tìm thấy nhà cung cấp phù hợp với từ khóa "{supplierSearch}".
+                  </div>
+                ) : (
+                  filteredAvailableSuppliers.map((sup) => {
+                    const isSelected = selectedSupplierIds.includes(sup.id);
+                    return (
+                      <div
+                        key={sup.id}
+                        onClick={() => handleToggleSupplier(sup.id)}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 12,
+                          padding: '10px 14px',
+                          borderBottom: '1px solid #f1f5f9',
+                          cursor: 'pointer',
+                          backgroundColor: isSelected ? '#f0fdfa' : '#ffffff',
+                          transition: 'background-color 0.15s ease',
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => {}} // Đã xử lý ở thẻ div cha
+                          style={{
+                            width: 16,
+                            height: 16,
+                            accentColor: '#0f766e',
+                            cursor: 'pointer',
+                            flexShrink: 0,
+                          }}
+                        />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                            <span
+                              style={{
+                                fontFamily: 'var(--font-mono, monospace)',
+                                fontWeight: 700,
+                                fontSize: 12,
+                                color: '#0066FF',
+                              }}
+                            >
+                              {sup.code}
+                            </span>
+                            <span style={{ fontSize: 13, fontWeight: 600, color: '#0f172a' }}>
+                              {sup.name}
+                            </span>
+                          </div>
+                          <div style={{ fontSize: 11.5, color: '#64748b', marginTop: 2 }}>
+                            {sup.contactPerson || 'Chưa có đầu mối'} · {sup.phone || 'Chưa có SĐT'}
+                            {sup.category && ` · ${sup.category}`}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+
+              {/* Toolbar đếm số lượng & Chọn tất cả */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  marginTop: 10,
+                  padding: '8px 4px',
+                }}
+              >
+                <div>
+                  <span style={{ fontSize: 11.5, color: '#64748b', display: 'block' }}>
+                    Chỉ hiển thị nhà cung cấp chưa được gán cho chi nhánh đã chọn.
+                  </span>
+                  <span
+                    style={{
+                      display: 'inline-block',
+                      marginTop: 4,
+                      fontSize: 12,
+                      fontWeight: 700,
+                      color: selectedSupplierIds.length > 0 ? '#0f766e' : '#64748b',
+                      backgroundColor: selectedSupplierIds.length > 0 ? '#ccfbf1' : '#f1f5f9',
+                      padding: '2px 8px',
+                      borderRadius: 6,
+                    }}
+                  >
+                    Đã chọn: {selectedSupplierIds.length} nhà cung cấp
+                  </span>
+                </div>
+
+                {filteredAvailableSuppliers.length > 0 && (
+                  <div style={{ display: 'flex', gap: 10 }}>
+                    {isAllFilteredSelected ? (
+                      <button
+                        type="button"
+                        onClick={handleDeselectAll}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: '#64748b',
+                          fontSize: 12,
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          padding: 0,
+                          textDecoration: 'underline',
+                        }}
+                      >
+                        Bỏ chọn tất cả
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handleSelectAll}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: '#0f766e',
+                          fontSize: 12,
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          padding: 0,
+                          textDecoration: 'underline',
+                        }}
+                      >
+                        Chọn tất cả ({filteredAvailableSuppliers.length})
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </div>
 
-          {/* ── Modal Footer ── */}
+          {/* Footer Modal */}
           <div
             style={{
-              padding: '12px 20px',
+              padding: '14px 20px',
+              backgroundColor: '#f8fafc',
               borderTop: '1px solid #e2e8f0',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'flex-end',
               gap: 10,
-              backgroundColor: '#f8fafc',
             }}
           >
             <button
@@ -498,24 +563,34 @@ export const AssignBranchModal: FC<AssignBranchModalProps> = ({
               onClick={onClose}
               disabled={isSubmitting}
               className="po-btn po-btn-secondary"
-              style={{ height: 34, padding: '0 16px' }}
+              style={{ height: 36, padding: '0 16px', fontSize: 13 }}
             >
               Hủy
             </button>
             <button
               type="submit"
-              disabled={isSubmitting || selectedBranchIds.length === 0}
+              disabled={isSubmitting || !selectedBranchId || selectedSupplierIds.length === 0}
               className="po-btn po-btn-primary"
               style={{
-                height: 34,
-                padding: '0 18px',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 6,
+                height: 36,
+                padding: '0 20px',
+                fontSize: 13,
+                fontWeight: 600,
+                opacity: isSubmitting || !selectedBranchId || selectedSupplierIds.length === 0 ? 0.6 : 1,
+                cursor:
+                  isSubmitting || !selectedBranchId || selectedSupplierIds.length === 0
+                    ? 'not-allowed'
+                    : 'pointer',
               }}
             >
-              <Check size={14} />
-              <span>{isSubmitting ? 'Đang lưu...' : 'Lưu phân bổ'}</span>
+              {isSubmitting ? (
+                <>
+                  <Loader2 size={15} className="animate-spin" />
+                  <span>Đang lưu...</span>
+                </>
+              ) : (
+                <span>Lưu phân bổ ({selectedSupplierIds.length})</span>
+              )}
             </button>
           </div>
         </form>
