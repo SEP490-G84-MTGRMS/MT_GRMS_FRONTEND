@@ -8,6 +8,7 @@ import type {
   SupplierStatus,
   SupplierType,
   APLedgerEntry,
+  SupplierSearchSuggestions,
 } from '../types/supplier.types';
 
 // Map enums between Frontend and Backend
@@ -90,6 +91,11 @@ export const supplierApi = {
         pageSize: filter?.pageSize || 12,
       };
 
+      if (filter?.supplierIds?.length) params.supplierIds = filter.supplierIds;
+      if (filter?.productIds?.length) params.productIds = filter.productIds;
+      if (filter?.contactPersons?.length) params.contactPersons = filter.contactPersons;
+      if (filter?.phones?.length) params.phones = filter.phones;
+
       const res = await httpClient.get<ApiResponse<PagedResult<any>>>('/suppliers', { params });
       if (res.data?.success && res.data.data) {
         const paged = res.data.data;
@@ -104,6 +110,37 @@ export const supplierApi = {
       throw new Error(res.data?.message || 'Không thể tải danh sách nhà cung cấp.');
     } catch (err: any) {
       throw new Error(err?.response?.data?.message || err.message || 'Không thể tải danh sách nhà cung cấp.');
+    }
+  },
+
+  /**
+   * Gợi ý tìm kiếm nhanh phân nhóm đa thực thể (REQ-SEARCH-01)
+   */
+  async getSearchSuggestions(query: string, limit = 10): Promise<SupplierSearchSuggestions> {
+    try {
+      const res = await httpClient.get<ApiResponse<SupplierSearchSuggestions>>('/suppliers/search-suggestions', {
+        params: { query, limit },
+      });
+      if (res.data?.success && res.data.data) {
+        return res.data.data;
+      }
+      return { suppliers: [], products: [], contactPersons: [], phones: [] };
+    } catch {
+      return { suppliers: [], products: [], contactPersons: [], phones: [] };
+    }
+  },
+
+  /**
+   * Lấy lịch sử giao dịch đơn hàng và nhập kho của nhà cung cấp (REQ-HIST-01)
+   */
+  async getSupplierTransactions(supplierId: string, pageIndex = 1, pageSize = 20): Promise<any> {
+    try {
+      const res = await httpClient.get<ApiResponse<any>>(`/suppliers/${supplierId}/transactions`, {
+        params: { pageIndex, pageSize },
+      });
+      return res.data?.data || { items: [], totalItems: 0 };
+    } catch {
+      return { items: [], totalItems: 0 };
     }
   },
 

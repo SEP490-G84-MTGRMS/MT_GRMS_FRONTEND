@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { FC } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../../stores/useAuthStore';
@@ -14,12 +14,8 @@ import { SupplierDeliveryConfigTab } from '../components/detail/SupplierDelivery
 import { SupplierHolidaysTab } from '../components/detail/SupplierHolidaysTab';
 import { SupplierPayablesTab } from '../components/detail/SupplierPayablesTab';
 import { SupplierHistoryTab } from '../components/detail/SupplierHistoryTab';
-import {
-  INITIAL_SUPPLIERS,
-  INITIAL_AP_LEDGERS,
-  DEFAULT_DELIVERY_CONFIGS,
-  MOCK_PURCHASE_ORDERS,
-} from '../lib/mockData';
+import { supplierApi } from '../api/supplierApi';
+import { Loader2, AlertCircle } from 'lucide-react';
 import '../supplier.css';
 
 interface Props {
@@ -58,28 +54,79 @@ export const SupplierDetailPage: FC<Props> = ({
   // Active Tab
   const [activeTab, setActiveTab] = useState<TabKey>('profile');
 
-  // Resolved Supplier (from props or from params)
-  const currentSupplier: SupplierSummary =
-    propSupplier ||
-    INITIAL_SUPPLIERS.find((s) => s.id === id || s.code === id) ||
-    INITIAL_SUPPLIERS[0];
+  // Supplier state from API
+  const [currentSupplier, setCurrentSupplier] = useState<SupplierSummary | null>(propSupplier || null);
+  const [isLoading, setIsLoading] = useState<boolean>(!propSupplier);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // Dynamic delivery config state for this supplier
-  const [deliveryConfigs, setDeliveryConfigs] = useState<Record<string, SupplierDeliveryConfig>>(
-    DEFAULT_DELIVERY_CONFIGS
-  );
+  // Dynamic delivery config state
+  const [deliveryConfig, setDeliveryConfig] = useState<SupplierDeliveryConfig>({
+    leadTimeDays: 1,
+    leadTimeUnit: 'BUSINESS_DAYS',
+    activeDeliveryDays: [1, 2, 3, 4, 5, 6],
+    cutoffTime: '17:00',
+    allowStoreEdit: true,
+    editWindowType: 'BEFORE_CUTOFF',
+    hoursBeforeDelivery: 24,
+    hoursAfterOrder: 2,
+    holidays: [],
+  });
 
-  const deliveryConfig =
-    deliveryConfigs[currentSupplier.id] ||
-    DEFAULT_DELIVERY_CONFIGS['supp-001'];
+  const [apLedgers] = useState<APLedgerEntry[]>([]);
+  const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrderItem[]>([]);
 
-  const apLedgers: APLedgerEntry[] =
-    INITIAL_AP_LEDGERS[currentSupplier.id] || [];
+  // Load real supplier from API if not provided in props
+  useEffect(() => {
+    if (propSupplier) {
+      setCurrentSupplier(propSupplier);
+      return;
+    }
 
-  const purchaseOrders: PurchaseOrderItem[] =
-    MOCK_PURCHASE_ORDERS[currentSupplier.id] ||
-    MOCK_PURCHASE_ORDERS['supp-001'] ||
-    [];
+    if (!id) {
+      setErrorMessage('Không tìm thấy thông tin định danh nhà cung cấp.');
+      setIsLoading(false);
+      return;
+    }
+
+    let isMounted = true;
+    setIsLoading(true);
+    setErrorMessage(null);
+
+    supplierApi
+      .getSupplierById(id)
+      .then((data) => {
+        if (!isMounted) return;
+        if (data) {
+          setCurrentSupplier(data);
+        } else {
+          setErrorMessage(`Không tìm thấy nhà cung cấp với mã: ${id}`);
+        }
+      })
+      .catch((err: any) => {
+        if (!isMounted) return;
+        setErrorMessage(err.message || 'Không thể tải thông tin nhà cung cấp.');
+      })
+      .finally(() => {
+        if (isMounted) setIsLoading(false);
+      });
+
+    // Also load transactions
+    supplierApi
+      .getSupplierTransactions(id)
+      .then((res: any) => {
+        if (!isMounted) return;
+        if (res?.items) {
+          setPurchaseOrders(res.items);
+        }
+      })
+      .catch(() => {
+        // empty history
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [id, propSupplier]);
 
   const handleBack = () => {
     if (propOnBack) {
@@ -90,23 +137,75 @@ export const SupplierDetailPage: FC<Props> = ({
   };
 
   const handleEdit = (tab: 'basic' | 'terms' | 'bank' = 'basic') => {
-    if (propOnEdit) {
+    if (currentSupplier && propOnEdit) {
       propOnEdit(currentSupplier, tab);
-    } else {
+    } else if (currentSupplier) {
       alert(`Mở hộp thoại chỉnh sửa NCC ${currentSupplier.name}`);
     }
   };
 
   const handleSaveDeliveryConfig = (newCfg: SupplierDeliveryConfig) => {
-    setDeliveryConfigs((prev) => ({
-      ...prev,
-      [currentSupplier.id]: newCfg,
-    }));
+    setDeliveryConfig(newCfg);
   };
 
   const handleLinkCustomer = (_supplierId: string, customerId: string) => {
-    alert(`Đã liên kết thành công Hồ sơ Khách hàng ${customerId} cho NCC ${currentSupplier.name}!`);
+    if (currentSupplier) {
+      alert(`Đã liên kết thành công Hồ sơ Khách hàng ${customerId} cho NCC ${currentSupplier.name}!`);
+    }
   };
+
+  if (isLoading) {
+    return (
+      <div className="supplier-detail-page" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 300 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, color: '#0066FF' }}>
+          <Loader2 size={32} className="animate-spin" />
+          <span style={{ fontSize: 13, fontWeight: 500, color: '#64748b' }}>Đang tải thông tin nhà cung cấp...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (errorMessage || !currentSupplier) {
+    return (
+      <div className="supplier-detail-page" style={{ padding: 24 }}>
+        <div
+          style={{
+            padding: '16px 20px',
+            backgroundColor: '#fef2f2',
+            border: '1px solid #fecaca',
+            borderRadius: 8,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+            color: '#b91c1c',
+          }}
+        >
+          <AlertCircle size={22} />
+          <div>
+            <div style={{ fontWeight: 600 }}>Thông báo lỗi</div>
+            <div style={{ fontSize: 13 }}>{errorMessage || 'Không tìm thấy hồ sơ nhà cung cấp.'}</div>
+          </div>
+          <button
+            type="button"
+            onClick={handleBack}
+            style={{
+              marginLeft: 'auto',
+              padding: '6px 14px',
+              borderRadius: 6,
+              border: '1px solid #f87171',
+              backgroundColor: '#ffffff',
+              color: '#b91c1c',
+              cursor: 'pointer',
+              fontSize: 12.5,
+              fontWeight: 600,
+            }}
+          >
+            Quay lại danh sách
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="supplier-detail-page">
@@ -177,7 +276,6 @@ export const SupplierDetailPage: FC<Props> = ({
             />
           )}
         </div>
-
       </div>
     </div>
   );

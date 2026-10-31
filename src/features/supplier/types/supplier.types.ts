@@ -53,6 +53,21 @@ export interface SupplierStats {
   totalActive: number;
 }
 
+export interface SearchTag {
+  id: string;
+  type: 'supplier' | 'product' | 'contact' | 'phone';
+  value: string;
+  label: string;
+  subLabel?: string;
+}
+
+export interface SupplierSearchSuggestions {
+  suppliers: Array<{ id: string; code: string; name: string }>;
+  products: Array<{ id: string; sku: string; name: string; supplierId: string; supplierName: string }>;
+  contactPersons: Array<{ name: string; supplierId: string; supplierName: string }>;
+  phones: Array<{ phone: string; supplierId: string; supplierName: string }>;
+}
+
 export interface SupplierFilterState {
   searchTerm?: string;
   code?: string;
@@ -64,6 +79,11 @@ export interface SupplierFilterState {
   debtStatus: string;
   ratingFilter: string;
   status: string;
+  supplierIds?: string[];
+  productIds?: string[];
+  contactPersons?: string[];
+  phones?: string[];
+  tags?: SearchTag[];
   pageIndex: number;
   pageSize: number;
 }
