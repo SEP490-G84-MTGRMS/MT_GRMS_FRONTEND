@@ -114,7 +114,7 @@ describe('ProductDetailModal - Chức năng Switch Đơn vị tính (REQ-08)', (
     );
 
     // Tìm và click dòng quy đổi "thung" trong bảng ĐVT
-    const thungCell = screen.getByRole('cell', { name: 'thung' });
+    const thungCell = screen.getByRole('cell', { name: /thung/i });
     fireEvent.click(thungCell);
 
     // Xác nhận đã chuyển sang thùng
@@ -156,5 +156,76 @@ describe('ProductDetailModal - Chức năng Switch Đơn vị tính (REQ-08)', (
     // Giá vốn và giá vốn quy đổi (360.000 đ) vẫn bị ẩn tuyệt đối
     expect(screen.queryByText('Giá vốn')).toBeNull();
     expect(screen.queryByText('360.000 đ')).toBeNull();
+  });
+
+  it('hiển thị mô tả thực tế và ghi chú nội bộ từ data sản phẩm (không dùng text mock tĩnh)', () => {
+    const customProduct: ProductItem = {
+      ...mockProduct,
+      description: 'Mô tả thực tế hàng hóa chính hãng cao cấp',
+      internalNote: 'Ghi chú nội bộ chỉ quản lý xem',
+    };
+
+    render(
+      <ProductDetailModal
+        isOpen={true}
+        product={customProduct}
+        onClose={vi.fn()}
+        onEdit={vi.fn()}
+        onDelete={vi.fn()}
+        onToggleStatus={vi.fn()}
+        onDuplicate={vi.fn()}
+        userRole="StoreOwner"
+      />
+    );
+
+    // Chuyển sang tab Mô tả, ghi chú
+    const notesTabBtn = screen.getByRole('button', { name: /Mô tả, ghi chú/i });
+    fireEvent.click(notesTabBtn);
+
+    expect(screen.getByText('Mô tả thực tế hàng hóa chính hãng cao cấp')).toBeDefined();
+    expect(screen.getByText('Ghi chú nội bộ chỉ quản lý xem')).toBeDefined();
+  });
+
+  it('hỗ trợ hiển thị nhiều ảnh và mở modal phóng to ảnh (Lightbox)', () => {
+    const multiImageProduct: ProductItem = {
+      ...mockProduct,
+      imageUrl: 'https://res.cloudinary.com/demo/image/upload/sample.jpg',
+      imageUrls: [
+        'https://res.cloudinary.com/demo/image/upload/sample.jpg',
+        'https://res.cloudinary.com/demo/image/upload/sample2.jpg',
+      ],
+    };
+
+    render(
+      <ProductDetailModal
+        isOpen={true}
+        product={multiImageProduct}
+        onClose={vi.fn()}
+        onEdit={vi.fn()}
+        onDelete={vi.fn()}
+        onToggleStatus={vi.fn()}
+        onDuplicate={vi.fn()}
+        userRole="StoreOwner"
+      />
+    );
+
+    // Đếm số ảnh hiển thị và nút thumbnail
+    expect(screen.getByText(/\(2 ảnh/i)).toBeDefined();
+
+    // Click thumbnail ảnh thứ 2
+    const thumb2 = screen.getByTitle('Xem ảnh 2');
+    fireEvent.click(thumb2);
+
+    // Click vào ảnh chính để mở Lightbox
+    const mainImgContainer = screen.getByTitle('Nhấn để phóng to ảnh');
+    fireEvent.click(mainImgContainer);
+
+    // Modal phóng to ảnh xuất hiện
+    expect(screen.getByAltText('Phóng to ảnh hàng hóa')).toBeDefined();
+
+    // Đóng modal phóng to ảnh
+    const closeLightboxBtn = screen.getByTitle('Đóng xem ảnh');
+    fireEvent.click(closeLightboxBtn);
+    expect(screen.queryByAltText('Phóng to ảnh hàng hóa')).toBeNull();
   });
 });

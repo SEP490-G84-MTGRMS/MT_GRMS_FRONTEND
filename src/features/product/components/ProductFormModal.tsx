@@ -144,7 +144,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         setBarcode(productToEdit.barcode || '');
         setProductName(productToEdit.productName || '');
         setCategoryId(productToEdit.categoryId || '');
-        setImages(productToEdit.imageUrl ? [productToEdit.imageUrl] : []);
+        setImages(productToEdit.imageUrls && productToEdit.imageUrls.length > 0 ? productToEdit.imageUrls : (productToEdit.imageUrl ? [productToEdit.imageUrl] : []));
 
         setCostPrice(productToEdit.costPrice || 0);
         setSellingPrice(productToEdit.sellingPrice || 0);
@@ -264,7 +264,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       conversionRate: 1,
       barcode: '',
       price: sellingPrice || 0,
-      productCode: '',
+      productCode: productCode.trim() || 'Mã tự động',
     };
     setUomConversions([...uomConversions, newUom]);
   };
@@ -273,6 +273,13 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     setUomConversions(
       uomConversions.map((u) => {
         if (u.id !== id) return u;
+        if (field === 'unitName') {
+          return {
+            ...u,
+            unitName: String(value),
+            productCode: productCode.trim() || u.productCode || 'Mã tự động',
+          };
+        }
         if (field === 'conversionRate') {
           const newRate = Number(value) || 0;
           // Tự động tính giá bán theo tỷ lệ quy đổi * giá bán đơn vị cơ bản
@@ -296,17 +303,22 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
-    const file = files[0];
-    if (file.size > 5 * 1024 * 1024) {
-      triggerValidationError('Kích thước ảnh không được vượt quá 5 MB!');
-      return;
+    for (let i = 0; i < files.length; i++) {
+      if (files[i].size > 5 * 1024 * 1024) {
+        triggerValidationError(`Kích thước ảnh "${files[i].name}" không được vượt quá 5 MB!`);
+        return;
+      }
     }
 
     try {
       setIsUploadingImage(true);
       setValidationPopupMsg('');
-      const secureUrl = await uploadImageToCloudinary(file);
-      setImages((prev) => [...prev, secureUrl]);
+      const uploaded: string[] = [];
+      for (let i = 0; i < files.length; i++) {
+        const secureUrl = await uploadImageToCloudinary(files[i]);
+        uploaded.push(secureUrl);
+      }
+      setImages((prev) => [...prev, ...uploaded]);
     } catch (err: any) {
       triggerValidationError(
         err?.message || 'Không thể tải ảnh lên Cloudinary. Vui lòng kiểm tra lại kết nối mạng hoặc cấu hình .env.'
@@ -317,6 +329,13 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         fileInputRef.current.value = '';
       }
     }
+  };
+
+  const handleSetMainImage = (index: number) => {
+    if (index === 0 || index >= images.length) return;
+    const target = images[index];
+    const others = images.filter((_, idx) => idx !== index);
+    setImages([target, ...others]);
   };
 
   const handleRemoveImage = (index: number) => {
@@ -364,6 +383,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         categoryId,
         categoryName: selectedCategory ? selectedCategory.name : 'Khác',
         imageUrl: images[0] || undefined,
+        imageUrls: images,
         baseUnit: baseUnit.trim(),
         sellingPrice,
         costPrice: userRole === 'StoreOwner' ? costPrice : productToEdit?.costPrice ?? 0,
@@ -918,6 +938,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
               >
                 <input
                   type="file"
+                  multiple
                   accept="image/*"
                   ref={fileInputRef}
                   style={{ display: 'none' }}
@@ -1065,22 +1086,66 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                         key={idx}
                         onClick={() => setPreviewImageModalUrl(img)}
                         style={{
-                          width: 44,
-                          height: 44,
+                          width: 52,
+                          height: 52,
                           borderRadius: 6,
-                          border: '1.5px solid #CBD5E1',
+                          border: idx === 0 ? '2px solid #0D9488' : '1.5px solid #CBD5E1',
                           overflow: 'hidden',
                           position: 'relative',
                           cursor: 'pointer',
-                          boxShadow: '0 1px 2px rgba(0,0,0,0.08)',
+                          boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
                         }}
-                        title="Bấm để xem ảnh phóng to"
+                        title={idx === 0 ? 'Ảnh đại diện (Bấm để xem to)' : 'Bấm để xem to'}
                       >
                         <img
                           src={img}
                           alt={`thumb-${idx}`}
                           style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                         />
+                        {idx === 0 ? (
+                          <span
+                            style={{
+                              position: 'absolute',
+                              bottom: 0,
+                              left: 0,
+                              right: 0,
+                              backgroundColor: '#0D9488',
+                              color: '#FFFFFF',
+                              fontSize: 9,
+                              fontWeight: 700,
+                              textAlign: 'center',
+                              lineHeight: '13px',
+                            }}
+                          >
+                            Chính
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleSetMainImage(idx);
+                            }}
+                            style={{
+                              position: 'absolute',
+                              bottom: 0,
+                              left: 0,
+                              right: 0,
+                              backgroundColor: 'rgba(15, 23, 42, 0.75)',
+                              color: '#F8FAFC',
+                              fontSize: 8,
+                              fontWeight: 600,
+                              textAlign: 'center',
+                              lineHeight: '13px',
+                              border: 'none',
+                              cursor: 'pointer',
+                              padding: 0,
+                            }}
+                            title="Đặt làm ảnh đại diện"
+                          >
+                            Đặt chính
+                          </button>
+                        )}
                         <button
                           type="button"
                           onClick={(e) => {
@@ -1096,8 +1161,9 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                             border: 'none',
                             fontSize: 10,
                             cursor: 'pointer',
-                            padding: '1px 3px',
+                            padding: '1px 4px',
                             lineHeight: 1,
+                            borderRadius: '0 0 0 4px',
                           }}
                           title="Xóa ảnh"
                         >
@@ -1857,15 +1923,19 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                                 <td style={{ padding: '8px' }}>
                                   <input
                                     type="text"
-                                    placeholder="Tự động"
-                                    value={uom.productCode || ''}
-                                    onChange={(e) => handleUpdateUom(uom.id, 'productCode' as any, e.target.value)}
+                                    disabled
+                                    placeholder="Theo mã hàng"
+                                    value={productCode.trim() || uom.productCode || 'Mã tự động'}
+                                    title="Mã hàng của đơn vị quy đổi mặc định giống mã sản phẩm"
                                     style={{
                                       width: '100%',
                                       padding: '6px 8px',
                                       borderRadius: 6,
                                       border: '1px solid #E2E8F0',
+                                      backgroundColor: '#F1F5F9',
+                                      color: '#64748B',
                                       fontSize: 13,
+                                      cursor: 'not-allowed',
                                     }}
                                   />
                                 </td>

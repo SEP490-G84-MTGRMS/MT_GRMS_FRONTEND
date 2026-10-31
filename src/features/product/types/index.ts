@@ -23,6 +23,7 @@ export interface ProductResponse {
   productType: string;
   status: string; // "Active" | "Discontinued"
   imageUrl?: string | null;
+  imageUrls?: string[];
   description?: string | null;
   internalNote?: string | null;
   hasBatches: boolean;
@@ -80,7 +81,7 @@ export interface UomConversion {
   conversionRate: number;
   barcode?: string;
   price: number;
-  productCode?: string;
+  productCode?: string; // Mặc định hiển thị theo mã hàng của sản phẩm
 }
 
 export interface ProductUnitResponse {
@@ -109,6 +110,46 @@ export interface ProductUnitUpdatePayload {
   price: number;
   barcode?: string | null;
   isBaseUnit?: boolean;
+}
+
+export interface ProductCreatePayload {
+  name: string;
+  categoryId: string;
+  sellingPrice: number;
+  productCode?: string;
+  barcode?: string;
+  baseUnit?: string;
+  costPrice?: number | null;
+  minStock?: number;
+  maxStock?: number;
+  vatRate?: number;
+  productType?: string;
+  status?: string;
+  imageUrl?: string | null;
+  imageUrls?: string[];
+  description?: string | null;
+  internalNote?: string | null;
+  hasBatches?: boolean;
+  isFavorite?: boolean;
+}
+
+export interface ProductUpdatePayload {
+  name: string;
+  categoryId: string;
+  sellingPrice: number;
+  barcode?: string | null;
+  baseUnit?: string;
+  costPrice?: number | null;
+  minStock?: number;
+  maxStock?: number;
+  vatRate?: number;
+  status?: string;
+  imageUrl?: string | null;
+  imageUrls?: string[];
+  description?: string | null;
+  internalNote?: string | null;
+  hasBatches?: boolean;
+  isFavorite?: boolean;
 }
 
 export interface ComboComponent {
@@ -159,6 +200,7 @@ export interface ProductItem {
   createdAt: string;
   updatedAt: string;
   imageUrl?: string;
+  imageUrls?: string[];
   minStock?: number;
   maxStock?: number;
   vatRate?: number;

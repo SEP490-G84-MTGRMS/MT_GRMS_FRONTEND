@@ -7,45 +7,9 @@ import type {
   ProductUnitResponse,
   ProductUnitCreatePayload,
   ProductUnitUpdatePayload,
+  ProductCreatePayload,
+  ProductUpdatePayload,
 } from '../types';
-
-export interface ProductCreatePayload {
-  name: string;
-  categoryId: string;
-  sellingPrice: number;
-  productCode?: string;
-  barcode?: string;
-  baseUnit?: string;
-  costPrice?: number | null;
-  minStock?: number;
-  maxStock?: number;
-  vatRate?: number;
-  productType?: string;
-  status?: string;
-  imageUrl?: string | null;
-  description?: string | null;
-  internalNote?: string | null;
-  hasBatches?: boolean;
-  isFavorite?: boolean;
-}
-
-export interface ProductUpdatePayload {
-  name: string;
-  categoryId: string;
-  sellingPrice: number;
-  barcode?: string;
-  baseUnit?: string;
-  costPrice?: number | null;
-  minStock?: number;
-  maxStock?: number;
-  vatRate?: number;
-  status?: string;
-  imageUrl?: string | null;
-  description?: string | null;
-  internalNote?: string | null;
-  hasBatches?: boolean;
-  isFavorite?: boolean;
-}
 
 export const productApi = {
   /**
