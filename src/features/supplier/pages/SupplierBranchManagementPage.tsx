@@ -7,7 +7,7 @@ import type {
   SupplierSummary,
   SupplierBranchAssignmentItem,
   SupplierBranchFilterState,
-  AssignSupplierToBranchesInput,
+  AssignSuppliersToBranchInput,
 } from '../types/supplier.types';
 import type { BranchListItem } from '../../purchase-order/types/po.types';
 import {
@@ -146,14 +146,14 @@ export const SupplierBranchManagementPage: FC = () => {
   };
 
   // Assign & Unassign Handlers
-  const handleAssignBranches = async (input: AssignSupplierToBranchesInput) => {
+  const handleAssignBranches = async (input: AssignSuppliersToBranchInput) => {
     try {
-      await supplierBranchApi.assignSupplierToBranches(input);
-      showToast('Đã gán thành công nhà cung cấp với các cửa hàng.');
+      await supplierBranchApi.assignSuppliersToBranch(input);
+      showToast(`Đã phân bổ thành công ${input.supplierIds.length} nhà cung cấp cho cửa hàng.`);
       setIsAssignModalOpen(false);
       await fetchAssignments();
     } catch (err: any) {
-      showToast(err.message || 'Không thể thực hiện gán chi nhánh.', 'error');
+      showToast(err.message || 'Không thể thực hiện gán nhà cung cấp cho cửa hàng.', 'error');
     }
   };
 
@@ -186,15 +186,6 @@ export const SupplierBranchManagementPage: FC = () => {
       setIsUpdatingStatus(false);
     }
   };
-
-  const alreadyAssignedBranchIds = useMemo(() => {
-    if (appliedFilters.supplierId !== 'ALL') {
-      return assignments
-        .filter((a) => a.supplierId === appliedFilters.supplierId)
-        .map((a) => a.branchId);
-    }
-    return [];
-  }, [assignments, appliedFilters.supplierId]);
 
   return (
     <div
@@ -399,14 +390,14 @@ export const SupplierBranchManagementPage: FC = () => {
         onOpenAssignModal={() => setIsAssignModalOpen(true)}
       />
 
-      {/* Modal: Gán Nhà Cung Cấp Với Cửa Hàng */}
+      {/* Modal: Thêm nhà cung cấp cho cửa hàng (Refactored Flow) */}
       <AssignBranchModal
         isOpen={isAssignModalOpen}
         onClose={() => setIsAssignModalOpen(false)}
-        supplier={currentSupplier}
-        suppliers={suppliers}
         branches={branches}
-        alreadyAssignedBranchIds={alreadyAssignedBranchIds}
+        suppliers={suppliers}
+        assignments={assignments}
+        initialBranchId={appliedFilters.branchId !== 'ALL' ? appliedFilters.branchId : undefined}
         onAssign={handleAssignBranches}
       />
 

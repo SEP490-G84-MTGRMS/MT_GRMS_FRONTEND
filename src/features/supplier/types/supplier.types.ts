@@ -226,3 +226,8 @@ export interface AssignSupplierToBranchesInput {
   branchIds: string[];
 }
 
+export interface AssignSuppliersToBranchInput {
+  branchId: string;
+  supplierIds: string[];
+}
+

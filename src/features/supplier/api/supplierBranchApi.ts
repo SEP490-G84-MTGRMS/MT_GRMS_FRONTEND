@@ -4,6 +4,7 @@ import type {
   SupplierBranchAssignmentItem,
   SupplierBranchFilterState,
   AssignSupplierToBranchesInput,
+  AssignSuppliersToBranchInput,
 } from '../types/supplier.types';
 import { INITIAL_SUPPLIERS } from '../lib/mockData';
 import { MOCK_BRANCH_LIST } from '../../purchase-order/lib/mockData';
@@ -261,6 +262,61 @@ export const supplierBranchApi = {
           branchId,
           branchCode: branch?.code || branchId,
           branchName: branch?.name || branchId,
+          branchAddress: branch?.address || '—',
+          assignedAt: new Date().toISOString().split('T')[0],
+          status: 'Active',
+        });
+      }
+    });
+
+    return true;
+  },
+
+  /**
+   * Gán nhiều nhà cung cấp cho một chi nhánh (Refactored flow - REQ-SBA01)
+   */
+  async assignSuppliersToBranch(input: AssignSuppliersToBranchInput): Promise<boolean> {
+    try {
+      const res = await httpClient.post<ApiResponse<any>>(
+        '/suppliers/branch-assignments/batch-to-branch',
+        input
+      );
+      if (res.data?.success) {
+        return true;
+      }
+    } catch (err: any) {
+      const apiMessage = err.response?.data?.message;
+      if (apiMessage) {
+        throw new Error(apiMessage);
+      }
+      if (err.message && !err.message.includes('Network')) {
+        throw err;
+      }
+    }
+
+    // Fallback in-memory mock update
+    const branch = MOCK_BRANCH_LIST.find((b) => b.id === input.branchId);
+    input.supplierIds.forEach((supplierId) => {
+      const existsIndex = mockAssignments.findIndex(
+        (a) => a.supplierId === supplierId && a.branchId === input.branchId
+      );
+      if (existsIndex >= 0) {
+        mockAssignments[existsIndex] = {
+          ...mockAssignments[existsIndex],
+          status: 'Active',
+          inactiveReason: undefined,
+        };
+      } else {
+        const supplier = INITIAL_SUPPLIERS.find((s) => s.id === supplierId);
+        mockAssignments.unshift({
+          id: `asg-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          supplierId,
+          supplierCode: supplier?.code || 'SUP-NEW',
+          supplierName: supplier?.name || 'Nhà cung cấp mới',
+          supplierType: supplier?.supplierType || 'Goods',
+          branchId: input.branchId,
+          branchCode: branch?.code || input.branchId,
+          branchName: branch?.name || input.branchId,
           branchAddress: branch?.address || '—',
           assignedAt: new Date().toISOString().split('T')[0],
           status: 'Active',

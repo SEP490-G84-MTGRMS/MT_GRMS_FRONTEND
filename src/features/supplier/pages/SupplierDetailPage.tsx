@@ -126,56 +126,55 @@ export const SupplierDetailPage: FC<Props> = ({
 
   // Load real supplier from API if not provided in props
   useEffect(() => {
+    let isMounted = true;
+    const targetId = propSupplier?.id || id;
+
     if (propSupplier) {
       setCurrentSupplier(propSupplier);
-      return;
-    }
+      setIsLoading(false);
+    } else if (id) {
+      setIsLoading(true);
+      setErrorMessage(null);
 
-    if (!id) {
+      supplierApi
+        .getSupplierById(id)
+        .then((data) => {
+          if (!isMounted) return;
+          if (data) {
+            setCurrentSupplier(data);
+          } else {
+            setErrorMessage(`Không tìm thấy nhà cung cấp với mã: ${id}`);
+          }
+        })
+        .catch((err: any) => {
+          if (!isMounted) return;
+          setErrorMessage(err.message || 'Không thể tải thông tin nhà cung cấp.');
+        })
+        .finally(() => {
+          if (isMounted) setIsLoading(false);
+        });
+    } else {
       setErrorMessage('Không tìm thấy thông tin định danh nhà cung cấp.');
       setIsLoading(false);
       return;
     }
 
-    let isMounted = true;
-    setIsLoading(true);
-    setErrorMessage(null);
-
-    supplierApi
-      .getSupplierById(id)
-      .then((data) => {
-        if (!isMounted) return;
-        if (data) {
-          setCurrentSupplier(data);
-        } else {
-          setErrorMessage(`Không tìm thấy nhà cung cấp với mã: ${id}`);
-        }
-      })
-      .catch((err: any) => {
-        if (!isMounted) return;
-        setErrorMessage(err.message || 'Không thể tải thông tin nhà cung cấp.');
-      })
-      .finally(() => {
-        if (isMounted) setIsLoading(false);
-      });
-
-    // Also load transactions
-    supplierApi
-      .getSupplierTransactions(id)
-      .then((res: any) => {
-        if (!isMounted) return;
-        if (res?.items) {
-          setPurchaseOrders(res.items);
-        }
-      })
-      .catch(() => {
-        // empty history
-      });
-
-    const deliveryId = propSupplier?.id || id;
-    if (deliveryId) {
+    if (targetId) {
+      // Also load transactions
       supplierApi
-        .getDeliveryConfig(deliveryId)
+        .getSupplierTransactions(targetId)
+        .then((res: any) => {
+          if (!isMounted) return;
+          if (res?.items) {
+            setPurchaseOrders(res.items);
+          }
+        })
+        .catch(() => {
+          // empty history
+        });
+
+      supplierApi
+        .getDeliveryConfig(targetId)
         .then((data) => {
           if (!isMounted || !data) return;
           setDeliveryConfig((prev) => mapApiToDeliveryConfig(data, prev));
