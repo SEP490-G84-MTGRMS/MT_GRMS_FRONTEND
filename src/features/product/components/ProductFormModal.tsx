@@ -16,13 +16,14 @@ import {
 } from 'lucide-react';
 import type { ProductItem, Category, UomConversion } from '../types';
 import { uploadImageToCloudinary } from '../../../utils/cloudinary';
+import { productApi } from '../api/productApi';
 
 interface ProductFormModalProps {
   isOpen: boolean;
   productToEdit?: ProductItem | null;
   categories: Category[];
   onClose: () => void;
-  onSave: (product: Partial<ProductItem>, saveAndAddNew?: boolean) => Promise<void> | void;
+  onSave: (product: Partial<ProductItem>, saveAndAddNew?: boolean, deletedUnitIds?: string[]) => Promise<void> | void;
   onOpenCreateCategoryModal: () => void;
   userRole?: string; // e.g. "StoreOwner" | "Cashier"
 }
@@ -106,6 +107,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   const [baseUnit, setBaseUnit] = useState('chai');
   const [baseUnitPrice, setBaseUnitPrice] = useState<number>(0);
   const [uomConversions, setUomConversions] = useState<UomConversion[]>([]);
+  const [deletedUnitIds, setDeletedUnitIds] = useState<string[]>([]);
 
   // 5. Mô tả & Ghi chú sản phẩm
   const [description, setDescription] = useState('');
@@ -140,7 +142,35 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
 
         setBaseUnit(productToEdit.baseUnit || 'chai');
         setBaseUnitPrice(productToEdit.sellingPrice || 0);
-        setUomConversions(productToEdit.uomConversions || []);
+        setDeletedUnitIds([]);
+
+        if (productToEdit.uomConversions && productToEdit.uomConversions.length > 0) {
+          setUomConversions(productToEdit.uomConversions);
+        } else {
+          // Tự động nạp đơn vị tính từ API nếu chưa có sẵn
+          productApi
+            .getProductUnits(productToEdit.id)
+            .then((units) => {
+              if (units && units.length > 0) {
+                const nonBaseUnits = units.filter((u) => !u.isBaseUnit);
+                setUomConversions(
+                  nonBaseUnits.map((u) => ({
+                    id: u.id,
+                    unitName: u.unitName,
+                    conversionRate: u.conversionRate,
+                    barcode: u.barcode || '',
+                    price: u.price,
+                    productCode: '',
+                  }))
+                );
+              } else {
+                setUomConversions([]);
+              }
+            })
+            .catch(() => {
+              setUomConversions([]);
+            });
+        }
 
         setDescription(productToEdit.description || '');
         setInternalNote(productToEdit.internalNote || '');
@@ -168,6 +198,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         setBaseUnit('chai');
         setBaseUnitPrice(0);
         setUomConversions([]);
+        setDeletedUnitIds([]);
 
         setDescription('');
         setInternalNote('');
@@ -223,6 +254,9 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   };
 
   const handleRemoveUom = (id: string) => {
+    if (!id.startsWith('uom-')) {
+      setDeletedUnitIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
+    }
     setUomConversions(uomConversions.filter((u) => u.id !== id));
   };
 
@@ -321,7 +355,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         uomConversions,
       };
 
-      await onSave(payload, saveAndAddNew);
+      await onSave(payload, saveAndAddNew, deletedUnitIds);
 
       if (!saveAndAddNew) {
         onClose();
@@ -338,6 +372,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         setBaseUnit('Cái');
         setBaseUnitPrice(0);
         setUomConversions([]);
+        setDeletedUnitIds([]);
         setDescription('');
         setInternalNote('');
         setHasBatches(false);
@@ -482,6 +517,9 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                       placeholder="Mã tự động sinh"
                       value={productCode}
                       onChange={(e) => setProductCode(e.target.value)}
+                      disabled={isEditing}
+                      style={isEditing ? { backgroundColor: '#F1F5F9', cursor: 'not-allowed', color: '#64748B' } : undefined}
+                      title={isEditing ? 'Mã hàng không thể thay đổi sau khi tạo' : undefined}
                     />
                   </div>
 

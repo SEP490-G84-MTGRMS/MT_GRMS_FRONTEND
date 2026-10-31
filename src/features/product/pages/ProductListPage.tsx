@@ -299,7 +299,11 @@ export const ProductListPage: React.FC = () => {
   };
 
   // Product CRUD (kết nối trực tiếp Backend ProductsController & ProductUnitsController)
-  const handleSaveProduct = async (data: Partial<ProductItem>, saveAndAddNew?: boolean) => {
+  const handleSaveProduct = async (
+    data: Partial<ProductItem>,
+    saveAndAddNew?: boolean,
+    deletedUnitIds?: string[]
+  ) => {
     try {
       if (productToEdit) {
         // Cập nhật sản phẩm qua PUT /api/v1/products/{id}
@@ -321,9 +325,21 @@ export const ProductListPage: React.FC = () => {
           isFavorite: data.isFavorite ?? productToEdit.isFavorite,
         });
 
-        // Xử lý thêm các đơn vị quy đổi mới (nếu có)
+        // 1. Xóa các đơn vị quy đổi đã bị người dùng gỡ bỏ qua DELETE /api/v1/product-units/{id}
+        if (deletedUnitIds && deletedUnitIds.length > 0) {
+          for (const unitId of deletedUnitIds) {
+            try {
+              await productApi.deleteProductUnit(unitId);
+            } catch (delErr) {
+              console.warn(`Lỗi khi xóa đơn vị quy đổi ${unitId}:`, delErr);
+            }
+          }
+        }
+
+        // 2. Xử lý thêm mới hoặc cập nhật các đơn vị quy đổi
         if (data.uomConversions && data.uomConversions.length > 0) {
-          for (const uom of data.uomConversions) {
+          const validUnits = data.uomConversions.filter((u) => u.unitName && u.unitName.trim() !== '');
+          for (const uom of validUnits) {
             if (uom.id.startsWith('uom-')) {
               try {
                 await productApi.createProductUnit(productToEdit.id, {
@@ -335,6 +351,19 @@ export const ProductListPage: React.FC = () => {
                 });
               } catch (unitErr) {
                 console.warn('Lỗi khi thêm đơn vị quy đổi:', unitErr);
+              }
+            } else {
+              // Cập nhật đơn vị quy đổi hiện có qua PUT /api/v1/product-units/{id}
+              try {
+                await productApi.updateProductUnit(uom.id, {
+                  unitName: uom.unitName,
+                  conversionRate: uom.conversionRate,
+                  price: uom.price,
+                  barcode: uom.barcode?.trim() || null,
+                  isBaseUnit: false,
+                });
+              } catch (unitErr) {
+                console.warn(`Lỗi khi cập nhật đơn vị quy đổi ${uom.id}:`, unitErr);
               }
             }
           }

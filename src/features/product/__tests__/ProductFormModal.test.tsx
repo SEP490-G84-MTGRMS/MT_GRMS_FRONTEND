@@ -1,6 +1,24 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { ProductFormModal } from '../components/ProductFormModal';
+import { productApi } from '../api/productApi';
+
+vi.mock('../api/productApi', () => ({
+  productApi: {
+    getProductUnits: vi.fn().mockResolvedValue([
+      {
+        id: 'guid-auto-unit-1',
+        productId: 'prod-edit-auto-load',
+        unitName: 'Thùng 24',
+        conversionRate: 24,
+        price: 240000,
+        barcode: '89300000024',
+        isBaseUnit: false,
+        createdAt: '2026-10-31',
+      },
+    ]),
+  },
+}));
 
 const mockCategories = [
   {
@@ -84,5 +102,150 @@ describe('ProductFormModal - Quản lý đơn vị tính & Hàng cùng loại (R
 
     // Trong bảng hàng cùng loại xuất hiện dòng "thung"
     expect(screen.getByText('thung')).toBeDefined();
+  });
+
+  it('REQ-09: Ô Mã hàng bị disabled khi chỉnh sửa và enabled khi tạo mới', () => {
+    const mockProductToEdit: any = {
+      id: 'prod-edit-1',
+      productCode: 'SP000099',
+      productName: 'Trà xanh C2',
+      categoryId: 'cat-1',
+      categoryName: 'Đồ uống',
+      baseUnit: 'Chai',
+      sellingPrice: 10000,
+      costPrice: 7000,
+      onHand: 50,
+      committed: 0,
+      status: 'Active',
+      createdAt: '2026-10-31',
+      updatedAt: '2026-10-31',
+      uomConversions: [],
+    };
+
+    const { rerender } = render(
+      <ProductFormModal
+        isOpen={true}
+        productToEdit={mockProductToEdit}
+        categories={mockCategories}
+        onClose={vi.fn()}
+        onSave={vi.fn()}
+        onOpenCreateCategoryModal={vi.fn()}
+      />
+    );
+
+    const productCodeInput = screen.getByDisplayValue('SP000099') as HTMLInputElement;
+    expect(productCodeInput.disabled).toBe(true);
+
+    // Khi tạo mới (productToEdit = null)
+    rerender(
+      <ProductFormModal
+        isOpen={true}
+        productToEdit={null}
+        categories={mockCategories}
+        onClose={vi.fn()}
+        onSave={vi.fn()}
+        onOpenCreateCategoryModal={vi.fn()}
+      />
+    );
+
+    const newCodeInput = screen.getByPlaceholderText('Mã tự động sinh') as HTMLInputElement;
+    expect(newCodeInput.disabled).toBe(false);
+  });
+
+  it('REQ-09: Ghi nhận deletedUnitIds khi xóa đơn vị quy đổi cũ có sẵn trong DB (GUID) và truyền ra onSave', async () => {
+    const handleSave = vi.fn();
+    const mockProductWithUnits: any = {
+      id: 'prod-edit-1',
+      productCode: 'SP000099',
+      productName: 'Trà xanh C2',
+      categoryId: 'cat-1',
+      categoryName: 'Đồ uống',
+      baseUnit: 'Chai',
+      sellingPrice: 10000,
+      costPrice: 7000,
+      onHand: 50,
+      committed: 0,
+      status: 'Active',
+      createdAt: '2026-10-31',
+      updatedAt: '2026-10-31',
+      uomConversions: [
+        {
+          id: 'guid-existing-unit-1',
+          unitName: 'Lốc 6',
+          conversionRate: 6,
+          price: 55000,
+          barcode: '89300000006',
+        },
+      ],
+    };
+
+    render(
+      <ProductFormModal
+        isOpen={true}
+        productToEdit={mockProductWithUnits}
+        categories={mockCategories}
+        onClose={vi.fn()}
+        onSave={handleSave}
+        onOpenCreateCategoryModal={vi.fn()}
+      />
+    );
+
+    // Đơn vị quy đổi "Lốc 6" xuất hiện trong bảng
+    expect(screen.getByDisplayValue('Lốc 6')).toBeDefined();
+
+    // Click nút xóa đơn vị quy đổi (title="Xóa đơn vị" hoặc "Xóa đơn vị quy đổi")
+    const removeButtons = screen.getAllByTitle(/Xóa đơn vị/);
+    expect(removeButtons.length).toBeGreaterThan(0);
+    fireEvent.click(removeButtons[0]);
+
+    // Nhấn nút "Cập nhật"
+    const updateButton = screen.getByText('Cập nhật');
+    fireEvent.click(updateButton);
+
+    expect(handleSave).toHaveBeenCalledWith(
+      expect.objectContaining({
+        productName: 'Trà xanh C2',
+      }),
+      false,
+      ['guid-existing-unit-1']
+    );
+  });
+
+  it('REQ-09: Tự động nạp danh sách đơn vị tính qua getProductUnits khi productToEdit chưa có sẵn uomConversions', async () => {
+    const mockProductWithoutUnits: any = {
+      id: 'prod-edit-auto-load',
+      productCode: 'SP000099',
+      productName: 'Nước ép cam',
+      categoryId: 'cat-1',
+      categoryName: 'Đồ uống',
+      baseUnit: 'Chai',
+      sellingPrice: 15000,
+      costPrice: 10000,
+      onHand: 30,
+      committed: 0,
+      status: 'Active',
+      createdAt: '2026-10-31',
+      updatedAt: '2026-10-31',
+      uomConversions: [],
+    };
+
+    render(
+      <ProductFormModal
+        isOpen={true}
+        productToEdit={mockProductWithoutUnits}
+        categories={mockCategories}
+        onClose={vi.fn()}
+        onSave={vi.fn()}
+        onOpenCreateCategoryModal={vi.fn()}
+      />
+    );
+
+    // getProductUnits được gọi tự động
+    expect(productApi.getProductUnits).toHaveBeenCalledWith('prod-edit-auto-load');
+
+    // Chờ đơn vị tính nạp lên và hiển thị trên giao diện
+    await waitFor(() => {
+      expect(screen.getByDisplayValue('Thùng 24')).toBeDefined();
+    });
   });
 });

@@ -6,6 +6,7 @@ import type {
   PagedResult,
   ProductUnitResponse,
   ProductUnitCreatePayload,
+  ProductUnitUpdatePayload,
 } from '../types';
 
 export interface ProductCreatePayload {
@@ -168,6 +169,18 @@ export const productApi = {
   },
 
   /**
+   * Cập nhật thông tin đơn vị tính quy đổi
+   * Endpoint Backend: PUT /api/v1/product-units/{id}
+   */
+  async updateProductUnit(id: string, payload: ProductUnitUpdatePayload): Promise<ProductUnitResponse> {
+    const res = await httpClient.put<ApiResponse<ProductUnitResponse>>(`/product-units/${id}`, payload);
+    if (res.data?.success && res.data.data) {
+      return res.data.data;
+    }
+    throw new Error(res.data?.message || 'Không thể cập nhật đơn vị tính.');
+  },
+
+  /**
    * Xóa một đơn vị tính quy đổi
    * Endpoint Backend: DELETE /api/v1/product-units/{id}
    */
@@ -179,6 +192,6 @@ export const productApi = {
   },
 };
 
-
+export type { ProductUnitUpdatePayload };
 export { uploadImageToCloudinary } from '../../../utils/cloudinary';
 export type { ImageUploadResponse } from '../../../utils/cloudinary';

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { ProductListPage } from '../pages/ProductListPage';
 import { productApi } from '../api/productApi';
 import { categoryApi } from '../api/categoryApi';
@@ -12,7 +12,9 @@ vi.mock('../api/productApi', () => ({
     createProduct: vi.fn(),
     createProductUnit: vi.fn(),
     updateProduct: vi.fn(),
+    updateProductUnit: vi.fn(),
     deleteProduct: vi.fn(),
+    deleteProductUnit: vi.fn(),
   },
 }));
 
@@ -248,6 +250,92 @@ describe('ProductListPage - Task T6 BR-SEC-01 Phân quyền Giá vốn theo Vai 
     await waitFor(() => {
       expect(screen.getByText('- thung')).toBeDefined();
       expect(screen.getByText(/220[.,]000\s*đ/)).toBeDefined();
+    });
+  });
+
+  it('cập nhật hàng hóa và đồng bộ đơn vị tính qua API khi lưu chỉnh sửa (REQ-09)', async () => {
+    const mockProductWithUnits = {
+      ...mockSampleProduct,
+      id: 'prod-update-1',
+      name: 'Nước tăng lực Sting Dâu 330ml',
+      uomConversions: [
+        {
+          id: 'guid-unit-sting-1',
+          unitName: 'Lốc 6 lon',
+          conversionRate: 6,
+          barcode: '8930000000006',
+          price: 58000,
+        },
+      ],
+    };
+
+    (categoryApi.getCategories as any).mockResolvedValue([]);
+    (productApi.getProductsPaged as any).mockResolvedValue({
+      items: [mockProductWithUnits],
+      pageIndex: 1,
+      pageSize: 20,
+      totalCount: 1,
+      totalPages: 1,
+      hasPreviousPage: false,
+      hasNextPage: false,
+    });
+    (productApi.updateProduct as any).mockResolvedValue({
+      ...mockProductWithUnits,
+      name: 'Nước tăng lực Sting Dâu 330ml (Mới)',
+    });
+    (productApi.deleteProductUnit as any).mockResolvedValue(undefined);
+    (productApi.updateProductUnit as any).mockResolvedValue({
+      id: 'guid-unit-sting-1',
+      unitName: 'Lốc 6 lon',
+      conversionRate: 6,
+      price: 60000,
+    });
+
+    render(<ProductListPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Nước tăng lực Sting Dâu 330ml')).toBeDefined();
+    });
+
+    // Click vào dòng sản phẩm để mở ProductDetailModal
+    const productRow = screen.getByText('Nước tăng lực Sting Dâu 330ml');
+    productRow.click();
+
+    // Trong modal chi tiết, click nút "Chỉnh sửa"
+    await waitFor(() => {
+      expect(screen.getByText('Chỉnh sửa')).toBeDefined();
+    });
+    const editBtn = screen.getByText('Chỉnh sửa');
+    editBtn.click();
+
+    // Modal ProductFormModal mở ra, kiểm tra ô tên sản phẩm
+    await waitFor(() => {
+      expect(screen.getByDisplayValue('Nước tăng lực Sting Dâu 330ml')).toBeDefined();
+    });
+
+    // Sửa tên sản phẩm
+    const nameInput = screen.getByDisplayValue('Nước tăng lực Sting Dâu 330ml');
+    fireEvent.change(nameInput, { target: { value: 'Nước tăng lực Sting Dâu 330ml (Mới)' } });
+
+    // Click nút "Cập nhật"
+    const updateBtn = screen.getByText('Cập nhật');
+    fireEvent.click(updateBtn);
+
+    // Xác minh productApi.updateProduct và productApi.updateProductUnit được gọi
+    await waitFor(() => {
+      expect(productApi.updateProduct).toHaveBeenCalledWith(
+        'prod-update-1',
+        expect.objectContaining({
+          name: 'Nước tăng lực Sting Dâu 330ml (Mới)',
+        })
+      );
+      expect(productApi.updateProductUnit).toHaveBeenCalledWith(
+        'guid-unit-sting-1',
+        expect.objectContaining({
+          unitName: 'Lốc 6 lon',
+          price: 58000,
+        })
+      );
     });
   });
 });

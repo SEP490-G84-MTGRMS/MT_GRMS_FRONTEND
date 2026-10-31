@@ -243,5 +243,43 @@ describe('productApi.createProduct & createProductUnit', () => {
     expect(result.id).toBe('unit-1');
     expect(result.conversionRate).toBe(20);
   });
+
+  it('gọi PUT /product-units/{id} để cập nhật đơn vị tính quy đổi thành công (REQ-09)', async () => {
+    const mockUpdatedUnit = {
+      id: 'unit-guid-1',
+      productId: 'prod-1',
+      unitName: 'Thùng 24 lon',
+      conversionRate: 24,
+      price: 240000,
+      barcode: '89300000099',
+      isBaseUnit: false,
+      createdAt: '2026-10-31T12:00:00Z',
+    };
+
+    (httpClient.put as any).mockResolvedValueOnce({
+      data: {
+        success: true,
+        data: mockUpdatedUnit,
+      },
+    });
+
+    const result = await productApi.updateProductUnit('unit-guid-1', {
+      unitName: 'Thùng 24 lon',
+      conversionRate: 24,
+      price: 240000,
+      barcode: '89300000099',
+      isBaseUnit: false,
+    });
+
+    expect(httpClient.put).toHaveBeenCalledWith('/product-units/unit-guid-1', {
+      unitName: 'Thùng 24 lon',
+      conversionRate: 24,
+      price: 240000,
+      barcode: '89300000099',
+      isBaseUnit: false,
+    });
+    expect(result.unitName).toBe('Thùng 24 lon');
+    expect(result.price).toBe(240000);
+  });
 });
 

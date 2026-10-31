@@ -103,6 +103,14 @@ export interface ProductUnitCreatePayload {
   isBaseUnit?: boolean;
 }
 
+export interface ProductUnitUpdatePayload {
+  unitName: string;
+  conversionRate: number;
+  price: number;
+  barcode?: string | null;
+  isBaseUnit?: boolean;
+}
+
 export interface ComboComponent {
   id: string;
   productId: string;
@@ -110,7 +118,8 @@ export interface ComboComponent {
   productName: string;
   quantity: number;
   costPrice: number;
-  sellingprice: number;
+  sellingPrice?: number;
+  sellingprice?: number;
 }
 
 export interface StockLedgerEntry {
