@@ -18,10 +18,10 @@ export const SupplierTableRow: FC<Props> = ({
 }) => {
   return (
     <tr
+      className="so-list-row"
       style={{
         borderBottom: '1px solid #f1f5f9',
         backgroundColor: '#ffffff',
-        transition: 'background-color 0.12s ease',
       }}
       onMouseEnter={(e) => {
         e.currentTarget.style.backgroundColor = '#f8fafc';
@@ -48,8 +48,8 @@ export const SupplierTableRow: FC<Props> = ({
         </span>
       </td>
 
-      <td style={{ padding: '10px 12px', borderBottom: '1px solid #f1f5f9' }}>
-        <div style={{ fontWeight: 600, color: '#0f172a', lineHeight: 1.35 }}>
+      <td className="so-list-td--wrap">
+        <div className="so-list-name">
           {supplier.name}
         </div>
         {supplier.tradeName && supplier.tradeName !== supplier.name && (
@@ -74,24 +74,12 @@ export const SupplierTableRow: FC<Props> = ({
       </td>
 
       <td style={{ padding: '10px 12px', textAlign: 'right', whiteSpace: 'nowrap', borderBottom: '1px solid #f1f5f9' }}>
-        <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-end', gap: 6 }}>
+        <div className="so-list-actions">
           {canEdit && (
             <button
               type="button"
+              className="so-list-action-btn so-list-action-btn--icon"
               onClick={() => onEdit(supplier)}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                width: 28,
-                height: 28,
-                borderRadius: 6,
-                fontSize: 12,
-                backgroundColor: '#ffffff',
-                border: '1px solid #cbd5e1',
-                color: '#64748b',
-                cursor: 'pointer',
-              }}
               title="Chỉnh sửa thông tin nhà cung cấp"
             >
               <Edit3 size={12} />
@@ -100,21 +88,8 @@ export const SupplierTableRow: FC<Props> = ({
 
           <button
             type="button"
+            className="so-list-action-btn"
             onClick={() => onViewDetail(supplier)}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 4,
-              height: 28,
-              padding: '0 10px',
-              borderRadius: 6,
-              fontSize: 12,
-              fontWeight: 600,
-              backgroundColor: '#ffffff',
-              border: '1px solid #cbd5e1',
-              color: '#334155',
-              cursor: 'pointer',
-            }}
             title="Xem chi tiết nhà cung cấp"
           >
             <Eye size={12} />

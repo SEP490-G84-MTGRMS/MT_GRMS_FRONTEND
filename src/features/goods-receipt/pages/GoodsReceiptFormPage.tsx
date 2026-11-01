@@ -186,6 +186,8 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
       unit: 'Gói',
       orderedQty: 0,
       receivedQty: 1,
+      acceptedQty: 1,
+      rejectedQty: 0,
       differenceQty: 1,
       unitPrice: 50000,
       lineTotal: 50000,

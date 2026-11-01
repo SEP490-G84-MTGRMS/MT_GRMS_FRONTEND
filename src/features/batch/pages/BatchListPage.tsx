@@ -6,6 +6,7 @@ import {
   FileText,
   UserCheck,
   ShieldCheck,
+  ArrowLeft,
 } from 'lucide-react';
 import type {
   BatchItem,
@@ -23,6 +24,10 @@ import '../../purchase-order/purchase-order.css';
 
 const DEFAULT_FILTERS: BatchFilterState = {
   keyword: '',
+  productName: '',
+  sku: '',
+  batchCode: '',
+  supplierName: '',
   branchId: 'ALL',
   status: 'ALL',
   pageIndex: 1,
@@ -37,6 +42,8 @@ export const BatchListPage: FC<{ defaultRole?: UserRole }> = ({
 
   // Role Management (Store Owner vs Employee)
   const roleParam = searchParams.get('role') as UserRole | null;
+  const skuParam = searchParams.get('sku');
+  const fromInventory = searchParams.get('from') === 'inventory';
   const [role, setRole] = useState<UserRole>(roleParam || defaultRole);
   const employeeBranchId = searchParams.get('branch') || 'BR-01';
 
@@ -67,8 +74,8 @@ export const BatchListPage: FC<{ defaultRole?: UserRole }> = ({
     const branchParam = searchParams.get('branch');
 
     const updated = { ...DEFAULT_FILTERS };
-    if (skuParam) updated.keyword = skuParam;
-    else if (batchParam) updated.keyword = batchParam;
+    if (skuParam) updated.sku = skuParam;
+    if (batchParam && !skuParam) updated.batchCode = batchParam;
 
     if (statusParam && ['Expired', 'Critical', 'Warning', 'Normal'].includes(statusParam)) {
       updated.status = statusParam;
@@ -103,13 +110,21 @@ export const BatchListPage: FC<{ defaultRole?: UserRole }> = ({
     );
   };
 
-  // Base list scoped by role
+  // Base list scoped by role + optional product SKU from inventory
   const roleScopedBatches = useMemo(() => {
+    let list = batches;
     if (role === 'employee') {
-      return batches.filter((b) => b.branchId === employeeBranchId);
+      list = list.filter((b) => b.branchId === employeeBranchId);
     }
-    return batches;
-  }, [batches, role, employeeBranchId]);
+    if (skuParam) {
+      list = list.filter((b) => b.sku.toLowerCase() === skuParam.toLowerCase());
+    }
+    return list;
+  }, [batches, role, employeeBranchId, skuParam]);
+
+  const focusedProduct = skuParam
+    ? roleScopedBatches[0] || batches.find((b) => b.sku.toLowerCase() === skuParam.toLowerCase())
+    : null;
 
   // Filter input change
   const handleFilterChange = <K extends keyof BatchFilterState>(
@@ -133,7 +148,11 @@ export const BatchListPage: FC<{ defaultRole?: UserRole }> = ({
     setFilterInputs(resetState);
     setAppliedFilters(resetState);
     setPageIndex(1);
-    setSearchParams(new URLSearchParams(), { replace: true });
+    const keep = new URLSearchParams();
+    if (skuParam) keep.set('sku', skuParam);
+    if (fromInventory) keep.set('from', 'inventory');
+    if (searchParams.get('branch')) keep.set('branch', searchParams.get('branch') || '');
+    setSearchParams(keep, { replace: true });
     showToast('Đã đặt lại toàn bộ tiêu chí tìm kiếm', 'info');
   };
 
@@ -150,16 +169,29 @@ export const BatchListPage: FC<{ defaultRole?: UserRole }> = ({
         if (b.branchId !== appliedFilters.branchId) return false;
       }
 
-      // 3. Keyword Filter
+      if (appliedFilters.productName.trim()) {
+        const name = appliedFilters.productName.trim().toLowerCase();
+        if (!b.productName.toLowerCase().includes(name)) return false;
+      }
+      if (appliedFilters.sku.trim()) {
+        const sku = appliedFilters.sku.trim().toLowerCase();
+        if (!b.sku.toLowerCase().includes(sku)) return false;
+      }
+      if (appliedFilters.batchCode.trim()) {
+        const code = appliedFilters.batchCode.trim().toLowerCase();
+        if (!b.batchCode.toLowerCase().includes(code)) return false;
+      }
+      if (appliedFilters.supplierName.trim()) {
+        const ncc = appliedFilters.supplierName.trim().toLowerCase();
+        if (!b.supplierName.toLowerCase().includes(ncc)) return false;
+      }
       if (appliedFilters.keyword.trim()) {
         const kw = appliedFilters.keyword.trim().toLowerCase();
         const match =
           b.productName.toLowerCase().includes(kw) ||
           b.sku.toLowerCase().includes(kw) ||
           b.batchCode.toLowerCase().includes(kw) ||
-          b.supplierName.toLowerCase().includes(kw) ||
-          b.shelfLocation.toLowerCase().includes(kw) ||
-          b.originalGrnNo.toLowerCase().includes(kw);
+          b.supplierName.toLowerCase().includes(kw);
         if (!match) return false;
       }
 
@@ -267,9 +299,22 @@ export const BatchListPage: FC<{ defaultRole?: UserRole }> = ({
         }}
       >
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            {(fromInventory || skuParam) && (
+              <button
+                type="button"
+                onClick={() => navigate('/store-owner/inventory')}
+                className="po-btn po-btn-secondary"
+                style={{ height: 28, padding: '0 10px' }}
+              >
+                <ArrowLeft size={13} />
+                <span>Tồn kho</span>
+              </button>
+            )}
             <h1 style={{ fontSize: 18, fontWeight: 800, color: '#0f172a', margin: 0 }}>
-              Quản lý Lô & Hạn sử dụng (FEFO Expiry Management)
+              {skuParam
+                ? `Chi tiết lô & hạn sử dụng`
+                : 'Quản lý Lô & Hạn sử dụng (FEFO)'}
             </h1>
             <span
               style={{
@@ -286,7 +331,9 @@ export const BatchListPage: FC<{ defaultRole?: UserRole }> = ({
             </span>
           </div>
           <div style={{ fontSize: 12.5, color: '#64748b', marginTop: 3 }}>
-            Theo dõi vòng đời sản phẩm, phân loại hạn sử dụng và kiểm soát xuất kho theo nguyên tắc FEFO (First Expired, First Out)
+            {skuParam
+              ? `Sản phẩm ${focusedProduct?.productName || skuParam} · SKU ${skuParam} · ${filteredBatches.length} lô tại chi nhánh đang lọc`
+              : 'Theo dõi vòng đời sản phẩm, phân loại hạn sử dụng và kiểm soát xuất kho theo nguyên tắc FEFO'}
           </div>
         </div>
 
@@ -373,6 +420,29 @@ export const BatchListPage: FC<{ defaultRole?: UserRole }> = ({
             <span>Phiếu nhập kho (GRN)</span>
           </button>
 
+          <button
+            type="button"
+            onClick={() => navigate('/store-owner/inventory')}
+            style={{
+              height: 32,
+              padding: '0 12px',
+              borderRadius: 6,
+              border: '1px solid #cbd5e1',
+              backgroundColor: '#ffffff',
+              color: '#334155',
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 5,
+            }}
+            title="Danh sách tồn kho theo sản phẩm"
+          >
+            <Package size={13} color="#0d9488" />
+            <span>Tồn kho cửa hàng</span>
+          </button>
+
           {/* Quick link to Products */}
           <button
             type="button"
@@ -404,8 +474,6 @@ export const BatchListPage: FC<{ defaultRole?: UserRole }> = ({
         filterInputs={filterInputs}
         role={role}
         employeeBranchId={employeeBranchId}
-        totalFiltered={filteredBatches.length}
-        totalAll={roleScopedBatches.length}
         onFilterChange={handleFilterChange}
         onSearch={handleSearch}
         onReset={handleReset}

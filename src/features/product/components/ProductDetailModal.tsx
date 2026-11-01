@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   X,
   Edit2,
@@ -10,8 +10,12 @@ import {
   Warehouse,
   History,
   Star,
+  CheckCircle,
+  ZoomIn,
+  Image as ImageIcon,
 } from 'lucide-react';
-import type { ProductItem } from '../types';
+import type { ProductItem, UomConversion } from '../types';
+import { productApi } from '../api/productApi';
 
 interface ProductDetailModalProps {
   isOpen: boolean;
@@ -36,18 +40,112 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'info' | 'notes' | 'ledger' | 'branch'>('info');
 
+  // Đơn vị tính đang chọn và danh sách đơn vị quy đổi (REQ-08)
+  const [selectedUnitName, setSelectedUnitName] = useState<string>(product?.baseUnit || 'Cái');
+  const [units, setUnits] = useState<UomConversion[]>(product?.uomConversions || []);
+
+  // Multi-image selection & Lightbox popup
+  const [selectedImageIdx, setSelectedImageIdx] = useState<number>(0);
+  const [previewImageModalUrl, setPreviewImageModalUrl] = useState<string | null>(null);
+
+  const allImages = useMemo(() => {
+    if (!product) return [];
+    if (product.imageUrls && product.imageUrls.length > 0) {
+      return product.imageUrls;
+    }
+    return product.imageUrl ? [product.imageUrl] : [];
+  }, [product]);
+
+  useEffect(() => {
+    if (product) {
+      setSelectedUnitName(product.baseUnit || 'Cái');
+      setUnits(product.uomConversions || []);
+      setSelectedImageIdx(0);
+      setPreviewImageModalUrl(null);
+    }
+  }, [product]);
+
+  // T17: Nạp đơn vị quy đổi từ API nếu product chưa nạp sẵn
+  useEffect(() => {
+    if (!product?.id) return;
+    const isGuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(product.id);
+    if (isGuid && (!product.uomConversions || product.uomConversions.length === 0)) {
+      productApi
+        .getProductUnits(product.id)
+        .then((res) => {
+          if (res && res.length > 0) {
+            const convs: UomConversion[] = res
+              .filter((u) => !u.isBaseUnit)
+              .map((u) => ({
+                id: u.id,
+                unitName: u.unitName,
+                productCode: product.productCode,
+                conversionRate: u.conversionRate,
+                price: u.price,
+                barcode: u.barcode ?? undefined,
+              }));
+            setUnits(convs);
+          }
+        })
+        .catch(() => {
+          // ignore
+        });
+    }
+  }, [product?.id, product?.uomConversions, product?.productCode]);
+
   if (!isOpen || !product) return null;
 
   const isDiscontinued = product.status === 'Discontinued';
 
   const formatVND = (num?: number | null) => {
     if (num === undefined || num === null) return '—';
-    return `${num.toLocaleString('vi-VN')} đ`;
+    return `${Number(num).toLocaleString('vi-VN')} đ`;
   };
+
+  // T15: Tính toán các giá trị chuyển đổi theo đơn vị tính đang chọn (REQ-08)
+  const isBaseUnit = selectedUnitName === (product.baseUnit || 'Cái');
+  const currentUom = units.find((u) => u.unitName === selectedUnitName);
+  const conversionRate = isBaseUnit ? 1 : Math.max(1, currentUom?.conversionRate || 1);
+
+  // Mã hàng & Mã vạch (Mã hàng đơn vị quy đổi mặc định giống mã sản phẩm)
+  const displayCode = product.productCode;
+  const displayBarcode = (!isBaseUnit && currentUom?.barcode) ? currentUom.barcode : (isBaseUnit ? product.barcode : '—');
+
+  // Giá bán
+  const displaySellingPrice = isBaseUnit ? product.sellingPrice : (currentUom?.price ?? product.sellingPrice);
+
+  // Giá vốn (tuân thủ BR-SEC-01)
+  const displayCostPrice = product.costPrice != null
+    ? (isBaseUnit ? Number(product.costPrice) : Number(product.costPrice) * conversionRate)
+    : null;
+
+  // Tồn kho quy đổi
+  const onHandBase = product.onHand || 0;
+  const displayStock = isBaseUnit ? onHandBase : Math.floor(onHandBase / conversionRate);
+  const remainderStock = isBaseUnit ? 0 : onHandBase % conversionRate;
+
+  // Danh sách toàn bộ đơn vị để hiển thị Selector
+  const allUnitsList = [
+    { unitName: product.baseUnit || 'Cái', isBase: true, conversionRate: 1 },
+    ...units.map((u) => ({ unitName: u.unitName, isBase: false, conversionRate: u.conversionRate })),
+  ];
 
   return (
     <div className="custom-modal-backdrop" style={{ zIndex: 1100 }}>
-      <div className="custom-modal-box" style={{ maxWidth: 1050 }}>
+      <div
+        className="custom-modal-box"
+        style={{
+          maxWidth: 1160,
+          width: '96vw',
+          height: '88vh',
+          maxHeight: '88vh',
+          display: 'flex',
+          flexDirection: 'column',
+          borderRadius: 16,
+          overflow: 'hidden',
+          backgroundColor: '#FFFFFF',
+        }}
+      >
         {/* ============================================================== */}
         {/* THANH TỔNG QUAN PHÍA TRÊN CÙNG                                 */}
         {/* ============================================================== */}
@@ -61,6 +159,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             backgroundColor: '#FFFFFF',
             flexWrap: 'wrap',
             gap: 12,
+            flexShrink: 0,
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
@@ -70,9 +169,8 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={{ fontSize: 13, fontWeight: 700, color: '#0F766E' }}>
-                  {product.productCode}
+                  {displayCode}
                 </span>
-                {product.isCombo && <span className="badge-combo">Combo đóng gói</span>}
                 {isDiscontinued && (
                   <span
                     style={{
@@ -89,8 +187,42 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 )}
               </div>
               <span style={{ fontSize: 16, fontWeight: 700, color: '#0F172A' }}>
-                {product.productName}
+                {product.productName} {!isBaseUnit && <span style={{ color: '#0F766E', fontSize: 14 }}>- {selectedUnitName}</span>}
               </span>
+
+              {/* T16: Unit Switcher Segmented Pills trên Header */}
+              {allUnitsList.length > 1 && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 12, color: '#64748B', fontWeight: 600 }}>Xem theo ĐVT:</span>
+                  {allUnitsList.map((u) => {
+                    const isActive = u.unitName === selectedUnitName;
+                    return (
+                      <button
+                        key={u.unitName}
+                        type="button"
+                        onClick={() => setSelectedUnitName(u.unitName)}
+                        style={{
+                          border: isActive ? '1px solid #0F766E' : '1px solid #CBD5E1',
+                          background: isActive ? '#0F766E' : '#FFFFFF',
+                          color: isActive ? '#FFFFFF' : '#334155',
+                          padding: '3px 10px',
+                          borderRadius: 16,
+                          fontSize: 12,
+                          fontWeight: isActive ? 700 : 500,
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 4,
+                        }}
+                      >
+                        {isActive && <CheckCircle size={12} />}
+                        <span>{u.unitName} {u.isBase ? '(Cơ bản)' : `(x${u.conversionRate})`}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
 
@@ -98,7 +230,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             <div style={{ textAlign: 'right' }}>
               <div style={{ fontSize: 11, color: '#64748B' }}>Giá bán</div>
               <div style={{ fontSize: 15, fontWeight: 700, color: '#0F172A' }}>
-                {formatVND(product.sellingPrice)}
+                {formatVND(displaySellingPrice)}
               </div>
             </div>
 
@@ -106,7 +238,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               <div style={{ textAlign: 'right' }}>
                 <div style={{ fontSize: 11, color: '#64748B' }}>Giá vốn</div>
                 <div style={{ fontSize: 14, color: '#475569', fontWeight: 600 }}>
-                  {formatVND(product.costPrice)}
+                  {formatVND(displayCostPrice)}
                 </div>
               </div>
             )}
@@ -117,11 +249,16 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 style={{
                   fontSize: 15,
                   fontWeight: 700,
-                  color: product.onHand <= 0 ? '#EF4444' : '#0F766E',
+                  color: displayStock <= 0 ? '#EF4444' : '#0F766E',
                 }}
               >
-                {product.onHand} {product.baseUnit}
+                {displayStock} {selectedUnitName}
               </div>
+              {!isBaseUnit && remainderStock > 0 && (
+                <div style={{ fontSize: 11, color: '#64748B' }}>
+                  (Dư {remainderStock} {product.baseUnit})
+                </div>
+              )}
             </div>
 
             <button type="button" className="custom-modal-close" onClick={onClose} title="Đóng">
@@ -140,6 +277,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             padding: '0 24px',
             borderBottom: '2px solid #E2E8F0',
             gap: 4,
+            flexShrink: 0,
           }}
         >
           <button
@@ -231,7 +369,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
         {/* ============================================================== */}
         {/* NỘI DUNG TỪNG TAB                                               */}
         {/* ============================================================== */}
-        <div className="custom-modal-body" style={{ minHeight: 360, padding: '24px 28px' }}>
+        <div className="custom-modal-body" style={{ flex: 1, overflowY: 'auto', padding: '24px 28px', minHeight: 0 }}>
           {/* ─────────────────────────────────────────────────────────── */}
           {/* TAB 1: THÔNG TIN CHI TIẾT HÀNG HÓA                          */}
           {/* ─────────────────────────────────────────────────────────── */}
@@ -241,54 +379,164 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               <div
                 style={{
                   display: 'flex',
-                  alignItems: 'center',
-                  gap: 16,
+                  alignItems: 'flex-start',
+                  gap: 20,
                   paddingBottom: 16,
                   borderBottom: '1px solid #E2E8F0',
                 }}
               >
-                <div
-                  style={{
-                    width: 72,
-                    height: 72,
-                    borderRadius: 12,
-                    border: '1px solid #CBD5E1',
-                    backgroundColor: '#F8FAFC',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    overflow: 'hidden',
-                  }}
-                >
-                  {product.imageUrl ? (
-                    <img
-                      src={product.imageUrl}
-                      alt={product.productName}
-                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                    />
-                  ) : (
-                    <span style={{ fontSize: 32 }}>🛍️</span>
+                {/* Khu vực ảnh (Hỗ trợ nhiều ảnh + popup phóng to) */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flexShrink: 0 }}>
+                  <div
+                    onClick={() => {
+                      if (allImages.length > 0) {
+                        setPreviewImageModalUrl(allImages[selectedImageIdx] || allImages[0]);
+                      }
+                    }}
+                    style={{
+                      width: 96,
+                      height: 96,
+                      borderRadius: 12,
+                      border: '1px solid #CBD5E1',
+                      backgroundColor: '#F8FAFC',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      overflow: 'hidden',
+                      position: 'relative',
+                      cursor: allImages.length > 0 ? 'pointer' : 'default',
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+                    }}
+                    title={allImages.length > 0 ? 'Nhấn để phóng to ảnh' : undefined}
+                  >
+                    {allImages.length > 0 ? (
+                      <>
+                        <img
+                          src={allImages[selectedImageIdx] || allImages[0]}
+                          alt={product.productName}
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        />
+                        <div
+                          style={{
+                            position: 'absolute',
+                            bottom: 4,
+                            right: 4,
+                            backgroundColor: 'rgba(15, 23, 42, 0.65)',
+                            color: '#FFFFFF',
+                            borderRadius: 4,
+                            padding: '2px 5px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 3,
+                            fontSize: 10,
+                            fontWeight: 600,
+                          }}
+                        >
+                          <ZoomIn size={10} />
+                          <span>Xem</span>
+                        </div>
+                        {selectedImageIdx === 0 && (
+                          <div
+                            style={{
+                              position: 'absolute',
+                              top: 4,
+                              left: 4,
+                              backgroundColor: '#0D9488',
+                              color: '#FFFFFF',
+                              borderRadius: 4,
+                              padding: '1px 5px',
+                              fontSize: 9,
+                              fontWeight: 700,
+                            }}
+                          >
+                            Chính
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, color: '#94A3B8' }}>
+                        <ImageIcon size={28} />
+                        <span style={{ fontSize: 10 }}>Không có ảnh</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Thumbnail strip khi có nhiều ảnh */}
+                  {allImages.length > 1 && (
+                    <div style={{ display: 'flex', gap: 6, maxWidth: 220, flexWrap: 'wrap' }}>
+                      {allImages.map((img, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => setSelectedImageIdx(idx)}
+                          style={{
+                            width: 32,
+                            height: 32,
+                            borderRadius: 6,
+                            border: idx === selectedImageIdx ? '2px solid #0D9488' : '1px solid #CBD5E1',
+                            padding: 0,
+                            overflow: 'hidden',
+                            cursor: 'pointer',
+                            background: '#FFFFFF',
+                            position: 'relative',
+                            transition: 'border-color 0.15s ease',
+                          }}
+                          title={`Xem ảnh ${idx + 1}${idx === 0 ? ' (Ảnh đại diện)' : ''}`}
+                        >
+                          <img
+                            src={img}
+                            alt={`thumb-${idx}`}
+                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                          />
+                          {idx === 0 && (
+                            <span
+                              style={{
+                                position: 'absolute',
+                                bottom: 0,
+                                left: 0,
+                                right: 0,
+                                background: '#0D9488',
+                                color: '#FFFFFF',
+                                fontSize: 7,
+                                fontWeight: 700,
+                                textAlign: 'center',
+                                lineHeight: '8px',
+                              }}
+                            >
+                              ★
+                            </span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
                   )}
                 </div>
 
-                <div>
+                <div style={{ flex: 1 }}>
                   <h3 style={{ margin: '0 0 6px 0', fontSize: 18, color: '#0F172A', fontWeight: 700 }}>
                     {product.productName}
                   </h3>
-                  <div style={{ fontSize: 13, color: '#475569' }}>
-                    Nhóm hàng:{' '}
-                    <span
-                      style={{
-                        fontWeight: 700,
-                        color: '#0F766E',
-                        backgroundColor: '#F0FDFA',
-                        padding: '2px 8px',
-                        borderRadius: 6,
-                        border: '1px solid #CCFBF1',
-                      }}
-                    >
-                      {product.categoryName || 'Mặc định'}
+                  <div style={{ fontSize: 13, color: '#475569', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <span>
+                      Nhóm hàng:{' '}
+                      <span
+                        style={{
+                          fontWeight: 700,
+                          color: '#0F766E',
+                          backgroundColor: '#F0FDFA',
+                          padding: '2px 8px',
+                          borderRadius: 6,
+                          border: '1px solid #CCFBF1',
+                        }}
+                      >
+                        {product.categoryName || 'Mặc định'}
+                      </span>
                     </span>
+                    {allImages.length > 0 && (
+                      <span style={{ fontSize: 12, color: '#64748B' }}>
+                        ({allImages.length} ảnh{allImages.length > 1 ? `, đang chọn ảnh ${selectedImageIdx + 1}` : ''})
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -308,7 +556,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                   <div>
                     <div style={{ fontSize: 12, color: '#64748B', marginBottom: 2 }}>Mã hàng</div>
                     <div style={{ fontSize: 14, fontWeight: 700, color: '#0F172A' }}>
-                      {product.productCode}
+                      {displayCode}
                     </div>
                   </div>
 
@@ -316,7 +564,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                     <div>
                       <div style={{ fontSize: 12, color: '#64748B', marginBottom: 2 }}>Giá vốn</div>
                       <div style={{ fontSize: 14, fontWeight: 700, color: '#0F172A' }}>
-                        {formatVND(product.costPrice)}
+                        {formatVND(displayCostPrice)}
                       </div>
                     </div>
                   )}
@@ -327,14 +575,14 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                   <div>
                     <div style={{ fontSize: 12, color: '#64748B', marginBottom: 2 }}>Mã vạch</div>
                     <div style={{ fontSize: 14, fontWeight: 700, color: '#0F172A' }}>
-                      {product.barcode || '—'}
+                      {displayBarcode || '—'}
                     </div>
                   </div>
 
                   <div>
                     <div style={{ fontSize: 12, color: '#64748B', marginBottom: 2 }}>Giá bán</div>
                     <div style={{ fontSize: 14, fontWeight: 700, color: '#0F766E' }}>
-                      {formatVND(product.sellingPrice)}
+                      {formatVND(displaySellingPrice)}
                     </div>
                   </div>
                 </div>
@@ -342,16 +590,24 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 {/* Cột 3 */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                   <div>
-                    <div style={{ fontSize: 12, color: '#64748B', marginBottom: 2 }}>Đơn vị cơ bản</div>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: '#0F172A' }}>
-                      {product.baseUnit}
+                    <div style={{ fontSize: 12, color: '#64748B', marginBottom: 2 }}>Đơn vị đang xem</div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: '#0F766E' }}>
+                      {selectedUnitName}{' '}
+                      <span style={{ fontSize: 12, fontWeight: 500, color: '#64748B' }}>
+                        {isBaseUnit ? '(Đơn vị cơ bản)' : `(Quy đổi = ${conversionRate} ${product.baseUnit})`}
+                      </span>
                     </div>
                   </div>
 
                   <div>
                     <div style={{ fontSize: 12, color: '#64748B', marginBottom: 2 }}>Tồn kho hiện tại</div>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: '#0F172A' }}>
-                      {product.onHand} {product.baseUnit}
+                    <div style={{ fontSize: 14, fontWeight: 700, color: displayStock <= 0 ? '#EF4444' : '#0F172A' }}>
+                      {displayStock} {selectedUnitName}
+                      {!isBaseUnit && remainderStock > 0 && (
+                        <span style={{ fontSize: 12, fontWeight: 500, color: '#64748B', marginLeft: 4 }}>
+                          (dư {remainderStock} {product.baseUnit})
+                        </span>
+                      )}
                     </div>
                   </div>
 
@@ -367,118 +623,142 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 </div>
               </div>
 
-              {/* Bảng Đơn vị tính & Quy đổi giá */}
+              {/* Bảng Đơn vị tính & Quy đổi giá (Hỗ trợ click để chọn đơn vị tính - REQ-08) */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: '#0F172A' }}>
-                  Đơn vị tính & Quy đổi giá
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: '#0F172A' }}>
+                    Đơn vị tính & Quy đổi giá
+                  </div>
+                  <div style={{ fontSize: 12, color: '#64748B' }}>
+                    (Click vào từng dòng để xem chi tiết theo đơn vị tương ứng)
+                  </div>
                 </div>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                   <thead>
                     <tr style={{ background: '#F8FAFC', textAlign: 'left' }}>
-                      <th style={{ padding: '8px 12px', borderBottom: '1px solid #E2E8F0', width: '40%' }}>
+                      <th style={{ padding: '8px 12px', borderBottom: '1px solid #E2E8F0', width: '35%' }}>
                         Tên đơn vị
                       </th>
-                      <th style={{ padding: '8px 12px', borderBottom: '1px solid #E2E8F0', width: '30%' }}>
+                      <th style={{ padding: '8px 12px', borderBottom: '1px solid #E2E8F0', width: '25%' }}>
                         Giá trị quy đổi
                       </th>
                       <th
                         style={{
                           padding: '8px 12px',
                           borderBottom: '1px solid #E2E8F0',
-                          width: '30%',
+                          width: '25%',
                           textAlign: 'right',
                         }}
                       >
                         Giá bán
                       </th>
+                      <th
+                        style={{
+                          padding: '8px 12px',
+                          borderBottom: '1px solid #E2E8F0',
+                          width: '15%',
+                          textAlign: 'center',
+                        }}
+                      >
+                        Trạng thái
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
                     {/* Hàng 1: Đơn vị cơ bản */}
-                    <tr style={{ borderBottom: '1px solid #F1F5F9' }}>
+                    <tr
+                      onClick={() => setSelectedUnitName(product.baseUnit || 'Cái')}
+                      style={{
+                        borderBottom: '1px solid #F1F5F9',
+                        cursor: 'pointer',
+                        backgroundColor: isBaseUnit ? '#F0FDFA' : undefined,
+                        transition: 'background-color 0.15s ease',
+                      }}
+                    >
                       <td style={{ padding: '8px 12px' }}>
-                        <b>{product.baseUnit}</b>{' '}
+                        <b style={{ color: isBaseUnit ? '#0F766E' : '#1E293B' }}>{product.baseUnit}</b>{' '}
                         <span style={{ fontSize: 12, color: '#64748B' }}>(Đơn vị cơ bản)</span>
+                        <div style={{ fontSize: 11, color: '#64748B', marginTop: 2 }}>
+                          Mã hàng: <b style={{ color: '#0F766E' }}>{product.productCode}</b>
+                        </div>
                       </td>
                       <td style={{ padding: '8px 12px' }}>1</td>
                       <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 700 }}>
                         {formatVND(product.sellingPrice)}
                       </td>
+                      <td style={{ padding: '8px 12px', textAlign: 'center' }}>
+                        {isBaseUnit ? (
+                          <span
+                            style={{
+                              fontSize: 11,
+                              fontWeight: 700,
+                              color: '#0F766E',
+                              background: '#CCFBF1',
+                              padding: '2px 8px',
+                              borderRadius: 9999,
+                            }}
+                          >
+                            Đang xem
+                          </span>
+                        ) : (
+                          <span style={{ fontSize: 11, color: '#94A3B8' }}>Chọn xem</span>
+                        )}
+                      </td>
                     </tr>
 
                     {/* Hàng quy đổi */}
-                    {product.uomConversions &&
-                      product.uomConversions.map((uom) => (
-                        <tr key={uom.id} style={{ borderBottom: '1px solid #F1F5F9' }}>
-                          <td style={{ padding: '8px 12px', fontWeight: 600 }}>{uom.unitName}</td>
-                          <td style={{ padding: '8px 12px' }}>
-                            {uom.conversionRate} {product.baseUnit}
-                          </td>
-                          <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 700 }}>
-                            {formatVND(uom.price)}
-                          </td>
-                        </tr>
-                      ))}
+                    {units &&
+                      units.map((uom) => {
+                        const isThisSelected = uom.unitName === selectedUnitName;
+                        return (
+                          <tr
+                            key={uom.id}
+                            onClick={() => setSelectedUnitName(uom.unitName)}
+                            style={{
+                              borderBottom: '1px solid #F1F5F9',
+                              cursor: 'pointer',
+                              backgroundColor: isThisSelected ? '#F0FDFA' : undefined,
+                              transition: 'background-color 0.15s ease',
+                            }}
+                          >
+                            <td style={{ padding: '8px 12px' }}>
+                              <div style={{ fontWeight: 600, color: isThisSelected ? '#0F766E' : '#1E293B' }}>
+                                {uom.unitName}
+                              </div>
+                              <div style={{ fontSize: 11, color: '#64748B', marginTop: 2 }}>
+                                Mã hàng: <b style={{ color: '#0F766E' }}>{uom.productCode || product.productCode}</b>
+                              </div>
+                            </td>
+                            <td style={{ padding: '8px 12px' }}>
+                              {uom.conversionRate} {product.baseUnit}
+                            </td>
+                            <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 700 }}>
+                              {formatVND(uom.price)}
+                            </td>
+                            <td style={{ padding: '8px 12px', textAlign: 'center' }}>
+                              {isThisSelected ? (
+                                <span
+                                  style={{
+                                    fontSize: 11,
+                                    fontWeight: 700,
+                                    color: '#0F766E',
+                                    background: '#CCFBF1',
+                                    padding: '2px 8px',
+                                    borderRadius: 9999,
+                                  }}
+                                >
+                                  Đang xem
+                                </span>
+                              ) : (
+                                <span style={{ fontSize: 11, color: '#94A3B8' }}>Chọn xem</span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
                   </tbody>
                 </table>
               </div>
-
-              {/* Nếu là Combo, hiển thị các thành phần */}
-              {product.isCombo && product.comboComponents && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: '#0F172A' }}>
-                    Thành phần đóng gói trong Combo
-                  </div>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-                    <thead>
-                      <tr style={{ background: '#F8FAFC', textAlign: 'left' }}>
-                        <th style={{ padding: '8px 12px', borderBottom: '1px solid #E2E8F0', width: 120 }}>
-                          Mã hàng
-                        </th>
-                        <th style={{ padding: '8px 12px', borderBottom: '1px solid #E2E8F0' }}>
-                          Tên hàng thành phần
-                        </th>
-                        <th
-                          style={{
-                            padding: '8px 12px',
-                            borderBottom: '1px solid #E2E8F0',
-                            textAlign: 'center',
-                            width: 100,
-                          }}
-                        >
-                          Số lượng
-                        </th>
-                        <th
-                          style={{
-                            padding: '8px 12px',
-                            borderBottom: '1px solid #E2E8F0',
-                            textAlign: 'right',
-                            width: 120,
-                          }}
-                        >
-                          Giá bán lẻ
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {product.comboComponents.map((comp) => (
-                        <tr key={comp.id} style={{ borderBottom: '1px solid #F1F5F9' }}>
-                          <td style={{ padding: '8px 12px', fontWeight: 700, color: '#0F766E' }}>
-                            {comp.productCode}
-                          </td>
-                          <td style={{ padding: '8px 12px' }}>{comp.productName}</td>
-                          <td style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 700 }}>
-                            {comp.quantity}
-                          </td>
-                          <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 600 }}>
-                            {formatVND(comp.sellingPrice)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
             </div>
           )}
 
@@ -499,11 +779,12 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                     border: '1px solid #E2E8F0',
                     fontSize: 13.5,
                     lineHeight: 1.6,
-                    color: '#334155',
+                    color: product.description?.trim() ? '#334155' : '#94A3B8',
+                    fontStyle: product.description?.trim() ? 'normal' : 'italic',
+                    whiteSpace: 'pre-wrap',
                   }}
                 >
-                  {product.description ||
-                    'Sản phẩm được lưu kho và quản lý tại chuỗi bán lẻ. Cam kết chất lượng chính hãng và an toàn thực phẩm.'}
+                  {product.description?.trim() || 'Chưa có mô tả chi tiết cho hàng hóa này.'}
                 </div>
               </div>
 
@@ -519,11 +800,12 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                     border: '1px solid #FEF08A',
                     fontSize: 13.5,
                     lineHeight: 1.6,
-                    color: '#854D0E',
+                    color: product.internalNote?.trim() ? '#854D0E' : '#A16207',
+                    fontStyle: product.internalNote?.trim() ? 'normal' : 'italic',
+                    whiteSpace: 'pre-wrap',
                   }}
                 >
-                  {product.internalNote ||
-                    'Bảo quản nơi khô ráo, thoáng mát. Ưu tiên kiểm kê định kỳ mỗi tuần.'}
+                  {product.internalNote?.trim() || 'Chưa có ghi chú nội bộ.'}
                 </div>
               </div>
             </div>
@@ -706,6 +988,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             padding: '16px 28px',
             borderTop: '1px solid #E2E8F0',
             backgroundColor: '#FFFFFF',
+            flexShrink: 0,
           }}
         >
           {/* Các nút tác vụ bên trái */}
@@ -751,6 +1034,72 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Pop-up xem phóng to ảnh sản phẩm (Lightbox) */}
+      {previewImageModalUrl && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.75)',
+            zIndex: 1300,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 24,
+            backdropFilter: 'blur(3px)',
+          }}
+          onClick={() => setPreviewImageModalUrl(null)}
+        >
+          <div
+            style={{
+              position: 'relative',
+              maxWidth: '90vw',
+              maxHeight: '90vh',
+              backgroundColor: '#FFFFFF',
+              borderRadius: 12,
+              padding: 10,
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => setPreviewImageModalUrl(null)}
+              style={{
+                position: 'absolute',
+                top: 12,
+                right: 12,
+                background: 'rgba(15, 23, 42, 0.7)',
+                color: '#FFFFFF',
+                border: 'none',
+                borderRadius: '50%',
+                width: 32,
+                height: 32,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                zIndex: 10,
+              }}
+              title="Đóng xem ảnh"
+            >
+              <X size={18} />
+            </button>
+            <img
+              src={previewImageModalUrl}
+              alt="Phóng to ảnh hàng hóa"
+              style={{
+                maxWidth: '100%',
+                maxHeight: '80vh',
+                objectFit: 'contain',
+                borderRadius: 8,
+                display: 'block',
+              }}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 };

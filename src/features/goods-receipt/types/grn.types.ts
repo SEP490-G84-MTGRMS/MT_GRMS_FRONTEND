@@ -1,27 +1,67 @@
-export type GrnStatus = 'TODAY' | 'DRAFT' | 'CONFIRMED' | 'MISMATCH' | 'CANCELED';
+export type GrnStatus = 'DRAFT' | 'COMPLETED' | 'CANCELLED' | 'TODAY' | 'CONFIRMED' | 'MISMATCH' | 'CANCELED';
 
-export type GrnType = 'TODAY_DELIVERY' | 'FROM_PO' | 'DIRECT';
+export type GrnType = 'FROM_PO' | 'TODAY_DELIVERY';
+
+export type RejectionReason =
+  | 'DAMAGE'
+  | 'EXPIRED'
+  | 'NEAR_EXPIRY'
+  | 'WRONG_SPEC'
+  | 'WRONG_ITEM'
+  | 'QUALITY_ISSUE'
+  | 'OTHER';
+
+export const REJECTION_REASON_LABELS: Record<RejectionReason, string> = {
+  DAMAGE: 'Hàng hư hỏng / móp méo',
+  EXPIRED: 'Hàng đã hết hạn sử dụng',
+  NEAR_EXPIRY: 'Hàng cận hạn không đạt chuẩn',
+  WRONG_SPEC: 'Sai quy cách đóng gói',
+  WRONG_ITEM: 'Giao sai sản phẩm',
+  QUALITY_ISSUE: 'Chất lượng không đạt',
+  OTHER: 'Lý do khác (ghi chú)',
+};
+
+export interface GrnBatchDetail {
+  id: string;
+  batchCode: string;
+  manufactureDate?: string;
+  expiryDate: string;
+  acceptedQty: number;
+  daysLeft?: number;
+  isNearExpiry?: boolean;
+}
 
 export interface GrnItemDetail {
   id: string;
   productCode: string;
   productName: string;
   unit: string;
-  orderedQty: number; // Số lượng đặt theo PO (0 nếu là nhập trực tiếp)
-  receivedQty: number; // Số lượng thực nhận kiểm đếm
-  differenceQty: number; // receivedQty - orderedQty
+  orderedQty: number; // Số lượng đặt theo PO
+  receivedQty: number; // Số lượng thực nhận kiểm đếm từ NCC
+  acceptedQty?: number; // Số lượng chấp nhận nhập kho
+  rejectedQty?: number; // Số lượng bị từ chối = receivedQty - acceptedQty
+  shortageQty?: number; // Số lượng giao thiếu = Math.max(0, orderedQty - receivedQty)
+  differenceQty: number; // Chênh lệch thực tế nhập vs đặt = acceptedQty - orderedQty
+  rejectionReason?: RejectionReason; // Lý do từ chối nếu có hàng hỏng
+  rejectionNote?: string; // Ghi chú lý do từ chối nếu là OTHER
+  hasBatches?: boolean; // Sản phẩm có quản lý HSD hay không
+  batches?: GrnBatchDetail[]; // Danh sách nhiều lô cho 1 sản phẩm
   unitPrice: number;
   lineTotal: number;
   batchCode?: string; // Mã lô hàng FEFO (vd: B26-1008)
+  manufactureDate?: string; // Ngày sản xuất
   expiryDate?: string; // Hạn sử dụng (vd: 2027-10-08)
-  note?: string; // Ghi chú hoặc lý do lệch hàng
+  note?: string; // Ghi chú
 }
+
+export type GrnRemainingOption = 'cancel' | 'backorder';
+export type PoStatusPreview = 'COMPLETED' | 'PARTIALLY_RECEIVED';
 
 export interface GoodsReceiptListItem {
   id: string;
   code: string; // GRN-20261008-01 hoặc PO-20261009-001
   type: GrnType;
-  typeLabel: string; // 'Lịch hôm nay' | 'Từ PO' | 'Trực tiếp'
+  typeLabel: string; // 'Từ PO' | 'Lịch hôm nay'
   receiveDate: string; // Chuỗi hiển thị: 09/10/2026 (Hôm nay 08:00)
   rawDate: string; // YYYY-MM-DD để lọc theo ngày
   branchId: string; // BR-01, BR-02, DC-01
@@ -29,16 +69,17 @@ export interface GoodsReceiptListItem {
   supplierId: string;
   supplierName: string; // TươiSạch (SUP-001)
   supplierCode: string; // SUP-001
-  poReference: string; // PO-20261009-001 hoặc '-'
+  poReference: string; // PO-20261009-001
   lineCount: number;
   totalAmount: number; // VNĐ
   status: GrnStatus;
   receiverName: string; // Phân công: NV. Văn A, Đức.DM...
   items: GrnItemDetail[];
   notes?: string;
+  cancelledReason?: string;
 }
 
-export type GrnFilterTab = 'ALL' | 'TODAY' | 'DRAFT' | 'MISMATCH';
+export type GrnFilterTab = 'ALL' | 'TODAY' | 'DRAFT' | 'COMPLETED' | 'MISMATCH' | 'CANCELLED';
 
 export interface GrnFilterState {
   keyword: string;
@@ -63,6 +104,7 @@ export type PaymentTerm =
   | 'CREDIT_45'
   | 'CASH_ON_DELIVERY'
   | 'ADVANCE_PAID';
+
 export type PaymentMethod = 'Credit' | 'Cash' | 'Bank';
 
 export interface PoLookupOption {
@@ -107,10 +149,6 @@ export interface GrnFormData {
   status: GrnStatus;
 }
 
-export type GrnRemainingOption = 'backorder' | 'cancel';
-
-export type PoStatusPreview = 'PARTIALLY_RECEIVED' | 'COMPLETED';
-
 export interface GrnDetailItem extends GrnItemDetail {
   landedCostPerUnit?: number;
   newUnitCost?: number;
@@ -127,4 +165,3 @@ export interface GrnPostSettings {
   attachmentName?: string;
   attachmentSize?: string;
 }
-

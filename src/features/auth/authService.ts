@@ -1,4 +1,5 @@
 import { httpClient } from '../../api/httpClient';
+import type { ApiResponse } from '../../api/types';
 import type {
   AuthResponse,
   LoginCredentials,
@@ -6,6 +7,59 @@ import type {
   ResetPasswordPayload,
   UserProfile,
 } from './authTypes';
+
+const SEED_TENANT_ID = 'tenant_mt_mart_01';
+
+type BackendLoginUser = {
+  id: string;
+  username?: string;
+  fullName: string;
+  email: string;
+  roleName?: string;
+  role?: string;
+  branchId?: string | null;
+  tenantId?: string;
+  phone?: string;
+};
+
+type BackendLoginPayload = {
+  accessToken: string;
+  refreshToken?: string;
+  expiresAt?: string;
+  user: BackendLoginUser;
+};
+
+function mapRole(roleName?: string): UserProfile['role'] {
+  const role = (roleName || '').toUpperCase();
+  if (role === 'CASHIER') return 'CASHIER';
+  if (role === 'MANAGER' || role === 'BRANCH_MANAGER') return 'MANAGER';
+  if (role === 'STORE_OWNER') return 'STORE_OWNER';
+  return 'ADMIN';
+}
+
+function mapLoginUser(user: BackendLoginUser): UserProfile {
+  return {
+    id: user.id,
+    email: user.email,
+    fullName: user.fullName,
+    role: mapRole(user.roleName || user.role),
+    tenantId: user.tenantId || SEED_TENANT_ID,
+    branchId: user.branchId || undefined,
+    phone: user.phone,
+  };
+}
+
+function unwrapLogin(body: ApiResponse<BackendLoginPayload> | BackendLoginPayload | undefined): AuthResponse | null {
+  if (!body) return null;
+  const payload = 'data' in body && body.data ? body.data : (body as BackendLoginPayload);
+  if (!payload?.accessToken || !payload.user) return null;
+  return {
+    accessToken: payload.accessToken,
+    refreshToken: payload.refreshToken,
+    expiresIn: 3600,
+    user: mapLoginUser(payload.user),
+  };
+}
 
 // Danh sách tài khoản demo tiện lợi cho kiểm thử giao diện & nghiệm thu
 export const DEMO_ACCOUNTS = [
@@ -67,14 +121,31 @@ export const DEMO_ACCOUNTS = [
     password: 'password123',
     tenantCode: 'tenant_mt_mart_01',
     user: {
-      id: 'usr_admin_01',
+      id: 'usr_super_admin',
       email: 'admin@mtgrms.vn',
-      fullName: 'Nguyễn Văn Quản Trị (Super Admin)',
+      fullName: 'Hệ Thống Super Admin',
       role: 'ADMIN' as const,
       tenantId: 'tenant_mt_mart_01',
       tenantName: 'Chuỗi Bán Lẻ Thực Phẩm Sạch MT-Mart',
-      branchId: 'BR-HCM-01',
+      branchId: 'BR-001',
       phone: '0901 234 567',
+    },
+  },
+  {
+    roleLabel: 'Thu ngân quầy POS',
+    username: 'poscashier',
+    email: 'pos.cashier@mtgrms.vn',
+    password: 'password123',
+    tenantCode: 'tenant_mt_mart_01',
+    user: {
+      id: 'usr_cashier',
+      email: 'pos.cashier@mtgrms.vn',
+      fullName: 'Trần Thị Thu Ngân',
+      role: 'CASHIER' as const,
+      tenantId: 'tenant_mt_mart_01',
+      tenantName: 'Chuỗi Siêu Thị Thực Phẩm Sạch MT-Mart',
+      branchId: 'BR-001',
+      phone: '0988 765 432',
     },
   },
 ];
@@ -85,38 +156,28 @@ export const authService = {
    */
   async login(credentials: LoginCredentials): Promise<AuthResponse> {
     try {
-      const payload = {
+      const response = await httpClient.post<ApiResponse<BackendLoginPayload>>('/auth/login', {
         usernameOrEmail: credentials.email.trim(),
         password: credentials.password,
-        tenantCode: credentials.tenantCode,
-      };
-      const response = await httpClient.post<any>('/auth/login', payload);
-      const resData = response.data?.data || response.data;
-      if (resData?.accessToken && resData?.user) {
-        return {
-          accessToken: resData.accessToken,
-          refreshToken: resData.refreshToken,
-          expiresIn: 3600,
-          user: {
-            id: resData.user.id || resData.user.Id,
-            email: resData.user.email || resData.user.Email || credentials.email,
-            fullName: resData.user.fullName || resData.user.FullName || 'Người dùng POS',
-            role: (resData.user.roleName || resData.user.role || 'CASHIER').toUpperCase() as any,
-            tenantId: resData.user.tenantId || resData.user.TenantId || 'tenant_mt_mart_01',
-            tenantName: 'Chuỗi Siêu Thị Thực Phẩm Sạch MT-Mart',
-            branchId: resData.user.branchId || 'BR-HCM-01',
-            phone: resData.user.phone,
-          },
-        };
+        tenantCode: credentials.tenantCode || SEED_TENANT_ID,
+      });
+      const mapped = unwrapLogin(response.data);
+      if (!mapped) {
+        throw new Error('Phản hồi đăng nhập không hợp lệ.');
       }
-      return response.data;
-    } catch {
+      return mapped;
+    } catch (error: unknown) {
+      const axiosError = error as { response?: { data?: { message?: string } }; message?: string };
+      if (axiosError.response?.data?.message) {
+        throw new Error(axiosError.response.data.message);
+      }
+
       // Fallback giả lập logic xác thực cho môi trường phát triển / kiểm thử UI
       const cleanInput = credentials.email.trim().toLowerCase();
       const phoneClean = cleanInput.replace(/\s+/g, '');
       const foundDemo = DEMO_ACCOUNTS.find(
         acc =>
-          acc.username.toLowerCase() === cleanInput ||
+          (acc.username && acc.username.toLowerCase() === cleanInput) ||
           acc.email.toLowerCase() === cleanInput ||
           (acc.user.phone && acc.user.phone.replace(/\s+/g, '') === phoneClean)
       );
@@ -193,18 +254,22 @@ export const authService = {
       );
       return response.data;
     } catch {
-      await new Promise(resolve => setTimeout(resolve, 350));
+      await new Promise(resolve => setTimeout(resolve, 300));
       return {
         success: true,
-        message: `Mã OTP khôi phục mật khẩu đã được gửi thành công đến hòm thư ${email}`,
+        message: 'Mã OTP xác thực đã được gửi về email của bạn (mô phỏng).',
       };
     }
   },
 
   /**
-   * Xác nhận đặt lại mật khẩu mới bằng mã OTP
+   * Đặt lại mật khẩu với mã OTP
    */
   async confirmPasswordReset(payload: ResetPasswordPayload): Promise<{ success: boolean; message: string }> {
+    return this.resetPassword(payload);
+  },
+
+  async resetPassword(payload: ResetPasswordPayload): Promise<{ success: boolean; message: string }> {
     try {
       const response = await httpClient.post<{ success: boolean; message: string }>(
         '/auth/reset-password',
@@ -212,25 +277,22 @@ export const authService = {
       );
       return response.data;
     } catch {
-      await new Promise(resolve => setTimeout(resolve, 350));
+      await new Promise(resolve => setTimeout(resolve, 300));
       return {
         success: true,
-        message: 'Mật khẩu của bạn đã được cập nhật thành công. Vui lòng đăng nhập lại.',
+        message: 'Đổi mật khẩu thành công. Vui lòng đăng nhập lại.',
       };
     }
   },
 
   /**
-   * Đăng xuất
+   * Đăng xuất khỏi hệ thống
    */
   async logout(): Promise<void> {
     try {
       await httpClient.post('/auth/logout');
     } catch {
-      // Bỏ qua lỗi mạng khi logout
-    } finally {
-      localStorage.removeItem('access_token');
-      localStorage.removeItem('auth_user');
+      // Bỏ qua lỗi mạng khi logout trên môi trường test/dev
     }
   },
 };

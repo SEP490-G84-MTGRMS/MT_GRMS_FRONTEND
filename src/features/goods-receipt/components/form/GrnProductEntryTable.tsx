@@ -9,7 +9,8 @@ import {
   CheckCircle2,
   AlertCircle,
 } from 'lucide-react';
-import type { GrnItemDetail } from '../../types/grn.types';
+import type { GrnItemDetail, RejectionReason } from '../../types/grn.types';
+import { REJECTION_REASON_LABELS } from '../../types/grn.types';
 
 interface GrnProductEntryTableProps {
   items: GrnItemDetail[];
@@ -58,7 +59,7 @@ export const GrnProductEntryTable: FC<GrnProductEntryTableProps> = ({
         return;
       }
 
-      // Default internal scanning logic
+      // Default internal scanning logic (GR-02)
       const targetItem = items.find(
         (it) =>
           it.productCode.toLowerCase() === code.toLowerCase() ||
@@ -66,20 +67,28 @@ export const GrnProductEntryTable: FC<GrnProductEntryTableProps> = ({
       );
 
       if (targetItem) {
-        onItemChange(targetItem.id, 'receivedQty', targetItem.receivedQty + 1);
-        setBarcodeAlert(`Đã tăng SL thực nhận cho: ${targetItem.productName}`);
+        const nextReceived = targetItem.receivedQty + 1;
+        const nextAccepted = Math.min(nextReceived, targetItem.orderedQty);
+        onItemChange(targetItem.id, 'receivedQty', nextReceived);
+        onItemChange(targetItem.id, 'acceptedQty', nextAccepted);
+        onItemChange(targetItem.id, 'differenceQty', nextAccepted - targetItem.orderedQty);
+        onItemChange(targetItem.id, 'lineTotal', nextAccepted * targetItem.unitPrice);
+
+        setBarcodeAlert(`Đã quét SKU ${targetItem.productCode}: +1 cho "${targetItem.productName}"`);
         setTimeout(() => setBarcodeAlert(null), 3000);
       } else {
-        setBarcodeAlert(`Không tìm thấy sản phẩm "${code}" trong đơn PO này!`);
+        setBarcodeAlert(`Không tìm thấy sản phẩm mã "${code}" trong đơn PO này!`);
         setTimeout(() => setBarcodeAlert(null), 4000);
       }
       setBarcodeQuery('');
     }
   };
 
-  const totalOrderedQty = items.reduce((acc, it) => acc + it.orderedQty, 0);
-  const totalReceivedQty = items.reduce((acc, it) => acc + it.receivedQty, 0);
-  const totalGoodsAmount = items.reduce((acc, it) => acc + it.lineTotal, 0);
+  const totalOrderedQty = items.reduce((acc, it) => acc + (it.orderedQty || 0), 0);
+  const totalReceivedQty = items.reduce((acc, it) => acc + (it.receivedQty || 0), 0);
+  const totalAcceptedQty = items.reduce((acc, it) => acc + (it.acceptedQty !== undefined ? it.acceptedQty : it.receivedQty || 0), 0);
+  const totalRejectedQty = items.reduce((acc, it) => acc + (it.rejectedQty || 0), 0);
+  const totalGoodsAmount = items.reduce((acc, it) => acc + (it.lineTotal || 0), 0);
 
   return (
     <div
@@ -126,8 +135,23 @@ export const GrnProductEntryTable: FC<GrnProductEntryTableProps> = ({
               fontWeight: 700,
             }}
           >
-            {items.length} mặt hàng
+            {items.length} SKU
           </span>
+          {totalRejectedQty > 0 && (
+            <span
+              style={{
+                padding: '1px 8px',
+                borderRadius: 12,
+                backgroundColor: '#fef2f2',
+                color: '#dc2626',
+                border: '1px solid #fca5a5',
+                fontSize: 11.5,
+                fontWeight: 700,
+              }}
+            >
+              ⚠️ Từ chối {totalRejectedQty} mặt hàng lỗi
+            </span>
+          )}
         </div>
 
         {/* Barcode Search Input & Add Extra Row */}
@@ -231,9 +255,9 @@ export const GrnProductEntryTable: FC<GrnProductEntryTableProps> = ({
         <table
           style={{
             width: '100%',
-            minWidth: 1080,
+            minWidth: 1280,
             borderCollapse: 'collapse',
-            fontSize: 12.5,
+            fontSize: 12,
             textAlign: 'left',
           }}
         >
@@ -244,26 +268,29 @@ export const GrnProductEntryTable: FC<GrnProductEntryTableProps> = ({
                 backgroundColor: '#f8fafc',
                 borderBottom: '1px solid #cbd5e1',
                 color: '#475569',
-                fontSize: 11.5,
+                fontSize: 11,
                 fontWeight: 700,
                 textTransform: 'uppercase',
                 letterSpacing: 0.3,
                 whiteSpace: 'nowrap',
               }}
             >
-              <th style={{ padding: '9px 8px', textAlign: 'center', width: 36 }}>STT</th>
-              <th style={{ padding: '9px 10px', width: 95 }}>MÃ SKU</th>
-              <th style={{ padding: '9px 10px', width: 200 }}>TÊN SẢN PHẨM</th>
-              <th style={{ padding: '9px 8px', textAlign: 'center', width: 65 }}>ĐVT</th>
-              <th style={{ padding: '9px 10px', textAlign: 'right', width: 75 }}>SL ĐẶT</th>
-              <th style={{ padding: '9px 10px', textAlign: 'right', width: 95 }}>SL NHẬN (*)</th>
-              <th style={{ padding: '9px 8px', textAlign: 'center', width: 85 }}>LỆCH</th>
-              <th style={{ padding: '9px 10px', width: 140 }}>MÃ LÔ (BATCH NO) (*)</th>
-              <th style={{ padding: '9px 10px', width: 140 }}>HẠN DÙNG (EXP) (*)</th>
-              <th style={{ padding: '9px 10px', textAlign: 'right', width: 95 }}>ĐƠN GIÁ</th>
+              <th style={{ padding: '9px 8px', textAlign: 'center', width: 34 }}>STT</th>
+              <th style={{ padding: '9px 10px', width: 90 }}>MÃ SKU</th>
+              <th style={{ padding: '9px 10px', width: 170 }}>TÊN SẢN PHẨM</th>
+              <th style={{ padding: '9px 8px', textAlign: 'center', width: 55 }}>ĐVT</th>
+              <th style={{ padding: '9px 8px', textAlign: 'right', width: 65 }}>SL ĐẶT</th>
+              <th style={{ padding: '9px 8px', textAlign: 'right', width: 80 }}>THỰC NHẬN</th>
+              <th style={{ padding: '9px 8px', textAlign: 'right', width: 85 }}>CHẤP NHẬN (*)</th>
+              <th style={{ padding: '9px 8px', textAlign: 'right', width: 75 }}>TỪ CHỐI</th>
+              <th style={{ padding: '9px 10px', width: 160 }}>LÝ DO TỪ CHỐI</th>
+              <th style={{ padding: '9px 8px', textAlign: 'center', width: 70 }}>LỆCH PO</th>
+              <th style={{ padding: '9px 10px', width: 130 }}>MÃ LÔ (BATCH NO)</th>
+              <th style={{ padding: '9px 10px', width: 135 }}>HẠN DÙNG (EXP)</th>
+              <th style={{ padding: '9px 10px', textAlign: 'right', width: 90 }}>ĐƠN GIÁ</th>
               <th style={{ padding: '9px 12px', textAlign: 'right', width: 105 }}>THÀNH TIỀN</th>
               {!readOnly && (
-                <th style={{ padding: '9px 8px', textAlign: 'center', width: 40 }}>XÓA</th>
+                <th style={{ padding: '9px 8px', textAlign: 'center', width: 36 }}>XÓA</th>
               )}
             </tr>
           </thead>
@@ -273,7 +300,7 @@ export const GrnProductEntryTable: FC<GrnProductEntryTableProps> = ({
             {items.length === 0 ? (
               <tr>
                 <td
-                  colSpan={readOnly ? 11 : 12}
+                  colSpan={readOnly ? 14 : 15}
                   style={{
                     padding: '36px 16px',
                     textAlign: 'center',
@@ -287,15 +314,17 @@ export const GrnProductEntryTable: FC<GrnProductEntryTableProps> = ({
             ) : (
               items.map((row, idx) => {
                 const diff = row.differenceQty;
-                const isMismatch = diff !== 0;
+                const rejectedCount = row.rejectedQty || 0;
+                const isMismatch = diff !== 0 || rejectedCount > 0;
                 const isNearExp = isNearExpiry(row.expiryDate);
+                const hasExcessDelivery = row.receivedQty > row.orderedQty;
 
                 return (
                   <tr
                     key={row.id}
                     style={{
                       borderBottom: '1px solid #f1f5f9',
-                      backgroundColor: isMismatch ? '#fffbfb' : '#ffffff',
+                      backgroundColor: rejectedCount > 0 ? '#fff5f5' : isMismatch ? '#fffbfb' : '#ffffff',
                       transition: 'background-color 0.15s ease',
                       whiteSpace: 'nowrap',
                     }}
@@ -312,7 +341,14 @@ export const GrnProductEntryTable: FC<GrnProductEntryTableProps> = ({
 
                     {/* 3. Tên sản phẩm */}
                     <td style={{ padding: '8px 10px', fontWeight: 600, color: '#0f172a' }}>
-                      {row.productName}
+                      <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        <span>{row.productName}</span>
+                        {hasExcessDelivery && (
+                          <span style={{ fontSize: 10.5, color: '#9333ea', fontWeight: 600 }}>
+                            ⚠️ NCC giao thừa {row.receivedQty - row.orderedQty} (Chặn nhập vượt PO)
+                          </span>
+                        )}
+                      </div>
                     </td>
 
                     {/* 4. ĐVT */}
@@ -321,46 +357,136 @@ export const GrnProductEntryTable: FC<GrnProductEntryTableProps> = ({
                     </td>
 
                     {/* 5. SL đặt */}
-                    <td style={{ padding: '8px 10px', textAlign: 'right', color: '#475569', fontWeight: 600 }}>
+                    <td style={{ padding: '8px 8px', textAlign: 'right', color: '#475569', fontWeight: 600 }}>
                       {row.orderedQty}
                     </td>
 
                     {/* 6. SL thực nhận */}
-                    <td style={{ padding: '6px 8px', textAlign: 'right' }}>
+                    <td style={{ padding: '6px 6px', textAlign: 'right' }}>
                       {readOnly ? (
-                        <span style={{ fontWeight: 700, color: isMismatch ? '#dc2626' : '#0f172a' }}>
-                          {row.receivedQty}
-                        </span>
+                        <span style={{ fontWeight: 600, color: '#334155' }}>{row.receivedQty}</span>
                       ) : (
                         <input
                           type="number"
                           min={0}
                           value={row.receivedQty}
                           onChange={(e) => {
-                            const val = Math.max(0, parseInt(e.target.value) || 0);
+                            const val = Math.max(0, parseFloat(e.target.value) || 0);
                             onItemChange(row.id, 'receivedQty', val);
+                            // Tự động gán acceptedQty nếu chưa sửa riêng
+                            const newAccepted = Math.min(val, row.orderedQty);
+                            onItemChange(row.id, 'acceptedQty', newAccepted);
+                            const newRejected = Math.max(0, val - newAccepted);
+                            onItemChange(row.id, 'rejectedQty', newRejected);
+                            onItemChange(row.id, 'differenceQty', newAccepted - row.orderedQty);
+                            onItemChange(row.id, 'lineTotal', newAccepted * row.unitPrice);
                           }}
                           style={{
-                            width: 75,
-                            height: 30,
+                            width: 68,
+                            height: 28,
                             padding: '0 6px',
                             textAlign: 'right',
-                            borderRadius: 5,
-                            border: isMismatch ? '1.5px solid #ef4444' : '1px solid #cbd5e1',
-                            fontWeight: 700,
-                            fontSize: 13,
-                            color: isMismatch ? '#dc2626' : '#0f172a',
-                            backgroundColor: isMismatch ? '#fef2f2' : '#ffffff',
+                            borderRadius: 4,
+                            border: '1px solid #cbd5e1',
+                            fontWeight: 600,
+                            fontSize: 12,
+                            color: '#0f172a',
                             outline: 'none',
                           }}
                         />
                       )}
                     </td>
 
-                    {/* 7. Lệch */}
+                    {/* 7. SL Chấp nhận (*) */}
+                    <td style={{ padding: '6px 6px', textAlign: 'right' }}>
+                      {readOnly ? (
+                        <span style={{ fontWeight: 700, color: '#0d9488' }}>
+                          {row.acceptedQty}
+                        </span>
+                      ) : (
+                        <input
+                          type="number"
+                          min={0}
+                          max={Math.min(row.receivedQty, row.orderedQty)}
+                          value={row.acceptedQty}
+                          onChange={(e) => {
+                            const val = Math.max(0, parseFloat(e.target.value) || 0);
+                            const cappedVal = Math.min(val, row.receivedQty, row.orderedQty);
+                            onItemChange(row.id, 'acceptedQty', cappedVal);
+                            const newRejected = Math.max(0, row.receivedQty - cappedVal);
+                            onItemChange(row.id, 'rejectedQty', newRejected);
+                            onItemChange(row.id, 'differenceQty', cappedVal - row.orderedQty);
+                            onItemChange(row.id, 'lineTotal', cappedVal * row.unitPrice);
+                          }}
+                          style={{
+                            width: 68,
+                            height: 28,
+                            padding: '0 6px',
+                            textAlign: 'right',
+                            borderRadius: 4,
+                            border: '1.5px solid #0d9488',
+                            fontWeight: 700,
+                            fontSize: 12.5,
+                            color: '#0f172a',
+                            backgroundColor: '#f0fdfa',
+                            outline: 'none',
+                          }}
+                        />
+                      )}
+                    </td>
+
+                    {/* 8. SL Từ chối */}
+                    <td style={{ padding: '6px 6px', textAlign: 'right' }}>
+                      <span
+                        style={{
+                          fontWeight: 700,
+                          color: rejectedCount > 0 ? '#dc2626' : '#94a3b8',
+                          fontSize: 12,
+                        }}
+                      >
+                        {rejectedCount}
+                      </span>
+                    </td>
+
+                    {/* 9. Lý do từ chối */}
+                    <td style={{ padding: '6px 8px' }}>
+                      {rejectedCount > 0 ? (
+                        readOnly ? (
+                          <span style={{ color: '#dc2626', fontSize: 11, fontWeight: 600 }}>
+                            {row.rejectionReason ? REJECTION_REASON_LABELS[row.rejectionReason] : 'Chưa chọn lý do'}
+                          </span>
+                        ) : (
+                          <select
+                            value={row.rejectionReason || ''}
+                            onChange={(e) => onItemChange(row.id, 'rejectionReason', e.target.value as RejectionReason)}
+                            style={{
+                              width: '100%',
+                              height: 28,
+                              borderRadius: 4,
+                              border: !row.rejectionReason ? '1.5px solid #dc2626' : '1px solid #cbd5e1',
+                              fontSize: 11,
+                              color: !row.rejectionReason ? '#dc2626' : '#0f172a',
+                              backgroundColor: !row.rejectionReason ? '#fff1f2' : '#ffffff',
+                              outline: 'none',
+                            }}
+                          >
+                            <option value="">-- Chọn lý do từ chối --</option>
+                            {Object.entries(REJECTION_REASON_LABELS).map(([code, label]) => (
+                              <option key={code} value={code}>
+                                {label}
+                              </option>
+                            ))}
+                          </select>
+                        )
+                      ) : (
+                        <span style={{ color: '#94a3b8', fontSize: 11 }}>—</span>
+                      )}
+                    </td>
+
+                    {/* 10. Lệch PO */}
                     <td style={{ padding: '8px 8px', textAlign: 'center' }}>
                       {diff === 0 ? (
-                        <span style={{ color: '#94a3b8', fontSize: 12 }}>0</span>
+                        <span style={{ color: '#16a34a', fontSize: 11, fontWeight: 600 }}>Đủ 100%</span>
                       ) : diff < 0 ? (
                         <span
                           style={{
@@ -375,33 +501,19 @@ export const GrnProductEntryTable: FC<GrnProductEntryTableProps> = ({
                             fontSize: 11,
                             border: '1px solid #fca5a5',
                           }}
-                          title={`Thiếu ${Math.abs(diff)} ${row.unit} so với đơn PO`}
+                          title={`Giao thiếu ${Math.abs(diff)} ${row.unit} so với đơn PO`}
                         >
                           <AlertTriangle size={11} />
                           {diff}
                         </span>
                       ) : (
-                        <span
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: 3,
-                            padding: '1px 6px',
-                            borderRadius: 4,
-                            backgroundColor: '#f3e8ff',
-                            color: '#7e22ce',
-                            fontWeight: 700,
-                            fontSize: 11,
-                            border: '1px solid #d8b4fe',
-                          }}
-                          title={`Thừa ${diff} ${row.unit} so với đơn PO`}
-                        >
+                        <span style={{ color: '#7e22ce', fontWeight: 700, fontSize: 11 }}>
                           +{diff}
                         </span>
                       )}
                     </td>
 
-                    {/* 8. Mã Lô (Batch No) */}
+                    {/* 11. Mã Lô (Batch No) */}
                     <td style={{ padding: '6px 8px' }}>
                       {readOnly ? (
                         <span style={{ fontFamily: 'monospace', fontWeight: 600, color: '#334155' }}>
@@ -412,12 +524,12 @@ export const GrnProductEntryTable: FC<GrnProductEntryTableProps> = ({
                           type="text"
                           value={row.batchCode || ''}
                           onChange={(e) => onItemChange(row.id, 'batchCode', e.target.value)}
-                          placeholder="VD: BAT-2610-01"
+                          placeholder="VD: LOT-202610A"
                           style={{
                             width: '100%',
-                            height: 30,
-                            padding: '0 8px',
-                            borderRadius: 5,
+                            height: 28,
+                            padding: '0 6px',
+                            borderRadius: 4,
                             border: !row.batchCode ? '1px dashed #f59e0b' : '1px solid #cbd5e1',
                             fontFamily: 'monospace',
                             fontSize: 11.5,
@@ -430,109 +542,107 @@ export const GrnProductEntryTable: FC<GrnProductEntryTableProps> = ({
                       )}
                     </td>
 
-                    {/* 9. Hạn dùng (EXP) & Cảnh báo FEFO */}
+                    {/* 12. Hạn dùng (EXP) */}
                     <td style={{ padding: '6px 8px' }}>
                       {readOnly ? (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                          <span style={{ fontSize: 12, color: '#334155' }}>{row.expiryDate || '—'}</span>
+                          <span style={{ fontSize: 11.5, color: '#334155' }}>{row.expiryDate || '—'}</span>
                           {isNearExp && (
                             <span
                               style={{
                                 display: 'inline-flex',
                                 alignItems: 'center',
-                                gap: 3,
+                                gap: 2,
                                 fontSize: 10,
                                 fontWeight: 700,
                                 color: '#b45309',
                                 backgroundColor: '#fef3c7',
-                                padding: '1px 5px',
+                                padding: '1px 4px',
                                 borderRadius: 3,
                                 border: '1px solid #fde68a',
                                 width: 'fit-content',
                               }}
                             >
-                              ⚠️ Sát HSD (&lt;30 ngày)
+                              ⚠️ Cận HSD (&lt;30 ngày)
                             </span>
                           )}
                         </div>
                       ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', position: 'relative' }}>
-                            <input
-                              type="date"
-                              value={row.expiryDate || ''}
-                              onChange={(e) => onItemChange(row.id, 'expiryDate', e.target.value)}
-                              style={{
-                                width: '100%',
-                                height: 30,
-                                padding: '0 6px',
-                                borderRadius: 5,
-                                border: isNearExp ? '1px solid #f59e0b' : '1px solid #cbd5e1',
-                                fontSize: 11.5,
-                                color: '#0f172a',
-                                backgroundColor: '#ffffff',
-                                outline: 'none',
-                              }}
-                            />
-                          </div>
+                          <input
+                            type="date"
+                            value={row.expiryDate || ''}
+                            onChange={(e) => onItemChange(row.id, 'expiryDate', e.target.value)}
+                            style={{
+                              width: '100%',
+                              height: 28,
+                              padding: '0 4px',
+                              borderRadius: 4,
+                              border: isNearExp ? '1px solid #f59e0b' : '1px solid #cbd5e1',
+                              fontSize: 11,
+                              color: '#0f172a',
+                              backgroundColor: '#ffffff',
+                              outline: 'none',
+                            }}
+                          />
                           {isNearExp && (
                             <span
                               style={{
                                 display: 'inline-flex',
                                 alignItems: 'center',
-                                gap: 3,
+                                gap: 2,
                                 fontSize: 10,
                                 fontWeight: 700,
                                 color: '#b45309',
                                 backgroundColor: '#fef3c7',
-                                padding: '1px 5px',
+                                padding: '1px 4px',
                                 borderRadius: 3,
                                 border: '1px solid #fde68a',
                                 width: 'fit-content',
                               }}
                             >
-                              ⚠️ Sát HSD (&lt;30 ngày)
+                              ⚠️ Cận HSD (&lt;30 ngày)
                             </span>
                           )}
                         </div>
                       )}
                     </td>
 
-                    {/* 10. Đơn giá nhập */}
-                    <td style={{ padding: '8px 10px', textAlign: 'right', color: '#475569', fontFamily: 'monospace' }}>
+                    {/* 13. Đơn giá */}
+                    <td style={{ padding: '8px 8px', textAlign: 'right', color: '#475569', fontFamily: 'monospace' }}>
                       {formatCurrency(row.unitPrice)}
                     </td>
 
-                    {/* 11. Thành tiền */}
+                    {/* 14. Thành tiền */}
                     <td
                       style={{
-                        padding: '8px 12px',
+                        padding: '8px 10px',
                         textAlign: 'right',
                         fontWeight: 700,
                         fontFamily: 'monospace',
                         color: '#0f172a',
-                        fontSize: 13,
+                        fontSize: 12.5,
                       }}
                     >
                       {formatCurrency(row.lineTotal)}
                     </td>
 
-                    {/* 12. Xóa */}
+                    {/* 15. Xóa */}
                     {!readOnly && (
-                      <td style={{ padding: '8px 8px', textAlign: 'center' }}>
+                      <td style={{ padding: '6px 8px', textAlign: 'center' }}>
                         {onRemoveRow && (
                           <button
                             type="button"
                             onClick={() => onRemoveRow(row.id)}
                             style={{
-                              background: 'none',
                               border: 'none',
-                              padding: 4,
+                              background: 'transparent',
                               color: '#94a3b8',
                               cursor: 'pointer',
+                              padding: 4,
                               borderRadius: 4,
                             }}
-                            title="Xóa dòng này"
+                            title="Xóa dòng"
                           >
                             <Trash2 size={13} />
                           </button>
@@ -544,44 +654,54 @@ export const GrnProductEntryTable: FC<GrnProductEntryTableProps> = ({
               })
             )}
           </tbody>
-        </table>
-      </div>
 
-      {/* Table Summary Footer */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          flexWrap: 'wrap',
-          gap: 12,
-          paddingTop: 12,
-          marginTop: 10,
-          borderTop: '1px solid #f1f5f9',
-          fontSize: 12.5,
-          color: '#475569',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <span>
-            Tổng SL đặt theo PO: <b style={{ color: '#0f172a' }}>{totalOrderedQty}</b>
-          </span>
-          <span>
-            Tổng SL thực nhận: <b style={{ color: '#0f766e' }}>{totalReceivedQty}</b>
-          </span>
-          {totalReceivedQty !== totalOrderedQty && (
-            <span style={{ color: '#dc2626', fontWeight: 600 }}>
-              (Chênh lệch: {totalReceivedQty - totalOrderedQty > 0 ? `+${totalReceivedQty - totalOrderedQty}` : totalReceivedQty - totalOrderedQty})
-            </span>
+          {/* Footer Totals */}
+          {items.length > 0 && (
+            <tfoot>
+              <tr
+                style={{
+                  backgroundColor: '#f8fafc',
+                  borderTop: '2px solid #cbd5e1',
+                  fontWeight: 700,
+                  fontSize: 12,
+                  color: '#0f172a',
+                }}
+              >
+                <td colSpan={4} style={{ padding: '10px 10px', textAlign: 'right' }}>
+                  TỔNG CỘNG KIỂM ĐẾM:
+                </td>
+                <td style={{ padding: '10px 8px', textAlign: 'right', color: '#475569' }}>
+                  {totalOrderedQty}
+                </td>
+                <td style={{ padding: '10px 8px', textAlign: 'right', color: '#334155' }}>
+                  {totalReceivedQty}
+                </td>
+                <td style={{ padding: '10px 8px', textAlign: 'right', color: '#0d9488' }}>
+                  {totalAcceptedQty}
+                </td>
+                <td style={{ padding: '10px 8px', textAlign: 'right', color: totalRejectedQty > 0 ? '#dc2626' : '#94a3b8' }}>
+                  {totalRejectedQty}
+                </td>
+                <td colSpan={4}></td>
+                <td style={{ padding: '10px 8px', textAlign: 'right', color: '#475569' }}>
+                  Tiền hàng:
+                </td>
+                <td
+                  style={{
+                    padding: '10px 10px',
+                    textAlign: 'right',
+                    fontFamily: 'monospace',
+                    fontSize: 13,
+                    color: '#0d9488',
+                  }}
+                >
+                  {formatCurrency(totalGoodsAmount)}
+                </td>
+                {!readOnly && <td></td>}
+              </tr>
+            </tfoot>
           )}
-        </div>
-
-        <div>
-          <span>Tổng tiền hàng ({items.length} mặt hàng): </span>
-          <b style={{ color: '#0d9488', fontSize: 14, fontFamily: 'monospace' }}>
-            {formatCurrency(totalGoodsAmount)} VNĐ
-          </b>
-        </div>
+        </table>
       </div>
     </div>
   );

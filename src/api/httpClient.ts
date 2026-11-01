@@ -5,6 +5,10 @@ export const httpClient = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  // Tuân thủ chuẩn ASP.NET Core Model Binding cho mảng: CategoryIds=id1&CategoryIds=id2 (thay vì CategoryIds[]=id1)
+  paramsSerializer: {
+    indexes: null,
+  },
 });
 
 httpClient.interceptors.request.use((config) => {
@@ -13,23 +17,24 @@ httpClient.interceptors.request.use((config) => {
     config.headers.Authorization = `Bearer ${token}`;
   }
 
-  // Lấy tenantId từ localStorage hoặc từ auth_user profile
-  let tenantId = localStorage.getItem('tenant_id');
-  if (!tenantId) {
+  // Tự động gắn Tenant ID chuẩn của hệ thống để đồng bộ dữ liệu đa người thuê
+  let tenantId = localStorage.getItem('tenant_id') || 'tenant_mt_mart_01';
+  const storedUser = localStorage.getItem('auth_user');
+  if (storedUser) {
     try {
-      const rawUser = localStorage.getItem('auth_user');
-      if (rawUser) {
-        const u = JSON.parse(rawUser);
-        tenantId = u.tenantId;
+      const user = JSON.parse(storedUser);
+      if (user.tenantId && user.tenantId !== 'TENANT-DEFAULT' && user.tenantId !== 'TENANT-HCM-01') {
+        tenantId = user.tenantId;
       }
     } catch {
-      // ignore
+      // fallback tenantId
     }
   }
 
   if (config.headers) {
-    config.headers['X-Tenant-Id'] = tenantId || 'tenant_mt_mart_01';
+    config.headers['X-Tenant-Id'] = tenantId;
   }
+
   return config;
 });
 
@@ -37,9 +42,14 @@ httpClient.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem('access_token');
-      if (window.location.pathname !== '/login') {
-        window.location.href = '/login';
+      const url = String(error.config?.url || '');
+      const isAuthCall = url.includes('/auth/login') || url.includes('/Auth/login');
+      if (!isAuthCall) {
+        localStorage.removeItem('access_token');
+        const path = window.location.pathname;
+        if (path !== '/login' && path !== '/auth/login') {
+          window.location.href = '/login';
+        }
       }
     }
     return Promise.reject(error);

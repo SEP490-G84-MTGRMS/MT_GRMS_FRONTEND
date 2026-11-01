@@ -22,7 +22,7 @@ import { EditSupplierProductModal } from '../components/products/EditSupplierPro
 import { AdminToast, type ToastState } from '../../admin/components';
 import { supplierProductApi } from '../api/supplierProductApi';
 import { supplierApi } from '../api/supplierApi';
-import { Building2, Download, Plus, Layers, Loader2 } from 'lucide-react';
+import { Building2, Download, Plus, Layers, Store, Loader2 } from 'lucide-react';
 import '../../purchase-order/purchase-order.css';
 import '../supplier.css';
 
@@ -39,7 +39,7 @@ const DEFAULT_FILTERS: ProductFilterState = {
   categoryFilter: 'ALL',
   statusFilter: 'ALL',
   pageIndex: 1,
-  pageSize: 10,
+  pageSize: 15,
 };
 
 export const SupplierProductManagementPage: FC = () => {
@@ -219,51 +219,35 @@ export const SupplierProductManagementPage: FC = () => {
       {/* Toast Notification */}
       <AdminToast toast={toast} onClose={() => setToast(null)} />
 
-      {/* ── Page Header theo chuẩn PoList / SupplierListPage ── */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          flexWrap: 'wrap',
-          gap: 12,
-          marginBottom: 8,
-          flexShrink: 0,
-        }}
-      >
+      <div className="so-list-header">
         <div>
-          <h1
-            style={{
-              fontSize: 20,
-              fontWeight: 800,
-              color: 'var(--text-main)',
-              margin: 0,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-            }}
-          >
+          <h1 className="so-list-title">
             <Layers size={22} color="var(--blue-primary, #0f766e)" />
             <span>Sản Phẩm Theo Nhà Cung Cấp</span>
             {isLoading && <Loader2 size={16} className="animate-spin" style={{ color: 'var(--blue-primary, #0f766e)' }} />}
           </h1>
         </div>
 
-        {/* Action buttons */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div className="so-list-header-actions">
           <Link
             to="/store-owner/suppliers"
             className="po-btn po-btn-secondary"
-            style={{ height: 32, padding: '0 14px', textDecoration: 'none' }}
             title="Quay lại danh sách nhà cung cấp"
           >
             <Building2 size={14} />
             <span>Danh sách NCC</span>
           </Link>
+          <Link
+            to="/store-owner/suppliers/branches"
+            className="po-btn po-btn-secondary"
+            title="Gán nhà cung cấp phân bổ tới các cửa hàng / chi nhánh"
+          >
+            <Store size={14} />
+            <span>Gán NCC với Cửa hàng</span>
+          </Link>
           <button
             type="button"
             className="po-btn po-btn-secondary"
-            style={{ height: 32, padding: '0 14px' }}
             onClick={() => showToast('Đang kết xuất danh mục mặt hàng NCC ra tệp Excel (.xlsx)...', 'info')}
           >
             <Download size={14} />
@@ -273,7 +257,6 @@ export const SupplierProductManagementPage: FC = () => {
             type="button"
             id="btnOpenAssignProductModal"
             className="po-btn po-btn-primary"
-            style={{ height: 32, padding: '0 14px' }}
             onClick={() => setIsAssignModalOpen(true)}
           >
             <Plus size={14} />

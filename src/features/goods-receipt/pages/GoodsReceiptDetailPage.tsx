@@ -15,7 +15,6 @@ import {
 import type {
   GrnDetailItem,
   GrnPostSettings,
-  GrnRemainingOption,
   GrnStatus,
   PoStatusPreview,
   UserRole,
@@ -62,7 +61,7 @@ export const GoodsReceiptDetailPage: FC<{ defaultRole?: UserRole }> = ({
   const isConfirmationMode = isModeConfirmParam || status === 'DRAFT';
 
   // Items with detail fields
-  const [items, setItems] = useState<GrnDetailItem[]>(() => {
+  const [items] = useState<GrnDetailItem[]>(() => {
     return existingReceipt.items.map((it) => {
       const isCatchWeight =
         it.productCode === 'FR-THIT-01' ||
@@ -78,7 +77,6 @@ export const GoodsReceiptDetailPage: FC<{ defaultRole?: UserRole }> = ({
         retailPrice: retail,
         isCatchWeight,
         isGift,
-        remainingOption: (it.differenceQty || 0) < 0 ? 'backorder' : undefined,
       };
     });
   });
@@ -104,15 +102,8 @@ export const GoodsReceiptDetailPage: FC<{ defaultRole?: UserRole }> = ({
     return items.reduce((sum, it) => sum + Math.ceil(it.receivedQty || 0), 0);
   }, [items]);
 
-  // PO status calculation
-  const calculatedPoStatus = useMemo<PoStatusPreview>(() => {
-    const shortages = items.filter((it) => (it.receivedQty || 0) < (it.orderedQty || 0));
-    if (shortages.length === 0) return 'COMPLETED';
-    const hasBackorder = shortages.some((it) => it.remainingOption === 'backorder');
-    return hasBackorder ? 'PARTIALLY_RECEIVED' : 'COMPLETED';
-  }, [items]);
-
-  const [poStatusPreview, setPoStatusPreview] = useState<PoStatusPreview>(calculatedPoStatus);
+  // PO status calculation: In V1, PO directly transitions to COMPLETED
+  const poStatusPreview: PoStatusPreview = 'COMPLETED';
 
   // Post settings
   const [postSettings, setPostSettings] = useState<GrnPostSettings>({
@@ -148,17 +139,6 @@ export const GoodsReceiptDetailPage: FC<{ defaultRole?: UserRole }> = ({
       `Đã chuyển sang góc nhìn ${newRole === 'store_owner' ? 'Chủ cửa hàng (Toàn chuỗi)' : 'Thủ kho (Chi nhánh ' + employeeBranchId + ')'}`,
       'info'
     );
-  };
-
-  // Handling option change
-  const handleRemainingOptionChange = (itemId: string, option: GrnRemainingOption) => {
-    setItems((prev) => {
-      const updated = prev.map((it) => (it.id === itemId ? { ...it, remainingOption: option } : it));
-      const shortages = updated.filter((it) => (it.receivedQty || 0) < (it.orderedQty || 0));
-      const hasBackorder = shortages.some((it) => it.remainingOption === 'backorder');
-      setPoStatusPreview(hasBackorder ? 'PARTIALLY_RECEIVED' : 'COMPLETED');
-      return updated;
-    });
   };
 
   const handlePostSettingChange = (key: keyof GrnPostSettings, value: boolean) => {
@@ -357,9 +337,6 @@ export const GoodsReceiptDetailPage: FC<{ defaultRole?: UserRole }> = ({
       <GrnPoRemainingTable
         poReference={existingReceipt.poReference}
         items={items}
-        poStatusPreview={poStatusPreview}
-        onRemainingOptionChange={handleRemainingOptionChange}
-        onPoStatusChange={(st) => setPoStatusPreview(st)}
         readOnly={!isConfirmationMode && status === 'CONFIRMED'}
       />
 

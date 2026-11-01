@@ -1,25 +1,55 @@
 import React, { useRef } from 'react';
 import type { FC, KeyboardEvent, ChangeEvent } from 'react';
-import type { OrderMatrixProduct, DayColInfo, QtyMatrixMap } from '../../types/po.types';
+import type {
+  OrderMatrixProduct,
+  DayColInfo,
+  QtyMatrixMap,
+  MatrixCellMap,
+  MatrixCellData,
+} from '../../types/po.types';
+import { RotateCcw } from 'lucide-react';
 
 interface OrderMatrixTableProps {
   products: OrderMatrixProduct[];
   days: DayColInfo[];
-  qtyMap: QtyMatrixMap;
+  qtyMap?: QtyMatrixMap;
+  cellMap?: MatrixCellMap;
   showSoh: boolean;
-  onQtyChange: (productId: string, dateKey: string, val: number) => void;
+  onQtyChange?: (productId: string, dateKey: string, val: number) => void;
+  onCellChange?: (productId: string, dateKey: string, val: number) => void;
+  onResetOverride?: (productId: string, dateKey: string) => void;
+  onDayCutoffClick?: (day: DayColInfo) => void;
   readOnly?: boolean;
+  isStoreOwner?: boolean;
 }
 
 export const OrderMatrixTable: FC<OrderMatrixTableProps> = ({
   products,
   days,
   qtyMap,
+  cellMap,
   showSoh,
   onQtyChange,
+  onCellChange,
+  onResetOverride,
+  onDayCutoffClick,
   readOnly = false,
+  isStoreOwner = true,
 }) => {
   const fmt = (n: number) => new Intl.NumberFormat('vi-VN').format(n);
+
+  // Helper to extract cell data consistently
+  const getCell = (productId: string, dateKey: string): MatrixCellData => {
+    if (cellMap && cellMap[productId]?.[dateKey]) {
+      return cellMap[productId][dateKey];
+    }
+    const val = qtyMap?.[productId]?.[dateKey] || 0;
+    return {
+      employeeQty: val,
+      storeQty: null,
+      finalQty: val,
+    };
+  };
 
   // Group products by Supplier
   const supplierOrder = ['TươiSạch', 'SnackVN', 'Vissan', 'CPFoods'];
@@ -49,18 +79,18 @@ export const OrderMatrixTable: FC<OrderMatrixTableProps> = ({
     }
   });
 
-  // Calculate daily totals across all products
+  // Calculate daily totals across all products based on finalQty
   const dailyTotalQty = days.map((d) => {
     return products.reduce((acc, p) => {
-      const q = qtyMap[p.id]?.[d.dateKey] || 0;
-      return acc + q;
+      const cell = getCell(p.id, d.dateKey);
+      return acc + (cell.finalQty || 0);
     }, 0);
   });
 
   const grandTotalQty = dailyTotalQty.reduce((a, b) => a + b, 0);
 
   const grandTotalAmt = products.reduce((acc, p) => {
-    const rowQty = days.reduce((sum, d) => sum + (qtyMap[p.id]?.[d.dateKey] || 0), 0);
+    const rowQty = days.reduce((sum, d) => sum + (getCell(p.id, d.dateKey).finalQty || 0), 0);
     return acc + rowQty * p.price;
   }, 0);
 
@@ -113,7 +143,12 @@ export const OrderMatrixTable: FC<OrderMatrixTableProps> = ({
     const rawVal = e.target.value.replace(/[^\d.]/g, '');
     let n = parseFloat(rawVal);
     if (isNaN(n) || n < 0) n = 0;
-    onQtyChange(productId, dateKey, n);
+
+    if (onCellChange) {
+      onCellChange(productId, dateKey, n);
+    } else if (onQtyChange) {
+      onQtyChange(productId, dateKey, n);
+    }
   };
 
   const headerRef = useRef<HTMLDivElement>(null);
@@ -138,7 +173,7 @@ export const OrderMatrixTable: FC<OrderMatrixTableProps> = ({
         </>
       )}
       {days.map((d) => (
-        <col key={d.dateKey} style={{ width: 54 }} />
+        <col key={d.dateKey} style={{ width: 58 }} />
       ))}
       <col style={{ width: 60 }} />
       <col style={{ width: 125 }} />
@@ -147,7 +182,7 @@ export const OrderMatrixTable: FC<OrderMatrixTableProps> = ({
 
   return (
     <div className="po-grid-container">
-      {/* ── Fixed Full-Width Header (Không bị thanh scroll ăn vào) ── */}
+      {/* ── Fixed Full-Width Header ── */}
       <div ref={headerRef} className="po-grid-header-box">
         <table className="po-grid-table">
           {renderColGroup()}
@@ -165,22 +200,67 @@ export const OrderMatrixTable: FC<OrderMatrixTableProps> = ({
               )}
 
               {days.map((d) => {
-                const isLockedOrOff = d.isOff || d.isLocked;
+                const isOff = d.isOff;
+                const isLocked = d.isLocked;
+                const isCutoffDue = d.cutoffStatus === 'CUTOFF_DUE';
+                const isPoGenerated = d.cutoffStatus === 'PO_GENERATED';
+
                 return (
                   <th
                     key={d.dateKey}
-                    className={`po-th-date ${isLockedOrOff ? 'po-th-locked' : 'po-th-open'}`}
+                    className={`po-th-date ${
+                      isOff
+                        ? 'po-th-off'
+                        : isLocked || isPoGenerated
+                        ? 'po-th-locked'
+                        : isCutoffDue
+                        ? 'po-th-cutoff-due'
+                        : 'po-th-open'
+                    }`}
                     title={
-                      d.isOff
-                        ? 'Nhà cung cấp không giao hàng ngày này'
-                        : d.isLocked
-                        ? 'Ngày này đã bị khóa nhận đơn'
-                        : 'Ngày mở đặt hàng'
+                      isOff
+                        ? d.offReason || 'Nhà cung cấp không giao hàng ngày này'
+                        : isPoGenerated
+                        ? `Đã chốt đơn PO (${d.poCode || 'Đã tạo'})`
+                        : isCutoffDue
+                        ? `ĐÃ ĐẾN HẠN CHỐT CUTOFF (${d.cutoffHour || 'Hạn chốt'}). Nhấp để chốt ngày này.`
+                        : `Lịch giao hợp lệ (Cutoff: ${d.cutoffHour || 'Theo lịch'})`
                     }
+                    onClick={() => {
+                      if (isCutoffDue && onDayCutoffClick) {
+                        onDayCutoffClick(d);
+                      }
+                    }}
+                    style={{ cursor: isCutoffDue ? 'pointer' : 'default' }}
                   >
                     <div className="po-col-date-header">
                       <span className="po-col-dow">{d.dowName}</span>
                       <span className="po-col-short">{d.dateShort}</span>
+
+                      {/* Cutoff Status Tag */}
+                      <span
+                        className={`po-cutoff-tag ${
+                          isOff
+                            ? 'po-tag-off'
+                            : isPoGenerated || isLocked
+                            ? 'po-tag-locked'
+                            : isCutoffDue
+                            ? 'po-tag-due'
+                            : 'po-tag-open'
+                        }`}
+                      >
+                        {isOff ? (
+                          'Nghỉ'
+                        ) : isPoGenerated ? (
+                          'Đã PO'
+                        ) : isLocked ? (
+                          'Khóa'
+                        ) : isCutoffDue ? (
+                          'Đến hạn'
+                        ) : (
+                          'Mở'
+                        )}
+                      </span>
                     </div>
                   </th>
                 );
@@ -195,7 +275,7 @@ export const OrderMatrixTable: FC<OrderMatrixTableProps> = ({
         </table>
       </div>
 
-      {/* ── Scrollable Body (Thanh scroll chỉ nằm ở phần thân bảng bên dưới) ── */}
+      {/* ── Scrollable Body ── */}
       <div ref={bodyRef} className="po-grid-body-box" onScroll={handleBodyScroll}>
         <table className="po-grid-table">
           {renderColGroup()}
@@ -208,15 +288,16 @@ export const OrderMatrixTable: FC<OrderMatrixTableProps> = ({
             </tr>
           ) : (
             groupedProducts.map((group) => {
-              // Subtotals for this category
+              // Subtotals for this supplier group
               const subDayQty = days.map((d) => {
                 return group.items.reduce((sum, item) => {
-                  return sum + (qtyMap[item.id]?.[d.dateKey] || 0);
+                  const cell = getCell(item.id, d.dateKey);
+                  return sum + (cell.finalQty || 0);
                 }, 0);
               });
               const subTotalQty = subDayQty.reduce((a, b) => a + b, 0);
               const subTotalAmt = group.items.reduce((sum, item) => {
-                const rowQty = days.reduce((rSum, d) => rSum + (qtyMap[item.id]?.[d.dateKey] || 0), 0);
+                const rowQty = days.reduce((rSum, d) => rSum + (getCell(item.id, d.dateKey).finalQty || 0), 0);
                 return sum + rowQty * item.price;
               }, 0);
 
@@ -254,20 +335,38 @@ export const OrderMatrixTable: FC<OrderMatrixTableProps> = ({
 
                         {/* Quantity Cells */}
                         {days.map((d, colIdx) => {
-                          const q = qtyMap[p.id]?.[d.dateKey] || 0;
+                          const cell = getCell(p.id, d.dateKey);
+                          const q = cell.finalQty || 0;
                           rowQty += q;
+
+                          const isOwnerModified =
+                            isStoreOwner &&
+                            cell.storeQty !== null &&
+                            cell.storeQty !== cell.employeeQty;
 
                           if (d.isOff) {
                             return (
-                              <td key={d.dateKey} className="po-cell-off" title="Nhà cung cấp không giao hàng ngày này">
+                              <td
+                                key={d.dateKey}
+                                className="po-cell-off"
+                                title={d.offReason || 'Nhà cung cấp không giao hàng ngày này'}
+                              >
                                 —
                               </td>
                             );
                           }
 
-                          if (d.isLocked) {
+                          if (d.isLocked || d.cutoffStatus === 'PO_GENERATED') {
                             return (
-                              <td key={d.dateKey} className="po-cell-locked" title="Đã quá giờ khóa sửa đơn của ngày này">
+                              <td
+                                key={d.dateKey}
+                                className="po-cell-locked"
+                                title={
+                                  d.cutoffStatus === 'PO_GENERATED'
+                                    ? `Đã chốt PO (${d.poCode || 'Đã tạo'})`
+                                    : 'Đã quá giờ khóa sửa đơn của ngày này'
+                                }
+                              >
                                 <input
                                   type="text"
                                   className="po-qty-input"
@@ -285,7 +384,7 @@ export const OrderMatrixTable: FC<OrderMatrixTableProps> = ({
                                   style={{
                                     fontFamily: 'var(--font-mono)',
                                     fontWeight: q > 0 ? 700 : 400,
-                                    color: q > 0 ? 'var(--blue-primary)' : '#cbd5e1',
+                                    color: isOwnerModified ? '#d97706' : q > 0 ? 'var(--blue-primary)' : '#cbd5e1',
                                     fontSize: 12.5,
                                   }}
                                 >
@@ -296,21 +395,51 @@ export const OrderMatrixTable: FC<OrderMatrixTableProps> = ({
                           }
 
                           const isBad = q > 0 && q < p.moq;
-                          const tooltip = isBad ? `⚠️ Dưới MOQ! Số lượng đặt tối thiểu là ${p.moq} ${p.unit}` : undefined;
+                          const tooltipParts: string[] = [];
+                          if (isBad) {
+                            tooltipParts.push(`⚠️ Dưới MOQ! Đặt tối thiểu ${p.moq} ${p.unit}`);
+                          }
+                          if (isOwnerModified) {
+                            tooltipParts.push(
+                              `👑 Chủ cửa hàng đã điều chỉnh (NV: ${cell.employeeQty} ➔ Chủ: ${cell.storeQty}). Bấm nút khôi phục bên cạnh để trả về đề xuất của NV.`
+                            );
+                          }
+                          const tooltip = tooltipParts.length > 0 ? tooltipParts.join('\n') : undefined;
 
                           return (
-                            <td key={d.dateKey} style={{ textAlign: 'center' }}>
-                              <input
-                                type="text"
-                                className={`po-qty-input ${isBad ? 'qty-bad' : ''}`}
-                                value={q > 0 ? q : ''}
-                                data-pid={p.id}
-                                data-day={d.dateKey}
-                                data-col={colIdx}
-                                title={tooltip}
-                                onChange={(e) => handleInputChange(p.id, d.dateKey, e)}
-                                onKeyDown={handleKeyDown}
-                              />
+                            <td
+                              key={d.dateKey}
+                              style={{ textAlign: 'center' }}
+                              className={isOwnerModified ? 'po-td-owner-modified' : ''}
+                            >
+                              <div className="po-cell-wrapper">
+                                <input
+                                  type="text"
+                                  className={`po-qty-input ${isBad ? 'qty-bad' : ''} ${
+                                    isOwnerModified ? 'qty-owner-override' : ''
+                                  }`}
+                                  value={q > 0 ? q : ''}
+                                  placeholder={cell.employeeQty > 0 ? String(cell.employeeQty) : ''}
+                                  data-pid={p.id}
+                                  data-day={d.dateKey}
+                                  data-col={colIdx}
+                                  title={tooltip}
+                                  onChange={(e) => handleInputChange(p.id, d.dateKey, e)}
+                                  onKeyDown={handleKeyDown}
+                                />
+
+                                {/* Revert to Employee Qty Action when overridden */}
+                                {isOwnerModified && onResetOverride && (
+                                  <button
+                                    type="button"
+                                    className="po-cell-revert-btn"
+                                    title={`Khôi phục số lượng đề xuất của Nhân viên (${cell.employeeQty})`}
+                                    onClick={() => onResetOverride(p.id, d.dateKey)}
+                                  >
+                                    <RotateCcw size={10} />
+                                  </button>
+                                )}
+                              </div>
                             </td>
                           );
                         })}
@@ -372,3 +501,5 @@ export const OrderMatrixTable: FC<OrderMatrixTableProps> = ({
     </div>
   );
 };
+
+export default OrderMatrixTable;
