@@ -22,6 +22,8 @@ export const storeProductApi = {
     const names = filters.names?.filter(Boolean) ?? [];
     const branchCodes = filters.storeCodes?.filter(Boolean) ?? [];
     const branchNames = filters.storeNames?.filter(Boolean) ?? [];
+    const supplierCodes = filters.supplierCodes?.filter(Boolean) ?? [];
+    const supplierNames = filters.supplierNames?.filter(Boolean) ?? [];
 
     const res = await httpClient.get<ApiResponse<PagedResult<any>>>(endpoint, {
       params: {
@@ -30,6 +32,8 @@ export const storeProductApi = {
         Names: names.length ? names : undefined,
         BranchCodes: branchCodes.length ? branchCodes : undefined,
         BranchNames: branchNames.length ? branchNames : undefined,
+        SupplierCodes: supplierCodes.length ? supplierCodes : undefined,
+        SupplierNames: supplierNames.length ? supplierNames : undefined,
         Status: filters.statusFilter !== 'ALL' ? filters.statusFilter : undefined,
         StockAlertFilter: filters.stockAlertFilter !== 'ALL' ? filters.stockAlertFilter : undefined,
         PageIndex: filters.pageIndex,
@@ -71,7 +75,8 @@ export const storeProductApi = {
         minOrderQuantity: x.minOrderQuantity ?? x.minimumOrderQuantity ?? 10,
         currentStock: x.currentStock,
         minStockLevel: x.minStockLevel,
-        primarySupplierName: x.primarySupplierName,
+        primarySupplierCode: x.primarySupplierCode || x.supplierCode || '',
+        primarySupplierName: x.primarySupplierName || x.supplierName || '',
         status: x.status,
         shelfLocation: x.shelfLocation,
         assignedDate: x.assignedDate ? x.assignedDate.slice(0, 10) : new Date().toISOString().slice(0, 10),
@@ -129,6 +134,8 @@ export const storeProductApi = {
       retailPrice: input.retailPrice,
       minStockLevel: input.minStockLevel,
       minOrderQuantity: input.minOrderQuantity,
+      status: input.status,
+      supplierId: input.supplierId,
       shelfLocation: input.shelfLocation,
     });
   },

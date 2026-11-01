@@ -13,6 +13,7 @@ export interface StoreProductItem {
   costPrice: number; // Giá vốn nhập sỉ từ NCC
   currentStock: number; // Tồn kho thực tế (SOH)
   minStockLevel: number; // Định mức tồn tối thiểu / an toàn
+  primarySupplierCode?: string;
   primarySupplierName: string;
   minOrderQuantity: number; // Số lượng đặt hàng tối thiểu MOQ
   status: 'Active' | 'Inactive';
@@ -38,6 +39,8 @@ export interface StoreProductFilterValues {
   names?: string[];
   storeCodes?: string[];
   storeNames?: string[];
+  supplierCodes?: string[];
+  supplierNames?: string[];
   storeId: string;
   categoryFilter?: string;
   statusFilter: 'ALL' | 'Active' | 'Inactive';
@@ -57,5 +60,7 @@ export interface EditStoreProductInput {
   minStockLevel?: number;
   minOrderQuantity?: number;
   status?: 'Active' | 'Inactive';
+  supplierId?: string;
   shelfLocation?: string;
 }
+
