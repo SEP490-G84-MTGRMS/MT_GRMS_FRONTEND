@@ -7,10 +7,12 @@ import type {
   SupplierSummary,
   SupplierFilterState,
   CreateSupplierInput,
+  UpdateBasicSupplierInput,
 } from '../types/supplier.types';
 import { SupplierFilterBar } from '../components/SupplierFilterBar';
 import { SupplierTable } from '../components/SupplierTable';
-import { SupplierFormModal } from '../components/SupplierFormModal';
+import { CreateSupplierModal } from '../components/CreateSupplierModal';
+import { EditSupplierModal } from '../components/EditSupplierModal';
 import { SupplierDetailPage } from './SupplierDetailPage';
 import { AdminToast, type ToastState } from '../../admin/components';
 import { supplierApi } from '../api/supplierApi';
@@ -48,9 +50,9 @@ export const SupplierListPage: FC = () => {
   // Filters are only applied when user clicks "Tìm kiếm" or "Đặt lại"
   const [appliedFilters, setAppliedFilters] = useState<SupplierFilterState>(DEFAULT_FILTERS);
 
-  const [isFormModalOpen, setIsFormModalOpen] = useState(false);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<SupplierSummary | null>(null);
-  const [modalTab, setModalTab] = useState<'basic' | 'terms' | 'bank'>('basic');
   const [selectedSupplier, setSelectedSupplier] = useState<SupplierSummary | null>(null);
 
   const [toast, setToast] = useState<ToastState | null>(null);
@@ -100,19 +102,37 @@ export const SupplierListPage: FC = () => {
     setAppliedFilters((prev) => ({ ...prev, pageSize: size, pageIndex: 1 }));
   };
 
-  const handleSaveSupplier = async (input: CreateSupplierInput & { id?: string }) => {
+  const handleCreateSupplier = async (input: CreateSupplierInput) => {
     try {
-      if (input.id) {
-        await supplierApi.updateSupplier(input.id, { ...input, id: input.id });
-        showToast(`Đã cập nhật thông tin nhà cung cấp ${input.name} thành công!`, 'success');
-      } else {
-        const created = await supplierApi.createSupplier(input);
-        showToast(`Đã thêm mới nhà cung cấp ${created.name} (${created.code}) thành công!`, 'success');
-      }
-      setIsFormModalOpen(false);
+      const created = await supplierApi.createSupplier(input);
+      showToast(`Đã thêm mới nhà cung cấp ${created.name} (${created.code}) thành công!`, 'success');
+      setIsCreateModalOpen(false);
       await fetchSuppliers();
     } catch (err: any) {
-      showToast(err.message || 'Thao tác không thành công.', 'error');
+      // Re-throw so modal error banner displays the message
+      throw err;
+    }
+  };
+
+  const handleEditSupplier = async (input: UpdateBasicSupplierInput) => {
+    try {
+      const updated = await supplierApi.updateBasicSupplier(input.id, input);
+      showToast(`Đã cập nhật thông tin nhà cung cấp ${updated.name} thành công!`, 'success');
+      setIsEditModalOpen(false);
+      setEditingSupplier(null);
+      await fetchSuppliers();
+      if (selectedSupplier && selectedSupplier.id === input.id) {
+        setSelectedSupplier((prev) =>
+          prev
+            ? {
+                ...prev,
+                ...updated,
+              }
+            : null
+        );
+      }
+    } catch (err: any) {
+      throw err;
     }
   };
 
@@ -195,27 +215,13 @@ export const SupplierListPage: FC = () => {
             setSelectedSupplier(null);
             fetchSuppliers();
           }}
-          onEdit={isStoreOwner ? (s, tab) => {
-            setEditingSupplier(s);
-            setModalTab(tab || 'basic');
-            setIsFormModalOpen(true);
-          } : undefined}
+          onSupplierUpdated={(updated) => {
+            setSelectedSupplier(updated);
+            fetchSuppliers();
+          }}
           onToggleStatus={handleToggleStatus}
           onDelete={handleDeleteSupplier}
           onLinkCustomer={handleLinkCustomer}
-        />
-
-        <SupplierFormModal
-          isOpen={isFormModalOpen}
-          editingSupplier={editingSupplier}
-          initialTab={modalTab}
-          onClose={() => setIsFormModalOpen(false)}
-          onSubmit={async (input) => {
-            await handleSaveSupplier(input);
-            if (editingSupplier && selectedSupplier) {
-              setSelectedSupplier(prev => prev ? ({ ...prev, ...input }) : null);
-            }
-          }}
         />
       </div>
     );
@@ -278,11 +284,7 @@ export const SupplierListPage: FC = () => {
             <button
               type="button"
               className="po-btn po-btn-primary"
-              onClick={() => {
-                setEditingSupplier(null);
-                setModalTab('basic');
-                setIsFormModalOpen(true);
-              }}
+              onClick={() => setIsCreateModalOpen(true)}
             >
               <Plus size={14} />
               <span>Thêm Nhà Cung Cấp</span>
@@ -313,19 +315,26 @@ export const SupplierListPage: FC = () => {
         }}
         onEdit={(s) => {
           setEditingSupplier(s);
-          setModalTab('basic');
-          setIsFormModalOpen(true);
+          setIsEditModalOpen(true);
         }}
         canEdit={isStoreOwner}
       />
 
       {/* Modals */}
-      <SupplierFormModal
-        isOpen={isFormModalOpen}
-        editingSupplier={editingSupplier}
-        initialTab={modalTab}
-        onClose={() => setIsFormModalOpen(false)}
-        onSubmit={handleSaveSupplier}
+      <CreateSupplierModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        onSubmit={handleCreateSupplier}
+      />
+
+      <EditSupplierModal
+        isOpen={isEditModalOpen}
+        supplier={editingSupplier}
+        onClose={() => {
+          setIsEditModalOpen(false);
+          setEditingSupplier(null);
+        }}
+        onSubmit={handleEditSupplier}
       />
     </div>
   );

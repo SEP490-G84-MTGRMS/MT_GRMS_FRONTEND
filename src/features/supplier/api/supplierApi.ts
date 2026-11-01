@@ -5,6 +5,9 @@ import type {
   SupplierFilterState,
   CreateSupplierInput,
   UpdateSupplierInput,
+  UpdateBasicSupplierInput,
+  UpdateSupplierBankInput,
+  UpdateSupplierVatInput,
   SupplierStatus,
   SupplierType,
   APLedgerEntry,
@@ -83,6 +86,7 @@ export const supplierApi = {
         searchTerm: filter?.searchTerm || undefined,
         supplierType: typeMapFrontendToBackend(filter?.supplierType),
         status: statusMapFrontendToBackend(filter?.status),
+        category: filter?.category || undefined,
         pageIndex: filter?.pageIndex || 1,
         pageSize: filter?.pageSize || 15,
       };
@@ -196,6 +200,8 @@ export const supplierApi = {
       code: input.code || undefined,
       name: input.name,
       supplierType: typeMapFrontendToBackend(input.supplierType) || 1,
+      categoryCode: input.category || 'FRESH',
+      status: statusMapFrontendToBackend(input.status) || 1,
       phone: input.phone,
       email: input.email || undefined,
       taxCode: input.taxCode || undefined,
@@ -218,12 +224,69 @@ export const supplierApi = {
   },
 
   /**
+   * Cập nhật thông tin cơ bản của nhà cung cấp (bảo toàn toàn bộ thông tin chi tiết)
+   */
+  async updateBasicSupplier(id: string, input: UpdateBasicSupplierInput): Promise<SupplierSummary> {
+    const payload = {
+      name: input.name.trim(),
+      contactPerson: input.contactPerson !== undefined ? input.contactPerson.trim() : undefined,
+      phone: input.phone.trim(),
+      email: input.email !== undefined ? (input.email.trim() || undefined) : undefined,
+      status: statusMapFrontendToBackend(input.status) || 1,
+      taxCode: input.taxCode !== undefined ? input.taxCode.trim() : undefined,
+      address: input.address !== undefined ? input.address.trim() : undefined,
+      notes: input.note !== undefined ? input.note.trim() : undefined,
+    };
+
+    const res = await httpClient.put<ApiResponse<any>>(`/suppliers/${id}/basic`, payload);
+    if (res.data?.success && res.data.data) {
+      return mapBackendSupplierToFrontend(res.data.data);
+    }
+    throw new Error(res.data?.message || 'Không thể cập nhật nhà cung cấp.');
+  },
+
+  /**
+   * Cập nhật thông tin tài khoản ngân hàng nhà cung cấp
+   */
+  async updateSupplierBank(id: string, input: UpdateSupplierBankInput): Promise<SupplierSummary> {
+    const payload = {
+      bankName: input.bankName?.trim() || null,
+      bankAccountNumber: input.bankAccount?.trim() || null,
+      bankAccountHolder: input.accountHolder?.trim() || null,
+    };
+
+    const res = await httpClient.put<ApiResponse<any>>(`/suppliers/${id}/bank`, payload);
+    if (res.data?.success && res.data.data) {
+      return mapBackendSupplierToFrontend(res.data.data);
+    }
+    throw new Error(res.data?.message || 'Không thể cập nhật thông tin tài khoản ngân hàng.');
+  },
+
+  /**
+   * Cập nhật thông tin hóa đơn VAT nhà cung cấp
+   */
+  async updateSupplierVat(id: string, input: UpdateSupplierVatInput): Promise<SupplierSummary> {
+    const payload = {
+      companyName: input.companyName?.trim() || null,
+      taxCode: input.taxCode?.trim() || null,
+      invoiceAddress: input.invoiceAddress?.trim() || null,
+    };
+
+    const res = await httpClient.put<ApiResponse<any>>(`/suppliers/${id}/vat`, payload);
+    if (res.data?.success && res.data.data) {
+      return mapBackendSupplierToFrontend(res.data.data);
+    }
+    throw new Error(res.data?.message || 'Không thể cập nhật thông tin hóa đơn VAT.');
+  },
+
+  /**
    * Cập nhật nhà cung cấp
    */
   async updateSupplier(id: string, input: UpdateSupplierInput): Promise<SupplierSummary> {
     const payload = {
       name: input.name,
       supplierType: typeMapFrontendToBackend(input.supplierType) || 1,
+      status: statusMapFrontendToBackend((input as any).status),
       phone: input.phone,
       email: input.email || undefined,
       taxCode: input.taxCode || undefined,

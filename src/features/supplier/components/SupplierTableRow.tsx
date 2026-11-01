@@ -34,13 +34,9 @@ export const SupplierTableRow: FC<Props> = ({
         <span
           style={{
             fontFamily: 'var(--font-mono, monospace)',
-            fontWeight: 700,
-            color: '#0f766e',
-            backgroundColor: '#f0fdfa',
-            padding: '2px 6px',
-            borderRadius: 4,
-            border: '1px solid #ccfbf1',
-            fontSize: 12,
+            fontWeight: 600,
+            color: '#334155',
+            fontSize: 12.5,
             whiteSpace: 'nowrap',
           }}
         >
@@ -59,6 +55,10 @@ export const SupplierTableRow: FC<Props> = ({
         )}
       </td>
 
+      <td style={{ padding: '10px 12px', borderBottom: '1px solid #f1f5f9', fontFamily: 'var(--font-mono, monospace)', fontSize: 12, color: supplier.taxCode ? '#334155' : '#94a3b8' }}>
+        {supplier.taxCode || '—'}
+      </td>
+
       <td style={{ padding: '10px 12px', borderBottom: '1px solid #f1f5f9' }}>
         <div style={{ fontWeight: 600, fontSize: 12.5, color: '#1e293b', lineHeight: 1.3 }}>
           {supplier.contactPerson || '—'}
@@ -67,6 +67,28 @@ export const SupplierTableRow: FC<Props> = ({
 
       <td style={{ padding: '10px 12px', borderBottom: '1px solid #f1f5f9', fontFamily: 'var(--font-mono, monospace)', fontSize: 12.5, color: '#334155' }}>
         {supplier.phone || '—'}
+      </td>
+
+      <td
+        className="so-list-td--wrap"
+        style={{
+          padding: '10px 12px',
+          borderBottom: '1px solid #f1f5f9',
+          verticalAlign: 'middle',
+        }}
+      >
+        <div
+          style={{
+            fontSize: 12.5,
+            color: supplier.address ? '#334155' : '#94a3b8',
+            lineHeight: 1.4,
+            whiteSpace: 'normal',
+            overflowWrap: 'anywhere',
+            wordBreak: 'break-word',
+          }}
+        >
+          {supplier.address || '—'}
+        </div>
       </td>
 
       <td style={{ padding: '10px 12px', whiteSpace: 'nowrap', textAlign: 'center', borderBottom: '1px solid #f1f5f9' }}>

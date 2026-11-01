@@ -24,8 +24,10 @@ interface Props {
 type SortField =
   | 'code'
   | 'name'
+  | 'taxCode'
   | 'contactPerson'
   | 'phone'
+  | 'address'
   | 'status';
 type SortDirection = 'asc' | 'desc';
 
@@ -73,6 +75,10 @@ export const SupplierTable: FC<Props> = ({
           valA = a.name.toLowerCase();
           valB = b.name.toLowerCase();
           break;
+        case 'taxCode':
+          valA = (a.taxCode || '').toLowerCase();
+          valB = (b.taxCode || '').toLowerCase();
+          break;
         case 'contactPerson':
           valA = (a.contactPerson || '').toLowerCase();
           valB = (b.contactPerson || '').toLowerCase();
@@ -80,6 +86,10 @@ export const SupplierTable: FC<Props> = ({
         case 'phone':
           valA = a.phone || '';
           valB = b.phone || '';
+          break;
+        case 'address':
+          valA = (a.address || '').toLowerCase();
+          valB = (b.address || '').toLowerCase();
           break;
         case 'status':
           valA = a.status;
@@ -133,12 +143,14 @@ export const SupplierTable: FC<Props> = ({
 
   const tableColGroup = (
     <colgroup>
-      <col style={{ width: '12%' }} />
-      <col style={{ width: '24%' }} />
+      <col style={{ width: '9%' }} />
+      <col style={{ width: '17%' }} />
+      <col style={{ width: '11%' }} />
+      <col style={{ width: '13%' }} />
+      <col style={{ width: '11%' }} />
       <col style={{ width: '18%' }} />
-      <col style={{ width: '16%' }} />
-      <col style={{ width: '14%' }} />
-      <col style={{ width: '16%' }} />
+      <col style={{ width: '9%' }} />
+      <col style={{ width: '12%' }} />
     </colgroup>
   );
 
@@ -194,6 +206,20 @@ export const SupplierTable: FC<Props> = ({
               </th>
 
               <th
+                onClick={() => handleSort('taxCode')}
+                style={{
+                  ...thBaseStyle,
+                  cursor: 'pointer',
+                  userSelect: 'none',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span>Mã số thuế</span>
+                  <ArrowUpDown size={12} color={sortField === 'taxCode' ? '#0f766e' : '#94a3b8'} />
+                </div>
+              </th>
+
+              <th
                 onClick={() => handleSort('contactPerson')}
                 style={{
                   ...thBaseStyle,
@@ -218,6 +244,20 @@ export const SupplierTable: FC<Props> = ({
                 <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                   <span>Số điện thoại</span>
                   <ArrowUpDown size={12} color={sortField === 'phone' ? '#0f766e' : '#94a3b8'} />
+                </div>
+              </th>
+
+              <th
+                onClick={() => handleSort('address')}
+                style={{
+                  ...thBaseStyle,
+                  cursor: 'pointer',
+                  userSelect: 'none',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span>Địa chỉ</span>
+                  <ArrowUpDown size={12} color={sortField === 'address' ? '#0f766e' : '#94a3b8'} />
                 </div>
               </th>
 
@@ -271,7 +311,7 @@ export const SupplierTable: FC<Props> = ({
             ) : (
               <tr>
                 <td
-                  colSpan={6}
+                  colSpan={8}
                   style={{
                     textAlign: 'center',
                     padding: '48px 16px',
