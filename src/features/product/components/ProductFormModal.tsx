@@ -25,6 +25,7 @@ interface ProductFormModalProps {
   onClose: () => void;
   onSave: (product: Partial<ProductItem>, saveAndAddNew?: boolean, deletedUnitIds?: string[]) => Promise<void> | void;
   onOpenCreateCategoryModal: () => void;
+  onDelete?: (product: ProductItem) => void;
   userRole?: string; // e.g. "StoreOwner" | "Cashier"
 }
 
@@ -35,6 +36,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   onClose,
   onSave,
   onOpenCreateCategoryModal,
+  onDelete,
   userRole = 'StoreOwner',
 }) => {
   // 1. Thông tin cơ bản
@@ -2119,57 +2121,79 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
           style={{
             padding: '16px 28px',
             display: 'flex',
-            justifyContent: 'flex-end',
+            justifyContent: isEditing && productToEdit && onDelete ? 'space-between' : 'flex-end',
+            alignItems: 'center',
             gap: 12,
             borderTop: '1px solid #E2E8F0',
             backgroundColor: '#F8FAFC',
           }}
         >
-          {/* (14) Bỏ qua */}
-          <button
-            type="button"
-            className="btn-secondary-white"
-            onClick={onClose}
-            disabled={isSubmitting}
-            style={{ borderRadius: 8, padding: '8px 18px' }}
-          >
-            Bỏ qua
-          </button>
-
-          {/* (15) Lưu & Thêm hàng mới */}
-          {!isEditing && (
+          {isEditing && productToEdit && onDelete && (
             <button
               type="button"
-              className="btn-secondary-white"
+              className="btn-danger-soft"
+              onClick={() => onDelete(productToEdit)}
+              disabled={isSubmitting}
               style={{
                 borderRadius: 8,
-                padding: '8px 18px',
-                borderColor: '#CBD5E1',
+                padding: '8px 16px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
               }}
-              disabled={isSubmitting}
-              onClick={() => handleSubmit(true)}
             >
-              {isSubmitting ? 'Đang lưu...' : 'Lưu & Thêm hàng mới'}
+              <Trash2 size={15} />
+              <span>Xóa hàng hóa</span>
             </button>
           )}
 
-          {/* (16) 💾 Lưu */}
-          <button
-            type="button"
-            className="btn-primary-teal"
-            style={{
-              borderRadius: 8,
-              padding: '8px 20px',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6,
-            }}
-            disabled={isSubmitting}
-            onClick={() => handleSubmit(false)}
-          >
-            <Save size={16} />
-            <span>{isSubmitting ? 'Đang lưu...' : (isEditing ? 'Cập nhật' : 'Lưu')}</span>
-          </button>
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+            {/* (14) Bỏ qua */}
+            <button
+              type="button"
+              className="btn-secondary-white"
+              onClick={onClose}
+              disabled={isSubmitting}
+              style={{ borderRadius: 8, padding: '8px 18px' }}
+            >
+              Bỏ qua
+            </button>
+
+            {/* (15) Lưu & Thêm hàng mới */}
+            {!isEditing && (
+              <button
+                type="button"
+                className="btn-secondary-white"
+                style={{
+                  borderRadius: 8,
+                  padding: '8px 18px',
+                  borderColor: '#CBD5E1',
+                }}
+                disabled={isSubmitting}
+                onClick={() => handleSubmit(true)}
+              >
+                {isSubmitting ? 'Đang lưu...' : 'Lưu & Thêm hàng mới'}
+              </button>
+            )}
+
+            {/* (16) 💾 Lưu */}
+            <button
+              type="button"
+              className="btn-primary-teal"
+              style={{
+                borderRadius: 8,
+                padding: '8px 20px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+              }}
+              disabled={isSubmitting}
+              onClick={() => handleSubmit(false)}
+            >
+              <Save size={16} />
+              <span>{isSubmitting ? 'Đang lưu...' : (isEditing ? 'Cập nhật' : 'Lưu')}</span>
+            </button>
+          </div>
         </div>
       </div>
 

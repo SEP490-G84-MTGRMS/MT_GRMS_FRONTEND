@@ -9,6 +9,7 @@ import {
   ShieldCheck,
   Package,
   ChevronDown,
+  Trash2,
 } from 'lucide-react';
 import type { ProductItem, Category, UomConversion } from '../types';
 import { categoryApi } from '../api/categoryApi';
@@ -16,6 +17,7 @@ import { CategorySidebar } from '../components/CategorySidebar';
 import { CategoryModal } from '../components/CategoryModal';
 import { ProductFormModal } from '../components/ProductFormModal';
 import { ProductDetailModal } from '../components/ProductDetailModal';
+import { ProductDeleteConfirmModal } from '../components/ProductDeleteConfirmModal';
 import { TablePagination } from '../../../components/common';
 import { useAuthStore } from '../../../stores/useAuthStore';
 import { AdminToast, type ToastState } from '../../admin/components';
@@ -202,6 +204,11 @@ export const ProductListPage: React.FC = () => {
 
   // Table selection
   const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
+
+  // Delete product modal states
+  const [productToDelete, setProductToDelete] = useState<ProductItem | null>(null);
+  const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState<boolean>(false);
+  const [isDeleting, setIsDeleting] = useState<boolean>(false);
 
   // Toast
   const [toast, setToast] = useState<ToastState | null>(null);
@@ -437,30 +444,63 @@ export const ProductListPage: React.FC = () => {
     }
   };
 
-  const handleDeleteProduct = async (product: ProductItem) => {
+  const handleDeleteProduct = (product: ProductItem) => {
+    setProductToDelete(product);
+  };
+
+  const handleConfirmSingleDelete = async () => {
+    if (!productToDelete) return;
+    setIsDeleting(true);
     try {
-      // BR-DATA-01 Check: If has transactions -> Soft Delete (Discontinued)
-      if (product.hasTransactions) {
-        await productApi.updateProduct(product.id, {
-          name: product.productName,
-          categoryId: product.categoryId,
-          sellingPrice: product.sellingPrice,
-          status: 'Discontinued',
-        });
-        showToast(
-          `Sản phẩm đã có lịch sử giao dịch. Chuyển trạng thái sang "Ngừng kinh doanh" (Soft Delete theo BR-DATA-01).`,
-          'warning'
-        );
-      } else {
-        await productApi.deleteProduct(product.id);
-        showToast(`Đã xóa sản phẩm "${product.productName}" khỏi danh mục.`);
+      await productApi.deleteProduct(productToDelete.id);
+      showToast(`Đã xóa hàng hóa "${productToDelete.productName}" thành công.`);
+      if (selectedProduct?.id === productToDelete.id) {
+        setIsDetailModalOpen(false);
+        setSelectedProduct(null);
       }
-      setIsDetailModalOpen(false);
+      if (productToEdit?.id === productToDelete.id) {
+        setIsProductFormOpen(false);
+        setProductToEdit(null);
+      }
+      setSelectedProductIds((prev) => prev.filter((id) => id !== productToDelete.id));
+      setProductToDelete(null);
       await fetchCategories();
       await fetchProducts();
     } catch (err: any) {
-      const msg = err?.response?.data?.message || err?.message || 'Có lỗi xảy ra khi xóa sản phẩm.';
+      const msg = err?.response?.data?.message || err?.message || 'Có lỗi xảy ra khi xóa hàng hóa.';
       showToast(msg, 'error');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleConfirmBulkDelete = async () => {
+    if (selectedProductIds.length === 0) return;
+    setIsDeleting(true);
+    try {
+      let successCount = 0;
+      for (const id of selectedProductIds) {
+        try {
+          await productApi.deleteProduct(id);
+          successCount++;
+        } catch (delErr) {
+          console.warn(`Lỗi khi xóa hàng hóa ${id}:`, delErr);
+        }
+      }
+      showToast(`Đã xóa thành công ${successCount} hàng hóa đã chọn.`);
+      setSelectedProductIds([]);
+      setIsBulkDeleteOpen(false);
+      if (selectedProduct && selectedProductIds.includes(selectedProduct.id)) {
+        setIsDetailModalOpen(false);
+        setSelectedProduct(null);
+      }
+      await fetchCategories();
+      await fetchProducts();
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || err?.message || 'Có lỗi xảy ra khi xóa hàng hóa đã chọn.';
+      showToast(msg, 'error');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -689,8 +729,62 @@ export const ProductListPage: React.FC = () => {
         <div className="product-table-wrapper">
           {/* Summary bar */}
           <div className="product-table-summary-bar">
-            <div>
-              Đang hiển thị <b>{filteredProducts.length}</b> mặt hàng
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div>
+                Đang hiển thị <b>{filteredProducts.length}</b> mặt hàng
+              </div>
+              {selectedProductIds.length > 0 && (
+                <div
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    padding: '3px 10px',
+                    backgroundColor: '#FEF2F2',
+                    border: '1px solid #FECACA',
+                    borderRadius: 6,
+                  }}
+                >
+                  <span style={{ fontSize: 12.5, fontWeight: 600, color: '#991B1B' }}>
+                    Đã chọn {selectedProductIds.length} hàng hóa
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setIsBulkDeleteOpen(true)}
+                    style={{
+                      padding: '2px 8px',
+                      fontSize: 12,
+                      borderRadius: 4,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 4,
+                      backgroundColor: '#EF4444',
+                      color: '#FFFFFF',
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontWeight: 600,
+                    }}
+                  >
+                    <Trash2 size={13} />
+                    Xóa đã chọn
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedProductIds([])}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: '#64748B',
+                      fontSize: 12,
+                      cursor: 'pointer',
+                      textDecoration: 'underline',
+                      padding: '0 4px',
+                    }}
+                  >
+                    Bỏ chọn
+                  </button>
+                </div>
+              )}
             </div>
             <div style={{ display: 'flex', gap: 24 }}>
               <div>
@@ -993,6 +1087,7 @@ export const ProductListPage: React.FC = () => {
           setCategoryToEdit(null);
           setIsCategoryModalOpen(true);
         }}
+        onDelete={handleDeleteProduct}
         userRole={userRole}
       />
 
@@ -1012,7 +1107,26 @@ export const ProductListPage: React.FC = () => {
         userRole={userRole}
       />
 
-      {/* 6. Category Modal (Placed last with high z-index to always render on top when opened from form modals) */}
+      {/* 5. Product Delete Confirm Modal (Single) */}
+      <ProductDeleteConfirmModal
+        isOpen={Boolean(productToDelete)}
+        onClose={() => setProductToDelete(null)}
+        onConfirm={handleConfirmSingleDelete}
+        productName={productToDelete?.productName}
+        productCode={productToDelete?.productCode}
+        isDeleting={isDeleting}
+      />
+
+      {/* 6. Product Delete Confirm Modal (Bulk) */}
+      <ProductDeleteConfirmModal
+        isOpen={isBulkDeleteOpen}
+        onClose={() => setIsBulkDeleteOpen(false)}
+        onConfirm={handleConfirmBulkDelete}
+        itemCount={selectedProductIds.length}
+        isDeleting={isDeleting}
+      />
+
+      {/* 7. Category Modal (Placed last with high z-index to always render on top when opened from form modals) */}
       <CategoryModal
         isOpen={isCategoryModalOpen}
         categoryToEdit={categoryToEdit}

@@ -5,4 +5,5 @@ export * from './components/CategorySidebar';
 export * from './components/CategoryModal';
 export * from './components/ProductFormModal';
 export * from './components/ProductDetailModal';
+export * from './components/ProductDeleteConfirmModal';
 export * from './pages/ProductListPage';

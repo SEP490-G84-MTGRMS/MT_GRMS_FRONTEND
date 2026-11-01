@@ -338,4 +338,102 @@ describe('ProductListPage - Task T6 BR-SEC-01 Phân quyền Giá vốn theo Vai 
       );
     });
   });
+
+  it('xóa sản phẩm từ bảng hiển thị modal xác nhận và gọi API deleteProduct khi người dùng xác nhận', async () => {
+    (categoryApi.getCategories as any).mockResolvedValue([
+      { id: 'cat-1', name: 'Nước uống', productCount: 1 },
+    ]);
+    (productApi.getProductsPaged as any).mockResolvedValue({
+      items: [mockSampleProduct],
+      pageIndex: 1,
+      pageSize: 20,
+      totalCount: 1,
+      totalPages: 1,
+      hasPreviousPage: false,
+      hasNextPage: false,
+    });
+    (productApi.deleteProduct as any).mockResolvedValue(undefined);
+
+    render(<ProductListPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Nước suối Aquafina 500ml')).toBeDefined();
+    });
+
+    // Click vào dòng sản phẩm để mở modal chi tiết
+    const rowItem = screen.getByText('Nước suối Aquafina 500ml');
+    fireEvent.click(rowItem);
+
+    // Trong modal chi tiết, click nút "Xóa"
+    await waitFor(() => {
+      expect(screen.getByTitle('Xóa hàng hóa')).toBeDefined();
+    });
+    const deleteBtn = screen.getByTitle('Xóa hàng hóa');
+    fireEvent.click(deleteBtn);
+
+    // Modal xác nhận xuất hiện
+    await waitFor(() => {
+      expect(screen.getByText('Xác nhận xóa hàng hóa')).toBeDefined();
+      expect(screen.getByText('"Nước suối Aquafina 500ml"')).toBeDefined();
+    });
+
+    // Bấm nút Xác nhận xóa
+    const confirmBtn = screen.getByRole('button', { name: /Đồng ý xóa/i });
+    fireEvent.click(confirmBtn);
+
+    // Xác minh productApi.deleteProduct được gọi với ID sản phẩm
+    await waitFor(() => {
+      expect(productApi.deleteProduct).toHaveBeenCalledWith('p-1');
+    });
+  });
+
+  it('xóa hàng loạt khi chọn checkbox sản phẩm và xác nhận trong modal', async () => {
+    (categoryApi.getCategories as any).mockResolvedValue([
+      { id: 'cat-1', name: 'Nước uống', productCount: 1 },
+    ]);
+    (productApi.getProductsPaged as any).mockResolvedValue({
+      items: [mockSampleProduct],
+      pageIndex: 1,
+      pageSize: 20,
+      totalCount: 1,
+      totalPages: 1,
+      hasPreviousPage: false,
+      hasNextPage: false,
+    });
+    (productApi.deleteProduct as any).mockResolvedValue(undefined);
+
+    render(<ProductListPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Nước suối Aquafina 500ml')).toBeDefined();
+    });
+
+    // Chọn checkbox của sản phẩm p-1
+    const checkboxes = screen.getAllByRole('checkbox');
+    // checkbox[1] là checkbox của dòng p-1
+    fireEvent.click(checkboxes[1]);
+
+    // Thanh tác vụ hàng loạt xuất hiện
+    await waitFor(() => {
+      expect(screen.getByText('Đã chọn 1 hàng hóa')).toBeDefined();
+    });
+
+    // Click nút "Xóa đã chọn"
+    const bulkDeleteBtn = screen.getByText('Xóa đã chọn');
+    fireEvent.click(bulkDeleteBtn);
+
+    // Modal xác nhận xóa hàng loạt xuất hiện
+    await waitFor(() => {
+      expect(screen.getByText('Xóa 1 hàng hóa đã chọn?')).toBeDefined();
+    });
+
+    // Bấm nút Xác nhận xóa trong modal
+    const confirmBtn = screen.getByRole('button', { name: /Đồng ý xóa/i });
+    fireEvent.click(confirmBtn);
+
+    // Xác minh productApi.deleteProduct được gọi
+    await waitFor(() => {
+      expect(productApi.deleteProduct).toHaveBeenCalledWith('p-1');
+    });
+  });
 });
