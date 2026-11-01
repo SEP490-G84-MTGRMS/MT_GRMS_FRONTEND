@@ -12,6 +12,24 @@ httpClient.interceptors.request.use((config) => {
   if (token && config.headers) {
     config.headers.Authorization = `Bearer ${token}`;
   }
+
+  // Lấy tenantId từ localStorage hoặc từ auth_user profile
+  let tenantId = localStorage.getItem('tenant_id');
+  if (!tenantId) {
+    try {
+      const rawUser = localStorage.getItem('auth_user');
+      if (rawUser) {
+        const u = JSON.parse(rawUser);
+        tenantId = u.tenantId;
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  if (config.headers) {
+    config.headers['X-Tenant-Id'] = tenantId || 'tenant_mt_mart_01';
+  }
   return config;
 });
 
