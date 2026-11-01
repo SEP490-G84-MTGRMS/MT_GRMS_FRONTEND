@@ -2,14 +2,15 @@ import { useState, useMemo, useEffect } from 'react';
 import type { FC, FormEvent } from 'react';
 import type { StoreSummary, AssignStoreProductInput } from '../types/storeProduct.types';
 import { storeProductApi } from '../api/storeProductApi';
-import { X, Search, Loader2 } from 'lucide-react';
+import { supplierProductApi } from '../../supplier/api/supplierProductApi';
+import { X, Search, Loader2, Store, AlertCircle } from 'lucide-react';
 
 interface AssignStoreProductModalProps {
   isOpen: boolean;
   onClose: () => void;
   stores: StoreSummary[];
   currentStore?: StoreSummary | null;
-  onAssign: (input: AssignStoreProductInput) => void;
+  onAssign: (input: AssignStoreProductInput) => void | Promise<void>;
 }
 
 interface MasterProduct {
@@ -20,6 +21,7 @@ interface MasterProduct {
   categoryName: string;
   baseUoM: string;
   costPrice: number;
+  moq: number;
 }
 
 export const AssignStoreProductModal: FC<AssignStoreProductModalProps> = ({
@@ -29,15 +31,27 @@ export const AssignStoreProductModal: FC<AssignStoreProductModalProps> = ({
   currentStore,
   onAssign,
 }) => {
+  // Store selection
   const [selectedBranchId, setSelectedBranchId] = useState<string>('');
+
+  // Products data
   const [masterProducts, setMasterProducts] = useState<MasterProduct[]>([]);
   const [assignedProductIds, setAssignedProductIds] = useState<string[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
+
+  // Filters
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('ALL');
+
+  // Selection state - independent of filters
   const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
+
+  // Optional min stock state
   const [defaultMinStock, setDefaultMinStock] = useState<number>(0);
+
+  // Form submission & error states
   const [errorMsg, setErrorMsg] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Reset when modal opens
   useEffect(() => {
@@ -49,9 +63,9 @@ export const AssignStoreProductModal: FC<AssignStoreProductModalProps> = ({
       setCategoryFilter('ALL');
       setDefaultMinStock(0);
       setErrorMsg('');
+      setIsSubmitting(false);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen]);
+  }, [isOpen, currentStore, stores]);
 
   // Load products when branch changes
   useEffect(() => {
@@ -62,7 +76,6 @@ export const AssignStoreProductModal: FC<AssignStoreProductModalProps> = ({
     }
     let cancelled = false;
     setLoadingProducts(true);
-    setSelectedProductIds([]);
 
     Promise.all([
       storeProductApi.getMasterProducts(),
@@ -73,18 +86,44 @@ export const AssignStoreProductModal: FC<AssignStoreProductModalProps> = ({
         pageIndex: 1,
         pageSize: 9999,
       }),
+      supplierProductApi
+        .getSupplierProducts('ALL', { pageIndex: 1, pageSize: 9999 })
+        .catch(() => ({ items: [], total: 0 })),
     ])
-      .then(([all, branchPaged]) => {
+      .then(([all, branchPaged, suppProductsRes]) => {
         if (cancelled) return;
-        const mapped: MasterProduct[] = (all as any[]).map((p) => ({
-          id: p.id,
-          sku: p.sku || '',
-          barcode: p.barcode || '',
-          name: p.productName || p.name || '',
-          categoryName: p.categoryName || 'Khac',
-          baseUoM: p.unitName || p.baseUnit || 'Goi',
-          costPrice: p.costPrice || 0,
-        }));
+
+        // Map ProductId -> MOQ & Wholesale Price from SupplierProducts (màn hình gán sản phẩm cho NCC)
+        const spMap = new Map<string, { moq: number; costPrice?: number }>();
+        (suppProductsRes?.items || []).forEach((sp: any) => {
+          if (!spMap.has(sp.productId) || sp.isPrimary || sp.isPrimarySupplier) {
+            spMap.set(sp.productId, {
+              moq: sp.moq ?? sp.minimumOrderQuantity ?? 1,
+              costPrice: sp.agreedPrice ?? sp.agreedWholesalePrice,
+            });
+          }
+        });
+
+        const mapped: MasterProduct[] = (all as any[]).map((p) => {
+          const suppInfo = spMap.get(p.id);
+          const resolvedMoq = suppInfo?.moq ?? p.minOrderQuantity ?? p.defaultMoq ?? p.moq ?? 1;
+          const resolvedCost =
+            suppInfo?.costPrice && suppInfo.costPrice > 0
+              ? suppInfo.costPrice
+              : p.costPrice || 0;
+
+          return {
+            id: p.id,
+            sku: p.sku || p.productCode || '',
+            barcode: p.barcode || '',
+            name: p.productName || p.name || '',
+            categoryName: p.categoryName || p.category || 'Khác',
+            baseUoM: p.unitName || p.baseUnit || p.unit || 'Cái',
+            costPrice: resolvedCost,
+            moq: resolvedMoq,
+          };
+        });
+
         const alreadyAssigned = branchPaged.items.map((i) => i.productId);
         setMasterProducts(mapped);
         setAssignedProductIds(alreadyAssigned);
@@ -99,15 +138,21 @@ export const AssignStoreProductModal: FC<AssignStoreProductModalProps> = ({
         if (!cancelled) setLoadingProducts(false);
       });
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [isOpen, selectedBranchId]);
 
+  // Get unique categories for dropdown
   const categories = useMemo(() => {
     const set = new Set<string>();
-    masterProducts.forEach((p) => { if (p.categoryName) set.add(p.categoryName); });
+    masterProducts.forEach((p) => {
+      if (p.categoryName) set.add(p.categoryName);
+    });
     return Array.from(set).sort();
   }, [masterProducts]);
 
+  // Filtered products list (unassigned products matching search & category)
   const filteredProducts = useMemo(() => {
     return masterProducts.filter((p) => {
       if (assignedProductIds.includes(p.id)) return false;
@@ -124,246 +169,590 @@ export const AssignStoreProductModal: FC<AssignStoreProductModalProps> = ({
     });
   }, [masterProducts, assignedProductIds, categoryFilter, searchTerm]);
 
-  if (!isOpen) return null;
+  // Total available assignable products (excluding already assigned)
+  const totalAvailableCount = useMemo(() => {
+    return masterProducts.filter((p) => !assignedProductIds.includes(p.id)).length;
+  }, [masterProducts, assignedProductIds]);
 
   const selectedBranch = stores.find((s) => s.id === selectedBranchId);
 
+  // Toggle single product selection
   const handleToggleProduct = (pid: string) => {
     setSelectedProductIds((prev) =>
       prev.includes(pid) ? prev.filter((id) => id !== pid) : [...prev, pid]
     );
   };
 
-  const handleSelectAll = () => {
-    if (selectedProductIds.length === filteredProducts.length && filteredProducts.length > 0) {
-      setSelectedProductIds([]);
+  // Select all or deselect all for the current filtered products
+  const handleSelectAllFiltered = () => {
+    const filteredIds = filteredProducts.map((p) => p.id);
+    const allFilteredSelected =
+      filteredIds.length > 0 && filteredIds.every((id) => selectedProductIds.includes(id));
+
+    if (allFilteredSelected) {
+      // Unselect only those in current filtered list
+      setSelectedProductIds((prev) => prev.filter((id) => !filteredIds.includes(id)));
     } else {
-      setSelectedProductIds(filteredProducts.map((p) => p.id));
+      // Add all filtered items to selection (preserving others)
+      const newSet = new Set([...selectedProductIds, ...filteredIds]);
+      setSelectedProductIds(Array.from(newSet));
     }
   };
 
-  const handleSubmit = (e: FormEvent) => {
+  // Handle branch change: clear selection to prevent accidental assignment to wrong store
+  const handleBranchChange = (newBranchId: string) => {
+    setSelectedBranchId(newBranchId);
+    setSelectedProductIds([]);
+    setSearchTerm('');
+    setCategoryFilter('ALL');
+    setErrorMsg('');
+  };
+
+  // Form submit handler
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
+
     if (!selectedBranchId) {
       setErrorMsg('Vui lòng chọn chi nhánh cần gán sản phẩm.');
       return;
     }
+
     if (selectedProductIds.length === 0) {
       setErrorMsg('Vui lòng chọn ít nhất 1 sản phẩm để gán vào chi nhánh.');
       return;
     }
+
     if (defaultMinStock < 0) {
       setErrorMsg('Định mức tồn tối thiểu không thể âm.');
       return;
     }
-    onAssign({ storeId: selectedBranchId, productIds: selectedProductIds, defaultMinStock });
-    onClose();
+
+    try {
+      setIsSubmitting(true);
+      await onAssign({
+        storeId: selectedBranchId,
+        productIds: selectedProductIds,
+        defaultMinStock,
+      });
+      onClose();
+    } catch (err: any) {
+      setErrorMsg(
+        err.response?.data?.message ||
+          err.message ||
+          'Không thể gán sản phẩm vào chi nhánh. Vui lòng thử lại.'
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const fmt = (n: number) => new Intl.NumberFormat('vi-VN').format(n);
 
-  const isSubmitDisabled = selectedProductIds.length === 0 || !selectedBranchId;
+  if (!isOpen) return null;
+
+  const isSubmitDisabled = selectedProductIds.length === 0 || !selectedBranchId || isSubmitting;
+
+  const isAllFilteredSelected =
+    filteredProducts.length > 0 &&
+    filteredProducts.every((p) => selectedProductIds.includes(p.id));
 
   return (
     <div
-      style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.55)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: 16 }}
+      id="modalAssignStoreProductBackdrop"
+      style={{
+        position: 'fixed',
+        inset: 0,
+        backgroundColor: 'rgba(15,23,42,0.65)',
+        backdropFilter: 'blur(4px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 9999,
+        padding: 16,
+      }}
       onClick={onClose}
     >
       <div
-        style={{ backgroundColor: '#fff', borderRadius: 16, width: '100%', maxWidth: 760, boxShadow: '0 20px 40px rgba(0,0,0,0.15)', border: '1px solid #e2e8f0', overflow: 'hidden', display: 'flex', flexDirection: 'column', maxHeight: '92vh' }}
+        id="modalAssignStoreProductDialog"
+        style={{
+          backgroundColor: '#fff',
+          borderRadius: 14,
+          width: '100%',
+          maxWidth: 1180,
+          maxHeight: '92vh',
+          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+          border: '1px solid #e2e8f0',
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+        }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div style={{ padding: '16px 20px', borderBottom: '1px solid #edf2f7', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'linear-gradient(to right,#F8FAFC,#fff)' }}>
+        <div
+          style={{
+            padding: '16px 24px',
+            borderBottom: '1px solid #edf2f7',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            background: 'linear-gradient(to right, #f8fafc, #ffffff)',
+            flexShrink: 0,
+          }}
+        >
           <div>
-            <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: '#0f172a' }}>
+            <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700, color: '#0f172a' }}>
               Gán Sản Phẩm Vào Chi Nhánh
             </h3>
-            <div style={{ fontSize: '0.82rem', color: '#64748b', marginTop: 2 }}>
-              Chọn chi nhánh và sản phẩm muốn đưa vào kinh doanh.
-            </div>
           </div>
-          <button type="button" onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', padding: 6, borderRadius: 6, display: 'flex', alignItems: 'center' }}>
+          <button
+            type="button"
+            id="btnCloseAssignModalX"
+            onClick={onClose}
+            disabled={isSubmitting}
+            style={{
+              background: 'none',
+              border: 'none',
+              cursor: isSubmitting ? 'not-allowed' : 'pointer',
+              color: '#94a3b8',
+              padding: 6,
+              borderRadius: 6,
+              display: 'flex',
+              alignItems: 'center',
+            }}
+          >
             <X size={20} />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
-          <div style={{ padding: '16px 20px', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: 14 }}>
-
+        <form
+          id="formAssignStoreProduct"
+          onSubmit={handleSubmit}
+          style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}
+        >
+          {/* Scrollable Body */}
+          <div
+            style={{
+              padding: '18px 24px',
+              overflowY: 'auto',
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 16,
+            }}
+          >
+            {/* Global Error Message */}
             {errorMsg && (
-              <div style={{ padding: '10px 14px', borderRadius: 8, backgroundColor: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', fontSize: '0.85rem' }}>
-                {errorMsg}
-              </div>
-            )}
-
-            {/* Branch selector */}
-            <div>
-              <label style={{ fontSize: '0.82rem', fontWeight: 600, color: '#475569', display: 'block', marginBottom: 6 }}>
-                Chi nhánh gán sản phẩm <span style={{ color: '#ef4444' }}>*</span>
-              </label>
-              <select
-                value={selectedBranchId}
-                onChange={(e) => {
-                  setSelectedBranchId(e.target.value);
-                  setSelectedProductIds([]);
-                  setSearchTerm('');
-                  setCategoryFilter('ALL');
-                  setErrorMsg('');
-                }}
+              <div
+                id="assignProductErrorBanner"
                 style={{
-                  width: '100%',
-                  padding: '9px 12px',
+                  padding: '10px 14px',
                   borderRadius: 8,
-                  border: `1.5px solid ${selectedBranchId ? '#0066FF' : '#cbd5e1'}`,
-                  fontSize: '0.9rem',
-                  backgroundColor: '#fff',
-                  outline: 'none',
-                  color: selectedBranchId ? '#0f172a' : '#94a3b8',
-                  fontWeight: selectedBranchId ? 600 : 400,
+                  backgroundColor: '#fef2f2',
+                  border: '1px solid #fecaca',
+                  color: '#b91c1c',
+                  fontSize: '0.85rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
                 }}
               >
-                <option value="">-- Chọn chi nhánh --</option>
-                {stores.map((s) => (
-                  <option key={s.id} value={s.id}>{s.name} ({s.code})</option>
-                ))}
-              </select>
-              {selectedBranch && (
-                <div style={{ marginTop: 6, fontSize: '0.8rem', color: '#64748b' }}>
-                  {selectedBranch.address} &nbsp;|&nbsp; QL: {selectedBranch.managerName} &nbsp;|&nbsp; Hiện có <strong>{selectedBranch.totalProducts}</strong> sản phẩm
+                <AlertCircle size={16} style={{ flexShrink: 0 }} />
+                <span>{errorMsg}</span>
+              </div>
+            )}
+
+            {/* SECTION 1 – STORE SELECTION */}
+            <div
+              style={{
+                backgroundColor: '#f8fafc',
+                border: '1px solid #e2e8f0',
+                borderRadius: 10,
+                padding: '14px 18px',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                <Store size={18} style={{ color: '#0d9488' }} />
+                <label
+                  htmlFor="assignStoreSelect"
+                  style={{ fontSize: '0.88rem', fontWeight: 700, color: '#1e293b' }}
+                >
+                  Chi nhánh gán sản phẩm <span style={{ color: '#ef4444' }}>*</span>
+                </label>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, alignItems: 'center' }}>
+                <div>
+                  <select
+                    id="assignStoreSelect"
+                    value={selectedBranchId}
+                    onChange={(e) => handleBranchChange(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '9px 12px',
+                      borderRadius: 8,
+                      border: `1.5px solid ${selectedBranchId ? '#0d9488' : '#cbd5e1'}`,
+                      fontSize: '0.9rem',
+                      backgroundColor: '#fff',
+                      outline: 'none',
+                      color: selectedBranchId ? '#0f172a' : '#94a3b8',
+                      fontWeight: selectedBranchId ? 600 : 400,
+                    }}
+                  >
+                    <option value="">-- Chọn chi nhánh nhận hàng --</option>
+                    {stores.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name} ({s.code})
+                      </option>
+                    ))}
+                  </select>
                 </div>
-              )}
+
+                {selectedBranch ? (
+                  <div
+                    style={{
+                      fontSize: '0.82rem',
+                      color: '#475569',
+                      backgroundColor: '#ffffff',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: 8,
+                      padding: '8px 14px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 2,
+                    }}
+                  >
+                    <div>
+                      <strong>Địa chỉ:</strong> {selectedBranch.address || 'Đang cập nhật'}
+                    </div>
+                    <div>
+                      <strong>Quản lý:</strong> {selectedBranch.managerName} &bull;{' '}
+                      <strong>Đang kinh doanh:</strong>{' '}
+                      <span style={{ color: '#0d9488', fontWeight: 700 }}>
+                        {selectedBranch.totalProducts} sản phẩm
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ fontSize: '0.82rem', color: '#94a3b8', fontStyle: 'italic' }}>
+                    Vui lòng chọn chi nhánh để xem danh sách sản phẩm khả dụng.
+                  </div>
+                )}
+              </div>
             </div>
 
-            {/* Filters */}
+            {/* SECTION 2 – PRODUCT SEARCH AND FILTERS */}
             {selectedBranchId && (
-              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-                <div style={{ position: 'relative', flex: 1, minWidth: 220 }}>
-                  <Search size={15} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+              <div
+                style={{
+                  display: 'flex',
+                  gap: 12,
+                  flexWrap: 'wrap',
+                  alignItems: 'center',
+                  backgroundColor: '#ffffff',
+                  padding: '8px 0',
+                }}
+              >
+                {/* Search */}
+                <div style={{ position: 'relative', flex: 2, minWidth: 260 }}>
+                  <Search
+                    size={16}
+                    style={{
+                      position: 'absolute',
+                      left: 12,
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      color: '#94a3b8',
+                    }}
+                  />
                   <input
+                    id="inputSearchAssignableProducts"
                     type="text"
-                    placeholder="Tìm theo tên, SKU, barcode..."
+                    placeholder="Tìm theo tên sản phẩm, mã SKU, barcode..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    style={{ width: '100%', padding: '8px 12px 8px 32px', borderRadius: 6, border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none', boxSizing: 'border-box' }}
+                    style={{
+                      width: '100%',
+                      padding: '9px 12px 9px 36px',
+                      borderRadius: 8,
+                      border: '1px solid #cbd5e1',
+                      fontSize: '0.88rem',
+                      outline: 'none',
+                      boxSizing: 'border-box',
+                    }}
                   />
                 </div>
-                <select
-                  value={categoryFilter}
-                  onChange={(e) => setCategoryFilter(e.target.value)}
-                  style={{ padding: '8px 12px', borderRadius: 6, border: '1px solid #cbd5e1', fontSize: '0.85rem', backgroundColor: '#fff', outline: 'none' }}
+
+                {/* Category filter */}
+                <div style={{ minWidth: 200, flex: 1 }}>
+                  <select
+                    id="selectAssignCategoryFilter"
+                    value={categoryFilter}
+                    onChange={(e) => setCategoryFilter(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '9px 12px',
+                      borderRadius: 8,
+                      border: '1px solid #cbd5e1',
+                      fontSize: '0.88rem',
+                      backgroundColor: '#fff',
+                      outline: 'none',
+                    }}
+                  >
+                    <option value="ALL">Tất cả ngành hàng</option>
+                    {categories.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Total available products & selection badge */}
+                <div
+                  style={{
+                    fontSize: '0.82rem',
+                    color: '#64748b',
+                    padding: '8px 14px',
+                    backgroundColor: '#f1f5f9',
+                    borderRadius: 6,
+                    whiteSpace: 'nowrap',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 12,
+                  }}
                 >
-                  <option value="ALL">Tất cả ngành hàng</option>
-                  {categories.map((c) => <option key={c} value={c}>{c}</option>)}
-                </select>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <label style={{ fontSize: '0.82rem', fontWeight: 600, color: '#475569', whiteSpace: 'nowrap' }}>
-                    Tồn tối thiểu mặc định:
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={defaultMinStock}
-                    onChange={(e) => setDefaultMinStock(Math.max(0, Number(e.target.value) || 0))}
-                    style={{ width: 72, padding: '7px 10px', borderRadius: 6, border: '1px solid #cbd5e1', fontSize: '0.85rem', textAlign: 'center' }}
-                  />
+                  <span>Khả dụng: <strong>{totalAvailableCount}</strong> sản phẩm</span>
+                  <span style={{ color: '#cbd5e1' }}>|</span>
+                  <span>
+                    Đã chọn:{' '}
+                    <strong
+                      id="summarySelectedCount"
+                      style={{ color: selectedProductIds.length > 0 ? '#0d9488' : '#64748b' }}
+                    >
+                      {selectedProductIds.length} sản phẩm
+                    </strong>
+                  </span>
                 </div>
               </div>
             )}
 
-            {/* Product table */}
+            {/* SECTION 3 – PRODUCT SELECTION TABLE */}
             {selectedBranchId && (
-              <div style={{ border: '1px solid #e2e8f0', borderRadius: 8, overflow: 'hidden', maxHeight: 340, overflowY: 'auto' }}>
+              <div
+                style={{
+                  border: '1px solid #e2e8f0',
+                  borderRadius: 8,
+                  overflow: 'hidden',
+                  maxHeight: 380,
+                  overflowY: 'auto',
+                }}
+              >
                 {loadingProducts ? (
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '32px 16px', color: '#64748b', gap: 8 }}>
-                    <Loader2 size={18} className="animate-spin" />
-                    <span>Đang tải danh sách sản phẩm...</span>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      padding: '40px 16px',
+                      color: '#64748b',
+                      gap: 8,
+                    }}
+                  >
+                    <Loader2 size={20} className="animate-spin" />
+                    <span>Đang tải danh sách sản phẩm từ catalog...</span>
                   </div>
                 ) : (
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.84rem' }}>
+                  <table
+                    id="tableAssignableProducts"
+                    style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.86rem' }}
+                  >
                     <thead style={{ position: 'sticky', top: 0, backgroundColor: '#f8fafc', zIndex: 1 }}>
-                      <tr style={{ borderBottom: '1px solid #cbd5e1', textAlign: 'left', color: '#475569' }}>
-                        <th style={{ padding: '8px 12px', width: 40, textAlign: 'center' }}>
+                      <tr
+                        style={{
+                          borderBottom: '1px solid #cbd5e1',
+                          textAlign: 'left',
+                          color: '#475569',
+                        }}
+                      >
+                        <th style={{ padding: '10px 14px', width: 44, textAlign: 'center' }}>
                           <input
                             type="checkbox"
-                            checked={filteredProducts.length > 0 && selectedProductIds.length === filteredProducts.length}
-                            onChange={handleSelectAll}
-                            style={{ cursor: 'pointer', accentColor: '#0066FF' }}
+                            id="chkSelectAllProducts"
+                            checked={isAllFilteredSelected}
+                            onChange={handleSelectAllFiltered}
+                            style={{ cursor: 'pointer', accentColor: '#0d9488', width: 16, height: 16 }}
                           />
                         </th>
-                        <th style={{ padding: '8px 12px', width: 105 }}>Mã SKU</th>
-                        <th style={{ padding: '8px 12px' }}>Tên sản phẩm</th>
-                        <th style={{ padding: '8px 12px', width: 110 }}>Ngành hàng</th>
-                        <th style={{ padding: '8px 12px', width: 60, textAlign: 'center' }}>ĐVT</th>
-                        <th style={{ padding: '8px 12px', width: 120, textAlign: 'right' }}>Giá vốn</th>
+                        <th style={{ padding: '10px 14px', width: 120 }}>Mã SKU</th>
+                        <th style={{ padding: '10px 14px' }}>Tên sản phẩm</th>
+                        <th style={{ padding: '10px 14px', width: 130 }}>Ngành hàng</th>
+                        <th style={{ padding: '10px 14px', width: 70, textAlign: 'center' }}>ĐVT</th>
+                        <th style={{ padding: '10px 14px', width: 110, textAlign: 'right' }}>Giá vốn</th>
+                        <th style={{ padding: '10px 14px', width: 80, textAlign: 'center' }}>MOQ</th>
                       </tr>
                     </thead>
                     <tbody>
                       {filteredProducts.length === 0 ? (
                         <tr>
-                          <td colSpan={6} style={{ textAlign: 'center', padding: '30px 16px', color: '#94a3b8' }}>
+                          <td
+                            colSpan={7}
+                            style={{ textAlign: 'center', padding: '36px 16px', color: '#94a3b8' }}
+                          >
                             {masterProducts.length === 0
                               ? 'Không có sản phẩm nào trong danh mục tổng.'
                               : 'Tất cả sản phẩm đã được gán vào chi nhánh này, hoặc không khớp bộ lọc.'}
                           </td>
                         </tr>
-                      ) : filteredProducts.map((p) => {
-                        const isSelected = selectedProductIds.includes(p.id);
-                        return (
-                          <tr
-                            key={p.id}
-                            onClick={() => handleToggleProduct(p.id)}
-                            style={{ borderBottom: '1px solid #f1f5f9', backgroundColor: isSelected ? '#f0f7ff' : '#fff', cursor: 'pointer', transition: 'background-color 0.15s ease' }}
-                          >
-                            <td style={{ padding: '8px 12px', textAlign: 'center' }}>
-                              <input type="checkbox" checked={isSelected} onChange={() => handleToggleProduct(p.id)} onClick={(e) => e.stopPropagation()} style={{ cursor: 'pointer', accentColor: '#0066FF' }} />
-                            </td>
-                            <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontWeight: 600, color: '#0066FF' }}>{p.sku}</td>
-                            <td style={{ padding: '8px 12px', fontWeight: 600, color: '#1e293b' }}>{p.name}</td>
-                            <td style={{ padding: '8px 12px', color: '#64748b' }}>{p.categoryName}</td>
-                            <td style={{ padding: '8px 12px', textAlign: 'center', color: '#475569' }}>{p.baseUoM}</td>
-                            <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 600, color: '#334155' }}>{fmt(p.costPrice)} đ</td>
-                          </tr>
-                        );
-                      })}
+                      ) : (
+                        filteredProducts.map((p) => {
+                          const isSelected = selectedProductIds.includes(p.id);
+                          return (
+                            <tr
+                              key={p.id}
+                              onClick={() => handleToggleProduct(p.id)}
+                              style={{
+                                borderBottom: '1px solid #f1f5f9',
+                                backgroundColor: isSelected ? '#f0fdf4' : '#fff',
+                                cursor: 'pointer',
+                                transition: 'background-color 0.15s ease',
+                              }}
+                            >
+                              <td style={{ padding: '10px 14px', textAlign: 'center' }}>
+                                <input
+                                  type="checkbox"
+                                  checked={isSelected}
+                                  onChange={() => handleToggleProduct(p.id)}
+                                  onClick={(e) => e.stopPropagation()}
+                                  style={{
+                                    cursor: 'pointer',
+                                    accentColor: '#0d9488',
+                                    width: 16,
+                                    height: 16,
+                                  }}
+                                />
+                              </td>
+                              <td
+                                style={{
+                                  padding: '10px 14px',
+                                  fontFamily: 'monospace',
+                                  fontWeight: 700,
+                                  color: '#0d9488',
+                                }}
+                              >
+                                {p.sku}
+                              </td>
+                              <td
+                                style={{
+                                  padding: '10px 14px',
+                                  fontWeight: 600,
+                                  color: '#1e293b',
+                                }}
+                              >
+                                {p.name}
+                              </td>
+                              <td style={{ padding: '10px 14px', color: '#64748b' }}>{p.categoryName}</td>
+                              <td style={{ padding: '10px 14px', textAlign: 'center', color: '#475569' }}>
+                                {p.baseUoM}
+                              </td>
+                              <td
+                                style={{
+                                  padding: '10px 14px',
+                                  textAlign: 'right',
+                                  fontWeight: 600,
+                                  color: '#334155',
+                                }}
+                              >
+                                {fmt(p.costPrice)} đ
+                              </td>
+                              <td
+                                style={{
+                                  padding: '10px 14px',
+                                  textAlign: 'center',
+                                  fontWeight: 700,
+                                  color: '#0f766e',
+                                  fontFamily: 'monospace',
+                                }}
+                              >
+                                {p.moq}
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
                     </tbody>
                   </table>
                 )}
               </div>
             )}
-
-            {/* Count summary */}
-            {selectedBranchId && !loadingProducts && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.82rem', color: '#64748b' }}>
-                <span>
-                  Đã chọn: <strong style={{ color: '#0066FF' }}>{selectedProductIds.length}</strong> / {filteredProducts.length} sản phẩm khả dụng
-                </span>
-                <span style={{ color: '#94a3b8' }}>
-                  ({assignedProductIds.length} sản phẩm đã có tại chi nhánh này)
-                </span>
-              </div>
-            )}
           </div>
 
-          {/* Footer */}
-          <div style={{ padding: '14px 20px', borderTop: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 12, backgroundColor: '#f8fafc' }}>
-            <button
-              type="button"
-              onClick={onClose}
-              className="po-btn po-btn-secondary"
-              style={{ height: 34, padding: '0 18px', borderRadius: 6, fontSize: '0.86rem', fontWeight: 600, cursor: 'pointer' }}
-            >
-              Hủy bỏ
-            </button>
-            <button
-              type="submit"
-              disabled={isSubmitDisabled}
-              className="po-btn po-btn-primary"
-              style={{ height: 34, padding: '0 20px', borderRadius: 6, fontSize: '0.86rem', fontWeight: 600, cursor: isSubmitDisabled ? 'not-allowed' : 'pointer', opacity: isSubmitDisabled ? 0.6 : 1 }}
-            >
-              {selectedProductIds.length > 0 ? `Gán ${selectedProductIds.length} sản phẩm vào chi nhánh` : 'Gán sản phẩm đã chọn'}
-            </button>
+          {/* Modal Footer */}
+          <div
+            style={{
+              padding: '16px 24px',
+              borderTop: '1px solid #e2e8f0',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              backgroundColor: '#f8fafc',
+              flexShrink: 0,
+            }}
+          >
+            <div style={{ fontSize: '0.82rem', color: '#64748b' }}>
+              {selectedBranch && (
+                <span>
+                  {assignedProductIds.length} sản phẩm đã có tại {selectedBranch.name}
+                </span>
+              )}
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <button
+                type="button"
+                id="btnCancelAssignProducts"
+                onClick={onClose}
+                disabled={isSubmitting}
+                className="po-btn po-btn-secondary"
+                style={{
+                  height: 38,
+                  padding: '0 20px',
+                  borderRadius: 6,
+                  fontSize: '0.88rem',
+                  fontWeight: 600,
+                  cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                }}
+              >
+                Hủy bỏ
+              </button>
+              <button
+                type="submit"
+                id="btnSubmitAssignProducts"
+                onClick={handleSubmit}
+                disabled={isSubmitDisabled}
+                className="po-btn po-btn-primary"
+                style={{
+                  height: 38,
+                  padding: '0 24px',
+                  borderRadius: 6,
+                  fontSize: '0.88rem',
+                  fontWeight: 600,
+                  cursor: isSubmitDisabled ? 'not-allowed' : 'pointer',
+                  opacity: isSubmitDisabled ? 0.6 : 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                }}
+              >
+                {isSubmitting && <Loader2 size={16} className="animate-spin" />}
+                <span>
+                  {selectedProductIds.length > 0
+                    ? `Gán ${selectedProductIds.length} sản phẩm vào chi nhánh`
+                    : 'Gán sản phẩm đã chọn'}
+                </span>
+              </button>
+            </div>
           </div>
         </form>
       </div>

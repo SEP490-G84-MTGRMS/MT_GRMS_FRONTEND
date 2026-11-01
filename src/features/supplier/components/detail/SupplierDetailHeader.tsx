@@ -1,6 +1,6 @@
 import type { FC } from 'react';
 import type { SupplierSummary } from '../../types/supplier.types';
-import { ArrowLeft, Building2, Edit3 } from 'lucide-react';
+import { ArrowLeft, Building2 } from 'lucide-react';
 
 interface Props {
   supplier: SupplierSummary;

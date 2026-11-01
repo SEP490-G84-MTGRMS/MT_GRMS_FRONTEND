@@ -453,7 +453,7 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
                     {/* 10. SL Đặt Tối Thiểu (MOQ) */}
                     <td style={{ padding: '8px 6px', textAlign: 'center', verticalAlign: 'middle', whiteSpace: 'nowrap', borderBottom: '1px solid #f1f5f9' }}>
                       <span style={{ fontFamily: 'var(--font-mono, monospace)', fontWeight: 700, fontSize: 12.5, color: '#0f172a' }}>
-                        {p.minOrderQuantity ?? 10}
+                        {p.minOrderQuantity ?? 1}
                       </span>
                     </td>
 

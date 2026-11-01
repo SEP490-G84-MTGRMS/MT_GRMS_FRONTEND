@@ -1,12 +1,29 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import type { FC, FormEvent } from 'react';
-import type { StoreProductItem, EditStoreProductInput } from '../types/storeProduct.types';
-import { X, AlertTriangle, Trash2, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
+import type {
+  StoreProductItem,
+  StoreSummary,
+  EditStoreProductInput,
+} from '../types/storeProduct.types';
+import {
+  X,
+  AlertTriangle,
+  Trash2,
+  Loader2,
+  CheckCircle2,
+  AlertCircle,
+  Store,
+  Package,
+  Building2,
+  SlidersHorizontal,
+  Lock,
+} from 'lucide-react';
 
 interface EditStoreProductModalProps {
   isOpen: boolean;
   onClose: () => void;
   product: StoreProductItem | null;
+  stores?: StoreSummary[];
   onSave: (storeId: string, productId: string, input: EditStoreProductInput) => Promise<void> | void;
   onToggleStatus?: (item: StoreProductItem) => Promise<void> | void;
   onRemove?: (item: StoreProductItem) => Promise<void> | void;
@@ -21,10 +38,11 @@ export const EditStoreProductModal: FC<EditStoreProductModalProps> = ({
   isOpen,
   onClose,
   product,
+  stores = [],
   onSave,
   onRemove,
 }) => {
-  // Input fields state as strings to allow natural user typing and clearing
+  // Input fields state
   const [retailPriceStr, setRetailPriceStr] = useState<string>('');
   const [minOrderQuantityStr, setMinOrderQuantityStr] = useState<string>('');
   const [status, setStatus] = useState<'Active' | 'Inactive'>('Active');
@@ -35,16 +53,16 @@ export const EditStoreProductModal: FC<EditStoreProductModalProps> = ({
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [isRemoving, setIsRemoving] = useState<boolean>(false);
 
-  // Sub-dialogs state: confirmation on unsaved changes & removal confirmation
+  // Sub-dialogs: confirmation on unsaved changes & removal confirmation
   const [showUnsavedConfirm, setShowUnsavedConfirm] = useState<boolean>(false);
   const [showRemoveConfirm, setShowRemoveConfirm] = useState<boolean>(false);
   const [removeError, setRemoveError] = useState<string>('');
 
-  // Reset and sync state whenever a new product is selected or modal opens
+  // Reset and sync state when product changes or modal opens
   useEffect(() => {
     if (isOpen && product) {
       setRetailPriceStr(String(product.retailPrice ?? 0));
-      setMinOrderQuantityStr(String(product.minOrderQuantity ?? 10));
+      setMinOrderQuantityStr(String(product.minOrderQuantity ?? 1));
       setStatus(product.status ?? 'Active');
       setFieldErrors({});
       setFormError('');
@@ -54,7 +72,6 @@ export const EditStoreProductModal: FC<EditStoreProductModalProps> = ({
       setShowRemoveConfirm(false);
       setRemoveError('');
     } else if (!isOpen) {
-      // Clear completely when closed to ensure zero stale data on next open
       setRetailPriceStr('');
       setMinOrderQuantityStr('');
       setFieldErrors({});
@@ -65,6 +82,14 @@ export const EditStoreProductModal: FC<EditStoreProductModalProps> = ({
   }, [isOpen, product]);
 
   const fmt = (n: number) => new Intl.NumberFormat('vi-VN').format(n);
+
+  // Look up store address if stores prop is provided
+  const matchedStore = useMemo(() => {
+    if (!product) return null;
+    return stores.find((s) => s.id === product.storeId || s.code === product.storeCode);
+  }, [stores, product]);
+
+  const storeAddress = matchedStore?.address || 'Khu vực hoạt động kinh doanh chi nhánh';
 
   // Parse numeric values safely
   const parsedPrice = useMemo(() => {
@@ -77,17 +102,29 @@ export const EditStoreProductModal: FC<EditStoreProductModalProps> = ({
   const parsedMoq = useMemo(() => {
     const trimmed = minOrderQuantityStr.trim();
     if (!trimmed) return NaN;
-    // Disallow decimals for MOQ: must match integer digits
-    if (!/^-?\d+$/.test(trimmed)) return NaN;
+    if (!/^-?\d+$/.test(trimmed)) return NaN; // Non-decimal integer check
     const num = Number(trimmed);
     return isNaN(num) ? NaN : num;
   }, [minOrderQuantityStr]);
 
-  // Determine whether user made any changes to the initial data
+  // Gross profit calculation
+  const profitMarginInfo = useMemo(() => {
+    if (!product || isNaN(parsedPrice) || parsedPrice <= 0) return null;
+    const cost = product.costPrice || 0;
+    const profit = parsedPrice - cost;
+    const margin = parsedPrice > 0 ? (profit / parsedPrice) * 100 : 0;
+    return {
+      profit,
+      margin: margin.toFixed(1),
+      isNegative: profit < 0,
+    };
+  }, [product, parsedPrice]);
+
+  // Determine whether user made any changes to initial data
   const isDirty = useMemo(() => {
     if (!product) return false;
     const priceChanged = !isNaN(parsedPrice) && parsedPrice !== product.retailPrice;
-    const initialMoq = product.minOrderQuantity ?? 10;
+    const initialMoq = product.minOrderQuantity ?? 1;
     const moqChanged = !isNaN(parsedMoq) && parsedMoq !== initialMoq;
     const statusChanged = status !== product.status;
     return priceChanged || moqChanged || statusChanged;
@@ -95,7 +132,7 @@ export const EditStoreProductModal: FC<EditStoreProductModalProps> = ({
 
   // Close handler with dirty check
   const handleRequestClose = useCallback(() => {
-    if (isSaving || isRemoving) return; // Prevent closing while an async action is running
+    if (isSaving || isRemoving) return;
     if (isDirty) {
       setShowUnsavedConfirm(true);
     } else {
@@ -125,7 +162,7 @@ export const EditStoreProductModal: FC<EditStoreProductModalProps> = ({
 
   if (!isOpen || !product) return null;
 
-  // Validation function
+  // Form validation
   const validateForm = (): boolean => {
     const errors: FieldErrors = {};
 
@@ -149,8 +186,8 @@ export const EditStoreProductModal: FC<EditStoreProductModalProps> = ({
       errors.minOrderQuantity = 'MOQ chỉ nhận số nguyên, không hỗ trợ số thập phân.';
     } else if (isNaN(parsedMoq)) {
       errors.minOrderQuantity = 'MOQ phải là một số nguyên hợp lệ.';
-    } else if (parsedMoq < 1) {
-      errors.minOrderQuantity = 'Số lượng đặt hàng tối thiểu (MOQ) phải từ 1 trở lên.';
+    } else if (parsedMoq < 0) {
+      errors.minOrderQuantity = 'Số lượng đặt hàng tối thiểu (MOQ) không thể âm.';
     } else if (parsedMoq > 10_000_000) {
       errors.minOrderQuantity = 'MOQ không được vượt quá 10,000,000.';
     }
@@ -159,32 +196,28 @@ export const EditStoreProductModal: FC<EditStoreProductModalProps> = ({
     return Object.keys(errors).length === 0;
   };
 
-  // Submit Save Handler
+  // Submit Handler
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    setFormError('');
+    if (isSaving || isRemoving) return;
 
-    if (isSaving) return; // Prevent double-clicking
-
-    const isValid = validateForm();
-    if (!isValid) return;
+    if (!validateForm()) return;
 
     setIsSaving(true);
+    setFormError('');
+
     try {
       await onSave(product.storeId, product.productId, {
         retailPrice: parsedPrice,
         minOrderQuantity: parsedMoq,
         status,
-        supplierId: (product as any).supplierId || undefined,
       });
-      // Close only on confirmed success
       onClose();
     } catch (err: any) {
-      // Do not close popup, preserve entered values, show clear error
       setFormError(
         err.response?.data?.message ||
           err.message ||
-          'Không thể lưu thay đổi sản phẩm tại chi nhánh. Vui lòng thử lại.'
+          'Không thể lưu thay đổi cấu hình sản phẩm. Vui lòng kiểm tra lại.'
       );
     } finally {
       setIsSaving(false);
@@ -193,10 +226,10 @@ export const EditStoreProductModal: FC<EditStoreProductModalProps> = ({
 
   // Confirm Removal Handler
   const handleConfirmRemove = async () => {
-    if (!onRemove || isRemoving) return;
+    if (!onRemove || !product || isRemoving) return;
+
     setIsRemoving(true);
     setRemoveError('');
-
     try {
       await onRemove(product);
       setShowRemoveConfirm(false);
@@ -211,8 +244,6 @@ export const EditStoreProductModal: FC<EditStoreProductModalProps> = ({
       setIsRemoving(false);
     }
   };
-
-  const isMarginNegative = !isNaN(parsedPrice) && parsedPrice > 0 && parsedPrice < product.costPrice;
 
   return (
     <>
@@ -238,7 +269,7 @@ export const EditStoreProductModal: FC<EditStoreProductModalProps> = ({
             backgroundColor: '#ffffff',
             borderRadius: 14,
             width: '100%',
-            maxWidth: 540,
+            maxWidth: 920,
             maxHeight: '90vh',
             boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
             border: '1px solid #e2e8f0',
@@ -251,7 +282,7 @@ export const EditStoreProductModal: FC<EditStoreProductModalProps> = ({
           {/* Header */}
           <div
             style={{
-              padding: '16px 20px',
+              padding: '16px 24px',
               borderBottom: '1px solid #e2e8f0',
               display: 'flex',
               alignItems: 'center',
@@ -261,42 +292,29 @@ export const EditStoreProductModal: FC<EditStoreProductModalProps> = ({
             }}
           >
             <div>
-              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#0f172a' }}>
-                Thao Tác Sản Phẩm Tại Chi Nhánh
+              <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700, color: '#0f172a' }}>
+                Chỉnh Sửa Sản Phẩm Tại Chi Nhánh
               </h3>
-              <div style={{ fontSize: 12, color: '#64748b', marginTop: 3, display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span>Chi nhánh:</span>
-                <strong style={{ color: '#0f766e', backgroundColor: '#f0fdfa', padding: '1px 8px', borderRadius: 4, border: '1px solid #ccfbf1' }}>
-                  {product.storeName}
-                </strong>
-              </div>
             </div>
             <button
               type="button"
               id="btnCloseEditProductModalX"
               onClick={handleRequestClose}
-              disabled={isSaving}
+              disabled={isSaving || isRemoving}
               style={{
                 background: 'none',
                 border: 'none',
-                cursor: isSaving ? 'not-allowed' : 'pointer',
+                cursor: isSaving || isRemoving ? 'not-allowed' : 'pointer',
                 color: '#94a3b8',
                 padding: 6,
                 borderRadius: 6,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                transition: 'all 0.15s ease',
-              }}
-              onMouseEnter={(e) => {
-                if (!isSaving) e.currentTarget.style.backgroundColor = '#f1f5f9';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'transparent';
               }}
               title="Đóng popup (Esc)"
             >
-              <X size={18} />
+              <X size={20} />
             </button>
           </div>
 
@@ -308,10 +326,10 @@ export const EditStoreProductModal: FC<EditStoreProductModalProps> = ({
           >
             <div
               style={{
-                padding: '16px 20px',
+                padding: '20px 24px',
                 display: 'flex',
                 flexDirection: 'column',
-                gap: 14,
+                gap: 18,
                 overflowY: 'auto',
                 flex: 1,
               }}
@@ -321,358 +339,665 @@ export const EditStoreProductModal: FC<EditStoreProductModalProps> = ({
                 <div
                   id="editProductFormErrorBanner"
                   style={{
-                    padding: '10px 14px',
+                    padding: '12px 16px',
                     borderRadius: 8,
                     backgroundColor: '#fef2f2',
                     border: '1px solid #fecaca',
                     color: '#b91c1c',
-                    fontSize: 12.5,
+                    fontSize: '0.86rem',
                     display: 'flex',
                     alignItems: 'flex-start',
-                    gap: 8,
+                    gap: 10,
                   }}
                 >
-                  <AlertCircle size={16} style={{ flexShrink: 0, marginTop: 2 }} />
+                  <AlertCircle size={18} style={{ flexShrink: 0, marginTop: 1 }} />
                   <div style={{ flex: 1, lineHeight: 1.4 }}>{formError}</div>
                 </div>
               )}
 
-              {/* Product Summary Information Card (Master attributes) */}
+              {/* GROUP A – THÔNG TIN CỬA HÀNG / CHI NHÁNH (Read-only) */}
               <div
                 style={{
                   backgroundColor: '#f8fafc',
                   border: '1px solid #e2e8f0',
-                  borderRadius: 8,
-                  padding: '12px 14px',
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(2, 1fr)',
-                  gap: '8px 12px',
-                  fontSize: 12.5,
+                  borderRadius: 10,
+                  padding: '14px 18px',
                 }}
               >
-                <div>
-                  <span style={{ color: '#64748b' }}>Sản phẩm:</span>{' '}
-                  <strong style={{ color: '#0f172a' }}>{product.name}</strong>
-                </div>
-                <div>
-                  <span style={{ color: '#64748b' }}>Mã SKU:</span>{' '}
-                  <span
-                    style={{
-                      fontFamily: 'monospace',
-                      fontWeight: 700,
-                      color: '#0f766e',
-                      backgroundColor: '#f0fdfa',
-                      padding: '1px 6px',
-                      borderRadius: 4,
-                      border: '1px solid #ccfbf1',
-                    }}
-                  >
-                    {product.sku}
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    fontSize: '0.86rem',
+                    fontWeight: 700,
+                    color: '#334155',
+                    marginBottom: 12,
+                    borderBottom: '1px solid #e2e8f0',
+                    paddingBottom: 6,
+                  }}
+                >
+                  <Store size={16} style={{ color: '#0d9488' }} />
+                  <span>THÔNG TIN CHI NHÁNH</span>
+                  <span style={{ fontSize: '0.74rem', color: '#94a3b8', fontWeight: 500, display: 'flex', alignItems: 'center', gap: 4, marginLeft: 'auto' }}>
+                    <Lock size={12} /> Chỉ đọc
                   </span>
                 </div>
-                <div>
-                  <span style={{ color: '#64748b' }}>ĐVT:</span>{' '}
-                  <strong style={{ color: '#334155' }}>{product.unit}</strong>{' '}
-                  <span style={{ color: '#cbd5e1' }}>•</span>{' '}
-                  <span style={{ color: '#64748b' }}>Ngành hàng:</span>{' '}
-                  <strong style={{ color: '#334155' }}>{product.category || '---'}</strong>
-                </div>
-                <div>
-                  <span style={{ color: '#64748b' }}>Giá vốn NCC:</span>{' '}
-                  <strong style={{ color: '#475569', fontFamily: 'monospace' }}>
-                    {fmt(product.costPrice)} đ
-                  </strong>
-                </div>
-                <div style={{ gridColumn: 'span 2', borderTop: '1px dashed #e2e8f0', paddingTop: 6, display: 'flex', justifyContent: 'space-between' }}>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr 2fr', gap: 12 }}>
                   <div>
-                    <span style={{ color: '#64748b' }}>Nhà cung cấp:</span>{' '}
-                    <strong style={{ color: '#1e293b' }}>
-                      {product.primarySupplierName || '---'}
-                    </strong>
-                    {product.primarySupplierCode && (
-                      <span style={{ color: '#64748b', fontSize: 11.5, marginLeft: 4 }}>
-                        ({product.primarySupplierCode})
-                      </span>
-                    )}
+                    <label style={{ fontSize: '0.78rem', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: 4 }}>
+                      Mã cửa hàng
+                    </label>
+                    <input
+                      type="text"
+                      readOnly
+                      value={product.storeCode || product.storeId.slice(0, 8)}
+                      style={{
+                        width: '100%',
+                        height: 38,
+                        padding: '0 12px',
+                        backgroundColor: '#f1f5f9',
+                        border: '1px solid #cbd5e1',
+                        borderRadius: 6,
+                        fontSize: '0.86rem',
+                        fontWeight: 600,
+                        color: '#334155',
+                        cursor: 'default',
+                        boxSizing: 'border-box',
+                      }}
+                    />
                   </div>
                   <div>
-                    <span style={{ color: '#64748b' }}>Tồn kho thực tế:</span>{' '}
-                    <strong style={{ color: product.currentStock > 0 ? '#0f766e' : '#dc2626' }}>
-                      {fmt(product.currentStock)} {product.unit}
-                    </strong>
+                    <label style={{ fontSize: '0.78rem', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: 4 }}>
+                      Tên cửa hàng / Chi nhánh
+                    </label>
+                    <input
+                      type="text"
+                      readOnly
+                      value={product.storeName}
+                      style={{
+                        width: '100%',
+                        height: 38,
+                        padding: '0 12px',
+                        backgroundColor: '#f1f5f9',
+                        border: '1px solid #cbd5e1',
+                        borderRadius: 6,
+                        fontSize: '0.86rem',
+                        fontWeight: 600,
+                        color: '#0f172a',
+                        cursor: 'default',
+                        boxSizing: 'border-box',
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '0.78rem', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: 4 }}>
+                      Địa chỉ chi nhánh
+                    </label>
+                    <input
+                      type="text"
+                      readOnly
+                      value={storeAddress}
+                      style={{
+                        width: '100%',
+                        height: 38,
+                        padding: '0 12px',
+                        backgroundColor: '#f1f5f9',
+                        border: '1px solid #cbd5e1',
+                        borderRadius: 6,
+                        fontSize: '0.84rem',
+                        color: '#475569',
+                        cursor: 'default',
+                        boxSizing: 'border-box',
+                      }}
+                    />
                   </div>
                 </div>
               </div>
 
-              {/* Field 1: Giá bán lẻ niêm yết (Retail Price) */}
-              <div>
-                <label
-                  htmlFor="inputRetailPrice"
+              {/* GROUP B – THÔNG TIN SẢN PHẨM (Read-only) */}
+              <div
+                style={{
+                  backgroundColor: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: 10,
+                  padding: '14px 18px',
+                }}
+              >
+                <div
                   style={{
-                    display: 'block',
-                    fontSize: 12.5,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    fontSize: '0.86rem',
                     fontWeight: 700,
                     color: '#334155',
-                    marginBottom: 6,
+                    marginBottom: 12,
+                    borderBottom: '1px solid #e2e8f0',
+                    paddingBottom: 6,
                   }}
                 >
-                  Giá bán lẻ niêm yết (VNĐ) <span style={{ color: '#ef4444' }}>*</span>
-                </label>
-                <div style={{ position: 'relative' }}>
-                  <input
-                    id="inputRetailPrice"
-                    type="text"
-                    inputMode="numeric"
-                    value={retailPriceStr}
-                    disabled={isSaving}
-                    onChange={(e) => {
-                      setRetailPriceStr(e.target.value);
-                      if (fieldErrors.retailPrice) {
-                        setFieldErrors((prev) => ({ ...prev, retailPrice: undefined }));
-                      }
-                      setFormError('');
-                    }}
-                    placeholder="Nhập giá bán lẻ (ví dụ: 195000)"
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      borderRadius: 6,
-                      border: `1px solid ${
-                        fieldErrors.retailPrice
-                          ? '#ef4444'
-                          : isMarginNegative
-                          ? '#f59e0b'
-                          : '#cbd5e1'
-                      }`,
-                      fontSize: 13,
-                      fontWeight: 700,
-                      color: '#0f766e',
-                      fontFamily: 'monospace',
-                      outline: 'none',
-                      boxSizing: 'border-box',
-                      backgroundColor: isSaving ? '#f8fafc' : '#ffffff',
-                    }}
-                  />
-                  <span
-                    style={{
-                      position: 'absolute',
-                      right: 12,
-                      top: '50%',
-                      transform: 'translateY(-50%)',
-                      fontSize: 12,
-                      color: '#94a3b8',
-                      fontWeight: 600,
-                      pointerEvents: 'none',
-                    }}
-                  >
-                    đ
+                  <Package size={16} style={{ color: '#0d9488' }} />
+                  <span>THÔNG TIN SẢN PHẨM (CATALOG CHUẨN)</span>
+                  <span style={{ fontSize: '0.74rem', color: '#94a3b8', fontWeight: 500, display: 'flex', alignItems: 'center', gap: 4, marginLeft: 'auto' }}>
+                    <Lock size={12} /> Chỉ đọc
                   </span>
                 </div>
 
-                {/* Inline field error */}
-                {fieldErrors.retailPrice && (
-                  <div
-                    id="errorMsgRetailPrice"
-                    style={{
-                      color: '#dc2626',
-                      fontSize: 11.5,
-                      marginTop: 4,
-                      fontWeight: 500,
-                    }}
-                  >
-                    {fieldErrors.retailPrice}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr 1fr', gap: 12, marginBottom: 12 }}>
+                  <div>
+                    <label style={{ fontSize: '0.78rem', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: 4 }}>
+                      Mã SKU
+                    </label>
+                    <input
+                      type="text"
+                      readOnly
+                      value={product.sku}
+                      style={{
+                        width: '100%',
+                        height: 38,
+                        padding: '0 12px',
+                        backgroundColor: '#f1f5f9',
+                        border: '1px solid #cbd5e1',
+                        borderRadius: 6,
+                        fontSize: '0.86rem',
+                        fontWeight: 700,
+                        fontFamily: 'monospace',
+                        color: '#0d9488',
+                        cursor: 'default',
+                        boxSizing: 'border-box',
+                      }}
+                    />
                   </div>
-                )}
+                  <div>
+                    <label style={{ fontSize: '0.78rem', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: 4 }}>
+                      Tên sản phẩm
+                    </label>
+                    <input
+                      type="text"
+                      readOnly
+                      value={product.name}
+                      style={{
+                        width: '100%',
+                        height: 38,
+                        padding: '0 12px',
+                        backgroundColor: '#f1f5f9',
+                        border: '1px solid #cbd5e1',
+                        borderRadius: 6,
+                        fontSize: '0.88rem',
+                        fontWeight: 600,
+                        color: '#0f172a',
+                        cursor: 'default',
+                        boxSizing: 'border-box',
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '0.78rem', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: 4 }}>
+                      Mã vạch (Barcode)
+                    </label>
+                    <input
+                      type="text"
+                      readOnly
+                      value={product.barcode || 'N/A'}
+                      style={{
+                        width: '100%',
+                        height: 38,
+                        padding: '0 12px',
+                        backgroundColor: '#f1f5f9',
+                        border: '1px solid #cbd5e1',
+                        borderRadius: 6,
+                        fontSize: '0.84rem',
+                        fontFamily: 'monospace',
+                        color: '#475569',
+                        cursor: 'default',
+                        boxSizing: 'border-box',
+                      }}
+                    />
+                  </div>
+                </div>
 
-                {/* Margin feedback */}
-                {!fieldErrors.retailPrice && (
-                  <>
-                    {isMarginNegative ? (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+                  <div>
+                    <label style={{ fontSize: '0.78rem', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: 4 }}>
+                      Ngành hàng
+                    </label>
+                    <input
+                      type="text"
+                      readOnly
+                      value={product.category || 'Khác'}
+                      style={{
+                        width: '100%',
+                        height: 38,
+                        padding: '0 12px',
+                        backgroundColor: '#f1f5f9',
+                        border: '1px solid #cbd5e1',
+                        borderRadius: 6,
+                        fontSize: '0.84rem',
+                        color: '#334155',
+                        cursor: 'default',
+                        boxSizing: 'border-box',
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '0.78rem', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: 4 }}>
+                      Đơn vị tính (ĐVT)
+                    </label>
+                    <input
+                      type="text"
+                      readOnly
+                      value={product.unit}
+                      style={{
+                        width: '100%',
+                        height: 38,
+                        padding: '0 12px',
+                        backgroundColor: '#f1f5f9',
+                        border: '1px solid #cbd5e1',
+                        borderRadius: 6,
+                        fontSize: '0.84rem',
+                        fontWeight: 600,
+                        color: '#334155',
+                        textAlign: 'center',
+                        cursor: 'default',
+                        boxSizing: 'border-box',
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '0.78rem', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: 4 }}>
+                      Giá vốn nhà cung cấp
+                    </label>
+                    <input
+                      type="text"
+                      readOnly
+                      value={`${fmt(product.costPrice)} đ`}
+                      style={{
+                        width: '100%',
+                        height: 38,
+                        padding: '0 12px',
+                        backgroundColor: '#f1f5f9',
+                        border: '1px solid #cbd5e1',
+                        borderRadius: 6,
+                        fontSize: '0.86rem',
+                        fontWeight: 600,
+                        color: '#334155',
+                        textAlign: 'right',
+                        cursor: 'default',
+                        boxSizing: 'border-box',
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '0.78rem', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: 4 }}>
+                      Tồn kho thực tế (SOH)
+                    </label>
+                    <input
+                      type="text"
+                      readOnly
+                      value={`${fmt(product.currentStock)} ${product.unit}`}
+                      style={{
+                        width: '100%',
+                        height: 38,
+                        padding: '0 12px',
+                        backgroundColor: '#f1f5f9',
+                        border: '1px solid #cbd5e1',
+                        borderRadius: 6,
+                        fontSize: '0.86rem',
+                        fontWeight: 700,
+                        color: product.currentStock > 0 ? '#0f766e' : '#b91c1c',
+                        textAlign: 'right',
+                        cursor: 'default',
+                        boxSizing: 'border-box',
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* GROUP C – THÔNG TIN NHÀ CUNG CẤP (Read-only) */}
+              <div
+                style={{
+                  backgroundColor: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: 10,
+                  padding: '14px 18px',
+                }}
+              >
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    fontSize: '0.86rem',
+                    fontWeight: 700,
+                    color: '#334155',
+                    marginBottom: 12,
+                    borderBottom: '1px solid #e2e8f0',
+                    paddingBottom: 6,
+                  }}
+                >
+                  <Building2 size={16} style={{ color: '#0d9488' }} />
+                  <span>THÔNG TIN NHÀ CUNG CẤP CHÍNH</span>
+                  <span style={{ fontSize: '0.74rem', color: '#94a3b8', fontWeight: 500, display: 'flex', alignItems: 'center', gap: 4, marginLeft: 'auto' }}>
+                    <Lock size={12} /> Chỉ đọc
+                  </span>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 12 }}>
+                  <div>
+                    <label style={{ fontSize: '0.78rem', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: 4 }}>
+                      Mã nhà cung cấp
+                    </label>
+                    <input
+                      type="text"
+                      readOnly
+                      value={product.primarySupplierCode || 'NCC-N/A'}
+                      style={{
+                        width: '100%',
+                        height: 38,
+                        padding: '0 12px',
+                        backgroundColor: '#f1f5f9',
+                        border: '1px solid #cbd5e1',
+                        borderRadius: 6,
+                        fontSize: '0.86rem',
+                        fontFamily: 'monospace',
+                        fontWeight: 600,
+                        color: '#334155',
+                        cursor: 'default',
+                        boxSizing: 'border-box',
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '0.78rem', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: 4 }}>
+                      Tên nhà cung cấp
+                    </label>
+                    <input
+                      type="text"
+                      readOnly
+                      value={product.primarySupplierName || 'Chưa liên kết nhà cung cấp'}
+                      style={{
+                        width: '100%',
+                        height: 38,
+                        padding: '0 12px',
+                        backgroundColor: '#f1f5f9',
+                        border: '1px solid #cbd5e1',
+                        borderRadius: 6,
+                        fontSize: '0.86rem',
+                        fontWeight: 600,
+                        color: '#0f172a',
+                        cursor: 'default',
+                        boxSizing: 'border-box',
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* GROUP D – CẤU HÌNH KINH DOANH TẠI CHI NHÁNH (Editable) */}
+              <div
+                id="groupStoreBusinessConfig"
+                style={{
+                  backgroundColor: '#ffffff',
+                  border: '1.5px solid #0d9488',
+                  borderRadius: 10,
+                  padding: '16px 20px',
+                  boxShadow: '0 2px 8px rgba(13, 148, 136, 0.08)',
+                }}
+              >
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    fontSize: '0.92rem',
+                    fontWeight: 700,
+                    color: '#0f766e',
+                    marginBottom: 14,
+                    borderBottom: '1px solid #ccfbf1',
+                    paddingBottom: 8,
+                  }}
+                >
+                  <SlidersHorizontal size={18} />
+                  <span>CẤU HÌNH KINH DOANH TẠI CHI NHÁNH</span>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18 }}>
+                  {/* Field 1: Giá bán lẻ niêm yết (VNĐ) */}
+                  <div>
+                    <label
+                      htmlFor="inputEditRetailPrice"
+                      style={{
+                        fontSize: '0.84rem',
+                        fontWeight: 600,
+                        color: '#1e293b',
+                        display: 'block',
+                        marginBottom: 6,
+                      }}
+                    >
+                      Giá bán lẻ niêm yết (VNĐ) <span style={{ color: '#ef4444' }}>*</span>
+                    </label>
+                    <div style={{ position: 'relative' }}>
+                      <input
+                        id="inputEditRetailPrice"
+                        type="number"
+                        min="1"
+                        step="100"
+                        value={retailPriceStr}
+                        onChange={(e) => {
+                          setRetailPriceStr(e.target.value);
+                          if (fieldErrors.retailPrice) {
+                            setFieldErrors((prev) => ({ ...prev, retailPrice: undefined }));
+                          }
+                        }}
+                        style={{
+                          width: '100%',
+                          height: 40,
+                          padding: '0 36px 0 12px',
+                          borderRadius: 8,
+                          border: `1.5px solid ${fieldErrors.retailPrice ? '#ef4444' : '#cbd5e1'}`,
+                          backgroundColor: '#ffffff',
+                          fontSize: '0.94rem',
+                          fontWeight: 700,
+                          color: '#0f172a',
+                          outline: 'none',
+                          boxSizing: 'border-box',
+                        }}
+                      />
+                      <span
+                        style={{
+                          position: 'absolute',
+                          right: 12,
+                          top: '50%',
+                          transform: 'translateY(-50%)',
+                          fontSize: '0.88rem',
+                          color: '#64748b',
+                          fontWeight: 600,
+                        }}
+                      >
+                        đ
+                      </span>
+                    </div>
+
+                    {fieldErrors.retailPrice && (
+                      <div
+                        id="errEditRetailPrice"
+                        style={{ fontSize: '0.78rem', color: '#ef4444', marginTop: 4, fontWeight: 500 }}
+                      >
+                        {fieldErrors.retailPrice}
+                      </div>
+                    )}
+
+                    {/* Dynamic Gross Profit Margin */}
+                    {profitMarginInfo && (
                       <div
                         style={{
+                          marginTop: 6,
+                          fontSize: '0.8rem',
+                          padding: '4px 10px',
+                          borderRadius: 6,
+                          backgroundColor: profitMarginInfo.isNegative ? '#fef2f2' : '#f0fdf4',
+                          color: profitMarginInfo.isNegative ? '#b91c1c' : '#15803d',
+                          fontWeight: 600,
                           display: 'flex',
                           alignItems: 'center',
                           gap: 6,
-                          color: '#d97706',
-                          fontSize: 11.5,
-                          marginTop: 4,
                         }}
                       >
-                        <AlertTriangle size={14} /> Giá bán đang thấp hơn giá vốn ({fmt(product.costPrice)} đ). Cửa hàng sẽ bị lỗ!
+                        {profitMarginInfo.isNegative ? (
+                          <>
+                            <AlertTriangle size={14} />
+                            <span>Cảnh báo: Bán dưới giá vốn! Lỗ gộp: {fmt(profitMarginInfo.profit)} đ ({profitMarginInfo.margin}%)</span>
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle2 size={14} />
+                            <span>Lãi gộp ước tính: +{fmt(profitMarginInfo.profit)} đ (Tỷ suất: {profitMarginInfo.margin}%)</span>
+                          </>
+                        )}
                       </div>
-                    ) : parsedPrice > 0 ? (
-                      <div style={{ fontSize: 11.5, color: '#64748b', marginTop: 4 }}>
-                        Biên lợi nhuận gộp dự kiến:{' '}
-                        <strong style={{ color: '#0f766e' }}>
-                          {Math.round(((parsedPrice - product.costPrice) / (parsedPrice || 1)) * 100)}%
-                        </strong>
-                      </div>
-                    ) : null}
-                  </>
-                )}
-              </div>
-
-              {/* Field 2: Số lượng đặt hàng tối thiểu (MOQ) */}
-              <div>
-                <label
-                  htmlFor="inputMinOrderQuantity"
-                  style={{
-                    display: 'block',
-                    fontSize: 12.5,
-                    fontWeight: 700,
-                    color: '#334155',
-                    marginBottom: 6,
-                  }}
-                >
-                  Số lượng đặt hàng tối thiểu (MOQ) <span style={{ color: '#ef4444' }}>*</span>
-                </label>
-                <div style={{ position: 'relative' }}>
-                  <input
-                    id="inputMinOrderQuantity"
-                    type="text"
-                    inputMode="numeric"
-                    value={minOrderQuantityStr}
-                    disabled={isSaving}
-                    onChange={(e) => {
-                      setMinOrderQuantityStr(e.target.value);
-                      if (fieldErrors.minOrderQuantity) {
-                        setFieldErrors((prev) => ({ ...prev, minOrderQuantity: undefined }));
-                      }
-                      setFormError('');
-                    }}
-                    placeholder="Nhập MOQ (ví dụ: 10)"
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      borderRadius: 6,
-                      border: `1px solid ${fieldErrors.minOrderQuantity ? '#ef4444' : '#cbd5e1'}`,
-                      fontSize: 13,
-                      fontWeight: 700,
-                      fontFamily: 'monospace',
-                      outline: 'none',
-                      boxSizing: 'border-box',
-                      backgroundColor: isSaving ? '#f8fafc' : '#ffffff',
-                    }}
-                  />
-                  <span
-                    style={{
-                      position: 'absolute',
-                      right: 12,
-                      top: '50%',
-                      transform: 'translateY(-50%)',
-                      fontSize: 12,
-                      color: '#94a3b8',
-                      fontWeight: 600,
-                      pointerEvents: 'none',
-                    }}
-                  >
-                    {product.unit}
-                  </span>
-                </div>
-
-                {/* Inline field error */}
-                {fieldErrors.minOrderQuantity && (
-                  <div
-                    id="errorMsgMinOrderQuantity"
-                    style={{
-                      color: '#dc2626',
-                      fontSize: 11.5,
-                      marginTop: 4,
-                      fontWeight: 500,
-                    }}
-                  >
-                    {fieldErrors.minOrderQuantity}
+                    )}
                   </div>
-                )}
 
-                <div style={{ fontSize: 11.5, color: '#64748b', marginTop: 4 }}>
-                  Số lượng tối thiểu khi lập phiếu đặt hàng gửi cho nhà cung cấp (áp dụng theo ĐVT cơ sở: {product.unit}).
-                </div>
-              </div>
-
-              {/* Field 3: Trạng thái kinh doanh tại chi nhánh */}
-              <div>
-                <label
-                  style={{
-                    display: 'block',
-                    fontSize: 12.5,
-                    fontWeight: 700,
-                    color: '#334155',
-                    marginBottom: 6,
-                  }}
-                >
-                  Trạng thái kinh doanh tại chi nhánh
-                </label>
-                <div style={{ display: 'flex', gap: 10 }}>
-                  <button
-                    type="button"
-                    id="btnStatusActive"
-                    disabled={isSaving}
-                    onClick={() => setStatus('Active')}
-                    style={{
-                      flex: 1,
-                      padding: '9px 12px',
-                      borderRadius: 6,
-                      border: status === 'Active' ? '2px solid #0f766e' : '1px solid #cbd5e1',
-                      backgroundColor: status === 'Active' ? '#f0fdfa' : '#ffffff',
-                      color: status === 'Active' ? '#0f766e' : '#64748b',
-                      fontSize: 12.5,
-                      fontWeight: 700,
-                      cursor: isSaving ? 'not-allowed' : 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: 6,
-                      transition: 'all 0.15s ease',
-                    }}
-                  >
-                    <CheckCircle2 size={15} color={status === 'Active' ? '#0f766e' : '#94a3b8'} />
-                    <span>Đang kinh doanh</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    id="btnStatusInactive"
-                    disabled={isSaving}
-                    onClick={() => setStatus('Inactive')}
-                    style={{
-                      flex: 1,
-                      padding: '9px 12px',
-                      borderRadius: 6,
-                      border: status === 'Inactive' ? '2px solid #64748b' : '1px solid #cbd5e1',
-                      backgroundColor: status === 'Inactive' ? '#f1f5f9' : '#ffffff',
-                      color: status === 'Inactive' ? '#1e293b' : '#64748b',
-                      fontSize: 12.5,
-                      fontWeight: 700,
-                      cursor: isSaving ? 'not-allowed' : 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: 6,
-                      transition: 'all 0.15s ease',
-                    }}
-                  >
-                    <span
+                  {/* Field 2: Số lượng đặt hàng tối thiểu (MOQ) */}
+                  <div>
+                    <label
+                      htmlFor="inputEditMoq"
                       style={{
-                        width: 8,
-                        height: 8,
-                        borderRadius: '50%',
-                        backgroundColor: status === 'Inactive' ? '#64748b' : '#cbd5e1',
+                        fontSize: '0.84rem',
+                        fontWeight: 600,
+                        color: '#1e293b',
+                        display: 'block',
+                        marginBottom: 6,
                       }}
-                    />
-                    <span>Tạm ngừng bán</span>
-                  </button>
+                    >
+                      Số lượng đặt hàng tối thiểu (MOQ) <span style={{ color: '#ef4444' }}>*</span>
+                    </label>
+                    <div style={{ position: 'relative' }}>
+                      <input
+                        id="inputEditMoq"
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={minOrderQuantityStr}
+                        onChange={(e) => {
+                          setMinOrderQuantityStr(e.target.value);
+                          if (fieldErrors.minOrderQuantity) {
+                            setFieldErrors((prev) => ({ ...prev, minOrderQuantity: undefined }));
+                          }
+                        }}
+                        style={{
+                          width: '100%',
+                          height: 40,
+                          padding: '0 70px 0 12px',
+                          borderRadius: 8,
+                          border: `1.5px solid ${fieldErrors.minOrderQuantity ? '#ef4444' : '#cbd5e1'}`,
+                          backgroundColor: '#ffffff',
+                          fontSize: '0.94rem',
+                          fontWeight: 700,
+                          color: '#0f172a',
+                          outline: 'none',
+                          boxSizing: 'border-box',
+                        }}
+                      />
+                      <span
+                        style={{
+                          position: 'absolute',
+                          right: 12,
+                          top: '50%',
+                          transform: 'translateY(-50%)',
+                          fontSize: '0.82rem',
+                          color: '#64748b',
+                          fontWeight: 600,
+                        }}
+                      >
+                        {product.unit}
+                      </span>
+                    </div>
+
+                    {fieldErrors.minOrderQuantity && (
+                      <div
+                        id="errEditMoq"
+                        style={{ fontSize: '0.78rem', color: '#ef4444', marginTop: 4, fontWeight: 500 }}
+                      >
+                        {fieldErrors.minOrderQuantity}
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <div style={{ fontSize: 11.5, color: '#64748b', marginTop: 4 }}>
-                  Chỉ áp dụng tại <strong>{product.storeName}</strong>, không làm thay đổi trạng thái tại các chi nhánh khác.
+
+                {/* Field 3: Trạng thái kinh doanh tại chi nhánh */}
+                <div style={{ marginTop: 16 }}>
+                  <label style={{ fontSize: '0.84rem', fontWeight: 600, color: '#1e293b', display: 'block', marginBottom: 6 }}>
+                    Trạng thái kinh doanh tại chi nhánh <span style={{ color: '#ef4444' }}>*</span>
+                  </label>
+                  <div style={{ display: 'flex', gap: 16 }}>
+                    <label
+                      id="optStatusActive"
+                      style={{
+                        flex: 1,
+                        padding: '10px 14px',
+                        borderRadius: 8,
+                        border: `1.5px solid ${status === 'Active' ? '#0d9488' : '#e2e8f0'}`,
+                        backgroundColor: status === 'Active' ? '#f0fdfa' : '#ffffff',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 10,
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease',
+                      }}
+                    >
+                      <input
+                        type="radio"
+                        name="storeProductStatus"
+                        value="Active"
+                        checked={status === 'Active'}
+                        onChange={() => setStatus('Active')}
+                        style={{ accentColor: '#0d9488', width: 16, height: 16 }}
+                      />
+                      <span style={{ fontSize: '0.88rem', fontWeight: 700, color: '#0f766e' }}>
+                        Đang kinh doanh
+                      </span>
+                    </label>
+
+                    <label
+                      id="optStatusInactive"
+                      style={{
+                        flex: 1,
+                        padding: '10px 14px',
+                        borderRadius: 8,
+                        border: `1.5px solid ${status === 'Inactive' ? '#d97706' : '#e2e8f0'}`,
+                        backgroundColor: status === 'Inactive' ? '#fffbeb' : '#ffffff',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 10,
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease',
+                      }}
+                    >
+                      <input
+                        type="radio"
+                        name="storeProductStatus"
+                        value="Inactive"
+                        checked={status === 'Inactive'}
+                        onChange={() => setStatus('Inactive')}
+                        style={{ accentColor: '#d97706', width: 16, height: 16 }}
+                      />
+                      <span style={{ fontSize: '0.88rem', fontWeight: 700, color: '#b45309' }}>
+                        Tạm ngừng bán
+                      </span>
+                    </label>
+                  </div>
                 </div>
               </div>
             </div>
 
-            {/* Footer with Actions */}
+            {/* Modal Footer */}
             <div
               style={{
-                padding: '12px 20px',
+                padding: '16px 24px',
                 borderTop: '1px solid #e2e8f0',
                 display: 'flex',
                 alignItems: 'center',
@@ -681,105 +1006,82 @@ export const EditStoreProductModal: FC<EditStoreProductModalProps> = ({
                 flexShrink: 0,
               }}
             >
-              {/* Delete / Remove button on the left */}
+              {/* Left: Destructive Action - Remove from Store */}
               {onRemove ? (
                 <button
                   type="button"
-                  id="btnOpenRemoveConfirmModal"
-                  disabled={isSaving}
-                  onClick={() => {
-                    setRemoveError('');
-                    setShowRemoveConfirm(true);
-                  }}
+                  id="btnRemoveFromStore"
+                  onClick={() => setShowRemoveConfirm(true)}
+                  disabled={isSaving || isRemoving}
                   style={{
-                    height: 34,
-                    padding: '0 12px',
-                    borderRadius: 6,
-                    border: '1px solid #fecaca',
-                    backgroundColor: '#ffffff',
-                    color: '#dc2626',
-                    fontSize: 12,
-                    fontWeight: 600,
-                    cursor: isSaving ? 'not-allowed' : 'pointer',
-                    display: 'inline-flex',
+                    display: 'flex',
                     alignItems: 'center',
                     gap: 6,
+                    height: 38,
+                    padding: '0 16px',
+                    borderRadius: 6,
+                    border: '1px solid #fecaca',
+                    backgroundColor: '#fff',
+                    color: '#dc2626',
+                    fontSize: '0.86rem',
+                    fontWeight: 600,
+                    cursor: isSaving || isRemoving ? 'not-allowed' : 'pointer',
                     transition: 'all 0.15s ease',
                   }}
                   onMouseEnter={(e) => {
-                    if (!isSaving) e.currentTarget.style.backgroundColor = '#fef2f2';
+                    if (!isSaving && !isRemoving) e.currentTarget.style.backgroundColor = '#fef2f2';
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = '#ffffff';
+                    e.currentTarget.style.backgroundColor = '#fff';
                   }}
-                  title="Gỡ sản phẩm khỏi danh mục kinh doanh của chi nhánh"
                 >
-                  <Trash2 size={13} />
-                  <span>Gỡ khỏi cửa hàng</span>
+                  <Trash2 size={16} />
+                  <span>Xóa khỏi chi nhánh</span>
                 </button>
               ) : (
                 <div />
               )}
 
-              {/* Cancel & Save buttons on the right */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              {/* Right: Cancel & Save */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <button
                   type="button"
-                  id="btnCancelEditStoreProduct"
-                  disabled={isSaving}
+                  id="btnCancelEditProduct"
                   onClick={handleRequestClose}
+                  disabled={isSaving || isRemoving}
+                  className="po-btn po-btn-secondary"
                   style={{
-                    height: 34,
-                    padding: '0 14px',
+                    height: 38,
+                    padding: '0 20px',
                     borderRadius: 6,
-                    border: '1px solid #cbd5e1',
-                    backgroundColor: '#ffffff',
-                    color: '#334155',
-                    fontSize: 12.5,
+                    fontSize: '0.88rem',
                     fontWeight: 600,
-                    cursor: isSaving ? 'not-allowed' : 'pointer',
-                    transition: 'all 0.15s ease',
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!isSaving) e.currentTarget.style.backgroundColor = '#f8fafc';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = '#ffffff';
+                    cursor: isSaving || isRemoving ? 'not-allowed' : 'pointer',
                   }}
                 >
                   Hủy bỏ
                 </button>
-
                 <button
                   type="submit"
-                  id="btnSaveEditStoreProduct"
-                  disabled={isSaving}
+                  id="btnSaveEditProduct"
+                  onClick={handleSubmit}
+                  disabled={isSaving || isRemoving}
+                  className="po-btn po-btn-primary"
                   style={{
-                    height: 34,
-                    padding: '0 18px',
+                    height: 38,
+                    padding: '0 24px',
                     borderRadius: 6,
-                    fontSize: 12.5,
-                    fontWeight: 700,
-                    cursor: isSaving ? 'not-allowed' : 'pointer',
-                    backgroundColor: '#0f766e',
-                    border: 'none',
-                    color: '#ffffff',
-                    display: 'inline-flex',
+                    fontSize: '0.88rem',
+                    fontWeight: 600,
+                    display: 'flex',
                     alignItems: 'center',
-                    gap: 6,
-                    boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
-                    opacity: isSaving ? 0.75 : 1,
-                    transition: 'all 0.15s ease',
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!isSaving) e.currentTarget.style.backgroundColor = '#115e59';
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!isSaving) e.currentTarget.style.backgroundColor = '#0f766e';
+                    gap: 8,
+                    cursor: isSaving || isRemoving ? 'not-allowed' : 'pointer',
+                    opacity: isSaving || isRemoving ? 0.65 : 1,
                   }}
                 >
-                  {isSaving && <Loader2 size={14} className="animate-spin" />}
-                  <span>{isSaving ? 'Đang lưu...' : 'Lưu thay đổi'}</span>
+                  {isSaving && <Loader2 size={16} className="animate-spin" />}
+                  <span>{isSaving ? 'Đang lưu thay đổi...' : 'Lưu thay đổi'}</span>
                 </button>
               </div>
             </div>
@@ -787,44 +1089,42 @@ export const EditStoreProductModal: FC<EditStoreProductModalProps> = ({
         </div>
       </div>
 
-      {/* ── Sub-Modal 1: Unsaved Changes Confirmation Dialog ── */}
+      {/* ── Sub-dialog: Confirmation on Unsaved Changes ── */}
       {showUnsavedConfirm && (
         <div
-          id="modalUnsavedChangesBackdrop"
+          id="modalUnsavedChangesConfirmBackdrop"
           style={{
             position: 'fixed',
             inset: 0,
-            backgroundColor: 'rgba(15, 23, 42, 0.7)',
+            backgroundColor: 'rgba(15, 23, 42, 0.75)',
             backdropFilter: 'blur(3px)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            zIndex: 10001,
+            zIndex: 10000,
             padding: 16,
           }}
           onClick={() => setShowUnsavedConfirm(false)}
         >
           <div
-            id="modalUnsavedChangesDialog"
+            id="modalUnsavedChangesConfirmDialog"
             style={{
               backgroundColor: '#ffffff',
               borderRadius: 12,
               width: '100%',
-              maxWidth: 420,
+              maxWidth: 440,
               boxShadow: '0 20px 40px rgba(0, 0, 0, 0.25)',
               border: '1px solid #e2e8f0',
-              padding: '20px 22px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 14,
+              overflow: 'hidden',
+              padding: 24,
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
               <div
                 style={{
-                  width: 36,
-                  height: 36,
+                  width: 42,
+                  height: 42,
                   borderRadius: '50%',
                   backgroundColor: '#fef3c7',
                   color: '#d97706',
@@ -834,81 +1134,80 @@ export const EditStoreProductModal: FC<EditStoreProductModalProps> = ({
                   flexShrink: 0,
                 }}
               >
-                <AlertTriangle size={20} />
+                <AlertTriangle size={22} />
               </div>
-              <h4 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#0f172a' }}>
-                Thay đổi chưa được lưu
-              </h4>
+              <div style={{ flex: 1 }}>
+                <h4 style={{ margin: '0 0 6px 0', fontSize: '1rem', fontWeight: 700, color: '#0f172a' }}>
+                  Hủy thay đổi chưa lưu?
+                </h4>
+                <div style={{ fontSize: '0.85rem', color: '#475569', lineHeight: 1.5 }}>
+                  Bạn có một số cấu hình đã chỉnh sửa nhưng chưa được lưu lại. Nếu đóng bây giờ, các thay
+                  đổi này sẽ bị hủy bỏ.
+                </div>
+              </div>
             </div>
 
-            <p style={{ margin: 0, fontSize: 13, color: '#475569', lineHeight: 1.5 }}>
-              Bạn đã chỉnh sửa thông tin sản phẩm nhưng chưa lưu lại. Bạn có chắc chắn muốn thoát và hủy bỏ các thay đổi này không?
-            </p>
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 4 }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 22 }}>
               <button
                 type="button"
-                id="btnContinueEditing"
+                id="btnResumeEditing"
                 onClick={() => setShowUnsavedConfirm(false)}
                 style={{
-                  height: 32,
-                  padding: '0 14px',
+                  height: 36,
+                  padding: '0 16px',
                   borderRadius: 6,
                   border: '1px solid #cbd5e1',
                   backgroundColor: '#ffffff',
-                  color: '#334155',
-                  fontSize: 12.5,
+                  fontSize: '0.85rem',
                   fontWeight: 600,
+                  color: '#475569',
                   cursor: 'pointer',
                 }}
               >
                 Tiếp tục chỉnh sửa
               </button>
-
               <button
                 type="button"
-                id="btnDiscardChangesAndClose"
+                id="btnConfirmDiscardChanges"
                 onClick={() => {
                   setShowUnsavedConfirm(false);
                   onClose();
                 }}
                 style={{
-                  height: 32,
-                  padding: '0 14px',
+                  height: 36,
+                  padding: '0 16px',
                   borderRadius: 6,
                   border: 'none',
                   backgroundColor: '#dc2626',
+                  fontSize: '0.85rem',
+                  fontWeight: 600,
                   color: '#ffffff',
-                  fontSize: 12.5,
-                  fontWeight: 700,
                   cursor: 'pointer',
                 }}
               >
-                Bỏ thay đổi
+                Hủy bỏ thay đổi
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* ── Sub-Modal 2: Custom Remove From Branch Confirmation Dialog ── */}
+      {/* ── Sub-dialog: Confirmation on Remove Product from Store ── */}
       {showRemoveConfirm && (
         <div
           id="modalRemoveConfirmBackdrop"
           style={{
             position: 'fixed',
             inset: 0,
-            backgroundColor: 'rgba(15, 23, 42, 0.7)',
+            backgroundColor: 'rgba(15, 23, 42, 0.75)',
             backdropFilter: 'blur(3px)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            zIndex: 10001,
+            zIndex: 10000,
             padding: 16,
           }}
-          onClick={() => {
-            if (!isRemoving) setShowRemoveConfirm(false);
-          }}
+          onClick={() => !isRemoving && setShowRemoveConfirm(false)}
         >
           <div
             id="modalRemoveConfirmDialog"
@@ -916,21 +1215,19 @@ export const EditStoreProductModal: FC<EditStoreProductModalProps> = ({
               backgroundColor: '#ffffff',
               borderRadius: 12,
               width: '100%',
-              maxWidth: 460,
+              maxWidth: 480,
               boxShadow: '0 20px 40px rgba(0, 0, 0, 0.25)',
               border: '1px solid #fecaca',
-              padding: '20px 22px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 14,
+              overflow: 'hidden',
+              padding: 24,
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
               <div
                 style={{
-                  width: 36,
-                  height: 36,
+                  width: 44,
+                  height: 44,
                   borderRadius: '50%',
                   backgroundColor: '#fee2e2',
                   color: '#dc2626',
@@ -940,112 +1237,93 @@ export const EditStoreProductModal: FC<EditStoreProductModalProps> = ({
                   flexShrink: 0,
                 }}
               >
-                <Trash2 size={18} />
+                <Trash2 size={22} />
               </div>
-              <div>
-                <h4 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#0f172a' }}>
+              <div style={{ flex: 1 }}>
+                <h4 style={{ margin: '0 0 6px 0', fontSize: '1.02rem', fontWeight: 700, color: '#991b1b' }}>
                   Xác nhận gỡ sản phẩm khỏi chi nhánh
                 </h4>
-                <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
-                  Thao tác sẽ hủy phân bổ sản phẩm tại chi nhánh này
+                <div style={{ fontSize: '0.85rem', color: '#475569', lineHeight: 1.5 }}>
+                  Bạn có chắc chắn muốn gỡ sản phẩm{' '}
+                  <strong style={{ color: '#0f172a' }}>{product.name}</strong> ({product.sku}) khỏi chi
+                  nhánh <strong style={{ color: '#0f172a' }}>{product.storeName}</strong> không?
+                </div>
+                <div
+                  style={{
+                    marginTop: 10,
+                    padding: '8px 12px',
+                    borderRadius: 6,
+                    backgroundColor: '#fffbeb',
+                    border: '1px solid #fef3c7',
+                    fontSize: '0.78rem',
+                    color: '#92400e',
+                    lineHeight: 1.4,
+                  }}
+                >
+                  &bull; Thao tác này <strong>KHÔNG</strong> xóa sản phẩm khỏi danh mục sản phẩm tổng (Master Catalog).<br />
+                  &bull; <strong>KHÔNG</strong> làm mất dữ liệu lịch sử đơn hàng hoặc chứng từ kho đã có.
                 </div>
               </div>
             </div>
 
             {removeError && (
               <div
-                id="removeConfirmErrorBanner"
                 style={{
-                  padding: '10px 12px',
+                  marginTop: 14,
+                  padding: '8px 12px',
                   borderRadius: 6,
                   backgroundColor: '#fef2f2',
                   border: '1px solid #fecaca',
                   color: '#b91c1c',
-                  fontSize: 12,
-                  lineHeight: 1.4,
+                  fontSize: '0.8rem',
                 }}
               >
                 {removeError}
               </div>
             )}
 
-            <div style={{ fontSize: 13, color: '#334155', lineHeight: 1.5 }}>
-              Bạn có chắc chắn muốn gỡ sản phẩm{' '}
-              <strong style={{ color: '#0f172a' }}>"{product.name}"</strong> ({product.sku}) khỏi danh mục kinh doanh của chi nhánh{' '}
-              <strong style={{ color: '#0f766e' }}>"{product.storeName}"</strong> không?
-            </div>
-
-            {/* Inventory Constraint Notice */}
-            <div
-              style={{
-                padding: '10px 12px',
-                borderRadius: 8,
-                backgroundColor: product.currentStock > 0 ? '#fffbeb' : '#f8fafc',
-                border: `1px solid ${product.currentStock > 0 ? '#fde68a' : '#e2e8f0'}`,
-                fontSize: 12,
-                color: product.currentStock > 0 ? '#b45309' : '#475569',
-              }}
-            >
-              <div>
-                Tồn kho thực tế hiện tại:{' '}
-                <strong style={{ color: product.currentStock > 0 ? '#d97706' : '#0f766e' }}>
-                  {fmt(product.currentStock)} {product.unit}
-                </strong>
-              </div>
-              {product.currentStock > 0 ? (
-                <div style={{ marginTop: 4, fontWeight: 500 }}>
-                  ⚠️ Sản phẩm đang có tồn kho tại chi nhánh. Hệ thống sẽ chặn thao tác gỡ để đảm bảo an toàn kho.
-                </div>
-              ) : (
-                <div style={{ marginTop: 4, color: '#64748b' }}>
-                  ✓ Tồn kho bằng 0. Sản phẩm sẽ được gỡ khỏi danh mục phân bổ an toàn (bảo toàn lịch sử giao dịch).
-                </div>
-              )}
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 4 }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 22 }}>
               <button
                 type="button"
-                id="btnCancelRemove"
-                disabled={isRemoving}
+                id="btnCancelRemoveProduct"
                 onClick={() => setShowRemoveConfirm(false)}
+                disabled={isRemoving}
                 style={{
-                  height: 34,
-                  padding: '0 14px',
+                  height: 36,
+                  padding: '0 16px',
                   borderRadius: 6,
                   border: '1px solid #cbd5e1',
                   backgroundColor: '#ffffff',
-                  color: '#334155',
-                  fontSize: 12.5,
+                  fontSize: '0.85rem',
                   fontWeight: 600,
+                  color: '#475569',
                   cursor: isRemoving ? 'not-allowed' : 'pointer',
                 }}
               >
                 Hủy bỏ
               </button>
-
               <button
                 type="button"
                 id="btnConfirmRemoveProduct"
-                disabled={isRemoving}
                 onClick={handleConfirmRemove}
+                disabled={isRemoving}
                 style={{
-                  height: 34,
-                  padding: '0 16px',
+                  height: 36,
+                  padding: '0 18px',
                   borderRadius: 6,
                   border: 'none',
                   backgroundColor: '#dc2626',
+                  fontSize: '0.85rem',
+                  fontWeight: 600,
                   color: '#ffffff',
-                  fontSize: 12.5,
-                  fontWeight: 700,
                   cursor: isRemoving ? 'not-allowed' : 'pointer',
-                  display: 'inline-flex',
+                  display: 'flex',
                   alignItems: 'center',
-                  gap: 6,
+                  gap: 8,
                 }}
               >
-                {isRemoving && <Loader2 size={14} className="animate-spin" />}
-                <span>{isRemoving ? 'Đang xử lý...' : 'Xác nhận gỡ'}</span>
+                {isRemoving && <Loader2 size={15} className="animate-spin" />}
+                <span>{isRemoving ? 'Đang gỡ...' : 'Xác nhận gỡ'}</span>
               </button>
             </div>
           </div>
@@ -1054,5 +1332,3 @@ export const EditStoreProductModal: FC<EditStoreProductModalProps> = ({
     </>
   );
 };
-
-export default EditStoreProductModal;

@@ -396,6 +396,7 @@ export const StoreProductManagementPage: FC = () => {
         isOpen={Boolean(editingItem)}
         onClose={() => setEditingItem(null)}
         product={editingItem}
+        stores={stores}
         onSave={handleUpdateProduct}
         onToggleStatus={handleToggleStatus}
         onRemove={handleRemoveProduct}

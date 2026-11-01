@@ -72,7 +72,7 @@ export const storeProductApi = {
         unit: x.unit,
         retailPrice: x.retailPrice,
         costPrice: x.costPrice,
-        minOrderQuantity: x.minOrderQuantity ?? x.minimumOrderQuantity ?? 10,
+        minOrderQuantity: x.minOrderQuantity ?? x.minimumOrderQuantity ?? 1,
         currentStock: x.currentStock,
         minStockLevel: x.minStockLevel,
         primarySupplierCode: x.primarySupplierCode || x.supplierCode || '',
@@ -121,6 +121,7 @@ export const storeProductApi = {
       productIds: input.productIds,
       defaultRetailPrice: input.defaultRetailPrice,
       defaultMinStock: input.defaultMinStock,
+      defaultMinOrderQuantity: input.defaultMinOrderQuantity,
     });
   },
 
