@@ -18,7 +18,7 @@ httpClient.interceptors.request.use((config) => {
   }
 
   // Tự động gắn Tenant ID chuẩn của hệ thống để đồng bộ dữ liệu đa người thuê
-  let tenantId = 'tenant_mt_mart_01';
+  let tenantId = localStorage.getItem('tenant_id') || 'tenant_mt_mart_01';
   const storedUser = localStorage.getItem('auth_user');
   if (storedUser) {
     try {

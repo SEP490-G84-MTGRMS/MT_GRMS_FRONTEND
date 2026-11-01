@@ -217,6 +217,8 @@ export class InvoiceDTO {
 export class PreOrderDTO {
   preOrderId: string = '';          // PRE-2026-008
   createdAt: string = '';           // Ngày tạo
+  branchId: string = 'BR-01';
+  branchName: string = 'Chi nhánh Cầu Giấy (Trung tâm)';
   pickupAppointment: string = '';   // Thời gian hẹn đến quầy lấy hàng
   customerName: string = '';
   customerPhone: string = '';

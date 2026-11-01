@@ -9,15 +9,14 @@ interface Props {
 }
 
 export const AddCustomerModal: FC<Props> = ({ isOpen, onClose, onSave }) => {
-  const [name, setName] = useState('Hoàng Sơn');
-  const [phone, setPhone] = useState('0912.345.678');
+  const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
-  const [group, setGroup] = useState('');
   const [dob, setDob] = useState('');
   const [gender, setGender] = useState<'Nam' | 'Nữ'>('Nam');
   const [address, setAddress] = useState('');
-  const [area, setArea] = useState('Hà Nội - Hoàn Kiếm');
-  const [ward, setWard] = useState('Phường Tràng Tiền');
+  const [area, setArea] = useState('');
+  const [ward, setWard] = useState('');
   const [note, setNote] = useState('');
 
   if (!isOpen) return null;
@@ -34,7 +33,7 @@ export const AddCustomerModal: FC<Props> = ({ isOpen, onClose, onSave }) => {
       name: name.trim(),
       phone: phone.trim(),
       email: email.trim() || undefined,
-      group: group.trim() || 'Khách lẻ',
+      group: 'Khách lẻ',
       dob: dob || undefined,
       gender,
       address: address.trim() || undefined,
@@ -44,11 +43,22 @@ export const AddCustomerModal: FC<Props> = ({ isOpen, onClose, onSave }) => {
       loyaltyPoints: 0,
       membershipTier: 'Standard',
       debtLimit: 0,
+      debtCount: 0,
+      totalDebtPurchased: 0,
       currentDebt: 0,
-      allowDebt: false,
+      allowDebt: true,
     };
 
     onSave(newCust);
+    // Reset form
+    setName('');
+    setPhone('');
+    setEmail('');
+    setDob('');
+    setAddress('');
+    setArea('');
+    setWard('');
+    setNote('');
     onClose();
   };
 
@@ -97,58 +107,17 @@ export const AddCustomerModal: FC<Props> = ({ isOpen, onClose, onSave }) => {
               }}
             >
               <tbody>
-                {/* Hàng 1: Mã KH & Nhóm */}
+                {/* Hàng 1: Tên KH & Ngày sinh + Giới tính */}
                 <tr>
                   <td style={{ width: '18%', padding: '6px 8px', border: '1px solid #94a3b8' }}>
-                    Mã KH:
-                  </td>
-                  <td style={{ width: '32%', padding: '6px 8px', border: '1px solid #94a3b8' }}>
-                    <input
-                      type="text"
-                      placeholder="Mã tự động"
-                      disabled
-                      value=""
-                      style={{
-                        width: '100%',
-                        padding: '4px 6px',
-                        border: '1px solid #cbd5e1',
-                        backgroundColor: '#f8fafc',
-                        color: '#94a3b8',
-                        fontSize: 12.5,
-                        boxSizing: 'border-box',
-                      }}
-                    />
-                  </td>
-                  <td style={{ width: '18%', padding: '6px 8px', border: '1px solid #94a3b8' }}>
-                    Nhóm:
-                  </td>
-                  <td style={{ width: '32%', padding: '6px 8px', border: '1px solid #94a3b8' }}>
-                    <input
-                      type="text"
-                      value={group}
-                      onChange={(e) => setGroup(e.target.value)}
-                      placeholder="Nhóm khách"
-                      style={{
-                        width: '100%',
-                        padding: '4px 6px',
-                        border: '1px solid #cbd5e1',
-                        fontSize: 12.5,
-                        boxSizing: 'border-box',
-                      }}
-                    />
-                  </td>
-                </tr>
-
-                {/* Hàng 2: Tên KH & Ngày sinh + Giới tính */}
-                <tr>
-                  <td style={{ padding: '6px 8px', border: '1px solid #94a3b8' }}>
                     Tên KH (*):
                   </td>
-                  <td style={{ padding: '6px 8px', border: '1px solid #94a3b8' }}>
+                  <td style={{ width: '32%', padding: '6px 8px', border: '1px solid #94a3b8' }}>
                     <input
                       type="text"
                       value={name}
                       onChange={(e) => setName(e.target.value)}
+                      placeholder="Nhập họ và tên..."
                       style={{
                         width: '100%',
                         padding: '4px 6px',
@@ -159,10 +128,10 @@ export const AddCustomerModal: FC<Props> = ({ isOpen, onClose, onSave }) => {
                       }}
                     />
                   </td>
-                  <td style={{ padding: '6px 8px', border: '1px solid #94a3b8', verticalAlign: 'top' }}>
+                  <td style={{ width: '18%', padding: '6px 8px', border: '1px solid #94a3b8', verticalAlign: 'top' }}>
                     Ngày sinh:
                   </td>
-                  <td style={{ padding: '6px 8px', border: '1px solid #94a3b8' }}>
+                  <td style={{ width: '32%', padding: '6px 8px', border: '1px solid #94a3b8' }}>
                     <input
                       type="date"
                       value={dob}
