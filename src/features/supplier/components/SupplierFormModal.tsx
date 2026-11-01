@@ -145,83 +145,67 @@ export const SupplierFormModal: FC<Props> = ({
             {/* THÊM MỚI NHANH: Form tinh gọn, không chia tab, không rườm rà */}
             {isCreate ? (
               <div className="form-grid">
-                <div className="form-grid-2">
-                  <div className="form-group">
-                    <label className="form-label">Tên Nhà Cung Cấp <span className="required">*</span></label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="VD: Nông Sản Tươi Sạch Khải Anh"
-                      value={formData.name}
-                      onChange={e => set({ name: e.target.value })}
-                      className="form-input"
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Số Điện Thoại <span className="required">*</span></label>
-                    <input
-                      type="tel"
-                      required
-                      placeholder="VD: 0901111222"
-                      value={formData.phone}
-                      onChange={e => set({ phone: e.target.value })}
-                      className="form-input"
-                      style={{ fontFamily: 'var(--font-mono)' }}
-                    />
-                  </div>
+                <div className="form-group">
+                  <label className="form-label">Tên Nhà Cung Cấp <span className="required">*</span></label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="VD: Nông Sản Tươi Sạch Khải Anh"
+                    value={formData.name}
+                    onChange={e => set({ name: e.target.value })}
+                    className="form-input"
+                  />
                 </div>
 
-                <div className="form-grid-2">
-                  <div className="form-group">
-                    <label className="form-label">Người Liên Hệ (Sale / Đầu mối)</label>
-                    <input
-                      type="text"
-                      placeholder="VD: Anh Nam (Kinh doanh)"
-                      value={formData.contactPerson}
-                      onChange={e => set({ contactPerson: e.target.value })}
-                      className="form-input"
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Email Liên Hệ</label>
-                    <input
-                      type="email"
-                      placeholder="VD: contact@khaianhfarm.vn"
-                      value={formData.email}
-                      onChange={e => set({ email: e.target.value })}
-                      className="form-input"
-                    />
-                  </div>
+                <div className="form-group">
+                  <label className="form-label">Số Điện Thoại <span className="required">*</span></label>
+                  <input
+                    type="tel"
+                    required
+                    placeholder="VD: 0901111222"
+                    value={formData.phone}
+                    onChange={e => set({ phone: e.target.value })}
+                    className="form-input"
+                    style={{ fontFamily: 'var(--font-mono)' }}
+                  />
                 </div>
 
-                <div className="form-grid-2">
-                  <div className="form-group">
-                    <label className="form-label">Loại Nhà Cung Cấp</label>
-                    <select
-                      value={formData.supplierType}
-                      onChange={e => set({ supplierType: e.target.value as SupplierType })}
-                      className="form-select"
-                    >
-                      <option value="Goods">Goods (Hàng hóa)</option>
-                      <option value="Service">Service (Dịch vụ)</option>
-                      <option value="Both">Both (Cả hai)</option>
-                    </select>
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Phân Loại Ngành Hàng</label>
-                    <select
-                      value={formData.category}
-                      onChange={e => set({ category: e.target.value as SupplierCategory })}
-                      className="form-select"
-                    >
-                      <option value="FRESH">FRESH (Nông sản tươi)</option>
-                      <option value="AMBIENT">AMBIENT (Đồ khô / Tạp hóa)</option>
-                      <option value="FROZEN">FROZEN (Hàng đông lạnh)</option>
-                      <option value="UTILITIES">UTILITIES (Điện nước)</option>
-                      <option value="RENT">RENT (Thuê mặt bằng)</option>
-                      <option value="LOGISTICS">LOGISTICS (Vận chuyển)</option>
-                    </select>
-                  </div>
+                <div className="form-group">
+                  <label className="form-label">Người Liên Hệ</label>
+                  <input
+                    type="text"
+                    placeholder="VD: Anh Nam (Kinh doanh)"
+                    value={formData.contactPerson}
+                    onChange={e => set({ contactPerson: e.target.value })}
+                    className="form-input"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Email Liên Hệ</label>
+                  <input
+                    type="email"
+                    placeholder="VD: contact@khaianhfarm.vn"
+                    value={formData.email}
+                    onChange={e => set({ email: e.target.value })}
+                    className="form-input"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Phân Loại Ngành Hàng</label>
+                  <select
+                    value={formData.category}
+                    onChange={e => set({ category: e.target.value as SupplierCategory })}
+                    className="form-select"
+                  >
+                    <option value="FRESH">FRESH (Nông sản tươi)</option>
+                    <option value="AMBIENT">AMBIENT (Đồ khô / Tạp hóa)</option>
+                    <option value="FROZEN">FROZEN (Hàng đông lạnh)</option>
+                    <option value="UTILITIES">UTILITIES (Điện nước)</option>
+                    <option value="RENT">RENT (Thuê mặt bằng)</option>
+                    <option value="LOGISTICS">LOGISTICS (Vận chuyển)</option>
+                  </select>
                 </div>
 
                 <div className="form-group">
@@ -272,32 +256,29 @@ export const SupplierFormModal: FC<Props> = ({
                 {/* TAB 1: Cơ bản */}
                 {activeTab === 'basic' && (
                   <div className="form-grid">
-                    <div className="form-grid-2">
-                      <div className="form-group">
-                        <label className="form-label">Mã Nhà Cung Cấp</label>
-                        <input
-                          type="text"
-                          disabled
-                          value={formData.code}
-                          className="form-input"
-                          style={{ background: '#f3f4f6' }}
-                        />
-                      </div>
-                      <div className="form-group">
-                        <label className="form-label">Tên Nhà Cung Cấp <span className="required">*</span></label>
-                        <input
-                          type="text"
-                          required
-                          placeholder="VD: Nông Sản Tươi Sạch Khải Anh"
-                          value={formData.name}
-                          onChange={e => set({ name: e.target.value })}
-                          className="form-input"
-                        />
-                      </div>
-                    </div>
-
                     <div className="form-group">
-                      <label className="form-label">Tên Thương Mại (Trade Name)</label>
+                      <label className="form-label">Mã Nhà Cung Cấp</label>
+                      <input
+                        type="text"
+                        disabled
+                        value={formData.code}
+                        className="form-input"
+                        style={{ background: '#f3f4f6' }}
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Tên Nhà Cung Cấp <span className="required">*</span></label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="VD: Nông Sản Tươi Sạch Khải Anh"
+                        value={formData.name}
+                        onChange={e => set({ name: e.target.value })}
+                        className="form-input"
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Tên Thương Mại</label>
                       <input
                         type="text"
                         placeholder="VD: Khải Anh Farm"
@@ -306,83 +287,74 @@ export const SupplierFormModal: FC<Props> = ({
                         className="form-input"
                       />
                     </div>
-
-                    <div className="form-grid-2">
-                      <div className="form-group">
-                        <label className="form-label">Loại Nhà Cung Cấp</label>
-                        <select
-                          value={formData.supplierType}
-                          onChange={e => set({ supplierType: e.target.value as SupplierType })}
-                          className="form-select"
-                        >
-                          <option value="Goods">Goods (Hàng hóa)</option>
-                          <option value="Service">Service (Dịch vụ)</option>
-                          <option value="Both">Both (Cả hai)</option>
-                        </select>
-                      </div>
-                      <div className="form-group">
-                        <label className="form-label">Phân Loại Ngành Hàng</label>
-                        <select
-                          value={formData.category}
-                          onChange={e => set({ category: e.target.value as SupplierCategory })}
-                          className="form-select"
-                        >
-                          <option value="FRESH">FRESH (Nông sản tươi)</option>
-                          <option value="AMBIENT">AMBIENT (Đồ khô / Tạp hóa)</option>
-                          <option value="FROZEN">FROZEN (Hàng đông lạnh)</option>
-                          <option value="UTILITIES">UTILITIES (Điện nước)</option>
-                          <option value="RENT">RENT (Thuê mặt bằng)</option>
-                          <option value="LOGISTICS">LOGISTICS (Vận chuyển)</option>
-                        </select>
-                      </div>
+                    <div className="form-group">
+                      <label className="form-label">Loại Nhà Cung Cấp</label>
+                      <select
+                        value={formData.supplierType}
+                        onChange={e => set({ supplierType: e.target.value as SupplierType })}
+                        className="form-select"
+                      >
+                        <option value="Goods">Goods (Hàng hóa)</option>
+                        <option value="Service">Service (Dịch vụ)</option>
+                        <option value="Both">Both (Cả hai)</option>
+                      </select>
                     </div>
-
-                    <div className="form-grid-2">
-                      <div className="form-group">
-                        <label className="form-label">Người Liên Hệ (Sale)</label>
-                        <input
-                          type="text"
-                          placeholder="VD: Anh Nam (Kinh doanh)"
-                          value={formData.contactPerson}
-                          onChange={e => set({ contactPerson: e.target.value })}
-                          className="form-input"
-                        />
-                      </div>
-                      <div className="form-group">
-                        <label className="form-label">Số Điện Thoại <span className="required">*</span></label>
-                        <input
-                          type="text"
-                          required
-                          placeholder="VD: 0901111222"
-                          value={formData.phone}
-                          onChange={e => set({ phone: e.target.value })}
-                          className="form-input"
-                          style={{ fontFamily: 'var(--font-mono)' }}
-                        />
-                      </div>
+                    <div className="form-group">
+                      <label className="form-label">Phân Loại Ngành Hàng</label>
+                      <select
+                        value={formData.category}
+                        onChange={e => set({ category: e.target.value as SupplierCategory })}
+                        className="form-select"
+                      >
+                        <option value="FRESH">FRESH (Nông sản tươi)</option>
+                        <option value="AMBIENT">AMBIENT (Đồ khô / Tạp hóa)</option>
+                        <option value="FROZEN">FROZEN (Hàng đông lạnh)</option>
+                        <option value="UTILITIES">UTILITIES (Điện nước)</option>
+                        <option value="RENT">RENT (Thuê mặt bằng)</option>
+                        <option value="LOGISTICS">LOGISTICS (Vận chuyển)</option>
+                      </select>
                     </div>
-
-                    <div className="form-grid-2">
-                      <div className="form-group">
-                        <label className="form-label">Email</label>
-                        <input
-                          type="email"
-                          placeholder="VD: contact@khaianhfarm.vn"
-                          value={formData.email}
-                          onChange={e => set({ email: e.target.value })}
-                          className="form-input"
-                        />
-                      </div>
-                      <div className="form-group">
-                        <label className="form-label">Địa Chỉ Chi Tiết</label>
-                        <input
-                          type="text"
-                          placeholder="VD: 124 Đường 3/2, Phường 12, Quận 10, TP.HCM"
-                          value={formData.address}
-                          onChange={e => set({ address: e.target.value })}
-                          className="form-input"
-                        />
-                      </div>
+                    <div className="form-group">
+                      <label className="form-label">Người Liên Hệ</label>
+                      <input
+                        type="text"
+                        placeholder="VD: Anh Nam (Kinh doanh)"
+                        value={formData.contactPerson}
+                        onChange={e => set({ contactPerson: e.target.value })}
+                        className="form-input"
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Số Điện Thoại <span className="required">*</span></label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="VD: 0901111222"
+                        value={formData.phone}
+                        onChange={e => set({ phone: e.target.value })}
+                        className="form-input"
+                        style={{ fontFamily: 'var(--font-mono)' }}
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Email</label>
+                      <input
+                        type="email"
+                        placeholder="VD: contact@khaianhfarm.vn"
+                        value={formData.email}
+                        onChange={e => set({ email: e.target.value })}
+                        className="form-input"
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Địa Chỉ Chi Tiết</label>
+                      <input
+                        type="text"
+                        placeholder="VD: 124 Đường 3/2, Phường 12, Quận 10, TP.HCM"
+                        value={formData.address}
+                        onChange={e => set({ address: e.target.value })}
+                        className="form-input"
+                      />
                     </div>
                   </div>
                 )}
@@ -390,37 +362,34 @@ export const SupplierFormModal: FC<Props> = ({
                 {/* TAB 2: Hạn Nợ & Hóa Đơn */}
                 {activeTab === 'terms' && (
                   <div className="form-grid">
-                    <div className="form-grid-2">
-                      <div className="form-group">
-                        <label className="form-label">Thời Hạn Nợ (Số ngày)</label>
-                        <select
-                          value={formData.paymentTermDays}
-                          onChange={e => set({ paymentTermDays: Number(e.target.value) })}
-                          className="form-select"
-                          style={{ fontFamily: 'var(--font-mono)' }}
-                        >
-                          <option value={0}>0 ngày (Thanh toán ngay)</option>
-                          <option value={3}>3 ngày (Gối đầu ngắn)</option>
-                          <option value={7}>7 ngày (Theo tuần)</option>
-                          <option value={15}>15 ngày (Nửa tháng)</option>
-                          <option value={30}>30 ngày (1 tháng)</option>
-                        </select>
-                      </div>
-                      <div className="form-group">
-                        <label className="form-label">Mã Số Thuế (Tax Code)</label>
-                        <input
-                          type="text"
-                          placeholder="VD: 0312345678"
-                          value={formData.taxCode}
-                          onChange={e => set({ taxCode: e.target.value })}
-                          className="form-input"
-                          style={{ fontFamily: 'var(--font-mono)' }}
-                        />
-                      </div>
-                    </div>
-
                     <div className="form-group">
-                      <label className="form-label">Tên Công Ty Xuất Hóa Đơn VAT</label>
+                      <label className="form-label">Thời Hạn Nợ (Số ngày)</label>
+                      <select
+                        value={formData.paymentTermDays}
+                        onChange={e => set({ paymentTermDays: Number(e.target.value) })}
+                        className="form-select"
+                        style={{ fontFamily: 'var(--font-mono)' }}
+                      >
+                        <option value={0}>0 ngày (Thanh toán ngay)</option>
+                        <option value={3}>3 ngày (Gối đầu ngắn)</option>
+                        <option value={7}>7 ngày (Theo tuần)</option>
+                        <option value={15}>15 ngày (Nửa tháng)</option>
+                        <option value={30}>30 ngày (1 tháng)</option>
+                      </select>
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Mã Số Thuế (Tax Code)</label>
+                      <input
+                        type="text"
+                        placeholder="VD: 0312345678"
+                        value={formData.taxCode}
+                        onChange={e => set({ taxCode: e.target.value })}
+                        className="form-input"
+                        style={{ fontFamily: 'var(--font-mono)' }}
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Tên Công Ty Xuất HĐ VAT</label>
                       <input
                         type="text"
                         placeholder="VD: Công ty TNHH Nông Sản Tươi Sạch Khải Anh"
@@ -429,9 +398,8 @@ export const SupplierFormModal: FC<Props> = ({
                         className="form-input"
                       />
                     </div>
-
                     <div className="form-group">
-                      <label className="form-label">Địa Chỉ Xuất Hóa Đơn GTGT</label>
+                      <label className="form-label">Địa Chỉ Xuất HĐ GTGT</label>
                       <input
                         type="text"
                         placeholder="VD: 124 Đường 3/2, Phường 12, Quận 10, TP.HCM"
@@ -446,32 +414,30 @@ export const SupplierFormModal: FC<Props> = ({
                 {/* TAB 3: Ngân Hàng & Ghi Chú */}
                 {activeTab === 'bank' && (
                   <div className="form-grid">
-                    <div className="form-grid-2">
-                      <div className="form-group">
-                        <label className="form-label">Ngân Hàng Thụ Hưởng</label>
-                        <select
-                          value={formData.bankName}
-                          onChange={e => set({ bankName: e.target.value })}
-                          className="form-select"
-                        >
-                          {VIETNAM_BANKS.map((b) => (
-                            <option key={b.code} value={b.shortName}>
-                              {b.shortName} — {b.name}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="form-group">
-                        <label className="form-label">Số Tài Khoản</label>
-                        <input
-                          type="text"
-                          placeholder="VD: 990111122288"
-                          value={formData.bankAccount}
-                          onChange={e => set({ bankAccount: e.target.value })}
-                          className="form-input"
-                          style={{ fontFamily: 'var(--font-mono)' }}
-                        />
-                      </div>
+                    <div className="form-group">
+                      <label className="form-label">Ngân Hàng Thụ Hưởng</label>
+                      <select
+                        value={formData.bankName}
+                        onChange={e => set({ bankName: e.target.value })}
+                        className="form-select"
+                      >
+                        {VIETNAM_BANKS.map((b) => (
+                          <option key={b.code} value={b.shortName}>
+                            {b.shortName} — {b.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Số Tài Khoản</label>
+                      <input
+                        type="text"
+                        placeholder="VD: 990111122288"
+                        value={formData.bankAccount}
+                        onChange={e => set({ bankAccount: e.target.value })}
+                        className="form-input"
+                        style={{ fontFamily: 'var(--font-mono)' }}
+                      />
                     </div>
 
                     <div className="form-group">

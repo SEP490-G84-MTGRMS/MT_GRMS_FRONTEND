@@ -919,8 +919,9 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
       setStatus('Draft');
       setIsDirty(false);
       showToast('Bản thảo ma trận đặt hàng đã được lưu thành công trên hệ thống backend.', 'success');
-    } catch {
-      showToast('Không thể kết nối máy chủ, đã lưu bản thảo tạm thời ở chế độ ngoại tuyến.', 'warning');
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || 'Không thể kết nối máy chủ, đã lưu bản thảo tạm thời ở chế độ ngoại tuyến.';
+      showToast(msg, 'warning');
     } finally {
       setIsSaving(false);
     }
@@ -973,11 +974,15 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
       <OrderMatrixFilterBar
         branches={branches}
         selectedBranchId={selectedBranchId}
+        hideBranchSelect={!isStoreOwner}
+        fixedBranchLabel={branches.find((b) => b.id === selectedBranchId)?.name}
         onSelectBranch={(id) => {
           setSelectedBranchId(id);
           setSelectedSupplierId('ALL');
           setCategoryFilter('');
           setKeyword('');
+          setCellMap({});
+          setIsDirty(false);
         }}
         suppliers={suppliers}
         selectedSupplierId={selectedSupplierId}

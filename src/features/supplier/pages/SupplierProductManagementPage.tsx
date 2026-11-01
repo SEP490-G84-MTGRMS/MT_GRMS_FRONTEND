@@ -1,17 +1,12 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import type { FC } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import {
-  INITIAL_SUPPLIERS,
-  MASTER_PRODUCTS,
-} from '../lib/mockData';
 import type {
   SupplierSummary,
   SupplierProductItem,
   AssignProductInput,
   EditSupplierProductInput,
 } from '../types/supplier.types';
-import { SupplierContextCard } from '../components/products/SupplierContextCard';
 import {
   SupplierProductFilterBar,
   type SupplierProductFilterValues,
@@ -20,7 +15,7 @@ import { SupplierProductTable } from '../components/products/SupplierProductTabl
 import { AssignProductModal } from '../components/products/AssignProductModal';
 import { EditSupplierProductModal } from '../components/products/EditSupplierProductModal';
 import { AdminToast, type ToastState } from '../../admin/components';
-import { supplierProductApi } from '../api/supplierProductApi';
+import { supplierProductApi, type BatchAssignProductInput } from '../api/supplierProductApi';
 import { supplierApi } from '../api/supplierApi';
 import { Building2, Download, Plus, Layers, Store, Loader2 } from 'lucide-react';
 import '../../purchase-order/purchase-order.css';
@@ -45,8 +40,9 @@ const DEFAULT_FILTERS: ProductFilterState = {
 export const SupplierProductManagementPage: FC = () => {
   const { id: paramSupplierId } = useParams<{ id?: string }>();
 
-  // Suppliers state (fetched from API with fallback to mock)
-  const [suppliers, setSuppliers] = useState<SupplierSummary[]>(INITIAL_SUPPLIERS);
+  // Suppliers state (fetched from API)
+  const [suppliers, setSuppliers] = useState<SupplierSummary[]>([]);
+  const [masterProducts, setMasterProducts] = useState<any[]>([]);
   const [products, setProducts] = useState<SupplierProductItem[]>([]);
   const [totalCount, setTotalCount] = useState<number>(0);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -71,19 +67,25 @@ export const SupplierProductManagementPage: FC = () => {
     toastTimerRef.current = setTimeout(() => setToast(null), 3000);
   };
 
-  // Fetch real suppliers list for filter dropdowns
+  // Fetch real suppliers & master products for filter dropdowns
   useEffect(() => {
-    const loadSuppliers = async () => {
+    const loadData = async () => {
       try {
-        const res = await supplierApi.getSuppliers({ pageIndex: 1, pageSize: 100 });
-        if (res.items && res.items.length > 0) {
-          setSuppliers(res.items);
+        const [resSuppliers, resProducts] = await Promise.all([
+          supplierApi.getSuppliers({ pageIndex: 1, pageSize: 100 }),
+          supplierProductApi.getMasterProducts(),
+        ]);
+        if (resSuppliers.items) {
+          setSuppliers(resSuppliers.items);
+        }
+        if (resProducts) {
+          setMasterProducts(resProducts);
         }
       } catch {
-        // Keep initial suppliers fallback
+        // Handle error gracefully
       }
     };
-    loadSuppliers();
+    loadData();
   }, []);
 
   // Fetch supplier products based on applied filters & pagination
@@ -113,19 +115,22 @@ export const SupplierProductManagementPage: FC = () => {
   // Current active supplier (if a single supplier is selected)
   const currentSupplier = useMemo(() => {
     if (appliedFilters.supplierId !== 'ALL') {
-      return suppliers.find((s) => s.id === appliedFilters.supplierId) || suppliers[0];
+      return suppliers.find((s) => s.id === appliedFilters.supplierId) || suppliers[0] || null;
     }
-    return suppliers[0];
+    return suppliers[0] || null;
   }, [suppliers, appliedFilters.supplierId]);
 
-  // Available categories across master products
+  // Available categories across master products and supplier products
   const availableCategories = useMemo(() => {
     const set = new Set<string>();
-    MASTER_PRODUCTS.forEach((p) => {
+    products.forEach((p) => {
+      if (p.categoryName) set.add(p.categoryName);
+    });
+    masterProducts.forEach((p) => {
       if (p.categoryName) set.add(p.categoryName);
     });
     return Array.from(set);
-  }, []);
+  }, [products, masterProducts]);
 
   // Filter Search & Reset Handlers
   const handleApplySearch = (newValues: SupplierProductFilterValues) => {
@@ -149,14 +154,48 @@ export const SupplierProductManagementPage: FC = () => {
   };
 
   // Item Handlers
-  const handleAssignProduct = async (input: AssignProductInput) => {
+  const handleAssignProduct = async (input: AssignProductInput, keepOpen: boolean = false) => {
     try {
-      await supplierProductApi.assignProduct(input);
-      showToast('Đã gán thành công sản phẩm cho nhà cung cấp.');
-      setIsAssignModalOpen(false);
+      const res = await supplierProductApi.assignProduct(input);
+      const syncedCount = res?.syncedBranchesCount ?? 0;
+      if (syncedCount > 0) {
+        showToast(`Đã gán sản phẩm thành công. Hệ thống đã tự động phân bổ sản phẩm đến ${syncedCount} chi nhánh.`);
+      } else {
+        showToast('Đã gán sản phẩm thành công. Sản phẩm sẽ được tự động phân bổ khi nhà cung cấp được liên kết với chi nhánh.');
+      }
+      if (!keepOpen) {
+        setIsAssignModalOpen(false);
+      }
       await fetchProducts();
+      return res;
     } catch (err: any) {
       showToast(err.message || 'Thao tác gán sản phẩm không thành công.', 'error');
+      throw err;
+    }
+  };
+
+  const handleAssignBatchProducts = async (input: BatchAssignProductInput, keepOpen: boolean = false) => {
+    try {
+      const res = await supplierProductApi.assignBatchProducts(input);
+      const assignedCount = res?.assignedCount ?? input.productIds.length;
+      const syncedCount = res?.syncedBranchesCount ?? 0;
+      if (syncedCount > 0) {
+        showToast(
+          `Đã gán thành công ${assignedCount} sản phẩm cho nhà cung cấp. Hệ thống đã tự động phân bổ đến ${syncedCount} chi nhánh.`
+        );
+      } else {
+        showToast(
+          `Đã gán thành công ${assignedCount} sản phẩm cho nhà cung cấp. Sản phẩm sẽ được tự động phân bổ khi NCC liên kết với chi nhánh.`
+        );
+      }
+      if (!keepOpen) {
+        setIsAssignModalOpen(false);
+      }
+      await fetchProducts();
+      return res;
+    } catch (err: any) {
+      showToast(err.message || 'Thao tác gán sản phẩm không thành công.', 'error');
+      throw err;
     }
   };
 
@@ -265,19 +304,6 @@ export const SupplierProductManagementPage: FC = () => {
         </div>
       </div>
 
-      {/* ── Context Card: Hiển thị khi lọc theo 1 NCC cụ thể ── */}
-      {appliedFilters.supplierId !== 'ALL' && (
-        <div style={{ flexShrink: 0, marginBottom: 8 }}>
-          <SupplierContextCard
-            supplier={currentSupplier}
-            suppliers={suppliers}
-            onSelectSupplier={(newId) =>
-              setAppliedFilters((prev) => ({ ...prev, supplierId: newId, pageIndex: 1 }))
-            }
-            productCount={totalCount}
-          />
-        </div>
-      )}
 
       {/* ── UNIFIED FILTER BAR THEO CHUẨN SUPPLIER LIST ── */}
       <div style={{ flexShrink: 0, marginBottom: 8 }}>
@@ -312,9 +338,11 @@ export const SupplierProductManagementPage: FC = () => {
         isOpen={isAssignModalOpen}
         onClose={() => setIsAssignModalOpen(false)}
         supplier={currentSupplier}
-        masterProducts={MASTER_PRODUCTS}
+        suppliers={suppliers}
+        masterProducts={masterProducts}
         assignedProductIds={assignedProductIds}
         onAssign={handleAssignProduct}
+        onAssignBatch={handleAssignBatchProducts}
       />
 
       {/* Modal 2: Edit Product Price & MOQ */}
@@ -323,7 +351,7 @@ export const SupplierProductManagementPage: FC = () => {
         onClose={() => setEditingItem(null)}
         item={editingItem}
         supplierName={
-          suppliers.find((s) => s.id === editingItem?.supplierId)?.name || currentSupplier.name
+          suppliers.find((s) => s.id === editingItem?.supplierId)?.name || currentSupplier?.name || ''
         }
         onSave={handleSaveEdit}
       />

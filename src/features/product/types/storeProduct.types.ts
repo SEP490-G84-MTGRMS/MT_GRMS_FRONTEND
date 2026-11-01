@@ -1,6 +1,7 @@
 export interface StoreProductItem {
   id: string;
   storeId: string;
+  storeCode?: string;
   storeName: string;
   productId: string;
   name: string;
@@ -35,10 +36,10 @@ export interface StoreProductFilterValues {
   searchTerm?: string;
   skus?: string[];
   names?: string[];
+  storeCodes?: string[];
   storeNames?: string[];
-  categories?: string[];
   storeId: string;
-  categoryFilter: string;
+  categoryFilter?: string;
   statusFilter: 'ALL' | 'Active' | 'Inactive';
   stockAlertFilter?: 'ALL' | 'LOW' | 'OUT_OF_STOCK' | 'NORMAL';
 }

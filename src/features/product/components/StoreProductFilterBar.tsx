@@ -6,7 +6,6 @@ import type { StoreProductFilterValues, StoreSummary, StoreProductItem } from '.
 export interface StoreProductFilterBarProps {
   initialValues: StoreProductFilterValues;
   stores: StoreSummary[];
-  categories: string[];
   products: StoreProductItem[];
   totalCount: number;
   filteredCount: number;
@@ -14,7 +13,7 @@ export interface StoreProductFilterBarProps {
   onReset: () => void;
 }
 
-type FieldKey = 'sku' | 'name' | 'storeName' | 'category';
+type FieldKey = 'sku' | 'name' | 'storeCode' | 'storeName';
 type TokenMap = Record<FieldKey, string[]>;
 type QueryMap = Record<FieldKey, string>;
 
@@ -33,23 +32,23 @@ interface FieldConfig {
 
 const FIELDS: FieldConfig[] = [
   { key: 'sku', label: 'Mã SKU', placeholder: 'Nhập SKU, Enter để thêm...', minWidth: 200 },
-  { key: 'name', label: 'Tên sản phẩm', placeholder: 'Nhập tên, Enter để thêm...', minWidth: 280 },
+  { key: 'name', label: 'Tên sản phẩm', placeholder: 'Nhập tên, Enter để thêm...', minWidth: 260 },
+  { key: 'storeCode', label: 'Mã cửa hàng', placeholder: 'Nhập mã CH, Enter để thêm...', minWidth: 200 },
   { key: 'storeName', label: 'Cửa hàng', placeholder: 'Nhập tên CH, Enter để thêm...', minWidth: 220 },
-  { key: 'category', label: 'Ngành hàng', placeholder: 'Nhập ngành hàng, Enter để thêm...', minWidth: 220 },
 ];
 
 const EMPTY_TOKENS: TokenMap = {
   sku: [],
   name: [],
+  storeCode: [],
   storeName: [],
-  category: [],
 };
 
 const EMPTY_QUERIES: QueryMap = {
   sku: '',
   name: '',
+  storeCode: '',
   storeName: '',
-  category: '',
 };
 
 function uniqueTokens(values: string[]): string[] {
@@ -70,14 +69,8 @@ function tokensFromFilters(filters: StoreProductFilterValues): TokenMap {
   return {
     sku: uniqueTokens(filters.skus?.length ? filters.skus : []),
     name: uniqueTokens(filters.names?.length ? filters.names : []),
+    storeCode: uniqueTokens(filters.storeCodes?.length ? filters.storeCodes : []),
     storeName: uniqueTokens(filters.storeNames?.length ? filters.storeNames : []),
-    category: uniqueTokens(
-      filters.categories?.length
-        ? filters.categories
-        : filters.categoryFilter && filters.categoryFilter !== 'ALL'
-          ? [filters.categoryFilter]
-          : []
-    ),
   };
 }
 
@@ -108,7 +101,6 @@ function highlightMatch(text: string, query: string) {
 export const StoreProductFilterBar: FC<StoreProductFilterBarProps> = ({
   initialValues,
   stores,
-  categories,
   products,
   totalCount,
   filteredCount,
@@ -129,8 +121,8 @@ export const StoreProductFilterBar: FC<StoreProductFilterBarProps> = ({
   const inputRefs = useRef<Record<FieldKey, HTMLInputElement | null>>({
     sku: null,
     name: null,
+    storeCode: null,
     storeName: null,
-    category: null,
   });
 
   useEffect(() => {
@@ -160,10 +152,18 @@ export const StoreProductFilterBar: FC<StoreProductFilterBarProps> = ({
   };
 
   const removeToken = (field: FieldKey, value: string) => {
-    setTokens((prev) => ({
-      ...prev,
-      [field]: prev[field].filter((item) => item.toLowerCase() !== value.toLowerCase()),
-    }));
+    const updated = tokens[field].filter((item) => item.toLowerCase() !== value.toLowerCase());
+    const nextTokens = { ...tokens, [field]: updated };
+    setTokens(nextTokens);
+    onSearch({
+      skus: nextTokens.sku,
+      names: nextTokens.name,
+      storeCodes: nextTokens.storeCode,
+      storeNames: nextTokens.storeName,
+      storeId: initialValues.storeId || 'ALL',
+      statusFilter: status,
+      searchTerm: '',
+    });
   };
 
   const loadSuggestions = useCallback(
@@ -207,6 +207,33 @@ export const StoreProductFilterBar: FC<StoreProductFilterBarProps> = ({
           });
           if (mapped.length >= 8) break;
         }
+      } else if (field === 'storeCode') {
+        for (const item of stores) {
+          const val = item.code;
+          if (!val?.trim()) continue;
+          const key = val.toLowerCase();
+          if (selectedSet.has(key) || seen.has(key) || !key.includes(trimmed)) continue;
+          seen.add(key);
+          mapped.push({
+            id: `storecode-${item.id}-${val}`,
+            value: val,
+            primary: `${val} (${item.name})`,
+          });
+          if (mapped.length >= 8) break;
+        }
+        for (const item of products) {
+          const val = item.storeCode;
+          if (!val?.trim()) continue;
+          const key = val.toLowerCase();
+          if (selectedSet.has(key) || seen.has(key) || !key.includes(trimmed)) continue;
+          seen.add(key);
+          mapped.push({
+            id: `prod-sc-${item.id}-${val}`,
+            value: val,
+            primary: `${val} (${item.storeName})`,
+          });
+          if (mapped.length >= 8) break;
+        }
       } else if (field === 'storeName') {
         for (const item of stores) {
           const val = item.name;
@@ -221,16 +248,16 @@ export const StoreProductFilterBar: FC<StoreProductFilterBarProps> = ({
           });
           if (mapped.length >= 8) break;
         }
-      } else if (field === 'category') {
-        for (const cat of categories) {
-          if (!cat?.trim()) continue;
-          const key = cat.toLowerCase();
+        for (const item of products) {
+          const val = item.storeName;
+          if (!val?.trim()) continue;
+          const key = val.toLowerCase();
           if (selectedSet.has(key) || seen.has(key) || !key.includes(trimmed)) continue;
           seen.add(key);
           mapped.push({
-            id: `cat-${cat}`,
-            value: cat,
-            primary: cat,
+            id: `prod-sn-${item.id}-${val}`,
+            value: val,
+            primary: val,
           });
           if (mapped.length >= 8) break;
         }
@@ -240,7 +267,7 @@ export const StoreProductFilterBar: FC<StoreProductFilterBarProps> = ({
       setOpenField(mapped.length > 0 ? field : null);
       setFocusedIndex(mapped.length > 0 ? 0 : -1);
     },
-    [products, stores, categories]
+    [products, stores]
   );
 
   const handleFieldChange = (field: FieldKey, rawValue: string) => {
@@ -284,12 +311,43 @@ export const StoreProductFilterBar: FC<StoreProductFilterBarProps> = ({
     if (e.key === 'Enter') {
       e.preventDefault();
       if (isDropdownOpen && focusedIndex >= 0 && suggestions[focusedIndex]) {
-        addTokens(field, [suggestions[focusedIndex].value]);
+        const val = suggestions[focusedIndex].value;
+        const newTokens = uniqueTokens([...tokens[field], val]);
+        const nextTokens = { ...tokens, [field]: newTokens };
+        setTokens(nextTokens);
+        setQueries((prev) => ({ ...prev, [field]: '' }));
+        setSuggestions([]);
+        setOpenField(null);
+        setFocusedIndex(-1);
+        onSearch({
+          skus: nextTokens.sku,
+          names: nextTokens.name,
+          storeCodes: nextTokens.storeCode,
+          storeNames: nextTokens.storeName,
+          storeId: initialValues.storeId || 'ALL',
+          statusFilter: status,
+          searchTerm: '',
+        });
         return;
       }
       const trimmed = queries[field].trim();
       if (trimmed) {
-        addTokens(field, [trimmed]);
+        const newTokens = uniqueTokens([...tokens[field], trimmed]);
+        const nextTokens = { ...tokens, [field]: newTokens };
+        setTokens(nextTokens);
+        setQueries((prev) => ({ ...prev, [field]: '' }));
+        setSuggestions([]);
+        setOpenField(null);
+        setFocusedIndex(-1);
+        onSearch({
+          skus: nextTokens.sku,
+          names: nextTokens.name,
+          storeCodes: nextTokens.storeCode,
+          storeNames: nextTokens.storeName,
+          storeId: initialValues.storeId || 'ALL',
+          statusFilter: status,
+          searchTerm: '',
+        });
       } else {
         handleSubmit();
       }
@@ -310,19 +368,29 @@ export const StoreProductFilterBar: FC<StoreProductFilterBarProps> = ({
   };
 
   const handleClearField = (field: FieldKey) => {
-    setTokens((prev) => ({ ...prev, [field]: [] }));
+    const nextTokens = { ...tokens, [field]: [] };
+    setTokens(nextTokens);
     setQueries((prev) => ({ ...prev, [field]: '' }));
     setSuggestions([]);
     setOpenField(null);
     inputRefs.current[field]?.focus();
+    onSearch({
+      skus: nextTokens.sku,
+      names: nextTokens.name,
+      storeCodes: nextTokens.storeCode,
+      storeNames: nextTokens.storeName,
+      storeId: initialValues.storeId || 'ALL',
+      statusFilter: status,
+      searchTerm: '',
+    });
   };
 
   const buildCurrentValues = (): StoreProductFilterValues => {
     const effectiveTokens: TokenMap = {
       sku: [...tokens.sku],
       name: [...tokens.name],
+      storeCode: [...tokens.storeCode],
       storeName: [...tokens.storeName],
-      category: [...tokens.category],
     };
 
     (Object.keys(queries) as FieldKey[]).forEach((k) => {
@@ -335,10 +403,9 @@ export const StoreProductFilterBar: FC<StoreProductFilterBarProps> = ({
     return {
       skus: effectiveTokens.sku,
       names: effectiveTokens.name,
+      storeCodes: effectiveTokens.storeCode,
       storeNames: effectiveTokens.storeName,
-      categories: effectiveTokens.category,
       storeId: initialValues.storeId || 'ALL',
-      categoryFilter: effectiveTokens.category[0] || 'ALL',
       statusFilter: status,
       searchTerm: '',
     };
@@ -365,8 +432,8 @@ export const StoreProductFilterBar: FC<StoreProductFilterBarProps> = ({
   const totalActiveTokens =
     tokens.sku.length +
     tokens.name.length +
-    tokens.storeName.length +
-    tokens.category.length;
+    tokens.storeCode.length +
+    tokens.storeName.length;
 
   const isFiltered = totalActiveTokens > 0 || status !== 'ALL';
 
@@ -610,7 +677,12 @@ export const StoreProductFilterBar: FC<StoreProductFilterBarProps> = ({
             <span style={{ fontSize: 12, fontWeight: 700, color: '#475569' }}>Trạng thái:</span>
             <select
               value={status}
-              onChange={(e) => setStatus(e.target.value as StoreProductFilterValues['statusFilter'])}
+              onChange={(e) => {
+                const newStatus = e.target.value as StoreProductFilterValues['statusFilter'];
+                setStatus(newStatus);
+                const current = buildCurrentValues();
+                onSearch({ ...current, statusFilter: newStatus });
+              }}
               style={{
                 height: 32,
                 padding: '0 10px',

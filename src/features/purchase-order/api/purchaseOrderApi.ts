@@ -80,7 +80,7 @@ export const purchaseOrderApi = {
    */
   async getOrderMatrix(
     branchId: string,
-    supplierId: string | null,
+    supplierId: string | null | undefined,
     viewFrom: string,
     durationDays: number
   ): Promise<{
@@ -181,12 +181,7 @@ export const purchaseOrderApi = {
       // ignore
     }
 
-    const relevantProducts =
-      !supplierId || supplierId === 'ALL'
-        ? MOCK_MATRIX_PRODUCTS
-        : MOCK_MATRIX_PRODUCTS.filter((p) => p.supplierId === supplierId);
-
-    return { products: relevantProducts, cellMap: cachedMap, supplierConfigs: [] };
+    return { products: [], cellMap: cachedMap, supplierConfigs: [] };
   },
 
   /**
@@ -240,8 +235,9 @@ export const purchaseOrderApi = {
         note,
         cells,
       });
-    } catch {
-      // Offline fallback: Dữ liệu đã được bảo toàn trong localStorage
+    } catch (err) {
+      console.error('Lỗi khi lưu bản thảo ma trận lên backend:', err);
+      throw err;
     }
   },
 

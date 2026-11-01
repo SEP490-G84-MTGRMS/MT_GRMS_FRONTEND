@@ -78,6 +78,7 @@ export interface MatrixCellData {
   finalQty: number; // Số lượng chốt cuối cùng (storeQty !== null ? storeQty : employeeQty)
   suggestedQty?: number; // Số lượng hệ thống gợi ý
   isOwnerOverridden?: boolean;
+  isOwnerAdjusted?: boolean;
   modifiedBy?: 'employee' | 'store_owner';
   modifiedAt?: string;
 }

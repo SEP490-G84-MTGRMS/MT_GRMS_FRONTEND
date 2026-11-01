@@ -21,7 +21,7 @@ type SortField =
   | 'sku'
   | 'name'
   | 'unit'
-  | 'category'
+  | 'storeCode'
   | 'storeName'
   | 'costPrice'
   | 'retailPrice'
@@ -37,8 +37,6 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
   onPageChange,
   onPageSizeChange,
   onEdit,
-  onToggleStatus,
-  onRemove,
   onOpenAssignModal,
 }) => {
   const [sortField, setSortField] = useState<SortField | null>(null);
@@ -80,9 +78,9 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
           valA = a.unit.toLowerCase();
           valB = b.unit.toLowerCase();
           break;
-        case 'category':
-          valA = a.category.toLowerCase();
-          valB = b.category.toLowerCase();
+        case 'storeCode':
+          valA = (a.storeCode || '').toLowerCase();
+          valB = (b.storeCode || '').toLowerCase();
           break;
         case 'storeName':
           valA = a.storeName.toLowerCase();
@@ -156,12 +154,12 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
       <col style={{ width: '4%' }} />   {/* STT */}
       <col style={{ width: '10%' }} />  {/* Mã SKU */}
       <col style={{ width: '18%' }} />  {/* Tên SP */}
-      <col style={{ width: '5%' }} />   {/* ĐVT */}
-      <col style={{ width: '9%' }} />   {/* Ngành Hàng */}
+      <col style={{ width: '10%' }} />  {/* Mã Cửa Hàng */}
       <col style={{ width: '11%' }} />  {/* Cửa Hàng */}
       <col style={{ width: '9%' }} />   {/* Giá Vốn */}
       <col style={{ width: '9%' }} />   {/* Giá Bán */}
-      <col style={{ width: '8%' }} />   {/* MOQ */}
+      <col style={{ width: '7%' }} />   {/* MOQ */}
+      <col style={{ width: '5%' }} />   {/* ĐVT */}
       <col style={{ width: '9%' }} />   {/* Trạng Thái */}
       <col style={{ width: '8%' }} />   {/* Thao Tác */}
     </colgroup>
@@ -217,24 +215,13 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
               </th>
 
               <th
-                style={{ ...thStyle, textAlign: 'center', cursor: 'pointer' }}
-                onClick={() => handleSort('unit')}
-                title="Sắp xếp theo đơn vị tính"
-              >
-                <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4, width: '100%' }}>
-                  <span>ĐVT</span>
-                  <ArrowUpDown size={12} style={{ color: sortField === 'unit' ? '#0f766e' : '#94a3b8' }} />
-                </div>
-              </th>
-
-              <th
                 style={{ ...thStyle, cursor: 'pointer' }}
-                onClick={() => handleSort('category')}
-                title="Sắp xếp theo ngành hàng"
+                onClick={() => handleSort('storeCode')}
+                title="Sắp xếp theo mã cửa hàng"
               >
                 <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                  <span>Ngành Hàng</span>
-                  <ArrowUpDown size={12} style={{ color: sortField === 'category' ? '#0f766e' : '#94a3b8' }} />
+                  <span>Mã Cửa Hàng</span>
+                  <ArrowUpDown size={12} style={{ color: sortField === 'storeCode' ? '#0f766e' : '#94a3b8' }} />
                 </div>
               </th>
 
@@ -279,6 +266,17 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
                 <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4, width: '100%' }}>
                   <span>SL Đặt Tối Thiểu</span>
                   <ArrowUpDown size={12} style={{ color: sortField === 'minOrderQuantity' ? '#0f766e' : '#94a3b8' }} />
+                </div>
+              </th>
+
+              <th
+                style={{ ...thStyle, textAlign: 'center', cursor: 'pointer' }}
+                onClick={() => handleSort('unit')}
+                title="Sắp xếp theo đơn vị tính"
+              >
+                <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4, width: '100%' }}>
+                  <span>ĐVT</span>
+                  <ArrowUpDown size={12} style={{ color: sortField === 'unit' ? '#0f766e' : '#94a3b8' }} />
                 </div>
               </th>
 
@@ -346,20 +344,14 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
                       {rowIndex}
                     </td>
 
-                    {/* 2. Mã SKU (Bỏ Barcode) */}
+                    {/* 2. Mã SKU */}
                     <td style={{ padding: '10px 8px', verticalAlign: 'middle', borderBottom: '1px solid #f1f5f9' }}>
                       <span
                         style={{
                           fontFamily: 'var(--font-mono, monospace)',
                           fontSize: 12,
-                          fontWeight: 700,
+                          fontWeight: 600,
                           color: '#0f766e',
-                          backgroundColor: '#f0fdfa',
-                          padding: '2px 8px',
-                          borderRadius: 4,
-                          border: '1px solid #ccfbf1',
-                          display: 'inline-block',
-                          whiteSpace: 'nowrap',
                         }}
                       >
                         {p.sku}
@@ -371,7 +363,52 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
                       <div className="so-list-name">{p.name}</div>
                     </td>
 
-                    {/* 4. Đơn vị tính (ĐVT) */}
+                    {/* 4. Mã Cửa Hàng */}
+                    <td style={{ padding: '10px 8px', verticalAlign: 'middle', borderBottom: '1px solid #f1f5f9' }}>
+                      <span
+                        style={{
+                          fontFamily: 'var(--font-mono, monospace)',
+                          fontSize: 12,
+                          fontWeight: 600,
+                          color: '#0f766e',
+                          backgroundColor: '#f0fdfa',
+                          padding: '2px 6px',
+                          borderRadius: 4,
+                          border: '1px solid #ccfbf1',
+                          display: 'inline-block',
+                        }}
+                      >
+                        {p.storeCode || '---'}
+                      </span>
+                    </td>
+
+                    {/* 5. Cửa Hàng */}
+                    <td className="so-list-td--wrap">
+                      <div className="so-list-name">{p.storeName}</div>
+                    </td>
+
+                    {/* 6. Giá Vốn (đ) */}
+                    <td style={{ padding: '10px 8px', textAlign: 'right', verticalAlign: 'middle', whiteSpace: 'nowrap', borderBottom: '1px solid #f1f5f9' }}>
+                      <span style={{ fontFamily: 'var(--font-mono, monospace)', fontWeight: 600, fontSize: 12.5, color: '#64748b' }}>
+                        {fmt(p.costPrice)} đ
+                      </span>
+                    </td>
+
+                    {/* 7. Giá Bán Lẻ (đ) */}
+                    <td style={{ padding: '10px 8px', textAlign: 'right', verticalAlign: 'middle', whiteSpace: 'nowrap', borderBottom: '1px solid #f1f5f9' }}>
+                      <span style={{ fontFamily: 'var(--font-mono, monospace)', fontWeight: 700, fontSize: 13, color: '#0f766e' }}>
+                        {fmt(p.retailPrice)} đ
+                      </span>
+                    </td>
+
+                    {/* 8. SL Đặt Tối Thiểu (MOQ) */}
+                    <td style={{ padding: '10px 6px', textAlign: 'center', verticalAlign: 'middle', whiteSpace: 'nowrap', borderBottom: '1px solid #f1f5f9' }}>
+                      <span style={{ fontFamily: 'var(--font-mono, monospace)', fontWeight: 700, fontSize: 12.5, color: '#0f172a' }}>
+                        {p.minOrderQuantity ?? 10}
+                      </span>
+                    </td>
+
+                    {/* 9. ĐVT – kế SL Đặt Tối Thiểu */}
                     <td style={{ padding: '10px 4px', textAlign: 'center', verticalAlign: 'middle', borderBottom: '1px solid #f1f5f9' }}>
                       <span
                         style={{
@@ -387,53 +424,6 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
                         }}
                       >
                         {p.unit}
-                      </span>
-                    </td>
-
-                    {/* 5. Ngành Hàng (Tự động xuống dòng khi dài) */}
-                    <td style={{ padding: '10px 8px', verticalAlign: 'middle', borderBottom: '1px solid #f1f5f9' }}>
-                      <span
-                        style={{
-                          fontSize: 11.5,
-                          fontWeight: 600,
-                          padding: '2px 8px',
-                          borderRadius: 4,
-                          backgroundColor: '#f1f5f9',
-                          color: '#475569',
-                          border: '1px solid #e2e8f0',
-                          display: 'inline-block',
-                          lineHeight: 1.25,
-                          whiteSpace: 'normal',
-                          wordBreak: 'break-word',
-                        }}
-                      >
-                        {p.category}
-                      </span>
-                    </td>
-
-                    {/* 6. Cửa Hàng (Bỏ vị trí, tự động xuống dòng khi dài) */}
-                    <td className="so-list-td--wrap">
-                      <div className="so-list-name">{p.storeName}</div>
-                    </td>
-
-                    {/* 7. Giá Vốn (đ) (Tách riêng) */}
-                    <td style={{ padding: '10px 8px', textAlign: 'right', verticalAlign: 'middle', whiteSpace: 'nowrap', borderBottom: '1px solid #f1f5f9' }}>
-                      <span style={{ fontFamily: 'var(--font-mono, monospace)', fontWeight: 600, fontSize: 12.5, color: '#64748b' }}>
-                        {fmt(p.costPrice)} đ
-                      </span>
-                    </td>
-
-                    {/* 8. Giá Bán Lẻ (đ) (Tách riêng) */}
-                    <td style={{ padding: '10px 8px', textAlign: 'right', verticalAlign: 'middle', whiteSpace: 'nowrap', borderBottom: '1px solid #f1f5f9' }}>
-                      <span style={{ fontFamily: 'var(--font-mono, monospace)', fontWeight: 700, fontSize: 13, color: '#0f766e' }}>
-                        {fmt(p.retailPrice)} đ
-                      </span>
-                    </td>
-
-                    {/* 9. SL Đặt Tối Thiểu (MOQ) */}
-                    <td style={{ padding: '10px 6px', textAlign: 'center', verticalAlign: 'middle', whiteSpace: 'nowrap', borderBottom: '1px solid #f1f5f9' }}>
-                      <span style={{ fontFamily: 'var(--font-mono, monospace)', fontWeight: 700, fontSize: 12.5, color: '#0f172a' }}>
-                        {p.minOrderQuantity ?? 10}
                       </span>
                     </td>
 

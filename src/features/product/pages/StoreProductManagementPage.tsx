@@ -15,7 +15,6 @@ import { AssignStoreProductModal } from '../components/AssignStoreProductModal';
 import { EditStoreProductModal } from '../components/EditStoreProductModal';
 import { AdminToast, type ToastState } from '../../admin/components';
 import { storeProductApi } from '../api/storeProductApi';
-import { MASTER_PRODUCTS } from '../../supplier/lib/mockData';
 import { Loader2, Package } from 'lucide-react';
 import '../../purchase-order/purchase-order.css';
 import '../../supplier/supplier.css';
@@ -29,10 +28,9 @@ const DEFAULT_FILTERS: StoreProductFilterState = {
   searchTerm: '',
   skus: [],
   names: [],
+  storeCodes: [],
   storeNames: [],
-  categories: [],
   storeId: 'ALL',
-  categoryFilter: 'ALL',
   statusFilter: 'ALL',
   pageIndex: 1,
   pageSize: 15,
@@ -86,14 +84,18 @@ export const StoreProductManagementPage: FC = () => {
     setIsLoading(true);
     try {
       const res = await storeProductApi.getStoreProducts(appliedFilters);
-      setProducts(res.items);
+      const enriched = res.items.map((item) => ({
+        ...item,
+        storeCode: item.storeCode || stores.find((s) => s.id === item.storeId)?.code || '---',
+      }));
+      setProducts(enriched);
       setTotalCount(res.total);
     } catch (err: any) {
       showToast(err.message || 'Không thể tải danh sách sản phẩm cửa hàng.', 'error');
     } finally {
       setIsLoading(false);
     }
-  }, [appliedFilters]);
+  }, [appliedFilters, stores]);
 
   useEffect(() => {
     fetchProducts();
@@ -106,15 +108,6 @@ export const StoreProductManagementPage: FC = () => {
     }
     return stores[0];
   }, [stores, appliedFilters.storeId]);
-
-  // Unique categories list
-  const availableCategories = useMemo(() => {
-    const set = new Set<string>();
-    MASTER_PRODUCTS.forEach((p) => {
-      if (p.categoryName) set.add(p.categoryName);
-    });
-    return Array.from(set);
-  }, []);
 
   // Filter Search & Reset Handlers
   const handleApplySearch = (newValues: StoreProductFilterValues) => {
@@ -203,10 +196,6 @@ export const StoreProductManagementPage: FC = () => {
     }
   };
 
-  const assignedProductIds = useMemo(
-    () => products.map((p) => p.productId),
-    [products]
-  );
 
   return (
     <div
@@ -286,7 +275,6 @@ export const StoreProductManagementPage: FC = () => {
         <StoreProductFilterBar
           initialValues={appliedFilters}
           stores={stores}
-          categories={availableCategories}
           products={products}
           totalCount={totalCount}
           filteredCount={products.length}
@@ -310,15 +298,13 @@ export const StoreProductManagementPage: FC = () => {
       />
 
       {/* ── Modal Gán sản phẩm mới vào Cửa hàng ── */}
-      {currentStore && (
-        <AssignStoreProductModal
-          isOpen={isAssignModalOpen}
-          onClose={() => setIsAssignModalOpen(false)}
-          currentStore={currentStore}
-          assignedProductIds={assignedProductIds}
-          onAssign={handleAssignProducts}
-        />
-      )}
+      <AssignStoreProductModal
+        isOpen={isAssignModalOpen}
+        onClose={() => setIsAssignModalOpen(false)}
+        stores={stores}
+        currentStore={appliedFilters.storeId !== 'ALL' ? currentStore : null}
+        onAssign={handleAssignProducts}
+      />
 
       {/* ── Modal Thao tác sản phẩm chi nhánh (Đầy đủ mọi thao tác trong popup) ── */}
       <EditStoreProductModal
