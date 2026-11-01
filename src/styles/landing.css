@@ -1301,6 +1301,9 @@ button, input, select {
   align-items: center;
   padding: 16px 0;
   cursor: pointer;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
   user-select: none;
 }
 

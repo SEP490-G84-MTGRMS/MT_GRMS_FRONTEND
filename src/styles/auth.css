@@ -395,6 +395,9 @@
   align-items: center;
   gap: 8px;
   cursor: pointer;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
   user-select: none;
   color: var(--text-muted);
 }
