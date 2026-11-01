@@ -15,6 +15,7 @@ import { SubscriptionCheckoutModal } from './components/SubscriptionCheckoutModa
 import { StoreWalletTopupModal } from './components/StoreWalletTopupModal';
 import { StoreInfoTab } from './components/StoreInfoTab';
 import { OrderHistoryTab } from './components/OrderHistoryTab';
+import { storeApi, mapBackendStoreToFrontend } from './api/storeApi';
 
 export const StoreSettingsHubPage: FC = () => {
   const [searchParams] = useSearchParams();
@@ -40,6 +41,21 @@ export const StoreSettingsHubPage: FC = () => {
     useState<SubscriptionPlanItem | null>(null);
   const [showTopupModal, setShowTopupModal] = useState<boolean>(false);
 
+  // Load real store info from Backend API
+  useEffect(() => {
+    const fetchStore = async () => {
+      try {
+        const res = await storeApi.getStoreInfo();
+        if (res.success && res.data) {
+          setStoreInfo((prev) => mapBackendStoreToFrontend(res.data, prev.walletBalance));
+        }
+      } catch {
+        // Giữ mock fallback nếu mạng lỗi
+      }
+    };
+    fetchStore();
+  }, []);
+
   useEffect(() => {
     if (
       tabParam &&
@@ -49,7 +65,6 @@ export const StoreSettingsHubPage: FC = () => {
       setActiveTab(tabParam);
     }
   }, [tabParam, activeTab]);
-
 
   // Nạp tiền ví
   const handleTopupSuccess = (amount: number) => {
@@ -118,13 +133,27 @@ export const StoreSettingsHubPage: FC = () => {
   };
 
   // Cập nhật thông tin store
-  const handleUpdateStoreInfo = (updated: Partial<StoreInfo>) => {
+  const handleUpdateStoreInfo = async (updated: Partial<StoreInfo>) => {
+    try {
+      const res = await storeApi.updateStoreInfo({
+        name: updated.name || storeInfo.name,
+        taxCode: updated.taxCode,
+        hotline: updated.hotline,
+        address: updated.address,
+        city: updated.city,
+      });
+      if (res.success && res.data) {
+        setStoreInfo((prev) => mapBackendStoreToFrontend(res.data, prev.walletBalance));
+        return;
+      }
+    } catch {
+      // fallback local update
+    }
     setStoreInfo((prev) => ({ ...prev, ...updated }));
   };
 
   return (
     <div className="store-hub-container">
-
       {/* Main Workspace */}
       <div className="store-hub-main">
         {/* Top Status Bar */}

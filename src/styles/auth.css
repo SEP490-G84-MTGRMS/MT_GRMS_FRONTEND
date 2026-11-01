@@ -652,3 +652,56 @@
   background-color: var(--blue-subtle);
   border-color: var(--blue-primary);
 }
+
+
+/* Khung Thông Báo Lỗi / Cảnh Báo (Auth Alert) */
+.auth-alert {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1.45;
+  margin: 8px 0;
+  animation: authAlertFadeIn 0.2s ease-out;
+}
+
+.auth-alert-error {
+  background-color: #FEF2F2 !important;
+  border: 1px solid #FCA5A5 !important;
+  color: #DC2626 !important;
+}
+
+.auth-alert-error svg {
+  color: #DC2626 !important;
+  stroke: #DC2626 !important;
+}
+
+.auth-alert-error span {
+  color: #DC2626 !important;
+}
+
+.auth-alert-info {
+  background-color: #EFF6FF !important;
+  border: 1px solid #BFDBFE !important;
+  color: #2563EB !important;
+}
+
+.auth-alert-success {
+  background-color: #F0FDF4 !important;
+  border: 1px solid #BBF7D0 !important;
+  color: #16A34A !important;
+}
+
+@keyframes authAlertFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

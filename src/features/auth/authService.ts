@@ -1,4 +1,5 @@
 import { httpClient } from '../../api/httpClient';
+import { ApiError } from './authTypes';
 import type {
   AuthResponse,
   LoginCredentials,
@@ -23,6 +24,24 @@ export const DEMO_ACCOUNTS = [
       tenantName: 'Chuỗi Bán Lẻ Thực Phẩm Sạch MT',
       branchId: 'BR-001',
       phone: '0901 234 567',
+      isAdmin: true,
+    },
+  },
+  {
+    roleLabel: 'Chủ cửa hàng (Store Owner)',
+    email: 'hung.nguyen@mtmart.vn',
+    password: 'password123',
+    tenantCode: 'TENANT-HCM-01',
+    user: {
+      id: 'usr_store_manager',
+      email: 'hung.nguyen@mtmart.vn',
+      fullName: 'Nguyễn Văn Hùng (Chủ Cửa Hàng)',
+      role: 'STORE_OWNER' as const,
+      tenantId: 'tenant_mt_mart_01',
+      tenantName: 'Chuỗi Siêu Thị Thực Phẩm Sạch MT-Mart',
+      branchId: 'BR-HCM-01',
+      phone: '0909 876 543',
+      isAdmin: false,
     },
   },
   {
@@ -39,6 +58,7 @@ export const DEMO_ACCOUNTS = [
       tenantName: 'Chuỗi Bán Lẻ Thực Phẩm Sạch MT',
       branchId: 'BR-001',
       phone: '0988 765 432',
+      isAdmin: false,
     },
   },
 ];
@@ -55,11 +75,17 @@ export const authService = {
       // Hỗ trợ đăng nhập linh hoạt: map số điện thoại demo / email / username sang tài khoản seed backend
       const phoneClean = usernameOrEmail.replace(/\s+/g, '');
       if (
-        (phoneClean === '0901234567' || usernameOrEmail.toLowerCase() === 'admin@mtgrms.vn' || usernameOrEmail.toLowerCase() === 'admin') &&
+        (phoneClean === '0901234567' || usernameOrEmail.toLowerCase() === 'admin@mtgrms.vn' || usernameOrEmail === 'admin') &&
         (password === 'password123' || password === 'Admin@123')
       ) {
         usernameOrEmail = 'admin';
         password = 'Admin@123';
+      } else if (
+        (phoneClean === '0909876543' || usernameOrEmail.toLowerCase() === 'manager01' || usernameOrEmail.toLowerCase() === 'hung.nguyen@mtmart.vn') &&
+        (password === 'password123' || password === 'Manager@123')
+      ) {
+        usernameOrEmail = 'manager01';
+        password = 'Manager@123';
       } else if (
         (phoneClean === '0912345678' || usernameOrEmail.toLowerCase() === 'cashier01' || usernameOrEmail.toLowerCase() === 'pos.cashier@mtgrms.vn') &&
         (password === 'password123' || password === 'Cashier@123')
@@ -81,6 +107,10 @@ export const authService = {
         throw new Error('Dữ liệu phản hồi xác thực không hợp lệ.');
       }
 
+      const isUserAdmin = Boolean(
+        loginData.user?.isAdmin ?? (loginData.user?.role === 'ADMIN' || loginData.user?.roleName === 'ADMIN')
+      );
+
       return {
         accessToken: loginData.accessToken,
         refreshToken: loginData.refreshToken,
@@ -89,42 +119,38 @@ export const authService = {
           id: loginData.user?.id || 'usr_admin',
           email: loginData.user?.email || 'admin@mtgrms.vn',
           fullName: loginData.user?.fullName || 'Super Admin',
-          role: (loginData.user?.role || loginData.user?.roleName || 'ADMIN') as UserProfile['role'],
+          role: (isUserAdmin ? 'ADMIN' : (loginData.user?.role || loginData.user?.roleName || 'STORE_OWNER')) as UserProfile['role'],
           tenantId: loginData.user?.tenantId || 'DEFAULT',
           branchId: loginData.user?.branchId,
           phone: loginData.user?.phone || phoneClean,
+          isAdmin: isUserAdmin,
         },
       };
-    } catch (err: unknown) {
-      // Nếu API trả về lỗi nhưng là mạng cục bộ / offline dev fallback
-      const cleanInput = credentials.email.trim();
-      const phoneClean = cleanInput.replace(/\s+/g, '');
-      const foundDemo = DEMO_ACCOUNTS.find(
-        acc =>
-          acc.email.toLowerCase() === cleanInput.toLowerCase() ||
-          (acc.user.phone && acc.user.phone.replace(/\s+/g, '') === phoneClean)
-      );
+    } catch (err: any) {
+      if (err instanceof ApiError) {
+        throw err;
+      }
 
-      const defaultUser: UserProfile = foundDemo
-        ? foundDemo.user
-        : {
-            id: `usr_${Date.now()}`,
-            email: cleanInput,
-            fullName: cleanInput.includes('@') ? cleanInput.split('@')[0] : 'Chủ Cửa Hàng',
-            role: 'STORE_OWNER',
-            tenantId: credentials.tenantCode || 'TENANT-DEFAULT',
-            tenantName: 'Cửa hàng MT-GRMS',
-          };
+      // Trích xuất status từ HTTP response hoặc từ data body của API
+      const status =
+        err.response?.status ??
+        err.response?.data?.statusCode ??
+        err.response?.data?.status ??
+        (err.code === 'ERR_NETWORK' ? 0 : 500);
 
-      // Mô phỏng độ trễ mạng nhẹ (300ms) để hiện loading button sắc nét
-      await new Promise(resolve => setTimeout(resolve, 300));
+      const errorCode =
+        err.response?.data?.errorCode ??
+        (status === 401 ? 'UNAUTHORIZED' : status === 400 ? 'BAD_REQUEST' : 'LOGIN_FAILED');
 
-      return {
-        accessToken: `mt_token_${Date.now()}_mock`,
-        refreshToken: `mt_refresh_${Date.now()}_mock`,
-        expiresIn: 3600,
-        user: defaultUser,
-      };
+      const message =
+        err.response?.data?.message ??
+        (status === 401
+          ? 'Tài khoản hoặc mật khẩu không chính xác.'
+          : status === 400
+          ? 'Thông tin đăng nhập không hợp lệ.'
+          : 'Không thể kết nối đến máy chủ. Vui lòng kiểm tra lại đường truyền.');
+
+      throw new ApiError(status, message, errorCode, err.response?.data, err.response);
     }
   },
 
@@ -145,6 +171,7 @@ export const authService = {
         tenantId: `TNT_${Date.now().toString(36).toUpperCase()}`,
         tenantName: payload.storeName,
         phone: payload.phone,
+        isAdmin: false,
       };
 
       return {
