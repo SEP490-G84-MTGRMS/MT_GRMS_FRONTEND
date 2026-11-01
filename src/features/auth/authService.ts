@@ -64,33 +64,33 @@ export const DEMO_ACCOUNTS = [
   {
     roleLabel: 'Chủ chuỗi / Admin',
     email: 'admin@mtgrms.vn',
-    password: 'Admin@123',
-    tenantCode: SEED_TENANT_ID,
+    password: 'password123',
+    tenantCode: 'tenant_mt_mart_01',
     user: {
       id: 'usr_super_admin',
       email: 'admin@mtgrms.vn',
       fullName: 'Hệ Thống Super Admin',
       role: 'ADMIN' as const,
-      tenantId: SEED_TENANT_ID,
+      tenantId: 'tenant_mt_mart_01',
       tenantName: 'Chuỗi Siêu Thị Thực Phẩm Sạch MT-Mart',
-      branchId: undefined,
-      phone: '0901234567',
+      branchId: 'BR-001',
+      phone: '0901 234 567',
     },
   },
   {
     roleLabel: 'Thu ngân quầy POS',
-    email: 'thao.le@mtmart.vn',
-    password: 'Cashier@123',
-    tenantCode: SEED_TENANT_ID,
+    email: 'pos.cashier@mtgrms.vn',
+    password: 'password123',
+    tenantCode: 'tenant_mt_mart_01',
     user: {
       id: 'usr_cashier',
-      email: 'thao.le@mtmart.vn',
-      fullName: 'Lê Thị Thảo (Thu Ngân POS)',
+      email: 'pos.cashier@mtgrms.vn',
+      fullName: 'Trần Thị Thu Ngân',
       role: 'CASHIER' as const,
-      tenantId: SEED_TENANT_ID,
+      tenantId: 'tenant_mt_mart_01',
       tenantName: 'Chuỗi Siêu Thị Thực Phẩm Sạch MT-Mart',
-      branchId: undefined,
-      phone: '0912345678',
+      branchId: 'BR-001',
+      phone: '0988 765 432',
     },
   },
 ];
@@ -129,13 +129,13 @@ export const authService = {
       const defaultUser: UserProfile = foundDemo
         ? foundDemo.user
         : {
-            id: `usr_${Date.now()}`,
-            email: cleanInput,
-            fullName: cleanInput.includes('@') ? cleanInput.split('@')[0] : 'Chủ Cửa Hàng',
-            role: 'STORE_OWNER',
-            tenantId: credentials.tenantCode || SEED_TENANT_ID,
-            tenantName: 'Cửa hàng MT-GRMS',
-          };
+          id: `usr_${Date.now()}`,
+          email: cleanInput,
+          fullName: cleanInput.includes('@') ? cleanInput.split('@')[0] : 'Chủ Cửa Hàng',
+          role: 'STORE_OWNER',
+          tenantId: credentials.tenantCode || 'tenant_mt_mart_01',
+          tenantName: 'Cửa hàng MT-GRMS',
+        };
 
       await new Promise(resolve => setTimeout(resolve, 300));
 
@@ -162,7 +162,7 @@ export const authService = {
         email: payload.email || `${payload.phone}@mtgrms.vn`,
         fullName: payload.fullName,
         role: 'STORE_OWNER',
-        tenantId: `TNT_${Date.now().toString(36).toUpperCase()}`,
+        tenantId: `tenant_mt_mart_01`,
         tenantName: payload.storeName,
         phone: payload.phone,
       };
@@ -187,18 +187,22 @@ export const authService = {
       );
       return response.data;
     } catch {
-      await new Promise(resolve => setTimeout(resolve, 350));
+      await new Promise(resolve => setTimeout(resolve, 300));
       return {
         success: true,
-        message: `Mã OTP khôi phục mật khẩu đã được gửi thành công đến hòm thư ${email}`,
+        message: 'Mã OTP xác thực đã được gửi về email của bạn (mô phỏng).',
       };
     }
   },
 
   /**
-   * Xác nhận đặt lại mật khẩu mới bằng mã OTP
+   * Đặt lại mật khẩu với mã OTP
    */
   async confirmPasswordReset(payload: ResetPasswordPayload): Promise<{ success: boolean; message: string }> {
+    return this.resetPassword(payload);
+  },
+
+  async resetPassword(payload: ResetPasswordPayload): Promise<{ success: boolean; message: string }> {
     try {
       const response = await httpClient.post<{ success: boolean; message: string }>(
         '/auth/reset-password',
@@ -206,25 +210,22 @@ export const authService = {
       );
       return response.data;
     } catch {
-      await new Promise(resolve => setTimeout(resolve, 350));
+      await new Promise(resolve => setTimeout(resolve, 300));
       return {
         success: true,
-        message: 'Mật khẩu của bạn đã được cập nhật thành công. Vui lòng đăng nhập lại.',
+        message: 'Đổi mật khẩu thành công. Vui lòng đăng nhập lại.',
       };
     }
   },
 
   /**
-   * Đăng xuất
+   * Đăng xuất khỏi hệ thống
    */
   async logout(): Promise<void> {
     try {
       await httpClient.post('/auth/logout');
     } catch {
-      // Bỏ qua lỗi mạng khi logout
-    } finally {
-      localStorage.removeItem('access_token');
-      localStorage.removeItem('auth_user');
+      // Bỏ qua lỗi mạng khi logout trên môi trường test/dev
     }
   },
 };

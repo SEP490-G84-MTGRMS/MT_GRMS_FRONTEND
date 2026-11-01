@@ -5,6 +5,10 @@ export const httpClient = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  // Tuân thủ chuẩn ASP.NET Core Model Binding cho mảng: CategoryIds=id1&CategoryIds=id2 (thay vì CategoryIds[]=id1)
+  paramsSerializer: {
+    indexes: null,
+  },
 });
 
 httpClient.interceptors.request.use((config) => {
@@ -13,28 +17,24 @@ httpClient.interceptors.request.use((config) => {
     config.headers.Authorization = `Bearer ${token}`;
   }
 
+  // Tự động gắn Tenant ID chuẩn của hệ thống để đồng bộ dữ liệu đa người thuê
   let tenantId = 'tenant_mt_mart_01';
-  try {
-    const raw = localStorage.getItem('auth_user');
-    if (raw) {
-      const parsed = JSON.parse(raw) as { tenantId?: string };
-      const stored = parsed.tenantId?.trim();
-      const isPlaceholder =
-        !stored ||
-        stored === 'DEFAULT' ||
-        stored === 'default-tenant' ||
-        stored === 'TENANT-HCM-01' ||
-        stored === 'TENANT-DEFAULT';
-      if (!isPlaceholder) {
-        tenantId = stored;
+  const storedUser = localStorage.getItem('auth_user');
+  if (storedUser) {
+    try {
+      const user = JSON.parse(storedUser);
+      if (user.tenantId && user.tenantId !== 'TENANT-DEFAULT' && user.tenantId !== 'TENANT-HCM-01') {
+        tenantId = user.tenantId;
       }
+    } catch {
+      // fallback tenantId
     }
-  } catch {
-    // keep seed tenant
   }
+
   if (config.headers) {
     config.headers['X-Tenant-Id'] = tenantId;
   }
+
   return config;
 });
 
