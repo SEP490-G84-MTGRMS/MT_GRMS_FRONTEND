@@ -205,6 +205,7 @@ export const StoreSettingsHubPage: FC = () => {
             </div>
             <SubscriptionPricingCards
               onSelectPlan={(plan) => setSelectedPlanForCheckout(plan)}
+              currentPlanName={storeInfo.currentPlan}
             />
           </div>
         )}
