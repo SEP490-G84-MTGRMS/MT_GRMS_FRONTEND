@@ -1,9 +1,9 @@
 ﻿import { useState } from 'react';
 import type { FC } from 'react';
 import { X, FileCheck, CheckCircle2, Download, Receipt, ArrowRight, Layers, Calendar, Hash } from 'lucide-react';
-import type { TaxSnapshot, TaxSnapshotStatus } from '../types/taxSnapshot';
+import { formatTaxPeriodLabel, type TaxSnapshot, type TaxSnapshotStatus } from '../types/taxSnapshot';
 import { TaxSnapshotStatusBadge } from './TaxSnapshotStatusBadge';
-import { mockOrdersPool } from '../api/mockTaxData';
+// Mock pool removed - using real snapshot order count
 import { TablePagination } from '../../../components/common/TablePagination';
 
 interface Props {
@@ -48,14 +48,17 @@ export const TaxSnapshotDetailDrawer: FC<Props> = ({
     }
   };
 
-  const paginatedOrders = mockOrdersPool.slice(
+  const ytdRev = snapshot.annualAccumulatedRevenue ?? snapshot.ytdRevenue ?? 0;
+  const threshold = snapshot.taxExemptionThreshold || 1000000000;
+  const taxableExcess = snapshot.taxableRevenueInExcess ?? Math.max(0, ytdRev - threshold);
+  const periodTitle = formatTaxPeriodLabel(snapshot.periodType, snapshot.periodNumber ?? snapshot.quarter, snapshot.year);
+
+  // In production, real orders are parsed from BookDataJson or fetched via API
+  const ordersList: any[] = [];
+  const paginatedOrders = ordersList.slice(
     (orderPage - 1) * orderPageSize,
     orderPage * orderPageSize
   );
-
-  const ytdRev = snapshot.ytdRevenue || 1417500000;
-  const threshold = snapshot.taxExemptionThreshold || 1000000000;
-  const taxableExcess = snapshot.taxableRevenueInExcess || Math.max(0, ytdRev - threshold);
 
   return (
     <div className="tax-drawer-backdrop" onClick={onClose}>
@@ -65,7 +68,7 @@ export const TaxSnapshotDetailDrawer: FC<Props> = ({
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
               <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0F172A', margin: 0, letterSpacing: '-0.02em' }}>
-                Kỳ tính thuế Quý {snapshot.quarter ?? snapshot.periodNumber}/{snapshot.year}
+                Kỳ tính thuế {periodTitle}
               </h2>
               <TaxSnapshotStatusBadge status={snapshot.status || 'draft'} />
             </div>
@@ -98,7 +101,7 @@ export const TaxSnapshotDetailDrawer: FC<Props> = ({
             className={'tax-drawer-tab-btn ' + (activeTab === 'orders' ? 'active' : '')}
           >
             <Layers size={16} />
-            <span>Bảng kê hóa đơn ({mockOrdersPool.length})</span>
+            <span>Bảng kê hóa đơn ({snapshot.ordersCount ?? 0})</span>
           </button>
         </div>
 
@@ -126,7 +129,7 @@ export const TaxSnapshotDetailDrawer: FC<Props> = ({
               {/* Number Details Calculation Card */}
               <div className="tax-calc-card">
                 <div className="tax-calc-row bordered-bottom">
-                  <span style={{ color: '#475569', fontWeight: 600 }}>Doanh thu phát sinh trong quý</span>
+                  <span style={{ color: '#475569', fontWeight: 600 }}>Doanh thu phát sinh trong kỳ</span>
                   <span style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0F172A' }}>
                     {formatVND(snapshot.taxableRevenue ?? snapshot.taxableRevenueInPeriod ?? 0)}
                   </span>
@@ -156,7 +159,7 @@ export const TaxSnapshotDetailDrawer: FC<Props> = ({
                 <div className="tax-calc-row bordered-top">
                   <div>
                     <span style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0F172A' }}>
-                      Tổng tiền thuế phải nộp Quý {snapshot.quarter ?? snapshot.periodNumber}
+                      Tổng tiền thuế phải nộp {periodTitle}
                     </span>
                     <div style={{ fontSize: '0.74rem', color: '#64748B' }}>Đã tính theo cơ chế lũy kế năm</div>
                   </div>
@@ -174,7 +177,7 @@ export const TaxSnapshotDetailDrawer: FC<Props> = ({
                     <span>Ngày chốt số liệu:</span>
                   </span>
                   <strong style={{ color: '#0F172A' }}>
-                    {new Date(snapshot.generatedAt || snapshot.finalizedAtUtc || Date.now()).toLocaleString('vi-VN')}
+                    {snapshot.generatedAt || snapshot.finalizedAtUtc ? new Date(snapshot.generatedAt || snapshot.finalizedAtUtc!).toLocaleString('vi-VN') : '—'}
                   </strong>
                 </div>
 
@@ -217,53 +220,62 @@ export const TaxSnapshotDetailDrawer: FC<Props> = ({
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div style={{ fontSize: '0.82rem', color: '#64748B' }}>
-                Hiển thị các hóa đơn bán lẻ POS cấu thành doanh thu Quý {snapshot.quarter}/{snapshot.year}:
+                Hiển thị các hóa đơn bán lẻ POS cấu thành doanh thu {periodTitle}:
               </div>
 
-              <div className="tax-table-wrapper">
-                <table className="tax-table">
-                  <thead>
-                    <tr>
-                      <th>MÃ HÓA ĐƠN</th>
-                      <th>THỜI GIAN</th>
-                      <th>KHÁCH HÀNG</th>
-                      <th>PTTT</th>
-                      <th style={{ textAlign: 'right' }}>SỐ TIỀN</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {paginatedOrders.map((ord: any) => (
-                      <tr key={ord.orderId}>
-                        <td style={{ fontWeight: 700, color: '#0F766E' }}>{ord.orderCode}</td>
-                        <td style={{ color: '#64748B', fontSize: '0.78rem' }}>{ord.orderDate}</td>
-                        <td style={{ fontWeight: 600, color: '#1E293B' }}>{ord.customerName}</td>
-                        <td>
-                          <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: 6, background: '#F1F5F9', fontSize: '0.72rem', fontWeight: 600, color: '#475569' }}>
-                            {ord.paymentMethod}
-                          </span>
-                        </td>
-                        <td style={{ textAlign: 'right', fontWeight: 800, color: '#0F172A' }}>
-                          {formatVND(ord.finalAmount)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              {(snapshot.ordersCount ?? 0) === 0 && paginatedOrders.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '40px 16px', background: '#F8FAFC', borderRadius: 12, border: '1px dashed #CBD5E1', color: '#64748B' }}>
+                  <Receipt size={32} style={{ margin: '0 auto 8px', color: '#94A3B8' }} />
+                  <p style={{ margin: 0, fontWeight: 700, fontSize: '0.88rem', color: '#334155' }}>Không có hóa đơn bán lẻ trong kỳ</p>
+                  <p style={{ margin: '4px 0 0', fontSize: '0.78rem' }}>Kỳ tính thuế này không ghi nhận đơn hàng chịu thuế phát sinh.</p>
+                </div>
+              ) : (
+                <>
+                  <div className="tax-table-wrapper">
+                    <table className="tax-table">
+                      <thead>
+                        <tr>
+                          <th>MÃ HÓA ĐƠN</th>
+                          <th>THỜI GIAN</th>
+                          <th>KHÁCH HÀNG</th>
+                          <th>PTTT</th>
+                          <th style={{ textAlign: 'right' }}>SỐ TIỀN</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {paginatedOrders.map((ord: any) => (
+                          <tr key={ord.orderId}>
+                            <td style={{ fontWeight: 700, color: '#0F766E' }}>{ord.orderCode}</td>
+                            <td style={{ color: '#64748B', fontSize: '0.78rem' }}>{ord.orderDate}</td>
+                            <td style={{ fontWeight: 600, color: '#1E293B' }}>{ord.customerName}</td>
+                            <td>
+                              <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: 6, background: '#F1F5F9', fontSize: '0.72rem', fontWeight: 600, color: '#475569' }}>
+                                {ord.paymentMethod}
+                              </span>
+                            </td>
+                            <td style={{ textAlign: 'right', fontWeight: 800, color: '#0F172A' }}>
+                              {formatVND(ord.finalAmount)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
 
-              {/* TablePagination */}
-              <TablePagination
-                currentPage={orderPage}
-                pageSize={orderPageSize}
-                totalItems={mockOrdersPool.length}
-                pageSizeOptions={[5, 10, 20]}
-                onPageChange={setOrderPage}
-                onPageSizeChange={(newSize) => {
-                  setOrderPageSize(newSize);
-                  setOrderPage(1);
-                }}
-                itemLabel="hóa đơn"
-              />
+                  <TablePagination
+                    currentPage={orderPage}
+                    pageSize={orderPageSize}
+                    totalItems={snapshot.ordersCount ?? paginatedOrders.length}
+                    pageSizeOptions={[5, 10, 20]}
+                    onPageChange={setOrderPage}
+                    onPageSizeChange={(newSize) => {
+                      setOrderPageSize(newSize);
+                      setOrderPage(1);
+                    }}
+                    itemLabel="hóa đơn"
+                  />
+                </>
+              )}
             </div>
           )}
         </div>

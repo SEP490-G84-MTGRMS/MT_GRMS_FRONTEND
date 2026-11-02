@@ -1,4 +1,4 @@
-﻿import {
+import {
   TaxPeriodType,
   TaxCalculationMethod,
   HouseholdTaxGroup,
@@ -109,13 +109,16 @@ export function generateMockSummary(filter: HouseholdTaxFilterDto): HouseholdTax
   // Thuế suất GTGT: 1.0% hoặc 0.8% nếu giảm 20%
   const baseVatRate = filter.customVatRate ?? 1.0;
   const isVatReduced = Boolean(filter.applyVatReduction2026);
-  const vatRate = isVatReduced ? baseVatRate * 0.8 : baseVatRate;
+  const reductionPct = filter.vatReductionPercentage ?? 20;
+  const vatRate = isVatReduced ? Math.round(baseVatRate * (1 - reductionPct / 100) * 10000) / 10000 : baseVatRate;
   
   const vatTaxableRevenue = isExempt ? 0 : inPeriodTaxable;
   const vatAmount = isExempt ? 0 : Math.round(vatTaxableRevenue * (vatRate / 100));
 
   // Thuế TNCN
-  const pitRate = filter.calculationMethod === TaxCalculationMethod.DeclarationBased ? 15.0 : (filter.customPitRate ?? 0.5);
+  const pitRate = filter.calculationMethod === TaxCalculationMethod.DeclarationBased
+    ? (filter.customPitRate ?? 15.0)
+    : (filter.customPitRate ?? 0.5);
   let pitTaxableRevenue = 0;
   let pitAmount = 0;
 

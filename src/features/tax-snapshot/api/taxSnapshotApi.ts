@@ -50,6 +50,9 @@ export interface TaxAuditLogEntry {
   periodNumber: number;
   calculationMethod: number;
   applyVatReduction2026: boolean;
+  vatReductionPercentage?: number | null;
+  customVatRate?: number | null;
+  customPitRate?: number | null;
   totalTaxAmount: number;
   status: 'SUCCESS' | 'FAILED_PIN' | 'LOCKED';
   notes?: string;
@@ -101,9 +104,11 @@ export const taxSnapshotApi = {
           periodType: filter.periodType,
           periodNumber: filter.periodNumber,
           branchId: filter.branchId,
+          method: filter.calculationMethod,
           calculationMethod: filter.calculationMethod,
           tier2Method: filter.tier2Method,
           applyVatReduction: filter.applyVatReduction2026,
+          vatReductionPercentage: filter.vatReductionPercentage,
           customVatRate: filter.customVatRate,
           customPitRate: filter.customPitRate,
         },
@@ -218,6 +223,9 @@ export const taxSnapshotApi = {
       tier2Method: req.tier2Method || 'REVENUE_EXCESS',
       securityPin: req.pin, // Đồng bộ trường PIN sang SecurityPin của Backend
       applyVatReduction2026: Boolean(req.applyVatReduction2026),
+      vatReductionPercentage: req.vatReductionPercentage ?? null,
+      customVatRate: req.customVatRate ?? null,
+      customPitRate: req.customPitRate ?? null,
       confirmEstimatedCogsResponsible: Boolean(req.confirmEstimatedCogsResponsible),
       estimatedCogsConfirmationStatement: req.estimatedCogsConfirmationStatement || null,
       notes: req.notes || null,
@@ -271,6 +279,9 @@ export const taxSnapshotApi = {
         periodNumber: req.periodNumber,
         calculationMethod: req.calculationMethod,
         applyVatReduction2026: Boolean(req.applyVatReduction2026),
+      vatReductionPercentage: req.vatReductionPercentage ?? null,
+      customVatRate: req.customVatRate ?? null,
+      customPitRate: req.customPitRate ?? null,
         totalTaxAmount: 0,
         status: failedPinAttempts >= MAX_PIN_ATTEMPTS ? 'LOCKED' : 'FAILED_PIN',
         notes: `Mã PIN không chính xác. Số lần còn lại: ${Math.max(0, attemptsLeft)}`,
@@ -309,6 +320,9 @@ export const taxSnapshotApi = {
       householdGroup: summary.householdGroup,
       calculationMethod: req.calculationMethod,
       applyVatReduction2026: Boolean(req.applyVatReduction2026),
+      vatReductionPercentage: req.vatReductionPercentage ?? null,
+      customVatRate: req.customVatRate ?? null,
+      customPitRate: req.customPitRate ?? null,
       isTaxExempt: summary.isTaxExempt,
       taxableRevenueInPeriod: summary.taxableRevenueInPeriod,
       vatRate: summary.vatRate,
@@ -333,6 +347,9 @@ export const taxSnapshotApi = {
       periodNumber: req.periodNumber,
       calculationMethod: req.calculationMethod,
       applyVatReduction2026: Boolean(req.applyVatReduction2026),
+      vatReductionPercentage: req.vatReductionPercentage ?? null,
+      customVatRate: req.customVatRate ?? null,
+      customPitRate: req.customPitRate ?? null,
       totalTaxAmount: summary.totalTaxAmount,
       status: 'SUCCESS',
       notes: `Chốt kỳ thành công. Mã snapshot: ${newSnapshot.id}`,
@@ -344,6 +361,24 @@ export const taxSnapshotApi = {
   /**
    * Kiểm tra tính toàn vẹn và chữ ký số bất biến của snapshot
    */
+  /**
+   * Xuất báo cáo thuế 4 sheet phẳng (Excel .xlsx)
+   */
+  async exportTaxExcel(filter: HouseholdTaxFilterDto): Promise<Blob> {
+    const res = await financeHttpClient.get('/tax/household/export-excel', {
+      params: {
+        year: filter.year,
+        periodType: filter.periodType,
+        periodNumber: filter.periodNumber,
+        branchId: filter.branchId,
+        method: filter.calculationMethod,
+        applyVatReduction: filter.applyVatReduction2026,
+      },
+      responseType: 'blob',
+    });
+    return res.data;
+  },
+
   async verifyIntegrity(snapshotId: string): Promise<{ isIntegrityValid: boolean; message: string }> {
     try {
       const res = await financeHttpClient.get<{ data: { isIntegrityValid: boolean }; message?: string }>(

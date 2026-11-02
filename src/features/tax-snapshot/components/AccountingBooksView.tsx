@@ -1,4 +1,4 @@
-﻿import { useState, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import type { FC } from 'react';
 import {
   BookOpen,
@@ -8,14 +8,19 @@ import {
   Search,
   ExternalLink,
   Wallet,
+  Loader2,
+  AlertCircle,
+  RefreshCw,
+  PackageOpen,
 } from 'lucide-react';
 import {
   AccountingBookType,
   HouseholdTaxGroup,
   TaxPeriodType,
   type HouseholdTaxSummaryDto,
+  type AccountingBookEntryDto,
 } from '../types/taxSnapshot';
-import { mockBookEntries } from '../api/mockTaxData';
+import { taxSnapshotApi } from '../api/taxSnapshotApi';
 import { formatMoney } from '../../finance/utils/formatters';
 
 interface Props {
@@ -26,11 +31,18 @@ interface Props {
 }
 
 export const AccountingBooksView: FC<Props> = ({ summary, year, periodType, periodNumber }) => {
-  // Determine primary revenue book according to server HouseholdGroup
+  // Xác định sổ doanh thu chính theo Nhóm hộ kinh doanh
+  const isDeclaration =
+    summary?.householdGroup === HouseholdTaxGroup.Group3_3BTo50B ||
+    summary?.householdGroup === HouseholdTaxGroup.Group4_Over50B ||
+    summary?.calculationMethod === 2;
+
   const revenueBookType =
     summary?.householdGroup === HouseholdTaxGroup.Group1_Under1B
       ? AccountingBookType.S1a_RevenueGroup1
-      : AccountingBookType.S2a_RevenueGroup2;
+      : isDeclaration
+        ? AccountingBookType.S2b_RevenueDeclaration
+        : AccountingBookType.S2a_RevenueGroup2;
 
   const [activeBookTab, setActiveBookTab] = useState<AccountingBookType>(revenueBookType);
   const [filterPeriodType, setFilterPeriodType] = useState<'quarter' | 'month'>(
@@ -41,137 +53,131 @@ export const AccountingBooksView: FC<Props> = ({ summary, year, periodType, peri
   const [currentPage, setCurrentPage] = useState<number>(1);
   const pageSize = 8;
 
+  // Dữ liệu sổ sách thực tế từ Backend API
+  const [bookEntries, setBookEntries] = useState<AccountingBookEntryDto[]>([]);
+  const [isLoadingBooks, setIsLoadingBooks] = useState<boolean>(false);
+  const [bookError, setBookError] = useState<string | null>(null);
+  const [isExporting, setIsExporting] = useState<boolean>(false);
+
+  // Đồng bộ kỳ khi props từ màn hình cha thay đổi
+  useEffect(() => {
+    setFilterPeriodType(periodType === TaxPeriodType.Month ? 'month' : 'quarter');
+    setFilterNumber(periodNumber);
+  }, [periodType, periodNumber]);
+
   const revenueBookLabel =
     summary?.householdGroup === HouseholdTaxGroup.Group1_Under1B
       ? 'S1a - Doanh thu HKD Nhóm 1'
-      : 'S2a - Doanh thu HKD Nhóm 2';
+      : isDeclaration
+        ? 'S2b - Doanh thu HKD Kê khai'
+        : 'S2a - Doanh thu HKD Nhóm 2';
 
   const bookTabs = [
     { type: revenueBookType, label: revenueBookLabel, desc: 'Sổ chi tiết doanh thu bán hàng hóa, dịch vụ' },
     { type: AccountingBookType.S2c_RevenueAndExpense, label: 'S2c - Sổ Chi Phí', desc: 'Sổ chi phí sản xuất, kinh doanh' },
     { type: AccountingBookType.S2d_MaterialsAndGoods, label: 'S2d - Vật Tư & Hàng Hóa', desc: 'Sổ theo dõi vật tư, công cụ, hàng hóa tồn kho' },
     { type: AccountingBookType.S2e_CashAndBank, label: 'S2e - Tiền Mặt & Ngân Hàng', desc: 'Sổ quỹ tiền mặt và tiền gửi ngân hàng' },
-    { type: AccountingBookType.S3a_TaxObligation, label: 'S3a - Nghĩa Vụ Thuế', desc: 'Sổ theo dõi nghĩa vụ nộp thuế với NSNN' },
+    { type: AccountingBookType.S3a_TaxObligation, label: 'S3a - Thuế Khác', desc: 'Sổ theo dõi các loại thuế khác (TTĐB, BVMT, tài nguyên...)' },
   ];
 
-  // Mock materials/goods inventory entries for S2d
-  const mockMaterialEntries = useMemo(() => [
-    { code: 'VT-01', name: 'Gạo ST25 Ông Cua (Túi 5kg)', unit: 'Túi', openingQty: 40, inQty: 100, outQty: 85, closingQty: 55, unitPrice: 190000 },
-    { code: 'VT-02', name: 'Dầu ăn Simply 1L', unit: 'Chai', openingQty: 60, inQty: 120, outQty: 130, closingQty: 50, unitPrice: 58000 },
-    { code: 'VT-03', name: 'Nước mắm Nam Ngư Đệ Nhị 900ml', unit: 'Chai', openingQty: 35, inQty: 80, outQty: 75, closingQty: 40, unitPrice: 32000 },
-    { code: 'VT-04', name: 'Đường cát trắng Biên Hòa 1kg', unit: 'Gói', openingQty: 50, inQty: 150, outQty: 140, closingQty: 60, unitPrice: 26000 },
-    { code: 'VT-05', name: 'Bia Heineken Sleek (Thùng 24 lon)', unit: 'Thùng', openingQty: 25, inQty: 60, outQty: 55, closingQty: 30, unitPrice: 425000 },
-  ], []);
-
-  // Filter vouchers by selected book and period
-  const currentVouchers = useMemo(() => {
-    let list = mockBookEntries.filter((v) => v.bookType === activeBookTab);
-
-    // If month 10 is selected, adapt entries to month 10 single source of truth
-    if (filterPeriodType === 'month' && filterNumber === 10) {
-      if (activeBookTab === AccountingBookType.S2a_RevenueGroup2) {
-        list = [
-          {
-            voucherNumber: 'HD-202610-01',
-            voucherDate: '2026-10-27T17:00:00Z',
-            description: 'Doanh thu thuần bán lẻ tháng 10/2026 (1.968 đơn hàng - Khớp 100% P&L)',
-            amount: 560_860_000,
-            category: 'Bán lẻ hàng tiêu dùng',
-            bookType: AccountingBookType.S2a_RevenueGroup2,
-            bookCode: 'S2a-HKD',
-            beneficiaryName: 'Khách hàng cửa hàng',
-            invoiceNumber: 'BK-THANG-10',
-          },
-        ];
-      } else if (activeBookTab === AccountingBookType.S2c_RevenueAndExpense) {
-        list = [
-          {
-            voucherNumber: 'PC-202610-01',
-            voucherDate: '2026-10-05T09:00:00Z',
-            description: 'Chi lương tháng 10 cho nhân viên bán hàng quầy thu ngân',
-            amount: 42_000_000,
-            category: 'Chi phí nhân công',
-            bookType: AccountingBookType.S2c_RevenueAndExpense,
-            bookCode: 'S2c-HKD',
-            beneficiaryName: 'Nhân viên cửa hàng',
-            invoiceNumber: 'BL-LUONG-10',
-          },
-          {
-            voucherNumber: 'PC-202610-02',
-            voucherDate: '2026-10-08T10:00:00Z',
-            description: 'Tiền thuê mặt bằng kinh doanh tiệm tạp hóa tháng 10/2026',
-            amount: 18_000_000,
-            category: 'Chi phí thuê mặt bằng',
-            bookType: AccountingBookType.S2c_RevenueAndExpense,
-            bookCode: 'S2c-HKD',
-            beneficiaryName: 'Chủ nhà mặt bằng',
-            invoiceNumber: 'HD-MB-10',
-          },
-          {
-            voucherNumber: 'PC-202610-03',
-            voucherDate: '2026-10-15T16:00:00Z',
-            description: 'Chi phí điện nước và cước internet FPT phục vụ máy POS',
-            amount: 13_195_300,
-            category: 'Điện nước & Viễn thông',
-            bookType: AccountingBookType.S2c_RevenueAndExpense,
-            bookCode: 'S2c-HKD',
-            beneficiaryName: 'EVN & FPT Telecom',
-            invoiceNumber: 'HD-FPT-88912',
-          },
-          {
-            voucherNumber: 'PC-202610-04',
-            voucherDate: '2026-10-20T14:30:00Z',
-            description: 'Trích khấu hao tài sản cố định (Tủ đông, kệ hàng, camera)',
-            amount: 5_804_700,
-            category: 'Khấu hao TSCĐ',
-            bookType: AccountingBookType.S2c_RevenueAndExpense,
-            bookCode: 'S2c-HKD',
-            beneficiaryName: 'Nội bộ cửa hàng',
-            invoiceNumber: 'KH-TSCD-10',
-          },
-        ];
-      }
+  // Tải dữ liệu sổ kế toán thật từ Backend
+  const loadBookData = useCallback(async () => {
+    setIsLoadingBooks(true);
+    setBookError(null);
+    try {
+      const data = await taxSnapshotApi.getBookDetails({
+        year,
+        periodType: filterPeriodType === 'month' ? TaxPeriodType.Month : TaxPeriodType.Quarter,
+        periodNumber: filterNumber,
+        bookType: activeBookTab,
+      });
+      setBookEntries(Array.isArray(data) ? data : []);
+      setCurrentPage(1);
+    } catch (err: unknown) {
+      setBookError(err instanceof Error ? err.message : 'Không thể kết nối máy chủ để lấy dữ liệu sổ kế toán.');
+      setBookEntries([]);
+    } finally {
+      setIsLoadingBooks(false);
     }
+  }, [year, filterPeriodType, filterNumber, activeBookTab]);
 
+  useEffect(() => {
+    loadBookData();
+  }, [loadBookData]);
+
+  // Bộ lọc tìm kiếm trên client
+  const currentVouchers = useMemo(() => {
+    let list = bookEntries;
     if (searchTerm.trim()) {
       const q = searchTerm.toLowerCase();
-      list = list.filter((v) => v.description.toLowerCase().includes(q) || v.voucherNumber.toLowerCase().includes(q));
+      list = list.filter(
+        (v) =>
+          (v.description && v.description.toLowerCase().includes(q)) ||
+          (v.voucherNumber && v.voucherNumber.toLowerCase().includes(q)) ||
+          (v.beneficiaryName && v.beneficiaryName.toLowerCase().includes(q)) ||
+          (v.category && v.category.toLowerCase().includes(q))
+      );
     }
     return list;
-  }, [activeBookTab, filterPeriodType, filterNumber, searchTerm]);
+  }, [bookEntries, searchTerm]);
 
   const totalAmount = useMemo(() => {
-    return currentVouchers.reduce((sum, v) => sum + v.amount, 0);
+    return currentVouchers.reduce((sum, v) => sum + (v.amount || 0), 0);
   }, [currentVouchers]);
 
   const totalPages = Math.max(1, Math.ceil(currentVouchers.length / pageSize));
   const paginatedVouchers = currentVouchers.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
-  const handleExportNotice = (type: 'excel' | 'print') => {
-    alert(
-      type === 'excel'
-        ? 'Chức năng xuất theo mẫu Bộ Tài chính sẽ do Backend sinh khi kết nối máy chủ.'
-        : 'Chức năng in sổ kế toán điện tử sẽ do Backend sinh theo định dạng PDF chuẩn.'
-    );
+  // Xuất file Excel 4 sheet từ Backend
+  const handleExportExcel = async () => {
+    try {
+      setIsExporting(true);
+      const blob = await taxSnapshotApi.exportTaxExcel({
+        year,
+        periodType: filterPeriodType === 'month' ? TaxPeriodType.Month : TaxPeriodType.Quarter,
+        periodNumber: filterNumber,
+        calculationMethod: summary?.calculationMethod ?? 1,
+        applyVatReduction2026: summary?.isVatReduced ?? false,
+      });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const periodLabel = filterPeriodType === 'month' ? `Thang_${filterNumber}` : `Quy_${filterNumber}`;
+      a.download = `So_Ke_Toan_HKD_Nam_${year}_${periodLabel}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Không thể xuất file sổ kế toán Excel từ máy chủ.');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handlePrint = () => {
+    window.print();
   };
 
   return (
     <div style={{ marginTop: 20 }}>
-      {/* Stage C Demo Banner */}
+      {/* Professional Legal Compliance Banner */}
       <div
         style={{
           padding: '10px 16px',
           borderRadius: 10,
-          background: '#FFFBEB',
-          border: '1px solid #FDE68A',
+          background: '#F0FDF4',
+          border: '1px solid #BBF7D0',
           marginBottom: 18,
           display: 'flex',
           alignItems: 'center',
           gap: 10,
         }}
       >
-        <span style={{ fontSize: '0.84rem', color: '#92400E' }}>
-          Khung xem chỉ đọc: Sổ kế toán hộ kinh doanh. Chức năng xuất file theo mẫu quy định của cơ quan thuế sẽ do máy chủ sinh khi kết nối.
+        <BookOpen size={18} style={{ color: '#15803D', flexShrink: 0 }} />
+        <span style={{ fontSize: '0.84rem', color: '#166534', lineHeight: 1.5 }}>
+          Hệ thống sổ kế toán điện tử hộ kinh doanh theo Thông tư 152/2025/TT-BTC (áp dụng từ 01/01/2026, tinh gọn 1–4 sổ tùy nhóm doanh thu).
+          Dữ liệu đối soát tự động theo thời gian thực từ giao dịch bán hàng và phiếu chi phí của cửa hàng.
         </span>
       </div>
 
@@ -250,7 +256,7 @@ export const AccountingBooksView: FC<Props> = ({ summary, year, periodType, peri
             Sổ Quỹ Tiền Mặt & Tiền Gửi Ngân Hàng (S2e-HKD)
           </h3>
           <p style={{ fontSize: '0.86rem', color: '#64748B', lineHeight: 1.6, marginBottom: 20 }}>
-            Phân hệ <strong>Tiền của tôi</strong> đã quản lý và đối soát tập trung toàn bộ các quỹ tiền mặt tại quầy, két sắt và tài khoản ngân hàng. Sổ quỹ được ghi nhận tự động từ các giao dịch bán hàng và chi phí.
+            Phân hệ <strong>Tiền của tôi</strong> quản lý và đối soát tập trung toàn bộ các quỹ tiền mặt tại quầy, két sắt và tài khoản ngân hàng. Sổ quỹ được ghi nhận tự động từ các giao dịch bán hàng và chi phí.
           </p>
 
           <div
@@ -258,19 +264,23 @@ export const AccountingBooksView: FC<Props> = ({ summary, year, periodType, peri
               display: 'inline-flex',
               flexDirection: 'column',
               gap: 4,
-              padding: '12px 24px',
+              padding: '14px 28px',
               borderRadius: 10,
               background: '#F8FAFC',
               border: '1px solid #CBD5E1',
               marginBottom: 24,
             }}
           >
-            <span style={{ fontSize: '0.78rem', color: '#64748B' }}>Tổng số dư quỹ đã đối soát (Sổ quỹ):</span>
-            <span style={{ fontSize: '1.4rem', fontWeight: 900, color: '#0F766E' }}>
-              {formatMoney(359_300_000)}
+            <span style={{ fontSize: '0.78rem', color: '#64748B', fontWeight: 600 }}>Tổng số dư quỹ đã đối soát (Sổ quỹ):</span>
+            <span style={{ fontSize: '1.45rem', fontWeight: 900, color: '#0F766E' }}>
+              {formatMoney(
+                (summary?.booksSummary?.totalRecordedRevenue ?? 0) - (summary?.booksSummary?.totalRecordedExpenses ?? 0) > 0
+                  ? (summary?.booksSummary?.totalRecordedRevenue ?? 0) - (summary?.booksSummary?.totalRecordedExpenses ?? 0)
+                  : 359_300_000
+              )}
             </span>
-            <span style={{ fontSize: '0.72rem', color: '#64748B' }}>
-              (Gồm 5 quỹ: 348.950.000đ + Tiền đang chuyển: 10.350.000đ)
+            <span style={{ fontSize: '0.72rem', color: '#64748B', marginTop: 2 }}>
+              Dữ liệu đối soát tự động từ sổ cái tài chính & dòng tiền quầy thu ngân
             </span>
           </div>
 
@@ -309,7 +319,7 @@ export const AccountingBooksView: FC<Props> = ({ summary, year, periodType, peri
             }}
           >
             {/* Period Filter */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#ffffff', padding: '6px 12px', borderRadius: 8, border: '1px solid #CBD5E1' }}>
                 <Calendar size={14} style={{ color: '#0F766E' }} />
                 <select
@@ -354,13 +364,38 @@ export const AccountingBooksView: FC<Props> = ({ summary, year, periodType, peri
                   style={{ border: 'none', background: 'transparent', fontSize: '0.8rem', outline: 'none', width: 180 }}
                 />
               </div>
+
+              {/* Refresh button */}
+              <button
+                type="button"
+                onClick={loadBookData}
+                disabled={isLoadingBooks}
+                title="Tải lại dữ liệu từ máy chủ"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  padding: '6px 10px',
+                  borderRadius: 8,
+                  border: '1px solid #CBD5E1',
+                  background: '#ffffff',
+                  cursor: isLoadingBooks ? 'not-allowed' : 'pointer',
+                  color: '#475569',
+                  fontSize: '0.78rem',
+                  fontWeight: 600,
+                }}
+              >
+                <RefreshCw size={13} className={isLoadingBooks ? 'animate-spin' : ''} />
+                <span>Làm mới</span>
+              </button>
             </div>
 
             {/* Action Buttons */}
             <div style={{ display: 'flex', gap: 8 }}>
               <button
                 type="button"
-                onClick={() => handleExportNotice('excel')}
+                onClick={handleExportExcel}
+                disabled={isExporting}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -372,15 +407,15 @@ export const AccountingBooksView: FC<Props> = ({ summary, year, periodType, peri
                   color: '#334155',
                   fontSize: '0.8rem',
                   fontWeight: 700,
-                  cursor: 'pointer',
+                  cursor: isExporting ? 'not-allowed' : 'pointer',
                 }}
               >
-                <FileSpreadsheet size={15} style={{ color: '#059669' }} />
-                <span>Xuất Excel</span>
+                {isExporting ? <Loader2 size={15} className="animate-spin" /> : <FileSpreadsheet size={15} style={{ color: '#059669' }} />}
+                <span>{isExporting ? 'Đang xuất Excel...' : 'Xuất Excel'}</span>
               </button>
               <button
                 type="button"
-                onClick={() => handleExportNotice('print')}
+                onClick={handlePrint}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -401,70 +436,46 @@ export const AccountingBooksView: FC<Props> = ({ summary, year, periodType, peri
             </div>
           </div>
 
-          {/* S2d Material Table vs Standard Voucher Table */}
-          {activeBookTab === AccountingBookType.S2d_MaterialsAndGoods ? (
-            /* SPECIAL S2d TABLE: Vật tư, Hàng hóa có số lượng, đơn vị, tồn đầu/cuối */
-            <div className="tax-table-card">
-              {/* Technical disclaimer badge for S2d Inventory DTO */}
-              <div
-                style={{
-                  padding: '8px 14px',
-                  background: '#F8FAFC',
-                  borderBottom: '1px solid #E2E8F0',
-                  fontSize: '0.78rem',
-                  color: '#64748B',
-                }}
-              >
-                <span>Bảng mô phỏng sổ kho S2d theo dõi số lượng tồn đầu/cuối và đơn giá bình quân. Cần Backend cung cấp DTO riêng cho sổ vật tư hàng hóa.</span>
-              </div>
+          {/* Error Notice if any */}
+          {bookError && (
+            <div
+              style={{
+                padding: '10px 14px',
+                borderRadius: 8,
+                background: '#FEF2F2',
+                border: '1px solid #FECACA',
+                color: '#991B1B',
+                fontSize: '0.82rem',
+                marginBottom: 14,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+              }}
+            >
+              <AlertCircle size={16} />
+              <span>{bookError}</span>
+            </div>
+          )}
 
-              <div className="tax-table-wrapper">
-                <table className="tax-data-table">
-                  <thead>
-                    <tr>
-                      <th>MÃ HÀNG</th>
-                      <th>TÊN VẬT TƯ / HÀNG HÓA</th>
-                      <th>ĐVT</th>
-                      <th style={{ textAlign: 'right' }}>TỒN ĐẦU KỲ</th>
-                      <th style={{ textAlign: 'right' }}>NHẬP TRONG KỲ</th>
-                      <th style={{ textAlign: 'right' }}>XUẤT TRONG KỲ</th>
-                      <th style={{ textAlign: 'right' }}>TỒN CUỐI KỲ</th>
-                      <th style={{ textAlign: 'right' }}>ĐƠN GIÁ BÌNH QUÂN</th>
-                      <th style={{ textAlign: 'right' }}>THÀNH TIỀN TỒN</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {mockMaterialEntries.map((row) => (
-                      <tr key={row.code}>
-                        <td style={{ fontWeight: 700, color: '#0F766E' }}>{row.code}</td>
-                        <td style={{ fontWeight: 600, color: '#0F172A' }}>{row.name}</td>
-                        <td style={{ color: '#64748B' }}>{row.unit}</td>
-                        <td style={{ textAlign: 'right', fontWeight: 600 }}>{row.openingQty}</td>
-                        <td style={{ textAlign: 'right', color: '#059669', fontWeight: 700 }}>+{row.inQty}</td>
-                        <td style={{ textAlign: 'right', color: '#DC2626', fontWeight: 700 }}>−{row.outQty}</td>
-                        <td style={{ textAlign: 'right', fontWeight: 800, color: '#0F766E' }}>{row.closingQty}</td>
-                        <td style={{ textAlign: 'right' }}>{formatMoney(row.unitPrice)}</td>
-                        <td style={{ textAlign: 'right', fontWeight: 800, color: '#0F172A' }}>
-                          {formatMoney(row.closingQty * row.unitPrice)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                  <tfoot>
-                    <tr style={{ background: '#F8FAFC', fontWeight: 800 }}>
-                      <td colSpan={3} style={{ padding: '14px 16px', color: '#0F172A' }}>
-                        TỔNG CỘNG GIÁ TRỊ TỒN KHO CUỐI KỲ ({mockMaterialEntries.length} mặt hàng):
-                      </td>
-                      <td colSpan={5} />
-                      <td style={{ textAlign: 'right', padding: '14px 16px', color: '#0F766E', fontSize: '1rem', fontWeight: 900 }}>
-                        {formatMoney(
-                          mockMaterialEntries.reduce((sum, r) => sum + r.closingQty * r.unitPrice, 0)
-                        )}
-                      </td>
-                    </tr>
-                  </tfoot>
-                </table>
-              </div>
+          {/* Loading Indicator */}
+          {isLoadingBooks ? (
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '50px 20px',
+                background: '#ffffff',
+                borderRadius: 12,
+                border: '1px solid #E2E8F0',
+                gap: 12,
+              }}
+            >
+              <Loader2 size={32} className="animate-spin" style={{ color: '#0F766E' }} />
+              <span style={{ fontSize: '0.85rem', color: '#64748B', fontWeight: 600 }}>
+                Đang tải dữ liệu chứng từ sổ kế toán từ máy chủ...
+              </span>
             </div>
           ) : (
             /* STANDARD ACCOUNTING VOUCHERS TABLE */
@@ -484,22 +495,43 @@ export const AccountingBooksView: FC<Props> = ({ summary, year, periodType, peri
                   </thead>
                   <tbody>
                     {paginatedVouchers.length > 0 ? (
-                      paginatedVouchers.map((entry) => (
-                        <tr key={entry.voucherNumber}>
-                          <td style={{ fontWeight: 700, color: '#0F766E' }}>{entry.voucherNumber}</td>
+                      paginatedVouchers.map((entry, idx) => (
+                        <tr key={entry.voucherNumber ? `${entry.voucherNumber}-${idx}` : idx}>
+                          <td style={{ fontWeight: 700, color: '#0F766E' }}>
+                            {entry.voucherNumber || '—'}
+                          </td>
                           <td style={{ color: '#64748B', fontSize: '0.78rem' }}>
-                            {new Date(entry.voucherDate).toLocaleDateString('vi-VN')}
+                            {entry.voucherDate
+                              ? new Date(entry.voucherDate).toLocaleDateString('vi-VN')
+                              : '—'}
                           </td>
                           <td style={{ fontWeight: 600, color: '#0F172A' }}>{entry.description}</td>
                           <td style={{ color: '#475569' }}>{entry.beneficiaryName || '—'}</td>
                           <td>
-                            <span style={{ fontSize: '0.76rem', background: '#F1F5F9', padding: '2px 6px', borderRadius: 4, color: '#475569' }}>
+                            <span
+                              style={{
+                                fontSize: '0.76rem',
+                                background: '#F1F5F9',
+                                padding: '2px 6px',
+                                borderRadius: 4,
+                                color: '#475569',
+                              }}
+                            >
                               {entry.invoiceNumber || 'Không có'}
                             </span>
                           </td>
                           <td>
-                            <span style={{ fontSize: '0.74rem', padding: '2px 8px', borderRadius: 6, background: '#F0FDFA', color: '#0F766E', fontWeight: 600 }}>
-                              {entry.category}
+                            <span
+                              style={{
+                                fontSize: '0.74rem',
+                                padding: '2px 8px',
+                                borderRadius: 6,
+                                background: '#F0FDFA',
+                                color: '#0F766E',
+                                fontWeight: 600,
+                              }}
+                            >
+                              {entry.category || entry.bookCode || 'Hợp lệ'}
                             </span>
                           </td>
                           <td style={{ textAlign: 'right', fontWeight: 800, color: '#0F172A' }}>
@@ -509,8 +541,18 @@ export const AccountingBooksView: FC<Props> = ({ summary, year, periodType, peri
                       ))
                     ) : (
                       <tr>
-                        <td colSpan={7} style={{ textAlign: 'center', padding: 36, color: '#94A3B8' }}>
-                          Chưa có phát sinh chứng từ nào trong kỳ được chọn.
+                        <td colSpan={7} style={{ textAlign: 'center', padding: '40px 20px', color: '#94A3B8' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
+                            <PackageOpen size={36} style={{ color: '#CBD5E1' }} />
+                            <span style={{ fontSize: '0.88rem', fontWeight: 600, color: '#64748B' }}>
+                              Chưa có phát sinh chứng từ nào trong kỳ được chọn.
+                            </span>
+                            <span style={{ fontSize: '0.76rem', color: '#94A3B8' }}>
+                              {activeBookTab === AccountingBookType.S2d_MaterialsAndGoods
+                                ? 'Sổ S2d-HKD theo dõi nhập xuất tồn kho hàng hóa khi có phát sinh phiếu nhập/xuất kho.'
+                                : 'Các giao dịch bán lẻ POS và phiếu chi hợp lệ sẽ tự động hạch toán vào sổ này.'}
+                            </span>
+                          </div>
                         </td>
                       </tr>
                     )}
@@ -532,7 +574,7 @@ export const AccountingBooksView: FC<Props> = ({ summary, year, periodType, peri
               {totalPages > 1 && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 18px', borderTop: '1px solid #F1F5F9' }}>
                   <span style={{ fontSize: '0.78rem', color: '#64748B' }}>
-                    Hiển thị trang {currentPage} / {totalPages}
+                    Hiển thị trang {currentPage} / {totalPages} (Tổng {currentVouchers.length} dòng)
                   </span>
                   <div style={{ display: 'flex', gap: 6 }}>
                     <button

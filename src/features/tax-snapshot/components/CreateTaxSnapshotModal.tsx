@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import {
   X,
   Lock,
@@ -19,6 +19,9 @@ interface CreateTaxSnapshotModalProps {
   summary?: HouseholdTaxSummaryDto;
   calculationMethod: TaxCalculationMethod;
   applyVatReduction: boolean;
+  customVatRate?: number | null;
+  customPitRate?: number | null;
+  vatReductionPercentage?: number | null;
   onSubmit: (request: CreateTaxSnapshotRequest) => Promise<void>;
 }
 
@@ -28,6 +31,9 @@ export const CreateTaxSnapshotModal: React.FC<CreateTaxSnapshotModalProps> = ({
   summary,
   calculationMethod,
   applyVatReduction,
+  customVatRate,
+  customPitRate,
+  vatReductionPercentage,
   onSubmit,
 }) => {
   const [step, setStep] = useState<1 | 2 | 3>(1);
@@ -55,13 +61,7 @@ export const CreateTaxSnapshotModal: React.FC<CreateTaxSnapshotModalProps> = ({
     setStep(3);
   };
 
-  const handlePinInput = (digit: string) => {
-    if (pin.length < 4) {
-      const nextPin = pin + digit;
-      setPin(nextPin);
-      setPinError(null);
-    }
-  };
+  const handlePinInput = (digit: string) => { setPin(prev => prev.length < 4 ? prev + digit : prev); setPinError(null); };
 
   const handlePinBackspace = () => {
     setPin((prev) => prev.slice(0, -1));
@@ -85,6 +85,9 @@ export const CreateTaxSnapshotModal: React.FC<CreateTaxSnapshotModalProps> = ({
         branchId: summary.branchId,
         calculationMethod,
         applyVatReduction2026: applyVatReduction,
+        customVatRate,
+        customPitRate,
+        vatReductionPercentage,
         pin,
         notes: notes.trim() || undefined,
       });
@@ -175,7 +178,20 @@ export const CreateTaxSnapshotModal: React.FC<CreateTaxSnapshotModalProps> = ({
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span style={{ fontSize: '0.82rem', color: '#64748B' }}>Chính sách giảm thuế GTGT:</span>
                   <strong style={{ fontSize: '0.85rem', color: applyVatReduction ? '#059669' : '#64748B' }}>
-                    {applyVatReduction ? 'Đang bật (Giảm 20% GTGT)' : 'Tắt'}
+                    {applyVatReduction
+                      ? `Đang bật (Giảm ${(summary.vatReductionPercentage != null && summary.vatReductionPercentage > 0) ? summary.vatReductionPercentage : (vatReductionPercentage ?? 20)}% GTGT)`
+                      : 'Tắt'}
+                  </strong>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: '0.82rem', color: '#64748B' }}>Thuế suất GTGT & TNCN:</span>
+                  <strong style={{ fontSize: '0.85rem', color: '#0F172A' }}>
+                    GTGT: {summary.vatRate}% | TNCN: {summary.pitRate}%
+                    {(customVatRate != null || customPitRate != null) && (
+                      <span style={{ marginLeft: 6, fontSize: '0.72rem', color: '#D97706', fontWeight: 600 }}>
+                        (Tùy chỉnh)
+                      </span>
+                    )}
                   </strong>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #E2E8F0', paddingTop: 8 }}>

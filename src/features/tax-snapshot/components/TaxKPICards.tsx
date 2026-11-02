@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import {
   TrendingUp,
   Percent,
@@ -41,10 +41,45 @@ export const TaxKPICards: React.FC<TaxKPICardsProps> = ({ summary, isLoading }) 
 
   return (
     <>
+      {/* Banner lưu ý ước tính */}
+      <div style={{ background: '#F8FAFC', border: '1px solid #CBD5E1', color: '#475569', padding: '8px 14px', borderRadius: 10, fontSize: '0.8rem', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span>⚠️</span>
+        <span><strong>Lưu ý:</strong> Mọi số liệu tính thuế trên hệ thống đều mang tính chất <strong>ước tính, tham khảo</strong>. Vui lòng đối chiếu với cơ quan thuế địa bàn khi lập hồ sơ kê khai chính thức.</span>
+      </div>
+
+      {summary.isApproaching3BThreshold && !summary.isExceeding3BThreshold && (
+        <div style={{ background: '#EFF6FF', border: '1px solid #93C5FD', color: '#1E40AF', padding: '10px 14px', borderRadius: 10, fontSize: '0.82rem', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span>⚠️</span>
+          <span><strong>Cảnh báo tiến sát ngưỡng 3 tỷ:</strong> Doanh thu năm đạt {formatMoney(summary.annualAccumulatedRevenue)} (đạt trên 90% mốc 3 tỷ). Chuẩn bị hồ sơ, sổ sách và hóa đơn để chuyển đổi sang phương pháp Kê khai từ năm sau.</span>
+        </div>
+      )}
+
+      {summary.isExceeding3BThreshold && (
+        <div style={{ background: '#FEF2F2', border: '1px solid #F87171', color: '#991B1B', padding: '10px 14px', borderRadius: 10, fontSize: '0.82rem', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span>🚨</span>
+          <span><strong>Doanh thu vượt ngưỡng 3 tỷ VNĐ:</strong> {summary.declarationMethodStartYear ? `Doanh thu năm nay đã vượt 3 tỷ. Bắt buộc chuyển sang phương pháp Kê khai từ năm ${summary.declarationMethodStartYear} (ổn định 2 năm theo Điểm d Khoản 5 Điều 4 NĐ 68/2026/NĐ-CP).` : 'Doanh thu năm nay đã vượt 3 tỷ đồng.'}</span>
+        </div>
+      )}
+
       {summary.isThresholdCrossedMidYear && (
         <div style={{ background: '#FFFBEB', border: '1px solid #F59E0B', color: '#92400E', padding: '10px 14px', borderRadius: 10, fontSize: '0.82rem', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
           <span>🔔</span>
           <span><strong>Lưu ý vượt ngưỡng miễn thuế giữa năm:</strong> {summary.thresholdExceededNote || 'Doanh thu năm lũy kế đã vượt ngưỡng 1 tỷ VNĐ trong kỳ này. Hệ thống bắt đầu tính nghĩa vụ thuế GTGT và TNCN theo thuế suất ngành nghề đăng ký trên phần doanh thu vượt ngưỡng. Khuyến nghị chủ hộ tham vấn cơ quan thuế địa bàn về quy định kê khai và chính sách áp dụng cho trường hợp vượt ngưỡng giữa năm.'}</span>
+        </div>
+      )}
+
+      {summary.isGrossOver1BNetUnder1B && (
+        <div style={{ background: '#FFFBEB', border: '1px solid #F59E0B', color: '#92400E', padding: '10px 14px', borderRadius: 10, fontSize: '0.82rem', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span>⚖️</span>
+          <span>
+            <strong>Cảnh báo chênh lệch Gross vs Net:</strong>{' '}
+            {summary.netVsGrossThresholdWarning || 'Doanh thu gộp (Gross) lũy kế đã vượt ngưỡng 1 tỷ VNĐ nhưng Doanh thu thuần (Net) dưới 1 tỷ VNĐ (thuộc diện chưa phải nộp thuế).'}
+            {summary.grossBasedEstimatedTaxAmount != null && summary.grossBasedEstimatedTaxAmount > 0 && (
+              <span style={{ display: 'block', marginTop: 4, fontWeight: 700 }}>
+                Số thuế ước tính dự phòng nếu tính theo Doanh thu gộp: {formatMoney(summary.grossBasedEstimatedTaxAmount)}
+              </span>
+            )}
+          </span>
         </div>
       )}
       {summary.isApproachingGroup4Threshold && (
@@ -87,6 +122,7 @@ export const TaxKPICards: React.FC<TaxKPICardsProps> = ({ summary, isLoading }) 
         <div className="tax-kpi-value" style={{ color: '#0F766E' }}>
           {formatMoney(summary.vatAmount)}
         </div>
+        <div style={{ fontSize: '0.68rem', color: '#64748B', fontStyle: 'italic', marginBottom: 2 }}>⚠️ Ước tính, tham khảo</div>
         <div className="tax-kpi-subtext" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <span>Doanh thu {periodLabel}</span>
           {summary.isVatReduced && (
@@ -100,7 +136,7 @@ export const TaxKPICards: React.FC<TaxKPICardsProps> = ({ summary, isLoading }) 
                 fontWeight: 700,
               }}
             >
-              Giảm 20%
+              Giảm {(summary.vatReductionPercentage != null && summary.vatReductionPercentage > 0) ? `${summary.vatReductionPercentage}%` : '20%'}
             </span>
           )}
         </div>
@@ -117,6 +153,7 @@ export const TaxKPICards: React.FC<TaxKPICardsProps> = ({ summary, isLoading }) 
         <div className="tax-kpi-value" style={{ color: '#7C3AED' }}>
           {formatMoney(summary.pitAmount)}
         </div>
+        <div style={{ fontSize: '0.68rem', color: '#64748B', fontStyle: 'italic', marginBottom: 2 }}>⚠️ Ước tính, tham khảo</div>
         <div className="tax-kpi-subtext">
           {summary.isTaxExempt ? (
             <span style={{ color: '#059669', fontWeight: 600 }}>Miễn thuế (≤ 1 tỷ)</span>
@@ -139,6 +176,7 @@ export const TaxKPICards: React.FC<TaxKPICardsProps> = ({ summary, isLoading }) 
         <div className="tax-kpi-value" style={{ color: '#0F766E', fontWeight: 900 }}>
           {formatMoney(summary.totalTaxAmount)}
         </div>
+        <div style={{ fontSize: '0.68rem', color: '#64748B', fontStyle: 'italic', marginBottom: 2 }}>⚠️ Ước tính, tham khảo</div>
         <div className="tax-kpi-subtext" style={{ display: 'flex', alignItems: 'center', gap: 4, color: deadline.isUrgent ? '#DC2626' : '#0F766E', flexWrap: 'wrap' }}>
           <Clock size={12} />
           <span>

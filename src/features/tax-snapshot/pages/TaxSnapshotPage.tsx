@@ -10,19 +10,22 @@ import {
   AlertCircle,
   Calendar,
   Scale,
+  Download,
+  SlidersHorizontal,
 } from 'lucide-react';
 import { AdminToast, type ToastState } from '../../admin/components';
 import { useTaxSnapshots } from '../hooks/useTaxSnapshots';
 import { TaxKPICards } from '../components/TaxKPICards';
 import { TaxSnapshotTable } from '../components/TaxSnapshotTable';
 import { CreateTaxSnapshotModal } from '../components/CreateTaxSnapshotModal';
+import { TaxRateConfigModal } from '../components/TaxRateConfigModal';
 import { TaxSnapshotDetailDrawer } from '../components/TaxSnapshotDetailDrawer';
 import { TaxExportModal } from '../components/TaxExportModal';
 import { TaxDeclarationFormView } from '../components/TaxDeclarationFormView';
 import { TaxAnalyticsSection } from '../components/TaxAnalyticsSection';
 import { AccountingBooksView } from '../components/AccountingBooksView';
 import { ThresholdRuler } from '../../../components/common/ThresholdRuler';
-import { isUsingMockData } from '../api/taxSnapshotApi';
+import { isUsingMockData, taxSnapshotApi } from '../api/taxSnapshotApi';
 import {
   TaxPeriodType,
   type CreateTaxSnapshotRequest,
@@ -47,10 +50,13 @@ export const TaxSnapshotPage: FC = () => {
     setPeriod,
     setYear,
     setApplyVatReduction,
+    updateTaxRates,
+    resetTaxRatesToDefault,
     createSnapshot,
   } = useTaxSnapshots(2026);
 
   // Modals & Drawers
+  const [isRateConfigOpen, setIsRateConfigOpen] = useState<boolean>(false);
   const [isCreateOpen, setIsCreateOpen] = useState<boolean>(false);
   const [selectedSnapshot, setSelectedSnapshot] = useState<HouseholdTaxSnapshotDto | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState<boolean>(false);
@@ -58,9 +64,39 @@ export const TaxSnapshotPage: FC = () => {
 
   // Toast
   const [toast, setToast] = useState<ToastState | null>(null);
+  const [isExportingExcel, setIsExportingExcel] = useState<boolean>(false);
+
+  const handleExportExcel = async () => {
+    try {
+      setIsExportingExcel(true);
+      const blob = await taxSnapshotApi.exportTaxExcel(filterParams);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const pCode = filterParams.periodType === TaxPeriodType.Quarter ? `Q${filterParams.periodNumber}` : `T${filterParams.periodNumber}`;
+      a.download = `BaoCaoThue_${filterParams.year}_${pCode}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      setToast({
+        id: `toast-${Date.now()}`,
+        type: 'success',
+        message: 'Xuất file Excel báo cáo thuế thành công!',
+      });
+    } catch (err: any) {
+      setToast({
+        id: `toast-${Date.now()}`,
+        type: 'error',
+        message: err.message || 'Không thể xuất file Excel báo cáo thuế.',
+      });
+    } finally {
+      setIsExportingExcel(false);
+    }
+  };
 
   const handlePeriodTypeChange = (pType: TaxPeriodType) => {
-    const defaultNumber = pType === TaxPeriodType.Month ? 10 : pType === TaxPeriodType.Quarter ? 3 : 2026;
+    const defaultNumber = pType === TaxPeriodType.Month ? 1 : pType === TaxPeriodType.Quarter ? 1 : 2026;
     setPeriod(pType, defaultNumber);
   };
 
@@ -263,6 +299,40 @@ export const TaxSnapshotPage: FC = () => {
                 </select>
               </div>
 
+              {/* Tax Rate Config Button */}
+              <button
+                type="button"
+                onClick={() => setIsRateConfigOpen(true)}
+                className="btn-secondary-pill"
+                title="Cấu hình mức thuế suất GTGT, TNCN và chính sách giảm thuế"
+                style={{
+                  position: 'relative',
+                  ...(filterParams.customVatRate != null || filterParams.customPitRate != null
+                    ? {
+                        borderColor: '#0F766E',
+                        color: '#0F766E',
+                        background: '#F0FDFA',
+                        fontWeight: 700,
+                      }
+                    : {}),
+                }}
+              >
+                <SlidersHorizontal size={15} />
+                <span>Cấu hình thuế</span>
+                {(filterParams.customVatRate != null || filterParams.customPitRate != null) && (
+                  <span
+                    style={{
+                      width: 6,
+                      height: 6,
+                      borderRadius: '50%',
+                      background: '#0F766E',
+                      display: 'inline-block',
+                      marginLeft: 2,
+                    }}
+                  />
+                )}
+              </button>
+
               {/* Refresh Button */}
               <button
                 type="button"
@@ -273,6 +343,18 @@ export const TaxSnapshotPage: FC = () => {
               >
                 <RotateCcw size={15} className={isSummaryLoading ? 'animate-spin' : ''} />
                 <span>Làm mới</span>
+              </button>
+
+              {/* Export Excel Button */}
+              <button
+                type="button"
+                onClick={handleExportExcel}
+                disabled={isExportingExcel || isSummaryLoading}
+                className="btn-secondary-pill"
+                title="Xuất bảng tính Excel 4 sheet phẳng phục vụ đối chiếu"
+              >
+                <Download size={15} />
+                <span>{isExportingExcel ? 'Đang xuất...' : 'Xuất Excel'}</span>
               </button>
 
               {/* Finalize Button */}
@@ -336,9 +418,12 @@ export const TaxSnapshotPage: FC = () => {
 
         {/* 2. 1 Billion Revenue Ruler (Compact status tracker directly below KPIs) */}
         <ThresholdRuler
-          currentYtdRevenue={summary?.annualAccumulatedRevenue ?? 1_417_500_000}
+          currentYtdRevenue={summary?.annualAccumulatedRevenue ?? 0}
           threshold={summary?.taxExemptionThreshold ?? 1_000_000_000}
           year={filterParams.year}
+          periodType={filterParams.periodType}
+          periodNumber={filterParams.periodNumber}
+          householdGroup={summary?.householdGroup}
         />
 
         {/* 3. Segmented Pill Tabs */}
@@ -387,6 +472,10 @@ export const TaxSnapshotPage: FC = () => {
             calculationMethod={filterParams.calculationMethod}
             onSelectCalculationMethod={setCalculationMethod}
             applyVatReduction={Boolean(filterParams.applyVatReduction2026)}
+          customVatRate={filterParams.customVatRate}
+          customPitRate={filterParams.customPitRate}
+          vatReductionPercentage={filterParams.vatReductionPercentage}
+            onOpenRateConfig={() => setIsRateConfigOpen(true)}
             onToggleVatReduction={setApplyVatReduction}
             isLoading={isSummaryLoading}
           />
@@ -426,6 +515,7 @@ export const TaxSnapshotPage: FC = () => {
           <TaxAnalyticsSection
             snapshots={snapshots as any}
             year={filterParams.year}
+            periodType={filterParams.periodType}
           />
         )}
       </div>
@@ -438,9 +528,40 @@ export const TaxSnapshotPage: FC = () => {
           summary={summary}
           calculationMethod={filterParams.calculationMethod}
           applyVatReduction={Boolean(filterParams.applyVatReduction2026)}
+          customVatRate={filterParams.customVatRate}
+          customPitRate={filterParams.customPitRate}
+          vatReductionPercentage={filterParams.vatReductionPercentage}
           onSubmit={handleCreateSnapshot}
         />
       )}
+
+      {/* Tax Rate Config Modal */}
+      <TaxRateConfigModal
+        isOpen={isRateConfigOpen}
+        onClose={() => setIsRateConfigOpen(false)}
+        currentRates={{
+          customVatRate: filterParams.customVatRate,
+          customPitRate: filterParams.customPitRate,
+          vatReductionPercentage: filterParams.vatReductionPercentage,
+          applyVatReduction2026: filterParams.applyVatReduction2026,
+        }}
+        onSave={(rates) => {
+          updateTaxRates(rates);
+          setToast({
+            id: 'toast-' + Date.now(),
+            type: 'success',
+            message: 'Đã lưu cấu hình tham số thuế suất và áp dụng cho bảng tính.',
+          });
+        }}
+        onResetToDefault={() => {
+          resetTaxRatesToDefault();
+          setToast({
+            id: 'toast-' + Date.now(),
+            type: 'info',
+            message: 'Đã khôi phục mức thuế suất mặc định theo luật định.',
+          });
+        }}
+      />
 
       {/* Snapshot Detail Drawer */}
       <TaxSnapshotDetailDrawer

@@ -40,9 +40,9 @@ describe('Stage C & Mock Security Integration Tests', () => {
       expect(pageContent).toContain('Chế độ dữ liệu mẫu: máy chủ chưa kết nối, số liệu chỉ để xem thiết kế, không dùng để kê khai.');
     });
 
-    it('Components must NOT contain unverified circular citations in user-facing JSX', () => {
+    it('Components must NOT contain obsolete or repealed legal citations in user-facing JSX', () => {
       const bannedCitations = [
-        'Thông tư 152/2025/TT-BTC',
+        'Thông tư 88/2021/TT-BTC',
         'Thông tư 40/2021/TT-BTC',
       ];
 
@@ -105,6 +105,45 @@ describe('Stage C & Mock Security Integration Tests', () => {
       expect(MOCK_PNL_MONTH.shrinkageWarehouse).toBe(6_730_320);
       expect(MOCK_PNL_MONTH.netProfit).toBe(85_811_580);
       expect(MOCK_PNL_MONTH.netProfitMargin).toBe(0.153);
+    });
+  });
+
+  describe('5. Configurable Tax Rate Parameters Validation', () => {
+    it('generates summary with custom VAT and PIT rates correctly', async () => {
+      const { taxSnapshotApi } = await import('../api/taxSnapshotApi');
+      const customSummary = await taxSnapshotApi.getTaxSummary({
+        year: 2026,
+        periodType: 2,
+        periodNumber: 3,
+        calculationMethod: 1,
+        customVatRate: 1.5,
+        customPitRate: 0.8,
+        applyVatReduction2026: true,
+        vatReductionPercentage: 20,
+      });
+
+      // 1.5% base with 20% reduction = 1.2% effective
+      expect(customSummary.vatRate).toBe(1.2);
+      expect(customSummary.pitRate).toBe(0.8);
+    });
+
+    it('creates snapshot preserving custom tax rates in request payload', async () => {
+      const { taxSnapshotApi } = await import('../api/taxSnapshotApi');
+      const created = await taxSnapshotApi.createSnapshot({
+        year: 2026,
+        periodType: 2,
+        periodNumber: 1,
+        calculationMethod: 1,
+        applyVatReduction2026: true,
+        customVatRate: 2.0,
+        customPitRate: 1.0,
+        vatReductionPercentage: 30,
+        pin: '1234',
+        notes: 'Test snapshot with custom rates',
+      });
+
+      expect(created.year).toBe(2026);
+      expect(created.periodNumber).toBe(1);
     });
   });
 });

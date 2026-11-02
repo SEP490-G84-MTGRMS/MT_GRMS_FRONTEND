@@ -23,6 +23,10 @@ interface TaxDeclarationFormViewProps {
   onSelectCalculationMethod: (method: TaxCalculationMethod) => void;
   applyVatReduction: boolean;
   onToggleVatReduction: (applied: boolean) => void;
+  customVatRate?: number | null;
+  customPitRate?: number | null;
+  vatReductionPercentage?: number | null;
+  onOpenRateConfig?: () => void;
   isLoading?: boolean;
 }
 
@@ -32,6 +36,10 @@ export const TaxDeclarationFormView: React.FC<TaxDeclarationFormViewProps> = ({
   onSelectCalculationMethod,
   applyVatReduction,
   onToggleVatReduction,
+  customVatRate,
+  customPitRate,
+  vatReductionPercentage,
+  onOpenRateConfig,
   isLoading,
 }) => {
   const [showAccountantDetails, setShowAccountantDetails] = useState<boolean>(false);
@@ -46,6 +54,20 @@ export const TaxDeclarationFormView: React.FC<TaxDeclarationFormViewProps> = ({
 
   const isDeclaration = calculationMethod === TaxCalculationMethod.DeclarationBased;
   const isExempt = summary.isTaxExempt;
+
+  const reductionPct: number =
+    (summary.vatReductionPercentage != null && summary.vatReductionPercentage > 0)
+      ? summary.vatReductionPercentage
+      : (vatReductionPercentage ?? 20);
+  const baseVatRate: number =
+    (summary.originalVatRate != null && summary.originalVatRate > 0)
+      ? summary.originalVatRate
+      : (customVatRate ?? 1.0);
+  const effectiveVatRate: number = applyVatReduction
+    ? (summary.vatRate > 0
+        ? summary.vatRate
+        : Math.round(baseVatRate * (1 - reductionPct / 100) * 10000) / 10000)
+    : baseVatRate;
 
   const periodLabel =
     summary.periodType === 1
@@ -192,9 +214,31 @@ export const TaxDeclarationFormView: React.FC<TaxDeclarationFormViewProps> = ({
             </button>
           </div>
 
+          {summary.declarationMethodStartYear && (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                marginTop: 10,
+                padding: '8px 12px',
+                borderRadius: 8,
+                background: '#EFF6FF',
+                border: '1px solid #BFDBFE',
+                color: '#1E40AF',
+                fontSize: '0.8rem',
+              }}
+            >
+              <AlertCircle size={14} />
+              <span>
+                <strong>Bắt buộc chuyển sang kê khai từ năm {summary.declarationMethodStartYear}:</strong> Áp dụng ổn định 2 năm liên tiếp theo Điểm d Khoản 5 Điều 4 Nghị định 68/2026/NĐ-CP do doanh thu lũy kế đã vượt 3 tỷ đồng.
+              </span>
+            </div>
+          )}
+
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 10, fontSize: '0.76rem', color: '#64748B' }}>
             <Clock size={12} />
-            <span>Đang xem thử, chưa lưu. Phương pháp được ghi chính thức khi chốt kỳ.</span>
+            <span>⚠️ Số liệu ước tính, tham khảo. Phương pháp được ghi chính thức khi chốt kỳ.</span>
           </div>
         </div>
 
@@ -378,12 +422,35 @@ export const TaxDeclarationFormView: React.FC<TaxDeclarationFormViewProps> = ({
               {/* VAT Reduction Toggle */}
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
                 <div>
-                  <strong style={{ fontSize: '0.85rem', color: '#0F172A' }}>Chính sách giảm 20% mức thuế suất GTGT (Nghị quyết 204/2025/QH15)</strong>
+                  <strong style={{ fontSize: '0.85rem', color: '#0F172A' }}>
+                    Chính sách giảm {reductionPct}% mức thuế suất GTGT (Nghị quyết 204/2025/QH15)
+                  </strong>
                   <p style={{ fontSize: '0.78rem', color: '#64748B', margin: '2px 0 0 0' }}>
-                    Áp dụng giảm 20% mức tỷ lệ tính thuế GTGT (1% → 0.8%) cho nhóm hàng hóa thuộc diện hỗ trợ. Kế toán cần thẩm định danh mục mặt hàng trước khi nộp tờ khai.
+                    Áp dụng giảm {reductionPct}% mức tỷ lệ tính thuế GTGT ({baseVatRate}% → {effectiveVatRate}%) cho nhóm hàng hóa thuộc diện hỗ trợ. Kế toán cần thẩm định danh mục mặt hàng trước khi nộp tờ khai.{customPitRate != null ? ` (Thuế TNCN cấu hình: ${customPitRate}%)` : ''}
                   </p>
                 </div>
-                <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  {onOpenRateConfig && (
+                    <button
+                      type="button"
+                      onClick={onOpenRateConfig}
+                      style={{
+                        padding: '4px 10px',
+                        borderRadius: 6,
+                        border: '1px solid #CBD5E1',
+                        background: '#ffffff',
+                        color: '#0F766E',
+                        fontSize: '0.75rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        whiteSpace: 'nowrap',
+                      }}
+                      title="Cấu hình mức giảm % và thuế suất chi tiết"
+                    >
+                      ⚙️ Đổi mức giảm
+                    </button>
+                  )}
+                  <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
                   <input
                     type="checkbox"
                     checked={applyVatReduction}
@@ -391,17 +458,20 @@ export const TaxDeclarationFormView: React.FC<TaxDeclarationFormViewProps> = ({
                     style={{ width: 18, height: 18, accentColor: '#0F766E', cursor: 'pointer' }}
                   />
                   <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#334155' }}>
-                    {applyVatReduction ? 'Đang bật (Giảm 20%)' : 'Đang tắt'}
+                    {applyVatReduction ? `Đang bật (Giảm ${reductionPct}%)` : 'Đang tắt'}
                   </span>
                 </label>
+              </div>
               </div>
 
               {/* Retroactive VAT Analysis for Accountants */}
               <div style={{ borderTop: '1px solid #E2E8F0', paddingTop: 12, marginBottom: 12 }}>
                 <strong style={{ fontSize: '0.82rem', color: '#0F172A' }}>Đối soát nghĩa vụ thuế lũy kế cả năm:</strong>
                 <div style={{ marginTop: 6, fontSize: '0.78rem', color: '#475569', lineHeight: 1.6 }}>
-                  <div>• <strong>Kịch bản chuẩn (Thực tế áp dụng):</strong> Quý 3 phát sinh <strong>{formatMoney(summary.totalTaxAmount)}</strong>. Hai quý đầu (Q1+Q2 doanh thu 950tr ≤ 1 tỷ) được miễn thuế 0đ. Tổng thuế phát sinh lũy kế hết Quý 3 là <strong>{formatMoney(summary.totalTaxAmount)}</strong>.</div>
-                  <div>• <strong>Kịch bản dự phòng (Truy thu hồi tố GTGT):</strong> Nếu cơ quan thuế yêu cầu nộp bù 1% GTGT của 950tr hai quý đầu (9.500.000đ), tổng thuế cả năm sẽ là <strong>16.262.500đ</strong>. Đang chờ ý kiến thẩm định từ Kế toán trưởng.</div>
+                  <div>• <strong>Kịch bản chuẩn (Thực tế áp dụng):</strong> Kỳ {periodLabel} phát sinh <strong>{formatMoney(summary.totalTaxAmount)}</strong>. Doanh thu lũy kế cả năm: <strong>{formatMoney(summary.annualAccumulatedRevenue)}</strong>. Tổng thuế phát sinh lũy kế đến hết kỳ là <strong>{formatMoney(summary.totalTaxAmount)}</strong>.</div>
+                  {summary.annualAccumulatedRevenue > summary.taxExemptionThreshold && summary.isThresholdCrossedMidYear && (
+                    <div>• <strong>Kịch bản dự phòng (Truy thu hồi tố GTGT kỳ trước):</strong> Trường hợp cơ quan thuế yêu cầu truy thu GTGT trên toàn bộ doanh thu từ đầu năm, số thuế GTGT dự phòng ước tính là <strong>{formatMoney(summary.retrospectiveVatAmount || (summary.annualAccumulatedRevenue * 0.01))}</strong>.</div>
+                  )}
                 </div>
               </div>
 

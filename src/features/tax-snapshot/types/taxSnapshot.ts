@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Tax Period Object & Type compatible with erasableSyntaxOnly
  */
 export const TaxPeriodType = {
@@ -78,13 +78,16 @@ export interface HouseholdTaxFilterDto {
   periodNumber: number;
   branchId?: string;
   calculationMethod: TaxCalculationMethod;
+  appliedPitMethod?: TaxCalculationMethod | null;
   tier2Method?: 'REVENUE_EXCESS' | 'PROFIT_15';
   applyVatReduction2026?: boolean;
+  vatReductionPercentage?: number | null;
   reducedVatRevenueInPeriod?: number;
   standardVatRevenueInPeriod?: number;
-  customVatRate?: number;
-  customPitRate?: number;
+  customVatRate?: number | null;
+  customPitRate?: number | null;
   priorDeclaredPitTaxOverride?: number;
+  vatOption?: 'PRUDENT_YTD' | 'QUARTER_ONLY';
 }
 
 /**
@@ -120,8 +123,27 @@ export interface HouseholdTaxSummaryDto {
   taxExemptionThreshold: number; // 1.000.000.000 VND
 
   // Cảnh báo vượt ngưỡng miễn thuế 1 tỷ VNĐ giữa năm
+  // Cảnh báo Gross vs Net & Ước tính nếu áp dụng Gross
+  annualAccumulatedGrossRevenue?: number;
+  isGrossOver1BNetUnder1B?: boolean;
+  isGrossOver3BNetUnder3B?: boolean;
+  netVsGrossThresholdWarning?: string;
+  grossBasedEstimatedTaxAmount?: number | null;
+
+  // Tùy chọn VAT khi vượt 1 tỷ giữa năm
+  quarterlyVatAmount?: number;
+  retrospectiveVatAmount?: number;
+  vatCalculationOption?: string;
+  periodNetRevenue?: number;
+
   isThresholdCrossedMidYear?: boolean;
   thresholdExceededNote?: string;
+
+  // Cảnh báo tiến trình ngưỡng 3 tỷ VNĐ (Điểm d Khoản 5 Điều 4 Nghị định 68/2026/NĐ-CP)
+  isApproaching3BThreshold?: boolean;
+  isExceeding3BThreshold?: boolean;
+  is3BCrossedMidYear?: boolean;
+  declarationMethodStartYear?: number | null;
 
   // Cảnh báo ngưỡng Nhóm 4 (toàn chuỗi Tenant)
   isApproachingGroup4Threshold?: boolean;
@@ -135,9 +157,13 @@ export interface HouseholdTaxSummaryDto {
 
   // VAT & Effective Rate
   vatRate: number; // Effective VAT rate
+  originalVatRate?: number | null;
+  vatReductionPercentage?: number | null;
   isVatReduced: boolean;
   vatTaxableRevenue: number;
   vatAmount: number;
+  customVatRate?: number | null;
+  customPitRate?: number | null;
   vatBreakdown?: VatBreakdown;
 
   // PIT
@@ -197,6 +223,9 @@ export interface CreateTaxSnapshotRequest {
   calculationMethod: TaxCalculationMethod;
   tier2Method?: 'REVENUE_EXCESS' | 'PROFIT_15';
   applyVatReduction2026: boolean;
+  vatReductionPercentage?: number | null;
+  customVatRate?: number | null;
+  customPitRate?: number | null;
   confirmEstimatedCogsResponsible?: boolean;
   estimatedCogsConfirmationStatement?: string;
   pin: string;
@@ -220,7 +249,11 @@ export interface HouseholdTaxSnapshotDto {
   isTaxExempt: boolean;
   taxableRevenueInPeriod: number;
   vatRate: number;
+  originalVatRate?: number | null;
+  vatReductionPercentage?: number | null;
   vatAmount: number;
+  customVatRate?: number | null;
+  customPitRate?: number | null;
   vatBreakdown?: VatBreakdown;
   pitRate: number;
   pitAmount: number;
@@ -259,4 +292,22 @@ export interface TaxSnapshotFilterParams {
   status?: TaxSnapshotStatus | 'ALL' | 'all';
   keyword?: string;
   search?: string;
+}
+
+/**
+ * Format standard Vietnamese label for tax period (Month, Quarter, Year)
+ */
+
+/**
+ * Format standard Vietnamese label for tax period (Month, Quarter, Year)
+ */
+export function formatTaxPeriodLabel(periodType?: number, periodNumber?: number, year?: number): string {
+  const yStr = year ? `/${year}` : '';
+  if (periodType === TaxPeriodType.Month || periodType === 1) {
+    return `Tháng ${periodNumber || 1}${yStr}`;
+  }
+  if (periodType === TaxPeriodType.Year || periodType === 3) {
+    return `Cả năm ${year || ''}`.trim();
+  }
+  return `Quý ${periodNumber || 1}${yStr}`;
 }

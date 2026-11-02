@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { FC } from 'react';
 import { Eye, FileCheck, CheckCircle2, Trash2, FileSpreadsheet } from 'lucide-react';
-import type { TaxSnapshot } from '../types/taxSnapshot';
+import { formatTaxPeriodLabel, type TaxSnapshot } from '../types/taxSnapshot';
 import { TaxSnapshotStatusBadge } from './TaxSnapshotStatusBadge';
 import { TablePagination } from '../../../components/common/TablePagination';
 
@@ -62,7 +62,7 @@ export const TaxSnapshotTable: FC<Props> = ({
           <thead>
             <tr>
               <th>Kỳ tính thuế</th>
-              <th style={{ textAlign: 'right' }}>Doanh thu quý</th>
+              <th style={{ textAlign: 'right' }}>Doanh thu phát sinh</th>
               <th style={{ textAlign: 'right' }}>VAT (1%)</th>
               <th style={{ textAlign: 'right' }}>PIT (0.5%)</th>
               <th style={{ textAlign: 'right' }}>Tổng thuế phải nộp</th>
@@ -76,7 +76,7 @@ export const TaxSnapshotTable: FC<Props> = ({
             {paginatedSnapshots.map((s) => (
               <tr key={s.id}>
                 <td style={{ fontWeight: 700, color: '#111827' }}>
-                  Quý {s.quarter ?? s.periodNumber}/{s.year}
+                  {formatTaxPeriodLabel(s.periodType, s.periodNumber ?? s.quarter, s.year)}
                 </td>
                 <td style={{ textAlign: 'right', fontWeight: 600 }}>
                   {formatVND(s.taxableRevenue ?? s.taxableRevenueInPeriod ?? 0)}
@@ -97,7 +97,7 @@ export const TaxSnapshotTable: FC<Props> = ({
                   <TaxSnapshotStatusBadge status={s.status || 'draft'} />
                 </td>
                 <td style={{ fontSize: '0.78rem', color: '#64748B' }}>
-                  {new Date(s.generatedAt || s.finalizedAtUtc || Date.now()).toLocaleDateString('vi-VN')}
+                  {s.generatedAt || s.finalizedAtUtc ? new Date(s.generatedAt || s.finalizedAtUtc!).toLocaleDateString('vi-VN') : '—'}
                 </td>
                 <td style={{ textAlign: 'right' }}>
                   <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>

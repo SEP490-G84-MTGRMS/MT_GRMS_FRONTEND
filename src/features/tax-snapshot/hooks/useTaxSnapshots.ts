@@ -8,16 +8,54 @@ import {
   type CreateTaxSnapshotRequest,
 } from '../types/taxSnapshot';
 
+const STORAGE_KEY = 'mt_grms_tax_rate_config';
+
+interface StoredTaxRates {
+  customVatRate?: number | null;
+  customPitRate?: number | null;
+  vatReductionPercentage?: number | null;
+  applyVatReduction2026?: boolean;
+}
+
+const loadStoredTaxRates = (): StoredTaxRates => {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+};
+
+const saveStoredTaxRates = (rates: StoredTaxRates) => {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(rates));
+  } catch {
+    // Ignore storage quota errors
+  }
+};
+
+const clearStoredTaxRates = () => {
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    // Ignore errors
+  }
+};
+
 export function useTaxSnapshots(initialYear: number = 2026) {
   const queryClient = useQueryClient();
+  const storedRates = loadStoredTaxRates();
 
   const [filterParams, setFilterParams] = useState<HouseholdTaxFilterDto>({
     year: initialYear,
     periodType: TaxPeriodType.Quarter,
-    periodNumber: 3,
+    periodNumber: 1,
     branchId: undefined,
     calculationMethod: TaxCalculationMethod.RevenuePercentage,
-    applyVatReduction2026: false,
+    applyVatReduction2026: storedRates.applyVatReduction2026 ?? false,
+    customVatRate: storedRates.customVatRate,
+    customPitRate: storedRates.customPitRate,
+    vatReductionPercentage: storedRates.vatReductionPercentage,
   });
 
   // Query Live Summary from Server
@@ -54,7 +92,82 @@ export function useTaxSnapshots(initialYear: number = 2026) {
   }, []);
 
   const setApplyVatReduction = useCallback((apply: boolean) => {
-    setFilterParams((prev) => ({ ...prev, applyVatReduction2026: apply }));
+    setFilterParams((prev) => {
+      const next = { ...prev, applyVatReduction2026: apply };
+      saveStoredTaxRates({
+        customVatRate: next.customVatRate,
+        customPitRate: next.customPitRate,
+        vatReductionPercentage: next.vatReductionPercentage,
+        applyVatReduction2026: apply,
+      });
+      return next;
+    });
+  }, []);
+
+  const setCustomVatRate = useCallback((rate?: number) => {
+    setFilterParams((prev) => {
+      const next = { ...prev, customVatRate: rate };
+      saveStoredTaxRates({
+        customVatRate: rate,
+        customPitRate: next.customPitRate,
+        vatReductionPercentage: next.vatReductionPercentage,
+        applyVatReduction2026: next.applyVatReduction2026,
+      });
+      return next;
+    });
+  }, []);
+
+  const setCustomPitRate = useCallback((rate?: number) => {
+    setFilterParams((prev) => {
+      const next = { ...prev, customPitRate: rate };
+      saveStoredTaxRates({
+        customVatRate: next.customVatRate,
+        customPitRate: rate,
+        vatReductionPercentage: next.vatReductionPercentage,
+        applyVatReduction2026: next.applyVatReduction2026,
+      });
+      return next;
+    });
+  }, []);
+
+  const setVatReductionPercentage = useCallback((pct?: number) => {
+    setFilterParams((prev) => {
+      const next = { ...prev, vatReductionPercentage: pct };
+      saveStoredTaxRates({
+        customVatRate: next.customVatRate,
+        customPitRate: next.customPitRate,
+        vatReductionPercentage: pct,
+        applyVatReduction2026: next.applyVatReduction2026,
+      });
+      return next;
+    });
+  }, []);
+
+  const updateTaxRates = useCallback(
+    (rates: {
+      customVatRate?: number | null;
+      customPitRate?: number | null;
+      vatReductionPercentage?: number | null;
+      applyVatReduction2026?: boolean;
+    }) => {
+      saveStoredTaxRates(rates);
+      setFilterParams((prev) => ({
+        ...prev,
+        ...rates,
+      }));
+    },
+    []
+  );
+
+  const resetTaxRatesToDefault = useCallback(() => {
+    clearStoredTaxRates();
+    setFilterParams((prev) => ({
+      ...prev,
+      customVatRate: undefined,
+      customPitRate: undefined,
+      vatReductionPercentage: undefined,
+      applyVatReduction2026: false,
+    }));
   }, []);
 
   return {
@@ -73,6 +186,11 @@ export function useTaxSnapshots(initialYear: number = 2026) {
     setPeriod,
     setYear,
     setApplyVatReduction,
+    setCustomVatRate,
+    setCustomPitRate,
+    setVatReductionPercentage,
+    updateTaxRates,
+    resetTaxRatesToDefault,
 
     createSnapshot: createMutation.mutateAsync,
     isCreating: createMutation.isPending,
