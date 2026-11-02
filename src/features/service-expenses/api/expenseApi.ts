@@ -303,33 +303,29 @@ export const createServiceExpense = async (
   data: CreateExpenseRequest
 ): Promise<ServiceExpenseDto> => {
   if (import.meta.env.MODE !== 'test') {
-    try {
-      const idempotencyKey = generateUUID();
-      const payload = {
-        branchId: isGuid(data.branchId) ? data.branchId : null,
-        beneficiaryName: data.vendorName,
-        category: EXPENSE_CATEGORY_LABELS[data.category] || data.category,
-        amount: data.amount,
-        paymentSourceType: 0, // Till
-        paymentSourceAccountId: null,
-        isTaxDeductible: true,
-        invoiceNumber: null,
-        sellerTaxCode: null,
-        evidenceAttachmentUrl: data.attachedBillUrl || null,
-        note: data.note || null,
-      };
+    const idempotencyKey = generateUUID();
+    const payload = {
+      branchId: isGuid(data.branchId) ? data.branchId : null,
+      beneficiaryName: data.vendorName,
+      category: EXPENSE_CATEGORY_LABELS[data.category] || data.category,
+      amount: data.amount,
+      paymentSourceType: 0, // Till
+      paymentSourceAccountId: null,
+      isTaxDeductible: true,
+      invoiceNumber: null,
+      sellerTaxCode: null,
+      evidenceAttachmentUrl: data.attachedBillUrl || null,
+      note: data.note || null,
+    };
 
-      const res = await financeHttpClient.post<ApiResponse<any>>('/expenses', payload, {
-        headers: {
-          'Idempotency-Key': idempotencyKey,
-        },
-      });
+    const res = await financeHttpClient.post<ApiResponse<any>>('/expenses', payload, {
+      headers: {
+        'Idempotency-Key': idempotencyKey,
+      },
+    });
 
-      if (res.data?.data) {
-        return mapVoucherToExpenseDto(res.data.data);
-      }
-    } catch (error) {
-      console.warn('POST /expenses API unavailable, creating in mock storage:', error);
+    if (res.data?.data) {
+      return mapVoucherToExpenseDto(res.data.data);
     }
   }
 
@@ -367,37 +363,50 @@ export const payServiceExpense = async (
   data: PayExpenseRequest
 ): Promise<ServiceExpenseDto> => {
   if (import.meta.env.MODE !== 'test' && isGuid(expenseId)) {
-    try {
-      const idempotencyKey = generateUUID();
-      // Tự động approve nếu đang chờ duyệt
-      await financeHttpClient
-        .post(`/expenses/${expenseId}/approve`, {
-          expenseId,
-          note: 'Duyệt tự động trước khi xuất quỹ chi tiền',
-        })
-        .catch(() => null);
+    const idempotencyKey = generateUUID();
 
-      // Disburse xuất quỹ chi tiền
-      const res = await financeHttpClient.post<ApiResponse<any>>(
-        `/expenses/${expenseId}/disburse`,
-        {
-          expenseId,
-          paymentSourceType: data.paymentMethod === 'Cash' ? 0 : 2,
-          paymentSourceAccountId: data.paidFromAccountId || '00000000-0000-0000-0000-000000000000',
-          note: data.note || 'Xuất quỹ chi tiền qua hệ thống',
-        },
-        {
-          headers: {
-            'Idempotency-Key': idempotencyKey,
-          },
+    // Tự động approve nếu đang chờ duyệt
+    await financeHttpClient
+      .post(`/expenses/${expenseId}/approve`, {
+        expenseId,
+        note: 'Duyệt tự động trước khi xuất quỹ chi tiền',
+      })
+      .catch(() => null);
+
+    // Xác định PaymentSourceType dựa trên tài khoản được chọn
+    let paymentSourceType = data.paymentMethod === 'Cash' ? 0 : 2;
+    if (data.paidFromAccountId) {
+      const accounts = await cashbookService.getCashAccounts();
+      const matched = accounts.find((a) => a.id === data.paidFromAccountId);
+      if (matched) {
+        if (matched.isSafeDeposit) {
+          paymentSourceType = 1; // Safe
+        } else if (matched.accountType === 'BANK') {
+          paymentSourceType = 2; // Bank
+        } else {
+          paymentSourceType = 0; // Till
         }
-      );
-
-      if (res.data?.data) {
-        return mapVoucherToExpenseDto(res.data.data);
       }
-    } catch (error) {
-      console.warn('PAY /expenses API unavailable, updating in mock storage:', error);
+    }
+
+    // Disburse xuất quỹ chi tiền
+    const res = await financeHttpClient.post<ApiResponse<any>>(
+      `/expenses/${expenseId}/disburse`,
+      {
+        expenseId,
+        paymentSourceType,
+        paymentSourceAccountId: data.paidFromAccountId,
+        note: data.note || 'Xuất quỹ chi tiền qua hệ thống',
+      },
+      {
+        headers: {
+          'Idempotency-Key': idempotencyKey,
+        },
+      }
+    );
+
+    if (res.data?.data) {
+      return mapVoucherToExpenseDto(res.data.data);
     }
   }
 
@@ -460,6 +469,14 @@ export const cancelServiceExpense = async (
   expenseId: string,
   reason: string
 ): Promise<boolean> => {
+  if (import.meta.env.MODE !== 'test' && isGuid(expenseId)) {
+    const res = await financeHttpClient.post<ApiResponse<any>>(`/expenses/${expenseId}/cancel`, {
+      expenseId,
+      reason,
+    });
+    return !!res.data?.success;
+  }
+
   const itemIndex = mockExpenses.findIndex((e) => e.expenseId === expenseId);
   if (itemIndex === -1) throw new Error('Khoản chi phí không tồn tại');
 
@@ -469,4 +486,24 @@ export const cancelServiceExpense = async (
     note: `${mockExpenses[itemIndex].note || ''} (Lý do hủy: ${reason})`,
   };
   return true;
+};
+
+/**
+ * Reject a pending service expense approval
+ * @param expenseId Target ID
+ * @param reason Rejection note
+ * @returns Promise with boolean confirmation
+ */
+export const rejectServiceExpense = async (
+  expenseId: string,
+  reason: string
+): Promise<boolean> => {
+  if (import.meta.env.MODE !== 'test' && isGuid(expenseId)) {
+    const res = await financeHttpClient.post<ApiResponse<any>>(`/expenses/${expenseId}/reject`, {
+      expenseId,
+      reason,
+    });
+    return !!res.data?.success;
+  }
+  return cancelServiceExpense(expenseId, reason);
 };
