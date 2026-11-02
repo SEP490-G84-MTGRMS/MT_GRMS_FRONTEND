@@ -131,6 +131,7 @@ export interface ProductCreatePayload {
   internalNote?: string | null;
   hasBatches?: boolean;
   isFavorite?: boolean;
+  eligibleForVatReduction?: boolean;
 }
 
 export interface ProductUpdatePayload {
@@ -150,6 +151,7 @@ export interface ProductUpdatePayload {
   internalNote?: string | null;
   hasBatches?: boolean;
   isFavorite?: boolean;
+  eligibleForVatReduction?: boolean;
 }
 
 export interface ComboComponent {
@@ -203,7 +205,8 @@ export interface ProductItem {
   imageUrls?: string[];
   minStock?: number;
   maxStock?: number;
-  vatRate?: number;
+  vatRate?: number; // 0, 5, 8, 10
+  eligibleForVatReduction?: boolean; // Cờ giảm 20% thuế GTGT theo NQ 204/2025/QH15
   description?: string;
   internalNote?: string;
   hasTransactions?: boolean;

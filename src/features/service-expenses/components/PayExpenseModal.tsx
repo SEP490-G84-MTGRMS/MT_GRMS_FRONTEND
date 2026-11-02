@@ -228,7 +228,7 @@ export const PayExpenseModal: FC<PayExpenseModalProps> = ({
                     ))}
                 </select>
                 <span style={{ fontSize: '0.72rem', color: '#64748B', marginTop: 4, display: 'block' }}>
-                  ✓ Số dư tài khoản này sẽ tự động giảm và đồng bộ vào Sổ quỹ (FE-17)
+                  ✓ Số dư tài khoản này sẽ tự động giảm và đồng bộ vào Sổ quỹ
                 </span>
               </div>
             )}

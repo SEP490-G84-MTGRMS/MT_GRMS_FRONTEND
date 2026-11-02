@@ -1,0 +1,254 @@
+/**
+ * MT-GRMS Design Tokens for Finance Subsystem
+ * Based on Section 2 of MT-GRMS_Finance_Redesign_Spec_for_AI.md
+ */
+
+@import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap');
+
+:root {
+  /* Màu thương hiệu */
+  --brand-700: #115E59;      /* nút chính, tab active, viền chọn, thanh trên */
+  --brand-300: #5EEAD4;      /* focus ring, đoạn phụ biểu đồ */
+  --brand-100: #99F6E4;      /* viền nền nhấn */
+  --brand-50:  #F0FDFA;      /* nền ô được chọn, khối nhấn */
+
+  /* Ngữ nghĩa (mỗi màu CHỈ một nghĩa) */
+  --positive-700: #15803D;   /* tiền vào, tốt. Dùng làm chữ/icon/pill/nút Thu nợ */
+  --positive-100: #DCFCE7;
+  --warning-700:  #B45309;   /* sắp đến hạn, đang chuyển, vượt ngưỡng thuế */
+  --warning-900:  #92400E;
+  --warning-100:  #FEF3C7;
+  --warning-50:   #FFFBEB;
+  --warning-300:  #FCD34D;
+  --danger-700:   #B91C1C;   /* quá hạn, vượt hạn mức, thiếu tiền, lỗi, hư hao */
+  --danger-600:   #DC2626;
+  --danger-100:   #FEE2E2;
+  --info-100:     #DBEAFE;
+  --info-700:     #1D4ED8;
+
+  /* Trung tính */
+  --text-primary:   #1F2937;
+  --text-secondary: #4B5563;
+  --text-muted:     #6B7280;
+  --border:         #E5E7EB;
+  --surface:        #FFFFFF;
+  --page-bg:        #F7F8F7;
+  --surface-alt:    #F3F4F6;
+
+  /* Khoảng cách (đơn vị 8px) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+
+  /* Bo góc, bóng */
+  --radius-card: 16px;
+  --radius-btn: 12px;
+  --radius-input: 12px;
+  --radius-pill: 999px;
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-elevated: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+
+  --font-family-finance: 'Be Vietnam Pro', system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+/* Typography Utility Classes */
+.font-finance {
+  font-family: var(--font-family-finance);
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+  -moz-font-feature-settings: 'tnum';
+  -webkit-font-feature-settings: 'tnum';
+  font-feature-settings: 'tnum';
+}
+
+/* Ensure money amounts always use tabular-nums and no uppercase */
+.money-amount {
+  font-variant-numeric: tabular-nums;
+  text-transform: none !important;
+  font-family: var(--font-family-finance);
+}
+
+/* Prevent uppercase on Vietnamese labels */
+.no-uppercase {
+  text-transform: none !important;
+}
+
+/* Touch targets must be at least 48x48px */
+.touch-target {
+  min-height: 48px;
+  min-width: 48px;
+}
+
+/* Primary Teal Action Button */
+.btn-primary-teal {
+  background-color: var(--brand-700);
+  color: #FFFFFF;
+  border-radius: var(--radius-btn);
+  padding: 12px 24px;
+  font-weight: 600;
+  font-size: 16px;
+  min-height: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.15s ease-in-out;
+}
+
+.btn-primary-teal:hover {
+  background-color: #0d4c48;
+}
+
+.btn-primary-teal:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Debt Collection Green Button (D5 Exception) */
+.btn-collect-debt {
+  background-color: var(--positive-700);
+  color: #FFFFFF;
+  border-radius: var(--radius-btn);
+  padding: 12px 24px;
+  font-weight: 600;
+  font-size: 16px;
+  min-height: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.15s ease-in-out;
+}
+
+.btn-collect-debt:hover {
+  background-color: #116631;
+}
+
+/* Secondary & Text Buttons */
+.btn-secondary-outline {
+  background-color: transparent;
+  color: var(--brand-700);
+  border: 1px solid var(--brand-700);
+  border-radius: var(--radius-btn);
+  padding: 10px 20px;
+  font-weight: 600;
+  font-size: 14px;
+  min-height: 48px;
+  cursor: pointer;
+}
+
+.btn-secondary-outline:hover {
+  background-color: var(--brand-50);
+}
+
+.btn-text-cancel {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-weight: 500;
+  font-size: 16px;
+  padding: 12px 16px;
+  min-height: 48px;
+  cursor: pointer;
+}
+
+.btn-text-cancel:hover {
+  color: var(--text-primary);
+  text-decoration: underline;
+}
+
+/* Sub Navigation Styles (Vanilla CSS with Full Responsiveness) */
+.finance-subnav-container {
+  display: flex;
+  align-items: center;
+  background-color: #FFFFFF;
+  border-bottom: 1px solid #E2E8F0;
+  height: 48px;
+  padding: 0 16px;
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.finance-subnav-inner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 1280px;
+  width: 100%;
+  height: 100%;
+  margin: 0 auto;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.finance-subnav-inner::-webkit-scrollbar {
+  display: none;
+}
+
+.finance-subnav-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 16px;
+  height: 100%;
+  text-decoration: none;
+  font-size: 14.5px;
+  font-weight: 600;
+  color: #64748B;
+  border-bottom: 3px solid transparent;
+  white-space: nowrap;
+  transition: all 0.15s ease-in-out;
+  cursor: pointer;
+}
+
+.finance-subnav-item:hover {
+  color: #0F172A;
+  background-color: #F8FAFC;
+}
+
+.finance-subnav-item.active {
+  color: var(--brand-700, #115E59);
+  border-bottom-color: var(--brand-700, #115E59);
+  font-weight: 700;
+  background-color: var(--brand-50, #F0FDFA);
+}
+
+.finance-subnav-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  font-size: 11px;
+  font-weight: 800;
+  border-radius: 9999px;
+  background-color: #DC2626;
+  color: #FFFFFF;
+  line-height: 1;
+}
+
+/* Responsive Helpers */
+@media (max-width: 768px) {
+  .finance-subnav-container {
+    padding: 0 8px;
+    height: 44px;
+  }
+  .finance-subnav-item {
+    padding: 0 12px;
+    font-size: 13.5px;
+  }
+}

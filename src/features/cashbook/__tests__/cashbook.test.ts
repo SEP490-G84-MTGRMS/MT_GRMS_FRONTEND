@@ -29,7 +29,7 @@ describe('FE-17 Cashbook & Cash Flow Service Tests', () => {
     const newTx = await cashbookService.createReceipt({
       accountId: targetAccount.id,
       amount: receiptAmount,
-      category: 'Thu nợ khách hàng (FE-08)',
+      category: 'Thu nợ khách hàng',
       counterpartyType: 'CUSTOMER',
       counterpartyName: 'Khách hàng VIP test',
       description: 'Khách thanh toán đợt 1',
@@ -66,7 +66,7 @@ describe('FE-17 Cashbook & Cash Flow Service Tests', () => {
     const newTx = await cashbookService.createPayment({
       accountId: cashAccount.id,
       amount: paymentAmount,
-      category: 'Chi phí vận hành (FE-07)',
+      category: 'Chi phí vận hành',
       counterpartyType: 'SUPPLIER',
       counterpartyName: 'EVN Điện Lực',
       description: 'Thanh toán tiền điện',

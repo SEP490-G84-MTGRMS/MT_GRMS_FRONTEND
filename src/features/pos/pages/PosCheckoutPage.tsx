@@ -457,86 +457,84 @@ export const PosCheckoutPage: FC = () => {
     };
   };
 
-  const executeCompleteCheckout = async (debtNote?: string) => {
+  const executeCompleteCheckout = async (debtNote?: string, managerBypass = false) => {
     let createdOrderId: string | undefined;
     let createdOrderCode: string | undefined;
 
     try {
-      // 1. Chuẩn bị payload gửi lên backend API
-      const branchId = '01a185f3-d197-72c1-b6e7-cdb5d5363467'; // Chi nhánh Cầu Giấy UUIDv7
-      const orderPayload = {
+      const isDebt = currentTab.paymentMethod === 'debt';
+      const isBank = currentTab.paymentMethod === 'vietqr';
+      const paymentMethod = isDebt ? 'CREDIT' : isBank ? 'BANK' : 'CASH';
+
+      const branchId = '01a185f3-d197-72c1-b6e7-cdb5d5363467';
+      const items = currentTab.cart.map((c) => ({
+        productId: c.product.id || 'aaaaaaaa-1111-1111-1111-111111111111',
+        productName: c.product.name,
+        unitPrice: c.actualPrice,
+        quantity: c.quantity,
+        discountAmount: Math.max(0, (c.unitPrice - c.actualPrice) * c.quantity),
+      }));
+
+      const backendOrder = await posOrderApi.createOrder({
         branchId,
         customerId: currentTab.customer?.id || null,
-        paymentMethod:
-          currentTab.paymentMethod === 'vietqr'
-            ? 'VIETQR'
-            : currentTab.paymentMethod === 'debt'
-            ? 'DEBT'
-            : 'CASH',
+        paymentMethod,
         cashTendered: currentTab.paymentMethod === 'cash' ? currentTab.cashTendered : undefined,
         discountAmount: orderDiscountAmount + couponDiscountAmount + pointsDeduction,
+        items,
+        managerBypassCode: managerBypass ? 'MGR-BYPASS-2026' : undefined,
         note: currentTab.note || debtNote || undefined,
         creatorRole: user?.role,
-        items: currentTab.cart.map((c) => ({
-          productId: c.product.id,
-          quantity: c.quantity,
-          unitPrice: c.unitPrice,
-          discountAmount: Math.max(0, c.unitPrice - c.actualPrice) * c.quantity,
-          productName: c.product.name,
-        })),
-      };
+      });
 
-      const backendOrder = await posOrderApi.createOrder(orderPayload);
       createdOrderId = backendOrder.id;
       createdOrderCode = backendOrder.orderCode;
+
+      if (isDebt && currentTab.customer) {
+        const addedDebt = backendOrder.finalAmount;
+        const updatedDebt = currentTab.customer.currentDebt + addedDebt;
+        const updatedCustomer = { ...currentTab.customer, currentDebt: updatedDebt };
+
+        setCustomers((prev) => prev.map((c) => (c.id === updatedCustomer.id ? updatedCustomer : c)));
+        updateCurrentTab({ customer: updatedCustomer });
+      }
+
+      const receipt = buildReceiptData(debtNote);
+      if (createdOrderId) {
+        receipt.orderId = createdOrderId;
+      }
+      if (createdOrderCode) {
+        receipt.orderCode = createdOrderCode;
+      }
+      setReceiptData(receipt);
+
+      // In trực tiếp 1-click tới máy in POS-58
+      posOrderApi.printDirect(receipt).then((res) => {
+        if (res.success) {
+          showToast(`✅ Đã thanh toán đơn ${receipt.orderCode} & in trực tiếp ra máy in POS-58!`);
+        } else {
+          showToast(`⚠️ ${res.message}`, 'error');
+        }
+      });
+
+      setIsReceiptModalOpen(true);
     } catch (apiErr: unknown) {
       console.warn('Backend createOrder error:', apiErr);
       const axiosErr = apiErr as { response?: { status?: number; data?: { message?: string } }; message?: string };
-      const errMsg = axiosErr.response?.data?.message || axiosErr.message;
-      if (errMsg && errMsg.includes('tồn kho')) {
+      const errMsg = axiosErr.response?.data?.message || axiosErr.message || String(apiErr);
+      if (
+        errMsg.includes('CREDIT_LIMIT_EXCEEDED') ||
+        errMsg.includes('DEBT_OVERDUE_BLOCKED') ||
+        errMsg.includes('hạn mức tín dụng') ||
+        errMsg.includes('quá hạn')
+      ) {
+        setIsDebtWarningOpen(true);
+      } else if (errMsg && errMsg.includes('tồn kho')) {
         alert(`Cảnh báo kho: ${errMsg}`);
-        return;
-      }
-    }
-
-    if (currentTab.paymentMethod === 'debt' && currentTab.customer) {
-      const vat = Math.round(finalAmount * 0.01);
-      const totalOrderDebt = finalAmount + vat;
-      const updatedDebt = currentTab.customer.currentDebt + totalOrderDebt;
-      const updatedDebtCount = (currentTab.customer.debtCount || 0) + 1;
-      const updatedTotalPurchased = (currentTab.customer.totalDebtPurchased || 0) + totalOrderDebt;
-
-      const updatedCustomer = {
-        ...currentTab.customer,
-        currentDebt: updatedDebt,
-        debtCount: updatedDebtCount,
-        totalDebtPurchased: updatedTotalPurchased,
-      };
-
-      setCustomers((prev) => prev.map((c) => (c.id === updatedCustomer.id ? updatedCustomer : c)));
-      updateCurrentTab({ customer: updatedCustomer });
-    }
-
-    const receipt = buildReceiptData(debtNote);
-    if (createdOrderId) {
-      receipt.orderId = createdOrderId;
-    }
-    if (createdOrderCode) {
-      receipt.orderCode = createdOrderCode;
-    }
-    setReceiptData(receipt);
-
-    // THỰC HIỆN IN TRỰC TIẾP 1-CLICK TỚI MÁY IN POS-58 (BỎ QUA 100% PREVIEW TRÌNH DUYỆT)
-    posOrderApi.printDirect(receipt).then((res) => {
-      if (res.success) {
-        showToast(`✅ Đã thanh toán đơn ${receipt.orderCode} & in trực tiếp ra máy in POS-58!`);
       } else {
-        showToast(`⚠️ ${res.message}`, 'error');
+        alert('Lỗi tạo đơn hàng: ' + errMsg);
       }
-    });
-
-    // Mở modal hóa đơn trên giao diện để thu ngân xem bill ("vẫn có xem được bill")
-    setIsReceiptModalOpen(true);
+    }
   };
 
   const handleCheckoutSubmit = () => {
@@ -726,8 +724,8 @@ export const PosCheckoutPage: FC = () => {
         orderAmount={finalAmount + Math.round(finalAmount * 0.01)}
         onClose={() => setIsDebtWarningOpen(false)}
         onApprove={(note) => {
-          setIsDebtWarningOpen(false);
-          executeCompleteCheckout(note);
+setIsDebtWarningOpen(false);
+          executeCompleteCheckout(note, true);
         }}
       />
 

@@ -1,6 +1,6 @@
 /**
  * Cashbook & Cash Flow Management Types
- * Corresponding to Capability: cashbook (FE-17)
+ * Corresponding to Capability: cashbook
  */
 
 export type CashAccountType = 'CASH' | 'BANK';
@@ -17,7 +17,9 @@ export type ReferenceDocType =
   | 'TAX_PAYMENT'
   | 'INTERNAL_TRANSFER'
   | 'MANUAL'
-  | 'AUDIT';
+  | 'AUDIT'
+  | 'CASH_TRANSIT'
+  | 'COMPENSATING';
 
 export type SourceModuleName =
   | 'POS'
@@ -43,6 +45,7 @@ export interface CashAccount {
   initialBalance: number;
   isActive: boolean;
   currency: string;
+  isSafeDeposit?: boolean; // True for store owner's safe box
 }
 
 export interface LedgerTransaction {
@@ -65,6 +68,26 @@ export interface LedgerTransaction {
   isAutomated: boolean;
   createdBy: string;
   createdAt: string; // ISO string
+
+  // Immutable Ledger Poka-yoke attributes
+  isVoided?: boolean;
+  isCompensating?: boolean;
+  originalEntryId?: string;
+  voidReason?: string;
+}
+
+export interface CashTransitItem {
+  id: string;
+  transferCode: string;
+  fromAccountId: string;
+  fromAccountName: string;
+  toAccountId: string;
+  toAccountName: string;
+  amount: number;
+  senderName: string;
+  sentAt: string;
+  status: 'PENDING' | 'RECEIVED' | 'DISCREPANCY';
+  note?: string;
 }
 
 export interface CashbookFilterParams {
@@ -101,6 +124,7 @@ export interface CreatePaymentDTO {
   referenceDocId?: string;
   sourceModuleName?: SourceModuleName;
   isAutomated?: boolean;
+  branchId?: string;
 }
 
 export interface FundTransferDTO {
@@ -119,6 +143,7 @@ export interface CashReconciliationDTO {
   differenceAmount: number;
   reason: string;
   auditedBy: string;
+  breakdown?: Record<number, number>; // Denomination counts
 }
 
 export interface CashbookSummaryKPI {
@@ -128,4 +153,5 @@ export interface CashbookSummaryKPI {
   totalClosingBalance: number;
   totalCashInDrawers: number;
   totalBankDeposits: number;
+  totalSafeDepositBalance?: number;
 }

@@ -382,7 +382,7 @@ export const CustomerDebtLedgerDrawer: FC<CustomerDebtLedgerDrawerProps> = ({
                               color: '#0F766E',
                               fontWeight: 600,
                             }}
-                            title="Mã phiếu thu Sổ quỹ liên thông tự động (FE-17)"
+                            title="Mã phiếu thu Sổ quỹ liên thông tự động"
                           >
                             <Building2 className="w-3 h-3" />
                             Sổ quỹ: {item.cashTransactionCode}

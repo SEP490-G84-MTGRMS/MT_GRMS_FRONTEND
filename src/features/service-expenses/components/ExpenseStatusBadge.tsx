@@ -6,6 +6,7 @@ import {
   CloseIcon,
 } from '../../admin/components';
 import type { ExpenseStatus } from '../types/expense.types';
+import { calculateDaysOverdue } from '../../finance/services/financeClock';
 
 interface ExpenseStatusBadgeProps {
   status: ExpenseStatus;
@@ -16,9 +17,6 @@ export const ExpenseStatusBadge: FC<ExpenseStatusBadgeProps> = ({
   status,
   dueDate,
 }) => {
-  const isOverdue =
-    status === 'Pending' && dueDate ? new Date(dueDate) < new Date('2026-10-12') : false;
-
   if (status === 'Paid') {
     return (
       <span className="expense-badge badge-paid">
@@ -37,11 +35,38 @@ export const ExpenseStatusBadge: FC<ExpenseStatusBadgeProps> = ({
     );
   }
 
-  if (isOverdue) {
+  const overdueDays = dueDate ? calculateDaysOverdue(dueDate) : 0;
+
+  if (overdueDays > 0) {
     return (
-      <span className="expense-badge badge-overdue">
-        <AlertTriangleIcon size={13} color="#b91c1c" />
-        Quá hạn trả
+      <span
+        className="expense-badge badge-overdue"
+        style={{
+          background: 'var(--danger-50, #FEF2F2)',
+          color: 'var(--danger-700, #B91C1C)',
+          borderColor: 'var(--danger-200, #FECACA)',
+          fontWeight: 700,
+        }}
+      >
+        <AlertTriangleIcon size={13} color="#B91C1C" />
+        Quá hạn {overdueDays} ngày
+      </span>
+    );
+  }
+
+  if (overdueDays === 0 && dueDate) {
+    return (
+      <span
+        className="expense-badge"
+        style={{
+          background: '#FFFBEB',
+          color: '#B45309',
+          borderColor: '#FDE68A',
+          fontWeight: 700,
+        }}
+      >
+        <ClockIcon size={13} color="#B45309" />
+        Hạn hôm nay
       </span>
     );
   }
@@ -49,7 +74,7 @@ export const ExpenseStatusBadge: FC<ExpenseStatusBadgeProps> = ({
   return (
     <span className="expense-badge badge-pending">
       <ClockIcon size={13} color="#b45309" />
-      Chờ thanh toán
+      {dueDate ? `Còn ${Math.abs(overdueDays)} ngày` : 'Chờ thanh toán'}
     </span>
   );
 };
