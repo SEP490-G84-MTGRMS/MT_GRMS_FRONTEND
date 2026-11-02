@@ -16,7 +16,9 @@ export interface OrderCreateRequest {
   items: OrderItemCreateDto[];
   cashTendered?: number | null;
   discountAmount?: number | null;
+  managerBypassCode?: string | null;
   note?: string | null;
+  creatorRole?: string | null;
 }
 
 export interface OrderItemResponse {
