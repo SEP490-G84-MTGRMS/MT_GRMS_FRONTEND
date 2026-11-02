@@ -64,6 +64,7 @@ export interface ProductItem {
   minStock?: number;
   maxStock?: number;
   vatRate?: number; // 0, 5, 8, 10
+  eligibleForVatReduction?: boolean; // Cờ giảm 20% thuế GTGT theo NQ 204/2025/QH15
   description?: string;
   internalNote?: string;
   hasTransactions?: boolean; // Khóa Base UOM nếu true (BR-PROD-01)

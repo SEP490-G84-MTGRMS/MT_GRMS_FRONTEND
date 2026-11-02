@@ -55,6 +55,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   // 5. Mô tả & Ghi chú sản phẩm
   const [description, setDescription] = useState('');
   const [internalNote, setInternalNote] = useState('');
+  const [eligibleForVatReduction, setEligibleForVatReduction] = useState<boolean>(false);
 
   // Alerts
   const [errorMsg, setErrorMsg] = useState('');
@@ -85,6 +86,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
 
         setDescription(productToEdit.description || '');
         setInternalNote(productToEdit.internalNote || '');
+        setEligibleForVatReduction(productToEdit.eligibleForVatReduction ?? false);
 
         setErrorMsg('');
         setWarningMsg('');
@@ -108,6 +110,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
 
         setDescription('');
         setInternalNote('');
+        setEligibleForVatReduction(false);
 
         setErrorMsg('');
         setWarningMsg('');
@@ -219,6 +222,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       description,
       internalNote,
       uomConversions,
+      eligibleForVatReduction,
       isCombo: false,
     };
 
@@ -234,6 +238,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       setCostPrice(0);
       setInitialStock(0);
       setUomConversions([]);
+      setEligibleForVatReduction(false);
       setErrorMsg('');
       setWarningMsg('');
     }
@@ -1029,6 +1034,32 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                   value={internalNote}
                   onChange={(e) => setInternalNote(e.target.value)}
                 />
+              </div>
+
+              {/* (13b) Chính sách thuế GTGT */}
+              <div
+                style={{
+                  marginTop: 14,
+                  padding: '12px 16px',
+                  background: '#F0FDFA',
+                  borderRadius: 8,
+                  border: '1px solid #CCFBF1',
+                }}
+              >
+                <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', margin: 0 }}>
+                  <input
+                    type="checkbox"
+                    checked={eligibleForVatReduction}
+                    onChange={(e) => setEligibleForVatReduction(e.target.checked)}
+                    style={{ width: 16, height: 16, cursor: 'pointer' }}
+                  />
+                  <span style={{ fontSize: 13, fontWeight: 700, color: '#0F766E' }}>
+                    Đủ điều kiện giảm 20% thuế GTGT (Nghị quyết 204/2025/QH15)
+                  </span>
+                </label>
+                <p style={{ margin: '4px 0 0 26px', fontSize: 12, color: '#64748B' }}>
+                  Mặc định không áp dụng (áp thuế GTGT trực tiếp 1%). Tích chọn nếu mặt hàng thuộc nhóm hàng hóa áp dụng mức giảm 20% tỷ lệ GTGT (còn 0.8%) đến hết ngày 31/12/2026.
+                </p>
               </div>
             </div>
           </div>
