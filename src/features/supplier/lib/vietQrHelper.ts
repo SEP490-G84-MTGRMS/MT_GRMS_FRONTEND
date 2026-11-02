@@ -39,17 +39,32 @@ export function resolveBankCodeOrBin(bankNameInput?: string): string {
   if (!bankNameInput) return 'VCB'; // Default fallback Vietcombank
   const input = bankNameInput.trim().toLowerCase();
 
-  const found = VIETNAM_BANKS.find(
+  // 1. Exact match
+  const exact = VIETNAM_BANKS.find(
     (b) =>
       b.code.toLowerCase() === input ||
       b.bin === input ||
       b.shortName.toLowerCase() === input ||
-      b.name.toLowerCase() === input ||
-      input.includes(b.shortName.toLowerCase()) ||
-      input.includes(b.code.toLowerCase())
+      b.name.toLowerCase() === input
   );
+  if (exact) return exact.code;
 
-  return found ? found.code : 'VCB';
+  // 2. Substring on shortName or full name
+  const byName = VIETNAM_BANKS.find(
+    (b) =>
+      input.includes(b.shortName.toLowerCase()) ||
+      b.shortName.toLowerCase().includes(input) ||
+      input.includes(b.name.toLowerCase()) ||
+      b.name.toLowerCase().includes(input)
+  );
+  if (byName) return byName.code;
+
+  // 3. Match code as isolated token/word
+  const words = input.split(/[\s\-_,.]+/);
+  const byCodeWord = VIETNAM_BANKS.find((b) => words.includes(b.code.toLowerCase()));
+  if (byCodeWord) return byCodeWord.code;
+
+  return 'VCB';
 }
 
 export interface VietQrOptions {

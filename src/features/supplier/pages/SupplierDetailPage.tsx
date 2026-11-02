@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { FC } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../../stores/useAuthStore';
@@ -7,6 +7,9 @@ import type {
   APLedgerEntry,
   SupplierDeliveryConfig,
   PurchaseOrderItem,
+  UpdateBasicSupplierInput,
+  UpdateSupplierBankInput,
+  UpdateSupplierVatInput,
 } from '../types/supplier.types';
 import { SupplierDetailHeader } from '../components/detail/SupplierDetailHeader';
 import { SupplierGeneralProfileTab } from '../components/detail/SupplierGeneralProfileTab';
@@ -14,6 +17,10 @@ import { SupplierDeliveryConfigTab } from '../components/detail/SupplierDelivery
 import { SupplierHolidaysTab } from '../components/detail/SupplierHolidaysTab';
 import { SupplierPayablesTab } from '../components/detail/SupplierPayablesTab';
 import { SupplierHistoryTab } from '../components/detail/SupplierHistoryTab';
+import { EditSupplierModal } from '../components/EditSupplierModal';
+import { SupplierBankModal } from '../components/detail/SupplierBankModal';
+import { SupplierVatModal } from '../components/detail/SupplierVatModal';
+import { AdminToast, type ToastState } from '../../admin/components';
 import { supplierApi } from '../api/supplierApi';
 import { Loader2, AlertCircle } from 'lucide-react';
 import '../supplier.css';
@@ -25,6 +32,7 @@ interface Props {
   onToggleStatus?: (supplier: SupplierSummary) => void;
   onDelete?: (supplier: SupplierSummary) => void;
   onLinkCustomer?: (supplierId: string, customerId: string) => void;
+  onSupplierUpdated?: (supplier: SupplierSummary) => void;
 }
 
 type TabKey = 'profile' | 'delivery' | 'holidays' | 'payables' | 'history';
@@ -92,6 +100,7 @@ export const SupplierDetailPage: FC<Props> = ({
   onToggleStatus: _propOnToggleStatus,
   onDelete: _propOnDelete,
   onLinkCustomer: propOnLinkCustomer,
+  onSupplierUpdated,
 }) => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -102,10 +111,29 @@ export const SupplierDetailPage: FC<Props> = ({
   // Active Tab
   const [activeTab, setActiveTab] = useState<TabKey>('profile');
 
+  // Modals state
+  const [isEditGeneralModalOpen, setIsEditGeneralModalOpen] = useState(false);
+  const [isBankModalOpen, setIsBankModalOpen] = useState(false);
+  const [isVatModalOpen, setIsVatModalOpen] = useState(false);
+
   // Supplier state from API
   const [currentSupplier, setCurrentSupplier] = useState<SupplierSummary | null>(propSupplier || null);
   const [isLoading, setIsLoading] = useState<boolean>(!propSupplier);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Toast
+  const [toast, setToast] = useState<ToastState | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showToast = (message: string, type: ToastState['type'] = 'success') => {
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current);
+    }
+    setToast({ id: Date.now().toString(), message, type });
+    toastTimerRef.current = setTimeout(() => {
+      setToast(null);
+    }, 3200);
+  };
 
   // Dynamic delivery config state
   const [deliveryConfig, setDeliveryConfig] = useState<SupplierDeliveryConfig>({
@@ -129,35 +157,38 @@ export const SupplierDetailPage: FC<Props> = ({
     let isMounted = true;
     const targetId = propSupplier?.id || id;
 
-    if (propSupplier) {
-      setCurrentSupplier(propSupplier);
-      setIsLoading(false);
-    } else if (id) {
-      setIsLoading(true);
-      setErrorMessage(null);
-
-      supplierApi
-        .getSupplierById(id)
-        .then((data) => {
-          if (!isMounted) return;
-          if (data) {
-            setCurrentSupplier(data);
-          } else {
-            setErrorMessage(`Không tìm thấy nhà cung cấp với mã: ${id}`);
-          }
-        })
-        .catch((err: any) => {
-          if (!isMounted) return;
-          setErrorMessage(err.message || 'Không thể tải thông tin nhà cung cấp.');
-        })
-        .finally(() => {
-          if (isMounted) setIsLoading(false);
-        });
-    } else {
+    if (!targetId) {
       setErrorMessage('Không tìm thấy thông tin định danh nhà cung cấp.');
       setIsLoading(false);
       return;
     }
+
+    if (propSupplier) {
+      setCurrentSupplier(propSupplier);
+    } else {
+      setIsLoading(true);
+    }
+    setErrorMessage(null);
+
+    supplierApi
+      .getSupplierById(targetId)
+      .then((data) => {
+        if (!isMounted) return;
+        if (data) {
+          setCurrentSupplier(data);
+        } else if (!propSupplier) {
+          setErrorMessage(`Không tìm thấy nhà cung cấp với mã: ${targetId}`);
+        }
+      })
+      .catch((err: any) => {
+        if (!isMounted) return;
+        if (!propSupplier) {
+          setErrorMessage(err.message || 'Không thể tải thông tin nhà cung cấp.');
+        }
+      })
+      .finally(() => {
+        if (isMounted) setIsLoading(false);
+      });
 
     if (targetId) {
       // Also load transactions
@@ -197,11 +228,75 @@ export const SupplierDetailPage: FC<Props> = ({
     }
   };
 
-  const handleEdit = (tab: 'basic' | 'terms' | 'bank' = 'basic') => {
-    if (currentSupplier && propOnEdit) {
-      propOnEdit(currentSupplier, tab);
-    } else if (currentSupplier) {
-      alert(`Mở hộp thoại chỉnh sửa NCC ${currentSupplier.name}`);
+  const handleSaveGeneralInfo = async (input: UpdateBasicSupplierInput) => {
+    try {
+      const updated = await supplierApi.updateBasicSupplier(input.id, input);
+      setCurrentSupplier((prev) => (prev ? { ...prev, ...updated } : updated));
+      onSupplierUpdated?.(updated);
+      showToast(`Đã cập nhật thông tin chung nhà cung cấp ${updated.name} thành công!`, 'success');
+      setIsEditGeneralModalOpen(false);
+    } catch (err: any) {
+      throw err;
+    }
+  };
+
+  const handleSaveBank = async (input: UpdateSupplierBankInput) => {
+    if (!currentSupplier) return;
+    try {
+      const updated = await supplierApi.updateSupplierBank(currentSupplier.id, input);
+      setCurrentSupplier((prev) => (prev ? { ...prev, ...updated } : updated));
+      onSupplierUpdated?.(updated);
+      showToast(`Đã lưu tài khoản ngân hàng ${updated.bankName || ''} thành công!`, 'success');
+      setIsBankModalOpen(false);
+    } catch (err: any) {
+      throw err;
+    }
+  };
+
+  const handleDeleteBank = async () => {
+    if (!currentSupplier) return;
+    try {
+      const updated = await supplierApi.updateSupplierBank(currentSupplier.id, {
+        bankName: '',
+        bankAccount: '',
+        accountHolder: '',
+      });
+      setCurrentSupplier((prev) => (prev ? { ...prev, ...updated, bankName: undefined, bankAccount: undefined, accountHolder: undefined } : updated));
+      onSupplierUpdated?.(updated);
+      showToast('Đã xóa thông tin tài khoản ngân hàng thành công!', 'success');
+      setIsBankModalOpen(false);
+    } catch (err: any) {
+      throw err;
+    }
+  };
+
+  const handleSaveVat = async (input: UpdateSupplierVatInput) => {
+    if (!currentSupplier) return;
+    try {
+      const updated = await supplierApi.updateSupplierVat(currentSupplier.id, input);
+      setCurrentSupplier((prev) => (prev ? { ...prev, ...updated } : updated));
+      onSupplierUpdated?.(updated);
+      showToast('Đã lưu thông tin hóa đơn VAT thành công!', 'success');
+      setIsVatModalOpen(false);
+    } catch (err: any) {
+      throw err;
+    }
+  };
+
+  const handleDeleteVat = async () => {
+    if (!currentSupplier) return;
+    try {
+      const updated = await supplierApi.updateSupplierVat(currentSupplier.id, {
+        companyName: '',
+        taxCode: currentSupplier.taxCode,
+        invoiceAddress: '',
+      });
+      setCurrentSupplier((prev) => (prev ? { ...prev, ...updated, companyName: undefined, invoiceAddress: undefined } : updated));
+      onSupplierUpdated?.(updated);
+      showToast('Đã gỡ bỏ thông tin hóa đơn VAT thành công!', 'success');
+      setIsVatModalOpen(false);
+    } catch (err: any) {
+      throw err;
     }
   };
 
@@ -216,7 +311,7 @@ export const SupplierDetailPage: FC<Props> = ({
 
   const handleLinkCustomer = (_supplierId: string, customerId: string) => {
     if (currentSupplier) {
-      alert(`Đã liên kết thành công Hồ sơ Khách hàng ${customerId} cho NCC ${currentSupplier.name}!`);
+      showToast(`Đã liên kết thành công Hồ sơ Khách hàng ${customerId} cho NCC ${currentSupplier.name}!`, 'success');
     }
   };
 
@@ -275,12 +370,14 @@ export const SupplierDetailPage: FC<Props> = ({
 
   return (
     <div className="supplier-detail-page">
+      {/* Toast Notification */}
+      <AdminToast toast={toast} onClose={() => setToast(null)} />
+
       <div className="supplier-detail-container">
-        {/* Header with back button, avatar, name, and edit button */}
+        {/* Header with back button, avatar, name (R2 & R3: Status badge & Edit button removed from shared header) */}
         <SupplierDetailHeader
           supplier={currentSupplier}
           onBack={handleBack}
-          onEdit={() => handleEdit('basic')}
         />
 
         {/* Section Header */}
@@ -294,6 +391,7 @@ export const SupplierDetailPage: FC<Props> = ({
             <button
               key={tab.key}
               type="button"
+              data-testid={`tab-btn-${tab.key}`}
               onClick={() => setActiveTab(tab.key)}
               className={`supplier-detail-tab-pill ${activeTab === tab.key ? 'active' : ''}`}
             >
@@ -307,8 +405,16 @@ export const SupplierDetailPage: FC<Props> = ({
           {activeTab === 'profile' && (
             <SupplierGeneralProfileTab
               supplier={currentSupplier}
+              canEdit={isStoreOwner}
               onLinkCustomer={propOnLinkCustomer || handleLinkCustomer}
-              onEdit={propOnEdit ? handleEdit : undefined}
+              onEditGeneral={() => {
+                if (propOnEdit) {
+                  propOnEdit(currentSupplier, 'basic');
+                } else {
+                  setIsEditGeneralModalOpen(true);
+                }
+              }}
+              onEditBank={() => setIsBankModalOpen(true)}
             />
           )}
 
@@ -343,6 +449,38 @@ export const SupplierDetailPage: FC<Props> = ({
           )}
         </div>
       </div>
+
+      {/* Modals for General Profile, Bank Account, and VAT Invoice */}
+      {isStoreOwner && currentSupplier && (
+        <>
+          <EditSupplierModal
+            isOpen={isEditGeneralModalOpen}
+            supplier={currentSupplier}
+            onClose={() => setIsEditGeneralModalOpen(false)}
+            onSubmit={handleSaveGeneralInfo}
+          />
+
+          <SupplierBankModal
+            isOpen={isBankModalOpen}
+            initialBankName={currentSupplier.bankName}
+            initialAccountNumber={currentSupplier.bankAccount || (currentSupplier as any).bankAccountNumber}
+            initialAccountHolder={currentSupplier.accountHolder || (currentSupplier as any).bankAccountHolder || currentSupplier.name}
+            onClose={() => setIsBankModalOpen(false)}
+            onSubmit={handleSaveBank}
+            onDelete={handleDeleteBank}
+          />
+
+          <SupplierVatModal
+            isOpen={isVatModalOpen}
+            initialCompanyName={currentSupplier.companyName}
+            initialTaxCode={currentSupplier.taxCode}
+            initialInvoiceAddress={currentSupplier.invoiceAddress || currentSupplier.address}
+            onClose={() => setIsVatModalOpen(false)}
+            onSubmit={handleSaveVat}
+            onDelete={handleDeleteVat}
+          />
+        </>
+      )}
     </div>
   );
 };

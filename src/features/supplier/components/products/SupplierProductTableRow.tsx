@@ -50,12 +50,8 @@ export const SupplierProductTableRow: FC<SupplierProductTableRowProps> = ({
           style={{
             fontFamily: 'var(--font-mono, monospace)',
             fontSize: 12,
-            fontWeight: 700,
+            fontWeight: 600,
             color: '#0f766e',
-            backgroundColor: '#f0fdfa',
-            padding: '2px 6px',
-            borderRadius: 4,
-            border: '1px solid #ccfbf1',
           }}
         >
           {item.sku}
@@ -93,9 +89,6 @@ export const SupplierProductTableRow: FC<SupplierProductTableRowProps> = ({
             fontSize: 12,
             color: '#475569',
             fontWeight: 500,
-            backgroundColor: '#f1f5f9',
-            padding: '2px 8px',
-            borderRadius: 4,
           }}
         >
           {item.categoryName || 'Chung'}

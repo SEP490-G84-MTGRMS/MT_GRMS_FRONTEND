@@ -6,6 +6,7 @@ import type {
   QtyMatrixMap,
   MatrixCellMap,
   MatrixCellData,
+  OrderMatrixSupplierDeliveryConfig,
 } from '../../types/po.types';
 import { RotateCcw } from 'lucide-react';
 
@@ -14,6 +15,7 @@ interface OrderMatrixTableProps {
   days: DayColInfo[];
   qtyMap?: QtyMatrixMap;
   cellMap?: MatrixCellMap;
+  supplierConfigs?: OrderMatrixSupplierDeliveryConfig[];
   showSoh: boolean;
   onQtyChange?: (productId: string, dateKey: string, val: number) => void;
   onCellChange?: (productId: string, dateKey: string, val: number) => void;
@@ -28,6 +30,7 @@ export const OrderMatrixTable: FC<OrderMatrixTableProps> = ({
   days,
   qtyMap,
   cellMap,
+  supplierConfigs,
   showSoh,
   onQtyChange,
   onCellChange,
@@ -95,7 +98,7 @@ export const OrderMatrixTable: FC<OrderMatrixTableProps> = ({
   }, 0);
 
   // Number of fixed metadata columns
-  const fixedColCount = 4 + (showSoh ? 2 : 0);
+  const fixedColCount = 3 + (showSoh ? 2 : 0);
   const totalColSpan = fixedColCount + days.length + 2;
 
   // Handle cell navigation with keyboard
@@ -164,7 +167,6 @@ export const OrderMatrixTable: FC<OrderMatrixTableProps> = ({
     <colgroup>
       <col style={{ width: 190 }} />
       <col style={{ width: 68 }} />
-      <col style={{ width: 80 }} />
       <col style={{ width: 45 }} />
       {showSoh && (
         <>
@@ -188,9 +190,8 @@ export const OrderMatrixTable: FC<OrderMatrixTableProps> = ({
           {renderColGroup()}
           <thead>
             <tr>
-              <th className="po-th-left">Tên Sản Phẩm (Mã SKU)</th>
+              <th className="po-th-left po-th-product">Tên Sản Phẩm</th>
               <th>ĐVT</th>
-              <th>Giá Nhập (đ)</th>
               <th>MOQ</th>
               {showSoh && (
                 <>
@@ -237,30 +238,16 @@ export const OrderMatrixTable: FC<OrderMatrixTableProps> = ({
                       <span className="po-col-dow">{d.dowName}</span>
                       <span className="po-col-short">{d.dateShort}</span>
 
-                      {/* Cutoff Status Tag */}
-                      <span
-                        className={`po-cutoff-tag ${
-                          isOff
-                            ? 'po-tag-off'
-                            : isPoGenerated || isLocked
-                            ? 'po-tag-locked'
-                            : isCutoffDue
-                            ? 'po-tag-due'
-                            : 'po-tag-open'
-                        }`}
-                      >
-                        {isOff ? (
-                          'Nghỉ'
-                        ) : isPoGenerated ? (
-                          'Đã PO'
-                        ) : isLocked ? (
-                          'Khóa'
-                        ) : isCutoffDue ? (
-                          'Đến hạn'
-                        ) : (
-                          'Mở'
-                        )}
-                      </span>
+                      {/* Cutoff Status Tag: chỉ hiển thị cho các ngày Nghỉ / Đã PO / Khóa, loại bỏ chữ Đến hạn và Mở */}
+                      {(isOff || isPoGenerated || isLocked) && (
+                        <span
+                          className={`po-cutoff-tag ${
+                            isOff ? 'po-tag-off' : 'po-tag-locked'
+                          }`}
+                        >
+                          {isOff ? 'Nghỉ' : isPoGenerated ? 'Đã PO' : 'Khóa'}
+                        </span>
+                      )}
                     </div>
                   </th>
                 );
@@ -313,13 +300,54 @@ export const OrderMatrixTable: FC<OrderMatrixTableProps> = ({
                   {/* Product Rows */}
                   {group.items.map((p) => {
                     let rowQty = 0;
+                    const isRowDisabled = p.isRowDisabled ?? (
+                      p.isProductActive === false ||
+                      p.isSupplierActive === false ||
+                      p.isSupplierProductActive === false ||
+                      p.isSupplierBranchActive === false ||
+                      p.isBranchProductActive === false
+                    );
+
                     return (
-                      <tr key={p.id}>
-                        <td>
-                          <b>{p.name}</b> <small style={{ color: 'var(--text-muted)' }}>({p.sku})</small>
+                      <tr key={p.id} className={isRowDisabled ? 'po-row-disabled' : ''}>
+                        <td className="po-cell-product">
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                            <div
+                              style={{ whiteSpace: 'normal', wordBreak: 'break-word', overflowWrap: 'break-word', lineHeight: 1.35 }}
+                              title={p.sku ? `Mã SKU: ${p.sku}` : undefined}
+                            >
+                              <b style={{ color: isRowDisabled ? '#64748b' : '#0f172a' }}>{p.name}</b>
+                            </div>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 1 }}>
+                              {p.isProductActive === false && (
+                                <span className="po-status-badge po-badge-danger" title={p.productInactiveReason || 'Sản phẩm tạm ngưng'}>
+                                  SP Tạm ngưng
+                                </span>
+                              )}
+                              {p.isSupplierActive === false && (
+                                <span className="po-status-badge po-badge-danger" title={p.supplierInactiveReason || 'NCC tạm ngưng hoạt động'}>
+                                  NCC Tạm ngưng
+                                </span>
+                              )}
+                              {p.isSupplierActive !== false && p.isSupplierBranchActive === false && (
+                                <span className="po-status-badge po-badge-warning" title={p.supplierBranchInactiveReason || 'NCC chưa phân bổ tới chi nhánh này'}>
+                                  Chưa liên kết CH
+                                </span>
+                              )}
+                              {p.isProductActive !== false && p.isSupplierActive !== false && p.isSupplierProductActive === false && (
+                                <span className="po-status-badge po-badge-warning" title={p.supplierProductInactiveReason || 'Tạm ngưng nhập mặt hàng này từ NCC'}>
+                                  Ngưng nhập từ NCC
+                                </span>
+                              )}
+                              {p.isProductActive !== false && p.isBranchProductActive === false && (
+                                <span className="po-status-badge po-badge-secondary" title={p.branchProductInactiveReason || 'Sản phẩm chưa mở bán tại chi nhánh này'}>
+                                  Chưa mở bán tại CH
+                                </span>
+                              )}
+                            </div>
+                          </div>
                         </td>
                         <td style={{ textAlign: 'center' }}>{p.unit}</td>
-                        <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{fmt(p.price)}</td>
                         <td style={{ textAlign: 'center', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{p.moq}</td>
 
                         {showSoh && (
@@ -339,19 +367,66 @@ export const OrderMatrixTable: FC<OrderMatrixTableProps> = ({
                           const q = cell.finalQty || 0;
                           rowQty += q;
 
-                          const isOwnerModified =
-                            isStoreOwner &&
-                            cell.storeQty !== null &&
-                            cell.storeQty !== cell.employeeQty;
+                          const isOwnerAdjusted = Boolean(
+                            cell.isOwnerAdjusted ||
+                            cell.isOwnerOverridden ||
+                            (cell.storeQty !== null && cell.storeQty !== undefined)
+                          );
 
-                          if (d.isOff) {
+                          // Kiểm tra lịch giao và trạng thái của NCC theo cấu hình backend
+                          const supConfig = supplierConfigs?.find((sc) => sc.supplierId === p.supplierId);
+                          let isCellOff = false;
+                          let cellOffReason = '';
+
+                          if (supConfig) {
+                            if (!supConfig.isActive) {
+                              isCellOff = true;
+                              cellOffReason = supConfig.inactiveReason || 'Nhà cung cấp đang tạm dừng hoạt động';
+                            } else if (!supConfig.isAssignedToBranch) {
+                              isCellOff = true;
+                              cellOffReason = 'Nhà cung cấp chưa được phân bổ tới chi nhánh này';
+                            } else if (supConfig.activeDeliveryDays && !supConfig.activeDeliveryDays.includes(d.date.getDay())) {
+                              isCellOff = true;
+                              cellOffReason = `NCC không giao hàng vào ${d.dowName}`;
+                            } else if (supConfig.blackoutDates && supConfig.blackoutDates.includes(d.dateKey)) {
+                              isCellOff = true;
+                              cellOffReason = 'Ngày nghỉ lễ/blackout của nhà cung cấp';
+                            } else if (d.isOff) {
+                              isCellOff = true;
+                              cellOffReason = d.offReason || 'Ngày nghỉ';
+                            }
+                          } else if (d.isOff) {
+                            isCellOff = true;
+                            cellOffReason = d.offReason || 'Nhà cung cấp không giao hàng ngày này';
+                          }
+
+                          if (isCellOff) {
                             return (
                               <td
                                 key={d.dateKey}
                                 className="po-cell-off"
-                                title={d.offReason || 'Nhà cung cấp không giao hàng ngày này'}
+                                title={cellOffReason}
                               >
                                 —
+                              </td>
+                            );
+                          }
+
+                          // Nếu sản phẩm hoặc NCC bị inactive -> Disable ô nhập cho cả dòng/ngày
+                          if (isRowDisabled) {
+                            return (
+                              <td
+                                key={d.dateKey}
+                                className="po-cell-disabled"
+                                title={p.rowDisabledReason || 'Sản phẩm hoặc nhà cung cấp đang tạm ngưng'}
+                              >
+                                <input
+                                  type="text"
+                                  className="po-qty-input po-qty-input-disabled"
+                                  value=""
+                                  placeholder="—"
+                                  disabled
+                                />
                               </td>
                             );
                           }
@@ -384,7 +459,7 @@ export const OrderMatrixTable: FC<OrderMatrixTableProps> = ({
                                   style={{
                                     fontFamily: 'var(--font-mono)',
                                     fontWeight: q > 0 ? 700 : 400,
-                                    color: isOwnerModified ? '#d97706' : q > 0 ? 'var(--blue-primary)' : '#cbd5e1',
+                                    color: isOwnerAdjusted ? '#d97706' : q > 0 ? 'var(--blue-primary)' : '#cbd5e1',
                                     fontSize: 12.5,
                                   }}
                                 >
@@ -399,45 +474,102 @@ export const OrderMatrixTable: FC<OrderMatrixTableProps> = ({
                           if (isBad) {
                             tooltipParts.push(`⚠️ Dưới MOQ! Đặt tối thiểu ${p.moq} ${p.unit}`);
                           }
-                          if (isOwnerModified) {
-                            tooltipParts.push(
-                              `👑 Chủ cửa hàng đã điều chỉnh (NV: ${cell.employeeQty} ➔ Chủ: ${cell.storeQty}). Bấm nút khôi phục bên cạnh để trả về đề xuất của NV.`
-                            );
+
+                          if (isStoreOwner) {
+                            if (isOwnerAdjusted) {
+                              tooltipParts.push(
+                                `👑 Chủ cửa hàng đã điều chỉnh (NV: ${cell.employeeQty} ➔ Chủ chốt: ${cell.storeQty ?? cell.finalQty}). Bấm nút xoay tròn để khôi phục đề xuất ban đầu của NV.`
+                              );
+                            } else if (cell.employeeQty > 0) {
+                              tooltipParts.push(`Số lượng Employee đề xuất: ${cell.employeeQty} ${p.unit}`);
+                            }
+                          } else {
+                            if (isOwnerAdjusted) {
+                              tooltipParts.push(
+                                `⚠️ Đã được Store Owner điều chỉnh: Đề xuất ban đầu: ${cell.employeeQty} ➔ Store Owner chốt: ${cell.finalQty}`
+                              );
+                            } else {
+                              tooltipParts.push(`Nhân viên nhập số lượng đề xuất đặt hàng`);
+                            }
                           }
                           const tooltip = tooltipParts.length > 0 ? tooltipParts.join('\n') : undefined;
+
+                          // Input value logic:
+                          // Store Owner: displays finalQty (or storeQty if set to 0), fallback to employeeQty
+                          // Employee: always displays employeeQty
+                          const displayVal = isStoreOwner
+                            ? (isOwnerAdjusted
+                                ? (cell.storeQty !== null && cell.storeQty !== undefined ? cell.storeQty : (q > 0 ? q : ''))
+                                : (cell.employeeQty > 0 ? cell.employeeQty : (q > 0 ? q : '')))
+                            : (cell.employeeQty > 0 ? cell.employeeQty : '');
+
+                          const inputClassName = `po-qty-input ${isBad ? 'qty-bad' : ''} ${
+                            isStoreOwner
+                              ? (isOwnerAdjusted ? 'qty-owner-override' : '')
+                              : (isOwnerAdjusted ? 'qty-employee-overridden' : '')
+                          }`;
+
+                          const tdClassName = isStoreOwner
+                            ? (isOwnerAdjusted ? 'po-td-owner-modified' : '')
+                            : (isOwnerAdjusted ? 'po-td-employee-overridden' : '');
 
                           return (
                             <td
                               key={d.dateKey}
                               style={{ textAlign: 'center' }}
-                              className={isOwnerModified ? 'po-td-owner-modified' : ''}
+                              className={tdClassName}
                             >
                               <div className="po-cell-wrapper">
-                                <input
-                                  type="text"
-                                  className={`po-qty-input ${isBad ? 'qty-bad' : ''} ${
-                                    isOwnerModified ? 'qty-owner-override' : ''
-                                  }`}
-                                  value={q > 0 ? q : ''}
-                                  placeholder={cell.employeeQty > 0 ? String(cell.employeeQty) : ''}
-                                  data-pid={p.id}
-                                  data-day={d.dateKey}
-                                  data-col={colIdx}
-                                  title={tooltip}
-                                  onChange={(e) => handleInputChange(p.id, d.dateKey, e)}
-                                  onKeyDown={handleKeyDown}
-                                />
+                                <div className="po-cell-input-row">
+                                  <input
+                                    type="text"
+                                    className={inputClassName}
+                                    value={displayVal}
+                                    placeholder={!isStoreOwner ? '' : (cell.employeeQty > 0 ? String(cell.employeeQty) : '')}
+                                    data-pid={p.id}
+                                    data-day={d.dateKey}
+                                    data-col={colIdx}
+                                    title={tooltip}
+                                    onChange={(e) => handleInputChange(p.id, d.dateKey, e)}
+                                    onKeyDown={handleKeyDown}
+                                  />
 
-                                {/* Revert to Employee Qty Action when overridden */}
-                                {isOwnerModified && onResetOverride && (
-                                  <button
-                                    type="button"
-                                    className="po-cell-revert-btn"
-                                    title={`Khôi phục số lượng đề xuất của Nhân viên (${cell.employeeQty})`}
-                                    onClick={() => onResetOverride(p.id, d.dateKey)}
-                                  >
-                                    <RotateCcw size={10} />
-                                  </button>
+                                  {/* Revert to Employee Qty Action when overridden */}
+                                  {isStoreOwner && isOwnerAdjusted && onResetOverride && (
+                                    <button
+                                      type="button"
+                                      className="po-cell-revert-btn"
+                                      title={`Khôi phục số lượng đề xuất của Nhân viên (${cell.employeeQty})`}
+                                      onClick={() => onResetOverride(p.id, d.dateKey)}
+                                    >
+                                      <RotateCcw size={9} />
+                                    </button>
+                                  )}
+                                </div>
+
+                                {/* Subtext indicator below input */}
+                                {isStoreOwner ? (
+                                  cell.employeeQty > 0 ? (
+                                    <div
+                                      className="po-cell-subtext po-cell-subtext--emp"
+                                      title={`Số lượng Nhân viên đề xuất: ${cell.employeeQty}`}
+                                    >
+                                      NV: {cell.employeeQty}
+                                    </div>
+                                  ) : isOwnerAdjusted ? (
+                                    <div className="po-cell-subtext po-cell-subtext--emp" title="Nhân viên chưa nhập đề xuất">
+                                      NV: —
+                                    </div>
+                                  ) : null
+                                ) : (
+                                  isOwnerAdjusted ? (
+                                    <div
+                                      className="po-cell-subtext po-cell-subtext--override"
+                                      title={`Số lượng Store Owner chốt: ${cell.finalQty}`}
+                                    >
+                                      Chốt: {cell.finalQty}
+                                    </div>
+                                  ) : null
                                 )}
                               </div>
                             </td>

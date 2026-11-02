@@ -1,11 +1,7 @@
 import { useRef } from 'react';
 import type { FC } from 'react';
 import type { SupplierOption, BranchOption } from '../../types/po.types';
-import {
-  Search,
-  ChevronLeft,
-  ChevronRight,
-} from 'lucide-react';
+import { Search, RotateCcw } from 'lucide-react';
 
 interface OrderMatrixFilterBarProps {
   // Scope selectors
@@ -55,8 +51,8 @@ interface OrderMatrixFilterBarProps {
   isDirty?: boolean;
 
   // Toolbar actions
-  onShiftWeek: (deltaWeeks: number) => void;
-  onThisWeek: () => void;
+  onShiftWeek?: (deltaWeeks: number) => void;
+  onThisWeek?: () => void;
   onCopyPrevWeek: () => void;
   onAutoSuggest?: () => void;
   onExcelDownload: () => void;
@@ -96,8 +92,8 @@ export const OrderMatrixFilterBar: FC<OrderMatrixFilterBarProps> = ({
   onShowSohChange,
   onResetFilters,
   isDirty = false,
-  onShiftWeek,
-  onThisWeek,
+  onShiftWeek: _onShiftWeek,
+  onThisWeek: _onThisWeek,
   onCopyPrevWeek,
   onAutoSuggest,
   onExcelDownload,
@@ -116,10 +112,6 @@ export const OrderMatrixFilterBar: FC<OrderMatrixFilterBarProps> = ({
 
   const handleSupplierChange = (newId: string) => {
     if (newId === selectedSupplierId) return;
-    if (isDirty) {
-      const ok = window.confirm('Bạn có số lượng chưa lưu! Chuyển NCC sẽ làm mới ma trận. Tiếp tục?');
-      if (!ok) return;
-    }
     onSelectSupplier(newId);
   };
 
@@ -148,7 +140,7 @@ export const OrderMatrixFilterBar: FC<OrderMatrixFilterBarProps> = ({
             </div>
           )}
 
-          {hideBranchSelect && fixedBranchLabel && (
+          {hideBranchSelect && (
             <div
               className="po-fixed-branch-chip"
               style={{
@@ -157,17 +149,18 @@ export const OrderMatrixFilterBar: FC<OrderMatrixFilterBarProps> = ({
                 gap: 6,
                 padding: '0 12px',
                 height: 32,
-                background: '#f8fafc',
+                background: '#f1f5f9',
                 border: '1px solid #cbd5e1',
                 borderRadius: 6,
                 fontSize: 12,
-                fontWeight: 600,
                 color: '#334155',
                 whiteSpace: 'nowrap',
               }}
-              title={`Chi nhánh làm việc: ${fixedBranchLabel}`}
+              title={`Chi nhánh phân công của nhân viên: ${fixedBranchLabel || 'Chi nhánh làm việc'}`}
             >
-              <span>Chi nhánh: {fixedBranchLabel}</span>
+              <span style={{ color: '#64748b', fontWeight: 500 }}>Chi nhánh:</span>
+              <span style={{ color: '#0f172a', fontWeight: 700 }}>{fixedBranchLabel || 'MT-Mart Chi Nhánh'}</span>
+              <span style={{ fontSize: 10, padding: '1px 6px', background: '#e2e8f0', borderRadius: 4, color: '#475569', fontWeight: 600 }}>Cố định</span>
             </div>
           )}
 
@@ -176,7 +169,7 @@ export const OrderMatrixFilterBar: FC<OrderMatrixFilterBarProps> = ({
             <label className="po-filter-label">Nhà cung cấp:</label>
             <select
               className="po-ctrl-select"
-              style={{ width: 250, fontWeight: 600 }}
+              style={{ width: 210, fontWeight: 600 }}
               value={selectedSupplierId}
               onChange={(e) => handleSupplierChange(e.target.value)}
               title="Chọn Nhà Cung Cấp"
@@ -196,69 +189,40 @@ export const OrderMatrixFilterBar: FC<OrderMatrixFilterBarProps> = ({
           {onSelectDuration && (
             <div className="po-filter-field">
               <label className="po-filter-label">Khung ngày:</label>
-              <div style={{ display: 'inline-flex', gap: 4 }}>
+              <div style={{ display: 'inline-flex', gap: 3 }}>
                 {[7, 14, 21, 31].map((d) => (
                   <button
                     key={d}
                     type="button"
                     className={`po-icon-btn ${durationDays === d ? 'po-icon-btn--active' : ''}`}
                     style={{
-                      height: 30,
-                      padding: '0 10px',
-                      fontSize: 12,
+                      height: 28,
+                      padding: '0 8px',
+                      fontSize: 11,
                       fontWeight: durationDays === d ? 700 : 500,
                       backgroundColor: durationDays === d ? '#eff6ff' : '#ffffff',
                       color: durationDays === d ? '#1d4ed8' : '#475569',
                       borderColor: durationDays === d ? '#93c5fd' : '#cbd5e1',
                     }}
                     onClick={() => onSelectDuration(d)}
-                    title={`Xem ma trận ${d} ngày (${d === 31 ? 'tối đa 1 tháng' : `${d / 7} tuần`})`}
+                    title={`Xem ma trận ${d} ngày`}
                   >
-                    <span>{d === 31 ? '1 tháng (31N)' : `${d} ngày`}</span>
+                    <span>{d} ngày</span>
                   </button>
                 ))}
               </div>
             </div>
           )}
+        </div>
 
-          {/* Điều hướng tuần */}
-          <div className="po-bar-group">
-            <button
-              type="button"
-              className="po-icon-btn"
-              onClick={() => onShiftWeek(-1)}
-              title="Tuần trước"
-            >
-              <ChevronLeft size={14} />
-            </button>
-            <button
-              type="button"
-              className="po-icon-btn"
-              onClick={onThisWeek}
-              title="Về ngày hiện tại"
-              style={{ padding: '0 10px', fontWeight: 600 }}
-            >
-              <span>Hôm nay</span>
-            </button>
-            <button
-              type="button"
-              className="po-icon-btn"
-              onClick={() => onShiftWeek(1)}
-              title="Tuần tới"
-            >
-              <ChevronRight size={14} />
-            </button>
-          </div>
-
-          <div className="po-bar-divider" />
-
-          {/* Khoảng ngày Từ - Đến */}
+        {/* Khoảng ngày Từ - Đến & Nút Áp dụng, Đặt lại (Căn về bên phải màn hình) */}
+        <div className="po-filter-row-right">
           <div className="po-filter-field">
             <label className="po-filter-label">Từ:</label>
             <input
               type="date"
               className="po-ctrl-date"
-              style={{ width: 130 }}
+              style={{ width: 122, height: 28, fontSize: 12 }}
               value={dateFrom}
               onChange={(e) => onDateFromChange(e.target.value)}
             />
@@ -266,7 +230,7 @@ export const OrderMatrixFilterBar: FC<OrderMatrixFilterBarProps> = ({
             <input
               type="date"
               className="po-ctrl-date"
-              style={{ width: 130 }}
+              style={{ width: 122, height: 28, fontSize: 12 }}
               value={dateTo}
               onChange={(e) => onDateToChange(e.target.value)}
             />
@@ -275,9 +239,28 @@ export const OrderMatrixFilterBar: FC<OrderMatrixFilterBarProps> = ({
               className="po-ctrl-btn-apply"
               onClick={onApplyRange}
               title="Áp dụng khoảng ngày (tối đa 31 ngày)"
-              style={{ padding: '0 12px', height: 32 }}
+              style={{ padding: '0 12px', height: 28, fontSize: 12, fontWeight: 600 }}
             >
               <span>Áp dụng</span>
+            </button>
+            <button
+              type="button"
+              className="po-icon-btn"
+              onClick={onResetFilters}
+              title="Đặt lại các bộ lọc"
+              style={{
+                height: 28,
+                padding: '0 10px',
+                fontSize: 12,
+                fontWeight: 600,
+                color: '#64748b',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 4,
+              }}
+            >
+              <RotateCcw size={12} />
+              <span>Đặt lại</span>
             </button>
           </div>
         </div>
@@ -286,23 +269,27 @@ export const OrderMatrixFilterBar: FC<OrderMatrixFilterBarProps> = ({
       {/* ── ROW 2: Tìm kiếm, Ngành hàng, Bộ lọc kiểm tra & Nút Thao tác ── */}
       <div className="po-filter-row">
         <div className="po-filter-row-left">
-          {/* Tìm kiếm nhanh */}
-          <div className="po-ctrl-search" style={{ width: 240 }}>
-            <Search size={14} className="po-ctrl-search-icon" />
-            <input
-              type="text"
-              className="po-ctrl-search-input"
-              placeholder="Tìm tên sản phẩm, mã SKU..."
-              value={keyword}
-              onChange={(e) => onKeywordChange(e.target.value)}
-            />
+          {/* Tìm kiếm sản phẩm: có text label & tăng width */}
+          <div className="po-filter-field">
+            <label className="po-filter-label">Tìm kiếm:</label>
+            <div className="po-ctrl-search" style={{ width: 280, height: 28 }}>
+              <Search size={13} className="po-ctrl-search-icon" />
+              <input
+                type="text"
+                className="po-ctrl-search-input"
+                placeholder="Tìm tên SP, SKU..."
+                style={{ fontSize: 12 }}
+                value={keyword}
+                onChange={(e) => onKeywordChange(e.target.value)}
+              />
+            </div>
           </div>
 
           {/* Ngành hàng */}
           <div className="po-filter-field">
             <select
               className="po-ctrl-select"
-              style={{ width: 165 }}
+              style={{ width: 155, height: 28, fontSize: 12 }}
               value={categoryFilter}
               onChange={(e) => onCategoryChange(e.target.value)}
             >
@@ -318,17 +305,18 @@ export const OrderMatrixFilterBar: FC<OrderMatrixFilterBarProps> = ({
           <div className="po-bar-divider" />
 
           {/* Checkboxes bộ lọc nhanh */}
-          <div className="po-bar-group">
+          <div className="po-bar-group" style={{ gap: 4 }}>
             <label
               className={`po-bar-checkbox ${orderedOnly ? 'is-checked' : ''}`}
               title="Lọc hiển thị những dòng đã nhập số lượng"
+              style={{ height: 28, padding: '0 7px', fontSize: 11 }}
             >
               <input
                 type="checkbox"
                 checked={orderedOnly}
                 onChange={(e) => onOrderedOnlyChange(e.target.checked)}
               />
-              <span>Dòng đã nhập</span>
+              <span>Đã nhập</span>
             </label>
 
             {onOwnerModifiedOnlyChange && (
@@ -336,6 +324,9 @@ export const OrderMatrixFilterBar: FC<OrderMatrixFilterBarProps> = ({
                 className={`po-bar-checkbox ${ownerModifiedOnly ? 'is-checked' : ''}`}
                 title="Lọc hiển thị những dòng Chủ cửa hàng đã điều chỉnh"
                 style={{
+                  height: 28,
+                  padding: '0 7px',
+                  fontSize: 11,
                   borderColor: ownerModifiedOnly ? '#f59e0b' : undefined,
                   backgroundColor: ownerModifiedOnly ? '#fffbeb' : undefined,
                   color: ownerModifiedOnly ? '#b45309' : undefined,
@@ -346,7 +337,7 @@ export const OrderMatrixFilterBar: FC<OrderMatrixFilterBarProps> = ({
                   checked={ownerModifiedOnly}
                   onChange={(e) => onOwnerModifiedOnlyChange(e.target.checked)}
                 />
-                <span>Chủ đã sửa</span>
+                <span>Chủ sửa</span>
                 {ownerModifiedCount > 0 && (
                   <span
                     style={{
@@ -354,7 +345,7 @@ export const OrderMatrixFilterBar: FC<OrderMatrixFilterBarProps> = ({
                       fontWeight: 700,
                       backgroundColor: '#fef3c7',
                       color: '#b45309',
-                      padding: '1px 5px',
+                      padding: '0 4px',
                       borderRadius: 999,
                     }}
                   >
@@ -367,13 +358,14 @@ export const OrderMatrixFilterBar: FC<OrderMatrixFilterBarProps> = ({
             <label
               className={`po-bar-checkbox po-bar-checkbox--danger ${moqOnly ? 'is-checked' : ''}`}
               title="Lọc hiển thị những dòng có ô cảnh báo vi phạm MOQ"
+              style={{ height: 28, padding: '0 7px', fontSize: 11 }}
             >
               <input
                 type="checkbox"
                 checked={moqOnly}
                 onChange={(e) => onMoqOnlyChange(e.target.checked)}
               />
-              <span>Vi phạm MOQ</span>
+              <span>Lỗi MOQ</span>
               {moqFailsCount > 0 && (
                 <span className="po-badge-count-danger" title={`${moqFailsCount} ô vi phạm rule MOQ`}>
                   {moqFailsCount}
@@ -384,13 +376,14 @@ export const OrderMatrixFilterBar: FC<OrderMatrixFilterBarProps> = ({
             <label
               className={`po-bar-checkbox ${showSoh ? 'is-checked' : ''}`}
               title="Hiện cột Tồn kho (SOH) & Bán/Ngày"
+              style={{ height: 28, padding: '0 7px', fontSize: 11 }}
             >
               <input
                 type="checkbox"
                 checked={showSoh}
                 onChange={(e) => onShowSohChange(e.target.checked)}
               />
-              <span>SOH &amp; Bán/ngày</span>
+              <span>SOH &amp; Bán</span>
             </label>
           </div>
         </div>
@@ -407,11 +400,13 @@ export const OrderMatrixFilterBar: FC<OrderMatrixFilterBarProps> = ({
                 color: '#0d9488',
                 borderColor: '#99f6e4',
                 backgroundColor: '#f0fdfa',
-                padding: '0 12px',
+                padding: '0 8px',
+                height: 28,
+                fontSize: 11,
                 fontWeight: 600,
               }}
             >
-              <span>Gợi ý số lượng</span>
+              <span>Gợi ý SL</span>
             </button>
           )}
 
@@ -423,11 +418,13 @@ export const OrderMatrixFilterBar: FC<OrderMatrixFilterBarProps> = ({
             style={{
               color: 'var(--blue-primary)',
               borderColor: 'var(--blue-border)',
-              padding: '0 12px',
+              padding: '0 8px',
+              height: 28,
+              fontSize: 11,
               fontWeight: 600,
             }}
           >
-            <span>Sao chép tuần trước</span>
+            <span>Sao chép tuần</span>
           </button>
 
           <button
@@ -435,7 +432,7 @@ export const OrderMatrixFilterBar: FC<OrderMatrixFilterBarProps> = ({
             className="po-icon-btn"
             onClick={onExcelDownload}
             title="Xuất bảng ma trận Excel (CSV/XLSX)"
-            style={{ padding: '0 12px', fontWeight: 600 }}
+            style={{ padding: '0 8px', height: 28, fontSize: 11, fontWeight: 600 }}
           >
             <span>Xuất Excel</span>
           </button>
@@ -445,7 +442,7 @@ export const OrderMatrixFilterBar: FC<OrderMatrixFilterBarProps> = ({
             className="po-icon-btn"
             onClick={() => fileInputRef.current?.click()}
             title="Nạp dữ liệu từ file Excel"
-            style={{ padding: '0 12px', fontWeight: 600 }}
+            style={{ padding: '0 8px', height: 28, fontSize: 11, fontWeight: 600 }}
           >
             <span>Nạp Excel</span>
           </button>
@@ -459,16 +456,6 @@ export const OrderMatrixFilterBar: FC<OrderMatrixFilterBarProps> = ({
               e.target.value = '';
             }}
           />
-
-          <button
-            type="button"
-            className="po-icon-btn"
-            onClick={onResetFilters}
-            title="Đặt lại các bộ lọc"
-            style={{ padding: '0 10px', color: '#64748b' }}
-          >
-            <span>Đặt lại</span>
-          </button>
         </div>
       </div>
     </div>

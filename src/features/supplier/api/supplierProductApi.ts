@@ -5,7 +5,6 @@ import type {
   AssignProductInput,
   EditSupplierProductInput,
 } from '../types/supplier.types';
-import { MOCK_SUPPLIER_PRODUCTS } from '../lib/mockData';
 
 export interface SupplierProductFilterParams {
   searchTerm?: string;
@@ -19,6 +18,13 @@ export interface SupplierProductFilterParams {
   suppliers?: Array<{ id: string; code: string; name: string }>;
 }
 
+export interface BatchAssignProductInput {
+  supplierId: string;
+  productIds: string[];
+  agreedPrice?: number;
+  moq?: number;
+}
+
 export const supplierProductApi = {
   /**
    * Lấy danh sách sản phẩm theo NCC có phân trang và bộ lọc (REQ-SP05, REQ-SP06)
@@ -27,98 +33,70 @@ export const supplierProductApi = {
     supplierId: string,
     filter: SupplierProductFilterParams
   ): Promise<{ items: SupplierProductItem[]; total: number }> {
-    try {
-      if (supplierId && supplierId !== 'ALL') {
-        const res = await httpClient.get<ApiResponse<PagedResult<any>>>(
-          `/suppliers/${supplierId}/products`,
-          {
-            params: {
-              SearchTerm: filter.productSearch || filter.searchTerm || undefined,
-              Status:
-                filter.statusFilter === 'Active'
-                  ? 1
-                  : filter.statusFilter === 'Inactive'
-                  ? 2
-                  : undefined,
-              PageIndex: filter.pageIndex || 1,
-              PageSize: filter.pageSize || 15,
-            },
-          }
-        );
+    const isSpecificSupplier = supplierId && supplierId !== 'ALL';
+    const endpoint = isSpecificSupplier
+      ? `/suppliers/${supplierId}/products`
+      : `/suppliers/products`;
 
-        if (res.data?.success && res.data.data) {
-          const paged = res.data.data;
-          const items: SupplierProductItem[] = paged.items.map((item: any) => ({
-            id: item.id,
-            supplierId: item.supplierId,
-            productId: item.productId,
-            barcode: item.barcode || '',
-            sku: item.sku || '',
-            name: item.productName || item.name || '',
-            categoryName: item.categoryName || 'Chung',
-            deliveryUoM: item.deliveryUoM || 'Cái',
-            baseUoM: item.baseUoM || 'Cái',
-            agreedPrice: item.agreedWholesalePrice ?? item.agreedPrice ?? 0,
-            moq: item.minimumOrderQuantity ?? item.moq ?? 1,
-            isPrimary: Boolean(item.isPrimarySupplier ?? item.isPrimary),
-            supplierProductCode: item.supplierProductCode || undefined,
-            effectiveDate: item.createdAt ? item.createdAt.split('T')[0] : new Date().toISOString().split('T')[0],
-            status: item.status === 'Active' || item.status === 1 ? 'Active' : 'Inactive',
-          }));
-
-          return { items, total: paged.totalItems };
-        }
-      }
-    } catch {
-      // Backend request fallback to mock data
-    }
-
-    // In-memory filter & paging fallback
-    const allItems: SupplierProductItem[] =
-      supplierId && supplierId !== 'ALL'
-        ? MOCK_SUPPLIER_PRODUCTS[supplierId] || []
-        : Object.values(MOCK_SUPPLIER_PRODUCTS).flat();
-
-    const filtered = allItems.filter((p) => {
-      // 1. Lọc theo Tên sản phẩm, Barcode, SKU
-      const productQuery = (filter.productSearch || filter.searchTerm || '').trim().toLowerCase();
-      if (productQuery) {
-        const matchName = p.name.toLowerCase().includes(productQuery);
-        const matchBarcode = p.barcode.toLowerCase().includes(productQuery);
-        const matchSku = p.sku.toLowerCase().includes(productQuery);
-        const matchCode = p.supplierProductCode?.toLowerCase().includes(productQuery) ?? false;
-        if (!matchName && !matchBarcode && !matchSku && !matchCode) return false;
-      }
-
-      // 2. Lọc theo Nhà cung cấp (mã NCC hoặc tên NCC)
-      const supplierQuery = (filter.supplierSearch || '').trim().toLowerCase();
-      if (supplierQuery) {
-        const supp = filter.suppliers?.find((s) => s.id === p.supplierId);
-        const suppCode = (supp?.code || p.supplierId || '').toLowerCase();
-        const suppName = (supp?.name || '').toLowerCase();
-        if (!suppCode.includes(supplierQuery) && !suppName.includes(supplierQuery)) {
-          return false;
-        }
-      }
-
-      if (filter.supplierId && filter.supplierId !== 'ALL' && p.supplierId !== filter.supplierId) {
-        return false;
-      }
-      if (filter.categoryFilter && filter.categoryFilter !== 'ALL' && p.categoryName !== filter.categoryFilter) {
-        return false;
-      }
-      if (filter.statusFilter && filter.statusFilter !== 'ALL' && p.status !== filter.statusFilter) {
-        return false;
-      }
-      return true;
+    const res = await httpClient.get<ApiResponse<PagedResult<any>>>(endpoint, {
+      params: {
+        SupplierId: isSpecificSupplier ? undefined : filter.supplierId !== 'ALL' ? filter.supplierId : undefined,
+        SearchTerm: filter.productSearch || filter.searchTerm || undefined,
+        Status:
+          filter.statusFilter === 'Active'
+            ? 1
+            : filter.statusFilter === 'Inactive'
+            ? 2
+            : undefined,
+        PageIndex: filter.pageIndex || 1,
+        PageSize: filter.pageSize || 15,
+      },
     });
 
-    const page = filter.pageIndex || 1;
-    const size = filter.pageSize || 15;
-    const start = (page - 1) * size;
-    const pagedItems = filtered.slice(start, start + size);
+    if (res.data?.success && res.data.data) {
+      const paged = res.data.data;
+      const items: SupplierProductItem[] = paged.items.map((item: any) => ({
+        id: item.id,
+        supplierId: item.supplierId,
+        productId: item.productId,
+        barcode: item.barcode || '',
+        sku: item.sku || '',
+        name: item.productName || item.name || '',
+        categoryName: item.categoryName || 'Chung',
+        deliveryUoM: item.deliveryUoM || 'Cái',
+        baseUoM: item.baseUoM || 'Cái',
+        agreedPrice: item.agreedWholesalePrice ?? item.agreedPrice ?? 0,
+        moq: item.minimumOrderQuantity ?? item.moq ?? 1,
+        isPrimary: Boolean(item.isPrimarySupplier ?? item.isPrimary),
+        supplierProductCode: item.supplierProductCode || undefined,
+        effectiveDate: item.createdAt ? item.createdAt.split('T')[0] : new Date().toISOString().split('T')[0],
+        status: item.status === 'Active' || item.status === 1 ? 'Active' : 'Inactive',
+      }));
 
-    return { items: pagedItems, total: filtered.length };
+      return { items, total: paged.totalItems };
+    }
+
+    return { items: [], total: 0 };
+  },
+
+  /**
+   * Lấy danh sách Master Products từ Backend Catalog API để gán cho NCC
+   */
+  async getMasterProducts(): Promise<any[]> {
+    const res = await httpClient.get<ApiResponse<any[]>>('/products');
+    if (res.data?.success && res.data.data) {
+      return res.data.data.map((p: any) => ({
+        id: p.id,
+        sku: p.sku,
+        barcode: p.barcode,
+        name: p.productName || p.name,
+        categoryName: p.categoryName || 'Chung',
+        baseUoM: p.unitName || p.baseUnit || 'Cái',
+        defaultWholesalePrice: p.costPrice || p.basePrice || 0,
+        defaultMoq: 1,
+      }));
+    }
+    return [];
   },
 
   /**
@@ -144,6 +122,32 @@ export const supplierProductApi = {
       if (err.response?.status === 409) {
         throw new Error('Sản phẩm này đã được gán cho nhà cung cấp.');
       }
+      throw new Error(err.response?.data?.message || err.message || 'Không thể gán sản phẩm.');
+    }
+  },
+
+  /**
+   * Gán hàng loạt sản phẩm cho Nhà cung cấp kèm tự động phân bổ chi nhánh
+   */
+  async assignBatchProducts(input: BatchAssignProductInput): Promise<{
+    assignedCount: number;
+    syncedBranchesCount: number;
+    items: any[];
+  }> {
+    try {
+      const res = await httpClient.post<ApiResponse<any>>(
+        `/suppliers/${input.supplierId}/products/batch`,
+        {
+          productIds: input.productIds,
+          agreedWholesalePrice: input.agreedPrice,
+          minimumOrderQuantity: input.moq ?? 1,
+        }
+      );
+      if (res.data?.success && res.data.data) {
+        return res.data.data;
+      }
+      throw new Error(res.data?.message || 'Không thể gán sản phẩm.');
+    } catch (err: any) {
       throw new Error(err.response?.data?.message || err.message || 'Không thể gán sản phẩm.');
     }
   },
@@ -219,5 +223,40 @@ export const supplierProductApi = {
     } catch (err: any) {
       throw new Error(err.response?.data?.message || err.message || 'Không thể cập nhật NCC chính.');
     }
+  },
+
+  /**
+   * Lấy danh sách chi nhánh đang được liên kết với nhà cung cấp
+   */
+  async getSupplierLinkedBranches(supplierId: string): Promise<any[]> {
+    try {
+      const res = await httpClient.get<ApiResponse<any[]>>(`/suppliers/${supplierId}/branches`);
+      if (res.data?.success && Array.isArray(res.data.data)) {
+        return res.data.data;
+      }
+    } catch {
+      // ignore
+    }
+    return [];
+  },
+
+  /**
+   * Lấy danh sách ID các sản phẩm đã được gán cho nhà cung cấp
+   */
+  async getSupplierAssignedProductIds(supplierId: string): Promise<string[]> {
+    try {
+      const res = await httpClient.get<ApiResponse<PagedResult<any>>>(
+        `/suppliers/${supplierId}/products`,
+        {
+          params: { PageIndex: 1, PageSize: 500 },
+        }
+      );
+      if (res.data?.success && res.data.data?.items) {
+        return res.data.data.items.map((x: any) => x.productId);
+      }
+    } catch {
+      // ignore
+    }
+    return [];
   },
 };

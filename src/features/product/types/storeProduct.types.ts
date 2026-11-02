@@ -1,6 +1,7 @@
 export interface StoreProductItem {
   id: string;
   storeId: string;
+  storeCode?: string;
   storeName: string;
   productId: string;
   name: string;
@@ -12,6 +13,7 @@ export interface StoreProductItem {
   costPrice: number; // Giá vốn nhập sỉ từ NCC
   currentStock: number; // Tồn kho thực tế (SOH)
   minStockLevel: number; // Định mức tồn tối thiểu / an toàn
+  primarySupplierCode?: string;
   primarySupplierName: string;
   minOrderQuantity: number; // Số lượng đặt hàng tối thiểu MOQ
   status: 'Active' | 'Inactive';
@@ -35,10 +37,12 @@ export interface StoreProductFilterValues {
   searchTerm?: string;
   skus?: string[];
   names?: string[];
+  storeCodes?: string[];
   storeNames?: string[];
-  categories?: string[];
+  supplierCodes?: string[];
+  supplierNames?: string[];
   storeId: string;
-  categoryFilter: string;
+  categoryFilter?: string;
   statusFilter: 'ALL' | 'Active' | 'Inactive';
   stockAlertFilter?: 'ALL' | 'LOW' | 'OUT_OF_STOCK' | 'NORMAL';
 }
@@ -56,5 +60,7 @@ export interface EditStoreProductInput {
   minStockLevel?: number;
   minOrderQuantity?: number;
   status?: 'Active' | 'Inactive';
+  supplierId?: string;
   shelfLocation?: string;
 }
+

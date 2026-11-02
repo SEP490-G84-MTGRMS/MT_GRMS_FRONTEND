@@ -21,8 +21,10 @@ type SortField =
   | 'sku'
   | 'name'
   | 'unit'
-  | 'category'
+  | 'storeCode'
   | 'storeName'
+  | 'supplierCode'
+  | 'supplierName'
   | 'costPrice'
   | 'retailPrice'
   | 'minOrderQuantity'
@@ -80,13 +82,21 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
           valA = a.unit.toLowerCase();
           valB = b.unit.toLowerCase();
           break;
-        case 'category':
-          valA = a.category.toLowerCase();
-          valB = b.category.toLowerCase();
+        case 'storeCode':
+          valA = (a.storeCode || '').toLowerCase();
+          valB = (b.storeCode || '').toLowerCase();
           break;
         case 'storeName':
           valA = a.storeName.toLowerCase();
           valB = b.storeName.toLowerCase();
+          break;
+        case 'supplierCode':
+          valA = (a.primarySupplierCode || '').toLowerCase();
+          valB = (b.primarySupplierCode || '').toLowerCase();
+          break;
+        case 'supplierName':
+          valA = (a.primarySupplierName || '').toLowerCase();
+          valB = (b.primarySupplierName || '').toLowerCase();
           break;
         case 'costPrice':
           valA = a.costPrice;
@@ -153,29 +163,32 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
 
   const tableColGroup = (
     <colgroup>
-      <col style={{ width: '4%' }} />   {/* STT */}
-      <col style={{ width: '10%' }} />  {/* Mã SKU */}
-      <col style={{ width: '18%' }} />  {/* Tên SP */}
-      <col style={{ width: '5%' }} />   {/* ĐVT */}
-      <col style={{ width: '9%' }} />   {/* Ngành Hàng */}
-      <col style={{ width: '11%' }} />  {/* Cửa Hàng */}
-      <col style={{ width: '9%' }} />   {/* Giá Vốn */}
-      <col style={{ width: '9%' }} />   {/* Giá Bán */}
-      <col style={{ width: '8%' }} />   {/* MOQ */}
-      <col style={{ width: '9%' }} />   {/* Trạng Thái */}
-      <col style={{ width: '8%' }} />   {/* Thao Tác */}
+      <col style={{ width: '9%' }} />
+      <col style={{ width: '15%' }} />
+      <col style={{ width: '7%' }} />
+      <col style={{ width: '10.5%' }} />
+      <col style={{ width: '9%' }} />
+      <col style={{ width: '11.5%' }} />
+      <col style={{ width: '7%' }} />
+      <col style={{ width: '7%' }} />
+      <col style={{ width: '4%' }} />
+      <col style={{ width: '4%' }} />
+      <col style={{ width: '8.5%' }} />
+      <col style={{ width: '7.5%' }} />
     </colgroup>
   );
 
   const thStyle: React.CSSProperties = {
     backgroundColor: '#f8fafc',
-    padding: '10px 8px',
+    padding: '8px 6px',
     fontSize: 12,
     fontWeight: 700,
     color: '#334155',
     textTransform: 'uppercase',
-    letterSpacing: '0.03em',
-    whiteSpace: 'nowrap',
+    letterSpacing: '0.02em',
+    whiteSpace: 'normal',
+    wordBreak: 'break-word',
+    lineHeight: 1.25,
     boxSizing: 'border-box',
     borderBottom: '1px solid #cbd5e1',
     userSelect: 'none',
@@ -188,12 +201,10 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
         className="so-list-table-head"
         style={{ paddingRight: hasScrollY ? 6 : 0 }}
       >
-        <table className="so-list-table">
+        <table className="so-list-table" style={{ minWidth: 1380, tableLayout: 'fixed' }}>
           {tableColGroup}
           <thead>
             <tr>
-              <th style={{ ...thStyle, textAlign: 'center' }}>STT</th>
-
               <th
                 style={{ ...thStyle, cursor: 'pointer' }}
                 onClick={() => handleSort('sku')}
@@ -201,7 +212,7 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
               >
                 <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                   <span>Mã SKU</span>
-                  <ArrowUpDown size={12} style={{ color: sortField === 'sku' ? '#0f766e' : '#94a3b8' }} />
+                  <ArrowUpDown size={12} style={{ color: sortField === 'sku' ? '#0f766e' : '#94a3b8', flexShrink: 0 }} />
                 </div>
               </th>
 
@@ -212,29 +223,18 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
               >
                 <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                   <span>Tên Sản Phẩm</span>
-                  <ArrowUpDown size={12} style={{ color: sortField === 'name' ? '#0f766e' : '#94a3b8' }} />
-                </div>
-              </th>
-
-              <th
-                style={{ ...thStyle, textAlign: 'center', cursor: 'pointer' }}
-                onClick={() => handleSort('unit')}
-                title="Sắp xếp theo đơn vị tính"
-              >
-                <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4, width: '100%' }}>
-                  <span>ĐVT</span>
-                  <ArrowUpDown size={12} style={{ color: sortField === 'unit' ? '#0f766e' : '#94a3b8' }} />
+                  <ArrowUpDown size={12} style={{ color: sortField === 'name' ? '#0f766e' : '#94a3b8', flexShrink: 0 }} />
                 </div>
               </th>
 
               <th
                 style={{ ...thStyle, cursor: 'pointer' }}
-                onClick={() => handleSort('category')}
-                title="Sắp xếp theo ngành hàng"
+                onClick={() => handleSort('storeCode')}
+                title="Sắp xếp theo mã cửa hàng"
               >
                 <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                  <span>Ngành Hàng</span>
-                  <ArrowUpDown size={12} style={{ color: sortField === 'category' ? '#0f766e' : '#94a3b8' }} />
+                  <span>Mã Cửa Hàng</span>
+                  <ArrowUpDown size={12} style={{ color: sortField === 'storeCode' ? '#0f766e' : '#94a3b8', flexShrink: 0 }} />
                 </div>
               </th>
 
@@ -245,7 +245,29 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
               >
                 <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                   <span>Cửa Hàng</span>
-                  <ArrowUpDown size={12} style={{ color: sortField === 'storeName' ? '#0f766e' : '#94a3b8' }} />
+                  <ArrowUpDown size={12} style={{ color: sortField === 'storeName' ? '#0f766e' : '#94a3b8', flexShrink: 0 }} />
+                </div>
+              </th>
+
+              <th
+                style={{ ...thStyle, cursor: 'pointer' }}
+                onClick={() => handleSort('supplierCode')}
+                title="Sắp xếp theo mã nhà cung cấp"
+              >
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                  <span>Mã NCC</span>
+                  <ArrowUpDown size={12} style={{ color: sortField === 'supplierCode' ? '#0f766e' : '#94a3b8', flexShrink: 0 }} />
+                </div>
+              </th>
+
+              <th
+                style={{ ...thStyle, cursor: 'pointer' }}
+                onClick={() => handleSort('supplierName')}
+                title="Sắp xếp theo nhà cung cấp"
+              >
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                  <span>Nhà Cung Cấp</span>
+                  <ArrowUpDown size={12} style={{ color: sortField === 'supplierName' ? '#0f766e' : '#94a3b8', flexShrink: 0 }} />
                 </div>
               </th>
 
@@ -256,7 +278,7 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
               >
                 <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4, width: '100%' }}>
                   <span>Giá Vốn (đ)</span>
-                  <ArrowUpDown size={12} style={{ color: sortField === 'costPrice' ? '#0f766e' : '#94a3b8' }} />
+                  <ArrowUpDown size={12} style={{ color: sortField === 'costPrice' ? '#0f766e' : '#94a3b8', flexShrink: 0 }} />
                 </div>
               </th>
 
@@ -267,24 +289,35 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
               >
                 <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4, width: '100%' }}>
                   <span>Giá Bán Lẻ (đ)</span>
-                  <ArrowUpDown size={12} style={{ color: sortField === 'retailPrice' ? '#0f766e' : '#94a3b8' }} />
+                  <ArrowUpDown size={12} style={{ color: sortField === 'retailPrice' ? '#0f766e' : '#94a3b8', flexShrink: 0 }} />
                 </div>
               </th>
 
               <th
                 style={{ ...thStyle, textAlign: 'center', cursor: 'pointer' }}
                 onClick={() => handleSort('minOrderQuantity')}
-                title="Số lượng đặt hàng tối thiểu"
+                title="Số lượng đặt hàng tối thiểu (MOQ)"
               >
                 <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4, width: '100%' }}>
-                  <span>SL Đặt Tối Thiểu</span>
-                  <ArrowUpDown size={12} style={{ color: sortField === 'minOrderQuantity' ? '#0f766e' : '#94a3b8' }} />
+                  <span>MOQ</span>
+                  <ArrowUpDown size={12} style={{ color: sortField === 'minOrderQuantity' ? '#0f766e' : '#94a3b8', flexShrink: 0 }} />
                 </div>
               </th>
 
-              <th style={{ ...thStyle, textAlign: 'center' }}>Trạng Thái</th>
+              <th
+                style={{ ...thStyle, textAlign: 'center', cursor: 'pointer' }}
+                onClick={() => handleSort('unit')}
+                title="Sắp xếp theo đơn vị tính"
+              >
+                <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4, width: '100%' }}>
+                  <span>ĐVT</span>
+                  <ArrowUpDown size={12} style={{ color: sortField === 'unit' ? '#0f766e' : '#94a3b8', flexShrink: 0 }} />
+                </div>
+              </th>
 
-              <th style={{ ...thStyle, textAlign: 'center' }}>Thao Tác</th>
+              <th style={{ ...thStyle, textAlign: 'right', paddingRight: 8 }}>Trạng Thái</th>
+
+              <th style={{ ...thStyle, textAlign: 'right', paddingRight: 14 }}>Thao Tác</th>
             </tr>
           </thead>
         </table>
@@ -296,13 +329,13 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
         className="so-list-table-body supplier-table-scroll-container"
         onScroll={handleBodyScroll}
       >
-        <table className="so-list-table">
+        <table className="so-list-table" style={{ minWidth: 1380, tableLayout: 'fixed' }}>
           {tableColGroup}
           <tbody>
             {sortedProducts.length === 0 ? (
               <tr>
                 <td
-                  colSpan={11}
+                  colSpan={12}
                   style={{
                     textAlign: 'center',
                     padding: '48px 16px',
@@ -323,9 +356,7 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
                 </td>
               </tr>
             ) : (
-              sortedProducts.map((p, idx) => {
-                const rowIndex = (pageIndex - 1) * pageSize + idx + 1;
-
+              sortedProducts.map((p) => {
                 return (
                   <tr
                     key={p.id}
@@ -341,48 +372,100 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
                       e.currentTarget.style.backgroundColor = '#ffffff';
                     }}
                   >
-                    {/* 1. STT */}
-                    <td style={{ padding: '10px 4px', textAlign: 'center', fontSize: 12, color: '#64748b', verticalAlign: 'middle', borderBottom: '1px solid #f1f5f9' }}>
-                      {rowIndex}
-                    </td>
-
-                    {/* 2. Mã SKU (Bỏ Barcode) */}
-                    <td style={{ padding: '10px 8px', verticalAlign: 'middle', borderBottom: '1px solid #f1f5f9' }}>
+                    {/* 1. Mã SKU */}
+                    <td style={{ padding: '8px 8px', verticalAlign: 'middle', borderBottom: '1px solid #f1f5f9' }}>
                       <span
                         style={{
                           fontFamily: 'var(--font-mono, monospace)',
                           fontSize: 12,
-                          fontWeight: 700,
+                          fontWeight: 600,
                           color: '#0f766e',
-                          backgroundColor: '#f0fdfa',
-                          padding: '2px 8px',
-                          borderRadius: 4,
-                          border: '1px solid #ccfbf1',
-                          display: 'inline-block',
                           whiteSpace: 'nowrap',
+                          display: 'inline-block',
                         }}
+                        title={p.sku}
                       >
                         {p.sku}
                       </span>
                     </td>
 
-                    {/* 3. Tên Sản phẩm (Tách riêng, tự động xuống dòng khi dài) */}
+                    {/* 2. Tên Sản phẩm (xuống dòng tối đa 2 dòng khi dài) */}
                     <td className="so-list-td--wrap">
-                      <div className="so-list-name">{p.name}</div>
+                      <div className="so-list-name" title={p.name}>{p.name}</div>
                     </td>
 
-                    {/* 4. Đơn vị tính (ĐVT) */}
-                    <td style={{ padding: '10px 4px', textAlign: 'center', verticalAlign: 'middle', borderBottom: '1px solid #f1f5f9' }}>
+                    {/* 3. Mã Cửa Hàng */}
+                    <td style={{ padding: '8px 8px', verticalAlign: 'middle', borderBottom: '1px solid #f1f5f9' }}>
                       <span
                         style={{
+                          fontFamily: 'var(--font-mono, monospace)',
                           fontSize: 12,
                           fontWeight: 600,
-                          color: '#475569',
-                          backgroundColor: '#f8fafc',
-                          padding: '2px 8px',
-                          borderRadius: 4,
-                          border: '1px solid #e2e8f0',
+                          color: '#334155',
+                          whiteSpace: 'nowrap',
                           display: 'inline-block',
+                        }}
+                        title={p.storeCode}
+                      >
+                        {p.storeCode || '---'}
+                      </span>
+                    </td>
+
+                    {/* 4. Cửa Hàng (xuống dòng tối đa 2 dòng khi dài) */}
+                    <td className="so-list-td--wrap">
+                      <div className="so-list-name" title={p.storeName}>{p.storeName}</div>
+                    </td>
+
+                    {/* 5. Mã Nhà Cung Cấp */}
+                    <td style={{ padding: '8px 8px', verticalAlign: 'middle', borderBottom: '1px solid #f1f5f9' }}>
+                      <span
+                        style={{
+                          fontFamily: 'var(--font-mono, monospace)',
+                          fontSize: 12,
+                          fontWeight: 600,
+                          color: '#334155',
+                          whiteSpace: 'nowrap',
+                          display: 'inline-block',
+                        }}
+                        title={p.primarySupplierCode}
+                      >
+                        {p.primarySupplierCode || '---'}
+                      </span>
+                    </td>
+
+                    {/* 6. Tên Nhà Cung Cấp */}
+                    <td className="so-list-td--wrap">
+                      <div className="so-list-name" title={p.primarySupplierName}>{p.primarySupplierName || '---'}</div>
+                    </td>
+
+                    {/* 8. Giá Vốn (đ) */}
+                    <td style={{ padding: '8px 6px', textAlign: 'right', verticalAlign: 'middle', whiteSpace: 'nowrap', borderBottom: '1px solid #f1f5f9' }}>
+                      <span style={{ fontFamily: 'var(--font-mono, monospace)', fontWeight: 600, fontSize: 12.5, color: '#64748b' }}>
+                        {fmt(p.costPrice)} đ
+                      </span>
+                    </td>
+
+                    {/* 9. Giá Bán Lẻ (đ) */}
+                    <td style={{ padding: '8px 6px', textAlign: 'right', verticalAlign: 'middle', whiteSpace: 'nowrap', borderBottom: '1px solid #f1f5f9' }}>
+                      <span style={{ fontFamily: 'var(--font-mono, monospace)', fontWeight: 700, fontSize: 13, color: '#0f766e' }}>
+                        {fmt(p.retailPrice)} đ
+                      </span>
+                    </td>
+
+                    {/* 10. SL Đặt Tối Thiểu (MOQ) */}
+                    <td style={{ padding: '8px 6px', textAlign: 'center', verticalAlign: 'middle', whiteSpace: 'nowrap', borderBottom: '1px solid #f1f5f9' }}>
+                      <span style={{ fontFamily: 'var(--font-mono, monospace)', fontWeight: 700, fontSize: 12.5, color: '#0f172a' }}>
+                        {p.minOrderQuantity ?? 1}
+                      </span>
+                    </td>
+
+                    {/* 10. ĐVT (bỏ highlight, hiển thị text sạch gọn) */}
+                    <td style={{ padding: '8px 4px', textAlign: 'center', verticalAlign: 'middle', borderBottom: '1px solid #f1f5f9' }}>
+                      <span
+                        style={{
+                          fontSize: 12.5,
+                          fontWeight: 600,
+                          color: '#334155',
                           whiteSpace: 'nowrap',
                         }}
                       >
@@ -390,60 +473,31 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
                       </span>
                     </td>
 
-                    {/* 5. Ngành Hàng (Tự động xuống dòng khi dài) */}
-                    <td style={{ padding: '10px 8px', verticalAlign: 'middle', borderBottom: '1px solid #f1f5f9' }}>
-                      <span
-                        style={{
-                          fontSize: 11.5,
-                          fontWeight: 600,
-                          padding: '2px 8px',
-                          borderRadius: 4,
-                          backgroundColor: '#f1f5f9',
-                          color: '#475569',
-                          border: '1px solid #e2e8f0',
-                          display: 'inline-block',
-                          lineHeight: 1.25,
-                          whiteSpace: 'normal',
-                          wordBreak: 'break-word',
-                        }}
-                      >
-                        {p.category}
-                      </span>
-                    </td>
-
-                    {/* 6. Cửa Hàng (Bỏ vị trí, tự động xuống dòng khi dài) */}
-                    <td className="so-list-td--wrap">
-                      <div className="so-list-name">{p.storeName}</div>
-                    </td>
-
-                    {/* 7. Giá Vốn (đ) (Tách riêng) */}
-                    <td style={{ padding: '10px 8px', textAlign: 'right', verticalAlign: 'middle', whiteSpace: 'nowrap', borderBottom: '1px solid #f1f5f9' }}>
-                      <span style={{ fontFamily: 'var(--font-mono, monospace)', fontWeight: 600, fontSize: 12.5, color: '#64748b' }}>
-                        {fmt(p.costPrice)} đ
-                      </span>
-                    </td>
-
-                    {/* 8. Giá Bán Lẻ (đ) (Tách riêng) */}
-                    <td style={{ padding: '10px 8px', textAlign: 'right', verticalAlign: 'middle', whiteSpace: 'nowrap', borderBottom: '1px solid #f1f5f9' }}>
-                      <span style={{ fontFamily: 'var(--font-mono, monospace)', fontWeight: 700, fontSize: 13, color: '#0f766e' }}>
-                        {fmt(p.retailPrice)} đ
-                      </span>
-                    </td>
-
-                    {/* 9. SL Đặt Tối Thiểu (MOQ) */}
-                    <td style={{ padding: '10px 6px', textAlign: 'center', verticalAlign: 'middle', whiteSpace: 'nowrap', borderBottom: '1px solid #f1f5f9' }}>
-                      <span style={{ fontFamily: 'var(--font-mono, monospace)', fontWeight: 700, fontSize: 12.5, color: '#0f172a' }}>
-                        {p.minOrderQuantity ?? 10}
-                      </span>
-                    </td>
-
-                    {/* 10. Trạng Thái (CSS chuẩn theo http://localhost:5173/store-owner/suppliers/products) */}
-                    <td style={{ textAlign: 'center' }}>
+                    {/* 11. Trạng Thái (Căn sát lại gần cột Thao Tác) */}
+                    <td
+                      style={{
+                        textAlign: 'right',
+                        verticalAlign: 'middle',
+                        padding: '8px 8px 8px 4px',
+                        borderBottom: '1px solid #f1f5f9',
+                        overflow: 'visible',
+                        textOverflow: 'clip',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
                       <SupplierStatusBadge status={p.status} />
                     </td>
 
-                    {/* 11. Thao Tác (1 nút duy nhất mở popup thao tác) */}
-                    <td style={{ padding: '10px 6px', textAlign: 'center', whiteSpace: 'nowrap', verticalAlign: 'middle', borderBottom: '1px solid #f1f5f9' }}>
+                    {/* 12. Thao Tác (Căn sát về bên phải của table) */}
+                    <td
+                      style={{
+                        padding: '8px 14px 8px 4px',
+                        textAlign: 'right',
+                        whiteSpace: 'nowrap',
+                        verticalAlign: 'middle',
+                        borderBottom: '1px solid #f1f5f9',
+                      }}
+                    >
                       <button
                         type="button"
                         className="so-list-action-btn"

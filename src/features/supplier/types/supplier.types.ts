@@ -98,6 +98,7 @@ export interface CreateSupplierInput {
   category: SupplierCategory;
   contactPerson: string;
   phone: string;
+  status?: SupplierStatus;
   email?: string;
   address?: string;
   paymentTermDays: number;
@@ -110,6 +111,30 @@ export interface CreateSupplierInput {
   accountHolder?: string;
   note?: string;
   linkedCustomerId?: string;
+}
+
+export interface UpdateBasicSupplierInput {
+  id: string;
+  name: string;
+  contactPerson?: string;
+  phone: string;
+  email?: string;
+  status: SupplierStatus;
+  taxCode?: string;
+  address?: string;
+  note?: string;
+}
+
+export interface UpdateSupplierBankInput {
+  bankName?: string;
+  bankAccount?: string;
+  accountHolder?: string;
+}
+
+export interface UpdateSupplierVatInput {
+  companyName?: string;
+  taxCode?: string;
+  invoiceAddress?: string;
 }
 
 export type UpdateSupplierInput = Partial<CreateSupplierInput> & { id: string };

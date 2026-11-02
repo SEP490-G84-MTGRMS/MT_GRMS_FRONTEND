@@ -55,7 +55,7 @@ export const LoginPage: FC = () => {
       if (res.user.role === "CASHIER") {
         navigate("/pos");
       } else {
-        navigate("/admin/dashboard");
+        navigate("/store-owner/purchase-orders/create-matrix");
       }
     } catch (err: unknown) {
       const msg =
@@ -96,6 +96,55 @@ export const LoginPage: FC = () => {
           <span>{errorMessage}</span>
         </div>
       )}
+
+      {/* Nút chọn nhanh tài khoản kiểm thử */}
+      <div style={{ marginBottom: "16px", padding: "12px", background: "#f8fafc", borderRadius: "8px", border: "1px dashed #cbd5e1" }}>
+        <div style={{ fontSize: "12px", fontWeight: 700, color: "#475569", marginBottom: "8px" }}>
+          Tài khoản kiểm thử vai trò (1-Click điền thông tin):
+        </div>
+        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+          <button
+            type="button"
+            style={{
+              flex: 1,
+              padding: "7px 10px",
+              background: "#eff6ff",
+              border: "1px solid #bfdbfe",
+              color: "#1d4ed8",
+              borderRadius: "6px",
+              fontSize: "12px",
+              fontWeight: 700,
+              cursor: "pointer"
+            }}
+            onClick={() => {
+              setPhoneOrEmail("owner@mtgrms.vn");
+              setPassword("Owner@123456");
+            }}
+          >
+            👑 Store Owner (Chủ tiệm)
+          </button>
+          <button
+            type="button"
+            style={{
+              flex: 1,
+              padding: "7px 10px",
+              background: "#f0fdf4",
+              border: "1px solid #bbf7d0",
+              color: "#15803d",
+              borderRadius: "6px",
+              fontSize: "12px",
+              fontWeight: 700,
+              cursor: "pointer"
+            }}
+            onClick={() => {
+              setPhoneOrEmail("employee@mtgrms.vn");
+              setPassword("Staff@123456");
+            }}
+          >
+            👷‍♂️ Employee (Nhân viên)
+          </button>
+        </div>
+      </div>
 
       {/* FORM ĐĂNG NHẬP */}
       <form onSubmit={handleLoginSubmit} className="auth-form-fields">

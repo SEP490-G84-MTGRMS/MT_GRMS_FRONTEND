@@ -1,17 +1,17 @@
 import { useState, useMemo, useEffect } from 'react';
 import type { FC } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import {
-  MOCK_PO_SUPPLIERS,
-  MOCK_BRANCHES,
-  MOCK_MATRIX_PRODUCTS,
-} from '../lib/mockData';
 import type {
   DayColInfo,
   MatrixCellMap,
   MatrixCellData,
   SplitPoPreview,
   SplitPoItem,
+  OrderMatrixProduct,
+  OrderMatrixSupplierDeliveryConfig,
+  BranchOption,
+  SupplierOption,
+  SupplierDeliveryConfig,
 } from '../types/po.types';
 import { OrderMatrixHeader } from '../components/matrix/OrderMatrixHeader';
 import { OrderMatrixFilterBar } from '../components/matrix/OrderMatrixFilterBar';
@@ -19,7 +19,57 @@ import { OrderMatrixTable } from '../components/matrix/OrderMatrixTable';
 import { OrderMatrixSplitModal } from '../components/matrix/OrderMatrixSplitModal';
 import { AdminToast, type ToastState } from '../../admin/components';
 import { purchaseOrderApi } from '../api/purchaseOrderApi';
+import { storeProductApi } from '../../product/api/storeProductApi';
+import { useAuthStore } from '../../../stores/useAuthStore';
 import '../purchase-order.css';
+
+const GUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+const DEFAULT_DELIVERY: SupplierDeliveryConfig = {
+  supplierId: '',
+  leadDays: 1,
+  cutoffHour: '15:00',
+  lockHour: '16:00',
+  activeDeliveryDays: [1, 2, 3, 4, 5, 6],
+  holidays: [],
+};
+
+function suppliersFromMatrix(
+  products: OrderMatrixProduct[],
+  configs: OrderMatrixSupplierDeliveryConfig[]
+): SupplierOption[] {
+  const map = new Map<string, SupplierOption>();
+  configs.forEach((sc) => {
+    map.set(sc.supplierId, {
+      id: sc.supplierId,
+      code: sc.supplierCode,
+      name: sc.supplierName,
+      creditLimit: 0,
+      openAp: 0,
+      config: {
+        supplierId: sc.supplierId,
+        leadDays: sc.leadTimeDays,
+        cutoffHour: sc.cutoffTime,
+        lockHour: sc.cutoffTime,
+        activeDeliveryDays: sc.activeDeliveryDays,
+        holidays: sc.blackoutDates,
+      },
+    });
+  });
+  products.forEach((p) => {
+    if (!p.supplierId || map.has(p.supplierId)) return;
+    map.set(p.supplierId, {
+      id: p.supplierId,
+      code: p.supplierId,
+      name: p.supplierName || p.supplierId,
+      creditLimit: 0,
+      openAp: 0,
+      config: { ...DEFAULT_DELIVERY, supplierId: p.supplierId },
+    });
+  });
+  return Array.from(map.values());
+}
 
 // Base mock reference date matching FE-05 prototype: Monday 2026-11-02
 const BASE_TODAY = '2026-11-02';
@@ -60,16 +110,18 @@ function computeDayColumns(
   viewFrom: Date,
   durationDays: number,
   supplierId: string,
-  lockedDates: Set<string>
+  lockedDates: Set<string>,
+  supplierConfigs?: OrderMatrixSupplierDeliveryConfig[]
 ): DayColInfo[] {
   const list: DayColInfo[] = [];
   const isAll = supplierId === 'ALL';
-  const sup = MOCK_PO_SUPPLIERS.find((s) => s.id === supplierId) || MOCK_PO_SUPPLIERS[0];
-  const config = sup.config;
+  const supConfig = supplierConfigs?.find((sc) => sc.supplierId === supplierId);
   const baseDate = parseDateStr(BASE_TODAY);
+
+  const leadDays = supConfig?.leadTimeDays ?? (isAll ? 0 : DEFAULT_DELIVERY.leadDays);
   const earliestAllowed = isAll
     ? BASE_TODAY
-    : fmtDateStr(addDaysToDate(baseDate, config.leadDays));
+    : fmtDateStr(addDaysToDate(baseDate, leadDays));
 
   // Today + 1 is Tuesday 03/11 in this scenario -> cutoff due today at 15:00
   const cutoffDueThreshold = fmtDateStr(addDaysToDate(baseDate, 1));
@@ -77,15 +129,38 @@ function computeDayColumns(
   for (let i = 0; i < durationDays; i++) {
     const d = addDaysToDate(viewFrom, i);
     const k = fmtDateStr(d);
+    const dow = d.getDay();
     const isLeadBlocked = isAll ? false : k < earliestAllowed;
-    const isDayOff = isAll ? d.getDay() === 0 : !config.activeDeliveryDays.includes(d.getDay());
-    const isHoliday = isAll ? false : config.holidays.includes(k);
-    const isOff = isLeadBlocked || isDayOff || isHoliday;
 
+    let isDayOff = false;
+    let isHoliday = false;
+    let isSupplierInactive = false;
+    let isSupplierNotAssigned = false;
     let offReason = '';
-    if (isLeadBlocked) offReason = 'Vi phạm thời gian chuẩn bị giao hàng (Lead time)';
-    else if (isDayOff) offReason = 'Nhà cung cấp không giao hàng vào thứ này';
-    else if (isHoliday) offReason = 'Ngày lễ/nghỉ của nhà cung cấp';
+
+    if (supConfig) {
+      if (!supConfig.isActive) {
+        isSupplierInactive = true;
+        offReason = supConfig.inactiveReason || 'Nhà cung cấp đang tạm dừng hoạt động';
+      } else if (!supConfig.isAssignedToBranch) {
+        isSupplierNotAssigned = true;
+        offReason = 'Nhà cung cấp chưa được phân bổ tới chi nhánh này';
+      } else {
+        isDayOff = supConfig.activeDeliveryDays ? !supConfig.activeDeliveryDays.includes(dow) : false;
+        isHoliday = supConfig.blackoutDates ? supConfig.blackoutDates.includes(k) : false;
+      }
+    } else {
+      isDayOff = isAll ? false : !DEFAULT_DELIVERY.activeDeliveryDays.includes(dow);
+      isHoliday = false;
+    }
+
+    const isOff = isSupplierInactive || isSupplierNotAssigned || isLeadBlocked || isDayOff || isHoliday;
+
+    if (!offReason) {
+      if (isLeadBlocked) offReason = 'Vi phạm thời gian chuẩn bị giao hàng (Lead time)';
+      else if (isDayOff) offReason = 'Nhà cung cấp không giao hàng vào thứ này';
+      else if (isHoliday) offReason = 'Ngày lễ/nghỉ của nhà cung cấp';
+    }
 
     // Status resolution
     const isAlreadyPo = lockedDates.has(k);
@@ -98,7 +173,6 @@ function computeDayColumns(
     } else if (isPastLocked) {
       cutoffStatus = 'LOCKED';
     } else if (!isOff && k <= cutoffDueThreshold) {
-      // The nearest delivery date (e.g. Tuesday 03/11) has reached cutoff!
       cutoffStatus = 'CUTOFF_DUE';
     } else {
       cutoffStatus = 'OPEN';
@@ -112,7 +186,7 @@ function computeDayColumns(
       isOff,
       isLocked,
       offReason,
-      cutoffHour: config.cutoffHour || '15:00',
+      cutoffHour: supConfig?.cutoffTime || DEFAULT_DELIVERY.cutoffHour,
       cutoffStatus,
       poCode: isAlreadyPo ? `PO-${k.replace(/-/g, '')}-GEN` : undefined,
     });
@@ -120,63 +194,30 @@ function computeDayColumns(
   return list;
 }
 
-// Compute default initial 3-tier matrix cell data
-function computeDefaultCellMap(
-  supplierId: string,
-  days: DayColInfo[]
+function buildEmptyCellMap(
+  prodList: OrderMatrixProduct[],
+  existing?: MatrixCellMap
 ): MatrixCellMap {
-  const initialMap: MatrixCellMap = {};
-  const relevantProducts =
-    supplierId === 'ALL'
-      ? MOCK_MATRIX_PRODUCTS
-      : MOCK_MATRIX_PRODUCTS.filter((p) => p.supplierId === supplierId);
-
-  relevantProducts.forEach((p) => {
-    initialMap[p.id] = {};
-  });
-
-  days.forEach((d, idx) => {
-    if (!d.isOff && !d.isLocked && idx % 2 === 1) {
-      relevantProducts.slice(0, 10).forEach((p, pIdx) => {
-        if (!initialMap[p.id]) initialMap[p.id] = {};
-
-        // Base employee proposed quantity
-        const empQty = Math.max(p.moq, 10 + (pIdx % 3) * 5);
-
-        // Simulate a few Store Owner overrides for demonstration
-        let storeQty: number | null = null;
-        if (pIdx === 0 && idx === 1) {
-          storeQty = empQty + 5; // Store Owner increased by 5
-        } else if (pIdx === 2 && idx === 3) {
-          storeQty = 0; // Store Owner explicitly zeroed out
-        }
-
-        const finalQty = storeQty !== null ? storeQty : empQty;
-        const suggestedQty = Math.max(0, Math.round(p.sales * 2.5 + (p.safetyStock || 4) - p.soh));
-
-        initialMap[p.id][d.dateKey] = {
-          employeeQty: empQty,
-          storeQty,
-          finalQty,
-          suggestedQty,
-          isOwnerOverridden: storeQty !== null,
-          modifiedBy: storeQty !== null ? 'store_owner' : 'employee',
-        };
-      });
+  const map: MatrixCellMap = { ...(existing || {}) };
+  prodList.forEach((p) => {
+    if (!map[p.id]) {
+      map[p.id] = {};
     }
   });
-
-  return initialMap;
+  return map;
 }
 
-export const OrderMatrixPage: FC = () => {
+export interface OrderMatrixPageProps {
+  forcedRole?: 'STORE_OWNER' | 'EMPLOYEE';
+}
+
+export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
   const initialSupplier = searchParams.get('supplier') || 'ALL';
-  const branchParam = searchParams.get('branchId') || searchParams.get('branch');
-  const initialBranch =
-    branchParam && MOCK_BRANCHES.some((b) => b.id === branchParam) ? branchParam : 'DC1';
+  const branchParam =
+    searchParams.get('branchId') || searchParams.get('branch') || searchParams.get('storeId') || '';
   const isReadOnly =
     searchParams.get('mode') === 'view' || searchParams.get('readOnly') === 'true';
 
@@ -188,14 +229,11 @@ export const OrderMatrixPage: FC = () => {
   const [lockedDates, setLockedDates] = useState<Set<string>>(new Set());
 
   // State: Filter Scope
-  const [selectedBranchId, setSelectedBranchId] = useState<string>(initialBranch);
-
-  useEffect(() => {
-    const currentParam = searchParams.get('branchId') || searchParams.get('branch');
-    if (currentParam && MOCK_BRANCHES.some((b) => b.id === currentParam)) {
-      setSelectedBranchId(currentParam);
-    }
-  }, [searchParams]);
+  const [branches, setBranches] = useState<BranchOption[]>([]);
+  const [suppliers, setSuppliers] = useState<SupplierOption[]>([]);
+  const [selectedBranchId, setSelectedBranchId] = useState<string>(
+    GUID_RE.test(branchParam) ? branchParam : ''
+  );
 
   const [selectedSupplierId, setSelectedSupplierId] = useState<string>(initialSupplier);
   const [viewFrom, setViewFrom] = useState<Date>(initialViewFrom);
@@ -212,16 +250,12 @@ export const OrderMatrixPage: FC = () => {
   const [ownerModifiedOnly, setOwnerModifiedOnly] = useState<boolean>(false);
   const [showSoh, setShowSoh] = useState<boolean>(false);
 
-  // State: Matrix 3-tier Data
-  const initialDays = useMemo(
-    () => computeDayColumns(initialViewFrom, durationDays, initialSupplier, lockedDates),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    []
-  );
+  // Backend Data State: Products & Supplier Delivery Configurations
+  const [matrixProducts, setMatrixProducts] = useState<OrderMatrixProduct[]>([]);
+  const [supplierConfigs, setSupplierConfigs] = useState<OrderMatrixSupplierDeliveryConfig[]>([]);
+  const [, setIsLoadingMatrix] = useState<boolean>(false);
 
-  const [cellMap, setCellMap] = useState<MatrixCellMap>(() =>
-    computeDefaultCellMap(initialSupplier, initialDays)
-  );
+  const [cellMap, setCellMap] = useState<MatrixCellMap>({});
 
   const [isDirty, setIsDirty] = useState<boolean>(false);
   const [status, setStatus] = useState<string>('Draft');
@@ -233,45 +267,198 @@ export const OrderMatrixPage: FC = () => {
   // State: Toast
   const [toast, setToast] = useState<ToastState | null>(null);
 
+  // Role State: Xác định quyền thao tác Store Owner vs Employee
+  // Ưu tiên: 1. forcedRole từ Route, 2. param ?role=, 3. userRole trong AuthStore
+  const roleParam = searchParams.get('role');
+  const userRole = useAuthStore((s) => s.user?.role);
+  const isStoreOwner = useMemo(() => {
+    if (forcedRole === 'STORE_OWNER') return true;
+    if (forcedRole === 'EMPLOYEE') return false;
+    if (roleParam === 'employee' || roleParam === 'staff') return false;
+    if (roleParam === 'owner' || roleParam === 'store_owner') return true;
+    return userRole !== 'EMPLOYEE' && userRole !== 'CASHIER';
+  }, [forcedRole, roleParam, userRole]);
+
   const showToast = (message: string, type: ToastState['type'] = 'success') => {
     setToast({ id: Date.now().toString(), message, type });
     setTimeout(() => setToast(null), 3500);
   };
 
-  // Date columns calculated dynamically
+  // Nạp danh sách chi nhánh thật (không dùng mock DC1 / BR-01)
+  useEffect(() => {
+    let isMounted = true;
+    const loadBranches = async () => {
+      try {
+        const summaries = await storeProductApi.getStoreSummaries();
+        if (!isMounted) return;
+        const realBranches = (summaries || [])
+          .filter((b) => GUID_RE.test(b.id))
+          .map((b) => ({ id: b.id, code: b.code, name: b.name }));
+        setBranches(realBranches);
+
+        const authUser = useAuthStore.getState().user;
+        const employeeBranchId = !isStoreOwner ? (authUser?.branchId || '') : '';
+
+        const urlBranch =
+          employeeBranchId ||
+          searchParams.get('branchId') ||
+          searchParams.get('branch') ||
+          searchParams.get('storeId') ||
+          '';
+        if (urlBranch && realBranches.some((b) => b.id === urlBranch)) {
+          setSelectedBranchId(urlBranch);
+        } else {
+          const withProducts = (summaries || []).find(
+            (b) => GUID_RE.test(b.id) && (b.totalProducts || 0) > 0
+          );
+          const nextId = withProducts?.id || realBranches[0]?.id || '';
+          if (nextId !== selectedBranchId) {
+            setSelectedBranchId(nextId);
+          }
+        }
+      } catch {
+        if (isMounted) {
+          setBranches([]);
+          showToast('Không tải được danh sách chi nhánh.', 'error');
+        }
+      }
+    };
+    loadBranches();
+    return () => {
+      isMounted = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, isStoreOwner]);
+
+  // Nạp dữ liệu ma trận từ sản phẩm theo chi nhánh
+  useEffect(() => {
+    let isMounted = true;
+    const fetchMatrixData = async () => {
+      if (!GUID_RE.test(selectedBranchId)) {
+        setMatrixProducts([]);
+        setCellMap({});
+        setSupplierConfigs([]);
+        return;
+      }
+      try {
+        setIsLoadingMatrix(true);
+        // Nạp toàn bộ sản phẩm và cấu hình NCC của chi nhánh đã chọn
+        const res = await purchaseOrderApi.getOrderMatrix(
+          selectedBranchId,
+          undefined,
+          fmtDateStr(viewFrom),
+          durationDays
+        );
+        if (!isMounted) return;
+
+        setMatrixProducts(res.products || []);
+        setSupplierConfigs(res.supplierConfigs || []);
+
+        // Khôi phục số lượng ô đặt hàng: Ưu tiên dữ liệu từ Backend, nếu chưa có thì nạp từ LocalStorage
+        let targetCells = res.cellMap || {};
+        if (Object.keys(targetCells).length === 0) {
+          try {
+            const localKey = `matrix_draft_${selectedBranchId}_ALL`;
+            const raw = localStorage.getItem(localKey);
+            if (raw) {
+              const parsed = JSON.parse(raw);
+              if (parsed && Object.keys(parsed).length > 0) {
+                targetCells = parsed;
+              }
+            }
+          } catch {
+            // ignore
+          }
+        }
+
+        setCellMap(buildEmptyCellMap(res.products || [], targetCells));
+        const nextSuppliers = suppliersFromMatrix(res.products || [], res.supplierConfigs || []);
+        setSuppliers(nextSuppliers);
+      } catch {
+        if (!isMounted) return;
+        setMatrixProducts([]);
+        setCellMap({});
+        showToast('Không tải được sản phẩm theo chi nhánh cho ma trận đặt hàng.', 'error');
+      } finally {
+        if (isMounted) setIsLoadingMatrix(false);
+      }
+    };
+
+    fetchMatrixData();
+    return () => {
+      isMounted = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedBranchId, viewFrom, durationDays]);
+
+  // Date columns calculated dynamically with supplier configurations
   const dayColumns: DayColInfo[] = useMemo(() => {
-    return computeDayColumns(viewFrom, durationDays, selectedSupplierId, lockedDates);
-  }, [viewFrom, durationDays, selectedSupplierId, lockedDates]);
+    return computeDayColumns(viewFrom, durationDays, selectedSupplierId, lockedDates, supplierConfigs);
+  }, [viewFrom, durationDays, selectedSupplierId, lockedDates, supplierConfigs]);
 
   // Available Categories
   const availableCategories = useMemo(() => {
     const set = new Set<string>();
     const prods =
       selectedSupplierId === 'ALL'
-        ? MOCK_MATRIX_PRODUCTS
-        : MOCK_MATRIX_PRODUCTS.filter((p) => p.supplierId === selectedSupplierId);
-    prods.forEach((p) => set.add(p.category));
+        ? matrixProducts
+        : matrixProducts.filter((p) => p.supplierId === selectedSupplierId);
+    prods.forEach((p) => {
+      if (p.category) set.add(p.category);
+    });
     return Array.from(set);
-  }, [selectedSupplierId]);
+  }, [selectedSupplierId, matrixProducts]);
 
-  // Handle cell quantity change by Store Owner
-  const handleCellChange = (productId: string, dateKey: string, newStoreQty: number) => {
+  // Handle cell quantity change by Store Owner or Employee
+  const handleCellChange = (productId: string, dateKey: string, val: number) => {
     setCellMap((prev) => {
       const prodMap = { ...(prev[productId] || {}) };
       const currentCell = prodMap[dateKey] || {
         employeeQty: 0,
         storeQty: null,
         finalQty: 0,
+        isOwnerAdjusted: false,
+        isOwnerOverridden: false,
       };
 
-      const updatedCell: MatrixCellData = {
-        ...currentCell,
-        storeQty: newStoreQty,
-        finalQty: newStoreQty,
-        isOwnerOverridden: true,
-        modifiedBy: 'store_owner',
-        modifiedAt: new Date().toISOString(),
-      };
+      let updatedCell: MatrixCellData;
+
+      if (isStoreOwner) {
+        // Store Owner điều chỉnh:
+        // 1. Cập nhật ownerQuantity (storeQty) = val (chủ động điều chỉnh, kể cả gán 0).
+        // 2. Bật isOwnerAdjusted = true.
+        // 3. finalQuantity = ownerQuantity (val).
+        // 4. employeeQuantity KHÔNG bị thay đổi.
+        updatedCell = {
+          ...currentCell,
+          storeQty: val,
+          isOwnerAdjusted: true,
+          isOwnerOverridden: true,
+          finalQty: val,
+          modifiedBy: 'store_owner',
+          modifiedAt: new Date().toISOString(),
+        };
+      } else {
+        // Employee nhập số lượng đề xuất:
+        // 1. Lưu vào employeeQuantity = val.
+        // 2. Không cập nhật ownerQuantity.
+        // 3. Nếu Store Owner đã điều chỉnh: giữ nguyên ownerQuantity và finalQuantity.
+        // 4. Nếu Store Owner chưa điều chỉnh: finalQuantity = employeeQuantity (val).
+        const isAdjusted = Boolean(
+          currentCell.isOwnerAdjusted ||
+          currentCell.isOwnerOverridden ||
+          (currentCell.storeQty !== null && currentCell.storeQty !== undefined)
+        );
+        const finalQty = isAdjusted ? (currentCell.storeQty ?? val) : val;
+
+        updatedCell = {
+          ...currentCell,
+          employeeQty: val,
+          finalQty,
+          modifiedBy: 'employee',
+          modifiedAt: new Date().toISOString(),
+        };
+      }
 
       prodMap[dateKey] = updatedCell;
       return { ...prev, [productId]: prodMap };
@@ -286,11 +473,16 @@ export const OrderMatrixPage: FC = () => {
       const currentCell = prodMap[dateKey];
       if (!currentCell) return prev;
 
+      // 1. Xóa owner override / đặt ownerQuantity về null.
+      // 2. isOwnerAdjusted = false.
+      // 3. finalQuantity = employeeQuantity (mới nhất).
+      // 4. Không được xóa employeeQuantity.
       const updatedCell: MatrixCellData = {
         ...currentCell,
         storeQty: null,
-        finalQty: currentCell.employeeQty,
+        isOwnerAdjusted: false,
         isOwnerOverridden: false,
+        finalQty: currentCell.employeeQty,
         modifiedBy: 'employee',
       };
 
@@ -306,7 +498,7 @@ export const OrderMatrixPage: FC = () => {
     let count = 0;
     Object.values(cellMap).forEach((prodMap) => {
       Object.values(prodMap).forEach((cell) => {
-        if (cell.storeQty !== null && cell.storeQty !== cell.employeeQty) {
+        if (cell.isOwnerAdjusted || cell.isOwnerOverridden || (cell.storeQty !== null && cell.storeQty !== undefined)) {
           count++;
         }
       });
@@ -317,7 +509,7 @@ export const OrderMatrixPage: FC = () => {
   // Filtered Products
   const filteredProducts = useMemo(() => {
     const kw = keyword.trim().toLowerCase();
-    return MOCK_MATRIX_PRODUCTS.filter((p) => {
+    return matrixProducts.filter((p) => {
       if (selectedSupplierId !== 'ALL' && p.supplierId !== selectedSupplierId) return false;
       if (categoryFilter && p.category !== categoryFilter) return false;
       if (kw && !p.name.toLowerCase().includes(kw) && !p.sku.toLowerCase().includes(kw)) {
@@ -346,6 +538,7 @@ export const OrderMatrixPage: FC = () => {
       return true;
     });
   }, [
+    matrixProducts,
     selectedSupplierId,
     categoryFilter,
     keyword,
@@ -361,8 +554,8 @@ export const OrderMatrixPage: FC = () => {
     const fails: string[] = [];
     const activeProducts =
       selectedSupplierId === 'ALL'
-        ? MOCK_MATRIX_PRODUCTS
-        : MOCK_MATRIX_PRODUCTS.filter((p) => p.supplierId === selectedSupplierId);
+        ? matrixProducts
+        : matrixProducts.filter((p) => p.supplierId === selectedSupplierId);
 
     activeProducts.forEach((p) => {
       dayColumns.forEach((d) => {
@@ -374,7 +567,7 @@ export const OrderMatrixPage: FC = () => {
     });
 
     return { moqFails: fails };
-  }, [dayColumns, cellMap, selectedSupplierId]);
+  }, [dayColumns, cellMap, selectedSupplierId, matrixProducts]);
 
   // Change duration preset (7, 14, 21, 31)
   const handleSelectDuration = (days: number) => {
@@ -470,8 +663,8 @@ export const OrderMatrixPage: FC = () => {
     let copyCount = 0;
     const relevantProducts =
       selectedSupplierId === 'ALL'
-        ? MOCK_MATRIX_PRODUCTS
-        : MOCK_MATRIX_PRODUCTS.filter((p) => p.supplierId === selectedSupplierId);
+        ? matrixProducts
+        : matrixProducts.filter((p) => p.supplierId === selectedSupplierId);
 
     relevantProducts.forEach((p) => {
       if (!newMap[p.id]) newMap[p.id] = {};
@@ -507,8 +700,8 @@ export const OrderMatrixPage: FC = () => {
   const handleExcelDownload = () => {
     const relevantProducts =
       selectedSupplierId === 'ALL'
-        ? MOCK_MATRIX_PRODUCTS
-        : MOCK_MATRIX_PRODUCTS.filter((p) => p.supplierId === selectedSupplierId);
+        ? matrixProducts
+        : matrixProducts.filter((p) => p.supplierId === selectedSupplierId);
 
     const headers = [
       'Nhà Cung Cấp',
@@ -575,7 +768,7 @@ export const OrderMatrixPage: FC = () => {
         const cols = line.split(',');
         if (cols.length >= 7) {
           const sku = cols[3]?.trim();
-          const targetProd = MOCK_MATRIX_PRODUCTS.find((p) => p.sku === sku);
+          const targetProd = matrixProducts.find((p) => p.sku === sku);
           if (targetProd && (selectedSupplierId === 'ALL' || targetProd.supplierId === selectedSupplierId)) {
             if (!newMap[targetProd.id]) newMap[targetProd.id] = {};
             dayColumns.forEach((d, idx) => {
@@ -608,16 +801,19 @@ export const OrderMatrixPage: FC = () => {
   // 1 PO for each [Branch + Supplier + Delivery Date]
   const splitPos: SplitPoPreview[] = useMemo(() => {
     const list: SplitPoPreview[] = [];
-    const currentBranch = MOCK_BRANCHES.find((b) => b.id === selectedBranchId) || MOCK_BRANCHES[0];
+    const currentBranch = branches.find((b) => b.id === selectedBranchId) || {
+      id: selectedBranchId,
+      code: '',
+      name: 'Chi nhánh',
+    };
 
-    // Determine relevant suppliers
     const activeSuppliers =
       selectedSupplierId === 'ALL'
-        ? MOCK_PO_SUPPLIERS
-        : MOCK_PO_SUPPLIERS.filter((s) => s.id === selectedSupplierId);
+        ? suppliers
+        : suppliers.filter((s) => s.id === selectedSupplierId);
 
     activeSuppliers.forEach((sup) => {
-      const supProducts = MOCK_MATRIX_PRODUCTS.filter((p) => p.supplierId === sup.id);
+      const supProducts = matrixProducts.filter((p) => p.supplierId === sup.id);
 
       dayColumns.forEach((d) => {
         if (d.isOff) return;
@@ -675,7 +871,7 @@ export const OrderMatrixPage: FC = () => {
     });
 
     return list;
-  }, [selectedBranchId, selectedSupplierId, dayColumns, cellMap]);
+  }, [branches, suppliers, selectedBranchId, selectedSupplierId, dayColumns, cellMap, matrixProducts]);
 
   // Handle confirming PO Generation from Split Modal
   const handleConfirmGeneratePo = async (selectedPoIds: string[]) => {
@@ -723,10 +919,24 @@ export const OrderMatrixPage: FC = () => {
       setStatus('Draft');
       setIsDirty(false);
       showToast('Bản thảo ma trận đặt hàng đã được lưu thành công trên hệ thống backend.', 'success');
-    } catch {
-      showToast('Không thể kết nối máy chủ, đã lưu bản thảo tạm thời ở chế độ ngoại tuyến.', 'warning');
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || 'Không thể kết nối máy chủ, đã lưu bản thảo tạm thời ở chế độ ngoại tuyến.';
+      showToast(msg, 'warning');
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleSwitchScreen = () => {
+    const params = new URLSearchParams(searchParams);
+    if (selectedBranchId) params.set('branchId', selectedBranchId);
+    if (selectedSupplierId && selectedSupplierId !== 'ALL') params.set('supplier', selectedSupplierId);
+
+    const qs = params.toString() ? `?${params.toString()}` : '';
+    if (isStoreOwner) {
+      navigate(`/store-owner/purchase-orders/employee-matrix${qs}`);
+    } else {
+      navigate(`/store-owner/purchase-orders/create-matrix${qs}`);
     }
   };
 
@@ -744,25 +954,40 @@ export const OrderMatrixPage: FC = () => {
         onOpenSplitModal={() => setIsSplitModalOpen(true)}
         onGoToCutoffHub={() => navigate('/store-owner/purchase-orders/dispatch-hub')}
         readOnly={isReadOnly}
+        isStoreOwner={isStoreOwner}
         title={
           isReadOnly
-            ? `Chi Tiết Đơn Đặt Hàng — ${MOCK_BRANCHES.find((b) => b.id === selectedBranchId)?.name || ''}`
-            : undefined
+            ? `Chi Tiết Đơn Đặt Hàng — ${branches.find((b) => b.id === selectedBranchId)?.name || ''}`
+            : isStoreOwner
+            ? '👑 Tạo Đơn Mua Hàng (Chủ Cửa Hàng Duyệt & Tách PO)'
+            : '👤 Đặt Hàng Theo Ma Trận (Nhân Viên Đề Xuất)'
+        }
+        onSwitchScreen={handleSwitchScreen}
+        switchScreenLabel={
+          isStoreOwner
+            ? '👉 Sang Màn Nhân Viên Đặt Hàng'
+            : '👉 Sang Màn Chủ Cửa Hàng Duyệt'
         }
       />
 
-      {/* 2. Unified Filter + Action Bar (1 row) */}
+      {/* 2. Unified Filter + Action Bar (2 rows) */}
       <OrderMatrixFilterBar
-        branches={MOCK_BRANCHES}
+        branches={branches}
         selectedBranchId={selectedBranchId}
-        onSelectBranch={(id) => setSelectedBranchId(id)}
-        suppliers={MOCK_PO_SUPPLIERS}
+        hideBranchSelect={!isStoreOwner}
+        fixedBranchLabel={branches.find((b) => b.id === selectedBranchId)?.name}
+        onSelectBranch={(id) => {
+          setSelectedBranchId(id);
+          setSelectedSupplierId('ALL');
+          setCategoryFilter('');
+          setKeyword('');
+          setCellMap({});
+          setIsDirty(false);
+        }}
+        suppliers={suppliers}
         selectedSupplierId={selectedSupplierId}
         onSelectSupplier={(id) => {
           setSelectedSupplierId(id);
-          const nextDays = computeDayColumns(viewFrom, durationDays, id, lockedDates);
-          setCellMap(computeDefaultCellMap(id, nextDays));
-          setIsDirty(false);
         }}
         dateFrom={dateFromInput}
         dateTo={dateToInput}
@@ -781,7 +1006,7 @@ export const OrderMatrixPage: FC = () => {
         orderedOnly={orderedOnly}
         onOrderedOnlyChange={(checked) => setOrderedOnly(checked)}
         ownerModifiedOnly={ownerModifiedOnly}
-        onOwnerModifiedOnlyChange={(checked) => setOwnerModifiedOnly(checked)}
+        onOwnerModifiedOnlyChange={isStoreOwner ? (checked) => setOwnerModifiedOnly(checked) : undefined}
         ownerModifiedCount={ownerModifiedCount}
         moqFailsCount={moqFails.length}
         showSoh={showSoh}
@@ -809,12 +1034,13 @@ export const OrderMatrixPage: FC = () => {
           products={filteredProducts}
           days={dayColumns}
           cellMap={cellMap}
+          supplierConfigs={supplierConfigs}
           showSoh={showSoh}
           onCellChange={handleCellChange}
           onResetOverride={handleResetOverride}
           onDayCutoffClick={() => setIsSplitModalOpen(true)}
           readOnly={isReadOnly}
-          isStoreOwner={true}
+          isStoreOwner={isStoreOwner}
         />
       </div>
 
@@ -823,7 +1049,7 @@ export const OrderMatrixPage: FC = () => {
         isOpen={isSplitModalOpen}
         onClose={() => setIsSplitModalOpen(false)}
         splitPos={splitPos}
-        branchName={MOCK_BRANCHES.find((b) => b.id === selectedBranchId)?.name || 'Chi nhánh'}
+        branchName={branches.find((b) => b.id === selectedBranchId)?.name || 'Chi nhánh'}
         onConfirmGenerate={handleConfirmGeneratePo}
       />
     </div>

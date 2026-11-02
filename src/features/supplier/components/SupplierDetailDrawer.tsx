@@ -131,12 +131,14 @@ export const SupplierDetailDrawer: FC<Props> = ({
                     <span className="info-row-value info-row-value--mono">{supplier.email}</span>
                   </div>
                 )}
-                {supplier.address && (
-                  <div className="info-row">
-                    <span className="info-row-label">Địa chỉ kho/cửa hàng:</span>
-                    <span className="info-row-value">{supplier.address}</span>
-                  </div>
-                )}
+                <div className="info-row">
+                  <span className="info-row-label">Địa chỉ kho/cửa hàng:</span>
+                  <span className="info-row-value">{supplier.address || '—'}</span>
+                </div>
+                <div className="info-row">
+                  <span className="info-row-label">Ghi chú nhanh:</span>
+                  <span className="info-row-value">{supplier.note || '—'}</span>
+                </div>
               </div>
 
               {/* Ngân hàng */}
@@ -193,16 +195,6 @@ export const SupplierDetailDrawer: FC<Props> = ({
                       <span className="info-row-value">{supplier.companyName}</span>
                     </div>
                   )}
-                </div>
-              )}
-
-              {/* Ghi chú */}
-              {supplier.note && (
-                <div className="info-section">
-                  <div className="info-section-title">📝 Ghi Chú Nghiệp Vụ</div>
-                  <div style={{ fontSize: '0.82rem', color: '#374151', lineHeight: 1.6, background: '#fafafa', borderRadius: 10, padding: '10px 14px', border: '1px solid #f3f4f6' }}>
-                    {supplier.note}
-                  </div>
                 </div>
               )}
             </>

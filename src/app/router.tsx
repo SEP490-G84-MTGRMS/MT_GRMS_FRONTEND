@@ -374,11 +374,11 @@ export const router = createBrowserRouter([
       },
       {
         path: 'purchase-orders/create-matrix',
-        element: <OrderMatrixPage />,
+        element: <OrderMatrixPage forcedRole="STORE_OWNER" />,
       },
       {
         path: 'purchase-orders/employee-matrix',
-        element: <EmployeeOrderMatrixPage />,
+        element: <OrderMatrixPage forcedRole="EMPLOYEE" />,
       },
       {
         path: 'purchase-orders/dispatch-hub',
@@ -872,7 +872,7 @@ export const router = createBrowserRouter([
           },
           {
             path: 'create-matrix',
-            element: <EmployeeOrderMatrixPage />,
+            element: <OrderMatrixPage forcedRole="EMPLOYEE" />,
           },
         ],
       },
@@ -881,7 +881,7 @@ export const router = createBrowserRouter([
         children: [
           {
             path: 'purchase-orders/create-matrix',
-            element: <EmployeeOrderMatrixPage />,
+            element: <OrderMatrixPage forcedRole="EMPLOYEE" />,
           },
         ],
       },

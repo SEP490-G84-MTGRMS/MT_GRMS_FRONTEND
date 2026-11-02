@@ -34,7 +34,8 @@ function mapRole(roleName?: string): UserProfile['role'] {
   if (role === 'CASHIER') return 'CASHIER';
   if (role === 'MANAGER' || role === 'BRANCH_MANAGER') return 'MANAGER';
   if (role === 'STORE_OWNER') return 'STORE_OWNER';
-  return 'ADMIN';
+  if (role === 'EMPLOYEE' || role === 'STAFF') return 'EMPLOYEE';
+  return 'STORE_OWNER';
 }
 
 function mapLoginUser(user: BackendLoginUser): UserProfile {
@@ -63,6 +64,40 @@ function unwrapLogin(body: ApiResponse<BackendLoginPayload> | BackendLoginPayloa
 
 // Danh sách tài khoản demo tiện lợi cho kiểm thử giao diện & nghiệm thu
 export const DEMO_ACCOUNTS = [
+  {
+    roleLabel: '👑 Chủ Cửa Hàng (Store Owner)',
+    username: 'store_owner',
+    email: 'owner@mtgrms.vn',
+    password: 'Owner@123456',
+    tenantCode: SEED_TENANT_ID,
+    user: {
+      id: 'user-owner-001',
+      email: 'owner@mtgrms.vn',
+      fullName: 'Chủ Cửa Hàng (Store Owner)',
+      role: 'STORE_OWNER' as const,
+      tenantId: SEED_TENANT_ID,
+      tenantName: 'Cửa hàng MT-GRMS',
+      branchId: undefined,
+      phone: '0901234567',
+    },
+  },
+  {
+    roleLabel: '👷‍♂️ Nhân Viên Đặt Hàng (Employee)',
+    username: 'staff_employee',
+    email: 'employee@mtgrms.vn',
+    password: 'Staff@123456',
+    tenantCode: SEED_TENANT_ID,
+    user: {
+      id: 'user-employee-001',
+      email: 'employee@mtgrms.vn',
+      fullName: 'Nhân Viên Cửa Hàng (Employee)',
+      role: 'EMPLOYEE' as const,
+      tenantId: SEED_TENANT_ID,
+      tenantName: 'Cửa hàng MT-GRMS',
+      branchId: undefined,
+      phone: '0912345678',
+    },
+  },
   {
     roleLabel: 'Chủ cửa hàng (Store Owner - Được phép bán nợ)',
     username: 'chucuahang',
@@ -132,7 +167,24 @@ export const DEMO_ACCOUNTS = [
     },
   },
   {
-    roleLabel: 'Thu ngân quầy POS',
+    roleLabel: 'Thu ngân quầy POS (Lê Thị Thảo)',
+    username: 'staff_cashier',
+    email: 'cashier@mtgrms.vn',
+    password: 'Staff@123456',
+    tenantCode: SEED_TENANT_ID,
+    user: {
+      id: 'user-cashier-001',
+      email: 'cashier@mtgrms.vn',
+      fullName: 'Lê Thị Thảo (Thu Ngân POS)',
+      role: 'CASHIER' as const,
+      tenantId: 'tenant_mt_mart_01',
+      tenantName: 'Chuỗi Siêu Thị Thực Phẩm Sạch MT-Mart',
+      branchId: 'BR-001',
+      phone: '0988 765 432',
+    },
+  },
+  {
+    roleLabel: 'Thu ngân POS Demo (Trần Thị Thu Ngân)',
     username: 'poscashier',
     email: 'pos.cashier@mtgrms.vn',
     password: 'password123',
