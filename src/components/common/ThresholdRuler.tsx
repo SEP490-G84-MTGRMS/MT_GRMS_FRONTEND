@@ -9,6 +9,9 @@ interface ThresholdRulerProps {
   warningThreshold?: number;
   year?: number;
   quarter?: number;
+  periodType?: number;
+  periodNumber?: number;
+  periodLabel?: string;
   householdGroup?: HouseholdTaxGroup;
   onHelpClick?: () => void;
 }
@@ -19,6 +22,9 @@ export const ThresholdRuler: React.FC<ThresholdRulerProps> = ({
   warningThreshold = 850000000,
   year = 2026,
   quarter = 3,
+  periodType,
+  periodNumber,
+  periodLabel,
   householdGroup,
   onHelpClick,
 }) => {
@@ -278,7 +284,13 @@ export const ThresholdRuler: React.FC<ThresholdRulerProps> = ({
         }}
       >
         <div>
-          <span>Lũy kế YTD (Quý 1 đến Quý {quarter}/{year}): </span>
+          <span>
+            {periodLabel
+              ? `Lũy kế YTD (${periodLabel}): `
+              : periodType === 1
+              ? `Lũy kế YTD (Tháng 1 đến Tháng ${periodNumber || 1}/${year}): `
+              : `Lũy kế YTD (Quý 1 đến Quý ${periodNumber || quarter || 1}/${year}): `}
+          </span>
           <strong style={{ color: '#0F172A' }}>{formatMoney(currentYtdRevenue)}</strong>
         </div>
         <div>

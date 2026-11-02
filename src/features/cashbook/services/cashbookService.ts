@@ -55,7 +55,7 @@ export interface BackendCashbookSummaryResponse {
 
 const INITIAL_ACCOUNTS: CashAccount[] = [
   {
-    id: 'ACC-01',
+    id: '01a19664-6210-7b12-a9eb-6fa16ca5b9db',
     branchId: 'BR-01',
     branchName: 'Chi nhánh Quận 1 (Cửa hàng chính)',
     accountName: 'Két tiền mặt quầy Q1',
@@ -67,7 +67,7 @@ const INITIAL_ACCOUNTS: CashAccount[] = [
     isSafeDeposit: false,
   },
   {
-    id: 'ACC-02',
+    id: '01a19664-6238-7fb3-8bc6-2a2e444932ee',
     branchId: 'BR-02',
     branchName: 'Chi nhánh Quận 7',
     accountName: 'Két tiền mặt quầy Q7',
@@ -79,7 +79,7 @@ const INITIAL_ACCOUNTS: CashAccount[] = [
     isSafeDeposit: false,
   },
   {
-    id: 'ACC-SAFE',
+    id: '01a19664-6492-7d10-9a82-54801db4f342',
     branchId: 'ALL',
     branchName: 'Toàn hệ thống (Chủ cửa hàng)',
     accountName: 'Két sắt của chủ shop (Safe Deposit)',
@@ -91,7 +91,7 @@ const INITIAL_ACCOUNTS: CashAccount[] = [
     isSafeDeposit: true,
   },
   {
-    id: 'ACC-03',
+    id: '01a19664-6741-7f3d-9be7-cb4c7b876559',
     branchId: 'ALL',
     branchName: 'Toàn hệ thống',
     accountName: 'Vietcombank - TK Thu Bán Hàng',
@@ -104,7 +104,7 @@ const INITIAL_ACCOUNTS: CashAccount[] = [
     currency: 'VND',
   },
   {
-    id: 'ACC-04',
+    id: '01a19664-6761-78c3-b60a-cc460c68c51c',
     branchId: 'ALL',
     branchName: 'Toàn hệ thống',
     accountName: 'Techcombank - TK Chi Trả NCC',
@@ -122,9 +122,9 @@ const INITIAL_TRANSITS: CashTransitItem[] = [
   {
     id: 'TR-001',
     transferCode: 'TRANSIT-20261027-01',
-    fromAccountId: 'ACC-01',
+    fromAccountId: '01a19664-6210-7b12-a9eb-6fa16ca5b9db',
     fromAccountName: 'Két tiền mặt quầy Q1',
-    toAccountId: 'ACC-SAFE',
+    toAccountId: '01a19664-6492-7d10-9a82-54801db4f342',
     toAccountName: 'Két sắt của chủ shop',
     amount: 10350000,
     senderName: 'Thu ngân Ca sáng (Trần Thị Lan)',
@@ -546,25 +546,21 @@ export const cashbookService = {
     }
 
     if (!isMockMode()) {
-      try {
-        const idempotencyKey = crypto.randomUUID();
-        const res = await financeHttpClient.post<{ data: BackendCashbookEntryResponse }>(
-          '/cashbook/receipts',
-          {
-            accountId: dto.accountId,
-            amount: dto.amount,
-            category: dto.category,
-            description: dto.description,
-            referenceCode: dto.referenceDocId,
-          },
-          {
-            headers: { 'Idempotency-Key': idempotencyKey },
-          }
-        );
-        return mapBackendEntryToLedgerTransaction(res.data.data);
-      } catch (err) {
-        console.warn('Backend receipt failed, falling back to local:', err);
-      }
+      const idempotencyKey = crypto.randomUUID();
+      const res = await financeHttpClient.post<{ data: BackendCashbookEntryResponse }>(
+        '/cashbook/receipts',
+        {
+          accountId: dto.accountId,
+          amount: dto.amount,
+          category: dto.category,
+          description: dto.description,
+          referenceCode: dto.referenceDocId,
+        },
+        {
+          headers: { 'Idempotency-Key': idempotencyKey },
+        }
+      );
+      return mapBackendEntryToLedgerTransaction(res.data.data);
     }
 
     const accounts = loadState<CashAccount[]>(STORAGE_KEYS.ACCOUNTS, INITIAL_ACCOUNTS);
@@ -621,30 +617,21 @@ export const cashbookService = {
     }
 
     if (!isMockMode()) {
-      try {
-        const idempotencyKey = crypto.randomUUID();
-        const res = await financeHttpClient.post<{ data: BackendCashbookEntryResponse }>(
-          '/cashbook/payments',
-          {
-            accountId: dto.accountId,
-            amount: dto.amount,
-            category: dto.category,
-            description: dto.description,
-            referenceCode: dto.referenceDocId,
-          },
-          {
-            headers: { 'Idempotency-Key': idempotencyKey },
-          }
-        );
-        return mapBackendEntryToLedgerTransaction(res.data.data);
-      } catch (err) {
-        // If error is GBR-CSH-03 insufficient funds, throw directly
-        const msg = err instanceof Error ? err.message : String(err);
-        if (msg.includes('vượt quá số dư') || msg.includes('GBR-CSH-03') || msg.includes('INSUFFICIENT_FUNDS')) {
-          throw err;
+      const idempotencyKey = crypto.randomUUID();
+      const res = await financeHttpClient.post<{ data: BackendCashbookEntryResponse }>(
+        '/cashbook/payments',
+        {
+          accountId: dto.accountId,
+          amount: dto.amount,
+          category: dto.category,
+          description: dto.description,
+          referenceCode: dto.referenceDocId,
+        },
+        {
+          headers: { 'Idempotency-Key': idempotencyKey },
         }
-        console.warn('Backend payment failed, falling back to local:', err);
-      }
+      );
+      return mapBackendEntryToLedgerTransaction(res.data.data);
     }
 
     const accounts = loadState<CashAccount[]>(STORAGE_KEYS.ACCOUNTS, INITIAL_ACCOUNTS);

@@ -22,6 +22,30 @@ financeHttpClient.interceptors.request.use((config) => {
   if (token && config.headers) {
     config.headers.Authorization = `Bearer ${token}`;
   }
+
+  let tenantId = 'tenant-grocery-001';
+  try {
+    const raw = localStorage.getItem('auth_user');
+    if (raw) {
+      const parsed = JSON.parse(raw) as { tenantId?: string };
+      const stored = parsed.tenantId?.trim();
+      const isPlaceholder =
+        !stored ||
+        stored === 'DEFAULT' ||
+        stored === 'default-tenant' ||
+        stored === 'TENANT-HCM-01' ||
+        stored === 'TENANT-DEFAULT';
+      if (!isPlaceholder) {
+        tenantId = stored;
+      }
+    }
+  } catch {
+    // keep default seed tenant
+  }
+  if (config.headers) {
+    config.headers['X-Tenant-Id'] = tenantId;
+  }
+
   return config;
 });
 
