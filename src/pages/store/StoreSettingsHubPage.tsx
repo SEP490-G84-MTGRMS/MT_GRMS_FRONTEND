@@ -1,6 +1,6 @@
 // src/pages/store/StoreSettingsHubPage.tsx
 import { useState, useEffect, type FC } from 'react';
-import { useSearchParams, Navigate } from 'react-router-dom';
+import { useSearchParams, useNavigate, Navigate } from 'react-router-dom';
 import {
   INITIAL_STORE_INFO,
   type StoreInfo,
@@ -8,34 +8,46 @@ import {
   type SubscriptionPlanItem,
   INITIAL_TRANSACTIONS,
 } from './storeData';
-import type { StoreHubTabKey } from './components/StoreSidebarNav';
+import { StoreSidebarNav, type StoreHubTabKey } from './components/StoreSidebarNav';
 import { StoreTopStatusBar } from './components/StoreTopStatusBar';
 import { SubscriptionPricingCards } from './components/SubscriptionPricingCards';
 import { SubscriptionCheckoutModal } from './components/SubscriptionCheckoutModal';
 import { StoreWalletTopupModal } from './components/StoreWalletTopupModal';
 import { StoreInfoTab } from './components/StoreInfoTab';
 import { OrderHistoryTab } from './components/OrderHistoryTab';
+import { TermsOfServiceTab } from './components/TermsOfServiceTab';
+import { WalletLedgerTab } from './components/WalletLedgerTab';
 import { storeApi, mapBackendStoreToFrontend } from './api/storeApi';
 
+const VALID_TABS: StoreHubTabKey[] = [
+  'store-info',
+  'subscriptions',
+  'order-history',
+  'service-confirm',
+  'terms',
+  'wallet',
+];
+
 export const StoreSettingsHubPage: FC = () => {
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const rawTab = searchParams.get('tab');
 
-  // Nếu người dùng truy cập tab tài khoản cũ, chuyển hướng sang trang Quản lý tài khoản riêng
-  if (rawTab === 'account-profile' || rawTab === 'wallet' || rawTab === 'terms') {
-    return <Navigate to={`/store-owner/account?tab=${rawTab}`} replace />;
+  // Nếu người dùng truy cập tab tài khoản cá nhân, chuyển hướng sang trang Profile riêng
+  if (rawTab === 'account-profile') {
+    return <Navigate to="/store-owner/account?tab=account-profile" replace />;
   }
 
   const tabParam = rawTab as StoreHubTabKey | null;
 
   const [activeTab, setActiveTab] = useState<StoreHubTabKey>(
-    tabParam && ['store-info', 'subscriptions', 'order-history', 'service-confirm'].includes(tabParam)
+    tabParam && VALID_TABS.includes(tabParam)
       ? tabParam
-      : 'subscriptions'
+      : 'store-info'
   );
 
   const [storeInfo, setStoreInfo] = useState<StoreInfo>(INITIAL_STORE_INFO);
-  const [, setTransactions] = useState<WalletTransaction[]>(INITIAL_TRANSACTIONS);
+  const [transactions, setTransactions] = useState<WalletTransaction[]>(INITIAL_TRANSACTIONS);
 
   const [selectedPlanForCheckout, setSelectedPlanForCheckout] =
     useState<SubscriptionPlanItem | null>(null);
@@ -57,14 +69,16 @@ export const StoreSettingsHubPage: FC = () => {
   }, []);
 
   useEffect(() => {
-    if (
-      tabParam &&
-      tabParam !== activeTab &&
-      ['store-info', 'subscriptions', 'order-history', 'service-confirm'].includes(tabParam)
-    ) {
+    if (tabParam && tabParam !== activeTab && VALID_TABS.includes(tabParam)) {
       setActiveTab(tabParam);
     }
   }, [tabParam, activeTab]);
+
+  // Điều hướng chuyển tab khi click sidebar
+  const handleSelectTab = (tab: StoreHubTabKey) => {
+    setActiveTab(tab);
+    navigate(`/store-owner/subscriptions?tab=${tab}`);
+  };
 
   // Nạp tiền ví
   const handleTopupSuccess = (amount: number) => {
@@ -154,7 +168,13 @@ export const StoreSettingsHubPage: FC = () => {
 
   return (
     <div className="store-hub-container">
-      {/* Main Workspace */}
+      {/* 1. Sidebar bên trái chuẩn phong cách KiotViet */}
+      <StoreSidebarNav
+        activeTab={activeTab}
+        onSelectTab={handleSelectTab}
+      />
+
+      {/* 2. Không gian làm việc chính bên phải */}
       <div className="store-hub-main">
         {/* Top Status Bar */}
         <StoreTopStatusBar
@@ -196,6 +216,24 @@ export const StoreSettingsHubPage: FC = () => {
         {activeTab === 'service-confirm' && (
           <OrderHistoryTab isServiceConfirmation={true} />
         )}
+
+        {/* Tab 5: Điều khoản sử dụng */}
+        {activeTab === 'terms' && (
+          <div style={{ marginTop: 8 }}>
+            <TermsOfServiceTab />
+          </div>
+        )}
+
+        {/* Tab 6: Thanh toán & Ví gian hàng */}
+        {activeTab === 'wallet' && (
+          <div style={{ marginTop: 8 }}>
+            <WalletLedgerTab
+              storeInfo={storeInfo}
+              transactions={transactions}
+              onOpenTopupModal={() => setShowTopupModal(true)}
+            />
+          </div>
+        )}
       </div>
 
       {/* Modal Checkout */}
@@ -219,3 +257,5 @@ export const StoreSettingsHubPage: FC = () => {
     </div>
   );
 };
+
+export default StoreSettingsHubPage;

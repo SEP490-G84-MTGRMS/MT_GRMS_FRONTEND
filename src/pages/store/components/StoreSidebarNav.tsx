@@ -1,17 +1,21 @@
 // src/pages/store/components/StoreSidebarNav.tsx
 import type { FC } from 'react';
 import {
-  Store,
+  User,
   Boxes,
   History,
   FileCheck2,
+  FileText,
+  Wallet,
 } from 'lucide-react';
 
 export type StoreHubTabKey =
   | 'store-info'
   | 'subscriptions'
   | 'order-history'
-  | 'service-confirm';
+  | 'service-confirm'
+  | 'terms'
+  | 'wallet';
 
 interface StoreSidebarNavProps {
   activeTab: StoreHubTabKey;
@@ -33,7 +37,7 @@ export const StoreSidebarNav: FC<StoreSidebarNavProps> = ({
           onClick={() => onSelectTab('store-info')}
         >
           <span className="store-sidebar-icon">
-            <Store size={18} strokeWidth={1.8} />
+            <User size={18} strokeWidth={1.8} />
           </span>
           <span>Thông tin gian hàng</span>
         </button>
@@ -73,6 +77,32 @@ export const StoreSidebarNav: FC<StoreSidebarNavProps> = ({
             <FileCheck2 size={18} strokeWidth={1.8} />
           </span>
           <span>Bản xác nhận dịch vụ</span>
+        </button>
+      </div>
+
+      {/* Nhóm 3: Khác (Chuẩn KiotViet) */}
+      <div className="store-sidebar-group">
+        <div className="store-sidebar-title">Khác</div>
+        <button
+          type="button"
+          className={`store-sidebar-item ${activeTab === 'terms' ? 'active' : ''}`}
+          onClick={() => onSelectTab('terms')}
+        >
+          <span className="store-sidebar-icon">
+            <FileText size={18} strokeWidth={1.8} />
+          </span>
+          <span>Điều khoản sử dụng</span>
+        </button>
+
+        <button
+          type="button"
+          className={`store-sidebar-item ${activeTab === 'wallet' ? 'active' : ''}`}
+          onClick={() => onSelectTab('wallet')}
+        >
+          <span className="store-sidebar-icon">
+            <Wallet size={18} strokeWidth={1.8} />
+          </span>
+          <span>Thanh toán</span>
         </button>
       </div>
     </aside>
