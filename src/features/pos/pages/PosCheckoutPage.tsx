@@ -19,6 +19,7 @@ import { BelowCostWarningModal } from '../components/modals/BelowCostWarningModa
 import { DebtLimitWarningModal } from '../components/modals/DebtLimitWarningModal';
 import { OrderDiscountModal } from '../components/modals/OrderDiscountModal';
 import { PosReceiptModal } from '../components/PosReceiptModal';
+import { posOrderApi } from '../services/posOrderApi';
 import '../pos.css';
 
 export const PosCheckoutPage: FC = () => {
@@ -291,20 +292,57 @@ export const PosCheckoutPage: FC = () => {
     };
   };
 
-  const executeCompleteCheckout = (debtNote?: string) => {
-    if (currentTab.paymentMethod === 'debt' && currentTab.customer) {
-      const vat = Math.round(finalAmount * 0.08);
-      const totalOrderDebt = finalAmount + vat;
-      const updatedDebt = currentTab.customer.currentDebt + totalOrderDebt;
-      const updatedCustomer = { ...currentTab.customer, currentDebt: updatedDebt };
+  const executeCompleteCheckout = async (debtNote?: string, managerBypass = false) => {
+    try {
+      const isDebt = currentTab.paymentMethod === 'debt';
+      const isBank = currentTab.paymentMethod === 'vietqr';
+      const paymentMethod = isDebt ? 'CREDIT' : isBank ? 'BANK' : 'CASH';
 
-      setCustomers((prev) => prev.map((c) => (c.id === updatedCustomer.id ? updatedCustomer : c)));
-      updateCurrentTab({ customer: updatedCustomer });
+      const items = currentTab.cart.map((c) => ({
+        productId: c.product.id || 'aaaaaaaa-1111-1111-1111-111111111111',
+        productName: c.product.name,
+        unitPrice: c.actualPrice,
+        quantity: c.quantity,
+        discountAmount: Math.max(0, (c.unitPrice - c.actualPrice) * c.quantity),
+      }));
+
+      const orderResult = await posOrderApi.createOrder({
+        customerId: currentTab.customer?.id,
+        paymentMethod,
+        discountAmount: orderDiscountAmount + couponDiscountAmount + pointsDeduction,
+        items,
+        managerBypassCode: managerBypass ? 'MGR-BYPASS-2026' : undefined,
+        note: debtNote || currentTab.note,
+      });
+
+      if (isDebt && currentTab.customer) {
+        const addedDebt = orderResult.finalAmount;
+        const updatedDebt = currentTab.customer.currentDebt + addedDebt;
+        const updatedCustomer = { ...currentTab.customer, currentDebt: updatedDebt };
+
+        setCustomers((prev) => prev.map((c) => (c.id === updatedCustomer.id ? updatedCustomer : c)));
+        updateCurrentTab({ customer: updatedCustomer });
+      }
+
+      const receipt = buildReceiptData(debtNote);
+      if (orderResult.orderCode) {
+        receipt.orderCode = orderResult.orderCode;
+      }
+      setReceiptData(receipt);
+      setIsReceiptModalOpen(true);
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      if (
+        errMsg.includes('CREDIT_LIMIT_EXCEEDED') ||
+        errMsg.includes('DEBT_OVERDUE_BLOCKED') ||
+        errMsg.includes('hạn mức tín dụng') ||
+        errMsg.includes('quá hạn')
+      ) {
+        setIsDebtWarningOpen(true);
+      } else {
+        alert('Lỗi tạo đơn hàng: ' + errMsg);
+      }
     }
-
-    const receipt = buildReceiptData(debtNote);
-    setReceiptData(receipt);
-    setIsReceiptModalOpen(true);
   };
 
   const handleCheckoutSubmit = () => {
@@ -491,7 +529,7 @@ export const PosCheckoutPage: FC = () => {
         orderAmount={finalAmount + Math.round(finalAmount * 0.08)}
         onClose={() => setIsDebtWarningOpen(false)}
         onApprove={(note) => {
-          executeCompleteCheckout(note);
+          executeCompleteCheckout(note, true);
         }}
       />
 
