@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { FC } from 'react';
-import { Plus, X, Tag, AlertTriangle, ShoppingBag, Trash2, LayoutGrid } from 'lucide-react';
+import { X, Tag, AlertTriangle, ShoppingBag, Trash2 } from 'lucide-react';
 import type { CartItem } from '../types/pos.types';
 
 interface Props {
@@ -8,7 +8,7 @@ interface Props {
   onUpdateQuantity: (id: string, quantity: number) => void;
   onRemoveItem: (id: string) => void;
   onUpdateItemDiscount: (id: string, discount: number, type: 'vnd' | 'percent') => void;
-  onOpenQuickAddProduct: () => void;
+
   onOpenBelowCostWarning: (item: CartItem) => void;
   onOpenCatalogModal?: () => void;
   orderNote: string;
@@ -20,9 +20,8 @@ export const PosCartTable: FC<Props> = ({
   onUpdateQuantity,
   onRemoveItem,
   onUpdateItemDiscount,
-  onOpenQuickAddProduct,
+
   onOpenBelowCostWarning,
-  onOpenCatalogModal,
   orderNote,
   onOrderNoteChange,
 }) => {
@@ -40,30 +39,6 @@ export const PosCartTable: FC<Props> = ({
       {/* Thanh tiêu đề giỏ hàng */}
       <div className="pos-cart-header-bar">
         <b className="pos-cart-heading">DANH SÁCH MẶT HÀNG TRONG ĐƠN HÀNG</b>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          {onOpenCatalogModal && (
-            <button
-              type="button"
-              className="pos-btn-secondary"
-              onClick={onOpenCatalogModal}
-              style={{ fontSize: 12.5, display: 'inline-flex', alignItems: 'center', gap: 5 }}
-              title="Mở danh mục chọn hàng cảm ứng (F3)"
-            >
-              <LayoutGrid size={13} />
-              <span>Bán thường (F3)</span>
-            </button>
-          )}
-          <button
-            type="button"
-            className="pos-btn-secondary"
-            onClick={onOpenQuickAddProduct}
-            style={{ fontSize: 12.5 }}
-            title="Thêm nhanh hàng hóa mới"
-          >
-            <Plus size={13} />
-            <span>Thêm nhanh mặt hàng mới</span>
-          </button>
-        </div>
       </div>
 
       {/* Bảng giỏ hàng */}
@@ -115,8 +90,7 @@ export const PosCartTable: FC<Props> = ({
                         </span>
                       )}
                       <div style={{ fontSize: 11, color: '#16a34a', marginTop: 2 }}>
-                        &#10003; Tồn kho: {item.product.quantityOnHand} &bull; KH đặt:{' '}
-                        {item.product.allocatedQty ?? 0}
+                        &#10003; Tồn kho: {item.product.quantityOnHand}
                       </div>
                     </td>
                     <td style={{ textAlign: 'center' }}>{item.unit}</td>

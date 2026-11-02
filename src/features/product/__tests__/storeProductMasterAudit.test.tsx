@@ -54,6 +54,8 @@ const mockMasterCatalog = [
     categoryName: 'Gạo & Nông sản',
     baseUoM: 'Túi',
     costPrice: 170000,
+    minOrderQuantity: 10,
+    moq: 10,
   },
   {
     id: 'prod-02',

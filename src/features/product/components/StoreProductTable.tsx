@@ -39,6 +39,8 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
   onPageChange,
   onPageSizeChange,
   onEdit,
+  onToggleStatus: _onToggleStatus,
+  onRemove: _onRemove,
   onOpenAssignModal,
 }) => {
   const [sortField, setSortField] = useState<SortField | null>(null);

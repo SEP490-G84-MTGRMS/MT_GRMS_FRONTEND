@@ -1,6 +1,7 @@
 import React from 'react';
 import type { TimeFilter } from '../types/dashboard.types';
 import { useNavigate } from 'react-router-dom';
+import { useAuthStore } from '../../../stores/useAuthStore';
 
 interface StoreOwnerHeaderProps {
   timeFilter: TimeFilter;
@@ -16,6 +17,8 @@ export const StoreOwnerHeader: React.FC<StoreOwnerHeaderProps> = ({
   storeName = 'Tạp Hóa Minh Đức',
 }) => {
   const navigate = useNavigate();
+  const { user } = useAuthStore();
+  const displayStoreName = user?.tenantName || storeName;
 
   const filterOptions: { key: TimeFilter; label: string }[] = [
     { key: 'today', label: 'Hôm nay' },
@@ -89,7 +92,7 @@ export const StoreOwnerHeader: React.FC<StoreOwnerHeaderProps> = ({
           }}
         >
           <span style={{ fontWeight: 600, color: 'var(--text-main, #1E293B)' }}>
-            {storeName}
+            {displayStoreName}
           </span>
           <span>•</span>
           <span>{branchName}</span>
@@ -139,36 +142,36 @@ export const StoreOwnerHeader: React.FC<StoreOwnerHeaderProps> = ({
         {/* Nút thao tác nhanh POS */}
         <button
           type="button"
-          onClick={() => navigate('/store-owner/products')}
+          onClick={() => navigate('/pos')}
           style={{
             display: 'inline-flex',
             alignItems: 'center',
             gap: 8,
-            padding: '8px 18px',
+            padding: '8px 20px',
             borderRadius: 'var(--radius-pill, 9999px)',
-            backgroundColor: 'var(--blue-primary, #0066FF)',
+            backgroundColor: '#10b981',
             color: '#ffffff',
             fontSize: '13.5px',
             fontWeight: 700,
             border: 'none',
             cursor: 'pointer',
-            boxShadow: '0 4px 12px rgba(0, 102, 255, 0.25)',
-            transition: 'background-color 0.15s ease',
+            boxShadow: '0 4px 14px rgba(16, 185, 129, 0.35)',
+            transition: 'all 0.15s ease',
             whiteSpace: 'nowrap',
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = 'var(--blue-hover, #0052CC)';
+            e.currentTarget.style.backgroundColor = '#059669';
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = 'var(--blue-primary, #0066FF)';
+            e.currentTarget.style.backgroundColor = '#10b981';
           }}
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
             <rect x="2" y="3" width="20" height="14" rx="2" />
             <line x1="8" y1="21" x2="16" y2="21" />
             <line x1="12" y1="17" x2="12" y2="21" />
           </svg>
-          Mở Quầy POS
+          Mở Quầy POS (Bán Hàng)
         </button>
       </div>
     </div>

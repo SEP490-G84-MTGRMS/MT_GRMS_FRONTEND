@@ -71,7 +71,9 @@ export class CustomerDTO {
   group?: string;
   loyaltyPoints: number = 0;
   membershipTier: 'Standard' | 'Silver' | 'Gold' | 'VIP' = 'Standard';
-  debtLimit: number = 0;              // Hạn mức nợ tối đa (VD: 500.000 đ)
+  debtLimit: number = 0;              // (Không bắt buộc) Hạn mức nợ cũ
+  debtCount: number = 0;              // Số lần đã mua nợ
+  totalDebtPurchased: number = 0;     // Tổng số tiền đã từng nợ
   currentDebt: number = 0;            // Nợ hiện tại chưa trả (VD: 120.000 đ)
   allowDebt: boolean = false;         // Cho phép ghi nợ
   note?: string;
@@ -154,6 +156,7 @@ export class ReceiptCustomerDTO {
  * C# Equivalent: PosReceiptDto / ReceiptDataDto
  */
 export class ReceiptDataDTO {
+  orderId?: string;
   storeName: string = '';
   storeAddress: string = '';
   storePhone: string = '';
@@ -536,3 +539,4 @@ export type ShiftHandoverData = ShiftHandoverDataDTO;
 export type ShiftHistoryItem = ShiftHistoryItemDTO;
 export type ShiftHistoryFilterState = ShiftHistoryFilterStateDTO;
 export type PaymentMethod = 'cash' | 'vietqr' | 'debt';
+
