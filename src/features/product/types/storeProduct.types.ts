@@ -13,6 +13,7 @@ export interface StoreProductItem {
   currentStock: number; // Tồn kho thực tế (SOH)
   minStockLevel: number; // Định mức tồn tối thiểu / an toàn
   primarySupplierName: string;
+  minOrderQuantity: number; // Số lượng đặt hàng tối thiểu MOQ
   status: 'Active' | 'Inactive';
   shelfLocation?: string;
   assignedDate: string;
@@ -31,11 +32,15 @@ export interface StoreSummary {
 }
 
 export interface StoreProductFilterValues {
-  searchTerm: string;
+  searchTerm?: string;
+  skus?: string[];
+  names?: string[];
+  storeNames?: string[];
+  categories?: string[];
   storeId: string;
   categoryFilter: string;
   statusFilter: 'ALL' | 'Active' | 'Inactive';
-  stockAlertFilter: 'ALL' | 'LOW' | 'OUT_OF_STOCK' | 'NORMAL';
+  stockAlertFilter?: 'ALL' | 'LOW' | 'OUT_OF_STOCK' | 'NORMAL';
 }
 
 export interface AssignStoreProductInput {
@@ -43,10 +48,13 @@ export interface AssignStoreProductInput {
   productIds: string[];
   defaultRetailPrice?: number;
   defaultMinStock?: number;
+  defaultMinOrderQuantity?: number;
 }
 
 export interface EditStoreProductInput {
   retailPrice: number;
-  minStockLevel: number;
+  minStockLevel?: number;
+  minOrderQuantity?: number;
+  status?: 'Active' | 'Inactive';
   shelfLocation?: string;
 }

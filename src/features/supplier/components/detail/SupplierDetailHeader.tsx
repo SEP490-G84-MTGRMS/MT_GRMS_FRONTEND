@@ -28,19 +28,8 @@ export const SupplierDetailHeader: FC<Props> = ({ supplier, onBack, onEdit }) =>
     <div className="supplier-detail-header-card">
       {/* Main Header Row */}
       <div className="supplier-detail-header-main">
-        {/* Left: Back button + Avatar + Title + Meta */}
+        {/* Left: Avatar + Title + Meta */}
         <div className="supplier-detail-profile-info">
-          <button
-            type="button"
-            onClick={onBack}
-            className="admin-btn admin-btn-secondary"
-            title="Quay lại danh sách nhà cung cấp"
-            style={{ height: 32, padding: '0 10px', fontSize: 12.5 }}
-          >
-            <ArrowLeft size={15} />
-            <span>Quay lại</span>
-          </button>
-
           <div className="supplier-detail-avatar">
             <Building2 size={20} color="var(--blue-primary)" />
           </div>
@@ -56,7 +45,7 @@ export const SupplierDetailHeader: FC<Props> = ({ supplier, onBack, onEdit }) =>
           </div>
         </div>
 
-        {/* Right: Status badge + Action Button */}
+        {/* Right: Status badge + Action Button + Back Button */}
         <div className="supplier-detail-actions">
           <span
             className={`admin-badge ${supplier.status === 'Active' ? 'admin-badge-active' : 'admin-badge-inactive'}`}
@@ -81,6 +70,17 @@ export const SupplierDetailHeader: FC<Props> = ({ supplier, onBack, onEdit }) =>
           >
             <Edit3 size={14} />
             <span>Chỉnh sửa</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={onBack}
+            className="admin-btn admin-btn-secondary"
+            title="Quay lại danh sách nhà cung cấp"
+            style={{ height: 32, padding: '0 12px', fontSize: 12.5, gap: 6 }}
+          >
+            <ArrowLeft size={15} />
+            <span>Quay lại</span>
           </button>
         </div>
       </div>

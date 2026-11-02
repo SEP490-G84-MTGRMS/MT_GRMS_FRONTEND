@@ -36,7 +36,7 @@ export const SupplierHistoryTab: FC<Props> = ({ supplier, purchaseOrders }) => {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      <div className="supplier-detail-card">
+      <div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
           <div style={{
             width: 36,

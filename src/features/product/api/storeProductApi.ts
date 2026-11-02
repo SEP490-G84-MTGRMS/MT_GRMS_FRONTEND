@@ -43,6 +43,7 @@ const generateInitialStoreProducts = (): StoreProductItem[] => {
         unit: mp.baseUoM || 'Gói',
         costPrice: baseCost,
         retailPrice,
+        minOrderQuantity: (idx % 4 + 1) * 5,
         currentStock,
         minStockLevel,
         primarySupplierName: idx % 2 === 0 ? 'Nông Sản Tươi Sạch Khải Anh' : 'Bánh Kẹo SnackVN',
@@ -93,6 +94,7 @@ export const storeProductApi = {
             unit: x.unit,
             retailPrice: x.retailPrice,
             costPrice: x.costPrice,
+            minOrderQuantity: x.minOrderQuantity ?? x.minimumOrderQuantity ?? 10,
             currentStock: x.currentStock,
             minStockLevel: x.minStockLevel,
             primarySupplierName: x.primarySupplierName,
@@ -111,12 +113,52 @@ export const storeProductApi = {
 
     let filtered = [...inMemoryStoreProducts];
 
-    // Filter by store
+    // Filter by store ID
     if (filters.storeId && filters.storeId !== 'ALL') {
       filtered = filtered.filter((p) => p.storeId === filters.storeId);
     }
 
-    // Filter by keyword
+    // Multi-token filter by SKU
+    if (filters.skus && filters.skus.length > 0) {
+      const tokens = filters.skus.map((s) => s.trim().toLowerCase()).filter(Boolean);
+      if (tokens.length > 0) {
+        filtered = filtered.filter((p) =>
+          tokens.some((t) => p.sku.toLowerCase().includes(t))
+        );
+      }
+    }
+
+    // Multi-token filter by Product Name
+    if (filters.names && filters.names.length > 0) {
+      const tokens = filters.names.map((s) => s.trim().toLowerCase()).filter(Boolean);
+      if (tokens.length > 0) {
+        filtered = filtered.filter((p) =>
+          tokens.some((t) => p.name.toLowerCase().includes(t))
+        );
+      }
+    }
+
+    // Multi-token filter by Store Name
+    if (filters.storeNames && filters.storeNames.length > 0) {
+      const tokens = filters.storeNames.map((s) => s.trim().toLowerCase()).filter(Boolean);
+      if (tokens.length > 0) {
+        filtered = filtered.filter((p) =>
+          tokens.some((t) => p.storeName.toLowerCase().includes(t))
+        );
+      }
+    }
+
+    // Multi-token filter by Category
+    if (filters.categories && filters.categories.length > 0) {
+      const tokens = filters.categories.map((s) => s.trim().toLowerCase()).filter(Boolean);
+      if (tokens.length > 0) {
+        filtered = filtered.filter((p) =>
+          tokens.some((t) => p.category.toLowerCase().includes(t))
+        );
+      }
+    }
+
+    // Filter by keyword (backward compatibility)
     if (filters.searchTerm && filters.searchTerm.trim()) {
       const kw = filters.searchTerm.trim().toLowerCase();
       filtered = filtered.filter(
@@ -236,6 +278,7 @@ export const storeProductApi = {
           unit: mp.baseUoM || 'Gói',
           costPrice: baseCost,
           retailPrice,
+          minOrderQuantity: input.defaultMinOrderQuantity || 10,
           currentStock: 0,
           minStockLevel,
           primarySupplierName: 'Nông Sản Tươi Sạch Khải Anh',
@@ -257,6 +300,7 @@ export const storeProductApi = {
       await httpClient.put(`/branches/${storeId}/products/${productId}`, {
         retailPrice: input.retailPrice,
         minStockLevel: input.minStockLevel,
+        minOrderQuantity: input.minOrderQuantity,
         shelfLocation: input.shelfLocation,
       });
     } catch {
@@ -268,7 +312,9 @@ export const storeProductApi = {
         return {
           ...p,
           retailPrice: input.retailPrice,
-          minStockLevel: input.minStockLevel,
+          minStockLevel: input.minStockLevel ?? p.minStockLevel,
+          minOrderQuantity: input.minOrderQuantity ?? p.minOrderQuantity,
+          status: input.status ?? p.status,
           shelfLocation: input.shelfLocation || p.shelfLocation,
         };
       }

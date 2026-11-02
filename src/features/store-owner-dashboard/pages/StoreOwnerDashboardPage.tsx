@@ -7,8 +7,10 @@ import { FefoWarningCard } from '../components/FefoWarningCard';
 import { LowStockWarningCard } from '../components/LowStockWarningCard';
 import { TopSellingProductsCard } from '../components/TopSellingProductsCard';
 import { StoreQuickActionsCard } from '../components/StoreQuickActionsCard';
+import { useAuthStore } from '../../../stores/useAuthStore';
 
 export const StoreOwnerDashboardPage: React.FC = () => {
+  const { user } = useAuthStore();
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('today');
 
   return (
@@ -26,8 +28,8 @@ export const StoreOwnerDashboardPage: React.FC = () => {
       <StoreOwnerHeader
         timeFilter={timeFilter}
         onTimeFilterChange={setTimeFilter}
-        storeName="Tạp Hóa Minh Đức"
-        branchName="Chi nhánh 1 (Quận 9, TP.HCM)"
+        storeName={user?.tenantName || 'Chuỗi Thực Phẩm Sạch MT-Mart'}
+        branchName="Chi nhánh 1 (Quận 1, TP.HCM)"
       />
 
       {/* 2. Hàng 4 thẻ KPI chỉ số bán lẻ */}

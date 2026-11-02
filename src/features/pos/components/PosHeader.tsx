@@ -1,13 +1,28 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import type { FC } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Menu, Bookmark, Printer, Clock, Plus, ChevronLeft, ChevronRight, Layers, Receipt } from 'lucide-react';
-import type { OrderTab } from '../types/pos.types';
+import {
+  ArrowLeft,
+  Menu,
+  Bookmark,
+  Printer,
+  Clock,
+  Plus,
+  ChevronLeft,
+  ChevronRight,
+  Layers,
+  Receipt,
+  Package,
+} from 'lucide-react';
+import type { OrderTab, Product } from '../types/pos.types';
+import { useAuthStore } from '../../../stores/useAuthStore';
 
 interface Props {
   searchQuery?: string;
   onSearchChange?: (query: string) => void;
   onBarcodeSubmit?: (e?: React.FormEvent) => void;
+  products?: Product[];
+  onSelectProduct?: (product: Product) => void;
   tabs?: OrderTab[];
   activeTabId?: number;
   onSelectTab?: (id: number) => void;
@@ -24,6 +39,8 @@ export const PosHeader: FC<Props> = ({
   searchQuery = '',
   onSearchChange,
   onBarcodeSubmit,
+  products = [],
+  onSelectProduct,
   tabs = [],
   activeTabId = 1,
   onSelectTab,
@@ -37,8 +54,17 @@ export const PosHeader: FC<Props> = ({
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { user } = useAuthStore();
+  const isStoreOwner = user?.role === 'STORE_OWNER';
+  const roleLabel = isStoreOwner ? 'Chủ cửa hàng' : 'Nhân viên';
+  const cashierDisplayName = user?.fullName || (isStoreOwner ? 'Trần Văn Chủ' : 'Lê Thị Thu Ngân');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  // Autocomplete Search State
+  const [isSearchDropdownOpen, setIsSearchDropdownOpen] = useState(false);
+  const [highlightedIndex, setHighlightedIndex] = useState(-1);
+  const searchContainerRef = useRef<HTMLDivElement>(null);
 
   // Drag & Scroll State cho dãy Tab hóa đơn
   const tabsScrollRef = useRef<HTMLDivElement>(null);
@@ -47,6 +73,17 @@ export const PosHeader: FC<Props> = ({
   const [scrollLeftState, setScrollLeftState] = useState(0);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
+
+  // Lọc sản phẩm theo từ khóa tìm kiếm
+  const trimmedQuery = searchQuery.trim().toLowerCase();
+  const matchingProducts = trimmedQuery
+    ? products.filter(
+        (p) =>
+          p.name.toLowerCase().includes(trimmedQuery) ||
+          p.sku.toLowerCase().includes(trimmedQuery) ||
+          p.barcode.toLowerCase().includes(trimmedQuery)
+      )
+    : [];
 
   const checkScrollable = useCallback(() => {
     if (tabsScrollRef.current) {
@@ -119,56 +156,194 @@ export const PosHeader: FC<Props> = ({
   // Base path cho /pos hoặc /employee/pos
   const posBasePath = location.pathname.startsWith('/employee/pos') ? '/employee/pos' : '/pos';
 
-  // Close hamburger dropdown when clicking outside
+  // Close hamburger dropdown & search dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+      const target = event.target as Node;
+      if (menuRef.current && !menuRef.current.contains(target)) {
         setIsMenuOpen(false);
       }
+      if (searchContainerRef.current && !searchContainerRef.current.contains(target)) {
+        setIsSearchDropdownOpen(false);
+      }
     };
-    if (isMenuOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
+    document.addEventListener('mousedown', handleClickOutside);
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [isMenuOpen]);
+  }, []);
+
+  const handleSelectProductItem = (product: Product) => {
+    onSelectProduct?.(product);
+    onSearchChange?.('');
+    setIsSearchDropdownOpen(false);
+    setHighlightedIndex(-1);
+  };
+
+  const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setIsSearchDropdownOpen(true);
+      setHighlightedIndex((prev) =>
+        prev < matchingProducts.length - 1 ? prev + 1 : 0
+      );
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setIsSearchDropdownOpen(true);
+      setHighlightedIndex((prev) =>
+        prev > 0 ? prev - 1 : matchingProducts.length - 1
+      );
+    } else if (e.key === 'Escape') {
+      setIsSearchDropdownOpen(false);
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      const q = searchQuery.trim().toLowerCase();
+      if (!q) return;
+
+      // 1. Kiểm tra nếu là Barcode scanner bắn chính xác hoặc SKU chính xác 100%
+      const exactMatch = products.find(
+        (p) => p.barcode.toLowerCase() === q || p.sku.toLowerCase() === q
+      );
+      if (exactMatch) {
+        handleSelectProductItem(exactMatch);
+        return;
+      }
+
+      // 2. Nếu người dùng đang dùng phím mũi tên highlight 1 món
+      if (highlightedIndex >= 0 && highlightedIndex < matchingProducts.length) {
+        handleSelectProductItem(matchingProducts[highlightedIndex]);
+        return;
+      }
+
+      // 3. Nếu chỉ có đúng 1 món duy nhất khớp kết quả
+      if (matchingProducts.length === 1) {
+        handleSelectProductItem(matchingProducts[0]);
+        return;
+      }
+
+      // 4. Nếu có nhiều hơn 1 kết quả (vd: gõ "nước mắm"), KHÔNG tự động chọn bừa món đầu tiên,
+      // mà mở dropdown để người dùng nhìn thấy danh sách và chủ động chọn!
+      if (matchingProducts.length > 1) {
+        setIsSearchDropdownOpen(true);
+        if (highlightedIndex === -1) {
+          setHighlightedIndex(0);
+        }
+        return;
+      }
+
+      // 5. Nếu không có món nào khớp
+      if (matchingProducts.length === 0) {
+        onBarcodeSubmit?.();
+      }
+    }
+  };
 
   return (
     <header className="pos-header-container">
       {/* 1. HÀNG TRÊN CÙNG: Brand + Quét mã / Search + Chế độ + Thu ngân + Menu Hamburger */}
       <div className="pos-header-top-row">
-        {/* Cột trái: Tên quầy và Chi nhánh */}
+        {/* Cột trái: Chi nhánh & Quầy gọn gàng */}
         <div className="pos-header-left">
           <div className="pos-header-branding" onClick={() => navigate(posBasePath)} style={{ cursor: 'pointer' }}>
-            <h1 className="pos-header-title">Quầy Bán Hàng</h1>
-            <div className="pos-header-subtitle">
-              Chi nhánh: <b>Chi nhánh trung tâm</b> &bull; Quầy #01
+            <div className="pos-header-subtitle" style={{ fontSize: 13, fontWeight: 600, color: '#0f766e', margin: 0 }}>
+              Chi nhánh: <b>{user?.tenantName ? user.tenantName.split(' ')[0] + ' Trung Tâm' : 'Chi nhánh trung tâm'}</b> &bull; Quầy #01
             </div>
           </div>
         </div>
 
-        {/* Cột giữa: Form quét Barcode / Search */}
-        <div className="pos-header-center-search">
+        {/* Cột giữa: Form quét Barcode / Search với Autocomplete Dropdown */}
+        <div className="pos-header-center-search" ref={searchContainerRef}>
           <form
             className="pos-barcode-search-form"
             onSubmit={(e) => {
               e.preventDefault();
-              onBarcodeSubmit?.(e);
             }}
           >
             <input
               type="text"
               id="product_search"
               value={searchQuery}
-              onChange={(e) => onSearchChange?.(e.target.value)}
+              onChange={(e) => {
+                onSearchChange?.(e.target.value);
+                setIsSearchDropdownOpen(true);
+                setHighlightedIndex(-1);
+              }}
+              onFocus={() => {
+                if (searchQuery.trim().length > 0) {
+                  setIsSearchDropdownOpen(true);
+                }
+              }}
+              onKeyDown={handleSearchKeyDown}
               placeholder="[F2] Quét Barcode, SKU, tên sản phẩm..."
               className="pos-barcode-input"
+              autoComplete="off"
             />
-            <button type="submit" className="pos-barcode-submit-btn">
-              Quét mã
+            <button
+              type="button"
+              className="pos-barcode-submit-btn"
+              onClick={() => {
+                if (matchingProducts.length === 1) {
+                  handleSelectProductItem(matchingProducts[0]);
+                } else if (matchingProducts.length > 1) {
+                  setIsSearchDropdownOpen(true);
+                } else {
+                  onBarcodeSubmit?.();
+                }
+              }}
+            >
+              Tìm kiếm
             </button>
           </form>
+
+          {/* Autocomplete Dropdown hiển thị các sản phẩm gợi ý */}
+          {isSearchDropdownOpen && searchQuery.trim().length > 0 && (
+            <div className="pos-search-dropdown">
+              <div className="pos-search-dropdown-header">
+                <span>Kết quả tìm kiếm ({matchingProducts.length} mặt hàng)</span>
+              </div>
+
+              {matchingProducts.length > 0 ? (
+                <div className="pos-search-dropdown-list">
+                  {matchingProducts.map((p, index) => (
+                    <div
+                      key={p.id}
+                      className={`pos-search-dropdown-item ${highlightedIndex === index ? 'active' : ''}`}
+                      onClick={() => handleSelectProductItem(p)}
+                      onMouseEnter={() => setHighlightedIndex(index)}
+                    >
+                      {p.imageUrl ? (
+                        <img src={p.imageUrl} alt={p.name} className="pos-search-item-thumb" />
+                      ) : (
+                        <div className="pos-search-item-thumb-placeholder">
+                          <Package size={20} />
+                        </div>
+                      )}
+
+                      <div className="pos-search-item-details">
+                        <div className="pos-search-item-name">{p.name}</div>
+                        <div className="pos-search-item-meta">
+                          <span className="badge-sku">Mã: {p.barcode || p.sku}</span>
+                          <span>&bull;</span>
+                          <span className={`badge-stock ${p.quantityOnHand <= 0 ? 'out' : ''}`}>
+                            {p.quantityOnHand > 0 ? `Tồn: ${p.quantityOnHand} ${p.baseUnit}` : 'Hết hàng'}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="pos-search-item-price-col">
+                        <div className="pos-search-item-price">{p.basePrice.toLocaleString('vi-VN')} đ</div>
+                        <div className="pos-search-item-unit">/{p.baseUnit}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="pos-search-empty-state">
+                  <div>Không tìm thấy mặt hàng nào phù hợp với "{searchQuery}"</div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Cột phải: Chế độ bán, Thông tin thu ngân, Nút Hamburger */}
@@ -194,8 +369,22 @@ export const PosHeader: FC<Props> = ({
             </div>
           )}
 
-          <div className="pos-cashier-badge">
-            Thu ngân: <b>Nguyễn Bá Sơn (NV004)</b>
+          <div
+            className="pos-cashier-badge"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '4px 10px',
+              borderRadius: 6,
+              border: isStoreOwner ? '1px solid #10b981' : '1px solid #cbd5e1',
+              backgroundColor: isStoreOwner ? '#ecfdf5' : '#f8fafc',
+              color: isStoreOwner ? '#065f46' : '#334155',
+              fontSize: 12.5,
+            }}
+            title={isStoreOwner ? "Quyền Chủ cửa hàng: Được phép bán nợ" : "Quyền Thu ngân: Ẩn nút bán nợ"}
+          >
+            <span>{roleLabel}: <b>{cashierDisplayName}</b></span>
           </div>
 
           {/* Menu Hamburger 3 gạch */}
@@ -213,6 +402,27 @@ export const PosHeader: FC<Props> = ({
 
             {isMenuOpen && (
               <div className="pos-hamburger-dropdown">
+                {/* Lối tắt quay lại Dashboard cho Chủ Cửa Hàng */}
+                {isStoreOwner && (
+                  <>
+                    <button
+                      type="button"
+                      className="pos-dropdown-item"
+                      onClick={() => {
+                        setIsMenuOpen(false);
+                        navigate('/store-owner/dashboard');
+                      }}
+                    >
+                      <ArrowLeft size={16} className="text-teal-700" />
+                      <div className="item-content">
+                        <div className="item-title">Về Dashboard Chủ Cửa Hàng</div>
+                        <div className="item-desc">Quay lại trang tổng quan bán lẻ & quản trị</div>
+                      </div>
+                    </button>
+                    <div style={{ height: 1, backgroundColor: '#e2e8f0', margin: '4px 0' }} />
+                  </>
+                )}
+
                 <button
                   type="button"
                   className="pos-dropdown-item"
@@ -329,7 +539,8 @@ export const PosHeader: FC<Props> = ({
                 onClick={() => onSelectTab?.(tab.id)}
               >
                 <span className="pos-tab-name">{tab.name}</span>
-                {tabs.length > 1 && (
+                {/* Dấu x đóng hóa đơn: Hiện khi có > 1 hóa đơn, hoặc hóa đơn duy nhất đang có hàng (để làm mới đơn) */}
+                {(tabs.length > 1 || tab.cart.length > 0) && (
                   <button
                     type="button"
                     className="pos-tab-close"
@@ -337,7 +548,7 @@ export const PosHeader: FC<Props> = ({
                       e.stopPropagation();
                       onCloseTab?.(tab.id);
                     }}
-                    title="Đóng hóa đơn"
+                    title={tabs.length > 1 ? 'Đóng hóa đơn' : 'Làm mới đơn (Xóa giỏ hàng)'}
                   >
                     &times;
                   </button>

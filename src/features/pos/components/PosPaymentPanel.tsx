@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { FC } from 'react';
 import { Plus, X } from 'lucide-react';
 import type { Customer } from '../types/pos.types';
+import { useAuthStore } from '../../../stores/useAuthStore';
 
 interface Props {
   customer: Customer | null;
@@ -42,8 +43,29 @@ export const PosPaymentPanel: FC<Props> = ({
   onSubmitCheckout,
   customerSearchList,
 }) => {
+  const { user } = useAuthStore();
+  const isStoreOwner = user?.role === 'STORE_OWNER';
+
+  // Nếu vai trò là nhân viên thu ngân mà phương thức hiện tại đang là ghi nợ -> Tự động chuyển về tiền mặt
+  useEffect(() => {
+    if (!isStoreOwner && paymentMethod === 'debt') {
+      onPaymentMethodChange('cash');
+    }
+  }, [isStoreOwner, paymentMethod, onPaymentMethodChange]);
+
   const [customerSearchInput, setCustomerSearchInput] = useState('');
   const [isSearchingCustomer, setIsSearchingCustomer] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setIsSearchingCustomer(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Tính toán các khoản giảm giá và thành tiền
   const orderDiscountAmount = Math.round((totalItemAmount * orderDiscountPercent) / 100);
@@ -57,12 +79,14 @@ export const PosPaymentPanel: FC<Props> = ({
   const finalAmount = Math.max(0, subTotalBeforePoints - pointsDeduction);
   const changeAmount = Math.max(0, cashTendered - finalAmount);
 
-  const filteredCustomers = customerSearchList.filter(
-    (c) =>
-      c.name.toLowerCase().includes(customerSearchInput.toLowerCase()) ||
-      c.phone.includes(customerSearchInput) ||
-      c.code.toLowerCase().includes(customerSearchInput.toLowerCase())
-  );
+  // Tìm kiếm khách hàng thuần túy CHỈ BẰNG SỐ ĐIỆN THOẠI (SĐT)
+  const phoneQuery = customerSearchInput.replace(/\D/g, '');
+
+  const filteredCustomers = customerSearchList.filter((c) => {
+    if (!phoneQuery) return false;
+    const cleanPhone = (c.phone || '').replace(/\D/g, '');
+    return cleanPhone.includes(phoneQuery);
+  });
 
   return (
     <div className="pos-payment-panel">
@@ -80,23 +104,37 @@ export const PosPaymentPanel: FC<Props> = ({
 
       <hr className="pos-divider" />
 
-      {/* 1. KHÁCH HÀNG (F4) */}
+      {/* 1. KHÁCH HÀNG (F4) - CHỈ TÌM BẰNG SỐ ĐIỆN THOẠI */}
       <fieldset className="pos-fieldset">
         <legend className="pos-legend">
-          <b>Khách hàng (F4)</b>
+          <b>Khách hàng (F4) - Chỉ tìm bằng SĐT</b>
         </legend>
 
-        <div style={{ display: 'flex', gap: 6, position: 'relative' }}>
+        <div style={{ display: 'flex', gap: 6, position: 'relative' }} ref={dropdownRef}>
           <input
-            type="text"
+            type="tel"
             id="customer_search"
             value={customerSearchInput}
             onChange={(e) => {
-              setCustomerSearchInput(e.target.value);
+              // Chỉ cho phép nhập số điện thoại
+              const val = e.target.value.replace(/[^\d\s.-]/g, '');
+              setCustomerSearchInput(val);
               setIsSearchingCustomer(true);
             }}
-            onFocus={() => setIsSearchingCustomer(true)}
-            placeholder="Tìm khách hàng (F4)..."
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && filteredCustomers.length > 0) {
+                e.preventDefault();
+                onSelectCustomer(filteredCustomers[0]);
+                setCustomerSearchInput('');
+                setIsSearchingCustomer(false);
+              }
+            }}
+            onFocus={() => {
+              if (customerSearchInput.trim()) {
+                setIsSearchingCustomer(true);
+              }
+            }}
+            placeholder="Nhập số điện thoại khách hàng (F4)..."
             className="pos-input"
             style={{ flex: 1 }}
           />
@@ -110,31 +148,35 @@ export const PosPaymentPanel: FC<Props> = ({
             <Plus size={14} />
           </button>
 
-          {/* Dropdown tìm kiếm khách hàng */}
+          {/* Dropdown tìm kiếm khách hàng chỉ theo SĐT */}
           {isSearchingCustomer && customerSearchInput.trim() && (
             <div className="pos-customer-dropdown">
               {filteredCustomers.length > 0 ? (
-                filteredCustomers.map((cust) => (
+                filteredCustomers.slice(0, 8).map((cust) => (
                   <div
                     key={cust.id}
                     className="pos-customer-dropdown-item"
                     onClick={() => {
                       onSelectCustomer(cust);
-                      setCustomerSearchInput(`${cust.name} (${cust.phone})`);
+                      setCustomerSearchInput('');
                       setIsSearchingCustomer(false);
                     }}
                   >
-                    <div>
-                      <b>{cust.name}</b> ({cust.code}) - {cust.phone}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: '#0f766e' }}>
+                        📞 {cust.phone}
+                      </span>
+                      <b style={{ color: '#1e293b' }}>{cust.name}</b>
                     </div>
-                    <div style={{ fontSize: 11.5, color: '#16a34a' }}>
-                      Điểm tích lũy: {cust.loyaltyPoints} điểm &bull; {cust.membershipTier}
+                    <div style={{ fontSize: 11.5, color: '#16a34a', display: 'flex', justifyContent: 'space-between', marginTop: 3 }}>
+                      <span>Mã: {cust.code} &bull; {cust.membershipTier}</span>
+                      <span>Tích lũy: {cust.loyaltyPoints} điểm</span>
                     </div>
                   </div>
                 ))
               ) : (
-                <div style={{ padding: 10, fontSize: 12, color: '#64748b', textAlign: 'center' }}>
-                  Không tìm thấy. Bấm [+] để thêm mới.
+                <div style={{ padding: 12, fontSize: 12, color: '#64748b', textAlign: 'center' }}>
+                  Không tìm thấy khách hàng với SĐT &quot;{customerSearchInput}&quot;. Bấm [+] để thêm mới.
                 </div>
               )}
             </div>
@@ -149,17 +191,17 @@ export const PosPaymentPanel: FC<Props> = ({
               <span className="pos-loyalty-text">
                 Điểm: <b>{customer.loyaltyPoints} điểm</b> ({customer.membershipTier})
               </span>
-              {customer.allowDebt ? (
-                <div style={{ marginTop: 4, fontSize: 11, color: '#334155' }}>
-                  <span>Hạn mức: <b style={{ color: '#0f766e' }}>{customer.debtLimit.toLocaleString('vi-VN')} đ</b></span>
-                  {' '}&bull;{' '}
-                  <span>Đang nợ: <b style={{ color: customer.currentDebt > 0 ? '#dc2626' : '#16a34a' }}>{customer.currentDebt.toLocaleString('vi-VN')} đ</b></span>
-                </div>
-              ) : (
-                <div style={{ marginTop: 3, fontSize: 11, color: '#94a3b8' }}>
-                  Chưa kích hoạt hạn mức mua nợ
-                </div>
-              )}
+              <div style={{ marginTop: 4, fontSize: 11, color: '#334155', display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                <span>Đã nợ: <b style={{ color: '#0f766e' }}>{customer.debtCount || 0} lần</b></span>
+                <span>&bull;</span>
+                <span>Đang nợ: <b style={{ color: customer.currentDebt > 0 ? '#dc2626' : '#16a34a' }}>{customer.currentDebt.toLocaleString('vi-VN')} đ</b></span>
+                {customer.totalDebtPurchased ? (
+                  <>
+                    <span>&bull;</span>
+                    <span>Tổng từng nợ: <b>{customer.totalDebtPurchased.toLocaleString('vi-VN')} đ</b></span>
+                  </>
+                ) : null}
+              </div>
             </div>
             <button
               type="button"
@@ -287,17 +329,20 @@ export const PosPaymentPanel: FC<Props> = ({
             />
             <b>Chuyển khoản VietQR</b>
           </label>
-          <label style={{ display: 'inline-flex', alignItems: 'center', gap: 5, cursor: 'pointer' }}>
-            <input
-              type="radio"
-              name="pay_method"
-              checked={paymentMethod === 'debt'}
-              onChange={() => onPaymentMethodChange('debt')}
-            />
-            <b style={{ color: paymentMethod === 'debt' ? '#d97706' : 'inherit' }}>
-              Ghi nợ (Bán nợ)
-            </b>
-          </label>
+          {/* Chỉ Chủ cửa hàng hoặc Quản trị viên mới nhìn thấy và được thực hiện Bán nợ */}
+          {isStoreOwner && (
+            <label style={{ display: 'inline-flex', alignItems: 'center', gap: 5, cursor: 'pointer' }}>
+              <input
+                type="radio"
+                name="pay_method"
+                checked={paymentMethod === 'debt'}
+                onChange={() => onPaymentMethodChange('debt')}
+              />
+              <b style={{ color: paymentMethod === 'debt' ? '#d97706' : 'inherit' }}>
+                Ghi nợ (Bán nợ)
+              </b>
+            </label>
+          )}
         </div>
 
         {/* Nhập tiền khách đưa & tiền thừa (ở chế độ tiền mặt) */}
@@ -333,46 +378,42 @@ export const PosPaymentPanel: FC<Props> = ({
           </table>
         )}
 
-        {/* Hiển thị thông tin kiểm tra công nợ khi chọn Ghi nợ */}
-        {paymentMethod === 'debt' && (
-          <div style={{ marginTop: 8, padding: 10, borderRadius: 6, backgroundColor: '#fffbeb', border: '1px solid #fef3c7', fontSize: 12 }}>
+        {/* Hiển thị thông tin sổ nợ khi chọn Ghi nợ (chỉ cho Chủ cửa hàng - không giới hạn hạn mức) */}
+        {isStoreOwner && paymentMethod === 'debt' && (
+          <div style={{ marginTop: 8, padding: 10, borderRadius: 6, backgroundColor: '#fffbeb', border: '1px solid #fde68a', fontSize: 12 }}>
             {!customer ? (
               <div style={{ color: '#b45309', display: 'flex', alignItems: 'center', gap: 6 }}>
                 <span style={{ fontSize: 14 }}>⚠️</span>
-                <span><strong>Chưa chọn khách hàng:</strong> Vui lòng tìm và chọn khách hàng định danh trước khi thực hiện ghi nợ.</span>
+                <span><strong>Chưa chọn khách hàng:</strong> Vui lòng tìm và chọn khách hàng trước khi thực hiện ghi nợ.</span>
               </div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
-                  <span>Hạn mức nợ cho phép:</span>
-                  <strong>{customer.debtLimit ? customer.debtLimit.toLocaleString('vi-VN') + ' đ' : '0 đ (Chưa cấp)'}</strong>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                <div style={{ fontWeight: 700, color: '#92400e', marginBottom: 2 }}>
+                  📒 Thông tin sổ nợ khách hàng:
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
-                  <span>Nợ hiện tại:</span>
-                  <span style={{ color: customer.currentDebt > 0 ? '#ef4444' : '#10b981', fontWeight: 600 }}>
+                  <span>Số lần đã mua nợ:</span>
+                  <strong style={{ color: '#0f766e' }}>{customer.debtCount || 0} lần</strong>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
+                  <span>Tổng tiền từng mua nợ:</span>
+                  <span>{(customer.totalDebtPurchased || customer.currentDebt).toLocaleString('vi-VN')} đ</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
+                  <span>Số tiền đang nợ hiện tại:</span>
+                  <strong style={{ color: customer.currentDebt > 0 ? '#dc2626' : '#16a34a' }}>
                     {customer.currentDebt.toLocaleString('vi-VN')} đ
-                  </span>
+                  </strong>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed #cbd5e1', paddingTop: 4 }}>
-                  <span>Dự kiến sau đơn:</span>
-                  <strong style={{ color: (customer.currentDebt + finalAmount) > (customer.debtLimit || 0) ? '#dc2626' : '#1e293b' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed #cbd5e1', paddingTop: 5, color: '#1e293b' }}>
+                  <span>Tổng nợ sau đơn này:</span>
+                  <strong style={{ color: '#b45309', fontSize: 13 }}>
                     {(customer.currentDebt + finalAmount).toLocaleString('vi-VN')} đ
                   </strong>
                 </div>
-
-                {!customer.allowDebt ? (
-                  <div style={{ marginTop: 6, padding: '4px 8px', borderRadius: 4, backgroundColor: '#fee2e2', color: '#b91c1c', fontSize: 11 }}>
-                    ⚠️ Khách hàng này chưa được cấu hình cho phép mua nợ. Cần quyền quản trị viên duyệt nếu tiếp tục.
-                  </div>
-                ) : (customer.currentDebt + finalAmount) > customer.debtLimit ? (
-                  <div style={{ marginTop: 6, padding: '4px 8px', borderRadius: 4, backgroundColor: '#fee2e2', color: '#b91c1c', fontSize: 11 }}>
-                    ⚠️ <strong>Vượt hạn mức nợ {((customer.currentDebt + finalAmount) - customer.debtLimit).toLocaleString('vi-VN')} đ.</strong> Hệ thống sẽ yêu cầu xác nhận duyệt ngoại lệ khi thanh toán.
-                  </div>
-                ) : (
-                  <div style={{ marginTop: 6, padding: '4px 8px', borderRadius: 4, backgroundColor: '#dcfce7', color: '#15803d', fontSize: 11 }}>
-                    ✓ Nằm trong hạn mức cho phép. Khả dụng còn lại: {(customer.debtLimit - (customer.currentDebt + finalAmount)).toLocaleString('vi-VN')} đ.
-                  </div>
-                )}
+                <div style={{ marginTop: 4, padding: '4px 8px', borderRadius: 4, backgroundColor: '#ecfdf5', color: '#047857', fontSize: 11.5 }}>
+                  ✓ Đơn hàng <b>{finalAmount.toLocaleString('vi-VN')} đ</b> sẽ được cộng dồn vào sổ nợ của khách.
+                </div>
               </div>
             )}
           </div>
