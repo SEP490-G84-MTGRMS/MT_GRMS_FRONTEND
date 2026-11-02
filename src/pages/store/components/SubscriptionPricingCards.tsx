@@ -1,7 +1,8 @@
 // src/pages/store/components/SubscriptionPricingCards.tsx
-import { useState, type FC } from 'react';
+import { useState, useEffect, type FC } from 'react';
 import { Check, ChevronDown, ChevronUp } from 'lucide-react';
 import { SUBSCRIPTION_PLANS, type SubscriptionPlanItem } from '../storeData';
+import { storeApi } from '../api/storeApi';
 
 interface SubscriptionPricingCardsProps {
   onSelectPlan: (plan: SubscriptionPlanItem) => void;
@@ -10,7 +11,42 @@ interface SubscriptionPricingCardsProps {
 export const SubscriptionPricingCards: FC<SubscriptionPricingCardsProps> = ({
   onSelectPlan,
 }) => {
+  const [plans, setPlans] = useState<SubscriptionPlanItem[]>(SUBSCRIPTION_PLANS);
   const [expandedCards, setExpandedCards] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchPlans = async () => {
+      try {
+        const res = await storeApi.getPricingPlans();
+        if (isMounted && res.success && Array.isArray(res.data) && res.data.length > 0) {
+          const merged = SUBSCRIPTION_PLANS.map((staticPlan) => {
+            const match = res.data.find(
+              (p) =>
+                p.code?.toUpperCase() === staticPlan.code?.toUpperCase() ||
+                p.id === staticPlan.id
+            );
+            if (match) {
+              return {
+                ...staticPlan,
+                name: match.name || staticPlan.name,
+                monthlyPrice: match.monthlyPrice || staticPlan.monthlyPrice,
+                yearlyPrice: match.yearlyPrice || staticPlan.yearlyPrice,
+              };
+            }
+            return staticPlan;
+          });
+          setPlans(merged);
+        }
+      } catch {
+        // Fallback gracefully to default SUBSCRIPTION_PLANS
+      }
+    };
+    fetchPlans();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const toggleExpand = (planId: string) => {
     setExpandedCards((prev) => ({
@@ -21,7 +57,7 @@ export const SubscriptionPricingCards: FC<SubscriptionPricingCardsProps> = ({
 
   return (
     <div className="pricing-cards-grid">
-      {SUBSCRIPTION_PLANS.map((plan) => {
+      {plans.map((plan) => {
         const isExpanded = !!expandedCards[plan.id];
         // Display top 6 features by default, or all if expanded
         const displayedFeatures = isExpanded

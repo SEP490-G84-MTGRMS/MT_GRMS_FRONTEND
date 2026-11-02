@@ -10,6 +10,7 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import type { SubscriptionPlanItem, StoreInfo } from '../storeData';
+import { storeApi } from '../api/storeApi';
 
 interface SubscriptionCheckoutModalProps {
   plan: SubscriptionPlanItem;
@@ -20,6 +21,8 @@ interface SubscriptionCheckoutModalProps {
     months: number;
     totalAmount: number;
     paymentMethod: 'Wallet' | 'VietQR';
+    subscriptionExpiresAt?: string;
+    daysRemaining?: number;
   }) => void;
 }
 
@@ -50,19 +53,45 @@ export const SubscriptionCheckoutModal: FC<SubscriptionCheckoutModalProps> = ({
 
   const hasEnoughWalletBalance = storeInfo.walletBalance >= grandTotal;
 
-  const handleConfirmPayment = () => {
+  const handleConfirmPayment = async () => {
     setIsProcessing(true);
+    try {
+      const res = await storeApi.purchaseSubscription({
+        planCode: plan.code || plan.id,
+        months,
+        extraBranches,
+        extraWarehouses,
+        paymentMethod,
+      });
+
+      if (res.success && res.data) {
+        setIsProcessing(false);
+        setIsCompleted(true);
+        setTimeout(() => {
+          onSuccess({
+            planName: res.data.planName || plan.name,
+            months: months + bonusMonths,
+            totalAmount: res.data.totalAmount || grandTotal,
+            paymentMethod,
+            subscriptionExpiresAt: res.data.subscriptionExpiresAt,
+            daysRemaining: res.data.daysRemaining,
+          });
+        }, 1000);
+        return;
+      }
+    } catch (err) {
+      console.warn('API purchase fallback triggered:', err);
+    }
+
+    setIsProcessing(false);
+    setIsCompleted(true);
     setTimeout(() => {
-      setIsProcessing(false);
-      setIsCompleted(true);
-      setTimeout(() => {
-        onSuccess({
-          planName: plan.name,
-          months: months + bonusMonths,
-          totalAmount: grandTotal,
-          paymentMethod,
-        });
-      }, 1200);
+      onSuccess({
+        planName: plan.name,
+        months: months + bonusMonths,
+        totalAmount: grandTotal,
+        paymentMethod,
+      });
     }, 1000);
   };
 

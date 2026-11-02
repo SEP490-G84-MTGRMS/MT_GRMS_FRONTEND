@@ -110,17 +110,27 @@ export const StoreSettingsHubPage: FC = () => {
     months: number;
     totalAmount: number;
     paymentMethod: 'Wallet' | 'VietQR';
+    subscriptionExpiresAt?: string;
+    daysRemaining?: number;
   }) => {
     let newBal = storeInfo.walletBalance;
     if (result.paymentMethod === 'Wallet') {
       newBal = Math.max(0, storeInfo.walletBalance - result.totalAmount);
     }
 
-    // Gia hạn thêm ngày
-    const newDaysRemaining = storeInfo.daysRemaining + result.months * 30;
-    const expDate = new Date();
-    expDate.setDate(expDate.getDate() + newDaysRemaining);
-    const newExpStr = expDate.toISOString().split('T')[0];
+    // Gia hạn thêm ngày (ưu tiên dữ liệu từ backend trả về)
+    const newDaysRemaining =
+      result.daysRemaining !== undefined
+        ? result.daysRemaining
+        : storeInfo.daysRemaining + result.months * 30;
+
+    const newExpStr = result.subscriptionExpiresAt
+      ? result.subscriptionExpiresAt.split('T')[0]
+      : (() => {
+          const expDate = new Date();
+          expDate.setDate(expDate.getDate() + newDaysRemaining);
+          return expDate.toISOString().split('T')[0];
+        })();
 
     const newTx: WalletTransaction = {
       id: `tx-${Date.now()}`,

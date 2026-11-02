@@ -108,4 +108,33 @@ export const storeApi = {
     const res = await httpClient.get<ApiResponse<BackendPricingPlanResponse[]>>('/tenant/pricing-plans');
     return res.data;
   },
+
+  async purchaseSubscription(
+    payload: PurchaseSubscriptionPayload
+  ): Promise<ApiResponse<PurchaseSubscriptionResult>> {
+    const res = await httpClient.post<ApiResponse<PurchaseSubscriptionResult>>(
+      '/tenant/subscriptions/purchase',
+      payload
+    );
+    return res.data;
+  },
 };
+
+export interface PurchaseSubscriptionPayload {
+  planCode: string;
+  months?: number;
+  extraBranches?: number;
+  extraWarehouses?: number;
+  paymentMethod?: 'Wallet' | 'VietQR';
+}
+
+export interface PurchaseSubscriptionResult {
+  planCode: string;
+  planName: string;
+  subscriptionExpiresAt: string;
+  daysRemaining: number;
+  totalAmount: number;
+  paymentMethod: string;
+  message: string;
+}
+
