@@ -27,7 +27,7 @@ import {
   NotificationPopover,
   NotificationDrawer,
 } from "../../features/notifications";
-
+import { BranchSelectorDropdown } from "./BranchSelectorDropdown";
 /* ─── Data ─── */
 
 interface NavSubItem {
@@ -94,42 +94,7 @@ const NAV_GROUPS: NavGroup[] = [
     id: "store",
     label: "Cửa hàng",
     icon: StoreNavIcon,
-    sections: [
-      {
-        title: "Gian hàng & Chi nhánh",
-        items: [
-          {
-            label: "Thông tin gian hàng",
-            to: "/store-owner/subscriptions?tab=store-info",
-          },
-          {
-            label: "Chi nhánh & Kho hàng",
-            to: "/store-owner/subscriptions?tab=store-info&view=branches",
-          },
-          {
-            label: "Hồ sơ định danh & MST",
-            to: "/store-owner/subscriptions?tab=store-info&view=identity",
-          },
-        ],
-      },
-      {
-        title: "Gói dịch vụ MT-GRMS",
-        items: [
-          {
-            label: "Gói dịch vụ & Nâng cấp",
-            to: "/store-owner/subscriptions?tab=subscriptions",
-          },
-          {
-            label: "Lịch sử mua hàng",
-            to: "/store-owner/subscriptions?tab=order-history",
-          },
-          {
-            label: "Bản xác nhận dịch vụ",
-            to: "/store-owner/subscriptions?tab=service-confirm",
-          },
-        ],
-      },
-    ],
+    to: "/store-owner/subscriptions",
   },
   {
     id: "goods",
@@ -1299,7 +1264,7 @@ export const AppTopNav: FC = () => {
             })}
           </div>
 
-          {/* Right actions: Hỗ trợ + Góp ý + Divider + Thông báo + Cài đặt + Profile */}
+          {/* Right actions: Chọn chi nhánh + Hỗ trợ + Góp ý + Divider + Thông báo + Cài đặt + Profile */}
           <div
             style={{
               display: "flex",
@@ -1309,6 +1274,9 @@ export const AppTopNav: FC = () => {
               flexShrink: 0,
             }}
           >
+            {/* 0. Dropdown chọn chi nhánh */}
+            <BranchSelectorDropdown />
+
             {/* 1. Hỗ trợ */}
             <button
               type="button"

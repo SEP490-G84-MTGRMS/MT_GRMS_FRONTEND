@@ -261,6 +261,58 @@ button, input, select {
   white-space: nowrap;
 }
 
+.nav-buttons .btn {
+  height: 46px;
+  padding: 0 24px;
+  font-size: 1rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-pill);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-sizing: border-box;
+  text-decoration: none;
+}
+
+.nav-buttons .btn-ghost {
+  background: #ffffff;
+  color: #1e293b;
+  border: 1.5px solid #e2e8f0;
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.nav-buttons .btn-ghost:hover {
+  color: var(--blue-primary);
+  border-color: var(--blue-primary);
+  background: var(--blue-light);
+  transform: translateY(-1px);
+  box-shadow: 0 3px 10px rgba(15, 118, 110, 0.15);
+}
+
+.nav-buttons .btn-primary {
+  background: var(--blue-primary);
+  color: #ffffff;
+  border: 1.5px solid var(--blue-primary);
+  font-weight: 700;
+  box-shadow: 0 4px 14px rgba(15, 118, 110, 0.28);
+}
+
+.nav-buttons .btn-primary:hover {
+  background: var(--blue-hover);
+  border-color: var(--blue-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(15, 118, 110, 0.38);
+}
+
+.nav-buttons-backup {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  white-space: nowrap;
+}
+
 .mobile-toggle {
   display: none;
   background: none;
@@ -442,6 +494,43 @@ button, input, select {
   align-items: center;
   gap: 16px;
   flex-wrap: wrap;
+}
+
+/* Nút Dùng thử miễn phí chính trong Hero Section (To, nổi bật, cân đối) */
+.hero-actions .btn-primary {
+  height: 58px;
+  padding: 0 42px;
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  border-radius: var(--radius-pill);
+  background: var(--blue-primary);
+  color: #ffffff;
+  border: 2px solid var(--blue-primary);
+  box-shadow: 0 8px 24px rgba(15, 118, 110, 0.35);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.hero-actions .btn-primary:hover {
+  background: var(--blue-hover);
+  border-color: var(--blue-hover);
+  transform: translateY(-2px);
+  box-shadow: 0 12px 32px rgba(15, 118, 110, 0.45);
+}
+
+/* Nút Khám phá tính năng đồng bộ chiều cao 58px */
+.hero-actions .btn-play-pill {
+  height: 58px;
+  padding: 0 30px;
+  font-size: 1.05rem;
+  font-weight: 700;
+  border-radius: var(--radius-pill);
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
 }
 
 .hero-subnote-link {
@@ -1301,6 +1390,9 @@ button, input, select {
   align-items: center;
   padding: 16px 0;
   cursor: pointer;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
   user-select: none;
 }
 
@@ -2143,6 +2235,19 @@ button, input, select {
 }
 
 @media (max-width: 768px) {
+  .nav-buttons .btn {
+    height: 40px;
+    padding: 0 16px;
+    font-size: 0.9rem;
+  }
+
+  .hero-actions .btn-primary,
+  .hero-actions .btn-play-pill {
+    height: 52px;
+    padding: 0 24px;
+    font-size: 1rem;
+  }
+
   .nav-menu {
     display: none;
   }

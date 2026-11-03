@@ -180,9 +180,9 @@ export const RegisterPage: FC = () => {
     <div className="auth-card">
       {/* Thanh trên cùng */}
       <div className="auth-card-topbar">
-        <Link to="/auth/login" className="auth-back-home-link">
+        <Link to="/" className="auth-back-home-link">
           <ArrowLeft size={14} strokeWidth={2.2} />
-          <span>Quay lại Đăng nhập</span>
+          <span>Quay lại trang chủ</span>
         </Link>
       </div>
 

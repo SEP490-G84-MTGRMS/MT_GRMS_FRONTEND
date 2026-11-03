@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import type { FC } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
@@ -28,6 +28,7 @@ import {
   ApplyLockModal,
 } from '../../features/admin/components';
 import type { Tenant, LockType } from '../../features/admin/types/admin.types';
+import { tenantApi, mapBackendTenantDetailToFrontend } from '../../features/admin/api';
 
 export const TenantDetailPage: FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -35,9 +36,17 @@ export const TenantDetailPage: FC = () => {
 
   // Load tenant list and active tenant
   const [tenants, setTenants] = useState<Tenant[]>(mockTenants);
+  const [realTenant, setRealTenant] = useState<Tenant | null>(null);
+
+  useEffect(() => {
+    if (!id) return;
+    tenantApi.getById(id).then(res => {
+      if (res.success && res.data) setRealTenant(mapBackendTenantDetailToFrontend(res.data));
+    }).catch(() => {});
+  }, [id]);
   const currentTenant = useMemo(() => {
     return (
-      tenants.find((t) => t.id === id || t.subdomain === id) ||
+      realTenant || tenants.find((t) => t.id === id || t.subdomain === id) ||
       tenants[0]
     );
   }, [tenants, id]);
@@ -67,7 +76,9 @@ export const TenantDetailPage: FC = () => {
     setTimeout(() => setCopiedSubdomain(false), 2000);
   };
 
-  const handleUnlock = () => {
+  const handleUnlock = async () => {
+    if (currentTenant) { try { await tenantApi.unlock(currentTenant.id); } catch {} }
+    if (realTenant) setRealTenant((prev) => (prev ? { ...prev, status: "active", lockType: undefined } : null));
     if (!currentTenant) return;
     setTenants((prev) =>
       prev.map((t) =>
@@ -79,7 +90,9 @@ export const TenantDetailPage: FC = () => {
     showToast(`Đã dỡ bỏ lệnh khóa và phục hồi dịch vụ cho chuỗi ${currentTenant.name}.`, 'success');
   };
 
-  const handleApplyLockSubmit = (tenant: Tenant, lockType: LockType) => {
+  const handleApplyLockSubmit = async (tenant: Tenant, lockType: LockType) => {
+    try { await tenantApi.lock(tenant.id, { lockType: lockType.toUpperCase() as "SOFT" | "HARD", reason: "Khóa từ trang chi tiết" }); } catch {}
+    if (realTenant) setRealTenant((prev) => (prev ? { ...prev, status: "locked", lockType } : null));
     setTenants((prev) =>
       prev.map((t) =>
         t.id === tenant.id ? { ...t, status: 'locked', lockType } : t
@@ -91,7 +104,9 @@ export const TenantDetailPage: FC = () => {
     );
   };
 
-  const handleExtendGraceSubmit = (tenant: Tenant, days: number) => {
+  const handleExtendGraceSubmit = async (tenant: Tenant, days: number) => {
+    try { await tenantApi.extendGrace(tenant.id, { additionalDays: days, reason: "Gia hạn từ trang chi tiết" }); } catch {}
+    if (realTenant) setRealTenant((prev) => (prev ? { ...prev, status: "grace", graceDaysRemaining: (prev.graceDaysRemaining || 0) + days } : null));
     setTenants((prev) =>
       prev.map((t) =>
         t.id === tenant.id

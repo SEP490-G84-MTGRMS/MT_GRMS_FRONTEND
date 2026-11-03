@@ -1,17 +1,21 @@
 // src/pages/store/components/StoreSidebarNav.tsx
 import type { FC } from 'react';
 import {
-  Store,
+  User,
+  Building2,
   Boxes,
   History,
-  FileCheck2,
+  FileText,
+  Wallet,
 } from 'lucide-react';
 
 export type StoreHubTabKey =
   | 'store-info'
+  | 'branches'
   | 'subscriptions'
   | 'order-history'
-  | 'service-confirm';
+  | 'terms'
+  | 'wallet';
 
 interface StoreSidebarNavProps {
   activeTab: StoreHubTabKey;
@@ -33,9 +37,20 @@ export const StoreSidebarNav: FC<StoreSidebarNavProps> = ({
           onClick={() => onSelectTab('store-info')}
         >
           <span className="store-sidebar-icon">
-            <Store size={18} strokeWidth={1.8} />
+            <User size={18} strokeWidth={1.8} />
           </span>
           <span>Thông tin gian hàng</span>
+        </button>
+
+        <button
+          type="button"
+          className={`store-sidebar-item ${activeTab === 'branches' ? 'active' : ''}`}
+          onClick={() => onSelectTab('branches')}
+        >
+          <span className="store-sidebar-icon">
+            <Building2 size={18} strokeWidth={1.8} />
+          </span>
+          <span>Chi nhánh & Kho hàng</span>
         </button>
       </div>
 
@@ -63,16 +78,31 @@ export const StoreSidebarNav: FC<StoreSidebarNavProps> = ({
           </span>
           <span>Lịch sử mua hàng</span>
         </button>
+      </div>
+
+      {/* Nhóm 3: Khác (Chuẩn KiotViet) */}
+      <div className="store-sidebar-group">
+        <div className="store-sidebar-title">Khác</div>
+        <button
+          type="button"
+          className={`store-sidebar-item ${activeTab === 'terms' ? 'active' : ''}`}
+          onClick={() => onSelectTab('terms')}
+        >
+          <span className="store-sidebar-icon">
+            <FileText size={18} strokeWidth={1.8} />
+          </span>
+          <span>Điều khoản sử dụng</span>
+        </button>
 
         <button
           type="button"
-          className={`store-sidebar-item ${activeTab === 'service-confirm' ? 'active' : ''}`}
-          onClick={() => onSelectTab('service-confirm')}
+          className={`store-sidebar-item ${activeTab === 'wallet' ? 'active' : ''}`}
+          onClick={() => onSelectTab('wallet')}
         >
           <span className="store-sidebar-icon">
-            <FileCheck2 size={18} strokeWidth={1.8} />
+            <Wallet size={18} strokeWidth={1.8} />
           </span>
-          <span>Bản xác nhận dịch vụ</span>
+          <span>Thanh toán & Ví</span>
         </button>
       </div>
     </aside>

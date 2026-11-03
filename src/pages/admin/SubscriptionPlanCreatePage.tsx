@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import type { PlanStatus, PlanQuotaConfig, PlanFeatureConfig, SubscriptionPlan } from '../../features/admin/types/plan.types';
+import type { PlanStatus, PlanQuotaConfig, PlanFeatureConfig } from '../../features/admin/types/plan.types';
 import {
   PlanBasicInfoForm,
   PlanQuotasForm,
@@ -12,7 +12,7 @@ import {
   validatePlanPricing,
   validatePlanQuotas,
 } from '../../features/admin/utils/planValidation';
-import { mockPlans } from '../../features/admin/data/mockPlanData';
+import { planApi } from '../../features/admin/api';
 
 export const SubscriptionPlanCreatePage: React.FC = () => {
   const navigate = useNavigate();
@@ -69,10 +69,10 @@ export const SubscriptionPlanCreatePage: React.FC = () => {
     setErrors({});
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const codeValidation = validatePlanCode(code, mockPlans.map((p) => p.code));
+    const codeValidation = validatePlanCode(code);
     const pricingValidation = validatePlanPricing(monthlyPrice, yearlyPrice);
     const quotasValidation = validatePlanQuotas(quotas);
 
@@ -97,28 +97,32 @@ export const SubscriptionPlanCreatePage: React.FC = () => {
     setErrors({});
     setIsSubmitting(true);
 
-    const newPlan: SubscriptionPlan = {
-      id: `plan-${Date.now().toString(36)}`,
-      code,
-      name,
-      monthlyPrice,
-      yearlyPrice,
-      status,
-      description,
-      quotas,
-      features,
-      activeTenantCount: 0,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
+    try {
+      const res = await planApi.create({
+        code,
+        name,
+        monthlyPrice,
+        yearlyPrice,
+        description,
+        quotas,
+        features,
+      });
 
-    mockPlans.unshift(newPlan);
-    setToastMessage(`Đã khởi tạo thành công gói cước "${name}"!`);
-
-    setTimeout(() => {
+      if (res.success && res.data) {
+        setToastMessage(`Đã khởi tạo thành công gói cước "${name}"!`);
+        setTimeout(() => {
+          setIsSubmitting(false);
+          navigate('/admin/subscriptions');
+        }, 800);
+      } else {
+        setIsSubmitting(false);
+        setToastMessage(res.message || 'Không thể khởi tạo gói cước');
+      }
+    } catch (err: unknown) {
       setIsSubmitting(false);
-      navigate('/admin/subscriptions');
-    }, 800);
+      const errorMsg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      setToastMessage(errorMsg || 'Lỗi khi kết nối với máy chủ Backend');
+    }
   };
 
   return (
@@ -259,7 +263,7 @@ export const SubscriptionPlanCreatePage: React.FC = () => {
             alignItems: 'start',
           }}
         >
-          {/* CỘT TRÁI: 3 Section Form đầy đặn */}
+          {/* CỘT TRÁI: Form Sections */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
             <PlanBasicInfoForm
               code={code}
@@ -270,7 +274,7 @@ export const SubscriptionPlanCreatePage: React.FC = () => {
               description={description}
               errors={errors}
               onChange={(fields) => {
-                if (fields.code !== undefined) setCode(fields.code);
+                if (fields.code !== undefined) setCode(fields.code.toUpperCase());
                 if (fields.name !== undefined) setName(fields.name);
                 if (fields.monthlyPrice !== undefined) setMonthlyPrice(fields.monthlyPrice);
                 if (fields.yearlyPrice !== undefined) setYearlyPrice(fields.yearlyPrice);
