@@ -29,6 +29,7 @@ export interface ProductResponse {
   hasBatches: boolean;
   isFavorite: boolean;
   createdAt: string;
+  rawCreatedAt?: string;
   updatedAt?: string | null;
 }
 
@@ -93,6 +94,7 @@ export interface ProductUnitResponse {
   barcode?: string | null;
   isBaseUnit: boolean;
   createdAt: string;
+  rawCreatedAt?: string;
   updatedAt?: string | null;
 }
 
@@ -123,7 +125,7 @@ export interface ProductCreatePayload {
   minStock?: number;
   maxStock?: number;
   vatRate?: number;
-  productType?: string;
+  taxCategory?: string;
   status?: string;
   imageUrl?: string | null;
   imageUrls?: string[];
@@ -143,6 +145,8 @@ export interface ProductUpdatePayload {
   minStock?: number;
   maxStock?: number;
   vatRate?: number;
+  taxCategory?: string;
+  productType?: string;
   status?: string;
   imageUrl?: string | null;
   imageUrls?: string[];
@@ -198,12 +202,15 @@ export interface ProductItem {
   isCombo?: boolean;
   status: 'Active' | 'Discontinued';
   createdAt: string;
+  rawCreatedAt?: string;
   updatedAt: string;
   imageUrl?: string;
   imageUrls?: string[];
   minStock?: number;
   maxStock?: number;
   vatRate?: number;
+  taxCategory?: string;
+  productType?: string;
   description?: string;
   internalNote?: string;
   hasTransactions?: boolean;

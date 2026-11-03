@@ -88,7 +88,6 @@ describe('ProductFormModal - Quản lý đơn vị tính & Hàng cùng loại (R
     expect(screen.getByRole('columnheader', { name: 'Mã vạch' })).toBeDefined();
     expect(screen.getByRole('columnheader', { name: 'Giá vốn' })).toBeDefined();
     expect(screen.getByRole('columnheader', { name: 'Giá bán' })).toBeDefined();
-    expect(screen.getByRole('columnheader', { name: 'Tồn kho' })).toBeDefined();
 
     // Dòng 1 hiển thị tên đơn vị cơ bản "chai" trong bảng
     expect(screen.getAllByText('chai').length).toBeGreaterThan(0);

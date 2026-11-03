@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+﻿import React, { useState, useEffect, useRef } from 'react';
 import {
   X,
   Trash2,
@@ -110,12 +110,6 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   const [costPrice, setCostPrice] = useState<number>(0);
   const [sellingPrice, setSellingPrice] = useState<number>(0);
   const [vatRate, setVatRate] = useState<number>(0);
-
-  // 3. Tồn kho & Định mức cảnh báo
-  const [initialStock, setInitialStock] = useState<number>(0);
-  const [minStock, setMinStock] = useState<number>(0);
-  const [maxStock, setMaxStock] = useState<number>(1000);
-  const [hasBatches, setHasBatches] = useState<boolean>(false);
   const [isFavorite, setIsFavorite] = useState<boolean>(false);
 
   // Trạng thái lưu (loading)
@@ -150,12 +144,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
 
         setCostPrice(productToEdit.costPrice || 0);
         setSellingPrice(productToEdit.sellingPrice || 0);
-
-        setInitialStock(productToEdit.onHand || 0);
-        setMinStock(productToEdit.minStock ?? 0);
-        setMaxStock(productToEdit.maxStock ?? 1000);
         setVatRate(productToEdit.vatRate ?? 0);
-        setHasBatches(productToEdit.hasBatches ?? false);
         setIsFavorite(productToEdit.isFavorite ?? false);
         setIsSubmitting(false);
 
@@ -206,11 +195,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         setCostPrice(0);
         setSellingPrice(0);
 
-        setInitialStock(0);
-        setMinStock(0);
-        setMaxStock(1000);
         setVatRate(0);
-        setHasBatches(false);
         setIsFavorite(false);
         setIsSubmitting(false);
 
@@ -358,14 +343,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       triggerValidationError('Vui lòng nhập tên đơn vị cơ bản (Bắt buộc).');
       return;
     }
-    if (minStock < 0) {
-      triggerValidationError('Định mức tồn thấp nhất không được nhỏ hơn 0.');
-      return;
-    }
-    if (maxStock < minStock) {
-      triggerValidationError('Định mức tồn cao nhất không được nhỏ hơn định mức tồn thấp nhất.');
-      return;
-    }
+    
     if (sellingPrice < costPrice && costPrice > 0 && !warningMsg) {
       setWarningMsg('Cảnh báo: Giá bán đang thấp hơn giá vốn! Nhấn Lưu lần nữa để xác nhận.');
       return;
@@ -389,11 +367,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         baseUnit: baseUnit.trim(),
         sellingPrice,
         costPrice: userRole === 'StoreOwner' ? costPrice : productToEdit?.costPrice ?? 0,
-        onHand: initialStock,
-        minStock,
-        maxStock,
         vatRate,
-        hasBatches,
         isFavorite,
         description: description.trim() || undefined,
         internalNote: internalNote.trim() || undefined,
@@ -411,16 +385,12 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         setImages([]);
         setSellingPrice(0);
         setCostPrice(0);
-        setInitialStock(0);
-        setMinStock(0);
-        setMaxStock(1000);
         setBaseUnit('');
         setBaseUnitPrice(0);
         setUomConversions([]);
         setDeletedUnitIds([]);
         setDescription('');
         setInternalNote('');
-        setHasBatches(false);
         setIsFavorite(false);
         setVatRate(0);
         setWarningMsg('');
@@ -1378,129 +1348,11 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, color: '#334155' }}>
                 <input
                   type="checkbox"
-                  checked={hasBatches}
-                  onChange={(e) => setHasBatches(e.target.checked)}
-                />
-                <span style={{ fontWeight: 500 }}>Quản lý theo lô & hạn sử dụng (FEFO)</span>
-              </label>
-
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, color: '#334155' }}>
-                <input
-                  type="checkbox"
                   checked={isFavorite}
                   onChange={(e) => setIsFavorite(e.target.checked)}
                 />
                 <span style={{ fontWeight: 500 }}>Đánh dấu hàng bán chạy / yêu thích (Ưu tiên POS)</span>
               </label>
-            </div>
-          </div>
-
-          {/* ───────────────────────────────────────────────────────── */}
-          {/* 3. TỒN KHO & ĐỊNH MỨC CẢNH BÁO (11, 10)                     */}
-          {/* ───────────────────────────────────────────────────────── */}
-          <div
-            style={{
-              border: '1px solid #E2E8F0',
-              borderRadius: 10,
-              padding: '18px 20px',
-              backgroundColor: '#FFFFFF',
-              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.02)',
-            }}
-          >
-            <h4
-              style={{
-                fontSize: 14,
-                fontWeight: 700,
-                color: '#0F172A',
-                margin: '0 0 4px 0',
-              }}
-            >
-              Tồn kho & Định mức cảnh báo
-            </h4>
-            <p
-              style={{
-                fontSize: 12,
-                color: '#64748B',
-                margin: '0 0 16px 0',
-                paddingBottom: 8,
-                borderBottom: '1px solid #F1F5F9',
-              }}
-            >
-              Quản lý số lượng tồn kho và định mức tồn. Khi chạm định mức, hệ thống sẽ gửi cảnh báo nhập hàng.
-            </p>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 20 }}>
-              {/* (11) Tồn kho ban đầu */}
-              <div>
-                <label
-                  style={{
-                    display: 'block',
-                    marginBottom: 6,
-                    fontSize: 13,
-                    fontWeight: 600,
-                    color: '#334155',
-                  }}
-                >
-                  Tồn kho ban đầu
-                </label>
-                <input
-                  type="number"
-                  className="filter-input"
-                  placeholder="0"
-                  value={initialStock === 0 ? '' : initialStock}
-                  onChange={(e) => setInitialStock(e.target.value === '' ? 0 : Math.max(0, Number(e.target.value)))}
-                  onFocus={(e) => e.target.select()}
-                  min={0}
-                />
-              </div>
-
-              {/* (10) Định mức tồn thấp nhất */}
-              <div>
-                <label
-                  style={{
-                    display: 'block',
-                    marginBottom: 6,
-                    fontSize: 13,
-                    fontWeight: 600,
-                    color: '#334155',
-                  }}
-                >
-                  Định mức tồn thấp nhất
-                </label>
-                <input
-                  type="number"
-                  className="filter-input"
-                  placeholder="0"
-                  value={minStock === 0 ? '' : minStock}
-                  onChange={(e) => setMinStock(e.target.value === '' ? 0 : Math.max(0, Number(e.target.value)))}
-                  onFocus={(e) => e.target.select()}
-                  min={0}
-                />
-              </div>
-
-              {/* (10) Định mức tồn cao nhất */}
-              <div>
-                <label
-                  style={{
-                    display: 'block',
-                    marginBottom: 6,
-                    fontSize: 13,
-                    fontWeight: 600,
-                    color: '#334155',
-                  }}
-                >
-                  Định mức tồn cao nhất
-                </label>
-                <input
-                  type="number"
-                  className="filter-input"
-                  placeholder="1000"
-                  value={maxStock === 0 ? '' : maxStock}
-                  onChange={(e) => setMaxStock(e.target.value === '' ? 0 : Math.max(0, Number(e.target.value)))}
-                  onFocus={(e) => e.target.select()}
-                  min={0}
-                />
-              </div>
             </div>
           </div>
 
@@ -1763,8 +1615,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                             <th style={{ padding: '10px 8px', textAlign: 'left', minWidth: 130 }}>Mã vạch</th>
                             <th style={{ padding: '10px 8px', textAlign: 'right', minWidth: 110 }}>Giá vốn</th>
                             <th style={{ padding: '10px 8px', textAlign: 'right', minWidth: 110 }}>Giá bán</th>
-                            <th style={{ padding: '10px 8px', textAlign: 'right', minWidth: 90 }}>Tồn kho</th>
-                            <th style={{ padding: '10px 12px', textAlign: 'center', width: 44 }}></th>
+                                                        <th style={{ padding: '10px 12px', textAlign: 'center', width: 44 }}></th>
                           </tr>
                         </thead>
                         <tbody>
@@ -1854,23 +1705,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                                 }}
                               />
                             </td>
-                            <td style={{ padding: '8px' }}>
-                              <input
-                                type="number"
-                                placeholder="0"
-                                value={initialStock === 0 ? '' : initialStock}
-                                onChange={(e) => setInitialStock(e.target.value === '' ? 0 : Math.max(0, Number(e.target.value)))}
-                                onFocus={(e) => e.target.select()}
-                                style={{
-                                  width: '100%',
-                                  padding: '6px 8px',
-                                  borderRadius: 6,
-                                  border: '1px solid #E2E8F0',
-                                  textAlign: 'right',
-                                  fontSize: 13,
-                                }}
-                              />
-                            </td>
+                            
                             <td style={{ padding: '8px 12px', textAlign: 'center' }}>
                               <button
                                 type="button"
@@ -1892,11 +1727,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                           {/* Dòng 2 trở đi: Các đơn vị quy đổi */}
                           {uomConversions.map((uom) => {
                             const convertedCost = costPrice > 0 ? costPrice * (uom.conversionRate || 1) : 0;
-                            const convertedStock =
-                              initialStock > 0 && (uom.conversionRate || 1) > 0
-                                ? Math.floor(initialStock / uom.conversionRate)
-                                : 0;
-
+                            
                             return (
                               <tr key={uom.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
                                 <td style={{ padding: '8px 12px', color: '#1E293B', fontWeight: 500 }}>
@@ -1992,23 +1823,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                                     }}
                                   />
                                 </td>
-                                <td style={{ padding: '8px' }}>
-                                  <input
-                                    type="text"
-                                    disabled
-                                    value={convertedStock.toLocaleString('vi-VN')}
-                                    style={{
-                                      width: '100%',
-                                      padding: '6px 8px',
-                                      borderRadius: 6,
-                                      border: '1px solid #E2E8F0',
-                                      background: '#f1f5f9',
-                                      color: '#64748b',
-                                      textAlign: 'right',
-                                      fontSize: 13,
-                                    }}
-                                  />
-                                </td>
+                                
                                 <td style={{ padding: '8px 12px', textAlign: 'center' }}>
                                   <button
                                     type="button"
