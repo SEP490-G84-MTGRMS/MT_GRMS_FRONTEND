@@ -40,3 +40,4 @@
 ## 5. Ghi chú cho Manager khi Duyệt & Merge (Manager Merge Notes)
 - **Mức độ rủi ro**: Low.
 - **File cần review**: `StoreSidebarNav.tsx`, `StoreSettingsHubPage.tsx`, `OrderHistoryTab.tsx`.
+
