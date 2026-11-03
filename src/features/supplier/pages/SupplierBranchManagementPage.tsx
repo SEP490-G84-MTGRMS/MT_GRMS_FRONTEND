@@ -1,8 +1,6 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import type { FC } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { INITIAL_SUPPLIERS } from '../lib/mockData';
-import { MOCK_BRANCH_LIST } from '../../purchase-order/lib/mockData';
 import type {
   SupplierSummary,
   SupplierBranchAssignmentItem,
@@ -41,8 +39,8 @@ export const SupplierBranchManagementPage: FC = () => {
   const { id: paramSupplierId } = useParams<{ id?: string }>();
 
   // Suppliers & Branches state
-  const [suppliers, setSuppliers] = useState<SupplierSummary[]>(INITIAL_SUPPLIERS);
-  const [branches, setBranches] = useState<BranchListItem[]>(MOCK_BRANCH_LIST);
+  const [suppliers, setSuppliers] = useState<SupplierSummary[]>([]);
+  const [branches, setBranches] = useState<BranchListItem[]>([]);
   const [assignments, setAssignments] = useState<SupplierBranchAssignmentItem[]>([]);
   const [totalCount, setTotalCount] = useState<number>(0);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -73,11 +71,9 @@ export const SupplierBranchManagementPage: FC = () => {
     const loadSuppliers = async () => {
       try {
         const res = await supplierApi.getSuppliers({ pageIndex: 1, pageSize: 100 });
-        if (res.items && res.items.length > 0) {
-          setSuppliers(res.items);
-        }
-      } catch {
-        // Keep initial suppliers fallback
+        setSuppliers(res.items ?? []);
+      } catch (err: any) {
+        showToast(err.message || 'Không thể tải danh sách nhà cung cấp.', 'error');
       }
     };
     loadSuppliers();
@@ -88,11 +84,9 @@ export const SupplierBranchManagementPage: FC = () => {
     const loadBranches = async () => {
       try {
         const res = await branchApi.getBranches({ pageIndex: 1, pageSize: 100 });
-        if (res.items && res.items.length > 0) {
-          setBranches(res.items);
-        }
-      } catch {
-        // Keep initial branches fallback
+        setBranches(res.items ?? []);
+      } catch (err: any) {
+        showToast(err.message || 'Không thể tải danh sách chi nhánh.', 'error');
       }
     };
     loadBranches();

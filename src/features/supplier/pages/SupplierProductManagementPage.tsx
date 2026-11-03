@@ -27,6 +27,10 @@ export interface ProductFilterState extends SupplierProductFilterValues {
 }
 
 const DEFAULT_FILTERS: ProductFilterState = {
+  skus: [],
+  names: [],
+  supplierCodes: [],
+  supplierNames: [],
   productSearch: '',
   supplierSearch: '',
   searchTerm: '',
@@ -34,7 +38,7 @@ const DEFAULT_FILTERS: ProductFilterState = {
   categoryFilter: 'ALL',
   statusFilter: 'ALL',
   pageIndex: 1,
-  pageSize: 15,
+  pageSize: 20,
 };
 
 export const SupplierProductManagementPage: FC = () => {
@@ -67,25 +71,33 @@ export const SupplierProductManagementPage: FC = () => {
     toastTimerRef.current = setTimeout(() => setToast(null), 3000);
   };
 
-  // Fetch real suppliers & master products for filter dropdowns
+  // Fetch suppliers & master products independently so one failure does not blank the other
   useEffect(() => {
-    const loadData = async () => {
+    const loadSuppliers = async () => {
       try {
-        const [resSuppliers, resProducts] = await Promise.all([
-          supplierApi.getSuppliers({ pageIndex: 1, pageSize: 100 }),
-          supplierProductApi.getMasterProducts(),
-        ]);
-        if (resSuppliers.items) {
-          setSuppliers(resSuppliers.items);
-        }
-        if (resProducts) {
-          setMasterProducts(resProducts);
-        }
-      } catch {
-        // Handle error gracefully
+        const resSuppliers = await supplierApi.getSuppliers({
+          pageIndex: 1,
+          pageSize: 100,
+          status: 'Active',
+        });
+        setSuppliers(resSuppliers.items ?? []);
+      } catch (err: any) {
+        showToast(err.message || 'Không thể tải danh sách nhà cung cấp.', 'error');
       }
     };
-    loadData();
+
+    const loadMasterProducts = async () => {
+      try {
+        const resProducts = await supplierProductApi.getMasterProducts();
+        setMasterProducts(resProducts ?? []);
+      } catch (err: any) {
+        showToast(err.message || 'Không thể tải danh sách sản phẩm Master.', 'error');
+      }
+    };
+
+    void loadSuppliers();
+    void loadMasterProducts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Fetch supplier products based on applied filters & pagination
@@ -112,12 +124,12 @@ export const SupplierProductManagementPage: FC = () => {
     fetchProducts();
   }, [fetchProducts]);
 
-  // Current active supplier (if a single supplier is selected)
+  // Prefer filtered supplier; otherwise first Active supplier so assign popup feels populated
   const currentSupplier = useMemo(() => {
-    if (appliedFilters.supplierId !== 'ALL') {
-      return suppliers.find((s) => s.id === appliedFilters.supplierId) || suppliers[0] || null;
+    if (appliedFilters.supplierId && appliedFilters.supplierId !== 'ALL') {
+      return suppliers.find((s) => s.id === appliedFilters.supplierId) || null;
     }
-    return suppliers[0] || null;
+    return suppliers.find((s) => s.status === 'Active') || suppliers[0] || null;
   }, [suppliers, appliedFilters.supplierId]);
 
   // Available categories across master products and supplier products
@@ -154,7 +166,7 @@ export const SupplierProductManagementPage: FC = () => {
   };
 
   // Item Handlers
-  const handleAssignProduct = async (input: AssignProductInput, keepOpen: boolean = false) => {
+  const handleAssignProduct = async (input: AssignProductInput) => {
     try {
       const res = await supplierProductApi.assignProduct(input);
       const syncedCount = res?.syncedBranchesCount ?? 0;
@@ -163,9 +175,7 @@ export const SupplierProductManagementPage: FC = () => {
       } else {
         showToast('Đã gán sản phẩm thành công. Sản phẩm sẽ được tự động phân bổ khi nhà cung cấp được liên kết với chi nhánh.');
       }
-      if (!keepOpen) {
-        setIsAssignModalOpen(false);
-      }
+      setIsAssignModalOpen(false);
       await fetchProducts();
       return res;
     } catch (err: any) {
@@ -174,7 +184,7 @@ export const SupplierProductManagementPage: FC = () => {
     }
   };
 
-  const handleAssignBatchProducts = async (input: BatchAssignProductInput, keepOpen: boolean = false) => {
+  const handleAssignBatchProducts = async (input: BatchAssignProductInput) => {
     try {
       const res = await supplierProductApi.assignBatchProducts(input);
       const assignedCount = res?.assignedCount ?? input.productIds.length;
@@ -188,9 +198,7 @@ export const SupplierProductManagementPage: FC = () => {
           `Đã gán thành công ${assignedCount} sản phẩm cho nhà cung cấp. Sản phẩm sẽ được tự động phân bổ khi NCC liên kết với chi nhánh.`
         );
       }
-      if (!keepOpen) {
-        setIsAssignModalOpen(false);
-      }
+      setIsAssignModalOpen(false);
       await fetchProducts();
       return res;
     } catch (err: any) {
@@ -203,11 +211,19 @@ export const SupplierProductManagementPage: FC = () => {
     if (!editingItem) return;
     try {
       await supplierProductApi.updateProduct(editingItem.supplierId, editingItem.productId, input);
-      showToast('Đã cập nhật thành công giá nhập sỉ và số lượng tối thiểu (MOQ).');
+      if (input.status !== editingItem.status) {
+        await supplierProductApi.toggleStatus(
+          editingItem.supplierId,
+          editingItem.productId,
+          input.status
+        );
+      }
+      showToast('Đã cập nhật điều khoản cung ứng.');
       setEditingItem(null);
       await fetchProducts();
     } catch (err: any) {
       showToast(err.message || 'Không thể cập nhật sản phẩm.', 'error');
+      throw err;
     }
   };
 
@@ -223,6 +239,7 @@ export const SupplierProductManagementPage: FC = () => {
       await fetchProducts();
     } catch (err: any) {
       showToast(err.message || 'Không thể đổi trạng thái sản phẩm.', 'error');
+      throw err;
     }
   };
 
@@ -305,11 +322,12 @@ export const SupplierProductManagementPage: FC = () => {
       </div>
 
 
-      {/* ── UNIFIED FILTER BAR THEO CHUẨN SUPPLIER LIST ── */}
+      {/* ── Filter bar chip-token theo chuẩn Store Products ── */}
       <div style={{ flexShrink: 0, marginBottom: 8 }}>
         <SupplierProductFilterBar
           initialValues={appliedFilters}
           suppliers={suppliers}
+          products={products}
           categories={availableCategories}
           totalCount={totalCount}
           filteredCount={products.length}

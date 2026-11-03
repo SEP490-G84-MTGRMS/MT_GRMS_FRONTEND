@@ -2,7 +2,6 @@ import { httpClient } from '../../../api/httpClient';
 import type { ApiResponse, PagedResult } from '../../../api/types';
 import type { BranchListItem } from '../types/po.types';
 import type { BranchFilterParams } from '../types/branch.types';
-import { MOCK_BRANCH_LIST } from '../lib/mockData';
 
 export interface BranchBackendDto {
   id: string;
@@ -49,19 +48,6 @@ export const mapBackendBranchToListItem = (item: BranchBackendDto): BranchListIt
   };
 };
 
-const parseDateString = (dateStr: string): Date | null => {
-  if (!dateStr || dateStr === '—') return null;
-  const parts = dateStr.trim().split(' ');
-  if (!parts[0]) return null;
-  const dmy = parts[0].split('/');
-  if (dmy.length !== 3) return null;
-  const day = parseInt(dmy[0], 10);
-  const month = parseInt(dmy[1], 10) - 1;
-  const year = parseInt(dmy[2], 10);
-  if (isNaN(day) || isNaN(month) || isNaN(year)) return null;
-  return new Date(year, month, day);
-};
-
 export const branchApi = {
   /**
    * Truy vấn danh sách chi nhánh có phân trang và bộ lọc (REQ-BR-01, REQ-BR-03)
@@ -92,54 +78,11 @@ export const branchApi = {
         const items = paged.items.map(mapBackendBranchToListItem);
         return { items, total: paged.totalItems };
       }
-    } catch {
-      // Backend offline hoặc lỗi -> Fallback an toàn sang in-memory mock data
+
+      return { items: [], total: 0 };
+    } catch (err: any) {
+      throw new Error(err.response?.data?.message || err.message || 'Không thể tải danh sách chi nhánh.');
     }
-
-    // In-memory Fallback
-    const filtered = MOCK_BRANCH_LIST.filter((b) => {
-      if (filter.keyword?.trim()) {
-        const kw = filter.keyword.trim().toLowerCase();
-        const match =
-          b.code.toLowerCase().includes(kw) ||
-          b.name.toLowerCase().includes(kw) ||
-          b.address.toLowerCase().includes(kw) ||
-          b.managerName.toLowerCase().includes(kw) ||
-          b.managerPhone.toLowerCase().includes(kw);
-        if (!match) return false;
-      }
-
-      if (filter.branchCode && filter.branchCode !== 'all' && b.code !== filter.branchCode) {
-        return false;
-      }
-
-      if (filter.status && filter.status !== 'all' && b.status !== filter.status) {
-        return false;
-      }
-
-      if (filter.dateFrom) {
-        const from = new Date(filter.dateFrom);
-        from.setHours(0, 0, 0, 0);
-        const itemDate = parseDateString(b.lastUpdated);
-        if (!itemDate || itemDate < from) return false;
-      }
-
-      if (filter.dateTo) {
-        const to = new Date(filter.dateTo);
-        to.setHours(23, 59, 59, 999);
-        const itemDate = parseDateString(b.lastUpdated);
-        if (!itemDate || itemDate > to) return false;
-      }
-
-      return true;
-    });
-
-    const page = filter.pageIndex || 1;
-    const size = filter.pageSize || 10;
-    const start = (page - 1) * size;
-    const pagedItems = filtered.slice(start, start + size);
-
-    return { items: pagedItems, total: filtered.length };
   },
 
   /**
@@ -151,11 +94,9 @@ export const branchApi = {
       if (res.data?.success && res.data.data) {
         return mapBackendBranchToListItem(res.data.data);
       }
-    } catch {
-      // Fallback
+      return null;
+    } catch (err: any) {
+      throw new Error(err.response?.data?.message || err.message || 'Không thể tải chi tiết chi nhánh.');
     }
-
-    const found = MOCK_BRANCH_LIST.find((b) => b.id === id);
-    return found || null;
   },
 };

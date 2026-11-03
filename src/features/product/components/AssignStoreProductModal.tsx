@@ -2,7 +2,6 @@ import { useState, useMemo, useEffect } from 'react';
 import type { FC, FormEvent } from 'react';
 import type { StoreSummary, AssignStoreProductInput } from '../types/storeProduct.types';
 import { storeProductApi } from '../api/storeProductApi';
-import { supplierProductApi } from '../../supplier/api/supplierProductApi';
 import { X, Search, Loader2, Store, AlertCircle } from 'lucide-react';
 
 interface AssignStoreProductModalProps {
@@ -22,6 +21,8 @@ interface MasterProduct {
   baseUoM: string;
   costPrice: number;
   moq: number;
+  supplierCode?: string;
+  supplierName?: string;
 }
 
 export const AssignStoreProductModal: FC<AssignStoreProductModalProps> = ({
@@ -31,8 +32,10 @@ export const AssignStoreProductModal: FC<AssignStoreProductModalProps> = ({
   currentStore,
   onAssign,
 }) => {
-  // Store selection
+  // Store selection (text search)
   const [selectedBranchId, setSelectedBranchId] = useState<string>('');
+  const [branchQuery, setBranchQuery] = useState('');
+  const [branchDropdownOpen, setBranchDropdownOpen] = useState(false);
 
   // Products data
   const [masterProducts, setMasterProducts] = useState<MasterProduct[]>([]);
@@ -46,9 +49,6 @@ export const AssignStoreProductModal: FC<AssignStoreProductModalProps> = ({
   // Selection state - independent of filters
   const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
 
-  // Optional min stock state
-  const [defaultMinStock, setDefaultMinStock] = useState<number>(0);
-
   // Form submission & error states
   const [errorMsg, setErrorMsg] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -57,17 +57,30 @@ export const AssignStoreProductModal: FC<AssignStoreProductModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       const preselect = currentStore?.id || stores[0]?.id || '';
+      const pre = stores.find((s) => s.id === preselect);
       setSelectedBranchId(preselect);
+      setBranchQuery(pre ? `${pre.code} — ${pre.name}` : '');
+      setBranchDropdownOpen(false);
       setSelectedProductIds([]);
       setSearchTerm('');
       setCategoryFilter('ALL');
-      setDefaultMinStock(0);
       setErrorMsg('');
       setIsSubmitting(false);
     }
   }, [isOpen, currentStore, stores]);
 
-  // Load products when branch changes
+  const filteredBranches = useMemo(() => {
+    const q = branchQuery.trim().toLowerCase();
+    if (!q) return stores;
+    return stores.filter(
+      (s) =>
+        s.code.toLowerCase().includes(q) ||
+        s.name.toLowerCase().includes(q) ||
+        (s.address || '').toLowerCase().includes(q)
+    );
+  }, [stores, branchQuery]);
+
+  // Load products when branch changes: chỉ SP thuộc NCC đang cung cấp cho chi nhánh
   useEffect(() => {
     if (!isOpen || !selectedBranchId) {
       setMasterProducts([]);
@@ -76,62 +89,38 @@ export const AssignStoreProductModal: FC<AssignStoreProductModalProps> = ({
     }
     let cancelled = false;
     setLoadingProducts(true);
+    setErrorMsg('');
 
-    Promise.all([
-      storeProductApi.getMasterProducts(),
-      storeProductApi.getStoreProducts({
-        storeId: selectedBranchId,
-        categoryFilter: 'ALL',
-        statusFilter: 'ALL',
-        pageIndex: 1,
-        pageSize: 9999,
-      }),
-      supplierProductApi
-        .getSupplierProducts('ALL', { pageIndex: 1, pageSize: 9999 })
-        .catch(() => ({ items: [], total: 0 })),
-    ])
-      .then(([all, branchPaged, suppProductsRes]) => {
+    storeProductApi
+      .getAssignableProducts(selectedBranchId)
+      .then((items) => {
         if (cancelled) return;
 
-        // Map ProductId -> MOQ & Wholesale Price from SupplierProducts (màn hình gán sản phẩm cho NCC)
-        const spMap = new Map<string, { moq: number; costPrice?: number }>();
-        (suppProductsRes?.items || []).forEach((sp: any) => {
-          if (!spMap.has(sp.productId) || sp.isPrimary || sp.isPrimarySupplier) {
-            spMap.set(sp.productId, {
-              moq: sp.moq ?? sp.minimumOrderQuantity ?? 1,
-              costPrice: sp.agreedPrice ?? sp.agreedWholesalePrice,
-            });
-          }
-        });
+        const mapped: MasterProduct[] = items.map((p) => ({
+          id: p.id,
+          sku: p.sku,
+          barcode: p.barcode,
+          name: p.name,
+          categoryName: p.categoryName || 'Khác',
+          baseUoM: p.baseUoM || 'Cái',
+          costPrice: p.costPrice || 0,
+          moq: p.moq > 0 ? p.moq : 1,
+          supplierCode: p.supplierCode,
+          supplierName: p.supplierName,
+        }));
 
-        const mapped: MasterProduct[] = (all as any[]).map((p) => {
-          const suppInfo = spMap.get(p.id);
-          const resolvedMoq = suppInfo?.moq ?? p.minOrderQuantity ?? p.defaultMoq ?? p.moq ?? 1;
-          const resolvedCost =
-            suppInfo?.costPrice && suppInfo.costPrice > 0
-              ? suppInfo.costPrice
-              : p.costPrice || 0;
-
-          return {
-            id: p.id,
-            sku: p.sku || p.productCode || '',
-            barcode: p.barcode || '',
-            name: p.productName || p.name || '',
-            categoryName: p.categoryName || p.category || 'Khác',
-            baseUoM: p.unitName || p.baseUnit || p.unit || 'Cái',
-            costPrice: resolvedCost,
-            moq: resolvedMoq,
-          };
-        });
-
-        const alreadyAssigned = branchPaged.items.map((i) => i.productId);
         setMasterProducts(mapped);
-        setAssignedProductIds(alreadyAssigned);
+        setAssignedProductIds(items.filter((p) => p.isAlreadyAssigned).map((p) => p.id));
       })
-      .catch(() => {
+      .catch((err: any) => {
         if (!cancelled) {
           setMasterProducts([]);
           setAssignedProductIds([]);
+          setErrorMsg(
+            err.response?.data?.message ||
+              err.message ||
+              'Không thể tải sản phẩm khả dụng cho chi nhánh.'
+          );
         }
       })
       .finally(() => {
@@ -152,10 +141,9 @@ export const AssignStoreProductModal: FC<AssignStoreProductModalProps> = ({
     return Array.from(set).sort();
   }, [masterProducts]);
 
-  // Filtered products list (unassigned products matching search & category)
+  // Filtered products: hiện cả đã gán / chưa gán để popup có data; chỉ cho chọn chưa gán
   const filteredProducts = useMemo(() => {
     return masterProducts.filter((p) => {
-      if (assignedProductIds.includes(p.id)) return false;
       if (categoryFilter !== 'ALL' && p.categoryName !== categoryFilter) return false;
       if (searchTerm.trim()) {
         const kw = searchTerm.toLowerCase();
@@ -167,33 +155,37 @@ export const AssignStoreProductModal: FC<AssignStoreProductModalProps> = ({
       }
       return true;
     });
-  }, [masterProducts, assignedProductIds, categoryFilter, searchTerm]);
+  }, [masterProducts, categoryFilter, searchTerm]);
 
   // Total available assignable products (excluding already assigned)
   const totalAvailableCount = useMemo(() => {
     return masterProducts.filter((p) => !assignedProductIds.includes(p.id)).length;
   }, [masterProducts, assignedProductIds]);
 
+  const availableFilteredProducts = useMemo(
+    () => filteredProducts.filter((p) => !assignedProductIds.includes(p.id)),
+    [filteredProducts, assignedProductIds]
+  );
+
   const selectedBranch = stores.find((s) => s.id === selectedBranchId);
 
   // Toggle single product selection
   const handleToggleProduct = (pid: string) => {
+    if (assignedProductIds.includes(pid)) return;
     setSelectedProductIds((prev) =>
       prev.includes(pid) ? prev.filter((id) => id !== pid) : [...prev, pid]
     );
   };
 
-  // Select all or deselect all for the current filtered products
+  // Select all or deselect all for currently available (unassigned) filtered products
   const handleSelectAllFiltered = () => {
-    const filteredIds = filteredProducts.map((p) => p.id);
+    const filteredIds = availableFilteredProducts.map((p) => p.id);
     const allFilteredSelected =
       filteredIds.length > 0 && filteredIds.every((id) => selectedProductIds.includes(id));
 
     if (allFilteredSelected) {
-      // Unselect only those in current filtered list
       setSelectedProductIds((prev) => prev.filter((id) => !filteredIds.includes(id)));
     } else {
-      // Add all filtered items to selection (preserving others)
       const newSet = new Set([...selectedProductIds, ...filteredIds]);
       setSelectedProductIds(Array.from(newSet));
     }
@@ -201,7 +193,10 @@ export const AssignStoreProductModal: FC<AssignStoreProductModalProps> = ({
 
   // Handle branch change: clear selection to prevent accidental assignment to wrong store
   const handleBranchChange = (newBranchId: string) => {
+    const branch = stores.find((s) => s.id === newBranchId);
     setSelectedBranchId(newBranchId);
+    setBranchQuery(branch ? `${branch.code} — ${branch.name}` : '');
+    setBranchDropdownOpen(false);
     setSelectedProductIds([]);
     setSearchTerm('');
     setCategoryFilter('ALL');
@@ -223,17 +218,11 @@ export const AssignStoreProductModal: FC<AssignStoreProductModalProps> = ({
       return;
     }
 
-    if (defaultMinStock < 0) {
-      setErrorMsg('Định mức tồn tối thiểu không thể âm.');
-      return;
-    }
-
     try {
       setIsSubmitting(true);
       await onAssign({
         storeId: selectedBranchId,
         productIds: selectedProductIds,
-        defaultMinStock,
       });
       onClose();
     } catch (err: any) {
@@ -254,8 +243,8 @@ export const AssignStoreProductModal: FC<AssignStoreProductModalProps> = ({
   const isSubmitDisabled = selectedProductIds.length === 0 || !selectedBranchId || isSubmitting;
 
   const isAllFilteredSelected =
-    filteredProducts.length > 0 &&
-    filteredProducts.every((p) => selectedProductIds.includes(p.id));
+    availableFilteredProducts.length > 0 &&
+    availableFilteredProducts.every((p) => selectedProductIds.includes(p.id));
 
   return (
     <div
@@ -382,49 +371,123 @@ export const AssignStoreProductModal: FC<AssignStoreProductModalProps> = ({
                 </label>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, alignItems: 'center' }}>
-                <div>
-                  <select
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, alignItems: 'start' }}>
+                <div style={{ position: 'relative' }}>
+                  <label style={{ fontSize: '0.78rem', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: 4 }}>
+                    Tìm chi nhánh
+                  </label>
+                  <input
                     id="assignStoreSelect"
-                    value={selectedBranchId}
-                    onChange={(e) => handleBranchChange(e.target.value)}
+                    type="text"
+                    value={branchQuery}
+                    placeholder="Nhập mã / tên chi nhánh..."
+                    onChange={(e) => {
+                      setBranchQuery(e.target.value);
+                      setBranchDropdownOpen(true);
+                      if (selectedBranchId) setSelectedBranchId('');
+                    }}
+                    onFocus={() => setBranchDropdownOpen(true)}
                     style={{
                       width: '100%',
-                      padding: '9px 12px',
+                      height: 40,
+                      padding: '0 12px',
                       borderRadius: 8,
                       border: `1.5px solid ${selectedBranchId ? '#0d9488' : '#cbd5e1'}`,
                       fontSize: '0.9rem',
                       backgroundColor: '#fff',
                       outline: 'none',
-                      color: selectedBranchId ? '#0f172a' : '#94a3b8',
+                      boxSizing: 'border-box',
                       fontWeight: selectedBranchId ? 600 : 400,
                     }}
-                  >
-                    <option value="">-- Chọn chi nhánh nhận hàng --</option>
-                    {stores.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name} ({s.code})
-                      </option>
-                    ))}
-                  </select>
+                  />
+                  {branchDropdownOpen && (
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: '100%',
+                        left: 0,
+                        right: 0,
+                        marginTop: 4,
+                        maxHeight: 220,
+                        overflowY: 'auto',
+                        background: '#fff',
+                        border: '1px solid #cbd5e1',
+                        borderRadius: 8,
+                        boxShadow: '0 10px 25px -5px rgba(15,23,42,0.12)',
+                        zIndex: 40,
+                      }}
+                    >
+                      {filteredBranches.length === 0 ? (
+                        <div style={{ padding: '10px 12px', fontSize: 13, color: '#94a3b8' }}>
+                          Không tìm thấy chi nhánh
+                        </div>
+                      ) : (
+                        filteredBranches.map((s) => (
+                          <button
+                            key={s.id}
+                            type="button"
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => handleBranchChange(s.id)}
+                            style={{
+                              width: '100%',
+                              textAlign: 'left',
+                              border: 'none',
+                              background: s.id === selectedBranchId ? '#f0fdfa' : '#fff',
+                              padding: '9px 12px',
+                              cursor: 'pointer',
+                              borderBottom: '1px solid #f1f5f9',
+                            }}
+                          >
+                            <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>
+                              {s.code} — {s.name}
+                            </div>
+                            <div style={{ fontSize: 11.5, color: '#64748b', marginTop: 2 }}>
+                              {s.address || 'Chưa có địa chỉ'}
+                            </div>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  )}
                 </div>
 
-                {selectedBranch ? (
+                <div>
+                  <label style={{ fontSize: '0.78rem', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: 4 }}>
+                    Địa chỉ chi nhánh
+                  </label>
+                  <input
+                    type="text"
+                    readOnly
+                    value={selectedBranch?.address || ''}
+                    placeholder="Chọn chi nhánh để hiện địa chỉ"
+                    style={{
+                      width: '100%',
+                      height: 40,
+                      padding: '0 12px',
+                      borderRadius: 8,
+                      border: '1px solid #cbd5e1',
+                      backgroundColor: '#f8fafc',
+                      fontSize: '0.86rem',
+                      color: '#475569',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                </div>
+              </div>
+
+              {selectedBranch ? (
                   <div
                     style={{
                       fontSize: '0.82rem',
                       color: '#475569',
-                      backgroundColor: '#ffffff',
-                      border: '1px solid #e2e8f0',
-                      borderRadius: 8,
-                      padding: '8px 14px',
+                      marginTop: 10,
                       display: 'flex',
                       flexDirection: 'column',
                       gap: 2,
                     }}
                   >
                     <div>
-                      <strong>Địa chỉ:</strong> {selectedBranch.address || 'Đang cập nhật'}
+                      <strong>Đã chọn:</strong> {selectedBranch.code} — {selectedBranch.name}
                     </div>
                     <div>
                       <strong>Quản lý:</strong> {selectedBranch.managerName} &bull;{' '}
@@ -435,11 +498,10 @@ export const AssignStoreProductModal: FC<AssignStoreProductModalProps> = ({
                     </div>
                   </div>
                 ) : (
-                  <div style={{ fontSize: '0.82rem', color: '#94a3b8', fontStyle: 'italic' }}>
+                  <div style={{ fontSize: '0.82rem', color: '#94a3b8', fontStyle: 'italic', marginTop: 10 }}>
                     Vui lòng chọn chi nhánh để xem danh sách sản phẩm khả dụng.
                   </div>
                 )}
-              </div>
             </div>
 
             {/* SECTION 2 – PRODUCT SEARCH AND FILTERS */}
@@ -561,7 +623,7 @@ export const AssignStoreProductModal: FC<AssignStoreProductModalProps> = ({
                     }}
                   >
                     <Loader2 size={20} className="animate-spin" />
-                    <span>Đang tải danh sách sản phẩm từ catalog...</span>
+                    <span>Đang tải sản phẩm từ nhà cung cấp của chi nhánh...</span>
                   </div>
                 ) : (
                   <table
@@ -591,31 +653,39 @@ export const AssignStoreProductModal: FC<AssignStoreProductModalProps> = ({
                         <th style={{ padding: '10px 14px', width: 70, textAlign: 'center' }}>ĐVT</th>
                         <th style={{ padding: '10px 14px', width: 110, textAlign: 'right' }}>Giá vốn</th>
                         <th style={{ padding: '10px 14px', width: 80, textAlign: 'center' }}>MOQ</th>
+                        <th style={{ padding: '10px 14px', width: 100, textAlign: 'center' }}>Trạng thái</th>
                       </tr>
                     </thead>
                     <tbody>
                       {filteredProducts.length === 0 ? (
                         <tr>
                           <td
-                            colSpan={7}
+                            colSpan={8}
                             style={{ textAlign: 'center', padding: '36px 16px', color: '#94a3b8' }}
                           >
                             {masterProducts.length === 0
-                              ? 'Không có sản phẩm nào trong danh mục tổng.'
-                              : 'Tất cả sản phẩm đã được gán vào chi nhánh này, hoặc không khớp bộ lọc.'}
+                              ? 'Chi nhánh chưa có sản phẩm khả dụng. Hãy gán nhà cung cấp cho cửa hàng và đảm bảo NCC đã có sản phẩm cung ứng.'
+                              : 'Không tìm thấy sản phẩm khớp bộ lọc.'}
                           </td>
                         </tr>
                       ) : (
                         filteredProducts.map((p) => {
+                          const isAssigned = assignedProductIds.includes(p.id);
                           const isSelected = selectedProductIds.includes(p.id);
                           return (
                             <tr
                               key={p.id}
-                              onClick={() => handleToggleProduct(p.id)}
+                              onClick={() => {
+                                if (!isAssigned) handleToggleProduct(p.id);
+                              }}
                               style={{
                                 borderBottom: '1px solid #f1f5f9',
-                                backgroundColor: isSelected ? '#f0fdf4' : '#fff',
-                                cursor: 'pointer',
+                                backgroundColor: isAssigned
+                                  ? '#f8fafc'
+                                  : isSelected
+                                  ? '#f0fdf4'
+                                  : '#fff',
+                                cursor: isAssigned ? 'not-allowed' : 'pointer',
                                 transition: 'background-color 0.15s ease',
                               }}
                             >
@@ -623,10 +693,11 @@ export const AssignStoreProductModal: FC<AssignStoreProductModalProps> = ({
                                 <input
                                   type="checkbox"
                                   checked={isSelected}
+                                  disabled={isAssigned}
                                   onChange={() => handleToggleProduct(p.id)}
                                   onClick={(e) => e.stopPropagation()}
                                   style={{
-                                    cursor: 'pointer',
+                                    cursor: isAssigned ? 'not-allowed' : 'pointer',
                                     accentColor: '#0d9488',
                                     width: 16,
                                     height: 16,
@@ -638,7 +709,7 @@ export const AssignStoreProductModal: FC<AssignStoreProductModalProps> = ({
                                   padding: '10px 14px',
                                   fontFamily: 'monospace',
                                   fontWeight: 700,
-                                  color: '#0d9488',
+                                  color: isAssigned ? '#94a3b8' : '#0d9488',
                                 }}
                               >
                                 {p.sku}
@@ -647,10 +718,15 @@ export const AssignStoreProductModal: FC<AssignStoreProductModalProps> = ({
                                 style={{
                                   padding: '10px 14px',
                                   fontWeight: 600,
-                                  color: '#1e293b',
+                                  color: isAssigned ? '#94a3b8' : '#1e293b',
                                 }}
                               >
-                                {p.name}
+                                <div>{p.name}</div>
+                                {p.supplierName && (
+                                  <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 500 }}>
+                                    NCC: {p.supplierName}
+                                  </div>
+                                )}
                               </td>
                               <td style={{ padding: '10px 14px', color: '#64748b' }}>{p.categoryName}</td>
                               <td style={{ padding: '10px 14px', textAlign: 'center', color: '#475569' }}>
@@ -661,7 +737,7 @@ export const AssignStoreProductModal: FC<AssignStoreProductModalProps> = ({
                                   padding: '10px 14px',
                                   textAlign: 'right',
                                   fontWeight: 600,
-                                  color: '#334155',
+                                  color: isAssigned ? '#94a3b8' : '#334155',
                                 }}
                               >
                                 {fmt(p.costPrice)} đ
@@ -671,11 +747,26 @@ export const AssignStoreProductModal: FC<AssignStoreProductModalProps> = ({
                                   padding: '10px 14px',
                                   textAlign: 'center',
                                   fontWeight: 700,
-                                  color: '#0f766e',
+                                  color: isAssigned ? '#94a3b8' : '#0f766e',
                                   fontFamily: 'monospace',
                                 }}
                               >
                                 {p.moq}
+                              </td>
+                              <td style={{ padding: '10px 14px', textAlign: 'center' }}>
+                                <span
+                                  style={{
+                                    fontSize: '0.7rem',
+                                    fontWeight: 600,
+                                    padding: '2px 8px',
+                                    borderRadius: 4,
+                                    backgroundColor: isAssigned ? '#f1f5f9' : '#ecfdf5',
+                                    color: isAssigned ? '#64748b' : '#047857',
+                                    border: isAssigned ? '1px solid #e2e8f0' : '1px solid #a7f3d0',
+                                  }}
+                                >
+                                  {isAssigned ? 'Đã gán' : 'Chưa gán'}
+                                </span>
                               </td>
                             </tr>
                           );

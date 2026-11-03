@@ -1,19 +1,21 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import type { FC, FormEvent } from 'react';
 import type { SupplierSummary, MasterProduct, AssignProductInput } from '../../types/supplier.types';
-import { supplierProductApi, type BatchAssignProductInput } from '../../api/supplierProductApi';
+import { supplierApi } from '../../api/supplierApi';
+import {
+  supplierProductApi,
+  type BatchAssignProductInput,
+  type SupplierAssignedProductInfo,
+} from '../../api/supplierProductApi';
 import {
   X,
   Building2,
   Search,
   Check,
   AlertCircle,
-  PlusCircle,
   Store,
   ChevronDown,
   RotateCcw,
-  CheckCircle2,
-  Info,
   Loader2,
   CheckSquare,
   Square,
@@ -26,9 +28,24 @@ interface AssignProductModalProps {
   suppliers?: SupplierSummary[];
   masterProducts: MasterProduct[];
   assignedProductIds?: string[];
-  onAssign?: (input: AssignProductInput, keepOpen?: boolean) => Promise<any>;
-  onAssignBatch?: (input: BatchAssignProductInput, keepOpen?: boolean) => Promise<any>;
+  onAssign?: (input: AssignProductInput) => Promise<any>;
+  onAssignBatch?: (input: BatchAssignProductInput) => Promise<any>;
 }
+
+type ProductTerms = Record<string, { price: string; moq: string }>;
+
+const formatCurrency = (val: number): string =>
+  new Intl.NumberFormat('vi-VN').format(Number.isFinite(val) ? val : 0);
+
+const parseCurrency = (str: string): number => {
+  const cleaned = String(str ?? '').replace(/[^\d]/g, '');
+  return cleaned ? parseInt(cleaned, 10) : 0;
+};
+
+const defaultTerms = (masterPrice = 0, masterMoq = 1): { price: string; moq: string } => ({
+  price: String(Math.max(0, Math.round(masterPrice || 0))),
+  moq: String(Math.max(1, Math.round(masterMoq || 1))),
+});
 
 export const AssignProductModal: FC<AssignProductModalProps> = ({
   isOpen,
@@ -40,125 +57,178 @@ export const AssignProductModal: FC<AssignProductModalProps> = ({
   onAssign,
   onAssignBatch,
 }) => {
-  // ── Supplier selection state ───────────────────────────────────────────
-  const [selectedSupplierId, setSelectedSupplierId] = useState<string>('');
-  const [supplierSearch, setSupplierSearch] = useState<string>('');
+  const [selectedSupplierId, setSelectedSupplierId] = useState('');
+  const [supplierSearch, setSupplierSearch] = useState('');
   const [isSupplierDropdownOpen, setIsSupplierDropdownOpen] = useState(false);
+  const [localSuppliers, setLocalSuppliers] = useState<SupplierSummary[]>([]);
+  const [localMasterProducts, setLocalMasterProducts] = useState<MasterProduct[]>([]);
+  const [isLoadingSuppliers, setIsLoadingSuppliers] = useState(false);
   const supplierDropdownRef = useRef<HTMLDivElement>(null);
 
-  // ── Products table selection state ─────────────────────────────────────
   const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
-  const [productSearch, setProductSearch] = useState<string>('');
-  const [supplierAssignedIds, setSupplierAssignedIds] = useState<string[]>([]);
-  const [isLoadingAssigned, setIsLoadingAssigned] = useState<boolean>(false);
+  const [productSearch, setProductSearch] = useState('');
+  const [assignedMap, setAssignedMap] = useState<Record<string, SupplierAssignedProductInfo>>({});
+  const [productTerms, setProductTerms] = useState<ProductTerms>({});
+  const [isLoadingAssigned, setIsLoadingAssigned] = useState(false);
 
-  // ── Supply info fields (No SupplierProductCode, No DeliveryUoM on popup)
-  // ĐVT luôn lấy từ Product Master theo yêu cầu nghiệp vụ
-  const [agreedPriceInput, setAgreedPriceInput] = useState<string>('0');
-  const [moqInput, setMoqInput] = useState<string>('1');
-
-  // ── Linked branches count ──────────────────────────────────────────────
-  const [linkedBranchesCount, setLinkedBranchesCount] = useState<number | null>(null);
-
-  // ── UX & Form states ───────────────────────────────────────────────────
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
-  const [submitSuccessMsg, setSubmitSuccessMsg] = useState<string>('');
-  const [showCloseConfirm, setShowCloseConfirm] = useState<boolean>(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showCloseConfirm, setShowCloseConfirm] = useState(false);
 
-  // ── Active supplier object ─────────────────────────────────────────────
-  const selectedSupplier = useMemo(() => {
-    return suppliers.find((s) => s.id === selectedSupplierId) || null;
-  }, [suppliers, selectedSupplierId]);
+  const supplierOptions = useMemo(() => {
+    const merged = [...suppliers, ...localSuppliers];
+    const byId = new Map<string, SupplierSummary>();
+    merged.forEach((s) => {
+      if (s?.id) byId.set(s.id, s);
+    });
+    return Array.from(byId.values());
+  }, [suppliers, localSuppliers]);
 
-  // ── Filtered suppliers for autocomplete dropdown ───────────────────────
+  const selectedSupplier = useMemo(
+    () => supplierOptions.find((s) => s.id === selectedSupplierId) || null,
+    [supplierOptions, selectedSupplierId]
+  );
+
+  const activeSuppliers = useMemo(
+    () => supplierOptions.filter((s) => s.status === 'Active' || !s.status),
+    [supplierOptions]
+  );
+
   const filteredSuppliers = useMemo(() => {
     const q = supplierSearch.trim().toLowerCase();
-    if (!q) return suppliers;
-    return suppliers.filter(
+    if (!q) return activeSuppliers;
+    return activeSuppliers.filter(
       (s) =>
         s.name.toLowerCase().includes(q) ||
         s.code.toLowerCase().includes(q) ||
         (s.phone && s.phone.toLowerCase().includes(q))
     );
-  }, [suppliers, supplierSearch]);
+  }, [activeSuppliers, supplierSearch]);
 
-  // ── Filtered products for table (by search keyword) ───────────────────
+  const productCatalog = useMemo(() => {
+    return masterProducts.length > 0 ? masterProducts : localMasterProducts;
+  }, [masterProducts, localMasterProducts]);
+
   const filteredProducts = useMemo(() => {
     const q = productSearch.trim().toLowerCase();
-    if (!q) return masterProducts;
-    return masterProducts.filter((p) => {
-      const matchName = p.name.toLowerCase().includes(q);
-      const matchSku = p.sku.toLowerCase().includes(q);
-      return matchName || matchSku;
-    });
-  }, [masterProducts, productSearch]);
+    if (!q) return productCatalog;
+    return productCatalog.filter(
+      (p) => p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q)
+    );
+  }, [productCatalog, productSearch]);
 
-  // ── Available (unassigned) products in current filtered view ───────────
-  const availableFilteredProducts = useMemo(() => {
-    return filteredProducts.filter((p) => !supplierAssignedIds.includes(p.id));
-  }, [filteredProducts, supplierAssignedIds]);
+  const availableFilteredProducts = useMemo(
+    () => filteredProducts.filter((p) => !assignedMap[p.id]),
+    [filteredProducts, assignedMap]
+  );
 
-  // ── Check if all available filtered products are currently selected ───
   const isAllAvailableSelected = useMemo(() => {
     if (availableFilteredProducts.length === 0) return false;
     return availableFilteredProducts.every((p) => selectedProductIds.includes(p.id));
   }, [availableFilteredProducts, selectedProductIds]);
 
-  // ── Initialize / reset modal when opened ───────────────────────────────
-  useEffect(() => {
-    if (isOpen) {
-      const initialSupplierId = supplier?.id || '';
-      setSelectedSupplierId(initialSupplierId);
-      setSupplierSearch('');
-      setIsSupplierDropdownOpen(false);
+  const resetSelectionState = useCallback(() => {
+    setSelectedProductIds([]);
+    setProductSearch('');
+    setProductTerms({});
+    setFieldErrors({});
+  }, []);
 
-      setSelectedProductIds([]);
-      setProductSearch('');
-      setSupplierAssignedIds(initialAssignedIds);
-
-      setAgreedPriceInput('0');
-      setMoqInput('1');
-
-      setFieldErrors({});
-      setIsSubmitting(false);
-      setSubmitSuccessMsg('');
-      setShowCloseConfirm(false);
-
-      if (initialSupplierId) {
-        fetchSupplierDetails(initialSupplierId);
-      } else {
-        setLinkedBranchesCount(null);
-      }
+  const fetchSupplierAssignments = useCallback(async (supplierId: string) => {
+    if (!supplierId) {
+      setAssignedMap({});
+      return;
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen]);
-
-  // ── Load supplier's assigned products & linked branches ───────────────
-  const fetchSupplierDetails = async (supplierId: string) => {
-    if (!supplierId) return;
     setIsLoadingAssigned(true);
     try {
-      const [assignedIds, branches] = await Promise.all([
-        supplierProductApi.getSupplierAssignedProductIds(supplierId),
-        supplierProductApi.getSupplierLinkedBranches(supplierId),
-      ]);
-      setSupplierAssignedIds(assignedIds);
-      setLinkedBranchesCount(branches.length);
+      const assigned = await supplierProductApi.getSupplierAssignedProducts(supplierId);
+      const map: Record<string, SupplierAssignedProductInfo> = {};
+      assigned.forEach((item) => {
+        map[item.productId] = item;
+      });
+      setAssignedMap(map);
     } catch {
-      // Fallback: keep previous or empty
+      setAssignedMap({});
     } finally {
       setIsLoadingAssigned(false);
     }
-  };
+  }, []);
 
-  // ── Close dropdown when clicking outside ───────────────────────────────
+  useEffect(() => {
+    if (!isOpen) return;
+
+    setSupplierSearch('');
+    setIsSupplierDropdownOpen(false);
+    resetSelectionState();
+    setIsSubmitting(false);
+    setShowCloseConfirm(false);
+    setFieldErrors({});
+
+    const pickDefaultSupplierId = (list: SupplierSummary[]): string => {
+      if (supplier?.id && (supplier.status === 'Active' || !supplier.status)) {
+        return supplier.id;
+      }
+      const firstActive = list.find((s) => s.status === 'Active' || !s.status);
+      return firstActive?.id || '';
+    };
+
+    const applyDefaultSupplier = (list: SupplierSummary[]) => {
+      const defaultId = pickDefaultSupplierId(list);
+      setSelectedSupplierId(defaultId);
+      if (!defaultId) {
+        setAssignedMap({});
+        return;
+      }
+      const seedMap: Record<string, SupplierAssignedProductInfo> = {};
+      initialAssignedIds.forEach((id) => {
+        seedMap[id] = { productId: id, agreedPrice: 0, moq: 1 };
+      });
+      setAssignedMap(seedMap);
+      void fetchSupplierAssignments(defaultId);
+    };
+
+    const bootstrapModal = async () => {
+      setIsLoadingSuppliers(true);
+      try {
+        let nextSuppliers = suppliers.filter((s) => s.status === 'Active' || !s.status);
+        if (nextSuppliers.length === 0) {
+          const res = await supplierApi.getSuppliers({
+            pageIndex: 1,
+            pageSize: 100,
+            status: 'Active',
+          });
+          nextSuppliers = res.items ?? [];
+        }
+        setLocalSuppliers(nextSuppliers);
+
+        if (masterProducts.length === 0) {
+          const products = await supplierProductApi.getMasterProducts();
+          setLocalMasterProducts(products as MasterProduct[]);
+        } else {
+          setLocalMasterProducts([]);
+        }
+
+        applyDefaultSupplier(nextSuppliers);
+      } catch (err: any) {
+        setLocalSuppliers([]);
+        setSelectedSupplierId('');
+        setAssignedMap({});
+        setFieldErrors({
+          supplier: err.message || 'Không thể tải dữ liệu nhà cung cấp / sản phẩm.',
+        });
+      } finally {
+        setIsLoadingSuppliers(false);
+      }
+    };
+
+    void bootstrapModal();
+    // Only reset when modal opens or preselected supplier changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, supplier?.id]);
+
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (
-        supplierDropdownRef.current &&
-        !supplierDropdownRef.current.contains(e.target as Node)
-      ) {
+      if (supplierDropdownRef.current && !supplierDropdownRef.current.contains(e.target as Node)) {
         setIsSupplierDropdownOpen(false);
       }
     };
@@ -166,38 +236,41 @@ export const AssignProductModal: FC<AssignProductModalProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // ── Handle supplier selection ──────────────────────────────────────────
   const handleSelectSupplier = (s: SupplierSummary) => {
-    if (s.status === 'Inactive') return;
-
+    if (s.status && s.status !== 'Active') return;
     setSelectedSupplierId(s.id);
     setSupplierSearch('');
     setIsSupplierDropdownOpen(false);
-    setSelectedProductIds([]); // Reset selected products on supplier change
-    setFieldErrors((prev) => {
-      const copy = { ...prev };
-      delete copy.supplier;
-      delete copy.products;
-      return copy;
-    });
-    fetchSupplierDetails(s.id);
+    resetSelectionState();
+    void fetchSupplierAssignments(s.id);
   };
 
   const handleClearSupplier = () => {
     setSelectedSupplierId('');
-    setSelectedProductIds([]);
-    setSupplierAssignedIds([]);
-    setLinkedBranchesCount(null);
-    setFieldErrors({});
+    setAssignedMap({});
+    resetSelectionState();
   };
 
-  // ── Toggle individual product selection ────────────────────────────────
+  const termsFromMaster = (productId: string): { price: string; moq: string } => {
+    const product = productCatalog.find((p) => p.id === productId);
+    return defaultTerms(product?.defaultWholesalePrice ?? 0, product?.defaultMoq ?? 1);
+  };
+
+  const ensureTerms = (productId: string): { price: string; moq: string } =>
+    productTerms[productId] ?? termsFromMaster(productId);
+
   const handleToggleProduct = (productId: string) => {
-    if (supplierAssignedIds.includes(productId)) return; // Do not allow toggling assigned products
+    if (assignedMap[productId]) return;
 
     setSelectedProductIds((prev) => {
       const exists = prev.includes(productId);
       const next = exists ? prev.filter((id) => id !== productId) : [...prev, productId];
+      if (!exists) {
+        setProductTerms((terms) => ({
+          ...terms,
+          [productId]: terms[productId] ?? termsFromMaster(productId),
+        }));
+      }
       if (next.length > 0) {
         setFieldErrors((errs) => {
           const copy = { ...errs };
@@ -209,60 +282,57 @@ export const AssignProductModal: FC<AssignProductModalProps> = ({
     });
   };
 
-  // ── Toggle select all available products ───────────────────────────────
   const handleToggleSelectAll = () => {
     if (isAllAvailableSelected) {
-      // Unselect all available filtered products
       const availableIds = new Set(availableFilteredProducts.map((p) => p.id));
       setSelectedProductIds((prev) => prev.filter((id) => !availableIds.has(id)));
-    } else {
-      // Select all available filtered products
-      const toAdd = availableFilteredProducts.map((p) => p.id);
-      setSelectedProductIds((prev) => Array.from(new Set([...prev, ...toAdd])));
-      setFieldErrors((errs) => {
-        const copy = { ...errs };
-        delete copy.products;
-        return copy;
-      });
+      return;
     }
-  };
 
-  // ── Format currency for input ──────────────────────────────────────────
-  const formatCurrency = (val: number): string => {
-    return new Intl.NumberFormat('vi-VN').format(val);
-  };
-
-  const parseCurrency = (str: string): number => {
-    const cleaned = str.replace(/[^\d]/g, '');
-    return cleaned ? parseInt(cleaned, 10) : 0;
-  };
-
-  const handlePriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const raw = e.target.value;
-    const num = parseCurrency(raw);
-    setAgreedPriceInput(formatCurrency(num));
-    if (fieldErrors.price) {
-      setFieldErrors((prev) => {
-        const copy = { ...prev };
-        delete copy.price;
-        return copy;
+    const toAdd = availableFilteredProducts.map((p) => p.id);
+    setSelectedProductIds((prev) => Array.from(new Set([...prev, ...toAdd])));
+    setProductTerms((prev) => {
+      const next = { ...prev };
+      toAdd.forEach((id) => {
+        if (!next[id]) next[id] = termsFromMaster(id);
       });
-    }
+      return next;
+    });
+    setFieldErrors((errs) => {
+      const copy = { ...errs };
+      delete copy.products;
+      return copy;
+    });
   };
 
-  const handleMoqChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value.replace(/[^\d]/g, '');
-    setMoqInput(val);
-    if (fieldErrors.moq) {
-      setFieldErrors((prev) => {
-        const copy = { ...prev };
-        delete copy.moq;
-        return copy;
-      });
-    }
+  const updateRowPrice = (productId: string, raw: string) => {
+    const digits = raw.replace(/[^\d]/g, '');
+    setProductTerms((prev) => ({
+      ...prev,
+      [productId]: { ...ensureTerms(productId), price: digits },
+    }));
+    setFieldErrors((prev) => {
+      const copy = { ...prev };
+      delete copy[`price_${productId}`];
+      delete copy.form;
+      return copy;
+    });
   };
 
-  // ── Validation ─────────────────────────────────────────────────────────
+  const updateRowMoq = (productId: string, raw: string) => {
+    const digits = raw.replace(/[^\d]/g, '');
+    setProductTerms((prev) => ({
+      ...prev,
+      [productId]: { ...ensureTerms(productId), moq: digits },
+    }));
+    setFieldErrors((prev) => {
+      const copy = { ...prev };
+      delete copy[`moq_${productId}`];
+      delete copy.form;
+      return copy;
+    });
+  };
+
   const validateForm = (): boolean => {
     const errors: Record<string, string> = {};
 
@@ -274,78 +344,70 @@ export const AssignProductModal: FC<AssignProductModalProps> = ({
       errors.products = 'Vui lòng chọn ít nhất 1 sản phẩm để gán cho nhà cung cấp.';
     }
 
-    const price = parseCurrency(agreedPriceInput);
-    if (isNaN(price) || price < 0) {
-      errors.price = 'Giá nhập thỏa thuận phải lớn hơn hoặc bằng 0 đ.';
-    }
+    selectedProductIds.forEach((id) => {
+      if (assignedMap[id]) {
+        errors.products = 'Không thể gán lại sản phẩm đã thuộc nhà cung cấp này.';
+        return;
+      }
 
-    const moq = parseInt(moqInput, 10);
-    if (isNaN(moq) || moq < 1) {
-      errors.moq = 'Số lượng đặt tối thiểu (MOQ) phải từ 1 trở lên.';
-    }
+      const terms = ensureTerms(id);
+      const price = parseCurrency(terms.price);
+      if (Number.isNaN(price) || price < 0) {
+        errors[`price_${id}`] = 'Giá nhập phải ≥ 0.';
+      }
+
+      const moq = parseInt(terms.moq, 10);
+      if (!terms.moq || Number.isNaN(moq) || moq < 1) {
+        errors[`moq_${id}`] = 'MOQ phải > 0.';
+      }
+    });
 
     setFieldErrors(errors);
     return Object.keys(errors).length === 0;
   };
 
-  // ── Form submission (batch assign) ─────────────────────────────────────
-  const executeSubmit = async (keepOpen: boolean) => {
+  const executeSubmit = async () => {
+    if (isSubmitting) return;
     if (!validateForm()) return;
 
     setIsSubmitting(true);
-    setSubmitSuccessMsg('');
-
     try {
-      const price = parseCurrency(agreedPriceInput);
-      const moq = parseInt(moqInput, 10) || 1;
+      const items = selectedProductIds.map((pid) => {
+        const terms = ensureTerms(pid);
+        return {
+          productId: pid,
+          agreedPrice: parseCurrency(terms.price),
+          moq: parseInt(terms.moq, 10),
+        };
+      });
 
       if (onAssignBatch) {
-        await onAssignBatch(
-          {
-            supplierId: selectedSupplierId,
-            productIds: selectedProductIds,
-            agreedPrice: price,
-            moq: moq,
-          },
-          keepOpen
-        );
+        await onAssignBatch({
+          supplierId: selectedSupplierId,
+          productIds: selectedProductIds,
+          items,
+        });
       } else if (onAssign) {
-        // Fallback: loop through products if single assign handler provided
-        for (const pid of selectedProductIds) {
-          const product = masterProducts.find((p) => p.id === pid);
-          await onAssign(
-            {
-              supplierId: selectedSupplierId,
-              productId: pid,
-              deliveryUoM: product?.baseUoM || 'Cái',
-              agreedPrice: price,
-              moq: moq,
-              isPrimary: false,
-            },
-            true
-          );
+        for (const item of items) {
+          const product = productCatalog.find((p) => p.id === item.productId);
+          await onAssign({
+            supplierId: selectedSupplierId,
+            productId: item.productId,
+            deliveryUoM: product?.baseUoM || 'Cái',
+            agreedPrice: item.agreedPrice,
+            moq: item.moq,
+            isPrimary: false,
+          });
         }
       } else {
-        // Directly call batch API
         await supplierProductApi.assignBatchProducts({
           supplierId: selectedSupplierId,
           productIds: selectedProductIds,
-          agreedPrice: price,
-          moq: moq,
+          items,
         });
       }
 
-      if (keepOpen) {
-        // Multi-assign UX: update assigned list and reset selected products
-        setSupplierAssignedIds((prev) => [...prev, ...selectedProductIds]);
-        setSubmitSuccessMsg(
-          `Đã gán thành công ${selectedProductIds.length} sản phẩm vào "${selectedSupplier?.name}". Bạn có thể tiếp tục chọn sản phẩm khác.`
-        );
-        setSelectedProductIds([]);
-        setFieldErrors({});
-      } else {
-        onClose();
-      }
+      onClose();
     } catch (err: any) {
       setFieldErrors((prev) => ({
         ...prev,
@@ -358,13 +420,13 @@ export const AssignProductModal: FC<AssignProductModalProps> = ({
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
-    executeSubmit(false);
+    void executeSubmit();
   };
 
-  // ── Safe Close with confirmation if dirty ───────────────────────────────
   const hasUnsavedChanges = selectedProductIds.length > 0;
 
   const handleAttemptClose = () => {
+    if (isSubmitting) return;
     if (hasUnsavedChanges) {
       setShowCloseConfirm(true);
     } else {
@@ -373,6 +435,8 @@ export const AssignProductModal: FC<AssignProductModalProps> = ({
   };
 
   if (!isOpen) return null;
+
+  const gridColumns = '40px 110px 1.4fr 70px 100px 120px 90px 90px';
 
   return (
     <div
@@ -394,20 +458,16 @@ export const AssignProductModal: FC<AssignProductModalProps> = ({
           backgroundColor: '#ffffff',
           borderRadius: 14,
           width: '100%',
-          maxWidth: 820,
+          maxWidth: 980,
           boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
           border: '1px solid #e2e8f0',
           overflow: 'hidden',
           display: 'flex',
           flexDirection: 'column',
           maxHeight: '94vh',
-          animation: 'fadeInModal 0.2s ease-out',
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* ══════════════════════════════════════════════════════════════
-            HEADER
-           ══════════════════════════════════════════════════════════════ */}
         <div
           style={{
             padding: '16px 22px',
@@ -434,64 +494,40 @@ export const AssignProductModal: FC<AssignProductModalProps> = ({
             >
               <Store size={22} />
             </div>
-            <div>
-              <h2
-                style={{
-                  margin: 0,
-                  fontSize: '1.1rem',
-                  fontWeight: 700,
-                  color: '#0f172a',
-                  letterSpacing: '-0.01em',
-                }}
-              >
-                Gán Sản Phẩm Vào Nhà Cung Cấp
-              </h2>
-              <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: 2 }}>
-                Chọn nhà cung cấp và chọn các sản phẩm Master để gán hàng loạt vào danh mục cung ứng.
-              </div>
-            </div>
+            <h2
+              style={{
+                margin: 0,
+                fontSize: '1.1rem',
+                fontWeight: 700,
+                color: '#0f172a',
+              }}
+            >
+              Gán Sản Phẩm Vào Nhà Cung Cấp
+            </h2>
           </div>
 
           <button
             type="button"
             onClick={handleAttemptClose}
+            disabled={isSubmitting}
             style={{
               background: 'none',
               border: 'none',
-              cursor: 'pointer',
+              cursor: isSubmitting ? 'not-allowed' : 'pointer',
               color: '#94a3b8',
               padding: 6,
               borderRadius: 6,
               display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              transition: 'background 0.15s, color 0.15s',
             }}
             title="Đóng popup"
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = '#f1f5f9';
-              e.currentTarget.style.color = '#0f172a';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = 'transparent';
-              e.currentTarget.style.color = '#94a3b8';
-            }}
           >
             <X size={20} />
           </button>
         </div>
 
-        {/* ══════════════════════════════════════════════════════════════
-            BODY (FORM)
-           ══════════════════════════════════════════════════════════════ */}
         <form
           onSubmit={handleSubmit}
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            flex: 1,
-            overflow: 'hidden',
-          }}
+          style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}
         >
           <div
             style={{
@@ -503,7 +539,6 @@ export const AssignProductModal: FC<AssignProductModalProps> = ({
               gap: 16,
             }}
           >
-            {/* Global Error Banner */}
             {fieldErrors.form && (
               <div
                 style={{
@@ -523,29 +558,7 @@ export const AssignProductModal: FC<AssignProductModalProps> = ({
               </div>
             )}
 
-            {/* Success banner when using "Gán & Tiếp tục" */}
-            {submitSuccessMsg && (
-              <div
-                style={{
-                  backgroundColor: '#ecfdf5',
-                  border: '1px solid #a7f3d0',
-                  color: '#047857',
-                  padding: '10px 14px',
-                  borderRadius: 8,
-                  fontSize: '0.84rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 8,
-                }}
-              >
-                <CheckCircle2 size={16} />
-                <span>{submitSuccessMsg}</span>
-              </div>
-            )}
-
-            {/* ══════════════════════════════════════════════════════════════
-                SECTION 1: CHỌN NHÀ CUNG CẤP (*)
-               ══════════════════════════════════════════════════════════════ */}
+            {/* Supplier selection */}
             <div>
               <div
                 style={{
@@ -556,12 +569,13 @@ export const AssignProductModal: FC<AssignProductModalProps> = ({
                 }}
               >
                 <label style={{ fontSize: '0.84rem', fontWeight: 700, color: '#334155' }}>
-                  1. Chọn Nhà cung cấp <span style={{ color: '#ef4444' }}>*</span>
+                  Nhà cung cấp <span style={{ color: '#ef4444' }}>*</span>
                 </label>
                 {selectedSupplier && (
                   <button
                     type="button"
                     onClick={handleClearSupplier}
+                    disabled={isSubmitting}
                     style={{
                       background: 'none',
                       border: 'none',
@@ -574,7 +588,7 @@ export const AssignProductModal: FC<AssignProductModalProps> = ({
                       gap: 4,
                     }}
                   >
-                    <RotateCcw size={12} /> Đổi NCC khác
+                    <RotateCcw size={12} /> Đổi NCC
                   </button>
                 )}
               </div>
@@ -595,12 +609,11 @@ export const AssignProductModal: FC<AssignProductModalProps> = ({
                       cursor: 'pointer',
                       fontSize: '0.88rem',
                       color: '#64748b',
-                      boxSizing: 'border-box',
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <Building2 size={16} style={{ color: '#0f766e' }} />
-                      <span>-- Tìm & chọn Nhà cung cấp (Tên, Mã NCC, SĐT) --</span>
+                      <span>Tìm theo tên, mã NCC hoặc SĐT...</span>
                     </div>
                     <ChevronDown size={16} style={{ color: '#94a3b8' }} />
                   </div>
@@ -623,15 +636,7 @@ export const AssignProductModal: FC<AssignProductModalProps> = ({
                         overflow: 'hidden',
                       }}
                     >
-                      <div
-                        style={{
-                          padding: '8px 10px',
-                          borderBottom: '1px solid #f1f5f9',
-                          position: 'sticky',
-                          top: 0,
-                          backgroundColor: '#ffffff',
-                        }}
-                      >
+                      <div style={{ padding: '8px 10px', borderBottom: '1px solid #f1f5f9' }}>
                         <div style={{ position: 'relative' }}>
                           <Search
                             size={14}
@@ -664,110 +669,98 @@ export const AssignProductModal: FC<AssignProductModalProps> = ({
                       </div>
 
                       <div style={{ overflowY: 'auto', flex: 1 }}>
-                        {filteredSuppliers.length === 0 ? (
+                        {isLoadingSuppliers ? (
                           <div
                             style={{
-                              padding: '16px',
+                              padding: 16,
+                              textAlign: 'center',
+                              color: '#64748b',
+                              fontSize: '0.84rem',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: 8,
+                            }}
+                          >
+                            <Loader2 size={14} className="animate-spin" />
+                            Đang tải danh sách nhà cung cấp...
+                          </div>
+                        ) : filteredSuppliers.length === 0 ? (
+                          <div
+                            style={{
+                              padding: 16,
                               textAlign: 'center',
                               color: '#94a3b8',
                               fontSize: '0.84rem',
                             }}
                           >
-                            Không tìm thấy nhà cung cấp nào.
+                            Không tìm thấy nhà cung cấp đang hoạt động.
                           </div>
                         ) : (
-                          filteredSuppliers.map((s) => {
-                            const isInactive = s.status === 'Inactive';
-                            return (
-                              <div
-                                key={s.id}
-                                onClick={() => handleSelectSupplier(s)}
+                          filteredSuppliers.map((s) => (
+                            <div
+                              key={s.id}
+                              onClick={() => handleSelectSupplier(s)}
+                              style={{
+                                padding: '9px 12px',
+                                borderBottom: '1px solid #f8fafc',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                cursor: 'pointer',
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.backgroundColor = '#f0fdfa';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.backgroundColor = '#ffffff';
+                              }}
+                            >
+                              <div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                  <span style={{ fontWeight: 600, fontSize: '0.88rem', color: '#0f172a' }}>
+                                    {s.name}
+                                  </span>
+                                  <span
+                                    style={{
+                                      fontFamily: 'monospace',
+                                      fontSize: '0.74rem',
+                                      color: '#0f766e',
+                                      backgroundColor: '#f0fdfa',
+                                      padding: '1px 6px',
+                                      borderRadius: 4,
+                                      border: '1px solid #ccfbf1',
+                                    }}
+                                  >
+                                    {s.code}
+                                  </span>
+                                </div>
+                                {s.phone && (
+                                  <div style={{ fontSize: '0.76rem', color: '#64748b', marginTop: 2 }}>
+                                    SĐT: {s.phone}
+                                  </div>
+                                )}
+                              </div>
+                              <span
                                 style={{
-                                  padding: '9px 12px',
-                                  borderBottom: '1px solid #f8fafc',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'space-between',
-                                  cursor: isInactive ? 'not-allowed' : 'pointer',
-                                  backgroundColor: isInactive ? '#fafafa' : '#ffffff',
-                                  opacity: isInactive ? 0.6 : 1,
-                                }}
-                                onMouseEnter={(e) => {
-                                  if (!isInactive) e.currentTarget.style.backgroundColor = '#f0fdfa';
-                                }}
-                                onMouseLeave={(e) => {
-                                  if (!isInactive) e.currentTarget.style.backgroundColor = '#ffffff';
+                                  fontSize: '0.72rem',
+                                  padding: '2px 8px',
+                                  borderRadius: 4,
+                                  backgroundColor: '#ecfdf5',
+                                  color: '#059669',
+                                  fontWeight: 600,
                                 }}
                               >
-                                <div>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                    <span
-                                      style={{
-                                        fontWeight: 600,
-                                        fontSize: '0.88rem',
-                                        color: isInactive ? '#64748b' : '#0f172a',
-                                      }}
-                                    >
-                                      {s.name}
-                                    </span>
-                                    <span
-                                      style={{
-                                        fontFamily: 'monospace',
-                                        fontSize: '0.74rem',
-                                        color: '#0f766e',
-                                        backgroundColor: '#f0fdfa',
-                                        padding: '1px 6px',
-                                        borderRadius: 4,
-                                        border: '1px solid #ccfbf1',
-                                      }}
-                                    >
-                                      {s.code}
-                                    </span>
-                                  </div>
-                                  <div style={{ fontSize: '0.76rem', color: '#64748b', marginTop: 2 }}>
-                                    {s.contactPerson && <span>LH: {s.contactPerson}</span>}
-                                    {s.phone && <span> · SĐT: {s.phone}</span>}
-                                  </div>
-                                </div>
-
-                                <div>
-                                  {isInactive ? (
-                                    <span
-                                      style={{
-                                        fontSize: '0.72rem',
-                                        padding: '2px 8px',
-                                        borderRadius: 4,
-                                        backgroundColor: '#f1f5f9',
-                                        color: '#94a3b8',
-                                      }}
-                                    >
-                                      Tạm ngưng
-                                    </span>
-                                  ) : (
-                                    <span
-                                      style={{
-                                        fontSize: '0.72rem',
-                                        padding: '2px 8px',
-                                        borderRadius: 4,
-                                        backgroundColor: '#ecfdf5',
-                                        color: '#059669',
-                                        fontWeight: 600,
-                                      }}
-                                    >
-                                      Hoạt động
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                            );
-                          })
+                                Hoạt động
+                              </span>
+                            </div>
+                          ))
                         )}
                       </div>
                     </div>
                   )}
                 </div>
               ) : (
-                /* Selected Supplier Summary Card */
                 <div
                   style={{
                     backgroundColor: '#f8fafc',
@@ -780,21 +773,7 @@ export const AssignProductModal: FC<AssignProductModalProps> = ({
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <div
-                      style={{
-                        width: 36,
-                        height: 36,
-                        borderRadius: 8,
-                        backgroundColor: '#f0fdfa',
-                        color: '#0f766e',
-                        border: '1px solid #ccfbf1',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}
-                    >
-                      <Building2 size={18} />
-                    </div>
+                    <Building2 size={18} style={{ color: '#0f766e' }} />
                     <div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <span style={{ fontWeight: 700, fontSize: '0.9rem', color: '#0f172a' }}>
@@ -813,48 +792,14 @@ export const AssignProductModal: FC<AssignProductModalProps> = ({
                         >
                           {selectedSupplier.code}
                         </span>
-                        <span
-                          style={{
-                            fontSize: '0.7rem',
-                            padding: '1px 6px',
-                            borderRadius: 4,
-                            backgroundColor: '#ecfdf5',
-                            color: '#059669',
-                            fontWeight: 600,
-                          }}
-                        >
-                          Hoạt động
-                        </span>
                       </div>
-                      <div style={{ fontSize: '0.76rem', color: '#64748b', marginTop: 2 }}>
-                        {selectedSupplier.contactPerson && (
-                          <span>Người liên hệ: <b>{selectedSupplier.contactPerson}</b></span>
-                        )}
-                        {selectedSupplier.phone && <span> · SĐT: <b>{selectedSupplier.phone}</b></span>}
-                      </div>
+                      {selectedSupplier.phone && (
+                        <div style={{ fontSize: '0.76rem', color: '#64748b', marginTop: 2 }}>
+                          SĐT: {selectedSupplier.phone}
+                        </div>
+                      )}
                     </div>
                   </div>
-
-                  <button
-                    type="button"
-                    onClick={handleClearSupplier}
-                    title="Chọn nhà cung cấp khác"
-                    style={{
-                      padding: '5px 10px',
-                      borderRadius: 6,
-                      border: '1px solid #cbd5e1',
-                      backgroundColor: '#ffffff',
-                      color: '#0f766e',
-                      fontSize: '0.76rem',
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 4,
-                    }}
-                  >
-                    <RotateCcw size={12} /> Đổi NCC
-                  </button>
                 </div>
               )}
 
@@ -865,57 +810,35 @@ export const AssignProductModal: FC<AssignProductModalProps> = ({
               )}
             </div>
 
-            {/* ══════════════════════════════════════════════════════════════
-                SECTION 2: DANH SÁCH SẢN PHẨM MASTER DẠNG TABLE (*)
-                - Hiển thị cột: [checkbox] | Mã SKU | Tên sản phẩm | Đơn vị
-                - Bỏ tất cả các cột khác
-                - Sản phẩm nào đã gán rồi thì disabled, không cho tick chọn
-               ══════════════════════════════════════════════════════════════ */}
+            {/* Product table */}
             <div>
-              <div
+              <label
                 style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
+                  fontSize: '0.84rem',
+                  fontWeight: 700,
+                  color: '#334155',
+                  display: 'block',
                   marginBottom: 6,
                 }}
               >
-                <label style={{ fontSize: '0.84rem', fontWeight: 700, color: '#334155' }}>
-                  2. Chọn Sản phẩm Master (*)
-                </label>
-                {selectedSupplierId && (
-                  <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
-                    Đã chọn:{' '}
-                    <strong style={{ color: '#0f766e', fontSize: '0.85rem' }}>
-                      {selectedProductIds.length}
-                    </strong>{' '}
-                    / {availableFilteredProducts.length} sản phẩm khả dụng
-                    {supplierAssignedIds.length > 0 && (
-                      <span style={{ color: '#94a3b8', marginLeft: 6 }}>
-                        ({supplierAssignedIds.length} đã gán cho NCC này)
-                      </span>
-                    )}
-                  </div>
-                )}
-              </div>
+                Danh sách sản phẩm Master
+              </label>
 
               {!selectedSupplierId ? (
                 <div
                   style={{
-                    height: 44,
-                    padding: '0 12px',
+                    height: 88,
                     borderRadius: 8,
                     border: '1px dashed #cbd5e1',
                     backgroundColor: '#f8fafc',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: 8,
+                    justifyContent: 'center',
                     color: '#94a3b8',
                     fontSize: '0.84rem',
                   }}
                 >
-                  <Info size={15} />
-                  <span>Vui lòng chọn nhà cung cấp ở Bước 1 trước khi chọn sản phẩm.</span>
+                  Chọn nhà cung cấp để tải danh sách sản phẩm.
                 </div>
               ) : (
                 <div
@@ -923,12 +846,9 @@ export const AssignProductModal: FC<AssignProductModalProps> = ({
                     border: fieldErrors.products ? '1.5px solid #ef4444' : '1px solid #cbd5e1',
                     borderRadius: 8,
                     overflow: 'hidden',
-                    display: 'flex',
-                    flexDirection: 'column',
                     backgroundColor: '#ffffff',
                   }}
                 >
-                  {/* Search Bar for Product Table */}
                   <div
                     style={{
                       padding: '8px 12px',
@@ -964,7 +884,6 @@ export const AssignProductModal: FC<AssignProductModalProps> = ({
                           fontSize: '0.82rem',
                           outline: 'none',
                           boxSizing: 'border-box',
-                          backgroundColor: '#ffffff',
                         }}
                       />
                       {productSearch && (
@@ -1009,48 +928,48 @@ export const AssignProductModal: FC<AssignProductModalProps> = ({
                       >
                         {isAllAvailableSelected ? (
                           <>
-                            <Square size={13} /> Bỏ chọn tất cả
+                            <Square size={13} /> Bỏ chọn
                           </>
                         ) : (
                           <>
-                            <CheckSquare size={13} /> Chọn tất cả khả dụng
+                            <CheckSquare size={13} /> Chọn tất cả chưa gán
                           </>
                         )}
                       </button>
                     )}
                   </div>
 
-                  {/* Fixed Table Header: Completely OUTSIDE the scroll container */}
                   <div
                     style={{
                       display: 'grid',
-                      gridTemplateColumns: '44px 140px 1fr 90px',
+                      gridTemplateColumns: gridColumns,
                       backgroundColor: '#f1f5f9',
                       borderBottom: '1px solid #cbd5e1',
                       fontWeight: 700,
                       color: '#475569',
-                      fontSize: '0.83rem',
+                      fontSize: '0.78rem',
                       alignItems: 'center',
-                      userSelect: 'none',
                     }}
                   >
-                    <div style={{ padding: '8px 12px', textAlign: 'center' }}>
+                    <div style={{ padding: '8px 8px', textAlign: 'center' }}>
                       <input
                         type="checkbox"
                         checked={isAllAvailableSelected}
                         onChange={handleToggleSelectAll}
                         disabled={availableFilteredProducts.length === 0}
                         style={{ cursor: 'pointer', accentColor: '#0f766e' }}
-                        title="Chọn tất cả sản phẩm khả dụng"
                       />
                     </div>
-                    <div style={{ padding: '8px 12px' }}>Mã SKU</div>
-                    <div style={{ padding: '8px 12px' }}>Tên sản phẩm</div>
-                    <div style={{ padding: '8px 12px', textAlign: 'center' }}>Đơn vị</div>
+                    <div style={{ padding: '8px 8px' }}>SKU</div>
+                    <div style={{ padding: '8px 8px' }}>Tên sản phẩm</div>
+                    <div style={{ padding: '8px 8px', textAlign: 'center' }}>ĐVT</div>
+                    <div style={{ padding: '8px 8px', textAlign: 'center' }}>Trạng thái</div>
+                    <div style={{ padding: '8px 8px', textAlign: 'right' }}>Giá nhập</div>
+                    <div style={{ padding: '8px 8px', textAlign: 'right' }}>MOQ</div>
+                    <div style={{ padding: '8px 8px', textAlign: 'center' }}>Thao tác</div>
                   </div>
 
-                  {/* Scrollable Body ONLY: Scrollbar and rows are strictly confined within this container */}
-                  <div style={{ maxHeight: 230, overflowY: 'auto', backgroundColor: '#ffffff' }}>
+                  <div style={{ maxHeight: 320, overflowY: 'auto' }}>
                     {isLoadingAssigned ? (
                       <div
                         style={{
@@ -1064,7 +983,7 @@ export const AssignProductModal: FC<AssignProductModalProps> = ({
                         }}
                       >
                         <Loader2 size={16} className="animate-spin" />
-                        <span>Đang tải danh mục cung ứng của nhà cung cấp...</span>
+                        <span>Đang tải trạng thái gán sản phẩm...</span>
                       </div>
                     ) : filteredProducts.length === 0 ? (
                       <div
@@ -1075,59 +994,41 @@ export const AssignProductModal: FC<AssignProductModalProps> = ({
                           fontSize: '0.83rem',
                         }}
                       >
-                        {masterProducts.length === 0
-                          ? 'Không có sản phẩm nào trong danh mục Master.'
-                          : 'Không tìm thấy sản phẩm nào khớp với từ khóa tìm kiếm.'}
+                        {productCatalog.length === 0
+                          ? 'Không có sản phẩm Master.'
+                          : 'Không tìm thấy sản phẩm khớp từ khóa.'}
                       </div>
                     ) : (
                       filteredProducts.map((p) => {
-                        const isAssigned = supplierAssignedIds.includes(p.id);
+                        const assigned = assignedMap[p.id];
+                        const isAssigned = !!assigned;
                         const isSelected = selectedProductIds.includes(p.id);
+                        const terms = ensureTerms(p.id);
+                        const priceError = fieldErrors[`price_${p.id}`];
+                        const moqError = fieldErrors[`moq_${p.id}`];
 
                         return (
                           <div
                             key={p.id}
-                            onClick={() => {
-                              if (!isAssigned) handleToggleProduct(p.id);
-                            }}
                             style={{
                               display: 'grid',
-                              gridTemplateColumns: '44px 140px 1fr 90px',
+                              gridTemplateColumns: gridColumns,
                               alignItems: 'center',
                               borderBottom: '1px solid #f1f5f9',
-                              fontSize: '0.83rem',
+                              fontSize: '0.8rem',
                               backgroundColor: isAssigned
                                 ? '#f8fafc'
                                 : isSelected
                                 ? '#f0fdfa'
                                 : '#ffffff',
-                              cursor: isAssigned ? 'not-allowed' : 'pointer',
-                              transition: 'background-color 0.12s',
-                            }}
-                            onMouseEnter={(e) => {
-                              if (!isAssigned && !isSelected) {
-                                e.currentTarget.style.backgroundColor = '#f8fafc';
-                              }
-                            }}
-                            onMouseLeave={(e) => {
-                              if (!isAssigned && !isSelected) {
-                                e.currentTarget.style.backgroundColor = '#ffffff';
-                              }
                             }}
                           >
-                            {/* Checkbox column */}
-                            <div
-                              style={{
-                                padding: '8px 12px',
-                                textAlign: 'center',
-                              }}
-                            >
+                            <div style={{ padding: '8px', textAlign: 'center' }}>
                               <input
                                 type="checkbox"
                                 checked={isSelected}
-                                disabled={isAssigned}
+                                disabled={isAssigned || isSubmitting}
                                 onChange={() => handleToggleProduct(p.id)}
-                                onClick={(e) => e.stopPropagation()}
                                 style={{
                                   cursor: isAssigned ? 'not-allowed' : 'pointer',
                                   accentColor: '#0f766e',
@@ -1135,72 +1036,165 @@ export const AssignProductModal: FC<AssignProductModalProps> = ({
                               />
                             </div>
 
-                            {/* Cột Mã SKU */}
                             <div
                               style={{
-                                padding: '8px 12px',
+                                padding: '8px',
                                 fontFamily: 'monospace',
                                 fontWeight: 600,
                                 color: isAssigned ? '#94a3b8' : '#0f766e',
-                                whiteSpace: 'nowrap',
                                 overflow: 'hidden',
                                 textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
                               }}
                             >
                               {p.sku}
                             </div>
 
-                            {/* Cột Tên sản phẩm */}
                             <div
                               style={{
-                                padding: '8px 12px',
+                                padding: '8px',
                                 fontWeight: isSelected ? 700 : 500,
                                 color: isAssigned ? '#94a3b8' : '#0f172a',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: 8,
-                                minWidth: 0,
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
                               }}
+                              title={p.name}
                             >
-                              <span
-                                style={{
-                                  overflow: 'hidden',
-                                  textOverflow: 'ellipsis',
-                                  whiteSpace: 'nowrap',
-                                }}
-                              >
-                                {p.name}
-                              </span>
-                              {isAssigned && (
-                                <span
-                                  style={{
-                                    fontSize: '0.72rem',
-                                    fontWeight: 600,
-                                    padding: '1px 6px',
-                                    borderRadius: 4,
-                                    backgroundColor: '#f1f5f9',
-                                    color: '#64748b',
-                                    border: '1px solid #e2e8f0',
-                                    whiteSpace: 'nowrap',
-                                    flexShrink: 0,
-                                  }}
-                                >
-                                  Đã gán
-                                </span>
-                              )}
+                              {p.name}
                             </div>
 
-                            {/* Cột Đơn vị */}
                             <div
                               style={{
-                                padding: '8px 12px',
+                                padding: '8px',
                                 textAlign: 'center',
                                 fontWeight: 600,
                                 color: isAssigned ? '#94a3b8' : '#334155',
-                                whiteSpace: 'nowrap',
                               }}
                             >
                               {p.baseUoM || 'Cái'}
+                            </div>
+
+                            <div style={{ padding: '8px', textAlign: 'center' }}>
+                              <span
+                                style={{
+                                  fontSize: '0.7rem',
+                                  fontWeight: 600,
+                                  padding: '2px 7px',
+                                  borderRadius: 4,
+                                  backgroundColor: isAssigned ? '#f1f5f9' : '#ecfdf5',
+                                  color: isAssigned ? '#64748b' : '#047857',
+                                  border: isAssigned ? '1px solid #e2e8f0' : '1px solid #a7f3d0',
+                                }}
+                              >
+                                {isAssigned ? 'Đã gán' : 'Chưa gán'}
+                              </span>
+                            </div>
+
+                            <div style={{ padding: '6px 8px' }}>
+                              {isAssigned ? (
+                                <div
+                                  style={{
+                                    textAlign: 'right',
+                                    color: '#64748b',
+                                    fontWeight: 600,
+                                  }}
+                                >
+                                  {formatCurrency(assigned.agreedPrice)}
+                                </div>
+                              ) : isSelected ? (
+                                <div>
+                                  <input
+                                    type="text"
+                                    inputMode="numeric"
+                                    value={terms.price}
+                                    onChange={(e) => updateRowPrice(p.id, e.target.value)}
+                                    disabled={isSubmitting}
+                                    style={{
+                                      width: '100%',
+                                      height: 30,
+                                      padding: '0 8px',
+                                      borderRadius: 6,
+                                      border: priceError ? '1.5px solid #ef4444' : '1px solid #cbd5e1',
+                                      textAlign: 'right',
+                                      fontSize: '0.78rem',
+                                      boxSizing: 'border-box',
+                                    }}
+                                  />
+                                  {priceError && (
+                                    <div style={{ fontSize: '0.68rem', color: '#dc2626', marginTop: 2 }}>
+                                      {priceError}
+                                    </div>
+                                  )}
+                                </div>
+                              ) : (
+                                <div style={{ textAlign: 'right', color: '#cbd5e1' }}>—</div>
+                              )}
+                            </div>
+
+                            <div style={{ padding: '6px 8px' }}>
+                              {isAssigned ? (
+                                <div
+                                  style={{
+                                    textAlign: 'right',
+                                    color: '#64748b',
+                                    fontWeight: 600,
+                                  }}
+                                >
+                                  {assigned.moq} {p.baseUoM || 'Cái'}
+                                </div>
+                              ) : isSelected ? (
+                                <div>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                    <input
+                                      type="text"
+                                      inputMode="numeric"
+                                      value={terms.moq}
+                                      onChange={(e) => updateRowMoq(p.id, e.target.value)}
+                                      disabled={isSubmitting}
+                                      style={{
+                                        width: '100%',
+                                        height: 30,
+                                        padding: '0 8px',
+                                        borderRadius: 6,
+                                        border: moqError ? '1.5px solid #ef4444' : '1px solid #cbd5e1',
+                                        textAlign: 'right',
+                                        fontSize: '0.78rem',
+                                        boxSizing: 'border-box',
+                                      }}
+                                    />
+                                    <span
+                                      style={{
+                                        fontSize: '0.7rem',
+                                        color: '#64748b',
+                                        whiteSpace: 'nowrap',
+                                        minWidth: 28,
+                                      }}
+                                    >
+                                      {p.baseUoM || 'Cái'}
+                                    </span>
+                                  </div>
+                                  {moqError && (
+                                    <div style={{ fontSize: '0.68rem', color: '#dc2626', marginTop: 2 }}>
+                                      {moqError}
+                                    </div>
+                                  )}
+                                </div>
+                              ) : (
+                                <div style={{ textAlign: 'right', color: '#cbd5e1' }}>—</div>
+                              )}
+                            </div>
+
+                            <div
+                              style={{
+                                padding: '8px',
+                                textAlign: 'center',
+                                fontSize: '0.72rem',
+                                color: isAssigned ? '#64748b' : '#94a3b8',
+                                fontWeight: 600,
+                              }}
+                            >
+                              {isAssigned ? 'Giữ nguyên' : isSelected ? 'Sẽ gán' : '—'}
                             </div>
                           </div>
                         );
@@ -1216,224 +1210,8 @@ export const AssignProductModal: FC<AssignProductModalProps> = ({
                 </div>
               )}
             </div>
-
-            {/* ══════════════════════════════════════════════════════════════
-                SECTION 3: THÔNG TIN CUNG ỨNG
-                - Bỏ SupplierProductCode và DeliveryUoM
-                - ĐVT luôn lấy từ Product Master
-                - Chỉ còn: Giá nhập thỏa thuận (*) & MOQ (*)
-               ══════════════════════════════════════════════════════════════ */}
-            <div>
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  marginBottom: 6,
-                }}
-              >
-                <label style={{ fontSize: '0.84rem', fontWeight: 700, color: '#334155' }}>
-                  3. Thông tin cung ứng
-                </label>
-                <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
-                  * Đơn vị tính tự động lấy theo ĐVT cơ sở của từng sản phẩm Master
-                </span>
-              </div>
-
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-                  gap: 12,
-                }}
-              >
-                {/* Giá nhập thỏa thuận (*) */}
-                <div>
-                  <label
-                    style={{
-                      fontSize: '0.8rem',
-                      fontWeight: 600,
-                      color: '#475569',
-                      display: 'block',
-                      marginBottom: 4,
-                    }}
-                  >
-                    Giá nhập thỏa thuận (*)<span style={{ color: '#ef4444' }}>*</span>
-                  </label>
-                  <div style={{ position: 'relative' }}>
-                    <input
-                      type="text"
-                      value={agreedPriceInput}
-                      onChange={handlePriceChange}
-                      placeholder="0"
-                      style={{
-                        width: '100%',
-                        height: 38,
-                        padding: '0 36px 0 12px',
-                        borderRadius: 6,
-                        border: fieldErrors.price ? '1.5px solid #ef4444' : '1px solid #cbd5e1',
-                        fontSize: '0.88rem',
-                        fontWeight: 600,
-                        color: '#0f172a',
-                        boxSizing: 'border-box',
-                        outline: 'none',
-                      }}
-                    />
-                    <span
-                      style={{
-                        position: 'absolute',
-                        right: 12,
-                        top: '50%',
-                        transform: 'translateY(-50%)',
-                        fontSize: '0.8rem',
-                        fontWeight: 600,
-                        color: '#64748b',
-                      }}
-                    >
-                      đ
-                    </span>
-                  </div>
-                  <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: 3 }}>
-                    Giá thỏa thuận chung (nếu để 0 đ, hệ thống sẽ lấy theo giá vốn Master).
-                  </div>
-                  {fieldErrors.price && (
-                    <div style={{ fontSize: '0.75rem', color: '#dc2626', marginTop: 2 }}>
-                      {fieldErrors.price}
-                    </div>
-                  )}
-                </div>
-
-                {/* Số lượng đặt tối thiểu (MOQ) (*) */}
-                <div>
-                  <label
-                    style={{
-                      fontSize: '0.8rem',
-                      fontWeight: 600,
-                      color: '#475569',
-                      display: 'block',
-                      marginBottom: 4,
-                    }}
-                  >
-                    Số lượng đặt tối thiểu (MOQ) (*)<span style={{ color: '#ef4444' }}>*</span>
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    step="1"
-                    value={moqInput}
-                    onChange={handleMoqChange}
-                    placeholder="1"
-                    style={{
-                      width: '100%',
-                      height: 38,
-                      padding: '0 12px',
-                      borderRadius: 6,
-                      border: fieldErrors.moq ? '1.5px solid #ef4444' : '1px solid #cbd5e1',
-                      fontSize: '0.88rem',
-                      fontWeight: 600,
-                      color: '#0f172a',
-                      boxSizing: 'border-box',
-                      outline: 'none',
-                    }}
-                  />
-                  <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: 3 }}>
-                    Số lượng tối thiểu khi tạo đơn đặt hàng mua (PO) từ NCC này.
-                  </div>
-                  {fieldErrors.moq && (
-                    <div style={{ fontSize: '0.75rem', color: '#dc2626', marginTop: 2 }}>
-                      {fieldErrors.moq}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* ══════════════════════════════════════════════════════════════
-                SECTION 4: THÔNG TIN PHÂN BỔ ĐẾN CHI NHÁNH
-               ══════════════════════════════════════════════════════════════ */}
-            <div
-              style={{
-                backgroundColor: '#f8fafc',
-                border: '1px solid #e2e8f0',
-                borderRadius: 8,
-                padding: '12px 14px',
-                display: 'flex',
-                alignItems: 'flex-start',
-                gap: 12,
-              }}
-            >
-              <div
-                style={{
-                  width: 32,
-                  height: 32,
-                  borderRadius: 6,
-                  backgroundColor: '#f0fdfa',
-                  color: '#0f766e',
-                  border: '1px solid #ccfbf1',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0,
-                  marginTop: 2,
-                }}
-              >
-                <Store size={16} />
-              </div>
-
-              <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 700, fontSize: '0.86rem', color: '#0f172a' }}>
-                  Tự động phân bổ sản phẩm đến các chi nhánh liên kết
-                </div>
-                <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: 2, lineHeight: 1.4 }}>
-                  Sau khi gán thành công, hệ thống sẽ tự động phân bổ các sản phẩm này đến các chi nhánh đang liên kết với nhà cung cấp. Tồn kho và cấu hình riêng của từng chi nhánh được giữ nguyên, không bị ghi đè.
-                </div>
-
-                {selectedSupplierId && (
-                  <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
-                    {linkedBranchesCount !== null ? (
-                      linkedBranchesCount > 0 ? (
-                        <span
-                          style={{
-                            fontSize: '0.74rem',
-                            padding: '2px 8px',
-                            borderRadius: 4,
-                            backgroundColor: '#ecfdf5',
-                            color: '#047857',
-                            fontWeight: 600,
-                            border: '1px solid #a7f3d0',
-                          }}
-                        >
-                          ✓ Nhà cung cấp này đang liên kết với {linkedBranchesCount} chi nhánh (sản phẩm sẽ được phân bổ ngay)
-                        </span>
-                      ) : (
-                        <span
-                          style={{
-                            fontSize: '0.74rem',
-                            padding: '2px 8px',
-                            borderRadius: 4,
-                            backgroundColor: '#fffbeb',
-                            color: '#b45309',
-                            fontWeight: 500,
-                            border: '1px solid #fde68a',
-                          }}
-                        >
-                          Nhà cung cấp hiện chưa liên kết chi nhánh. Sản phẩm sẽ tự động phân bổ khi NCC được gán vào chi nhánh.
-                        </span>
-                      )
-                    ) : (
-                      <span style={{ fontSize: '0.74rem', color: '#94a3b8' }}>
-                        Đang kiểm tra chi nhánh liên kết...
-                      </span>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
           </div>
 
-          {/* ══════════════════════════════════════════════════════════════
-              FOOTER
-             ══════════════════════════════════════════════════════════════ */}
           <div
             style={{
               padding: '12px 22px',
@@ -1447,8 +1225,7 @@ export const AssignProductModal: FC<AssignProductModalProps> = ({
             <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
               {selectedProductIds.length > 0 ? (
                 <span>
-                  Đang chọn:{' '}
-                  <b style={{ color: '#0f766e' }}>{selectedProductIds.length}</b> sản phẩm
+                  Đã chọn: <b style={{ color: '#0f766e' }}>{selectedProductIds.length}</b> sản phẩm
                 </span>
               ) : (
                 <span style={{ color: '#94a3b8' }}>Chưa chọn sản phẩm nào</span>
@@ -1456,7 +1233,6 @@ export const AssignProductModal: FC<AssignProductModalProps> = ({
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              {/* Button: Hủy bỏ */}
               <button
                 type="button"
                 onClick={handleAttemptClose}
@@ -1471,45 +1247,11 @@ export const AssignProductModal: FC<AssignProductModalProps> = ({
                   fontSize: '0.84rem',
                   fontWeight: 600,
                   cursor: isSubmitting ? 'not-allowed' : 'pointer',
-                  outline: 'none',
                 }}
               >
                 Hủy bỏ
               </button>
 
-              {/* Button: Gán & Tiếp tục (giữ lại NCC, reset danh sách sản phẩm) */}
-              <button
-                type="button"
-                onClick={() => executeSubmit(true)}
-                disabled={isSubmitting || selectedProductIds.length === 0 || !selectedSupplierId}
-                style={{
-                  height: 36,
-                  padding: '0 14px',
-                  borderRadius: 6,
-                  border: '1px solid #0f766e',
-                  backgroundColor: '#ffffff',
-                  color: '#0f766e',
-                  fontSize: '0.84rem',
-                  fontWeight: 600,
-                  cursor:
-                    isSubmitting || selectedProductIds.length === 0 || !selectedSupplierId
-                      ? 'not-allowed'
-                      : 'pointer',
-                  opacity:
-                    isSubmitting || selectedProductIds.length === 0 || !selectedSupplierId
-                      ? 0.5
-                      : 1,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  outline: 'none',
-                }}
-              >
-                <PlusCircle size={15} />
-                <span>Gán & Tiếp tục</span>
-              </button>
-
-              {/* Button: Xác nhận & Hoàn tất (gán và đóng popup) */}
               <button
                 type="submit"
                 disabled={isSubmitting || selectedProductIds.length === 0 || !selectedSupplierId}
@@ -1527,29 +1269,21 @@ export const AssignProductModal: FC<AssignProductModalProps> = ({
                       ? 'not-allowed'
                       : 'pointer',
                   opacity:
-                    isSubmitting || selectedProductIds.length === 0 || !selectedSupplierId
-                      ? 0.5
-                      : 1,
+                    isSubmitting || selectedProductIds.length === 0 || !selectedSupplierId ? 0.5 : 1,
                   display: 'flex',
                   alignItems: 'center',
                   gap: 6,
-                  outline: 'none',
-                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
                 }}
               >
                 {isSubmitting ? (
                   <>
                     <Loader2 size={15} className="animate-spin" />
-                    <span>Đang gán sản phẩm...</span>
+                    <span>Đang gán...</span>
                   </>
                 ) : (
                   <>
                     <Check size={15} />
-                    <span>
-                      {selectedProductIds.length > 1
-                        ? `Gán ${selectedProductIds.length} sản phẩm`
-                        : 'Xác nhận & Hoàn tất'}
-                    </span>
+                    <span>Xác nhận gán</span>
                   </>
                 )}
               </button>
@@ -1557,9 +1291,6 @@ export const AssignProductModal: FC<AssignProductModalProps> = ({
           </div>
         </form>
 
-        {/* ══════════════════════════════════════════════════════════════
-            CONFIRM CLOSE DIALOG (Khi người dùng đang chọn dở SP mà đóng)
-           ══════════════════════════════════════════════════════════════ */}
         {showCloseConfirm && (
           <div
             style={{
@@ -1592,7 +1323,8 @@ export const AssignProductModal: FC<AssignProductModalProps> = ({
                 </h4>
               </div>
               <p style={{ margin: '0 0 16px 0', fontSize: '0.84rem', color: '#64748b', lineHeight: 1.5 }}>
-                Bạn đang chọn <strong>{selectedProductIds.length}</strong> sản phẩm chưa được lưu. Nếu đóng lúc này, các lựa chọn sẽ bị hủy. Bạn có chắc muốn đóng?
+                Bạn đang chọn <strong>{selectedProductIds.length}</strong> sản phẩm chưa lưu. Đóng
+                popup sẽ hủy lựa chọn hiện tại.
               </p>
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
                 <button
@@ -1609,7 +1341,7 @@ export const AssignProductModal: FC<AssignProductModalProps> = ({
                     color: '#475569',
                   }}
                 >
-                  Tiếp tục chọn
+                  Tiếp tục
                 </button>
                 <button
                   type="button"
