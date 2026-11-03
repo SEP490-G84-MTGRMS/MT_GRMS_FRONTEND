@@ -162,6 +162,8 @@ export interface SupplierDeliveryConfig {
 export interface SupplierProductItem {
   id: string;
   supplierId: string;
+  supplierCode?: string;
+  supplierName?: string;
   productId: string;
   barcode: string;
   sku: string;
@@ -170,6 +172,8 @@ export interface SupplierProductItem {
   deliveryUoM: string;
   baseUoM: string;
   agreedPrice: number;
+  costPrice?: number;
+  effectivePrice?: number;
   importPrice?: number; // alias cho backward compatibility
   unit?: string;        // alias cho backward compatibility
   moq: number;
@@ -207,6 +211,7 @@ export interface EditSupplierProductInput {
   moq: number;
   isPrimary: boolean;
   supplierProductCode?: string;
+  status: 'Active' | 'Inactive';
 }
 
 export interface PurchaseOrderItem {

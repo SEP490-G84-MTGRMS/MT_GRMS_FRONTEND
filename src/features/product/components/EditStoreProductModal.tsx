@@ -99,14 +99,6 @@ export const EditStoreProductModal: FC<EditStoreProductModalProps> = ({
     return isNaN(num) ? NaN : num;
   }, [retailPriceStr]);
 
-  const parsedMoq = useMemo(() => {
-    const trimmed = minOrderQuantityStr.trim();
-    if (!trimmed) return NaN;
-    if (!/^-?\d+$/.test(trimmed)) return NaN; // Non-decimal integer check
-    const num = Number(trimmed);
-    return isNaN(num) ? NaN : num;
-  }, [minOrderQuantityStr]);
-
   // Gross profit calculation
   const profitMarginInfo = useMemo(() => {
     if (!product || isNaN(parsedPrice) || parsedPrice <= 0) return null;
@@ -124,11 +116,9 @@ export const EditStoreProductModal: FC<EditStoreProductModalProps> = ({
   const isDirty = useMemo(() => {
     if (!product) return false;
     const priceChanged = !isNaN(parsedPrice) && parsedPrice !== product.retailPrice;
-    const initialMoq = product.minOrderQuantity ?? 1;
-    const moqChanged = !isNaN(parsedMoq) && parsedMoq !== initialMoq;
     const statusChanged = status !== product.status;
-    return priceChanged || moqChanged || statusChanged;
-  }, [product, parsedPrice, parsedMoq, status]);
+    return priceChanged || statusChanged;
+  }, [product, parsedPrice, status]);
 
   // Close handler with dirty check
   const handleRequestClose = useCallback(() => {
@@ -178,20 +168,6 @@ export const EditStoreProductModal: FC<EditStoreProductModalProps> = ({
       errors.retailPrice = 'Giá bán lẻ không được vượt quá 1,000,000,000 VNĐ.';
     }
 
-    // 2. MOQ validation
-    const trimmedMoq = minOrderQuantityStr.trim();
-    if (!trimmedMoq) {
-      errors.minOrderQuantity = 'Số lượng đặt hàng tối thiểu (MOQ) không được để trống.';
-    } else if (trimmedMoq.includes('.') || trimmedMoq.includes(',')) {
-      errors.minOrderQuantity = 'MOQ chỉ nhận số nguyên, không hỗ trợ số thập phân.';
-    } else if (isNaN(parsedMoq)) {
-      errors.minOrderQuantity = 'MOQ phải là một số nguyên hợp lệ.';
-    } else if (parsedMoq < 0) {
-      errors.minOrderQuantity = 'Số lượng đặt hàng tối thiểu (MOQ) không thể âm.';
-    } else if (parsedMoq > 10_000_000) {
-      errors.minOrderQuantity = 'MOQ không được vượt quá 10,000,000.';
-    }
-
     setFieldErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -209,7 +185,6 @@ export const EditStoreProductModal: FC<EditStoreProductModalProps> = ({
     try {
       await onSave(product.storeId, product.productId, {
         retailPrice: parsedPrice,
-        minOrderQuantity: parsedMoq,
         status,
       });
       onClose();
@@ -873,7 +848,7 @@ export const EditStoreProductModal: FC<EditStoreProductModalProps> = ({
                         marginBottom: 6,
                       }}
                     >
-                      Số lượng đặt hàng tối thiểu (MOQ) <span style={{ color: '#ef4444' }}>*</span>
+                      Số lượng đặt hàng tối thiểu (MOQ)
                     </label>
                     <div style={{ position: 'relative' }}>
                       <input
@@ -882,22 +857,17 @@ export const EditStoreProductModal: FC<EditStoreProductModalProps> = ({
                         min="0"
                         step="1"
                         value={minOrderQuantityStr}
-                        onChange={(e) => {
-                          setMinOrderQuantityStr(e.target.value);
-                          if (fieldErrors.minOrderQuantity) {
-                            setFieldErrors((prev) => ({ ...prev, minOrderQuantity: undefined }));
-                          }
-                        }}
+                        readOnly
                         style={{
                           width: '100%',
                           height: 40,
                           padding: '0 70px 0 12px',
                           borderRadius: 8,
-                          border: `1.5px solid ${fieldErrors.minOrderQuantity ? '#ef4444' : '#cbd5e1'}`,
-                          backgroundColor: '#ffffff',
+                          border: '1.5px solid #e2e8f0',
+                          backgroundColor: '#f8fafc',
                           fontSize: '0.94rem',
                           fontWeight: 700,
-                          color: '#0f172a',
+                          color: '#475569',
                           outline: 'none',
                           boxSizing: 'border-box',
                         }}
@@ -915,6 +885,9 @@ export const EditStoreProductModal: FC<EditStoreProductModalProps> = ({
                       >
                         {product.unit}
                       </span>
+                    </div>
+                    <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: 4 }}>
+                      MOQ lấy từ điều khoản nhà cung cấp, chỉ xem tại màn hình chi nhánh.
                     </div>
 
                     {fieldErrors.minOrderQuantity && (

@@ -1,7 +1,7 @@
 import type { FC } from 'react';
 import type { SupplierProductItem } from '../../types/supplier.types';
 import { SupplierStatusBadge } from '../SupplierStatusBadge';
-import { Edit2, Power } from 'lucide-react';
+import { Edit2 } from 'lucide-react';
 
 interface SupplierProductTableRowProps {
   index: number;
@@ -9,7 +9,7 @@ interface SupplierProductTableRowProps {
   supplierCode?: string;
   supplierName?: string;
   onEdit: (item: SupplierProductItem) => void;
-  onToggleStatus: (item: SupplierProductItem) => void;
+  onToggleStatus?: (item: SupplierProductItem) => void;
   onSetPrimary?: (item: SupplierProductItem) => void;
 }
 
@@ -19,7 +19,7 @@ export const SupplierProductTableRow: FC<SupplierProductTableRowProps> = ({
   supplierCode,
   supplierName,
   onEdit,
-  onToggleStatus,
+  onToggleStatus: _onToggleStatus,
   onSetPrimary: _onSetPrimary,
 }) => {
   const fmtCurrency = (val: number) => new Intl.NumberFormat('vi-VN').format(val) + ' đ';
@@ -73,13 +73,13 @@ export const SupplierProductTableRow: FC<SupplierProductTableRowProps> = ({
             color: '#475569',
           }}
         >
-          {supplierCode || item.supplierId}
+          {supplierCode || item.supplierCode || item.supplierId}
         </span>
       </td>
 
       {/* 6. Tên Nhà Cung Cấp */}
       <td className="so-list-td--wrap">
-        <div className="so-list-name">{supplierName || '---'}</div>
+        <div className="so-list-name">{supplierName || item.supplierName || '---'}</div>
       </td>
 
       {/* 7. Ngành Hàng */}
@@ -98,7 +98,7 @@ export const SupplierProductTableRow: FC<SupplierProductTableRowProps> = ({
       {/* 8. ĐVT */}
       <td style={{ padding: '10px 12px', textAlign: 'center', whiteSpace: 'nowrap' }}>
         <span style={{ fontSize: 12, fontWeight: 600, color: '#1e293b' }}>
-          {item.deliveryUoM}
+          {item.baseUoM || item.deliveryUoM}
         </span>
       </td>
 
@@ -112,7 +112,7 @@ export const SupplierProductTableRow: FC<SupplierProductTableRowProps> = ({
             color: '#0f766e',
           }}
         >
-          {fmtCurrency(item.agreedPrice)}
+          {fmtCurrency(item.effectivePrice ?? item.agreedPrice)}
         </span>
       </td>
 
@@ -125,7 +125,7 @@ export const SupplierProductTableRow: FC<SupplierProductTableRowProps> = ({
             color: '#475569',
           }}
         >
-          {item.moq} {item.deliveryUoM}
+          {item.moq} {item.baseUoM || item.deliveryUoM}
         </span>
       </td>
 
@@ -141,18 +141,9 @@ export const SupplierProductTableRow: FC<SupplierProductTableRowProps> = ({
             type="button"
             className="so-list-action-btn"
             onClick={() => onEdit(item)}
-            title="Sửa giá sỉ thỏa thuận & MOQ"
+            title="Sửa điều khoản cung ứng"
           >
             <Edit2 size={12} /> Sửa
-          </button>
-
-          <button
-            type="button"
-            className={`so-list-action-btn${item.status === 'Active' ? ' so-list-action-btn--danger' : ' so-list-action-btn--success'}`}
-            onClick={() => onToggleStatus(item)}
-            title={item.status === 'Active' ? 'Tạm ngưng cung ứng mặt hàng này' : 'Kích hoạt lại'}
-          >
-            <Power size={12} /> {item.status === 'Active' ? 'Ngưng' : 'Bật'}
           </button>
         </div>
       </td>

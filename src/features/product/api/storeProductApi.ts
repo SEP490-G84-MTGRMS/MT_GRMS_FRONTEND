@@ -108,9 +108,52 @@ export const storeProductApi = {
 
   // Get master products from Backend API for assigning
   getMasterProducts: async (): Promise<any[]> => {
-    const res = await httpClient.get<ApiResponse<any[]>>('/products');
-    if (res.data?.success && res.data.data) {
-      return res.data.data;
+    const res = await httpClient.get<ApiResponse<PagedResult<any> | any[]>>('/products', {
+      params: { PageIndex: 1, PageSize: 500, Status: 'Active' },
+    });
+    if (!res.data?.success || !res.data.data) {
+      return [];
+    }
+    const raw = res.data.data;
+    return Array.isArray(raw) ? raw : Array.isArray(raw.items) ? raw.items : [];
+  },
+
+  /**
+   * Sản phẩm khả dụng để gán vào chi nhánh:
+   * chỉ các SP thuộc NCC Active đang liên kết với chi nhánh đó.
+   */
+  getAssignableProducts: async (branchId: string): Promise<
+    Array<{
+      id: string;
+      sku: string;
+      barcode: string;
+      name: string;
+      categoryName: string;
+      baseUoM: string;
+      costPrice: number;
+      moq: number;
+      supplierId: string;
+      supplierCode: string;
+      supplierName: string;
+      isAlreadyAssigned: boolean;
+    }>
+  > => {
+    const res = await httpClient.get<ApiResponse<any[]>>(`/branches/${branchId}/assignable-products`);
+    if (res.data?.success && Array.isArray(res.data.data)) {
+      return res.data.data.map((p: any) => ({
+        id: String(p.productId || p.id),
+        sku: p.sku || p.productCode || '',
+        barcode: p.barcode || '',
+        name: p.name || p.productName || '',
+        categoryName: p.categoryName || p.category || 'Khác',
+        baseUoM: p.baseUoM || p.unitName || p.baseUnit || 'Cái',
+        costPrice: Number(p.costPrice ?? 0),
+        moq: Number(p.moq ?? p.minimumOrderQuantity ?? 1),
+        supplierId: String(p.supplierId || ''),
+        supplierCode: p.supplierCode || '',
+        supplierName: p.supplierName || '',
+        isAlreadyAssigned: Boolean(p.isAlreadyAssigned),
+      }));
     }
     return [];
   },
@@ -119,9 +162,6 @@ export const storeProductApi = {
   assignProducts: async (input: AssignStoreProductInput): Promise<void> => {
     await httpClient.post(`/branches/${input.storeId}/products`, {
       productIds: input.productIds,
-      defaultRetailPrice: input.defaultRetailPrice,
-      defaultMinStock: input.defaultMinStock,
-      defaultMinOrderQuantity: input.defaultMinOrderQuantity,
     });
   },
 
@@ -133,10 +173,7 @@ export const storeProductApi = {
   ): Promise<void> => {
     await httpClient.put(`/branches/${storeId}/products/${productId}`, {
       retailPrice: input.retailPrice,
-      minStockLevel: input.minStockLevel,
-      minOrderQuantity: input.minOrderQuantity,
       status: input.status,
-      supplierId: input.supplierId,
       shelfLocation: input.shelfLocation,
     });
   },

@@ -18,11 +18,24 @@ export interface SupplierProductFilterParams {
   suppliers?: Array<{ id: string; code: string; name: string }>;
 }
 
+export interface BatchAssignProductItemInput {
+  productId: string;
+  agreedPrice: number;
+  moq: number;
+}
+
+export interface SupplierAssignedProductInfo {
+  productId: string;
+  agreedPrice: number;
+  moq: number;
+}
+
 export interface BatchAssignProductInput {
   supplierId: string;
   productIds: string[];
   agreedPrice?: number;
   moq?: number;
+  items?: BatchAssignProductItemInput[];
 }
 
 export const supplierProductApi = {
@@ -42,6 +55,9 @@ export const supplierProductApi = {
       params: {
         SupplierId: isSpecificSupplier ? undefined : filter.supplierId !== 'ALL' ? filter.supplierId : undefined,
         SearchTerm: filter.productSearch || filter.searchTerm || undefined,
+        SupplierSearch: filter.supplierSearch || undefined,
+        CategoryName:
+          filter.categoryFilter && filter.categoryFilter !== 'ALL' ? filter.categoryFilter : undefined,
         Status:
           filter.statusFilter === 'Active'
             ? 1
@@ -58,14 +74,18 @@ export const supplierProductApi = {
       const items: SupplierProductItem[] = paged.items.map((item: any) => ({
         id: item.id,
         supplierId: item.supplierId,
+        supplierCode: item.supplierCode || '',
+        supplierName: item.supplierName || '',
         productId: item.productId,
         barcode: item.barcode || '',
         sku: item.sku || '',
         name: item.productName || item.name || '',
         categoryName: item.categoryName || 'Chung',
-        deliveryUoM: item.deliveryUoM || 'Cái',
-        baseUoM: item.baseUoM || 'Cái',
+        deliveryUoM: item.baseUoM || item.deliveryUoM || 'Cái',
+        baseUoM: item.baseUoM || item.deliveryUoM || 'Cái',
         agreedPrice: item.agreedWholesalePrice ?? item.agreedPrice ?? 0,
+        costPrice: item.costPrice,
+        effectivePrice: item.effectivePurchasePrice ?? item.effectivePrice,
         moq: item.minimumOrderQuantity ?? item.moq ?? 1,
         isPrimary: Boolean(item.isPrimarySupplier ?? item.isPrimary),
         supplierProductCode: item.supplierProductCode || undefined,
@@ -83,20 +103,27 @@ export const supplierProductApi = {
    * Lấy danh sách Master Products từ Backend Catalog API để gán cho NCC
    */
   async getMasterProducts(): Promise<any[]> {
-    const res = await httpClient.get<ApiResponse<any[]>>('/products');
-    if (res.data?.success && res.data.data) {
-      return res.data.data.map((p: any) => ({
-        id: p.id,
-        sku: p.sku,
-        barcode: p.barcode,
-        name: p.productName || p.name,
-        categoryName: p.categoryName || 'Chung',
-        baseUoM: p.unitName || p.baseUnit || 'Cái',
-        defaultWholesalePrice: p.costPrice || p.basePrice || 0,
-        defaultMoq: 1,
-      }));
+    const res = await httpClient.get<ApiResponse<PagedResult<any> | any[]>>('/products', {
+      params: { PageIndex: 1, PageSize: 500, Status: 'Active' },
+    });
+
+    if (!res.data?.success || !res.data.data) {
+      return [];
     }
-    return [];
+
+    const raw = res.data.data;
+    const list = Array.isArray(raw) ? raw : Array.isArray(raw.items) ? raw.items : [];
+
+    return list.map((p: any) => ({
+      id: p.id,
+      sku: p.sku || p.productCode || '',
+      barcode: p.barcode || '',
+      name: p.productName || p.name || '',
+      categoryName: p.categoryName || 'Chung',
+      baseUoM: p.unitName || p.baseUnit || 'Cái',
+      defaultWholesalePrice: p.costPrice || p.basePrice || 0,
+      defaultMoq: 1,
+    }));
   },
 
   /**
@@ -141,6 +168,11 @@ export const supplierProductApi = {
           productIds: input.productIds,
           agreedWholesalePrice: input.agreedPrice,
           minimumOrderQuantity: input.moq ?? 1,
+          items: input.items?.map((item) => ({
+            productId: item.productId,
+            agreedWholesalePrice: item.agreedPrice,
+            minimumOrderQuantity: item.moq,
+          })),
         }
       );
       if (res.data?.success && res.data.data) {
@@ -243,7 +275,7 @@ export const supplierProductApi = {
   /**
    * Lấy danh sách ID các sản phẩm đã được gán cho nhà cung cấp
    */
-  async getSupplierAssignedProductIds(supplierId: string): Promise<string[]> {
+  async getSupplierAssignedProducts(supplierId: string): Promise<SupplierAssignedProductInfo[]> {
     try {
       const res = await httpClient.get<ApiResponse<PagedResult<any>>>(
         `/suppliers/${supplierId}/products`,
@@ -252,11 +284,20 @@ export const supplierProductApi = {
         }
       );
       if (res.data?.success && res.data.data?.items) {
-        return res.data.data.items.map((x: any) => x.productId);
+        return res.data.data.items.map((x: any) => ({
+          productId: String(x.productId),
+          agreedPrice: Number(x.agreedWholesalePrice ?? x.agreedPrice ?? 0),
+          moq: Number(x.minimumOrderQuantity ?? x.moq ?? 1),
+        }));
       }
     } catch {
       // ignore
     }
     return [];
+  },
+
+  async getSupplierAssignedProductIds(supplierId: string): Promise<string[]> {
+    const assigned = await supplierProductApi.getSupplierAssignedProducts(supplierId);
+    return assigned.map((x) => x.productId);
   },
 };

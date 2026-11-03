@@ -175,6 +175,12 @@ export const StoreProductManagementPage: FC = () => {
   // Actions: Toggle status
   const handleToggleStatus = async (item: StoreProductItem): Promise<void> => {
     const newStatus = item.status === 'Active' ? 'Inactive' : 'Active';
+    const confirmed = window.confirm(
+      newStatus === 'Inactive'
+        ? `Tạm ngừng kinh doanh "${item.name}" tại chi nhánh này? Các chi nhánh khác không bị ảnh hưởng.`
+        : `Kích hoạt lại "${item.name}" tại chi nhánh này?`
+    );
+    if (!confirmed) return;
     try {
       await storeProductApi.toggleStatus(item.storeId, item.productId, newStatus);
       showToast(
