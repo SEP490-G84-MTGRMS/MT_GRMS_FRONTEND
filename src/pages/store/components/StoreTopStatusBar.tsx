@@ -6,11 +6,13 @@ import type { StoreInfo } from '../storeData';
 interface StoreTopStatusBarProps {
   storeInfo: StoreInfo;
   onOpenTopupModal: () => void;
+  onNavigateBranches?: () => void;
 }
 
 export const StoreTopStatusBar: FC<StoreTopStatusBarProps> = ({
   storeInfo,
   onOpenTopupModal,
+  onNavigateBranches,
 }) => {
   return (
     <div className="store-top-status-bar">
@@ -23,7 +25,12 @@ export const StoreTopStatusBar: FC<StoreTopStatusBarProps> = ({
       </div>
 
       {/* 2. Số chi nhánh */}
-      <div className="store-status-col">
+      <div
+        className="store-status-col"
+        onClick={onNavigateBranches}
+        style={{ cursor: onNavigateBranches ? 'pointer' : 'default' }}
+        title="Bấm để chuyển sang Quản lý chi nhánh"
+      >
         <span className="store-status-label">Số chi nhánh</span>
         <div className="store-status-value">
           <span style={{ fontFamily: 'var(--font-mono)' }}>
@@ -48,26 +55,17 @@ export const StoreTopStatusBar: FC<StoreTopStatusBarProps> = ({
         </div>
       </div>
 
-      {/* 5. Số dư ví & Nút Nạp tiền */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 16,
-          borderLeft: '1px solid #EDF2F9',
-          paddingLeft: 24,
-        }}
-      >
-        <div className="store-status-col">
+      {/* 5. Ví gian hàng & Nút nạp ví */}
+      <div className="store-status-col store-status-wallet">
+        <div>
           <span className="store-status-label">Ví gian hàng</span>
           <div className="store-status-value">
             <span
               style={{
                 fontFamily: 'var(--font-mono)',
-                fontSize: 16,
+                color: '#0066FF',
                 fontWeight: 800,
-                color: '#15803D',
-                fontVariantNumeric: 'tabular-nums',
+                fontSize: 16,
               }}
             >
               {new Intl.NumberFormat('vi-VN').format(storeInfo.walletBalance)} đ
@@ -77,30 +75,9 @@ export const StoreTopStatusBar: FC<StoreTopStatusBarProps> = ({
 
         <button
           type="button"
+          className="store-btn-topup"
           onClick={onOpenTopupModal}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 6,
-            padding: '8px 16px',
-            borderRadius: 'var(--radius-pill)',
-            backgroundColor: 'var(--blue-primary)',
-            color: '#FFFFFF',
-            border: 'none',
-            fontSize: 13,
-            fontWeight: 700,
-            cursor: 'pointer',
-            boxShadow: '0 4px 12px rgba(15, 118, 110, 0.25)',
-            transition: 'all 0.15s ease',
-            whiteSpace: 'nowrap',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = 'var(--blue-hover)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = 'var(--blue-primary)';
-          }}
-          title="Nạp tiền vào ví gian hàng qua VietQR Napas247"
+          title="Nạp tiền vào ví gian hàng qua Napas VietQR"
         >
           <PlusCircle size={15} strokeWidth={2.2} />
           <span>Nạp ví</span>

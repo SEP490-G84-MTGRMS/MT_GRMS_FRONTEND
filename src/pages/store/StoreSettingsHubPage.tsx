@@ -17,10 +17,12 @@ import { StoreInfoTab } from './components/StoreInfoTab';
 import { OrderHistoryTab } from './components/OrderHistoryTab';
 import { TermsOfServiceTab } from './components/TermsOfServiceTab';
 import { WalletLedgerTab } from './components/WalletLedgerTab';
+import { BranchManagementTab } from './components/BranchManagementTab';
 import { storeApi, mapBackendStoreToFrontend } from './api/storeApi';
 
 const VALID_TABS: StoreHubTabKey[] = [
   'store-info',
+  'branches',
   'subscriptions',
   'order-history',
   'service-confirm',
@@ -190,6 +192,7 @@ export const StoreSettingsHubPage: FC = () => {
         <StoreTopStatusBar
           storeInfo={storeInfo}
           onOpenTopupModal={() => setShowTopupModal(true)}
+          onNavigateBranches={() => handleSelectTab('branches')}
         />
 
         {/* Tab 1: Gói dịch vụ */}
@@ -216,6 +219,23 @@ export const StoreSettingsHubPage: FC = () => {
             storeInfo={storeInfo}
             onUpdateStoreInfo={handleUpdateStoreInfo}
           />
+        )}
+
+        {/* Tab: Chi nhánh & Kho hàng */}
+        {activeTab === 'branches' && (
+          <div>
+            <div style={{ marginBottom: 18 }}>
+              <h1 style={{ fontSize: 22, fontWeight: 800, color: '#0F172A', margin: 0 }}>
+                Quản lý chi nhánh & Kho hàng
+              </h1>
+              <p style={{ fontSize: 13, color: '#64748B', margin: '4px 0 0 0' }}>
+                Danh sách chi nhánh thuộc chuỗi, kiểm soát hạn mức quota và phân công quản lý.
+              </p>
+            </div>
+            <BranchManagementTab
+              onGoToSubscriptions={() => handleSelectTab('subscriptions')}
+            />
+          </div>
         )}
 
         {/* Tab 3: Lịch sử mua hàng */}

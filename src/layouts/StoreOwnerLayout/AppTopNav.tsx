@@ -100,7 +100,7 @@ const NAV_GROUPS: NavGroup[] = [
           },
           {
             label: "Chi nhánh & Kho hàng",
-            to: "/store-owner/subscriptions?tab=store-info&view=branches",
+            to: "/store-owner/subscriptions?tab=branches",
           },
           {
             label: "Hồ sơ định danh & MST",

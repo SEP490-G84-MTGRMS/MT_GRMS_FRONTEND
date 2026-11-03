@@ -2,6 +2,7 @@
 import type { FC } from 'react';
 import {
   User,
+  Building2,
   Boxes,
   History,
   FileCheck2,
@@ -11,6 +12,7 @@ import {
 
 export type StoreHubTabKey =
   | 'store-info'
+  | 'branches'
   | 'subscriptions'
   | 'order-history'
   | 'service-confirm'
@@ -40,6 +42,17 @@ export const StoreSidebarNav: FC<StoreSidebarNavProps> = ({
             <User size={18} strokeWidth={1.8} />
           </span>
           <span>Thông tin gian hàng</span>
+        </button>
+
+        <button
+          type="button"
+          className={`store-sidebar-item ${activeTab === 'branches' ? 'active' : ''}`}
+          onClick={() => onSelectTab('branches')}
+        >
+          <span className="store-sidebar-icon">
+            <Building2 size={18} strokeWidth={1.8} />
+          </span>
+          <span>Chi nhánh & Kho hàng</span>
         </button>
       </div>
 
@@ -102,7 +115,7 @@ export const StoreSidebarNav: FC<StoreSidebarNavProps> = ({
           <span className="store-sidebar-icon">
             <Wallet size={18} strokeWidth={1.8} />
           </span>
-          <span>Thanh toán</span>
+          <span>Thanh toán & Ví</span>
         </button>
       </div>
     </aside>
