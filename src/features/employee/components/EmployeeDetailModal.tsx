@@ -8,6 +8,7 @@ interface EmployeeDetailModalProps {
   employee: Employee | null;
   onEdit: (employee: Employee) => void;
   onToggleStatus: (employeeId: string) => void;
+  onDelete?: (employeeId: string) => void;
   onAddPayment: (employeeId: string, payment: DebtTransaction) => void;
   initialTab?: 'info' | 'schedule' | 'salary' | 'payslip' | 'debt';
 }
@@ -18,6 +19,7 @@ export const EmployeeDetailModal: React.FC<EmployeeDetailModalProps> = ({
   employee,
   onEdit,
   onToggleStatus,
+  onDelete,
   onAddPayment,
   initialTab = 'info',
 }) => {
@@ -522,32 +524,41 @@ export const EmployeeDetailModal: React.FC<EmployeeDetailModalProps> = ({
                 </div>
 
                 <div className="emp-section-card">
-                  <div className="emp-section-title">Các khoản phụ cấp áp dụng</div>
+                  <div className="emp-section-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span>Các khoản phụ cấp áp dụng</span>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: '#0F766E' }}>
+                      Tổng:{' '}
+                      {formatVND(
+                        (employee.salaryConfig?.allowances || [])
+                          .filter((a) => a.enabled)
+                          .reduce((sum, a) => sum + (Number(a.amount) || 0), 0)
+                      )}{' '}
+                      đ
+                    </span>
+                  </div>
                   <table className="emp-table" style={{ border: '1px solid #E2E8F0', borderRadius: 8 }}>
                     <thead>
                       <tr>
                         <th>Tên phụ cấp</th>
-                        <th>Loại phụ cấp</th>
-                        <th className="align-right">Mức phụ cấp</th>
+                        <th className="align-right" style={{ width: 220 }}>Mức phụ cấp</th>
                       </tr>
                     </thead>
                     <tbody>
                       {employee.salaryConfig?.allowances?.filter((a) => a.enabled).length ? (
                         employee.salaryConfig.allowances
                           .filter((a) => a.enabled)
-                          .map((a) => (
-                            <tr key={a.id}>
+                          .map((a, idx) => (
+                            <tr key={a.id || idx}>
                               <td style={{ fontWeight: 600 }}>{a.name}</td>
-                              <td style={{ color: '#64748B' }}>{a.type}</td>
                               <td className="align-right" style={{ fontWeight: 600, color: '#0F766E' }}>
-                                {formatVND(a.amount)}
+                                {formatVND(a.amount)} đ
                               </td>
                             </tr>
                           ))
                       ) : (
                         <tr>
-                          <td colSpan={3} style={{ textAlign: 'center', color: '#94A3B8' }}>
-                            Không có phụ cấp nào đang kích hoạt
+                          <td colSpan={2} style={{ textAlign: 'center', color: '#94A3B8', padding: 24 }}>
+                            Không có phụ cấp nào đang áp dụng cho nhân viên này
                           </td>
                         </tr>
                       )}
@@ -742,6 +753,20 @@ export const EmployeeDetailModal: React.FC<EmployeeDetailModalProps> = ({
 
           {/* Footer */}
           <div className="emp-modal-footer">
+            {onDelete && (
+              <button
+                type="button"
+                className="emp-btn emp-btn-danger-outline"
+                style={{ marginRight: 'auto' }}
+                onClick={() => {
+                  if (window.confirm(`Bạn có chắc chắn muốn xóa nhân viên "${employee.fullName}" (${employee.employeeCode})?`)) {
+                    onDelete(employee.id);
+                  }
+                }}
+              >
+                Xóa nhân viên
+              </button>
+            )}
             <button
               type="button"
               className={`emp-btn ${employee.status === 'active' ? 'emp-btn-danger-outline' : 'emp-btn-secondary'

@@ -102,6 +102,7 @@ export interface Employee {
   city?: string;
   
   // Work info
+  jobTitle?: string;
   departmentId?: string;
   departmentName?: string;
   startDate?: string;

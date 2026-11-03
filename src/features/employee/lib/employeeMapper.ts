@@ -1,0 +1,212 @@
+import type { Employee, SalaryConfig } from '../types';
+
+export interface EmployeeBackendSummaryDto {
+  id: string;
+  employeeCode: string;
+  fullName: string;
+  phone: string;
+  email?: string;
+  branchId: string;
+  branchName: string;
+  jobTitle?: string;
+  status: string;
+  salaryType: string;
+  baseRate: number;
+  userId?: string;
+  userName?: string;
+  createdAt: string;
+}
+
+export interface EmployeeBackendDetailDto {
+  id: string;
+  employeeCode: string;
+  fullName: string;
+  citizenId: string;
+  dateOfBirth?: string;
+  gender?: string;
+  phone: string;
+  email?: string;
+  avatarUrl?: string;
+  jobTitle?: string;
+  branchId: string;
+  branchName: string;
+  userId?: string;
+  userName?: string;
+  role?: string;
+  salaryType: string;
+  baseRate: number;
+  allowances?: Array<{ name: string; amount: number }>;
+  debtAmount: number;
+  status: string;
+  bankAccountNumber?: string;
+  bankName?: string;
+  bankAccountHolder?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface CreateEmployeePayload {
+  fullName: string;
+  citizenId: string;
+  phone: string;
+  branchId: string;
+  email?: string;
+  jobTitle?: string;
+  dateOfBirth?: string;
+  gender?: string;
+  salaryType: string;
+  baseRate: number;
+  allowances?: Array<{ name: string; amount: number }>;
+  bankAccountNumber?: string;
+  bankName?: string;
+  bankAccountHolder?: string;
+  avatarUrl?: string;
+}
+
+export interface UpdateEmployeePayload extends CreateEmployeePayload {}
+
+export interface CreateIdentityAccountPayload {
+  username: string;
+  password: string;
+  role: string;
+}
+
+export interface EmployeeQueryFilterParams {
+  keyword?: string;
+  branchId?: string;
+  status?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+/**
+ * Chuyển đổi từ EmployeeBackendSummaryDto sang Employee model của Frontend
+ */
+export const mapBackendSummaryToEmployee = (dto: EmployeeBackendSummaryDto): Employee => {
+  const salaryType = (dto.salaryType?.toLowerCase() || 'monthly') as 'monthly' | 'hourly' | 'shift';
+  const salaryConfig: SalaryConfig = {
+    salaryType,
+    baseSalary: dto.baseRate || 0,
+    otWeekday: '150%',
+    otSunday: '200%',
+    otDayOff: '200%',
+    otHoliday: '300%',
+    allowances: [],
+  };
+
+  return {
+    id: dto.id,
+    employeeCode: dto.employeeCode,
+    fullName: dto.fullName,
+    phone: dto.phone,
+    email: dto.email || '',
+    avatarUrl: '',
+    gender: 'male',
+    dateOfBirth: '',
+    citizenId: '',
+    jobTitle: dto.jobTitle || 'Nhân viên',
+    salaryBranchId: dto.branchId,
+    salaryBranchName: dto.branchName || 'Chưa gán',
+    workingBranchIds: dto.branchId ? [dto.branchId] : [],
+    workingBranchNames: dto.branchName ? [dto.branchName] : ['Chưa gán'],
+    userId: dto.userId,
+    userName: dto.userName,
+    status: dto.status?.toLowerCase() === 'inactive' ? 'inactive' : 'active',
+    debtAmount: 0,
+    salaryConfig,
+  };
+};
+
+/**
+ * Chuyển đổi từ EmployeeBackendDetailDto sang Employee model chi tiết
+ */
+export const mapBackendDetailToEmployee = (dto: EmployeeBackendDetailDto): Employee => {
+  const salaryType = (dto.salaryType?.toLowerCase() || 'monthly') as 'monthly' | 'hourly' | 'shift';
+  const allowances: Array<{ id: string; name: string; type: string; amount: number; enabled: boolean }> = [];
+  if (dto.allowances && dto.allowances.length > 0) {
+    dto.allowances.forEach((a, idx) => {
+      allowances.push({
+        id: `al-${idx}`,
+        name: a.name,
+        type: 'monthly',
+        amount: a.amount,
+        enabled: true,
+      });
+    });
+  }
+
+  const salaryConfig: SalaryConfig = {
+    salaryType,
+    baseSalary: dto.baseRate || 0,
+    otWeekday: '150%',
+    otSunday: '200%',
+    otDayOff: '200%',
+    otHoliday: '300%',
+    allowances,
+  };
+
+  const genderVal = dto.gender?.toLowerCase() === 'female' ? 'female' : 'male';
+
+  return {
+    id: dto.id,
+    employeeCode: dto.employeeCode,
+    fullName: dto.fullName,
+    phone: dto.phone,
+    email: dto.email || '',
+    avatarUrl: dto.avatarUrl || '',
+    gender: genderVal,
+    dateOfBirth: dto.dateOfBirth ? dto.dateOfBirth.split('T')[0] : '',
+    citizenId: dto.citizenId,
+    jobTitle: dto.jobTitle || 'Nhân viên',
+    salaryBranchId: dto.branchId,
+    salaryBranchName: dto.branchName || 'Chưa gán',
+    workingBranchIds: dto.branchId ? [dto.branchId] : [],
+    workingBranchNames: dto.branchName ? [dto.branchName] : ['Chưa gán'],
+    userId: dto.userId,
+    userName: dto.userName,
+    status: dto.status?.toLowerCase() === 'inactive' ? 'inactive' : 'active',
+    debtAmount: dto.debtAmount || 0,
+    bankAccountNumber: dto.bankAccountNumber,
+    bankName: dto.bankName,
+    bankAccountHolder: dto.bankAccountHolder,
+    salaryConfig,
+  };
+};
+
+/**
+ * Chuyển đổi từ dữ liệu form sang CreateEmployeePayload gửi lên Backend
+ */
+export const mapFormToCreatePayload = (
+  emp: Partial<Employee>,
+  salaryConfig?: SalaryConfig,
+  branchId?: string
+): CreateEmployeePayload => {
+  const targetBranchId =
+    branchId ||
+    emp.salaryBranchId ||
+    (emp.workingBranchIds && emp.workingBranchIds[0]) ||
+    '';
+
+  const activeAllowances = (salaryConfig?.allowances || [])
+    .filter((a) => a.enabled && a.amount > 0)
+    .map((a) => ({ name: a.name.trim(), amount: a.amount }));
+
+  return {
+    fullName: (emp.fullName || '').trim(),
+    citizenId: (emp.citizenId || '').trim(),
+    phone: (emp.phone || '').trim(),
+    branchId: targetBranchId,
+    email: emp.email?.trim() || undefined,
+    jobTitle: emp.jobTitle?.trim() || undefined,
+    dateOfBirth: emp.dateOfBirth ? new Date(emp.dateOfBirth).toISOString() : undefined,
+    gender: emp.gender || 'male',
+    salaryType: salaryConfig?.salaryType || 'monthly',
+    baseRate: salaryConfig?.baseSalary || 0,
+    allowances: activeAllowances,
+    bankAccountNumber: emp.bankAccountNumber?.trim() || undefined,
+    bankName: emp.bankName?.trim() || undefined,
+    bankAccountHolder: emp.bankAccountHolder?.trim() || undefined,
+    avatarUrl: emp.avatarUrl?.trim() || undefined,
+  };
+};
+

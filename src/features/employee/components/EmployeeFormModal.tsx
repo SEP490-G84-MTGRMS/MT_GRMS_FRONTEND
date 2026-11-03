@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Camera, Trash2, Search, ChevronDown, X, Check, Building2 } from 'lucide-react';
+import { Camera, Trash2, Search, ChevronDown, X, Check, Building2, AlertTriangle } from 'lucide-react';
 import type {
   Employee,
   Branch,
@@ -9,6 +9,8 @@ import type {
 import { MOCK_DEFAULT_ALLOWANCES } from '../services/mockData';
 import { CreateUserModal } from './CreateUserModal';
 import { CreateAllowanceModal } from './CreateAllowanceModal';
+import { employeeApi } from '../api/employeeApi';
+import { mapFormToCreatePayload } from '../lib/employeeMapper';
 
 interface EmployeeFormModalProps {
   isOpen: boolean;
@@ -30,6 +32,8 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
   // Sub-modals
   const [showCreateUser, setShowCreateUser] = useState(false);
   const [showCreateAllowance, setShowCreateAllowance] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
   // Form states - Tab 1: Thông tin
   const [fullName, setFullName] = useState('');
@@ -98,7 +102,9 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
         setOtSunday(employee.salaryConfig.otSunday);
         setOtDayOff(employee.salaryConfig.otDayOff);
         setOtHoliday(employee.salaryConfig.otHoliday);
-        setAllowances(employee.salaryConfig.allowances || MOCK_DEFAULT_ALLOWANCES);
+        const empAllowances = employee.salaryConfig.allowances || [];
+        setAllowances(empAllowances);
+        setEnableAllowance(empAllowances.length > 0);
       }
     } else {
       // Default reset for creation
@@ -126,8 +132,14 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
 
       setSalaryType('monthly');
       setBaseSalary(7500000);
-      setAllowances(MOCK_DEFAULT_ALLOWANCES);
+      setAllowances([
+        { id: 'al_1', name: 'Phụ cấp ăn trưa', type: 'monthly', amount: 650000, enabled: true },
+        { id: 'al_2', name: 'Phụ cấp xăng xe', type: 'monthly', amount: 300000, enabled: true },
+      ]);
+      setEnableAllowance(true);
     }
+    setFormError(null);
+    setIsSubmitting(false);
   }, [employee, branches, isOpen]);
 
   const [isBranchDropdownOpen, setIsBranchDropdownOpen] = useState(false);
@@ -188,6 +200,12 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
     setWorkingBranchIds(workingBranchIds.filter((id) => id !== branchId));
   };
 
+  const handleAllowanceNameChange = (id: string, name: string) => {
+    setAllowances(
+      allowances.map((item) => (item.id === id ? { ...item, name } : item))
+    );
+  };
+
   const handleAllowanceAmountChange = (id: string, amount: number) => {
     setAllowances(
       allowances.map((item) => (item.id === id ? { ...item, amount } : item))
@@ -204,6 +222,23 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
     setAllowances(allowances.filter((item) => item.id !== id));
   };
 
+  const handleAddAllowanceRow = () => {
+    const newAl: AllowanceItem = {
+      id: `al_${Date.now()}`,
+      name: '',
+      type: 'monthly',
+      amount: 0,
+      enabled: true,
+    };
+    setAllowances([...allowances, newAl]);
+  };
+
+  const totalAllowances = enableAllowance
+    ? allowances
+        .filter((a) => a.enabled)
+        .reduce((sum, a) => sum + (Number(a.amount) || 0), 0)
+    : 0;
+
   const handleAddAllowanceSuccess = (newAl: AllowanceItem) => {
     setAllowances([...allowances, newAl]);
   };
@@ -213,47 +248,46 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
     setUserName(user.username);
   };
 
-  const handleSave = (isAddNew: boolean = false) => {
+  const handleSave = async (isAddNew: boolean = false) => {
+    setFormError(null);
     if (!fullName.trim()) {
-      alert('Vui lòng nhập Tên nhân viên!');
+      setFormError('Vui lòng nhập Họ và tên nhân viên!');
       return;
     }
     if (!phone.trim()) {
-      alert('Vui lòng nhập Số điện thoại!');
+      setFormError('Vui lòng nhập Số điện thoại!');
       return;
     }
-    const wBranchNames = branches
-      .filter((b) => workingBranchIds.includes(b.id))
-      .map((b) => b.name);
+    if (!citizenId.trim()) {
+      setFormError('Vui lòng nhập Số CMND / CCCD (12 chữ số)!');
+      return;
+    }
+    if (!/^\d{12}$/.test(citizenId.trim())) {
+      setFormError('Số CMND / CCCD phải bao gồm đúng 12 chữ số!');
+      return;
+    }
 
-    const generatedCode =
-      employeeCode.trim() || `NV${String(Math.floor(Math.random() * 900000) + 100000)}`;
+    const targetBranchId = workingBranchIds[0] || (branches[0] ? branches[0].id : '');
+    if (!targetBranchId) {
+      setFormError('Vui lòng chọn ít nhất 1 chi nhánh làm việc!');
+      return;
+    }
 
-    const savedEmployee: Employee = {
-      id: employee?.id || `emp-${Date.now()}`,
-      employeeCode: generatedCode,
-      attendanceCode: attendanceCode.trim() || `CC${generatedCode.replace(/\D/g, '')}`,
-      fullName: fullName.trim(),
-      phone: phone.trim(),
-      email: email.trim(),
-      avatarUrl,
-      gender,
-      dateOfBirth,
-      citizenId,
-      address,
-      city,
-      startDate,
-      workingBranchIds,
-      workingBranchNames: wBranchNames,
-      userId,
-      userName,
-      note,
-      status: employee?.status || 'active',
-      debtAmount: employee?.debtAmount ?? 0,
-      bankAccountNumber,
-      bankName,
-      bankAccountHolder: bankAccountHolder.toUpperCase(),
-      salaryConfig: {
+    const payload = mapFormToCreatePayload(
+      {
+        fullName,
+        citizenId,
+        phone,
+        email,
+        gender,
+        dateOfBirth,
+        bankAccountNumber,
+        bankName,
+        bankAccountHolder,
+        avatarUrl,
+        salaryBranchId: targetBranchId,
+      },
+      {
         salaryType,
         baseSalary,
         otWeekday,
@@ -262,20 +296,40 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
         otHoliday,
         allowances: enableAllowance ? allowances : [],
       },
-      payslips: employee?.payslips || [],
-      workSchedule: employee?.workSchedule || [],
-      debtHistory: employee?.debtHistory || [],
-    };
+      targetBranchId
+    );
 
-    onSave(savedEmployee, isAddNew);
-    if (!isAddNew) {
-      onClose();
-    } else {
-      // Reset for next employee
-      setFullName('');
-      setEmployeeCode('');
-      setPhone('');
-      setEmail('');
+    setIsSubmitting(true);
+    try {
+      let savedEmp: Employee;
+      if (employee?.id) {
+        savedEmp = await employeeApi.updateEmployee(employee.id, payload);
+      } else {
+        savedEmp = await employeeApi.createEmployee(payload);
+      }
+
+      onSave(savedEmp, isAddNew);
+      if (!isAddNew) {
+        onClose();
+      } else {
+        // Reset for next employee
+        setFullName('');
+        setEmployeeCode('');
+        setAttendanceCode('');
+        setPhone('');
+        setEmail('');
+        setCitizenId('');
+        setDateOfBirth('');
+        setFormError(null);
+      }
+    } catch (err: any) {
+      const msg =
+        err?.response?.data?.message ||
+        err?.message ||
+        'Lưu thông tin thất bại. Vui lòng kiểm tra lại.';
+      setFormError(msg);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -288,10 +342,35 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
           {/* Header */}
           <div className="emp-modal-header">
             <h3>{employee ? `Cập nhật nhân viên: ${employee.fullName}` : 'Thêm mới nhân viên'}</h3>
-            <button type="button" className="emp-modal-close-btn" onClick={onClose}>
+            <button
+              type="button"
+              className="emp-modal-close-btn"
+              onClick={onClose}
+              disabled={isSubmitting}
+            >
               &times;
             </button>
           </div>
+
+          {formError && (
+            <div
+              style={{
+                margin: '12px 24px 0',
+                padding: '10px 14px',
+                backgroundColor: '#FEE2E2',
+                border: '1px solid #FCA5A5',
+                color: '#B91C1C',
+                borderRadius: 6,
+                fontSize: 13,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+              }}
+            >
+              <AlertTriangle size={16} />
+              <span>{formError}</span>
+            </div>
+          )}
 
           {/* Tabs */}
           <div className="emp-modal-tabs">
@@ -990,9 +1069,9 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
 
                 {/* Phụ cấp */}
                 <div className="emp-section-card">
-                  <div className="emp-section-title">
+                  <div className="emp-section-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <span>Phụ cấp hỗ trợ</span>
+                      <span>Phụ cấp lương</span>
                       <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 400 }}>
                         <input
                           type="checkbox"
@@ -1000,84 +1079,131 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
                           onChange={(e) => setEnableAllowance(e.target.checked)}
                           style={{ accentColor: '#0F766E' }}
                         />
-                        <span>Kích hoạt phụ cấp</span>
+                        <span>Áp dụng phụ cấp</span>
                       </label>
                     </div>
                     {enableAllowance && (
                       <button
                         type="button"
                         style={{
-                          background: 'transparent',
-                          border: 'none',
+                          background: '#F0FDFA',
+                          border: '1px solid #99F6E4',
                           color: '#0F766E',
+                          borderRadius: 6,
+                          padding: '4px 12px',
                           fontWeight: 600,
                           fontSize: 13,
                           cursor: 'pointer',
                         }}
-                        onClick={() => setShowCreateAllowance(true)}
+                        onClick={handleAddAllowanceRow}
                       >
-                        + Thêm loại phụ cấp
+                        + Thêm khoản phụ cấp
                       </button>
                     )}
                   </div>
 
                   {enableAllowance && (
-                    <table className="emp-table" style={{ border: '1px solid #E2E8F0', borderRadius: 8 }}>
-                      <thead>
-                        <tr>
-                          <th style={{ width: 40 }}>Bật</th>
-                          <th>Tên phụ cấp</th>
-                          <th>Loại phụ cấp</th>
-                          <th style={{ width: 180 }}>Mức phụ cấp (VNĐ)</th>
-                          <th style={{ width: 40 }}></th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {allowances.map((al) => (
-                          <tr key={al.id}>
-                            <td>
-                              <input
-                                type="checkbox"
-                                checked={al.enabled}
-                                onChange={() => handleAllowanceToggle(al.id)}
-                                style={{ accentColor: '#0F766E' }}
-                              />
-                            </td>
-                            <td style={{ fontWeight: 600 }}>{al.name}</td>
-                            <td style={{ color: '#64748B' }}>{al.type}</td>
-                            <td>
-                              <input
-                                type="number"
-                                className="emp-form-input"
-                                style={{ height: 32 }}
-                                value={al.amount}
-                                onChange={(e) => handleAllowanceAmountChange(al.id, Number(e.target.value))}
-                                disabled={!al.enabled}
-                              />
-                            </td>
-                            <td>
-                              <button
-                                type="button"
-                                style={{
-                                  background: 'transparent',
-                                  border: 'none',
-                                  color: '#EF4444',
-                                  cursor: 'pointer',
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  padding: 4,
-                                }}
-                                onClick={() => handleDeleteAllowance(al.id)}
-                                title="Xóa phụ cấp"
-                              >
-                                <Trash2 size={16} />
-                              </button>
-                            </td>
+                    <>
+                      <table className="emp-table" style={{ border: '1px solid #E2E8F0', borderRadius: 8, marginTop: 8 }}>
+                        <thead>
+                          <tr>
+                            <th style={{ width: 44, textAlign: 'center' }}>Bật</th>
+                            <th>Tên khoản phụ cấp</th>
+                            <th style={{ width: 220 }}>Số tiền (VNĐ)</th>
+                            <th style={{ width: 44, textAlign: 'center' }}></th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                        </thead>
+                        <tbody>
+                          {allowances.length > 0 ? (
+                            allowances.map((al) => (
+                              <tr key={al.id}>
+                                <td style={{ textAlign: 'center' }}>
+                                  <input
+                                    type="checkbox"
+                                    checked={al.enabled}
+                                    onChange={() => handleAllowanceToggle(al.id)}
+                                    style={{ accentColor: '#0F766E' }}
+                                  />
+                                </td>
+                                <td>
+                                  <input
+                                    type="text"
+                                    className="emp-form-input"
+                                    style={{ height: 32 }}
+                                    placeholder="VD: Phụ cấp ăn trưa, xăng xe, trách nhiệm..."
+                                    value={al.name}
+                                    onChange={(e) => handleAllowanceNameChange(al.id, e.target.value)}
+                                    disabled={!al.enabled}
+                                  />
+                                </td>
+                                <td>
+                                  <input
+                                    type="number"
+                                    className="emp-form-input"
+                                    style={{ height: 32 }}
+                                    step="10000"
+                                    min="0"
+                                    value={al.amount}
+                                    onChange={(e) =>
+                                      handleAllowanceAmountChange(al.id, Math.max(0, Number(e.target.value)))
+                                    }
+                                    disabled={!al.enabled}
+                                  />
+                                </td>
+                                <td style={{ textAlign: 'center' }}>
+                                  <button
+                                    type="button"
+                                    style={{
+                                      background: 'transparent',
+                                      border: 'none',
+                                      color: '#EF4444',
+                                      cursor: 'pointer',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      padding: 4,
+                                    }}
+                                    onClick={() => handleDeleteAllowance(al.id)}
+                                    title="Xóa phụ cấp này"
+                                  >
+                                    <Trash2 size={16} />
+                                  </button>
+                                </td>
+                              </tr>
+                            ))
+                          ) : (
+                            <tr>
+                              <td colSpan={4} style={{ textAlign: 'center', color: '#94A3B8', padding: 20 }}>
+                                Chưa có khoản phụ cấp nào. Bấm "+ Thêm khoản phụ cấp" để tạo mới.
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+
+                      {/* Total Allowance Summary */}
+                      <div
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'flex-end',
+                          alignItems: 'center',
+                          gap: 12,
+                          marginTop: 10,
+                          padding: '8px 14px',
+                          background: '#F8FAFC',
+                          borderRadius: 6,
+                          border: '1px solid #E2E8F0',
+                          fontSize: 13,
+                          fontWeight: 600,
+                          color: '#334155',
+                        }}
+                      >
+                        <span>Tổng phụ cấp đang áp dụng:</span>
+                        <span style={{ color: '#0F766E', fontSize: 15, fontWeight: 700 }}>
+                          {totalAllowances.toLocaleString('vi-VN')} đ
+                        </span>
+                      </div>
+                    </>
                   )}
                 </div>
               </div>
@@ -1086,7 +1212,12 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
 
           {/* Footer */}
           <div className="emp-modal-footer">
-            <button type="button" className="emp-btn emp-btn-secondary" onClick={onClose}>
+            <button
+              type="button"
+              className="emp-btn emp-btn-secondary"
+              onClick={onClose}
+              disabled={isSubmitting}
+            >
               Bỏ qua
             </button>
             {!employee && (
@@ -1094,16 +1225,18 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
                 type="button"
                 className="emp-btn emp-btn-outline-teal"
                 onClick={() => handleSave(true)}
+                disabled={isSubmitting}
               >
-                Lưu & Thêm mới
+                {isSubmitting ? 'Đang lưu...' : 'Lưu & Thêm mới'}
               </button>
             )}
             <button
               type="button"
               className="emp-btn emp-btn-primary"
               onClick={() => handleSave(false)}
+              disabled={isSubmitting}
             >
-              Lưu thông tin
+              {isSubmitting ? 'Đang lưu...' : 'Lưu thông tin'}
             </button>
           </div>
         </div>
@@ -1113,6 +1246,7 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
       <CreateUserModal
         isOpen={showCreateUser}
         onClose={() => setShowCreateUser(false)}
+        employeeId={employee?.id}
         onSuccess={handleCreateUserSuccess}
       />
       <CreateAllowanceModal

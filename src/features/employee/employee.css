@@ -854,3 +854,16 @@
   letter-spacing: normal;
   line-height: 20px;
 }
+
+@keyframes empSpin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.emp-spin-icon {
+  animation: empSpin 1s linear infinite;
+}

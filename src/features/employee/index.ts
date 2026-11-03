@@ -1,4 +1,6 @@
 export * from './types';
+export * from './api/employeeApi';
+export * from './lib/employeeMapper';
 export * from './services/mockData';
 export * from './components/EmployeeFilterSidebar';
 export * from './components/EmployeeFormModal';
