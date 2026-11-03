@@ -64,3 +64,4 @@
 ## 5. Ghi Chú Cho Manager Khi Duyệt & Merge (Manager Merge Notes)
 - **Mức độ rủi ro**: Thấp (Low). Toàn bộ conflict được phân tích và merge chuẩn xác theo cả nghiệp vụ Store Owner và Admin.
 - **Hành động sau merge**: Chạy `npm install` một lần nếu môi trường dev khác chưa có package `xlsx`.
+
