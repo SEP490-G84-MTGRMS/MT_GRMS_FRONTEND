@@ -19,8 +19,6 @@ export interface ProductResponse {
   costPrice: number | null; // Ẩn với Cashier/Staff theo BR-SEC-01
   minStock: number;
   maxStock: number;
-  vatRate: number;
-  productType: string;
   status: string; // "Active" | "Discontinued"
   imageUrl?: string | null;
   imageUrls?: string[];
@@ -124,7 +122,6 @@ export interface ProductCreatePayload {
   costPrice?: number | null;
   minStock?: number;
   maxStock?: number;
-  vatRate?: number;
   taxCategory?: string;
   status?: string;
   imageUrl?: string | null;
@@ -144,9 +141,7 @@ export interface ProductUpdatePayload {
   costPrice?: number | null;
   minStock?: number;
   maxStock?: number;
-  vatRate?: number;
   taxCategory?: string;
-  productType?: string;
   status?: string;
   imageUrl?: string | null;
   imageUrls?: string[];
@@ -208,9 +203,7 @@ export interface ProductItem {
   imageUrls?: string[];
   minStock?: number;
   maxStock?: number;
-  vatRate?: number;
   taxCategory?: string;
-  productType?: string;
   description?: string;
   internalNote?: string;
   hasTransactions?: boolean;

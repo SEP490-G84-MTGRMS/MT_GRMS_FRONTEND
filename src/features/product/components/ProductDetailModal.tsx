@@ -194,13 +194,6 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               </div>
             )}
 
-            <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: 11, color: '#64748B' }}>Thuế VAT</div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: '#0F766E' }}>
-                {product.vatRate ?? 0}%
-              </div>
-            </div>
-
             <button type="button" className="custom-modal-close" onClick={onClose} title="Đóng">
               <X size={18} />
             </button>
@@ -471,13 +464,6 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                       </div>
                     </div>
                   )}
-
-                  <div>
-                    <div style={{ fontSize: 12, color: '#64748B', marginBottom: 2 }}>Thuế VAT</div>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: '#334155' }}>
-                      {product.vatRate ?? 0}%
-                    </div>
-                  </div>
                 </div>
 
                 {/* Cột 3: Đơn vị & Trạng thái */}

@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   X,
   Trash2,
@@ -106,10 +106,9 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   const [previewImageModalUrl, setPreviewImageModalUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // 2. Giá vốn, giá bán & Thuế VAT
+  // 2. Giá vốn, giá bán
   const [costPrice, setCostPrice] = useState<number>(0);
   const [sellingPrice, setSellingPrice] = useState<number>(0);
-  const [vatRate, setVatRate] = useState<number>(0);
   const [isFavorite, setIsFavorite] = useState<boolean>(false);
 
   // Trạng thái lưu (loading)
@@ -144,7 +143,6 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
 
         setCostPrice(productToEdit.costPrice || 0);
         setSellingPrice(productToEdit.sellingPrice || 0);
-        setVatRate(productToEdit.vatRate ?? 0);
         setIsFavorite(productToEdit.isFavorite ?? false);
         setIsSubmitting(false);
 
@@ -195,7 +193,6 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         setCostPrice(0);
         setSellingPrice(0);
 
-        setVatRate(0);
         setIsFavorite(false);
         setIsSubmitting(false);
 
@@ -367,7 +364,6 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         baseUnit: baseUnit.trim(),
         sellingPrice,
         costPrice: userRole === 'StoreOwner' ? costPrice : productToEdit?.costPrice ?? 0,
-        vatRate,
         isFavorite,
         description: description.trim() || undefined,
         internalNote: internalNote.trim() || undefined,
@@ -392,7 +388,6 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         setDescription('');
         setInternalNote('');
         setIsFavorite(false);
-        setVatRate(0);
         setWarningMsg('');
         setValidationPopupMsg('');
         setPreviewImageModalUrl(null);
@@ -1193,7 +1188,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
               Giá vốn, giá bán
             </h4>
 
-            <div style={{ display: 'grid', gridTemplateColumns: userRole === 'StoreOwner' ? '1fr 1fr 1fr' : '1fr 1fr', gap: 20 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: userRole === 'StoreOwner' ? '1fr 1fr' : '1fr', gap: 20 }}>
               {/* (6) Giá vốn - Chỉ Chủ cửa hàng mới xem/sửa theo BR-SEC-01 */}
               {userRole === 'StoreOwner' && (
                 <div>
@@ -1272,73 +1267,6 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                   >
                     đ
                   </span>
-                </div>
-              </div>
-
-              {/* Thuế suất VAT (%) */}
-              <div>
-                <label
-                  style={{
-                    display: 'block',
-                    marginBottom: 6,
-                    fontSize: 13,
-                    fontWeight: 600,
-                    color: '#334155',
-                  }}
-                >
-                  Thuế suất VAT (%)
-                </label>
-                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                  <div style={{ position: 'relative', width: 90 }}>
-                    <input
-                      type="number"
-                      className="filter-input"
-                      style={{ paddingRight: 24, textAlign: 'right' }}
-                      min={0}
-                      max={100}
-                      step={0.5}
-                      value={vatRate === 0 ? '' : vatRate}
-                      placeholder="0"
-                      onChange={(e) =>
-                        setVatRate(e.target.value === '' ? 0 : Math.max(0, Math.min(100, Number(e.target.value))))
-                      }
-                      onFocus={(e) => e.target.select()}
-                    />
-                    <span
-                      style={{
-                        position: 'absolute',
-                        right: 8,
-                        top: '50%',
-                        transform: 'translateY(-50%)',
-                        fontSize: 13,
-                        color: '#64748B',
-                        pointerEvents: 'none',
-                      }}
-                    >
-                      %
-                    </span>
-                  </div>
-                  <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                    {[0, 5, 8, 10].map((rate) => (
-                      <button
-                        key={rate}
-                        type="button"
-                        onClick={() => setVatRate(rate)}
-                        style={{
-                          padding: '6px 10px',
-                          fontSize: 12,
-                          fontWeight: vatRate === rate ? 700 : 500,
-                          background: vatRate === rate ? '#E6FFFA' : '#F8FAFC',
-                          color: vatRate === rate ? '#0F766E' : '#475569',
-                          border: vatRate === rate ? '1.5px solid #0D9488' : '1px solid #CBD5E1',
-                          borderRadius: 6,
-                          cursor: 'pointer',
-                        }}
-                      >
-                        {rate}%
-                      </button>
-                    ))}
-                  </div>
                 </div>
               </div>
             </div>
