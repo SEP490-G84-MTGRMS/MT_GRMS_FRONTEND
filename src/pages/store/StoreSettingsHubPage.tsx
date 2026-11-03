@@ -25,7 +25,6 @@ const VALID_TABS: StoreHubTabKey[] = [
   'branches',
   'subscriptions',
   'order-history',
-  'service-confirm',
   'terms',
   'wallet',
 ];
@@ -239,22 +238,17 @@ export const StoreSettingsHubPage: FC = () => {
 
         {/* Tab 3: Lịch sử mua hàng */}
         {activeTab === 'order-history' && (
-          <OrderHistoryTab isServiceConfirmation={false} />
+          <OrderHistoryTab />
         )}
 
-        {/* Tab 4: Bản xác nhận dịch vụ */}
-        {activeTab === 'service-confirm' && (
-          <OrderHistoryTab isServiceConfirmation={true} />
-        )}
-
-        {/* Tab 5: Điều khoản sử dụng */}
+        {/* Tab 4: Điều khoản sử dụng */}
         {activeTab === 'terms' && (
           <div style={{ marginTop: 8 }}>
             <TermsOfServiceTab />
           </div>
         )}
 
-        {/* Tab 6: Thanh toán & Ví gian hàng */}
+        {/* Tab 5: Thanh toán & Ví gian hàng */}
         {activeTab === 'wallet' && (
           <div style={{ marginTop: 8 }}>
             <WalletLedgerTab

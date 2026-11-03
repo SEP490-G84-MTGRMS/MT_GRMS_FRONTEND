@@ -5,7 +5,6 @@ import {
   Building2,
   Boxes,
   History,
-  FileCheck2,
   FileText,
   Wallet,
 } from 'lucide-react';
@@ -15,7 +14,6 @@ export type StoreHubTabKey =
   | 'branches'
   | 'subscriptions'
   | 'order-history'
-  | 'service-confirm'
   | 'terms'
   | 'wallet';
 
@@ -79,17 +77,6 @@ export const StoreSidebarNav: FC<StoreSidebarNavProps> = ({
             <History size={18} strokeWidth={1.8} />
           </span>
           <span>Lịch sử mua hàng</span>
-        </button>
-
-        <button
-          type="button"
-          className={`store-sidebar-item ${activeTab === 'service-confirm' ? 'active' : ''}`}
-          onClick={() => onSelectTab('service-confirm')}
-        >
-          <span className="store-sidebar-icon">
-            <FileCheck2 size={18} strokeWidth={1.8} />
-          </span>
-          <span>Bản xác nhận dịch vụ</span>
         </button>
       </div>
 

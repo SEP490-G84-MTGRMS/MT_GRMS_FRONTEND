@@ -9,6 +9,7 @@ Toàn bộ các thay đổi của repository Frontend React SPA được tổng 
 - Thêm component Dropdown **Chọn chi nhánh** (`BranchSelectorDropdown`) trên thanh header chính (`AppTopNav`), hỗ trợ chọn từng chi nhánh hoặc xem toàn hệ thống [worklog: docs/worklogs/2026-11-03_FE-STORE_AI_remove-wallet-topup-from-status-bar.md].
 
 ### Changed
+- Loại bỏ hoàn toàn mục và tab **"Bản xác nhận dịch vụ"** khỏi thanh điều hướng bên trái và trang Hub Cài đặt gian hàng (`StoreSettingsHubPage`) [worklog: docs/worklogs/2026-11-03_FE-STORE_AI_remove-service-confirmation-tab.md].
 - Tinh gọn Dropdown chọn chi nhánh: bỏ các icon và mã cửa hàng (`BR-xxx`), hiển thị đầy đủ tên chi nhánh và địa chỉ rõ ràng, không bị co kéo hoặc cắt chữ.
 - Loại bỏ hoàn toàn mục "Ví gian hàng" & nút "Nạp ví" cùng popup VietQR khỏi thanh trạng thái tổng quan `StoreTopStatusBar`.
 - Loại bỏ menu thả xuống (dropdown / mega-menu) của mục **"Cửa hàng"** trên `AppTopNav`, chuyển thành liên kết trực tiếp vào trang `/store-owner/subscriptions`.
