@@ -1,17 +1,14 @@
 // src/pages/store/components/StoreTopStatusBar.tsx
 import type { FC } from 'react';
-import { PlusCircle } from 'lucide-react';
 import type { StoreInfo } from '../storeData';
 
 interface StoreTopStatusBarProps {
   storeInfo: StoreInfo;
-  onOpenTopupModal: () => void;
   onNavigateBranches?: () => void;
 }
 
 export const StoreTopStatusBar: FC<StoreTopStatusBarProps> = ({
   storeInfo,
-  onOpenTopupModal,
   onNavigateBranches,
 }) => {
   return (
@@ -53,35 +50,6 @@ export const StoreTopStatusBar: FC<StoreTopStatusBarProps> = ({
             {storeInfo.daysRemaining} ngày
           </span>
         </div>
-      </div>
-
-      {/* 5. Ví gian hàng & Nút nạp ví */}
-      <div className="store-status-col store-status-wallet">
-        <div>
-          <span className="store-status-label">Ví gian hàng</span>
-          <div className="store-status-value">
-            <span
-              style={{
-                fontFamily: 'var(--font-mono)',
-                color: '#0066FF',
-                fontWeight: 800,
-                fontSize: 16,
-              }}
-            >
-              {new Intl.NumberFormat('vi-VN').format(storeInfo.walletBalance)} đ
-            </span>
-          </div>
-        </div>
-
-        <button
-          type="button"
-          className="store-btn-topup"
-          onClick={onOpenTopupModal}
-          title="Nạp tiền vào ví gian hàng qua Napas VietQR"
-        >
-          <PlusCircle size={15} strokeWidth={2.2} />
-          <span>Nạp ví</span>
-        </button>
       </div>
     </div>
   );

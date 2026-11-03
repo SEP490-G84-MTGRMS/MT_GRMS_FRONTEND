@@ -191,7 +191,6 @@ export const StoreSettingsHubPage: FC = () => {
         {/* Top Status Bar */}
         <StoreTopStatusBar
           storeInfo={storeInfo}
-          onOpenTopupModal={() => setShowTopupModal(true)}
           onNavigateBranches={() => handleSelectTab('branches')}
         />
 
