@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback, Fragment } from "react";
+﻿import { useState, useRef, useEffect, useCallback, Fragment } from "react";
 import type { FC } from "react";
 import { NavLink, Link, useLocation, useNavigate } from "react-router-dom";
 import {
@@ -13,7 +13,6 @@ import {
   Gift,
   MessageCircle,
   SquarePen,
-  Bell,
   Settings,
   User,
   Store,
@@ -23,6 +22,11 @@ import {
   FileText,
 } from "lucide-react";
 import { useAuthStore } from "../../stores/useAuthStore";
+import {
+  NotificationBadge,
+  NotificationPopover,
+  NotificationDrawer,
+} from "../../features/notifications";
 
 /* ─── Data ─── */
 
@@ -275,50 +279,24 @@ const NAV_GROUPS: NavGroup[] = [
     icon: TrendingUpIcon,
     sections: [
       {
-        title: "Chi phí & Vận hành",
+        title: "Dòng tiền & Chi tiêu",
         items: [
-          {
-            label: "Chi phí vận hành (FE-07)",
-            to: "/store-owner/expenses",
-            badge: "FE-07",
-            badgeType: "red",
-          },
-          {
-            label: "Sổ quỹ & Dòng tiền (FE-17)",
-            to: "/store-owner/cashbook",
-            badge: "FE-17",
-          },
+          { label: "Tổng quan tài chính", to: "/store-owner/finance" },
+          { label: "Tiền của tôi", to: "/store-owner/cashbook" },
+          { label: "Phải trả", to: "/store-owner/expenses" },
         ],
       },
       {
-        title: "Khách hàng & Công nợ",
+        title: "Công nợ & Khách hàng",
         items: [
-          {
-            label: "Khách hàng & Sổ nợ (FE-08)",
-            to: "/store-owner/customers",
-            badge: "FE-08",
-            badgeType: "blue",
-          },
-          {
-            label: "Công nợ nhà cung cấp",
-            to: "/store-owner/suppliers?view=debt",
-          },
+          { label: "Khách nợ", to: "/store-owner/customers" },
         ],
       },
       {
-        title: "Báo cáo tài chính & Thuế",
+        title: "Báo cáo & Thuế",
         items: [
-          { label: "Báo cáo kết quả kinh doanh", to: "/store-owner/dashboard" },
-          {
-            label: "Báo cáo Lãi / Lỗ & KPIs (FE-10)",
-            to: "/store-owner/reports/pnl",
-            badge: "FE-10",
-          },
-          {
-            label: "Kê khai thuế HKD (FE-19)",
-            to: "/store-owner/tax-snapshots",
-            badge: "FE-19",
-          },
+          { label: "Lãi lỗ", to: "/store-owner/reports/pnl" },
+          { label: "Thuế", to: "/store-owner/tax-snapshots" },
         ],
       },
     ],
@@ -1392,7 +1370,7 @@ export const AppTopNav: FC = () => {
               }}
               onClick={() =>
                 alert(
-                  "Cảm ơn bạn! Mọi ý kiến góp ý xin gửi về: hotro@mt-grms.vn",
+                  "Cảm ơn bạn! Mọi ý kiến đóng góp xin gửi về: hotro@mt-grms.vn",
                 )
               }
               title="Gửi ý kiến đóng góp tính năng"
@@ -1411,57 +1389,11 @@ export const AppTopNav: FC = () => {
               }}
             />
 
-            {/* 4. Bell notification with red badge 3 */}
-            <button
-              type="button"
-              style={{
-                width: 32,
-                height: 32,
-                borderRadius: "50%",
-                border: "none",
-                backgroundColor: "transparent",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                cursor: "pointer",
-                position: "relative",
-                color: "#ffffff",
-                flexShrink: 0,
-                transition: "background-color 0.15s ease",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor =
-                  "rgba(255, 255, 255, 0.14)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = "transparent";
-              }}
-              title="Thông báo hệ thống (3 chưa đọc)"
-            >
-              <Bell size={17} strokeWidth={2} />
-              <span
-                style={{
-                  position: "absolute",
-                  top: 0,
-                  right: 0,
-                  minWidth: 15,
-                  height: 15,
-                  borderRadius: "var(--radius-pill)",
-                  backgroundColor: "#FF3B30",
-                  color: "#ffffff",
-                  fontSize: 9.5,
-                  fontWeight: 800,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  padding: "0 2px",
-                  border: "1.5px solid #ffffff",
-                  lineHeight: 1,
-                }}
-              >
-                3
-              </span>
-            </button>
+            {/* 4. Bell notification (Dynamic Notification Center) */}
+            <div style={{ position: "relative" }}>
+              <NotificationBadge />
+              <NotificationPopover />
+            </div>
 
             {/* 5. Settings Gear icon */}
             <Link
@@ -1552,15 +1484,12 @@ export const AppTopNav: FC = () => {
                       backgroundColor: "#ffffff",
                       borderRadius: 14,
                       boxShadow:
-                        "0 12px 32px rgba(0, 0, 0, 0.16), 0 2px 8px rgba(0, 0, 0, 0.08)",
+                        "0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)",
                       border: "1px solid #E2E8F0",
                       overflow: "hidden",
-                      display: "flex",
-                      flexDirection: "column",
-                      fontFamily: "var(--font-sans)",
                     }}
                   >
-                    {/* Row 1: Profile Summary */}
+                    {/* Header info tài khoản */}
                     <Link
                       to="/store-owner/account?tab=account-profile"
                       onClick={() => setAccountMenuOpen(false)}
@@ -1568,17 +1497,17 @@ export const AppTopNav: FC = () => {
                         display: "flex",
                         alignItems: "center",
                         gap: 12,
-                        padding: "14px 16px",
+                        padding: "16px",
                         textDecoration: "none",
-                        color: "inherit",
-                        backgroundColor: "#ffffff",
+                        backgroundColor: "#F8FAFC",
+                        borderBottom: "1px solid #E2E8F0",
                         transition: "background-color 0.15s ease",
                       }}
                       onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = "#F8FAFC";
+                        e.currentTarget.style.backgroundColor = "#F1F5F9";
                       }}
                       onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = "#ffffff";
+                        e.currentTarget.style.backgroundColor = "#F8FAFC";
                       }}
                     >
                       <div
@@ -2034,6 +1963,8 @@ export const AppTopNav: FC = () => {
           </div>
         </div>
       )}
+      {/* Extended Global Notification Drawer */}
+      <NotificationDrawer />
     </>
   );
 };

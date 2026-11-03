@@ -1,83 +1,198 @@
 import { useState, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { taxSnapshotApi } from '../api/taxSnapshotApi';
-import type {
-  TaxSnapshotFilterParams,
-  TaxSnapshotStatus,
+import {
+  TaxPeriodType,
+  TaxCalculationMethod,
+  type HouseholdTaxFilterDto,
+  type CreateTaxSnapshotRequest,
 } from '../types/taxSnapshot';
 
-export function useTaxSnapshots(initialYear: number = new Date().getFullYear()) {
+const STORAGE_KEY = 'mt_grms_tax_rate_config';
+
+interface StoredTaxRates {
+  customVatRate?: number | null;
+  customPitRate?: number | null;
+  vatReductionPercentage?: number | null;
+  applyVatReduction2026?: boolean;
+}
+
+const loadStoredTaxRates = (): StoredTaxRates => {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+};
+
+const saveStoredTaxRates = (rates: StoredTaxRates) => {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(rates));
+  } catch {
+    // Ignore storage quota errors
+  }
+};
+
+const clearStoredTaxRates = () => {
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    // Ignore errors
+  }
+};
+
+export function useTaxSnapshots(initialYear: number = 2026) {
   const queryClient = useQueryClient();
+  const storedRates = loadStoredTaxRates();
 
-  const [filterParams, setFilterParams] = useState<TaxSnapshotFilterParams>({
+  const [filterParams, setFilterParams] = useState<HouseholdTaxFilterDto>({
     year: initialYear,
-    quarter: undefined,
-    status: 'ALL',
-    keyword: '',
+    periodType: TaxPeriodType.Quarter,
+    periodNumber: 1,
+    branchId: undefined,
+    calculationMethod: TaxCalculationMethod.RevenuePercentage,
+    applyVatReduction2026: storedRates.applyVatReduction2026 ?? false,
+    customVatRate: storedRates.customVatRate,
+    customPitRate: storedRates.customPitRate,
+    vatReductionPercentage: storedRates.vatReductionPercentage,
   });
 
-  // Queries
+  // Query Live Summary from Server
+  const summaryQuery = useQuery({
+    queryKey: ['tax-summary', filterParams],
+    queryFn: () => taxSnapshotApi.getTaxSummary(filterParams),
+  });
+
+  // Query Historical Snapshots
   const snapshotsQuery = useQuery({
-    queryKey: ['tax-snapshots', filterParams],
-    queryFn: () => taxSnapshotApi.getSnapshots(filterParams),
+    queryKey: ['tax-snapshots', filterParams.year],
+    queryFn: () => taxSnapshotApi.getSnapshots(filterParams.year),
   });
 
-  const kpisQuery = useQuery({
-    queryKey: ['tax-kpis', filterParams.year || initialYear],
-    queryFn: () => taxSnapshotApi.getKPIs(filterParams.year || initialYear),
-  });
-
-  // Mutations
+  // Finalize Snapshot Mutation
   const createMutation = useMutation({
-    mutationFn: taxSnapshotApi.createSnapshot,
+    mutationFn: (req: CreateTaxSnapshotRequest) => taxSnapshotApi.createSnapshot(req),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tax-snapshots'] });
-      queryClient.invalidateQueries({ queryKey: ['tax-kpis'] });
+      queryClient.invalidateQueries({ queryKey: ['tax-summary'] });
     },
   });
 
-  const updateStatusMutation = useMutation({
-    mutationFn: ({
-      id,
-      status,
-      note,
-    }: {
-      id: string;
-      status: TaxSnapshotStatus;
-      note?: string;
-    }) => taxSnapshotApi.updateStatus(id, status, note),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tax-snapshots'] });
-      queryClient.invalidateQueries({ queryKey: ['tax-kpis'] });
-    },
-  });
+  const setCalculationMethod = useCallback((method: TaxCalculationMethod) => {
+    setFilterParams((prev) => ({ ...prev, calculationMethod: method }));
+  }, []);
 
-  const deleteMutation = useMutation({
-    mutationFn: taxSnapshotApi.deleteSnapshot,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tax-snapshots'] });
-      queryClient.invalidateQueries({ queryKey: ['tax-kpis'] });
-    },
-  });
+  const setPeriod = useCallback((periodType: TaxPeriodType, periodNumber: number) => {
+    setFilterParams((prev) => ({ ...prev, periodType, periodNumber }));
+  }, []);
 
-  const handleFilterChange = useCallback((newParams: Partial<TaxSnapshotFilterParams>) => {
-    setFilterParams((prev) => ({ ...prev, ...newParams }));
+  const setYear = useCallback((year: number) => {
+    setFilterParams((prev) => ({ ...prev, year }));
+  }, []);
+
+  const setApplyVatReduction = useCallback((apply: boolean) => {
+    setFilterParams((prev) => {
+      const next = { ...prev, applyVatReduction2026: apply };
+      saveStoredTaxRates({
+        customVatRate: next.customVatRate,
+        customPitRate: next.customPitRate,
+        vatReductionPercentage: next.vatReductionPercentage,
+        applyVatReduction2026: apply,
+      });
+      return next;
+    });
+  }, []);
+
+  const setCustomVatRate = useCallback((rate?: number) => {
+    setFilterParams((prev) => {
+      const next = { ...prev, customVatRate: rate };
+      saveStoredTaxRates({
+        customVatRate: rate,
+        customPitRate: next.customPitRate,
+        vatReductionPercentage: next.vatReductionPercentage,
+        applyVatReduction2026: next.applyVatReduction2026,
+      });
+      return next;
+    });
+  }, []);
+
+  const setCustomPitRate = useCallback((rate?: number) => {
+    setFilterParams((prev) => {
+      const next = { ...prev, customPitRate: rate };
+      saveStoredTaxRates({
+        customVatRate: next.customVatRate,
+        customPitRate: rate,
+        vatReductionPercentage: next.vatReductionPercentage,
+        applyVatReduction2026: next.applyVatReduction2026,
+      });
+      return next;
+    });
+  }, []);
+
+  const setVatReductionPercentage = useCallback((pct?: number) => {
+    setFilterParams((prev) => {
+      const next = { ...prev, vatReductionPercentage: pct };
+      saveStoredTaxRates({
+        customVatRate: next.customVatRate,
+        customPitRate: next.customPitRate,
+        vatReductionPercentage: pct,
+        applyVatReduction2026: next.applyVatReduction2026,
+      });
+      return next;
+    });
+  }, []);
+
+  const updateTaxRates = useCallback(
+    (rates: {
+      customVatRate?: number | null;
+      customPitRate?: number | null;
+      vatReductionPercentage?: number | null;
+      applyVatReduction2026?: boolean;
+    }) => {
+      saveStoredTaxRates(rates);
+      setFilterParams((prev) => ({
+        ...prev,
+        ...rates,
+      }));
+    },
+    []
+  );
+
+  const resetTaxRatesToDefault = useCallback(() => {
+    clearStoredTaxRates();
+    setFilterParams((prev) => ({
+      ...prev,
+      customVatRate: undefined,
+      customPitRate: undefined,
+      vatReductionPercentage: undefined,
+      applyVatReduction2026: false,
+    }));
   }, []);
 
   return {
+    summary: summaryQuery.data,
+    isSummaryLoading: summaryQuery.isLoading,
+    isSummaryRefetching: summaryQuery.isRefetching,
+    summaryError: summaryQuery.error,
+    refetchSummary: summaryQuery.refetch,
+
     snapshots: snapshotsQuery.data || [],
-    isLoading: snapshotsQuery.isLoading,
-    isRefetching: snapshotsQuery.isRefetching,
-    refetch: snapshotsQuery.refetch,
-    kpis: kpisQuery.data,
-    isKpiLoading: kpisQuery.isLoading,
+    isSnapshotsLoading: snapshotsQuery.isLoading,
+    refetchSnapshots: snapshotsQuery.refetch,
+
     filterParams,
-    setFilterParams: handleFilterChange,
+    setCalculationMethod,
+    setPeriod,
+    setYear,
+    setApplyVatReduction,
+    setCustomVatRate,
+    setCustomPitRate,
+    setVatReductionPercentage,
+    updateTaxRates,
+    resetTaxRatesToDefault,
+
     createSnapshot: createMutation.mutateAsync,
     isCreating: createMutation.isPending,
-    updateStatus: updateStatusMutation.mutateAsync,
-    isUpdatingStatus: updateStatusMutation.isPending,
-    deleteSnapshot: deleteMutation.mutateAsync,
-    isDeleting: deleteMutation.isPending,
   };
 }

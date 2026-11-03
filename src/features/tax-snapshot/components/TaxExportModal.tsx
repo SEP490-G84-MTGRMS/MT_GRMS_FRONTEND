@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import type { FC } from 'react';
 import { X, FileSpreadsheet, Code, CheckCircle, Download } from 'lucide-react';
-import type { TaxSnapshot } from '../types/taxSnapshot';
+import { formatTaxPeriodLabel, type TaxSnapshot } from '../types/taxSnapshot';
+import { taxSnapshotApi } from '../api/taxSnapshotApi';
 
 interface Props {
   snapshot: TaxSnapshot | null;
@@ -16,28 +17,65 @@ export const TaxExportModal: FC<Props> = ({ snapshot, isOpen, onClose }) => {
 
   if (!isOpen || !snapshot) return null;
 
-  const handleExport = () => {
+  const periodTitle = formatTaxPeriodLabel(snapshot.periodType, snapshot.periodNumber ?? snapshot.quarter, snapshot.year);
+
+  const handleExport = async () => {
     setIsExporting(true);
-    setTimeout(() => {
-      const filename =
-        exportType === 'excel'
-          ? 'To_Khai_Thue_HKD_Q' + snapshot.quarter + '_' + snapshot.year + '.xlsx'
-          : 'To_Khai_Form_01_CNKD_Q' + snapshot.quarter + '_' + snapshot.year + '.xml';
+    try {
+      const pNum = snapshot.periodNumber ?? snapshot.quarter ?? 1;
+      const pType = snapshot.periodType ?? 2;
+      const pCode = pType === 1 ? `T${pNum}` : pType === 3 ? `Nam${snapshot.year}` : `Q${pNum}`;
 
-      const dummyContent = exportType === 'excel' ? 'DATA_EXCEL_PLACEHOLDER' : '<?xml version="1.0"?><TaxReport></TaxReport>';
-      const blob = new Blob([dummyContent], { type: 'application/octet-stream' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-
-      setIsExporting(false);
+      if (exportType === 'excel') {
+        const blob = await taxSnapshotApi.exportTaxExcel({
+          year: snapshot.year,
+          periodType: pType,
+          periodNumber: pNum,
+          branchId: snapshot.branchId,
+          calculationMethod: snapshot.calculationMethod ?? 1,
+          applyVatReduction2026: Boolean(snapshot.applyVatReduction2026),
+        });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `BaoCaoThue_${snapshot.year}_${pCode}.xlsx`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      } else {
+        const xmlContent = `<?xml version="1.0" encoding="UTF-8"?>
+<HSoThueDTu xmlns="http://kekhaithue.gdt.gov.vn/TKhai">
+  <ThongTinChung>
+    <MaTKhai>01_CNKD</MaTKhai>
+    <TenTKhai>Tờ khai thuế đối với hộ kinh doanh, cá nhân kinh doanh</TenTKhai>
+    <KyKKhai>${pCode}/${snapshot.year}</KyKKhai>
+    <NguoiNopThue>${snapshot.finalizedBy || 'Chủ hộ kinh doanh'}</NguoiNopThue>
+  </ThongTinChung>
+  <ChiTiet>
+    <DoanhThu>${snapshot.taxableRevenueInPeriod ?? snapshot.taxableRevenue ?? 0}</DoanhThu>
+    <ThueGTGT>${snapshot.vatAmount}</ThueGTGT>
+    <ThueTNCN>${snapshot.pitAmount}</ThueTNCN>
+    <TongThue>${snapshot.totalTaxAmount}</TongThue>
+    <MaChungTu>${snapshot.auditSignatureHash || snapshot.id}</MaChungTu>
+  </ChiTiet>
+</HSoThueDTu>`;
+        const blob = new Blob([xmlContent], { type: 'application/xml;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `To_Khai_Form_01_CNKD_${snapshot.year}_${pCode}.xml`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }
       setIsDone(true);
-    }, 600);
+    } catch (err: any) {
+      alert(err.message || 'Không thể xuất báo cáo thuế');
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   return (
@@ -53,7 +91,7 @@ export const TaxExportModal: FC<Props> = ({ snapshot, isOpen, onClose }) => {
                 Xuất hồ sơ khai thuế
               </h3>
               <p style={{ fontSize: '0.78rem', color: '#64748B', margin: '2px 0 0 0' }}>
-                Hồ sơ Quý {snapshot.quarter}/{snapshot.year} (Thông tư 40/2021/TT-BTC)
+                Hồ sơ {periodTitle} (Hồ sơ lưu trữ nội bộ và kê khai điện tử)
               </p>
             </div>
           </div>

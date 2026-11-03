@@ -81,6 +81,7 @@ import {
 import {
   PosCheckoutPage,
   PosShiftPage,
+  CashierShiftDashboardPage,
   InventoryLookupPage,
   InvoiceManagementPage,
 } from '../features/pos';
@@ -97,6 +98,7 @@ import { LoginPage, RegisterPage, ForgotPasswordPage } from '../pages/auth';
 import { ReportsPnlDashboardPage } from '../features/reports-pnl';
 import { CashbookPage } from '../features/cashbook';
 import { TaxSnapshotPage } from '../features/tax-snapshot';
+import { FinanceOverviewPage } from '../features/finance/pages/FinanceOverviewPage';
 import { StoreSettingsHubPage } from '../pages/store/StoreSettingsHubPage';
 import { AccountManagementPage } from '../pages/store/AccountManagementPage';
 
@@ -452,6 +454,14 @@ export const router = createBrowserRouter([
         path: 'reports/pnl',
         element: <ReportsPnlDashboardPage />,
       },
+        {
+          path: 'finance',
+          element: <FinanceOverviewPage />,
+        },
+        {
+          path: 'finance/*',
+          element: <Navigate to="/store-owner/finance" replace />,
+        },
       {
         path: 'cashbook',
         element: <CashbookPage />,
@@ -732,40 +742,34 @@ export const router = createBrowserRouter([
     ],
   },
 
-  // Expenses (FE-07)
+  // Expenses Shortcut (FE-07)
   {
     path: '/expenses',
-    element: <StoreOwnerLayout />,
-    children: [
-      {
-        index: true,
-        element: <ServiceExpensesPage />,
-      },
-    ],
+    element: <Navigate to="/store-owner/expenses" replace />,
+  },
+  {
+    path: '/expenses/*',
+    element: <Navigate to="/store-owner/expenses" replace />,
   },
 
-  // Tax Snapshots (FE-19)
+  // Tax Snapshots Shortcut (FE-19)
   {
     path: '/tax-snapshots',
-    element: <StoreOwnerLayout />,
-    children: [
-      {
-        index: true,
-        element: <TaxSnapshotPage />,
-      },
-    ],
+    element: <Navigate to="/store-owner/tax-snapshots" replace />,
+  },
+  {
+    path: '/tax-snapshots/*',
+    element: <Navigate to="/store-owner/tax-snapshots" replace />,
   },
 
-  // Cashbook (FE-17)
+  // Cashbook Shortcut (FE-17)
   {
     path: '/cashbook',
-    element: <StoreOwnerLayout />,
-    children: [
-      {
-        index: true,
-        element: <CashbookPage />,
-      },
-    ],
+    element: <Navigate to="/store-owner/cashbook" replace />,
+  },
+  {
+    path: '/cashbook/*',
+    element: <Navigate to="/store-owner/cashbook" replace />,
   },
 
   // Promotions
@@ -802,6 +806,10 @@ export const router = createBrowserRouter([
         element: <PosShiftPage />,
       },
       {
+        path: 'cashier-shift',
+        element: <CashierShiftDashboardPage />,
+      },
+      {
         path: 'inventory-lookup',
         element: <InventoryLookupPage />,
       },
@@ -834,8 +842,12 @@ export const router = createBrowserRouter([
           },
           {
             path: 'shift',
-            element: <PosShiftPage />,
-          },
+        element: <PosShiftPage />,
+      },
+      {
+        path: 'cashier-shift',
+        element: <CashierShiftDashboardPage />,
+      },
           {
             path: 'inventory-lookup',
             element: <InventoryLookupPage />,

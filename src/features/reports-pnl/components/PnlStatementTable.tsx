@@ -274,7 +274,7 @@ export const PnlStatementTable: React.FC<PnlStatementTableProps> = ({
           </div>
           <div>
             <div style={{ fontSize: '0.88rem', fontWeight: 800, color: '#92400E' }}>
-              Liên thông Đối soát Kê khai & Nộp thuế HKD (FE-19)
+              Liên thông Đối soát Kê khai & Nộp thuế HKD
             </div>
             <p style={{ margin: '3px 0 0', fontSize: '0.78rem', color: '#B45309', lineHeight: 1.45 }}>
               Nghĩa vụ thuế 1.5% (<strong>8.412.900 đ</strong>) được trích lập tự động từ Doanh thu bán lẻ. Sau khi xác nhận nộp thuế tại FE-19, hệ thống sẽ tự động hạch toán Phiếu Chi sang Sổ quỹ FE-17, bảo đảm đối soát ba bên tuyệt đối.

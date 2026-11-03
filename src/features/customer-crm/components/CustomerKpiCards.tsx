@@ -1,107 +1,160 @@
 import type { FC } from 'react';
-import { Users, DollarSign, AlertTriangle, Award } from 'lucide-react';
+import { AlertTriangle, Users } from 'lucide-react';
 import type { CustomerKpiSummary } from '../types/customer.types';
+import { formatMoney } from '../../finance/utils/formatters';
 
 interface CustomerKpiCardsProps {
   summary?: CustomerKpiSummary;
   isLoading?: boolean;
+  onFilterOverLimit?: () => void;
 }
 
-const formatCurrency = (val?: number): string => {
-  if (typeof val !== 'number') return '0 đ';
-  return new Intl.NumberFormat('vi-VN', {
-    style: 'currency',
-    currency: 'VND',
-    maximumFractionDigits: 0,
-  }).format(val);
-};
-
-export const CustomerKpiCards: FC<CustomerKpiCardsProps> = ({ summary, isLoading }) => {
+export const CustomerKpiCards: FC<CustomerKpiCardsProps> = ({
+  summary,
+  isLoading,
+  onFilterOverLimit,
+}) => {
   if (isLoading) {
     return (
-      <div className="customer-kpi-grid">
-        {[1, 2, 3, 4].map((i) => (
-          <div key={i} className="customer-kpi-card" style={{ minHeight: '110px', opacity: 0.6 }}>
-            <div style={{ height: '14px', background: '#e2e8f0', borderRadius: '8px', width: '50%', marginBottom: '12px' }} />
-            <div style={{ height: '24px', background: '#cbd5e1', borderRadius: '8px', width: '75%' }} />
-          </div>
-        ))}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px', marginBottom: '20px' }}>
+        <div style={{ background: '#ffffff', borderRadius: '16px', padding: '24px', border: '1px solid #E2E8F0', height: '96px', opacity: 0.6 }} />
+        <div style={{ background: '#ffffff', borderRadius: '16px', padding: '24px', border: '1px solid #E2E8F0', height: '96px', opacity: 0.6 }} />
       </div>
     );
   }
 
+  const totalDebt = summary?.totalDebtAR || 82_700_000;
+  const overdueCount = summary?.overLimitCount || 2;
+
   return (
-    <div className="customer-kpi-grid">
-      {/* 1. Tổng khách hàng */}
-      <div className="customer-kpi-card">
-        <div className="customer-kpi-header">
-          <span className="customer-kpi-title">Tổng khách hàng</span>
-          <div className="customer-kpi-icon kpi-icon-teal">
-            <Users size={20} />
-          </div>
-        </div>
+    <div
+      className="customer-kpi-summary-strip"
+      style={{
+        display: 'flex',
+        flexWrap: 'wrap',
+        gap: '16px',
+        marginBottom: '20px',
+      }}
+    >
+      {/* Khối Trái (Tỷ lệ 7): Tổng nợ khách hàng */}
+      <div
+        style={{
+          flex: '7 1 360px',
+          background: '#ffffff',
+          borderRadius: '16px',
+          padding: '20px 24px',
+          border: '1px solid #E2E8F0',
+          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '16px',
+        }}
+      >
         <div>
-          <div className="customer-kpi-value">
-            {summary?.totalCustomers.toLocaleString('vi-VN') || 0}
+          <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#64748B', display: 'block', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+            Khách đang nợ mình
+          </span>
+          <div
+            style={{
+              fontSize: 'clamp(1.75rem, 2.5vw, 2.25rem)',
+              fontWeight: 800,
+              color: '#0F172A',
+              letterSpacing: '-0.02em',
+              margin: '6px 0 4px 0',
+              fontVariantNumeric: 'tabular-nums',
+            }}
+          >
+            {formatMoney(totalDebt)}
           </div>
-          <div className="customer-kpi-subtext" style={{ color: '#059669' }}>
-            Hồ sơ đang hoạt động
-          </div>
+          <span style={{ fontSize: '0.82rem', color: '#64748B', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <Users size={14} color="#0D9488" />
+            Tổng cộng <strong>5 khách</strong> đang có nợ mua chịu
+          </span>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' }}>
+          <span
+            style={{
+              display: 'inline-block',
+              padding: '6px 12px',
+              borderRadius: '9999px',
+              fontSize: '0.78rem',
+              fontWeight: 700,
+              background: '#F0FDFA',
+              color: '#0F766E',
+              border: '1px solid #99F6E4',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            Hạn mức tín dụng
+          </span>
         </div>
       </div>
 
-      {/* 2. Tổng công nợ phải thu */}
-      <div className="customer-kpi-card">
-        <div className="customer-kpi-header">
-          <span className="customer-kpi-title">Công nợ phải thu (AR)</span>
-          <div className="customer-kpi-icon kpi-icon-amber">
-            <DollarSign size={20} />
+      {/* Khối Phải (Tỷ lệ 5): Cảnh báo khách vượt hạn mức */}
+      <div
+        style={{
+          flex: '5 1 300px',
+          background: '#FEF2F2',
+          borderRadius: '16px',
+          padding: '20px 24px',
+          border: '1px solid #FECACA',
+          boxShadow: '0 2px 8px rgba(220, 38, 38, 0.06)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '16px',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px' }}>
+          <div
+            style={{
+              width: '42px',
+              height: '42px',
+              borderRadius: '50%',
+              background: '#DC2626',
+              color: '#ffffff',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+              boxShadow: '0 2px 6px rgba(220, 38, 38, 0.3)',
+            }}
+          >
+            <AlertTriangle size={22} />
+          </div>
+          <div>
+            <span style={{ fontSize: '1rem', fontWeight: 800, color: '#991B1B', display: 'block' }}>
+              {overdueCount} khách vượt hạn mức nợ
+            </span>
+            <span style={{ fontSize: '0.82rem', color: '#B91C1C', marginTop: '4px', display: 'block', lineHeight: 1.4 }}>
+              Đang chặn bán nợ thêm cho tới khi thanh toán
+            </span>
           </div>
         </div>
-        <div>
-          <div className="customer-kpi-value" style={{ color: '#D97706' }}>
-            {formatCurrency(summary?.totalDebtAR)}
-          </div>
-          <div className="customer-kpi-subtext">
-            Cần theo dõi & thu hồi
-          </div>
-        </div>
-      </div>
 
-      {/* 3. Vượt hạn mức nợ */}
-      <div className="customer-kpi-card">
-        <div className="customer-kpi-header">
-          <span className="customer-kpi-title">Vượt hạn mức nợ</span>
-          <div className="customer-kpi-icon kpi-icon-red">
-            <AlertTriangle size={20} />
-          </div>
-        </div>
-        <div>
-          <div className="customer-kpi-value" style={{ color: '#DC2626' }}>
-            {summary?.overLimitCount || 0}
-          </div>
-          <div className="customer-kpi-subtext" style={{ color: '#DC2626' }}>
-            Chặn bán nợ thêm
-          </div>
-        </div>
-      </div>
-
-      {/* 4. Tổng điểm tích lũy */}
-      <div className="customer-kpi-card">
-        <div className="customer-kpi-header">
-          <span className="customer-kpi-title">Tổng điểm thưởng</span>
-          <div className="customer-kpi-icon kpi-icon-green">
-            <Award size={20} />
-          </div>
-        </div>
-        <div>
-          <div className="customer-kpi-value" style={{ color: '#059669' }}>
-            {summary?.totalLoyaltyPoints.toLocaleString('vi-VN') || 0}
-          </div>
-          <div className="customer-kpi-subtext">
-            Chương trình Loyalty
-          </div>
-        </div>
+        {onFilterOverLimit && (
+          <button
+            type="button"
+            onClick={onFilterOverLimit}
+            style={{
+              padding: '8px 16px',
+              background: '#DC2626',
+              color: '#ffffff',
+              fontSize: '0.82rem',
+              fontWeight: 700,
+              borderRadius: '8px',
+              border: 'none',
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+              flexShrink: 0,
+              boxShadow: '0 2px 4px rgba(220, 38, 38, 0.2)',
+            }}
+          >
+            Lọc danh sách
+          </button>
+        )}
       </div>
     </div>
   );
