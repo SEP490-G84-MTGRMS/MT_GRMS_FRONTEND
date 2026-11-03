@@ -464,12 +464,11 @@ describe('STORE PRODUCT MANAGEMENT – MASTER AUDIT SUITE', () => {
           product={mockItemStore1}
           stores={mockStores}
           onSave={vi.fn()}
-          onRemove={vi.fn()}
         />
       );
 
       // Header
-      expect(screen.getByText('Chỉnh Sửa Sản Phẩm Tại Chi Nhánh')).toBeInTheDocument();
+      expect(screen.getByText(/Chỉnh sửa sản phẩm tại chi nhánh/i)).toBeInTheDocument();
 
       // Group A - Store Info
       expect(screen.getByDisplayValue('ST-01')).toBeInTheDocument();
@@ -655,39 +654,19 @@ describe('STORE PRODUCT MANAGEMENT – MASTER AUDIT SUITE', () => {
       expect(handleClose).toHaveBeenCalled();
     });
 
-    it('TC-EDIT-008: Remove from store triggers confirmation and preserves master catalog', async () => {
-      const handleRemove = vi.fn().mockResolvedValue(undefined);
-      const handleClose = vi.fn();
-
+    it('TC-EDIT-008: Edit modal no longer exposes remove-from-store action', () => {
       render(
         <EditStoreProductModal
           isOpen={true}
-          onClose={handleClose}
+          onClose={vi.fn()}
           product={mockItemStore1}
           stores={mockStores}
           onSave={vi.fn()}
-          onRemove={handleRemove}
         />
       );
 
-      // Click "Xóa khỏi chi nhánh"
-      const removeBtn = document.getElementById('btnRemoveFromStore')!;
-      fireEvent.click(removeBtn);
-
-      // Confirmation dialog appears explaining product remains in Master Catalog
-      expect(screen.getByText('Xác nhận gỡ sản phẩm khỏi chi nhánh')).toBeInTheDocument();
-      expect(document.getElementById('modalRemoveConfirmDialog')?.textContent).toContain(
-        'KHÔNG xóa sản phẩm khỏi danh mục sản phẩm tổng'
-      );
-
-      // Confirm removal
-      const confirmBtn = document.getElementById('btnConfirmRemoveProduct')!;
-      fireEvent.click(confirmBtn);
-
-      await waitFor(() => {
-        expect(handleRemove).toHaveBeenCalledWith(mockItemStore1);
-        expect(handleClose).toHaveBeenCalled();
-      });
+      expect(document.getElementById('btnRemoveFromStore')).toBeNull();
+      expect(screen.queryByText(/Gỡ khỏi/i)).not.toBeInTheDocument();
     });
 
     it('TC-EDIT-009: Shows error banner when saving fails and preserves user edits for retry', async () => {

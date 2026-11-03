@@ -10,6 +10,10 @@ export interface SupplierProductFilterParams {
   searchTerm?: string;
   productSearch?: string;
   supplierSearch?: string;
+  skus?: string[];
+  names?: string[];
+  supplierCodes?: string[];
+  supplierNames?: string[];
   supplierId?: string;
   categoryFilter?: string;
   statusFilter?: string;
@@ -51,11 +55,22 @@ export const supplierProductApi = {
       ? `/suppliers/${supplierId}/products`
       : `/suppliers/products`;
 
+    const skus = filter.skus?.filter(Boolean) ?? [];
+    const names = filter.names?.filter(Boolean) ?? [];
+    const supplierCodes = filter.supplierCodes?.filter(Boolean) ?? [];
+    const supplierNames = filter.supplierNames?.filter(Boolean) ?? [];
+    const legacyName = filter.productSearch?.trim() || filter.searchTerm?.trim() || '';
+    const legacySupplier = filter.supplierSearch?.trim() || '';
+
     const res = await httpClient.get<ApiResponse<PagedResult<any>>>(endpoint, {
       params: {
         SupplierId: isSpecificSupplier ? undefined : filter.supplierId !== 'ALL' ? filter.supplierId : undefined,
-        SearchTerm: filter.productSearch || filter.searchTerm || undefined,
-        SupplierSearch: filter.supplierSearch || undefined,
+        SearchTerm: !names.length && legacyName ? legacyName : undefined,
+        SupplierSearch: !supplierCodes.length && !supplierNames.length && legacySupplier ? legacySupplier : undefined,
+        Skus: skus.length ? skus : undefined,
+        Names: names.length ? names : undefined,
+        SupplierCodes: supplierCodes.length ? supplierCodes : undefined,
+        SupplierNames: supplierNames.length ? supplierNames : undefined,
         CategoryName:
           filter.categoryFilter && filter.categoryFilter !== 'ALL' ? filter.categoryFilter : undefined,
         Status:
@@ -65,7 +80,23 @@ export const supplierProductApi = {
             ? 2
             : undefined,
         PageIndex: filter.pageIndex || 1,
-        PageSize: filter.pageSize || 15,
+        PageSize: filter.pageSize || 20,
+      },
+      paramsSerializer: (p) => {
+        const search = new URLSearchParams();
+        Object.entries(p).forEach(([key, value]) => {
+          if (value === undefined || value === null || value === '') return;
+          if (Array.isArray(value)) {
+            value.forEach((item) => {
+              if (item !== undefined && item !== null && String(item).trim() !== '') {
+                search.append(key, String(item));
+              }
+            });
+            return;
+          }
+          search.append(key, String(value));
+        });
+        return search.toString();
       },
     });
 

@@ -70,6 +70,7 @@ export const storeProductApi = {
         barcode: x.barcode,
         category: x.category || '',
         unit: x.unit,
+        imageUrl: x.imageUrl || undefined,
         retailPrice: x.retailPrice,
         costPrice: x.costPrice,
         minOrderQuantity: x.minOrderQuantity ?? x.minimumOrderQuantity ?? 1,
@@ -80,6 +81,15 @@ export const storeProductApi = {
         status: x.status,
         shelfLocation: x.shelfLocation,
         assignedDate: x.assignedDate ? x.assignedDate.slice(0, 10) : new Date().toISOString().slice(0, 10),
+        unitPrices: Array.isArray(x.unitPrices)
+          ? x.unitPrices.map((u: any) => ({
+              unitId: u.unitId ? String(u.unitId) : undefined,
+              unitName: u.unitName || '',
+              conversionRate: Number(u.conversionRate ?? 1) || 1,
+              price: Number(u.price ?? 0),
+              isBaseUnit: Boolean(u.isBaseUnit),
+            }))
+          : undefined,
       }));
       return { items, total: paged.totalItems };
     }
@@ -130,12 +140,20 @@ export const storeProductApi = {
       name: string;
       categoryName: string;
       baseUoM: string;
+      imageUrl?: string;
       costPrice: number;
+      sellingPrice: number;
       moq: number;
       supplierId: string;
       supplierCode: string;
       supplierName: string;
       isAlreadyAssigned: boolean;
+      unitPrices?: Array<{
+        unitName: string;
+        conversionRate: number;
+        price: number;
+        isBaseUnit: boolean;
+      }>;
     }>
   > => {
     const res = await httpClient.get<ApiResponse<any[]>>(`/branches/${branchId}/assignable-products`);
@@ -147,12 +165,22 @@ export const storeProductApi = {
         name: p.name || p.productName || '',
         categoryName: p.categoryName || p.category || 'Khác',
         baseUoM: p.baseUoM || p.unitName || p.baseUnit || 'Cái',
+        imageUrl: p.imageUrl || undefined,
         costPrice: Number(p.costPrice ?? 0),
+        sellingPrice: Number(p.sellingPrice ?? p.retailPrice ?? 0),
         moq: Number(p.moq ?? p.minimumOrderQuantity ?? 1),
         supplierId: String(p.supplierId || ''),
         supplierCode: p.supplierCode || '',
         supplierName: p.supplierName || '',
         isAlreadyAssigned: Boolean(p.isAlreadyAssigned),
+        unitPrices: Array.isArray(p.unitPrices)
+          ? p.unitPrices.map((u: any) => ({
+              unitName: u.unitName || '',
+              conversionRate: Number(u.conversionRate ?? 1) || 1,
+              price: Number(u.price ?? 0),
+              isBaseUnit: Boolean(u.isBaseUnit),
+            }))
+          : undefined,
       }));
     }
     return [];
@@ -173,6 +201,13 @@ export const storeProductApi = {
   ): Promise<void> => {
     await httpClient.put(`/branches/${storeId}/products/${productId}`, {
       retailPrice: input.retailPrice,
+      unitPrices: input.unitPrices?.map((u) => ({
+        unitId: u.unitId || undefined,
+        unitName: u.unitName,
+        conversionRate: u.conversionRate,
+        price: u.price,
+        isBaseUnit: u.isBaseUnit,
+      })),
       status: input.status,
       shelfLocation: input.shelfLocation,
     });

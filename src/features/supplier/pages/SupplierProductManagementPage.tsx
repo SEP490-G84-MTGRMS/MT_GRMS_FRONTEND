@@ -27,6 +27,10 @@ export interface ProductFilterState extends SupplierProductFilterValues {
 }
 
 const DEFAULT_FILTERS: ProductFilterState = {
+  skus: [],
+  names: [],
+  supplierCodes: [],
+  supplierNames: [],
   productSearch: '',
   supplierSearch: '',
   searchTerm: '',
@@ -34,7 +38,7 @@ const DEFAULT_FILTERS: ProductFilterState = {
   categoryFilter: 'ALL',
   statusFilter: 'ALL',
   pageIndex: 1,
-  pageSize: 15,
+  pageSize: 20,
 };
 
 export const SupplierProductManagementPage: FC = () => {
@@ -318,11 +322,12 @@ export const SupplierProductManagementPage: FC = () => {
       </div>
 
 
-      {/* ── UNIFIED FILTER BAR THEO CHUẨN SUPPLIER LIST ── */}
+      {/* ── Filter bar chip-token theo chuẩn Store Products ── */}
       <div style={{ flexShrink: 0, marginBottom: 8 }}>
         <SupplierProductFilterBar
           initialValues={appliedFilters}
           suppliers={suppliers}
+          products={products}
           categories={availableCategories}
           totalCount={totalCount}
           filteredCount={products.length}

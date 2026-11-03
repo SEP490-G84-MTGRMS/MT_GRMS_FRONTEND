@@ -1,3 +1,11 @@
+export interface StoreProductUnitPrice {
+  unitId?: string;
+  unitName: string;
+  conversionRate: number;
+  price: number;
+  isBaseUnit: boolean;
+}
+
 export interface StoreProductItem {
   id: string;
   storeId: string;
@@ -9,16 +17,18 @@ export interface StoreProductItem {
   barcode: string;
   category: string;
   unit: string;
-  retailPrice: number; // Giá bán lẻ niêm yết tại cửa hàng
-  costPrice: number; // Giá vốn nhập sỉ từ NCC
+  imageUrl?: string;
+  retailPrice: number; // Giá bán lẻ niêm yết tại cửa hàng (ĐVT cơ sở)
+  costPrice: number; // Giá vốn từ SupplierProduct
   currentStock: number; // Tồn kho thực tế (SOH)
   minStockLevel: number; // Định mức tồn tối thiểu / an toàn
   primarySupplierCode?: string;
   primarySupplierName: string;
-  minOrderQuantity: number; // Số lượng đặt hàng tối thiểu MOQ
+  minOrderQuantity: number; // MOQ từ NCC — chỉ xem tại màn này
   status: 'Active' | 'Inactive';
   shelfLocation?: string;
   assignedDate: string;
+  unitPrices?: StoreProductUnitPrice[];
 }
 
 export interface StoreSummary {
@@ -57,7 +67,9 @@ export interface AssignStoreProductInput {
 
 export interface EditStoreProductInput {
   retailPrice: number;
+  unitPrices?: StoreProductUnitPrice[];
   minStockLevel?: number;
+  /** Không gửi lên API — MOQ chỉ sửa ở màn NCC */
   minOrderQuantity?: number;
   status?: 'Active' | 'Inactive';
   supplierId?: string;

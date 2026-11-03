@@ -149,7 +149,7 @@ export const CreateSupplierModal: FC<Props> = ({ isOpen, onClose, onSubmit }) =>
       <div
         className="modal-box"
         style={{
-          maxWidth: 620,
+          maxWidth: 580,
           width: '95%',
           maxHeight: '90vh',
           display: 'flex',
@@ -345,6 +345,7 @@ export const CreateSupplierModal: FC<Props> = ({ isOpen, onClose, onSubmit }) =>
                   width: '100%',
                   height: 38,
                   fontSize: 13.5,
+                  fontFamily: 'var(--font-mono, monospace)',
                   boxSizing: 'border-box',
                   borderColor: fieldErrors.email ? '#dc2626' : undefined,
                 }}
@@ -444,7 +445,7 @@ export const CreateSupplierModal: FC<Props> = ({ isOpen, onClose, onSubmit }) =>
                     }}
                   />
                   <span style={{ fontSize: 13.5, fontWeight: 600, color: status === 'Active' ? '#0f766e' : '#334155' }}>
-                    Hoạt động
+                    Đang hoạt động
                   </span>
                 </div>
 
@@ -473,7 +474,7 @@ export const CreateSupplierModal: FC<Props> = ({ isOpen, onClose, onSubmit }) =>
                     }}
                   />
                   <span style={{ fontSize: 13.5, fontWeight: 600, color: status === 'Inactive' ? '#dc2626' : '#334155' }}>
-                    Tạm ngưng
+                    Ngưng hoạt động
                   </span>
                 </div>
               </div>

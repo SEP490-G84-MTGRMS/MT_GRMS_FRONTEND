@@ -32,8 +32,10 @@ export const AssignStoreProductModal: FC<AssignStoreProductModalProps> = ({
   currentStore,
   onAssign,
 }) => {
-  // Store selection
+  // Store selection (text search)
   const [selectedBranchId, setSelectedBranchId] = useState<string>('');
+  const [branchQuery, setBranchQuery] = useState('');
+  const [branchDropdownOpen, setBranchDropdownOpen] = useState(false);
 
   // Products data
   const [masterProducts, setMasterProducts] = useState<MasterProduct[]>([]);
@@ -55,7 +57,10 @@ export const AssignStoreProductModal: FC<AssignStoreProductModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       const preselect = currentStore?.id || stores[0]?.id || '';
+      const pre = stores.find((s) => s.id === preselect);
       setSelectedBranchId(preselect);
+      setBranchQuery(pre ? `${pre.code} — ${pre.name}` : '');
+      setBranchDropdownOpen(false);
       setSelectedProductIds([]);
       setSearchTerm('');
       setCategoryFilter('ALL');
@@ -63,6 +68,17 @@ export const AssignStoreProductModal: FC<AssignStoreProductModalProps> = ({
       setIsSubmitting(false);
     }
   }, [isOpen, currentStore, stores]);
+
+  const filteredBranches = useMemo(() => {
+    const q = branchQuery.trim().toLowerCase();
+    if (!q) return stores;
+    return stores.filter(
+      (s) =>
+        s.code.toLowerCase().includes(q) ||
+        s.name.toLowerCase().includes(q) ||
+        (s.address || '').toLowerCase().includes(q)
+    );
+  }, [stores, branchQuery]);
 
   // Load products when branch changes: chỉ SP thuộc NCC đang cung cấp cho chi nhánh
   useEffect(() => {
@@ -177,7 +193,10 @@ export const AssignStoreProductModal: FC<AssignStoreProductModalProps> = ({
 
   // Handle branch change: clear selection to prevent accidental assignment to wrong store
   const handleBranchChange = (newBranchId: string) => {
+    const branch = stores.find((s) => s.id === newBranchId);
     setSelectedBranchId(newBranchId);
+    setBranchQuery(branch ? `${branch.code} — ${branch.name}` : '');
+    setBranchDropdownOpen(false);
     setSelectedProductIds([]);
     setSearchTerm('');
     setCategoryFilter('ALL');
@@ -352,49 +371,123 @@ export const AssignStoreProductModal: FC<AssignStoreProductModalProps> = ({
                 </label>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, alignItems: 'center' }}>
-                <div>
-                  <select
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, alignItems: 'start' }}>
+                <div style={{ position: 'relative' }}>
+                  <label style={{ fontSize: '0.78rem', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: 4 }}>
+                    Tìm chi nhánh
+                  </label>
+                  <input
                     id="assignStoreSelect"
-                    value={selectedBranchId}
-                    onChange={(e) => handleBranchChange(e.target.value)}
+                    type="text"
+                    value={branchQuery}
+                    placeholder="Nhập mã / tên chi nhánh..."
+                    onChange={(e) => {
+                      setBranchQuery(e.target.value);
+                      setBranchDropdownOpen(true);
+                      if (selectedBranchId) setSelectedBranchId('');
+                    }}
+                    onFocus={() => setBranchDropdownOpen(true)}
                     style={{
                       width: '100%',
-                      padding: '9px 12px',
+                      height: 40,
+                      padding: '0 12px',
                       borderRadius: 8,
                       border: `1.5px solid ${selectedBranchId ? '#0d9488' : '#cbd5e1'}`,
                       fontSize: '0.9rem',
                       backgroundColor: '#fff',
                       outline: 'none',
-                      color: selectedBranchId ? '#0f172a' : '#94a3b8',
+                      boxSizing: 'border-box',
                       fontWeight: selectedBranchId ? 600 : 400,
                     }}
-                  >
-                    <option value="">-- Chọn chi nhánh nhận hàng --</option>
-                    {stores.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name} ({s.code})
-                      </option>
-                    ))}
-                  </select>
+                  />
+                  {branchDropdownOpen && (
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: '100%',
+                        left: 0,
+                        right: 0,
+                        marginTop: 4,
+                        maxHeight: 220,
+                        overflowY: 'auto',
+                        background: '#fff',
+                        border: '1px solid #cbd5e1',
+                        borderRadius: 8,
+                        boxShadow: '0 10px 25px -5px rgba(15,23,42,0.12)',
+                        zIndex: 40,
+                      }}
+                    >
+                      {filteredBranches.length === 0 ? (
+                        <div style={{ padding: '10px 12px', fontSize: 13, color: '#94a3b8' }}>
+                          Không tìm thấy chi nhánh
+                        </div>
+                      ) : (
+                        filteredBranches.map((s) => (
+                          <button
+                            key={s.id}
+                            type="button"
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => handleBranchChange(s.id)}
+                            style={{
+                              width: '100%',
+                              textAlign: 'left',
+                              border: 'none',
+                              background: s.id === selectedBranchId ? '#f0fdfa' : '#fff',
+                              padding: '9px 12px',
+                              cursor: 'pointer',
+                              borderBottom: '1px solid #f1f5f9',
+                            }}
+                          >
+                            <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>
+                              {s.code} — {s.name}
+                            </div>
+                            <div style={{ fontSize: 11.5, color: '#64748b', marginTop: 2 }}>
+                              {s.address || 'Chưa có địa chỉ'}
+                            </div>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  )}
                 </div>
 
-                {selectedBranch ? (
+                <div>
+                  <label style={{ fontSize: '0.78rem', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: 4 }}>
+                    Địa chỉ chi nhánh
+                  </label>
+                  <input
+                    type="text"
+                    readOnly
+                    value={selectedBranch?.address || ''}
+                    placeholder="Chọn chi nhánh để hiện địa chỉ"
+                    style={{
+                      width: '100%',
+                      height: 40,
+                      padding: '0 12px',
+                      borderRadius: 8,
+                      border: '1px solid #cbd5e1',
+                      backgroundColor: '#f8fafc',
+                      fontSize: '0.86rem',
+                      color: '#475569',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                </div>
+              </div>
+
+              {selectedBranch ? (
                   <div
                     style={{
                       fontSize: '0.82rem',
                       color: '#475569',
-                      backgroundColor: '#ffffff',
-                      border: '1px solid #e2e8f0',
-                      borderRadius: 8,
-                      padding: '8px 14px',
+                      marginTop: 10,
                       display: 'flex',
                       flexDirection: 'column',
                       gap: 2,
                     }}
                   >
                     <div>
-                      <strong>Địa chỉ:</strong> {selectedBranch.address || 'Đang cập nhật'}
+                      <strong>Đã chọn:</strong> {selectedBranch.code} — {selectedBranch.name}
                     </div>
                     <div>
                       <strong>Quản lý:</strong> {selectedBranch.managerName} &bull;{' '}
@@ -405,11 +498,10 @@ export const AssignStoreProductModal: FC<AssignStoreProductModalProps> = ({
                     </div>
                   </div>
                 ) : (
-                  <div style={{ fontSize: '0.82rem', color: '#94a3b8', fontStyle: 'italic' }}>
+                  <div style={{ fontSize: '0.82rem', color: '#94a3b8', fontStyle: 'italic', marginTop: 10 }}>
                     Vui lòng chọn chi nhánh để xem danh sách sản phẩm khả dụng.
                   </div>
                 )}
-              </div>
             </div>
 
             {/* SECTION 2 – PRODUCT SEARCH AND FILTERS */}

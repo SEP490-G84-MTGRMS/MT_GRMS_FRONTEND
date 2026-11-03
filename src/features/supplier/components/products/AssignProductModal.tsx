@@ -42,7 +42,10 @@ const parseCurrency = (str: string): number => {
   return cleaned ? parseInt(cleaned, 10) : 0;
 };
 
-const defaultTerms = (): { price: string; moq: string } => ({ price: '0', moq: '1' });
+const defaultTerms = (masterPrice = 0, masterMoq = 1): { price: string; moq: string } => ({
+  price: String(Math.max(0, Math.round(masterPrice || 0))),
+  moq: String(Math.max(1, Math.round(masterMoq || 1))),
+});
 
 export const AssignProductModal: FC<AssignProductModalProps> = ({
   isOpen,
@@ -248,8 +251,13 @@ export const AssignProductModal: FC<AssignProductModalProps> = ({
     resetSelectionState();
   };
 
+  const termsFromMaster = (productId: string): { price: string; moq: string } => {
+    const product = productCatalog.find((p) => p.id === productId);
+    return defaultTerms(product?.defaultWholesalePrice ?? 0, product?.defaultMoq ?? 1);
+  };
+
   const ensureTerms = (productId: string): { price: string; moq: string } =>
-    productTerms[productId] ?? defaultTerms();
+    productTerms[productId] ?? termsFromMaster(productId);
 
   const handleToggleProduct = (productId: string) => {
     if (assignedMap[productId]) return;
@@ -260,7 +268,7 @@ export const AssignProductModal: FC<AssignProductModalProps> = ({
       if (!exists) {
         setProductTerms((terms) => ({
           ...terms,
-          [productId]: terms[productId] ?? defaultTerms(),
+          [productId]: terms[productId] ?? termsFromMaster(productId),
         }));
       }
       if (next.length > 0) {
@@ -286,7 +294,7 @@ export const AssignProductModal: FC<AssignProductModalProps> = ({
     setProductTerms((prev) => {
       const next = { ...prev };
       toAdd.forEach((id) => {
-        if (!next[id]) next[id] = defaultTerms();
+        if (!next[id]) next[id] = termsFromMaster(id);
       });
       return next;
     });

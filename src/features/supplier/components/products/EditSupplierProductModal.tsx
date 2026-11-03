@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import type { CSSProperties, FC, FormEvent, ReactNode } from 'react';
 import type { SupplierProductItem, EditSupplierProductInput } from '../../types/supplier.types';
-import { X, Check, AlertCircle } from 'lucide-react';
+import { X, Save, Loader2, AlertCircle } from 'lucide-react';
+import '../../supplier.css';
 
 interface EditSupplierProductModalProps {
   isOpen: boolean;
@@ -19,30 +20,31 @@ interface EditSupplierProductFormProps {
 }
 
 const labelStyle: CSSProperties = {
-  width: 160,
+  width: 140,
   flexShrink: 0,
-  fontSize: '0.84rem',
+  fontSize: 13,
   fontWeight: 600,
-  color: '#334155',
-  lineHeight: '40px',
+  color: '#475569',
+  textAlign: 'left',
 };
 
 const inputBase: CSSProperties = {
   flex: 1,
   minWidth: 0,
-  height: 40,
+  height: 38,
   padding: '0 12px',
   borderRadius: 8,
-  fontSize: '0.88rem',
+  fontSize: 13.5,
   outline: 'none',
   boxSizing: 'border-box',
+  textAlign: 'left',
 };
 
 const readonlyInputStyle: CSSProperties = {
   ...inputBase,
-  border: '1px solid #e2e8f0',
+  border: '1px solid #cbd5e1',
   backgroundColor: '#f1f5f9',
-  color: '#64748b',
+  color: '#475569',
   cursor: 'not-allowed',
 };
 
@@ -53,9 +55,15 @@ const editableInputStyle: CSSProperties = {
   color: '#0f172a',
 };
 
-const FieldRow: FC<{ label: string; children: ReactNode }> = ({ label, children }) => (
+const FieldRow: FC<{ label: string; children: ReactNode; htmlFor?: string }> = ({
+  label,
+  children,
+  htmlFor,
+}) => (
   <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-    <label style={labelStyle}>{label}</label>
+    <label htmlFor={htmlFor} style={labelStyle}>
+      {label}
+    </label>
     {children}
   </div>
 );
@@ -103,29 +111,21 @@ const EditSupplierProductForm: FC<EditSupplierProductFormProps> = ({
   onSave,
   onClose,
 }) => {
-  const [agreedPrice, setAgreedPrice] = useState<number>(item.agreedPrice);
+  const masterCost = item.costPrice ?? 0;
+  const initialPrice = item.agreedPrice > 0 ? item.agreedPrice : masterCost;
+  const [purchasePrice, setPurchasePrice] = useState<number>(initialPrice);
   const [moq, setMoq] = useState<number>(item.moq);
   const [isActive, setIsActive] = useState<boolean>(item.status === 'Active');
   const [errorMsg, setErrorMsg] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const unitLabel = item.baseUoM || item.deliveryUoM || 'Cái';
-  const costPrice = item.costPrice ?? 0;
-  const effectivePrice = agreedPrice > 0 ? agreedPrice : costPrice;
-  const fmtCurrency = (val: number) => `${new Intl.NumberFormat('vi-VN').format(val)} đ`;
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
 
-    if (isNaN(agreedPrice) || agreedPrice < 0) {
-      setErrorMsg('Giá nhập thỏa thuận không được âm.');
-      return;
-    }
-
-    if (agreedPrice === 0 && (costPrice == null || Number.isNaN(costPrice))) {
-      setErrorMsg(
-        'Không xác định được giá nhập hợp lệ. Nhập giá thỏa thuận hoặc đảm bảo sản phẩm đã có giá vốn.'
-      );
+    if (isNaN(purchasePrice) || purchasePrice < 0) {
+      setErrorMsg('Giá nhập không được âm.');
       return;
     }
 
@@ -139,7 +139,7 @@ const EditSupplierProductForm: FC<EditSupplierProductFormProps> = ({
       await onSave({
         id: item.id,
         deliveryUoM: unitLabel,
-        agreedPrice,
+        agreedPrice: purchasePrice,
         moq,
         isPrimary: item.isPrimary,
         supplierProductCode: item.supplierProductCode,
@@ -156,7 +156,9 @@ const EditSupplierProductForm: FC<EditSupplierProductFormProps> = ({
   return (
     <>
       <div
+        className="modal-header"
         style={{
+          background: '#f8fafc',
           padding: '16px 20px',
           borderBottom: '1px solid #e2e8f0',
           display: 'flex',
@@ -164,154 +166,191 @@ const EditSupplierProductForm: FC<EditSupplierProductFormProps> = ({
           justifyContent: 'space-between',
         }}
       >
-        <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: '#0f172a' }}>
-          Chỉnh sửa điều khoản cung ứng
-        </h3>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: 8,
+              backgroundColor: '#f0fdfa',
+              color: '#0f766e',
+              border: '1px solid #ccfbf1',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Save size={18} />
+          </div>
+          <h2 className="modal-title" style={{ fontSize: '1rem', fontWeight: 700, margin: 0, color: '#0f172a' }}>
+            Chỉnh sửa điều khoản cung ứng
+          </h2>
+        </div>
         <button
           type="button"
           onClick={onClose}
+          disabled={isSaving}
+          className="modal-close"
           style={{
-            background: 'none',
+            background: 'transparent',
             border: 'none',
-            color: '#94a3b8',
-            cursor: 'pointer',
+            cursor: isSaving ? 'not-allowed' : 'pointer',
+            color: '#64748b',
             padding: 4,
+            borderRadius: 6,
           }}
+          title="Đóng (Esc)"
         >
-          <X size={20} />
+          <X size={18} />
         </button>
       </div>
 
       <form
         onSubmit={(e) => void handleSubmit(e)}
-        style={{
-          padding: '20px',
-          overflowY: 'auto',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 12,
-        }}
+        noValidate
+        style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}
       >
-        {errorMsg && (
-          <div
-            style={{
-              backgroundColor: '#fef2f2',
-              border: '1px solid #fecaca',
-              color: '#dc2626',
-              padding: '10px 12px',
-              borderRadius: 8,
-              fontSize: '0.84rem',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-            }}
-          >
-            <AlertCircle size={16} />
-            <span>{errorMsg}</span>
-          </div>
-        )}
+        <div
+          className="modal-body"
+          style={{
+            padding: '20px',
+            overflowY: 'auto',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 14,
+          }}
+        >
+          {errorMsg && (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                padding: '10px 14px',
+                backgroundColor: '#fef2f2',
+                border: '1px solid #fecaca',
+                borderRadius: 8,
+                fontSize: '0.85rem',
+                color: '#b91c1c',
+              }}
+            >
+              <AlertCircle size={18} style={{ flexShrink: 0 }} />
+              <span>{errorMsg}</span>
+            </div>
+          )}
 
-        <FieldRow label="Nhà cung cấp">
-          <input type="text" value={supplierName} readOnly style={readonlyInputStyle} />
-        </FieldRow>
+          <FieldRow label="Nhà cung cấp">
+            <input type="text" value={supplierName} readOnly className="form-input" style={readonlyInputStyle} />
+          </FieldRow>
 
-        <FieldRow label="Sản phẩm">
-          <input type="text" value={item.name} readOnly style={readonlyInputStyle} />
-        </FieldRow>
+          <FieldRow label="Sản phẩm">
+            <input type="text" value={item.name} readOnly className="form-input" style={readonlyInputStyle} />
+          </FieldRow>
 
-        <FieldRow label="SKU">
-          <input type="text" value={item.sku} readOnly style={readonlyInputStyle} />
-        </FieldRow>
+          <FieldRow label="SKU">
+            <input
+              type="text"
+              value={item.sku}
+              readOnly
+              className="form-input"
+              style={{ ...readonlyInputStyle, fontFamily: 'var(--font-mono, monospace)', fontWeight: 700 }}
+            />
+          </FieldRow>
 
-        <FieldRow label="Barcode">
-          <input type="text" value={item.barcode || '—'} readOnly style={readonlyInputStyle} />
-        </FieldRow>
+          <FieldRow label="Barcode">
+            <input
+              type="text"
+              value={item.barcode || '—'}
+              readOnly
+              className="form-input"
+              style={{ ...readonlyInputStyle, fontFamily: 'var(--font-mono, monospace)' }}
+            />
+          </FieldRow>
 
-        <FieldRow label="Đơn vị tính">
-          <input type="text" value={unitLabel} readOnly style={readonlyInputStyle} />
-        </FieldRow>
+          <FieldRow label="Đơn vị tính">
+            <input type="text" value={unitLabel} readOnly className="form-input" style={readonlyInputStyle} />
+          </FieldRow>
 
-        <FieldRow label="Giá nhập hiệu lực">
-          <input type="text" value={fmtCurrency(effectivePrice)} readOnly style={readonlyInputStyle} />
-        </FieldRow>
+          <FieldRow label="Trạng thái">
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 12, height: 38 }}>
+              <StatusToggle checked={isActive} onChange={setIsActive} />
+              <span style={{ fontSize: 13.5, color: isActive ? '#15803d' : '#64748b', fontWeight: 600 }}>
+                {isActive ? 'Enable' : 'Disable'}
+              </span>
+            </div>
+          </FieldRow>
 
-        <FieldRow label="Trạng thái">
-          <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 12, height: 40 }}>
-            <StatusToggle checked={isActive} onChange={setIsActive} />
-            <span style={{ fontSize: '0.88rem', color: isActive ? '#15803d' : '#64748b', fontWeight: 600 }}>
-              {isActive ? 'Enable' : 'Disable'}
-            </span>
-          </div>
-        </FieldRow>
+          <FieldRow label="Giá nhập" htmlFor="inputSupplierPurchasePrice">
+            <input
+              id="inputSupplierPurchasePrice"
+              type="number"
+              min={0}
+              step={1000}
+              value={Number.isFinite(purchasePrice) ? purchasePrice : 0}
+              onChange={(e) => setPurchasePrice(parseFloat(e.target.value) || 0)}
+              className="form-input"
+              style={editableInputStyle}
+            />
+          </FieldRow>
 
-        <FieldRow label="Giá thỏa thuận">
-          <input
-            type="number"
-            min={0}
-            step={1000}
-            value={Number.isFinite(agreedPrice) ? agreedPrice : 0}
-            onChange={(e) => setAgreedPrice(parseFloat(e.target.value) || 0)}
-            style={editableInputStyle}
-          />
-        </FieldRow>
-
-        <FieldRow label="MOQ">
-          <input
-            type="number"
-            min={1}
-            value={moq || ''}
-            onChange={(e) => setMoq(parseInt(e.target.value, 10) || 1)}
-            style={editableInputStyle}
-          />
-        </FieldRow>
+          <FieldRow label="MOQ" htmlFor="inputSupplierMoq">
+            <input
+              id="inputSupplierMoq"
+              type="number"
+              min={1}
+              value={moq || ''}
+              onChange={(e) => setMoq(parseInt(e.target.value, 10) || 1)}
+              className="form-input"
+              style={editableInputStyle}
+            />
+          </FieldRow>
+        </div>
 
         <div
+          className="modal-footer"
           style={{
+            padding: '12px 20px',
+            backgroundColor: '#f8fafc',
+            borderTop: '1px solid #e2e8f0',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'flex-end',
             gap: 10,
-            paddingTop: 12,
-            borderTop: '1px solid #e2e8f0',
-            marginTop: 4,
           }}
         >
           <button
             type="button"
             onClick={onClose}
             disabled={isSaving}
-            style={{
-              padding: '8px 16px',
-              borderRadius: 8,
-              border: '1px solid #cbd5e1',
-              backgroundColor: '#ffffff',
-              color: '#475569',
-              fontSize: '0.85rem',
-              fontWeight: 600,
-              cursor: 'pointer',
-            }}
+            className="po-btn po-btn-secondary"
+            style={{ height: 36, padding: '0 16px', fontSize: 13 }}
           >
-            Hủy
+            Hủy Bỏ
           </button>
           <button
             type="submit"
             disabled={isSaving}
+            className="po-btn po-btn-primary"
             style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6,
-              padding: '8px 16px',
-              borderRadius: 8,
-              border: 'none',
-              backgroundColor: 'var(--blue-primary, #0f766e)',
-              color: '#ffffff',
-              fontSize: '0.85rem',
+              height: 36,
+              padding: '0 18px',
+              fontSize: 13,
               fontWeight: 600,
-              cursor: isSaving ? 'wait' : 'pointer',
-              opacity: isSaving ? 0.75 : 1,
+              backgroundColor: '#0f766e',
+              borderColor: '#0f766e',
             }}
           >
-            <Check size={16} /> {isSaving ? 'Đang lưu...' : 'Lưu'}
+            {isSaving ? (
+              <>
+                <Loader2 size={15} className="animate-spin" />
+                <span>Đang lưu...</span>
+              </>
+            ) : (
+              <>
+                <Save size={15} />
+                <span>Lưu Thay Đổi</span>
+              </>
+            )}
           </button>
         </div>
       </form>
@@ -329,31 +368,18 @@ export const EditSupplierProductModal: FC<EditSupplierProductModalProps> = ({
   if (!isOpen || !item) return null;
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        backgroundColor: 'rgba(15, 23, 42, 0.55)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 9999,
-        padding: 16,
-      }}
-      onClick={onClose}
-    >
+    <div className="modal-overlay" style={{ zIndex: 1050 }} onClick={onClose}>
       <div
+        className="modal-box"
         style={{
-          backgroundColor: '#ffffff',
-          borderRadius: 12,
-          width: '100%',
-          maxWidth: 560,
-          boxShadow: '0 20px 40px rgba(0, 0, 0, 0.15)',
-          border: '1px solid #e2e8f0',
-          overflow: 'hidden',
+          maxWidth: 580,
+          width: '95%',
+          maxHeight: '90vh',
           display: 'flex',
           flexDirection: 'column',
-          maxHeight: '90vh',
+          borderRadius: 12,
+          overflow: 'hidden',
+          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
         }}
         onClick={(e) => e.stopPropagation()}
       >

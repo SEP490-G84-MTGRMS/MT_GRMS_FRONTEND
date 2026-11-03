@@ -405,7 +405,6 @@ export const StoreProductManagementPage: FC = () => {
         stores={stores}
         onSave={handleUpdateProduct}
         onToggleStatus={handleToggleStatus}
-        onRemove={handleRemoveProduct}
       />
     </div>
   );
