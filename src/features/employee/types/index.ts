@@ -134,7 +134,8 @@ export interface Employee {
 export interface EmployeeFilterState {
   keyword: string;
   status: 'all' | 'active' | 'inactive';
-  workingBranchId: string;
+  workingBranchId?: string;
+  selectedBranchIds?: string[];
   salaryBranchId?: string;
   departmentId?: string;
 }

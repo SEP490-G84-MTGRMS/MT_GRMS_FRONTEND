@@ -348,6 +348,12 @@ const NAV_GROUPS: NavGroup[] = [
             badgeType: "blue",
           },
           {
+            label: "Cấu hình ca làm việc",
+            to: "/store-owner/employees/shifts",
+            badge: "Mới",
+            badgeType: "blue",
+          },
+          {
             label: "Bảng chấm công GPS/QR",
             to: "/store-owner/employees/attendance",
             badge: "GPS/QR",
@@ -365,8 +371,8 @@ const NAV_GROUPS: NavGroup[] = [
             badgeType: "red",
           },
           {
-            label: "Thiết lập ca & Phụ cấp",
-            to: "/store-owner/employees/schedule?view=shifts",
+            label: "Cấu hình ca làm việc",
+            to: "/store-owner/employees/shifts",
           },
         ],
       },
@@ -610,10 +616,15 @@ const NavDropdown: FC<DropdownProps> = ({
       return (
         (currPath === toPath || currPath.startsWith(toPath + "/")) &&
         !currPath.includes("/schedule") &&
+        !currPath.includes("/shifts") &&
         !currPath.includes("/attendance") &&
         !currPath.includes("/payroll") &&
         !hasOtherView
       );
+    }
+
+    if (toPath === "/store-owner/employees/shifts") {
+      return currPath === toPath || currPath.startsWith(toPath + "/");
     }
 
     if (toPath === "/store-owner/employees/schedule") {

@@ -88,6 +88,7 @@ export interface CreateIdentityAccountPayload {
 export interface EmployeeQueryFilterParams {
   keyword?: string;
   branchId?: string;
+  branchIds?: string[];
   status?: string;
   salaryType?: string;
   page?: number;

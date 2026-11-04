@@ -32,7 +32,9 @@ export const employeeApi = {
       params.keyword = filter.keyword.trim();
     }
 
-    if (filter.branchId && filter.branchId !== '' && filter.branchId !== 'all') {
+    if (filter.branchIds && filter.branchIds.length > 0) {
+      params.branchIds = filter.branchIds;
+    } else if (filter.branchId && filter.branchId !== '' && filter.branchId !== 'all') {
       params.branchId = filter.branchId;
     }
 

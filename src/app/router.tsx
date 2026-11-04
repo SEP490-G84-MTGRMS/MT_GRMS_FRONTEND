@@ -66,6 +66,7 @@ import {
 import {
   EmployeeListPage,
   WorkSchedulePage,
+  ShiftConfigPage,
   AttendancePage,
   PayslipManagementPage,
 } from '../features/employee';
@@ -469,6 +470,10 @@ export const router = createBrowserRouter([
         element: <WorkSchedulePage />,
       },
       {
+        path: 'employees/shifts',
+        element: <ShiftConfigPage />,
+      },
+      {
         path: 'employees/attendance',
         element: <AttendancePage />,
       },
@@ -589,6 +594,10 @@ export const router = createBrowserRouter([
         element: <WorkSchedulePage />,
       },
       {
+        path: 'employees/shifts',
+        element: <ShiftConfigPage />,
+      },
+      {
         path: 'employees/attendance',
         element: <AttendancePage />,
       },
@@ -676,6 +685,10 @@ export const router = createBrowserRouter([
       {
         path: 'schedule',
         element: <WorkSchedulePage />,
+      },
+      {
+        path: 'shifts',
+        element: <ShiftConfigPage />,
       },
       {
         path: 'attendance',

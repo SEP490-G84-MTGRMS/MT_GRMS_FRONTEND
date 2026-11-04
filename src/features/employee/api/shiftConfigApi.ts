@@ -4,28 +4,34 @@ import type { ApiResponse } from '../../../api/types';
 export interface ShiftConfigDto {
   id: string;
   branchId: string;
+  branchIds?: string[];
   shiftCode: string;
   shiftName: string;
-  startTime: string; // "06:00:00"
-  endTime: string;   // "14:00:00"
+  startTime: string; // "17:00:00"
+  endTime: string;   // "21:00:00"
   durationHours: number;
-  allowedCheckInStart: string;
-  allowedCheckInEnd: string;
+  allowedCheckInStart: string; // "14:00:00"
+  allowedCheckInEnd: string;   // "00:00:00"
+  isCheckInNextDay?: boolean;
   description?: string | null;
   isActive: boolean;
   createdAt: string;
   updatedAt?: string | null;
+  branchName?: string | null;
+  branchNames?: string[] | null;
 }
 
 export interface CreateShiftConfigPayload {
-  branchId: string;
-  shiftCode: string;
   shiftName: string;
   startTime: string;
   endTime: string;
-  durationHours?: number;
   allowedCheckInStart?: string;
   allowedCheckInEnd?: string;
+  branchIds?: string[];
+  branchId?: string;
+  shiftCode?: string;
+  durationHours?: number;
+  isCheckInNextDay?: boolean;
   description?: string;
   isActive?: boolean;
 }
@@ -34,20 +40,27 @@ export interface UpdateShiftConfigPayload {
   shiftName: string;
   startTime: string;
   endTime: string;
-  durationHours?: number;
   allowedCheckInStart?: string;
   allowedCheckInEnd?: string;
+  branchIds?: string[];
+  branchId?: string;
+  shiftCode?: string;
+  durationHours?: number;
+  isCheckInNextDay?: boolean;
   description?: string;
   isActive?: boolean;
 }
 
 export const shiftConfigApi = {
   /**
-   * Lấy danh sách cấu hình ca làm việc theo chi nhánh
+   * Lấy danh sách cấu hình ca làm việc theo chi nhánh (hoặc toàn bộ chi nhánh nếu không truyền branchId)
    * GET /api/v1/hr/shift-configs?branchId=...&isActive=...
    */
-  async getShiftConfigsByBranch(branchId: string, isActive?: boolean): Promise<ShiftConfigDto[]> {
-    const params: Record<string, any> = { branchId };
+  async getShiftConfigsByBranch(branchId?: string, isActive?: boolean): Promise<ShiftConfigDto[]> {
+    const params: Record<string, any> = {};
+    if (branchId) {
+      params.branchId = branchId;
+    }
     if (typeof isActive === 'boolean') {
       params.isActive = isActive;
     }
@@ -120,4 +133,3 @@ export const shiftConfigApi = {
     await httpClient.delete(`/hr/shift-configs/${id}`);
   },
 };
-

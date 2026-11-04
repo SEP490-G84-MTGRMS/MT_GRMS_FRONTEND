@@ -1,513 +1,737 @@
-import React, { useState, useEffect } from 'react';
-import { Clock, Plus, Edit2, Trash2, CheckCircle2, XCircle, AlertCircle, RefreshCw } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Info, X, ChevronDown, Check, AlertCircle } from 'lucide-react';
 import {
   shiftConfigApi,
   type ShiftConfigDto,
   type CreateShiftConfigPayload,
   type UpdateShiftConfigPayload,
 } from '../api/shiftConfigApi';
+import { employeeApi } from '../api/employeeApi';
+import type { Branch } from '../types';
+import '../employee.css';
 
 interface ShiftConfigModalProps {
   isOpen: boolean;
   onClose: () => void;
-  branchId: string;
+  branchId?: string;
   branchName?: string;
+  branches?: Branch[];
+  shiftToEdit?: ShiftConfigDto | null;
+  onSaved?: () => void;
 }
+
+// Helper tính khoảng cách giờ (hỗ trợ ca qua đêm)
+const calculateHoursText = (start: string, end: string): { hours: number; text: string } => {
+  try {
+    const [sh, sm] = start.split(':').map(Number);
+    const [eh, em] = end.split(':').map(Number);
+    if (isNaN(sh) || isNaN(sm) || isNaN(eh) || isNaN(em)) return { hours: 4, text: '4h' };
+    let diff = eh * 60 + em - (sh * 60 + sm);
+    if (diff < 0) diff += 24 * 60;
+    const h = Math.round((diff / 60) * 100) / 100;
+    return { hours: h, text: `${h}h` };
+  } catch {
+    return { hours: 4, text: '4h' };
+  }
+};
+
+// Helper format HH:mm:ss -> HH:mm
+const formatTimeHHmm = (timeStr?: string | null, fallback = '00:00'): string => {
+  if (!timeStr) return fallback;
+  return timeStr.slice(0, 5);
+};
 
 export const ShiftConfigModal: React.FC<ShiftConfigModalProps> = ({
   isOpen,
   onClose,
   branchId,
-  branchName,
+  branches: passedBranches,
+  shiftToEdit,
+  onSaved,
 }) => {
-  const [shifts, setShifts] = useState<ShiftConfigDto[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  // Form mode: null | 'create' | 'edit'
-  const [formMode, setFormMode] = useState<'create' | 'edit' | null>(null);
-  const [editingShiftId, setEditingShiftId] = useState<string | null>(null);
-
-  // Form states
-  const [shiftCode, setShiftCode] = useState('');
-  const [shiftName, setShiftName] = useState('');
-  const [startTime, setStartTime] = useState('06:00');
-  const [endTime, setEndTime] = useState('14:00');
-  const [durationHours, setDurationHours] = useState<string>('');
-  const [allowedStart, setAllowedStart] = useState<string>('');
-  const [allowedEnd, setAllowedEnd] = useState<string>('');
-  const [description, setDescription] = useState('');
+  const [allBranches, setAllBranches] = useState<Branch[]>(passedBranches || []);
+  const [shiftName, setShiftName] = useState('Tối');
+  const [startTime, setStartTime] = useState('17:00');
+  const [endTime, setEndTime] = useState('21:00');
+  const [checkInStart, setCheckInStart] = useState('14:00');
+  const [checkInEnd, setCheckInEnd] = useState('00:00');
+  const [selectedBranchIds, setSelectedBranchIds] = useState<string[]>([]);
   const [isActive, setIsActive] = useState(true);
+
+  const [isBranchDropdownOpen, setIsBranchDropdownOpen] = useState(false);
+  const [branchSearch, setBranchSearch] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const fetchShifts = async () => {
-    if (!branchId) return;
-    try {
-      setLoading(true);
-      setError(null);
-      const data = await shiftConfigApi.getShiftConfigsByBranch(branchId);
-      setShifts(data);
-    } catch (err: any) {
-      setError(err?.response?.data?.message || err?.message || 'Không thể tải danh sách ca làm việc.');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const branchDropdownRef = useRef<HTMLDivElement>(null);
 
+  // Load branches nếu chưa có
   useEffect(() => {
-    if (isOpen && branchId) {
-      fetchShifts();
-      setFormMode(null);
-      setEditingShiftId(null);
+    if (passedBranches && passedBranches.length > 0) {
+      setAllBranches(passedBranches);
+    } else {
+      employeeApi.getBranches().then((list) => {
+        setAllBranches(list || []);
+      });
     }
-  }, [isOpen, branchId]);
+  }, [passedBranches]);
+
+  // Đóng dropdown chọn chi nhánh khi click bên ngoài
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (branchDropdownRef.current && !branchDropdownRef.current.contains(e.target as Node)) {
+        setIsBranchDropdownOpen(false);
+      }
+    };
+    if (isBranchDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isBranchDropdownOpen]);
+
+  // Khi modal mở hoặc shiftToEdit thay đổi
+  useEffect(() => {
+    if (!isOpen) return;
+
+    if (shiftToEdit) {
+      setShiftName(shiftToEdit.shiftName || '');
+      setStartTime(formatTimeHHmm(shiftToEdit.startTime, '17:00'));
+      setEndTime(formatTimeHHmm(shiftToEdit.endTime, '21:00'));
+      setCheckInStart(formatTimeHHmm(shiftToEdit.allowedCheckInStart, '14:00'));
+      setCheckInEnd(formatTimeHHmm(shiftToEdit.allowedCheckInEnd, '00:00'));
+      setIsActive(shiftToEdit.isActive ?? true);
+
+      // Branch ids
+      if (shiftToEdit.branchIds && shiftToEdit.branchIds.length > 0) {
+        setSelectedBranchIds(shiftToEdit.branchIds);
+      } else if (shiftToEdit.branchId) {
+        setSelectedBranchIds([shiftToEdit.branchId]);
+      } else {
+        setSelectedBranchIds([]);
+      }
+    } else {
+      // Create mode
+      setShiftName('');
+      setStartTime('17:00');
+      setEndTime('21:00');
+      setCheckInStart('14:00');
+      setCheckInEnd('00:00');
+      setIsActive(true);
+      if (branchId) {
+        setSelectedBranchIds([branchId]);
+      } else if (allBranches.length > 0) {
+        setSelectedBranchIds([allBranches[0].id]);
+      } else {
+        setSelectedBranchIds([]);
+      }
+    }
+    setErrorMessage(null);
+    setIsBranchDropdownOpen(false);
+  }, [isOpen, shiftToEdit, branchId, allBranches.length]);
 
   if (!isOpen) return null;
 
-  const calculateAutoHours = (startStr: string, endStr: string) => {
+  // Tính số giờ làm việc
+  const durationInfo = calculateHoursText(startTime, endTime);
+
+  // Kiểm tra check-in có kéo dài sang ngày "hôm sau" hay không
+  const isNextDayCheckIn = (): boolean => {
     try {
-      const [sh, sm] = startStr.split(':').map(Number);
-      const [eh, em] = endStr.split(':').map(Number);
-      let diff = eh * 60 + em - (sh * 60 + sm);
-      if (diff < 0) diff += 24 * 60; // Ca đêm qua 24h
-      return Math.round((diff / 60) * 100) / 100;
+      const [sh, sm] = checkInStart.split(':').map(Number);
+      const [eh, em] = checkInEnd.split(':').map(Number);
+      const [wsh] = startTime.split(':').map(Number);
+      // Kết thúc lúc 00:00 hoặc trước giờ check-in bắt đầu, hoặc qua đêm
+      if (eh * 60 + em <= sh * 60 + sm) return true;
+      if (eh * 60 + em < wsh * 60) return true;
+      return false;
     } catch {
-      return 8;
+      return false;
     }
   };
 
-  const handleOpenCreate = () => {
-    setFormMode('create');
-    setEditingShiftId(null);
-    setShiftCode('');
-    setShiftName('');
-    setStartTime('06:00');
-    setEndTime('14:00');
-    setDurationHours('8');
-    setAllowedStart('05:30');
-    setAllowedEnd('07:00');
-    setDescription('');
-    setIsActive(true);
-    setError(null);
+  // Toggle chi nhánh
+  const handleToggleBranch = (bId: string) => {
+    setSelectedBranchIds((prev) =>
+      prev.includes(bId) ? prev.filter((id) => id !== bId) : [...prev, bId]
+    );
   };
 
-  const handleOpenEdit = (sh: ShiftConfigDto) => {
-    setFormMode('edit');
-    setEditingShiftId(sh.id);
-    setShiftCode(sh.shiftCode);
-    setShiftName(sh.shiftName);
-    setStartTime(sh.startTime.slice(0, 5));
-    setEndTime(sh.endTime.slice(0, 5));
-    setDurationHours(String(sh.durationHours));
-    setAllowedStart(sh.allowedCheckInStart ? sh.allowedCheckInStart.slice(0, 5) : '');
-    setAllowedEnd(sh.allowedCheckInEnd ? sh.allowedCheckInEnd.slice(0, 5) : '');
-    setDescription(sh.description || '');
-    setIsActive(sh.isActive);
-    setError(null);
+  const handleRemoveBranch = (e: React.MouseEvent, bId: string) => {
+    e.stopPropagation();
+    setSelectedBranchIds((prev) => prev.filter((id) => id !== bId));
   };
 
-  const handleToggleStatus = async (sh: ShiftConfigDto) => {
-    try {
-      const updated = await shiftConfigApi.updateShiftConfigStatus(sh.id, !sh.isActive);
-      setShifts((prev) => prev.map((item) => (item.id === sh.id ? updated : item)));
-    } catch (err: any) {
-      alert(err?.response?.data?.message || 'Lỗi khi cập nhật trạng thái');
-    }
+  const handleSelectAllBranches = () => {
+    setSelectedBranchIds(allBranches.map((b) => b.id));
   };
 
-  const handleDelete = async (id: string) => {
-    if (!window.confirm('Bạn có chắc chắn muốn xóa cấu hình ca này không?')) return;
-    try {
-      await shiftConfigApi.deleteShiftConfig(id);
-      setShifts((prev) => prev.filter((s) => s.id !== id));
-    } catch (err: any) {
-      alert(err?.response?.data?.message || 'Lỗi khi xóa ca làm việc');
-    }
+  const handleClearAllBranches = () => {
+    setSelectedBranchIds([]);
   };
 
+  // Submit form
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setErrorMessage(null);
+
     if (!shiftName.trim()) {
-      alert('Vui lòng nhập tên ca làm việc.');
+      setErrorMessage('Vui lòng nhập tên ca làm việc.');
+      return;
+    }
+
+    if (selectedBranchIds.length === 0) {
+      setErrorMessage('Vui lòng chọn ít nhất một chi nhánh trong phạm vi áp dụng.');
       return;
     }
 
     try {
       setSubmitting(true);
-      setError(null);
+      const isNextDay = isNextDayCheckIn();
 
-      const parsedDuration = durationHours ? parseFloat(durationHours) : calculateAutoHours(startTime, endTime);
-      const formatTimeSpan = (t: string) => (t.length === 5 ? `${t}:00` : t);
-
-      if (formMode === 'create') {
-        if (!shiftCode.trim()) {
-          alert('Vui lòng nhập mã ca làm việc (ví dụ: SANG, CHIEU, TOI).');
-          return;
-        }
-
-        const payload: CreateShiftConfigPayload = {
-          branchId,
-          shiftCode: shiftCode.trim().toUpperCase(),
-          shiftName: shiftName.trim(),
-          startTime: formatTimeSpan(startTime),
-          endTime: formatTimeSpan(endTime),
-          durationHours: parsedDuration,
-          allowedCheckInStart: allowedStart ? formatTimeSpan(allowedStart) : undefined,
-          allowedCheckInEnd: allowedEnd ? formatTimeSpan(allowedEnd) : undefined,
-          description: description.trim() || undefined,
-          isActive,
-        };
-
-        const created = await shiftConfigApi.createShiftConfig(payload);
-        setShifts((prev) => [...prev, created]);
-        setFormMode(null);
-      } else if (formMode === 'edit' && editingShiftId) {
+      if (shiftToEdit) {
         const payload: UpdateShiftConfigPayload = {
           shiftName: shiftName.trim(),
-          startTime: formatTimeSpan(startTime),
-          endTime: formatTimeSpan(endTime),
-          durationHours: parsedDuration,
-          allowedCheckInStart: allowedStart ? formatTimeSpan(allowedStart) : undefined,
-          allowedCheckInEnd: allowedEnd ? formatTimeSpan(allowedEnd) : undefined,
-          description: description.trim() || undefined,
+          startTime: startTime.length === 5 ? `${startTime}:00` : startTime,
+          endTime: endTime.length === 5 ? `${endTime}:00` : endTime,
+          durationHours: durationInfo.hours,
+          allowedCheckInStart: checkInStart.length === 5 ? `${checkInStart}:00` : checkInStart,
+          allowedCheckInEnd: checkInEnd.length === 5 ? `${checkInEnd}:00` : checkInEnd,
+          isCheckInNextDay: isNextDay,
+          branchIds: selectedBranchIds,
+          branchId: selectedBranchIds[0],
           isActive,
         };
-
-        const updated = await shiftConfigApi.updateShiftConfig(editingShiftId, payload);
-        setShifts((prev) => prev.map((s) => (s.id === editingShiftId ? updated : s)));
-        setFormMode(null);
-        setEditingShiftId(null);
+        await shiftConfigApi.updateShiftConfig(shiftToEdit.id, payload);
+      } else {
+        const payload: CreateShiftConfigPayload = {
+          shiftName: shiftName.trim(),
+          startTime: startTime.length === 5 ? `${startTime}:00` : startTime,
+          endTime: endTime.length === 5 ? `${endTime}:00` : endTime,
+          durationHours: durationInfo.hours,
+          allowedCheckInStart: checkInStart.length === 5 ? `${checkInStart}:00` : checkInStart,
+          allowedCheckInEnd: checkInEnd.length === 5 ? `${checkInEnd}:00` : checkInEnd,
+          isCheckInNextDay: isNextDay,
+          branchIds: selectedBranchIds,
+          branchId: selectedBranchIds[0],
+          isActive,
+        };
+        await shiftConfigApi.createShiftConfig(payload);
       }
+
+      onSaved?.();
+      onClose();
     } catch (err: any) {
-      setError(err?.response?.data?.message || err?.message || 'Có lỗi xảy ra.');
+      console.error('Lỗi lưu ca làm việc:', err);
+      setErrorMessage(
+        err?.response?.data?.message || err?.message || 'Có lỗi xảy ra khi lưu ca làm việc.'
+      );
     } finally {
       setSubmitting(false);
     }
   };
 
+  const filteredBranches = allBranches.filter((b) =>
+    b.name.toLowerCase().includes(branchSearch.toLowerCase().trim())
+  );
+
   return (
-    <div className="emp-modal-overlay" style={{ zIndex: 1100 }}>
-      <div className="emp-modal-card" style={{ maxWidth: 760, width: '90%' }}>
-        {/* Header Modal */}
-        <div className="emp-modal-header" style={{ background: '#F8FAFC' }}>
-          <div>
-            <h3 style={{ margin: 0, fontSize: 18, color: '#0F172A', display: 'flex', alignItems: 'center', gap: 8 }}>
-              <Clock size={20} color="#0F766E" />
-              <span>Quản lý danh mục Ca làm việc</span>
-            </h3>
-            <div style={{ fontSize: 13, color: '#64748B', marginTop: 4 }}>
-              Chi nhánh: <b>{branchName || 'Đang chọn'}</b> · Cấu hình các khung giờ làm việc chuẩn để xếp ca
-            </div>
-          </div>
-          <button type="button" className="emp-modal-close-btn" onClick={onClose}>
-            &times;
+    <div className="emp-modal-overlay" style={{ zIndex: 1200 }}>
+      <div
+        className="emp-modal-card"
+        style={{
+          maxWidth: 580,
+          borderRadius: 16,
+          boxShadow: '0 20px 40px -10px rgba(0, 0, 0, 0.25)',
+          overflow: 'visible',
+        }}
+      >
+        {/* Header */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '18px 24px 14px',
+            borderBottom: '1px solid #F1F5F9',
+          }}
+        >
+          <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1E293B' }}>
+            {shiftToEdit ? 'Chỉnh sửa ca làm việc' : 'Thêm ca làm việc'}
+          </h3>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={submitting}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              color: '#64748B',
+              fontSize: 18,
+              padding: 4,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <X size={20} />
           </button>
         </div>
 
-        {/* Modal Body */}
-        <div className="emp-modal-body" style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {error && (
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                padding: '10px 14px',
-                background: '#FEF2F2',
-                border: '1px solid #FECACA',
-                color: '#B91C1C',
-                borderRadius: 8,
-                fontSize: 13,
-              }}
-            >
-              <AlertCircle size={16} />
-              <span>{error}</span>
-            </div>
-          )}
-
-          {/* Form Create/Edit */}
-          {formMode ? (
-            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14, background: '#F8FAFC', padding: 18, borderRadius: 10, border: '1px solid #E2E8F0' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <h4 style={{ margin: 0, fontSize: 15, color: '#0F172A' }}>
-                  {formMode === 'create' ? '➕ Tạo mới ca làm việc' : `✏️ Chỉnh sửa ca: ${shiftCode}`}
-                </h4>
-                <button
-                  type="button"
-                  className="emp-btn emp-btn-secondary"
-                  onClick={() => setFormMode(null)}
-                  style={{ padding: '4px 10px', fontSize: 12 }}
-                >
-                  Hủy bỏ
-                </button>
+        {/* Form Body */}
+        <form onSubmit={handleSubmit} style={{ overflow: 'visible', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 18, overflow: 'visible' }}>
+            {errorMessage && (
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  padding: '10px 14px',
+                  background: '#FEF2F2',
+                  border: '1px solid #FECACA',
+                  borderRadius: 8,
+                  color: '#DC2626',
+                  fontSize: 13,
+                }}
+              >
+                <AlertCircle size={16} />
+                <span>{errorMessage}</span>
               </div>
+            )}
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 12 }}>
-                <div>
-                  <label style={{ fontSize: 13, fontWeight: 500, color: '#334155' }}>Mã ca *</label>
-                  <input
-                    type="text"
-                    required
-                    disabled={formMode === 'edit'}
-                    placeholder="VD: SANG, CHIEU"
-                    value={shiftCode}
-                    onChange={(e) => setShiftCode(e.target.value.toUpperCase())}
-                    style={{ width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid #CBD5E1', marginTop: 4, textTransform: 'uppercase' }}
-                  />
-                </div>
-                <div>
-                  <label style={{ fontSize: 13, fontWeight: 500, color: '#334155' }}>Tên ca *</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="VD: Ca sáng chuẩn"
-                    value={shiftName}
-                    onChange={(e) => setShiftName(e.target.value)}
-                    style={{ width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid #CBD5E1', marginTop: 4 }}
-                  />
-                </div>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
-                <div>
-                  <label style={{ fontSize: 13, fontWeight: 500, color: '#334155' }}>Giờ bắt đầu *</label>
-                  <input
-                    type="time"
-                    required
-                    value={startTime}
-                    onChange={(e) => {
-                      setStartTime(e.target.value);
-                      setDurationHours(String(calculateAutoHours(e.target.value, endTime)));
-                    }}
-                    style={{ width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid #CBD5E1', marginTop: 4 }}
-                  />
-                </div>
-                <div>
-                  <label style={{ fontSize: 13, fontWeight: 500, color: '#334155' }}>Giờ kết thúc *</label>
-                  <input
-                    type="time"
-                    required
-                    value={endTime}
-                    onChange={(e) => {
-                      setEndTime(e.target.value);
-                      setDurationHours(String(calculateAutoHours(startTime, e.target.value)));
-                    }}
-                    style={{ width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid #CBD5E1', marginTop: 4 }}
-                  />
-                </div>
-                <div>
-                  <label style={{ fontSize: 13, fontWeight: 500, color: '#334155' }}>Thời lượng (giờ)</label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    min="0.5"
-                    max="24"
-                    value={durationHours}
-                    onChange={(e) => setDurationHours(e.target.value)}
-                    placeholder="Tự tính theo khung giờ"
-                    style={{ width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid #CBD5E1', marginTop: 4 }}
-                  />
-                </div>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                <div>
-                  <label style={{ fontSize: 13, fontWeight: 500, color: '#334155' }}>Check-in sớm từ</label>
-                  <input
-                    type="time"
-                    value={allowedStart}
-                    onChange={(e) => setAllowedStart(e.target.value)}
-                    placeholder="Mặc định: trước 30p"
-                    style={{ width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid #CBD5E1', marginTop: 4 }}
-                  />
-                </div>
-                <div>
-                  <label style={{ fontSize: 13, fontWeight: 500, color: '#334155' }}>Check-in trễ tối đa</label>
-                  <input
-                    type="time"
-                    value={allowedEnd}
-                    onChange={(e) => setAllowedEnd(e.target.value)}
-                    placeholder="Mặc định: sau 60p"
-                    style={{ width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid #CBD5E1', marginTop: 4 }}
-                  />
-                </div>
-              </div>
-
+            {/* Hàng 1: Tên */}
+            <div style={{ display: 'grid', gridTemplateColumns: '170px 1fr', alignItems: 'center', gap: 12 }}>
+              <label style={{ fontSize: 14, fontWeight: 600, color: '#334155' }}>
+                Tên
+              </label>
               <div>
-                <label style={{ fontSize: 13, fontWeight: 500, color: '#334155' }}>Ghi chú ca</label>
                 <input
                   type="text"
-                  placeholder="Mô tả bổ sung hoặc bàn giao ca..."
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  style={{ width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid #CBD5E1', marginTop: 4 }}
+                  placeholder="VD: Tối, Sáng, Chiều..."
+                  value={shiftName}
+                  onChange={(e) => setShiftName(e.target.value)}
+                  style={{
+                    width: '100%',
+                    height: 40,
+                    padding: '0 12px',
+                    borderRadius: 8,
+                    border: '1px solid #CBD5E1',
+                    fontSize: 14,
+                    color: '#1E293B',
+                    outline: 'none',
+                  }}
+                  autoFocus
                 />
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
-                <input
-                  type="checkbox"
-                  id="chk-shift-active"
-                  checked={isActive}
-                  onChange={(e) => setIsActive(e.target.checked)}
-                />
-                <label htmlFor="chk-shift-active" style={{ fontSize: 13, color: '#334155', cursor: 'pointer' }}>
-                  Kích hoạt sử dụng ca này trong phân ca
-                </label>
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 6 }}>
-                <button
-                  type="button"
-                  className="emp-btn emp-btn-secondary"
-                  onClick={() => setFormMode(null)}
-                >
-                  Đóng
-                </button>
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="emp-btn emp-btn-primary"
-                >
-                  {submitting ? 'Đang lưu...' : formMode === 'create' ? 'Tạo ca' : 'Lưu cập nhật'}
-                </button>
-              </div>
-            </form>
-          ) : (
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: 13, color: '#64748B' }}>
-                Tổng cộng <b>{shifts.length}</b> cấu hình ca trong chi nhánh
-              </span>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button
-                  type="button"
-                  className="emp-btn emp-btn-secondary"
-                  onClick={fetchShifts}
-                  disabled={loading}
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
-                >
-                  <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-                  <span>Tải lại</span>
-                </button>
-                <button
-                  type="button"
-                  className="emp-btn emp-btn-primary"
-                  onClick={handleOpenCreate}
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
-                >
-                  <Plus size={15} />
-                  <span>Thêm ca mới</span>
-                </button>
               </div>
             </div>
-          )}
 
-          {/* Danh sách các ca */}
-          <div style={{ maxHeight: 380, overflowY: 'auto' }}>
-            {loading ? (
-              <div style={{ padding: 30, textAlign: 'center', color: '#64748B' }}>Đang tải dữ liệu ca...</div>
-            ) : shifts.length === 0 ? (
-              <div style={{ padding: 30, textAlign: 'center', color: '#94A3B8' }}>
-                Chưa có cấu hình ca nào cho chi nhánh này. Hãy bấm <b>Thêm ca mới</b> để bắt đầu.
+            {/* Hàng 2: Giờ làm việc ⓘ */}
+            <div style={{ display: 'grid', gridTemplateColumns: '170px 1fr', alignItems: 'center', gap: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                <span style={{ fontSize: 14, fontWeight: 600, color: '#334155' }}>
+                  Giờ làm việc
+                </span>
+                <span title="Khung giờ nhân viên thực hiện ca làm việc" style={{ cursor: 'pointer', display: 'flex' }}>
+                  <Info size={15} color="#94A3B8" />
+                </span>
               </div>
-            ) : (
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-                <thead>
-                  <tr style={{ background: '#F1F5F9', borderBottom: '1px solid #CBD5E1', textAlign: 'left', color: '#475569' }}>
-                    <th style={{ padding: '10px 12px' }}>Mã ca</th>
-                    <th style={{ padding: '10px 12px' }}>Tên ca</th>
-                    <th style={{ padding: '10px 12px' }}>Khung giờ</th>
-                    <th style={{ padding: '10px 12px' }}>Thời lượng</th>
-                    <th style={{ padding: '10px 12px' }}>Check-in</th>
-                    <th style={{ padding: '10px 12px', textAlign: 'center' }}>Trạng thái</th>
-                    <th style={{ padding: '10px 12px', textAlign: 'right' }}>Thao tác</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {shifts.map((sh) => (
-                    <tr key={sh.id} style={{ borderBottom: '1px solid #E2E8F0' }}>
-                      <td style={{ padding: '10px 12px', fontWeight: 600, color: '#0F172A' }}>
-                        <span style={{ padding: '2px 8px', borderRadius: 4, background: '#F1F5F9', border: '1px solid #E2E8F0' }}>
-                          {sh.shiftCode}
-                        </span>
-                      </td>
-                      <td style={{ padding: '10px 12px', fontWeight: 500 }}>{sh.shiftName}</td>
-                      <td style={{ padding: '10px 12px', color: '#0F766E', fontWeight: 600 }}>
-                        {sh.startTime.slice(0, 5)} - {sh.endTime.slice(0, 5)}
-                      </td>
-                      <td style={{ padding: '10px 12px', color: '#475569' }}>{sh.durationHours}h</td>
-                      <td style={{ padding: '10px 12px', color: '#64748B', fontSize: 12 }}>
-                        {sh.allowedCheckInStart?.slice(0, 5)} ~ {sh.allowedCheckInEnd?.slice(0, 5)}
-                      </td>
-                      <td style={{ padding: '10px 12px', textAlign: 'center' }}>
-                        <button
-                          type="button"
-                          onClick={() => handleToggleStatus(sh)}
-                          title="Bấm để bật/tắt kích hoạt"
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                {/* Giờ bắt đầu */}
+                <div style={{ position: 'relative', width: 110 }}>
+                  <input
+                    type="time"
+                    value={startTime}
+                    onChange={(e) => setStartTime(e.target.value)}
+                    style={{
+                      width: '100%',
+                      height: 38,
+                      padding: '0 10px',
+                      borderRadius: 8,
+                      border: '1px solid #CBD5E1',
+                      fontSize: 13,
+                      fontWeight: 500,
+                      color: '#1E293B',
+                      background: '#FFFFFF',
+                      outline: 'none',
+                    }}
+                  />
+                </div>
+
+                <span style={{ fontSize: 13, color: '#475569', fontWeight: 500 }}>Đến</span>
+
+                {/* Giờ kết thúc */}
+                <div style={{ position: 'relative', width: 110 }}>
+                  <input
+                    type="time"
+                    value={endTime}
+                    onChange={(e) => setEndTime(e.target.value)}
+                    style={{
+                      width: '100%',
+                      height: 38,
+                      padding: '0 10px',
+                      borderRadius: 8,
+                      border: '1px solid #CBD5E1',
+                      fontSize: 13,
+                      fontWeight: 500,
+                      color: '#1E293B',
+                      background: '#FFFFFF',
+                      outline: 'none',
+                    }}
+                  />
+                </div>
+
+                {/* Thời lượng hiển thị (e.g. 4h) */}
+                <span
+                  style={{
+                    fontSize: 14,
+                    fontWeight: 600,
+                    color: '#334155',
+                    marginLeft: 6,
+                  }}
+                >
+                  {durationInfo.text}
+                </span>
+              </div>
+            </div>
+
+            {/* Hàng 3: Giờ cho phép chấm công ⓘ */}
+            <div style={{ display: 'grid', gridTemplateColumns: '170px 1fr', alignItems: 'center', gap: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                <span style={{ fontSize: 14, fontWeight: 600, color: '#334155' }}>
+                  Giờ cho phép chấm công
+                </span>
+                <span title="Khoảng thời gian cho phép nhân viên điểm danh vào ca" style={{ cursor: 'pointer', display: 'flex' }}>
+                  <Info size={15} color="#94A3B8" />
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                {/* Check-in start */}
+                <div style={{ position: 'relative', width: 110 }}>
+                  <input
+                    type="time"
+                    value={checkInStart}
+                    onChange={(e) => setCheckInStart(e.target.value)}
+                    style={{
+                      width: '100%',
+                      height: 38,
+                      padding: '0 10px',
+                      borderRadius: 8,
+                      border: '1px solid #CBD5E1',
+                      fontSize: 13,
+                      fontWeight: 500,
+                      color: '#1E293B',
+                      background: '#FFFFFF',
+                      outline: 'none',
+                    }}
+                  />
+                </div>
+
+                <span style={{ fontSize: 13, color: '#475569', fontWeight: 500 }}>Đến</span>
+
+                {/* Check-in end */}
+                <div style={{ position: 'relative', width: 110 }}>
+                  <input
+                    type="time"
+                    value={checkInEnd}
+                    onChange={(e) => setCheckInEnd(e.target.value)}
+                    style={{
+                      width: '100%',
+                      height: 38,
+                      padding: '0 10px',
+                      borderRadius: 8,
+                      border: '1px solid #CBD5E1',
+                      fontSize: 13,
+                      fontWeight: 500,
+                      color: '#1E293B',
+                      background: '#FFFFFF',
+                      outline: 'none',
+                    }}
+                  />
+                </div>
+
+                {/* Chữ 'hôm sau' khi kết thúc qua ngày hôm sau */}
+                {isNextDayCheckIn() && (
+                  <span
+                    style={{
+                      fontSize: 13,
+                      fontWeight: 500,
+                      color: '#475569',
+                      marginLeft: 6,
+                    }}
+                  >
+                    hôm sau
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Hàng 4: Phạm vi áp dụng (Multi-select Chips) */}
+            <div style={{ display: 'grid', gridTemplateColumns: '170px 1fr', alignItems: 'flex-start', gap: 12 }}>
+              <label style={{ fontSize: 14, fontWeight: 600, color: '#334155', paddingTop: 6 }}>
+                Phạm vi áp dụng
+              </label>
+
+              <div ref={branchDropdownRef} style={{ position: 'relative', width: '100%' }}>
+                {/* Khung chứa các tag chi nhánh */}
+                <div
+                  onClick={() => setIsBranchDropdownOpen((prev) => !prev)}
+                  style={{
+                    minHeight: 42,
+                    padding: '4px 8px',
+                    borderRadius: 8,
+                    border: `1px solid ${isBranchDropdownOpen ? 'var(--blue-primary, #0F766E)' : '#CBD5E1'}`,
+                    boxShadow: isBranchDropdownOpen ? '0 0 0 3px rgba(15, 118, 110, 0.15)' : 'none',
+                    background: '#FFFFFF',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    flexWrap: 'wrap',
+                    gap: 6,
+                    transition: 'all 0.15s ease',
+                  }}
+                >
+                  {selectedBranchIds.length === 0 ? (
+                    <span style={{ color: '#94A3B8', fontSize: 13, padding: '4px 6px' }}>
+                      Chọn chi nhánh áp dụng...
+                    </span>
+                  ) : (
+                    selectedBranchIds.map((bId) => {
+                      const branch = allBranches.find((b) => b.id === bId);
+                      const name = branch ? branch.name : 'Chi nhánh';
+                      return (
+                        <span
+                          key={bId}
                           style={{
-                            background: 'none',
-                            border: 'none',
-                            cursor: 'pointer',
-                            padding: 0,
                             display: 'inline-flex',
                             alignItems: 'center',
-                            gap: 4,
-                            color: sh.isActive ? '#10B981' : '#94A3B8',
-                            fontSize: 12,
-                            fontWeight: 500,
+                            gap: 6,
+                            background: 'var(--blue-primary, #0F766E)',
+                            color: '#FFFFFF',
+                            fontSize: 13,
+                            fontWeight: 600,
+                            padding: '4px 10px',
+                            borderRadius: 8,
                           }}
                         >
-                          {sh.isActive ? (
-                            <>
-                              <CheckCircle2 size={16} color="#10B981" />
-                              <span>Hoạt động</span>
-                            </>
-                          ) : (
-                            <>
-                              <XCircle size={16} color="#94A3B8" />
-                              <span>Tắt</span>
-                            </>
-                          )}
-                        </button>
-                      </td>
-                      <td style={{ padding: '10px 12px', textAlign: 'right' }}>
-                        <div style={{ display: 'inline-flex', gap: 6 }}>
-                          <button
-                            type="button"
-                            onClick={() => handleOpenEdit(sh)}
-                            className="emp-btn emp-btn-secondary"
-                            style={{ padding: '4px 8px' }}
-                            title="Sửa cấu hình ca"
+                          <span>{name}</span>
+                          <span
+                            onClick={(e) => handleRemoveBranch(e, bId)}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              cursor: 'pointer',
+                              borderRadius: '50%',
+                              width: 16,
+                              height: 16,
+                              fontSize: 13,
+                              fontWeight: 700,
+                            }}
+                            title="Xóa chi nhánh"
                           >
-                            <Edit2 size={14} />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleDelete(sh.id)}
-                            className="emp-btn emp-btn-danger"
-                            style={{ padding: '4px 8px' }}
-                            title="Xóa ca"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-        </div>
+                            ✕
+                          </span>
+                        </span>
+                      );
+                    })
+                  )}
 
-        {/* Modal Footer */}
-        <div className="emp-modal-footer" style={{ justifyContent: 'flex-end', background: '#F8FAFC' }}>
-          <button type="button" className="emp-btn emp-btn-secondary" onClick={onClose}>
-            Đóng
-          </button>
-        </div>
+                  <div style={{ marginLeft: 'auto', paddingRight: 4, color: '#94A3B8' }}>
+                    <ChevronDown
+                      size={16}
+                      style={{
+                        transform: isBranchDropdownOpen ? 'rotate(180deg)' : 'none',
+                        transition: 'transform 0.2s ease',
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* Dropdown Menu để chọn chi nhánh */}
+                {isBranchDropdownOpen && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      bottom: 'calc(100% + 6px)',
+                      left: 0,
+                      right: 0,
+                      background: '#FFFFFF',
+                      border: '1px solid #E2E8F0',
+                      borderRadius: 10,
+                      boxShadow: '0 -10px 25px -5px rgba(0, 0, 0, 0.18), 0 -4px 10px -4px rgba(0, 0, 0, 0.1)',
+                      zIndex: 2000,
+                      overflow: 'hidden',
+                    }}
+                  >
+                    {/* Thanh tìm kiếm */}
+                    <div style={{ padding: '8px 10px', borderBottom: '1px solid #F1F5F9' }}>
+                      <input
+                        type="text"
+                        placeholder="Tìm chi nhánh..."
+                        value={branchSearch}
+                        onChange={(e) => setBranchSearch(e.target.value)}
+                        style={{
+                          width: '100%',
+                          padding: '6px 10px',
+                          border: '1px solid #CBD5E1',
+                          borderRadius: 6,
+                          fontSize: 12,
+                          outline: 'none',
+                        }}
+                        autoFocus
+                      />
+                    </div>
+
+                    {/* Quick selection */}
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        padding: '6px 12px',
+                        background: '#F8FAFC',
+                        borderBottom: '1px solid #F1F5F9',
+                        fontSize: 12,
+                      }}
+                    >
+                      <button
+                        type="button"
+                        onClick={handleSelectAllBranches}
+                        style={{
+                          border: 'none',
+                          background: 'transparent',
+                          color: 'var(--blue-primary, #0F766E)',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          padding: 0,
+                        }}
+                      >
+                        Chọn tất cả ({allBranches.length})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleClearAllBranches}
+                        style={{
+                          border: 'none',
+                          background: 'transparent',
+                          color: '#64748B',
+                          cursor: 'pointer',
+                          padding: 0,
+                        }}
+                      >
+                        Bỏ chọn tất cả
+                      </button>
+                    </div>
+
+                    {/* Danh sách */}
+                    <div style={{ maxHeight: 180, overflowY: 'auto' }}>
+                      {filteredBranches.map((b) => {
+                        const isChecked = selectedBranchIds.includes(b.id);
+                        return (
+                          <div
+                            key={b.id}
+                            onClick={() => handleToggleBranch(b.id)}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              padding: '8px 12px',
+                              cursor: 'pointer',
+                              background: isChecked ? 'var(--blue-light, #F0FDFA)' : 'transparent',
+                              fontSize: 13,
+                            }}
+                          >
+                            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={() => {}}
+                                style={{ accentColor: 'var(--blue-primary, #0F766E)', width: 15, height: 15 }}
+                              />
+                              <span style={{ fontWeight: isChecked ? 600 : 400, color: '#1E293B' }}>
+                                {b.name}
+                              </span>
+                            </label>
+                            {isChecked && <Check size={14} color="var(--blue-primary, #0F766E)" />}
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    <div
+                      style={{
+                        padding: '6px 12px',
+                        background: '#F8FAFC',
+                        borderTop: '1px solid #F1F5F9',
+                        display: 'flex',
+                        justifyContent: 'flex-end',
+                      }}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setIsBranchDropdownOpen(false)}
+                        style={{
+                          padding: '4px 12px',
+                          fontSize: 12,
+                          background: 'var(--blue-primary, #0F766E)',
+                          color: '#FFFFFF',
+                          border: 'none',
+                          borderRadius: 6,
+                          cursor: 'pointer',
+                          fontWeight: 600,
+                        }}
+                      >
+                        Xong
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div
+            style={{
+              padding: '14px 24px',
+              borderTop: '1px solid #F1F5F9',
+              display: 'flex',
+              justifyContent: 'flex-end',
+              gap: 10,
+              background: '#F8FAFC',
+              borderRadius: '0 0 16px 16px',
+            }}
+          >
+            <button
+              type="button"
+              className="emp-btn emp-btn-secondary"
+              onClick={onClose}
+              disabled={submitting}
+              style={{ padding: '0 18px', height: 38 }}
+            >
+              Hủy
+            </button>
+            <button
+              type="submit"
+              className="emp-btn emp-btn-primary"
+              disabled={submitting}
+              style={{
+                padding: '0 24px',
+                height: 38,
+                background: 'var(--blue-primary, #0F766E)',
+                borderColor: 'var(--blue-primary, #0F766E)',
+                fontWeight: 600,
+              }}
+            >
+              {submitting ? 'Đang lưu...' : shiftToEdit ? 'Lưu thay đổi' : 'Thêm ca'}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );
 };
-
