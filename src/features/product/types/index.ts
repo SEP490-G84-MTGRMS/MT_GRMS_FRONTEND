@@ -29,6 +29,9 @@ export interface ProductResponse {
   createdAt: string;
   rawCreatedAt?: string;
   updatedAt?: string | null;
+  units?: ProductUnitResponse[];
+  uomConversions?: UomConversion[];
+  totalUnits?: number;
 }
 
 export interface ProductQueryFilter {
@@ -208,6 +211,7 @@ export interface ProductItem {
   internalNote?: string;
   hasTransactions?: boolean;
   uomConversions?: UomConversion[];
+  totalUnits?: number;
   comboComponents?: ComboComponent[];
   stockLedger?: StockLedgerEntry[];
   branchStocks?: BranchStock[];

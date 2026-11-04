@@ -147,6 +147,41 @@ export const ProductListPage: React.FC = () => {
   const [selectedUnits, setSelectedUnits] = useState<Record<string, string>>({});
   const [activeUnitDropdownId, setActiveUnitDropdownId] = useState<string | null>(null);
 
+  const handleToggleUnitDropdown = async (e: React.MouseEvent, productId: string) => {
+    e.stopPropagation();
+    if (activeUnitDropdownId === productId) {
+      setActiveUnitDropdownId(null);
+      return;
+    }
+    setActiveUnitDropdownId(productId);
+    const targetProduct = products.find((x) => x.id === productId);
+    if (targetProduct && (!targetProduct.uomConversions || targetProduct.uomConversions.length === 0)) {
+      try {
+        const units = await productApi.getProductUnits(productId);
+        if (units && units.length > 0) {
+          const uoms: UomConversion[] = units
+            .filter((u) => !u.isBaseUnit && u.unitName !== targetProduct.baseUnit)
+            .map((u) => ({
+              id: u.id,
+              unitName: u.unitName,
+              conversionRate: u.conversionRate,
+              price: u.price,
+              barcode: u.barcode ?? undefined,
+            }));
+          setProducts((prev) =>
+            prev.map((item) =>
+              item.id === productId
+                ? { ...item, uomConversions: uoms, totalUnits: 1 + uoms.length }
+                : item
+            )
+          );
+        }
+      } catch {
+        // ignore network error
+      }
+    }
+  };
+
   // Đóng popover chọn đơn vị khi click ra ngoài
   useEffect(() => {
     if (!activeUnitDropdownId) return;
@@ -205,31 +240,19 @@ export const ProductListPage: React.FC = () => {
         categoryIds: selectedCategoryIds.length > 0 ? selectedCategoryIds : undefined,
       });
       if (res && res.items) {
-        const mapped: ProductItem[] = await Promise.all(
-          res.items.map(async (p) => {
-            let uomConversions: UomConversion[] = (p as any).uomConversions || [];
-            if (uomConversions.length === 0 && p.id) {
-              const isGuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(p.id);
-              if (isGuid) {
-                try {
-                  const units = await productApi.getProductUnits(p.id);
-                  if (units && units.length > 0) {
-                    uomConversions = units
-                      .filter((u) => !u.isBaseUnit)
-                      .map((u) => ({
-                        id: u.id,
-                        unitName: u.unitName,
-                        conversionRate: u.conversionRate,
-                        price: u.price,
-                        barcode: u.barcode ?? undefined,
-                      }));
-                  }
-                } catch {
-                  // ignore network or not found
-                }
-              }
-            }
-            return {
+        const mapped: ProductItem[] = res.items.map((p) => {
+          const rawUnits: any[] = (p as any).units || (p as any).uomConversions || [];
+          const uomConversions: UomConversion[] = rawUnits
+            .filter((u) => !u.isBaseUnit && u.unitName !== (p.baseUnit || (p as any).unitName))
+            .map((u) => ({
+              id: u.id,
+              unitName: u.unitName,
+              conversionRate: u.conversionRate ?? 1,
+              price: u.price ?? 0,
+              barcode: u.barcode ?? undefined,
+            }));
+          const totalUnits = (p as any).totalUnits ?? (p as any).unitsCount ?? (1 + uomConversions.length);
+          return {
               id: p.id,
               productCode: p.productCode || (p as any).sku || p.barcode || 'SP000000',
               barcode: p.barcode || '',
@@ -252,9 +275,9 @@ export const ProductListPage: React.FC = () => {
               taxCategory: (p as any).taxCategory || 'STANDARD_1PCT',
               isFavorite: Boolean(p.isFavorite),
               uomConversions,
+              totalUnits,
             };
-          })
-        );
+        });
         setProducts(mapped);
         setTotalCount(res.totalCount);
       } else {
@@ -1391,7 +1414,7 @@ export const ProductListPage: React.FC = () => {
                   <th style={{ width: 36, textAlign: 'center' }}>★</th>
                   <th style={{ width: 180, minWidth: 150 }}>Mã hàng</th>
                   <th>Tên hàng hóa</th>
-                  <th style={{ width: 110 }}>Đơn vị tính</th>
+                  <th style={{ width: 150, minWidth: 140 }}>Đơn vị tính</th>
                   <th style={{ textAlign: 'right', width: 120 }}>Giá bán</th>
                   {userRole === 'StoreOwner' && (
                     <th style={{ textAlign: 'right', width: 120 }}>Giá vốn</th>
@@ -1415,6 +1438,8 @@ export const ProductListPage: React.FC = () => {
                   const displayPrice = currentUom ? currentUom.price : (p.sellingPrice ?? 0);
                   const displayCode = currentUom?.productCode || p.productCode;
                   const otherUnits = allUnits.filter((u) => u.unitName !== currentUnitName);
+                  const totalUnits = p.totalUnits ?? allUnits.length;
+                  const hasMultipleUnits = totalUnits >= 2 || (p.uomConversions && p.uomConversions.length > 0);
 
                   return (
                     <tr
@@ -1511,15 +1536,12 @@ export const ProductListPage: React.FC = () => {
                         </div>
                       </td>
                       {/* Đơn vị tính (chứa option chuyển đổi ĐVT) */}
-                      <td>
-                        {p.uomConversions && p.uomConversions.length > 0 ? (
+                      <td style={{ whiteSpace: 'nowrap' }}>
+                        {hasMultipleUnits ? (
                           <div className="unit-dropdown-container" style={{ position: 'relative', display: 'inline-block' }}>
                             <button
                               type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setActiveUnitDropdownId(activeUnitDropdownId === p.id ? null : p.id);
-                              }}
+                              onClick={(e) => handleToggleUnitDropdown(e, p.id)}
                               style={{
                                 background: '#F0FDFA',
                                 border: '1px solid #CCFBF1',
@@ -1534,7 +1556,7 @@ export const ProductListPage: React.FC = () => {
                                 gap: 4,
                                 transition: 'all 0.15s ease',
                               }}
-                              title="Bấm để chuyển đổi đơn vị tính"
+                              title="Chọn đơn vị tính"
                             >
                               <span>{currentUnitName}</span>
                               <ChevronDown
