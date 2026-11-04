@@ -143,13 +143,13 @@ export const ServiceExpensesPage: FC = () => {
       )}
 
       {/* Top Header Bar */}
-      <div className="expense-topbar">
+      <div className="expense-topbar" style={{ marginTop: '16px' }}>
         <div className="expense-topbar-title">
-          <h1>
-            <span>Quản Lý Chi Phí Dịch Vụ & Vận Hành (FE-07)</span>
+          <h1 style={{ fontSize: '1.4rem', fontWeight: 800, margin: 0, color: 'var(--text-main, #0F172A)' }}>
+            Phải trả
           </h1>
-          <p>
-            Theo dõi hóa đơn định kỳ, kiểm soát hạn nợ đối soát và liên kết tự động Sổ quỹ tiền mặt
+          <p style={{ margin: '4px 0 0', fontSize: '0.84rem', color: '#64748B' }}>
+            Theo dõi tiền phụ tùng, mặt bằng, điện nước cần thanh toán
           </p>
         </div>
 
@@ -168,9 +168,23 @@ export const ServiceExpensesPage: FC = () => {
             type="button"
             onClick={() => setIsCreateOpen(true)}
             className="btn-primary-pill"
+            style={{
+              background: 'var(--brand-700, #115E59)',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '10px 18px',
+              borderRadius: '9999px',
+              color: '#ffffff',
+              fontWeight: 700,
+              fontSize: '0.85rem',
+              border: 'none',
+              cursor: 'pointer',
+              boxShadow: '0 2px 6px rgba(17,94,89,0.25)',
+            }}
           >
             <PlusIcon size={16} color="#ffffff" />
-            <span>Ghi nhận chi phí</span>
+            <span>+ Ghi nhận chi phí</span>
           </button>
         </div>
       </div>
@@ -235,3 +249,4 @@ export const ServiceExpensesPage: FC = () => {
     </div>
   );
 };
+export default ServiceExpensesPage;

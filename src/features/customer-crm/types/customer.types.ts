@@ -86,7 +86,21 @@ export interface CollectDebtInput {
   customerId: string;
   amount: number;
   method: 'Cash' | 'VietQR';
+  targetAccountId?: string;
   note?: string;
+}
+
+export interface CustomerDebtLedgerDto {
+  id: string;
+  customerId: string;
+  transactionType: 'DEBT_INCREASE' | 'DEBT_DECREASE';
+  amount: number;
+  balanceAfter: number;
+  referenceDocId?: string;
+  paymentMethod?: 'Cash' | 'VietQR';
+  cashTransactionCode?: string;
+  note?: string;
+  createdAt: string;
 }
 
 /**

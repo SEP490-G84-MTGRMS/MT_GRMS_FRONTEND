@@ -64,27 +64,28 @@
 
 /* ── Standard Action Buttons ── */
 .btn-primary-pill {
-  background: var(--blue-primary, #0F766E);
+  background: var(--blue-primary, #0f766e);
   color: #ffffff;
-  border-radius: var(--radius-pill, 9999px);
-  padding: 9px 20px;
-  font-size: 0.84rem;
-  font-weight: 600;
+  border-radius: 6px;
+  padding: 0 16px;
+  height: 34px;
+  font-size: 13px;
+  font-weight: 500;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   cursor: pointer;
-  border: none;
-  box-shadow: 0 4px 14px rgba(15, 118, 110, 0.28);
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  border: 1px solid var(--blue-primary, #0f766e);
+  box-shadow: 0 1px 2px rgba(15, 118, 110, 0.2);
+  transition: all 0.15s ease;
   text-decoration: none;
   white-space: nowrap;
+  box-sizing: border-box;
 }
 
 .btn-primary-pill:hover {
-  background: var(--blue-hover, #115E59);
-  transform: translateY(-1px);
-  box-shadow: 0 6px 18px rgba(15, 118, 110, 0.35);
+  background: var(--blue-hover, #115e59);
+  border-color: var(--blue-hover, #115e59);
 }
 
 .btn-secondary-pill {
@@ -133,7 +134,7 @@
   height: 32px;
   border-radius: var(--radius-pill, 9999px);
   background: #ffffff;
-  border: 1px solid var(--border-subtle, #e5edf8);
+  border: 1px solid #cbd5e1;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -244,10 +245,10 @@
 /* ── Filter Bar ── */
 .customer-filter-bar {
   background: #ffffff;
-  border-radius: var(--radius-lg, 24px);
+  border-radius: 10px;
   padding: 16px 20px;
-  border: 1px solid var(--border-subtle, #e5edf8);
-  box-shadow: var(--shadow-sm, 0 2px 8px rgba(15, 118, 110, 0.04));
+  border: 1px solid #cbd5e1;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
   margin-bottom: 24px;
   display: flex;
   flex-wrap: wrap;
@@ -283,8 +284,8 @@
 .customer-search-input {
   width: 100%;
   background: var(--bg-soft-blue, #F0FDFA);
-  border: 1px solid var(--blue-border, #99F6E4);
-  border-radius: var(--radius-pill, 9999px);
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
   padding: 8px 36px 8px 40px;
   font-size: 0.83rem;
   color: var(--text-main, #111827);
@@ -316,8 +317,8 @@
 
 .customer-select {
   background: var(--bg-soft-blue, #F0FDFA);
-  border: 1px solid var(--blue-border, #99F6E4);
-  border-radius: var(--radius-pill, 9999px);
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
   padding: 8px 16px;
   font-size: 0.83rem;
   color: var(--text-main, #111827);

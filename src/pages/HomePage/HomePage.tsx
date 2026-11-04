@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import type { FC } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { TopAnnouncementBar } from './components/TopAnnouncementBar';
 import { Navbar } from './components/Navbar';
 import { HeroSection } from './components/HeroSection';
@@ -10,13 +11,12 @@ import { FaqSection } from './components/FaqSection';
 import { CtaBanner } from './components/CtaBanner';
 import { Footer } from './components/Footer';
 import { TrialModal } from './components/TrialModal';
-import { LoginModal } from './components/LoginModal';
 import { FloatingChatButton } from './components/FloatingChatButton';
 import { Toast, type ToastMessage } from './components/Toast';
 
 export const HomePage: FC = () => {
+  const navigate = useNavigate();
   const [isTrialOpen, setIsTrialOpen] = useState(false);
-  const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
   const showToast = useCallback((text: string) => {
@@ -31,18 +31,14 @@ export const HomePage: FC = () => {
     showToast(`🎉 Đã kích hoạt dùng thử thành công cho tiệm: ${storeName}`);
   };
 
-  const handleLoginSuccess = () => {
-    showToast('✅ Đăng nhập thành công! Đang chuyển hướng vào quầy POS...');
-  };
-
   return (
     <div className="home-page-wrapper">
       {/* 1. Top Announcement Bar */}
       <TopAnnouncementBar />
 
-      {/* 2. Site Header / Navigation */}
+      {/* 2. Site Header / Navigation - Link trực tiếp sang trang Đăng nhập /auth/login */}
       <Navbar
-        onOpenLogin={() => setIsLoginOpen(true)}
+        onOpenLogin={() => navigate('/auth/login')}
         onOpenTrial={() => setIsTrialOpen(true)}
       />
 
@@ -69,17 +65,11 @@ export const HomePage: FC = () => {
       {/* 9. Site Footer */}
       <Footer />
 
-      {/* 10. Modals */}
+      {/* 10. Modal Dùng Thử */}
       <TrialModal
         isOpen={isTrialOpen}
         onClose={() => setIsTrialOpen(false)}
         onSuccess={handleTrialSuccess}
-      />
-
-      <LoginModal
-        isOpen={isLoginOpen}
-        onClose={() => setIsLoginOpen(false)}
-        onSuccess={handleLoginSuccess}
       />
 
       {/* 11. Floating Chat Trigger */}

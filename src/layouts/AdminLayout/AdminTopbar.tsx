@@ -8,7 +8,7 @@ interface AdminTopbarProps {
 export const AdminTopbar: FC<AdminTopbarProps> = ({ onSearch }) => {
   return (
     <header className="admin-topbar">
-      <div style={{ display: 'flex', alignItems: 'center', flex: 1, maxWidth: 480 }}>
+      <div style={{ display: 'flex', alignItems: 'center', flex: 1, maxWidth: 520 }}>
         <div className="admin-search-wrapper">
           <span className="admin-search-icon" style={{ display: 'flex', alignItems: 'center' }}>
             <SearchIcon size={16} color="var(--text-faint)" />
@@ -37,6 +37,7 @@ export const AdminTopbar: FC<AdminTopbarProps> = ({ onSearch }) => {
             cursor: 'pointer',
             position: 'relative',
             color: 'var(--text-muted)',
+            transition: 'all 0.15s ease',
           }}
           title="Thông báo hệ thống"
         >
@@ -54,19 +55,9 @@ export const AdminTopbar: FC<AdminTopbarProps> = ({ onSearch }) => {
             }}
           />
         </button>
-
-        <div className="admin-profile-pill">
-          <div className="admin-avatar">AD</div>
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <span style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-main)', lineHeight: 1.2 }}>
-              Super Admin
-            </span>
-            <span style={{ fontSize: 11, color: 'var(--blue-primary)', fontWeight: 600 }}>
-              Quản trị Nền tảng
-            </span>
-          </div>
-        </div>
       </div>
     </header>
   );
 };
+
+export default AdminTopbar;

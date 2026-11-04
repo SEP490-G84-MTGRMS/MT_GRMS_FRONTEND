@@ -65,29 +65,19 @@ export const UrgentAlertTable: FC<UrgentAlertTableProps> = ({
                 <span className="admin-subdomain-tag">{t.subdomain}</span>
               </td>
               <td>
-                <b>{t.name}</b>
+                <span style={{ fontWeight: 600, color: '#111827' }}>{t.name}</span>
               </td>
-              <td>
+              <td style={{ color: '#4b5563' }}>
                 {t.ownerName} &bull; {t.hotline}
               </td>
               <td>
-                <span className="admin-badge admin-badge-blue">{t.planText}</span>
+                <span className="admin-table-neutral-tag">{t.planText}</span>
+              </td>
+              <td style={{ color: '#374151', fontWeight: 500 }}>
+                {t.expiryNotice}
               </td>
               <td>
-                <b
-                  style={{
-                    color: t.statusType === 'grace' ? 'var(--red-accent)' : 'var(--orange-accent)',
-                  }}
-                >
-                  {t.expiryNotice}
-                </b>
-              </td>
-              <td>
-                <span
-                  className={`admin-badge ${
-                    t.statusType === 'grace' ? 'admin-badge-danger' : 'admin-badge-warning'
-                  }`}
-                >
+                <span className="admin-table-status-tag">
                   {t.statusText}
                 </span>
               </td>
@@ -96,7 +86,7 @@ export const UrgentAlertTable: FC<UrgentAlertTableProps> = ({
                   {t.statusType === 'grace' ? (
                     <button
                       type="button"
-                      className="admin-btn admin-btn-sm admin-btn-danger"
+                      className="admin-table-btn"
                       onClick={() => onLock?.(t.subdomain)}
                     >
                       Khóa mềm
@@ -104,7 +94,7 @@ export const UrgentAlertTable: FC<UrgentAlertTableProps> = ({
                   ) : (
                     <button
                       type="button"
-                      className="admin-btn admin-btn-sm admin-btn-secondary"
+                      className="admin-table-btn"
                       onClick={() => onExtendGrace?.(t.subdomain)}
                     >
                       Gia hạn ân hạn
@@ -112,7 +102,7 @@ export const UrgentAlertTable: FC<UrgentAlertTableProps> = ({
                   )}
                   <button
                     type="button"
-                    className="admin-btn admin-btn-sm admin-btn-primary"
+                    className="admin-table-btn admin-table-btn-primary"
                     onClick={() => onDetail?.(t.subdomain)}
                   >
                     Chi tiết

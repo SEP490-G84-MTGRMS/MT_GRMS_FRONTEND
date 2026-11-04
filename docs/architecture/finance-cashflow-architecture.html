@@ -1,0 +1,1292 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MT-GRMS • Finance, Cashflow & Tax Architecture Simulator</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-dark: #070d18;
+      --bg-card: rgba(13, 22, 38, 0.85);
+      --bg-card-hover: rgba(20, 35, 60, 0.95);
+      --border-teal: rgba(15, 118, 110, 0.35);
+      --border-teal-glow: rgba(20, 184, 166, 0.8);
+      
+      --teal-primary: #0F766E;
+      --teal-bright: #14B8A6;
+      --teal-light: #CCFBF1;
+      
+      --green-inflow: #10B981;
+      --green-glow: rgba(16, 185, 129, 0.4);
+      
+      --red-outflow: #F43F5E;
+      --red-glow: rgba(244, 63, 94, 0.4);
+      
+      --amber-tax: #F59E0B;
+      --amber-glow: rgba(245, 158, 11, 0.4);
+      
+      --blue-intel: #3B82F6;
+      --blue-glow: rgba(59, 130, 246, 0.4);
+      
+      --text-main: #F8FAFC;
+      --text-muted: #94A3B8;
+      --text-faint: #64748B;
+      
+      --radius-sm: 10px;
+      --radius-md: 18px;
+      --radius-lg: 24px;
+      --radius-pill: 9999px;
+      
+      --font-sans: 'Be Vietnam Pro', -apple-system, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-dark);
+      background-image: 
+        radial-gradient(circle at 15% 15%, rgba(15, 118, 110, 0.22) 0%, transparent 40%),
+        radial-gradient(circle at 85% 85%, rgba(59, 130, 246, 0.18) 0%, transparent 45%),
+        radial-gradient(circle at 50% 50%, rgba(16, 185, 129, 0.1) 0%, transparent 50%);
+      color: var(--text-main);
+      font-family: var(--font-sans);
+      min-height: 100vh;
+      overflow-x: hidden;
+      line-height: 1.5;
+    }
+
+    /* ── Header ── */
+    header {
+      background: rgba(7, 13, 24, 0.85);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border-teal);
+      padding: 16px 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .brand-wrap {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .brand-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: var(--radius-sm);
+      background: linear-gradient(135deg, var(--teal-primary), var(--teal-bright));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 20px rgba(20, 184, 166, 0.5);
+    }
+
+    .brand-text h1 {
+      font-size: 1.15rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .badge-pill {
+      font-size: 0.68rem;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: var(--radius-pill);
+      background: rgba(20, 184, 166, 0.2);
+      border: 1px solid var(--teal-bright);
+      color: var(--teal-bright);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .brand-text p {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+    }
+
+    /* Live Cash Counter Bar */
+    .cash-counter-bar {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      background: rgba(13, 22, 38, 0.9);
+      border: 1px solid var(--border-teal);
+      padding: 8px 18px;
+      border-radius: var(--radius-pill);
+      box-shadow: inset 0 2px 8px rgba(0,0,0,0.4);
+    }
+
+    .counter-item {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .counter-label {
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      font-weight: 700;
+      color: var(--text-muted);
+      letter-spacing: 0.03em;
+    }
+
+    .counter-val {
+      font-family: var(--font-mono);
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--teal-bright);
+    }
+
+    .counter-val.inflow { color: var(--green-inflow); }
+    .counter-val.outflow { color: var(--red-outflow); }
+
+    /* Controls */
+    .top-controls {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .btn {
+      padding: 8px 16px;
+      border-radius: var(--radius-pill);
+      font-size: 0.8rem;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border: 1px solid transparent;
+      outline: none;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--teal-primary), #115e59);
+      border-color: var(--teal-bright);
+      color: #fff;
+      box-shadow: 0 4px 14px rgba(15, 118, 110, 0.4);
+    }
+
+    .btn-primary:hover {
+      background: linear-gradient(135deg, var(--teal-bright), var(--teal-primary));
+      transform: translateY(-1px);
+      box-shadow: 0 6px 20px rgba(20, 184, 166, 0.6);
+    }
+
+    .btn-outline {
+      background: rgba(15, 23, 42, 0.6);
+      border-color: rgba(148, 163, 184, 0.3);
+      color: var(--text-main);
+    }
+
+    .btn-outline:hover {
+      background: rgba(30, 41, 59, 0.8);
+      border-color: var(--teal-bright);
+      color: var(--teal-light);
+    }
+
+    /* ── Main Layout ── */
+    .app-container {
+      max-width: 1600px;
+      margin: 0 auto;
+      padding: 24px;
+      display: grid;
+      grid-template-columns: 1fr 340px;
+      gap: 24px;
+    }
+
+    /* Simulation Canvas & Stages */
+    .sim-panel {
+      position: relative;
+      background: var(--bg-card);
+      border: 1px solid var(--border-teal);
+      border-radius: var(--radius-lg);
+      padding: 30px;
+      min-height: 820px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      gap: 40px;
+    }
+
+    /* Animated Canvas Background for Cash Streams */
+    #cashFlowCanvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    .stage-row {
+      position: relative;
+      z-index: 2;
+      display: flex;
+      justify-content: center;
+      gap: 24px;
+      flex-wrap: wrap;
+    }
+
+    .stage-title {
+      width: 100%;
+      text-align: center;
+      font-size: 0.76rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+    }
+
+    .stage-title::before, .stage-title::after {
+      content: "";
+      height: 1px;
+      width: 60px;
+      background: linear-gradient(90deg, transparent, var(--border-teal));
+    }
+    .stage-title::after {
+      background: linear-gradient(90deg, var(--border-teal), transparent);
+    }
+
+    .stage-title.inflow { color: var(--green-inflow); }
+    .stage-title.core { color: var(--teal-bright); }
+    .stage-title.outflow { color: var(--red-outflow); }
+    .stage-title.intel { color: var(--blue-intel); }
+
+    /* ── Architecture Nodes ── */
+    .node-card {
+      background: rgba(15, 23, 42, 0.75);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: var(--radius-md);
+      padding: 18px 20px;
+      width: 260px;
+      cursor: pointer;
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    }
+
+    .node-card:hover {
+      transform: translateY(-4px) scale(1.02);
+      border-color: var(--teal-bright);
+      box-shadow: 0 12px 32px rgba(20, 184, 166, 0.25);
+    }
+
+    .node-card.active-selected {
+      border-color: var(--teal-bright);
+      background: rgba(15, 118, 110, 0.2);
+      box-shadow: 0 0 28px rgba(20, 184, 166, 0.45);
+    }
+
+    /* Node Themes */
+    .node-card.theme-inflow {
+      border-top: 3px solid var(--green-inflow);
+    }
+    .node-card.theme-inflow:hover {
+      box-shadow: 0 12px 32px var(--green-glow);
+      border-color: var(--green-inflow);
+    }
+
+    .node-card.theme-outflow {
+      border-top: 3px solid var(--red-outflow);
+    }
+    .node-card.theme-outflow:hover {
+      box-shadow: 0 12px 32px var(--red-glow);
+      border-color: var(--red-outflow);
+    }
+
+    .node-card.theme-tax {
+      border-top: 3px solid var(--amber-tax);
+    }
+    .node-card.theme-tax:hover {
+      box-shadow: 0 12px 32px var(--amber-glow);
+      border-color: var(--amber-tax);
+    }
+
+    .node-card.theme-intel {
+      border-top: 3px solid var(--blue-intel);
+    }
+    .node-card.theme-intel:hover {
+      box-shadow: 0 12px 32px var(--blue-glow);
+      border-color: var(--blue-intel);
+    }
+
+    /* Special Master Cashbook Node (Center Engine) */
+    .node-card.node-master-core {
+      width: 440px;
+      border: 2px solid var(--teal-bright);
+      background: radial-gradient(circle at 50% 0%, rgba(20, 184, 166, 0.25), rgba(15, 23, 42, 0.9));
+      box-shadow: 0 0 45px rgba(20, 184, 166, 0.35);
+      animation: pulseTeal 4s infinite alternate;
+    }
+
+    @keyframes pulseTeal {
+      0% { box-shadow: 0 0 30px rgba(20, 184, 166, 0.2); }
+      100% { box-shadow: 0 0 50px rgba(20, 184, 166, 0.5); }
+    }
+
+    .node-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+    }
+
+    .node-code {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text-main);
+    }
+
+    .theme-inflow .node-code { background: rgba(16, 185, 129, 0.15); color: var(--green-inflow); }
+    .theme-outflow .node-code { background: rgba(244, 63, 94, 0.15); color: var(--red-outflow); }
+    .theme-tax .node-code { background: rgba(245, 158, 11, 0.15); color: var(--amber-tax); }
+    .theme-intel .node-code { background: rgba(59, 130, 246, 0.15); color: var(--blue-intel); }
+
+    .node-title {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .node-desc {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      line-height: 1.4;
+    }
+
+    .node-meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-top: 1px dashed rgba(255, 255, 255, 0.1);
+      padding-top: 8px;
+      font-size: 0.72rem;
+      color: var(--text-faint);
+    }
+
+    .node-amount {
+      font-family: var(--font-mono);
+      font-weight: 700;
+    }
+
+    .node-pulse-point {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #10B981;
+      box-shadow: 0 0 8px #10B981;
+    }
+
+    /* Core Dual Box: Cash & Bank */
+    .core-vault-split {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-top: 8px;
+    }
+
+    .vault-box {
+      background: rgba(0, 0, 0, 0.35);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: var(--radius-sm);
+      padding: 10px 12px;
+    }
+
+    .vault-box-title {
+      font-size: 0.68rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      font-weight: 600;
+    }
+
+    .vault-box-val {
+      font-family: var(--font-mono);
+      font-size: 0.95rem;
+      font-weight: 800;
+      color: #fff;
+      margin-top: 2px;
+    }
+
+    /* ── Action Trigger Floating Bar ── */
+    .action-triggers-bar {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(13, 22, 38, 0.92);
+      backdrop-filter: blur(20px);
+      border: 1px solid var(--border-teal);
+      border-radius: var(--radius-pill);
+      padding: 8px 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      z-index: 10;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
+    }
+
+    .trigger-label {
+      font-size: 0.74rem;
+      font-weight: 700;
+      color: var(--teal-bright);
+      text-transform: uppercase;
+      padding-right: 6px;
+      border-right: 1px solid var(--border-teal);
+    }
+
+    .sim-btn {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: var(--text-main);
+      padding: 6px 12px;
+      border-radius: var(--radius-pill);
+      font-size: 0.74rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+
+    .sim-btn:hover {
+      background: rgba(20, 184, 166, 0.2);
+      border-color: var(--teal-bright);
+      color: var(--teal-light);
+    }
+
+    .sim-btn.inflow:hover {
+      background: rgba(16, 185, 129, 0.2);
+      border-color: var(--green-inflow);
+      color: #6ee7b7;
+    }
+
+    .sim-btn.outflow:hover {
+      background: rgba(244, 63, 94, 0.2);
+      border-color: var(--red-outflow);
+      color: #fca5a5;
+    }
+
+    /* ── Sidebar Right (Inspector & GAP Matrix) ── */
+    .sidebar {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .side-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-teal);
+      border-radius: var(--radius-lg);
+      padding: 20px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+    }
+
+    .side-card-title {
+      font-size: 0.88rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      color: var(--teal-bright);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      padding-bottom: 10px;
+    }
+
+    /* Inspector Details */
+    .inspector-content {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .prop-row {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .prop-label {
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: var(--text-faint);
+    }
+
+    .prop-val {
+      font-size: 0.82rem;
+      color: var(--text-main);
+      background: rgba(255, 255, 255, 0.04);
+      padding: 6px 10px;
+      border-radius: 6px;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .prop-val.mono {
+      font-family: var(--font-mono);
+      font-size: 0.76rem;
+      color: var(--teal-bright);
+    }
+
+    /* Transaction Feed */
+    .tx-feed {
+      max-height: 220px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .tx-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 10px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.03);
+      font-size: 0.76rem;
+      border-left: 3px solid transparent;
+      animation: fadeIn 0.3s ease;
+    }
+
+    .tx-item.in {
+      border-left-color: var(--green-inflow);
+    }
+
+    .tx-item.out {
+      border-left-color: var(--red-outflow);
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* GAP Accordion */
+    .gap-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-height: 280px;
+      overflow-y: auto;
+    }
+
+    .gap-item {
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 8px;
+      padding: 8px 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .gap-item:hover {
+      border-color: var(--amber-tax);
+      background: rgba(245, 158, 11, 0.05);
+    }
+
+    .gap-item.active {
+      border-color: var(--amber-tax);
+      background: rgba(245, 158, 11, 0.1);
+    }
+
+    .gap-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 0.76rem;
+      font-weight: 700;
+    }
+
+    .gap-tag {
+      font-family: var(--font-mono);
+      color: var(--amber-tax);
+      font-size: 0.7rem;
+    }
+
+    .gap-desc {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      margin-top: 4px;
+      display: none;
+      line-height: 1.4;
+    }
+
+    .gap-item.active .gap-desc {
+      display: block;
+    }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar {
+      width: 5px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(0, 0, 0, 0.2);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.15);
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--teal-primary);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Header -->
+  <header>
+    <div class="brand-wrap">
+      <div class="brand-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+        </svg>
+      </div>
+      <div class="brand-text">
+        <h1>MT-GRMS • Finance, Cashflow & Tax Architecture <span class="badge-pill">Epic Session</span></h1>
+        <p>Kiến trúc Dòng tiền khép kín & Ma trận điều phối giữa FE-07, FE-08, FE-10, FE-17, FE-19</p>
+      </div>
+    </div>
+
+    <!-- Live Counter -->
+    <div class="cash-counter-bar">
+      <div class="counter-item">
+        <span class="counter-label">Số dư Quỹ Tiền Mặt</span>
+        <span class="counter-val" id="valCash">38.450.000 ₫</span>
+      </div>
+      <div style="width: 1px; height: 24px; background: rgba(255,255,255,0.1);"></div>
+      <div class="counter-item">
+        <span class="counter-label">Số dư Tài Khoản Ngân Hàng</span>
+        <span class="counter-val" id="valBank">185.200.000 ₫</span>
+      </div>
+      <div style="width: 1px; height: 24px; background: rgba(255,255,255,0.1);"></div>
+      <div class="counter-item">
+        <span class="counter-label">Lợi Nhuận Thuần (P&L Tháng)</span>
+        <span class="counter-val inflow" id="valPnl">+42.860.000 ₫</span>
+      </div>
+    </div>
+
+    <div class="top-controls">
+      <button class="btn btn-outline" id="btnToggleAnim" onclick="toggleAnimation()">
+        <span id="animIcon">⏸️</span> <span id="animText">Tạm dừng luồng</span>
+      </button>
+      <button class="btn btn-primary" onclick="resetSimulation()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
+        Đặt lại dòng tiền
+      </button>
+    </div>
+  </header>
+
+  <!-- Application Body -->
+  <main class="app-container">
+    
+    <!-- Simulation Center Stage -->
+    <section class="sim-panel" id="simPanel">
+      <canvas id="cashFlowCanvas"></canvas>
+
+      <!-- STAGE 1: INFLOW SOURCES -->
+      <div class="stage-row" id="stageInflow">
+        <div class="stage-title inflow">▼ Giai Đoạn 1: Hai Dòng Tiền Vào (Inflow Sources)</div>
+        
+        <!-- Node POS -->
+        <div class="node-card theme-inflow" id="node-pos" onclick="inspectNode('pos')">
+          <div class="node-header">
+            <span class="node-code">FE-02 / 03</span>
+            <div class="node-pulse-point" style="background:#10B981;"></div>
+          </div>
+          <div class="node-title">Bán Lẻ Tại Quầy (POS)</div>
+          <p class="node-desc">Thanh toán ngay bằng tiền mặt vào két thu ngân hoặc quét mã VietQR tĩnh chuyển khoản vào Bank.</p>
+          <div class="node-meta">
+            <span>Doanh thu hôm nay:</span>
+            <span class="node-amount" style="color:var(--green-inflow)">+14.250.000 ₫</span>
+          </div>
+        </div>
+
+        <!-- Node Customer AR -->
+        <div class="node-card theme-inflow" id="node-fe08" onclick="inspectNode('fe08')">
+          <div class="node-header">
+            <span class="node-code">FE-08 • AnNT</span>
+            <div class="node-pulse-point" style="background:#10B981;"></div>
+          </div>
+          <div class="node-title">Khách Hàng & Công Nợ (AR)</div>
+          <p class="node-desc">Thu nợ mua chịu gối đầu, phát hành VietQR động gắn mã khách hàng, đối soát hạn mức nợ tín dụng.</p>
+          <div class="node-meta">
+            <span>Đã thu hồi nợ kỳ này:</span>
+            <span class="node-amount" style="color:var(--green-inflow)">+6.800.000 ₫</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- STAGE 2: CENTRAL CASH ENGINE -->
+      <div class="stage-row" id="stageCore">
+        <div class="stage-title core">▼ Giai Đoạn 2: Trọng Tâm Điều Phối Dòng Tiền Toàn Chuỗi (Central Hub)</div>
+
+        <!-- Master Cashbook Node -->
+        <div class="node-card node-master-core active-selected" id="node-fe17" onclick="inspectNode('fe17')">
+          <div class="node-header">
+            <span class="node-code" style="background:var(--teal-primary); color:#fff;">FE-17 • CORE ENGINE • AnNT</span>
+            <span class="badge-pill">Cái Két Sắt Trung Tâm</span>
+          </div>
+          <div class="node-title" style="font-size:1.15rem;">SỔ QUỸ & DÒNG TIỀN (MASTER CASHBOOK)</div>
+          <p class="node-desc">Ghi nhận Real-time mọi biến động tiền mặt và chuyển khoản. Là nguồn dữ liệu duy nhất (Single Source of Truth) đối soát dòng tiền thực tế.</p>
+          
+          <div class="core-vault-split">
+            <div class="vault-box">
+              <div class="vault-box-title">Tiền mặt tại két (Physical Cash)</div>
+              <div class="vault-box-val" id="coreCash">38.450.000 ₫</div>
+            </div>
+            <div class="vault-box">
+              <div class="vault-box-title">Tài khoản Ngân Hàng (Bank)</div>
+              <div class="vault-box-val" id="coreBank">185.200.000 ₫</div>
+            </div>
+          </div>
+
+          <div class="node-meta" style="margin-top: 6px;">
+            <span>Trạng thái: 🟢 Real-time Synchronized</span>
+            <span style="color:var(--teal-bright); font-weight:700;">Click xem chi tiết</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- STAGE 3: OUTFLOW CHANNELS -->
+      <div class="stage-row" id="stageOutflow">
+        <div class="stage-title outflow">▼ Giai Đoạn 3: Bốn Kênh Rút Tiền Ra (Outflow Channels)</div>
+
+        <!-- Node FE-07 Service Expenses -->
+        <div class="node-card theme-outflow" id="node-fe07" onclick="inspectNode('fe07')">
+          <div class="node-header">
+            <span class="node-code">FE-07 • AnNT</span>
+            <div class="node-pulse-point" style="background:var(--red-outflow);"></div>
+          </div>
+          <div class="node-title">Chi Phí Vận Hành (OpEx)</div>
+          <p class="node-desc">Hóa đơn điện, nước, internet, thuê mặt bằng, sửa chữa. Phải sinh phiếu chi tự động khi duyệt.</p>
+          <div class="node-meta">
+            <span>Chi vận hành tháng:</span>
+            <span class="node-amount" style="color:var(--red-outflow)">-12.800.000 ₫</span>
+          </div>
+        </div>
+
+        <!-- Node Supplier AP -->
+        <div class="node-card theme-outflow" id="node-ap" onclick="inspectNode('ap')">
+          <div class="node-header">
+            <span class="node-code">FE-05 / FE-09</span>
+            <div class="node-pulse-point" style="background:var(--red-outflow);"></div>
+          </div>
+          <div class="node-title">Công Nợ Nhà Cung Cấp (AP)</div>
+          <p class="node-desc">Nhập hàng tạp hóa từ kho tổng/NCC, thanh toán công nợ theo đợt hóa đơn nhập gối đầu.</p>
+          <div class="node-meta">
+            <span>Đã thanh toán NCC:</span>
+            <span class="node-amount" style="color:var(--red-outflow)">-84.500.000 ₫</span>
+          </div>
+        </div>
+
+        <!-- Node Payroll -->
+        <div class="node-card theme-outflow" id="node-payroll" onclick="inspectNode('payroll')">
+          <div class="node-header">
+            <span class="node-code">FE-18</span>
+            <div class="node-pulse-point" style="background:var(--red-outflow);"></div>
+          </div>
+          <div class="node-title">Bảng Lương & Nhân Viên</div>
+          <p class="node-desc">Chi trả lương cơ bản, hoa hồng bán hàng, thưởng ca theo tháng cho nhân sự chi nhánh.</p>
+          <div class="node-meta">
+            <span>Quỹ lương giải ngân:</span>
+            <span class="node-amount" style="color:var(--red-outflow)">-18.000.000 ₫</span>
+          </div>
+        </div>
+
+        <!-- Node Tax FE-19 -->
+        <div class="node-card theme-tax" id="node-fe19" onclick="inspectNode('fe19')">
+          <div class="node-header">
+            <span class="node-code">FE-19 • AnNT</span>
+            <div class="node-pulse-point" style="background:var(--amber-tax);"></div>
+          </div>
+          <div class="node-title">Thuế Hộ Kinh Doanh (Tax)</div>
+          <p class="node-desc">Kê khai thuế GTGT + TNCN theo TT40/2021. Trích nộp tiền thuế vào ngân sách nhà nước.</p>
+          <div class="node-meta">
+            <span>Dự toán thuế quý:</span>
+            <span class="node-amount" style="color:var(--amber-tax)">-3.450.000 ₫</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- STAGE 4: REPORTING & COMPLIANCE -->
+      <div class="stage-row" id="stageIntel">
+        <div class="stage-title intel">▼ Giai Đoạn 4: Bộ Não Báo Cáo & Giám Sát Tài Chính (Intelligence & Compliance)</div>
+
+        <!-- Node FE-10 PnL -->
+        <div class="node-card theme-intel" style="width:360px;" id="node-fe10" onclick="inspectNode('fe10')">
+          <div class="node-header">
+            <span class="node-code">FE-10 • P&L ENGINE • AnNT</span>
+            <span class="badge-pill" style="border-color:var(--blue-intel); color:var(--blue-intel);">Accrual Accounting</span>
+          </div>
+          <div class="node-title">BÁO CÁO LÃI / LỖ & KPIS (P&L)</div>
+          <p class="node-desc">Hạch toán Dồn Tích: Doanh Thu Bán Hàng - Giá Vốn Hàng Bán (COGS) - Chi Phí Vận Hành (FE-07) - Dự Phòng Nợ Khó Đòi (FE-08) = <strong>Lợi Nhuận Thuần (Net Profit)</strong>.</p>
+          <div class="node-meta">
+            <span>Tỷ suất lợi nhuận ròng:</span>
+            <span class="node-amount" style="color:var(--blue-intel)">18.6% (Khỏe mạnh)</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Interactive Simulation Trigger Bar -->
+      <div class="action-triggers-bar">
+        <span class="trigger-label">Bấm để thử nghiệm giao dịch:</span>
+        <button class="sim-btn inflow" onclick="triggerTx('pos')">+ Bán đơn POS (+350k)</button>
+        <button class="sim-btn inflow" onclick="triggerTx('debt')">+ Khách trả nợ AR (+1.200k)</button>
+        <button class="sim-btn outflow" onclick="triggerTx('expense')">- Chi điện nước FE-07 (-850k)</button>
+        <button class="sim-btn outflow" onclick="triggerTx('supplier')">- Trả nợ NCC AP (-5.000k)</button>
+        <button class="sim-btn outflow" onclick="triggerTx('tax')">- Nộp thuế FE-19 (-1.500k)</button>
+      </div>
+    </section>
+
+    <!-- Sidebar Right: Inspector & GAPs -->
+    <aside class="sidebar">
+      <!-- Node Inspector Card -->
+      <div class="side-card">
+        <div class="side-card-title">
+          <span>Khảo Sát Node (Inspector)</span>
+          <span id="inspectBadge" class="badge-pill">FE-17</span>
+        </div>
+        <div class="inspector-content" id="inspectorBox">
+          <div class="prop-row">
+            <span class="prop-label">Tên Chức Năng</span>
+            <div class="prop-val" id="insTitle">Sổ Quỹ & Quản Lý Dòng Tiền</div>
+          </div>
+          <div class="prop-row">
+            <span class="prop-label">Người Phụ Trách</span>
+            <div class="prop-val" id="insAuthor">Nguyễn Trường An (AnNT - HE186612)</div>
+          </div>
+          <div class="prop-row">
+            <span class="prop-label">Vai Trò Trong Kiến Trúc</span>
+            <div class="prop-val" id="insRole">Cái két sắt trung tâm toàn chuỗi. Nơi ghi nhận số dư vật lý và điện tử real-time.</div>
+          </div>
+          <div class="prop-row">
+            <span class="prop-label">Database Tables Liên Quan</span>
+            <div class="prop-val mono" id="insTables">Cashbooks, CashbookTransactions, CashAccounts</div>
+          </div>
+          <div class="prop-row">
+            <span class="prop-label">Liên Kết Nghiệp Vụ Cốt Lõi</span>
+            <div class="prop-val" id="insLinks">Nhận tiền từ POS + FE-08; Giải ngân chi tiền cho FE-07, FE-05, FE-18, FE-19.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Real-time Transaction Feed Card -->
+      <div class="side-card">
+        <div class="side-card-title">
+          <span>Nhật Ký Dòng Tiền (Live Feed)</span>
+          <span style="font-size:0.65rem; color:var(--text-muted);" id="txCount">4 giao dịch</span>
+        </div>
+        <div class="tx-feed" id="txFeed">
+          <div class="tx-item in">
+            <span>POS #1092 • Thu ngân bán lẻ</span>
+            <strong style="color:var(--green-inflow)">+320.000 ₫</strong>
+          </div>
+          <div class="tx-item in">
+            <span>Thu nợ KH #KH-004 (VietQR)</span>
+            <strong style="color:var(--green-inflow)">+1.500.000 ₫</strong>
+          </div>
+          <div class="tx-item out">
+            <span>Chi tiền điện kỳ 10/2026 (FE-07)</span>
+            <strong style="color:var(--red-outflow)">-1.450.000 ₫</strong>
+          </div>
+          <div class="tx-item out">
+            <span>Thanh toán NCC Vinamilk</span>
+            <strong style="color:var(--red-outflow)">-6.200.000 ₫</strong>
+          </div>
+        </div>
+      </div>
+
+      <!-- GAP Matrix Card -->
+      <div class="side-card">
+        <div class="side-card-title">
+          <span>8 Điểm Gãy Luồng (GAP Matrix)</span>
+          <span class="badge-pill" style="border-color:var(--amber-tax); color:var(--amber-tax);">Critical</span>
+        </div>
+        <div class="gap-list" id="gapList">
+          <div class="gap-item active" onclick="toggleGap(this)">
+            <div class="gap-header">
+              <span>Hủy chi phí FE-07 không hoàn tiền FE-17</span>
+              <span class="gap-tag">GAP-01</span>
+            </div>
+            <p class="gap-desc"><strong>Khắc phục:</strong> Thiết kế Transaction 2 chiều trong C# Backend: khi hủy chi phí đã thanh toán, hệ thống tự động sinh bút toán Thu hoàn ứng trên Sổ quỹ FE-17.</p>
+          </div>
+
+          <div class="gap-item" onclick="toggleGap(this)">
+            <div class="gap-header">
+              <span>Nhầm lẫn Két quầy & Tài khoản ngân hàng</span>
+              <span class="gap-tag">GAP-02</span>
+            </div>
+            <p class="gap-desc"><strong>Khắc phục:</strong> Tách 2 tài khoản con trong Sổ quỹ: `CASH_DRAWER` (tiền mặt ca POS) và `BANK_ACCOUNT` (chuyển khoản VietQR), có nghiệp vụ Nộp tiền két vào Bank.</p>
+          </div>
+
+          <div class="gap-item" onclick="toggleGap(this)">
+            <div class="gap-header">
+              <span>Bán nợ FE-08 ghi nhận doanh thu ảo P&L</span>
+              <span class="gap-tag">GAP-04</span>
+            </div>
+            <p class="gap-desc"><strong>Khắc phục:</strong> P&L FE-10 hạch toán dồn tích (Accrual), phân định rạch ròi giữa Doanh thu ghi nhận (Sales) và Dòng tiền thực thu (Cashflow) để chủ tiệm không bị ngộ nhận dòng tiền.</p>
+          </div>
+
+          <div class="gap-item" onclick="toggleGap(this)">
+            <div class="gap-header">
+              <span>Thuế FE-19 trùng lặp doanh thu thu nợ</span>
+              <span class="gap-tag">GAP-05</span>
+            </div>
+            <p class="gap-desc"><strong>Khắc phục:</strong> Doanh thu tính thuế chỉ tính trên giá trị Đơn hàng lúc phát sinh tại POS. Khi khách trả nợ FE-08, bút toán chỉ ghi nhận giảm công nợ, không tính thuế lần 2.</p>
+          </div>
+        </div>
+      </div>
+
+    </aside>
+
+  </main>
+
+  <!-- Interactive JavaScript Logic -->
+  <script>
+    /* ─── State Management ─── */
+    let isAnimated = true;
+    let cashBalance = 38450000;
+    let bankBalance = 185200000;
+    let pnlNet = 42860000;
+
+    const nodeData = {
+      fe17: {
+        code: 'FE-17 • CORE ENGINE',
+        title: 'Sổ Quỹ & Quản Lý Dòng Tiền (Master Cashbook)',
+        author: 'Nguyễn Trường An (AnNT - HE186612)',
+        role: 'Cái két sắt trung tâm toàn chuỗi. Nơi ghi nhận số dư vật lý và điện tử real-time.',
+        tables: 'Cashbooks, CashbookTransactions, CashAccounts',
+        links: 'Nhận tiền từ POS + FE-08; Giải ngân chi tiền cho FE-07, FE-05, FE-18, FE-19.',
+      },
+      fe07: {
+        code: 'FE-07',
+        title: 'Quản Lý Chi Phí Dịch Vụ & Vận Hành (OpEx)',
+        author: 'Nguyễn Trường An (AnNT - HE186612)',
+        role: 'Quản lý các khoản chi phí định kỳ (tiền điện, nước, internet, mặt bằng...).',
+        tables: 'ServiceExpenses, ServiceExpensePayments, Vendors',
+        links: 'Khi bấm thanh toán, bắt buộc sinh bút toán chi tiền tại Sổ quỹ FE-17 và tính vào chi phí P&L FE-10.',
+      },
+      fe08: {
+        code: 'FE-08',
+        title: 'Khách Hàng & Công Nợ Tín Dụng (CRM / AR)',
+        author: 'Nguyễn Trường An (AnNT - HE186612)',
+        role: 'Quản lý danh bạ khách quen, hạn mức bán chịu, nhắc nợ và thu nợ tích hợp VietQR.',
+        tables: 'Customers, CustomerDebts, DebtRepayments, LoyaltyPoints',
+        links: 'Khi thu nợ thành công, lập tức rót tiền vào Sổ quỹ FE-17; nợ quá hạn kích hoạt dự phòng trên FE-10.',
+      },
+      fe10: {
+        code: 'FE-10',
+        title: 'Báo Cáo Lãi / Lỗ & Chỉ Số KPIs (P&L Dashboard)',
+        author: 'Nguyễn Trường An (AnNT - HE186612)',
+        role: 'Bộ não phân tích sức khỏe tài chính theo nguyên tắc Kế toán Dồn tích (Accrual).',
+        tables: 'PnlSnapshots, FinancialMetrics, BranchKpiSummaries',
+        links: 'Tổng hợp Doanh thu POS, Giá vốn nhập kho, Chi phí FE-07 và Nợ khó đòi FE-08.',
+      },
+      fe19: {
+        code: 'FE-19',
+        title: 'Kê Khai & Quản Lý Thuế Hộ Kinh Doanh (Tax Management)',
+        author: 'Nguyễn Trường An (AnNT - HE186612)',
+        role: 'Lập tờ khai thuế theo Thông tư 40/2021/TT-BTC, quản lý ngưỡng 100tr/năm và trích nộp thuế.',
+        tables: 'TaxDeclarations, TaxSnapshots, TaxRateSchedules',
+        links: 'Lấy doanh thu gộp từ POS và rút tiền nộp thuế qua phiếu chi Sổ quỹ FE-17.',
+      },
+      pos: {
+        code: 'FE-02 / 03',
+        title: 'Bán Hàng Quầy POS (Point of Sale)',
+        author: 'Nhóm POS & Checkout',
+        role: 'Dòng tiền vào chủ lực tại cửa hàng, phân tách tiền mặt két và chuyển khoản ngân hàng.',
+        tables: 'Invoices, InvoiceItems, PosShifts, ShiftFloats',
+        links: 'Bơm tiền trực tiếp vào két ca làm việc và tài khoản VietQR của Sổ quỹ FE-17.',
+      },
+      ap: {
+        code: 'FE-05 / FE-09',
+        title: 'Mua Hàng & Công Nợ Nhà Cung Cấp (AP)',
+        author: 'Nhóm Supply Chain & Supplier',
+        role: 'Nhập hàng hóa tạp hóa, quản lý nợ gối đầu và lịch trình thanh toán cho nhà cung cấp.',
+        tables: 'PurchaseOrders, PurchaseOrderReceipts, SupplierDebts',
+        links: 'Rút tiền chi trả từ tài khoản ngân hàng của Sổ quỹ FE-17.',
+      },
+      payroll: {
+        code: 'FE-18',
+        title: 'Quản Lý Bảng Lương & Nhân Sự (Payroll)',
+        author: 'Nhóm Nhân Sự & Bán Hàng',
+        role: 'Tính lương theo ca làm, phụ cấp và thưởng đạt KPI bán hàng của nhân viên cửa hàng.',
+        tables: 'Employees, WorkShifts, Payslips, PayrollBatches',
+        links: 'Sinh phiếu chi giải ngân lương hàng tháng tại Sổ quỹ FE-17.',
+      }
+    };
+
+    /* ─── Inspector Logic ─── */
+    function inspectNode(key) {
+      document.querySelectorAll('.node-card').forEach(n => n.classList.remove('active-selected'));
+      const activeEl = document.getElementById(`node-${key}`);
+      if (activeEl) activeEl.classList.add('active-selected');
+
+      const data = nodeData[key];
+      if (!data) return;
+
+      document.getElementById('inspectBadge').textContent = data.code;
+      document.getElementById('insTitle').textContent = data.title;
+      document.getElementById('insAuthor').textContent = data.author;
+      document.getElementById('insRole').textContent = data.role;
+      document.getElementById('insTables').textContent = data.tables;
+      document.getElementById('insLinks').textContent = data.links;
+    }
+
+    /* ─── GAP Accordion Toggle ─── */
+    function toggleGap(item) {
+      document.querySelectorAll('.gap-item').forEach(el => {
+        if (el !== item) el.classList.remove('active');
+      });
+      item.classList.toggle('active');
+    }
+
+    /* ─── Currency Formatter ─── */
+    function fmt(val) {
+      return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(val);
+    }
+
+    function updateCounters() {
+      document.getElementById('valCash').textContent = fmt(cashBalance);
+      document.getElementById('valBank').textContent = fmt(bankBalance);
+      document.getElementById('coreCash').textContent = fmt(cashBalance);
+      document.getElementById('coreBank').textContent = fmt(bankBalance);
+      document.getElementById('valPnl').textContent = (pnlNet >= 0 ? '+' : '') + fmt(pnlNet);
+    }
+
+    /* ─── Live Transaction Triggers ─── */
+    function triggerTx(type) {
+      const feed = document.getElementById('txFeed');
+      let item = document.createElement('div');
+      
+      if (type === 'pos') {
+        const amt = 350000;
+        cashBalance += amt;
+        pnlNet += Math.round(amt * 0.22); // Biên lãi gộp 22%
+        item.className = 'tx-item in';
+        item.innerHTML = `<span>Đơn POS khách thanh toán tiền mặt</span><strong style="color:var(--green-inflow)">+${fmt(amt)}</strong>`;
+        spawnParticles('node-pos', 'node-fe17', '#10B981');
+      } 
+      else if (type === 'debt') {
+        const amt = 1200000;
+        bankBalance += amt;
+        item.className = 'tx-item in';
+        item.innerHTML = `<span>Khách quét VietQR trả nợ AR (FE-08)</span><strong style="color:var(--green-inflow)">+${fmt(amt)}</strong>`;
+        spawnParticles('node-fe08', 'node-fe17', '#10B981');
+      } 
+      else if (type === 'expense') {
+        const amt = 850000;
+        bankBalance -= amt;
+        pnlNet -= amt;
+        item.className = 'tx-item out';
+        item.innerHTML = `<span>Thanh toán hóa đơn điện EVN (FE-07)</span><strong style="color:var(--red-outflow)">-${fmt(amt)}</strong>`;
+        spawnParticles('node-fe17', 'node-fe07', '#F43F5E');
+      } 
+      else if (type === 'supplier') {
+        const amt = 5000000;
+        bankBalance -= amt;
+        item.className = 'tx-item out';
+        item.innerHTML = `<span>Chuyển khoản trả nợ NCC nước giải khát</span><strong style="color:var(--red-outflow)">-${fmt(amt)}</strong>`;
+        spawnParticles('node-fe17', 'node-ap', '#F43F5E');
+      } 
+      else if (type === 'tax') {
+        const amt = 1500000;
+        bankBalance -= amt;
+        item.className = 'tx-item out';
+        item.innerHTML = `<span>Nộp thuế TNCN & GTGT HKD (FE-19)</span><strong style="color:var(--amber-tax)">-${fmt(amt)}</strong>`;
+        spawnParticles('node-fe17', 'node-fe19', '#F59E0B');
+      }
+
+      feed.insertBefore(item, feed.firstChild);
+      if (feed.children.length > 8) feed.removeChild(feed.lastChild);
+      updateCounters();
+    }
+
+    function resetSimulation() {
+      cashBalance = 38450000;
+      bankBalance = 185200000;
+      pnlNet = 42860000;
+      updateCounters();
+      document.getElementById('txFeed').innerHTML = `
+        <div class="tx-item in">
+          <span>POS #1092 • Thu ngân bán lẻ</span>
+          <strong style="color:var(--green-inflow)">+320.000 ₫</strong>
+        </div>
+        <div class="tx-item in">
+          <span>Thu nợ KH #KH-004 (VietQR)</span>
+          <strong style="color:var(--green-inflow)">+1.500.000 ₫</strong>
+        </div>
+        <div class="tx-item out">
+          <span>Chi tiền điện kỳ 10/2026 (FE-07)</span>
+          <strong style="color:var(--red-outflow)">-1.450.000 ₫</strong>
+        </div>
+      `;
+    }
+
+    /* ─── Canvas Particle Flow Animation ─── */
+    const canvas = document.getElementById('cashFlowCanvas');
+    const ctx = canvas.getContext('2d');
+    let particles = [];
+
+    function resizeCanvas() {
+      const panel = document.getElementById('simPanel');
+      canvas.width = panel.clientWidth;
+      canvas.height = panel.clientHeight;
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    function getCenter(id) {
+      const panel = document.getElementById('simPanel');
+      const el = document.getElementById(id);
+      if (!el) return { x: 0, y: 0 };
+      const pRect = panel.getBoundingClientRect();
+      const eRect = el.getBoundingClientRect();
+      return {
+        x: eRect.left - pRect.left + eRect.width / 2,
+        y: eRect.top - pRect.top + eRect.height / 2
+      };
+    }
+
+    function createFlow(fromId, toId, color, speed = 0.008) {
+      return {
+        fromId,
+        toId,
+        color,
+        t: Math.random(),
+        speed
+      };
+    }
+
+    // Default persistent stream flows
+    let streamFlows = [
+      createFlow('node-pos', 'node-fe17', '#10B981', 0.006),
+      createFlow('node-fe08', 'node-fe17', '#10B981', 0.005),
+      createFlow('node-fe17', 'node-fe07', '#F43F5E', 0.005),
+      createFlow('node-fe17', 'node-ap', '#F43F5E', 0.006),
+      createFlow('node-fe17', 'node-payroll', '#F43F5E', 0.004),
+      createFlow('node-fe17', 'node-fe19', '#F59E0B', 0.004),
+      createFlow('node-fe17', 'node-fe10', '#3B82F6', 0.003),
+    ];
+
+    function spawnParticles(fromId, toId, color) {
+      for (let i = 0; i < 12; i++) {
+        streamFlows.push({
+          fromId,
+          toId,
+          color,
+          t: -i * 0.05,
+          speed: 0.018,
+          isBurst: true
+        });
+      }
+    }
+
+    function toggleAnimation() {
+      isAnimated = !isAnimated;
+      document.getElementById('animIcon').textContent = isAnimated ? '⏸️' : '▶️';
+      document.getElementById('animText').textContent = isAnimated ? 'Tạm dừng luồng' : 'Tiếp tục luồng';
+    }
+
+    function animate() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      if (isAnimated) {
+        // Draw connection lines
+        const connections = [
+          ['node-pos', 'node-fe17', 'rgba(16, 185, 129, 0.15)'],
+          ['node-fe08', 'node-fe17', 'rgba(16, 185, 129, 0.15)'],
+          ['node-fe17', 'node-fe07', 'rgba(244, 63, 94, 0.15)'],
+          ['node-fe17', 'node-ap', 'rgba(244, 63, 94, 0.15)'],
+          ['node-fe17', 'node-payroll', 'rgba(244, 63, 94, 0.15)'],
+          ['node-fe17', 'node-fe19', 'rgba(245, 158, 11, 0.15)'],
+          ['node-fe17', 'node-fe10', 'rgba(59, 130, 246, 0.15)'],
+        ];
+
+        connections.forEach(([fromId, toId, style]) => {
+          const start = getCenter(fromId);
+          const end = getCenter(toId);
+          ctx.beginPath();
+          ctx.strokeStyle = style;
+          ctx.lineWidth = 2;
+          ctx.setLineDash([4, 6]);
+          ctx.moveTo(start.x, start.y);
+          ctx.lineTo(end.x, end.y);
+          ctx.stroke();
+          ctx.setLineDash([]);
+        });
+
+        // Update and draw stream particles
+        for (let i = streamFlows.length - 1; i >= 0; i--) {
+          const flow = streamFlows[i];
+          flow.t += flow.speed;
+
+          if (flow.t > 1) {
+            if (flow.isBurst) {
+              streamFlows.splice(i, 1);
+              continue;
+            } else {
+              flow.t = 0;
+            }
+          }
+
+          if (flow.t >= 0 && flow.t <= 1) {
+            const start = getCenter(flow.fromId);
+            const end = getCenter(flow.toId);
+            const currentX = start.x + (end.x - start.x) * flow.t;
+            const currentY = start.y + (end.y - start.y) * flow.t;
+
+            ctx.beginPath();
+            ctx.arc(currentX, currentY, flow.isBurst ? 5 : 3.5, 0, Math.PI * 2);
+            ctx.fillStyle = flow.color;
+            ctx.shadowColor = flow.color;
+            ctx.shadowBlur = 12;
+            ctx.fill();
+            ctx.shadowBlur = 0;
+          }
+        }
+      }
+
+      requestAnimationFrame(animate);
+    }
+
+    // Init
+    setTimeout(() => {
+      resizeCanvas();
+      animate();
+    }, 100);
+  </script>
+</body>
+</html>

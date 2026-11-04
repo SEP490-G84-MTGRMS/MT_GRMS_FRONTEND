@@ -45,6 +45,9 @@ export interface ServiceExpenseDto {
   vendorName: string;
   cashBookId?: string | null;
   attachedBillUrl?: string | null;
+  isRecurring?: boolean;
+  recurringCycle?: "Monthly" | "Quarterly" | "Yearly";
+  recurringDayOfMonth?: number;
   note?: string | null;
   createdAt: string;
 }
@@ -109,6 +112,9 @@ export const createExpenseSchema = z.object({
     .optional()
     .or(z.literal('')),
   note: z.string().max(500, 'Ghi chú tối đa 500 ký tự').optional(),
+  isRecurring: z.boolean().optional(),
+  recurringCycle: z.enum(["Monthly", "Quarterly", "Yearly"]).optional(),
+  recurringDayOfMonth: z.number().min(1).max(31).optional(),
 });
 
 export type CreateExpenseFormValues = z.infer<typeof createExpenseSchema>;
@@ -124,6 +130,9 @@ export interface CreateExpenseRequest {
   dueDate: string;
   vendorName: string;
   attachedBillUrl?: string;
+  isRecurring?: boolean;
+  recurringCycle?: "Monthly" | "Quarterly" | "Yearly";
+  recurringDayOfMonth?: number;
   note?: string;
 }
 
@@ -146,6 +155,7 @@ export type PayExpenseFormValues = z.infer<typeof payExpenseSchema>;
  */
 export interface PayExpenseRequest {
   paymentMethod: 'Cash' | 'BankTransfer';
+  paidFromAccountId?: string;
   createCashBookEntry: boolean;
   paymentDate: string;
   note?: string;

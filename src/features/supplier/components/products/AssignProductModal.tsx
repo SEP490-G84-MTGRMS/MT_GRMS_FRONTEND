@@ -1,97 +1,449 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import type { FC, FormEvent } from 'react';
 import type { SupplierSummary, MasterProduct, AssignProductInput } from '../../types/supplier.types';
-import { X, Plus, AlertCircle, Package } from 'lucide-react';
+import { supplierApi } from '../../api/supplierApi';
+import {
+  supplierProductApi,
+  type BatchAssignProductInput,
+  type SupplierAssignedProductInfo,
+} from '../../api/supplierProductApi';
+import {
+  X,
+  Building2,
+  Search,
+  Check,
+  AlertCircle,
+  Store,
+  ChevronDown,
+  RotateCcw,
+  Loader2,
+  CheckSquare,
+  Square,
+} from 'lucide-react';
 
 interface AssignProductModalProps {
   isOpen: boolean;
   onClose: () => void;
-  supplier: SupplierSummary;
+  supplier?: SupplierSummary | null;
+  suppliers?: SupplierSummary[];
   masterProducts: MasterProduct[];
-  assignedProductIds: string[];
-  onAssign: (input: AssignProductInput) => void;
+  assignedProductIds?: string[];
+  onAssign?: (input: AssignProductInput) => Promise<any>;
+  onAssignBatch?: (input: BatchAssignProductInput) => Promise<any>;
 }
+
+type ProductTerms = Record<string, { price: string; moq: string }>;
+
+const formatCurrency = (val: number): string =>
+  new Intl.NumberFormat('vi-VN').format(Number.isFinite(val) ? val : 0);
+
+const parseCurrency = (str: string): number => {
+  const cleaned = String(str ?? '').replace(/[^\d]/g, '');
+  return cleaned ? parseInt(cleaned, 10) : 0;
+};
+
+const defaultTerms = (masterPrice = 0, masterMoq = 1): { price: string; moq: string } => ({
+  price: String(Math.max(0, Math.round(masterPrice || 0))),
+  moq: String(Math.max(1, Math.round(masterMoq || 1))),
+});
 
 export const AssignProductModal: FC<AssignProductModalProps> = ({
   isOpen,
   onClose,
   supplier,
-  masterProducts,
-  assignedProductIds,
+  suppliers = [],
+  masterProducts = [],
+  assignedProductIds: initialAssignedIds = [],
   onAssign,
+  onAssignBatch,
 }) => {
-  const [selectedProductId, setSelectedProductId] = useState('');
-  const [deliveryUoM, setDeliveryUoM] = useState('kg');
-  const [agreedPrice, setAgreedPrice] = useState<number>(0);
-  const [moq, setMoq] = useState<number>(10);
-  const [isPrimary, setIsPrimary] = useState<boolean>(true);
-  const [supplierProductCode, setSupplierProductCode] = useState('');
-  const [errorMsg, setErrorMsg] = useState('');
+  const [selectedSupplierId, setSelectedSupplierId] = useState('');
+  const [supplierSearch, setSupplierSearch] = useState('');
+  const [isSupplierDropdownOpen, setIsSupplierDropdownOpen] = useState(false);
+  const [localSuppliers, setLocalSuppliers] = useState<SupplierSummary[]>([]);
+  const [localMasterProducts, setLocalMasterProducts] = useState<MasterProduct[]>([]);
+  const [isLoadingSuppliers, setIsLoadingSuppliers] = useState(false);
+  const supplierDropdownRef = useRef<HTMLDivElement>(null);
 
-  const handleSelectProduct = (productId: string) => {
-    setSelectedProductId(productId);
-    if (!productId) {
-      setAgreedPrice(0);
-      setDeliveryUoM('kg');
-      setMoq(10);
+  const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
+  const [productSearch, setProductSearch] = useState('');
+  const [assignedMap, setAssignedMap] = useState<Record<string, SupplierAssignedProductInfo>>({});
+  const [productTerms, setProductTerms] = useState<ProductTerms>({});
+  const [isLoadingAssigned, setIsLoadingAssigned] = useState(false);
+
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showCloseConfirm, setShowCloseConfirm] = useState(false);
+
+  const supplierOptions = useMemo(() => {
+    const merged = [...suppliers, ...localSuppliers];
+    const byId = new Map<string, SupplierSummary>();
+    merged.forEach((s) => {
+      if (s?.id) byId.set(s.id, s);
+    });
+    return Array.from(byId.values());
+  }, [suppliers, localSuppliers]);
+
+  const selectedSupplier = useMemo(
+    () => supplierOptions.find((s) => s.id === selectedSupplierId) || null,
+    [supplierOptions, selectedSupplierId]
+  );
+
+  const activeSuppliers = useMemo(
+    () => supplierOptions.filter((s) => s.status === 'Active' || !s.status),
+    [supplierOptions]
+  );
+
+  const filteredSuppliers = useMemo(() => {
+    const q = supplierSearch.trim().toLowerCase();
+    if (!q) return activeSuppliers;
+    return activeSuppliers.filter(
+      (s) =>
+        s.name.toLowerCase().includes(q) ||
+        s.code.toLowerCase().includes(q) ||
+        (s.phone && s.phone.toLowerCase().includes(q))
+    );
+  }, [activeSuppliers, supplierSearch]);
+
+  const productCatalog = useMemo(() => {
+    return masterProducts.length > 0 ? masterProducts : localMasterProducts;
+  }, [masterProducts, localMasterProducts]);
+
+  const filteredProducts = useMemo(() => {
+    const q = productSearch.trim().toLowerCase();
+    if (!q) return productCatalog;
+    return productCatalog.filter(
+      (p) => p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q)
+    );
+  }, [productCatalog, productSearch]);
+
+  const availableFilteredProducts = useMemo(
+    () => filteredProducts.filter((p) => !assignedMap[p.id]),
+    [filteredProducts, assignedMap]
+  );
+
+  const isAllAvailableSelected = useMemo(() => {
+    if (availableFilteredProducts.length === 0) return false;
+    return availableFilteredProducts.every((p) => selectedProductIds.includes(p.id));
+  }, [availableFilteredProducts, selectedProductIds]);
+
+  const resetSelectionState = useCallback(() => {
+    setSelectedProductIds([]);
+    setProductSearch('');
+    setProductTerms({});
+    setFieldErrors({});
+  }, []);
+
+  const fetchSupplierAssignments = useCallback(async (supplierId: string) => {
+    if (!supplierId) {
+      setAssignedMap({});
+      return;
+    }
+    setIsLoadingAssigned(true);
+    try {
+      const assigned = await supplierProductApi.getSupplierAssignedProducts(supplierId);
+      const map: Record<string, SupplierAssignedProductInfo> = {};
+      assigned.forEach((item) => {
+        map[item.productId] = item;
+      });
+      setAssignedMap(map);
+    } catch {
+      setAssignedMap({});
+    } finally {
+      setIsLoadingAssigned(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    setSupplierSearch('');
+    setIsSupplierDropdownOpen(false);
+    resetSelectionState();
+    setIsSubmitting(false);
+    setShowCloseConfirm(false);
+    setFieldErrors({});
+
+    const pickDefaultSupplierId = (list: SupplierSummary[]): string => {
+      if (supplier?.id && (supplier.status === 'Active' || !supplier.status)) {
+        return supplier.id;
+      }
+      const firstActive = list.find((s) => s.status === 'Active' || !s.status);
+      return firstActive?.id || '';
+    };
+
+    const applyDefaultSupplier = (list: SupplierSummary[]) => {
+      const defaultId = pickDefaultSupplierId(list);
+      setSelectedSupplierId(defaultId);
+      if (!defaultId) {
+        setAssignedMap({});
+        return;
+      }
+      const seedMap: Record<string, SupplierAssignedProductInfo> = {};
+      initialAssignedIds.forEach((id) => {
+        seedMap[id] = { productId: id, agreedPrice: 0, moq: 1 };
+      });
+      setAssignedMap(seedMap);
+      void fetchSupplierAssignments(defaultId);
+    };
+
+    const bootstrapModal = async () => {
+      setIsLoadingSuppliers(true);
+      try {
+        let nextSuppliers = suppliers.filter((s) => s.status === 'Active' || !s.status);
+        if (nextSuppliers.length === 0) {
+          const res = await supplierApi.getSuppliers({
+            pageIndex: 1,
+            pageSize: 100,
+            status: 'Active',
+          });
+          nextSuppliers = res.items ?? [];
+        }
+        setLocalSuppliers(nextSuppliers);
+
+        if (masterProducts.length === 0) {
+          const products = await supplierProductApi.getMasterProducts();
+          setLocalMasterProducts(products as MasterProduct[]);
+        } else {
+          setLocalMasterProducts([]);
+        }
+
+        applyDefaultSupplier(nextSuppliers);
+      } catch (err: any) {
+        setLocalSuppliers([]);
+        setSelectedSupplierId('');
+        setAssignedMap({});
+        setFieldErrors({
+          supplier: err.message || 'Không thể tải dữ liệu nhà cung cấp / sản phẩm.',
+        });
+      } finally {
+        setIsLoadingSuppliers(false);
+      }
+    };
+
+    void bootstrapModal();
+    // Only reset when modal opens or preselected supplier changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, supplier?.id]);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (supplierDropdownRef.current && !supplierDropdownRef.current.contains(e.target as Node)) {
+        setIsSupplierDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleSelectSupplier = (s: SupplierSummary) => {
+    if (s.status && s.status !== 'Active') return;
+    setSelectedSupplierId(s.id);
+    setSupplierSearch('');
+    setIsSupplierDropdownOpen(false);
+    resetSelectionState();
+    void fetchSupplierAssignments(s.id);
+  };
+
+  const handleClearSupplier = () => {
+    setSelectedSupplierId('');
+    setAssignedMap({});
+    resetSelectionState();
+  };
+
+  const termsFromMaster = (productId: string): { price: string; moq: string } => {
+    const product = productCatalog.find((p) => p.id === productId);
+    return defaultTerms(product?.defaultWholesalePrice ?? 0, product?.defaultMoq ?? 1);
+  };
+
+  const ensureTerms = (productId: string): { price: string; moq: string } =>
+    productTerms[productId] ?? termsFromMaster(productId);
+
+  const handleToggleProduct = (productId: string) => {
+    if (assignedMap[productId]) return;
+
+    setSelectedProductIds((prev) => {
+      const exists = prev.includes(productId);
+      const next = exists ? prev.filter((id) => id !== productId) : [...prev, productId];
+      if (!exists) {
+        setProductTerms((terms) => ({
+          ...terms,
+          [productId]: terms[productId] ?? termsFromMaster(productId),
+        }));
+      }
+      if (next.length > 0) {
+        setFieldErrors((errs) => {
+          const copy = { ...errs };
+          delete copy.products;
+          return copy;
+        });
+      }
+      return next;
+    });
+  };
+
+  const handleToggleSelectAll = () => {
+    if (isAllAvailableSelected) {
+      const availableIds = new Set(availableFilteredProducts.map((p) => p.id));
+      setSelectedProductIds((prev) => prev.filter((id) => !availableIds.has(id)));
       return;
     }
 
-    const prod = masterProducts.find((p) => p.id === productId);
-    if (prod) {
-      setDeliveryUoM(prod.baseUoM);
-      setAgreedPrice(prod.defaultWholesalePrice);
-      setMoq(prod.defaultMoq);
+    const toAdd = availableFilteredProducts.map((p) => p.id);
+    setSelectedProductIds((prev) => Array.from(new Set([...prev, ...toAdd])));
+    setProductTerms((prev) => {
+      const next = { ...prev };
+      toAdd.forEach((id) => {
+        if (!next[id]) next[id] = termsFromMaster(id);
+      });
+      return next;
+    });
+    setFieldErrors((errs) => {
+      const copy = { ...errs };
+      delete copy.products;
+      return copy;
+    });
+  };
+
+  const updateRowPrice = (productId: string, raw: string) => {
+    const digits = raw.replace(/[^\d]/g, '');
+    setProductTerms((prev) => ({
+      ...prev,
+      [productId]: { ...ensureTerms(productId), price: digits },
+    }));
+    setFieldErrors((prev) => {
+      const copy = { ...prev };
+      delete copy[`price_${productId}`];
+      delete copy.form;
+      return copy;
+    });
+  };
+
+  const updateRowMoq = (productId: string, raw: string) => {
+    const digits = raw.replace(/[^\d]/g, '');
+    setProductTerms((prev) => ({
+      ...prev,
+      [productId]: { ...ensureTerms(productId), moq: digits },
+    }));
+    setFieldErrors((prev) => {
+      const copy = { ...prev };
+      delete copy[`moq_${productId}`];
+      delete copy.form;
+      return copy;
+    });
+  };
+
+  const validateForm = (): boolean => {
+    const errors: Record<string, string> = {};
+
+    if (!selectedSupplierId) {
+      errors.supplier = 'Vui lòng chọn nhà cung cấp hợp lệ.';
+    }
+
+    if (selectedProductIds.length === 0) {
+      errors.products = 'Vui lòng chọn ít nhất 1 sản phẩm để gán cho nhà cung cấp.';
+    }
+
+    selectedProductIds.forEach((id) => {
+      if (assignedMap[id]) {
+        errors.products = 'Không thể gán lại sản phẩm đã thuộc nhà cung cấp này.';
+        return;
+      }
+
+      const terms = ensureTerms(id);
+      const price = parseCurrency(terms.price);
+      if (Number.isNaN(price) || price < 0) {
+        errors[`price_${id}`] = 'Giá nhập phải ≥ 0.';
+      }
+
+      const moq = parseInt(terms.moq, 10);
+      if (!terms.moq || Number.isNaN(moq) || moq < 1) {
+        errors[`moq_${id}`] = 'MOQ phải > 0.';
+      }
+    });
+
+    setFieldErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const executeSubmit = async () => {
+    if (isSubmitting) return;
+    if (!validateForm()) return;
+
+    setIsSubmitting(true);
+    try {
+      const items = selectedProductIds.map((pid) => {
+        const terms = ensureTerms(pid);
+        return {
+          productId: pid,
+          agreedPrice: parseCurrency(terms.price),
+          moq: parseInt(terms.moq, 10),
+        };
+      });
+
+      if (onAssignBatch) {
+        await onAssignBatch({
+          supplierId: selectedSupplierId,
+          productIds: selectedProductIds,
+          items,
+        });
+      } else if (onAssign) {
+        for (const item of items) {
+          const product = productCatalog.find((p) => p.id === item.productId);
+          await onAssign({
+            supplierId: selectedSupplierId,
+            productId: item.productId,
+            deliveryUoM: product?.baseUoM || 'Cái',
+            agreedPrice: item.agreedPrice,
+            moq: item.moq,
+            isPrimary: false,
+          });
+        }
+      } else {
+        await supplierProductApi.assignBatchProducts({
+          supplierId: selectedSupplierId,
+          productIds: selectedProductIds,
+          items,
+        });
+      }
+
+      onClose();
+    } catch (err: any) {
+      setFieldErrors((prev) => ({
+        ...prev,
+        form: err.message || 'Thao tác gán sản phẩm không thành công. Vui lòng thử lại.',
+      }));
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleSubmit = (e: FormEvent) => {
+    e.preventDefault();
+    void executeSubmit();
+  };
+
+  const hasUnsavedChanges = selectedProductIds.length > 0;
+
+  const handleAttemptClose = () => {
+    if (isSubmitting) return;
+    if (hasUnsavedChanges) {
+      setShowCloseConfirm(true);
+    } else {
+      onClose();
     }
   };
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: FormEvent) => {
-    e.preventDefault();
-    setErrorMsg('');
-
-    if (!selectedProductId) {
-      setErrorMsg('Vui lòng chọn sản phẩm cần gán.');
-      return;
-    }
-
-    if (assignedProductIds.includes(selectedProductId)) {
-      setErrorMsg('Sản phẩm này đã được gán cho Nhà cung cấp này rồi (BR-SP01). Vui lòng chọn sản phẩm khác hoặc chỉnh sửa ở bảng danh sách.');
-      return;
-    }
-
-    if (agreedPrice <= 0) {
-      setErrorMsg('Giá nhập sỉ thỏa thuận phải lớn hơn 0 VNĐ.');
-      return;
-    }
-
-    if (moq < 1) {
-      setErrorMsg('Số lượng đặt hàng tối thiểu (MOQ) phải từ 1 trở lên.');
-      return;
-    }
-
-    onAssign({
-      supplierId: supplier.id,
-      productId: selectedProductId,
-      deliveryUoM: deliveryUoM.trim() || 'cái',
-      agreedPrice,
-      moq,
-      isPrimary,
-      supplierProductCode: supplierProductCode.trim() || undefined,
-    });
-
-    onClose();
-  };
-
-  const selectedProduct = masterProducts.find((p) => p.id === selectedProductId);
+  const gridColumns = '40px 110px 1.4fr 70px 100px 120px 90px 90px';
 
   return (
     <div
       style={{
         position: 'fixed',
         inset: 0,
-        backgroundColor: 'rgba(15, 23, 42, 0.55)',
+        backgroundColor: 'rgba(15, 23, 42, 0.65)',
         backdropFilter: 'blur(4px)',
         display: 'flex',
         alignItems: 'center',
@@ -99,337 +451,921 @@ export const AssignProductModal: FC<AssignProductModalProps> = ({
         zIndex: 9999,
         padding: 16,
       }}
-      onClick={onClose}
+      onClick={handleAttemptClose}
     >
       <div
         style={{
           backgroundColor: '#ffffff',
-          borderRadius: 24,
+          borderRadius: 14,
           width: '100%',
-          maxWidth: 580,
-          boxShadow: '0 20px 40px rgba(0, 0, 0, 0.15)',
+          maxWidth: 980,
+          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
           border: '1px solid #e2e8f0',
           overflow: 'hidden',
           display: 'flex',
           flexDirection: 'column',
-          maxHeight: '90vh',
+          maxHeight: '94vh',
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Modal Header */}
         <div
           style={{
-            padding: '20px 24px',
-            borderBottom: '1px solid #edf2f7',
+            padding: '16px 22px',
+            borderBottom: '1px solid #e2e8f0',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            background: 'linear-gradient(to right, #F7FAFF, #ffffff)',
+            background: 'linear-gradient(to right, #f8fafc, #ffffff)',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <div
               style={{
-                width: 36,
-                height: 36,
+                width: 40,
+                height: 40,
                 borderRadius: 10,
-                backgroundColor: '#eff6ff',
-                color: '#0066FF',
+                backgroundColor: '#f0fdfa',
+                color: '#0f766e',
+                border: '1px solid #ccfbf1',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
               }}
             >
-              <Package size={20} />
+              <Store size={22} />
             </div>
-            <div>
-              <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: '#0f172a' }}>
-                Gán Sản Phẩm Vào Nhà Cung Cấp
-              </h3>
-              <div style={{ fontSize: '0.78rem', color: '#64748b' }}>
-                Đang gán cho: <b style={{ color: '#0066FF' }}>{supplier.name}</b> ({supplier.code})
-              </div>
-            </div>
+            <h2
+              style={{
+                margin: 0,
+                fontSize: '1.1rem',
+                fontWeight: 700,
+                color: '#0f172a',
+              }}
+            >
+              Gán Sản Phẩm Vào Nhà Cung Cấp
+            </h2>
           </div>
 
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleAttemptClose}
+            disabled={isSubmitting}
             style={{
               background: 'none',
               border: 'none',
+              cursor: isSubmitting ? 'not-allowed' : 'pointer',
               color: '#94a3b8',
-              cursor: 'pointer',
-              padding: 4,
+              padding: 6,
               borderRadius: 6,
+              display: 'flex',
             }}
+            title="Đóng popup"
           >
             <X size={20} />
           </button>
         </div>
 
-        {/* Modal Form */}
-        <form onSubmit={handleSubmit} style={{ padding: '20px 24px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {errorMsg && (
-            <div
-              style={{
-                backgroundColor: '#fef2f2',
-                border: '1px solid #fecaca',
-                color: '#dc2626',
-                padding: '10px 14px',
-                borderRadius: 12,
-                fontSize: '0.84rem',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-              }}
-            >
-              <AlertCircle size={16} />
-              <span>{errorMsg}</span>
-            </div>
-          )}
-
-          {/* Select Product */}
-          <div>
-            <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#334155', marginBottom: 6 }}>
-              Chọn sản phẩm từ danh mục Master (*)
-            </label>
-            <select
-              id="selectAssignProduct"
-              value={selectedProductId}
-              onChange={(e) => handleSelectProduct(e.target.value)}
-              style={{
-                width: '100%',
-                height: 40,
-                padding: '0 12px',
-                borderRadius: 10,
-                border: '1.5px solid #cbd5e1',
-                fontSize: '0.88rem',
-                backgroundColor: '#f8fafc',
-                outline: 'none',
-              }}
-            >
-              <option value="">-- Tìm & chọn sản phẩm (Barcode / SKU / Tên) --</option>
-              {masterProducts.map((p) => {
-                const isAssigned = assignedProductIds.includes(p.id);
-                return (
-                  <option key={p.id} value={p.id} disabled={isAssigned}>
-                    {p.barcode} — {p.sku} — {p.name} ({p.baseUoM}) {isAssigned ? ' [Đã gán]' : ''}
-                  </option>
-                );
-              })}
-            </select>
-          </div>
-
-          {/* Product Preview Card */}
-          {selectedProduct && (
-            <div
-              style={{
-                backgroundColor: 'var(--bg-soft-blue)',
-                borderRadius: 14,
-                padding: '12px 16px',
-                border: '1px solid var(--blue-border)',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                fontSize: '0.82rem',
-              }}
-            >
-              <div>
-                <div style={{ fontWeight: 700, color: '#0066FF' }}>{selectedProduct.name}</div>
-                <div style={{ color: '#64748b', marginTop: 2 }}>
-                  Ngành hàng: <b>{selectedProduct.categoryName}</b> | ĐVT gốc: <b>{selectedProduct.baseUoM}</b>
-                </div>
-              </div>
-              <div style={{ textAlign: 'right' }}>
-                <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Barcode:</span>
-                <div style={{ fontFamily: 'JetBrains Mono, monospace', fontWeight: 600 }}>{selectedProduct.barcode}</div>
-              </div>
-            </div>
-          )}
-
-          {/* Delivery UoM & SKU NCC */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-            <div>
-              <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#334155', marginBottom: 6 }}>
-                Đơn vị tính giao hàng (Delivery UoM) (*)
-              </label>
-              <select
-                value={deliveryUoM}
-                onChange={(e) => setDeliveryUoM(e.target.value)}
-                style={{
-                  width: '100%',
-                  height: 40,
-                  padding: '0 12px',
-                  borderRadius: 10,
-                  border: '1px solid #cbd5e1',
-                  fontSize: '0.88rem',
-                  outline: 'none',
-                }}
-              >
-                <option value="kg">kg (Kilôgam)</option>
-                <option value="bottle">bottle (Chai/Lọ)</option>
-                <option value="box">box (Hộp/Thùng)</option>
-                <option value="pack">pack (Gói/Túi)</option>
-                <option value="can">can (Lon)</option>
-                <option value="cái">cái (Chiếc)</option>
-              </select>
-            </div>
-
-            <div>
-              <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#334155', marginBottom: 6 }}>
-                Mã sản phẩm riêng phía NCC (tùy chọn)
-              </label>
-              <input
-                type="text"
-                placeholder="VD: SUP-PRD-01"
-                value={supplierProductCode}
-                onChange={(e) => setSupplierProductCode(e.target.value)}
-                style={{
-                  width: '100%',
-                  height: 40,
-                  padding: '0 12px',
-                  borderRadius: 10,
-                  border: '1px solid #cbd5e1',
-                  fontSize: '0.88rem',
-                  outline: 'none',
-                  boxSizing: 'border-box',
-                }}
-              />
-            </div>
-          </div>
-
-          {/* Agreed Wholesale Price & MOQ */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 14 }}>
-            <div>
-              <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#334155', marginBottom: 6 }}>
-                Giá nhập sỉ thỏa thuận (VNĐ) (*)
-              </label>
-              <input
-                type="number"
-                min={1000}
-                step={500}
-                value={agreedPrice || ''}
-                onChange={(e) => setAgreedPrice(parseFloat(e.target.value) || 0)}
-                placeholder="VD: 25000"
-                style={{
-                  width: '100%',
-                  height: 40,
-                  padding: '0 12px',
-                  borderRadius: 10,
-                  border: '1.5px solid #0066FF',
-                  fontSize: '0.95rem',
-                  fontWeight: 700,
-                  color: '#0066FF',
-                  fontFamily: 'JetBrains Mono, monospace',
-                  outline: 'none',
-                  boxSizing: 'border-box',
-                }}
-              />
-            </div>
-
-            <div>
-              <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#334155', marginBottom: 6 }}>
-                Số lượng đặt tối thiểu (MOQ) (*)
-              </label>
-              <input
-                type="number"
-                min={1}
-                value={moq || ''}
-                onChange={(e) => setMoq(parseInt(e.target.value, 10) || 1)}
-                placeholder="VD: 10"
-                style={{
-                  width: '100%',
-                  height: 40,
-                  padding: '0 12px',
-                  borderRadius: 10,
-                  border: '1px solid #cbd5e1',
-                  fontSize: '0.88rem',
-                  outline: 'none',
-                  boxSizing: 'border-box',
-                }}
-              />
-            </div>
-          </div>
-
-          {/* Primary Supplier Checkbox */}
+        <form
+          onSubmit={handleSubmit}
+          style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}
+        >
           <div
             style={{
-              padding: '12px 16px',
-              borderRadius: 14,
-              backgroundColor: '#fefce8',
-              border: '1px solid #fef08a',
+              padding: '16px 22px',
+              overflowY: 'auto',
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 16,
+            }}
+          >
+            {fieldErrors.form && (
+              <div
+                style={{
+                  backgroundColor: '#fef2f2',
+                  border: '1px solid #fecaca',
+                  color: '#b91c1c',
+                  padding: '10px 14px',
+                  borderRadius: 8,
+                  fontSize: '0.84rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                }}
+              >
+                <AlertCircle size={16} />
+                <span>{fieldErrors.form}</span>
+              </div>
+            )}
+
+            {/* Supplier selection */}
+            <div>
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: 6,
+                }}
+              >
+                <label style={{ fontSize: '0.84rem', fontWeight: 700, color: '#334155' }}>
+                  Nhà cung cấp <span style={{ color: '#ef4444' }}>*</span>
+                </label>
+                {selectedSupplier && (
+                  <button
+                    type="button"
+                    onClick={handleClearSupplier}
+                    disabled={isSubmitting}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: '#0f766e',
+                      fontSize: '0.78rem',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 4,
+                    }}
+                  >
+                    <RotateCcw size={12} /> Đổi NCC
+                  </button>
+                )}
+              </div>
+
+              {!selectedSupplier ? (
+                <div ref={supplierDropdownRef} style={{ position: 'relative' }}>
+                  <div
+                    onClick={() => setIsSupplierDropdownOpen(!isSupplierDropdownOpen)}
+                    style={{
+                      height: 40,
+                      padding: '0 12px',
+                      borderRadius: 8,
+                      border: fieldErrors.supplier ? '1.5px solid #ef4444' : '1px solid #cbd5e1',
+                      backgroundColor: '#ffffff',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      cursor: 'pointer',
+                      fontSize: '0.88rem',
+                      color: '#64748b',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <Building2 size={16} style={{ color: '#0f766e' }} />
+                      <span>Tìm theo tên, mã NCC hoặc SĐT...</span>
+                    </div>
+                    <ChevronDown size={16} style={{ color: '#94a3b8' }} />
+                  </div>
+
+                  {isSupplierDropdownOpen && (
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: 'calc(100% + 4px)',
+                        left: 0,
+                        right: 0,
+                        backgroundColor: '#ffffff',
+                        borderRadius: 8,
+                        border: '1px solid #cbd5e1',
+                        boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.15)',
+                        zIndex: 100,
+                        maxHeight: 250,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        overflow: 'hidden',
+                      }}
+                    >
+                      <div style={{ padding: '8px 10px', borderBottom: '1px solid #f1f5f9' }}>
+                        <div style={{ position: 'relative' }}>
+                          <Search
+                            size={14}
+                            style={{
+                              position: 'absolute',
+                              left: 10,
+                              top: '50%',
+                              transform: 'translateY(-50%)',
+                              color: '#94a3b8',
+                            }}
+                          />
+                          <input
+                            type="text"
+                            placeholder="Gõ mã, tên hoặc SĐT nhà cung cấp..."
+                            value={supplierSearch}
+                            onChange={(e) => setSupplierSearch(e.target.value)}
+                            autoFocus
+                            style={{
+                              width: '100%',
+                              height: 32,
+                              padding: '0 10px 0 32px',
+                              borderRadius: 6,
+                              border: '1px solid #e2e8f0',
+                              fontSize: '0.84rem',
+                              outline: 'none',
+                              boxSizing: 'border-box',
+                            }}
+                          />
+                        </div>
+                      </div>
+
+                      <div style={{ overflowY: 'auto', flex: 1 }}>
+                        {isLoadingSuppliers ? (
+                          <div
+                            style={{
+                              padding: 16,
+                              textAlign: 'center',
+                              color: '#64748b',
+                              fontSize: '0.84rem',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: 8,
+                            }}
+                          >
+                            <Loader2 size={14} className="animate-spin" />
+                            Đang tải danh sách nhà cung cấp...
+                          </div>
+                        ) : filteredSuppliers.length === 0 ? (
+                          <div
+                            style={{
+                              padding: 16,
+                              textAlign: 'center',
+                              color: '#94a3b8',
+                              fontSize: '0.84rem',
+                            }}
+                          >
+                            Không tìm thấy nhà cung cấp đang hoạt động.
+                          </div>
+                        ) : (
+                          filteredSuppliers.map((s) => (
+                            <div
+                              key={s.id}
+                              onClick={() => handleSelectSupplier(s)}
+                              style={{
+                                padding: '9px 12px',
+                                borderBottom: '1px solid #f8fafc',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                cursor: 'pointer',
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.backgroundColor = '#f0fdfa';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.backgroundColor = '#ffffff';
+                              }}
+                            >
+                              <div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                  <span style={{ fontWeight: 600, fontSize: '0.88rem', color: '#0f172a' }}>
+                                    {s.name}
+                                  </span>
+                                  <span
+                                    style={{
+                                      fontFamily: 'monospace',
+                                      fontSize: '0.74rem',
+                                      color: '#0f766e',
+                                      backgroundColor: '#f0fdfa',
+                                      padding: '1px 6px',
+                                      borderRadius: 4,
+                                      border: '1px solid #ccfbf1',
+                                    }}
+                                  >
+                                    {s.code}
+                                  </span>
+                                </div>
+                                {s.phone && (
+                                  <div style={{ fontSize: '0.76rem', color: '#64748b', marginTop: 2 }}>
+                                    SĐT: {s.phone}
+                                  </div>
+                                )}
+                              </div>
+                              <span
+                                style={{
+                                  fontSize: '0.72rem',
+                                  padding: '2px 8px',
+                                  borderRadius: 4,
+                                  backgroundColor: '#ecfdf5',
+                                  color: '#059669',
+                                  fontWeight: 600,
+                                }}
+                              >
+                                Hoạt động
+                              </span>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div
+                  style={{
+                    backgroundColor: '#f8fafc',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: 8,
+                    padding: '10px 14px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <Building2 size={18} style={{ color: '#0f766e' }} />
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontWeight: 700, fontSize: '0.9rem', color: '#0f172a' }}>
+                          {selectedSupplier.name}
+                        </span>
+                        <span
+                          style={{
+                            fontFamily: 'monospace',
+                            fontSize: '0.74rem',
+                            color: '#0f766e',
+                            backgroundColor: '#ffffff',
+                            padding: '1px 6px',
+                            borderRadius: 4,
+                            border: '1px solid #cbd5e1',
+                          }}
+                        >
+                          {selectedSupplier.code}
+                        </span>
+                      </div>
+                      {selectedSupplier.phone && (
+                        <div style={{ fontSize: '0.76rem', color: '#64748b', marginTop: 2 }}>
+                          SĐT: {selectedSupplier.phone}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {fieldErrors.supplier && (
+                <div style={{ fontSize: '0.78rem', color: '#dc2626', marginTop: 4 }}>
+                  {fieldErrors.supplier}
+                </div>
+              )}
+            </div>
+
+            {/* Product table */}
+            <div>
+              <label
+                style={{
+                  fontSize: '0.84rem',
+                  fontWeight: 700,
+                  color: '#334155',
+                  display: 'block',
+                  marginBottom: 6,
+                }}
+              >
+                Danh sách sản phẩm Master
+              </label>
+
+              {!selectedSupplierId ? (
+                <div
+                  style={{
+                    height: 88,
+                    borderRadius: 8,
+                    border: '1px dashed #cbd5e1',
+                    backgroundColor: '#f8fafc',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#94a3b8',
+                    fontSize: '0.84rem',
+                  }}
+                >
+                  Chọn nhà cung cấp để tải danh sách sản phẩm.
+                </div>
+              ) : (
+                <div
+                  style={{
+                    border: fieldErrors.products ? '1.5px solid #ef4444' : '1px solid #cbd5e1',
+                    borderRadius: 8,
+                    overflow: 'hidden',
+                    backgroundColor: '#ffffff',
+                  }}
+                >
+                  <div
+                    style={{
+                      padding: '8px 12px',
+                      borderBottom: '1px solid #e2e8f0',
+                      backgroundColor: '#f8fafc',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                    }}
+                  >
+                    <div style={{ position: 'relative', flex: 1 }}>
+                      <Search
+                        size={14}
+                        style={{
+                          position: 'absolute',
+                          left: 10,
+                          top: '50%',
+                          transform: 'translateY(-50%)',
+                          color: '#94a3b8',
+                        }}
+                      />
+                      <input
+                        type="text"
+                        placeholder="Tìm theo mã SKU hoặc tên sản phẩm..."
+                        value={productSearch}
+                        onChange={(e) => setProductSearch(e.target.value)}
+                        style={{
+                          width: '100%',
+                          height: 32,
+                          padding: '0 28px 0 32px',
+                          borderRadius: 6,
+                          border: '1px solid #cbd5e1',
+                          fontSize: '0.82rem',
+                          outline: 'none',
+                          boxSizing: 'border-box',
+                        }}
+                      />
+                      {productSearch && (
+                        <button
+                          type="button"
+                          onClick={() => setProductSearch('')}
+                          style={{
+                            position: 'absolute',
+                            right: 8,
+                            top: '50%',
+                            transform: 'translateY(-50%)',
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            color: '#94a3b8',
+                            padding: 2,
+                          }}
+                        >
+                          <X size={13} />
+                        </button>
+                      )}
+                    </div>
+
+                    {availableFilteredProducts.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={handleToggleSelectAll}
+                        style={{
+                          padding: '6px 10px',
+                          borderRadius: 6,
+                          border: '1px solid #cbd5e1',
+                          backgroundColor: '#ffffff',
+                          color: '#0f766e',
+                          fontSize: '0.76rem',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 4,
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {isAllAvailableSelected ? (
+                          <>
+                            <Square size={13} /> Bỏ chọn
+                          </>
+                        ) : (
+                          <>
+                            <CheckSquare size={13} /> Chọn tất cả chưa gán
+                          </>
+                        )}
+                      </button>
+                    )}
+                  </div>
+
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: gridColumns,
+                      backgroundColor: '#f1f5f9',
+                      borderBottom: '1px solid #cbd5e1',
+                      fontWeight: 700,
+                      color: '#475569',
+                      fontSize: '0.78rem',
+                      alignItems: 'center',
+                    }}
+                  >
+                    <div style={{ padding: '8px 8px', textAlign: 'center' }}>
+                      <input
+                        type="checkbox"
+                        checked={isAllAvailableSelected}
+                        onChange={handleToggleSelectAll}
+                        disabled={availableFilteredProducts.length === 0}
+                        style={{ cursor: 'pointer', accentColor: '#0f766e' }}
+                      />
+                    </div>
+                    <div style={{ padding: '8px 8px' }}>SKU</div>
+                    <div style={{ padding: '8px 8px' }}>Tên sản phẩm</div>
+                    <div style={{ padding: '8px 8px', textAlign: 'center' }}>ĐVT</div>
+                    <div style={{ padding: '8px 8px', textAlign: 'center' }}>Trạng thái</div>
+                    <div style={{ padding: '8px 8px', textAlign: 'right' }}>Giá nhập</div>
+                    <div style={{ padding: '8px 8px', textAlign: 'right' }}>MOQ</div>
+                    <div style={{ padding: '8px 8px', textAlign: 'center' }}>Thao tác</div>
+                  </div>
+
+                  <div style={{ maxHeight: 320, overflowY: 'auto' }}>
+                    {isLoadingAssigned ? (
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          padding: '28px 16px',
+                          color: '#64748b',
+                          gap: 8,
+                          fontSize: '0.84rem',
+                        }}
+                      >
+                        <Loader2 size={16} className="animate-spin" />
+                        <span>Đang tải trạng thái gán sản phẩm...</span>
+                      </div>
+                    ) : filteredProducts.length === 0 ? (
+                      <div
+                        style={{
+                          textAlign: 'center',
+                          padding: '28px 16px',
+                          color: '#94a3b8',
+                          fontSize: '0.83rem',
+                        }}
+                      >
+                        {productCatalog.length === 0
+                          ? 'Không có sản phẩm Master.'
+                          : 'Không tìm thấy sản phẩm khớp từ khóa.'}
+                      </div>
+                    ) : (
+                      filteredProducts.map((p) => {
+                        const assigned = assignedMap[p.id];
+                        const isAssigned = !!assigned;
+                        const isSelected = selectedProductIds.includes(p.id);
+                        const terms = ensureTerms(p.id);
+                        const priceError = fieldErrors[`price_${p.id}`];
+                        const moqError = fieldErrors[`moq_${p.id}`];
+
+                        return (
+                          <div
+                            key={p.id}
+                            style={{
+                              display: 'grid',
+                              gridTemplateColumns: gridColumns,
+                              alignItems: 'center',
+                              borderBottom: '1px solid #f1f5f9',
+                              fontSize: '0.8rem',
+                              backgroundColor: isAssigned
+                                ? '#f8fafc'
+                                : isSelected
+                                ? '#f0fdfa'
+                                : '#ffffff',
+                            }}
+                          >
+                            <div style={{ padding: '8px', textAlign: 'center' }}>
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                disabled={isAssigned || isSubmitting}
+                                onChange={() => handleToggleProduct(p.id)}
+                                style={{
+                                  cursor: isAssigned ? 'not-allowed' : 'pointer',
+                                  accentColor: '#0f766e',
+                                }}
+                              />
+                            </div>
+
+                            <div
+                              style={{
+                                padding: '8px',
+                                fontFamily: 'monospace',
+                                fontWeight: 600,
+                                color: isAssigned ? '#94a3b8' : '#0f766e',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
+                              }}
+                            >
+                              {p.sku}
+                            </div>
+
+                            <div
+                              style={{
+                                padding: '8px',
+                                fontWeight: isSelected ? 700 : 500,
+                                color: isAssigned ? '#94a3b8' : '#0f172a',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
+                              }}
+                              title={p.name}
+                            >
+                              {p.name}
+                            </div>
+
+                            <div
+                              style={{
+                                padding: '8px',
+                                textAlign: 'center',
+                                fontWeight: 600,
+                                color: isAssigned ? '#94a3b8' : '#334155',
+                              }}
+                            >
+                              {p.baseUoM || 'Cái'}
+                            </div>
+
+                            <div style={{ padding: '8px', textAlign: 'center' }}>
+                              <span
+                                style={{
+                                  fontSize: '0.7rem',
+                                  fontWeight: 600,
+                                  padding: '2px 7px',
+                                  borderRadius: 4,
+                                  backgroundColor: isAssigned ? '#f1f5f9' : '#ecfdf5',
+                                  color: isAssigned ? '#64748b' : '#047857',
+                                  border: isAssigned ? '1px solid #e2e8f0' : '1px solid #a7f3d0',
+                                }}
+                              >
+                                {isAssigned ? 'Đã gán' : 'Chưa gán'}
+                              </span>
+                            </div>
+
+                            <div style={{ padding: '6px 8px' }}>
+                              {isAssigned ? (
+                                <div
+                                  style={{
+                                    textAlign: 'right',
+                                    color: '#64748b',
+                                    fontWeight: 600,
+                                  }}
+                                >
+                                  {formatCurrency(assigned.agreedPrice)}
+                                </div>
+                              ) : isSelected ? (
+                                <div>
+                                  <input
+                                    type="text"
+                                    inputMode="numeric"
+                                    value={terms.price}
+                                    onChange={(e) => updateRowPrice(p.id, e.target.value)}
+                                    disabled={isSubmitting}
+                                    style={{
+                                      width: '100%',
+                                      height: 30,
+                                      padding: '0 8px',
+                                      borderRadius: 6,
+                                      border: priceError ? '1.5px solid #ef4444' : '1px solid #cbd5e1',
+                                      textAlign: 'right',
+                                      fontSize: '0.78rem',
+                                      boxSizing: 'border-box',
+                                    }}
+                                  />
+                                  {priceError && (
+                                    <div style={{ fontSize: '0.68rem', color: '#dc2626', marginTop: 2 }}>
+                                      {priceError}
+                                    </div>
+                                  )}
+                                </div>
+                              ) : (
+                                <div style={{ textAlign: 'right', color: '#cbd5e1' }}>—</div>
+                              )}
+                            </div>
+
+                            <div style={{ padding: '6px 8px' }}>
+                              {isAssigned ? (
+                                <div
+                                  style={{
+                                    textAlign: 'right',
+                                    color: '#64748b',
+                                    fontWeight: 600,
+                                  }}
+                                >
+                                  {assigned.moq} {p.baseUoM || 'Cái'}
+                                </div>
+                              ) : isSelected ? (
+                                <div>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                    <input
+                                      type="text"
+                                      inputMode="numeric"
+                                      value={terms.moq}
+                                      onChange={(e) => updateRowMoq(p.id, e.target.value)}
+                                      disabled={isSubmitting}
+                                      style={{
+                                        width: '100%',
+                                        height: 30,
+                                        padding: '0 8px',
+                                        borderRadius: 6,
+                                        border: moqError ? '1.5px solid #ef4444' : '1px solid #cbd5e1',
+                                        textAlign: 'right',
+                                        fontSize: '0.78rem',
+                                        boxSizing: 'border-box',
+                                      }}
+                                    />
+                                    <span
+                                      style={{
+                                        fontSize: '0.7rem',
+                                        color: '#64748b',
+                                        whiteSpace: 'nowrap',
+                                        minWidth: 28,
+                                      }}
+                                    >
+                                      {p.baseUoM || 'Cái'}
+                                    </span>
+                                  </div>
+                                  {moqError && (
+                                    <div style={{ fontSize: '0.68rem', color: '#dc2626', marginTop: 2 }}>
+                                      {moqError}
+                                    </div>
+                                  )}
+                                </div>
+                              ) : (
+                                <div style={{ textAlign: 'right', color: '#cbd5e1' }}>—</div>
+                              )}
+                            </div>
+
+                            <div
+                              style={{
+                                padding: '8px',
+                                textAlign: 'center',
+                                fontSize: '0.72rem',
+                                color: isAssigned ? '#64748b' : '#94a3b8',
+                                fontWeight: 600,
+                              }}
+                            >
+                              {isAssigned ? 'Giữ nguyên' : isSelected ? 'Sẽ gán' : '—'}
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {fieldErrors.products && (
+                <div style={{ fontSize: '0.78rem', color: '#dc2626', marginTop: 4 }}>
+                  {fieldErrors.products}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div
+            style={{
+              padding: '12px 22px',
+              borderTop: '1px solid #e2e8f0',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
+              backgroundColor: '#f8fafc',
             }}
           >
-            <div>
-              <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#854d0e' }}>
-                Đặt làm Nhà cung cấp chính (Primary Supplier)
-              </div>
-              <div style={{ fontSize: '0.75rem', color: '#a16207' }}>
-                Hệ thống sẽ tự động ưu tiên NCC này khi tạo Đơn đặt hàng (PO) tự động.
-              </div>
+            <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
+              {selectedProductIds.length > 0 ? (
+                <span>
+                  Đã chọn: <b style={{ color: '#0f766e' }}>{selectedProductIds.length}</b> sản phẩm
+                </span>
+              ) : (
+                <span style={{ color: '#94a3b8' }}>Chưa chọn sản phẩm nào</span>
+              )}
             </div>
-            <input
-              type="checkbox"
-              id="chkPrimary"
-              checked={isPrimary}
-              onChange={(e) => setIsPrimary(e.target.checked)}
-              style={{ width: 18, height: 18, cursor: 'pointer', accentColor: '#eab308' }}
-            />
-          </div>
 
-          {/* Modal Actions */}
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'flex-end',
-              gap: 12,
-              marginTop: 10,
-              paddingTop: 16,
-              borderTop: '1px solid #edf2f7',
-            }}
-          >
-            <button
-              type="button"
-              onClick={onClose}
-              style={{
-                padding: '9px 18px',
-                borderRadius: 9999,
-                border: '1px solid #cbd5e1',
-                backgroundColor: '#ffffff',
-                color: '#475569',
-                fontSize: '0.85rem',
-                fontWeight: 600,
-                cursor: 'pointer',
-              }}
-            >
-              Hủy bỏ
-            </button>
-            <button
-              type="submit"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 6,
-                padding: '9px 22px',
-                borderRadius: 9999,
-                border: 'none',
-                backgroundColor: 'var(--blue-primary)',
-                color: '#ffffff',
-                fontSize: '0.85rem',
-                fontWeight: 600,
-                cursor: 'pointer',
-                boxShadow: '0 4px 12px rgba(15, 118, 110, 0.25)',
-              }}
-            >
-              <Plus size={16} /> Xác nhận gán sản phẩm
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <button
+                type="button"
+                onClick={handleAttemptClose}
+                disabled={isSubmitting}
+                style={{
+                  height: 36,
+                  padding: '0 14px',
+                  borderRadius: 6,
+                  border: '1px solid #cbd5e1',
+                  backgroundColor: '#ffffff',
+                  color: '#475569',
+                  fontSize: '0.84rem',
+                  fontWeight: 600,
+                  cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                }}
+              >
+                Hủy bỏ
+              </button>
+
+              <button
+                type="submit"
+                disabled={isSubmitting || selectedProductIds.length === 0 || !selectedSupplierId}
+                style={{
+                  height: 36,
+                  padding: '0 16px',
+                  borderRadius: 6,
+                  border: 'none',
+                  backgroundColor: '#0f766e',
+                  color: '#ffffff',
+                  fontSize: '0.84rem',
+                  fontWeight: 600,
+                  cursor:
+                    isSubmitting || selectedProductIds.length === 0 || !selectedSupplierId
+                      ? 'not-allowed'
+                      : 'pointer',
+                  opacity:
+                    isSubmitting || selectedProductIds.length === 0 || !selectedSupplierId ? 0.5 : 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                }}
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 size={15} className="animate-spin" />
+                    <span>Đang gán...</span>
+                  </>
+                ) : (
+                  <>
+                    <Check size={15} />
+                    <span>Xác nhận gán</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </form>
+
+        {showCloseConfirm && (
+          <div
+            style={{
+              position: 'fixed',
+              inset: 0,
+              backgroundColor: 'rgba(0, 0, 0, 0.4)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 10000,
+            }}
+            onClick={() => setShowCloseConfirm(false)}
+          >
+            <div
+              style={{
+                backgroundColor: '#ffffff',
+                borderRadius: 10,
+                padding: '20px 24px',
+                maxWidth: 420,
+                width: '100%',
+                boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.2)',
+                border: '1px solid #e2e8f0',
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                <AlertCircle size={20} style={{ color: '#f59e0b' }} />
+                <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: '#0f172a' }}>
+                  Xác nhận đóng popup
+                </h4>
+              </div>
+              <p style={{ margin: '0 0 16px 0', fontSize: '0.84rem', color: '#64748b', lineHeight: 1.5 }}>
+                Bạn đang chọn <strong>{selectedProductIds.length}</strong> sản phẩm chưa lưu. Đóng
+                popup sẽ hủy lựa chọn hiện tại.
+              </p>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                <button
+                  type="button"
+                  onClick={() => setShowCloseConfirm(false)}
+                  style={{
+                    padding: '6px 14px',
+                    borderRadius: 6,
+                    border: '1px solid #cbd5e1',
+                    backgroundColor: '#ffffff',
+                    fontSize: '0.82rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    color: '#475569',
+                  }}
+                >
+                  Tiếp tục
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowCloseConfirm(false);
+                    onClose();
+                  }}
+                  style={{
+                    padding: '6px 14px',
+                    borderRadius: 6,
+                    border: 'none',
+                    backgroundColor: '#ef4444',
+                    color: '#ffffff',
+                    fontSize: '0.82rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Đồng ý đóng
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

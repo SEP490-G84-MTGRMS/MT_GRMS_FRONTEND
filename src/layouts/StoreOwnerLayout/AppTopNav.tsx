@@ -1,22 +1,46 @@
-﻿import { useState, useRef, useEffect, useCallback } from 'react';
-import type { FC } from 'react';
-import { NavLink, Link, useLocation } from 'react-router-dom';
+﻿import { useState, useRef, useEffect, useCallback, Fragment } from "react";
+import type { FC } from "react";
+import { NavLink, Link, useLocation, useNavigate } from "react-router-dom";
 import {
   DashboardIcon,
   TruckIcon,
   PackageIcon,
-  BellIcon,
   ChevronRightIcon,
   MenuIcon,
   TrendingUpIcon,
-} from '../../features/admin/components';
-
+} from "../../features/admin/components";
+import {
+  Gift,
+  MessageCircle,
+  SquarePen,
+  Settings,
+  User,
+  Store,
+  LogOut,
+  ChevronRight,
+  Wallet,
+  FileText,
+} from "lucide-react";
+import { useAuthStore } from "../../stores/useAuthStore";
+import {
+  NotificationBadge,
+  NotificationPopover,
+  NotificationDrawer,
+} from "../../features/notifications";
+import { BranchSelectorDropdown } from "./BranchSelectorDropdown";
 /* ─── Data ─── */
 
 interface NavSubItem {
   label: string;
   to: string;
   badge?: string;
+  badgeType?: "red" | "blue";
+  divider?: boolean;
+}
+
+interface NavSection {
+  title: string;
+  items: NavSubItem[];
 }
 
 interface NavGroup {
@@ -25,40 +49,322 @@ interface NavGroup {
   icon: FC<{ size?: number; color?: string }>;
   to?: string; // direct link (no dropdown)
   children?: NavSubItem[];
+  sections?: NavSection[];
 }
+
+const UsersIcon: FC<{ size?: number; color?: string }> = ({
+  size = 18,
+  color = "currentColor",
+}) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke={color}
+    strokeWidth={2}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+    <circle cx="9" cy="7" r="4" />
+    <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+  </svg>
+);
+
+const GiftNavIcon: FC<{ size?: number; color?: string }> = ({
+  size = 18,
+  color = "currentColor",
+}) => <Gift size={size} color={color} />;
+
+const StoreNavIcon: FC<{ size?: number; color?: string }> = ({
+  size = 18,
+  color = "currentColor",
+}) => <Store size={size} color={color} strokeWidth={1.8} />;
 
 const NAV_GROUPS: NavGroup[] = [
   {
-    id: 'overview',
-    label: 'Tổng quan',
+    id: "overview",
+    label: "Tổng quan",
     icon: DashboardIcon,
-    to: '/admin/dashboard',
+    to: "/store-owner/dashboard",
   },
   {
-    id: 'goods',
-    label: 'Hàng hóa',
+    id: "store",
+    label: "Cửa hàng",
+    icon: StoreNavIcon,
+    to: "/store-owner/subscriptions",
+  },
+  {
+    id: "goods",
+    label: "Hàng hóa",
     icon: PackageIcon,
-    children: [
-      { label: 'Sản phẩm theo NCC', to: '/store-owner/suppliers/products', badge: 'Master' },
+    sections: [
+      {
+        title: "Danh mục & Sản phẩm",
+        items: [
+          {
+            label: "Danh mục hàng hóa",
+            to: "/store-owner/products",
+            badge: "",
+          },
+          {
+            label: "Sản phẩm theo NCC",
+            to: "/store-owner/suppliers/products",
+            badge: "",
+            badgeType: "blue",
+          },
+          {
+            label: "Sản phẩm theo Cửa hàng",
+            to: "/store-owner/stores/products",
+            badge: "Mới",
+            badgeType: "blue",
+          },
+          {
+            label: "Thiết lập bảng giá",
+            to: "/store-owner/suppliers/products?view=pricing",
+          },
+        ],
+      },
+      {
+        title: "Kho & Hạn dùng (FEFO)",
+        items: [
+          {
+            label: "Tồn kho cửa hàng",
+            to: "/store-owner/inventory",
+            badge: "FE-04",
+            badgeType: "blue",
+          },
+          {
+            label: "Chi tiết lô & Hạn sử dụng",
+            to: "/store-owner/batches",
+            badge: "FEFO",
+            badgeType: "blue",
+          },
+          {
+            label: "Kiểm kho & Cân đối",
+            to: "/store-owner/suppliers/products?view=inventory",
+          },
+          {
+            label: "Chuyển hàng liên kho",
+            to: "/store-owner/transfers",
+            badge: "",
+            badgeType: "blue",
+          },
+        ],
+      },
+      {
+        title: "Quy cách & Đóng gói",
+        items: [
+          {
+            label: "In mã vạch & Tem giá",
+            to: "/store-owner/suppliers/products?view=barcodes",
+          },
+        ],
+      },
     ],
   },
   {
-    id: 'purchasing',
-    label: 'Mua hàng',
+    id: "purchasing",
+    label: "Nhập hàng",
     icon: TruckIcon,
-    children: [
-      { label: 'Nhà cung cấp', to: '/store-owner/suppliers' },
-      { label: 'Đặt hàng theo chi nhánh', to: '/store-owner/purchase-orders/branches' },
-      { label: 'Đặt hàng theo ma trận', to: '/store-owner/purchase-orders/create-matrix', badge: 'Grid' },
+    sections: [
+      {
+        title: "Nhà cung cấp",
+        items: [
+          { label: "Danh sách nhà cung cấp", to: "/store-owner/suppliers" },
+          {
+            label: "Cửa Hàng với nhà cung cấp",
+            to: "/store-owner/suppliers/branches",
+          },
+          {
+            label: "Hóa đơn đầu vào",
+            to: "/store-owner/suppliers?view=invoices",
+            badge: "Mới",
+            badgeType: "red",
+          },
+        ],
+      },
+      {
+        title: "Đặt hàng & Nhập kho",
+        items: [
+          {
+            label: "Đặt hàng theo chi nhánh",
+            to: "/store-owner/purchase-orders/branches",
+          },
+          {
+            label: "Đặt hàng ma trận",
+            to: "/store-owner/purchase-orders/create-matrix",
+            badge: "Chủ",
+            badgeType: "blue",
+          },
+          {
+            label: "Chốt đơn với nhà cung cấp",
+            to: "/store-owner/purchase-orders/dispatch-hub",
+            badge: "Hub",
+            badgeType: "blue",
+          },
+          {
+            label: "Danh sách đơn mua hàng (PO)",
+            to: "/store-owner/purchase-orders/list",
+            badge: "PO",
+            badgeType: "blue",
+          },
+          {
+            label: "Phiếu nhập kho (GRN) & Lịch nhận",
+            to: "/store-owner/goods-receipts",
+            badge: "GRN",
+            badgeType: "blue",
+          },
+          {
+            label: "Trả hàng nhà cung cấp (RTV)",
+            to: "/store-owner/supplier-returns",
+            badge: "RTV",
+            badgeType: "blue",
+          },
+        ],
+      },
+      {
+        title: "Dịch vụ & Tiện ích",
+        items: [
+          {
+            label: "Chi phí mua dịch vụ",
+            to: "/store-owner/expenses",
+            badge: "Mới",
+            badgeType: "red",
+          },
+        ],
+      },
     ],
   },
   {
-    id: 'finance',
-    label: 'Tài chính',
+    id: "finance",
+    label: "Tài chính",
     icon: TrendingUpIcon,
-    children: [
-      { label: 'Khách hàng & Công nợ (FE-08)', to: '/store-owner/customers', badge: 'FE-08' },
-      { label: 'Chi phí vận hành (FE-07)', to: '/store-owner/expenses', badge: 'FE-07' },
+    sections: [
+      {
+        title: "Dòng tiền & Chi tiêu",
+        items: [
+          { label: "Tổng quan tài chính", to: "/store-owner/finance" },
+          { label: "Tiền của tôi", to: "/store-owner/cashbook" },
+          { label: "Phải trả", to: "/store-owner/expenses" },
+        ],
+      },
+      {
+        title: "Công nợ & Khách hàng",
+        items: [
+          { label: "Khách nợ", to: "/store-owner/customers" },
+        ],
+      },
+      {
+        title: "Báo cáo & Thuế",
+        items: [
+          { label: "Lãi lỗ", to: "/store-owner/reports/pnl" },
+          { label: "Thuế", to: "/store-owner/tax-snapshots" },
+        ],
+      },
+    ],
+  },
+  {
+    id: "employees",
+    label: "Nhân viên",
+    icon: UsersIcon,
+    sections: [
+      {
+        title: "Nhân sự & Hồ sơ",
+        items: [
+          { label: "Danh sách nhân viên", to: "/store-owner/employees" },
+          {
+            label: "Hồ sơ & Hợp đồng",
+            to: "/store-owner/employees?view=profiles",
+          },
+        ],
+      },
+      {
+        title: "Lịch & Chấm công",
+        items: [
+          {
+            label: "Lịch làm việc chi nhánh",
+            to: "/store-owner/employees/schedule",
+            badge: "Lịch",
+            badgeType: "blue",
+          },
+          {
+            label: "Bảng chấm công GPS/QR",
+            to: "/store-owner/employees/attendance",
+            badge: "GPS/QR",
+            badgeType: "blue",
+          },
+        ],
+      },
+      {
+        title: "Lương & Đãi ngộ",
+        items: [
+          {
+            label: "Bảng tính lương tháng",
+            to: "/store-owner/employees/payroll",
+            badge: "Mới",
+            badgeType: "red",
+          },
+          {
+            label: "Thiết lập ca & Phụ cấp",
+            to: "/store-owner/employees/schedule?view=shifts",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: "promotions",
+    label: "Khuyến mãi",
+    icon: GiftNavIcon,
+    sections: [
+      {
+        title: "Chương trình ưu đãi",
+        items: [
+          {
+            label: "Chương trình khuyến mãi",
+            to: "/store-owner/promotions",
+            badge: "Mới",
+            badgeType: "red",
+          },
+          {
+            label: "Khuyến mãi theo khung giờ",
+            to: "/store-owner/promotions?view=flash-sale",
+          },
+        ],
+      },
+      {
+        title: "Voucher & Mã giảm giá",
+        items: [
+          {
+            label: "Danh sách Voucher & Coupon",
+            to: "/store-owner/vouchers",
+            badge: "Hot",
+            badgeType: "blue",
+          },
+          {
+            label: "Phát hành mã quà tặng",
+            to: "/store-owner/vouchers?action=create",
+          },
+        ],
+      },
+      {
+        title: "Tích điểm & Hội viên",
+        items: [
+          {
+            label: "Thiết lập tích điểm",
+            to: "/store-owner/loyalty-config",
+            badge: "Xu",
+            badgeType: "blue",
+          },
+          {
+            label: "Hạng thành viên & Chiết khấu",
+            to: "/store-owner/loyalty-config?view=tiers",
+          },
+        ],
+      },
     ],
   },
 ];
@@ -77,7 +383,14 @@ const BrandLogo: FC = () => (
     />
     <circle cx="14" cy="22" r="3.5" fill="#FFFFFF" />
     <defs>
-      <linearGradient id="navBrandGrad" x1="4" y1="2" x2="24" y2="31" gradientUnits="userSpaceOnUse">
+      <linearGradient
+        id="navBrandGrad"
+        x1="4"
+        y1="2"
+        x2="24"
+        y2="31"
+        gradientUnits="userSpaceOnUse"
+      >
         <stop stopColor="#0F766E" />
         <stop offset="1" stopColor="#134E4A" />
       </linearGradient>
@@ -96,9 +409,10 @@ const ChevronDown: FC<{ open: boolean }> = ({ open }) => (
     strokeWidth="2.5"
     strokeLinecap="round"
     strokeLinejoin="round"
+    className="topnav-chevron"
     style={{
-      transition: 'transform 0.18s ease',
-      transform: open ? 'rotate(180deg)' : 'rotate(0deg)',
+      transition: "transform 0.18s ease",
+      transform: open ? "rotate(180deg)" : "rotate(0deg)",
       opacity: 0.85,
     }}
   >
@@ -108,19 +422,52 @@ const ChevronDown: FC<{ open: boolean }> = ({ open }) => (
 
 /* ─── Dropdown ─── */
 interface DropdownProps {
-  items: NavSubItem[];
+  items?: NavSubItem[];
+  sections?: NavSection[];
   isOpen: boolean;
   anchorRef: React.RefObject<HTMLDivElement | null>;
   onClose: () => void;
+  onMouseEnter?: () => void;
+  onMouseLeave?: () => void;
   currentPath: string;
 }
 
-const NavDropdown: FC<DropdownProps> = ({ items, isOpen, anchorRef, onClose, currentPath }) => {
+const NavDropdown: FC<DropdownProps> = ({
+  items,
+  sections,
+  isOpen,
+  anchorRef,
+  onClose,
+  onMouseEnter,
+  onMouseLeave,
+  currentPath,
+}) => {
   const dropRef = useRef<HTMLDivElement>(null);
+  const [coords, setCoords] = useState<{ top: number; left: number }>({
+    top: 100,
+    left: 0,
+  });
+
+  const updateCoords = useCallback(() => {
+    if (anchorRef.current) {
+      const rect = anchorRef.current.getBoundingClientRect();
+      setCoords({ top: rect.bottom, left: rect.left });
+    }
+  }, [anchorRef]);
+
+  useEffect(() => {
+    updateCoords();
+    window.addEventListener("resize", updateCoords);
+    window.addEventListener("scroll", updateCoords, true);
+    return () => {
+      window.removeEventListener("resize", updateCoords);
+      window.removeEventListener("scroll", updateCoords, true);
+    };
+  }, [updateCoords]);
 
   useEffect(() => {
     if (!isOpen) return;
-    const handleKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    const handleKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     const handleClick = (e: MouseEvent) => {
       if (
         dropRef.current &&
@@ -131,109 +478,370 @@ const NavDropdown: FC<DropdownProps> = ({ items, isOpen, anchorRef, onClose, cur
         onClose();
       }
     };
-    document.addEventListener('keydown', handleKey);
-    document.addEventListener('mousedown', handleClick);
+    document.addEventListener("keydown", handleKey);
+    document.addEventListener("mousedown", handleClick);
     return () => {
-      document.removeEventListener('keydown', handleKey);
-      document.removeEventListener('mousedown', handleClick);
+      document.removeEventListener("keydown", handleKey);
+      document.removeEventListener("mousedown", handleClick);
     };
   }, [isOpen, onClose, anchorRef]);
 
-  if (!isOpen) return null;
+  const isMega = Boolean(sections && sections.length > 0);
+  const rect = anchorRef.current?.getBoundingClientRect();
+  const top = rect && rect.bottom > 0 ? rect.bottom : coords.top;
+  const rawLeft = rect && rect.left > 0 ? rect.left : coords.left;
+  const maxLeft =
+    typeof window !== "undefined"
+      ? window.innerWidth - (isMega ? 700 : 250) - 16
+      : rawLeft;
+  const left = Math.max(16, Math.min(rawLeft, maxLeft));
+
+  const checkItemActive = (to: string) => {
+    const [toPath, toQuery] = to.split("?");
+    const [currPath, currQuery] = currentPath.split("?");
+
+    if (toQuery) {
+      if (
+        toPath === "/store-owner/subscriptions" &&
+        toQuery === "tab=subscriptions" &&
+        !currQuery
+      ) {
+        return currPath === toPath;
+      }
+      if (
+        toPath === "/store-owner/subscriptions" ||
+        toPath === "/store-owner/account"
+      ) {
+        return currPath === toPath && currQuery === toQuery;
+      }
+      return (
+        currPath === toPath && Boolean(currQuery && currQuery.includes(toQuery))
+      );
+    }
+
+    if (toPath === "/store-owner/suppliers") {
+      const hasOtherView = Boolean(currQuery && currQuery.includes("view="));
+      return (
+        (currPath === toPath || currPath.startsWith(toPath + "/")) &&
+        !currPath.includes("/products") &&
+        !currPath.includes("/branches") &&
+        !hasOtherView
+      );
+    }
+
+    if (toPath === "/store-owner/suppliers/products") {
+      const hasOtherView = Boolean(currQuery && currQuery.includes("view="));
+      return (
+        (currPath === toPath || currPath.startsWith(toPath + "/")) &&
+        !hasOtherView
+      );
+    }
+
+    if (toPath === "/store-owner/expenses") {
+      const hasOtherView = Boolean(
+        currQuery &&
+        (currQuery.includes("view=") || currQuery.includes("tab=")),
+      );
+      return (
+        (currPath === toPath || currPath.startsWith(toPath + "/")) &&
+        !hasOtherView
+      );
+    }
+
+    if (toPath === "/store-owner/employees") {
+      const hasOtherView = Boolean(currQuery && currQuery.includes("view="));
+      return (
+        (currPath === toPath || currPath.startsWith(toPath + "/")) &&
+        !currPath.includes("/schedule") &&
+        !currPath.includes("/attendance") &&
+        !currPath.includes("/payroll") &&
+        !hasOtherView
+      );
+    }
+
+    if (toPath === "/store-owner/employees/schedule") {
+      const hasOtherView = Boolean(currQuery && currQuery.includes("view="));
+      return (
+        (currPath === toPath || currPath.startsWith(toPath + "/")) &&
+        !hasOtherView
+      );
+    }
+
+    if (toPath === "/store-owner/promotions") {
+      const hasOtherView = Boolean(
+        currQuery &&
+        (currQuery.includes("view=") || currQuery.includes("action=")),
+      );
+      return (
+        (currPath === toPath || currPath.startsWith(toPath + "/")) &&
+        !hasOtherView
+      );
+    }
+
+    if (toPath === "/store-owner/vouchers") {
+      const hasOtherView = Boolean(
+        currQuery &&
+        (currQuery.includes("view=") || currQuery.includes("action=")),
+      );
+      return (
+        (currPath === toPath || currPath.startsWith(toPath + "/")) &&
+        !hasOtherView
+      );
+    }
+
+    if (toPath === "/store-owner/loyalty-config") {
+      const hasOtherView = Boolean(
+        currQuery &&
+        (currQuery.includes("view=") || currQuery.includes("action=")),
+      );
+      return (
+        (currPath === toPath || currPath.startsWith(toPath + "/")) &&
+        !hasOtherView
+      );
+    }
+
+    return currPath === toPath || currPath.startsWith(toPath + "/");
+  };
 
   return (
     <div
       ref={dropRef}
+      className={`topnav-dropdown-bridge ${isOpen ? "is-open" : ""}`}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
       style={{
-        position: 'fixed',
-        top: (() => {
-          if (!anchorRef.current) return 110;
-          const rect = anchorRef.current.getBoundingClientRect();
-          return rect.bottom + 6;
-        })(),
-        left: (() => {
-          if (!anchorRef.current) return 0;
-          const rect = anchorRef.current.getBoundingClientRect();
-          return rect.left;
-        })(),
+        position: "fixed",
+        top,
+        left,
         zIndex: 9999,
-        backgroundColor: '#ffffff',
-        borderRadius: 14,
-        boxShadow: '0 8px 32px rgba(0, 50, 150, 0.13), 0 2px 8px rgba(0, 50, 150, 0.06)',
-        border: '1px solid var(--border-light)',
-        padding: '8px 0',
-        minWidth: 220,
-        overflow: 'hidden',
+        paddingTop: 6, // Seamless gapless bridge to keep dropdown open during mouse hover
       }}
-      role="menu"
     >
-      {items.map((item) => {
-        const isActive = currentPath === item.to || currentPath.startsWith(item.to + '/');
-        return (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            onClick={onClose}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 10,
-              padding: '9px 18px',
-              textDecoration: 'none',
-              fontSize: '13.5px',
-              fontWeight: isActive ? 700 : 500,
-              color: isActive ? 'var(--blue-primary)' : 'var(--text-muted)',
-              backgroundColor: isActive ? 'var(--blue-light)' : 'transparent',
-              transition: 'all 0.14s ease',
-              position: 'relative',
-            }}
-            onMouseEnter={(e) => {
-              if (!isActive) {
-                e.currentTarget.style.backgroundColor = 'var(--bg-soft-blue)';
-                e.currentTarget.style.color = 'var(--text-main)';
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (!isActive) {
-                e.currentTarget.style.backgroundColor = 'transparent';
-                e.currentTarget.style.color = 'var(--text-muted)';
-              }
-            }}
-          >
-            {isActive && (
-              <span
+      <div
+        style={{
+          backgroundColor: "#ffffff",
+          borderRadius: 12,
+          boxShadow:
+            "0 12px 36px rgba(0, 30, 90, 0.15), 0 2px 8px rgba(0, 30, 90, 0.06)",
+          border: "1px solid var(--border-light)",
+          padding: isMega ? "18px 24px" : "8px 0",
+          minWidth: isMega
+            ? sections && sections.length <= 2
+              ? 460
+              : 680
+            : 210,
+          overflow: "hidden",
+          display: isMega ? "flex" : "block",
+          gap: isMega ? 20 : 0,
+        }}
+        role="menu"
+      >
+        {/* Mega Menu Layout: 3 Columns like KiotViet */}
+        {isMega &&
+          sections?.map((sec, secIdx) => (
+            <div
+              key={sec.title}
+              style={{
+                flex: 1,
+                minWidth: 195,
+                display: "flex",
+                flexDirection: "column",
+                gap: 2,
+                borderRight:
+                  secIdx < sections.length - 1 ? "1px solid #EDF2F9" : "none",
+                paddingRight: secIdx < sections.length - 1 ? 20 : 0,
+              }}
+            >
+              <div
                 style={{
-                  position: 'absolute',
-                  left: 0,
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  width: 3,
-                  height: 18,
-                  borderRadius: '0 3px 3px 0',
-                  backgroundColor: 'var(--blue-primary)',
-                }}
-              />
-            )}
-            <ChevronRightIcon size={13} color={isActive ? 'var(--blue-primary)' : '#bbb'} />
-            <span style={{ flex: 1 }}>{item.label}</span>
-            {item.badge && (
-              <span
-                style={{
-                  fontSize: 10,
-                  fontWeight: 700,
-                  padding: '1px 7px',
-                  borderRadius: 'var(--radius-pill)',
-                  backgroundColor: isActive ? 'rgba(15,118,110,0.15)' : 'var(--blue-light)',
-                  color: 'var(--blue-primary)',
-                  fontFamily: 'var(--font-mono)',
+                  fontSize: "13px",
+                  fontWeight: 600,
+                  color: "#64748B",
+                  padding: "2px 10px 10px",
+                  lineHeight: 1.3,
+                  userSelect: "none",
+                  whiteSpace: "nowrap",
                 }}
               >
-                {item.badge}
-              </span>
-            )}
-          </NavLink>
-        );
-      })}
+                {sec.title}
+              </div>
+              {sec.items.map((item) => {
+                const isActive = checkItemActive(item.to);
+                return (
+                  <NavLink
+                    key={item.label + item.to}
+                    to={item.to}
+                    onClick={onClose}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: 10,
+                      padding: "8px 10px",
+                      borderRadius: 8,
+                      textDecoration: "none",
+                      fontSize: "13.5px",
+                      fontWeight: isActive ? 600 : 500,
+                      color: isActive
+                        ? "var(--blue-primary)"
+                        : "var(--text-main)",
+                      backgroundColor: isActive
+                        ? "var(--blue-light)"
+                        : "transparent",
+                      transition: "all 0.14s ease",
+                      whiteSpace: "nowrap",
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!isActive) {
+                        e.currentTarget.style.backgroundColor =
+                          "var(--bg-soft-blue)";
+                        e.currentTarget.style.color = "var(--blue-primary)";
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isActive) {
+                        e.currentTarget.style.backgroundColor = "transparent";
+                        e.currentTarget.style.color = "var(--text-main)";
+                      }
+                    }}
+                  >
+                    <span style={{ whiteSpace: "nowrap" }}>{item.label}</span>
+                    {item.badge && (
+                      <span
+                        style={{
+                          fontSize: "10px",
+                          fontWeight: 700,
+                          padding: "1px 6px",
+                          borderRadius: "var(--radius-pill)",
+                          backgroundColor:
+                            item.badgeType === "red"
+                              ? "#FF3B30"
+                              : "var(--blue-light)",
+                          color:
+                            item.badgeType === "red"
+                              ? "#ffffff"
+                              : "var(--blue-primary)",
+                          fontFamily: "var(--font-sans)",
+                          lineHeight: 1.3,
+                          letterSpacing: "0.02em",
+                          flexShrink: 0,
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {item.badge}
+                      </span>
+                    )}
+                  </NavLink>
+                );
+              })}
+            </div>
+          ))}
+
+        {/* Standard Single-Column List */}
+        {!isMega &&
+          items?.map((item) => {
+            const isActive = checkItemActive(item.to);
+            return (
+              <Fragment key={item.to}>
+                {item.divider && (
+                  <div
+                    style={{
+                      height: 1,
+                      backgroundColor: "#F1F5F9",
+                      margin: "5px 0",
+                    }}
+                  />
+                )}
+                <NavLink
+                  to={item.to}
+                  onClick={onClose}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    padding: "9px 18px",
+                    textDecoration: "none",
+                    fontSize: "13.5px",
+                    fontWeight: isActive ? 700 : 500,
+                    color: isActive
+                      ? "var(--blue-primary)"
+                      : "var(--text-muted)",
+                    backgroundColor: isActive
+                      ? "var(--blue-light)"
+                      : "transparent",
+                    transition: "all 0.14s ease",
+                    position: "relative",
+                    whiteSpace: "nowrap",
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isActive) {
+                      e.currentTarget.style.backgroundColor =
+                        "var(--bg-soft-blue)";
+                      e.currentTarget.style.color = "var(--text-main)";
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isActive) {
+                      e.currentTarget.style.backgroundColor = "transparent";
+                      e.currentTarget.style.color = "var(--text-muted)";
+                    }
+                  }}
+                >
+                  {isActive && (
+                    <span
+                      style={{
+                        position: "absolute",
+                        left: 0,
+                        top: "50%",
+                        transform: "translateY(-50%)",
+                        width: 3,
+                        height: 18,
+                        borderRadius: "0 3px 3px 0",
+                        backgroundColor: "var(--blue-primary)",
+                      }}
+                    />
+                  )}
+                  <ChevronRightIcon
+                    size={13}
+                    color={isActive ? "var(--blue-primary)" : "#bbb"}
+                    style={{ flexShrink: 0 }}
+                  />
+                  <span style={{ flex: 1, whiteSpace: "nowrap" }}>
+                    {item.label}
+                  </span>
+                  {item.badge && (
+                    <span
+                      style={{
+                        fontSize: 10,
+                        fontWeight: 700,
+                        padding: "1px 7px",
+                        borderRadius: "var(--radius-pill)",
+                        backgroundColor:
+                          item.badgeType === "red"
+                            ? "#FF3B30"
+                            : isActive
+                              ? "rgba(15,118,110,0.15)"
+                              : "var(--blue-light)",
+                        color:
+                          item.badgeType === "red"
+                            ? "#ffffff"
+                            : "var(--blue-primary)",
+                        fontFamily:
+                          item.badgeType === "red"
+                            ? "var(--font-sans)"
+                            : "var(--font-mono)",
+                        flexShrink: 0,
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {item.badge}
+                    </span>
+                  )}
+                </NavLink>
+              </Fragment>
+            );
+          })}
+      </div>
     </div>
   );
 };
@@ -241,48 +849,198 @@ const NavDropdown: FC<DropdownProps> = ({ items, isOpen, anchorRef, onClose, cur
 /* ─── Main TopNav Component ─── */
 export const AppTopNav: FC = () => {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { user, logout } = useAuthStore();
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const anchorRefs = useRef<Map<string, React.RefObject<HTMLDivElement | null>>>(new Map());
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  const accountMenuRef = useRef<HTMLDivElement | null>(null);
+  const accountTimerRef = useRef<number | null>(null);
+  const anchorRefs = useRef<
+    Map<string, React.RefObject<HTMLDivElement | null>>
+  >(new Map());
+  const closeTimerRef = useRef<number | null>(null);
 
-  // Close dropdown on route change
-  useEffect(() => {
-    setOpenMenu(null);
-    setMobileOpen(false);
-  }, [location.pathname]);
-
-  const getAnchorRef = useCallback((id: string): React.RefObject<HTMLDivElement | null> => {
-    if (!anchorRefs.current.has(id)) {
-      anchorRefs.current.set(id, { current: null });
+  const clearCloseTimer = useCallback(() => {
+    if (closeTimerRef.current !== null) {
+      window.clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
     }
-    return anchorRefs.current.get(id)!;
   }, []);
 
-  const toggleMenu = (id: string) => {
-    setOpenMenu((prev) => (prev === id ? null : id));
-  };
+  const clearAccountTimer = useCallback(() => {
+    if (accountTimerRef.current !== null) {
+      window.clearTimeout(accountTimerRef.current);
+      accountTimerRef.current = null;
+    }
+  }, []);
+
+  const handleAccountEnter = useCallback(() => {
+    clearAccountTimer();
+    setAccountMenuOpen(true);
+  }, [clearAccountTimer]);
+
+  const handleAccountLeave = useCallback(() => {
+    clearAccountTimer();
+    accountTimerRef.current = window.setTimeout(() => {
+      setAccountMenuOpen(false);
+    }, 220);
+  }, [clearAccountTimer]);
+
+  // Close dropdown on route change and cleanup timer
+  useEffect(() => {
+    clearCloseTimer();
+    clearAccountTimer();
+    setOpenMenu(null);
+    setMobileOpen(false);
+    setAccountMenuOpen(false);
+    return () => {
+      clearCloseTimer();
+      clearAccountTimer();
+    };
+  }, [location.pathname, clearCloseTimer, clearAccountTimer]);
+
+  // Close account menu on click outside or Escape
+  useEffect(() => {
+    if (!accountMenuOpen) return;
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        accountMenuRef.current &&
+        !accountMenuRef.current.contains(event.target as Node)
+      ) {
+        setAccountMenuOpen(false);
+      }
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setAccountMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [accountMenuOpen]);
+
+  const getAnchorRef = useCallback(
+    (id: string): React.RefObject<HTMLDivElement | null> => {
+      if (!anchorRefs.current.has(id)) {
+        anchorRefs.current.set(id, { current: null });
+      }
+      return anchorRefs.current.get(id)!;
+    },
+    [],
+  );
+
+  const handleMenuEnter = useCallback(
+    (id: string) => {
+      clearCloseTimer();
+      setOpenMenu(id);
+    },
+    [clearCloseTimer],
+  );
+
+  const handleMenuLeave = useCallback(() => {
+    clearCloseTimer();
+    closeTimerRef.current = window.setTimeout(() => {
+      setOpenMenu(null);
+    }, 180);
+  }, [clearCloseTimer]);
+
+  const toggleMenu = useCallback(
+    (id: string) => {
+      clearCloseTimer();
+      setOpenMenu((prev) => (prev === id ? null : id));
+    },
+    [clearCloseTimer],
+  );
 
   const isGroupActive = (group: NavGroup): boolean => {
-    if (group.id === 'overview') {
+    if (group.id === "overview") {
       return (
-        location.pathname === '/admin/dashboard' ||
-        location.pathname === '/admin' ||
-        location.pathname === '/admin/' ||
-        location.pathname === '/dashboard' ||
-        location.pathname === '/store-owner/dashboard' ||
-        location.pathname === '/store-owner' ||
-        location.pathname === '/store-owner/'
+        location.pathname === "/admin/dashboard" ||
+        location.pathname === "/admin" ||
+        location.pathname === "/admin/" ||
+        location.pathname === "/dashboard" ||
+        location.pathname === "/store-owner/dashboard" ||
+        location.pathname === "/store-owner" ||
+        location.pathname === "/store-owner/"
       );
     }
-    if (group.to) return location.pathname === group.to || location.pathname.startsWith(group.to + '/');
+    if (group.id === "goods") {
+      return (
+        location.pathname === "/store-owner/suppliers/products" ||
+        location.pathname.startsWith("/store-owner/suppliers/products/") ||
+        location.pathname === "/admin/suppliers/products" ||
+        location.pathname.startsWith("/admin/suppliers/products/")
+      );
+    }
+    if (group.id === "purchasing") {
+      const isSupplier =
+        location.pathname === "/store-owner/suppliers" ||
+        location.pathname.startsWith("/store-owner/suppliers/") ||
+        location.pathname === "/admin/suppliers" ||
+        location.pathname.startsWith("/admin/suppliers/");
+      const isProduct =
+        location.pathname === "/store-owner/suppliers/products" ||
+        location.pathname.startsWith("/store-owner/suppliers/products/") ||
+        location.pathname === "/admin/suppliers/products" ||
+        location.pathname.startsWith("/admin/suppliers/products/");
+      const isPurchaseOrder = location.pathname.includes("/purchase-orders");
+      return (isSupplier && !isProduct) || isPurchaseOrder;
+    }
+    if (group.id === "finance") {
+      return (
+        location.pathname === "/store-owner/expenses" ||
+        location.pathname.startsWith("/store-owner/expenses/") ||
+        location.pathname === "/admin/expenses" ||
+        location.pathname.startsWith("/admin/expenses/") ||
+        location.pathname === "/store-owner/customers" ||
+        location.pathname.startsWith("/store-owner/customers/") ||
+        location.pathname === "/customers" ||
+        location.pathname.startsWith("/customers/")
+      );
+    }
+    if (group.id === "store") {
+      return (
+        location.pathname === "/store-owner/subscriptions" ||
+        location.pathname.startsWith("/store-owner/subscriptions/") ||
+        location.pathname === "/store-owner/settings" ||
+        location.pathname.startsWith("/store-owner/settings/")
+      );
+    }
+    if (group.to)
+      return (
+        location.pathname === group.to ||
+        location.pathname.startsWith(group.to + "/")
+      );
+    if (group.sections) {
+      return group.sections.some((sec) =>
+        sec.items.some(
+          (c) =>
+            location.pathname === c.to ||
+            location.pathname.startsWith(c.to.split("?")[0] + "/"),
+        ),
+      );
+    }
     if (group.children) {
       return group.children.some(
         (c) =>
           location.pathname === c.to ||
-          location.pathname.startsWith(c.to + '/') ||
-          (c.to === '/store-owner/suppliers' && (location.pathname === '/admin/suppliers' || location.pathname.startsWith('/admin/suppliers/'))) ||
-          (c.to === '/store-owner/suppliers/products' && (location.pathname === '/admin/suppliers/products' || location.pathname.startsWith('/admin/suppliers/products/'))) ||
-          (c.to === '/store-owner/purchase-orders/create-matrix' && (location.pathname === '/admin/purchase-orders/create-matrix' || location.pathname.startsWith('/admin/purchase-orders/create-matrix/')))
+          location.pathname.startsWith(c.to + "/") ||
+          (c.to === "/store-owner/suppliers" &&
+            (location.pathname === "/admin/suppliers" ||
+              location.pathname.startsWith("/admin/suppliers/"))) ||
+          (c.to === "/store-owner/suppliers/products" &&
+            (location.pathname === "/admin/suppliers/products" ||
+              location.pathname.startsWith("/admin/suppliers/products/"))) ||
+          (c.to === "/store-owner/purchase-orders/create-matrix" &&
+            (location.pathname === "/admin/purchase-orders/create-matrix" ||
+              location.pathname.startsWith(
+                "/admin/purchase-orders/create-matrix/",
+              ))),
       );
     }
     return false;
@@ -290,147 +1048,593 @@ export const AppTopNav: FC = () => {
 
   return (
     <>
-      {/* ── Row 1: Global Header ── */}
-      <div
+      {/* ── Single Unified Top Navigation Bar (Merged Header & Navigation) ── */}
+      <nav
+        className="topnav-primary"
         style={{
-          height: 56,
-          backgroundColor: '#ffffff',
-          borderBottom: '1px solid var(--border-light)',
-          display: 'flex',
-          alignItems: 'center',
-          padding: '0 24px',
-          gap: 16,
-          boxShadow: '0 1px 4px rgba(0, 40, 120, 0.04)',
-          position: 'sticky',
+          backgroundColor: "var(--blue-primary)",
+          borderBottom: "1px solid var(--blue-dark)",
+          position: "sticky",
           top: 0,
           zIndex: 200,
+          boxShadow: "0 2px 10px rgba(0, 50, 150, 0.18)",
         }}
+        aria-label="Điều hướng chính"
       >
-        {/* Brand */}
-        <Link
-          to="/admin/dashboard"
-          style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none', flexShrink: 0 }}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            height: 50,
+            padding: "0 20px",
+            gap: 12,
+            boxSizing: "border-box",
+          }}
         >
-          <BrandLogo />
-          <div>
-            <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--text-main)', letterSpacing: '-0.02em', lineHeight: 1.15 }}>
-              MT-GRMS
-            </div>
-            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--blue-primary)', textTransform: 'uppercase', letterSpacing: '0.06em', lineHeight: 1 }}>
-              Quản lý Chuỗi Tạp Hóa
-            </div>
-          </div>
-        </Link>
-
-        {/* Right actions */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginLeft: 'auto', flexShrink: 0 }}>
-          {/* Tenant badge */}
-          <div
+          {/* Brand Logo & Name */}
+          <Link
+            to={
+              location.pathname.startsWith("/store-owner")
+                ? "/store-owner/dashboard"
+                : "/admin/dashboard"
+            }
             style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 7,
-              height: 36,
-              padding: '0 14px',
-              borderRadius: 'var(--radius-pill)',
-              backgroundColor: 'var(--bg-soft-blue)',
-              border: '1px solid var(--border-light)',
-              fontSize: '12.5px',
-              fontWeight: 600,
-              color: 'var(--text-muted)',
-              whiteSpace: 'nowrap',
-              boxSizing: 'border-box',
-            }}
-          >
-            <span style={{ fontSize: 13, lineHeight: 1 }}>🏪</span>
-            <span>Mini Minh Đức</span>
-            <span style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: 'var(--green-money)', display: 'inline-block' }} />
-          </div>
-
-          {/* Bell */}
-          <button
-            type="button"
-            style={{
-              width: 36,
-              height: 36,
-              borderRadius: '50%',
-              border: '1px solid var(--border-light)',
-              backgroundColor: 'var(--bg-soft-blue)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
-              position: 'relative',
-              color: 'var(--text-muted)',
+              display: "flex",
+              alignItems: "center",
+              gap: 9,
+              textDecoration: "none",
               flexShrink: 0,
-              boxSizing: 'border-box',
-              transition: 'all 0.15s ease',
-            }}
-            title="Thông báo"
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = 'var(--blue-light)';
-              e.currentTarget.style.color = 'var(--blue-primary)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = 'var(--bg-soft-blue)';
-              e.currentTarget.style.color = 'var(--text-muted)';
+              marginRight: 10,
             }}
           >
-            <BellIcon size={16} />
-            <span style={{
-              position: 'absolute',
-              top: 7,
-              right: 7,
-              width: 7,
-              height: 7,
-              borderRadius: '50%',
-              backgroundColor: 'var(--red-accent)',
-              border: '1.5px solid #fff',
-            }} />
-          </button>
+            <BrandLogo />
+            <div>
+              <div
+                style={{
+                  fontSize: 15.5,
+                  fontWeight: 800,
+                  color: "#ffffff",
+                  letterSpacing: "-0.02em",
+                  lineHeight: 1.15,
+                  whiteSpace: "nowrap",
+                }}
+              >
+                MT-GRMS
+              </div>
+              <div
+                style={{
+                  fontSize: 9.5,
+                  fontWeight: 700,
+                  color: "rgba(255, 255, 255, 0.8)",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.06em",
+                  lineHeight: 1,
+                  whiteSpace: "nowrap",
+                }}
+              >
+                Quản lý Tạp Hóa
+              </div>
+            </div>
+          </Link>
 
-          {/* Profile */}
+          {/* Menus List */}
           <div
             style={{
-              display: 'inline-flex',
-              alignItems: 'center',
+              display: "flex",
+              alignItems: "stretch",
+              height: 50,
+              gap: 2,
+              overflowX: "auto",
+              scrollbarWidth: "none",
+              flex: 1,
+            }}
+          >
+            {NAV_GROUPS.map((group) => {
+              const active = isGroupActive(group);
+              const isOpen = openMenu === group.id;
+              const ref = getAnchorRef(group.id);
+
+              if (group.to) {
+                const targetTo =
+                  group.id === "overview" &&
+                    location.pathname.startsWith("/store-owner")
+                    ? "/store-owner/dashboard"
+                    : group.to;
+                // Direct link (no dropdown)
+                return (
+                  <NavLink
+                    key={group.id}
+                    to={targetTo}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 7,
+                      padding: "0 14px",
+                      height: "100%",
+                      textDecoration: "none",
+                      fontSize: 13.5,
+                      fontFamily: "var(--font-sans)",
+                      fontWeight: active ? 700 : 500,
+                      color: "#ffffff",
+                      backgroundColor: active
+                        ? "rgba(0,0,0,0.2)"
+                        : "transparent",
+                      borderRadius: 0,
+                      borderBottom: active
+                        ? "3px solid #ffffff"
+                        : "3px solid transparent",
+                      transition: "all 0.15s ease",
+                      whiteSpace: "nowrap",
+                      flexShrink: 0,
+                      boxSizing: "border-box",
+                    }}
+                    onMouseEnter={(e) => {
+                      clearCloseTimer();
+                      setOpenMenu(null);
+                      if (!active)
+                        e.currentTarget.style.backgroundColor =
+                          "rgba(255,255,255,0.12)";
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!active)
+                        e.currentTarget.style.backgroundColor = "transparent";
+                    }}
+                  >
+                    <group.icon size={16} color="currentColor" />
+                    <span>{group.label}</span>
+                  </NavLink>
+                );
+              }
+
+              // Dropdown trigger
+              return (
+                <div
+                  key={group.id}
+                  id={`nav-group-${group.id}`}
+                  ref={(el) => {
+                    ref.current = el;
+                  }}
+                  className="topnav-group"
+                  style={{
+                    position: "relative",
+                    display: "flex",
+                    alignItems: "stretch",
+                    height: "100%",
+                    flexShrink: 0,
+                  }}
+                  onMouseEnter={() => handleMenuEnter(group.id)}
+                  onMouseOver={() => handleMenuEnter(group.id)}
+                  onMouseLeave={handleMenuLeave}
+                >
+                  <button
+                    type="button"
+                    id={`nav-btn-${group.id}`}
+                    className={`topnav-group-btn ${isOpen ? "is-open" : ""}`}
+                    onClick={() => toggleMenu(group.id)}
+                    onMouseEnter={() => handleMenuEnter(group.id)}
+                    onMouseOver={() => handleMenuEnter(group.id)}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 7,
+                      padding: "0 14px",
+                      height: "100%",
+                      background: "none",
+                      border: "none",
+                      borderBottom:
+                        active || isOpen
+                          ? "3px solid #ffffff"
+                          : "3px solid transparent",
+                      backgroundColor:
+                        active || isOpen ? "rgba(0,0,0,0.2)" : "transparent",
+                      color: "#ffffff",
+                      fontSize: 13.5,
+                      fontWeight: active || isOpen ? 700 : 500,
+                      cursor: "pointer",
+                      fontFamily: "var(--font-sans)",
+                      transition: "all 0.15s ease",
+                      whiteSpace: "nowrap",
+                      boxSizing: "border-box",
+                    }}
+                    aria-expanded={isOpen}
+                    aria-haspopup="true"
+                  >
+                    <group.icon size={16} color="currentColor" />
+                    <span>{group.label}</span>
+                    <ChevronDown open={isOpen} />
+                  </button>
+
+                  {(group.children || group.sections) && (
+                    <NavDropdown
+                      items={group.children}
+                      sections={group.sections}
+                      isOpen={isOpen}
+                      anchorRef={ref}
+                      onClose={() => {
+                        clearCloseTimer();
+                        setOpenMenu(null);
+                      }}
+                      onMouseEnter={clearCloseTimer}
+                      onMouseLeave={handleMenuLeave}
+                      currentPath={location.pathname + location.search}
+                    />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Right actions: Chọn chi nhánh + Hỗ trợ + Góp ý + Divider + Thông báo + Cài đặt + Profile */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
               gap: 8,
-              height: 36,
-              padding: '0 12px 0 4px',
-              borderRadius: 'var(--radius-pill)',
-              border: '1px solid var(--border-light)',
-              backgroundColor: '#fff',
-              cursor: 'pointer',
+              marginLeft: "auto",
               flexShrink: 0,
-              boxSizing: 'border-box',
-              transition: 'background-color 0.15s ease',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = 'var(--bg-soft-blue)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = '#fff';
             }}
           >
+            {/* 0. Dropdown chọn chi nhánh */}
+            <BranchSelectorDropdown />
+
+            {/* 1. Hỗ trợ */}
+            <button
+              type="button"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                background: "none",
+                border: "none",
+                color: "#ffffff",
+                fontSize: 13,
+                fontWeight: 600,
+                cursor: "pointer",
+                padding: "6px 8px",
+                borderRadius: "var(--radius-pill)",
+                transition: "background-color 0.15s ease",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor =
+                  "rgba(255, 255, 255, 0.14)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = "transparent";
+              }}
+              onClick={() =>
+                alert(
+                  "Tổng đài hỗ trợ MT-GRMS: 1900 6522 (8h00 - 22h00 hàng ngày)",
+                )
+              }
+              title="Tổng đài CSKH: 1900 6522"
+            >
+              <MessageCircle size={15} strokeWidth={2} />
+              <span>Hỗ trợ</span>
+            </button>
+
+            {/* 2. Góp ý */}
+            <button
+              type="button"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                background: "none",
+                border: "none",
+                color: "#ffffff",
+                fontSize: 13,
+                fontWeight: 600,
+                cursor: "pointer",
+                padding: "6px 8px",
+                borderRadius: "var(--radius-pill)",
+                transition: "background-color 0.15s ease",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor =
+                  "rgba(255, 255, 255, 0.14)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = "transparent";
+              }}
+              onClick={() =>
+                alert(
+                  "Cảm ơn bạn! Mọi ý kiến đóng góp xin gửi về: hotro@mt-grms.vn",
+                )
+              }
+              title="Gửi ý kiến đóng góp tính năng"
+            >
+              <SquarePen size={15} strokeWidth={2} />
+              <span>Góp ý</span>
+            </button>
+
+            {/* 3. Divider */}
             <div
               style={{
-                width: 28,
-                height: 28,
-                borderRadius: '50%',
-                background: 'linear-gradient(135deg, #0F766E, #14B8A6)',
-                color: '#fff',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: 11,
-                fontWeight: 800,
+                width: 1,
+                height: 18,
+                backgroundColor: "rgba(255, 255, 255, 0.25)",
+                margin: "0 2px",
               }}
-            >
-              SO
+            />
+
+            {/* 4. Bell notification (Dynamic Notification Center) */}
+            <div style={{ position: "relative" }}>
+              <NotificationBadge />
+              <NotificationPopover />
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
-              <span style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-main)', lineHeight: 1.15 }}>Minh Đức</span>
-              <span style={{ fontSize: 10, color: 'var(--blue-primary)', fontWeight: 600, lineHeight: 1 }}>Store Owner</span>
+
+            {/* 5. Settings Gear icon */}
+            <Link
+              to="/store-owner/subscriptions"
+              style={{
+                width: 32,
+                height: 32,
+                borderRadius: "50%",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                color: "#ffffff",
+                textDecoration: "none",
+                transition: "background-color 0.15s ease",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor =
+                  "rgba(255, 255, 255, 0.14)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = "transparent";
+              }}
+              title="Thiết lập gian hàng & Gói dịch vụ"
+            >
+              <Settings size={18} strokeWidth={2} />
+            </Link>
+
+            {/* 6. Profile Avatar User Dropdown */}
+            <div
+              style={{ position: "relative" }}
+              ref={accountMenuRef}
+              onMouseEnter={handleAccountEnter}
+              onMouseLeave={handleAccountLeave}
+            >
+              <button
+                type="button"
+                onClick={() => {
+                  clearAccountTimer();
+                  setAccountMenuOpen((v) => !v);
+                }}
+                style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: "50%",
+                  backgroundColor: accountMenuOpen
+                    ? "rgba(255, 255, 255, 0.4)"
+                    : "rgba(255, 255, 255, 0.2)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: "#ffffff",
+                  border: "none",
+                  cursor: "pointer",
+                  transition: "all 0.15s ease",
+                  marginLeft: 2,
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor =
+                    "rgba(255, 255, 255, 0.35)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = accountMenuOpen
+                    ? "rgba(255, 255, 255, 0.4)"
+                    : "rgba(255, 255, 255, 0.2)";
+                }}
+                title="Tài khoản cá nhân"
+                aria-expanded={accountMenuOpen}
+                aria-haspopup="true"
+              >
+                <User size={18} strokeWidth={2} />
+              </button>
+
+              {accountMenuOpen && (
+                <div
+                  style={{
+                    position: "absolute",
+                    top: "100%",
+                    right: 0,
+                    paddingTop: 8,
+                    zIndex: 1000,
+                  }}
+                  onMouseEnter={handleAccountEnter}
+                  onMouseLeave={handleAccountLeave}
+                >
+                  <div
+                    style={{
+                      width: 270,
+                      backgroundColor: "#ffffff",
+                      borderRadius: 14,
+                      boxShadow:
+                        "0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)",
+                      border: "1px solid #E2E8F0",
+                      overflow: "hidden",
+                    }}
+                  >
+                    {/* Header info tài khoản */}
+                    <Link
+                      to="/store-owner/account?tab=account-profile"
+                      onClick={() => setAccountMenuOpen(false)}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 12,
+                        padding: "16px",
+                        textDecoration: "none",
+                        backgroundColor: "#F8FAFC",
+                        borderBottom: "1px solid #E2E8F0",
+                        transition: "background-color 0.15s ease",
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = "#F1F5F9";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = "#F8FAFC";
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: 44,
+                          height: 44,
+                          borderRadius: "50%",
+                          backgroundColor: "#EDF2F7",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          flexShrink: 0,
+                          color: "#64748B",
+                        }}
+                      >
+                        <User size={22} strokeWidth={2} />
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div
+                          style={{
+                            fontSize: 14.5,
+                            fontWeight: 700,
+                            color: "#1E293B",
+                            lineHeight: 1.3,
+                            whiteSpace: "nowrap",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                          }}
+                        >
+                          {user?.phone || user?.fullName || "0369880798"}
+                        </div>
+                        <div
+                          style={{
+                            fontSize: 12,
+                            fontWeight: 500,
+                            color: "#EF4444",
+                            marginTop: 2,
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          Chưa bật xác thực 2 lớp
+                        </div>
+                      </div>
+                      <ChevronRight size={16} color="#94A3B8" />
+                    </Link>
+
+                    <div style={{ height: 1, backgroundColor: "#F1F5F9" }} />
+
+                    {/* Ví gian hàng & Hợp đồng */}
+                    <Link
+                      to="/store-owner/account?tab=wallet"
+                      onClick={() => setAccountMenuOpen(false)}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 12,
+                        padding: "11px 16px",
+                        textDecoration: "none",
+                        color: "#1E293B",
+                        backgroundColor: "transparent",
+                        transition: "background-color 0.15s ease",
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = "#F8FAFC";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = "transparent";
+                      }}
+                    >
+                      <Wallet size={18} strokeWidth={1.9} color="#334155" />
+                      <span
+                        style={{
+                          flex: 1,
+                          fontSize: 13.5,
+                          fontWeight: 500,
+                          color: "#1E293B",
+                        }}
+                      >
+                        Ví tiền
+                      </span>
+                    </Link>
+
+                    <Link
+                      to="/store-owner/account?tab=terms"
+                      onClick={() => setAccountMenuOpen(false)}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 12,
+                        padding: "11px 16px",
+                        textDecoration: "none",
+                        color: "#1E293B",
+                        backgroundColor: "transparent",
+                        transition: "background-color 0.15s ease",
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = "#F8FAFC";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = "transparent";
+                      }}
+                    >
+                      <FileText size={18} strokeWidth={1.9} color="#334155" />
+                      <span
+                        style={{
+                          flex: 1,
+                          fontSize: 13.5,
+                          fontWeight: 500,
+                          color: "#1E293B",
+                        }}
+                      >
+                        Điều khoản & Hợp đồng
+                      </span>
+                    </Link>
+
+                    <div style={{ height: 1, backgroundColor: "#F1F5F9" }} />
+
+                    {/* Row 5: Đăng xuất */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAccountMenuOpen(false);
+                        logout();
+                        navigate("/login");
+                      }}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 12,
+                        padding: "12px 16px",
+                        border: "none",
+                        background: "none",
+                        width: "100%",
+                        cursor: "pointer",
+                        textAlign: "left",
+                        transition: "background-color 0.15s ease",
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = "#FEF2F2";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = "transparent";
+                      }}
+                    >
+                      <LogOut size={18} strokeWidth={1.9} color="#EF4444" />
+                      <span
+                        style={{
+                          flex: 1,
+                          fontSize: 13.5,
+                          fontWeight: 600,
+                          color: "#EF4444",
+                        }}
+                      >
+                        Đăng xuất
+                      </span>
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -439,149 +1643,24 @@ export const AppTopNav: FC = () => {
             type="button"
             onClick={() => setMobileOpen((v) => !v)}
             style={{
-              display: 'none',
-              width: 36,
-              height: 36,
-              borderRadius: 'var(--radius-pill)',
-              border: '1px solid var(--border-light)',
-              backgroundColor: 'var(--bg-soft-blue)',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
-              color: 'var(--text-muted)',
+              display: "none",
+              width: 32,
+              height: 32,
+              borderRadius: "var(--radius-pill)",
+              border: "1px solid rgba(255, 255, 255, 0.22)",
+              backgroundColor: "rgba(255, 255, 255, 0.14)",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: "pointer",
+              color: "#ffffff",
               flexShrink: 0,
-              boxSizing: 'border-box',
+              boxSizing: "border-box",
             }}
             className="topnav-hamburger"
             title="Menu"
           >
-            <MenuIcon size={18} />
+            <MenuIcon size={16} />
           </button>
-        </div>
-      </div>
-
-      {/* ── Row 2: Primary Navigation bar ── */}
-      <nav
-        className="topnav-primary"
-        style={{
-          backgroundColor: 'var(--blue-primary)',
-          borderBottom: '1px solid var(--blue-dark)',
-          position: 'sticky',
-          top: 56,
-          zIndex: 190,
-          boxShadow: '0 2px 8px rgba(0, 50, 150, 0.15)',
-        }}
-        aria-label="Điều hướng chính"
-      >
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'stretch',
-            height: 44,
-            padding: '0 24px',
-            gap: 4,
-            overflowX: 'auto',
-            scrollbarWidth: 'none',
-          }}
-        >
-          {NAV_GROUPS.map((group) => {
-            const active = isGroupActive(group);
-            const isOpen = openMenu === group.id;
-            const ref = getAnchorRef(group.id);
-
-            if (group.to) {
-              // Direct link (no dropdown)
-              return (
-                <NavLink
-                  key={group.id}
-                  to={group.to}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 8,
-                    padding: '0 16px',
-                    height: '100%',
-                    textDecoration: 'none',
-                    fontSize: 13.5,
-                    fontFamily: 'var(--font-sans)',
-                    fontWeight: active ? 700 : 500,
-                    color: '#ffffff',
-                    backgroundColor: active ? 'rgba(0,0,0,0.2)' : 'transparent',
-                    borderRadius: 0,
-                    borderBottom: active ? '3px solid #ffffff' : '3px solid transparent',
-                    transition: 'all 0.15s ease',
-                    whiteSpace: 'nowrap',
-                    flexShrink: 0,
-                    boxSizing: 'border-box',
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!active) e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.12)';
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!active) e.currentTarget.style.backgroundColor = 'transparent';
-                  }}
-                >
-                  <group.icon size={16} color="currentColor" />
-                  <span>{group.label}</span>
-                </NavLink>
-              );
-            }
-
-            // Dropdown trigger
-            return (
-              <div
-                key={group.id}
-                ref={(el) => { ref.current = el; }}
-                style={{ position: 'relative', display: 'flex', alignItems: 'stretch', height: '100%', flexShrink: 0 }}
-              >
-                <button
-                  type="button"
-                  onClick={() => toggleMenu(group.id)}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 8,
-                    padding: '0 16px',
-                    height: '100%',
-                    background: 'none',
-                    border: 'none',
-                    borderBottom: active || isOpen ? '3px solid #ffffff' : '3px solid transparent',
-                    backgroundColor: active || isOpen ? 'rgba(0,0,0,0.2)' : 'transparent',
-                    color: '#ffffff',
-                    fontSize: 13.5,
-                    fontWeight: active || isOpen ? 700 : 500,
-                    cursor: 'pointer',
-                    fontFamily: 'var(--font-sans)',
-                    transition: 'all 0.15s ease',
-                    whiteSpace: 'nowrap',
-                    boxSizing: 'border-box',
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!active && !isOpen) e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.12)';
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!active && !isOpen) e.currentTarget.style.backgroundColor = 'transparent';
-                  }}
-                  aria-expanded={isOpen}
-                  aria-haspopup="true"
-                >
-                  <group.icon size={16} color="currentColor" />
-                  <span>{group.label}</span>
-                  <ChevronDown open={isOpen} />
-                </button>
-
-                {group.children && (
-                  <NavDropdown
-                    items={group.children}
-                    isOpen={isOpen}
-                    anchorRef={ref}
-                    onClose={() => setOpenMenu(null)}
-                    currentPath={location.pathname}
-                  />
-                )}
-              </div>
-            );
-          })}
         </div>
       </nav>
 
@@ -589,50 +1668,76 @@ export const AppTopNav: FC = () => {
       {mobileOpen && (
         <div
           style={{
-            position: 'fixed',
+            position: "fixed",
             inset: 0,
             zIndex: 9998,
-            backgroundColor: 'rgba(15,23,42,0.45)',
+            backgroundColor: "rgba(15,23,42,0.45)",
           }}
           onClick={() => setMobileOpen(false)}
         >
           <div
             style={{
-              position: 'absolute',
+              position: "absolute",
               top: 0,
               left: 0,
               width: 280,
-              height: '100%',
-              backgroundColor: '#ffffff',
-              boxShadow: '4px 0 24px rgba(0,50,150,0.1)',
-              padding: '24px 0 32px',
-              overflowY: 'auto',
+              height: "100%",
+              backgroundColor: "#ffffff",
+              boxShadow: "4px 0 24px rgba(0,50,150,0.1)",
+              padding: "24px 0 32px",
+              overflowY: "auto",
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div style={{ padding: '0 20px 20px', borderBottom: '1px solid var(--border-light)', marginBottom: 12 }}>
-              <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--text-main)' }}>MT-GRMS</div>
-              <div style={{ fontSize: 11, color: 'var(--blue-primary)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            <div
+              style={{
+                padding: "0 20px 20px",
+                borderBottom: "1px solid var(--border-light)",
+                marginBottom: 12,
+              }}
+            >
+              <div
+                style={{
+                  fontSize: 16,
+                  fontWeight: 800,
+                  color: "var(--text-main)",
+                }}
+              >
+                MT-GRMS
+              </div>
+              <div
+                style={{
+                  fontSize: 11,
+                  color: "var(--blue-primary)",
+                  fontWeight: 700,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.05em",
+                }}
+              >
                 Quản lý Chuỗi Tạp Hóa
               </div>
             </div>
             {NAV_GROUPS.map((group) => (
-              <div key={group.id} style={{ padding: '0 12px 4px' }}>
+              <div key={group.id} style={{ padding: "0 12px 4px" }}>
                 {group.to ? (
                   <NavLink
                     to={group.to}
                     onClick={() => setMobileOpen(false)}
                     style={({ isActive }) => ({
-                      display: 'flex',
-                      alignItems: 'center',
+                      display: "flex",
+                      alignItems: "center",
                       gap: 10,
-                      padding: '11px 14px',
-                      borderRadius: 'var(--radius-pill)',
-                      textDecoration: 'none',
+                      padding: "11px 14px",
+                      borderRadius: "var(--radius-pill)",
+                      textDecoration: "none",
                       fontSize: 14,
                       fontWeight: isActive ? 700 : 500,
-                      color: isActive ? 'var(--blue-primary)' : 'var(--text-muted)',
-                      backgroundColor: isActive ? 'var(--blue-light)' : 'transparent',
+                      color: isActive
+                        ? "var(--blue-primary)"
+                        : "var(--text-muted)",
+                      backgroundColor: isActive
+                        ? "var(--blue-light)"
+                        : "transparent",
                     })}
                   >
                     <group.icon size={18} />
@@ -640,39 +1745,185 @@ export const AppTopNav: FC = () => {
                   </NavLink>
                 ) : (
                   <>
-                    <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em', padding: '10px 14px 4px' }}>
+                    <div
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 800,
+                        color: "var(--text-faint)",
+                        textTransform: "uppercase",
+                        letterSpacing: "0.05em",
+                        padding: "10px 14px 4px",
+                      }}
+                    >
                       {group.label}
                     </div>
-                    {group.children?.map((child) => {
-                      const isActive = location.pathname === child.to || location.pathname.startsWith(child.to + '/');
-                      return (
-                        <NavLink
-                          key={child.to}
-                          to={child.to}
-                          onClick={() => setMobileOpen(false)}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 10,
-                            padding: '9px 14px 9px 28px',
-                            borderRadius: 'var(--radius-pill)',
-                            textDecoration: 'none',
-                            fontSize: 13.5,
-                            fontWeight: isActive ? 700 : 500,
-                            color: isActive ? 'var(--blue-primary)' : 'var(--text-muted)',
-                            backgroundColor: isActive ? 'var(--blue-light)' : 'transparent',
-                          }}
-                        >
-                          <ChevronRightIcon size={13} />
-                          {child.label}
-                          {child.badge && (
-                            <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 'var(--radius-pill)', backgroundColor: '#e0f2fe', color: '#0284c7' }}>
-                              {child.badge}
-                            </span>
-                          )}
-                        </NavLink>
-                      );
-                    })}
+                    {group.sections
+                      ? group.sections.map((sec) => (
+                        <div key={sec.title} style={{ marginBottom: 6 }}>
+                          <div
+                            style={{
+                              fontSize: 11,
+                              fontWeight: 700,
+                              color: "#64748b",
+                              padding: "4px 14px 2px 24px",
+                            }}
+                          >
+                            {sec.title}
+                          </div>
+                          {sec.items.map((child) => {
+                            const isActive = (() => {
+                              const [toPath, toQuery] = child.to.split("?");
+                              const currPath = location.pathname;
+                              const currQuery = location.search;
+                              if (toQuery) {
+                                return (
+                                  currPath === toPath &&
+                                  currQuery.includes(toQuery)
+                                );
+                              }
+                              if (toPath === "/store-owner/suppliers") {
+                                const hasOtherView =
+                                  currQuery.includes("view=");
+                                return (
+                                  (currPath === toPath ||
+                                    currPath.startsWith(toPath + "/")) &&
+                                  !currPath.includes("/products") &&
+                                  !currPath.includes("/branches") &&
+                                  !hasOtherView
+                                );
+                              }
+                              if (
+                                toPath === "/store-owner/suppliers/products"
+                              ) {
+                                const hasOtherView =
+                                  currQuery.includes("view=");
+                                return (
+                                  (currPath === toPath ||
+                                    currPath.startsWith(toPath + "/")) &&
+                                  !hasOtherView
+                                );
+                              }
+                              if (toPath === "/store-owner/expenses") {
+                                const hasOtherView =
+                                  currQuery.includes("view=") ||
+                                  currQuery.includes("tab=");
+                                return (
+                                  (currPath === toPath ||
+                                    currPath.startsWith(toPath + "/")) &&
+                                  !hasOtherView
+                                );
+                              }
+                              return (
+                                currPath === toPath ||
+                                currPath.startsWith(toPath + "/")
+                              );
+                            })();
+                            return (
+                              <NavLink
+                                key={child.label + child.to}
+                                to={child.to}
+                                onClick={() => setMobileOpen(false)}
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: 10,
+                                  padding: "7px 14px 7px 32px",
+                                  borderRadius: "var(--radius-pill)",
+                                  textDecoration: "none",
+                                  fontSize: 13,
+                                  fontWeight: isActive ? 700 : 500,
+                                  color: isActive
+                                    ? "var(--blue-primary)"
+                                    : "var(--text-muted)",
+                                  backgroundColor: isActive
+                                    ? "var(--blue-light)"
+                                    : "transparent",
+                                }}
+                              >
+                                <span style={{ flex: 1 }}>{child.label}</span>
+                                {child.badge && (
+                                  <span
+                                    style={{
+                                      fontSize: 9.5,
+                                      fontWeight: 700,
+                                      padding: "1px 6px",
+                                      borderRadius: "var(--radius-pill)",
+                                      backgroundColor:
+                                        child.badgeType === "red"
+                                          ? "#FF3B30"
+                                          : "#e0f2fe",
+                                      color:
+                                        child.badgeType === "red"
+                                          ? "#ffffff"
+                                          : "#0284c7",
+                                    }}
+                                  >
+                                    {child.badge}
+                                  </span>
+                                )}
+                              </NavLink>
+                            );
+                          })}
+                        </div>
+                      ))
+                      : group.children?.map((child) => {
+                        const isActive = (() => {
+                          if (child.to === "/store-owner/suppliers") {
+                            return (
+                              (location.pathname === child.to ||
+                                location.pathname.startsWith(
+                                  child.to + "/",
+                                )) &&
+                              !location.pathname.includes("/products") &&
+                              !location.pathname.includes("/branches")
+                            );
+                          }
+                          return (
+                            location.pathname === child.to ||
+                            location.pathname.startsWith(child.to + "/")
+                          );
+                        })();
+                        return (
+                          <NavLink
+                            key={child.to}
+                            to={child.to}
+                            onClick={() => setMobileOpen(false)}
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 10,
+                              padding: "9px 14px 9px 28px",
+                              borderRadius: "var(--radius-pill)",
+                              textDecoration: "none",
+                              fontSize: 13.5,
+                              fontWeight: isActive ? 700 : 500,
+                              color: isActive
+                                ? "var(--blue-primary)"
+                                : "var(--text-muted)",
+                              backgroundColor: isActive
+                                ? "var(--blue-light)"
+                                : "transparent",
+                            }}
+                          >
+                            <ChevronRightIcon size={13} />
+                            {child.label}
+                            {child.badge && (
+                              <span
+                                style={{
+                                  fontSize: 10,
+                                  fontWeight: 700,
+                                  padding: "1px 6px",
+                                  borderRadius: "var(--radius-pill)",
+                                  backgroundColor: "#e0f2fe",
+                                  color: "#0284c7",
+                                }}
+                              >
+                                {child.badge}
+                              </span>
+                            )}
+                          </NavLink>
+                        );
+                      })}
                   </>
                 )}
               </div>
@@ -680,6 +1931,8 @@ export const AppTopNav: FC = () => {
           </div>
         </div>
       )}
+      {/* Extended Global Notification Drawer */}
+      <NotificationDrawer />
     </>
   );
 };

@@ -1,22 +1,109 @@
 import { useState } from 'react';
-import type { FC, FormEvent } from 'react';
+import type { CSSProperties, FC, FormEvent, ReactNode } from 'react';
 import type { SupplierProductItem, EditSupplierProductInput } from '../../types/supplier.types';
-import { X, Check, Edit2, AlertCircle } from 'lucide-react';
+import { X, Save, Loader2, AlertCircle } from 'lucide-react';
+import '../../supplier.css';
 
 interface EditSupplierProductModalProps {
   isOpen: boolean;
   onClose: () => void;
   item: SupplierProductItem | null;
   supplierName: string;
-  onSave: (input: EditSupplierProductInput) => void;
+  onSave: (input: EditSupplierProductInput) => void | Promise<void>;
 }
 
 interface EditSupplierProductFormProps {
   item: SupplierProductItem;
   supplierName: string;
-  onSave: (input: EditSupplierProductInput) => void;
+  onSave: (input: EditSupplierProductInput) => void | Promise<void>;
   onClose: () => void;
 }
+
+const labelStyle: CSSProperties = {
+  width: 140,
+  flexShrink: 0,
+  fontSize: 13,
+  fontWeight: 600,
+  color: '#475569',
+  textAlign: 'left',
+};
+
+const inputBase: CSSProperties = {
+  flex: 1,
+  minWidth: 0,
+  height: 38,
+  padding: '0 12px',
+  borderRadius: 8,
+  fontSize: 13.5,
+  outline: 'none',
+  boxSizing: 'border-box',
+  textAlign: 'left',
+};
+
+const readonlyInputStyle: CSSProperties = {
+  ...inputBase,
+  border: '1px solid #cbd5e1',
+  backgroundColor: '#f1f5f9',
+  color: '#475569',
+  cursor: 'not-allowed',
+};
+
+const editableInputStyle: CSSProperties = {
+  ...inputBase,
+  border: '1px solid #cbd5e1',
+  backgroundColor: '#ffffff',
+  color: '#0f172a',
+};
+
+const FieldRow: FC<{ label: string; children: ReactNode; htmlFor?: string }> = ({
+  label,
+  children,
+  htmlFor,
+}) => (
+  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+    <label htmlFor={htmlFor} style={labelStyle}>
+      {label}
+    </label>
+    {children}
+  </div>
+);
+
+const StatusToggle: FC<{
+  checked: boolean;
+  onChange: (next: boolean) => void;
+}> = ({ checked, onChange }) => (
+  <button
+    type="button"
+    role="switch"
+    aria-checked={checked}
+    onClick={() => onChange(!checked)}
+    style={{
+      width: 52,
+      height: 28,
+      borderRadius: 999,
+      border: 'none',
+      padding: 3,
+      cursor: 'pointer',
+      backgroundColor: checked ? '#3b82f6' : '#9ca3af',
+      transition: 'background-color 0.2s ease',
+      display: 'inline-flex',
+      alignItems: 'center',
+      justifyContent: checked ? 'flex-end' : 'flex-start',
+      flexShrink: 0,
+    }}
+  >
+    <span
+      style={{
+        width: 22,
+        height: 22,
+        borderRadius: '50%',
+        backgroundColor: '#ffffff',
+        boxShadow: '0 1px 3px rgba(0,0,0,0.25)',
+        display: 'block',
+      }}
+    />
+  </button>
+);
 
 const EditSupplierProductForm: FC<EditSupplierProductFormProps> = ({
   item,
@@ -24,50 +111,59 @@ const EditSupplierProductForm: FC<EditSupplierProductFormProps> = ({
   onSave,
   onClose,
 }) => {
-  const [deliveryUoM, setDeliveryUoM] = useState(item.deliveryUoM);
-  const [agreedPrice, setAgreedPrice] = useState<number>(item.agreedPrice);
+  const masterCost = item.costPrice ?? 0;
+  const initialPrice = item.agreedPrice > 0 ? item.agreedPrice : masterCost;
+  const [purchasePrice, setPurchasePrice] = useState<number>(initialPrice);
   const [moq, setMoq] = useState<number>(item.moq);
-  const [isPrimary, setIsPrimary] = useState<boolean>(item.isPrimary);
-  const [supplierProductCode, setSupplierProductCode] = useState(item.supplierProductCode || '');
+  const [isActive, setIsActive] = useState<boolean>(item.status === 'Active');
   const [errorMsg, setErrorMsg] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const unitLabel = item.baseUoM || item.deliveryUoM || 'Cái';
 
-  const handleSubmit = (e: FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
 
-    if (agreedPrice <= 0) {
-      setErrorMsg('Giá nhập sỉ thỏa thuận phải lớn hơn 0 VNĐ.');
+    if (isNaN(purchasePrice) || purchasePrice < 0) {
+      setErrorMsg('Giá nhập không được âm.');
       return;
     }
 
     if (moq < 1) {
-      setErrorMsg('Số lượng đặt hàng tối thiểu (MOQ) phải từ 1 trở lên.');
+      setErrorMsg('MOQ phải từ 1 trở lên.');
       return;
     }
 
-    onSave({
-      id: item.id,
-      deliveryUoM: deliveryUoM.trim() || item.baseUoM,
-      agreedPrice,
-      moq,
-      isPrimary,
-      supplierProductCode: supplierProductCode.trim() || undefined,
-    });
-
-    onClose();
+    setIsSaving(true);
+    try {
+      await onSave({
+        id: item.id,
+        deliveryUoM: unitLabel,
+        agreedPrice: purchasePrice,
+        moq,
+        isPrimary: item.isPrimary,
+        supplierProductCode: item.supplierProductCode,
+        status: isActive ? 'Active' : 'Inactive',
+      });
+      onClose();
+    } catch {
+      // Parent shows toast; keep modal open
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
     <>
-      {/* Header */}
       <div
+        className="modal-header"
         style={{
-          padding: '20px 24px',
-          borderBottom: '1px solid #edf2f7',
+          background: '#f8fafc',
+          padding: '16px 20px',
+          borderBottom: '1px solid #e2e8f0',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          background: 'linear-gradient(to right, #F7FAFF, #ffffff)',
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -75,309 +171,186 @@ const EditSupplierProductForm: FC<EditSupplierProductFormProps> = ({
             style={{
               width: 36,
               height: 36,
-              borderRadius: 10,
-              backgroundColor: '#eff6ff',
-              color: '#0066FF',
+              borderRadius: 8,
+              backgroundColor: '#f0fdfa',
+              color: '#0f766e',
+              border: '1px solid #ccfbf1',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
             }}
           >
-            <Edit2 size={18} />
+            <Save size={18} />
           </div>
-          <div>
-            <h3 style={{ margin: 0, fontSize: '1.02rem', fontWeight: 700, color: '#0f172a' }}>
-              Chỉnh Sửa Điều Khoản Cung Ứng
-            </h3>
-            <div style={{ fontSize: '0.78rem', color: '#64748b' }}>
-              Nhà cung cấp: <b style={{ color: '#0066FF' }}>{supplierName}</b>
-            </div>
-          </div>
+          <h2 className="modal-title" style={{ fontSize: '1rem', fontWeight: 700, margin: 0, color: '#0f172a' }}>
+            Chỉnh sửa điều khoản cung ứng
+          </h2>
         </div>
-
         <button
           type="button"
           onClick={onClose}
+          disabled={isSaving}
+          className="modal-close"
           style={{
-            background: 'none',
+            background: 'transparent',
             border: 'none',
-            color: '#94a3b8',
-            cursor: 'pointer',
+            cursor: isSaving ? 'not-allowed' : 'pointer',
+            color: '#64748b',
             padding: 4,
+            borderRadius: 6,
           }}
+          title="Đóng (Esc)"
         >
-          <X size={20} />
+          <X size={18} />
         </button>
       </div>
 
-      {/* Form Body */}
       <form
-        onSubmit={handleSubmit}
-        style={{
-          padding: '20px 24px',
-          overflowY: 'auto',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 16,
-        }}
+        onSubmit={(e) => void handleSubmit(e)}
+        noValidate
+        style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}
       >
-        {errorMsg && (
-          <div
-            style={{
-              backgroundColor: '#fef2f2',
-              border: '1px solid #fecaca',
-              color: '#dc2626',
-              padding: '10px 14px',
-              borderRadius: 12,
-              fontSize: '0.84rem',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-            }}
-          >
-            <AlertCircle size={16} />
-            <span>{errorMsg}</span>
-          </div>
-        )}
-
-        {/* Product Fixed Info */}
         <div
+          className="modal-body"
           style={{
-            backgroundColor: '#f8fafc',
-            borderRadius: 14,
-            padding: '12px 16px',
-            border: '1px solid #e2e8f0',
+            padding: '20px',
+            overflowY: 'auto',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 14,
           }}
         >
-          <div style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.92rem' }}>{item.name}</div>
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 12,
-              marginTop: 4,
-              fontSize: '0.8rem',
-              color: '#64748b',
-            }}
-          >
-            <span>
-              Barcode: <b style={{ fontFamily: 'JetBrains Mono, monospace' }}>{item.barcode}</b>
-            </span>
-            <span>•</span>
-            <span>
-              SKU: <b style={{ fontFamily: 'JetBrains Mono, monospace' }}>{item.sku}</b>
-            </span>
-          </div>
-        </div>
+          {errorMsg && (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                padding: '10px 14px',
+                backgroundColor: '#fef2f2',
+                border: '1px solid #fecaca',
+                borderRadius: 8,
+                fontSize: '0.85rem',
+                color: '#b91c1c',
+              }}
+            >
+              <AlertCircle size={18} style={{ flexShrink: 0 }} />
+              <span>{errorMsg}</span>
+            </div>
+          )}
 
-        {/* Delivery UoM & Code */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-          <div>
-            <label
-              style={{
-                display: 'block',
-                fontSize: '0.82rem',
-                fontWeight: 600,
-                color: '#334155',
-                marginBottom: 6,
-              }}
-            >
-              Đơn vị tính giao hàng (*)
-            </label>
-            <select
-              value={deliveryUoM}
-              onChange={(e) => setDeliveryUoM(e.target.value)}
-              style={{
-                width: '100%',
-                height: 40,
-                padding: '0 12px',
-                borderRadius: 10,
-                border: '1px solid #cbd5e1',
-                fontSize: '0.88rem',
-                outline: 'none',
-              }}
-            >
-              <option value="kg">kg (Kilôgam)</option>
-              <option value="bottle">bottle (Chai/Lọ)</option>
-              <option value="box">box (Hộp/Thùng)</option>
-              <option value="pack">pack (Gói/Túi)</option>
-              <option value="can">can (Lon)</option>
-              <option value="cái">cái (Chiếc)</option>
-            </select>
-          </div>
+          <FieldRow label="Nhà cung cấp">
+            <input type="text" value={supplierName} readOnly className="form-input" style={readonlyInputStyle} />
+          </FieldRow>
 
-          <div>
-            <label
-              style={{
-                display: 'block',
-                fontSize: '0.82rem',
-                fontWeight: 600,
-                color: '#334155',
-                marginBottom: 6,
-              }}
-            >
-              Mã sản phẩm phía NCC
-            </label>
+          <FieldRow label="Sản phẩm">
+            <input type="text" value={item.name} readOnly className="form-input" style={readonlyInputStyle} />
+          </FieldRow>
+
+          <FieldRow label="SKU">
             <input
               type="text"
-              placeholder="SUP-PRD-01"
-              value={supplierProductCode}
-              onChange={(e) => setSupplierProductCode(e.target.value)}
-              style={{
-                width: '100%',
-                height: 40,
-                padding: '0 12px',
-                borderRadius: 10,
-                border: '1px solid #cbd5e1',
-                fontSize: '0.88rem',
-                outline: 'none',
-                boxSizing: 'border-box',
-              }}
+              value={item.sku}
+              readOnly
+              className="form-input"
+              style={{ ...readonlyInputStyle, fontFamily: 'var(--font-mono, monospace)', fontWeight: 700 }}
             />
-          </div>
-        </div>
+          </FieldRow>
 
-        {/* Agreed Price & MOQ */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 14 }}>
-          <div>
-            <label
-              style={{
-                display: 'block',
-                fontSize: '0.82rem',
-                fontWeight: 600,
-                color: '#334155',
-                marginBottom: 6,
-              }}
-            >
-              Giá nhập sỉ thỏa thuận (VNĐ) (*)
-            </label>
+          <FieldRow label="Barcode">
             <input
+              type="text"
+              value={item.barcode || '—'}
+              readOnly
+              className="form-input"
+              style={{ ...readonlyInputStyle, fontFamily: 'var(--font-mono, monospace)' }}
+            />
+          </FieldRow>
+
+          <FieldRow label="Đơn vị tính">
+            <input type="text" value={unitLabel} readOnly className="form-input" style={readonlyInputStyle} />
+          </FieldRow>
+
+          <FieldRow label="Trạng thái">
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 12, height: 38 }}>
+              <StatusToggle checked={isActive} onChange={setIsActive} />
+              <span style={{ fontSize: 13.5, color: isActive ? '#15803d' : '#64748b', fontWeight: 600 }}>
+                {isActive ? 'Enable' : 'Disable'}
+              </span>
+            </div>
+          </FieldRow>
+
+          <FieldRow label="Giá nhập" htmlFor="inputSupplierPurchasePrice">
+            <input
+              id="inputSupplierPurchasePrice"
               type="number"
-              min={1000}
-              step={500}
-              value={agreedPrice || ''}
-              onChange={(e) => setAgreedPrice(parseFloat(e.target.value) || 0)}
-              style={{
-                width: '100%',
-                height: 40,
-                padding: '0 12px',
-                borderRadius: 10,
-                border: '1.5px solid #0066FF',
-                fontSize: '0.95rem',
-                fontWeight: 700,
-                color: '#0066FF',
-                fontFamily: 'JetBrains Mono, monospace',
-                outline: 'none',
-                boxSizing: 'border-box',
-              }}
+              min={0}
+              step={1000}
+              value={Number.isFinite(purchasePrice) ? purchasePrice : 0}
+              onChange={(e) => setPurchasePrice(parseFloat(e.target.value) || 0)}
+              className="form-input"
+              style={editableInputStyle}
             />
-          </div>
+          </FieldRow>
 
-          <div>
-            <label
-              style={{
-                display: 'block',
-                fontSize: '0.82rem',
-                fontWeight: 600,
-                color: '#334155',
-                marginBottom: 6,
-              }}
-            >
-              Số lượng tối thiểu (MOQ) (*)
-            </label>
+          <FieldRow label="MOQ" htmlFor="inputSupplierMoq">
             <input
+              id="inputSupplierMoq"
               type="number"
               min={1}
               value={moq || ''}
               onChange={(e) => setMoq(parseInt(e.target.value, 10) || 1)}
-              style={{
-                width: '100%',
-                height: 40,
-                padding: '0 12px',
-                borderRadius: 10,
-                border: '1px solid #cbd5e1',
-                fontSize: '0.88rem',
-                outline: 'none',
-                boxSizing: 'border-box',
-              }}
+              className="form-input"
+              style={editableInputStyle}
             />
-          </div>
+          </FieldRow>
         </div>
 
-        {/* Primary Supplier Checkbox */}
         <div
+          className="modal-footer"
           style={{
-            padding: '12px 16px',
-            borderRadius: 14,
-            backgroundColor: '#fefce8',
-            border: '1px solid #fef08a',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-          }}
-        >
-          <div>
-            <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#854d0e' }}>
-              Nhà cung cấp chính (Primary Supplier)
-            </div>
-            <div style={{ fontSize: '0.75rem', color: '#a16207' }}>
-              Hệ thống ưu tiên NCC này khi đặt hàng tự động bù kho.
-            </div>
-          </div>
-          <input
-            type="checkbox"
-            id="chkEditPrimary"
-            checked={isPrimary}
-            onChange={(e) => setIsPrimary(e.target.checked)}
-            style={{ width: 18, height: 18, cursor: 'pointer', accentColor: '#eab308' }}
-          />
-        </div>
-
-        {/* Footer Actions */}
-        <div
-          style={{
+            padding: '12px 20px',
+            backgroundColor: '#f8fafc',
+            borderTop: '1px solid #e2e8f0',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'flex-end',
-            gap: 12,
-            paddingTop: 16,
-            borderTop: '1px solid #edf2f7',
+            gap: 10,
           }}
         >
           <button
             type="button"
             onClick={onClose}
-            style={{
-              padding: '9px 18px',
-              borderRadius: 9999,
-              border: '1px solid #cbd5e1',
-              backgroundColor: '#ffffff',
-              color: '#475569',
-              fontSize: '0.85rem',
-              fontWeight: 600,
-              cursor: 'pointer',
-            }}
+            disabled={isSaving}
+            className="po-btn po-btn-secondary"
+            style={{ height: 36, padding: '0 16px', fontSize: 13 }}
           >
-            Hủy bỏ
+            Hủy Bỏ
           </button>
           <button
             type="submit"
+            disabled={isSaving}
+            className="po-btn po-btn-primary"
             style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6,
-              padding: '9px 22px',
-              borderRadius: 9999,
-              border: 'none',
-              backgroundColor: 'var(--blue-primary)',
-              color: '#ffffff',
-              fontSize: '0.85rem',
+              height: 36,
+              padding: '0 18px',
+              fontSize: 13,
               fontWeight: 600,
-              cursor: 'pointer',
-              boxShadow: '0 4px 12px rgba(15, 118, 110, 0.25)',
+              backgroundColor: '#0f766e',
+              borderColor: '#0f766e',
             }}
           >
-            <Check size={16} /> Lưu thay đổi
+            {isSaving ? (
+              <>
+                <Loader2 size={15} className="animate-spin" />
+                <span>Đang lưu...</span>
+              </>
+            ) : (
+              <>
+                <Save size={15} />
+                <span>Lưu Thay Đổi</span>
+              </>
+            )}
           </button>
         </div>
       </form>
@@ -395,32 +368,18 @@ export const EditSupplierProductModal: FC<EditSupplierProductModalProps> = ({
   if (!isOpen || !item) return null;
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        backgroundColor: 'rgba(15, 23, 42, 0.55)',
-        backdropFilter: 'blur(4px)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 9999,
-        padding: 16,
-      }}
-      onClick={onClose}
-    >
+    <div className="modal-overlay" style={{ zIndex: 1050 }} onClick={onClose}>
       <div
+        className="modal-box"
         style={{
-          backgroundColor: '#ffffff',
-          borderRadius: 24,
-          width: '100%',
-          maxWidth: 520,
-          boxShadow: '0 20px 40px rgba(0, 0, 0, 0.15)',
-          border: '1px solid #e2e8f0',
-          overflow: 'hidden',
+          maxWidth: 580,
+          width: '95%',
+          maxHeight: '90vh',
           display: 'flex',
           flexDirection: 'column',
-          maxHeight: '90vh',
+          borderRadius: 12,
+          overflow: 'hidden',
+          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
         }}
         onClick={(e) => e.stopPropagation()}
       >

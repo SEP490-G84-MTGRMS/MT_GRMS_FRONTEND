@@ -13,7 +13,7 @@ export const ServicesEcosystemSection: FC = () => {
           height="36"
           viewBox="0 0 24 24"
           fill="none"
-          stroke="#0066FF"
+          stroke="var(--blue-primary, #0F766E)"
           strokeWidth="2"
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -34,7 +34,7 @@ export const ServicesEcosystemSection: FC = () => {
           height="36"
           viewBox="0 0 24 24"
           fill="none"
-          stroke="#0066FF"
+          stroke="var(--blue-primary, #0F766E)"
           strokeWidth="2"
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -53,15 +53,15 @@ export const ServicesEcosystemSection: FC = () => {
           height="36"
           viewBox="0 0 24 24"
           fill="none"
-          stroke="#0066FF"
+          stroke="var(--blue-primary, #0F766E)"
           strokeWidth="2"
           strokeLinecap="round"
           strokeLinejoin="round"
         >
           <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
           <line x1="9" y1="15" x2="15" y2="9" />
-          <circle cx="9.5" cy="9.5" r="1" fill="#0066FF" />
-          <circle cx="14.5" cy="14.5" r="1" fill="#0066FF" />
+          <circle cx="9.5" cy="9.5" r="1" fill="var(--blue-primary, #0F766E)" />
+          <circle cx="14.5" cy="14.5" r="1" fill="var(--blue-primary, #0F766E)" />
         </svg>
       ),
     },
@@ -75,7 +75,7 @@ export const ServicesEcosystemSection: FC = () => {
           height="36"
           viewBox="0 0 24 24"
           fill="none"
-          stroke="#0066FF"
+          stroke="var(--blue-primary, #0F766E)"
           strokeWidth="2"
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -97,7 +97,7 @@ export const ServicesEcosystemSection: FC = () => {
           height="36"
           viewBox="0 0 24 24"
           fill="none"
-          stroke="#0066FF"
+          stroke="var(--blue-primary, #0F766E)"
           strokeWidth="2"
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -118,7 +118,7 @@ export const ServicesEcosystemSection: FC = () => {
           height="36"
           viewBox="0 0 24 24"
           fill="none"
-          stroke="#0066FF"
+          stroke="var(--blue-primary, #0F766E)"
           strokeWidth="2"
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -139,7 +139,7 @@ export const ServicesEcosystemSection: FC = () => {
           height="36"
           viewBox="0 0 24 24"
           fill="none"
-          stroke="#0066FF"
+          stroke="var(--blue-primary, #0F766E)"
           strokeWidth="2"
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -161,7 +161,7 @@ export const ServicesEcosystemSection: FC = () => {
           height="36"
           viewBox="0 0 24 24"
           fill="none"
-          stroke="#0066FF"
+          stroke="var(--blue-primary, #0F766E)"
           strokeWidth="2"
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -182,7 +182,7 @@ export const ServicesEcosystemSection: FC = () => {
           height="36"
           viewBox="0 0 24 24"
           fill="none"
-          stroke="#0066FF"
+          stroke="var(--blue-primary, #0F766E)"
           strokeWidth="2"
           strokeLinecap="round"
           strokeLinejoin="round"

@@ -1,4 +1,6 @@
-﻿import type {
+import { financeHttpClient } from '../../../api/financeHttpClient';
+import type { ApiResponse } from '../../../api/types';
+import type {
   CustomerDto,
   CreateCustomerInput,
   UpdateCustomerInput,
@@ -6,216 +8,207 @@
   CustomerKpiSummary,
   VietQrConfig,
   DebtFilterStatus,
+  CustomerDebtLedgerDto,
 } from '../types/customer.types';
-import { INITIAL_MOCK_CUSTOMERS } from './mockCustomers';
 
-const STORAGE_KEY = 'MT_GRMS_CUSTOMERS_CACHE';
-
-/**
- * Get current customers from local storage cache or fallback to initial dataset
- */
-function getStoredCustomers(): CustomerDto[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(INITIAL_MOCK_CUSTOMERS));
-      return [...INITIAL_MOCK_CUSTOMERS];
-    }
-    return JSON.parse(raw) as CustomerDto[];
-  } catch (error) {
-    console.error('Failed to read customers from localStorage:', error);
-    return [...INITIAL_MOCK_CUSTOMERS];
+function generateUUID(): string {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
   }
+  return 'idemp-' + Date.now() + '-' + Math.random().toString(36).substring(2, 9);
+}
+
+const DEFAULT_TILL_ID = '01a19664-6210-7b12-a9eb-6fa16ca5b9db';
+const DEFAULT_BANK_ID = '01a19664-6741-7f3d-9be7-cb4c7b876559';
+
+interface BackendCustomerDebtEntry {
+  id: string;
+  entryCode: string;
+  customerId: string;
+  entryType: string;
+  amount: number;
+  balanceAfter: number;
+  prepaymentAfter: number;
+  referenceCode: string;
+  description: string;
+  occurredAtUtc: string;
 }
 
 /**
- * Save updated customer list to local storage
- */
-function saveStoredCustomers(customers: CustomerDto[]): void {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(customers));
-  } catch (error) {
-    console.error('Failed to save customers to localStorage:', error);
-  }
-}
-
-/**
- * Customer CRM API Service
+ * Customer CRM & Accounts Receivable (FE-08) Live API Service
+ * Backed by PostgreSQL Neon DB & EF Core CustomerDebtService (FIFO Debt Clearing)
  */
 export const customerApi = {
   /**
-   * Fetch customer list with search and filters
+   * Fetch customer list with search and filters directly from Backend Neon DB
    */
   async getCustomers(params?: {
     search?: string;
     tier?: string;
     debtStatus?: DebtFilterStatus;
   }): Promise<CustomerDto[]> {
-    await new Promise((resolve) => setTimeout(resolve, 150));
-    let list = getStoredCustomers();
+    const res = await financeHttpClient.get<ApiResponse<CustomerDto[]>>('/customers', {
+      params: {
+        search: params?.search || undefined,
+        tier: params?.tier && params.tier !== 'ALL' ? params.tier : undefined,
+        debtStatus: params?.debtStatus && params.debtStatus !== 'ALL' ? params.debtStatus : undefined,
+      },
+    });
 
-    if (params?.search) {
-      const query = params.search.trim().toLowerCase();
-      list = list.filter(
-        (c) =>
-          c.phoneNumber.includes(query) ||
-          c.fullName.toLowerCase().includes(query) ||
-          (c.companyName && c.companyName.toLowerCase().includes(query))
-      );
+    if (!res.data.success || !res.data.data) {
+      throw new Error(res.data.message || 'Không thể tải danh sách khách hàng từ máy chủ');
     }
 
-    if (params?.tier && params.tier !== 'ALL') {
-      list = list.filter((c) => c.membershipTier === params.tier);
-    }
-
-    if (params?.debtStatus && params.debtStatus !== 'ALL') {
-      if (params.debtStatus === 'NO_DEBT') {
-        list = list.filter((c) => c.currentDebtAR <= 0);
-      } else if (params.debtStatus === 'IN_LIMIT') {
-        list = list.filter((c) => c.currentDebtAR > 0 && c.currentDebtAR <= c.debtLimit);
-      } else if (params.debtStatus === 'OVER_LIMIT') {
-        list = list.filter((c) => c.currentDebtAR > c.debtLimit);
-      }
-    }
-
-    return list;
+    return res.data.data;
   },
 
   /**
-   * Fetch a single customer by ID
+   * Fetch a single customer by ID including open invoices and repayment history
    */
   async getCustomerById(id: string): Promise<CustomerDto | null> {
-    await new Promise((resolve) => setTimeout(resolve, 80));
-    const list = getStoredCustomers();
-    const customer = list.find((c) => c.id === id);
-    return customer || null;
+    try {
+      const res = await financeHttpClient.get<ApiResponse<CustomerDto>>(`/customers/${id}`);
+      if (!res.data.success || !res.data.data) {
+        return null;
+      }
+      return res.data.data;
+    } catch {
+      return null;
+    }
   },
 
   /**
-   * Create a new customer
+   * Create a new customer in PostgreSQL Neon DB
    */
   async createCustomer(input: CreateCustomerInput): Promise<CustomerDto> {
-    await new Promise((resolve) => setTimeout(resolve, 200));
-    const list = getStoredCustomers();
-
-    // Check duplicate phone number in same tenant
-    const existing = list.find((c) => c.phoneNumber === input.phoneNumber.trim());
-    if (existing) {
-      throw new Error(`Số điện thoại ${input.phoneNumber} đã được đăng ký bởi khách hàng: ${existing.fullName}`);
-    }
-
-    const newCustomer: CustomerDto = {
-      id: `CUST-${Date.now().toString().slice(-4)}`,
-      tenantId: 'taphoa-hoangmai',
+    const res = await financeHttpClient.post<ApiResponse<CustomerDto>>('/customers', {
       phoneNumber: input.phoneNumber.trim(),
       fullName: input.fullName.trim(),
-      email: input.email?.trim() || '',
-      address: input.address?.trim() || '',
-      taxCode: input.taxCode?.trim() || '',
-      loyaltyPoints: 0,
-      membershipTier: input.membershipTier || 'Standard',
-      currentDebtAR: 0,
+      email: input.email?.trim() || null,
+      address: input.address?.trim() || null,
       debtLimit: Number(input.debtLimit) || 0,
-      totalSpending: 0,
-      status: 'Active',
-      createdAt: new Date().toISOString(),
-      invoices: [],
-      payments: [],
-    };
+      membershipTier: input.membershipTier || 'Standard',
+      allowDebt: (Number(input.debtLimit) || 0) > 0,
+    });
 
-    const updated = [newCustomer, ...list];
-    saveStoredCustomers(updated);
-    return newCustomer;
+    if (!res.data.success || !res.data.data) {
+      throw new Error(res.data.message || 'Tạo khách hàng mới thất bại');
+    }
+
+    return res.data.data;
   },
 
   /**
    * Update existing customer information
    */
   async updateCustomer(id: string, input: UpdateCustomerInput): Promise<CustomerDto> {
-    await new Promise((resolve) => setTimeout(resolve, 200));
-    const list = getStoredCustomers();
-    const index = list.findIndex((c) => c.id === id);
-    if (index === -1) {
-      throw new Error('Khách hàng không tồn tại');
+    const res = await financeHttpClient.put<ApiResponse<CustomerDto>>(`/customers/${id}`, {
+      fullName: input.fullName !== undefined ? input.fullName.trim() : undefined,
+      email: input.email !== undefined ? input.email.trim() : undefined,
+      address: input.address !== undefined ? input.address.trim() : undefined,
+      debtLimit: input.debtLimit !== undefined ? Number(input.debtLimit) : undefined,
+      membershipTier: input.membershipTier,
+      status: input.status,
+      allowDebt: input.debtLimit !== undefined ? Number(input.debtLimit) > 0 : undefined,
+    });
+
+    if (!res.data.success || !res.data.data) {
+      throw new Error(res.data.message || 'Cập nhật khách hàng thất bại');
     }
 
-    const current = list[index];
-    const updatedCustomer: CustomerDto = {
-      ...current,
-      fullName: input.fullName !== undefined ? input.fullName.trim() : current.fullName,
-      email: input.email !== undefined ? input.email.trim() : current.email,
-      address: input.address !== undefined ? input.address.trim() : current.address,
-      taxCode: input.taxCode !== undefined ? input.taxCode.trim() : current.taxCode,
-      debtLimit: input.debtLimit !== undefined ? Number(input.debtLimit) : current.debtLimit,
-      membershipTier: input.membershipTier !== undefined ? input.membershipTier : current.membershipTier,
-      status: input.status !== undefined ? input.status : current.status,
-    };
-
-    list[index] = updatedCustomer;
-    saveStoredCustomers(list);
-    return updatedCustomer;
+    return res.data.data;
   },
 
   /**
-   * Execute debt collection receipt
+   * Execute FIFO debt collection receipt
+   * Automatically clears oldest debt invoices first, generates SHA-256 cashbook receipt entry
    */
   async collectDebt(input: CollectDebtInput): Promise<CustomerDto> {
-    await new Promise((resolve) => setTimeout(resolve, 250));
-    const list = getStoredCustomers();
-    const index = list.findIndex((c) => c.id === input.customerId);
-    if (index === -1) {
-      throw new Error('Khách hàng không tồn tại');
-    }
-
-    const current = list[index];
     if (input.amount <= 0) {
       throw new Error('Số tiền thu nợ phải lớn hơn 0 VNĐ');
     }
-    if (input.amount > current.currentDebtAR) {
-      throw new Error(`Số tiền thu (${input.amount.toLocaleString('vi-VN')} đ) không được lớn hơn số nợ hiện tại (${current.currentDebtAR.toLocaleString('vi-VN')} đ)`);
+
+    const isCash = input.method === 'Cash';
+    const paymentSourceType = isCash ? 1 : 3; // 1 = BranchTill, 3 = TenantBank
+    const defaultAccountId = isCash ? DEFAULT_TILL_ID : DEFAULT_BANK_ID;
+    const paymentSourceAccountId = input.targetAccountId || defaultAccountId;
+    const idempotencyKey = generateUUID();
+
+    const res = await financeHttpClient.post<ApiResponse<unknown>>(
+      '/customers/debt/repay',
+      {
+        customerId: input.customerId,
+        amount: input.amount,
+        paymentSourceType,
+        paymentSourceAccountId,
+        referenceCode: `REC-${Date.now().toString().slice(-6)}`,
+        notes: input.note || `Thu hồi công nợ khách hàng (${input.method})`,
+      },
+      {
+        headers: {
+          'Idempotency-Key': idempotencyKey,
+        },
+      }
+    );
+
+    if (!res.data.success) {
+      throw new Error(res.data.message || 'Giao dịch thu nợ không thành công');
     }
 
-    const newPayment = {
-      id: `PAY-${Date.now().toString().slice(-4)}`,
-      date: new Date().toISOString().slice(0, 10),
-      amount: input.amount,
-      method: input.method,
-      staffName: 'Trường An (Store Owner)',
-      note: input.note || 'Thu hồi công nợ',
-    };
+    // Refresh and return latest customer state
+    const updated = await this.getCustomerById(input.customerId);
+    if (!updated) {
+      throw new Error('Đã thu nợ thành công nhưng không thể làm mới dữ liệu khách hàng');
+    }
 
-    const updatedCustomer: CustomerDto = {
-      ...current,
-      currentDebtAR: Math.max(0, current.currentDebtAR - input.amount),
-      payments: [newPayment, ...(current.payments || [])],
-    };
-
-    list[index] = updatedCustomer;
-    saveStoredCustomers(list);
-    return updatedCustomer;
+    return updated;
   },
 
   /**
-   * Calculate KPI totals for the customer CRM summary
+   * Calculate KPI totals directly from Neon Database
    */
   async getKpiSummary(): Promise<CustomerKpiSummary> {
-    await new Promise((resolve) => setTimeout(resolve, 100));
-    const list = getStoredCustomers();
-    const totalCustomers = list.length;
-    const totalDebtAR = list.reduce((sum, c) => sum + (c.currentDebtAR || 0), 0);
-    const overLimitCount = list.filter((c) => c.currentDebtAR > c.debtLimit).length;
-    const totalLoyaltyPoints = list.reduce((sum, c) => sum + (c.loyaltyPoints || 0), 0);
-
-    return {
-      totalCustomers,
-      totalDebtAR,
-      overLimitCount,
-      totalLoyaltyPoints,
-    };
+    const res = await financeHttpClient.get<ApiResponse<CustomerKpiSummary>>('/customers/kpi-summary');
+    if (!res.data.success || !res.data.data) {
+      throw new Error(res.data.message || 'Không thể tải thống kê KPI công nợ');
+    }
+    return res.data.data;
   },
 
   /**
-   * Generate VietQR configuration payload
+   * Get detailed debt audit history from CustomerDebtEntries in Neon DB
+   */
+  async getCustomerDebtLedger(customerId: string): Promise<CustomerDebtLedgerDto[]> {
+    try {
+      const res = await financeHttpClient.get<ApiResponse<BackendCustomerDebtEntry[]>>(
+        `/customers/debt/ledger/${customerId}`
+      );
+
+      if (!res.data.success || !res.data.data) {
+        return [];
+      }
+
+      return res.data.data.map((entry) => ({
+        id: entry.id,
+        customerId: entry.customerId,
+        transactionType:
+          entry.entryType === 'DebtRepayment' || entry.entryType === 'GoodsReturnOffset'
+            ? 'DEBT_DECREASE'
+            : 'DEBT_INCREASE',
+        amount: entry.amount,
+        balanceAfter: entry.balanceAfter,
+        referenceDocId: entry.referenceCode,
+        cashTransactionCode: entry.entryCode,
+        note: entry.description,
+        createdAt: entry.occurredAtUtc,
+      }));
+    } catch {
+      return [];
+    }
+  },
+
+  /**
+   * Generate VietQR configuration payload for instant QR scanning
    */
   generateVietQr(customer: CustomerDto, amount: number): VietQrConfig {
     const bankId = '970422'; // MB Bank Napas Bin
@@ -226,7 +219,7 @@ export const customerApi = {
     const description = `THUNO ${cleanPhone}`;
     const safeAmount = Math.max(0, Math.round(amount));
 
-    // Dynamic QR URL using quickchart / vietqr standard
+    // Dynamic QR URL using vietqr standard
     const qrDataUrl = `https://img.vietqr.io/image/${bankId}-${accountNo}-compact2.png?amount=${safeAmount}&addInfo=${encodeURIComponent(description)}&accountName=${encodeURIComponent(accountName)}`;
 
     return {

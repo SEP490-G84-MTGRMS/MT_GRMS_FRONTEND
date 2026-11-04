@@ -1,0 +1,110 @@
+// src/pages/store/components/StoreSidebarNav.tsx
+import type { FC } from 'react';
+import {
+  User,
+  Building2,
+  Boxes,
+  History,
+  FileText,
+  Wallet,
+} from 'lucide-react';
+
+export type StoreHubTabKey =
+  | 'store-info'
+  | 'branches'
+  | 'subscriptions'
+  | 'order-history'
+  | 'terms'
+  | 'wallet';
+
+interface StoreSidebarNavProps {
+  activeTab: StoreHubTabKey;
+  onSelectTab: (tab: StoreHubTabKey) => void;
+}
+
+export const StoreSidebarNav: FC<StoreSidebarNavProps> = ({
+  activeTab,
+  onSelectTab,
+}) => {
+  return (
+    <aside className="store-hub-sidebar" aria-label="Thanh điều hướng gian hàng">
+      {/* Nhóm 1: Gian hàng */}
+      <div className="store-sidebar-group">
+        <div className="store-sidebar-title">Gian hàng</div>
+        <button
+          type="button"
+          className={`store-sidebar-item ${activeTab === 'store-info' ? 'active' : ''}`}
+          onClick={() => onSelectTab('store-info')}
+        >
+          <span className="store-sidebar-icon">
+            <User size={18} strokeWidth={1.8} />
+          </span>
+          <span>Thông tin gian hàng</span>
+        </button>
+
+        <button
+          type="button"
+          className={`store-sidebar-item ${activeTab === 'branches' ? 'active' : ''}`}
+          onClick={() => onSelectTab('branches')}
+        >
+          <span className="store-sidebar-icon">
+            <Building2 size={18} strokeWidth={1.8} />
+          </span>
+          <span>Chi nhánh & Kho hàng</span>
+        </button>
+      </div>
+
+      {/* Nhóm 2: Gói dịch vụ */}
+      <div className="store-sidebar-group">
+        <div className="store-sidebar-title">Gói dịch vụ MT-GRMS</div>
+        <button
+          type="button"
+          className={`store-sidebar-item ${activeTab === 'subscriptions' ? 'active' : ''}`}
+          onClick={() => onSelectTab('subscriptions')}
+        >
+          <span className="store-sidebar-icon">
+            <Boxes size={18} strokeWidth={1.8} />
+          </span>
+          <span>Gói dịch vụ</span>
+        </button>
+
+        <button
+          type="button"
+          className={`store-sidebar-item ${activeTab === 'order-history' ? 'active' : ''}`}
+          onClick={() => onSelectTab('order-history')}
+        >
+          <span className="store-sidebar-icon">
+            <History size={18} strokeWidth={1.8} />
+          </span>
+          <span>Lịch sử mua hàng</span>
+        </button>
+      </div>
+
+      {/* Nhóm 3: Khác (Chuẩn KiotViet) */}
+      <div className="store-sidebar-group">
+        <div className="store-sidebar-title">Khác</div>
+        <button
+          type="button"
+          className={`store-sidebar-item ${activeTab === 'terms' ? 'active' : ''}`}
+          onClick={() => onSelectTab('terms')}
+        >
+          <span className="store-sidebar-icon">
+            <FileText size={18} strokeWidth={1.8} />
+          </span>
+          <span>Điều khoản sử dụng</span>
+        </button>
+
+        <button
+          type="button"
+          className={`store-sidebar-item ${activeTab === 'wallet' ? 'active' : ''}`}
+          onClick={() => onSelectTab('wallet')}
+        >
+          <span className="store-sidebar-icon">
+            <Wallet size={18} strokeWidth={1.8} />
+          </span>
+          <span>Thanh toán & Ví</span>
+        </button>
+      </div>
+    </aside>
+  );
+};

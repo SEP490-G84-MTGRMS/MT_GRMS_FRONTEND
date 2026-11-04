@@ -29,6 +29,19 @@ export interface SupplierOption {
   config: SupplierDeliveryConfig;
 }
 
+export interface OrderMatrixSupplierDeliveryConfig {
+  supplierId: string;
+  supplierCode: string;
+  supplierName: string;
+  isActive: boolean;
+  isAssignedToBranch: boolean;
+  inactiveReason?: string;
+  leadTimeDays: number;
+  cutoffTime: string;
+  activeDeliveryDays: number[]; // 0: CN, 1: T2, ..., 6: T7
+  blackoutDates: string[]; // YYYY-MM-DD
+}
+
 export interface OrderMatrixProduct {
   id: string;
   supplierId: string;
@@ -39,11 +52,41 @@ export interface OrderMatrixProduct {
   unit: string;
   price: number;
   moq: number;
+  orderMultiple?: number; // Bội số đặt hàng (vd: thùng 6, lốc 4)
   soh: number; // Stock on hand
   sales: number; // Sales per day
+  safetyStock?: number; // Tồn kho an toàn
+
+  // Trạng thái nghiệp vụ Active / Inactive
+  isProductActive?: boolean;
+  productInactiveReason?: string;
+  isSupplierActive?: boolean;
+  supplierInactiveReason?: string;
+  isSupplierProductActive?: boolean;
+  supplierProductInactiveReason?: string;
+  isSupplierBranchActive?: boolean;
+  supplierBranchInactiveReason?: string;
+  isBranchProductActive?: boolean;
+  branchProductInactiveReason?: string;
+  isRowDisabled?: boolean;
+  rowDisabledReason?: string;
 }
 
-export type QtyMatrixMap = Record<string, Record<string, number>>; // productId -> (dateKey -> qty)
+export interface MatrixCellData {
+  employeeQty: number; // Số lượng NV chi nhánh đề xuất
+  storeQty: number | null; // Số lượng Store Owner ghi đè (null: chưa sửa; 0: chủ động hủy đặt; >0: số lượng mới)
+  finalQty: number; // Số lượng chốt cuối cùng (storeQty !== null ? storeQty : employeeQty)
+  suggestedQty?: number; // Số lượng hệ thống gợi ý
+  isOwnerOverridden?: boolean;
+  isOwnerAdjusted?: boolean;
+  modifiedBy?: 'employee' | 'store_owner';
+  modifiedAt?: string;
+}
+
+export type MatrixCellMap = Record<string, Record<string, MatrixCellData>>; // productId -> (dateKey -> MatrixCellData)
+export type QtyMatrixMap = Record<string, Record<string, number>>; // productId -> (dateKey -> qty) - backward compatible
+
+export type DayCutoffStatus = 'OPEN' | 'CUTOFF_DUE' | 'LOCKED' | 'PO_GENERATED';
 
 export interface DayColInfo {
   date: Date;
@@ -52,6 +95,43 @@ export interface DayColInfo {
   dateShort: string; // MM/DD
   isOff: boolean;
   isLocked: boolean;
+  offReason?: string;
+  cutoffHour?: string;
+  cutoffTimeStr?: string;
+  cutoffStatus: DayCutoffStatus;
+  cutoffLabel?: string;
+  poCode?: string;
+}
+
+export interface SplitPoItem {
+  productId: string;
+  productName: string;
+  sku: string;
+  category: string;
+  unit: string;
+  price: number;
+  moq: number;
+  employeeQty: number;
+  storeQty: number | null;
+  finalQty: number;
+  lineTotal: number;
+}
+
+export interface SplitPoPreview {
+  id: string;
+  supplierId: string;
+  supplierName: string;
+  branchId: string;
+  branchName: string;
+  deliveryDate: string; // YYYY-MM-DD
+  dowName: string;
+  dateShort: string;
+  cutoffStatus: DayCutoffStatus;
+  isCutoffDue: boolean;
+  items: SplitPoItem[];
+  totalQuantity: number;
+  totalAmount: number;
+  status: 'DRAFT' | 'PENDING_APPROVAL' | 'PENDING_CREDIT_APPROVAL';
 }
 
 export interface MatrixCalculationResult {
@@ -107,4 +187,36 @@ export interface BranchFilterState {
   dateTo: string;
   pageIndex: number;
   pageSize: number;
+}
+
+/* ─── Supplier Order Dispatch & Cutoff Hub Types ─── */
+export type CutoffUrgency = 'critical' | 'today' | 'later' | 'completed';
+
+export interface DispatchItemSku {
+  id: string;
+  name: string;
+  sku: string;
+  unit: string;
+  price: number;
+  qty: number;
+  cutoffSchedule: string;
+  groupType?: 'daily' | 'weekly';
+}
+
+export interface SupplierDispatchGroup {
+  id: string;
+  code: string;
+  name: string;
+  categoryTags: string[];
+  cutoffTimeStr: string;
+  countdownDisplay: string;
+  remainingMinutes?: number;
+  urgency: CutoffUrgency;
+  expectedDelivery: string;
+  minOrderValue: number;
+  items: DispatchItemSku[];
+  note: string;
+  status: 'draft' | 'dispatched';
+  poCode?: string;
+  dispatchedAt?: string;
 }

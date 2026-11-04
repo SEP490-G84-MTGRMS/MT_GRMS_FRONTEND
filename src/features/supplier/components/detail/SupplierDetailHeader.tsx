@@ -1,12 +1,11 @@
 import type { FC } from 'react';
-import { Link } from 'react-router-dom';
 import type { SupplierSummary } from '../../types/supplier.types';
-import { ArrowLeft, Building2, Edit3, Package } from 'lucide-react';
+import { ArrowLeft, Building2 } from 'lucide-react';
 
 interface Props {
   supplier: SupplierSummary;
   onBack: () => void;
-  onEdit: () => void;
+  onEdit?: () => void;
 }
 
 const CATEGORY_LABEL: Record<string, string> = {
@@ -24,33 +23,20 @@ const TYPE_LABEL: Record<string, string> = {
   Both: 'Doanh nghiệp Hàng hóa & DV',
 };
 
-export const SupplierDetailHeader: FC<Props> = ({ supplier, onBack, onEdit }) => {
+export const SupplierDetailHeader: FC<Props> = ({ supplier, onBack }) => {
   return (
-    <div className="supplier-detail-header-card">
-      {/* Breadcrumb / Back Navigation */}
-      <div className="supplier-detail-breadcrumb">
-        <button
-          type="button"
-          onClick={onBack}
-          className="supplier-detail-back-btn"
-          title="Quay lại danh sách nhà cung cấp"
-        >
-          <ArrowLeft size={16} />
-          <span>Nhà cung cấp / Chi tiết</span>
-        </button>
-      </div>
-
+    <div className="supplier-detail-header-card" data-testid="supplier-detail-header">
       {/* Main Header Row */}
       <div className="supplier-detail-header-main">
         {/* Left: Avatar + Title + Meta */}
         <div className="supplier-detail-profile-info">
-          <div className="supplier-detail-avatar">
-            <Building2 size={26} color="var(--blue-primary)" />
+          <div className="supplier-detail-avatar" data-testid="supplier-detail-avatar">
+            <Building2 size={20} color="var(--blue-primary)" />
           </div>
           <div>
-            <h1 className="supplier-detail-title">{supplier.name}</h1>
-            <div className="supplier-detail-meta">
-              <span className="supplier-detail-code">{supplier.code}</span>
+            <h1 className="supplier-detail-title" data-testid="supplier-detail-title">{supplier.name}</h1>
+            <div className="supplier-detail-meta" data-testid="supplier-detail-meta">
+              <span className="supplier-detail-code" data-testid="supplier-detail-code">{supplier.code}</span>
               <span className="supplier-detail-dot">·</span>
               <span>{TYPE_LABEL[supplier.supplierType] || supplier.supplierType}</span>
               <span className="supplier-detail-dot">·</span>
@@ -59,58 +45,18 @@ export const SupplierDetailHeader: FC<Props> = ({ supplier, onBack, onEdit }) =>
           </div>
         </div>
 
-        {/* Right: Status badge + Action Button */}
+        {/* Right: Only Back Button (R2 & R3: Status badge & Edit button removed from shared header) */}
         <div className="supplier-detail-actions">
-          <span
-            className={`admin-badge ${supplier.status === 'Active' ? 'admin-badge-active' : 'admin-badge-inactive'}`}
-            style={{
-              padding: '6px 14px',
-              fontSize: '12.5px',
-              fontWeight: 600,
-              borderRadius: 'var(--radius-pill)',
-              backgroundColor: supplier.status === 'Active' ? '#e6f4ea' : '#f3f4f6',
-              color: supplier.status === 'Active' ? '#008800' : '#6b7280',
-              border: `1px solid ${supplier.status === 'Active' ? '#008800' : '#d1d5db'}`,
-            }}
-          >
-            {supplier.status === 'Active' ? 'Đang hoạt động' : 'Tạm ngưng'}
-          </span>
-
-          <Link
-            to={`/store-owner/suppliers/${supplier.id}/products`}
-            className="admin-btn admin-btn-secondary"
-            style={{
-              height: 38,
-              padding: '0 16px',
-              borderRadius: 'var(--radius-pill)',
-              fontSize: 13,
-              fontWeight: 600,
-              gap: 6,
-              textDecoration: 'none',
-              display: 'inline-flex',
-              alignItems: 'center',
-            }}
-            title="Quản lý danh mục sản phẩm của nhà cung cấp này"
-          >
-            <Package size={14} />
-            <span>Sản phẩm ({supplier.code})</span>
-          </Link>
-
           <button
             type="button"
+            onClick={onBack}
             className="admin-btn admin-btn-secondary"
-            onClick={onEdit}
-            style={{
-              height: 38,
-              padding: '0 18px',
-              borderRadius: 'var(--radius-pill)',
-              fontSize: 13,
-              fontWeight: 600,
-              gap: 6,
-            }}
+            title="Quay lại danh sách nhà cung cấp"
+            data-testid="supplier-header-back-btn"
+            style={{ height: 32, padding: '0 14px', fontSize: 12.5, gap: 6 }}
           >
-            <Edit3 size={14} />
-            <span>Chỉnh sửa</span>
+            <ArrowLeft size={15} />
+            <span>Quay lại</span>
           </button>
         </div>
       </div>

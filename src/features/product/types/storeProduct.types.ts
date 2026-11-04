@@ -1,0 +1,78 @@
+export interface StoreProductUnitPrice {
+  unitId?: string;
+  unitName: string;
+  conversionRate: number;
+  price: number;
+  isBaseUnit: boolean;
+}
+
+export interface StoreProductItem {
+  id: string;
+  storeId: string;
+  storeCode?: string;
+  storeName: string;
+  productId: string;
+  name: string;
+  sku: string;
+  barcode: string;
+  category: string;
+  unit: string;
+  imageUrl?: string;
+  retailPrice: number; // Giá bán lẻ niêm yết tại cửa hàng (ĐVT cơ sở)
+  costPrice: number; // Giá vốn từ SupplierProduct
+  currentStock: number; // Tồn kho thực tế (SOH)
+  minStockLevel: number; // Định mức tồn tối thiểu / an toàn
+  primarySupplierCode?: string;
+  primarySupplierName: string;
+  minOrderQuantity: number; // MOQ từ NCC — chỉ xem tại màn này
+  status: 'Active' | 'Inactive';
+  shelfLocation?: string;
+  assignedDate: string;
+  unitPrices?: StoreProductUnitPrice[];
+}
+
+export interface StoreSummary {
+  id: string;
+  code: string;
+  name: string;
+  address: string;
+  managerName: string;
+  phone: string;
+  totalProducts: number;
+  totalStock: number;
+  lowStockCount: number;
+}
+
+export interface StoreProductFilterValues {
+  searchTerm?: string;
+  skus?: string[];
+  names?: string[];
+  storeCodes?: string[];
+  storeNames?: string[];
+  supplierCodes?: string[];
+  supplierNames?: string[];
+  storeId: string;
+  categoryFilter?: string;
+  statusFilter: 'ALL' | 'Active' | 'Inactive';
+  stockAlertFilter?: 'ALL' | 'LOW' | 'OUT_OF_STOCK' | 'NORMAL';
+}
+
+export interface AssignStoreProductInput {
+  storeId: string;
+  productIds: string[];
+  defaultRetailPrice?: number;
+  defaultMinStock?: number;
+  defaultMinOrderQuantity?: number;
+}
+
+export interface EditStoreProductInput {
+  retailPrice: number;
+  unitPrices?: StoreProductUnitPrice[];
+  minStockLevel?: number;
+  /** Không gửi lên API — MOQ chỉ sửa ở màn NCC */
+  minOrderQuantity?: number;
+  status?: 'Active' | 'Inactive';
+  supplierId?: string;
+  shelfLocation?: string;
+}
+

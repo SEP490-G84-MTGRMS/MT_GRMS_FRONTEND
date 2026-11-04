@@ -53,13 +53,39 @@ export interface SupplierStats {
   totalActive: number;
 }
 
+export interface SearchTag {
+  id: string;
+  type: 'supplier' | 'product' | 'contact' | 'phone';
+  value: string;
+  label: string;
+  subLabel?: string;
+}
+
+export interface SupplierSearchSuggestions {
+  suppliers: Array<{ id: string; code: string; name: string }>;
+  products: Array<{ id: string; sku: string; name: string; supplierId: string; supplierName: string }>;
+  contactPersons: Array<{ name: string; supplierId: string; supplierName: string }>;
+  phones: Array<{ phone: string; supplierId: string; supplierName: string }>;
+}
+
 export interface SupplierFilterState {
-  searchTerm: string;
+  searchTerm?: string;
+  code?: string;
+  name?: string;
+  contactPerson?: string;
+  phone?: string;
   supplierType: string;
   category: string;
   debtStatus: string;
   ratingFilter: string;
   status: string;
+  supplierIds?: string[];
+  productIds?: string[];
+  codes?: string[];
+  names?: string[];
+  contactPersons?: string[];
+  phones?: string[];
+  tags?: SearchTag[];
   pageIndex: number;
   pageSize: number;
 }
@@ -72,6 +98,7 @@ export interface CreateSupplierInput {
   category: SupplierCategory;
   contactPerson: string;
   phone: string;
+  status?: SupplierStatus;
   email?: string;
   address?: string;
   paymentTermDays: number;
@@ -83,6 +110,31 @@ export interface CreateSupplierInput {
   bankAccount?: string;
   accountHolder?: string;
   note?: string;
+  linkedCustomerId?: string;
+}
+
+export interface UpdateBasicSupplierInput {
+  id: string;
+  name: string;
+  contactPerson?: string;
+  phone: string;
+  email?: string;
+  status: SupplierStatus;
+  taxCode?: string;
+  address?: string;
+  note?: string;
+}
+
+export interface UpdateSupplierBankInput {
+  bankName?: string;
+  bankAccount?: string;
+  accountHolder?: string;
+}
+
+export interface UpdateSupplierVatInput {
+  companyName?: string;
+  taxCode?: string;
+  invoiceAddress?: string;
 }
 
 export type UpdateSupplierInput = Partial<CreateSupplierInput> & { id: string };
@@ -97,6 +149,7 @@ export interface HolidayDateRange {
 export interface SupplierDeliveryConfig {
   leadTimeDays: number;
   leadTimeUnit: 'BUSINESS_DAYS' | 'CALENDAR_DAYS';
+  minOrderQuantity: number;
   activeDeliveryDays: number[]; // 0 = Sun, 1 = Mon, ..., 6 = Sat
   cutoffTime: string; // e.g. "14:00" or "16:00"
   allowStoreEdit: boolean;
@@ -109,6 +162,8 @@ export interface SupplierDeliveryConfig {
 export interface SupplierProductItem {
   id: string;
   supplierId: string;
+  supplierCode?: string;
+  supplierName?: string;
   productId: string;
   barcode: string;
   sku: string;
@@ -117,6 +172,8 @@ export interface SupplierProductItem {
   deliveryUoM: string;
   baseUoM: string;
   agreedPrice: number;
+  costPrice?: number;
+  effectivePrice?: number;
   importPrice?: number; // alias cho backward compatibility
   unit?: string;        // alias cho backward compatibility
   moq: number;
@@ -154,6 +211,7 @@ export interface EditSupplierProductInput {
   moq: number;
   isPrimary: boolean;
   supplierProductCode?: string;
+  status: 'Active' | 'Inactive';
 }
 
 export interface PurchaseOrderItem {
@@ -165,3 +223,41 @@ export interface PurchaseOrderItem {
   totalAmount: number;
   status: 'PENDING' | 'CONFIRMED' | 'PARTIALLY_RECEIVED' | 'COMPLETED' | 'CANCELLED';
 }
+
+export interface SupplierBranchAssignmentItem {
+  id: string;
+  supplierId: string;
+  supplierCode: string;
+  supplierName: string;
+  supplierType: SupplierType;
+  branchId: string;
+  branchCode: string;
+  branchName: string;
+  branchAddress: string;
+  assignedAt: string;
+  status: 'Active' | 'Inactive';
+  inactiveReason?: string;
+}
+
+export interface SupplierBranchFilterState {
+  supplierCodes: string[];
+  supplierNames: string[];
+  branchCodes: string[];
+  branchNames: string[];
+  supplierId: string;
+  branchId: string;
+  status: string;
+  pageIndex: number;
+  pageSize: number;
+}
+
+export interface AssignSupplierToBranchesInput {
+  supplierId: string;
+  branchIds: string[];
+}
+
+export interface AssignSuppliersToBranchInput {
+  branchId: string;
+  supplierIds: string[];
+}
+

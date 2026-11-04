@@ -9,6 +9,7 @@ import { CustomerTable } from '../components/CustomerTable';
 import { CustomerDrawerDetail } from '../components/CustomerDrawerDetail';
 import { CustomerFormModal } from '../components/CustomerFormModal';
 import { DebtCollectionModal } from '../components/DebtCollectionModal';
+import { CustomerDebtLedgerDrawer } from '../components/CustomerDebtLedgerDrawer';
 import type { CreateCustomerInput, UpdateCustomerInput } from '../types/customer.types';
 import '../customer-crm.css';
 
@@ -50,10 +51,11 @@ export const CustomerManagementPage: FC = () => {
     collectDebtMutation,
   } = useCustomerCrm();
 
+  const [ledgerCustomer, setLedgerCustomer] = useState<any>(null);
   const [toast, setToast] = useState<ToastState | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const showToast = (message: string, type: ToastState['type'] = 'success') => {
+  const showToast = (message: string, type: ToastState["type"] = "success") => {
     if (toastTimerRef.current) {
       clearTimeout(toastTimerRef.current);
     }
@@ -76,7 +78,7 @@ export const CustomerManagementPage: FC = () => {
         showToast(`Thêm mới khách hàng ${data.fullName} thành công!`);
       }
     } catch (err: any) {
-      showToast(err.message || 'Lỗi xử lý dữ liệu khách hàng', 'error');
+      showToast(err.message || "Lỗi xử lý dữ liệu khách hàng", "error");
       throw err;
     }
   };
@@ -85,16 +87,17 @@ export const CustomerManagementPage: FC = () => {
     try {
       await collectDebtMutation.mutateAsync(data);
       showToast(
-        `Đã lập phiếu thu nợ ${data.amount.toLocaleString('vi-VN')} đ qua ${data.method === 'VietQR' ? 'VietQR' : 'Tiền mặt'} và đồng bộ Sổ quỹ thành công!`
+        `Đã lập phiếu thu nợ ${data.amount.toLocaleString("vi-VN")} đ qua ${data.method === "VietQR" ? "VietQR" : "Tiền mặt"} và đồng bộ Sổ quỹ thành công!`,
       );
     } catch (err: any) {
-      showToast(err.message || 'Lỗi khi thu nợ', 'error');
+      showToast(err.message || "Lỗi khi thu nợ", "error");
       throw err;
     }
   };
 
   return (
-    <div className="customer-page">
+    <div className="min-h-screen bg-[#F7F8F7] font-finance">
+      <div className="customer-page">
       {/* Toast Notification chuẩn của dự án */}
       {toast && (
         <AdminToast
@@ -113,9 +116,10 @@ export const CustomerManagementPage: FC = () => {
             <Users size={22} color="#ffffff" />
           </div>
           <div className="customer-topbar-text">
-            <h1>Quản Lý Khách Hàng & Công Nợ</h1>
+            <h1>Khách nợ</h1>
             <p>
-              Phân hệ FE-08 (Customer CRM & Accounts Receivable) · Tích hợp thanh toán VietQR động
+              Sổ theo dõi nợ và thu hồi công nợ · Tích hợp thanh toán
+              VietQR động
             </p>
           </div>
         </div>
@@ -144,6 +148,7 @@ export const CustomerManagementPage: FC = () => {
         onSelect={handleSelectCustomer}
         onEdit={handleOpenEditModal}
         onCollect={handleOpenCollectModal}
+        onViewLedger={(c) => setLedgerCustomer(c)}
         currentPage={currentPage}
         pageSize={pageSize}
         onPageChange={setCurrentPage}
@@ -156,6 +161,7 @@ export const CustomerManagementPage: FC = () => {
         onClose={handleCloseDrawer}
         onOpenEdit={handleOpenEditModal}
         onOpenCollect={handleOpenCollectModal}
+        onViewLedger={(c) => setLedgerCustomer(c)}
       />
 
       {/* 5. Create / Edit Modal */}
@@ -175,6 +181,15 @@ export const CustomerManagementPage: FC = () => {
         onConfirm={handleCollectDebtConfirm}
         isSubmitting={collectDebtMutation.isPending}
       />
+
+      {/* 7. Customer Debt Ledger Drawer */}
+      <CustomerDebtLedgerDrawer
+        isOpen={Boolean(ledgerCustomer)}
+        customer={ledgerCustomer}
+        onClose={() => setLedgerCustomer(null)}
+        onOpenCollect={handleOpenCollectModal}
+      />
+    </div>
     </div>
   );
 };

@@ -44,43 +44,36 @@ export const TenantDataTable: FC<TenantDataTableProps> = ({
   const getPlanBadge = (plan: Tenant['plan']) => {
     switch (plan) {
       case 'enterprise':
-        return (
-          <span
-            className="admin-badge"
-            style={{ background: '#eef2ff', color: '#4f46e5', border: '1px solid #c7d2fe' }}
-          >
-            Doanh Nghiệp
-          </span>
-        );
+        return <span className="admin-table-neutral-tag">Doanh Nghiệp</span>;
       case 'advanced':
-        return <span className="admin-badge admin-badge-blue">Nâng Cao</span>;
+        return <span className="admin-table-neutral-tag">Nâng Cao</span>;
       case 'basic':
       default:
-        return <span className="admin-badge admin-badge-blue">Cơ Bản</span>;
+        return <span className="admin-table-neutral-tag">Cơ Bản</span>;
     }
   };
 
   const getStatusBadge = (tenant: Tenant) => {
     switch (tenant.status) {
       case 'active':
-        return <span className="admin-badge admin-badge-active">Hoạt động</span>;
+        return <span style={{ fontSize: 13, fontWeight: 500, color: '#16a34a' }}>Hoạt động</span>;
       case 'expiring':
-        return <span className="admin-badge admin-badge-warning">Sắp hết hạn</span>;
+        return <span style={{ fontSize: 13, fontWeight: 500, color: '#d97706' }}>Sắp hết hạn</span>;
       case 'grace':
         return (
-          <span className="admin-badge admin-badge-warning">
+          <span style={{ fontSize: 13, fontWeight: 500, color: '#d97706' }}>
             Ân hạn ({tenant.graceDaysRemaining ? 7 - tenant.graceDaysRemaining : 3}/7d)
           </span>
         );
       case 'locked':
         return (
-          <span className="admin-badge admin-badge-danger">
+          <span style={{ fontSize: 13, fontWeight: 500, color: '#dc2626' }}>
             Bị Khóa {tenant.lockType === 'hard' ? '(Hard-Lock)' : '(Soft-Lock)'}
           </span>
         );
       case 'pending':
         return (
-          <span className="admin-badge" style={{ background: '#f1f5f9', color: '#475569' }}>
+          <span style={{ fontSize: 13, fontWeight: 500, color: '#64748b' }}>
             Chờ kích hoạt
           </span>
         );
@@ -132,7 +125,7 @@ export const TenantDataTable: FC<TenantDataTableProps> = ({
                     className="admin-subdomain-tag"
                     style={
                       t.status === 'locked'
-                        ? { background: 'var(--red-light)', color: 'var(--red-accent)' }
+                        ? { color: '#dc2626' }
                         : {}
                     }
                   >
@@ -179,7 +172,7 @@ export const TenantDataTable: FC<TenantDataTableProps> = ({
                     {t.status === 'locked' ? (
                       <button
                         type="button"
-                        className="admin-btn admin-btn-sm admin-btn-success"
+                        className="admin-table-btn"
                         onClick={() => onUnlock(t)}
                       >
                         Mở khóa
@@ -188,14 +181,14 @@ export const TenantDataTable: FC<TenantDataTableProps> = ({
                       <>
                         <button
                           type="button"
-                          className="admin-btn admin-btn-sm admin-btn-secondary"
+                          className="admin-table-btn"
                           onClick={() => onExtendGrace(t)}
                         >
                           Thêm ngày
                         </button>
                         <button
                           type="button"
-                          className="admin-btn admin-btn-sm admin-btn-danger"
+                          className="admin-table-btn"
                           onClick={() => onLock(t)}
                         >
                           Khóa mềm
@@ -204,7 +197,7 @@ export const TenantDataTable: FC<TenantDataTableProps> = ({
                     ) : (
                       <button
                         type="button"
-                        className="admin-btn admin-btn-sm admin-btn-secondary"
+                        className="admin-table-btn"
                         onClick={() => onLock(t)}
                       >
                         Khóa
@@ -212,7 +205,7 @@ export const TenantDataTable: FC<TenantDataTableProps> = ({
                     )}
                     <button
                       type="button"
-                      className="admin-btn admin-btn-sm admin-btn-primary"
+                      className="admin-table-btn admin-table-btn-primary"
                       onClick={() => onDetail(t)}
                     >
                       Chi tiết

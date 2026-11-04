@@ -1,7 +1,12 @@
-import { useState } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import type { FC } from 'react';
+import {
+  ArrowUpDown,
+  ChevronLeft,
+  ChevronRight,
+  Building2,
+} from 'lucide-react';
 import type { SupplierSummary } from '../types/supplier.types';
-import { TablePagination } from '../../../components/common';
 import { SupplierTableRow } from './SupplierTableRow';
 
 interface Props {
@@ -13,8 +18,18 @@ interface Props {
   onPageSizeChange: (pageSize: number) => void;
   onViewDetail: (supplier: SupplierSummary) => void;
   onEdit: (supplier: SupplierSummary) => void;
-  onPayDebt: (supplier: SupplierSummary) => void;
+  canEdit?: boolean;
 }
+
+type SortField =
+  | 'code'
+  | 'name'
+  | 'taxCode'
+  | 'contactPerson'
+  | 'phone'
+  | 'address'
+  | 'status';
+type SortDirection = 'asc' | 'desc';
 
 export const SupplierTable: FC<Props> = ({
   suppliers,
@@ -25,91 +40,354 @@ export const SupplierTable: FC<Props> = ({
   onPageSizeChange,
   onViewDetail,
   onEdit,
-  onPayDebt,
+  canEdit = true,
 }) => {
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [sortField, setSortField] = useState<SortField | null>(null);
+  const [sortDir, setSortDir] = useState<SortDirection>('asc');
 
-  const toggleSelectAll = () => {
-    if (selectedIds.length === suppliers.length) {
-      setSelectedIds([]);
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      if (sortDir === 'asc') {
+        setSortDir('desc');
+      } else {
+        setSortField(null);
+        setSortDir('asc');
+      }
     } else {
-      setSelectedIds(suppliers.map((s) => s.id));
+      setSortField(field);
+      setSortDir('asc');
     }
   };
 
-  const toggleSelectOne = (id: string) => {
-    setSelectedIds((prev) =>
-      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
-    );
+  const sortedSuppliers = useMemo(() => {
+    if (!sortField) return suppliers;
+
+    return [...suppliers].sort((a, b) => {
+      let valA: string | number = '';
+      let valB: string | number = '';
+
+      switch (sortField) {
+        case 'code':
+          valA = a.code.toLowerCase();
+          valB = b.code.toLowerCase();
+          break;
+        case 'name':
+          valA = a.name.toLowerCase();
+          valB = b.name.toLowerCase();
+          break;
+        case 'taxCode':
+          valA = (a.taxCode || '').toLowerCase();
+          valB = (b.taxCode || '').toLowerCase();
+          break;
+        case 'contactPerson':
+          valA = (a.contactPerson || '').toLowerCase();
+          valB = (b.contactPerson || '').toLowerCase();
+          break;
+        case 'phone':
+          valA = a.phone || '';
+          valB = b.phone || '';
+          break;
+        case 'address':
+          valA = (a.address || '').toLowerCase();
+          valB = (b.address || '').toLowerCase();
+          break;
+        case 'status':
+          valA = a.status;
+          valB = b.status;
+          break;
+      }
+
+      if (valA < valB) return sortDir === 'asc' ? -1 : 1;
+      if (valA > valB) return sortDir === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [suppliers, sortField, sortDir]);
+
+  const totalPages = Math.ceil(totalCount / pageSize) || 1;
+  const startItem = totalCount === 0 ? 0 : (pageIndex - 1) * pageSize + 1;
+  const endItem = Math.min(pageIndex * pageSize, totalCount);
+
+  const headerRef = useRef<HTMLDivElement>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const [hasScrollY, setHasScrollY] = useState(false);
+
+  useEffect(() => {
+    const updateScrollState = () => {
+      if (bodyRef.current) {
+        setHasScrollY(bodyRef.current.scrollHeight > bodyRef.current.clientHeight);
+      }
+    };
+
+    updateScrollState();
+
+    let observer: ResizeObserver | null = null;
+    if (bodyRef.current && typeof ResizeObserver !== 'undefined') {
+      observer = new ResizeObserver(() => {
+        updateScrollState();
+      });
+      observer.observe(bodyRef.current);
+    }
+
+    window.addEventListener('resize', updateScrollState);
+    return () => {
+      window.removeEventListener('resize', updateScrollState);
+      if (observer) observer.disconnect();
+    };
+  }, [sortedSuppliers, pageSize]);
+
+  const handleBodyScroll = () => {
+    if (headerRef.current && bodyRef.current) {
+      headerRef.current.scrollLeft = bodyRef.current.scrollLeft;
+    }
+  };
+
+  const tableColGroup = (
+    <colgroup>
+      <col style={{ width: '9%' }} />
+      <col style={{ width: '17%' }} />
+      <col style={{ width: '11%' }} />
+      <col style={{ width: '13%' }} />
+      <col style={{ width: '11%' }} />
+      <col style={{ width: '18%' }} />
+      <col style={{ width: '9%' }} />
+      <col style={{ width: '12%' }} />
+    </colgroup>
+  );
+
+  const thBaseStyle: React.CSSProperties = {
+    backgroundColor: '#f8fafc',
+    padding: '10px 12px',
+    fontSize: 12,
+    fontWeight: 700,
+    color: '#334155',
+    textTransform: 'uppercase',
+    letterSpacing: '0.03em',
+    whiteSpace: 'nowrap',
+    boxSizing: 'border-box',
   };
 
   return (
-    <div className="admin-table-card" style={{ overflowX: 'hidden' }}>
-      <table className="admin-data-table supplier-admin-table" style={{ width: '100%', tableLayout: 'fixed' }}>
-        <colgroup>
-          <col style={{ width: '3%' }} />
-          <col style={{ width: '7%' }} />
-          <col style={{ width: '17%' }} />
-          <col style={{ width: '9.5%' }} />
-          <col style={{ width: '15.5%' }} />
-          <col style={{ width: '7%' }} />
-          <col style={{ width: '11%' }} />
-          <col style={{ width: '9%' }} />
-          <col style={{ width: '8%' }} />
-          <col style={{ width: '13%' }} />
-        </colgroup>
-        <thead>
-          <tr>
-            <th style={{ width: '3%', textAlign: 'center', padding: '10px 4px' }}>
-              <input
-                type="checkbox"
-                checked={suppliers.length > 0 && selectedIds.length === suppliers.length}
-                onChange={toggleSelectAll}
-              />
-            </th>
-            <th style={{ width: '7%' }}>Mã NCC</th>
-            <th style={{ width: '17%' }}>Tên Nhà Cung Cấp</th>
-            <th style={{ width: '9.5%', textAlign: 'center' }}>Phân loại</th>
-            <th style={{ width: '15.5%' }}>Người liên hệ</th>
-            <th style={{ width: '7%', textAlign: 'center' }}>Hạn nợ</th>
-            <th style={{ width: '11%', textAlign: 'right' }}>Đang nợ</th>
-            <th style={{ width: '9%', textAlign: 'right' }}>Quá hạn</th>
-            <th style={{ width: '8%', textAlign: 'center' }}>Trạng thái</th>
-            <th style={{ width: '13%', textAlign: 'right' }}>Hành động</th>
-          </tr>
-        </thead>
-        <tbody>
-          {suppliers.length > 0 ? (
-            suppliers.map((supplier) => (
-              <SupplierTableRow
-                key={supplier.id}
-                supplier={supplier}
-                onViewDetail={onViewDetail}
-                onEdit={onEdit}
-                onPayDebt={onPayDebt}
-                isSelected={selectedIds.includes(supplier.id)}
-                onToggleSelect={toggleSelectOne}
-              />
-            ))
-          ) : (
+    <div className="so-list-table-card">
+      <div
+        ref={headerRef}
+        className="so-list-table-head"
+        style={{ paddingRight: hasScrollY ? 6 : 0 }}
+      >
+        <table className="so-list-table">
+          {tableColGroup}
+          <thead>
             <tr>
-              <td colSpan={10} style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text-muted)' }}>
-                🔍 Không tìm thấy nhà cung cấp nào phù hợp với bộ lọc hiện tại.
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </table>
+              <th
+                onClick={() => handleSort('code')}
+                style={{
+                  ...thBaseStyle,
+                  cursor: 'pointer',
+                  userSelect: 'none',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span>Mã NCC</span>
+                  <ArrowUpDown size={12} color={sortField === 'code' ? '#0f766e' : '#94a3b8'} />
+                </div>
+              </th>
 
-      {/* Shared Pagination Footer */}
-      <TablePagination
-        currentPage={pageIndex}
-        pageSize={pageSize}
-        totalItems={totalCount}
-        itemLabel="nhà cung cấp"
-        onPageChange={onPageChange}
-        onPageSizeChange={onPageSizeChange}
-      />
+              <th
+                onClick={() => handleSort('name')}
+                style={{
+                  ...thBaseStyle,
+                  cursor: 'pointer',
+                  userSelect: 'none',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span>Tên Nhà Cung Cấp</span>
+                  <ArrowUpDown size={12} color={sortField === 'name' ? '#0f766e' : '#94a3b8'} />
+                </div>
+              </th>
+
+              <th
+                onClick={() => handleSort('taxCode')}
+                style={{
+                  ...thBaseStyle,
+                  cursor: 'pointer',
+                  userSelect: 'none',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span>Mã số thuế</span>
+                  <ArrowUpDown size={12} color={sortField === 'taxCode' ? '#0f766e' : '#94a3b8'} />
+                </div>
+              </th>
+
+              <th
+                onClick={() => handleSort('contactPerson')}
+                style={{
+                  ...thBaseStyle,
+                  cursor: 'pointer',
+                  userSelect: 'none',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span>Người liên hệ</span>
+                  <ArrowUpDown size={12} color={sortField === 'contactPerson' ? '#0f766e' : '#94a3b8'} />
+                </div>
+              </th>
+
+              <th
+                onClick={() => handleSort('phone')}
+                style={{
+                  ...thBaseStyle,
+                  cursor: 'pointer',
+                  userSelect: 'none',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span>Số điện thoại</span>
+                  <ArrowUpDown size={12} color={sortField === 'phone' ? '#0f766e' : '#94a3b8'} />
+                </div>
+              </th>
+
+              <th
+                onClick={() => handleSort('address')}
+                style={{
+                  ...thBaseStyle,
+                  cursor: 'pointer',
+                  userSelect: 'none',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span>Địa chỉ</span>
+                  <ArrowUpDown size={12} color={sortField === 'address' ? '#0f766e' : '#94a3b8'} />
+                </div>
+              </th>
+
+              <th
+                onClick={() => handleSort('status')}
+                style={{
+                  ...thBaseStyle,
+                  textAlign: 'center',
+                  cursor: 'pointer',
+                  userSelect: 'none',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+                  <span>Trạng thái</span>
+                  <ArrowUpDown size={12} color={sortField === 'status' ? '#0f766e' : '#94a3b8'} />
+                </div>
+              </th>
+
+              <th
+                style={{
+                  ...thBaseStyle,
+                  textAlign: 'right',
+                }}
+              >
+                <span>Hành động</span>
+              </th>
+            </tr>
+          </thead>
+        </table>
+      </div>
+
+      {/* ── Table Body Scroll Container (Vertical scroll strictly in rows area) ── */}
+      <div
+        ref={bodyRef}
+        className="so-list-table-body supplier-table-scroll-container"
+        onScroll={handleBodyScroll}
+      >
+        <table className="so-list-table">
+          {tableColGroup}
+          <tbody>
+            {sortedSuppliers.length > 0 ? (
+              sortedSuppliers.map((supplier) => (
+                <SupplierTableRow
+                  key={supplier.id}
+                  supplier={supplier}
+                  onViewDetail={onViewDetail}
+                  onEdit={onEdit}
+                  canEdit={canEdit}
+                />
+              ))
+            ) : (
+              <tr>
+                <td
+                  colSpan={8}
+                  style={{
+                    textAlign: 'center',
+                    padding: '48px 16px',
+                    color: '#64748b',
+                    fontSize: 13,
+                    borderBottom: '1px solid #f1f5f9',
+                  }}
+                >
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+                    <Building2 size={36} color="#cbd5e1" />
+                    <span style={{ fontWeight: 600, color: '#475569' }}>
+                      Không tìm thấy nhà cung cấp nào phù hợp
+                    </span>
+                    <span style={{ fontSize: 12, color: '#94a3b8' }}>
+                      Vui lòng thử thay đổi từ khóa tìm kiếm hoặc bấm &quot;Đặt lại&quot; bộ lọc.
+                    </span>
+                  </div>
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* ── Footer Phân trang (Paging) tích hợp theo chuẩn PoListTable ── */}
+      <div className="so-list-pager">
+        {/* Bên trái: Thông tin số lượng & Chọn số bản ghi / trang */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+          <div>
+            Hiển thị <b>{startItem}</b> - <b>{endItem}</b> trên <b>{totalCount}</b> nhà cung cấp
+          </div>
+
+          {onPageSizeChange && (
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ color: '#64748b' }}>Bản ghi/trang:</span>
+              <select
+                className="so-list-pager-select"
+                value={pageSize}
+                onChange={(e) => onPageSizeChange(Number(e.target.value))}
+              >
+                <option value={15}>15</option>
+                <option value={24}>24</option>
+                <option value={36}>36</option>
+                <option value={48}>48</option>
+              </select>
+            </div>
+          )}
+        </div>
+
+        {/* Bên phải: Nút Trước / Trang x / y / Sau */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <button
+            type="button"
+            className="so-list-pager-btn"
+            disabled={pageIndex <= 1}
+            onClick={() => onPageChange(pageIndex - 1)}
+          >
+            <ChevronLeft size={13} />
+            <span>Trước</span>
+          </button>
+
+          <span style={{ padding: '0 8px', fontWeight: 600, color: '#0f172a' }}>
+            Trang {pageIndex} / {totalPages}
+          </span>
+
+          <button
+            type="button"
+            className="so-list-pager-btn"
+            disabled={pageIndex >= totalPages}
+            onClick={() => onPageChange(pageIndex + 1)}
+          >
+            <span>Sau</span>
+            <ChevronRight size={13} />
+          </button>
+        </div>
+      </div>
     </div>
   );
 };

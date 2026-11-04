@@ -64,6 +64,51 @@
   min-width: 0 !important;
 }
 
+/* ── Custom Sleek Thin Scrollbar cho Bảng Nhà Cung Cấp ── */
+.supplier-table-scroll-container {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+.supplier-table-scroll-container::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.supplier-table-scroll-container::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.supplier-table-scroll-container::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+  transition: background-color 0.15s ease;
+}
+
+.supplier-table-scroll-container::-webkit-scrollbar-thumb:hover {
+  background: #0f766e;
+}
+
+.supplier-table-scroll-container::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Ô chip filter: cố định chiều cao, cuộn ngang khi nhiều giá trị */
+.supplier-chip-input {
+  height: 32px;
+  max-height: 32px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  flex-wrap: nowrap;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.supplier-chip-input::-webkit-scrollbar {
+  display: none;
+  height: 0;
+}
+
 
 /* ── Top Bar ── */
 .supplier-topbar {
@@ -106,53 +151,56 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 16px;
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: #374151;
+  padding: 0 14px;
+  height: 34px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #1e293b;
   background: #ffffff;
-  border: 1px solid #dbe9fe;
-  border-radius: 9999px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
   cursor: pointer;
-  transition: background 0.15s, box-shadow 0.15s, transform 0.1s;
+  transition: background 0.15s, border-color 0.15s;
+  box-sizing: border-box;
 }
-.btn-outline:hover { background: #f9fafb; }
-.btn-outline:active { transform: scale(0.95); }
+.btn-outline:hover { background: #f8fafc; border-color: #94a3b8; color: #0f172a; }
 
 .btn-primary {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 20px;
-  font-size: 0.75rem;
-  font-weight: 700;
+  padding: 0 16px;
+  height: 34px;
+  font-size: 13px;
+  font-weight: 500;
   color: #ffffff;
-  background: var(--blue-primary);
-  border: none;
-  border-radius: 9999px;
+  background: var(--blue-primary, #0f766e);
+  border: 1px solid var(--blue-primary, #0f766e);
+  border-radius: 6px;
   cursor: pointer;
-  box-shadow: 0 10px 25px -4px rgba(15, 118, 110, 0.32);
-  transition: background 0.15s, box-shadow 0.15s, transform 0.1s;
+  box-shadow: 0 1px 2px rgba(15, 118, 110, 0.2);
+  transition: background 0.15s;
+  box-sizing: border-box;
 }
-.btn-primary:hover { background: var(--blue-hover); }
-.btn-primary:active { transform: scale(0.95); }
+.btn-primary:hover { background: var(--blue-hover, #115e59); border-color: var(--blue-hover, #115e59); }
 
 .btn-ghost {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 16px;
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: #4b5563;
-  background: #ffffff;
-  border: 1px solid #d1d5db;
-  border-radius: 9999px;
+  padding: 0 12px;
+  height: 34px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #374151;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
   cursor: pointer;
-  transition: background 0.15s, transform 0.1s;
+  transition: background 0.15s;
+  box-sizing: border-box;
 }
-.btn-ghost:hover { background: #f9fafb; }
-.btn-ghost:active { transform: scale(0.95); }
+.btn-ghost:hover { background: #f3f4f6; color: #111827; }
 
 .btn-icon {
   display: inline-flex;
@@ -278,11 +326,11 @@
 /* ── Filter Bar ── */
 .filter-bar {
   background: #f7faff;
-  border: 1px solid #dbe9fe;
-  border-radius: 24px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
   padding: 16px;
   margin-bottom: 24px;
-  box-shadow: 0 2px 8px rgba(0, 50, 150, 0.04);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
 .filter-bar-row {
@@ -318,8 +366,8 @@
   padding: 6px 12px;
   font-size: 0.75rem;
   background: #ffffff;
-  border: 1px solid #dbe9fe;
-  border-radius: 9999px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
   font-family: var(--font-sans);
   font-weight: 500;
   color: #1f2937;
@@ -352,8 +400,8 @@
   padding: 8px 16px 8px 36px;
   font-size: 0.75rem;
   background: #ffffff;
-  border: 1px solid #dbe9fe;
-  border-radius: 9999px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
   font-family: var(--font-sans);
   color: #111827;
   outline: none;
@@ -601,13 +649,13 @@
 
 .modal-box {
   background: #ffffff;
-  border-radius: 28px;
+  border-radius: 16px;
   width: 100%;
-  max-width: 680px;
+  max-width: 720px;
   max-height: 90vh;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.18);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.15);
   overflow: hidden;
 }
 
@@ -712,6 +760,25 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
+}
+
+/* Horizontal label-input layout inside modal */
+.modal-body .form-group {
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+}
+
+.modal-body .form-label {
+  min-width: 180px;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.modal-body .form-input,
+.modal-body .form-select {
+  flex: 1;
+  min-width: 0;
 }
 
 .form-label {
@@ -1025,22 +1092,22 @@
 
 .supplier-detail-header-card {
   background: #ffffff;
-  border-radius: 24px;
-  padding: 20px 24px;
+  border-radius: 12px;
+  padding: 12px 18px;
   border: 1px solid #e5e7eb;
-  box-shadow: 0 2px 8px rgba(0, 50, 150, 0.03);
-  margin-bottom: 20px;
+  box-shadow: 0 1px 4px rgba(0, 50, 150, 0.03);
+  margin-bottom: 12px;
 }
 
 .supplier-detail-breadcrumb {
-  margin-bottom: 14px;
+  margin-bottom: 6px;
 }
 
 .supplier-detail-back-btn {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  font-size: 13.5px;
+  gap: 5px;
+  font-size: 12.5px;
   font-weight: 600;
   color: var(--text-muted);
   background: none;
@@ -1059,19 +1126,19 @@
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: 16px;
+  gap: 12px;
 }
 
 .supplier-detail-profile-info {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
 }
 
 .supplier-detail-avatar {
-  width: 54px;
-  height: 54px;
-  border-radius: 16px;
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
   background-color: var(--blue-light);
   border: 1px solid var(--blue-border);
   display: flex;
@@ -1081,18 +1148,18 @@
 }
 
 .supplier-detail-title {
-  font-size: 1.45rem;
+  font-size: 1.25rem;
   font-weight: 700;
   color: #111827;
-  letter-spacing: -0.02em;
-  margin: 0 0 4px 0;
+  letter-spacing: -0.01em;
+  margin: 0 0 2px 0;
 }
 
 .supplier-detail-meta {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 13px;
+  gap: 6px;
+  font-size: 12px;
   color: var(--text-muted);
   flex-wrap: wrap;
 }
@@ -1110,7 +1177,7 @@
 .supplier-detail-actions {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
 }
 
 /* Stat Grid: 4 columns on desktop, 2 on tablet, 1 on mobile */
@@ -1190,7 +1257,7 @@
   text-transform: uppercase;
   color: var(--text-muted);
   letter-spacing: 0.06em;
-  margin: 8px 0 12px 0;
+  margin: 4px 0 8px 0;
 }
 
 /* Tabs Bar */
@@ -1198,7 +1265,7 @@
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
-  margin-bottom: 20px;
+  margin-bottom: 14px;
 }
 
 .supplier-detail-tab-pill {
@@ -1297,6 +1364,223 @@
   border: 1px solid var(--blue-border);
   border-radius: 18px;
   padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+/* ── Supplier VietQR Card ── */
+.supplier-vietqr-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 18px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.supplier-vietqr-card:hover {
+  box-shadow: 0 4px 16px rgba(0, 102, 255, 0.08);
+}
+
+.supplier-vietqr-card--compact {
+  padding: 12px;
+  border-radius: 14px;
+  background: #f8fafc;
+}
+
+.supplier-vietqr-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  margin-bottom: 12px;
+}
+
+.supplier-vietqr-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #0f766e;
+  background: #ccfbf1;
+  padding: 3px 10px;
+  border-radius: 9999px;
+  letter-spacing: 0.02em;
+}
+
+.supplier-vietqr-subtitle {
+  font-size: 11px;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.supplier-vietqr-image-wrapper {
+  position: relative;
+  width: 100%;
+  max-width: 220px;
+  aspect-ratio: 1 / 1.15;
+  background: #f1f5f9;
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #e2e8f0;
+}
+
+.supplier-vietqr-skeleton {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 11.5px;
+  color: #64748b;
+  background: #f8fafc;
+}
+
+.supplier-vietqr-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  cursor: pointer;
+  transition: opacity 0.2s, transform 0.2s;
+}
+
+.supplier-vietqr-img.loading {
+  opacity: 0;
+}
+
+.supplier-vietqr-img.loaded {
+  opacity: 1;
+}
+
+.supplier-vietqr-img:hover {
+  transform: scale(1.02);
+}
+
+.supplier-vietqr-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  margin-top: 12px;
+}
+
+.supplier-vietqr-btn {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  height: 30px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #334155;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.supplier-vietqr-btn:hover {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+  color: #0f172a;
+}
+
+.supplier-vietqr-btn--primary {
+  background: #0066ff;
+  border-color: #0066ff;
+  color: #ffffff;
+}
+
+.supplier-vietqr-btn--primary:hover {
+  background: #0052cc;
+  border-color: #0052cc;
+  color: #ffffff;
+}
+
+.supplier-vietqr-hint {
+  font-size: 11px;
+  color: #64748b;
+  text-align: center;
+  margin-top: 8px;
+  line-height: 1.4;
+}
+
+/* ── Modal Phóng To QR ── */
+.supplier-qr-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(4px);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.supplier-qr-modal-content {
+  background: #ffffff;
+  border-radius: 20px;
+  width: 100%;
+  max-width: 420px;
+  overflow: hidden;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  animation: modalPopIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.supplier-qr-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.supplier-qr-modal-close {
+  background: none;
+  border: none;
+  font-size: 16px;
+  cursor: pointer;
+  color: #94a3b8;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: background 0.15s, color 0.15s;
+}
+
+.supplier-qr-modal-close:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.supplier-qr-modal-body {
+  padding: 24px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: #f8fafc;
+}
+
+.supplier-qr-modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 14px 20px;
+  background: #ffffff;
+  border-top: 1px solid #e2e8f0;
 }
 
 .supplier-detail-footer-note {

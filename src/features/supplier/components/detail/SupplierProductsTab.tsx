@@ -9,6 +9,7 @@ interface Props {
 
 export const SupplierProductsTab: FC<Props> = ({ products }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   const fmt = (val: number) => new Intl.NumberFormat('vi-VN').format(val) + ' đ';
 
@@ -17,6 +18,20 @@ export const SupplierProductsTab: FC<Props> = ({ products }) => {
       p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       p.sku.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const toggleSelectAll = () => {
+    if (selectedIds.length === filteredProducts.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(filteredProducts.map((p) => p.id));
+    }
+  };
+
+  const toggleSelectOne = (id: string) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -64,19 +79,33 @@ export const SupplierProductsTab: FC<Props> = ({ products }) => {
           <table className="admin-data-table" style={{ width: '100%' }}>
             <thead>
               <tr>
+                <th style={{ width: 30, textAlign: 'center', padding: '10px 4px' }}>
+                  <input
+                    type="checkbox"
+                    checked={filteredProducts.length > 0 && selectedIds.length === filteredProducts.length}
+                    onChange={toggleSelectAll}
+                  />
+                </th>
                 <th style={{ width: 110 }}>Mã SKU</th>
                 <th>Tên sản phẩm</th>
                 <th style={{ width: 80, textAlign: 'center' }}>ĐVT</th>
                 <th style={{ width: 140, textAlign: 'right' }}>Giá nhập hiện tại</th>
                 <th style={{ width: 110, textAlign: 'right' }}>MOQ (Tối thiểu)</th>
                 <th style={{ width: 120, textAlign: 'center' }}>Ngày áp dụng</th>
-                <th style={{ width: 110, textAlign: 'center' }}>Trạng thái</th>
+                <th style={{ width: 110, textAlign: 'left' }}>Trạng thái</th>
               </tr>
             </thead>
             <tbody>
               {filteredProducts.length > 0 ? (
                 filteredProducts.map((p) => (
                   <tr key={p.id}>
+                    <td style={{ textAlign: 'center', padding: '10px 4px' }}>
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.includes(p.id)}
+                        onChange={() => toggleSelectOne(p.id)}
+                      />
+                    </td>
                     <td>
                       <span className="admin-subdomain-tag" style={{ fontFamily: 'var(--font-mono)' }}>
                         {p.sku}
@@ -95,15 +124,12 @@ export const SupplierProductsTab: FC<Props> = ({ products }) => {
                     <td style={{ textAlign: 'center', fontSize: 12, color: 'var(--text-muted)' }}>
                       {p.effectiveDate}
                     </td>
-                    <td style={{ textAlign: 'center' }}>
+                    <td style={{ textAlign: 'left' }}>
                       <span
-                        className="admin-badge"
                         style={{
-                          backgroundColor: '#e6f4ea',
-                          color: '#008800',
-                          border: '1px solid #008800',
-                          padding: '3px 10px',
-                          fontSize: 11.5,
+                          color: '#16a34a',
+                          fontSize: 13,
+                          fontWeight: 500,
                         }}
                       >
                         Đang phân phối
@@ -113,7 +139,7 @@ export const SupplierProductsTab: FC<Props> = ({ products }) => {
                 ))
               ) : (
                 <tr>
-                  <td colSpan={7} style={{ textAlign: 'center', padding: '30px', color: 'var(--text-muted)' }}>
+                  <td colSpan={8} style={{ textAlign: 'center', padding: '30px', color: 'var(--text-muted)' }}>
                     Không có sản phẩm nào phù hợp với tìm kiếm.
                   </td>
                 </tr>

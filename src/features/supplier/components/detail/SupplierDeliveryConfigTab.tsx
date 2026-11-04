@@ -1,19 +1,20 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { FC } from 'react';
 import type { SupplierSummary, SupplierDeliveryConfig } from '../../types/supplier.types';
-import { Clock, Truck, ShieldCheck, Calculator, CheckCircle2 } from 'lucide-react';
+import { Clock, Truck, ShieldCheck, Package, CheckCircle2 } from 'lucide-react';
 
 interface Props {
   supplier: SupplierSummary;
   initialConfig?: SupplierDeliveryConfig;
-  onSaveConfig?: (cfg: SupplierDeliveryConfig) => void;
+  onSaveConfig?: (cfg: SupplierDeliveryConfig) => void | Promise<void>;
 }
 
 const DEFAULT_CONFIG: SupplierDeliveryConfig = {
   leadTimeDays: 1,
   leadTimeUnit: 'BUSINESS_DAYS',
+  minOrderQuantity: 0,
   activeDeliveryDays: [1, 2, 3, 4, 5, 6],
-  cutoffTime: '16:00',
+  cutoffTime: '17:00',
   allowStoreEdit: true,
   editWindowType: 'BEFORE_CUTOFF',
   hoursBeforeDelivery: 24,
@@ -38,15 +39,12 @@ export const SupplierDeliveryConfigTab: FC<Props> = ({
 }) => {
   const [config, setConfig] = useState<SupplierDeliveryConfig>(initialConfig || DEFAULT_CONFIG);
   const [saveSuccessMsg, setSaveSuccessMsg] = useState(false);
+  const [saveErrorMsg, setSaveErrorMsg] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
-  const [simOrderDatetime, setSimOrderDatetime] = useState(() => {
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const day = String(now.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}T15:00`;
-  });
-  const [calcResult, setCalcResult] = useState<{ deliveryDate: string; editDeadline: string; note: string } | null>(null);
+  useEffect(() => {
+    if (initialConfig) setConfig(initialConfig);
+  }, [initialConfig]);
 
   const handleToggleWeekday = (dayVal: number) => {
     setConfig((prev) => {
@@ -58,108 +56,99 @@ export const SupplierDeliveryConfigTab: FC<Props> = ({
     });
   };
 
-  const handleRunCalculator = () => {
-    if (!simOrderDatetime) return;
-    const dt = new Date(simOrderDatetime);
-    if (isNaN(dt.getTime())) return;
+  const validate = (): string | null => {
+    if (!config.activeDeliveryDays || config.activeDeliveryDays.length === 0) {
+      return 'Vui lòng chọn ít nhất một ngày giao hàng hoạt động trong tuần (Active Delivery Days).';
+    }
 
-    const [cutHourStr, cutMinStr] = config.cutoffTime.split(':');
-    const cutoffHour = parseInt(cutHourStr) || 16;
-    const cutoffMin = parseInt(cutMinStr) || 0;
+    if (config.leadTimeDays < 0 || config.leadTimeDays > 30) {
+      return 'Thời gian chuẩn bị (Lead Time) phải nằm trong khoảng từ 0 đến 30 ngày.';
+    }
 
-    const isAfterCutoff =
-      dt.getHours() > cutoffHour ||
-      (dt.getHours() === cutoffHour && dt.getMinutes() > cutoffMin);
+    if (config.minOrderQuantity < 0) {
+      return 'Số lượng đặt tối thiểu (MOQ) phải lớn hơn hoặc bằng 0.';
+    }
 
-    const checkHoliday = (d: Date): string | null => {
-      const y = d.getFullYear();
-      const m = String(d.getMonth() + 1).padStart(2, '0');
-      const dayStr = String(d.getDate()).padStart(2, '0');
-      const dateStr = `${y}-${m}-${dayStr}`;
-      for (const hol of config.holidays) {
-        if (dateStr >= hol.fromDate && dateStr <= hol.toDate) return hol.reason;
+    const cleanCutoff = (config.cutoffTime || '').trim();
+    if (!cleanCutoff) {
+      return 'Vui lòng nhập giờ chốt đơn hàng ngày (Cutoff Time).';
+    }
+    const cutoffRegex = /^([01]\d|2[0-3]):[0-5]\d$/;
+    if (!cutoffRegex.test(cleanCutoff)) {
+      return 'Giờ chốt đơn không hợp lệ. Vui lòng nhập đúng định dạng HH:mm (từ 00:00 đến 23:59).';
+    }
+
+    if (config.allowStoreEdit) {
+      if (config.editWindowType === 'HOURS_BEFORE_DELIVERY') {
+        const h = config.hoursBeforeDelivery ?? 24;
+        if (h < 1 || h > 72) {
+          return 'Số giờ cho phép sửa trước ngày giao hàng phải từ 1 đến 72 giờ.';
+        }
+      } else if (config.editWindowType === 'HOURS_AFTER_ORDER') {
+        const h = config.hoursAfterOrder ?? 2;
+        if (h < 1 || h > 24) {
+          return 'Số giờ cho phép sửa sau khi đặt đơn phải từ 1 đến 24 giờ.';
+        }
       }
-      return null;
-    };
-
-    const targetDate = new Date(dt);
-    if (isAfterCutoff) targetDate.setDate(targetDate.getDate() + 1);
-
-    let addedDays = 0;
-    while (addedDays < config.leadTimeDays) {
-      targetDate.setDate(targetDate.getDate() + 1);
-      if (targetDate.getDay() !== 0 && !checkHoliday(targetDate)) addedDays++;
     }
 
-    let loopCount = 0;
-    let bypassedReason: string | null = null;
-    while (
-      (targetDate.getDay() === 0 ||
-        !config.activeDeliveryDays.includes(targetDate.getDay()) ||
-        checkHoliday(targetDate)) &&
-      loopCount < 30
-    ) {
-      const reason = checkHoliday(targetDate);
-      if (reason && !bypassedReason) bypassedReason = reason;
-      targetDate.setDate(targetDate.getDate() + 1);
-      loopCount++;
-    }
-
-    const dayNames = ['Chủ nhật', 'Thứ hai', 'Thứ ba', 'Thứ tư', 'Thứ năm', 'Thứ sáu', 'Thứ bảy'];
-    const formattedDelDate = `${targetDate.getDate().toString().padStart(2, '0')}/${(targetDate.getMonth() + 1).toString().padStart(2, '0')}/${targetDate.getFullYear()} (${dayNames[targetDate.getDay()]})`;
-
-    let editDeadlineText = '';
-    if (!config.allowStoreEdit) {
-      editDeadlineText = 'Khóa đơn ngay khi đặt (Không cho phép chỉnh sửa PO)';
-    } else if (config.editWindowType === 'BEFORE_CUTOFF') {
-      const cutoffDt = new Date(dt);
-      if (isAfterCutoff) cutoffDt.setDate(cutoffDt.getDate() + 1);
-      editDeadlineText = `${cutoffDt.getDate().toString().padStart(2, '0')}/${(cutoffDt.getMonth() + 1).toString().padStart(2, '0')}/${cutoffDt.getFullYear()} lúc ${config.cutoffTime} (Giờ chốt đơn kế tiếp)`;
-    } else if (config.editWindowType === 'HOURS_BEFORE_DELIVERY') {
-      const bufHours = config.hoursBeforeDelivery || 24;
-      const dl = new Date(targetDate);
-      dl.setHours(dl.getHours() - bufHours);
-      editDeadlineText = `${dl.getDate().toString().padStart(2, '0')}/${(dl.getMonth() + 1).toString().padStart(2, '0')} ${dl.getHours()}:${dl.getMinutes().toString().padStart(2, '0')} (${bufHours} giờ trước ngày giao)`;
-    } else {
-      const fixedHours = config.hoursAfterOrder || 2;
-      const dl = new Date(dt);
-      dl.setHours(dl.getHours() + fixedHours);
-      editDeadlineText = `${dl.getDate().toString().padStart(2, '0')}/${(dl.getMonth() + 1).toString().padStart(2, '0')} ${dl.getHours()}:${dl.getMinutes().toString().padStart(2, '0')} (${fixedHours} giờ sau khi đặt đơn)`;
-    }
-
-    setCalcResult({
-      deliveryDate: formattedDelDate,
-      editDeadline: editDeadlineText,
-      note: bypassedReason
-        ? `Tự động né ngày nghỉ lễ: ${bypassedReason}`
-        : isAfterCutoff
-        ? 'Đơn đặt sau giờ Cutoff — tự động chuyển sang chu kỳ kế tiếp'
-        : 'Chu kỳ giao hàng hợp lệ',
-    });
+    return null;
   };
 
-  const handleSave = () => {
-    onSaveConfig?.(config);
-    setSaveSuccessMsg(true);
-    setTimeout(() => setSaveSuccessMsg(false), 3000);
+  const handleSave = async () => {
+    if (isSaving) return;
+    setSaveErrorMsg(null);
+
+    const validationErr = validate();
+    if (validationErr) {
+      setSaveErrorMsg(validationErr);
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      await onSaveConfig?.(config);
+      setSaveSuccessMsg(true);
+      setTimeout(() => setSaveSuccessMsg(false), 3000);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Không thể lưu cấu hình giao hàng.';
+      setSaveErrorMsg(message);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       {saveSuccessMsg && (
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: 10,
-          background: '#e8f9ee', border: '1px solid #bbf7d0',
-          padding: '12px 18px', borderRadius: 'var(--radius-pill)',
-          color: '#065f46', fontWeight: 600, fontSize: '0.88rem',
-        }}>
+        <div
+          data-testid="save-delivery-success-alert"
+          style={{
+            display: 'flex', alignItems: 'center', gap: 10,
+            background: '#e8f9ee', border: '1px solid #bbf7d0',
+            padding: '12px 18px', borderRadius: 'var(--radius-pill)',
+            color: '#065f46', fontWeight: 600, fontSize: '0.88rem',
+          }}
+        >
           <CheckCircle2 size={18} color="#00c853" />
           <span>Đã lưu cấu hình lịch giao hàng và thời gian Cutoff thành công cho {supplier.name}!</span>
         </div>
       )}
+      {saveErrorMsg && (
+        <div
+          data-testid="save-delivery-error-alert"
+          style={{
+            background: '#fef2f2', border: '1px solid #fecaca',
+            padding: '12px 18px', borderRadius: 'var(--radius-pill)',
+            color: '#991b1b', fontWeight: 600, fontSize: '0.88rem',
+          }}
+        >
+          {saveErrorMsg}
+        </div>
+      )}
 
       {/* Lịch giao hàng & Cutoff Time */}
-      <div className="supplier-detail-card">
+      <div className="supplier-detail-card" data-testid="delivery-config-card">
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
           <div style={{
             width: 36, height: 36, borderRadius: 'var(--radius-sm)',
@@ -187,12 +176,14 @@ export const SupplierDeliveryConfigTab: FC<Props> = ({
             <div style={{ display: 'flex', gap: 10 }}>
               <input
                 type="number" min="0" max="30"
+                data-testid="input-lead-time"
                 value={config.leadTimeDays}
                 onChange={(e) => setConfig({ ...config, leadTimeDays: Math.max(0, parseInt(e.target.value) || 0) })}
                 className="admin-search-input"
                 style={{ width: 80, height: 40, textAlign: 'center', fontFamily: 'var(--font-mono)' }}
               />
               <select
+                data-testid="select-lead-time-unit"
                 value={config.leadTimeUnit}
                 onChange={(e) => setConfig({ ...config, leadTimeUnit: e.target.value as any })}
                 className="form-select"
@@ -206,17 +197,37 @@ export const SupplierDeliveryConfigTab: FC<Props> = ({
 
           <div className="form-group">
             <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Package size={14} color="var(--blue-primary)" />
+              <span>Số lượng đặt tối thiểu (MOQ)</span>
+            </label>
+            <input
+              type="number"
+              min="0"
+              data-testid="input-moq"
+              value={config.minOrderQuantity}
+              onChange={(e) => setConfig({ ...config, minOrderQuantity: Math.max(0, parseInt(e.target.value) || 0) })}
+              className="admin-search-input"
+              style={{ width: '100%', height: 40, fontFamily: 'var(--font-mono)' }}
+            />
+            <div data-testid="moq-helper-text" style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 4 }}>
+              Đơn đặt hàng phải đạt tối thiểu <b>{config.minOrderQuantity}</b> đơn vị mới được gửi cho nhà cung cấp.
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <Clock size={14} color="var(--orange-accent)" />
               <span>Giờ chốt đơn hàng ngày (Order Cutoff Time)</span>
             </label>
             <input
               type="time"
+              data-testid="input-cutoff-time"
               value={config.cutoffTime}
               onChange={(e) => setConfig({ ...config, cutoffTime: e.target.value })}
               className="admin-search-input"
               style={{ width: '100%', height: 40, fontFamily: 'var(--font-mono)', fontSize: '0.95rem' }}
             />
-            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 4 }}>
+            <div data-testid="cutoff-helper-text" style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 4 }}>
               💡 Đơn PO đặt sau <b>{config.cutoffTime}</b> sẽ tự động tính chuyển sang chu kỳ giao hàng tiếp theo.
             </div>
           </div>
@@ -224,12 +235,15 @@ export const SupplierDeliveryConfigTab: FC<Props> = ({
 
         <div className="form-group" style={{ marginBottom: 20 }}>
           <label className="form-label">Các ngày giao hàng trong tuần (Active Delivery Days)</label>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }} data-testid="delivery-weekdays-group">
             {WEEKDAYS.map((day) => {
               const isChecked = config.activeDeliveryDays.includes(day.val);
               return (
                 <button
-                  key={day.val} type="button"
+                  key={day.val}
+                  type="button"
+                  data-testid={`btn-weekday-${day.val}`}
+                  aria-pressed={isChecked}
                   onClick={() => handleToggleWeekday(day.val)}
                   style={{
                     padding: '8px 16px', borderRadius: 'var(--radius-pill)',
@@ -255,40 +269,83 @@ export const SupplierDeliveryConfigTab: FC<Props> = ({
 
           <div style={{ display: 'flex', gap: 20, marginBottom: 12, flexWrap: 'wrap' }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13 }}>
-              <input type="radio" name="allowEdit" checked={config.allowStoreEdit} onChange={() => setConfig({ ...config, allowStoreEdit: true })} />
+              <input
+                type="radio"
+                name="allowEdit"
+                data-testid="radio-allow-store-edit"
+                checked={config.allowStoreEdit}
+                onChange={() => setConfig({ ...config, allowStoreEdit: true })}
+              />
               <span><b>Cho phép</b> cửa hàng chỉnh sửa PO trước hạn chót</span>
             </label>
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13 }}>
-              <input type="radio" name="allowEdit" checked={!config.allowStoreEdit} onChange={() => setConfig({ ...config, allowStoreEdit: false })} />
+              <input
+                type="radio"
+                name="allowEdit"
+                data-testid="radio-lock-immediately"
+                checked={!config.allowStoreEdit}
+                onChange={() => setConfig({ ...config, allowStoreEdit: false })}
+              />
               <span><b>Khóa ngay</b> (Không cho phép sửa sau khi gửi PO)</span>
             </label>
           </div>
 
           {config.allowStoreEdit && (
-            <div style={{
-              background: 'var(--bg-soft-blue)', borderRadius: 14,
-              padding: '12px 16px', border: '1px solid var(--border-light)',
-              display: 'flex', flexDirection: 'column', gap: 8, fontSize: '0.84rem',
-            }}>
+            <div
+              data-testid="po-edit-sub-options"
+              style={{
+                background: 'var(--bg-soft-blue)', borderRadius: 14,
+                padding: '12px 16px', border: '1px solid var(--border-light)',
+                display: 'flex', flexDirection: 'column', gap: 8, fontSize: '0.84rem',
+              }}
+            >
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-                <input type="radio" name="editWindowType" checked={config.editWindowType === 'BEFORE_CUTOFF'} onChange={() => setConfig({ ...config, editWindowType: 'BEFORE_CUTOFF' })} />
+                <input
+                  type="radio"
+                  name="editWindowType"
+                  data-testid="radio-edit-before-cutoff"
+                  checked={config.editWindowType === 'BEFORE_CUTOFF'}
+                  onChange={() => setConfig({ ...config, editWindowType: 'BEFORE_CUTOFF' })}
+                />
                 <span><b>Trước giờ Cutoff:</b> Cho phép sửa đến đúng giờ chốt đơn ({config.cutoffTime}) của ngày đặt</span>
               </label>
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-                <input type="radio" name="editWindowType" checked={config.editWindowType === 'HOURS_BEFORE_DELIVERY'} onChange={() => setConfig({ ...config, editWindowType: 'HOURS_BEFORE_DELIVERY' })} />
+                <input
+                  type="radio"
+                  name="editWindowType"
+                  data-testid="radio-edit-hours-before-delivery"
+                  checked={config.editWindowType === 'HOURS_BEFORE_DELIVERY'}
+                  onChange={() => setConfig({ ...config, editWindowType: 'HOURS_BEFORE_DELIVERY' })}
+                />
                 <span>
                   <b>Trước giờ giao hàng:</b> Cho phép sửa trước ngày giao{' '}
-                  <input type="number" min="1" max="72" value={config.hoursBeforeDelivery || 24}
+                  <input
+                    type="number"
+                    min="1"
+                    max="72"
+                    data-testid="input-hours-before-delivery"
+                    value={config.hoursBeforeDelivery || 24}
                     onChange={(e) => setConfig({ ...config, hoursBeforeDelivery: parseInt(e.target.value) || 24 })}
                     style={{ width: 55, height: 28, textAlign: 'center', borderRadius: 6, border: '1px solid #ccc' }}
                   />{' '}giờ
                 </span>
               </label>
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-                <input type="radio" name="editWindowType" checked={config.editWindowType === 'HOURS_AFTER_ORDER'} onChange={() => setConfig({ ...config, editWindowType: 'HOURS_AFTER_ORDER' })} />
+                <input
+                  type="radio"
+                  name="editWindowType"
+                  data-testid="radio-edit-hours-after-order"
+                  checked={config.editWindowType === 'HOURS_AFTER_ORDER'}
+                  onChange={() => setConfig({ ...config, editWindowType: 'HOURS_AFTER_ORDER' })}
+                />
                 <span>
                   <b>Sau khi đặt đơn:</b> Cho phép sửa trong vòng{' '}
-                  <input type="number" min="1" max="24" value={config.hoursAfterOrder || 2}
+                  <input
+                    type="number"
+                    min="1"
+                    max="24"
+                    data-testid="input-hours-after-order"
+                    value={config.hoursAfterOrder || 2}
                     onChange={(e) => setConfig({ ...config, hoursAfterOrder: parseInt(e.target.value) || 2 })}
                     style={{ width: 55, height: 28, textAlign: 'center', borderRadius: 6, border: '1px solid #ccc' }}
                   />{' '}giờ kể từ lúc tạo PO
@@ -300,79 +357,17 @@ export const SupplierDeliveryConfigTab: FC<Props> = ({
 
         <div style={{ marginTop: 20 }}>
           <button
-            type="button" className="admin-btn admin-btn-primary"
+            type="button"
+            className="admin-btn admin-btn-primary"
+            data-testid="btn-save-delivery-config"
+            disabled={isSaving}
             onClick={handleSave}
             style={{ height: 42, padding: '0 24px', borderRadius: 'var(--radius-pill)', gap: 8 }}
           >
             <CheckCircle2 size={16} />
-            <span>Lưu Cấu Hình Giao Hàng &amp; Cutoff</span>
+            <span>{isSaving ? 'Đang lưu...' : 'Lưu Cấu Hình Giao Hàng & Cutoff'}</span>
           </button>
         </div>
-      </div>
-
-      {/* Preview Calculator */}
-      <div className="supplier-detail-card" style={{ background: 'linear-gradient(180deg, #f0f6ff 0%, #ffffff 100%)', border: '1px solid var(--blue-border)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-          <div style={{
-            width: 36, height: 36, borderRadius: 'var(--radius-sm)',
-            background: 'var(--blue-primary)', display: 'flex',
-            alignItems: 'center', justifyContent: 'center', color: '#ffffff',
-          }}>
-            <Calculator size={20} />
-          </div>
-          <div>
-            <h2 className="supplier-detail-card-title" style={{ margin: 0, border: 'none', padding: 0, color: 'var(--blue-primary)' }}>
-              Trình Mô Phỏng Tính Toán Giao Hàng (Preview Calculator)
-            </h2>
-            <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-              Thử nghiệm giả lập thuật toán tính ngày giao dự kiến và hạn chót sửa đơn hàng dựa trên giờ Cutoff đã cấu hình.
-            </div>
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', marginBottom: 14 }}>
-          <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-main)' }}>
-            Thời điểm giả lập đặt đơn (Order Time):
-          </label>
-          <input
-            type="datetime-local" value={simOrderDatetime}
-            onChange={(e) => setSimOrderDatetime(e.target.value)}
-            className="admin-search-input"
-            style={{ width: 240, height: 38, fontFamily: 'var(--font-mono)' }}
-          />
-          <button
-            type="button" className="admin-btn admin-btn-primary"
-            onClick={handleRunCalculator}
-            style={{ height: 38, padding: '0 18px', borderRadius: 'var(--radius-pill)', gap: 6 }}
-          >
-            <Calculator size={14} />
-            <span>Tính Toán Ngày Giao</span>
-          </button>
-        </div>
-
-        {calcResult && (
-          <div style={{
-            background: '#ffffff', borderRadius: 16, padding: '16px 20px',
-            border: '1px solid var(--blue-border)', boxShadow: 'var(--shadow-sm)',
-            display: 'flex', flexDirection: 'column', gap: 10,
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.95rem' }}>
-              <span style={{ fontWeight: 700, color: 'var(--text-main)' }}>➔ Ngày giao hàng dự kiến (Delivery Date):</span>
-              <b style={{ color: 'var(--blue-primary)', fontSize: '1.05rem', fontFamily: 'var(--font-mono)' }}>
-                {calcResult.deliveryDate}
-              </b>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.9rem' }}>
-              <span style={{ fontWeight: 700, color: 'var(--text-main)' }}>➔ Hạn chót sửa đơn hàng (CanEditUntil):</span>
-              <span style={{ color: 'var(--red-accent)', fontWeight: 600, fontFamily: 'var(--font-mono)' }}>
-                {calcResult.editDeadline}
-              </span>
-            </div>
-            <div style={{ fontSize: '0.78rem', color: '#059669', fontStyle: 'italic', marginTop: 2 }}>
-              ℹ️ {calcResult.note}
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );

@@ -1,5 +1,6 @@
+import { useState } from 'react';
 import type { FC } from 'react';
-import { Eye, Edit2, QrCode, AlertCircle, CheckCircle, ShieldAlert } from 'lucide-react';
+import { Edit2, History, QrCode, AlertCircle } from 'lucide-react';
 import { TablePagination } from '../../../components/common';
 import type { CustomerDto, MembershipTier } from '../types/customer.types';
 
@@ -9,6 +10,7 @@ export interface CustomerTableProps {
   onSelect: (customer: CustomerDto) => void;
   onEdit: (customer: CustomerDto) => void;
   onCollect: (customer: CustomerDto) => void;
+  onViewLedger?: (customer: CustomerDto) => void;
   currentPage?: number;
   pageSize?: number;
   onPageChange?: (page: number) => void;
@@ -28,25 +30,25 @@ const renderTierBadge = (tier: MembershipTier) => {
   switch (tier) {
     case 'VIP':
       return (
-        <span className="tier-badge tier-badge-vip">
-          👑 VIP
+        <span style={{ fontSize: 12, fontWeight: 700, color: '#0F766E', background: '#CCFBF1', padding: '2px 8px', borderRadius: 9999 }}>
+          VIP
         </span>
       );
     case 'Gold':
       return (
-        <span className="tier-badge tier-badge-gold">
-          ⭐ Gold
+        <span style={{ fontSize: 12, fontWeight: 700, color: '#D97706', background: '#FEF3C7', padding: '2px 8px', borderRadius: 9999 }}>
+          Gold
         </span>
       );
     case 'Silver':
       return (
-        <span className="tier-badge tier-badge-silver">
-          🥈 Silver
+        <span style={{ fontSize: 12, fontWeight: 600, color: '#475569', background: '#F1F5F9', padding: '2px 8px', borderRadius: 9999 }}>
+          Silver
         </span>
       );
     default:
       return (
-        <span className="tier-badge tier-badge-standard">
+        <span style={{ fontSize: 12, fontWeight: 500, color: '#64748B', background: '#F8FAFC', padding: '2px 8px', borderRadius: 9999 }}>
           Standard
         </span>
       );
@@ -59,6 +61,7 @@ export const CustomerTable: FC<CustomerTableProps> = ({
   onSelect,
   onEdit,
   onCollect,
+  onViewLedger,
   currentPage = 1,
   pageSize = 10,
   onPageChange,
@@ -67,6 +70,22 @@ export const CustomerTable: FC<CustomerTableProps> = ({
   const displayedCustomers = onPageChange
     ? customers.slice((currentPage - 1) * pageSize, currentPage * pageSize)
     : customers;
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+
+  const toggleSelectAll = () => {
+    if (selectedIds.length === displayedCustomers.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(displayedCustomers.map((c) => c.id));
+    }
+  };
+
+  const toggleSelectOne = (id: string) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
+
   if (isLoading) {
     return (
       <div className="customer-table-container" style={{ padding: '48px', textAlign: 'center', color: '#64748b' }}>
@@ -97,7 +116,7 @@ export const CustomerTable: FC<CustomerTableProps> = ({
           Không tìm thấy khách hàng nào
         </h4>
         <p style={{ fontSize: '0.85rem', color: '#64748b', maxWidth: '460px', margin: '0 auto' }}>
-          Không có kết quả nào khớp với điều kiện tìm kiếm hoặc bộ lọc hiện tại. Vui lòng thử tìm từ khóa khác hoặc xóa bộ lọc.
+          Không có kết quả nào khớp với điều kiện tìm kiếm hoặc bộ lọc hiện tại.
         </p>
       </div>
     );
@@ -109,14 +128,21 @@ export const CustomerTable: FC<CustomerTableProps> = ({
         <table className="customer-table">
           <thead>
             <tr>
+              <th style={{ width: 30, textAlign: 'center', padding: '10px 4px' }}>
+                <input
+                  type="checkbox"
+                  checked={displayedCustomers.length > 0 && selectedIds.length === displayedCustomers.length}
+                  onChange={toggleSelectAll}
+                />
+              </th>
               <th>Khách hàng</th>
               <th>Số điện thoại</th>
               <th>Hạng thẻ</th>
-              <th style={{ textAlign: 'right' }}>Công nợ AR</th>
+              <th style={{ textAlign: 'right' }}>Công nợ phải thu (AR)</th>
               <th style={{ textAlign: 'right' }}>Hạn mức nợ</th>
-              <th style={{ textAlign: 'center' }}>Tình trạng nợ</th>
-              <th style={{ textAlign: 'right' }}>Điểm thưởng</th>
-              <th style={{ textAlign: 'center' }}>Thao tác</th>
+              <th style={{ textAlign: 'left' }}>Tình trạng nợ</th>
+              <th style={{ textAlign: 'right' }}>Điểm tích lũy</th>
+              <th style={{ textAlign: 'right' }}>Thao tác</th>
             </tr>
           </thead>
           <tbody>
@@ -130,10 +156,23 @@ export const CustomerTable: FC<CustomerTableProps> = ({
                 <tr
                   key={c.id}
                   onClick={() => onSelect(c)}
+                  style={{ cursor: 'pointer' }}
                 >
+                  {/* Checkbox */}
+                  <td
+                    style={{ textAlign: 'center', padding: '10px 4px' }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.includes(c.id)}
+                      onChange={() => toggleSelectOne(c.id)}
+                    />
+                  </td>
+
                   {/* Họ tên */}
                   <td>
-                    <div className="customer-name">
+                    <div className="customer-name" style={{ fontWeight: 700 }}>
                       {c.fullName}
                     </div>
                     {c.companyName && (
@@ -143,7 +182,7 @@ export const CustomerTable: FC<CustomerTableProps> = ({
                     )}
                   </td>
 
-                  {/* SĐT */}
+                  {/* SDT */}
                   <td>
                     <span className="customer-phone">{c.phoneNumber}</span>
                   </td>
@@ -156,7 +195,8 @@ export const CustomerTable: FC<CustomerTableProps> = ({
                     <div
                       style={{
                         fontFamily: 'var(--font-mono, monospace)',
-                        fontWeight: 700,
+                        fontWeight: 800,
+                        fontSize: '0.95rem',
                         color: isOverLimit ? '#DC2626' : hasDebt ? '#D97706' : '#94A3B8',
                       }}
                     >
@@ -186,42 +226,18 @@ export const CustomerTable: FC<CustomerTableProps> = ({
                   </td>
 
                   {/* Trạng thái nợ */}
-                  <td style={{ textAlign: 'center' }}>
+                  <td style={{ textAlign: 'left' }}>
                     {isOverLimit ? (
-                      <span className="badge-over-limit">
-                        <ShieldAlert className="w-3.5 h-3.5" /> Quá hạn mức
+                      <span style={{ fontSize: 12, fontWeight: 700, color: '#DC2626', background: '#FEE2E2', padding: '2px 8px', borderRadius: 9999 }}>
+                        Vượt hạn mức
                       </span>
                     ) : hasDebt ? (
-                      <span
-                        style={{
-                          background: '#FEF3C7',
-                          color: '#B45309',
-                          borderRadius: '9999px',
-                          padding: '3px 10px',
-                          fontSize: '0.72rem',
-                          fontWeight: 600,
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                        }}
-                      >
+                      <span style={{ fontSize: 12, fontWeight: 700, color: '#D97706', background: '#FEF3C7', padding: '2px 8px', borderRadius: 9999 }}>
                         Đang nợ ({debtPercent}%)
                       </span>
                     ) : (
-                      <span
-                        style={{
-                          background: '#ECFDF5',
-                          color: '#059669',
-                          borderRadius: '9999px',
-                          padding: '3px 10px',
-                          fontSize: '0.72rem',
-                          fontWeight: 600,
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                        }}
-                      >
-                        <CheckCircle className="w-3.5 h-3.5" /> Không nợ
+                      <span style={{ fontSize: 12, fontWeight: 600, color: '#16A34A', background: '#DCFCE7', padding: '2px 8px', borderRadius: 9999 }}>
+                        Đã thanh toán
                       </span>
                     )}
                   </td>
@@ -238,41 +254,88 @@ export const CustomerTable: FC<CustomerTableProps> = ({
                     {c.loyaltyPoints.toLocaleString('vi-VN')}
                   </td>
 
-                  {/* Thao tác */}
+                  {/* Thao tác tinh giản */}
                   <td
-                    style={{ textAlign: 'center' }}
-                    onClick={(e) => e.stopPropagation()} // Prevent row click
+                    style={{ textAlign: 'right' }}
+                    onClick={(e) => e.stopPropagation()}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
-                      {/* Nút Thu nợ */}
-                      {hasDebt && (
+                    <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px' }}>
+                      {/* Nút Thu nợ 1 chạm nổi bật */}
+                      {hasDebt ? (
                         <button
+                          type="button"
                           onClick={() => onCollect(c)}
-                          title="Lập phiếu thu nợ & Tạo VietQR"
-                          className="action-icon-btn collect-btn"
-                          style={{ width: 'auto', padding: '0 10px', height: '30px', fontSize: '0.75rem', gap: '4px' }}
+                          title="Lập phiếu thu nợ 1 chạm & Tạo mã VietQR"
+                          style={{
+                            background: '#16A34A',
+                            color: '#ffffff',
+                            border: 'none',
+                            borderRadius: '8px',
+                            padding: '6px 12px',
+                            fontWeight: 700,
+                            fontSize: '0.78rem',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '5px',
+                            cursor: 'pointer',
+                            boxShadow: '0 2px 4px rgba(22, 163, 74, 0.25)',
+                          }}
                         >
-                          <QrCode className="w-3.5 h-3.5" />
+                          <QrCode size={14} />
                           <span>Thu nợ</span>
+                        </button>
+                      ) : (
+                        <span style={{ fontSize: '0.75rem', color: '#94A3B8', fontStyle: 'italic', marginRight: 4 }}>
+                          Hết nợ
+                        </span>
+                      )}
+
+                      {/* Nút Sổ công nợ */}
+                      {onViewLedger && (
+                        <button
+                          type="button"
+                          onClick={() => onViewLedger(c)}
+                          title="Xem sổ chi tiết biến động công nợ"
+                          style={{
+                            background: '#F0FDFA',
+                            border: '1px solid #99F6E4',
+                            color: '#0F766E',
+                            borderRadius: '8px',
+                            padding: '6px 10px',
+                            fontWeight: 600,
+                            fontSize: '0.75rem',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          <History size={13} />
+                          <span>Sổ nợ</span>
                         </button>
                       )}
 
-                      {/* Nút Xem Drawer */}
-                      <button
-                        onClick={() => onSelect(c)}
-                        title="Xem chi tiết hồ sơ"
-                        className="action-icon-btn"
-                      >
-                        <Eye className="w-4 h-4" />
-                      </button>
-
                       {/* Nút Sửa */}
                       <button
+                        type="button"
                         onClick={() => onEdit(c)}
-                        title="Chỉnh sửa thông tin"
-                        className="action-icon-btn"
+                        title="Chỉnh sửa thông tin khách hàng"
+                        style={{
+                          background: '#F8FAFC',
+                          border: '1px solid #CBD5E1',
+                          color: '#475569',
+                          borderRadius: '8px',
+                          padding: '6px 10px',
+                          fontWeight: 600,
+                          fontSize: '0.75rem',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          cursor: 'pointer',
+                        }}
                       >
-                        <Edit2 className="w-4 h-4" />
+                        <Edit2 size={13} />
+                        <span>Sửa</span>
                       </button>
                     </div>
                   </td>
@@ -290,7 +353,6 @@ export const CustomerTable: FC<CustomerTableProps> = ({
           pageSize={pageSize}
           totalItems={customers.length}
           itemLabel="khách hàng"
-          isLoading={isLoading}
           onPageChange={onPageChange}
           onPageSizeChange={onPageSizeChange}
         />

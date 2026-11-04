@@ -1,17 +1,26 @@
 import type { FC } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, Navigate } from 'react-router-dom';
 import { AppTopNav } from './AppTopNav';
+import { useAuthStore } from '../../stores/useAuthStore';
 
 export const StoreOwnerLayout: FC = () => {
+  const { user, isAuthenticated } = useAuthStore();
+
+  if (!isAuthenticated || !user) {
+    return <Navigate to="/auth/login" replace />;
+  }
+
   return (
     <div
       style={{
         display: 'flex',
         flexDirection: 'column',
-        minHeight: '100vh',
+        height: '100vh',
+        maxHeight: '100vh',
         width: '100%',
-        backgroundColor: 'var(--bg-soft-blue)',
+        backgroundColor: '#ffffff',
         color: 'var(--text-main)',
+        overflow: 'hidden',
       }}
     >
       {/* Two-row sticky topbar */}
@@ -22,10 +31,13 @@ export const StoreOwnerLayout: FC = () => {
         style={{
           flex: 1,
           width: '100%',
-          boxSizing: 'border-box',
-          padding: '28px 32px 48px 32px',
+          padding: '16px 32px 20px 32px',
           maxWidth: '100%',
           overflowX: 'hidden',
+          overflowY: 'auto',
+          display: 'flex',
+          flexDirection: 'column',
+          minHeight: 0,
         }}
       >
         <Outlet />

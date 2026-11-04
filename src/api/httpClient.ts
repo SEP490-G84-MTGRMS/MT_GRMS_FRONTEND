@@ -5,6 +5,10 @@ export const httpClient = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  // Tuân thủ chuẩn ASP.NET Core Model Binding cho mảng: CategoryIds=id1&CategoryIds=id2 (thay vì CategoryIds[]=id1)
+  paramsSerializer: {
+    indexes: null,
+  },
 });
 
 httpClient.interceptors.request.use((config) => {
@@ -12,6 +16,25 @@ httpClient.interceptors.request.use((config) => {
   if (token && config.headers) {
     config.headers.Authorization = `Bearer ${token}`;
   }
+
+  // Tự động gắn Tenant ID chuẩn của hệ thống để đồng bộ dữ liệu đa người thuê
+  let tenantId = localStorage.getItem('tenant_id') || 'tenant_mt_mart_01';
+  const storedUser = localStorage.getItem('auth_user');
+  if (storedUser) {
+    try {
+      const user = JSON.parse(storedUser);
+      if (user.tenantId && user.tenantId !== 'TENANT-DEFAULT' && user.tenantId !== 'TENANT-HCM-01') {
+        tenantId = user.tenantId;
+      }
+    } catch {
+      // fallback tenantId
+    }
+  }
+
+  if (config.headers) {
+    config.headers['X-Tenant-Id'] = tenantId;
+  }
+
   return config;
 });
 
@@ -19,9 +42,18 @@ httpClient.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem('access_token');
-      if (window.location.pathname !== '/login') {
-        window.location.href = '/login';
+      const url = String(error.config?.url || '');
+      const isAuthCall = url.includes('/auth/login') || url.includes('/Auth/login');
+      if (!isAuthCall) {
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('auth_user');
+        const isAuthPage =
+          window.location.pathname.startsWith('/auth') ||
+          window.location.pathname === '/login' ||
+          window.location.pathname === '/register';
+        if (!isAuthPage) {
+          window.location.href = '/auth/login';
+        }
       }
     }
     return Promise.reject(error);
