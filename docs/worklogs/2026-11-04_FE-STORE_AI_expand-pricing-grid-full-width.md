@@ -47,3 +47,4 @@
 
 ## 4. Ghi Chú Cho Manager Khi Duyệt & Merge (Manager Merge Notes)
 - Rủi ro: Thấp (Low), thuần túy CSS layout responsive và bổ sung trường type.
+
