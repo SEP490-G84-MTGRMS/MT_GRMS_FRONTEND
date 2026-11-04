@@ -237,16 +237,9 @@ export const OrderMatrixTable: FC<OrderMatrixTableProps> = ({
                     <div className="po-col-date-header">
                       <span className="po-col-dow">{d.dowName}</span>
                       <span className="po-col-short">{d.dateShort}</span>
-
-                      {/* Cutoff Status Tag: chỉ hiển thị cho các ngày Nghỉ / Đã PO / Khóa, loại bỏ chữ Đến hạn và Mở */}
-                      {(isOff || isPoGenerated || isLocked) && (
-                        <span
-                          className={`po-cutoff-tag ${
-                            isOff ? 'po-tag-off' : 'po-tag-locked'
-                          }`}
-                        >
-                          {isOff ? 'Nghỉ' : isPoGenerated ? 'Đã PO' : 'Khóa'}
-                        </span>
+                      {/* Nghỉ/Khóa: chỉ tô xám header, không gắn chữ — hover xem title */}
+                      {isPoGenerated && (
+                        <span className="po-cutoff-tag po-tag-locked">Đã PO</span>
                       )}
                     </div>
                   </th>
@@ -311,40 +304,17 @@ export const OrderMatrixTable: FC<OrderMatrixTableProps> = ({
                     return (
                       <tr key={p.id} className={isRowDisabled ? 'po-row-disabled' : ''}>
                         <td className="po-cell-product">
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                            <div
-                              style={{ whiteSpace: 'normal', wordBreak: 'break-word', overflowWrap: 'break-word', lineHeight: 1.35 }}
-                              title={p.sku ? `Mã SKU: ${p.sku}` : undefined}
-                            >
-                              <b style={{ color: isRowDisabled ? '#64748b' : '#0f172a' }}>{p.name}</b>
-                            </div>
-                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 1 }}>
-                              {p.isProductActive === false && (
-                                <span className="po-status-badge po-badge-danger" title={p.productInactiveReason || 'Sản phẩm tạm ngưng'}>
-                                  SP Tạm ngưng
-                                </span>
-                              )}
-                              {p.isSupplierActive === false && (
-                                <span className="po-status-badge po-badge-danger" title={p.supplierInactiveReason || 'NCC tạm ngưng hoạt động'}>
-                                  NCC Tạm ngưng
-                                </span>
-                              )}
-                              {p.isSupplierActive !== false && p.isSupplierBranchActive === false && (
-                                <span className="po-status-badge po-badge-warning" title={p.supplierBranchInactiveReason || 'NCC chưa phân bổ tới chi nhánh này'}>
-                                  Chưa liên kết CH
-                                </span>
-                              )}
-                              {p.isProductActive !== false && p.isSupplierActive !== false && p.isSupplierProductActive === false && (
-                                <span className="po-status-badge po-badge-warning" title={p.supplierProductInactiveReason || 'Tạm ngưng nhập mặt hàng này từ NCC'}>
-                                  Ngưng nhập từ NCC
-                                </span>
-                              )}
-                              {p.isProductActive !== false && p.isBranchProductActive === false && (
-                                <span className="po-status-badge po-badge-secondary" title={p.branchProductInactiveReason || 'Sản phẩm chưa mở bán tại chi nhánh này'}>
-                                  Chưa mở bán tại CH
-                                </span>
-                              )}
-                            </div>
+                          <div
+                            style={{ whiteSpace: 'normal', wordBreak: 'break-word', overflowWrap: 'break-word', lineHeight: 1.35 }}
+                            title={
+                              isRowDisabled
+                                ? p.rowDisabledReason || 'Sản phẩm đang tạm ngưng / chưa mở bán'
+                                : p.sku
+                                  ? `Mã SKU: ${p.sku}`
+                                  : undefined
+                            }
+                          >
+                            <b style={{ color: '#0f172a' }}>{p.name}</b>
                           </div>
                         </td>
                         <td style={{ textAlign: 'center' }}>{p.unit}</td>
@@ -412,7 +382,7 @@ export const OrderMatrixTable: FC<OrderMatrixTableProps> = ({
                             );
                           }
 
-                          // Nếu sản phẩm hoặc NCC bị inactive -> Disable ô nhập cho cả dòng/ngày
+                          // Dòng inactive: giữ số lượng nháp chỉ-đọc (OpenSpec §7.1), không cho sửa
                           if (isRowDisabled) {
                             return (
                               <td
@@ -423,30 +393,33 @@ export const OrderMatrixTable: FC<OrderMatrixTableProps> = ({
                                 <input
                                   type="text"
                                   className="po-qty-input po-qty-input-disabled"
-                                  value=""
+                                  value={q > 0 ? String(q) : ''}
                                   placeholder="—"
                                   disabled
+                                  readOnly
                                 />
                               </td>
                             );
                           }
 
-                          if (d.isLocked || d.cutoffStatus === 'PO_GENERATED') {
+                          if (d.isLocked || d.cutoffStatus === 'PO_GENERATED' || d.cutoffStatus === 'LOCKED') {
                             return (
                               <td
                                 key={d.dateKey}
-                                className="po-cell-locked"
+                                className="po-cell-locked po-cell-disabled"
                                 title={
                                   d.cutoffStatus === 'PO_GENERATED'
-                                    ? `Đã chốt PO (${d.poCode || 'Đã tạo'})`
+                                    ? `Đã chốt PO (${d.poCode || 'Đã tạo'}) — chỉ xem`
                                     : 'Đã quá giờ khóa sửa đơn của ngày này'
                                 }
                               >
                                 <input
                                   type="text"
-                                  className="po-qty-input"
-                                  value={q > 0 ? q : ''}
+                                  className="po-qty-input po-qty-input-disabled"
+                                  value={q > 0 ? String(q) : ''}
+                                  placeholder="—"
                                   disabled
+                                  readOnly
                                 />
                               </td>
                             );

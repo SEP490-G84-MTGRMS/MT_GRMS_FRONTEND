@@ -22,6 +22,7 @@ import {
   BranchOrderListPage,
   EmployeeOrderMatrixPage,
   SupplierOrderDispatchHubPage,
+  SupplierDispatchDetailPage,
   StoreOwnerPurchaseOrderListPage,
 } from '../features/purchase-order';
 
@@ -385,6 +386,10 @@ export const router = createBrowserRouter([
       {
         path: 'purchase-orders/dispatch-hub',
         element: <SupplierOrderDispatchHubPage />,
+      },
+      {
+        path: 'purchase-orders/dispatch-hub/:supplierId',
+        element: <SupplierDispatchDetailPage />,
       },
       {
         path: 'purchase-orders/cutoff-hub',

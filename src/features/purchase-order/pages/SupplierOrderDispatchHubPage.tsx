@@ -1,267 +1,285 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import type { FC } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { MOCK_DISPATCH_SUPPLIERS } from '../lib/mockDispatchData';
-import { MOCK_BRANCHES } from '../lib/mockData';
-import type { SupplierDispatchGroup } from '../types/po.types';
+import { Link, useNavigate } from 'react-router-dom';
+import { Grid3x3, ListOrdered, Loader2, Truck } from 'lucide-react';
+import type {
+  SupplierDispatchGroup,
+  DispatchScope,
+  SplitMatrixBatchResult,
+} from '../types/po.types';
 import { DispatchFilterBar, type DispatchTabType } from '../components/dispatch/DispatchFilterBar';
 import { SupplierDispatchTable } from '../components/dispatch/SupplierDispatchTable';
-import { SupplierDispatchDrawer } from '../components/dispatch/SupplierDispatchDrawer';
 import { DispatchConfirmModal } from '../components/dispatch/DispatchConfirmModal';
 import { AdminToast, type ToastState } from '../../admin/components';
+import { dispatchHubApi } from '../api/dispatchHubApi';
 import '../purchase-order.css';
 
+const EMPTY_COUNTS: Record<DispatchTabType, number> = {
+  all: 0,
+  critical: 0,
+  today: 0,
+  later: 0,
+  completed: 0,
+};
+
+function getMondayOfThisWeek(): string {
+  const d = new Date();
+  const day = d.getDay();
+  const diff = (7 + (day - 1)) % 7;
+  d.setDate(d.getDate() - diff);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
 export const SupplierOrderDispatchHubPage: FC = () => {
-  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const [suppliers, setSuppliers] = useState<SupplierDispatchGroup[]>([]);
+  const [tabCounts, setTabCounts] = useState(EMPTY_COUNTS);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isDispatching, setIsDispatching] = useState(false);
 
-  // Branch scope
-  const branchParam = searchParams.get('branchId') || searchParams.get('branch') || 'DC1';
-  const [selectedBranchId, setSelectedBranchId] = useState<string>(branchParam);
-
-  // Master State: Suppliers
-  const [suppliers, setSuppliers] = useState<SupplierDispatchGroup[]>(MOCK_DISPATCH_SUPPLIERS);
-
-  // Drawer Open State: holds the ID of supplier currently viewed in Drawer
-  const [selectedDrawerSupplierId, setSelectedDrawerSupplierId] = useState<string | null>(null);
-
-  // Filter States
   const [activeTab, setActiveTab] = useState<DispatchTabType>('all');
-  const [keyword, setKeyword] = useState<string>('');
+  const [keyword, setKeyword] = useState('');
+  const [pageIndex, setPageIndex] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
-  // Pagination States
-  const [pageIndex, setPageIndex] = useState<number>(1);
-  const [pageSize, setPageSize] = useState<number>(10);
-
-  // Toast
   const [toast, setToast] = useState<ToastState | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const showToast = (message: string, type: ToastState['type'] = 'success') => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     setToast({ id: Date.now().toString(), message, type });
-    setTimeout(() => setToast(null), 3500);
+    toastTimerRef.current = setTimeout(() => setToast(null), 4000);
   };
 
-  // Confirm Modal State
   const [modalState, setModalState] = useState<{
     isOpen: boolean;
-    targets: SupplierDispatchGroup[];
-    isBatch: boolean;
+    supplier: SupplierDispatchGroup | null;
+    scope: DispatchScope;
+    weekStartDate: string;
+    previewData: SplitMatrixBatchResult | null;
+    batchResult: SplitMatrixBatchResult | null;
+    note: string;
   }>({
     isOpen: false,
-    targets: [],
-    isBatch: false,
+    supplier: null,
+    scope: 'NEAREST',
+    weekStartDate: getMondayOfThisWeek(),
+    previewData: null,
+    batchResult: null,
+    note: '',
   });
 
-  // Inline Quantity Edit in Drawer
-  const handleUpdateItemQty = (supplierId: string, itemId: string, newQty: number) => {
-    setSuppliers((prev) =>
-      prev.map((sup) => {
-        if (sup.id !== supplierId) return sup;
-        const updatedItems = sup.items.map((it) => (it.id === itemId ? { ...it, qty: newQty } : it));
-        return { ...sup, items: updatedItems };
-      })
-    );
-  };
+  const fetchHub = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const hub = await dispatchHubApi.getSupplierHub({
+        keyword: keyword.trim() || undefined,
+        urgency: activeTab,
+      });
+      setSuppliers(hub.suppliers);
+      setTabCounts({
+        all: hub.counts.all,
+        critical: hub.counts.critical,
+        today: hub.counts.today,
+        later: hub.counts.later,
+        completed: hub.counts.completed,
+      });
+    } catch (err: any) {
+      setSuppliers([]);
+      setTabCounts(EMPTY_COUNTS);
+      showToast(err.message || 'Không tải được hub chốt đơn.', 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [keyword, activeTab]);
 
-  // Delete Item from PO in Drawer
-  const handleDeleteItem = (supplierId: string, itemId: string) => {
-    setSuppliers((prev) =>
-      prev.map((sup) => {
-        if (sup.id !== supplierId) return sup;
-        const updatedItems = sup.items.filter((it) => it.id !== itemId);
-        return { ...sup, items: updatedItems };
-      })
-    );
-    showToast('Đã xóa mặt hàng khỏi đơn mua hàng.', 'info');
-  };
+  useEffect(() => {
+    const t = setTimeout(() => {
+      void fetchHub();
+    }, keyword ? 300 : 0);
+    return () => clearTimeout(t);
+  }, [fetchHub, keyword]);
 
-  // Update Note
-  const handleUpdateNote = (supplierId: string, note: string) => {
-    setSuppliers((prev) =>
-      prev.map((sup) => (sup.id === supplierId ? { ...sup, note } : sup))
-    );
-  };
-
-  // Open Dispatch Modal for single supplier
-  const handleOpenDispatchSingle = (sup: SupplierDispatchGroup) => {
+  const openConfirmForSupplier = async (sup: SupplierDispatchGroup, scope: DispatchScope = 'NEAREST') => {
     setModalState({
       isOpen: true,
-      targets: [sup],
-      isBatch: false,
+      supplier: sup,
+      scope,
+      weekStartDate: getMondayOfThisWeek(),
+      previewData: null,
+      batchResult: null,
+      note: '',
     });
+
+    try {
+      const preview = await dispatchHubApi.previewSupplierSplit(sup.id, scope);
+      setModalState((prev) =>
+        prev.isOpen && prev.supplier?.id === sup.id ? { ...prev, previewData: preview } : prev
+      );
+    } catch {
+      // preview optional
+    }
   };
 
-  // Confirm Dispatch & Generate PO
-  const handleConfirmDispatch = () => {
-    const targetIds = new Set(modalState.targets.map((t) => t.id));
-    const nowStr = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
-
-    setSuppliers((prev) =>
-      prev.map((s) => {
-        if (!targetIds.has(s.id)) return s;
-        const poCode = `PO-20261014-${s.code.replace('SUP-', '')}`;
-        return {
-          ...s,
-          status: 'dispatched',
-          poCode,
-          dispatchedAt: nowStr,
-        };
-      })
-    );
-
-    setModalState({ isOpen: false, targets: [], isBatch: false });
-    showToast(
-      `Đã phát hành đơn mua hàng PO thành công cho ${modalState.targets[0]?.name}!`,
-      'success'
-    );
+  const handleScopeChange = async (scope: DispatchScope) => {
+    const supplier = modalState.supplier;
+    if (!supplier) return;
+    setModalState((prev) => ({ ...prev, scope, previewData: null, batchResult: null }));
+    try {
+      const preview = await dispatchHubApi.previewSupplierSplit(
+        supplier.id,
+        scope,
+        scope === 'WEEK' ? modalState.weekStartDate : undefined
+      );
+      setModalState((prev) => ({ ...prev, previewData: preview }));
+    } catch {
+      // ignore
+    }
   };
 
-  // Tab counts for dropdown
-  const tabCounts = useMemo(() => {
-    return {
-      all: suppliers.length,
-      critical: suppliers.filter((s) => s.status !== 'dispatched' && s.urgency === 'critical').length,
-      today: suppliers.filter((s) => s.status !== 'dispatched' && (s.urgency === 'today' || s.urgency === 'critical')).length,
-      later: suppliers.filter((s) => s.status !== 'dispatched' && s.urgency === 'later').length,
-      completed: suppliers.filter((s) => s.status === 'dispatched').length,
-    };
-  }, [suppliers]);
-
-  // Filtered Suppliers
-  const filteredSuppliers = useMemo(() => {
-    const kw = keyword.trim().toLowerCase();
-
-    return suppliers.filter((s) => {
-      // Status dropdown filter
-      if (activeTab === 'critical' && (s.status === 'dispatched' || s.urgency !== 'critical')) return false;
-      if (activeTab === 'today' && (s.status === 'dispatched' || (s.urgency !== 'today' && s.urgency !== 'critical'))) return false;
-      if (activeTab === 'later' && (s.status === 'dispatched' || s.urgency !== 'later')) return false;
-      if (activeTab === 'completed' && s.status !== 'dispatched') return false;
-
-      // Keyword filter
-      if (kw) {
-        const matchName = s.name.toLowerCase().includes(kw);
-        const matchCode = s.code.toLowerCase().includes(kw);
-        const matchTag = s.categoryTags.some((t) => t.toLowerCase().includes(kw));
-        const matchItem = s.items.some((it) => it.name.toLowerCase().includes(kw) || it.sku.toLowerCase().includes(kw));
-        if (!matchName && !matchCode && !matchTag && !matchItem) return false;
+  const handleConfirmDispatch = async () => {
+    if (!modalState.supplier) return;
+    setIsDispatching(true);
+    try {
+      const result = await dispatchHubApi.dispatchSupplierByScope(
+        modalState.supplier.id,
+        modalState.scope,
+        modalState.scope === 'WEEK' ? modalState.weekStartDate : undefined,
+        modalState.note.trim() || undefined
+      );
+      setModalState((prev) => ({ ...prev, batchResult: result }));
+      if (result.successCount > 0) {
+        showToast(`Đã chốt thành công ${result.successCount}/${result.totalGroups} group PO.`, 'success');
+      } else {
+        showToast('Không có PO nào được tạo thành công.', 'warning');
       }
+      await fetchHub();
+    } catch (err: any) {
+      showToast(err.message || 'Không thể chốt đơn mua hàng.', 'error');
+    } finally {
+      setIsDispatching(false);
+    }
+  };
 
-      return true;
-    });
-  }, [suppliers, activeTab, keyword]);
-
-  // Paginated Suppliers
   const pagedSuppliers = useMemo(() => {
     const start = (pageIndex - 1) * pageSize;
-    return filteredSuppliers.slice(start, start + pageSize);
-  }, [filteredSuppliers, pageIndex, pageSize]);
-
-  // Drawer Navigation helpers
-  const selectedDrawerSupplier = useMemo(() => {
-    if (!selectedDrawerSupplierId) return null;
-    return suppliers.find((s) => s.id === selectedDrawerSupplierId) || null;
-  }, [suppliers, selectedDrawerSupplierId]);
-
-  const currentDrawerIndex = useMemo(() => {
-    if (!selectedDrawerSupplierId) return -1;
-    return filteredSuppliers.findIndex((s) => s.id === selectedDrawerSupplierId);
-  }, [filteredSuppliers, selectedDrawerSupplierId]);
-
-  const hasPrevSupplier = currentDrawerIndex > 0;
-  const hasNextSupplier = currentDrawerIndex >= 0 && currentDrawerIndex < filteredSuppliers.length - 1;
-
-  const handlePrevSupplier = () => {
-    if (hasPrevSupplier) {
-      setSelectedDrawerSupplierId(filteredSuppliers[currentDrawerIndex - 1].id);
-    }
-  };
-
-  const handleNextSupplier = () => {
-    if (hasNextSupplier) {
-      setSelectedDrawerSupplierId(filteredSuppliers[currentDrawerIndex + 1].id);
-    }
-  };
+    return suppliers.slice(start, start + pageSize);
+  }, [suppliers, pageIndex, pageSize]);
 
   return (
-    <div className="po-matrix-container" style={{ width: '100%' }}>
-      {/* Toast Notification */}
+    <div
+      className="po-matrix-container"
+      style={{
+        width: '100%',
+        height: '100%',
+        maxHeight: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        minHeight: 0,
+        flex: 1,
+        overflow: 'hidden',
+      }}
+    >
       <AdminToast toast={toast} onClose={() => setToast(null)} />
 
-      {/* ── Tiêu đề trang đơn giản theo yêu cầu ── */}
-      <div style={{ marginBottom: 10 }}>
-        <h1
-          style={{
-            fontSize: 20,
-            fontWeight: 800,
-            color: 'var(--text-main)',
-            margin: 0,
-          }}
-        >
-          Chốt đơn với nhà cung cấp
-        </h1>
+      <div className="so-list-header">
+        <div>
+          <h1 className="so-list-title">
+            <Truck size={22} color="var(--blue-primary, #0f766e)" />
+            <span>Chốt đơn với nhà cung cấp</span>
+            {isLoading && (
+              <Loader2 size={16} className="animate-spin" style={{ color: 'var(--blue-primary, #0f766e)' }} />
+            )}
+          </h1>
+        </div>
+
+        <div className="so-list-header-actions">
+          <Link to="/store-owner/purchase-orders/create-matrix" className="po-btn po-btn-secondary">
+            <Grid3x3 size={14} />
+            <span>Ma trận đặt hàng</span>
+          </Link>
+          <Link to="/store-owner/purchase-orders" className="po-btn po-btn-secondary">
+            <ListOrdered size={14} />
+            <span>Danh sách PO</span>
+          </Link>
+        </div>
       </div>
 
-      {/* ── BỘ LỌC TÌM KIẾM & CHỌN TRẠNG THÁI / CHI NHÁNH ── */}
-      <DispatchFilterBar
-        activeTab={activeTab}
-        onTabChange={(tab) => {
-          setActiveTab(tab);
-          setPageIndex(1);
-        }}
-        counts={tabCounts}
-        keyword={keyword}
-        onKeywordChange={(kw) => {
-          setKeyword(kw);
-          setPageIndex(1);
-        }}
-        branches={MOCK_BRANCHES}
-        selectedBranchId={selectedBranchId}
-        onSelectBranch={(id) => setSelectedBranchId(id)}
-        onResetFilters={() => {
-          setActiveTab('all');
-          setKeyword('');
-          setPageIndex(1);
-        }}
-      />
+      <div style={{ flexShrink: 0, marginBottom: 8 }}>
+        <DispatchFilterBar
+          activeTab={activeTab}
+          onTabChange={(tab) => {
+            setActiveTab(tab);
+            setPageIndex(1);
+          }}
+          counts={tabCounts}
+          keyword={keyword}
+          onKeywordChange={(kw) => {
+            setKeyword(kw);
+            setPageIndex(1);
+          }}
+          onResetFilters={() => {
+            setActiveTab('all');
+            setKeyword('');
+            setPageIndex(1);
+          }}
+        />
+      </div>
 
-      {/* ── BẢNG DỮ LIỆU CHÍNH CÓ PHÂN TRANG (MAIN DATA TABLE + PAGING) ── */}
       <SupplierDispatchTable
         suppliers={pagedSuppliers}
-        totalCount={filteredSuppliers.length}
+        totalCount={suppliers.length}
         pageIndex={pageIndex}
         pageSize={pageSize}
-        onPageChange={(page) => setPageIndex(page)}
+        onPageChange={setPageIndex}
         onPageSizeChange={(size) => {
           setPageSize(size);
           setPageIndex(1);
         }}
-        onOpenDrawer={(id) => setSelectedDrawerSupplierId(id)}
-        onDispatchSingle={handleOpenDispatchSingle}
+        onOpenDrawer={(supplierId) => {
+          navigate(`/store-owner/purchase-orders/dispatch-hub/${supplierId}`);
+        }}
+        onDispatchSingle={(sup) => {
+          void openConfirmForSupplier(sup, 'NEAREST');
+        }}
       />
 
-      {/* ── NGĂN KÉO CHI TIẾT (SLIDE-OVER DRAWER) ── */}
-      <SupplierDispatchDrawer
-        supplier={selectedDrawerSupplier}
-        isOpen={Boolean(selectedDrawerSupplierId)}
-        onClose={() => setSelectedDrawerSupplierId(null)}
-        onPrevSupplier={handlePrevSupplier}
-        onNextSupplier={handleNextSupplier}
-        hasPrev={hasPrevSupplier}
-        hasNext={hasNextSupplier}
-        currentIndex={currentDrawerIndex >= 0 ? currentDrawerIndex : undefined}
-        totalSuppliersCount={filteredSuppliers.length}
-        onUpdateItemQty={handleUpdateItemQty}
-        onDeleteItem={handleDeleteItem}
-        onUpdateNote={handleUpdateNote}
-        onDispatch={handleOpenDispatchSingle}
-      />
-
-      {/* ── MODAL XÁC NHẬN PHÁT HÀNH PO ── */}
       <DispatchConfirmModal
         isOpen={modalState.isOpen}
-        targetSuppliers={modalState.targets}
-        isBatch={modalState.isBatch}
-        onClose={() => setModalState({ isOpen: false, targets: [], isBatch: false })}
-        onConfirm={handleConfirmDispatch}
+        supplier={modalState.supplier}
+        scope={modalState.scope}
+        onScopeChange={(s) => {
+          void handleScopeChange(s);
+        }}
+        weekStartDate={modalState.weekStartDate}
+        onWeekChange={(w) => {
+          setModalState((prev) => ({ ...prev, weekStartDate: w }));
+          if (modalState.scope === 'WEEK' && modalState.supplier) {
+            void dispatchHubApi
+              .previewSupplierSplit(modalState.supplier.id, 'WEEK', w)
+              .then((preview) => setModalState((prev) => ({ ...prev, previewData: preview })))
+              .catch(() => undefined);
+          }
+        }}
+        previewData={modalState.previewData}
+        batchResult={modalState.batchResult}
+        note={modalState.note}
+        onNoteChange={(n) => setModalState((prev) => ({ ...prev, note: n }))}
+        isSubmitting={isDispatching}
+        onClose={() =>
+          setModalState({
+            isOpen: false,
+            supplier: null,
+            scope: 'NEAREST',
+            weekStartDate: getMondayOfThisWeek(),
+            previewData: null,
+            batchResult: null,
+            note: '',
+          })
+        }
+        onConfirm={() => {
+          void handleConfirmDispatch();
+        }}
       />
     </div>
   );

@@ -86,7 +86,17 @@ export interface MatrixCellData {
 export type MatrixCellMap = Record<string, Record<string, MatrixCellData>>; // productId -> (dateKey -> MatrixCellData)
 export type QtyMatrixMap = Record<string, Record<string, number>>; // productId -> (dateKey -> qty) - backward compatible
 
-export type DayCutoffStatus = 'OPEN' | 'CUTOFF_DUE' | 'LOCKED' | 'PO_GENERATED';
+export type DayCutoffStatus = 'OPEN' | 'CUTOFF_DUE' | 'LOCKED' | 'PO_GENERATED' | 'SUPPLIER_OFF';
+
+export interface OrderMatrixDayStatus {
+  supplierId: string;
+  deliveryDate: string; // YYYY-MM-DD
+  deliveryDateStatus: 'OPEN' | 'CUTOFF_DUE' | 'LOCKED' | 'FINALIZED' | 'SUPPLIER_OFF' | string;
+  cutoffDateTime?: string;
+  primaryReasonCode?: string;
+  poCode?: string;
+  poId?: string;
+}
 
 export interface DayColInfo {
   date: Date;
@@ -101,6 +111,7 @@ export interface DayColInfo {
   cutoffStatus: DayCutoffStatus;
   cutoffLabel?: string;
   poCode?: string;
+  primaryReasonCode?: string;
 }
 
 export interface SplitPoItem {
@@ -153,7 +164,7 @@ export interface GeneratedPO {
   deliveryDate: string;
   totalQuantity: number;
   totalAmount: number;
-  status: 'APPROVED' | 'PENDING_APPROVAL';
+  status: 'APPROVED' | 'PENDING_APPROVAL' | string;
   itemCount: number;
 }
 
@@ -194,6 +205,8 @@ export type CutoffUrgency = 'critical' | 'today' | 'later' | 'completed';
 
 export interface DispatchItemSku {
   id: string;
+  productId: string;
+  deliveryDate: string; // yyyy-MM-dd
   name: string;
   sku: string;
   unit: string;
@@ -219,4 +232,87 @@ export interface SupplierDispatchGroup {
   status: 'draft' | 'dispatched';
   poCode?: string;
   dispatchedAt?: string;
+  linkedBranchCount?: number;
+  branchesWithQty?: number;
+  skuCount?: number;
+  totalQty?: number;
+  totalAmount?: number;
+  branches?: DispatchSupplierBranchSummary[];
+}
+
+export interface DispatchSupplierBranchSummary {
+  branchId: string;
+  branchCode: string;
+  branchName: string;
+  skuCount: number;
+  totalQty: number;
+  totalAmount: number;
+  status: 'draft' | 'dispatched' | 'mixed' | string;
+}
+
+export interface DispatchSupplierDetailLine {
+  id: string;
+  productId: string;
+  name: string;
+  sku: string;
+  unit: string;
+  price: number;
+  qty: number;
+  deliveryDate: string;
+  cutoffSchedule: string;
+  dayStatus: string;
+}
+
+export interface DispatchSupplierDetailBranch {
+  branchId: string;
+  branchCode: string;
+  branchName: string;
+  status: string;
+  items: DispatchSupplierDetailLine[];
+}
+
+export interface DispatchSupplierDetail {
+  supplierId: string;
+  code: string;
+  name: string;
+  serverNow: string;
+  viewFrom: string;
+  durationDays: number;
+  cutoffTimeStr: string;
+  countdownDisplay: string;
+  remainingMinutes?: number;
+  urgency: CutoffUrgency;
+  status: 'draft' | 'dispatched' | string;
+  branches: DispatchSupplierDetailBranch[];
+}
+
+export type DispatchScope = 'NEAREST' | 'WEEK' | 'ALL';
+
+export interface SplitGroupResult {
+  branchId?: string;
+  branchName?: string;
+  supplierId: string;
+  supplierName: string;
+  deliveryDate: string;
+  status: 'SUCCESS' | 'FAILED' | 'SKIPPED' | 'ALREADY_FINALIZED';
+  purchaseOrderId?: string;
+  purchaseOrderCode?: string;
+  errorCode?: string;
+  errorMessage?: string;
+  totalAmount?: number;
+  validLineCount?: number;
+  invalidLineCount?: number;
+}
+
+export interface SplitMatrixBatchResult {
+  branchId: string;
+  scope?: DispatchScope;
+  serverNow?: string;
+  totalGroups: number;
+  successCount: number;
+  failedCount: number;
+  skippedCount: number;
+  alreadyFinalizedCount: number;
+  results: SplitGroupResult[];
+  createdPurchaseOrders: GeneratedPO[];
 }

@@ -857,12 +857,16 @@
   cursor: not-allowed;
 }
 
-/* Disabled Row & Cell Rules for Inactive Products/Suppliers */
+/* Disabled row: tên SP / ĐVT / MOQ giữ màu bình thường — chỉ ô nhập số lượng xám */
 .po-row-disabled {
-  background-color: #fbfcfd;
+  background-color: transparent;
 }
 .po-row-disabled td {
-  color: #64748b;
+  color: inherit;
+}
+.po-row-disabled .po-cell-product,
+.po-row-disabled .po-cell-product b {
+  color: #0f172a !important;
 }
 .po-cell-disabled {
   background-color: #f1f5f9;
