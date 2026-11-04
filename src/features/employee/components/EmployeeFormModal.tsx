@@ -6,7 +6,6 @@ import type {
   AllowanceItem,
   SalaryType,
 } from '../types';
-import { MOCK_DEFAULT_ALLOWANCES } from '../services/mockData';
 import { CreateUserModal } from './CreateUserModal';
 import { CreateAllowanceModal } from './CreateAllowanceModal';
 import { employeeApi } from '../api/employeeApi';
@@ -19,6 +18,25 @@ interface EmployeeFormModalProps {
   onSave: (employee: Employee, isAddNew?: boolean) => void;
   branches: Branch[];
 }
+
+const PREDEFINED_BANKS = [
+  { value: 'Techcombank', label: 'Techcombank (TCB)' },
+  { value: 'Vietcombank', label: 'Vietcombank (VCB)' },
+  { value: 'MB Bank', label: 'MB Bank (MB)' },
+  { value: 'BIDV', label: 'BIDV' },
+  { value: 'VietinBank', label: 'VietinBank (CTG)' },
+  { value: 'Agribank', label: 'Agribank' },
+  { value: 'ACB', label: 'ACB' },
+  { value: 'VPBank', label: 'VPBank' },
+  { value: 'TPBank', label: 'TPBank' },
+  { value: 'Sacombank', label: 'Sacombank' },
+  { value: 'HDBank', label: 'HDBank' },
+  { value: 'VIB', label: 'VIB' },
+  { value: 'SHB', label: 'SHB' },
+  { value: 'MSB', label: 'MSB' },
+  { value: 'OCB', label: 'OCB' },
+  { value: 'SeABank', label: 'SeABank' },
+];
 
 export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
   isOpen,
@@ -38,7 +56,6 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
   // Form states - Tab 1: Thông tin
   const [fullName, setFullName] = useState('');
   const [employeeCode, setEmployeeCode] = useState('');
-  const [attendanceCode, setAttendanceCode] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [avatarUrl, setAvatarUrl] = useState('');
@@ -46,7 +63,6 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
   const [dateOfBirth, setDateOfBirth] = useState('');
   const [citizenId, setCitizenId] = useState('');
   const [address, setAddress] = useState('');
-  const [city, setCity] = useState('');
 
   // Work info
   const [startDate, setStartDate] = useState('');
@@ -57,25 +73,25 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
 
   // Bank info
   const [bankAccountNumber, setBankAccountNumber] = useState('');
-  const [bankName, setBankName] = useState('Techcombank');
+  const [bankSelect, setBankSelect] = useState('Techcombank');
+  const [customBankName, setCustomBankName] = useState('');
   const [bankAccountHolder, setBankAccountHolder] = useState('');
 
   // Tab 2: Lương
   const [salaryType, setSalaryType] = useState<SalaryType>('monthly');
-  const [baseSalary, setBaseSalary] = useState<number>(7500000);
-  const [otWeekday, setOtWeekday] = useState('150%');
-  const [otSunday, setOtSunday] = useState('200%');
-  const [otDayOff, setOtDayOff] = useState('200%');
+  const [baseSalary, setBaseSalary] = useState<number | ''>('');
+  const [otWeekday, setOtWeekday] = useState('');
+  const [otSunday, setOtSunday] = useState('');
+  const [otDayOff, setOtDayOff] = useState('');
   const [otHoliday, setOtHoliday] = useState('300%');
-  const [enableAllowance, setEnableAllowance] = useState(true);
-  const [allowances, setAllowances] = useState<AllowanceItem[]>(MOCK_DEFAULT_ALLOWANCES);
+  const [enableAllowance, setEnableAllowance] = useState(false);
+  const [allowances, setAllowances] = useState<AllowanceItem[]>([]);
 
   // Sync when opening or editing
   useEffect(() => {
     if (employee) {
       setFullName(employee.fullName || '');
       setEmployeeCode(employee.employeeCode || '');
-      setAttendanceCode(employee.attendanceCode || '');
       setPhone(employee.phone || '');
       setEmail(employee.email || '');
       setAvatarUrl(employee.avatarUrl || '');
@@ -83,7 +99,6 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
       setDateOfBirth(employee.dateOfBirth || '');
       setCitizenId(employee.citizenId || '');
       setAddress(employee.address || '');
-      setCity(employee.city || '');
 
       setStartDate(employee.startDate || '');
       setWorkingBranchIds(employee.workingBranchIds || [branches[0]?.id || '']);
@@ -92,15 +107,25 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
       setNote(employee.note || '');
 
       setBankAccountNumber(employee.bankAccountNumber || '');
-      setBankName(employee.bankName || 'Techcombank');
+      const empBank = employee.bankName || '';
+      if (empBank && PREDEFINED_BANKS.some((b) => b.value === empBank)) {
+        setBankSelect(empBank);
+        setCustomBankName('');
+      } else if (empBank) {
+        setBankSelect('OTHER');
+        setCustomBankName(empBank);
+      } else {
+        setBankSelect('Techcombank');
+        setCustomBankName('');
+      }
       setBankAccountHolder(employee.bankAccountHolder || '');
 
       if (employee.salaryConfig) {
         setSalaryType(employee.salaryConfig.salaryType);
-        setBaseSalary(employee.salaryConfig.baseSalary);
-        setOtWeekday(employee.salaryConfig.otWeekday);
-        setOtSunday(employee.salaryConfig.otSunday);
-        setOtDayOff(employee.salaryConfig.otDayOff);
+        setBaseSalary(employee.salaryConfig.baseSalary ?? '');
+        setOtWeekday(employee.salaryConfig.otWeekday || '');
+        setOtSunday(employee.salaryConfig.otSunday || '');
+        setOtDayOff(employee.salaryConfig.otDayOff || '');
         setOtHoliday(employee.salaryConfig.otHoliday);
         const empAllowances = employee.salaryConfig.allowances || [];
         setAllowances(empAllowances);
@@ -110,7 +135,6 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
       // Default reset for creation
       setFullName('');
       setEmployeeCode('');
-      setAttendanceCode('');
       setPhone('');
       setEmail('');
       setAvatarUrl('');
@@ -118,7 +142,6 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
       setDateOfBirth('');
       setCitizenId('');
       setAddress('');
-      setCity('');
 
       setStartDate(new Date().toISOString().split('T')[0]);
       setWorkingBranchIds([branches[0]?.id || '']);
@@ -127,16 +150,17 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
       setNote('');
 
       setBankAccountNumber('');
-      setBankName('Techcombank');
+      setBankSelect('Techcombank');
+      setCustomBankName('');
       setBankAccountHolder('');
 
       setSalaryType('monthly');
-      setBaseSalary(7500000);
-      setAllowances([
-        { id: 'al_1', name: 'Phụ cấp ăn trưa', type: 'monthly', amount: 650000, enabled: true },
-        { id: 'al_2', name: 'Phụ cấp xăng xe', type: 'monthly', amount: 300000, enabled: true },
-      ]);
-      setEnableAllowance(true);
+      setBaseSalary('');
+      setOtWeekday('');
+      setOtSunday('');
+      setOtDayOff('');
+      setAllowances([]);
+      setEnableAllowance(false);
     }
     setFormError(null);
     setIsSubmitting(false);
@@ -223,6 +247,7 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
   };
 
   const handleAddAllowanceRow = () => {
+    setEnableAllowance(true);
     const newAl: AllowanceItem = {
       id: `al_${Date.now()}`,
       name: '',
@@ -230,13 +255,13 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
       amount: 0,
       enabled: true,
     };
-    setAllowances([...allowances, newAl]);
+    setAllowances((prev) => [...prev, newAl]);
   };
 
   const totalAllowances = enableAllowance
     ? allowances
-        .filter((a) => a.enabled)
-        .reduce((sum, a) => sum + (Number(a.amount) || 0), 0)
+      .filter((a) => a.enabled)
+      .reduce((sum, a) => sum + (Number(a.amount) || 0), 0)
     : 0;
 
   const handleAddAllowanceSuccess = (newAl: AllowanceItem) => {
@@ -267,6 +292,12 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
       return;
     }
 
+    if (bankSelect === 'OTHER' && !customBankName.trim()) {
+      setFormError('Vui lòng nhập tên ngân hàng khác!');
+      return;
+    }
+    const effectiveBankName = bankSelect === 'OTHER' ? customBankName.trim() : bankSelect;
+
     const targetBranchId = workingBranchIds[0] || (branches[0] ? branches[0].id : '');
     if (!targetBranchId) {
       setFormError('Vui lòng chọn ít nhất 1 chi nhánh làm việc!');
@@ -279,20 +310,23 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
         citizenId,
         phone,
         email,
+        address,
+        startDate,
+        note,
         gender,
         dateOfBirth,
         bankAccountNumber,
-        bankName,
+        bankName: effectiveBankName,
         bankAccountHolder,
         avatarUrl,
         salaryBranchId: targetBranchId,
       },
       {
         salaryType,
-        baseSalary,
-        otWeekday,
-        otSunday,
-        otDayOff,
+        baseSalary: Number(baseSalary) || 0,
+        otWeekday: otWeekday || '150%',
+        otSunday: otSunday || '200%',
+        otDayOff: otDayOff || '200%',
         otHoliday,
         allowances: enableAllowance ? allowances : [],
       },
@@ -315,7 +349,6 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
         // Reset for next employee
         setFullName('');
         setEmployeeCode('');
-        setAttendanceCode('');
         setPhone('');
         setEmail('');
         setCitizenId('');
@@ -476,27 +509,14 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
                 {/* 2. THÔNG TIN CÔNG VIỆC */}
                 <div className="emp-section-card">
                   <div className="emp-section-title">Thông tin công việc</div>
-                  <div className="emp-grid-2">
-                    <div className="emp-form-group">
-                      <label className="emp-form-label">Ngày bắt đầu làm việc</label>
-                      <input
-                        type="date"
-                        className="emp-form-input"
-                        value={startDate}
-                        onChange={(e) => setStartDate(e.target.value)}
-                      />
-                    </div>
-
-                    <div className="emp-form-group">
-                      <label className="emp-form-label">Mã chấm công</label>
-                      <input
-                        type="text"
-                        className="emp-form-input"
-                        placeholder="Mã máy chấm công (nếu có)"
-                        value={attendanceCode}
-                        onChange={(e) => setAttendanceCode(e.target.value)}
-                      />
-                    </div>
+                  <div className="emp-form-group">
+                    <label className="emp-form-label">Ngày bắt đầu làm việc</label>
+                    <input
+                      type="date"
+                      className="emp-form-input"
+                      value={startDate}
+                      onChange={(e) => setStartDate(e.target.value)}
+                    />
                   </div>
 
                   {/* Các chi nhánh làm việc - Searchable Multi-Select UI */}
@@ -772,7 +792,7 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
                                     <input
                                       type="checkbox"
                                       checked={isChecked}
-                                      onChange={() => {}} // Đã xử lý ở cấp row onClick
+                                      onChange={() => { }} // Đã xử lý ở cấp row onClick
                                       style={{ accentColor: '#0F766E', width: 16, height: 16 }}
                                     />
                                     <span style={{ fontWeight: isChecked ? 600 : 400, color: isChecked ? '#134E4A' : '#1E293B' }}>
@@ -889,20 +909,36 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
                       <label className="emp-form-label">Ngân hàng</label>
                       <select
                         className="emp-form-select"
-                        value={bankName}
-                        onChange={(e) => setBankName(e.target.value)}
+                        value={bankSelect}
+                        onChange={(e) => setBankSelect(e.target.value)}
                       >
-                        <option value="Techcombank">Techcombank (TCB)</option>
-                        <option value="Vietcombank">Vietcombank (VCB)</option>
-                        <option value="MB Bank">MB Bank</option>
-                        <option value="BIDV">BIDV</option>
-                        <option value="ACB">ACB</option>
-                        <option value="VPBank">VPBank</option>
+                        {PREDEFINED_BANKS.map((b) => (
+                          <option key={b.value} value={b.value}>
+                            {b.label}
+                          </option>
+                        ))}
+                        <option value="OTHER">Ngân hàng khác...</option>
                       </select>
                     </div>
                   </div>
 
-                  <div className="emp-form-group">
+                  {bankSelect === 'OTHER' && (
+                    <div className="emp-form-group" style={{ marginTop: 12 }}>
+                      <label className="emp-form-label" style={{ color: '#0F766E', fontWeight: 600 }}>
+                        Tên ngân hàng khác <span style={{ color: '#EF4444' }}>*</span>
+                      </label>
+                      <input
+                        type="text"
+                        className="emp-form-input"
+                        placeholder="Nhập tên ngân hàng (VD: Shinhan Bank, Woori Bank...)"
+                        value={customBankName}
+                        onChange={(e) => setCustomBankName(e.target.value)}
+                        autoFocus
+                      />
+                    </div>
+                  )}
+
+                  <div className="emp-form-group" style={{ marginTop: 12 }}>
                     <label className="emp-form-label">Tên chủ tài khoản</label>
                     <input
                       type="text"
@@ -966,28 +1002,15 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
                     </div>
                   </div>
 
-                  <div className="emp-grid-2">
-                    <div className="emp-form-group">
-                      <label className="emp-form-label">Địa chỉ</label>
-                      <input
-                        type="text"
-                        className="emp-form-input"
-                        placeholder="Số nhà, đường phố..."
-                        value={address}
-                        onChange={(e) => setAddress(e.target.value)}
-                      />
-                    </div>
-
-                    <div className="emp-form-group">
-                      <label className="emp-form-label">Tỉnh / Thành phố</label>
-                      <input
-                        type="text"
-                        className="emp-form-input"
-                        placeholder="VD: Hà Nội, TP. Hồ Chí Minh"
-                        value={city}
-                        onChange={(e) => setCity(e.target.value)}
-                      />
-                    </div>
+                  <div className="emp-form-group" style={{ marginTop: 12 }}>
+                    <label className="emp-form-label">Địa chỉ</label>
+                    <input
+                      type="text"
+                      className="emp-form-input"
+                      placeholder="Số nhà, đường phố, phường/xã, quận/huyện, tỉnh/thành..."
+                      value={address}
+                      onChange={(e) => setAddress(e.target.value)}
+                    />
                   </div>
                 </div>
               </div>
@@ -1017,15 +1040,22 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
                         {salaryType === 'monthly'
                           ? 'Mức lương chính (VNĐ/tháng)'
                           : salaryType === 'hourly'
-                          ? 'Mức lương chính (VNĐ/giờ)'
-                          : 'Mức lương chính (VNĐ/ca)'}
+                            ? 'Mức lương chính (VNĐ/giờ)'
+                            : 'Mức lương chính (VNĐ/ca)'}
                       </label>
                       <input
                         type="number"
-                        step="500000"
+                        step="50000"
                         className="emp-form-input"
-                        value={baseSalary}
-                        onChange={(e) => setBaseSalary(Number(e.target.value))}
+                        placeholder={
+                          salaryType === 'monthly'
+                            ? 'VD: 7,500,000'
+                            : salaryType === 'hourly'
+                              ? 'VD: 30,000'
+                              : 'VD: 250,000'
+                        }
+                        value={baseSalary === '' ? '' : baseSalary}
+                        onChange={(e) => setBaseSalary(e.target.value === '' ? '' : Number(e.target.value))}
                       />
                     </div>
                   </div>
@@ -1033,36 +1063,74 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
 
                 {/* OT Config */}
                 <div className="emp-section-card">
-                  <div className="emp-section-title">Hệ số làm thêm giờ (OT)</div>
-                  <div className="emp-grid-2">
-                    <div className="emp-form-group">
-                      <label className="emp-form-label">Tăng ca ngày thường</label>
-                      <input
-                        type="text"
-                        className="emp-form-input"
-                        value={otWeekday}
-                        onChange={(e) => setOtWeekday(e.target.value)}
-                      />
-                    </div>
-                    <div className="emp-form-group">
-                      <label className="emp-form-label">Tăng ca Chủ nhật / Ngày nghỉ</label>
-                      <input
-                        type="text"
-                        className="emp-form-input"
-                        value={otSunday}
-                        onChange={(e) => setOtSunday(e.target.value)}
-                      />
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                    <div>
+                      <div className="emp-section-title" style={{ marginBottom: 2 }}>Hệ số làm thêm giờ (OT)</div>
                     </div>
                   </div>
+
                   <div className="emp-grid-2">
+                    {/* Tăng ca ngày thường */}
                     <div className="emp-form-group">
-                      <label className="emp-form-label">Tăng ca ngày Lễ / Tết</label>
-                      <input
-                        type="text"
-                        className="emp-form-input"
-                        value={otHoliday}
-                        onChange={(e) => setOtHoliday(e.target.value)}
-                      />
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                        <label className="emp-form-label" style={{ marginBottom: 0 }}>Ngày thường</label>
+                        {otWeekday && (
+                          <span style={{ fontSize: 11, fontWeight: 600, color: '#0F766E' }}>
+                            x{((parseInt(otWeekday.replace('%', '')) || 0) / 100).toFixed(1)} lương/giờ
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                        <input
+                          type="number"
+                          min={100}
+                          max={500}
+                          step={10}
+                          className="emp-form-input"
+                          style={{ paddingRight: 36, fontWeight: 600 }}
+                          value={otWeekday ? otWeekday.replace('%', '') : ''}
+                          onChange={(e) => {
+                            const val = e.target.value.replace(/[^0-9]/g, '');
+                            setOtWeekday(val ? `${val}%` : '');
+                          }}
+                          placeholder="150"
+                        />
+                        <span style={{ position: 'absolute', right: 12, color: '#64748B', fontWeight: 600, pointerEvents: 'none' }}>
+                          %
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Tăng ca Chủ nhật / Ngày nghỉ */}
+                    <div className="emp-form-group">
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                        <label className="emp-form-label" style={{ marginBottom: 0 }}>Chủ nhật / Nghỉ tuần</label>
+                        {otSunday && (
+                          <span style={{ fontSize: 11, fontWeight: 600, color: '#0F766E' }}>
+                            x{((parseInt(otSunday.replace('%', '')) || 0) / 100).toFixed(1)} lương/giờ
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                        <input
+                          type="number"
+                          min={100}
+                          max={500}
+                          step={10}
+                          className="emp-form-input"
+                          style={{ paddingRight: 36, fontWeight: 600 }}
+                          value={otSunday ? otSunday.replace('%', '') : ''}
+                          onChange={(e) => {
+                            const val = e.target.value.replace(/[^0-9]/g, '');
+                            setOtSunday(val ? `${val}%` : '');
+                            setOtDayOff(val ? `${val}%` : '');
+                          }}
+                          placeholder="200"
+                        />
+                        <span style={{ position: 'absolute', right: 12, color: '#64748B', fontWeight: 600, pointerEvents: 'none' }}>
+                          %
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1082,24 +1150,22 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
                         <span>Áp dụng phụ cấp</span>
                       </label>
                     </div>
-                    {enableAllowance && (
-                      <button
-                        type="button"
-                        style={{
-                          background: '#F0FDFA',
-                          border: '1px solid #99F6E4',
-                          color: '#0F766E',
-                          borderRadius: 6,
-                          padding: '4px 12px',
-                          fontWeight: 600,
-                          fontSize: 13,
-                          cursor: 'pointer',
-                        }}
-                        onClick={handleAddAllowanceRow}
-                      >
-                        + Thêm khoản phụ cấp
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      style={{
+                        background: '#F0FDFA',
+                        border: '1px solid #99F6E4',
+                        color: '#0F766E',
+                        borderRadius: 6,
+                        padding: '4px 12px',
+                        fontWeight: 600,
+                        fontSize: 13,
+                        cursor: 'pointer',
+                      }}
+                      onClick={handleAddAllowanceRow}
+                    >
+                      + Thêm khoản phụ cấp
+                    </button>
                   </div>
 
                   {enableAllowance && (
@@ -1130,7 +1196,7 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
                                     type="text"
                                     className="emp-form-input"
                                     style={{ height: 32 }}
-                                    placeholder="VD: Phụ cấp ăn trưa, xăng xe, trách nhiệm..."
+                                    placeholder="Tên khoản phụ cấp (VD: Ăn trưa, xăng xe, trách nhiệm...)"
                                     value={al.name}
                                     onChange={(e) => handleAllowanceNameChange(al.id, e.target.value)}
                                     disabled={!al.enabled}
@@ -1143,9 +1209,13 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
                                     style={{ height: 32 }}
                                     step="10000"
                                     min="0"
-                                    value={al.amount}
+                                    placeholder="Số tiền (VD: 500,000)"
+                                    value={!al.amount ? '' : al.amount}
                                     onChange={(e) =>
-                                      handleAllowanceAmountChange(al.id, Math.max(0, Number(e.target.value)))
+                                      handleAllowanceAmountChange(
+                                        al.id,
+                                        e.target.value === '' ? 0 : Math.max(0, Number(e.target.value))
+                                      )
                                     }
                                     disabled={!al.enabled}
                                   />

@@ -6,12 +6,18 @@ export interface EmployeeBackendSummaryDto {
   fullName: string;
   phone: string;
   email?: string;
+  avatarUrl?: string;
+  address?: string;
+  startDate?: string;
+  note?: string;
   branchId: string;
   branchName: string;
-  jobTitle?: string;
   status: string;
   salaryType: string;
   baseRate: number;
+  otWeekday?: string;
+  otSunday?: string;
+  debtAmount?: number;
   userId?: string;
   userName?: string;
   createdAt: string;
@@ -27,7 +33,11 @@ export interface EmployeeBackendDetailDto {
   phone: string;
   email?: string;
   avatarUrl?: string;
-  jobTitle?: string;
+  address?: string;
+  startDate?: string;
+  note?: string;
+  otWeekday?: string;
+  otSunday?: string;
   branchId: string;
   branchName: string;
   userId?: string;
@@ -51,7 +61,11 @@ export interface CreateEmployeePayload {
   phone: string;
   branchId: string;
   email?: string;
-  jobTitle?: string;
+  address?: string;
+  startDate?: string;
+  note?: string;
+  otWeekday?: string;
+  otSunday?: string;
   dateOfBirth?: string;
   gender?: string;
   salaryType: string;
@@ -75,6 +89,7 @@ export interface EmployeeQueryFilterParams {
   keyword?: string;
   branchId?: string;
   status?: string;
+  salaryType?: string;
   page?: number;
   pageSize?: number;
 }
@@ -87,8 +102,8 @@ export const mapBackendSummaryToEmployee = (dto: EmployeeBackendSummaryDto): Emp
   const salaryConfig: SalaryConfig = {
     salaryType,
     baseSalary: dto.baseRate || 0,
-    otWeekday: '150%',
-    otSunday: '200%',
+    otWeekday: dto.otWeekday || '150%',
+    otSunday: dto.otSunday || '200%',
     otDayOff: '200%',
     otHoliday: '300%',
     allowances: [],
@@ -100,11 +115,13 @@ export const mapBackendSummaryToEmployee = (dto: EmployeeBackendSummaryDto): Emp
     fullName: dto.fullName,
     phone: dto.phone,
     email: dto.email || '',
-    avatarUrl: '',
+    avatarUrl: dto.avatarUrl || '',
     gender: 'male',
     dateOfBirth: '',
     citizenId: '',
-    jobTitle: dto.jobTitle || 'Nhân viên',
+    address: dto.address,
+    startDate: dto.startDate ? dto.startDate.split('T')[0] : '',
+    note: dto.note,
     salaryBranchId: dto.branchId,
     salaryBranchName: dto.branchName || 'Chưa gán',
     workingBranchIds: dto.branchId ? [dto.branchId] : [],
@@ -112,7 +129,7 @@ export const mapBackendSummaryToEmployee = (dto: EmployeeBackendSummaryDto): Emp
     userId: dto.userId,
     userName: dto.userName,
     status: dto.status?.toLowerCase() === 'inactive' ? 'inactive' : 'active',
-    debtAmount: 0,
+    debtAmount: dto.debtAmount || 0,
     salaryConfig,
   };
 };
@@ -138,8 +155,8 @@ export const mapBackendDetailToEmployee = (dto: EmployeeBackendDetailDto): Emplo
   const salaryConfig: SalaryConfig = {
     salaryType,
     baseSalary: dto.baseRate || 0,
-    otWeekday: '150%',
-    otSunday: '200%',
+    otWeekday: dto.otWeekday || '150%',
+    otSunday: dto.otSunday || '200%',
     otDayOff: '200%',
     otHoliday: '300%',
     allowances,
@@ -157,7 +174,9 @@ export const mapBackendDetailToEmployee = (dto: EmployeeBackendDetailDto): Emplo
     gender: genderVal,
     dateOfBirth: dto.dateOfBirth ? dto.dateOfBirth.split('T')[0] : '',
     citizenId: dto.citizenId,
-    jobTitle: dto.jobTitle || 'Nhân viên',
+    address: dto.address,
+    startDate: dto.startDate ? dto.startDate.split('T')[0] : '',
+    note: dto.note,
     salaryBranchId: dto.branchId,
     salaryBranchName: dto.branchName || 'Chưa gán',
     workingBranchIds: dto.branchId ? [dto.branchId] : [],
@@ -197,7 +216,11 @@ export const mapFormToCreatePayload = (
     phone: (emp.phone || '').trim(),
     branchId: targetBranchId,
     email: emp.email?.trim() || undefined,
-    jobTitle: emp.jobTitle?.trim() || undefined,
+    address: emp.address?.trim() || undefined,
+    startDate: emp.startDate ? new Date(emp.startDate).toISOString() : undefined,
+    note: emp.note?.trim() || undefined,
+    otWeekday: salaryConfig?.otWeekday || undefined,
+    otSunday: salaryConfig?.otSunday || undefined,
     dateOfBirth: emp.dateOfBirth ? new Date(emp.dateOfBirth).toISOString() : undefined,
     gender: emp.gender || 'male',
     salaryType: salaryConfig?.salaryType || 'monthly',
@@ -209,4 +232,3 @@ export const mapFormToCreatePayload = (
     avatarUrl: emp.avatarUrl?.trim() || undefined,
   };
 };
-

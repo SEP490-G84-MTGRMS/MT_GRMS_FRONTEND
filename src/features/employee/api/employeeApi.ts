@@ -141,21 +141,19 @@ export const employeeApi = {
    */
   async getBranches(): Promise<Branch[]> {
     try {
-      const res = await httpClient.get<ApiResponse<Array<{ id: string; name: string }>>>('/branches');
-      if (res.data?.success && Array.isArray(res.data.data)) {
-        return res.data.data.map((b) => ({
-          id: b.id,
-          name: b.name,
+      const res = await httpClient.get<any>('/branches', { params: { pageSize: 100 } });
+      const raw = res.data?.data;
+      const list = Array.isArray(raw) ? raw : (raw?.items || []);
+      if (Array.isArray(list) && list.length > 0) {
+        return list.map((b: any) => ({
+          id: String(b.id),
+          name: b.name || b.branchName || 'Chi nhánh',
         }));
       }
     } catch {
       // ignore, fallback
     }
-    return [
-      { id: '1', name: 'Chi nhánh 1 - Ba Đình' },
-      { id: '2', name: 'Chi nhánh 2 - Cầu Giấy' },
-      { id: '3', name: 'Chi nhánh 3 - Đống Đa' },
-    ];
+    return [];
   },
 };
 

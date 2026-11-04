@@ -21,12 +21,7 @@ import type {
   ApprovalRequest,
   DebtTransaction,
 } from '../types';
-import {
-  MOCK_BRANCHES,
-  MOCK_APPROVAL_REQUESTS,
-} from '../services/mockData';
 import { employeeApi } from '../api/employeeApi';
-import { EmployeeFilterSidebar } from '../components/EmployeeFilterSidebar';
 import { EmployeeFormModal } from '../components/EmployeeFormModal';
 import { EmployeeDetailModal } from '../components/EmployeeDetailModal';
 import { ApprovalRequestsModal } from '../components/ApprovalRequestsModal';
@@ -38,8 +33,8 @@ export const EmployeeListPage: React.FC = () => {
 
   // State data
   const [employees, setEmployees] = useState<Employee[]>([]);
-  const [branches, setBranches] = useState<Branch[]>(MOCK_BRANCHES);
-  const [approvalRequests, setApprovalRequests] = useState<ApprovalRequest[]>(MOCK_APPROVAL_REQUESTS);
+  const [branches, setBranches] = useState<Branch[]>([]);
+  const [approvalRequests, setApprovalRequests] = useState<ApprovalRequest[]>([]);
   const [totalItems, setTotalItems] = useState<number>(0);
   const [page, setPage] = useState<number>(1);
   const [pageSize] = useState<number>(10);
@@ -50,7 +45,7 @@ export const EmployeeListPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filters, setFilters] = useState<EmployeeFilterState>({
     keyword: '',
-    status: 'active',
+    status: 'all',
     workingBranchId: '',
   });
 
@@ -239,28 +234,12 @@ export const EmployeeListPage: React.FC = () => {
 
   return (
     <div className="emp-page-container">
-      {/* ─── HEADER BAR ─── */}
-      <div>
-        <h2 className="emp-header-title">
+      {/* ─── TITLE & ACTION BAR ─── */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
+        <h2 className="emp-header-title" style={{ margin: 0 }}>
           <span>Danh sách nhân viên</span>
           <span className="count-badge">{totalItems}</span>
         </h2>
-      </div>
-
-      <div className="emp-header-bar">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <div className="emp-search-box">
-            <span className="emp-search-icon">
-              <Search size={16} />
-            </span>
-            <input
-              type="text"
-              placeholder="Tìm theo mã, tên, SĐT nhân viên..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-        </div>
 
         <div className="emp-header-actions">
           <button type="button" className="emp-btn emp-btn-primary" onClick={handleCreateNew}>
@@ -362,6 +341,170 @@ export const EmployeeListPage: React.FC = () => {
         </div>
       </div>
 
+      {/* ─── TOP FILTER BAR: TÌM KIẾM, CHI NHÁNH, TRẠNG THÁI (ĐÃ ĐƯA LÊN HEADER) ─── */}
+      <div
+        style={{
+          background: '#FFFFFF',
+          borderRadius: 12,
+          border: '1px solid #E2E8F0',
+          padding: '12px 16px',
+          marginBottom: 16,
+          display: 'flex',
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 12,
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', flex: 1 }}>
+          {/* 1. Thanh tìm kiếm */}
+          <div className="emp-search-box" style={{ width: 320, position: 'relative' }}>
+            <span className="emp-search-icon">
+              <Search size={16} />
+            </span>
+            <input
+              type="text"
+              placeholder="Tìm theo mã, tên, SĐT nhân viên..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  setFilters((prev) => ({ ...prev, keyword: searchTerm }));
+                  setPage(1);
+                }
+              }}
+              style={{ paddingRight: searchTerm ? 36 : 16 }}
+            />
+            {searchTerm && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchTerm('');
+                  setFilters((prev) => ({ ...prev, keyword: '' }));
+                  setPage(1);
+                }}
+                style={{
+                  position: 'absolute',
+                  right: 12,
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'none',
+                  border: 'none',
+                  color: '#94A3B8',
+                  cursor: 'pointer',
+                  padding: 2,
+                  fontSize: 18,
+                  lineHeight: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+                title="Xóa tìm kiếm"
+              >
+                &times;
+              </button>
+            )}
+          </div>
+
+          {/* 2. Lọc Chi nhánh làm việc */}
+          <div style={{ minWidth: 220 }}>
+            <select
+              className="emp-form-select"
+              style={{ height: 40, padding: '0 12px', fontSize: 13, background: '#F8FAFC' }}
+              value={filters.workingBranchId}
+              onChange={(e) => {
+                setFilters((prev) => ({ ...prev, workingBranchId: e.target.value }));
+                setPage(1);
+              }}
+            >
+              <option value="">Tất cả chi nhánh làm việc</option>
+              {branches.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* 3. Lọc Trạng thái (Tabs/Pills) */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4,
+              background: '#F1F5F9',
+              padding: 3,
+              borderRadius: 8,
+            }}
+          >
+            {[
+              { key: 'all', label: 'Tất cả' },
+              { key: 'active', label: 'Đang làm việc' },
+              { key: 'inactive', label: 'Đã nghỉ' },
+            ].map((tab) => {
+              const isSelected = filters.status === tab.key;
+              return (
+                <button
+                  key={tab.key}
+                  type="button"
+                  onClick={() => {
+                    setFilters((prev) => ({ ...prev, status: tab.key as any }));
+                    setPage(1);
+                  }}
+                  style={{
+                    padding: '6px 14px',
+                    fontSize: 12,
+                    fontWeight: isSelected ? 600 : 500,
+                    borderRadius: 6,
+                    border: 'none',
+                    background: isSelected ? '#FFFFFF' : 'transparent',
+                    color: isSelected ? '#0F766E' : '#64748B',
+                    boxShadow: isSelected ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                  }}
+                >
+                  {tab.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* 4. Nút Đặt lại bộ lọc */}
+        {(searchTerm || filters.workingBranchId || filters.status !== 'all') && (
+          <button
+            type="button"
+            onClick={() => {
+              setSearchTerm('');
+              setFilters({
+                keyword: '',
+                status: 'all',
+                workingBranchId: '',
+              });
+              setPage(1);
+            }}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '6px 12px',
+              fontSize: 12,
+              fontWeight: 500,
+              color: '#EF4444',
+              background: '#FEE2E2',
+              border: '1px solid #FECACA',
+              borderRadius: 6,
+              cursor: 'pointer',
+            }}
+            title="Xóa toàn bộ bộ lọc và từ khóa"
+          >
+            <RotateCw size={12} />
+            <span>Đặt lại bộ lọc</span>
+          </button>
+        )}
+      </div>
+
       {/* Error Alert Banner if fetch fails */}
       {errorMessage && (
         <div
@@ -404,29 +547,8 @@ export const EmployeeListPage: React.FC = () => {
         </div>
       )}
 
-      {/* ─── MAIN CONTENT LAYOUT: SIDEBAR + TABLE ─── */}
-      <div className="emp-main-layout">
-        {/* Left Filter Sidebar */}
-        <EmployeeFilterSidebar
-          filters={filters}
-          onFilterChange={(newFilters) => {
-            setFilters(newFilters);
-            setPage(1);
-          }}
-          branches={branches}
-          onResetFilters={() => {
-            setSearchTerm('');
-            setFilters({
-              keyword: '',
-              status: 'all',
-              workingBranchId: '',
-            });
-            setPage(1);
-          }}
-        />
-
-        {/* Right Data Table */}
-        <div className="emp-table-container">
+      {/* ─── FULL-WIDTH TABLE CONTAINER ─── */}
+      <div className="emp-table-container" style={{ width: '100%' }}>
           <table className="emp-table">
             <thead>
               <tr>
@@ -443,8 +565,8 @@ export const EmployeeListPage: React.FC = () => {
                 </th>
                 <th style={{ width: 44, textAlign: 'center' }}></th>
                 <th style={{ width: 110 }}>Mã NV</th>
-                <th style={{ width: 110 }}>Mã chấm công</th>
-                <th>Tên nhân viên</th>
+                                <th>Tên nhân viên</th>
+                <th>Chi nhánh</th>
                 <th>Số điện thoại</th>
                 <th className="align-right">Nợ và tạm ứng</th>
                 <th>Trạng thái</th>
@@ -454,7 +576,7 @@ export const EmployeeListPage: React.FC = () => {
             <tbody>
               {isLoading ? (
                 <tr>
-                  <td colSpan={9} style={{ textAlign: 'center', padding: 48, color: '#64748B' }}>
+                  <td colSpan={8} style={{ textAlign: 'center', padding: 48, color: '#64748B' }}>
                     <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
                       <RotateCw className="emp-spin-icon" size={18} />
                       <span>Đang tải danh sách nhân viên từ máy chủ...</span>
@@ -489,8 +611,7 @@ export const EmployeeListPage: React.FC = () => {
                       </div>
                     </td>
                     <td style={{ fontWeight: 600, color: '#0F766E' }}>{emp.employeeCode}</td>
-                    <td style={{ color: '#64748B' }}>{emp.attendanceCode || '-'}</td>
-                    <td>
+                                        <td>
                       <div className="emp-name-badge">
                         <span>{emp.fullName}</span>
                         {emp.hasWarning && (
@@ -500,6 +621,7 @@ export const EmployeeListPage: React.FC = () => {
                         )}
                       </div>
                     </td>
+                    <td style={{ color: '#475569', fontSize: 13 }}>{emp.salaryBranchName || 'Chưa gán'}</td>
                     <td style={{ color: '#334155' }}>{emp.phone}</td>
                     <td className="align-right">
                       <span className={`emp-debt-value ${emp.debtAmount === 0 ? 'zero' : ''}`}>
@@ -547,7 +669,7 @@ export const EmployeeListPage: React.FC = () => {
                 ))
               ) : (
                 <tr>
-                  <td colSpan={9} style={{ textAlign: 'center', color: '#94A3B8', padding: 48 }}>
+                  <td colSpan={8} style={{ textAlign: 'center', color: '#94A3B8', padding: 48 }}>
                     <p style={{ margin: 0, fontWeight: 500, color: '#475569' }}>
                       Không tìm thấy nhân viên nào phù hợp với bộ lọc hiện tại
                     </p>
@@ -600,7 +722,6 @@ export const EmployeeListPage: React.FC = () => {
               </button>
             </div>
           </div>
-        </div>
       </div>
 
       {/* ─── MODALS ─── */}

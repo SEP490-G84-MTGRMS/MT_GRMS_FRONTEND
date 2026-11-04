@@ -27,7 +27,6 @@ describe('employeeMapper', () => {
       email: 'nva@test.com',
       branchId: 'branch-1',
       branchName: 'Chi nhánh Quận 1',
-      jobTitle: 'Thu ngân',
       status: 'active',
       salaryType: 'monthly',
       baseRate: 8500000,
