@@ -9,8 +9,12 @@
   flex-direction: column;
   gap: 8px;
   width: 100%;
+  flex: 1 1 auto;
+  height: 100%;
+  max-height: 100%;
   /* Sticky footer: container là flex column, bảng sẽ flex-grow */
   min-height: 0;
+  overflow: hidden;
 }
 
 /* Table wrapper tự co dãn theo chiều cao còn lại */

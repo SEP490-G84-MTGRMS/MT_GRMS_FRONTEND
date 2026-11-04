@@ -342,7 +342,7 @@ export const SupplierProductTable: FC<SupplierProductTableProps> = ({
               value={pageSize}
               onChange={(e) => onPageSizeChange(Number(e.target.value))}
             >
-              <option value={15}>15</option>
+              <option value={20}>20</option>
               <option value={24}>24</option>
               <option value={36}>36</option>
               <option value={48}>48</option>

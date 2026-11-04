@@ -70,6 +70,7 @@ export const storeProductApi = {
         barcode: x.barcode,
         category: x.category || '',
         unit: x.unit,
+        imageUrl: x.imageUrl || undefined,
         retailPrice: x.retailPrice,
         costPrice: x.costPrice,
         minOrderQuantity: x.minOrderQuantity ?? x.minimumOrderQuantity ?? 1,
@@ -80,6 +81,15 @@ export const storeProductApi = {
         status: x.status,
         shelfLocation: x.shelfLocation,
         assignedDate: x.assignedDate ? x.assignedDate.slice(0, 10) : new Date().toISOString().slice(0, 10),
+        unitPrices: Array.isArray(x.unitPrices)
+          ? x.unitPrices.map((u: any) => ({
+              unitId: u.unitId ? String(u.unitId) : undefined,
+              unitName: u.unitName || '',
+              conversionRate: Number(u.conversionRate ?? 1) || 1,
+              price: Number(u.price ?? 0),
+              isBaseUnit: Boolean(u.isBaseUnit),
+            }))
+          : undefined,
       }));
       return { items, total: paged.totalItems };
     }
@@ -108,9 +118,70 @@ export const storeProductApi = {
 
   // Get master products from Backend API for assigning
   getMasterProducts: async (): Promise<any[]> => {
-    const res = await httpClient.get<ApiResponse<any[]>>('/products');
-    if (res.data?.success && res.data.data) {
-      return res.data.data;
+    const res = await httpClient.get<ApiResponse<PagedResult<any> | any[]>>('/products', {
+      params: { PageIndex: 1, PageSize: 500, Status: 'Active' },
+    });
+    if (!res.data?.success || !res.data.data) {
+      return [];
+    }
+    const raw = res.data.data;
+    return Array.isArray(raw) ? raw : Array.isArray(raw.items) ? raw.items : [];
+  },
+
+  /**
+   * Sản phẩm khả dụng để gán vào chi nhánh:
+   * chỉ các SP thuộc NCC Active đang liên kết với chi nhánh đó.
+   */
+  getAssignableProducts: async (branchId: string): Promise<
+    Array<{
+      id: string;
+      sku: string;
+      barcode: string;
+      name: string;
+      categoryName: string;
+      baseUoM: string;
+      imageUrl?: string;
+      costPrice: number;
+      sellingPrice: number;
+      moq: number;
+      supplierId: string;
+      supplierCode: string;
+      supplierName: string;
+      isAlreadyAssigned: boolean;
+      unitPrices?: Array<{
+        unitName: string;
+        conversionRate: number;
+        price: number;
+        isBaseUnit: boolean;
+      }>;
+    }>
+  > => {
+    const res = await httpClient.get<ApiResponse<any[]>>(`/branches/${branchId}/assignable-products`);
+    if (res.data?.success && Array.isArray(res.data.data)) {
+      return res.data.data.map((p: any) => ({
+        id: String(p.productId || p.id),
+        sku: p.sku || p.productCode || '',
+        barcode: p.barcode || '',
+        name: p.name || p.productName || '',
+        categoryName: p.categoryName || p.category || 'Khác',
+        baseUoM: p.baseUoM || p.unitName || p.baseUnit || 'Cái',
+        imageUrl: p.imageUrl || undefined,
+        costPrice: Number(p.costPrice ?? 0),
+        sellingPrice: Number(p.sellingPrice ?? p.retailPrice ?? 0),
+        moq: Number(p.moq ?? p.minimumOrderQuantity ?? 1),
+        supplierId: String(p.supplierId || ''),
+        supplierCode: p.supplierCode || '',
+        supplierName: p.supplierName || '',
+        isAlreadyAssigned: Boolean(p.isAlreadyAssigned),
+        unitPrices: Array.isArray(p.unitPrices)
+          ? p.unitPrices.map((u: any) => ({
+              unitName: u.unitName || '',
+              conversionRate: Number(u.conversionRate ?? 1) || 1,
+              price: Number(u.price ?? 0),
+              isBaseUnit: Boolean(u.isBaseUnit),
+            }))
+          : undefined,
+      }));
     }
     return [];
   },
@@ -119,9 +190,6 @@ export const storeProductApi = {
   assignProducts: async (input: AssignStoreProductInput): Promise<void> => {
     await httpClient.post(`/branches/${input.storeId}/products`, {
       productIds: input.productIds,
-      defaultRetailPrice: input.defaultRetailPrice,
-      defaultMinStock: input.defaultMinStock,
-      defaultMinOrderQuantity: input.defaultMinOrderQuantity,
     });
   },
 
@@ -133,10 +201,14 @@ export const storeProductApi = {
   ): Promise<void> => {
     await httpClient.put(`/branches/${storeId}/products/${productId}`, {
       retailPrice: input.retailPrice,
-      minStockLevel: input.minStockLevel,
-      minOrderQuantity: input.minOrderQuantity,
+      unitPrices: input.unitPrices?.map((u) => ({
+        unitId: u.unitId || undefined,
+        unitName: u.unitName,
+        conversionRate: u.conversionRate,
+        price: u.price,
+        isBaseUnit: u.isBaseUnit,
+      })),
       status: input.status,
-      supplierId: input.supplierId,
       shelfLocation: input.shelfLocation,
     });
   },
