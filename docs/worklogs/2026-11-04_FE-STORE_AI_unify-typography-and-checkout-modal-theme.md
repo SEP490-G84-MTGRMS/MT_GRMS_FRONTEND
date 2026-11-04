@@ -45,3 +45,4 @@
 
 ## 4. Ghi Chú Cho Manager Khi Duyệt & Merge (Manager Merge Notes)
 - Rủi ro: Thấp (Low), tập trung vào trải nghiệm người dùng (UX/UI) và chuẩn hóa Design Tokens.
+
