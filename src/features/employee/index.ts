@@ -1,5 +1,6 @@
 export * from './types';
 export * from './api/employeeApi';
+export * from './api/shiftConfigApi';
 export * from './lib/employeeMapper';
 export * from './services/mockData';
 export * from './components/EmployeeFilterSidebar';
@@ -10,6 +11,7 @@ export * from './components/ImportEmployeeModal';
 export * from './components/CreateUserModal';
 export * from './components/CreateAllowanceModal';
 export * from './components/ShiftFormModal';
+export * from './components/ShiftConfigModal';
 export * from './components/AddScheduleModal';
 export * from './components/ScheduleScopeConfirmModal';
 export * from './components/AttendanceDetailModal';

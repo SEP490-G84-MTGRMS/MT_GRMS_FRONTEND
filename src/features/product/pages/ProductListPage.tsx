@@ -11,7 +11,7 @@ import {
   ChevronDown,
   Trash2,
 } from 'lucide-react';
-import type { ProductItem, Category, UomConversion } from '../types';
+import type { ProductItem, Category } from '../types';
 import { categoryApi } from '../api/categoryApi';
 import { CategorySidebar } from '../components/CategorySidebar';
 import { CategoryModal } from '../components/CategoryModal';
@@ -122,57 +122,31 @@ export const ProductListPage: React.FC = () => {
         categoryIds: selectedCategoryIds.length > 0 ? selectedCategoryIds : undefined,
       });
       if (res && res.items) {
-        const mapped: ProductItem[] = await Promise.all(
-          res.items.map(async (p) => {
-            let uomConversions: UomConversion[] = (p as any).uomConversions || [];
-            if (uomConversions.length === 0 && p.id) {
-              const isGuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(p.id);
-              if (isGuid) {
-                try {
-                  const units = await productApi.getProductUnits(p.id);
-                  if (units && units.length > 0) {
-                    uomConversions = units
-                      .filter((u) => !u.isBaseUnit)
-                      .map((u) => ({
-                        id: u.id,
-                        unitName: u.unitName,
-                        conversionRate: u.conversionRate,
-                        price: u.price,
-                        barcode: u.barcode ?? undefined,
-                      }));
-                  }
-                } catch {
-                  // ignore network or not found
-                }
-              }
-            }
-            return {
-              id: p.id,
-              productCode: p.productCode || (p as any).sku || p.barcode || 'SP000000',
-              barcode: p.barcode || '',
-              productName: p.name || (p as any).productName || '',
-              categoryId: p.categoryId,
-              categoryName: p.categoryName || 'Chung',
-              baseUnit: p.baseUnit || (p as any).unitName || 'Cái',
-              sellingPrice: p.sellingPrice ?? (p as any).basePrice ?? 0,
-              costPrice: p.costPrice != null ? Number(p.costPrice) : null,
-              onHand: 0,
-              committed: 0,
-              status: (p.status === 'Active' ? 'Active' : 'Discontinued') as 'Active' | 'Discontinued',
-              createdAt: p.createdAt ? new Date(p.createdAt).toLocaleDateString('vi-VN') : '',
-              updatedAt: p.updatedAt ? new Date(p.updatedAt).toLocaleDateString('vi-VN') : '',
-              imageUrl: p.imageUrl ?? undefined,
-              imageUrls: p.imageUrls || (p.imageUrl ? [p.imageUrl] : []),
-              description: p.description ?? undefined,
-              internalNote: p.internalNote ?? undefined,
-              minStock: p.minStock ?? 0,
-              maxStock: p.maxStock ?? 1000,
-              vatRate: p.vatRate ?? 0,
-              isFavorite: Boolean(p.isFavorite),
-              uomConversions,
-            };
-          })
-        );
+        const mapped: ProductItem[] = res.items.map((p) => ({
+          id: p.id,
+          productCode: p.productCode || (p as any).sku || p.barcode || 'SP000000',
+          barcode: p.barcode || '',
+          productName: p.name || (p as any).productName || '',
+          categoryId: p.categoryId,
+          categoryName: p.categoryName || 'Chung',
+          baseUnit: p.baseUnit || (p as any).unitName || 'Cái',
+          sellingPrice: p.sellingPrice ?? (p as any).basePrice ?? 0,
+          costPrice: p.costPrice != null ? Number(p.costPrice) : null,
+          onHand: 0,
+          committed: 0,
+          status: (p.status === 'Active' ? 'Active' : 'Discontinued') as 'Active' | 'Discontinued',
+          createdAt: p.createdAt ? new Date(p.createdAt).toLocaleDateString('vi-VN') : '',
+          updatedAt: p.updatedAt ? new Date(p.updatedAt).toLocaleDateString('vi-VN') : '',
+          imageUrl: p.imageUrl ?? undefined,
+          imageUrls: p.imageUrls || (p.imageUrl ? [p.imageUrl] : []),
+          description: p.description ?? undefined,
+          internalNote: p.internalNote ?? undefined,
+          minStock: p.minStock ?? 0,
+          maxStock: p.maxStock ?? 1000,
+          vatRate: p.vatRate ?? 0,
+          isFavorite: Boolean(p.isFavorite),
+          uomConversions: (p as any).uomConversions || [],
+        }));
         setProducts(mapped);
         setTotalCount(res.totalCount);
       } else {

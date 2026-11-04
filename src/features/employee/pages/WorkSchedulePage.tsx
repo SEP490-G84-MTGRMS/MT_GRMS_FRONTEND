@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Search, Clock, Plus, Download, User } from 'lucide-react';
+import { Search, Clock, Plus, Download, User, Settings } from 'lucide-react';
 import type {
   Employee,
   EmployeeStatus,
@@ -16,6 +16,7 @@ import {
 import { AddScheduleModal } from '../components/AddScheduleModal';
 import { EmployeeDetailModal } from '../components/EmployeeDetailModal';
 import { ShiftInfoModal } from '../components/ShiftInfoModal';
+import { ShiftConfigModal } from '../components/ShiftConfigModal';
 import { ScheduleScopeConfirmModal } from '../components/ScheduleScopeConfirmModal';
 import '../employee.css';
 
@@ -78,6 +79,7 @@ export const WorkSchedulePage: React.FC = () => {
   const [editingAssignment, setEditingAssignment] = useState<ScheduleAssignment | null>(null);
   const [deletingAssignment, setDeletingAssignment] = useState<ScheduleAssignment | null>(null);
   const [showShiftInfoModal, setShowShiftInfoModal] = useState(false);
+  const [showShiftConfigModal, setShowShiftConfigModal] = useState(false);
   const [selectedEmpId, setSelectedEmpId] = useState<string | undefined>();
   const [selectedDay, setSelectedDay] = useState<'T2' | 'T3' | 'T4' | 'T5' | 'T6' | 'T7' | 'CN' | undefined>();
 
@@ -224,6 +226,18 @@ export const WorkSchedulePage: React.FC = () => {
           >
             <Clock size={15} />
             <span>Thông tin ca</span>
+          </button>
+
+          {/* Nút Cấu hình ca làm việc */}
+          <button
+            type="button"
+            className="emp-btn emp-btn-secondary"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+            onClick={() => setShowShiftConfigModal(true)}
+            title="Quản lý và cấu hình danh mục ca làm việc của chi nhánh"
+          >
+            <Settings size={15} />
+            <span>Cấu hình ca</span>
           </button>
 
           <button
@@ -626,6 +640,14 @@ export const WorkSchedulePage: React.FC = () => {
       />
 
       {/* Modal Thông Tin Các Ca Làm Việc Cố Định */}
+      {/* Modal Quản lý Cấu hình Ca Làm Việc Chuẩn */}
+      <ShiftConfigModal
+        isOpen={showShiftConfigModal}
+        onClose={() => setShowShiftConfigModal(false)}
+        branchId={branches[0]?.id || 'b1'}
+        branchName={branches[0]?.name || 'Chi nhánh mặc định'}
+      />
+
       <ShiftInfoModal
         isOpen={showShiftInfoModal}
         onClose={() => setShowShiftInfoModal(false)}
