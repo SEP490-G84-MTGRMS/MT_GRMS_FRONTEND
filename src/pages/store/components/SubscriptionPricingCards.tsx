@@ -103,9 +103,9 @@ export const mapBackendPlanToCardItem = (
     buttonText = '#FFFFFF';
     highlight = true;
   } else {
-    themeColor = '#EA580C';
-    badgeBg = '#FFF7ED';
-    buttonBg = '#F97316';
+    themeColor = 'var(--blue-primary)';
+    badgeBg = 'var(--blue-light)';
+    buttonBg = 'var(--blue-primary)';
     buttonText = '#FFFFFF';
     highlight = false;
   }
@@ -340,7 +340,7 @@ export const SubscriptionPricingCards: FC<SubscriptionPricingCardsProps> = ({
                   </span>
                 ) : (
                   <>
-                    <span className="pricing-card-price">
+                    <span className="pricing-card-price" style={{ fontFamily: 'var(--font-sans)', fontVariantNumeric: 'tabular-nums' }}>
                       {new Intl.NumberFormat('vi-VN').format(plan.monthlyPrice)}
                     </span>
                     <span className="pricing-card-currency">đ</span>
@@ -412,22 +412,27 @@ export const SubscriptionPricingCards: FC<SubscriptionPricingCardsProps> = ({
                 className="pricing-cta-button"
                 disabled
                 style={{
-                  backgroundColor: '#F1F5F9',
-                  color: '#64748B',
-                  border: '1px solid #CBD5E1',
+                  backgroundColor: '#ECFDF5',
+                  color: '#059669',
+                  border: '1.5px solid #A7F3D0',
                   cursor: 'default',
-                  opacity: 0.85,
+                  fontWeight: 700,
+                  fontFamily: 'var(--font-sans)',
                 }}
               >
-                Gói hiện tại đang dùng
+                ✓ Gói hiện tại đang dùng
               </button>
             ) : plan.monthlyPrice === 0 ? (
               <button
                 type="button"
                 className="pricing-cta-button"
                 style={{
-                  backgroundColor: '#E2E8F0',
-                  color: '#0F172A',
+                  backgroundColor: '#F1F5F9',
+                  color: '#1E293B',
+                  border: '1px solid #CBD5E1',
+                  fontWeight: 700,
+                  fontFamily: 'var(--font-sans)',
+                  transition: 'all 0.15s ease',
                 }}
                 onClick={() => onSelectPlan(plan)}
               >
@@ -438,12 +443,17 @@ export const SubscriptionPricingCards: FC<SubscriptionPricingCardsProps> = ({
                 type="button"
                 className="pricing-cta-button"
                 style={{
-                  backgroundColor: plan.buttonBg,
-                  color: plan.buttonText,
+                  backgroundColor: 'var(--blue-primary)',
+                  color: '#FFFFFF',
+                  border: 'none',
+                  fontWeight: 700,
+                  boxShadow: plan.highlight ? '0 4px 14px rgba(15, 118, 110, 0.32)' : '0 2px 8px rgba(15, 118, 110, 0.16)',
+                  fontFamily: 'var(--font-sans)',
+                  transition: 'all 0.15s ease',
                 }}
                 onClick={() => onSelectPlan(plan)}
               >
-                Mua ngay
+                Nâng cấp ngay
               </button>
             )}
           </div>
