@@ -165,13 +165,15 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* Pricing Grid */
+/* Pricing Grid - Full width, responsive & zero whitespace */
 .pricing-cards-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-  max-width: 1040px;
-  gap: 24px;
+  grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
+  width: 100%;
+  max-width: 100%;
+  gap: 22px;
   margin-top: 8px;
+  align-items: stretch;
 }
 
 .pricing-card {

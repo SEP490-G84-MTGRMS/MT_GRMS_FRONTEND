@@ -9,6 +9,7 @@ Toàn bộ các thay đổi của repository Frontend React SPA được tổng 
 - Thêm component Dropdown **Chọn chi nhánh** (`BranchSelectorDropdown`) trên thanh header chính (`AppTopNav`), hỗ trợ chọn từng chi nhánh hoặc xem toàn hệ thống [worklog: docs/worklogs/2026-11-03_FE-STORE_AI_remove-wallet-topup-from-status-bar.md].
 
 ### Changed
+- Sửa layout bảng gói cước dịch vụ (pricing-cards-grid) mở rộng 100% toàn chiều ngang, loại bỏ max-width 1040px và khoảng trắng thừa bên phải màn hình [FE-STORE] [worklog: docs/worklogs/2026-11-04_FE-STORE_AI_expand-pricing-grid-full-width.md].
 - Hợp nhất an toàn nhánh feature/store-owner-confige-management vào dev, giải quyết xung đột httpClient, authService, LoginPage, AppTopNav, Navbar và hoàn thiện build [worklog: docs/worklogs/2026-11-03_MERGE-DEV_AI_resolve-store-owner-config-merge.md].
 - Loại bỏ hoàn toàn mục và tab **"Bản xác nhận dịch vụ"** khỏi thanh điều hướng bên trái và trang Hub Cài đặt gian hàng (`StoreSettingsHubPage`) [worklog: docs/worklogs/2026-11-03_FE-STORE_AI_remove-service-confirmation-tab.md].
 - Tinh gọn Dropdown chọn chi nhánh: bỏ các icon và mã cửa hàng (`BR-xxx`), hiển thị đầy đủ tên chi nhánh và địa chỉ rõ ràng, không bị co kéo hoặc cắt chữ.

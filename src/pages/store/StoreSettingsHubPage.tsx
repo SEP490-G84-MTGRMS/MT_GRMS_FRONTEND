@@ -195,7 +195,7 @@ export const StoreSettingsHubPage: FC = () => {
 
         {/* Tab 1: Gói dịch vụ */}
         {activeTab === 'subscriptions' && (
-          <div>
+          <div style={{ width: '100%' }}>
             <div style={{ marginBottom: 18 }}>
               <h1 style={{ fontSize: 22, fontWeight: 800, color: '#0F172A', margin: 0 }}>
                 Gói dịch vụ MT-GRMS

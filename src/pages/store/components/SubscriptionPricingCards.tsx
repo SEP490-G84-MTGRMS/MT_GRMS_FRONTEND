@@ -173,7 +173,7 @@ export const SubscriptionPricingCards: FC<SubscriptionPricingCardsProps> = ({
   if (isLoading) {
     return (
       <div className="pricing-cards-grid">
-        {[1, 2].map((i) => (
+        {[1, 2, 3, 4].map((i) => (
           <div
             key={i}
             className="pricing-card"

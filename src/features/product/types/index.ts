@@ -123,6 +123,7 @@ export interface ProductCreatePayload {
   minStock?: number;
   maxStock?: number;
   taxCategory?: string;
+  eligibleForVatReduction?: boolean;
   status?: string;
   imageUrl?: string | null;
   imageUrls?: string[];
@@ -130,7 +131,6 @@ export interface ProductCreatePayload {
   internalNote?: string | null;
   hasBatches?: boolean;
   isFavorite?: boolean;
-  eligibleForVatReduction?: boolean;
 }
 
 export interface ProductUpdatePayload {
@@ -206,6 +206,7 @@ export interface ProductItem {
   minStock?: number;
   maxStock?: number;
   taxCategory?: string;
+  eligibleForVatReduction?: boolean;
   description?: string;
   internalNote?: string;
   hasTransactions?: boolean;
