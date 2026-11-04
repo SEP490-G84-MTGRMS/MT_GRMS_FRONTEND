@@ -82,8 +82,8 @@ export const StoreSettingsHubPage: FC = () => {
   };
 
   // Nạp tiền ví
-  const handleTopupSuccess = (amount: number) => {
-    const newBal = storeInfo.walletBalance + amount;
+  const handleTopupSuccess = (amount: number, newBalance?: number) => {
+    const newBal = newBalance !== undefined ? newBalance : storeInfo.walletBalance + amount;
     const newTx: WalletTransaction = {
       id: `tx-${Date.now()}`,
       transactionCode: `WAL-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(100 + Math.random() * 900)}`,

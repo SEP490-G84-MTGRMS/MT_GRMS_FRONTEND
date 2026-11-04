@@ -4,7 +4,9 @@ Toàn bộ các thay đổi của repository Frontend React SPA được tổng 
 
 ---
 
-## [Unreleased] - 2026-11-03
+## [Unreleased] - 2026-11-04
+### Added
+- Tích hợp cổng thanh toán VietQR SePay thật, tái thiết kế giao diện Modal Nạp ví (`StoreWalletTopupModal`) theo chuẩn Deep Teal (`#0F766E`), tích hợp cơ chế Polling 3s/lần tự động cập nhật số dư, và đồng bộ tab Sổ cái `WalletLedgerTab` [FE-WALLET] [worklog: docs/worklogs/2026-11-04_FE-WALLET_AI_sepay-wallet-topup-modal.md].
 ### Added
 - Thêm component Dropdown **Chọn chi nhánh** (`BranchSelectorDropdown`) trên thanh header chính (`AppTopNav`), hỗ trợ chọn từng chi nhánh hoặc xem toàn hệ thống [worklog: docs/worklogs/2026-11-03_FE-STORE_AI_remove-wallet-topup-from-status-bar.md].
 

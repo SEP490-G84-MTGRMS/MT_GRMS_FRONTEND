@@ -55,6 +55,11 @@ export const SubscriptionCheckoutModal: FC<SubscriptionCheckoutModalProps> = ({
   const hasEnoughWalletBalance = storeInfo.walletBalance >= grandTotal;
 
   const handleConfirmPayment = async () => {
+    if (paymentMethod === 'Wallet' && !hasEnoughWalletBalance) {
+      alert(`Số dư ví gian hàng không đủ (thiếu ${new Intl.NumberFormat('vi-VN').format(grandTotal - storeInfo.walletBalance)} đ). Vui lòng chọn Quét mã VietQR hoặc Nạp thêm tiền vào ví.`);
+      return;
+    }
+
     setIsProcessing(true);
     try {
       const res = await storeApi.purchaseSubscription({
@@ -80,7 +85,13 @@ export const SubscriptionCheckoutModal: FC<SubscriptionCheckoutModalProps> = ({
         }, 1000);
         return;
       }
-    } catch (err) {
+
+      if (!res.success) {
+        setIsProcessing(false);
+        alert(res.message || 'Thanh toán không thành công.');
+        return;
+      }
+    } catch (err: unknown) {
       console.warn('API purchase fallback triggered:', err);
     }
 
