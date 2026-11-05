@@ -38,3 +38,4 @@
 ## 4. Ghi chú cho Manager khi Review & Merge
 - **Mức độ rủi ro**: Rất thấp (Low).
 - **Phạm vi tác động**: Chỉ sửa đổi hàm giải nén response đăng ký tại `authService.ts` và bảo vệ null-safety tại `useAuthStore.ts`.
+
