@@ -30,6 +30,7 @@ import { EmployeeFormModal } from '../components/EmployeeFormModal';
 import { EmployeeDetailModal } from '../components/EmployeeDetailModal';
 import { ApprovalRequestsModal } from '../components/ApprovalRequestsModal';
 import { ImportEmployeeModal } from '../components/ImportEmployeeModal';
+import { TablePagination } from '../../../components/common';
 import '../employee.css';
 
 export const EmployeeListPage: React.FC = () => {
@@ -41,7 +42,7 @@ export const EmployeeListPage: React.FC = () => {
   const [approvalRequests, setApprovalRequests] = useState<ApprovalRequest[]>([]);
   const [totalItems, setTotalItems] = useState<number>(0);
   const [page, setPage] = useState<number>(1);
-  const [pageSize] = useState<number>(10);
+  const [pageSize, setPageSize] = useState<number>(10);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -208,9 +209,15 @@ export const EmployeeListPage: React.FC = () => {
     setShowFormModal(true);
   };
 
-  const handleEdit = (emp: Employee) => {
+  const handleEdit = async (emp: Employee) => {
     setEditingEmployee(emp);
     setShowFormModal(true);
+    try {
+      const fullDetail = await employeeApi.getEmployeeById(emp.id);
+      setEditingEmployee(fullDetail);
+    } catch (err) {
+      console.warn('Lỗi khi tải thông tin chi tiết nhân viên để sửa:', err);
+    }
   };
 
   const handleSaveEmployee = (savedEmp: Employee, isAddNew: boolean = false) => {
@@ -300,8 +307,6 @@ export const EmployeeListPage: React.FC = () => {
     if (num === undefined || num === null) return '0';
     return num.toLocaleString('vi-VN');
   };
-
-  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
 
   return (
     <div className="emp-page-container">
@@ -1048,46 +1053,20 @@ export const EmployeeListPage: React.FC = () => {
             </tbody>
           </table>
 
-          {/* Pagination bar */}
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              padding: '12px 16px',
-              borderTop: '1px solid #E2E8F0',
-              fontSize: 13,
-              color: '#64748B',
+          {/* Enterprise Standard TablePagination */}
+          <TablePagination
+            currentPage={page}
+            pageSize={pageSize}
+            totalItems={totalItems}
+            pageSizeOptions={[10, 20, 50]}
+            onPageChange={(newPage) => setPage(newPage)}
+            onPageSizeChange={(newSize) => {
+              setPageSize(newSize);
+              setPage(1);
             }}
-          >
-            <div>
-              Hiển thị {totalItems > 0 ? (page - 1) * pageSize + 1 : 0} -{' '}
-              {Math.min(page * pageSize, totalItems)} trên tổng số {totalItems} nhân viên
-            </div>
-            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-              <button
-                type="button"
-                className="emp-btn emp-btn-secondary"
-                style={{ padding: '4px 12px', height: 32 }}
-                disabled={page <= 1 || isLoading}
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-              >
-                Trang trước
-              </button>
-              <span style={{ padding: '0 8px', fontWeight: 600 }}>
-                {page} / {totalPages}
-              </span>
-              <button
-                type="button"
-                className="emp-btn emp-btn-secondary"
-                style={{ padding: '4px 12px', height: 32 }}
-                disabled={page >= totalPages || isLoading}
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              >
-                Trang sau
-              </button>
-            </div>
-          </div>
+            itemLabel="nhân viên"
+            isLoading={isLoading}
+          />
       </div>
 
       {/* ─── MODALS ─── */}

@@ -241,7 +241,6 @@ export const ShiftConfigModal: React.FC<ShiftConfigModalProps> = ({
       <div
         className="emp-modal-card"
         style={{
-          maxWidth: 580,
           borderRadius: 16,
           boxShadow: '0 20px 40px -10px rgba(0, 0, 0, 0.25)',
           overflow: 'visible',
@@ -281,7 +280,7 @@ export const ShiftConfigModal: React.FC<ShiftConfigModalProps> = ({
         </div>
 
         {/* Form Body */}
-        <form onSubmit={handleSubmit} style={{ overflow: 'visible', display: 'flex', flexDirection: 'column' }}>
+        <form onSubmit={handleSubmit} style={{ overflow: 'visible', display: 'flex', flexDirection: 'column', flex: '1 1 auto', minHeight: 0, justifyContent: 'space-between' }}>
           <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 18, overflow: 'visible' }}>
             {errorMessage && (
               <div

@@ -13,7 +13,7 @@ export const ShiftInfoModal: React.FC<ShiftInfoModalProps> = ({ isOpen, onClose,
 
   return (
     <div className="emp-modal-overlay" style={{ zIndex: 1100 }}>
-      <div className="emp-modal-card" style={{ maxWidth: 640 }}>
+      <div className="emp-modal-card">
         {/* Header Modal */}
         <div className="emp-modal-header" style={{ background: '#F8FAFC' }}>
           <div>

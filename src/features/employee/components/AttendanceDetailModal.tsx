@@ -245,7 +245,7 @@ const AttendanceDetailModalContent: React.FC<AttendanceDetailModalContentProps> 
 
   return (
     <div className="emp-modal-overlay" style={{ zIndex: 1100 }}>
-      <div className="emp-modal-card" style={{ maxWidth: 760, width: '95vw', maxHeight: '90vh' }}>
+      <div className="emp-modal-card">
         {/* Header Modal */}
         <div className="emp-modal-header" style={{ background: '#F8FAFC', padding: '16px 24px' }}>
           <div>

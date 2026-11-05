@@ -62,7 +62,7 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
 
   return (
     <div className="emp-modal-overlay" style={{ zIndex: 1100 }}>
-      <div className="emp-modal-card" style={{ maxWidth: 480 }}>
+      <div className="emp-modal-card">
         <div className="emp-modal-header">
           <h3>Tạo tài khoản đăng nhập</h3>
           <button type="button" className="emp-modal-close-btn" onClick={onClose} disabled={isSubmitting}>

@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
-import { Pencil, Download, Banknote } from 'lucide-react';
+import { Pencil, Download, Banknote, Loader2 } from 'lucide-react';
 import type { Employee, DebtTransaction } from '../types';
+import { employeeApi } from '../api/employeeApi';
 
 interface EmployeeDetailModalProps {
   isOpen: boolean;
@@ -16,13 +17,43 @@ interface EmployeeDetailModalProps {
 export const EmployeeDetailModal: React.FC<EmployeeDetailModalProps> = ({
   isOpen,
   onClose,
-  employee,
+  employee: initialEmployee,
   onEdit,
   onToggleStatus,
   onDelete,
   onAddPayment,
   initialTab = 'info',
 }) => {
+  const [detail, setDetail] = useState<Employee | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  const fetchDetail = React.useCallback(async (id: string) => {
+    setIsLoading(true);
+    setLoadError(null);
+    try {
+      const data = await employeeApi.getEmployeeById(id);
+      setDetail(data);
+    } catch (err: any) {
+      console.error('Lỗi khi tải chi tiết nhân viên từ backend:', err);
+      setLoadError(err?.message || 'Không thể tải thông tin chi tiết từ hệ thống.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    if (isOpen && initialEmployee?.id) {
+      setDetail(initialEmployee);
+      fetchDetail(initialEmployee.id);
+    } else if (!isOpen) {
+      setDetail(null);
+      setLoadError(null);
+    }
+  }, [isOpen, initialEmployee?.id, fetchDetail]);
+
+  const employee = detail || initialEmployee;
+
   const [activeTab, setActiveTab] = useState<'info' | 'schedule' | 'salary' | 'payslip' | 'debt'>(initialTab);
 
   React.useEffect(() => {
@@ -134,10 +165,24 @@ export const EmployeeDetailModal: React.FC<EmployeeDetailModalProps> = ({
     return `${num.toLocaleString('vi-VN')} ₫`;
   };
 
+  const formatDateDisplay = (dateStr?: string) => {
+    if (!dateStr) return 'Chưa cập nhật';
+    try {
+      const clean = dateStr.split('T')[0];
+      const parts = clean.split('-');
+      if (parts.length === 3) {
+        return `${parts[2]}/${parts[1]}/${parts[0]}`;
+      }
+      return dateStr;
+    } catch {
+      return dateStr;
+    }
+  };
+
   return (
     <>
       <div className="emp-modal-overlay">
-        <div className="emp-modal-card" style={{ maxWidth: 1050 }}>
+        <div className="emp-modal-card">
           {/* Header Bar */}
           <div className="emp-modal-header" style={{ background: '#F8FAFC' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
@@ -157,9 +202,17 @@ export const EmployeeDetailModal: React.FC<EmployeeDetailModalProps> = ({
                     {employee.status === 'active' ? 'Đang làm việc' : 'Đã nghỉ'}
                   </span>
                 </div>
-                <div style={{ fontSize: 13, color: '#64748B', marginTop: 2 }}>
-                  Mã NV: <b>{employee.employeeCode}</b> &bull; SĐT: <b>{employee.phone}</b> &bull; Chi nhánh:{' '}
-                  <b>{employee.workingBranchNames?.join(', ') || 'Chưa phân bổ'}</b>
+                <div style={{ fontSize: 13, color: '#64748B', marginTop: 2, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                  <span>Mã NV: <b>{employee.employeeCode}</b></span>
+                  <span>&bull;</span>
+                  <span>SĐT: <b>{employee.phone}</b></span>
+                  <span>&bull;</span>
+                  <span>Chi nhánh: <b>{employee.workingBranchNames?.join(', ') || 'Chưa phân bổ'}</b></span>
+                  {isLoading && (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: '#0F766E', fontSize: 12, fontWeight: 500, marginLeft: 6 }}>
+                      <Loader2 size={13} className="animate-spin" /> Đang đồng bộ từ hệ thống...
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
@@ -219,6 +272,40 @@ export const EmployeeDetailModal: React.FC<EmployeeDetailModalProps> = ({
 
           {/* Body Content */}
           <div className="emp-modal-body">
+            {loadError && (
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '10px 16px',
+                  background: '#FEF2F2',
+                  border: '1px solid #FECACA',
+                  borderRadius: 8,
+                  color: '#DC2626',
+                  fontSize: 13,
+                  marginBottom: 16,
+                }}
+              >
+                <span>{loadError}</span>
+                <button
+                  type="button"
+                  onClick={() => initialEmployee?.id && fetchDetail(initialEmployee.id)}
+                  style={{
+                    border: 'none',
+                    background: 'transparent',
+                    color: '#DC2626',
+                    cursor: 'pointer',
+                    fontWeight: 600,
+                    textDecoration: 'underline',
+                    padding: 0,
+                  }}
+                >
+                  Thử lại
+                </button>
+              </div>
+            )}
+
             {/* TAB 1: THÔNG TIN */}
             {activeTab === 'info' && (
               <div className="emp-grid-3">
@@ -236,11 +323,13 @@ export const EmployeeDetailModal: React.FC<EmployeeDetailModalProps> = ({
                     </div>
                     <div>
                       <span style={{ color: '#64748B' }}>Giới tính:</span>
-                      <div style={{ fontWeight: 600 }}>{employee.gender === 'male' ? 'Nam' : 'Nữ'}</div>
+                      <div style={{ fontWeight: 600 }}>
+                        {employee.gender === 'female' ? 'Nữ' : employee.gender === 'male' ? 'Nam' : 'Chưa cập nhật'}
+                      </div>
                     </div>
                     <div>
                       <span style={{ color: '#64748B' }}>Ngày sinh:</span>
-                      <div style={{ fontWeight: 600 }}>{employee.dateOfBirth || 'Chưa cập nhật'}</div>
+                      <div style={{ fontWeight: 600 }}>{formatDateDisplay(employee.dateOfBirth)}</div>
                     </div>
                     <div>
                       <span style={{ color: '#64748B' }}>CMND / CCCD:</span>
@@ -249,7 +338,7 @@ export const EmployeeDetailModal: React.FC<EmployeeDetailModalProps> = ({
                     <div>
                       <span style={{ color: '#64748B' }}>Địa chỉ thường trú:</span>
                       <div style={{ fontWeight: 600 }}>
-                        {employee.address ? `${employee.address}, ${employee.city || ''}` : 'Chưa cập nhật'}
+                        {employee.address || 'Chưa cập nhật'}
                       </div>
                     </div>
                   </div>
@@ -260,14 +349,14 @@ export const EmployeeDetailModal: React.FC<EmployeeDetailModalProps> = ({
                   <div className="emp-section-title">Thông tin công việc</div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 12, fontSize: 13 }}>
                     <div>
-                      <span style={{ color: '#64748B' }}>Các chi nhánh làm việc:</span>
+                      <span style={{ color: '#64748B' }}>Chi nhánh làm việc:</span>
                       <div style={{ fontWeight: 600 }}>
                         {employee.workingBranchNames?.join(', ') || 'Chưa phân bổ'}
                       </div>
                     </div>
                     <div>
                       <span style={{ color: '#64748B' }}>Ngày bắt đầu làm:</span>
-                      <div style={{ fontWeight: 600 }}>{employee.startDate || 'Chưa ghi nhận'}</div>
+                      <div style={{ fontWeight: 600 }}>{formatDateDisplay(employee.startDate)}</div>
                     </div>
                     <div>
                       <span style={{ color: '#64748B' }}>Tài khoản phần mềm:</span>
@@ -792,7 +881,7 @@ export const EmployeeDetailModal: React.FC<EmployeeDetailModalProps> = ({
       {/* Sub-Modal Thanh Toán Lương / Tạm Ứng */}
       {showPaymentModal && (
         <div className="emp-modal-overlay" style={{ zIndex: 1200 }}>
-          <div className="emp-modal-card" style={{ maxWidth: 520 }}>
+          <div className="emp-modal-card">
             <div className="emp-modal-header">
               <h3>
                 {employee.debtAmount > 0

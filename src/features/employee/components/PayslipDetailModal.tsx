@@ -24,7 +24,7 @@ export const PayslipDetailModal: React.FC<PayslipDetailModalProps> = ({
 
   return (
     <div className="emp-modal-overlay">
-      <div className="emp-modal-card" style={{ maxWidth: 880 }}>
+      <div className="emp-modal-card">
         {/* Header */}
         <div className="emp-modal-header">
           <div>

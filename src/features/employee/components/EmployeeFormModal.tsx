@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Camera, Trash2, Search, ChevronDown, X, Check, Building2, AlertTriangle } from 'lucide-react';
+import { Camera, Trash2, Search, ChevronDown, X, Check, Building2, AlertTriangle, RotateCw } from 'lucide-react';
 import type {
   Employee,
   Branch,
@@ -10,6 +10,7 @@ import { CreateUserModal } from './CreateUserModal';
 import { CreateAllowanceModal } from './CreateAllowanceModal';
 import { employeeApi } from '../api/employeeApi';
 import { mapFormToCreatePayload } from '../lib/employeeMapper';
+import { uploadImageToCloudinary } from '../../../utils/cloudinary';
 
 interface EmployeeFormModalProps {
   isOpen: boolean;
@@ -59,6 +60,8 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [avatarUrl, setAvatarUrl] = useState('');
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
   const [gender, setGender] = useState<'male' | 'female'>('male');
   const [dateOfBirth, setDateOfBirth] = useState('');
   const [citizenId, setCitizenId] = useState('');
@@ -66,7 +69,7 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
 
   // Work info
   const [startDate, setStartDate] = useState('');
-  const [workingBranchIds, setWorkingBranchIds] = useState<string[]>([]);
+  const [workingBranchId, setWorkingBranchId] = useState<string>('');
   const [userId, setUserId] = useState('');
   const [userName, setUserName] = useState('');
   const [note, setNote] = useState('');
@@ -101,7 +104,11 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
       setAddress(employee.address || '');
 
       setStartDate(employee.startDate || '');
-      setWorkingBranchIds(employee.workingBranchIds || [branches[0]?.id || '']);
+      const initBranchId =
+        employee.salaryBranchId ||
+        (employee.workingBranchIds && employee.workingBranchIds[0]) ||
+        (branches[0]?.id || '');
+      setWorkingBranchId(initBranchId);
       setUserId(employee.userId || '');
       setUserName(employee.userName || '');
       setNote(employee.note || '');
@@ -144,7 +151,7 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
       setAddress('');
 
       setStartDate(new Date().toISOString().split('T')[0]);
-      setWorkingBranchIds([branches[0]?.id || '']);
+      setWorkingBranchId(branches[0]?.id || '');
       setUserId('');
       setUserName('');
       setNote('');
@@ -193,35 +200,42 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
     b.name.toLowerCase().includes(branchSearchKeyword.trim().toLowerCase())
   );
 
-  const handleWorkingBranchToggle = (branchId: string) => {
-    if (workingBranchIds.includes(branchId)) {
-      if (workingBranchIds.length === 1) {
-        alert('Nhân viên phải có ít nhất 1 chi nhánh làm việc!');
-        return;
-      }
-      setWorkingBranchIds(workingBranchIds.filter((id) => id !== branchId));
-    } else {
-      setWorkingBranchIds([...workingBranchIds, branchId]);
-    }
+  const handleSelectBranch = (branchId: string) => {
+    setWorkingBranchId(branchId);
+    setIsBranchDropdownOpen(false);
+    setBranchSearchKeyword('');
   };
 
-  const handleSelectAllBranches = () => {
-    setWorkingBranchIds(branches.map((b) => b.id));
-  };
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
 
-  const handleClearAllBranches = () => {
-    if (branches.length > 0) {
-      setWorkingBranchIds([branches[0].id]);
-    }
-  };
-
-  const handleRemoveBranchTag = (e: React.MouseEvent, branchId: string) => {
-    e.stopPropagation();
-    if (workingBranchIds.length <= 1) {
-      alert('Nhân viên phải có ít nhất 1 chi nhánh làm việc!');
+    if (file.size > 5 * 1024 * 1024) {
+      setFormError('Kích thước ảnh đại diện không được vượt quá 5MB.');
       return;
     }
-    setWorkingBranchIds(workingBranchIds.filter((id) => id !== branchId));
+
+    try {
+      setIsUploadingAvatar(true);
+      setFormError(null);
+      const secureUrl = await uploadImageToCloudinary(file, 'mtgrms/employees');
+      setAvatarUrl(secureUrl);
+    } catch (err: any) {
+      setFormError(err?.message || 'Không thể tải ảnh đại diện lên Cloudinary. Vui lòng thử lại.');
+    } finally {
+      setIsUploadingAvatar(false);
+      if (avatarInputRef.current) {
+        avatarInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handleRemoveAvatar = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setAvatarUrl('');
+    if (avatarInputRef.current) {
+      avatarInputRef.current.value = '';
+    }
   };
 
   const handleAllowanceNameChange = (id: string, name: string) => {
@@ -275,6 +289,10 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
 
   const handleSave = async (isAddNew: boolean = false) => {
     setFormError(null);
+    if (isUploadingAvatar) {
+      setFormError('Ảnh đại diện đang được tải lên Cloudinary, vui lòng chờ trong giây lát!');
+      return;
+    }
     if (!fullName.trim()) {
       setFormError('Vui lòng nhập Họ và tên nhân viên!');
       return;
@@ -298,9 +316,9 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
     }
     const effectiveBankName = bankSelect === 'OTHER' ? customBankName.trim() : bankSelect;
 
-    const targetBranchId = workingBranchIds[0] || (branches[0] ? branches[0].id : '');
+    const targetBranchId = workingBranchId || (branches[0] ? branches[0].id : '');
     if (!targetBranchId) {
-      setFormError('Vui lòng chọn ít nhất 1 chi nhánh làm việc!');
+      setFormError('Vui lòng chọn chi nhánh làm việc!');
       return;
     }
 
@@ -487,9 +505,68 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
 
                     {/* Upload Avatar */}
                     <div style={{ width: 140, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                      <div className="emp-avatar-upload-box">
-                        {avatarUrl ? (
-                          <img src={avatarUrl} alt="Avatar" />
+                      <input
+                        ref={avatarInputRef}
+                        type="file"
+                        accept="image/png,image/jpeg,image/jpg,image/webp"
+                        style={{ display: 'none' }}
+                        onChange={handleAvatarUpload}
+                      />
+
+                      <div
+                        className="emp-avatar-upload-box"
+                        onClick={() => !isUploadingAvatar && avatarInputRef.current?.click()}
+                        title={avatarUrl ? 'Nhấn để thay đổi ảnh' : 'Nhấn để tải ảnh đại diện lên'}
+                      >
+                        {isUploadingAvatar ? (
+                          <div style={{ textAlign: 'center', padding: 8 }}>
+                            <RotateCw size={24} className="spin-icon" color="#0F766E" style={{ margin: '0 auto 6px' }} />
+                            <span style={{ fontSize: 11, color: '#0F766E', fontWeight: 600, display: 'block' }}>
+                              Đang tải lên...
+                            </span>
+                          </div>
+                        ) : avatarUrl ? (
+                          <>
+                            <img src={avatarUrl} alt="Avatar" />
+                            <button
+                              type="button"
+                              onClick={handleRemoveAvatar}
+                              style={{
+                                position: 'absolute',
+                                top: 6,
+                                right: 6,
+                                width: 22,
+                                height: 22,
+                                borderRadius: '50%',
+                                background: 'rgba(0, 0, 0, 0.65)',
+                                color: '#FFFFFF',
+                                border: 'none',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                cursor: 'pointer',
+                              }}
+                              title="Xóa ảnh đại diện"
+                            >
+                              <X size={13} />
+                            </button>
+                            <div
+                              style={{
+                                position: 'absolute',
+                                bottom: 0,
+                                left: 0,
+                                right: 0,
+                                background: 'rgba(15, 23, 42, 0.65)',
+                                color: '#FFFFFF',
+                                fontSize: 10,
+                                padding: '3px 0',
+                                textAlign: 'center',
+                                fontWeight: 600,
+                              }}
+                            >
+                              Đổi ảnh
+                            </div>
+                          </>
                         ) : (
                           <div style={{ textAlign: 'center', padding: 8 }}>
                             <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 4 }}>
@@ -500,7 +577,7 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
                         )}
                       </div>
                       <small style={{ fontSize: 11, color: '#94A3B8', marginTop: 6, textAlign: 'center' }}>
-                        Tối đa 2MB
+                        JPG, PNG, WEBP (Tối đa 5MB)
                       </small>
                     </div>
                   </div>
@@ -519,23 +596,18 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
                     />
                   </div>
 
-                  {/* Các chi nhánh làm việc - Searchable Multi-Select UI */}
+                  {/* Chi nhánh làm việc - Searchable Single-Select UI */}
                   <div className="emp-form-group" ref={branchDropdownRef} style={{ position: 'relative' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                      <label className="emp-form-label" style={{ marginBottom: 0 }}>
-                        Các chi nhánh làm việc <span className="required">*</span>
-                      </label>
-                      <span style={{ fontSize: 12, color: '#0F766E', fontWeight: 600 }}>
-                        Đã chọn {workingBranchIds.length}/{branches.length} chi nhánh
-                      </span>
-                    </div>
+                    <label className="emp-form-label">
+                      Chi nhánh làm việc <span className="required">*</span>
+                    </label>
 
                     {/* Selector Trigger Input */}
                     <div
                       onClick={() => setIsBranchDropdownOpen((prev) => !prev)}
                       style={{
-                        minHeight: 40,
-                        padding: '6px 12px',
+                        height: 40,
+                        padding: '0 12px',
                         border: `1px solid ${isBranchDropdownOpen ? '#0F766E' : '#CBD5E1'}`,
                         borderRadius: 8,
                         background: '#FFFFFF',
@@ -548,87 +620,49 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
                         boxShadow: isBranchDropdownOpen ? '0 0 0 3px rgba(15, 118, 110, 0.15)' : 'none',
                       }}
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', flex: 1 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, overflow: 'hidden', flex: 1 }}>
                         <Building2 size={16} color="#64748B" style={{ flexShrink: 0 }} />
 
-                        {workingBranchIds.length === 0 ? (
-                          <span style={{ color: '#94A3B8', fontSize: 13 }}>Chọn các chi nhánh làm việc...</span>
-                        ) : workingBranchIds.length === branches.length && branches.length > 2 ? (
-                          <span
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              padding: '2px 10px',
-                              borderRadius: 6,
-                              fontSize: 12,
-                              fontWeight: 600,
-                              background: '#F0FDFA',
-                              color: '#0F766E',
-                              border: '1px solid #99F6E4',
-                            }}
-                          >
-                            Tất cả chi nhánh ({branches.length})
-                          </span>
-                        ) : (
-                          <>
-                            {branches
-                              .filter((b) => workingBranchIds.includes(b.id))
-                              .slice(0, 3)
-                              .map((b) => (
-                                <span
-                                  key={b.id}
-                                  style={{
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    gap: 4,
-                                    padding: '2px 8px',
-                                    borderRadius: 6,
-                                    fontSize: 12,
-                                    fontWeight: 500,
-                                    background: '#F0FDFA',
-                                    color: '#0F766E',
-                                    border: '1px solid #99F6E4',
-                                  }}
-                                >
-                                  <span>{b.name}</span>
-                                  <span
-                                    onClick={(e) => handleRemoveBranchTag(e, b.id)}
-                                    title="Gỡ chi nhánh"
-                                    style={{
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      cursor: 'pointer',
-                                      borderRadius: '50%',
-                                      width: 14,
-                                      height: 14,
-                                      color: '#0F766E',
-                                      fontWeight: 700,
-                                    }}
-                                  >
-                                    <X size={11} />
-                                  </span>
-                                </span>
-                              ))}
-                            {workingBranchIds.length > 3 && (
+                        {(() => {
+                          const currentBranch = branches.find((b) => b.id === workingBranchId);
+                          if (!currentBranch) {
+                            return <span style={{ color: '#94A3B8', fontSize: 13 }}>Chọn chi nhánh làm việc...</span>;
+                          }
+                          return (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, overflow: 'hidden' }}>
                               <span
                                 style={{
-                                  padding: '2px 8px',
-                                  borderRadius: 6,
-                                  fontSize: 12,
-                                  fontWeight: 600,
-                                  background: '#F1F5F9',
-                                  color: '#475569',
+                                  fontSize: 13,
+                                  fontWeight: 500,
+                                  color: '#1E293B',
+                                  whiteSpace: 'nowrap',
+                                  textOverflow: 'ellipsis',
+                                  overflow: 'hidden',
                                 }}
                               >
-                                +{workingBranchIds.length - 3} chi nhánh khác
+                                {currentBranch.name}
                               </span>
-                            )}
-                          </>
-                        )}
+                              {currentBranch.isMain && (
+                                <span
+                                  style={{
+                                    fontSize: 10,
+                                    padding: '1px 6px',
+                                    borderRadius: 4,
+                                    background: '#E2E8F0',
+                                    color: '#475569',
+                                    fontWeight: 600,
+                                    flexShrink: 0,
+                                  }}
+                                >
+                                  Trụ sở
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </div>
 
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#64748B' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', color: '#64748B' }}>
                         <ChevronDown
                           size={16}
                           style={{
@@ -704,98 +738,39 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
                           </div>
                         </div>
 
-                        {/* Quick Selection Actions */}
-                        <div
-                          style={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center',
-                            padding: '6px 12px',
-                            background: '#F8FAFC',
-                            borderBottom: '1px solid #F1F5F9',
-                            fontSize: 12,
-                          }}
-                        >
-                          <span style={{ color: '#64748B' }}>
-                            Tìm thấy {filteredBranches.length} chi nhánh
-                          </span>
-                          <div style={{ display: 'flex', gap: 12 }}>
-                            <button
-                              type="button"
-                              onClick={handleSelectAllBranches}
-                              style={{
-                                border: 'none',
-                                background: 'transparent',
-                                color: '#0F766E',
-                                fontWeight: 600,
-                                cursor: 'pointer',
-                                padding: 0,
-                                fontSize: 12,
-                              }}
-                            >
-                              Chọn tất cả ({branches.length})
-                            </button>
-                            <span style={{ color: '#CBD5E1' }}>|</span>
-                            <button
-                              type="button"
-                              onClick={handleClearAllBranches}
-                              style={{
-                                border: 'none',
-                                background: 'transparent',
-                                color: '#64748B',
-                                fontWeight: 500,
-                                cursor: 'pointer',
-                                padding: 0,
-                                fontSize: 12,
-                              }}
-                            >
-                              Mặc định (1 CN)
-                            </button>
-                          </div>
-                        </div>
-
                         {/* Branches List */}
                         <div style={{ maxHeight: 210, overflowY: 'auto', padding: '4px 0' }}>
                           {filteredBranches.length ? (
                             filteredBranches.map((b) => {
-                              const isChecked = workingBranchIds.includes(b.id);
+                              const isSelected = workingBranchId === b.id;
                               return (
                                 <div
                                   key={b.id}
-                                  onClick={() => handleWorkingBranchToggle(b.id)}
+                                  onClick={() => handleSelectBranch(b.id)}
                                   style={{
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'space-between',
-                                    padding: '8px 12px',
+                                    padding: '9px 14px',
                                     cursor: 'pointer',
-                                    background: isChecked ? '#F0FDFA' : 'transparent',
+                                    background: isSelected ? '#F0FDFA' : 'transparent',
                                     transition: 'background 0.12s ease',
                                   }}
                                   onMouseEnter={(e) => {
-                                    if (!isChecked) e.currentTarget.style.background = '#F8FAFC';
+                                    if (!isSelected) e.currentTarget.style.background = '#F8FAFC';
                                   }}
                                   onMouseLeave={(e) => {
-                                    if (!isChecked) e.currentTarget.style.background = 'transparent';
+                                    if (!isSelected) e.currentTarget.style.background = 'transparent';
                                   }}
                                 >
-                                  <label
-                                    style={{
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      gap: 10,
-                                      cursor: 'pointer',
-                                      fontSize: 13,
-                                      width: '100%',
-                                    }}
-                                  >
-                                    <input
-                                      type="checkbox"
-                                      checked={isChecked}
-                                      onChange={() => { }} // Đã xử lý ở cấp row onClick
-                                      style={{ accentColor: '#0F766E', width: 16, height: 16 }}
-                                    />
-                                    <span style={{ fontWeight: isChecked ? 600 : 400, color: isChecked ? '#134E4A' : '#1E293B' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <span
+                                      style={{
+                                        fontSize: 13,
+                                        fontWeight: isSelected ? 600 : 400,
+                                        color: isSelected ? '#0F766E' : '#1E293B',
+                                      }}
+                                    >
                                       {b.name}
                                     </span>
                                     {b.isMain && (
@@ -812,9 +787,9 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
                                         Trụ sở
                                       </span>
                                     )}
-                                  </label>
+                                  </div>
 
-                                  {isChecked && <Check size={15} color="#0F766E" />}
+                                  {isSelected && <Check size={16} color="#0F766E" />}
                                 </div>
                               );
                             })
@@ -823,26 +798,6 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
                               Không tìm thấy chi nhánh nào phù hợp
                             </div>
                           )}
-                        </div>
-
-                        {/* Footer */}
-                        <div
-                          style={{
-                            padding: '8px 12px',
-                            background: '#F8FAFC',
-                            borderTop: '1px solid #F1F5F9',
-                            display: 'flex',
-                            justifyContent: 'flex-end',
-                          }}
-                        >
-                          <button
-                            type="button"
-                            className="emp-btn emp-btn-primary"
-                            style={{ height: 28, padding: '0 14px', fontSize: 12 }}
-                            onClick={() => setIsBranchDropdownOpen(false)}
-                          >
-                            Xong ({workingBranchIds.length})
-                          </button>
                         </div>
                       </div>
                     )}
@@ -1286,7 +1241,7 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
               type="button"
               className="emp-btn emp-btn-secondary"
               onClick={onClose}
-              disabled={isSubmitting}
+              disabled={isSubmitting || isUploadingAvatar}
             >
               Bỏ qua
             </button>
@@ -1295,7 +1250,7 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
                 type="button"
                 className="emp-btn emp-btn-outline-teal"
                 onClick={() => handleSave(true)}
-                disabled={isSubmitting}
+                disabled={isSubmitting || isUploadingAvatar}
               >
                 {isSubmitting ? 'Đang lưu...' : 'Lưu & Thêm mới'}
               </button>
@@ -1304,7 +1259,7 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
               type="button"
               className="emp-btn emp-btn-primary"
               onClick={() => handleSave(false)}
-              disabled={isSubmitting}
+              disabled={isSubmitting || isUploadingAvatar}
             >
               {isSubmitting ? 'Đang lưu...' : 'Lưu thông tin'}
             </button>

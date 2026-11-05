@@ -965,7 +965,6 @@ export const ShiftConfigPage: React.FC = () => {
           <div
             className="emp-modal-card"
             style={{
-              maxWidth: 580,
               borderRadius: 16,
               boxShadow: '0 20px 40px -10px rgba(0, 0, 0, 0.25)',
               overflow: 'visible',
@@ -1005,7 +1004,7 @@ export const ShiftConfigPage: React.FC = () => {
             </div>
 
             {/* Form Body */}
-            <form onSubmit={handleSubmitForm} style={{ overflow: 'visible', display: 'flex', flexDirection: 'column' }}>
+            <form onSubmit={handleSubmitForm} style={{ overflow: 'visible', display: 'flex', flexDirection: 'column', flex: '1 1 auto', minHeight: 0, justifyContent: 'space-between' }}>
               <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 18, overflow: 'visible' }}>
                 {formError && (
                   <div
@@ -1461,7 +1460,7 @@ export const ShiftConfigPage: React.FC = () => {
       {/* ─── MODAL XÁC NHẬN XÓA CA ─── */}
       {deletingShift && (
         <div className="emp-modal-overlay">
-          <div className="emp-modal-card" style={{ maxWidth: 440 }}>
+          <div className="emp-modal-card">
             <div className="emp-modal-header">
               <h3 style={{ margin: 0, fontSize: 16, color: '#DC2626', display: 'flex', alignItems: 'center', gap: 8 }}>
                 <AlertTriangle size={20} />

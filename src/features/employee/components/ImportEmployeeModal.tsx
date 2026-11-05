@@ -47,7 +47,7 @@ export const ImportEmployeeModal: React.FC<ImportEmployeeModalProps> = ({
 
   return (
     <div className="emp-modal-overlay">
-      <div className="emp-modal-card" style={{ maxWidth: 580 }}>
+      <div className="emp-modal-card">
         <div className="emp-modal-header">
           <h3>Nhập nhân viên từ file dữ liệu Excel</h3>
           <button type="button" className="emp-modal-close-btn" onClick={onClose}>

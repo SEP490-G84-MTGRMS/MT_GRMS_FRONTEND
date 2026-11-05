@@ -45,7 +45,7 @@ export const CreateAllowanceModal: React.FC<CreateAllowanceModalProps> = ({
 
   return (
     <div className="emp-modal-overlay" style={{ zIndex: 1100 }}>
-      <div className="emp-modal-card" style={{ maxWidth: 500 }}>
+      <div className="emp-modal-card">
         <div className="emp-modal-header">
           <h3>Thêm mới loại phụ cấp</h3>
           <button type="button" className="emp-modal-close-btn" onClick={onClose}>

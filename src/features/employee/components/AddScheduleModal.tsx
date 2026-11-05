@@ -291,7 +291,7 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
 
   return (
     <div className="emp-modal-overlay">
-      <div className="emp-modal-card" style={{ maxWidth: 560, padding: 0, overflow: 'hidden' }}>
+      <div className="emp-modal-card" style={{ padding: 0, overflow: 'hidden' }}>
         {/* Header Modal theo mockup */}
         <div
           style={{
