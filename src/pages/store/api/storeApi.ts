@@ -28,6 +28,7 @@ export interface BackendTenantStoreResponse {
   maxBranches: number;
   staffCount: number;
   maxStaff: number;
+  walletBalance?: number;
 }
 
 export interface UpdateStoreInfoPayload {
@@ -89,7 +90,7 @@ export const mapBackendStoreToFrontend = (
     daysRemaining,
     branchesCount: backend.branchCount,
     industry: 'Tạp hóa & Siêu thị',
-    walletBalance: existingWalletBalance,
+    walletBalance: backend.walletBalance !== undefined ? backend.walletBalance : existingWalletBalance,
   };
 };
 

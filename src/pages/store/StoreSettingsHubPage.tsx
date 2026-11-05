@@ -82,8 +82,8 @@ export const StoreSettingsHubPage: FC = () => {
   };
 
   // Nạp tiền ví
-  const handleTopupSuccess = (amount: number) => {
-    const newBal = storeInfo.walletBalance + amount;
+  const handleTopupSuccess = (amount: number, newBalance?: number) => {
+    const newBal = newBalance !== undefined ? newBalance : storeInfo.walletBalance + amount;
     const newTx: WalletTransaction = {
       id: `tx-${Date.now()}`,
       transactionCode: `WAL-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(100 + Math.random() * 900)}`,
@@ -195,7 +195,7 @@ export const StoreSettingsHubPage: FC = () => {
 
         {/* Tab 1: Gói dịch vụ */}
         {activeTab === 'subscriptions' && (
-          <div>
+          <div style={{ width: '100%' }}>
             <div style={{ marginBottom: 18 }}>
               <h1 style={{ fontSize: 22, fontWeight: 800, color: '#0F172A', margin: 0 }}>
                 Gói dịch vụ MT-GRMS
