@@ -41,6 +41,7 @@ export interface WorkShift {
   shiftName: string; // Sáng (06:00 - 14:00), Chiều (14:00 - 22:00), Hành chính (08:00 - 17:00)
   dayOfWeek: 'T2' | 'T3' | 'T4' | 'T5' | 'T6' | 'T7' | 'CN';
   dateStr: string;
+  branchId?: string;
   branchName: string;
   note?: string;
 }
@@ -165,6 +166,7 @@ export interface ScheduleAssignment {
   shiftColor: string;
   dayOfWeek: 'T2' | 'T3' | 'T4' | 'T5' | 'T6' | 'T7' | 'CN';
   dateStr: string;
+  branchId?: string;
   branchName: string;
 }
 
