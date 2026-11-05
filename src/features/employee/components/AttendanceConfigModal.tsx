@@ -1,24 +1,19 @@
-import React, { useState, useEffect } from 'react';
-import { X, Info, Plus, Trash2, Settings, Building2, Copy, Check } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { X, Info, Plus, Trash2, Settings, Building2, Copy, Check, RotateCw, AlertTriangle } from 'lucide-react';
 import type { Branch } from '../types';
+import {
+  attendancePolicyApi,
+  type WorkHourConversionRule,
+  type UpsertAttendancePolicyPayload,
+} from '../api/attendancePolicyApi';
 
-export interface WorkHourConversionRule {
-  id: string;
-  type: 'range' | 'gte';
-  fromHours: number;
-  fromMinutes?: number;
-  toHours?: number;
-  toMinutes?: number;
-  workUnits: number;
-  workUnitsLabel: string;
-}
+export type { WorkHourConversionRule };
 
 export interface AttendanceConfig {
   // 1. Thiết lập số giờ tính công
   standardDayHours: number;
   isConvertHoursToDays: boolean;
   conversionRules: WorkHourConversionRule[];
-  recordLateEarlyIfHalfDay: boolean;
 
   // 2. Cài đặt đi muộn - về sớm
   enableLateThreshold: boolean;
@@ -31,7 +26,6 @@ export interface AttendanceConfig {
   otBeforeShiftMinutes: number;
   enableOtAfterShift: boolean;
   otAfterShiftMinutes: number;
-  enableOtAllActualTime: boolean;
 }
 
 export const DEFAULT_ATTENDANCE_CONFIG: AttendanceConfig = {
@@ -57,7 +51,6 @@ export const DEFAULT_ATTENDANCE_CONFIG: AttendanceConfig = {
       workUnitsLabel: '1 công',
     },
   ],
-  recordLateEarlyIfHalfDay: false,
   enableLateThreshold: true,
   lateThresholdMinutes: 0,
   enableEarlyLeaveThreshold: true,
@@ -66,32 +59,9 @@ export const DEFAULT_ATTENDANCE_CONFIG: AttendanceConfig = {
   otBeforeShiftMinutes: 0,
   enableOtAfterShift: true,
   otAfterShiftMinutes: 0,
-  enableOtAllActualTime: false,
 };
-
-const STORAGE_KEY = 'mt_grms_attendance_configs_by_branch';
 
 export type AttendanceConfigsByBranch = Record<string, AttendanceConfig>;
-
-export const loadAllAttendanceConfigs = (): AttendanceConfigsByBranch => {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      return JSON.parse(raw);
-    }
-  } catch (e) {
-    console.error('Không thể tải danh sách cấu hình chấm công:', e);
-  }
-  return {};
-};
-
-export const saveAllAttendanceConfigs = (configs: AttendanceConfigsByBranch): void => {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(configs));
-  } catch (e) {
-    console.error('Không thể lưu danh sách cấu hình chấm công:', e);
-  }
-};
 
 interface AttendanceConfigModalProps {
   isOpen: boolean;
@@ -108,56 +78,89 @@ export const AttendanceConfigModal: React.FC<AttendanceConfigModalProps> = ({
   initialBranchId,
   onSaveSuccess,
 }) => {
-  const [allConfigs, setAllConfigs] = useState<AttendanceConfigsByBranch>(loadAllAttendanceConfigs);
   const [selectedBranchId, setSelectedBranchId] = useState<string>('');
   const [currentConfig, setCurrentConfig] = useState<AttendanceConfig>(DEFAULT_ATTENDANCE_CONFIG);
   const [rules, setRules] = useState<WorkHourConversionRule[]>(DEFAULT_ATTENDANCE_CONFIG.conversionRules);
+  const [isCustomized, setIsCustomized] = useState<boolean>(false);
+
+  // Trạng thái async
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [isCopying, setIsCopying] = useState<boolean>(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Modal sao chép sang chi nhánh khác
   const [showCopyModal, setShowCopyModal] = useState(false);
   const [targetBranchIds, setTargetBranchIds] = useState<string[]>([]);
   const [copyFeedback, setCopyFeedback] = useState<string | null>(null);
 
+  // Tải cấu hình chính sách từ Backend
+  const fetchBranchPolicy = useCallback(async (branchId: string) => {
+    if (!branchId) return;
+    try {
+      setIsLoading(true);
+      setErrorMessage(null);
+      const dto = await attendancePolicyApi.getByBranch(branchId);
+
+      let parsedRules: WorkHourConversionRule[] = DEFAULT_ATTENDANCE_CONFIG.conversionRules;
+      if (dto.conversionRulesJson) {
+        try {
+          const parsed = JSON.parse(dto.conversionRulesJson);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            parsedRules = parsed;
+          }
+        } catch (e) {
+          console.warn('Lỗi parse conversionRulesJson:', e);
+        }
+      }
+
+      setCurrentConfig({
+        standardDayHours: dto.standardDayHours ?? 8,
+        isConvertHoursToDays: dto.isConvertHoursToDays ?? true,
+        conversionRules: parsedRules,
+        enableLateThreshold: dto.enableLateThreshold ?? true,
+        lateThresholdMinutes: dto.lateThresholdMinutes ?? 0,
+        enableEarlyLeaveThreshold: dto.enableEarlyLeaveThreshold ?? true,
+        earlyLeaveThresholdMinutes: dto.earlyLeaveThresholdMinutes ?? 0,
+        enableOtBeforeShift: dto.enableOtBeforeShift ?? true,
+        otBeforeShiftMinutes: dto.otBeforeShiftMinutes ?? 0,
+        enableOtAfterShift: dto.enableOtAfterShift ?? true,
+        otAfterShiftMinutes: dto.otAfterShiftMinutes ?? 0,
+      });
+      setRules(parsedRules);
+      setIsCustomized(Boolean(dto.isCustomized));
+    } catch (err: any) {
+      console.error('Lỗi tải cấu hình chấm công chi nhánh:', err);
+      setErrorMessage(
+        err?.response?.data?.message || err?.message || 'Không thể tải cấu hình chấm công từ máy chủ.'
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
   // Đồng bộ khi mở modal hoặc danh sách branches thay đổi
   useEffect(() => {
     if (isOpen && branches.length > 0) {
-      const stored = loadAllAttendanceConfigs();
-      setAllConfigs(stored);
-
       const defaultBranchId =
         initialBranchId && branches.some((b) => b.id === initialBranchId)
           ? initialBranchId
           : branches[0]?.id || '';
 
       setSelectedBranchId(defaultBranchId);
-
-      const branchConfig = stored[defaultBranchId] || DEFAULT_ATTENDANCE_CONFIG;
-      setCurrentConfig(branchConfig);
-      setRules(branchConfig.conversionRules || DEFAULT_ATTENDANCE_CONFIG.conversionRules);
       setShowCopyModal(false);
       setCopyFeedback(null);
+      setErrorMessage(null);
+      fetchBranchPolicy(defaultBranchId);
     }
-  }, [isOpen, initialBranchId, branches]);
+  }, [isOpen, initialBranchId, branches, fetchBranchPolicy]);
 
   if (!isOpen) return null;
 
   // Xử lý chuyển đổi chi nhánh
   const handleSwitchBranch = (nextBranchId: string) => {
-    // Lưu tạm cấu hình hiện tại vào allConfigs
-    const updatedAll = {
-      ...allConfigs,
-      [selectedBranchId]: {
-        ...currentConfig,
-        conversionRules: rules,
-      },
-    };
-    setAllConfigs(updatedAll);
     setSelectedBranchId(nextBranchId);
-
-    // Nạp cấu hình của chi nhánh mới
-    const nextConfig = updatedAll[nextBranchId] || DEFAULT_ATTENDANCE_CONFIG;
-    setCurrentConfig(nextConfig);
-    setRules(nextConfig.conversionRules || DEFAULT_ATTENDANCE_CONFIG.conversionRules);
+    fetchBranchPolicy(nextBranchId);
   };
 
   const handleAddRule = () => {
@@ -190,46 +193,88 @@ export const AttendanceConfigModal: React.FC<AttendanceConfigModalProps> = ({
   };
 
   // Xác nhận sao chép sang các chi nhánh được chọn
-  const handleConfirmCopy = () => {
-    const activeConfig: AttendanceConfig = {
-      ...currentConfig,
-      conversionRules: rules,
-    };
+  const handleConfirmCopy = async () => {
+    if (!selectedBranchId || targetBranchIds.length === 0) return;
 
-    const updatedAll = { ...allConfigs, [selectedBranchId]: activeConfig };
-    targetBranchIds.forEach((bId) => {
-      updatedAll[bId] = JSON.parse(JSON.stringify(activeConfig));
-    });
-
-    setAllConfigs(updatedAll);
-    saveAllAttendanceConfigs(updatedAll);
-    setCopyFeedback(`Đã sao chép cấu hình sang ${targetBranchIds.length} chi nhánh thành công!`);
-    setTimeout(() => {
-      setShowCopyModal(false);
+    try {
+      setIsCopying(true);
       setCopyFeedback(null);
-    }, 1200);
+
+      // 1. Lưu cấu hình hiện tại của chi nhánh nguồn nếu người dùng đang có chỉnh sửa
+      const payload: UpsertAttendancePolicyPayload = {
+        standardDayHours: currentConfig.standardDayHours,
+        isConvertHoursToDays: currentConfig.isConvertHoursToDays,
+        conversionRulesJson: JSON.stringify(rules),
+        enableLateThreshold: currentConfig.enableLateThreshold,
+        lateThresholdMinutes: currentConfig.lateThresholdMinutes,
+        enableEarlyLeaveThreshold: currentConfig.enableEarlyLeaveThreshold,
+        earlyLeaveThresholdMinutes: currentConfig.earlyLeaveThresholdMinutes,
+        enableOtBeforeShift: currentConfig.enableOtBeforeShift,
+        otBeforeShiftMinutes: currentConfig.otBeforeShiftMinutes,
+        enableOtAfterShift: currentConfig.enableOtAfterShift,
+        otAfterShiftMinutes: currentConfig.otAfterShiftMinutes,
+      };
+      await attendancePolicyApi.upsertPolicy(selectedBranchId, payload);
+
+      // 2. Gọi API sao chép
+      const res = await attendancePolicyApi.copyPolicy({
+        sourceBranchId: selectedBranchId,
+        targetBranchIds,
+      });
+
+      setCopyFeedback(res.message || `Đã sao chép cấu hình sang ${targetBranchIds.length} chi nhánh thành công!`);
+      setTimeout(() => {
+        setShowCopyModal(false);
+        setCopyFeedback(null);
+      }, 1200);
+    } catch (err: any) {
+      console.error('Lỗi sao chép cấu hình:', err);
+      setCopyFeedback(err?.response?.data?.message || err?.message || 'Có lỗi xảy ra khi sao chép cấu hình.');
+    } finally {
+      setIsCopying(false);
+    }
   };
 
-  // Lưu toàn bộ cài đặt
-  const handleSubmit = (e: React.FormEvent) => {
+  // Lưu toàn bộ cài đặt cho chi nhánh đang chọn
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const finalCurrentConfig: AttendanceConfig = {
-      ...currentConfig,
-      conversionRules: rules,
-    };
+    if (!selectedBranchId) return;
 
-    const finalAll = {
-      ...allConfigs,
-      [selectedBranchId]: finalCurrentConfig,
-    };
+    try {
+      setIsSubmitting(true);
+      setErrorMessage(null);
 
-    saveAllAttendanceConfigs(finalAll);
-    setAllConfigs(finalAll);
+      const payload: UpsertAttendancePolicyPayload = {
+        standardDayHours: currentConfig.standardDayHours,
+        isConvertHoursToDays: currentConfig.isConvertHoursToDays,
+        conversionRulesJson: JSON.stringify(rules),
+        enableLateThreshold: currentConfig.enableLateThreshold,
+        lateThresholdMinutes: currentConfig.lateThresholdMinutes,
+        enableEarlyLeaveThreshold: currentConfig.enableEarlyLeaveThreshold,
+        earlyLeaveThresholdMinutes: currentConfig.earlyLeaveThresholdMinutes,
+        enableOtBeforeShift: currentConfig.enableOtBeforeShift,
+        otBeforeShiftMinutes: currentConfig.otBeforeShiftMinutes,
+        enableOtAfterShift: currentConfig.enableOtAfterShift,
+        otAfterShiftMinutes: currentConfig.otAfterShiftMinutes,
+      };
 
-    if (onSaveSuccess) {
-      onSaveSuccess(selectedBranchId, finalCurrentConfig);
+      await attendancePolicyApi.upsertPolicy(selectedBranchId, payload);
+
+      const finalCurrentConfig: AttendanceConfig = {
+        ...currentConfig,
+        conversionRules: rules,
+      };
+
+      if (onSaveSuccess) {
+        onSaveSuccess(selectedBranchId, finalCurrentConfig);
+      }
+      onClose();
+    } catch (err: any) {
+      console.error('Lỗi lưu cấu hình chấm công:', err);
+      setErrorMessage(err?.response?.data?.message || err?.message || 'Không thể lưu cấu hình chấm công lên máy chủ.');
+    } finally {
+      setIsSubmitting(false);
     }
-    onClose();
   };
 
   const currentBranchName = branches.find((b) => b.id === selectedBranchId)?.name || 'Chi nhánh';
@@ -360,7 +405,7 @@ export const AttendanceConfigModal: React.FC<AttendanceConfigModalProps> = ({
                 </option>
               ))}
             </select>
-            {allConfigs[selectedBranchId] ? (
+            {isCustomized ? (
               <span
                 style={{
                   fontSize: 11.5,
@@ -393,6 +438,7 @@ export const AttendanceConfigModal: React.FC<AttendanceConfigModalProps> = ({
             <button
               type="button"
               onClick={handleOpenCopyModal}
+              disabled={isLoading || isSubmitting}
               className="emp-btn emp-btn-secondary"
               style={{
                 height: 32,
@@ -402,6 +448,8 @@ export const AttendanceConfigModal: React.FC<AttendanceConfigModalProps> = ({
                 alignItems: 'center',
                 gap: 6,
                 fontWeight: 500,
+                opacity: isLoading || isSubmitting ? 0.6 : 1,
+                cursor: isLoading || isSubmitting ? 'not-allowed' : 'pointer',
               }}
             >
               <Copy size={14} />
@@ -422,6 +470,32 @@ export const AttendanceConfigModal: React.FC<AttendanceConfigModalProps> = ({
               gap: 22,
             }}
           >
+            {errorMessage && (
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  padding: '10px 14px',
+                  background: '#FEF2F2',
+                  border: '1px solid #FECACA',
+                  borderRadius: 8,
+                  color: '#DC2626',
+                  fontSize: 13,
+                }}
+              >
+                <AlertTriangle size={16} />
+                <span>{errorMessage}</span>
+              </div>
+            )}
+
+            {isLoading ? (
+              <div style={{ padding: '60px 0', textAlign: 'center', color: '#64748B' }}>
+                <RotateCw size={28} className="spin-icon" style={{ margin: '0 auto 10px', opacity: 0.6 }} />
+                <div>Đang tải cấu hình chấm công chi nhánh...</div>
+              </div>
+            ) : (
+              <>
             {/* ─── SECTION 1: THIẾT LẬP SỐ GIỜ TÍNH CÔNG ─── */}
             <div style={{ borderBottom: '1px solid #F1F5F9', paddingBottom: 22 }}>
               <div style={{ fontSize: 14.5, fontWeight: 700, color: '#0F172A', marginBottom: 4 }}>
@@ -690,38 +764,6 @@ export const AttendanceConfigModal: React.FC<AttendanceConfigModalProps> = ({
                   </div>
                 </div>
               )}
-
-              {/* Dòng 3: Ghi nhận đi muộn - về sớm nếu nhân viên làm nửa công */}
-              <div style={{ marginTop: 14, paddingLeft: 2 }}>
-                <label
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 8,
-                    fontSize: 13,
-                    color: '#334155',
-                    cursor: 'pointer',
-                  }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={currentConfig.recordLateEarlyIfHalfDay}
-                    onChange={(e) =>
-                      setCurrentConfig((prev) => ({
-                        ...prev,
-                        recordLateEarlyIfHalfDay: e.target.checked,
-                      }))
-                    }
-                    style={{
-                      width: 16,
-                      height: 16,
-                      accentColor: 'var(--blue-primary, #0F766E)',
-                      cursor: 'pointer',
-                    }}
-                  />
-                  <span>Ghi nhận đi muộn - về sớm nếu nhân viên làm nửa công</span>
-                </label>
-              </div>
             </div>
 
             {/* ─── SECTION 2: CÀI ĐẶT ĐI MUỘN - VỀ SỚM ─── */}
@@ -1013,50 +1055,10 @@ export const AttendanceConfigModal: React.FC<AttendanceConfigModalProps> = ({
                     <Info size={15} />
                   </span>
                 </div>
-
-                {/* Tính toàn bộ thời gian làm thêm thực tế */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13 }}>
-                  <label
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 8,
-                      cursor: 'pointer',
-                      color: '#334155',
-                    }}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={currentConfig.enableOtAllActualTime}
-                      onChange={(e) =>
-                        setCurrentConfig((prev) => ({
-                          ...prev,
-                          enableOtAllActualTime: e.target.checked,
-                        }))
-                      }
-                      style={{
-                        width: 16,
-                        height: 16,
-                        accentColor: 'var(--blue-primary, #0F766E)',
-                        cursor: 'pointer',
-                      }}
-                    />
-                    <span>Tính toàn bộ thời gian làm thêm thực tế</span>
-                  </label>
-                  <span
-                    title="Ghi nhận chính xác 100% từng phút làm thêm trước và sau ca vào bảng tổng hợp giờ công."
-                    style={{
-                      cursor: 'help',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      color: '#94A3B8',
-                    }}
-                  >
-                    <Info size={15} />
-                  </span>
-                </div>
               </div>
             </div>
+            </>
+            )}
           </div>
 
           {/* Footer */}
@@ -1077,6 +1079,7 @@ export const AttendanceConfigModal: React.FC<AttendanceConfigModalProps> = ({
               <button
                 type="button"
                 onClick={onClose}
+                disabled={isSubmitting}
                 className="emp-btn emp-btn-secondary"
                 style={{ minWidth: 90 }}
               >
@@ -1084,14 +1087,18 @@ export const AttendanceConfigModal: React.FC<AttendanceConfigModalProps> = ({
               </button>
               <button
                 type="submit"
+                disabled={isLoading || isSubmitting}
                 className="emp-btn emp-btn-primary"
                 style={{
                   minWidth: 120,
                   background: 'var(--blue-primary, #0F766E)',
                   borderColor: 'var(--blue-primary, #0F766E)',
+                  opacity: isLoading || isSubmitting ? 0.7 : 1,
+                  cursor: isLoading || isSubmitting ? 'not-allowed' : 'pointer',
+                  fontWeight: 600,
                 }}
               >
-                Lưu cài đặt
+                {isSubmitting ? 'Đang lưu...' : 'Lưu cài đặt'}
               </button>
             </div>
           </div>
@@ -1256,16 +1263,17 @@ export const AttendanceConfigModal: React.FC<AttendanceConfigModalProps> = ({
                   type="button"
                   className="emp-btn emp-btn-primary"
                   onClick={handleConfirmCopy}
-                  disabled={targetBranchIds.length === 0}
+                  disabled={isCopying || targetBranchIds.length === 0}
                   style={{
                     height: 32,
                     fontSize: 12,
                     background: '#0F766E',
                     borderColor: '#0F766E',
-                    opacity: targetBranchIds.length === 0 ? 0.6 : 1,
+                    opacity: isCopying || targetBranchIds.length === 0 ? 0.6 : 1,
+                    cursor: isCopying || targetBranchIds.length === 0 ? 'not-allowed' : 'pointer',
                   }}
                 >
-                  Sao chép ({targetBranchIds.length})
+                  {isCopying ? 'Đang sao chép...' : `Sao chép (${targetBranchIds.length})`}
                 </button>
               </div>
             </div>

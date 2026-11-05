@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
   Search,
   Plus,
@@ -12,8 +11,6 @@ import {
   Check,
   X,
   AlertTriangle,
-  Calendar,
-  Users,
   Info,
   Sliders,
 } from 'lucide-react';
@@ -25,7 +22,7 @@ import {
   type CreateShiftConfigPayload,
   type UpdateShiftConfigPayload,
 } from '../api/shiftConfigApi';
-import { ConfirmModal, NotificationModal } from '../../../components/common';
+import { ConfirmModal, NotificationModal, TablePagination } from '../../../components/common';
 import { AttendanceConfigModal } from '../components/AttendanceConfigModal';
 import '../employee.css';
 
@@ -53,8 +50,6 @@ const calculateHoursText = (start: string, end: string): { hours: number; text: 
 };
 
 export const ShiftConfigPage: React.FC = () => {
-  const navigate = useNavigate();
-
   // State danh sách
   const [shifts, setShifts] = useState<ShiftConfigDto[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
@@ -71,9 +66,11 @@ export const ShiftConfigPage: React.FC = () => {
   const [filterBranchSearch, setFilterBranchSearch] = useState('');
   const filterBranchDropdownRef = useRef<HTMLDivElement>(null);
 
-  // Phân trang nội bộ
+  // Phân trang
   const [currentPage, setCurrentPage] = useState<number>(1);
-  const pageSize = 10;
+  const [pageSize, setPageSize] = useState<number>(10);
+  const [totalItems, setTotalItems] = useState<number>(0);
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
 
   // Modal Thêm / Sửa
   const [showFormModal, setShowFormModal] = useState(false);
@@ -145,18 +142,34 @@ export const ShiftConfigPage: React.FC = () => {
     };
   }, []);
 
+  // Debounce tìm kiếm
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
   // Tải danh sách cấu hình ca
   const fetchShifts = useCallback(async () => {
     try {
       setIsLoading(true);
       setErrorMessage(null);
 
-      const branchIdParam = selectedBranchIds.length === 1 ? selectedBranchIds[0] : undefined;
       const statusParam =
         filterStatus === 'active' ? true : filterStatus === 'inactive' ? false : undefined;
 
-      const data = await shiftConfigApi.getShiftConfigsByBranch(branchIdParam, statusParam);
-      setShifts(data || []);
+      const pagedResult = await shiftConfigApi.getShiftConfigsPaged({
+        keyword: debouncedSearchTerm.trim() || undefined,
+        branchId: selectedBranchIds.length === 1 ? selectedBranchIds[0] : undefined,
+        branchIds: selectedBranchIds.length > 0 ? selectedBranchIds : undefined,
+        isActive: statusParam,
+        page: currentPage,
+        pageSize,
+      });
+
+      setShifts(pagedResult.items || []);
+      setTotalItems(pagedResult.totalItems || 0);
     } catch (err: any) {
       console.error('Lỗi tải ca làm việc:', err);
       setErrorMessage(
@@ -165,39 +178,14 @@ export const ShiftConfigPage: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedBranchIds, filterStatus]);
+  }, [debouncedSearchTerm, selectedBranchIds, filterStatus, currentPage, pageSize]);
 
   useEffect(() => {
     fetchShifts();
   }, [fetchShifts]);
 
-  // Bộ lọc danh sách ca
-  const filteredShifts = shifts.filter((s) => {
-    if (searchTerm.trim()) {
-      const kw = searchTerm.trim().toLowerCase();
-      const nameMatch = s.shiftName?.toLowerCase().includes(kw);
-      const codeMatch = s.shiftCode?.toLowerCase().includes(kw);
-      if (!nameMatch && !codeMatch) return false;
-    }
-
-    if (selectedBranchIds.length > 0) {
-      const shiftBranchList = s.branchIds && s.branchIds.length > 0 ? s.branchIds : [s.branchId];
-      const hasMatch = selectedBranchIds.some((bId) => shiftBranchList.includes(bId));
-      if (!hasMatch) return false;
-    }
-
-    if (filterStatus === 'active' && !s.isActive) return false;
-    if (filterStatus === 'inactive' && s.isActive) return false;
-
-    return true;
-  });
-
   // Phân trang
-  const totalPages = Math.ceil(filteredShifts.length / pageSize) || 1;
-  const paginatedShifts = filteredShifts.slice(
-    (currentPage - 1) * pageSize,
-    currentPage * pageSize
-  );
+  const paginatedShifts = shifts;
 
   // Mở modal Thêm mới ca
   const handleOpenCreate = () => {
@@ -320,10 +308,10 @@ export const ShiftConfigPage: React.FC = () => {
           isActive: formIsActive,
         };
 
-        const updated = await shiftConfigApi.updateShiftConfig(editingShift.id, payload);
-        setShifts((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
+        await shiftConfigApi.updateShiftConfig(editingShift.id, payload);
         setShowFormModal(false);
         setEditingShift(null);
+        await fetchShifts();
         setNotification({
           isOpen: true,
           type: 'success',
@@ -346,10 +334,10 @@ export const ShiftConfigPage: React.FC = () => {
           isActive: formIsActive,
         };
 
-        const created = await shiftConfigApi.createShiftConfig(payload);
-        setShifts((prev) => [created, ...prev]);
+        await shiftConfigApi.createShiftConfig(payload);
         setShowFormModal(false);
         setEditingShift(null);
+        await fetchShifts();
         setNotification({
           isOpen: true,
           type: 'success',
@@ -374,8 +362,8 @@ export const ShiftConfigPage: React.FC = () => {
     try {
       setIsDeleting(true);
       await shiftConfigApi.deleteShiftConfig(deletingShift.id);
-      setShifts((prev) => prev.filter((item) => item.id !== deletingShift.id));
       setDeletingShift(null);
+      await fetchShifts();
       setNotification({
         isOpen: true,
         type: 'success',
@@ -400,8 +388,8 @@ export const ShiftConfigPage: React.FC = () => {
   const getBranchNamesDisplay = (shift: ShiftConfigDto): string[] => {
     const ids = shift.branchIds && shift.branchIds.length > 0 ? shift.branchIds : [shift.branchId];
     return ids.map((id) => {
-      const b = branches.find((item) => item.id === id);
-      return b ? b.name : 'Chi nhánh';
+      const b = branches.find((item) => (item.id || '').toLowerCase() === (id || '').toLowerCase());
+      return b ? b.name : (shift.branchName || 'Chi nhánh');
     });
   };
 
@@ -414,7 +402,7 @@ export const ShiftConfigPage: React.FC = () => {
       <div className="emp-page-header">
         <h2 className="emp-header-title">
           <span>Cấu hình ca làm việc</span>
-          <span className="count-badge">{filteredShifts.length}</span>
+          <span className="count-badge">{totalItems}</span>
         </h2>
       </div>
 
@@ -573,7 +561,7 @@ export const ShiftConfigPage: React.FC = () => {
                             <input
                               type="checkbox"
                               checked={isChecked}
-                              onChange={() => {}}
+                              onChange={() => { }}
                               style={{ accentColor: 'var(--blue-primary, #0F766E)', width: 15, height: 15 }}
                             />
                             <span>{b.name}</span>
@@ -674,22 +662,13 @@ export const ShiftConfigPage: React.FC = () => {
         <div className="emp-header-actions">
           <button
             type="button"
-            className="emp-btn emp-btn-secondary"
-            onClick={() => navigate('/store-owner/employees/schedule')}
+            className="emp-btn emp-btn-primary"
+            onClick={handleOpenCreate}
+            style={{ background: 'var(--blue-primary, #0F766E)', borderColor: 'var(--blue-primary, #0F766E)' }}
           >
-            <Calendar size={16} />
-            <span>Lịch làm việc</span>
+            <Plus size={16} />
+            <span>Thêm ca làm việc</span>
           </button>
-
-          <button
-            type="button"
-            className="emp-btn emp-btn-secondary"
-            onClick={() => navigate('/store-owner/employees')}
-          >
-            <Users size={16} />
-            <span>Nhân viên</span>
-          </button>
-
           <button
             type="button"
             className="emp-btn emp-btn-secondary"
@@ -700,15 +679,7 @@ export const ShiftConfigPage: React.FC = () => {
             <span>Cài đặt chấm công</span>
           </button>
 
-          <button
-            type="button"
-            className="emp-btn emp-btn-primary"
-            onClick={handleOpenCreate}
-            style={{ background: 'var(--blue-primary, #0F766E)', borderColor: 'var(--blue-primary, #0F766E)' }}
-          >
-            <Plus size={16} />
-            <span>Thêm ca làm việc</span>
-          </button>
+
         </div>
       </div>
 
@@ -756,7 +727,7 @@ export const ShiftConfigPage: React.FC = () => {
             <RotateCw size={32} className="spin-icon" style={{ margin: '0 auto 12px', opacity: 0.6 }} />
             <div>Đang tải danh sách ca làm việc...</div>
           </div>
-        ) : filteredShifts.length === 0 ? (
+        ) : totalItems === 0 ? (
           <div className="emp-empty-state" style={{ padding: '60px 20px', textAlign: 'center' }}>
             <Clock size={48} color="#94A3B8" style={{ margin: '0 auto 12px', strokeWidth: 1.5 }} />
             <h4 style={{ margin: '0 0 6px', color: '#1E293B', fontSize: 16 }}>
@@ -780,7 +751,7 @@ export const ShiftConfigPage: React.FC = () => {
                 <th style={{ minWidth: 150 }}>Ca làm việc</th>
                 <th style={{ width: 160 }}>Thời gian</th>
                 <th style={{ width: 140 }}>Tổng giờ làm việc</th>
-                <th style={{ minWidth: 220 }}>Chi nhánh làm việc</th>
+                <th style={{ width: 500, maxWidth: 500 }}>Chi nhánh làm việc</th>
                 <th style={{ width: 120, textAlign: 'center' }}>Hoạt động</th>
                 <th className="align-right" style={{ width: 110 }}>
                   Thao tác
@@ -834,27 +805,22 @@ export const ShiftConfigPage: React.FC = () => {
                     </td>
 
                     {/* 5. Chi nhánh làm việc */}
-                    <td>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
-                        {branchNames.map((name, idx) => (
-                          <span
-                            key={idx}
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: 4,
-                              background: 'var(--blue-primary, #0F766E)',
-                              color: '#FFFFFF',
-                              fontSize: 12,
-                              fontWeight: 600,
-                              padding: '2px 8px',
-                              borderRadius: 6,
-                            }}
-                          >
-                            {name}
-                          </span>
-                        ))}
-                      </div>
+                    <td style={{ maxWidth: 260 }}>
+                      <span
+                        title={branchNames.join(', ')}
+                        style={{
+                          display: 'block',
+                          maxWidth: 260,
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                          fontSize: 13,
+                          color: '#334155',
+                          fontWeight: 500,
+                        }}
+                      >
+                        {branchNames.length > 0 ? branchNames.join(', ') : '---'}
+                      </span>
                     </td>
 
                     {/* 6. Hoạt động (Switch / Toggle) */}
@@ -953,70 +919,20 @@ export const ShiftConfigPage: React.FC = () => {
         )}
 
         {/* ─── PHÂN TRANG FOOTER ─── */}
-        {!isLoading && filteredShifts.length > 0 && (
-          <div
-            style={{
-              padding: '12px 16px',
-              borderTop: '1px solid #E2E8F0',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              background: '#F8FAFC',
-              fontSize: 13,
-              color: '#64748B',
+        {!isLoading && totalItems > 0 && (
+          <TablePagination
+            currentPage={currentPage}
+            pageSize={pageSize}
+            totalItems={totalItems}
+            pageSizeOptions={[10, 20, 50]}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={(newSize) => {
+              setPageSize(newSize);
+              setCurrentPage(1);
             }}
-          >
-            <div>
-              Hiển thị{' '}
-              <span style={{ fontWeight: 600, color: '#1E293B' }}>
-                {(currentPage - 1) * pageSize + 1} -{' '}
-                {Math.min(currentPage * pageSize, filteredShifts.length)}
-              </span>{' '}
-              trong tổng số{' '}
-              <span style={{ fontWeight: 600, color: '#1E293B' }}>{filteredShifts.length}</span> ca làm
-              việc
-            </div>
-
-            {totalPages > 1 && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <button
-                  type="button"
-                  disabled={currentPage === 1}
-                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                  style={{
-                    padding: '4px 10px',
-                    borderRadius: 6,
-                    border: '1px solid #CBD5E1',
-                    background: '#FFFFFF',
-                    cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
-                    opacity: currentPage === 1 ? 0.5 : 1,
-                    fontSize: 12,
-                  }}
-                >
-                  Trước
-                </button>
-                <span style={{ fontSize: 12, fontWeight: 500 }}>
-                  Trang {currentPage} / {totalPages}
-                </span>
-                <button
-                  type="button"
-                  disabled={currentPage === totalPages}
-                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                  style={{
-                    padding: '4px 10px',
-                    borderRadius: 6,
-                    border: '1px solid #CBD5E1',
-                    background: '#FFFFFF',
-                    cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
-                    opacity: currentPage === totalPages ? 0.5 : 1,
-                    fontSize: 12,
-                  }}
-                >
-                  Sau
-                </button>
-              </div>
-            )}
-          </div>
+            itemLabel="ca làm việc"
+            isLoading={isLoading}
+          />
         )}
       </div>
 
@@ -1432,7 +1348,7 @@ export const ShiftConfigPage: React.FC = () => {
                                     <input
                                       type="checkbox"
                                       checked={isChecked}
-                                      onChange={() => {}}
+                                      onChange={() => { }}
                                       style={{ accentColor: 'var(--blue-primary, #0F766E)', width: 15, height: 15 }}
                                     />
                                     <span style={{ fontWeight: isChecked ? 600 : 400, color: '#1E293B' }}>

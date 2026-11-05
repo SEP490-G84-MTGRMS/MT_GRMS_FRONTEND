@@ -1,5 +1,5 @@
 import { httpClient } from '../../../api/httpClient';
-import type { ApiResponse } from '../../../api/types';
+import type { ApiResponse, PagedResult } from '../../../api/types';
 
 export interface ShiftConfigDto {
   id: string;
@@ -19,6 +19,15 @@ export interface ShiftConfigDto {
   updatedAt?: string | null;
   branchName?: string | null;
   branchNames?: string[] | null;
+}
+
+export interface ShiftConfigQueryFilter {
+  keyword?: string;
+  branchId?: string;
+  branchIds?: string[];
+  isActive?: boolean;
+  page?: number;
+  pageSize?: number;
 }
 
 export interface CreateShiftConfigPayload {
@@ -53,11 +62,36 @@ export interface UpdateShiftConfigPayload {
 
 export const shiftConfigApi = {
   /**
+   * Lấy danh sách cấu hình ca làm việc có phân trang, tìm kiếm và lọc
+   * GET /api/v1/shift-configs
+   */
+  async getShiftConfigsPaged(filter?: ShiftConfigQueryFilter): Promise<PagedResult<ShiftConfigDto>> {
+    const params: Record<string, any> = {};
+    if (filter) {
+      if (filter.keyword) params.keyword = filter.keyword;
+      if (filter.branchId) params.branchId = filter.branchId;
+      if (filter.branchIds && filter.branchIds.length > 0) params.branchIds = filter.branchIds;
+      if (typeof filter.isActive === 'boolean') params.isActive = filter.isActive;
+      if (filter.page) params.page = filter.page;
+      if (filter.pageSize) params.pageSize = filter.pageSize;
+    }
+
+    const res = await httpClient.get<ApiResponse<PagedResult<ShiftConfigDto>>>('/shift-configs', {
+      params,
+    });
+
+    if (res.data?.success && res.data.data) {
+      return res.data.data;
+    }
+    return { items: [], page: 1, pageSize: 20, totalItems: 0 };
+  },
+
+  /**
    * Lấy danh sách cấu hình ca làm việc theo chi nhánh (hoặc toàn bộ chi nhánh nếu không truyền branchId)
-   * GET /api/v1/hr/shift-configs?branchId=...&isActive=...
+   * GET /api/v1/shift-configs?branchId=...&isActive=...
    */
   async getShiftConfigsByBranch(branchId?: string, isActive?: boolean): Promise<ShiftConfigDto[]> {
-    const params: Record<string, any> = {};
+    const params: Record<string, any> = { page: 1, pageSize: 1000 };
     if (branchId) {
       params.branchId = branchId;
     }
@@ -65,22 +99,27 @@ export const shiftConfigApi = {
       params.isActive = isActive;
     }
 
-    const res = await httpClient.get<ApiResponse<ShiftConfigDto[]>>('/hr/shift-configs', {
+    const res = await httpClient.get<ApiResponse<any>>('/shift-configs', {
       params,
     });
 
     if (res.data?.success && res.data.data) {
-      return res.data.data;
+      if (Array.isArray(res.data.data)) {
+        return res.data.data;
+      }
+      if (Array.isArray(res.data.data.items)) {
+        return res.data.data.items;
+      }
     }
     return [];
   },
 
   /**
    * Lấy chi tiết ca theo ID
-   * GET /api/v1/hr/shift-configs/{id}
+   * GET /api/v1/shift-configs/{id}
    */
   async getShiftConfigById(id: string): Promise<ShiftConfigDto> {
-    const res = await httpClient.get<ApiResponse<ShiftConfigDto>>(`/hr/shift-configs/${id}`);
+    const res = await httpClient.get<ApiResponse<ShiftConfigDto>>(`/shift-configs/${id}`);
     if (res.data?.success && res.data.data) {
       return res.data.data;
     }
@@ -89,10 +128,10 @@ export const shiftConfigApi = {
 
   /**
    * Tạo ca làm việc mới
-   * POST /api/v1/hr/shift-configs
+   * POST /api/v1/shift-configs
    */
   async createShiftConfig(payload: CreateShiftConfigPayload): Promise<ShiftConfigDto> {
-    const res = await httpClient.post<ApiResponse<ShiftConfigDto>>('/hr/shift-configs', payload);
+    const res = await httpClient.post<ApiResponse<ShiftConfigDto>>('/shift-configs', payload);
     if (res.data?.success && res.data.data) {
       return res.data.data;
     }
@@ -101,10 +140,10 @@ export const shiftConfigApi = {
 
   /**
    * Cập nhật thông tin ca làm việc
-   * PUT /api/v1/hr/shift-configs/{id}
+   * PUT /api/v1/shift-configs/{id}
    */
   async updateShiftConfig(id: string, payload: UpdateShiftConfigPayload): Promise<ShiftConfigDto> {
-    const res = await httpClient.put<ApiResponse<ShiftConfigDto>>(`/hr/shift-configs/${id}`, payload);
+    const res = await httpClient.put<ApiResponse<ShiftConfigDto>>(`/shift-configs/${id}`, payload);
     if (res.data?.success && res.data.data) {
       return res.data.data;
     }
@@ -113,10 +152,10 @@ export const shiftConfigApi = {
 
   /**
    * Cập nhật trạng thái bật/tắt (IsActive)
-   * PATCH /api/v1/hr/shift-configs/{id}/status
+   * PATCH /api/v1/shift-configs/{id}/status
    */
   async updateShiftConfigStatus(id: string, isActive: boolean): Promise<ShiftConfigDto> {
-    const res = await httpClient.patch<ApiResponse<ShiftConfigDto>>(`/hr/shift-configs/${id}/status`, {
+    const res = await httpClient.patch<ApiResponse<ShiftConfigDto>>(`/shift-configs/${id}/status`, {
       isActive,
     });
     if (res.data?.success && res.data.data) {
@@ -127,9 +166,9 @@ export const shiftConfigApi = {
 
   /**
    * Xóa mềm ca làm việc
-   * DELETE /api/v1/hr/shift-configs/{id}
+   * DELETE /api/v1/shift-configs/{id}
    */
   async deleteShiftConfig(id: string): Promise<void> {
-    await httpClient.delete(`/hr/shift-configs/${id}`);
+    await httpClient.delete(`/shift-configs/${id}`);
   },
 };
