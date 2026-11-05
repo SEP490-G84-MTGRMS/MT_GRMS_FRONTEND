@@ -18,7 +18,7 @@ import { CategoryModal } from '../components/CategoryModal';
 import { ProductFormModal } from '../components/ProductFormModal';
 import { ProductDetailModal } from '../components/ProductDetailModal';
 import { ProductDeleteConfirmModal } from '../components/ProductDeleteConfirmModal';
-import { TablePagination } from '../../../components/common';
+import { TablePagination, NotificationModal } from '../../../components/common';
 import { useAuthStore } from '../../../stores/useAuthStore';
 import { AdminToast, type ToastState } from '../../admin/components';
 import '../product.css';
@@ -186,6 +186,15 @@ export const ProductListPage: React.FC = () => {
 
   // Toast
   const [toast, setToast] = useState<ToastState | null>(null);
+
+  // Notification Modal (Success / Error alerts)
+  const [notificationModal, setNotificationModal] = useState<{
+    isOpen: boolean;
+    type?: 'success' | 'error' | 'warning' | 'info';
+    title: string;
+    message: string | React.ReactNode;
+    itemCode?: string;
+  } | null>(null);
 
   const showToast = (message: string, type: ToastState['type'] = 'success') => {
     setToast({ id: Date.now().toString(), message, type });
@@ -355,6 +364,13 @@ export const ProductListPage: React.FC = () => {
         }
 
         showToast(`Cập nhật hàng hóa "${data.productName}" thành công.`);
+        setNotificationModal({
+          isOpen: true,
+          type: 'success',
+          title: 'Cập nhật hàng hóa thành công',
+          message: `Thông tin hàng hóa "${data.productName}" đã được cập nhật thành công vào hệ thống.`,
+          itemCode: data.productCode,
+        });
         if (selectedProduct && selectedProduct.id === productToEdit.id) {
           setSelectedProduct({ ...selectedProduct, ...data } as ProductItem);
         }
@@ -399,6 +415,13 @@ export const ProductListPage: React.FC = () => {
         }
 
         showToast(`Tạo mới hàng hóa "${created.name || data.productName}" thành công.`);
+        setNotificationModal({
+          isOpen: true,
+          type: 'success',
+          title: 'Tạo mới hàng hóa thành công',
+          message: `Hàng hóa "${created.name || data.productName}" đã được thêm mới thành công vào danh mục.`,
+          itemCode: created.productCode || data.productCode,
+        });
       }
 
       // Làm mới danh mục và danh sách sản phẩm từ backend
@@ -428,6 +451,13 @@ export const ProductListPage: React.FC = () => {
     try {
       await productApi.deleteProduct(productToDelete.id);
       showToast(`Đã xóa hàng hóa "${productToDelete.productName}" thành công.`);
+      setNotificationModal({
+        isOpen: true,
+        type: 'success',
+        title: 'Xóa hàng hóa thành công',
+        message: `Đã xóa hàng hóa "${productToDelete.productName}" khỏi danh mục kinh doanh.`,
+        itemCode: productToDelete.productCode,
+      });
       if (selectedProduct?.id === productToDelete.id) {
         setIsDetailModalOpen(false);
         setSelectedProduct(null);
@@ -462,6 +492,12 @@ export const ProductListPage: React.FC = () => {
         }
       }
       showToast(`Đã xóa thành công ${successCount} hàng hóa đã chọn.`);
+      setNotificationModal({
+        isOpen: true,
+        type: 'success',
+        title: 'Xóa hàng hóa thành công',
+        message: `Đã xóa thành công ${successCount} hàng hóa đã chọn khỏi danh mục kinh doanh.`,
+      });
       setSelectedProductIds([]);
       setIsBulkDeleteOpen(false);
       if (selectedProduct && selectedProductIds.includes(selectedProduct.id)) {
@@ -1108,6 +1144,18 @@ export const ProductListPage: React.FC = () => {
         onSave={handleSaveCategory}
         onDelete={handleDeleteCategory}
       />
+
+      {/* 8. Notification Modal (Success / Alert popup) */}
+      {notificationModal && (
+        <NotificationModal
+          isOpen={notificationModal.isOpen}
+          onClose={() => setNotificationModal(null)}
+          type={notificationModal.type}
+          title={notificationModal.title}
+          message={notificationModal.message}
+          itemCode={notificationModal.itemCode}
+        />
+      )}
     </div>
   );
 };

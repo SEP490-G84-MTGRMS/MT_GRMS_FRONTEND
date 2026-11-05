@@ -45,7 +45,7 @@ export interface EmployeeBackendDetailDto {
   role?: string;
   salaryType: string;
   baseRate: number;
-  allowances?: Array<{ name: string; amount: number }>;
+  allowances?: Array<{ id?: string; name: string; amount: number }>;
   debtAmount: number;
   status: string;
   bankAccountNumber?: string;
@@ -70,7 +70,7 @@ export interface CreateEmployeePayload {
   gender?: string;
   salaryType: string;
   baseRate: number;
-  allowances?: Array<{ name: string; amount: number }>;
+  allowances?: Array<{ id?: string; name: string; amount: number }>;
   bankAccountNumber?: string;
   bankName?: string;
   bankAccountHolder?: string;
@@ -144,7 +144,7 @@ export const mapBackendDetailToEmployee = (dto: EmployeeBackendDetailDto): Emplo
   if (dto.allowances && dto.allowances.length > 0) {
     dto.allowances.forEach((a, idx) => {
       allowances.push({
-        id: `al-${idx}`,
+        id: a.id || `al-${idx}`,
         name: a.name,
         type: 'monthly',
         amount: a.amount,
@@ -209,7 +209,14 @@ export const mapFormToCreatePayload = (
 
   const activeAllowances = (salaryConfig?.allowances || [])
     .filter((a) => a.enabled && a.amount > 0)
-    .map((a) => ({ name: a.name.trim(), amount: a.amount }));
+    .map((a) => {
+      const isRealGuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(a.id);
+      return {
+        id: isRealGuid ? a.id : undefined,
+        name: a.name.trim(),
+        amount: a.amount,
+      };
+    });
 
   return {
     fullName: (emp.fullName || '').trim(),
@@ -218,11 +225,19 @@ export const mapFormToCreatePayload = (
     branchId: targetBranchId,
     email: emp.email?.trim() || undefined,
     address: emp.address?.trim() || undefined,
-    startDate: emp.startDate ? new Date(emp.startDate).toISOString() : undefined,
+    startDate: emp.startDate
+      ? emp.startDate.includes('T')
+        ? emp.startDate
+        : `${emp.startDate}T00:00:00Z`
+      : undefined,
     note: emp.note?.trim() || undefined,
     otWeekday: salaryConfig?.otWeekday || undefined,
     otSunday: salaryConfig?.otSunday || undefined,
-    dateOfBirth: emp.dateOfBirth ? new Date(emp.dateOfBirth).toISOString() : undefined,
+    dateOfBirth: emp.dateOfBirth
+      ? emp.dateOfBirth.includes('T')
+        ? emp.dateOfBirth
+        : `${emp.dateOfBirth}T00:00:00Z`
+      : undefined,
     gender: emp.gender || 'male',
     salaryType: salaryConfig?.salaryType || 'monthly',
     baseRate: salaryConfig?.baseSalary || 0,

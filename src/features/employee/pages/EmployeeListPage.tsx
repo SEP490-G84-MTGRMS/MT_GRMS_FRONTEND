@@ -30,7 +30,7 @@ import { EmployeeFormModal } from '../components/EmployeeFormModal';
 import { EmployeeDetailModal } from '../components/EmployeeDetailModal';
 import { ApprovalRequestsModal } from '../components/ApprovalRequestsModal';
 import { ImportEmployeeModal } from '../components/ImportEmployeeModal';
-import { TablePagination } from '../../../components/common';
+import { TablePagination, NotificationModal, ConfirmModal } from '../../../components/common';
 import '../employee.css';
 
 export const EmployeeListPage: React.FC = () => {
@@ -45,6 +45,17 @@ export const EmployeeListPage: React.FC = () => {
   const [pageSize, setPageSize] = useState<number>(10);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Modals confirmation & notification
+  const [employeeToDelete, setEmployeeToDelete] = useState<Employee | null>(null);
+  const [isDeleting, setIsDeleting] = useState<boolean>(false);
+  const [notification, setNotification] = useState<{
+    isOpen: boolean;
+    type?: 'success' | 'error' | 'warning' | 'info';
+    title: string;
+    message: string | React.ReactNode;
+    itemCode?: string;
+  } | null>(null);
 
   // Search input & Debounced filters
   const [searchTerm, setSearchTerm] = useState('');
@@ -230,6 +241,21 @@ export const EmployeeListPage: React.FC = () => {
     if (!isAddNew) {
       setShowFormModal(false);
       setEditingEmployee(null);
+      setNotification({
+        isOpen: true,
+        type: 'success',
+        title: 'Cập nhật nhân viên thành công',
+        message: `Thông tin nhân viên "${savedEmp.fullName}" đã được cập nhật thành công vào hệ thống.`,
+        itemCode: savedEmp.employeeCode,
+      });
+    } else {
+      setNotification({
+        isOpen: true,
+        type: 'success',
+        title: 'Thêm mới nhân viên thành công',
+        message: `Hồ sơ nhân viên "${savedEmp.fullName}" đã được tạo mới thành công.`,
+        itemCode: savedEmp.employeeCode,
+      });
     }
   };
 
@@ -245,22 +271,52 @@ export const EmployeeListPage: React.FC = () => {
       if (selectedDetailEmployee?.id === employeeId) {
         setSelectedDetailEmployee({ ...selectedDetailEmployee, status: newStatus });
       }
+      setNotification({
+        isOpen: true,
+        type: 'success',
+        title: 'Cập nhật trạng thái thành công',
+        message: `Trạng thái của nhân viên "${currentEmp.fullName}" đã chuyển sang ${newStatus === 'active' ? 'Đang làm việc' : 'Tạm dừng hoạt động'}.`,
+        itemCode: currentEmp.employeeCode,
+      });
     } catch (err: any) {
-      alert(err?.response?.data?.message || err?.message || 'Cập nhật trạng thái nhân viên thất bại.');
+      setNotification({
+        isOpen: true,
+        type: 'error',
+        title: 'Cập nhật trạng thái thất bại',
+        message: err?.response?.data?.message || err?.message || 'Cập nhật trạng thái nhân viên thất bại.',
+      });
     }
   };
 
-  const handleDeleteEmployee = async (employeeId: string) => {
+  const handleConfirmDeleteEmployee = async () => {
+    if (!employeeToDelete) return;
+    setIsDeleting(true);
+    const target = employeeToDelete;
     try {
-      await employeeApi.deleteEmployee(employeeId);
-      setEmployees((prev) => prev.filter((e) => e.id !== employeeId));
+      await employeeApi.deleteEmployee(target.id);
+      setEmployees((prev) => prev.filter((e) => e.id !== target.id));
       setTotalItems((prev) => Math.max(0, prev - 1));
-      setSelectedIds((prev) => prev.filter((id) => id !== employeeId));
-      if (selectedDetailEmployee?.id === employeeId) {
+      setSelectedIds((prev) => prev.filter((id) => id !== target.id));
+      if (selectedDetailEmployee?.id === target.id) {
         setSelectedDetailEmployee(null);
       }
+      setEmployeeToDelete(null);
+      setNotification({
+        isOpen: true,
+        type: 'success',
+        title: 'Xóa nhân viên thành công',
+        message: `Đã xóa nhân viên "${target.fullName}" khỏi hệ thống thành công.`,
+        itemCode: target.employeeCode,
+      });
     } catch (err: any) {
-      alert(err?.response?.data?.message || err?.message || 'Xóa nhân viên thất bại.');
+      setNotification({
+        isOpen: true,
+        type: 'error',
+        title: 'Xóa nhân viên thất bại',
+        message: err?.response?.data?.message || err?.message || 'Có lỗi xảy ra khi xóa nhân viên.',
+      });
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -1023,15 +1079,7 @@ export const EmployeeListPage: React.FC = () => {
                           borderRadius: 4,
                         }}
                         title={`Xóa nhân viên ${emp.fullName}`}
-                        onClick={() => {
-                          if (
-                            window.confirm(
-                              `Bạn có chắc chắn muốn xóa nhân viên "${emp.fullName}" (${emp.employeeCode})?`
-                            )
-                          ) {
-                            handleDeleteEmployee(emp.id);
-                          }
-                        }}
+                        onClick={() => setEmployeeToDelete(emp)}
                       >
                         <Trash2 size={16} />
                       </button>
@@ -1092,7 +1140,12 @@ export const EmployeeListPage: React.FC = () => {
           handleEdit(emp);
         }}
         onToggleStatus={handleToggleEmployeeStatus}
-        onDelete={handleDeleteEmployee}
+        onDelete={(empId) => {
+          const target = employees.find((e) => e.id === empId) || selectedDetailEmployee;
+          if (target) {
+            setEmployeeToDelete(target);
+          }
+        }}
         onAddPayment={handleAddPayment}
       />
 
@@ -1111,6 +1164,41 @@ export const EmployeeListPage: React.FC = () => {
         onClose={() => setShowImportModal(false)}
         onImportSuccess={() => { }}
       />
+
+      {/* 5. Modal Xác nhận xóa nhân viên */}
+      <ConfirmModal
+        isOpen={Boolean(employeeToDelete)}
+        onClose={() => setEmployeeToDelete(null)}
+        onConfirm={handleConfirmDeleteEmployee}
+        title="Xác nhận xóa nhân viên"
+        itemName={employeeToDelete?.fullName}
+        itemCode={employeeToDelete?.employeeCode}
+        message={
+          <>
+            <p style={{ margin: 0 }}>
+              Bạn có chắc chắn muốn xóa nhân viên <b>"{employeeToDelete?.fullName}"</b> khỏi hệ thống? Thao tác này sẽ ẩn nhân viên khỏi danh sách làm việc.
+            </p>
+            <p style={{ margin: '10px 0 0', fontSize: 12.5, color: '#B45309', backgroundColor: '#FEF3C7', padding: '8px 12px', borderRadius: 6, lineHeight: 1.5 }}>
+              ⚠️ <b>Lưu ý:</b> Chỉ nhân viên chưa phát sinh lịch làm việc / ca làm việc và phiếu lương mới có thể xóa khỏi hệ thống. Nhân viên đã có dữ liệu làm việc vui lòng chuyển sang "Ngừng làm việc".
+            </p>
+          </>
+        }
+        isLoading={isDeleting}
+        confirmText="Đồng ý xóa"
+        cancelText="Hủy bỏ"
+      />
+
+      {/* 6. Modal Thông báo thành công / lỗi */}
+      {notification && (
+        <NotificationModal
+          isOpen={notification.isOpen}
+          onClose={() => setNotification(null)}
+          type={notification.type}
+          title={notification.title}
+          message={notification.message}
+          itemCode={notification.itemCode}
+        />
+      )}
     </div>
   );
 };

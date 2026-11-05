@@ -848,9 +848,7 @@ export const EmployeeDetailModal: React.FC<EmployeeDetailModalProps> = ({
                 className="emp-btn emp-btn-danger-outline"
                 style={{ marginRight: 'auto' }}
                 onClick={() => {
-                  if (window.confirm(`Bạn có chắc chắn muốn xóa nhân viên "${employee.fullName}" (${employee.employeeCode})?`)) {
-                    onDelete(employee.id);
-                  }
+                  onDelete(employee.id);
                 }}
               >
                 Xóa nhân viên
