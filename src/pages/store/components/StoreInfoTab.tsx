@@ -1,5 +1,5 @@
 // src/pages/store/components/StoreInfoTab.tsx
-import { useState, type FC, type FormEvent } from 'react';
+import { useState, useEffect, type FC, type FormEvent } from 'react';
 import {
   Store,
   Globe,
@@ -34,6 +34,18 @@ export const StoreInfoTab: FC<StoreInfoTabProps> = ({
   });
 
   const [savedSuccess, setSavedSuccess] = useState(false);
+
+  useEffect(() => {
+    setFormData({
+      name: storeInfo.name,
+      subdomain: storeInfo.subdomain,
+      taxCode: storeInfo.taxCode,
+      hotline: storeInfo.hotline,
+      email: storeInfo.email,
+      address: storeInfo.address,
+      city: storeInfo.city,
+    });
+  }, [storeInfo]);
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();

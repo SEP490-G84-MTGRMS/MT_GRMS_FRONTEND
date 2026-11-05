@@ -10,6 +10,7 @@ import type { StoreSummary, StoreProductItem, EditStoreProductInput } from '../t
 vi.mock('../api/storeProductApi', () => ({
   storeProductApi: {
     getMasterProducts: vi.fn(),
+    getAssignableProducts: vi.fn(),
     getStoreProducts: vi.fn(),
     assignProducts: vi.fn(),
     updateProduct: vi.fn(),
@@ -112,6 +113,15 @@ describe('STORE PRODUCT MANAGEMENT – MASTER AUDIT SUITE', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     (storeProductApi.getMasterProducts as any).mockResolvedValue(mockMasterCatalog);
+    (storeProductApi.getAssignableProducts as any).mockResolvedValue(
+      mockMasterCatalog.map((p) => ({
+        ...p,
+        supplierId: 'sup-01',
+        supplierCode: 'NCC-001',
+        supplierName: 'Công ty Lương thực Miền Nam',
+        isAlreadyAssigned: p.id === 'prod-04',
+      }))
+    );
     (storeProductApi.getStoreProducts as any).mockResolvedValue({
       items: [
         {
@@ -167,7 +177,6 @@ describe('STORE PRODUCT MANAGEMENT – MASTER AUDIT SUITE', () => {
         expect(handleAssign).toHaveBeenCalledWith({
           storeId: 'store-01',
           productIds: ['prod-01'],
-          defaultMinStock: 0,
         });
         expect(handleClose).toHaveBeenCalled();
       });
@@ -207,7 +216,6 @@ describe('STORE PRODUCT MANAGEMENT – MASTER AUDIT SUITE', () => {
         expect(handleAssign).toHaveBeenCalledWith({
           storeId: 'store-01',
           productIds: ['prod-01', 'prod-02', 'prod-03'],
-          defaultMinStock: 0,
         });
       });
     });
@@ -418,7 +426,7 @@ describe('STORE PRODUCT MANAGEMENT – MASTER AUDIT SUITE', () => {
       });
     });
 
-    it('TC-ASSIGN-011: Already-assigned products are excluded from available list', async () => {
+    it('TC-ASSIGN-011: Already-assigned products stay visible but cannot be selected again', async () => {
       render(
         <AssignStoreProductModal
           isOpen={true}
@@ -433,9 +441,14 @@ describe('STORE PRODUCT MANAGEMENT – MASTER AUDIT SUITE', () => {
         expect(screen.getByText('Gạo ST25 Ông Cua 5kg')).toBeInTheDocument();
       });
 
-      // prod-04 was returned in getStoreProducts as already assigned
-      expect(screen.queryByText('Sữa Tươi TH True Milk 1L')).not.toBeInTheDocument();
+      // prod-04 vẫn hiện để người dùng thấy data, nhưng bị khóa
+      expect(screen.getByText('Sữa Tươi TH True Milk 1L')).toBeInTheDocument();
+      expect(screen.getAllByText('Đã gán').length).toBeGreaterThan(0);
       expect(screen.getByText(/1 sản phẩm đã có tại/i)).toBeInTheDocument();
+
+      const assignedRow = screen.getByText('Sữa Tươi TH True Milk 1L').closest('tr');
+      const checkbox = assignedRow?.querySelector('input[type="checkbox"]') as HTMLInputElement;
+      expect(checkbox.disabled).toBe(true);
     });
   });
 
@@ -451,12 +464,11 @@ describe('STORE PRODUCT MANAGEMENT – MASTER AUDIT SUITE', () => {
           product={mockItemStore1}
           stores={mockStores}
           onSave={vi.fn()}
-          onRemove={vi.fn()}
         />
       );
 
       // Header
-      expect(screen.getByText('Chỉnh Sửa Sản Phẩm Tại Chi Nhánh')).toBeInTheDocument();
+      expect(screen.getByText(/Chỉnh sửa sản phẩm tại chi nhánh/i)).toBeInTheDocument();
 
       // Group A - Store Info
       expect(screen.getByDisplayValue('ST-01')).toBeInTheDocument();
@@ -537,14 +549,13 @@ describe('STORE PRODUCT MANAGEMENT – MASTER AUDIT SUITE', () => {
       await waitFor(() => {
         expect(handleSave).toHaveBeenCalledWith('store-01', 'prod-01', {
           retailPrice: 220000,
-          minOrderQuantity: 5,
           status: 'Active',
         });
       });
     });
 
-    it('TC-EDIT-004: Validates MOQ input (rejects empty, negative, decimal)', async () => {
-      const handleSave = vi.fn();
+    it('TC-EDIT-004: MOQ is read-only and is not submitted from the branch page', async () => {
+      const handleSave = vi.fn().mockResolvedValue(undefined);
       render(
         <EditStoreProductModal
           isOpen={true}
@@ -555,23 +566,18 @@ describe('STORE PRODUCT MANAGEMENT – MASTER AUDIT SUITE', () => {
         />
       );
 
-      const moqInput = screen.getByLabelText(/Số lượng đặt hàng tối thiểu/i);
+      const moqInput = screen.getByLabelText(/Số lượng đặt hàng tối thiểu/i) as HTMLInputElement;
+      expect(moqInput.readOnly).toBe(true);
+      fireEvent.change(moqInput, { target: { value: '99' } });
+      expect(moqInput.value).toBe('5');
 
-      // Empty MOQ
-      fireEvent.change(moqInput, { target: { value: '' } });
       fireEvent.click(document.getElementById('btnSaveEditProduct')!);
-      expect(screen.getByText(/Số lượng đặt hàng tối thiểu \(MOQ\) không được để trống/i)).toBeInTheDocument();
-      expect(handleSave).not.toHaveBeenCalled();
-
-      // Negative MOQ
-      fireEvent.change(moqInput, { target: { value: '-2' } });
-      fireEvent.click(document.getElementById('btnSaveEditProduct')!);
-      expect(screen.getByText(/Số lượng đặt hàng tối thiểu \(MOQ\) không thể âm/i)).toBeInTheDocument();
-
-      // Decimal MOQ
-      fireEvent.change(moqInput, { target: { value: '5.5' } });
-      fireEvent.click(document.getElementById('btnSaveEditProduct')!);
-      expect(screen.getByText(/MOQ chỉ nhận số nguyên, không hỗ trợ số thập phân/i)).toBeInTheDocument();
+      await waitFor(() => {
+        expect(handleSave).toHaveBeenCalledWith('store-01', 'prod-01', {
+          retailPrice: 210000,
+          status: 'Active',
+        });
+      });
     });
 
     it('TC-EDIT-005: Toggles store-specific business status between Active and Inactive', async () => {
@@ -595,7 +601,6 @@ describe('STORE PRODUCT MANAGEMENT – MASTER AUDIT SUITE', () => {
       await waitFor(() => {
         expect(handleSave).toHaveBeenCalledWith('store-01', 'prod-01', {
           retailPrice: 210000,
-          minOrderQuantity: 5,
           status: 'Inactive',
         });
       });
@@ -649,39 +654,19 @@ describe('STORE PRODUCT MANAGEMENT – MASTER AUDIT SUITE', () => {
       expect(handleClose).toHaveBeenCalled();
     });
 
-    it('TC-EDIT-008: Remove from store triggers confirmation and preserves master catalog', async () => {
-      const handleRemove = vi.fn().mockResolvedValue(undefined);
-      const handleClose = vi.fn();
-
+    it('TC-EDIT-008: Edit modal no longer exposes remove-from-store action', () => {
       render(
         <EditStoreProductModal
           isOpen={true}
-          onClose={handleClose}
+          onClose={vi.fn()}
           product={mockItemStore1}
           stores={mockStores}
           onSave={vi.fn()}
-          onRemove={handleRemove}
         />
       );
 
-      // Click "Xóa khỏi chi nhánh"
-      const removeBtn = document.getElementById('btnRemoveFromStore')!;
-      fireEvent.click(removeBtn);
-
-      // Confirmation dialog appears explaining product remains in Master Catalog
-      expect(screen.getByText('Xác nhận gỡ sản phẩm khỏi chi nhánh')).toBeInTheDocument();
-      expect(document.getElementById('modalRemoveConfirmDialog')?.textContent).toContain(
-        'KHÔNG xóa sản phẩm khỏi danh mục sản phẩm tổng'
-      );
-
-      // Confirm removal
-      const confirmBtn = document.getElementById('btnConfirmRemoveProduct')!;
-      fireEvent.click(confirmBtn);
-
-      await waitFor(() => {
-        expect(handleRemove).toHaveBeenCalledWith(mockItemStore1);
-        expect(handleClose).toHaveBeenCalled();
-      });
+      expect(document.getElementById('btnRemoveFromStore')).toBeNull();
+      expect(screen.queryByText(/Gỡ khỏi/i)).not.toBeInTheDocument();
     });
 
     it('TC-EDIT-009: Shows error banner when saving fails and preserves user edits for retry', async () => {

@@ -1,6 +1,6 @@
-import { useState } from 'react';
-import type { FC } from 'react';
-import { Link } from 'react-router-dom';
+import { useState } from "react";
+import type { FC } from "react";
+import { Link } from "react-router-dom";
 
 interface NavbarProps {
   onOpenLogin?: () => void;
@@ -27,7 +27,14 @@ export const Navbar: FC<NavbarProps> = ({ onOpenTrial }) => {
               />
               <circle cx="14" cy="22" r="3.5" fill="#FFFFFF" />
               <defs>
-                <linearGradient id="brandBlueGrad" x1="4" y1="2" x2="24" y2="31" gradientUnits="userSpaceOnUse">
+                <linearGradient
+                  id="brandBlueGrad"
+                  x1="4"
+                  y1="2"
+                  x2="24"
+                  y2="31"
+                  gradientUnits="userSpaceOnUse"
+                >
                   <stop stopColor="#0F766E" />
                   <stop offset="1" stopColor="#134E4A" />
                 </linearGradient>
@@ -40,40 +47,50 @@ export const Navbar: FC<NavbarProps> = ({ onOpenTrial }) => {
         </Link>
 
         <div className="nav-right-group">
-          <nav className={`nav-menu ${mobileMenuOpen ? 'active' : ''}`} id="navMenu">
-            <a href="#giai-phap" className="nav-link" onClick={() => setMobileMenuOpen(false)}>
-              Giải pháp
-            </a>
-            <a href="#dich-vu" className="nav-link" onClick={() => setMobileMenuOpen(false)}>
-              Dịch vụ & Tiện ích
-            </a>
-            <a href="#hoi-dap" className="nav-link" onClick={() => setMobileMenuOpen(false)}>
-              Chính sách & Hỏi đáp
-            </a>
-
-            <Link
-              to="/admin/dashboard"
+          <nav
+            className={`nav-menu ${mobileMenuOpen ? "active" : ""}`}
+            id="navMenu"
+          >
+            <a
+              href="#giai-phap"
               className="nav-link"
               onClick={() => setMobileMenuOpen(false)}
-              style={{ color: 'var(--blue-primary)', fontWeight: 600 }}
             >
-              👑 Demo Admin
-            </Link>
+              Giải pháp
+            </a>
+            <a
+              href="#dich-vu"
+              className="nav-link"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              Dịch vụ & Tiện ích
+            </a>
+            <a
+              href="#hoi-dap"
+              className="nav-link"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              Chính sách & Hỏi đáp
+            </a>
           </nav>
 
           <div className="nav-buttons">
             <Link to="/auth/login" className="btn btn-ghost btn-pill">
               Đăng nhập
             </Link>
-            <button type="button" className="btn btn-primary btn-pill" onClick={onOpenTrial}>
+            <button
+              type="button"
+              className="btn btn-primary btn-pill"
+              onClick={onOpenTrial}
+            >
               Dùng thử miễn phí
             </button>
             <button
               type="button"
-              className={`mobile-toggle ${mobileMenuOpen ? 'active' : ''}`}
+              className={`mobile-toggle ${mobileMenuOpen ? "active" : ""}`}
               id="mobileToggle"
               aria-label="Menu"
-              onClick={() => setMobileMenuOpen(prev => !prev)}
+              onClick={() => setMobileMenuOpen((prev) => !prev)}
             >
               <span></span>
               <span></span>

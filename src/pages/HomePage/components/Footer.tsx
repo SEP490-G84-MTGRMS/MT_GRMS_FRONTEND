@@ -1,5 +1,5 @@
-import type { FC } from 'react';
-import { Link } from 'react-router-dom';
+import type { FC } from "react";
+import { Link } from "react-router-dom";
 
 export const Footer: FC = () => {
   return (
@@ -68,17 +68,7 @@ export const Footer: FC = () => {
             </li>
             <li>
               <a href="#hoi-dap">Câu hỏi thường gặp</a>
-            </li>
-            <li>
-              <Link to="/auth/login" style={{ color: 'var(--blue-primary)', fontWeight: 600 }}>
-                🔑 Đăng nhập hệ thống
-              </Link>
-            </li>
-            <li>
-              <Link to="/admin/dashboard" style={{ color: 'var(--blue-primary)', fontWeight: 600 }}>
-                👑 Cổng Master Admin
-              </Link>
-            </li>
+            </li>x
           </ul>
         </div>
 

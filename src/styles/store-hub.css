@@ -5,13 +5,20 @@
   display: flex;
   width: 100%;
   font-family: var(--font-sans);
+  gap: 24px;
+  align-items: flex-start;
 }
 
 /* Sidebar */
 .store-hub-sidebar {
   width: 250px;
   background-color: #FFFFFF;
-  border-right: 1px solid #EDF2F9;
+  border: 1px solid #EDF2F9;
+  border-radius: 16px;
+  box-shadow: 0 2px 12px rgba(0, 30, 90, 0.03);
+  position: sticky;
+  top: 0;
+  align-self: flex-start;
   padding: 24px 16px;
   display: flex;
   flex-direction: column;
@@ -40,7 +47,7 @@
   align-items: center;
   gap: 12px;
   padding: 10px 14px;
-  border-radius: var(--radius-pill);
+  border-radius: 10px;
   font-size: 13.5px;
   font-weight: 600;
   color: #475569;
@@ -59,8 +66,8 @@
 }
 
 .store-sidebar-item.active {
-  background-color: #E8F1FF;
-  color: #0066FF;
+  background-color: #F0FDFA;
+  color: var(--blue-primary);
   font-weight: 700;
 }
 
@@ -88,7 +95,7 @@
   border-radius: 20px;
   padding: 12px 24px;
   display: grid;
-  grid-template-columns: repeat(4, 1fr) auto;
+  grid-template-columns: repeat(4, 1fr);
   align-items: center;
   gap: 20px;
   box-shadow: 0 4px 16px rgba(0, 30, 90, 0.03);
@@ -158,12 +165,15 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* Pricing Grid */
+/* Pricing Grid - Full width, responsive & zero whitespace */
 .pricing-cards-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 24px;
+  grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
+  width: 100%;
+  max-width: 100%;
+  gap: 22px;
   margin-top: 8px;
+  align-items: stretch;
 }
 
 .pricing-card {
@@ -185,8 +195,8 @@
 }
 
 .pricing-card.highlighted {
-  border: 2px solid #0066FF;
-  box-shadow: 0 12px 36px rgba(0, 102, 255, 0.12);
+  border: 2px solid var(--blue-primary);
+  box-shadow: 0 12px 36px rgba(15, 118, 110, 0.14);
 }
 
 .pricing-card-title {
@@ -205,6 +215,8 @@
 
 .pricing-card-price {
   font-family: var(--font-sans);
+  gap: 24px;
+  align-items: flex-start;
   font-size: 34px;
   font-weight: 800;
   color: #0F172A;
@@ -388,6 +400,7 @@
 }
 
 .store-modal-dialog {
+  font-family: var(--font-sans);
   background-color: #FFFFFF;
   border-radius: 24px;
   width: 100%;

@@ -13,6 +13,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { authService } from "../../features/auth/authService";
+import { ApiError } from "../../features/auth/authTypes";
 import { useAuthStore } from "../../stores/useAuthStore";
 
 export const LoginPage: FC = () => {
@@ -52,16 +53,30 @@ export const LoginPage: FC = () => {
       setAuth(res.user, res.accessToken);
 
       // Điều hướng thông minh theo vai trò
-      if (res.user.role === "CASHIER") {
+      if (res.user.isAdmin || res.user.role === "ADMIN") {
+        navigate("/admin/dashboard");
+      } else if (res.user.role === "CASHIER") {
         navigate("/pos");
       } else {
-        navigate("/store-owner/purchase-orders/create-matrix");
+        navigate("/store-owner/dashboard");
       }
     } catch (err: unknown) {
-      const msg =
-        err instanceof Error
-          ? err.message
-          : "Đăng nhập không thành công. Vui lòng kiểm tra lại tài khoản.";
+      let msg = "Đăng nhập không thành công. Vui lòng kiểm tra lại tài khoản.";
+      let status: number | undefined;
+      let errorCode: string | undefined;
+
+      if (err instanceof ApiError) {
+        status = err.status;
+        errorCode = err.errorCode;
+        msg = err.message;
+      } else if (typeof err === "object" && err !== null) {
+        const anyErr = err as Record<string, any>;
+        status = anyErr.status || anyErr.statusCode || anyErr.response?.status;
+        errorCode = anyErr.errorCode || anyErr.response?.data?.errorCode;
+        msg = anyErr.message || anyErr.response?.data?.message || msg;
+      }
+
+      console.warn(`[Login Failed] API Status: ${status}, ErrorCode: ${errorCode}, Message: ${msg}`);
       setErrorMessage(msg);
     } finally {
       setIsLoading(false);
@@ -80,71 +95,6 @@ export const LoginPage: FC = () => {
 
       {/* Tiêu đề thẻ */}
       <h1 className="auth-card-heading">Đăng nhập</h1>
-
-      {/* Thông báo lỗi */}
-      {errorMessage && (
-        <div
-          className="auth-alert auth-alert-error"
-          role="alert"
-          style={{ marginBottom: "14px" }}
-        >
-          <AlertCircle
-            size={16}
-            strokeWidth={2}
-            style={{ flexShrink: 0, marginTop: "2px" }}
-          />
-          <span>{errorMessage}</span>
-        </div>
-      )}
-
-      {/* Nút chọn nhanh tài khoản kiểm thử */}
-      <div style={{ marginBottom: "16px", padding: "12px", background: "#f8fafc", borderRadius: "8px", border: "1px dashed #cbd5e1" }}>
-        <div style={{ fontSize: "12px", fontWeight: 700, color: "#475569", marginBottom: "8px" }}>
-          Tài khoản kiểm thử vai trò (1-Click điền thông tin):
-        </div>
-        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-          <button
-            type="button"
-            style={{
-              flex: 1,
-              padding: "7px 10px",
-              background: "#eff6ff",
-              border: "1px solid #bfdbfe",
-              color: "#1d4ed8",
-              borderRadius: "6px",
-              fontSize: "12px",
-              fontWeight: 700,
-              cursor: "pointer"
-            }}
-            onClick={() => {
-              setPhoneOrEmail("owner@mtgrms.vn");
-              setPassword("Owner@123456");
-            }}
-          >
-            👑 Store Owner (Chủ tiệm)
-          </button>
-          <button
-            type="button"
-            style={{
-              flex: 1,
-              padding: "7px 10px",
-              background: "#f0fdf4",
-              border: "1px solid #bbf7d0",
-              color: "#15803d",
-              borderRadius: "6px",
-              fontSize: "12px",
-              fontWeight: 700,
-              cursor: "pointer"
-            }}
-            onClick={() => {
-              setPhoneOrEmail("employee@mtgrms.vn");
-              setPassword("Staff@123456");
-            }}
-          >
-            👷‍♂️ Employee (Nhân viên)
-          </button>
-        </div>
-      </div>
 
       {/* FORM ĐĂNG NHẬP */}
       <form onSubmit={handleLoginSubmit} className="auth-form-fields">
@@ -230,6 +180,35 @@ export const LoginPage: FC = () => {
             Quên mật khẩu?
           </Link>
         </div>
+
+        {/* Thông báo lỗi màu đỏ chuyển xuống bên dưới */}
+        {errorMessage && (
+          <div
+            className="auth-alert auth-alert-error"
+            role="alert"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              padding: "10px 14px",
+              backgroundColor: "#FEF2F2",
+              border: "1px solid #FCA5A5",
+              borderRadius: "10px",
+              color: "#DC2626",
+              fontSize: "13.5px",
+              fontWeight: 600,
+              margin: "6px 0 8px 0",
+              lineHeight: 1.4,
+            }}
+          >
+            <AlertCircle
+              size={17}
+              strokeWidth={2.2}
+              style={{ flexShrink: 0, color: "#DC2626" }}
+            />
+            <span style={{ color: "#DC2626" }}>{errorMessage}</span>
+          </div>
+        )}
 
         {/* Nút chính: ĐĂNG NHẬP VÀO HỆ THỐNG full pill */}
         <button

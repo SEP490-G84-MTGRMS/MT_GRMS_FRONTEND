@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { mockSubscriptionPlans } from '../../features/admin/data/mockPlanData';
-import type { SubscriptionPlan } from '../../features/admin/types/plan.types';
+import type { SubscriptionPlan, PlanStatus } from '../../features/admin/types/plan.types';
+import { planApi, mapBackendPlanToFrontend } from '../../features/admin/api';
 import {
   PlanPricingCard,
   PlanQuotasCard,
@@ -20,17 +20,15 @@ import {
   Trash2,
   CheckCircle2,
   AlertCircle,
+  Loader2,
 } from 'lucide-react';
 
 export const SubscriptionPlanDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
-  // Plans state
-  const [plans, setPlans] = useState<SubscriptionPlan[]>(mockSubscriptionPlans);
-
-  // Current plan
-  const currentPlan = plans.find((p) => p.id === id || p.code === id) || plans[2] || plans[0];
+  const [currentPlan, setCurrentPlan] = useState<SubscriptionPlan | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   // Modals
   const [isUpdateOpen, setIsUpdateOpen] = useState(false);
@@ -46,29 +44,103 @@ export const SubscriptionPlanDetailPage: React.FC = () => {
     }, 4000);
   };
 
+  useEffect(() => {
+    if (!id) return;
+
+    const loadPlan = async () => {
+      try {
+        setIsLoading(true);
+        const res = await planApi.getById(id);
+        if (res.success && res.data) {
+          setCurrentPlan(mapBackendPlanToFrontend(res.data));
+        } else {
+          showToast(res.message || 'Không tìm thấy gói cước', 'warning');
+        }
+      } catch (err: unknown) {
+        const errorMsg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+        showToast(errorMsg || 'Lỗi khi tải thông tin chi tiết gói cước', 'warning');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadPlan();
+  }, [id]);
+
   const handleUpdatePlan = (updatedPlan: SubscriptionPlan) => {
-    setPlans((prev) => prev.map((p) => (p.id === updatedPlan.id ? updatedPlan : p)));
+    setCurrentPlan(updatedPlan);
     showToast(`Đã cập nhật cấu hình gói dịch vụ "${updatedPlan.name}" thành công!`);
   };
 
-  const handleToggleStatus = () => {
-    const nextStatus = currentPlan.status === 'Active' ? 'Inactive' : 'Active';
-    const updated = {
-      ...currentPlan,
-      status: nextStatus as SubscriptionPlan['status'],
-      updatedAt: new Date().toISOString().split('T')[0],
-    };
-    handleUpdatePlan(updated);
-    showToast(`Đã chuyển trạng thái gói sang: ${nextStatus === 'Active' ? 'Đang mở bán' : 'Tạm ngừng bán'}`);
+  const handleToggleStatus = async () => {
+    if (!currentPlan) return;
+    try {
+      const res = await planApi.toggleStatus(currentPlan.id);
+      if (res.success) {
+        const nextStatus: PlanStatus = currentPlan.status === 'Active' ? 'Inactive' : 'Active';
+        setCurrentPlan({
+          ...currentPlan,
+          status: nextStatus,
+          updatedAt: new Date().toISOString().split('T')[0],
+        });
+        showToast(`Đã chuyển trạng thái gói sang: ${nextStatus === 'Active' ? 'Đang mở bán' : 'Tạm ngừng bán'}`);
+      } else {
+        showToast(res.message || 'Không thể đổi trạng thái gói cước', 'warning');
+      }
+    } catch (err: unknown) {
+      const errorMsg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      showToast(errorMsg || 'Lỗi khi đổi trạng thái gói cước', 'warning');
+    }
   };
 
-  const handleDeletePlan = (planId: string) => {
-    setPlans((prev) => prev.filter((p) => p.id !== planId));
-    showToast(`Đã xóa vĩnh viễn gói dịch vụ ${currentPlan.name} khỏi hệ thống!`);
-    setTimeout(() => {
-      navigate('/admin/subscriptions');
-    }, 1200);
+  const handleDeletePlan = async (planId: string) => {
+    try {
+      const res = await planApi.delete(planId);
+      if (res.success) {
+        showToast(`Đã xóa vĩnh viễn gói dịch vụ ${currentPlan?.name} khỏi hệ thống!`);
+        setTimeout(() => {
+          navigate('/admin/subscriptions');
+        }, 1000);
+      } else {
+        showToast(res.message || 'Không thể xóa gói cước', 'warning');
+      }
+    } catch (err: unknown) {
+      const errorMsg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      showToast(errorMsg || 'Không thể xóa gói cước đang có cửa hàng sử dụng', 'warning');
+    }
   };
+
+  if (isLoading) {
+    return (
+      <div
+        style={{
+          width: '100%',
+          minHeight: '60vh',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 12,
+          color: 'var(--text-muted)',
+        }}
+      >
+        <Loader2 className="animate-spin" size={32} color="var(--blue-primary, #0066ff)" />
+        <span style={{ fontSize: 14, fontWeight: 500 }}>Đang nạp hồ sơ gói cước...</span>
+      </div>
+    );
+  }
+
+  if (!currentPlan) {
+    return (
+      <div style={{ textAlign: 'center', padding: '60px 20px' }}>
+        <h3>Không tìm thấy gói cước</h3>
+        <p style={{ color: 'var(--text-muted)', marginBottom: 16 }}>Gói cước không tồn tại hoặc đã bị xóa.</p>
+        <Link to="/admin/subscriptions" className="admin-btn admin-btn-primary">
+          Quay lại danh sách
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div style={{ width: '100%' }}>
@@ -148,27 +220,13 @@ export const SubscriptionPlanDetailPage: React.FC = () => {
             >
               {currentPlan.status === 'Active' ? 'Active - Đang mở bán' : 'Inactive - Tạm ngừng bán'}
             </span>
-            {currentPlan.code === 'PLAN_ADVANCED' && (
-              <span
-                style={{
-                  fontSize: 12,
-                  padding: '3px 10px',
-                  borderRadius: 9999,
-                  fontWeight: 700,
-                  backgroundColor: '#e0f2fe',
-                  color: '#0369a1',
-                }}
-              >
-                Gói Mặc Định
-              </span>
-            )}
           </div>
           <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 6, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <span>Mã gói: <code style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--blue-primary)' }}>{currentPlan.code}</code></span>
             <span>&bull;</span>
             <span>Chu kỳ: Hàng tháng / Hàng năm</span>
             <span>&bull;</span>
-            <span>Khởi tạo: <span style={{ fontFamily: 'var(--font-mono)' }}>{currentPlan.createdAt}</span></span>
+            <span>Khởi tạo: <span style={{ fontFamily: 'var(--font-mono)' }}>{currentPlan.createdAt.split('T')[0]}</span></span>
             <span>&bull;</span>
             <span>Quản trị bởi: SaaS Master Admin</span>
           </div>
@@ -215,7 +273,7 @@ export const SubscriptionPlanDetailPage: React.FC = () => {
         </div>
       </div>
 
-      {/* 2-COLUMN LAYOUT: 68% CỘT CHÍNH / 32% CỘT PHỤ */}
+      {/* 2-COLUMN LAYOUT */}
       <div
         style={{
           display: 'grid',

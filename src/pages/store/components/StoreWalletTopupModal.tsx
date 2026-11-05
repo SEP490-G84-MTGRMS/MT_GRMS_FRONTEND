@@ -1,12 +1,13 @@
 // src/pages/store/components/StoreWalletTopupModal.tsx
-import { useState, type FC } from 'react';
-import { X, CheckCircle2, Copy, Check, ArrowRight } from 'lucide-react';
+import { useState, useEffect, useRef, type FC } from 'react';
+import { X, CheckCircle2, Copy, Check, ArrowRight, Loader2, RefreshCw, AlertCircle } from 'lucide-react';
 import type { StoreInfo } from '../storeData';
+import { walletApi, type TopupOrderResponse } from '../api/walletApi';
 
 interface StoreWalletTopupModalProps {
   storeInfo: StoreInfo;
   onClose: () => void;
-  onSuccess: (amount: number) => void;
+  onSuccess: (amount: number, newBalance?: number) => void;
 }
 
 const PRESET_AMOUNTS = [500000, 1000000, 2000000, 5000000];
@@ -18,35 +19,135 @@ export const StoreWalletTopupModal: FC<StoreWalletTopupModalProps> = ({
 }) => {
   const [selectedAmount, setSelectedAmount] = useState<number>(1000000);
   const [customAmount, setCustomAmount] = useState<string>('');
-  const [isCopied, setIsCopied] = useState<boolean>(false);
+  const [isCopiedContent, setIsCopiedContent] = useState<boolean>(false);
+  const [isCopiedAcc, setIsCopiedAcc] = useState<boolean>(false);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [isCompleted, setIsCompleted] = useState<boolean>(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Dữ liệu đơn nạp từ API Backend SePay
+  const [topupOrder, setTopupOrder] = useState<TopupOrderResponse | null>(null);
+  const [isLoadingOrder, setIsLoadingOrder] = useState<boolean>(false);
 
   const amountToTopup = customAmount
     ? parseInt(customAmount.replace(/\D/g, ''), 10) || 0
     : selectedAmount;
 
-  const transferCode = `WAL ${storeInfo.code} ${Math.floor(1000 + Math.random() * 9000)}`;
+  // 1. Tạo đơn nạp tiền khi số tiền thay đổi (Debounce 400ms)
+  useEffect(() => {
+    if (amountToTopup < 50000) {
+      setTopupOrder(null);
+      return;
+    }
 
-  const handleCopyCode = () => {
-    navigator.clipboard.writeText(transferCode);
-    setIsCopied(true);
-    setTimeout(() => setIsCopied(false), 2000);
+    setErrorMessage(null);
+    setIsLoadingOrder(true);
+
+    const timer = setTimeout(async () => {
+      try {
+        const res = await walletApi.createTopupOrder(amountToTopup);
+        if (res.success && res.data) {
+          setTopupOrder(res.data);
+        } else {
+          setErrorMessage(res.message || 'Không thể tạo mã VietQR cho số tiền này.');
+        }
+      } catch (err: unknown) {
+        console.warn('Lỗi gọi API tạo đơn nạp ví:', err);
+        // Fallback local QR nếu backend offline hoặc chưa có kết nối
+        const fallbackCode = `${Math.floor(100000 + Math.random() * 900000)}`;
+        const fallbackContent = `WAL ${fallbackCode}`;
+        const fallbackQr = `https://qr.sepay.vn/img?acc=190065228888&bank=MBBank&amount=${amountToTopup}&des=${encodeURIComponent(fallbackContent)}`;
+        setTopupOrder({
+          orderCode: fallbackCode,
+          amount: amountToTopup,
+          bankCode: 'MBBank',
+          bankName: 'MB Bank (Ngân hàng Quân Đội)',
+          accountNumber: '1900 6522 8888',
+          accountName: 'CONG TY TNHH PHAN MEM MT-GRMS',
+          transferContent: fallbackContent,
+          qrUrl: fallbackQr,
+          expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+        });
+      } finally {
+        setIsLoadingOrder(false);
+      }
+    }, 400);
+
+    return () => clearTimeout(timer);
+  }, [amountToTopup]);
+
+  // 2. Polling kiểm tra trạng thái đơn nạp mỗi 3 giây
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    if (!topupOrder?.orderCode || isCompleted) return;
+
+    const checkStatus = async () => {
+      try {
+        const res = await walletApi.getTopupStatus(topupOrder.orderCode);
+        if (res.success && res.data && res.data.status === 'COMPLETED') {
+          setIsProcessing(false);
+          setIsCompleted(true);
+          if (pollingRef.current) clearInterval(pollingRef.current);
+          setTimeout(() => {
+            onSuccess(amountToTopup, res.data.newBalance);
+          }, 1500);
+        }
+      } catch {
+        // Tiếp tục poll ở chu kỳ sau
+      }
+    };
+
+    pollingRef.current = setInterval(checkStatus, 3000);
+
+    return () => {
+      if (pollingRef.current) clearInterval(pollingRef.current);
+    };
+  }, [topupOrder?.orderCode, isCompleted, amountToTopup, onSuccess]);
+
+  // 3. Sao chép nội dung & số tài khoản
+  const handleCopy = (text: string, type: 'content' | 'acc') => {
+    navigator.clipboard.writeText(text);
+    if (type === 'content') {
+      setIsCopiedContent(true);
+      setTimeout(() => setIsCopiedContent(false), 2000);
+    } else {
+      setIsCopiedAcc(true);
+      setTimeout(() => setIsCopiedAcc(false), 2000);
+    }
   };
 
-  const handleConfirmTopup = () => {
+  // 4. Người dùng bấm "Xác nhận đã chuyển khoản" để check ngay lập tức
+  const handleManualCheck = async () => {
     if (amountToTopup < 50000) {
       alert('Số tiền nạp tối thiểu là 50.000 đ');
       return;
     }
+
     setIsProcessing(true);
+    setErrorMessage(null);
+
+    try {
+      if (topupOrder?.orderCode) {
+        const res = await walletApi.getTopupStatus(topupOrder.orderCode);
+        if (res.success && res.data && res.data.status === 'COMPLETED') {
+          setIsProcessing(false);
+          setIsCompleted(true);
+          setTimeout(() => {
+            onSuccess(amountToTopup, res.data.newBalance);
+          }, 1200);
+          return;
+        }
+      }
+    } catch {
+      // Giữ fallback check
+    }
+
+    // Nếu chưa nhận được tiền từ ngân hàng
     setTimeout(() => {
       setIsProcessing(false);
-      setIsCompleted(true);
-      setTimeout(() => {
-        onSuccess(amountToTopup);
-      }, 1200);
-    }, 1000);
+      setErrorMessage('Hệ thống chưa nhận được thông báo biến động số dư từ ngân hàng. Vui lòng kiểm tra đã chuyển đúng nội dung hoặc chờ 1-2 phút rồi thử lại.');
+    }, 1500);
   };
 
   return (
@@ -54,11 +155,33 @@ export const StoreWalletTopupModal: FC<StoreWalletTopupModalProps> = ({
       <div
         className="store-modal-dialog"
         onClick={(e) => e.stopPropagation()}
-        style={{ maxWidth: 580 }}
+        style={{ maxWidth: 580, fontFamily: 'var(--font-sans)', borderRadius: 24, overflow: 'hidden' }}
       >
         {/* Header */}
-        <div className="store-modal-header">
-          <div className="store-modal-title">Nạp tiền Ví gian hàng MT-GRMS</div>
+        <div
+          className="store-modal-header"
+          style={{
+            padding: '20px 24px',
+            borderBottom: '1px solid #EDF2F7',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span
+              style={{
+                display: 'inline-block',
+                width: 10,
+                height: 10,
+                borderRadius: '50%',
+                backgroundColor: 'var(--blue-primary)',
+              }}
+            />
+            <div style={{ fontSize: 18, fontWeight: 800, color: '#0F172A', letterSpacing: '-0.02em' }}>
+              Nạp tiền Ví gian hàng MT-GRMS
+            </div>
+          </div>
           <button
             type="button"
             onClick={onClose}
@@ -67,7 +190,12 @@ export const StoreWalletTopupModal: FC<StoreWalletTopupModalProps> = ({
               border: 'none',
               cursor: 'pointer',
               color: '#64748B',
-              padding: 4,
+              padding: 6,
+              borderRadius: 8,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'background-color 0.15s ease',
             }}
           >
             <X size={20} />
@@ -75,7 +203,7 @@ export const StoreWalletTopupModal: FC<StoreWalletTopupModalProps> = ({
         </div>
 
         {/* Body */}
-        <div className="store-modal-body">
+        <div className="store-modal-body" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: 20 }}>
           {isCompleted ? (
             <div
               style={{
@@ -87,21 +215,35 @@ export const StoreWalletTopupModal: FC<StoreWalletTopupModalProps> = ({
                 gap: 16,
               }}
             >
-              <CheckCircle2 size={54} color="#00C853" strokeWidth={2.2} />
-              <div style={{ fontSize: 20, fontWeight: 800, color: '#0F172A' }}>
-                Nạp tiền Thành công!
+              <div
+                style={{
+                  width: 72,
+                  height: 72,
+                  borderRadius: '50%',
+                  backgroundColor: '#F0FDF4',
+                  border: '2px solid #BBF7D0',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 8px 24px rgba(22, 101, 52, 0.12)',
+                }}
+              >
+                <CheckCircle2 size={44} color="#15803D" strokeWidth={2.4} />
               </div>
-              <div style={{ fontSize: 14, color: '#475569', maxWidth: 400 }}>
-                Ví gian hàng đã được cộng{' '}
-                <strong style={{ color: '#15803D' }}>
+              <div style={{ fontSize: 22, fontWeight: 800, color: '#0F172A' }}>
+                Nạp tiền thành công!
+              </div>
+              <div style={{ fontSize: 14.5, color: '#475569', maxWidth: 420, lineHeight: 1.6 }}>
+                Số tiền{' '}
+                <strong style={{ color: '#15803D', fontSize: 16, fontFamily: 'var(--font-mono)' }}>
                   +{new Intl.NumberFormat('vi-VN').format(amountToTopup)} đ
-                </strong>
-                . Bạn có thể sử dụng ngay để mua gói hoặc dịch vụ gia tăng.
+                </strong>{' '}
+                đã được cộng trực tiếp vào ví gian hàng của bạn qua VietQR Napas247.
               </div>
             </div>
           ) : (
             <>
-              {/* Chọn số tiền nạp */}
+              {/* Chọn số tiền nạp nhanh */}
               <div>
                 <label
                   style={{
@@ -136,13 +278,16 @@ export const StoreWalletTopupModal: FC<StoreWalletTopupModalProps> = ({
                           borderRadius: 14,
                           border: isSelected
                             ? '2px solid var(--blue-primary)'
-                            : '1px solid #CBD5E1',
+                            : '1.5px solid #E2E8F0',
                           backgroundColor: isSelected ? 'var(--blue-light)' : '#FFFFFF',
                           color: isSelected ? 'var(--blue-primary)' : '#1E293B',
                           fontSize: 13,
                           fontWeight: 700,
                           cursor: 'pointer',
                           fontFamily: 'var(--font-mono)',
+                          fontVariantNumeric: 'tabular-nums',
+                          transition: 'all 0.15s ease',
+                          boxShadow: isSelected ? '0 2px 10px rgba(15, 118, 110, 0.12)' : 'none',
                         }}
                       >
                         {new Intl.NumberFormat('vi-VN').format(amt)} đ
@@ -155,7 +300,7 @@ export const StoreWalletTopupModal: FC<StoreWalletTopupModalProps> = ({
                 <div style={{ marginTop: 12 }}>
                   <input
                     type="text"
-                    placeholder="Hoặc nhập số tiền khác (VNĐ)..."
+                    placeholder="Hoặc nhập số tiền khác (tối thiểu 50.000 đ)..."
                     value={customAmount}
                     onChange={(e) => {
                       const val = e.target.value.replace(/\D/g, '');
@@ -165,22 +310,31 @@ export const StoreWalletTopupModal: FC<StoreWalletTopupModalProps> = ({
                     }}
                     style={{
                       width: '100%',
-                      padding: '10px 14px',
+                      padding: '11px 16px',
                       borderRadius: 'var(--radius-pill)',
-                      border: '1px solid #CBD5E1',
+                      border: '1.5px solid #CBD5E1',
                       fontSize: 13.5,
                       fontFamily: 'var(--font-mono)',
+                      fontVariantNumeric: 'tabular-nums',
                       boxSizing: 'border-box',
+                      outline: 'none',
+                      transition: 'border-color 0.15s ease',
+                    }}
+                    onFocus={(e) => {
+                      e.currentTarget.style.borderColor = 'var(--blue-primary)';
+                    }}
+                    onBlur={(e) => {
+                      e.currentTarget.style.borderColor = '#CBD5E1';
                     }}
                   />
                 </div>
               </div>
 
-              {/* Khung VietQR Chuyển khoản */}
+              {/* Khung VietQR Chuyển khoản Thông minh */}
               <div
                 style={{
                   backgroundColor: '#F8FAFC',
-                  border: '1px solid #E2E8F0',
+                  border: '1.5px solid #E2E8F0',
                   borderRadius: 20,
                   padding: '20px',
                   display: 'flex',
@@ -188,121 +342,163 @@ export const StoreWalletTopupModal: FC<StoreWalletTopupModalProps> = ({
                   alignItems: 'center',
                 }}
               >
-                {/* QR Code SVG / Placeholder Box */}
+                {/* QR Code SePay Image Box */}
                 <div
                   style={{
-                    width: 140,
-                    height: 140,
+                    width: 146,
+                    height: 146,
                     backgroundColor: '#FFFFFF',
-                    border: '1px solid #CBD5E1',
-                    borderRadius: 14,
+                    border: '1.5px solid #CBD5E1',
+                    borderRadius: 16,
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    padding: 8,
+                    padding: 6,
                     flexShrink: 0,
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.06)',
+                    position: 'relative',
+                    overflow: 'hidden',
                   }}
                 >
-                  <svg
-                    width="100"
-                    height="100"
-                    viewBox="0 0 100 100"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <rect width="100" height="100" fill="white" />
-                    {/* Corner boxes */}
-                    <rect x="10" y="10" width="26" height="26" stroke="#0F172A" strokeWidth="4" fill="none" />
-                    <rect x="17" y="17" width="12" height="12" fill="#0F172A" />
-                    <rect x="64" y="10" width="26" height="26" stroke="#0F172A" strokeWidth="4" fill="none" />
-                    <rect x="71" y="17" width="12" height="12" fill="#0F172A" />
-                    <rect x="10" y="64" width="26" height="26" stroke="#0F172A" strokeWidth="4" fill="none" />
-                    <rect x="17" y="71" width="12" height="12" fill="#0F172A" />
-                    {/* Pattern bits */}
-                    <rect x="44" y="12" width="6" height="18" fill="#0066FF" />
-                    <rect x="54" y="24" width="6" height="6" fill="#0F172A" />
-                    <rect x="42" y="42" width="16" height="16" fill="#0066FF" />
-                    <rect x="12" y="44" width="6" height="12" fill="#0F172A" />
-                    <rect x="24" y="52" width="6" height="6" fill="#0F172A" />
-                    <rect x="64" y="44" width="14" height="6" fill="#0F172A" />
-                    <rect x="82" y="52" width="8" height="18" fill="#0F172A" />
-                    <rect x="44" y="68" width="6" height="18" fill="#0F172A" />
-                    <rect x="54" y="64" width="18" height="6" fill="#0066FF" />
-                    <rect x="64" y="76" width="14" height="14" fill="#0F172A" />
-                  </svg>
-                  <span
-                    style={{
-                      fontSize: 10,
-                      fontWeight: 800,
-                      color: '#0066FF',
-                      letterSpacing: '0.04em',
-                      marginTop: 4,
-                    }}
-                  >
-                    VIETQR · NAPAS247
-                  </span>
+                  {isLoadingOrder ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+                      <Loader2 size={28} className="animate-spin text-teal-600" />
+                      <span style={{ fontSize: 10, color: '#64748B', fontWeight: 600 }}>Đang tạo QR...</span>
+                    </div>
+                  ) : topupOrder?.qrUrl ? (
+                    <>
+                      <img
+                        src={topupOrder.qrUrl}
+                        alt="VietQR SePay Napas247"
+                        style={{ width: 110, height: 110, objectFit: 'contain' }}
+                        onError={(e) => {
+                          // Fallback nếu ảnh không tải được
+                          e.currentTarget.style.display = 'none';
+                        }}
+                      />
+                      <span
+                        style={{
+                          fontSize: 9.5,
+                          fontWeight: 800,
+                          color: 'var(--blue-primary)',
+                          letterSpacing: '0.04em',
+                          marginTop: 3,
+                        }}
+                      >
+                        VIETQR · NAPAS247
+                      </span>
+                    </>
+                  ) : (
+                    <div style={{ fontSize: 11, color: '#DC2626', textAlign: 'center', padding: 8 }}>
+                      Vui lòng nhập số tiền ≥ 50k
+                    </div>
+                  )}
                 </div>
 
                 {/* Thông tin chuyển khoản */}
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  <div style={{ fontSize: 12, color: '#64748B' }}>Ngân hàng thụ hưởng</div>
-                  <div style={{ fontSize: 13.5, fontWeight: 700, color: '#0F172A' }}>
-                    MB Bank (Ngân hàng Quân Đội)
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 7 }}>
+                  <div>
+                    <div style={{ fontSize: 11.5, color: '#64748B', fontWeight: 500 }}>Ngân hàng thụ hưởng</div>
+                    <div style={{ fontSize: 13.5, fontWeight: 700, color: '#0F172A' }}>
+                      {topupOrder?.bankName || 'MB Bank (Ngân hàng Quân Đội)'}
+                    </div>
                   </div>
 
-                  <div style={{ fontSize: 12, color: '#64748B', marginTop: 4 }}>Số tài khoản</div>
-                  <div
-                    style={{
-                      fontFamily: 'var(--font-mono)',
-                      fontSize: 15,
-                      fontWeight: 800,
-                      color: '#0066FF',
-                    }}
-                  >
-                    1900 6522 8888
+                  <div>
+                    <div style={{ fontSize: 11.5, color: '#64748B', fontWeight: 500 }}>Số tài khoản</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span
+                        style={{
+                          fontFamily: 'var(--font-mono)',
+                          fontSize: 15,
+                          fontWeight: 800,
+                          color: 'var(--blue-primary)',
+                          fontVariantNumeric: 'tabular-nums',
+                        }}
+                      >
+                        {topupOrder?.accountNumber || '1900 6522 8888'}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleCopy((topupOrder?.accountNumber || '190065228888').replace(/\s/g, ''), 'acc')}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          cursor: 'pointer',
+                          color: isCopiedAcc ? '#15803D' : '#64748B',
+                          padding: 2,
+                        }}
+                        title="Sao chép số tài khoản"
+                      >
+                        {isCopiedAcc ? <Check size={14} color="#15803D" strokeWidth={2.5} /> : <Copy size={14} />}
+                      </button>
+                    </div>
                   </div>
 
-                  <div style={{ fontSize: 12, color: '#64748B', marginTop: 4 }}>Nội dung chuyển khoản</div>
-                  <div
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 8,
-                      backgroundColor: '#FFFFFF',
-                      padding: '4px 10px',
-                      borderRadius: 8,
-                      border: '1px solid #CBD5E1',
-                    }}
-                  >
-                    <span
+                  <div>
+                    <div style={{ fontSize: 11.5, color: '#64748B', fontWeight: 500 }}>Nội dung chuyển khoản</div>
+                    <div
                       style={{
-                        fontFamily: 'var(--font-mono)',
-                        fontSize: 12.5,
-                        fontWeight: 700,
-                        color: '#DC2626',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        backgroundColor: '#FFFFFF',
+                        padding: '4px 10px',
+                        borderRadius: 10,
+                        border: '1.5px solid #CBD5E1',
+                        marginTop: 2,
                       }}
                     >
-                      {transferCode}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={handleCopyCode}
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        cursor: 'pointer',
-                        color: '#64748B',
-                        padding: 2,
-                      }}
-                      title="Sao chép nội dung"
-                    >
-                      {isCopied ? <Check size={14} color="#00C853" /> : <Copy size={14} />}
-                    </button>
+                      <span
+                        style={{
+                          fontFamily: 'var(--font-mono)',
+                          fontSize: 13,
+                          fontWeight: 800,
+                          color: '#DC2626',
+                          letterSpacing: '0.02em',
+                        }}
+                      >
+                        {topupOrder?.transferContent || `WAL ${storeInfo.code}`}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleCopy(topupOrder?.transferContent || `WAL ${storeInfo.code}`, 'content')}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          cursor: 'pointer',
+                          color: isCopiedContent ? '#15803D' : '#64748B',
+                          padding: 2,
+                        }}
+                        title="Sao chép nội dung"
+                      >
+                        {isCopiedContent ? <Check size={15} color="#15803D" strokeWidth={2.5} /> : <Copy size={15} />}
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
+
+              {/* Thông báo lỗi nếu có */}
+              {errorMessage && (
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    padding: '10px 14px',
+                    backgroundColor: '#FEF2F2',
+                    borderRadius: 12,
+                    border: '1px solid #FECACA',
+                    color: '#DC2626',
+                    fontSize: 12.5,
+                  }}
+                >
+                  <AlertCircle size={16} flex-shrink={0} />
+                  <span>{errorMessage}</span>
+                </div>
+              )}
 
               {/* Số tiền cần nạp */}
               <div
@@ -311,12 +507,12 @@ export const StoreWalletTopupModal: FC<StoreWalletTopupModalProps> = ({
                   alignItems: 'center',
                   justifyContent: 'space-between',
                   padding: '12px 18px',
-                  backgroundColor: '#F0FDF4',
-                  borderRadius: 14,
-                  border: '1px solid #BBF7D0',
+                  backgroundColor: 'var(--blue-light)',
+                  borderRadius: 16,
+                  border: '1.5px solid var(--blue-border)',
                 }}
               >
-                <span style={{ fontSize: 13.5, fontWeight: 600, color: '#166534' }}>
+                <span style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--blue-primary)' }}>
                   Số tiền thanh toán:
                 </span>
                 <span
@@ -324,7 +520,8 @@ export const StoreWalletTopupModal: FC<StoreWalletTopupModalProps> = ({
                     fontFamily: 'var(--font-mono)',
                     fontSize: 18,
                     fontWeight: 800,
-                    color: '#15803D',
+                    color: 'var(--blue-primary)',
+                    fontVariantNumeric: 'tabular-nums',
                   }}
                 >
                   {new Intl.NumberFormat('vi-VN').format(amountToTopup)} đ
@@ -336,27 +533,38 @@ export const StoreWalletTopupModal: FC<StoreWalletTopupModalProps> = ({
 
         {/* Footer */}
         {!isCompleted && (
-          <div className="store-modal-footer">
+          <div
+            className="store-modal-footer"
+            style={{
+              padding: '16px 24px',
+              borderTop: '1px solid #EDF2F7',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'flex-end',
+              gap: 12,
+            }}
+          >
             <button
               type="button"
               onClick={onClose}
               style={{
-                padding: '10px 18px',
+                padding: '10px 20px',
                 borderRadius: 'var(--radius-pill)',
-                border: '1px solid #CBD5E1',
+                border: '1.5px solid #CBD5E1',
                 backgroundColor: '#FFFFFF',
                 color: '#475569',
                 fontSize: 13.5,
                 fontWeight: 600,
                 cursor: 'pointer',
+                transition: 'all 0.15s ease',
               }}
             >
               Đóng
             </button>
             <button
               type="button"
-              onClick={handleConfirmTopup}
-              disabled={isProcessing}
+              onClick={handleManualCheck}
+              disabled={isProcessing || amountToTopup < 50000}
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
@@ -368,19 +576,33 @@ export const StoreWalletTopupModal: FC<StoreWalletTopupModalProps> = ({
                 border: 'none',
                 fontSize: 14,
                 fontWeight: 700,
-                cursor: 'pointer',
+                cursor: isProcessing || amountToTopup < 50000 ? 'not-allowed' : 'pointer',
+                opacity: isProcessing || amountToTopup < 50000 ? 0.7 : 1,
                 boxShadow: '0 4px 14px rgba(15, 118, 110, 0.28)',
-                transition: 'background-color 0.15s ease',
+                transition: 'all 0.15s ease',
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = 'var(--blue-hover)';
+                if (!isProcessing && amountToTopup >= 50000) {
+                  e.currentTarget.style.backgroundColor = 'var(--blue-hover)';
+                }
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'var(--blue-primary)';
+                if (!isProcessing && amountToTopup >= 50000) {
+                  e.currentTarget.style.backgroundColor = 'var(--blue-primary)';
+                }
               }}
             >
-              <span>{isProcessing ? 'Đang kiểm tra giao dịch...' : 'Xác nhận đã chuyển khoản'}</span>
-              <ArrowRight size={16} />
+              {isProcessing ? (
+                <>
+                  <RefreshCw size={16} className="animate-spin" />
+                  <span>Đang kiểm tra giao dịch...</span>
+                </>
+              ) : (
+                <>
+                  <span>Xác nhận đã chuyển khoản</span>
+                  <ArrowRight size={16} />
+                </>
+              )}
             </button>
           </div>
         )}

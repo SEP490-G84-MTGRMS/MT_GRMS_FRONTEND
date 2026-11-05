@@ -2,7 +2,7 @@ import { useState, useMemo, useRef, useEffect } from 'react';
 import type { FC } from 'react';
 import type { StoreProductItem } from '../types/storeProduct.types';
 import { SupplierStatusBadge } from '../../supplier/components/SupplierStatusBadge';
-import { ArrowUpDown, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ArrowUpDown, ChevronLeft, ChevronRight, Package } from 'lucide-react';
 
 interface StoreProductTableProps {
   products: StoreProductItem[];
@@ -47,6 +47,31 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
   const [sortDir, setSortDir] = useState<SortDirection>('asc');
 
   const fmt = (n: number) => new Intl.NumberFormat('vi-VN').format(n);
+
+  /** Compact VND: 10000 → 10k, 200000 → 200k, 1500000 → 1.5tr */
+  const fmtCompact = (n: number) => {
+    const abs = Math.abs(n);
+    if (abs >= 1_000_000) {
+      const m = n / 1_000_000;
+      const s = Number.isInteger(m) ? String(m) : m.toFixed(1).replace(/\.0$/, '');
+      return `${s}tr`;
+    }
+    if (abs >= 1_000) {
+      const k = n / 1_000;
+      const s = Number.isInteger(k) ? String(k) : k.toFixed(1).replace(/\.0$/, '');
+      return `${s}k`;
+    }
+    return String(Math.round(n));
+  };
+
+  /** One product row → all units on one line: Chai:10k Lốc:60k Thùng:200k */
+  const formatUnitPrices = (item: StoreProductItem) => {
+    const units = item.unitPrices?.filter((u) => u.unitName?.trim()) ?? [];
+    if (units.length === 0) {
+      return `${item.unit || 'ĐVT'}:${fmtCompact(item.retailPrice)}`;
+    }
+    return units.map((u) => `${u.unitName}:${fmtCompact(u.price)}`).join(' ');
+  };
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -163,18 +188,20 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
 
   const tableColGroup = (
     <colgroup>
+      <col style={{ width: '4%' }} />
+      <col style={{ width: '8%' }} />
+      <col style={{ width: '12%' }} />
+      <col style={{ width: '6%' }} />
       <col style={{ width: '9%' }} />
-      <col style={{ width: '15%' }} />
       <col style={{ width: '7%' }} />
-      <col style={{ width: '10.5%' }} />
       <col style={{ width: '9%' }} />
-      <col style={{ width: '11.5%' }} />
-      <col style={{ width: '7%' }} />
-      <col style={{ width: '7%' }} />
+      <col style={{ width: '6%' }} />
+      <col style={{ width: '6%' }} />
+      <col style={{ width: '12%' }} />
       <col style={{ width: '4%' }} />
       <col style={{ width: '4%' }} />
-      <col style={{ width: '8.5%' }} />
-      <col style={{ width: '7.5%' }} />
+      <col style={{ width: '7%' }} />
+      <col style={{ width: '6%' }} />
     </colgroup>
   );
 
@@ -201,10 +228,14 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
         className="so-list-table-head"
         style={{ paddingRight: hasScrollY ? 6 : 0 }}
       >
-        <table className="so-list-table" style={{ minWidth: 1380, tableLayout: 'fixed' }}>
+        <table className="so-list-table" style={{ minWidth: 1520, tableLayout: 'fixed' }}>
           {tableColGroup}
           <thead>
             <tr>
+              <th style={{ ...thStyle, textAlign: 'center' }}>
+                <span>Ảnh</span>
+              </th>
+
               <th
                 style={{ ...thStyle, cursor: 'pointer' }}
                 onClick={() => handleSort('sku')}
@@ -293,6 +324,10 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
                 </div>
               </th>
 
+              <th style={{ ...thStyle }}>
+                <span>Giá Bán Theo ĐVT</span>
+              </th>
+
               <th
                 style={{ ...thStyle, textAlign: 'center', cursor: 'pointer' }}
                 onClick={() => handleSort('minOrderQuantity')}
@@ -329,13 +364,13 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
         className="so-list-table-body supplier-table-scroll-container"
         onScroll={handleBodyScroll}
       >
-        <table className="so-list-table" style={{ minWidth: 1380, tableLayout: 'fixed' }}>
+        <table className="so-list-table" style={{ minWidth: 1520, tableLayout: 'fixed' }}>
           {tableColGroup}
           <tbody>
             {sortedProducts.length === 0 ? (
               <tr>
                 <td
-                  colSpan={12}
+                  colSpan={14}
                   style={{
                     textAlign: 'center',
                     padding: '48px 16px',
@@ -372,7 +407,40 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
                       e.currentTarget.style.backgroundColor = '#ffffff';
                     }}
                   >
-                    {/* 1. Mã SKU */}
+                    {/* Ảnh */}
+                    <td style={{ padding: '6px 4px', textAlign: 'center', verticalAlign: 'middle', borderBottom: '1px solid #f1f5f9' }}>
+                      {p.imageUrl ? (
+                        <img
+                          src={p.imageUrl}
+                          alt={p.name}
+                          style={{
+                            width: 36,
+                            height: 36,
+                            objectFit: 'cover',
+                            borderRadius: 6,
+                            border: '1px solid #e2e8f0',
+                            display: 'inline-block',
+                          }}
+                        />
+                      ) : (
+                        <span
+                          style={{
+                            width: 36,
+                            height: 36,
+                            borderRadius: 6,
+                            background: '#f1f5f9',
+                            border: '1px solid #e2e8f0',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                        >
+                          <Package size={16} color="#94a3b8" />
+                        </span>
+                      )}
+                    </td>
+
+                    {/* Mã SKU */}
                     <td style={{ padding: '8px 8px', verticalAlign: 'middle', borderBottom: '1px solid #f1f5f9' }}>
                       <span
                         style={{
@@ -445,14 +513,30 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
                       </span>
                     </td>
 
-                    {/* 9. Giá Bán Lẻ (đ) */}
+                    {/* Giá Bán Lẻ (đ) */}
                     <td style={{ padding: '8px 6px', textAlign: 'right', verticalAlign: 'middle', whiteSpace: 'nowrap', borderBottom: '1px solid #f1f5f9' }}>
                       <span style={{ fontFamily: 'var(--font-mono, monospace)', fontWeight: 700, fontSize: 13, color: '#0f766e' }}>
                         {fmt(p.retailPrice)} đ
                       </span>
                     </td>
 
-                    {/* 10. SL Đặt Tối Thiểu (MOQ) */}
+                    {/* Giá bán theo ĐVT — gộp 1 dòng: Chai:10k Lốc:60k Thùng:200k */}
+                    <td style={{ padding: '8px 6px', verticalAlign: 'middle', borderBottom: '1px solid #f1f5f9', whiteSpace: 'nowrap' }}>
+                      <span
+                        title={formatUnitPrices(p)}
+                        style={{
+                          fontFamily: 'var(--font-mono, monospace)',
+                          fontSize: 12,
+                          fontWeight: 600,
+                          color: '#334155',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {formatUnitPrices(p)}
+                      </span>
+                    </td>
+
+                    {/* MOQ */}
                     <td style={{ padding: '8px 6px', textAlign: 'center', verticalAlign: 'middle', whiteSpace: 'nowrap', borderBottom: '1px solid #f1f5f9' }}>
                       <span style={{ fontFamily: 'var(--font-mono, monospace)', fontWeight: 700, fontSize: 12.5, color: '#0f172a' }}>
                         {p.minOrderQuantity ?? 1}

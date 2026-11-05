@@ -19,8 +19,6 @@ export interface ProductResponse {
   costPrice: number | null; // Ẩn với Cashier/Staff theo BR-SEC-01
   minStock: number;
   maxStock: number;
-  vatRate: number;
-  productType: string;
   status: string; // "Active" | "Discontinued"
   imageUrl?: string | null;
   imageUrls?: string[];
@@ -29,6 +27,7 @@ export interface ProductResponse {
   hasBatches: boolean;
   isFavorite: boolean;
   createdAt: string;
+  rawCreatedAt?: string;
   updatedAt?: string | null;
 }
 
@@ -93,6 +92,7 @@ export interface ProductUnitResponse {
   barcode?: string | null;
   isBaseUnit: boolean;
   createdAt: string;
+  rawCreatedAt?: string;
   updatedAt?: string | null;
 }
 
@@ -122,8 +122,8 @@ export interface ProductCreatePayload {
   costPrice?: number | null;
   minStock?: number;
   maxStock?: number;
-  vatRate?: number;
-  productType?: string;
+  taxCategory?: string;
+  eligibleForVatReduction?: boolean;
   status?: string;
   imageUrl?: string | null;
   imageUrls?: string[];
@@ -131,7 +131,6 @@ export interface ProductCreatePayload {
   internalNote?: string | null;
   hasBatches?: boolean;
   isFavorite?: boolean;
-  eligibleForVatReduction?: boolean;
 }
 
 export interface ProductUpdatePayload {
@@ -143,7 +142,7 @@ export interface ProductUpdatePayload {
   costPrice?: number | null;
   minStock?: number;
   maxStock?: number;
-  vatRate?: number;
+  taxCategory?: string;
   status?: string;
   imageUrl?: string | null;
   imageUrls?: string[];
@@ -200,13 +199,14 @@ export interface ProductItem {
   isCombo?: boolean;
   status: 'Active' | 'Discontinued';
   createdAt: string;
+  rawCreatedAt?: string;
   updatedAt: string;
   imageUrl?: string;
   imageUrls?: string[];
   minStock?: number;
   maxStock?: number;
-  vatRate?: number; // 0, 5, 8, 10
-  eligibleForVatReduction?: boolean; // Cờ giảm 20% thuế GTGT theo NQ 204/2025/QH15
+  taxCategory?: string;
+  eligibleForVatReduction?: boolean;
   description?: string;
   internalNote?: string;
   hasTransactions?: boolean;

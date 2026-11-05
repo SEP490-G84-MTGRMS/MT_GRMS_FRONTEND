@@ -46,9 +46,13 @@ httpClient.interceptors.response.use(
       const isAuthCall = url.includes('/auth/login') || url.includes('/Auth/login');
       if (!isAuthCall) {
         localStorage.removeItem('access_token');
-        const path = window.location.pathname;
-        if (path !== '/login' && path !== '/auth/login') {
-          window.location.href = '/login';
+        localStorage.removeItem('auth_user');
+        const isAuthPage =
+          window.location.pathname.startsWith('/auth') ||
+          window.location.pathname === '/login' ||
+          window.location.pathname === '/register';
+        if (!isAuthPage) {
+          window.location.href = '/auth/login';
         }
       }
     }

@@ -17,13 +17,15 @@ import {
   validatePlanPricing,
   validatePlanQuotas,
 } from "../../features/admin/utils/planValidation";
-import { mockPlans } from "../../features/admin/data/mockPlanData";
+import { planApi, mapBackendPlanToFrontend } from "../../features/admin/api";
+import { Loader2 } from "lucide-react";
 
 export const SubscriptionPlanEditPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
   const [currentPlan, setCurrentPlan] = useState<SubscriptionPlan | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   // Form State
   const [name, setName] = useState("");
@@ -51,18 +53,54 @@ export const SubscriptionPlanEditPage: React.FC = () => {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    const found = mockPlans.find((p) => p.id === id || p.code === id);
-    if (found) {
-      setCurrentPlan(found);
-      setName(found.name);
-      setMonthlyPrice(found.monthlyPrice);
-      setYearlyPrice(found.yearlyPrice);
-      setStatus(found.status);
-      setDescription(found.description || "");
-      setQuotas(found.quotas);
-      setFeatures(found.features);
-    }
+    if (!id) return;
+
+    const loadPlan = async () => {
+      try {
+        setIsLoading(true);
+        const res = await planApi.getById(id);
+        if (res.success && res.data) {
+          const plan = mapBackendPlanToFrontend(res.data);
+          setCurrentPlan(plan);
+          setName(plan.name);
+          setMonthlyPrice(plan.monthlyPrice);
+          setYearlyPrice(plan.yearlyPrice);
+          setStatus(plan.status);
+          setDescription(plan.description || "");
+          setQuotas(plan.quotas);
+          setFeatures(plan.features);
+        }
+      } catch (err: unknown) {
+        const errorMsg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+        setToastMessage(errorMsg || "Không thể tải thông tin gói cước");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadPlan();
   }, [id]);
+
+  if (isLoading) {
+    return (
+      <div
+        style={{
+          width: "100%",
+          minHeight: "100vh",
+          background: "var(--bg-soft-blue, #f7faff)",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: "12px",
+          color: "var(--text-muted)",
+        }}
+      >
+        <Loader2 className="animate-spin" size={32} color="var(--blue-primary, #0066ff)" />
+        <span style={{ fontSize: "14px", fontWeight: 500 }}>Đang tải thông tin gói cước...</span>
+      </div>
+    );
+  }
 
   if (!currentPlan) {
     return (
@@ -123,19 +161,18 @@ export const SubscriptionPlanEditPage: React.FC = () => {
     setErrors({});
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     const pricingValidation = validatePlanPricing(monthlyPrice, yearlyPrice);
     const quotasValidation = validatePlanQuotas(quotas);
 
     const newErrors: Record<string, string> = {};
-    if (!name.trim()) newErrors.name = "Vui lòng nhập tên gói";
+    if (!name.trim()) newErrors.name = "Vui lòng nhập tên thương mại";
     if (!pricingValidation.isValid) {
       if (pricingValidation.error?.includes("tháng"))
         newErrors.monthlyPrice = pricingValidation.error;
-      else
-        newErrors.yearlyPrice = pricingValidation.error || "Giá không hợp lệ";
+      else newErrors.yearlyPrice = pricingValidation.error || "Giá không hợp lệ";
     }
     if (!quotasValidation.isValid) {
       if (quotasValidation.error?.includes("chi nhánh"))
@@ -154,27 +191,48 @@ export const SubscriptionPlanEditPage: React.FC = () => {
     setErrors({});
     setIsSubmitting(true);
 
-    const idx = mockPlans.findIndex((p) => p.id === currentPlan.id);
-    if (idx !== -1) {
-      mockPlans[idx] = {
-        ...currentPlan,
+    try {
+      const res = await planApi.update(currentPlan.id, {
         name,
         monthlyPrice,
         yearlyPrice,
-        status,
         description,
         quotas,
         features,
-        updatedAt: new Date().toISOString(),
-      };
-    }
+      });
 
-    setToastMessage(`Đã cập nhật thành công gói cước "${name}"!`);
-
-    setTimeout(() => {
+      if (res.success && res.data) {
+        setToastMessage(`Đã cập nhật thành công gói cước "${name}"!`);
+        setTimeout(() => {
+          setIsSubmitting(false);
+          navigate(`/admin/subscriptions/${currentPlan.id}`);
+        }, 800);
+      } else {
+        setIsSubmitting(false);
+        setToastMessage(res.message || "Không thể cập nhật gói cước");
+      }
+    } catch (err: unknown) {
       setIsSubmitting(false);
-      navigate(`/admin/subscriptions/${currentPlan.id}`);
-    }, 800);
+      const errorMsg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      setToastMessage(errorMsg || "Lỗi khi kết nối với máy chủ Backend");
+    }
+  };
+
+  const handleDeletePlan = async () => {
+    try {
+      const res = await planApi.delete(currentPlan.id);
+      if (res.success) {
+        setToastMessage("Xóa gói dịch vụ thành công!");
+        setTimeout(() => {
+          navigate("/admin/subscriptions");
+        }, 600);
+      } else {
+        setToastMessage(res.message || "Không thể xóa gói cước");
+      }
+    } catch (err: unknown) {
+      const errorMsg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      setToastMessage(errorMsg || "Lỗi khi xóa gói cước");
+    }
   };
 
   return (
@@ -280,36 +338,20 @@ export const SubscriptionPlanEditPage: React.FC = () => {
                 letterSpacing: "-0.02em",
               }}
             >
-              Sửa Gói: {currentPlan.name}
+              Chỉnh Sửa Gói Dịch Vụ: {currentPlan.name}
             </h1>
             <span
               style={{
-                background: "#f1f5f9",
-                color: "#475569",
+                fontFamily: "var(--font-mono, monospace)",
+                background: "#e2e8f0",
+                color: "#334155",
                 padding: "2px 8px",
-                borderRadius: "9999px",
-                fontSize: "11.5px",
-                fontFamily: "'JetBrains Mono', Consolas, monospace",
+                borderRadius: "6px",
+                fontSize: "12px",
                 fontWeight: 700,
               }}
             >
               {currentPlan.code}
-            </span>
-            <span
-              style={{
-                background:
-                  currentPlan.activeTenantCount > 0 ? "#dbeafe" : "#f1f5f9",
-                color:
-                  currentPlan.activeTenantCount > 0
-                    ? "var(--blue-primary, #0066ff)"
-                    : "#64748b",
-                padding: "2px 10px",
-                borderRadius: "9999px",
-                fontSize: "11px",
-                fontWeight: 600,
-              }}
-            >
-              {currentPlan.activeTenantCount} cửa hàng sử dụng
             </span>
           </div>
 
@@ -361,41 +403,10 @@ export const SubscriptionPlanEditPage: React.FC = () => {
                 <polyline points="17 21 17 13 7 13 7 21" />
                 <polyline points="7 3 7 8 15 8" />
               </svg>
-              {isSubmitting ? "Đang lưu..." : "💾 Lưu Cập Nhật"}
+              {isSubmitting ? "Đang lưu..." : "Cập Nhật Cấu Hình"}
             </button>
           </div>
         </div>
-      </div>
-
-      {/* Grandfathering Protection Compact Banner */}
-      <div
-        style={{
-          background: "#eff6ff",
-          border: "1px solid #bfdbfe",
-          borderRadius: "10px",
-          padding: "8px 14px",
-          marginBottom: "14px",
-          display: "flex",
-          alignItems: "center",
-          gap: "8px",
-          fontSize: "12px",
-          color: "#1e40af",
-        }}
-      >
-        <span
-          style={{
-            fontWeight: 700,
-            color: "var(--blue-primary, #0066ff)",
-            flexShrink: 0,
-          }}
-        >
-          🛡️ Grandfathering Protection:
-        </span>
-        <span style={{ lineHeight: 1.35 }}>
-          Việc thay đổi giá niêm yết áp dụng cho khách hàng mới hoặc chu kỳ tái
-          ký. Các cửa hàng đang trong chu kỳ hợp đồng được giữ nguyên giá ban
-          đầu.
-        </span>
       </div>
 
       {/* Main Grid: Left Form Controls (60%) vs Right Live Preview Card (40%) */}
@@ -449,9 +460,7 @@ export const SubscriptionPlanEditPage: React.FC = () => {
             {/* Danger Zone: Rule GB-02 */}
             <PlanDangerZone
               plan={currentPlan}
-              onDeleted={() => {
-                navigate("/admin/subscriptions");
-              }}
+              onDeleted={handleDeletePlan}
             />
           </div>
 

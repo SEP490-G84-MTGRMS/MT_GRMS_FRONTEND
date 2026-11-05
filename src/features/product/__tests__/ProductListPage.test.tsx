@@ -37,7 +37,6 @@ const mockSampleProduct = {
   minStock: 10,
   maxStock: 100,
   vatRate: 0,
-  productType: 'STANDARD',
   status: 'Active',
   hasBatches: false,
   isFavorite: false,

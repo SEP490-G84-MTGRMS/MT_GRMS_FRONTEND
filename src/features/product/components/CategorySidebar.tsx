@@ -10,14 +10,10 @@ interface CategorySidebarProps {
   onClearAll?: () => void;
   onOpenCreateModal: () => void;
   onOpenEditModal: (category: Category) => void;
-  stockCriteria: 'all' | 'in_stock' | 'out_of_stock' | 'below_min' | 'negative';
-  onChangeStockCriteria: (criteria: any) => void;
   createdTime: 'all' | 'custom';
   onChangeCreatedTime: (val: 'all' | 'custom') => void;
   customDate?: string;
   onChangeCustomDate: (date: string) => void;
-  supplierFilter: string;
-  onChangeSupplierFilter: (val: string) => void;
 }
 
 export const CategorySidebar: React.FC<CategorySidebarProps> = ({
@@ -27,14 +23,10 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
   onSelectAll,
   onOpenCreateModal,
   onOpenEditModal,
-  stockCriteria,
-  onChangeStockCriteria,
   createdTime,
   onChangeCreatedTime,
   customDate,
   onChangeCustomDate,
-  supplierFilter,
-  onChangeSupplierFilter,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -115,23 +107,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
         </div>
       </div>
 
-      {/* 2. Tiêu chí Tồn kho */}
-      <div className="filter-group-card">
-        <div className="filter-group-title">Tồn kho</div>
-        <select
-          className="filter-select"
-          value={stockCriteria}
-          onChange={(e) => onChangeStockCriteria(e.target.value)}
-        >
-          <option value="all">Tất cả trạng thái tồn</option>
-          <option value="in_stock">Còn hàng (&gt; 0)</option>
-          <option value="out_of_stock">Hết hàng (= 0)</option>
-          <option value="below_min">Dưới định mức tồn</option>
-          <option value="negative">Tồn âm (&lt; 0)</option>
-        </select>
-      </div>
-
-      {/* 3. Thời gian tạo */}
+      {/* 2. Thời gian tạo */}
       <div className="filter-group-card">
         <div className="filter-group-title">Thời gian tạo</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 13.5 }}>
@@ -163,18 +139,6 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
             />
           )}
         </div>
-      </div>
-
-      {/* 4. Nhà cung cấp */}
-      <div className="filter-group-card">
-        <div className="filter-group-title">Nhà cung cấp</div>
-        <input
-          type="text"
-          className="filter-input"
-          placeholder="Chọn hoặc nhập NCC..."
-          value={supplierFilter}
-          onChange={(e) => onChangeSupplierFilter(e.target.value)}
-        />
       </div>
     </aside>
   );

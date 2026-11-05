@@ -1,14 +1,8 @@
 // src/pages/store/components/OrderHistoryTab.tsx
 import type { FC } from 'react';
-import { History, FileText, Download } from 'lucide-react';
+import { History, Download } from 'lucide-react';
 
-interface OrderHistoryTabProps {
-  isServiceConfirmation?: boolean;
-}
-
-export const OrderHistoryTab: FC<OrderHistoryTabProps> = ({
-  isServiceConfirmation = false,
-}) => {
+export const OrderHistoryTab: FC = () => {
   const mockOrders = [
     {
       code: 'SUB-20261016-001',
@@ -35,15 +29,9 @@ export const OrderHistoryTab: FC<OrderHistoryTabProps> = ({
       <div className="profile-card">
         <div className="profile-card-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            {isServiceConfirmation ? (
-              <FileText size={20} color="#0066FF" />
-            ) : (
-              <History size={20} color="#0066FF" />
-            )}
+            <History size={20} color="#0066FF" />
             <div className="profile-card-title">
-              {isServiceConfirmation
-                ? 'Bản xác nhận hợp đồng & biên bản bàn giao dịch vụ SaaS'
-                : 'Lịch sử mua hàng & gia hạn gói dịch vụ'}
+              Lịch sử mua hàng & gia hạn gói dịch vụ
             </div>
           </div>
         </div>
@@ -107,7 +95,7 @@ export const OrderHistoryTab: FC<OrderHistoryTabProps> = ({
                         fontWeight: 600,
                         cursor: 'pointer',
                       }}
-                      title="Tải hóa đơn VAT & Bản xác nhận PDF"
+                      title="Tải hóa đơn VAT & Biên nhận PDF"
                       onClick={() => alert(`Đang xuất file PDF cho hợp đồng ${ord.code}...`)}
                     >
                       <Download size={13} />

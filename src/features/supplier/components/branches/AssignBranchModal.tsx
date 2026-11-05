@@ -180,7 +180,7 @@ export const AssignBranchModal: FC<AssignBranchModalProps> = ({
           backgroundColor: '#ffffff',
           borderRadius: 16,
           width: '100%',
-          maxWidth: 620,
+          maxWidth: 780,
           maxHeight: '90vh',
           display: 'flex',
           flexDirection: 'column',
@@ -392,11 +392,11 @@ export const AssignBranchModal: FC<AssignBranchModalProps> = ({
                 )}
               </div>
 
-              {/* Danh sách nhà cung cấp khả dụng */}
+              {/* Danh sách nhà cung cấp dạng bảng */}
               <div
                 style={{
-                  maxHeight: 280,
-                  overflowY: 'auto',
+                  maxHeight: 320,
+                  overflow: 'auto',
                   border: '1px solid #e2e8f0',
                   borderRadius: 10,
                   backgroundColor: '#ffffff',
@@ -417,59 +417,162 @@ export const AssignBranchModal: FC<AssignBranchModalProps> = ({
                     Không tìm thấy nhà cung cấp phù hợp với từ khóa "{supplierSearch}".
                   </div>
                 ) : (
-                  filteredAvailableSuppliers.map((sup) => {
-                    const isSelected = selectedSupplierIds.includes(sup.id);
-                    return (
-                      <div
-                        key={sup.id}
-                        onClick={() => handleToggleSupplier(sup.id)}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 12,
-                          padding: '10px 14px',
-                          borderBottom: '1px solid #f1f5f9',
-                          cursor: 'pointer',
-                          backgroundColor: isSelected ? '#f0fdfa' : '#ffffff',
-                          transition: 'background-color 0.15s ease',
-                        }}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={() => {}} // Đã xử lý ở thẻ div cha
+                  <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 640 }}>
+                    <thead>
+                      <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+                        <th style={{ width: 42, padding: '8px 10px', textAlign: 'center' }}>
+                          <input
+                            type="checkbox"
+                            checked={isAllFilteredSelected}
+                            onChange={() =>
+                              isAllFilteredSelected ? handleDeselectAll() : handleSelectAll()
+                            }
+                            style={{ width: 15, height: 15, accentColor: '#0f766e', cursor: 'pointer' }}
+                            title={isAllFilteredSelected ? 'Bỏ chọn tất cả' : 'Chọn tất cả'}
+                          />
+                        </th>
+                        <th
                           style={{
-                            width: 16,
-                            height: 16,
-                            accentColor: '#0f766e',
-                            cursor: 'pointer',
-                            flexShrink: 0,
+                            padding: '8px 10px',
+                            textAlign: 'left',
+                            fontSize: 11.5,
+                            fontWeight: 700,
+                            color: '#475569',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.02em',
+                            whiteSpace: 'nowrap',
                           }}
-                        />
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                            <span
+                        >
+                          Mã NCC
+                        </th>
+                        <th
+                          style={{
+                            padding: '8px 10px',
+                            textAlign: 'left',
+                            fontSize: 11.5,
+                            fontWeight: 700,
+                            color: '#475569',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.02em',
+                          }}
+                        >
+                          Tên nhà cung cấp
+                        </th>
+                        <th
+                          style={{
+                            padding: '8px 10px',
+                            textAlign: 'left',
+                            fontSize: 11.5,
+                            fontWeight: 700,
+                            color: '#475569',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.02em',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          Liên hệ
+                        </th>
+                        <th
+                          style={{
+                            padding: '8px 10px',
+                            textAlign: 'left',
+                            fontSize: 11.5,
+                            fontWeight: 700,
+                            color: '#475569',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.02em',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          SĐT
+                        </th>
+                        <th
+                          style={{
+                            padding: '8px 10px',
+                            textAlign: 'left',
+                            fontSize: 11.5,
+                            fontWeight: 700,
+                            color: '#475569',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.02em',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          Ngành hàng
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredAvailableSuppliers.map((sup) => {
+                        const isSelected = selectedSupplierIds.includes(sup.id);
+                        return (
+                          <tr
+                            key={sup.id}
+                            onClick={() => handleToggleSupplier(sup.id)}
+                            style={{
+                              borderBottom: '1px solid #f1f5f9',
+                              cursor: 'pointer',
+                              backgroundColor: isSelected ? '#f0fdfa' : '#ffffff',
+                            }}
+                            onMouseEnter={(e) => {
+                              if (!isSelected) e.currentTarget.style.backgroundColor = '#f8fafc';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.backgroundColor = isSelected ? '#f0fdfa' : '#ffffff';
+                            }}
+                          >
+                            <td style={{ padding: '8px 10px', textAlign: 'center', verticalAlign: 'middle' }}>
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onClick={(e) => e.stopPropagation()}
+                                onChange={() => handleToggleSupplier(sup.id)}
+                                style={{
+                                  width: 15,
+                                  height: 15,
+                                  accentColor: '#0f766e',
+                                  cursor: 'pointer',
+                                }}
+                              />
+                            </td>
+                            <td style={{ padding: '8px 10px', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
+                              <span
+                                style={{
+                                  fontFamily: 'var(--font-mono, monospace)',
+                                  fontWeight: 700,
+                                  fontSize: 12,
+                                  color: '#0f766e',
+                                }}
+                              >
+                                {sup.code}
+                              </span>
+                            </td>
+                            <td style={{ padding: '8px 10px', verticalAlign: 'middle' }}>
+                              <span style={{ fontSize: 13, fontWeight: 600, color: '#0f172a' }}>{sup.name}</span>
+                            </td>
+                            <td style={{ padding: '8px 10px', verticalAlign: 'middle', fontSize: 12.5, color: '#475569' }}>
+                              {sup.contactPerson || '—'}
+                            </td>
+                            <td
                               style={{
+                                padding: '8px 10px',
+                                verticalAlign: 'middle',
+                                fontSize: 12.5,
+                                color: '#475569',
                                 fontFamily: 'var(--font-mono, monospace)',
-                                fontWeight: 700,
-                                fontSize: 12,
-                                color: '#0066FF',
+                                whiteSpace: 'nowrap',
                               }}
                             >
-                              {sup.code}
-                            </span>
-                            <span style={{ fontSize: 13, fontWeight: 600, color: '#0f172a' }}>
-                              {sup.name}
-                            </span>
-                          </div>
-                          <div style={{ fontSize: 11.5, color: '#64748b', marginTop: 2 }}>
-                            {sup.contactPerson || 'Chưa có đầu mối'} · {sup.phone || 'Chưa có SĐT'}
-                            {sup.category && ` · ${sup.category}`}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })
+                              {sup.phone || '—'}
+                            </td>
+                            <td style={{ padding: '8px 10px', verticalAlign: 'middle', fontSize: 12.5, color: '#64748b' }}>
+                              {sup.category || '—'}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 )}
               </div>
 
