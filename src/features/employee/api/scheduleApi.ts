@@ -70,6 +70,27 @@ export interface CreateScheduleItemPayload {
 export interface BatchCreateSchedulePayload {
   branchId: string;
   schedules: CreateScheduleItemPayload[];
+  hasEndDate?: boolean;
+  endDate?: string | null;
+}
+
+export interface CreateRecurringSchedulePayload {
+  employeeId: string;
+  branchId: string;
+  startDate: string; // "YYYY-MM-DD"
+  hasEndDate?: boolean;
+  endDate?: string | null; // "YYYY-MM-DD"
+  repeatDays?: string[]; // e.g. ["T2", "T3", "T4", "T5", "T6", "T7", "CN"]
+  additionalEmployeeIds?: string[];
+  shiftConfigId?: string | null;
+  shiftCode?: string;
+  shiftName?: string;
+  plannedStartTime?: string; // "HH:mm:ss"
+  plannedEndTime?: string;   // "HH:mm:ss"
+  durationHours?: number;
+  allowedCheckInStart?: string;
+  allowedCheckInEnd?: string;
+  isCheckInNextDay?: boolean;
 }
 
 export interface UpdateSchedulePayload {
@@ -200,6 +221,18 @@ export const scheduleApi = {
       return res.data.data.map(mapScheduleResponseToAssignment);
     }
     throw new Error(res.data?.message || 'Phân ca hàng loạt thất bại.');
+  },
+
+  /**
+   * Khởi tạo ca làm việc lặp lại cho nhân viên (có ngày kết thúc -> tạo đến ngày chỉ định, không có ngày kết thúc -> tạo đến hết tháng sau)
+   * Backend: POST /api/v1/schedules/recurring
+   */
+  async createRecurringSchedule(payload: CreateRecurringSchedulePayload): Promise<ScheduleAssignment[]> {
+    const res = await httpClient.post<ApiResponse<ScheduleResponse[]>>('/schedules/recurring', payload);
+    if (res.data?.success && Array.isArray(res.data.data)) {
+      return res.data.data.map(mapScheduleResponseToAssignment);
+    }
+    throw new Error(res.data?.message || 'Khởi tạo ca làm việc lặp lại thất bại.');
   },
 
   /**

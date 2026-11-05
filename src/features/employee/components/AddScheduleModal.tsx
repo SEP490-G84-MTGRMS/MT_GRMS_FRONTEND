@@ -7,6 +7,7 @@ import type {
   ScheduleAssignment,
 } from '../types';
 import { shiftConfigApi, type ShiftConfigDto } from '../api/shiftConfigApi';
+import { scheduleApi, type CreateRecurringSchedulePayload } from '../api/scheduleApi';
 import { ScheduleScopeConfirmModal } from './ScheduleScopeConfirmModal';
 
 interface AddScheduleModalProps {
@@ -18,10 +19,21 @@ interface AddScheduleModalProps {
   defaultEmployeeId?: string;
   defaultDayOfWeek?: 'T2' | 'T3' | 'T4' | 'T5' | 'T6' | 'T7' | 'CN';
   defaultDateStr?: string;
+  defaultStartDate?: string;
+  weekDays?: Array<{
+    key: 'T2' | 'T3' | 'T4' | 'T5' | 'T6' | 'T7' | 'CN';
+    label: string;
+    date: string | number;
+    dateStr?: string;
+    dateIso?: string;
+    fullDate?: any;
+    isToday?: boolean;
+  }>;
   editingAssignment?: ScheduleAssignment | null;
-  onSave: (assignments: ScheduleAssignment[]) => void;
+  onSave?: (assignments: ScheduleAssignment[]) => void;
   onUpdate?: (updatedAssignment: ScheduleAssignment) => void;
   onDelete?: (assignmentId: string) => void;
+  onSuccess?: () => void;
 }
 
 const SHIFT_COLORS: Record<string, string> = {
@@ -67,10 +79,13 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
   branches,
   defaultEmployeeId,
   defaultDayOfWeek,
+  defaultStartDate,
+  weekDays,
   editingAssignment,
   onSave,
   onUpdate,
   onDelete,
+  onSuccess,
 }) => {
   const isEditMode = !!editingAssignment;
 
@@ -84,6 +99,10 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
   const [employeeId, setEmployeeId] = useState(
     editingAssignment?.employeeId || defaultEmployeeId || (employees[0]?.id || '')
   );
+
+  // Trạng thái gửi API & Báo lỗi
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   // Thông tin nhân viên chính
   const currentEmp = useMemo(() => {
@@ -165,6 +184,7 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
         if (items.length > 0) {
           const mapped: WorkShiftDefinition[] = items.map((c: ShiftConfigDto) => ({
             id: c.id,
+            code: c.shiftCode,
             name: c.shiftName,
             startTime: (c.startTime || '00:00').substring(0, 5),
             endTime: (c.endTime || '00:00').substring(0, 5),
@@ -257,6 +277,7 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
   const [selectedDays, setSelectedDays] = useState<Array<'T2' | 'T3' | 'T4' | 'T5' | 'T6' | 'T7' | 'CN'>>(
     editingAssignment ? [editingAssignment.dayOfWeek] : defaultDayOfWeek ? [defaultDayOfWeek] : ['T3']
   );
+  const [hasEndDate, setHasEndDate] = useState(false);
   const [endDate, setEndDate] = useState('');
 
   // Thêm lịch tương tự cho nhân viên khác
@@ -265,8 +286,60 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
   const [selectedOtherEmpIds, setSelectedOtherEmpIds] = useState<string[]>([]);
   const [isOtherEmpDropdownOpen, setIsOtherEmpDropdownOpen] = useState(false);
 
+  // Danh sách các ngày trong tuần (ưu tiên dùng weekDays truyền từ bảng lịch làm việc)
+  const activeDaysList = useMemo(() => {
+    if (weekDays && weekDays.length > 0) {
+      return weekDays.map((w) => ({
+        key: w.key,
+        label: w.label,
+        date: w.dateStr || String(w.date),
+        dateIso: w.dateIso || '',
+      }));
+    }
+    return DAYS.map((d) => ({
+      key: d.key,
+      label: d.label,
+      date: d.date,
+      dateIso: '',
+    }));
+  }, [weekDays]);
+
+  // Ngày bắt đầu tính toán (ISO YYYY-MM-DD)
+  const calculatedStartDate: string = useMemo(() => {
+    if (defaultStartDate) return defaultStartDate;
+    const activeKey = selectedDays[0] || defaultDayOfWeek || 'T2';
+    const dayObj = activeDaysList.find((d) => d.key === activeKey);
+    if (dayObj && dayObj.dateIso) {
+      return dayObj.dateIso;
+    }
+    const now = new Date();
+    const yyyy = now.getFullYear();
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const dd = String(now.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  }, [defaultStartDate, selectedDays, defaultDayOfWeek, activeDaysList]);
+
+  // Ngày cuối cùng của tháng sau (hiển thị khi không chọn ngày kết thúc)
+  const endOfNextMonthDisplay = useMemo(() => {
+    const d = new Date(calculatedStartDate);
+    if (isNaN(d.getTime())) return '';
+    const currentMonth = new Date(d.getFullYear(), d.getMonth(), 1);
+    const nextMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1);
+    const daysInNextMonth = new Date(nextMonth.getFullYear(), nextMonth.getMonth() + 1, 0).getDate();
+    const endOfNextMonth = new Date(nextMonth.getFullYear(), nextMonth.getMonth(), daysInNextMonth);
+    const dd = String(endOfNextMonth.getDate()).padStart(2, '0');
+    const mm = String(endOfNextMonth.getMonth() + 1).padStart(2, '0');
+    const yyyy = endOfNextMonth.getFullYear();
+    return `${dd}/${mm}/${yyyy}`;
+  }, [calculatedStartDate]);
+
   useEffect(() => {
     if (!isOpen) return;
+
+    setSubmitError(null);
+    setIsSubmitting(false);
+    setHasEndDate(false);
+    setEndDate('');
 
     if (editingAssignment) {
       setEmployeeId(editingAssignment.employeeId);
@@ -406,7 +479,7 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
     setSelectedOtherEmpIds(selectedOtherEmpIds.filter((id) => id !== empId));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentEmp) return;
 
@@ -429,6 +502,10 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
       }
     }
 
+    const parts = (shiftTime || '').split('-').map((s) => s.trim());
+    const rawStartTime = parts[0] || (selectedShiftId === 'custom' ? customStartTime : currentSelectedShift?.startTime) || '08:00';
+    const rawEndTime = parts[1] || (selectedShiftId === 'custom' ? customEndTime : currentSelectedShift?.endTime) || '17:00';
+
     const branchNameFinal =
       currentEmp?.workingBranchNames?.[0] ||
       currentEmp?.salaryBranchName ||
@@ -439,7 +516,7 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
     // Nếu đang ở chế độ Cập nhật ca cụ thể -> mở popup xác nhận phạm vi thay đổi
     if (isEditMode && editingAssignment) {
       const activeDay = selectedDays[0] || editingAssignment.dayOfWeek;
-      const dayObj = DAYS.find((item) => item.key === activeDay);
+      const dayObj = activeDaysList.find((item) => item.key === activeDay);
 
       const updatedItem: ScheduleAssignment = {
         ...editingAssignment,
@@ -500,41 +577,60 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
       targetEmpIds.push(...selectedOtherEmpIds);
     }
 
-    const allAssignments: ScheduleAssignment[] = [];
+    if (hasEndDate && !endDate) {
+      setSubmitError('Vui lòng chọn ngày kết thúc khi tích chọn Có ngày kết thúc.');
+      return;
+    }
 
-    targetEmpIds.forEach((eId) => {
-      const empItem = employees.find((e) => e.id === eId);
-      if (!empItem) return;
-      const empItemBranchId =
-        (empItem?.workingBranchIds && empItem.workingBranchIds[0]) ||
-        empItem?.salaryBranchId;
-      const empItemBranchName =
-        empItem?.workingBranchNames?.[0] ||
-        empItem?.salaryBranchName ||
-        branches.find((b) => b.id === empItemBranchId)?.name ||
-        branchNameFinal;
+    if (hasEndDate && endDate) {
+      if (endDate < calculatedStartDate) {
+        setSubmitError('Ngày kết thúc không được nhỏ hơn ngày bắt đầu.');
+        return;
+      }
+    }
 
-      selectedDays.forEach((d) => {
-        const dayObj = DAYS.find((item) => item.key === d);
-        allAssignments.push({
-          id: `sa_${Date.now()}_${eId}_${d}_${Math.floor(Math.random() * 1000)}`,
-          employeeId: empItem.id,
-          employeeName: empItem.fullName,
-          employeeCode: empItem.employeeCode,
-          shiftId: shiftIdFinal,
-          shiftName: shiftName,
-          shiftTime: shiftTime,
-          shiftColor: shiftColor,
-          dayOfWeek: d,
-          dateStr: dayObj?.date || '29/09',
-          branchId: empItemBranchId,
-          branchName: empItemBranchName,
-        });
-      });
-    });
+    try {
+      setIsSubmitting(true);
+      setSubmitError(null);
 
-    onSave(allAssignments);
-    onClose();
+      // Gọi API khởi tạo ca làm việc từ Backend (có ngày kết thúc -> tạo đến ngày chỉ định, không có ngày kết thúc -> tạo đến hết tháng sau)
+      const payload: CreateRecurringSchedulePayload = {
+        employeeId: currentEmp.id,
+        branchId: currentEmpBranchId || branches[0]?.id || '',
+        startDate: calculatedStartDate,
+        hasEndDate: hasEndDate && !!endDate,
+        endDate: hasEndDate && endDate ? endDate : null,
+        repeatDays: isRepeating ? selectedDays : [selectedDays[0] || 'T2'],
+        additionalEmployeeIds: applyToOthers && selectedOtherEmpIds.length > 0 ? selectedOtherEmpIds : [],
+        shiftConfigId: shiftIdFinal !== 'custom' ? shiftIdFinal : undefined,
+        shiftCode: currentSelectedShift?.code || (shiftIdFinal !== 'custom' ? undefined : 'CUSTOM'),
+        shiftName: shiftName,
+        plannedStartTime: rawStartTime ? (rawStartTime.length === 5 ? `${rawStartTime}:00` : rawStartTime) : undefined,
+        plannedEndTime: rawEndTime ? (rawEndTime.length === 5 ? `${rawEndTime}:00` : rawEndTime) : undefined,
+        durationHours: currentSelectedShift?.totalHours,
+        isCheckInNextDay: rawEndTime <= rawStartTime,
+      };
+
+      const resultAssignments = await scheduleApi.createRecurringSchedule(payload);
+
+      if (onSuccess) {
+        await onSuccess();
+      }
+      if (onSave) {
+        onSave(resultAssignments);
+      }
+
+      onClose();
+    } catch (err: any) {
+      console.error('Lỗi khởi tạo ca làm việc:', err);
+      const msg =
+        err?.response?.data?.message ||
+        err?.message ||
+        'Không thể khởi tạo ca làm việc. Vui lòng kiểm tra lại thời gian ca.';
+      setSubmitError(msg);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   if (!isOpen) return null;
@@ -998,7 +1094,7 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
                 <div style={{ marginTop: 14 }}>
                   {/* Danh sách các nút ngày */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                    {DAYS.map((d) => {
+                    {activeDaysList.map((d) => {
                       const isSelected = selectedDays.includes(d.key);
                       return (
                         <button
@@ -1036,7 +1132,7 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
                         textDecoration: 'underline',
                       }}
                     >
-                      {selectedDays.length === DAYS.length ? 'Bỏ chọn' : 'Chọn tất cả'}
+                      {selectedDays.length === activeDaysList.length ? 'Bỏ chọn' : 'Chọn tất cả'}
                     </button>
                   </div>
 
@@ -1044,26 +1140,71 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
                     {repeatSummaryText}
                   </div>
 
-                  {/* Ngày kết thúc & Làm việc ngày lễ */}
+                  {/* Tùy chọn Có ngày kết thúc */}
                   <div
                     style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
                       marginTop: 14,
-                      flexWrap: 'wrap',
-                      gap: 12,
+                      padding: '12px 14px',
+                      background: '#F8FAFC',
+                      borderRadius: 8,
+                      border: '1px solid #E2E8F0',
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ fontSize: 13, fontWeight: 600, color: '#334155' }}>Kết thúc:</span>
-                      <input
-                        type="date"
-                        value={endDate}
-                        onChange={(e) => setEndDate(e.target.value)}
-                        className="emp-form-input"
-                        style={{ height: 32, width: 150, fontSize: 13 }}
-                      />
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        flexWrap: 'wrap',
+                        gap: 10,
+                      }}
+                    >
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', userSelect: 'none' }}>
+                        <input
+                          type="checkbox"
+                          checked={hasEndDate}
+                          onChange={(e) => {
+                            setHasEndDate(e.target.checked);
+                            if (!e.target.checked) setEndDate('');
+                          }}
+                          style={{ width: 16, height: 16, accentColor: '#0F766E', cursor: 'pointer' }}
+                        />
+                        <span style={{ fontSize: 13, fontWeight: 600, color: '#1E293B' }}>
+                          Có ngày kết thúc
+                        </span>
+                      </label>
+
+                      {hasEndDate && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span style={{ fontSize: 13, color: '#64748B' }}>Đến ngày:</span>
+                          <input
+                            type="date"
+                            value={endDate}
+                            min={calculatedStartDate}
+                            onChange={(e) => {
+                              setEndDate(e.target.value);
+                              setSubmitError(null);
+                            }}
+                            className="emp-form-input"
+                            style={{ height: 32, width: 150, fontSize: 13 }}
+                            required={hasEndDate}
+                          />
+                        </div>
+                      )}
+                    </div>
+
+                    <div style={{ marginTop: 8, fontSize: 12, lineHeight: '18px' }}>
+                      {hasEndDate && endDate ? (
+                        <div style={{ color: '#D97706', display: 'flex', alignItems: 'center', gap: 6, fontWeight: 500 }}>
+                          <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#F59E0B', display: 'inline-block' }} />
+                          Có ngày kết thúc: Hệ thống sẽ tạo lịch đến ngày <strong>{endDate.split('-').reverse().join('/')}</strong>.
+                        </div>
+                      ) : (
+                        <div style={{ color: '#0F766E', display: 'flex', alignItems: 'center', gap: 6, fontWeight: 500 }}>
+                          <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#0F766E', display: 'inline-block' }} />
+                          Không kết thúc: Hệ thống sẽ tự động tạo lịch đến hết tháng hiện tại và tháng sau (đến ngày <strong>{endOfNextMonthDisplay}</strong>).
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1270,6 +1411,42 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
                 </div>
               )}
             </div>
+
+            {/* Hiển thị lỗi nếu có từ backend */}
+            {submitError && (
+              <div
+                style={{
+                  background: '#FEF2F2',
+                  border: '1px solid #FCA5A5',
+                  color: '#991B1B',
+                  padding: '10px 14px',
+                  borderRadius: 8,
+                  fontSize: 13,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 8,
+                  marginTop: 10,
+                }}
+              >
+                <span>{submitError}</span>
+                <button
+                  type="button"
+                  onClick={() => setSubmitError(null)}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: '#991B1B',
+                    cursor: 'pointer',
+                    fontSize: 16,
+                    padding: 0,
+                    lineHeight: 1,
+                  }}
+                >
+                  &times;
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Footer nút Bỏ qua & Lưu / Cập nhật */}
@@ -1316,6 +1493,7 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
                 type="button"
                 className="emp-btn emp-btn-secondary"
                 onClick={onClose}
+                disabled={isSubmitting}
                 style={{ minWidth: 80, height: 36, fontSize: 13 }}
               >
                 Bỏ qua
@@ -1323,9 +1501,16 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
               <button
                 type="submit"
                 className="emp-btn emp-btn-primary"
-                style={{ minWidth: 80, height: 36, fontSize: 13 }}
+                disabled={isSubmitting}
+                style={{
+                  minWidth: 80,
+                  height: 36,
+                  fontSize: 13,
+                  opacity: isSubmitting ? 0.7 : 1,
+                  cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                }}
               >
-                {isEditMode ? 'Cập nhật' : 'Lưu'}
+                {isSubmitting ? 'Đang lưu...' : isEditMode ? 'Cập nhật' : 'Lưu'}
               </button>
             </div>
           </div>
@@ -1344,10 +1529,10 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
           if (scopeAction === 'update' && pendingUpdatedItem) {
             if (onUpdate) {
               onUpdate(pendingUpdatedItem);
-            } else {
+            } else if (onSave) {
               onSave([pendingUpdatedItem]);
             }
-            if (pendingExtraAssignments.length > 0) {
+            if (pendingExtraAssignments.length > 0 && onSave) {
               onSave(pendingExtraAssignments);
             }
           } else if (scopeAction === 'delete' && editingAssignment) {

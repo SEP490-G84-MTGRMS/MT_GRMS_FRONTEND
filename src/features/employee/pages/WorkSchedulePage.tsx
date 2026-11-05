@@ -20,7 +20,7 @@ import { ScheduleScopeConfirmModal } from '../components/ScheduleScopeConfirmMod
 import { TablePagination, NotificationModal } from '../../../components/common';
 import { employeeApi } from '../api/employeeApi';
 import { shiftConfigApi, type ShiftConfigDto } from '../api/shiftConfigApi';
-import { scheduleApi, getShiftColor, type CreateScheduleItemPayload } from '../api/scheduleApi';
+import { scheduleApi, getShiftColor } from '../api/scheduleApi';
 import '../employee.css';
 
 const getWeekDates = (offsetWeeks: number) => {
@@ -231,11 +231,11 @@ export const WorkSchedulePage: React.FC = () => {
         const mockFiltered =
           selectedBranchIds.length > 0
             ? MOCK_EMPLOYEES.filter(
-                (e) =>
-                  (e.salaryBranchId && selectedBranchIds.includes(e.salaryBranchId)) ||
-                  (e.workingBranchIds &&
-                    e.workingBranchIds.some((id) => selectedBranchIds.includes(id)))
-              )
+              (e) =>
+                (e.salaryBranchId && selectedBranchIds.includes(e.salaryBranchId)) ||
+                (e.workingBranchIds &&
+                  e.workingBranchIds.some((id) => selectedBranchIds.includes(id)))
+            )
             : MOCK_EMPLOYEES;
         setEmployees(mockFiltered);
       }
@@ -288,8 +288,8 @@ export const WorkSchedulePage: React.FC = () => {
       const filteredData =
         selectedBranchIds.length > 1
           ? data.filter(
-              (item) => item.branchId && selectedBranchIds.includes(item.branchId)
-            )
+            (item) => item.branchId && selectedBranchIds.includes(item.branchId)
+          )
           : data;
 
       setAssignments(filteredData);
@@ -357,8 +357,8 @@ export const WorkSchedulePage: React.FC = () => {
         s.branchIds && s.branchIds.length > 0
           ? s.branchIds
           : s.branchId
-          ? [s.branchId]
-          : [];
+            ? [s.branchId]
+            : [];
       return selectedBranchIds.some((bId) => shiftBranchIds.includes(bId));
     });
   }, [shifts, selectedBranchIds]);
@@ -388,79 +388,9 @@ export const WorkSchedulePage: React.FC = () => {
     setShowAddModal(true);
   };
 
-  // 3. Lưu phân ca mới xuống Backend (có kiểm tra chống xung đột)
-  const handleSaveAssignments = async (newItems: ScheduleAssignment[]) => {
-    try {
-      const targetBranchId =
-        selectedBranchIds.length > 0
-          ? selectedBranchIds[0]
-          : branches[0]?.id || 'b1';
-
-      const payloads: CreateScheduleItemPayload[] = newItems.map((item) => {
-        const dayObj = DAYS_HEADER.find((d) => d.key === item.dayOfWeek);
-        const workDate = dayObj ? dayObj.dateIso : new Date().toISOString().split('T')[0];
-
-        const parts = (item.shiftTime || '').split('-');
-        const rawStart = parts[0]?.trim();
-        const rawEnd = parts[1]?.trim();
-        const startTime = rawStart ? (rawStart.length === 5 ? `${rawStart}:00` : rawStart) : undefined;
-        const endTime = rawEnd ? (rawEnd.length === 5 ? `${rawEnd}:00` : rawEnd) : undefined;
-
-        const matchingShift = shifts.find(
-          (s) => s.id === item.shiftId || s.name.toLowerCase() === item.shiftName.toLowerCase()
-        );
-        const shiftConfigId =
-          matchingShift && matchingShift.id !== 'custom'
-            ? matchingShift.id
-            : item.shiftId && item.shiftId !== 'custom'
-            ? item.shiftId
-            : undefined;
-
-        // Lấy BranchId của Employee hiện tại đang làm
-        const emp = employees.find((e) => e.id === item.employeeId);
-        const empBranchId =
-          item.branchId ||
-          (emp?.workingBranchIds && emp.workingBranchIds[0]) ||
-          emp?.salaryBranchId ||
-          targetBranchId;
-
-        return {
-          employeeId: item.employeeId,
-          branchId: empBranchId,
-          workDate,
-          shiftConfigId,
-          shiftCode: matchingShift?.id || (item.shiftId !== 'custom' ? item.shiftId : 'CUSTOM'),
-          shiftName: item.shiftName,
-          plannedStartTime: startTime,
-          plannedEndTime: endTime,
-        };
-      });
-
-      const primaryBranchId = payloads[0]?.branchId || targetBranchId;
-      await scheduleApi.batchCreateSchedules({
-        branchId: primaryBranchId,
-        schedules: payloads,
-      });
-
-      setNotificationModal({
-        isOpen: true,
-        type: 'success',
-        title: 'Thành công',
-        message: `Đã lưu thành công ${payloads.length} ca làm việc vào hệ thống.`,
-      });
-
-      await fetchSchedules();
-    } catch (err: any) {
-      setNotificationModal({
-        isOpen: true,
-        type: 'error',
-        title: 'Lỗi phân ca làm việc',
-        message:
-          err?.response?.data?.message ||
-          err?.message ||
-          'Không thể lưu ca làm việc do xung đột thời gian hoặc dữ liệu không hợp lệ.',
-      });
-    }
+  // 3. Làm mới danh sách phân ca sau khi thêm thành công
+  const handleSaveAssignments = async (_newItems?: ScheduleAssignment[]) => {
+    await fetchSchedules();
   };
 
   // 4. Cập nhật ca làm việc trên Backend
@@ -479,8 +409,8 @@ export const WorkSchedulePage: React.FC = () => {
         matchingShift && matchingShift.id !== 'custom'
           ? matchingShift.id
           : updated.shiftId && updated.shiftId !== 'custom'
-          ? updated.shiftId
-          : undefined;
+            ? updated.shiftId
+            : undefined;
 
       await scheduleApi.updateSchedule(updated.id, {
         shiftName: updated.shiftName,
@@ -874,7 +804,7 @@ export const WorkSchedulePage: React.FC = () => {
                             <input
                               type="checkbox"
                               checked={isChecked}
-                              onChange={() => {}}
+                              onChange={() => { }}
                               style={{ accentColor: '#0F766E', width: 16, height: 16 }}
                             />
                             <span style={{ fontWeight: isChecked ? 600 : 400, color: isChecked ? '#134E4A' : '#1E293B' }}>
@@ -1389,8 +1319,18 @@ export const WorkSchedulePage: React.FC = () => {
         branches={branches}
         defaultEmployeeId={selectedEmpId}
         defaultDayOfWeek={selectedDay}
+        weekDays={weekData.days}
         editingAssignment={editingAssignment}
         onSave={handleSaveAssignments}
+        onSuccess={async () => {
+          await fetchSchedules();
+          setNotificationModal({
+            isOpen: true,
+            type: 'success',
+            title: 'Thành công',
+            message: 'Đã khởi tạo ca làm việc thành công vào hệ thống.',
+          });
+        }}
         onUpdate={handleUpdateAssignment}
         onDelete={handleDeleteAssignment}
       />

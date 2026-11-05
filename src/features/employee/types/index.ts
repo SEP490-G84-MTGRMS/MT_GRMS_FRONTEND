@@ -143,6 +143,7 @@ export interface EmployeeFilterState {
 
 export interface WorkShiftDefinition {
   id: string;
+  code?: string;
   name: string; // Ca sáng, Ca chiều, Ca tối, Ca hành chính
   startTime: string; // 07:00
   endTime: string; // 12:30
