@@ -15,6 +15,7 @@ import {
   Calendar,
   Users,
   Info,
+  Sliders,
 } from 'lucide-react';
 import type { Branch } from '../types';
 import { employeeApi } from '../api/employeeApi';
@@ -24,6 +25,8 @@ import {
   type CreateShiftConfigPayload,
   type UpdateShiftConfigPayload,
 } from '../api/shiftConfigApi';
+import { ConfirmModal, NotificationModal } from '../../../components/common';
+import { AttendanceConfigModal } from '../components/AttendanceConfigModal';
 import '../employee.css';
 
 // Helper format HH:mm:ss -> HH:mm
@@ -79,6 +82,17 @@ export const ShiftConfigPage: React.FC = () => {
   // Modal Xóa
   const [deletingShift, setDeletingShift] = useState<ShiftConfigDto | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Modal Thông báo
+  const [notification, setNotification] = useState<{
+    isOpen: boolean;
+    type?: 'success' | 'error' | 'warning' | 'info';
+    title: string;
+    message: string | React.ReactNode;
+  } | null>(null);
+
+  // Modal Cài đặt chấm công
+  const [showAttendanceConfigModal, setShowAttendanceConfigModal] = useState<boolean>(false);
 
   // Form states bên trong Modal
   const [formShiftName, setFormShiftName] = useState('Tối');
@@ -253,8 +267,19 @@ export const ShiftConfigPage: React.FC = () => {
       setShifts((prev) =>
         prev.map((item) => (item.id === s.id ? { ...item, isActive: nextStatus } : item))
       );
+      setNotification({
+        isOpen: true,
+        type: 'success',
+        title: 'Cập nhật thành công',
+        message: `Đã ${nextStatus ? 'kích hoạt' : 'tạm ngưng'} ca làm việc "${s.shiftName}".`,
+      });
     } catch (err: any) {
-      alert(err?.response?.data?.message || err?.message || 'Không thể cập nhật trạng thái ca.');
+      setNotification({
+        isOpen: true,
+        type: 'error',
+        title: 'Cập nhật thất bại',
+        message: err?.response?.data?.message || err?.message || 'Không thể cập nhật trạng thái ca.',
+      });
     }
   };
 
@@ -297,6 +322,14 @@ export const ShiftConfigPage: React.FC = () => {
 
         const updated = await shiftConfigApi.updateShiftConfig(editingShift.id, payload);
         setShifts((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
+        setShowFormModal(false);
+        setEditingShift(null);
+        setNotification({
+          isOpen: true,
+          type: 'success',
+          title: 'Cập nhật thành công',
+          message: `Đã cập nhật ca làm việc "${payload.shiftName}" thành công.`,
+        });
       } else {
         const payload: CreateShiftConfigPayload = {
           shiftName: formShiftName.trim(),
@@ -315,10 +348,15 @@ export const ShiftConfigPage: React.FC = () => {
 
         const created = await shiftConfigApi.createShiftConfig(payload);
         setShifts((prev) => [created, ...prev]);
+        setShowFormModal(false);
+        setEditingShift(null);
+        setNotification({
+          isOpen: true,
+          type: 'success',
+          title: 'Tạo ca thành công',
+          message: `Đã tạo ca làm việc "${payload.shiftName}" thành công.`,
+        });
       }
-
-      setShowFormModal(false);
-      setEditingShift(null);
     } catch (err: any) {
       console.error('Lỗi lưu ca làm việc:', err);
       setFormError(
@@ -332,14 +370,27 @@ export const ShiftConfigPage: React.FC = () => {
   // Xác nhận xóa ca làm việc
   const handleConfirmDelete = async () => {
     if (!deletingShift) return;
+    const deletedName = deletingShift.shiftName;
     try {
       setIsDeleting(true);
       await shiftConfigApi.deleteShiftConfig(deletingShift.id);
       setShifts((prev) => prev.filter((item) => item.id !== deletingShift.id));
       setDeletingShift(null);
+      setNotification({
+        isOpen: true,
+        type: 'success',
+        title: 'Xóa ca thành công',
+        message: `Đã xóa ca làm việc "${deletedName}" khỏi hệ thống.`,
+      });
     } catch (err: any) {
       console.error('Lỗi xóa ca làm việc:', err);
-      alert(err?.response?.data?.message || err?.message || 'Không thể xóa ca làm việc.');
+      setDeletingShift(null);
+      setNotification({
+        isOpen: true,
+        type: 'error',
+        title: 'Xóa ca thất bại',
+        message: err?.response?.data?.message || err?.message || 'Không thể xóa ca làm việc.',
+      });
     } finally {
       setIsDeleting(false);
     }
@@ -637,6 +688,16 @@ export const ShiftConfigPage: React.FC = () => {
           >
             <Users size={16} />
             <span>Nhân viên</span>
+          </button>
+
+          <button
+            type="button"
+            className="emp-btn emp-btn-secondary"
+            onClick={() => setShowAttendanceConfigModal(true)}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+          >
+            <Sliders size={16} />
+            <span>Cài đặt chấm công</span>
           </button>
 
           <button
@@ -1458,68 +1519,53 @@ export const ShiftConfigPage: React.FC = () => {
       )}
 
       {/* ─── MODAL XÁC NHẬN XÓA CA ─── */}
-      {deletingShift && (
-        <div className="emp-modal-overlay">
-          <div className="emp-modal-card">
-            <div className="emp-modal-header">
-              <h3 style={{ margin: 0, fontSize: 16, color: '#DC2626', display: 'flex', alignItems: 'center', gap: 8 }}>
-                <AlertTriangle size={20} />
-                <span>Xác nhận xóa ca làm việc</span>
-              </h3>
-              <button
-                type="button"
-                className="emp-modal-close-btn"
-                onClick={() => setDeletingShift(null)}
-                disabled={isDeleting}
-              >
-                &times;
-              </button>
-            </div>
+      <ConfirmModal
+        isOpen={Boolean(deletingShift)}
+        onClose={() => setDeletingShift(null)}
+        onConfirm={handleConfirmDelete}
+        title="Xác nhận xóa ca làm việc"
+        itemName={deletingShift?.shiftName}
+        message={
+          <>
+            <p style={{ margin: 0 }}>
+              Bạn có chắc chắn muốn xóa ca làm việc <b>"{deletingShift?.shiftName}"</b> khỏi hệ thống?
+            </p>
+            <p style={{ margin: '10px 0 0', fontSize: 12.5, color: '#B45309', backgroundColor: '#FEF3C7', padding: '8px 12px', borderRadius: 6, lineHeight: 1.5 }}>
+              ⚠️ <b>Lưu ý:</b> Ca làm việc sau khi xóa sẽ không còn hiển thị khi xếp lịch mới.
+            </p>
+          </>
+        }
+        isLoading={isDeleting}
+        confirmText="Xóa ca"
+        cancelText="Hủy"
+      />
 
-            <div className="emp-modal-body" style={{ padding: '16px 20px', fontSize: 13, color: '#334155', lineHeight: 1.5 }}>
-              Bạn có chắc chắn muốn xóa ca làm việc{' '}
-              <strong style={{ color: '#0F172A' }}>{deletingShift.shiftName}</strong>?
-              <div
-                style={{
-                  marginTop: 12,
-                  padding: '8px 12px',
-                  background: '#FEF2F2',
-                  border: '1px solid #FECACA',
-                  borderRadius: 6,
-                  color: '#991B1B',
-                  fontSize: 12,
-                }}
-              >
-                Lưu ý: Ca làm việc sau khi xóa sẽ không còn hiển thị khi xếp lịch mới.
-              </div>
-            </div>
+      {/* ─── MODAL CẤU HÌNH CHẤM CÔNG ─── */}
+      <AttendanceConfigModal
+        isOpen={showAttendanceConfigModal}
+        onClose={() => setShowAttendanceConfigModal(false)}
+        branches={branches}
+        initialBranchId={selectedBranchIds[0] || branches[0]?.id}
+        onSaveSuccess={(branchId) => {
+          const bName = branches.find((b) => b.id === branchId)?.name || 'Chi nhánh';
+          setNotification({
+            isOpen: true,
+            type: 'success',
+            title: 'Lưu cài đặt thành công',
+            message: `Đã cập nhật các thiết lập chấm công cho ${bName} thành công.`,
+          });
+        }}
+      />
 
-            <div className="emp-modal-footer">
-              <button
-                type="button"
-                className="emp-btn emp-btn-secondary"
-                onClick={() => setDeletingShift(null)}
-                disabled={isDeleting}
-              >
-                Hủy
-              </button>
-              <button
-                type="button"
-                className="emp-btn"
-                style={{
-                  background: '#DC2626',
-                  color: '#FFFFFF',
-                  borderColor: '#DC2626',
-                  minWidth: 100,
-                }}
-                onClick={handleConfirmDelete}
-                disabled={isDeleting}
-              >
-                {isDeleting ? 'Đang xóa...' : 'Xóa ca'}
-              </button>
-            </div>
-          </div>
-        </div>
+      {/* ─── MODAL THÔNG BÁO ─── */}
+      {notification && (
+        <NotificationModal
+          isOpen={notification.isOpen}
+          onClose={() => setNotification(null)}
+          type={notification.type}
+          title={notification.title}
+          message={notification.message}
+        />
       )}
     </div>
   );
