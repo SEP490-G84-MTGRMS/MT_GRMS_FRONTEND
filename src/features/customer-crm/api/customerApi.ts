@@ -1,5 +1,6 @@
 import { financeHttpClient } from '../../../api/financeHttpClient';
 import type { ApiResponse } from '../../../api/types';
+import { cashbookService } from '../../cashbook/services/cashbookService';
 import type {
   CustomerDto,
   CreateCustomerInput,
@@ -17,9 +18,6 @@ function generateUUID(): string {
   }
   return 'idemp-' + Date.now() + '-' + Math.random().toString(36).substring(2, 9);
 }
-
-const DEFAULT_TILL_ID = '01a19664-6210-7b12-a9eb-6fa16ca5b9db';
-const DEFAULT_BANK_ID = '01a19664-6741-7f3d-9be7-cb4c7b876559';
 
 interface BackendCustomerDebtEntry {
   id: string;
@@ -130,8 +128,16 @@ export const customerApi = {
 
     const isCash = input.method === 'Cash';
     const paymentSourceType = isCash ? 1 : 3; // 1 = BranchTill, 3 = TenantBank
-    const defaultAccountId = isCash ? DEFAULT_TILL_ID : DEFAULT_BANK_ID;
-    const paymentSourceAccountId = input.targetAccountId || defaultAccountId;
+
+    let paymentSourceAccountId = input.targetAccountId;
+    if (!paymentSourceAccountId) {
+      const accounts = await cashbookService.getCashAccounts();
+      const matched = accounts.find((a) =>
+        isCash ? a.accountType === 'CASH' : a.accountType === 'BANK'
+      );
+      paymentSourceAccountId = matched?.id;
+    }
+
     const idempotencyKey = generateUUID();
 
     const res = await financeHttpClient.post<ApiResponse<unknown>>(

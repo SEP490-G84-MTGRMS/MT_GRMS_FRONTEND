@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import type { FC } from 'react';
 import {
   X,
@@ -35,6 +36,7 @@ export const CustomerDebtLedgerDrawer: FC<CustomerDebtLedgerDrawerProps> = ({
   onClose,
   onOpenCollect,
 }) => {
+  const navigate = useNavigate();
   const [filterType, setFilterType] = useState<'ALL' | 'INCREASE' | 'DECREASE'>('ALL');
 
   const [ledgers, setLedgers] = useState<CustomerDebtLedgerDto[]>([]);
@@ -374,19 +376,30 @@ export const CustomerDebtLedgerDrawer: FC<CustomerDebtLedgerDrawerProps> = ({
                           </span>
                         )}
                         {item.cashTransactionCode && (
-                          <span
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '3px',
-                              color: '#0F766E',
-                              fontWeight: 600,
+                          <button
+                            type="button"
+                            onClick={() => {
+                              onClose();
+                              navigate('/store-owner/cashbook?search=' + encodeURIComponent(item.cashTransactionCode || ''));
                             }}
-                            title="Mã phiếu thu Sổ quỹ liên thông tự động"
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              color: '#0F766E',
+                              background: '#F0FDFA',
+                              border: '1px solid #CCFBF1',
+                              padding: '2px 8px',
+                              borderRadius: '6px',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              fontSize: '0.75rem',
+                            }}
+                            title="Bấm để truy vết đối soát giao dịch dòng tiền trong Sổ quỹ"
                           >
                             <Building2 className="w-3 h-3" />
-                            Sổ quỹ: {item.cashTransactionCode}
-                          </span>
+                            <span>Sổ quỹ: {item.cashTransactionCode} ↗</span>
+                          </button>
                         )}
                       </div>
 

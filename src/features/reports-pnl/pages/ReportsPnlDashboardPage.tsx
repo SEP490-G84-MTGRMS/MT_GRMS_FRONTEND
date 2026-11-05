@@ -16,7 +16,6 @@ import { PnlStatementTable } from '../components/PnlStatementTable';
 import { PnlExportModal } from '../components/PnlExportModal';
 import { reportsPnlService } from '../services/reportsPnlService';
 import { WaterfallChart, type WaterfallItem } from '../../../components/common/WaterfallChart';
-import { MOCK_PNL_MONTH } from '../../finance/data/mockFinanceData';
 import { formatMoney } from '../../finance/utils/formatters';
 import type {
   BranchOption,
@@ -100,13 +99,13 @@ export const ReportsPnlDashboardPage: React.FC = () => {
     fetchReport(true);
   };
 
-  // Reconciled figures with Gate 0 Mock Ledger
-  const netRev = reportData?.kpiSummary?.netRevenue || MOCK_PNL_MONTH.netSales; // 560.86M
-  const cogsVal = reportData?.kpiSummary?.cogs || MOCK_PNL_MONTH.cogs; // 386.9934M
-  const grossProfitVal = reportData?.kpiSummary?.grossProfit || MOCK_PNL_MONTH.grossProfit; // 173.8666M
-  const opexVal = reportData?.kpiSummary?.operatingExpenses || MOCK_PNL_MONTH.operatingExpenses; // 81.3247M
-  const taxVal = reportData?.kpiSummary?.estimatedTaxAmount || MOCK_PNL_MONTH.shrinkageWarehouse; // 6.73032M
-  const netProfitVal = reportData?.kpiSummary?.netProfitAfterTax || MOCK_PNL_MONTH.netProfit; // 85.811.580 đ
+  // Live figures from report data (0 if not loaded yet)
+  const netRev = reportData?.kpiSummary?.netRevenue ?? 0;
+  const cogsVal = reportData?.kpiSummary?.cogs ?? 0;
+  const grossProfitVal = reportData?.kpiSummary?.grossProfit ?? 0;
+  const opexVal = reportData?.kpiSummary?.operatingExpenses ?? 0;
+  const taxVal = reportData?.kpiSummary?.estimatedTaxAmount ?? 0;
+  const netProfitVal = reportData?.kpiSummary?.netProfitAfterTax ?? 0;
 
   // Story formula: "Cứ 100đ bán ra, lãi ~15đ"
   const profitPerHundred = netRev > 0 ? Math.round((netProfitVal / netRev) * 100) : 15;

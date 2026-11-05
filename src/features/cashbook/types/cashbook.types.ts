@@ -46,6 +46,7 @@ export interface CashAccount {
   isActive: boolean;
   currency: string;
   isSafeDeposit?: boolean; // True for store owner's safe box
+  isDefault?: boolean; // True for primary business bank account (VietQR)
 }
 
 export interface LedgerTransaction {
@@ -154,4 +155,60 @@ export interface CashbookSummaryKPI {
   totalCashInDrawers: number;
   totalBankDeposits: number;
   totalSafeDepositBalance?: number;
+}
+
+export interface DepositItem {
+  id: string;
+  voucherCode: string;
+  customerName: string;
+  originalAmount: number;
+  amount?: number;
+  refundedAmount: number;
+  remainingAmount: number;
+  remainingDeposit?: number;
+  isSettled: boolean;
+  createdAt: string;
+  note?: string;
+}
+
+export interface CreateDepositDTO {
+  branchId?: string;
+  customerName: string;
+  amount: number;
+  paymentSourceType?: string;
+  paymentSourceAccountId?: string;
+  accountId?: string;
+  note?: string;
+}
+
+export interface RefundDepositDTO {
+  amount?: number;
+  refundAmount?: number;
+  paymentSourceType?: string;
+  paymentSourceAccountId?: string;
+  accountId?: string;
+  note?: string;
+}
+
+export interface TriageItem {
+  id: string;
+  voucherCode: string;
+  category: string;
+  beneficiaryName?: string;
+  description?: string;
+  amount: number;
+  status: string;
+  nature: string;
+  suspiciousReason?: string;
+  isTaxDeductible?: boolean;
+  createdBy?: string;
+  note?: string;
+  expenseDate: string;
+}
+
+export interface ResolveTriageDTO {
+  nature: number;
+  isTaxDeductible: boolean;
+  category?: string;
+  resolutionNote: string;
 }

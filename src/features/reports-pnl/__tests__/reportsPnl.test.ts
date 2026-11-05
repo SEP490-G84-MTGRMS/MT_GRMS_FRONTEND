@@ -1,11 +1,17 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   calculateMarginPct,
   reportsPnlService,
+  MOCK_BRANCHES,
 } from '../services/reportsPnlService';
+import { financeHttpClient } from '../../../api/financeHttpClient';
 
-describe('Reports P&L Financial Calculations Unit Tests', () => {
-  describe('calculateMarginPct safe division tests', () => {
+describe('Reports P&L Financial Calculations Unit & Integration Tests', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  describe('1. calculateMarginPct safe division tests', () => {
     it('should accurately calculate normal percentage', () => {
       expect(calculateMarginPct(25, 100)).toBe(25.0);
       expect(calculateMarginPct(1, 3)).toBe(33.3);
@@ -19,14 +25,40 @@ describe('Reports P&L Financial Calculations Unit Tests', () => {
 
     it('should handle negative profit or losses gracefully', () => {
       expect(calculateMarginPct(-50, 200)).toBe(-25.0);
+      expect(calculateMarginPct(-10190000, 7950000)).toBe(-128.2);
+    });
+
+    it('should handle decimal rounding precision accurately to 1 decimal place', () => {
+      expect(calculateMarginPct(1450000, 10000000)).toBe(14.5);
+      expect(calculateMarginPct(2, 3)).toBe(66.7);
     });
   });
 
-  describe('reportsPnlService financial consistency tests', () => {
-    it('should return all 4 default branch options including ALL', async () => {
+  describe('2. Happy Path Tests (Kịch bản thành công chuẩn)', () => {
+    it('should return branch options with "ALL" as the consolidated main choice', async () => {
       const branches = await reportsPnlService.getBranches();
-      expect(branches).toHaveLength(4);
+      expect(branches.length).toBeGreaterThanOrEqual(1);
       expect(branches[0].id).toBe('ALL');
+      expect(branches[0].isMain).toBe(true);
+    });
+
+    it('should parse live branches correctly when /v1/branches succeeds', async () => {
+      vi.spyOn(financeHttpClient, 'get').mockResolvedValueOnce({
+        data: {
+          data: {
+            items: [
+              { id: 'b-01', code: 'BR-Q1', name: 'Chi nhánh Quận 1' },
+              { id: 'b-02', code: 'BR-BT', name: 'Chi nhánh Bình Thạnh' },
+            ],
+          },
+        },
+      } as any);
+
+      const branches = await reportsPnlService.getBranches();
+      expect(branches).toHaveLength(3); // 'ALL' + 2 branches
+      expect(branches[0].id).toBe('ALL');
+      expect(branches[1].code).toBe('BR-Q1');
+      expect(branches[2].name).toBe('Chi nhánh Bình Thạnh');
     });
 
     it('should strictly satisfy retail P&L accounting equation', async () => {
@@ -63,17 +95,184 @@ describe('Reports P&L Financial Calculations Unit Tests', () => {
         calculateMarginPct(kpiSummary.netProfit, kpiSummary.netRevenue)
       );
 
-      // 5. PnL Tree must contain 6 top-level rows (I, REV-NET, II, GP, III, NP)
+      // 5. Net Profit After Tax = Net Profit - Estimated Tax
+      expect(kpiSummary.netProfitAfterTax).toBe(
+        kpiSummary.netProfit - kpiSummary.estimatedTaxAmount
+      );
+
+      // 6. PnL Tree must contain top-level structural rows
       expect(pnlTree.length).toBeGreaterThanOrEqual(6);
 
-      // 6. Expense breakdown must have at least 5 categories
-      expect(expenseBreakdown.length).toBeGreaterThanOrEqual(5);
+      // 7. Expense breakdown must have categories
+      expect(expenseBreakdown.length).toBeGreaterThanOrEqual(1);
 
-      // 7. Trend data must have points
+      // 8. Trend data must have points
       expect(trendData.length).toBeGreaterThan(0);
     });
 
-    it('should scale down amounts when specific branch is selected', async () => {
+    it('should correctly aggregate live top products from orders API', async () => {
+      const mockOrders = [
+        {
+          id: 'ord-1',
+          branchId: 'b-01',
+          status: 'Completed',
+          items: [
+            {
+              productId: 'p-beer',
+              productName: 'Bia Tiger thùng 24 lon',
+              barcode: '893482221004',
+              quantity: 2,
+              actualPrice: 385000,
+              costPriceAtSale: 340000,
+              totalLineAmount: 770000,
+            },
+            {
+              productId: 'p-snack',
+              productName: 'Bánh Chocopie 360g',
+              barcode: '893603601001',
+              quantity: 5,
+              actualPrice: 65000,
+              costPriceAtSale: 48000,
+              totalLineAmount: 325000,
+            },
+          ],
+        },
+        {
+          id: 'ord-2',
+          branchId: 'b-01',
+          status: 'Completed',
+          items: [
+            {
+              productId: 'p-beer',
+              productName: 'Bia Tiger thùng 24 lon',
+              barcode: '893482221004',
+              quantity: 1,
+              actualPrice: 385000,
+              costPriceAtSale: 340000,
+              totalLineAmount: 385000,
+            },
+          ],
+        },
+      ];
+
+      vi.spyOn(financeHttpClient, 'get').mockResolvedValueOnce({
+        data: { items: mockOrders },
+      } as any);
+
+      const topProducts = await reportsPnlService.getLiveTopProducts('b-01');
+      expect(topProducts).toHaveLength(2);
+
+      // Tiger beer: qty = 3, rev = 1.155.000, cost = 1.020.000, profit = 135.000
+      const tiger = topProducts.find((p) => p.productId === 'p-beer');
+      expect(tiger).toBeDefined();
+      expect(tiger?.quantitySold).toBe(3);
+      expect(tiger?.revenue).toBe(1155000);
+      expect(tiger?.profit).toBe(135000);
+
+      // Sorted descending by profit: tiger (135k) > chocopie (85k)
+      expect(topProducts[0].productId).toBe('p-beer');
+    });
+  });
+
+  describe('3. Bad Test Cases (Kịch bản dữ liệu dị thường & Lỗi hệ thống)', () => {
+    it('should safely handle when /v1/branches rejects with network error and fallback to default', async () => {
+      vi.spyOn(financeHttpClient, 'get').mockRejectedValueOnce(
+        new Error('Network error 500')
+      );
+
+      const branches = await reportsPnlService.getBranches();
+      expect(branches).toEqual(MOCK_BRANCHES);
+    });
+
+    it('should return empty top products without throwing when /orders returns 500', async () => {
+      vi.spyOn(financeHttpClient, 'get').mockRejectedValueOnce(
+        new Error('Database timeout')
+      );
+
+      const topProducts = await reportsPnlService.getLiveTopProducts();
+      expect(topProducts).toEqual([]);
+    });
+
+    it('should safely calculate margins when net revenue is zero', () => {
+      const grossMargin = calculateMarginPct(0, 0);
+      const netMargin = calculateMarginPct(-500000, 0);
+      expect(grossMargin).toBe(0);
+      expect(netMargin).toBe(0);
+    });
+
+    it('should ignore cancelled orders when aggregating live top products', async () => {
+      const mockOrders = [
+        {
+          id: 'ord-cancelled',
+          branchId: 'b-01',
+          status: 'Cancelled',
+          items: [
+            {
+              productId: 'p-void',
+              productName: 'Hàng hủy bỏ',
+              quantity: 10,
+              actualPrice: 100000,
+              costPriceAtSale: 80000,
+              totalLineAmount: 1000000,
+            },
+          ],
+        },
+      ];
+
+      vi.spyOn(financeHttpClient, 'get').mockResolvedValueOnce({
+        data: { items: mockOrders },
+      } as any);
+
+      const topProducts = await reportsPnlService.getLiveTopProducts();
+      expect(topProducts).toHaveLength(0);
+    });
+  });
+
+  describe('4. Edge Cases (Kịch bản biên & Nghiệp vụ đặc biệt)', () => {
+    it('should filter orders strictly by branchId when specified', async () => {
+      const mockOrders = [
+        {
+          id: 'ord-b1',
+          branchId: 'branch-q1',
+          status: 'Completed',
+          items: [
+            {
+              productId: 'p-1',
+              productName: 'SP Chi nhánh 1',
+              quantity: 1,
+              actualPrice: 100000,
+              costPriceAtSale: 80000,
+            },
+          ],
+        },
+        {
+          id: 'ord-b2',
+          branchId: 'branch-q2',
+          status: 'Completed',
+          items: [
+            {
+              productId: 'p-2',
+              productName: 'SP Chi nhánh 2',
+              quantity: 1,
+              actualPrice: 200000,
+              costPriceAtSale: 150000,
+            },
+          ],
+        },
+      ];
+
+      vi.spyOn(financeHttpClient, 'get').mockResolvedValueOnce({
+        data: { items: mockOrders },
+      } as any);
+
+      const topProductsB1 = await reportsPnlService.getLiveTopProducts(
+        'branch-q1'
+      );
+      expect(topProductsB1).toHaveLength(1);
+      expect(topProductsB1[0].productId).toBe('p-1');
+    });
+
+    it('should scale down grossSales when a specific branch is selected in mock calculation mode', async () => {
       const allData = await reportsPnlService.getPnlReportData({
         branchId: 'ALL',
         presetPeriod: 'THIS_MONTH',
@@ -90,6 +289,26 @@ describe('Reports P&L Financial Calculations Unit Tests', () => {
 
       expect(branchData.kpiSummary.grossSales).toBeLessThan(
         allData.kpiSummary.grossSales
+      );
+    });
+
+    it('should correctly adapt different preset periods (TODAY vs THIS_MONTH vs THIS_QUARTER)', async () => {
+      const todayData = await reportsPnlService.getPnlReportData({
+        branchId: 'ALL',
+        presetPeriod: 'TODAY',
+        startDate: '2026-11-04',
+        endDate: '2026-11-04',
+      });
+
+      const monthData = await reportsPnlService.getPnlReportData({
+        branchId: 'ALL',
+        presetPeriod: 'THIS_MONTH',
+        startDate: '2026-11-01',
+        endDate: '2026-11-30',
+      });
+
+      expect(todayData.kpiSummary.grossSales).toBeLessThan(
+        monthData.kpiSummary.grossSales
       );
     });
   });

@@ -12,7 +12,8 @@ import {
 } from '../types/expense.types';
 import { ExpenseStatusBadge } from './ExpenseStatusBadge';
 import { formatMoney } from '../../finance/utils/formatters';
-import { MoreHorizontal } from 'lucide-react';
+import { MoreHorizontal, ExternalLink } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 export interface ExpenseTableProps {
   data?: ServiceExpenseDto[];
@@ -39,6 +40,7 @@ export const ExpenseTable: FC<ExpenseTableProps> = ({
   onPay,
   onCancel,
 }) => {
+  const navigate = useNavigate();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
@@ -229,6 +231,31 @@ export const ExpenseTable: FC<ExpenseTableProps> = ({
                         }}
                       >
                         <span>Chi tiền</span>
+                      </button>
+                    )}
+
+                    
+                    {item.status === 'Paid' && (
+                      <button
+                        type="button"
+                        onClick={() => navigate('/store-owner/cashbook?search=' + encodeURIComponent(item.expenseId))}
+                        title="Xem phiếu chi dòng tiền trong Sổ quỹ Cashbook"
+                        style={{
+                          background: '#F0FDFA',
+                          border: '1px solid #CCFBF1',
+                          color: '#0F766E',
+                          borderRadius: '8px',
+                          padding: '6px 12px',
+                          fontSize: '0.8rem',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '5px',
+                        }}
+                      >
+                        <ExternalLink size={12} />
+                        <span>Sổ quỹ</span>
                       </button>
                     )}
 

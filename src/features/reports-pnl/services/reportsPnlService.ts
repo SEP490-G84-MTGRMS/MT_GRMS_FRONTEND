@@ -1,4 +1,4 @@
-﻿import { financeHttpClient } from '../../../api/financeHttpClient';
+import { financeHttpClient } from '../../../api/financeHttpClient';
 import type {
   BranchOption,
   ExpenseCategoryBreakdown,
@@ -26,9 +26,9 @@ export function calculateMarginPct(part: number, total: number): number {
  */
 export const MOCK_BRANCHES: BranchOption[] = [
   { id: 'ALL', code: 'ALL', name: 'Toàn hệ thống (Tất cả chi nhánh)', isMain: true },
-  { id: 'b1-cauthuong', code: 'CN-01', name: 'Chi nhánh Cầu Giấy - Hà Nội', isMain: true },
-  { id: 'b2-dongda', code: 'CN-02', name: 'Chi nhánh Đống Đa - Hà Nội' },
-  { id: 'b3-haibatrung', code: 'CN-03', name: 'Chi nhánh Hai Bà Trưng - Hà Nội' },
+  { id: '01a188b1-f1b0-7640-ad7c-a1dc16e62218', code: 'CN-01', name: 'Chi nhánh Quận 1 (Trụ sở chính)', isMain: true },
+  { id: '01a188b1-f1b0-7640-ad7c-a1dc16e62219', code: 'CN-02', name: 'Chi nhánh Bình Thạnh' },
+  { id: '01a188b1-f1b0-7640-ad7c-a1dc16e62220', code: 'CN-03', name: 'Chi nhánh Thủ Đức' },
 ];
 
 /**
@@ -243,6 +243,53 @@ function buildMockPnlTree(kpi: KpiSummaryData): PnlLineItem[] {
 /**
  * Generates mock expense categories breakdown.
  */
+
+/**
+ * Builds expense categories breakdown from live backend data.
+ */
+function buildLiveExpenseBreakdown(
+  categories: Array<{ category: string; amount: number; percentageOfRevenue: number }> = [],
+  operatingExpenses: number,
+  shrinkageLoss: number
+): ExpenseCategoryBreakdown[] {
+  const total = operatingExpenses + shrinkageLoss;
+  const result: ExpenseCategoryBreakdown[] = [];
+  const colorPalette = ['#0F766E', '#14B8A6', '#F59E0B', '#3B82F6', '#8B5CF6', '#EC4899', '#64748B'];
+
+  if (categories && categories.length > 0) {
+    categories.forEach((cat, idx) => {
+      const amt = Number(cat.amount || 0);
+      result.push({
+        categoryCode: cat.category,
+        categoryName: cat.category,
+        amount: amt,
+        percentage: calculateMarginPct(amt, total),
+        color: colorPalette[idx % colorPalette.length],
+      });
+    });
+  } else if (operatingExpenses > 0) {
+    result.push({
+      categoryCode: 'OPERATING',
+      categoryName: 'Chi phí dịch vụ & vận hành',
+      amount: operatingExpenses,
+      percentage: calculateMarginPct(operatingExpenses, total),
+      color: '#0F766E',
+    });
+  }
+
+  if (shrinkageLoss > 0) {
+    result.push({
+      categoryCode: 'SHRINKAGE',
+      categoryName: 'Hao hụt & Hủy kho (FE-06)',
+      amount: shrinkageLoss,
+      percentage: calculateMarginPct(shrinkageLoss, total),
+      color: '#EF4444',
+    });
+  }
+
+  return result;
+}
+
 function buildMockExpenseBreakdown(operatingExpenses: number, shrinkageLoss: number): ExpenseCategoryBreakdown[] {
   const total = operatingExpenses + shrinkageLoss;
   const rent = Math.round(operatingExpenses * 0.42);
@@ -444,7 +491,78 @@ export const reportsPnlService = {
    * Retrieves list of accessible branches for the current user.
    */
   async getBranches(): Promise<BranchOption[]> {
+    try {
+      const res = await financeHttpClient.get<{ data?: { items?: Array<{ id: string; code?: string; name: string }> } }>('/v1/branches');
+      if (res.data?.data?.items && Array.isArray(res.data.data.items) && res.data.data.items.length > 0) {
+        const liveBranches: BranchOption[] = res.data.data.items.map((b, idx) => ({
+          id: b.id,
+          code: b.code || `CN-0${idx + 1}`,
+          name: b.name,
+          isMain: idx === 0,
+        }));
+        return [
+          { id: 'ALL', code: 'ALL', name: 'Toàn hệ thống (Tất cả chi nhánh)', isMain: true },
+          ...liveBranches,
+        ];
+      }
+    } catch {
+      // Fallback sang danh sách chi nhánh thực tế
+    }
     return Promise.resolve(MOCK_BRANCHES);
+  },
+
+  /**
+   * Retrieves live top performing products aggregated from POS sales orders.
+   * @param branchId - Optional branch filter.
+   */
+  async getLiveTopProducts(branchId?: string): Promise<TopProductPerformance[]> {
+    try {
+      const res = await financeHttpClient.get<{ items?: any[] }>('/orders', {
+        params: { page: 1, pageSize: 100 },
+      });
+      const orderItems = res.data?.items;
+      if (Array.isArray(orderItems) && orderItems.length > 0) {
+        const productMap = new Map<string, TopProductPerformance>();
+        for (const order of orderItems) {
+          if (branchId && branchId !== 'ALL' && order.branchId !== branchId) continue;
+          if (order.status === 'Cancelled') continue;
+          for (const item of order.items || []) {
+            const pId = item.productId || 'UNKNOWN';
+            const pCode = item.barcode || `SP-${pId.substring(0, 6).toUpperCase()}`;
+            const pName = item.productName || 'Sản phẩm';
+            const qty = Number(item.quantity || 0);
+            const rev = Number(item.totalLineAmount || (Number(item.actualPrice || item.unitPrice || 0) * qty) || 0);
+            const cost = Number(item.costPriceAtSale || 0) * qty;
+            const profit = rev - cost;
+
+            if (productMap.has(pId)) {
+              const existing = productMap.get(pId)!;
+              existing.quantitySold += qty;
+              existing.revenue += rev;
+              existing.profit += profit;
+              existing.marginPct = calculateMarginPct(existing.profit, existing.revenue);
+            } else {
+              productMap.set(pId, {
+                productId: pId,
+                productCode: pCode,
+                productName: pName,
+                quantitySold: qty,
+                revenue: rev,
+                profit: profit,
+                marginPct: calculateMarginPct(profit, rev),
+              });
+            }
+          }
+        }
+        const sorted = Array.from(productMap.values()).sort((a, b) => b.profit - a.profit);
+        if (sorted.length > 0) {
+          return sorted.slice(0, 10);
+        }
+      }
+    } catch (err) {
+      console.warn('Error fetching live top products from orders:', err);
+    }
+    return [];
   },
 
   /**
@@ -462,9 +580,11 @@ export const reportsPnlService = {
           toDate: params.endDate ? `${params.endDate}T23:59:59Z` : undefined,
         };
 
-        const [summaryRes, trendRes] = await Promise.all([
+        const [summaryRes, trendRes, compRes, liveTopProducts] = await Promise.all([
           financeHttpClient.get('/finance/reports/pnl/summary', { params: queryParams }),
           financeHttpClient.get('/finance/reports/pnl/trend', { params: queryParams }).catch(() => null),
+          financeHttpClient.get('/finance/reports/pnl/comparison', { params: queryParams }).catch(() => null),
+          this.getLiveTopProducts(branchParam).catch(() => []),
         ]);
 
         if (summaryRes.data?.data) {
@@ -488,6 +608,20 @@ export const reportsPnlService = {
           const totalOrders = Math.max(1, Math.round(netRevenue / 285000));
           const averageOrderValue = Math.round(netRevenue / totalOrders);
 
+          // Tăng trưởng thật từ backend comparison endpoint
+          const comp = compRes?.data?.data;
+          const netRevenueGrowthPct = comp ? Number(comp.revenueGrowthPercentage ?? 0) : 0;
+          const grossProfitGrowthPct = comp ? Number(comp.grossProfitGrowthPercentage ?? 0) : 0;
+          const netProfitGrowthPct = comp ? Number(comp.netProfitGrowthPercentage ?? 0) : 0;
+
+          let expensesGrowthPct = 0;
+          if (comp?.previousPeriod?.operatingExpenses?.totalAmount > 0) {
+            const prevOpex = Number(comp.previousPeriod.operatingExpenses.totalAmount);
+            expensesGrowthPct = Math.round(((operatingExpenses - prevOpex) / prevOpex) * 1000) / 10;
+          } else if (operatingExpenses > 0) {
+            expensesGrowthPct = 100;
+          }
+
           const liveKpiSummary: KpiSummaryData = {
             grossSales,
             discounts,
@@ -505,19 +639,20 @@ export const reportsPnlService = {
             netProfitAfterTaxMarginPct,
             totalOrders,
             averageOrderValue,
-            netRevenueGrowthPct: 12.8,
-            grossProfitGrowthPct: 14.2,
-            netProfitGrowthPct: 18.5,
-            expensesGrowthPct: -3.4,
-            ordersGrowthPct: 8.6,
-            aovGrowthPct: 3.9,
+            netRevenueGrowthPct,
+            grossProfitGrowthPct,
+            netProfitGrowthPct,
+            expensesGrowthPct,
+            ordersGrowthPct: netRevenueGrowthPct > 0 ? netRevenueGrowthPct : 0,
+            aovGrowthPct: grossProfitGrowthPct > 0 ? grossProfitGrowthPct : 0,
             cogsSource: s.cogsSource || 'ACTUAL',
             cogsEstimatedPercentage: s.cogsEstimatedPercentage || 0,
             cogsWarningNotice: s.cogsWarningNotice || null,
           };
 
           const pnlTree = buildMockPnlTree(liveKpiSummary);
-          const expenseBreakdown = buildMockExpenseBreakdown(operatingExpenses, shrinkageLoss);
+          const rawCategories = s.operatingExpenses?.categories || [];
+          const expenseBreakdown = buildLiveExpenseBreakdown(rawCategories, operatingExpenses, shrinkageLoss);
 
           let trendData: PnlTrendPoint[] = [];
           if (trendRes?.data?.data && Array.isArray(trendRes.data.data) && trendRes.data.data.length > 0) {
@@ -542,7 +677,7 @@ export const reportsPnlService = {
             pnlTree,
             trendData,
             expenseBreakdown,
-            topProducts: buildMockTopProducts(),
+            topProducts: liveTopProducts && liveTopProducts.length > 0 ? liveTopProducts : buildMockTopProducts(),
           };
         }
       } catch (err) {

@@ -1,19 +1,18 @@
 import type { FC } from 'react';
-import { Lock, Store, Building2, Scale } from 'lucide-react';
+import { Lock, Store, Building2 } from 'lucide-react';
 import type { CashAccount } from '../types/cashbook.types';
 
 interface CashAccountsCardSectionProps {
   accounts: CashAccount[];
   selectedAccountId?: string;
   onSelectAccount: (accountId: string) => void;
-  onOpenReconcileModal: (account: CashAccount) => void;
+  onOpenReconcileModal?: (account: CashAccount) => void;
 }
 
 export const CashAccountsCardSection: FC<CashAccountsCardSectionProps> = ({
   accounts,
   selectedAccountId,
   onSelectAccount,
-  onOpenReconcileModal,
 }) => {
   return (
     <div className="cash-accounts-grid">
@@ -38,7 +37,7 @@ export const CashAccountsCardSection: FC<CashAccountsCardSectionProps> = ({
         } else if (isBank) {
           badgeBg = '#CCFBF1';
           badgeColor = '#0F766E';
-          badgeLabel = 'Tài khoản ngân hàng';
+          badgeLabel = acc.isDefault ? 'TK chính (VietQR)' : 'Tài khoản ngân hàng phụ';
           badgeIcon = <Building2 size={14} />;
           if (isSelected) borderHighlight = '#0D9488';
         }
@@ -103,28 +102,73 @@ export const CashAccountsCardSection: FC<CashAccountsCardSectionProps> = ({
               </span>
             </div>
 
-            {/* Reconciliation action for cash drawers */}
+            {/* Executive monitoring indicators for Store Owner */}
             {isCash && (
-              <div style={{ marginTop: '10px', display: 'flex', justifyContent: 'flex-end' }}>
-                <button
-                  type="button"
-                  className="cb-btn cb-btn-outline"
-                  style={{
-                    padding: '6px 14px',
-                    fontSize: '12px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 6,
-                    borderRadius: 8,
-                  }}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onOpenReconcileModal(acc);
-                  }}
-                >
-                  <Scale size={14} />
-                  <span>Kiểm kê kết ca</span>
-                </button>
+              <div
+                style={{
+                  marginTop: '10px',
+                  paddingTop: '8px',
+                  borderTop: '1px dashed #E2E8F0',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  fontSize: '11px',
+                  color: '#64748B',
+                }}
+              >
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                  <span
+                    style={{
+                      width: '6px',
+                      height: '6px',
+                      borderRadius: '50%',
+                      backgroundColor: '#10B981',
+                      display: 'inline-block',
+                    }}
+                  />
+                  <span>Thu ngân chi nhánh</span>
+                </span>
+                <span style={{ color: '#0284C7', fontWeight: 600 }}>Xem sổ quầy →</span>
+              </div>
+            )}
+            {isSafe && (
+              <div
+                style={{
+                  marginTop: '10px',
+                  paddingTop: '8px',
+                  borderTop: '1px dashed #FDE68A',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  fontSize: '11px',
+                  color: '#92400E',
+                }}
+              >
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                  <Lock size={12} />
+                  <span>Két tổng chủ hộ</span>
+                </span>
+                <span style={{ fontWeight: 600 }}>Chủ shop quản lý</span>
+              </div>
+            )}
+            {isBank && (
+              <div
+                style={{
+                  marginTop: '10px',
+                  paddingTop: '8px',
+                  borderTop: '1px dashed #CCFBF1',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  fontSize: '11px',
+                  color: '#0F766E',
+                }}
+              >
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                  <Building2 size={12} />
+                  <span>Online Banking</span>
+                </span>
+                <span style={{ fontWeight: 600 }}>Chi / Nộp thuế</span>
               </div>
             )}
           </div>
