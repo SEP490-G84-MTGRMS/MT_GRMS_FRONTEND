@@ -5,7 +5,6 @@ import {
   Smartphone,
   Trash2,
   RefreshCw,
-  Plus,
   Info,
   X,
 } from 'lucide-react';
@@ -18,21 +17,7 @@ interface AttendanceDetailModalProps {
   onUpdateStatus?: (recordId: string, newStatus: AttendanceRecord['status']) => void;
 }
 
-interface ViolationItem {
-  id: string;
-  type: string;
-  count: number;
-  unitPrice: number;
-}
-
-interface RewardItem {
-  id: string;
-  type: string;
-  count: number;
-  unitPrice: number;
-}
-
-type TabType = 'setup' | 'history' | 'violation' | 'reward' | 'all';
+type TabType = 'setup' | 'history' | 'all';
 
 interface TabItem {
   key: TabType;
@@ -42,29 +27,6 @@ interface TabItem {
 const TABS: TabItem[] = [
   { key: 'setup', label: 'Chấm công' },
   { key: 'history', label: 'Lịch sử chấm công' },
-  { key: 'violation', label: 'Phạt vi phạm' },
-  { key: 'reward', label: 'Thưởng' },
-];
-
-const VIOLATION_OPTIONS = [
-  { label: 'Chọn vi phạm', price: 0 },
-  { label: 'Đi làm muộn', price: 50000 },
-  { label: 'Về sớm trước giờ', price: 50000 },
-  { label: 'Quên quét vân tay / Check-in GPS', price: 30000 },
-  { label: 'Sai đồng phục / Tác phong', price: 50000 },
-  { label: 'Vắng mặt không phép', price: 200000 },
-  { label: 'Vi phạm quy trình phục vụ', price: 100000 },
-  { label: 'Vi phạm khác', price: 50000 },
-];
-
-const REWARD_OPTIONS = [
-  { label: 'Chọn thưởng', price: 0 },
-  { label: 'Thưởng chuyên cần', price: 50000 },
-  { label: 'Thưởng tăng ca / Giờ cao điểm', price: 100000 },
-  { label: 'Thưởng hiệu suất xuất sắc', price: 150000 },
-  { label: 'Được khách hàng khen ngợi', price: 100000 },
-  { label: 'Thưởng đóng góp đặc biệt', price: 200000 },
-  { label: 'Khen thưởng khác', price: 50000 },
 ];
 
 const SHIFT_OPTIONS = [
@@ -99,24 +61,7 @@ const AttendanceDetailModalContent: React.FC<AttendanceDetailModalContentProps> 
   const [hasCheckOut, setHasCheckOut] = useState<boolean>(true);
   const [checkOutTime, setCheckOutTime] = useState<string>(record.checkOutTime || '14:15');
 
-  // Violations & Rewards list
-  const [violations, setViolations] = useState<ViolationItem[]>(() => {
-    if (record.status === 'late') {
-      return [{ id: 'v1', type: 'Đi làm muộn', count: 1, unitPrice: 50000 }];
-    }
-    if (record.status === 'early') {
-      return [{ id: 'v1', type: 'Về sớm trước giờ', count: 1, unitPrice: 50000 }];
-    }
-    return [{ id: 'v1', type: 'Chọn vi phạm', count: 1, unitPrice: 0 }];
-  });
-
-  const [rewards, setRewards] = useState<RewardItem[]>(() => {
-    if (record.status === 'ontime') {
-      return [{ id: 'r1', type: 'Thưởng chuyên cần', count: 1, unitPrice: 50000 }];
-    }
-    return [{ id: 'r1', type: 'Chọn thưởng', count: 1, unitPrice: 0 }];
-  });
-
+  
   // Sync state when record changes
   useEffect(() => {
     setSelectedShift(record.shiftName || SHIFT_OPTIONS[0]);
@@ -124,72 +69,9 @@ const AttendanceDetailModalContent: React.FC<AttendanceDetailModalContentProps> 
     setCheckOutTime(record.checkOutTime || '14:15');
     setHasCheckIn(!!record.checkInTime || record.status === 'ontime' || record.status === 'late');
     setHasCheckOut(!!record.checkOutTime || record.status === 'ontime' || record.status === 'early');
-    if (record.status === 'late') {
-      setViolations([{ id: 'v1', type: 'Đi làm muộn', count: 1, unitPrice: 50000 }]);
-    } else if (record.status === 'early') {
-      setViolations([{ id: 'v1', type: 'Về sớm trước giờ', count: 1, unitPrice: 50000 }]);
-    } else {
-      setViolations([{ id: 'v1', type: 'Chọn vi phạm', count: 1, unitPrice: 0 }]);
-    }
-    if (record.status === 'ontime') {
-      setRewards([{ id: 'r1', type: 'Thưởng chuyên cần', count: 1, unitPrice: 50000 }]);
-    } else {
-      setRewards([{ id: 'r1', type: 'Chọn thưởng', count: 1, unitPrice: 0 }]);
-    }
   }, [record]);
 
-  // Handlers for Violations
-  const handleAddViolation = () => {
-    setViolations((prev) => [
-      ...prev,
-      { id: `v_${Date.now()}`, type: 'Chọn vi phạm', count: 1, unitPrice: 0 },
-    ]);
-  };
-
-  const handleUpdateViolation = (id: string, field: keyof ViolationItem, value: any) => {
-    setViolations((prev) =>
-      prev.map((item) => {
-        if (item.id !== id) return item;
-        const updated = { ...item, [field]: value };
-        if (field === 'type') {
-          const opt = VIOLATION_OPTIONS.find((o) => o.label === value);
-          if (opt) updated.unitPrice = opt.price;
-        }
-        return updated;
-      })
-    );
-  };
-
-  const handleDeleteViolation = (id: string) => {
-    setViolations((prev) => prev.filter((item) => item.id !== id));
-  };
-
-  // Handlers for Rewards
-  const handleAddReward = () => {
-    setRewards((prev) => [
-      ...prev,
-      { id: `r_${Date.now()}`, type: 'Chọn thưởng', count: 1, unitPrice: 0 },
-    ]);
-  };
-
-  const handleUpdateReward = (id: string, field: keyof RewardItem, value: any) => {
-    setRewards((prev) =>
-      prev.map((item) => {
-        if (item.id !== id) return item;
-        const updated = { ...item, [field]: value };
-        if (field === 'type') {
-          const opt = REWARD_OPTIONS.find((o) => o.label === value);
-          if (opt) updated.unitPrice = opt.price;
-        }
-        return updated;
-      })
-    );
-  };
-
-  const handleDeleteReward = (id: string) => {
-    setRewards((prev) => prev.filter((item) => item.id !== id));
-  };
-
+  
   // Save changes
   const handleSave = () => {
     if (onUpdateStatus) {
@@ -492,239 +374,6 @@ const AttendanceDetailModalContent: React.FC<AttendanceDetailModalContentProps> 
             </div>
           )}
 
-          {/* 3. PHẠT VI PHẠM */}
-          {(activeTab === 'violation' || activeTab === 'all') && (
-            <div
-              style={{
-                background: '#FFFFFF',
-                border: '1px solid #E2E8F0',
-                borderRadius: 10,
-                padding: '16px 20px',
-              }}
-            >
-              <div style={{ fontWeight: 700, fontSize: 14, color: '#0F172A', marginBottom: 12 }}>
-                3. Phạt vi phạm
-              </div>
-
-              <div className="emp-table-container" style={{ border: '1px solid #E2E8F0', borderRadius: 8, overflow: 'hidden', marginBottom: 10 }}>
-                <table className="emp-table" style={{ margin: 0 }}>
-                  <thead>
-                    <tr>
-                      <th>Loại vi phạm</th>
-                      <th style={{ width: 100, textAlign: 'center' }}>Số lần</th>
-                      <th style={{ width: 140, textAlign: 'right' }}>Mức áp dụng (₫)</th>
-                      <th style={{ width: 140, textAlign: 'right' }}>Thành tiền (₫)</th>
-                      <th style={{ width: 50, textAlign: 'center' }}></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {violations.map((v) => {
-                      const total = v.count * v.unitPrice;
-                      return (
-                        <tr key={v.id}>
-                          <td>
-                            <select
-                              className="emp-form-select"
-                              style={{ height: 32, fontSize: 13 }}
-                              value={v.type}
-                              onChange={(e) => handleUpdateViolation(v.id, 'type', e.target.value)}
-                            >
-                              {VIOLATION_OPTIONS.map((opt) => (
-                                <option key={opt.label} value={opt.label}>
-                                  {opt.label}
-                                </option>
-                              ))}
-                            </select>
-                          </td>
-                          <td style={{ textAlign: 'center' }}>
-                            <input
-                              type="number"
-                              min={1}
-                              className="emp-form-input"
-                              style={{ height: 32, textAlign: 'center', width: 70 }}
-                              value={v.count}
-                              onChange={(e) => handleUpdateViolation(v.id, 'count', Number(e.target.value))}
-                            />
-                          </td>
-                          <td style={{ textAlign: 'right' }}>
-                            <input
-                              type="number"
-                              step={10000}
-                              className="emp-form-input"
-                              style={{ height: 32, textAlign: 'right', width: 120 }}
-                              value={v.unitPrice}
-                              onChange={(e) => handleUpdateViolation(v.id, 'unitPrice', Number(e.target.value))}
-                            />
-                          </td>
-                          <td style={{ textAlign: 'right', fontWeight: 700, color: '#DC2626' }}>
-                            {total.toLocaleString('vi-VN')}
-                          </td>
-                          <td style={{ textAlign: 'center' }}>
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteViolation(v.id)}
-                              style={{
-                                background: '#FEF2F2',
-                                border: '1px solid #FECACA',
-                                color: '#DC2626',
-                                borderRadius: 6,
-                                width: 28,
-                                height: 28,
-                                cursor: 'pointer',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                              }}
-                              title="Xóa dòng"
-                            >
-                              <Trash2 size={13} />
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-
-              <button
-                type="button"
-                onClick={handleAddViolation}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  color: '#0F766E',
-                  fontSize: 13,
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 4,
-                  padding: '4px 0',
-                }}
-              >
-                <Plus size={14} />
-                <span>+ Thêm vi phạm</span>
-              </button>
-            </div>
-          )}
-
-          {/* 4. THƯỞNG CA LÀM VIỆC */}
-          {(activeTab === 'reward' || activeTab === 'all') && (
-            <div
-              style={{
-                background: '#FFFFFF',
-                border: '1px solid #E2E8F0',
-                borderRadius: 10,
-                padding: '16px 20px',
-              }}
-            >
-              <div style={{ fontWeight: 700, fontSize: 14, color: '#0F172A', marginBottom: 12 }}>
-                4. Thưởng ca làm việc
-              </div>
-
-              <div className="emp-table-container" style={{ border: '1px solid #E2E8F0', borderRadius: 8, overflow: 'hidden', marginBottom: 10 }}>
-                <table className="emp-table" style={{ margin: 0 }}>
-                  <thead>
-                    <tr>
-                      <th>Loại thưởng</th>
-                      <th style={{ width: 100, textAlign: 'center' }}>Số lần</th>
-                      <th style={{ width: 140, textAlign: 'right' }}>Mức áp dụng (₫)</th>
-                      <th style={{ width: 140, textAlign: 'right' }}>Thành tiền (₫)</th>
-                      <th style={{ width: 50, textAlign: 'center' }}></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {rewards.map((r) => {
-                      const total = r.count * r.unitPrice;
-                      return (
-                        <tr key={r.id}>
-                          <td>
-                            <select
-                              className="emp-form-select"
-                              style={{ height: 32, fontSize: 13 }}
-                              value={r.type}
-                              onChange={(e) => handleUpdateReward(r.id, 'type', e.target.value)}
-                            >
-                              {REWARD_OPTIONS.map((opt) => (
-                                <option key={opt.label} value={opt.label}>
-                                  {opt.label}
-                                </option>
-                              ))}
-                            </select>
-                          </td>
-                          <td style={{ textAlign: 'center' }}>
-                            <input
-                              type="number"
-                              min={1}
-                              className="emp-form-input"
-                              style={{ height: 32, textAlign: 'center', width: 70 }}
-                              value={r.count}
-                              onChange={(e) => handleUpdateReward(r.id, 'count', Number(e.target.value))}
-                            />
-                          </td>
-                          <td style={{ textAlign: 'right' }}>
-                            <input
-                              type="number"
-                              step={10000}
-                              className="emp-form-input"
-                              style={{ height: 32, textAlign: 'right', width: 120 }}
-                              value={r.unitPrice}
-                              onChange={(e) => handleUpdateReward(r.id, 'unitPrice', Number(e.target.value))}
-                            />
-                          </td>
-                          <td style={{ textAlign: 'right', fontWeight: 700, color: '#059669' }}>
-                            {total.toLocaleString('vi-VN')}
-                          </td>
-                          <td style={{ textAlign: 'center' }}>
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteReward(r.id)}
-                              style={{
-                                background: '#FEF2F2',
-                                border: '1px solid #FECACA',
-                                color: '#DC2626',
-                                borderRadius: 6,
-                                width: 28,
-                                height: 28,
-                                cursor: 'pointer',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                              }}
-                              title="Xóa dòng"
-                            >
-                              <Trash2 size={13} />
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-
-              <button
-                type="button"
-                onClick={handleAddReward}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  color: '#0F766E',
-                  fontSize: 13,
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 4,
-                  padding: '4px 0',
-                }}
-              >
-                <Plus size={14} />
-                <span>+ Thêm thưởng (Tạo loại thưởng mới)</span>
-              </button>
-            </div>
-          )}
         </div>
 
         {/* Footer Modal chuẩn Design System */}
