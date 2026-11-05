@@ -4,6 +4,11 @@ Toàn bộ các thay đổi của repository Frontend React SPA được tổng 
 
 ---
 
+## [Unreleased] - 2026-11-05
+### Fixed
+- Sửa lỗi trích xuất phản hồi API đăng ký `POST /api/v1/auth/register` trong `authService.ts`: giải nén `unwrapLogin(response.data)` từ vỏ bọc `ApiResponse`, khắc phục triệt để lỗi `Cannot read properties of undefined (reading 'tenantId')` trên màn hình Đăng ký [FE-AUTH] [worklog: docs/worklogs/2026-11-05_FE-AUTH_AI_fix-register-api-response-unwrapping.md].
+- Phòng vệ kiểm tra null-safe cho `user` trước khi truy cập `user.tenantId` trong `useAuthStore.ts`.
+
 ## [Unreleased] - 2026-11-04
 ### Added
 - Tích hợp cổng thanh toán VietQR SePay thật, tái thiết kế giao diện Modal Nạp ví (`StoreWalletTopupModal`) theo chuẩn Deep Teal (`#0F766E`), tích hợp cơ chế Polling 3s/lần tự động cập nhật số dư, và đồng bộ tab Sổ cái `WalletLedgerTab` [FE-WALLET] [worklog: docs/worklogs/2026-11-04_FE-WALLET_AI_sepay-wallet-topup-modal.md].
