@@ -252,6 +252,8 @@ export const WorkSchedulePage: React.FC = () => {
           status: c.isActive ? ('active' as const) : ('inactive' as const),
           branchId: c.branchId,
           branchName: c.branchName || undefined,
+          branchIds: c.branchIds || (c.branchId ? [c.branchId] : []),
+          branchNames: c.branchNames || (c.branchName ? [c.branchName] : []),
         }));
         setShifts(mapped);
       } else if (shiftResult.status === 'fulfilled') {
@@ -348,10 +350,17 @@ export const WorkSchedulePage: React.FC = () => {
     if (selectedBranchIds.length === 0) {
       return shifts;
     }
-    return shifts.filter(
-      (s) =>
-        !s.branchId || selectedBranchIds.includes(s.branchId) || s.id === 'custom'
-    );
+    return shifts.filter((s) => {
+      if (s.id === 'custom') return true;
+      if (!s.branchId && (!s.branchIds || s.branchIds.length === 0)) return true;
+      const shiftBranchIds =
+        s.branchIds && s.branchIds.length > 0
+          ? s.branchIds
+          : s.branchId
+          ? [s.branchId]
+          : [];
+      return selectedBranchIds.some((bId) => shiftBranchIds.includes(bId));
+    });
   }, [shifts, selectedBranchIds]);
 
   const paginatedShifts = useMemo(() => {
@@ -401,22 +410,35 @@ export const WorkSchedulePage: React.FC = () => {
           (s) => s.id === item.shiftId || s.name.toLowerCase() === item.shiftName.toLowerCase()
         );
         const shiftConfigId =
-          matchingShift && matchingShift.id !== 'custom' ? matchingShift.id : undefined;
+          matchingShift && matchingShift.id !== 'custom'
+            ? matchingShift.id
+            : item.shiftId && item.shiftId !== 'custom'
+            ? item.shiftId
+            : undefined;
+
+        // Lấy BranchId của Employee hiện tại đang làm
+        const emp = employees.find((e) => e.id === item.employeeId);
+        const empBranchId =
+          item.branchId ||
+          (emp?.workingBranchIds && emp.workingBranchIds[0]) ||
+          emp?.salaryBranchId ||
+          targetBranchId;
 
         return {
           employeeId: item.employeeId,
-          branchId: targetBranchId,
+          branchId: empBranchId,
           workDate,
           shiftConfigId,
-          shiftCode: matchingShift?.id || 'CUSTOM',
+          shiftCode: matchingShift?.id || (item.shiftId !== 'custom' ? item.shiftId : 'CUSTOM'),
           shiftName: item.shiftName,
           plannedStartTime: startTime,
           plannedEndTime: endTime,
         };
       });
 
+      const primaryBranchId = payloads[0]?.branchId || targetBranchId;
       await scheduleApi.batchCreateSchedules({
-        branchId: targetBranchId,
+        branchId: primaryBranchId,
         schedules: payloads,
       });
 
@@ -454,7 +476,11 @@ export const WorkSchedulePage: React.FC = () => {
         (s) => s.id === updated.shiftId || s.name.toLowerCase() === updated.shiftName.toLowerCase()
       );
       const shiftConfigId =
-        matchingShift && matchingShift.id !== 'custom' ? matchingShift.id : undefined;
+        matchingShift && matchingShift.id !== 'custom'
+          ? matchingShift.id
+          : updated.shiftId && updated.shiftId !== 'custom'
+          ? updated.shiftId
+          : undefined;
 
       await scheduleApi.updateSchedule(updated.id, {
         shiftName: updated.shiftName,

@@ -116,7 +116,7 @@ export const ScheduleScopeConfirmModal: React.FC<ScheduleScopeConfirmModalProps>
               style={{
                 width: 18,
                 height: 18,
-                accentColor: '#0066FF',
+                accentColor: '#0F766E',
                 cursor: 'pointer',
                 margin: 0,
               }}
@@ -144,7 +144,7 @@ export const ScheduleScopeConfirmModal: React.FC<ScheduleScopeConfirmModalProps>
               style={{
                 width: 18,
                 height: 18,
-                accentColor: '#0066FF',
+                accentColor: '#0F766E',
                 cursor: 'pointer',
                 margin: 0,
               }}
@@ -175,7 +175,7 @@ export const ScheduleScopeConfirmModal: React.FC<ScheduleScopeConfirmModalProps>
               style={{
                 width: 18,
                 height: 18,
-                accentColor: '#0066FF',
+                accentColor: '#0F766E',
                 cursor: 'pointer',
                 margin: 0,
                 marginTop: 2,
@@ -228,7 +228,7 @@ export const ScheduleScopeConfirmModal: React.FC<ScheduleScopeConfirmModalProps>
             type="button"
             onClick={handleConfirm}
             style={{
-              background: '#0066FF',
+              background: '#0F766E',
               border: 'none',
               borderRadius: 8,
               padding: '8px 22px',
@@ -236,14 +236,14 @@ export const ScheduleScopeConfirmModal: React.FC<ScheduleScopeConfirmModalProps>
               fontWeight: 600,
               color: '#FFFFFF',
               cursor: 'pointer',
-              boxShadow: '0 2px 4px rgba(0, 102, 255, 0.2)',
+              boxShadow: '0 2px 4px rgba(15, 118, 110, 0.2)',
               transition: 'all 0.15s ease',
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = '#0052CC';
+              e.currentTarget.style.backgroundColor = '#115E59';
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = '#0066FF';
+              e.currentTarget.style.backgroundColor = '#0F766E';
             }}
           >
             Đồng ý

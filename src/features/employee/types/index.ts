@@ -153,6 +153,8 @@ export interface WorkShiftDefinition {
   status: 'active' | 'inactive';
   branchId?: string;
   branchName?: string;
+  branchIds?: string[];
+  branchNames?: string[];
 }
 
 export interface ScheduleAssignment {
