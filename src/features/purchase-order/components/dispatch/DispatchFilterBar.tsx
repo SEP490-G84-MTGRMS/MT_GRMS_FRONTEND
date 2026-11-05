@@ -10,13 +10,16 @@ interface DispatchFilterBarProps {
   counts: Record<DispatchTabType, number>;
   keyword: string;
   onKeywordChange: (kw: string) => void;
-  branches: BranchOption[];
-  selectedBranchId: string;
-  onSelectBranch: (branchId: string) => void;
   onResetFilters: () => void;
 
-  scope: DispatchScope;
-  onScopeChange: (scope: DispatchScope) => void;
+  /** Optional — hub theo NCC không lọc chi nhánh ở list. */
+  branches?: BranchOption[];
+  selectedBranchId?: string;
+  onSelectBranch?: (branchId: string) => void;
+
+  /** Optional — scope chọn lúc confirm, không bắt buộc trên filter bar. */
+  scope?: DispatchScope;
+  onScopeChange?: (scope: DispatchScope) => void;
   weekStartDate?: string;
   onWeekChange?: (dateStr: string) => void;
 }
@@ -61,111 +64,120 @@ export const DispatchFilterBar: FC<DispatchFilterBarProps> = ({
   onWeekChange,
 }) => {
   const hasFilters = Boolean(keyword) || activeTab !== 'all';
+  const showScopeBar = Boolean(scope && onScopeChange);
+  const showBranchFilter = Boolean(onSelectBranch);
+  const branchList = branches ?? [];
+  const safeCounts = counts ?? {
+    all: 0,
+    critical: 0,
+    today: 0,
+    later: 0,
+    completed: 0,
+  };
 
   return (
     <div className="so-list-filter" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-      {/* Scope Switcher Bar */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          flexWrap: 'wrap',
-          gap: 10,
-          background: '#f8fafc',
-          padding: '8px 12px',
-          borderRadius: 8,
-          border: '1px solid #e2e8f0',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 13, fontWeight: 700, color: '#334155', marginRight: 4 }}>
-            Phạm vi chốt:
-          </span>
-          <button
-            type="button"
-            className={`po-btn ${scope === 'NEAREST' ? 'po-btn-primary' : 'po-btn-secondary'}`}
-            style={{
-              padding: '4px 12px',
-              fontSize: 12,
-              fontWeight: 600,
-              gap: 6,
-              borderRadius: 6,
-            }}
-            onClick={() => onScopeChange('NEAREST')}
-            title="Chỉ chốt ngày giao gần nhất có số lượng đặt hàng (>0)"
-          >
-            <Zap size={14} />
-            <span>Ngày giao gần nhất (NEAREST)</span>
-          </button>
-          <button
-            type="button"
-            className={`po-btn ${scope === 'WEEK' ? 'po-btn-primary' : 'po-btn-secondary'}`}
-            style={{
-              padding: '4px 12px',
-              fontSize: 12,
-              fontWeight: 600,
-              gap: 6,
-              borderRadius: 6,
-            }}
-            onClick={() => onScopeChange('WEEK')}
-            title="Chốt tất cả các ngày giao trong tuần từ Thứ Hai đến Chủ Nhật"
-          >
-            <Calendar size={14} />
-            <span>Cả tuần T2–CN (WEEK)</span>
-          </button>
-        </div>
-
-        {/* Week navigation when scope === 'WEEK' */}
-        {scope === 'WEEK' && onWeekChange && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <button
-              type="button"
-              className="po-btn po-btn-secondary"
-              style={{ padding: '3px 8px', fontSize: 11 }}
-              onClick={() => onWeekChange(shiftWeek(weekStartDate, -1))}
-              title="Tuần trước"
-            >
-              <ChevronLeft size={14} />
-              <span>Trước</span>
-            </button>
-            <span
-              style={{
-                fontSize: 12,
-                fontWeight: 700,
-                color: '#0f766e',
-                background: '#f0fdfa',
-                padding: '4px 10px',
-                borderRadius: 4,
-                border: '1px solid #99f6e4',
-              }}
-            >
-              {formatWeekLabel(weekStartDate)}
+      {showScopeBar && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: 10,
+            background: '#f8fafc',
+            padding: '8px 12px',
+            borderRadius: 8,
+            border: '1px solid #e2e8f0',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 13, fontWeight: 700, color: '#334155', marginRight: 4 }}>
+              Phạm vi chốt:
             </span>
             <button
               type="button"
-              className="po-btn po-btn-secondary"
-              style={{ padding: '3px 8px', fontSize: 11 }}
-              onClick={() => onWeekChange(shiftWeek(undefined, 0))}
-              title="Về tuần hiện tại"
+              className={`po-btn ${scope === 'NEAREST' ? 'po-btn-primary' : 'po-btn-secondary'}`}
+              style={{
+                padding: '4px 12px',
+                fontSize: 12,
+                fontWeight: 600,
+                gap: 6,
+                borderRadius: 6,
+              }}
+              onClick={() => onScopeChange?.('NEAREST')}
+              title="Chỉ chốt ngày giao gần nhất có số lượng đặt hàng (>0)"
             >
-              Tuần này
+              <Zap size={14} />
+              <span>Ngày giao gần nhất (NEAREST)</span>
             </button>
             <button
               type="button"
-              className="po-btn po-btn-secondary"
-              style={{ padding: '3px 8px', fontSize: 11 }}
-              onClick={() => onWeekChange(shiftWeek(weekStartDate, 1))}
-              title="Tuần kế tiếp"
+              className={`po-btn ${scope === 'WEEK' ? 'po-btn-primary' : 'po-btn-secondary'}`}
+              style={{
+                padding: '4px 12px',
+                fontSize: 12,
+                fontWeight: 600,
+                gap: 6,
+                borderRadius: 6,
+              }}
+              onClick={() => onScopeChange?.('WEEK')}
+              title="Chốt tất cả các ngày giao trong tuần từ Thứ Hai đến Chủ Nhật"
             >
-              <span>Sau</span>
-              <ChevronRight size={14} />
+              <Calendar size={14} />
+              <span>Cả tuần T2–CN (WEEK)</span>
             </button>
           </div>
-        )}
-      </div>
 
-      {/* Main Filter Row */}
+          {scope === 'WEEK' && onWeekChange && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <button
+                type="button"
+                className="po-btn po-btn-secondary"
+                style={{ padding: '3px 8px', fontSize: 11 }}
+                onClick={() => onWeekChange(shiftWeek(weekStartDate, -1))}
+                title="Tuần trước"
+              >
+                <ChevronLeft size={14} />
+                <span>Trước</span>
+              </button>
+              <span
+                style={{
+                  fontSize: 12,
+                  fontWeight: 700,
+                  color: '#0f766e',
+                  background: '#f0fdfa',
+                  padding: '4px 10px',
+                  borderRadius: 4,
+                  border: '1px solid #99f6e4',
+                }}
+              >
+                {formatWeekLabel(weekStartDate)}
+              </span>
+              <button
+                type="button"
+                className="po-btn po-btn-secondary"
+                style={{ padding: '3px 8px', fontSize: 11 }}
+                onClick={() => onWeekChange(shiftWeek(undefined, 0))}
+                title="Về tuần hiện tại"
+              >
+                Tuần này
+              </button>
+              <button
+                type="button"
+                className="po-btn po-btn-secondary"
+                style={{ padding: '3px 8px', fontSize: 11 }}
+                onClick={() => onWeekChange(shiftWeek(weekStartDate, 1))}
+                title="Tuần kế tiếp"
+              >
+                <span>Sau</span>
+                <ChevronRight size={14} />
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="so-list-filter-row">
         <div className="so-list-filter-field" style={{ position: 'relative', flex: '1 1 240px', maxWidth: 320 }}>
           <Search
@@ -199,30 +211,32 @@ export const DispatchFilterBar: FC<DispatchFilterBarProps> = ({
             }
             title="Lọc theo mức độ ưu tiên hoặc trạng thái PO"
           >
-            <option value="all">Tất cả ({counts.all})</option>
-            <option value="critical">Cần chốt gấp ({counts.critical})</option>
-            <option value="today">Hôm nay ({counts.today})</option>
-            <option value="later">Đợt tới ({counts.later})</option>
-            <option value="completed">Đã gửi PO ({counts.completed})</option>
+            <option value="all">Tất cả ({safeCounts.all})</option>
+            <option value="critical">Cần chốt gấp ({safeCounts.critical})</option>
+            <option value="today">Hôm nay ({safeCounts.today})</option>
+            <option value="later">Đợt tới ({safeCounts.later})</option>
+            <option value="completed">Đã gửi PO ({safeCounts.completed})</option>
           </select>
         </div>
 
-        <div className="so-list-filter-field">
-          <label className="so-list-filter-label">Chi nhánh:</label>
-          <select
-            className="so-list-filter-select"
-            value={selectedBranchId}
-            onChange={(e) => onSelectBranch(e.target.value)}
-            title="Lọc theo Chi nhánh"
-          >
-            {branches.length === 0 && <option value="">— Chưa có chi nhánh —</option>}
-            {branches.map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.code} - {b.name}
-              </option>
-            ))}
-          </select>
-        </div>
+        {showBranchFilter && (
+          <div className="so-list-filter-field">
+            <label className="so-list-filter-label">Chi nhánh:</label>
+            <select
+              className="so-list-filter-select"
+              value={selectedBranchId ?? ''}
+              onChange={(e) => onSelectBranch?.(e.target.value)}
+              title="Lọc theo Chi nhánh"
+            >
+              {branchList.length === 0 && <option value="">— Chưa có chi nhánh —</option>}
+              {branchList.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.code} - {b.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
       {hasFilters && (

@@ -104,7 +104,72 @@ function toDateKey(value: string): string {
   return value.slice(0, 10);
 }
 
+export interface PurchaseOrderListApiItem {
+  id: string;
+  code: string;
+  branchId: string;
+  branchName: string;
+  branchCode?: string;
+  supplierId: string;
+  supplierName: string;
+  supplierCode?: string;
+  deliveryDate?: string;
+  status: string;
+  totalQty: number;
+  totalAmount: number;
+  note?: string;
+  createdAt: string;
+  details: Array<{
+    id: string;
+    productId: string;
+    productName: string;
+    sku: string;
+    unit: string;
+    orderedQty: number;
+    unitPrice: number;
+    lineAmount: number;
+  }>;
+}
+
+export interface PurchaseOrderPagedResult {
+  items: PurchaseOrderListApiItem[];
+  page: number;
+  pageSize: number;
+  totalItems: number;
+}
+
 export const purchaseOrderApi = {
+  /**
+   * Danh sách PO đã chốt (không gồm DRAFT) — phân trang + lọc.
+   */
+  async getPagedPurchaseOrders(params: {
+    branchId?: string;
+    supplierId?: string;
+    status?: string;
+    dateFrom?: string;
+    dateTo?: string;
+    pageIndex?: number;
+    pageSize?: number;
+  }): Promise<PurchaseOrderPagedResult> {
+    const res = await httpClient.get<ApiResponse<PurchaseOrderPagedResult>>('/purchase-orders', {
+      params: {
+        BranchId: params.branchId && params.branchId !== 'all' ? params.branchId : undefined,
+        SupplierId: params.supplierId && params.supplierId !== 'all' ? params.supplierId : undefined,
+        Status: params.status && params.status !== 'all' ? params.status : undefined,
+        DateFrom: params.dateFrom || undefined,
+        DateTo: params.dateTo || undefined,
+        PageIndex: params.pageIndex ?? 1,
+        PageSize: params.pageSize ?? 10,
+      },
+    });
+
+    if (res.data?.success && res.data.data) {
+      return res.data.data;
+    }
+
+    throw new Error(res.data?.message || 'Không tải được danh sách đơn mua hàng.');
+  },
+
   /**
    * Lấy dữ liệu lưới ma trận đặt hàng từ backend
    */

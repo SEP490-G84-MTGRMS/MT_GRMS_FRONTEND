@@ -275,6 +275,7 @@ export interface DispatchSupplierDetail {
   supplierId: string;
   code: string;
   name: string;
+  email?: string;
   serverNow: string;
   viewFrom: string;
   durationDays: number;
@@ -287,21 +288,71 @@ export interface DispatchSupplierDetail {
 }
 
 export type DispatchScope = 'NEAREST' | 'WEEK' | 'ALL';
+export type EmailSendMode = 'SEND_NOW' | 'SCHEDULED_SEND';
+
+export interface SupplierDispatchPackage {
+  id: string;
+  dispatchBatchId: string;
+  supplierId: string;
+  supplierCode: string;
+  supplierName: string;
+  emailTo: string;
+  emailCc: string[];
+  emailSendMode: EmailSendMode | string;
+  scheduledSendAtUtc?: string;
+  emailStatus: string;
+  generationStatus: string;
+  fileName?: string;
+  fileSize?: number;
+  attemptCount: number;
+  lastError?: string;
+  generatedAtUtc?: string;
+  sentAtUtc?: string;
+  createdAt: string;
+  purchaseOrderCount: number;
+  purchaseOrderCodes: string[];
+  canDownload: boolean;
+  canCancelSchedule: boolean;
+  canRetryGeneration: boolean;
+  canRetryEmail: boolean;
+}
+
+export interface DispatchEmailOptions {
+  emailSendMode: EmailSendMode;
+  scheduledSendAt?: string;
+  ccEmails: string[];
+}
+
+export interface SplitGroupLine {
+  productId: string;
+  productName: string;
+  sku: string;
+  unit: string;
+  quantity: number;
+  unitPrice: number;
+  lineAmount: number;
+  hasMissingPrice: boolean;
+}
 
 export interface SplitGroupResult {
   branchId?: string;
   branchName?: string;
   supplierId: string;
   supplierName: string;
+  supplierCode?: string;
   deliveryDate: string;
   status: 'SUCCESS' | 'FAILED' | 'SKIPPED' | 'ALREADY_FINALIZED';
   purchaseOrderId?: string;
   purchaseOrderCode?: string;
   errorCode?: string;
   errorMessage?: string;
-  totalAmount?: number;
   validLineCount?: number;
   invalidLineCount?: number;
+  totalQuantity?: number;
+  totalAmount?: number;
+  hasMissingPrice?: boolean;
+  lines?: SplitGroupLine[];
+  warnings?: string[];
 }
 
 export interface SplitMatrixBatchResult {
@@ -315,4 +366,5 @@ export interface SplitMatrixBatchResult {
   alreadyFinalizedCount: number;
   results: SplitGroupResult[];
   createdPurchaseOrders: GeneratedPO[];
+  dispatchPackage?: SupplierDispatchPackage | null;
 }

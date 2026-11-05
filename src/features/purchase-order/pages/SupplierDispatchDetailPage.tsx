@@ -11,6 +11,7 @@ import {
 import type {
   DispatchScope,
   DispatchSupplierDetail,
+  EmailSendMode,
   SplitMatrixBatchResult,
   SupplierDispatchGroup,
 } from '../types/po.types';
@@ -57,6 +58,9 @@ export const SupplierDispatchDetailPage: FC = () => {
     previewData: SplitMatrixBatchResult | null;
     batchResult: SplitMatrixBatchResult | null;
     note: string;
+    emailSendMode: EmailSendMode;
+    scheduledSendAt: string;
+    ccEmails: string[];
   }>({
     isOpen: false,
     scope: 'NEAREST',
@@ -64,6 +68,9 @@ export const SupplierDispatchDetailPage: FC = () => {
     previewData: null,
     batchResult: null,
     note: '',
+    emailSendMode: 'SEND_NOW',
+    scheduledSendAt: '',
+    ccEmails: [],
   });
 
   const loadDetail = useCallback(async () => {
@@ -124,6 +131,9 @@ export const SupplierDispatchDetailPage: FC = () => {
       previewData: null,
       batchResult: null,
       note: '',
+      emailSendMode: 'SEND_NOW',
+      scheduledSendAt: '',
+      ccEmails: [],
     });
     try {
       const preview = await dispatchHubApi.previewSupplierSplit(supplierAsGroup.id, scope);
@@ -156,7 +166,13 @@ export const SupplierDispatchDetailPage: FC = () => {
         supplierAsGroup.id,
         modalState.scope,
         modalState.scope === 'WEEK' ? modalState.weekStartDate : undefined,
-        modalState.note.trim() || undefined
+        modalState.note.trim() || undefined,
+        {
+          emailSendMode: modalState.emailSendMode,
+          scheduledSendAt:
+            modalState.emailSendMode === 'SCHEDULED_SEND' ? modalState.scheduledSendAt : undefined,
+          ccEmails: modalState.ccEmails,
+        }
       );
       setModalState((prev) => ({ ...prev, batchResult: result }));
       if (result.successCount > 0) {
@@ -351,6 +367,7 @@ export const SupplierDispatchDetailPage: FC = () => {
       <DispatchConfirmModal
         isOpen={modalState.isOpen}
         supplier={supplierAsGroup}
+        supplierEmail={detail?.email}
         scope={modalState.scope}
         onScopeChange={(s) => {
           void handleScopeChange(s);
@@ -369,6 +386,12 @@ export const SupplierDispatchDetailPage: FC = () => {
         batchResult={modalState.batchResult}
         note={modalState.note}
         onNoteChange={(n) => setModalState((prev) => ({ ...prev, note: n }))}
+        emailSendMode={modalState.emailSendMode}
+        onEmailSendModeChange={(m) => setModalState((prev) => ({ ...prev, emailSendMode: m }))}
+        scheduledSendAt={modalState.scheduledSendAt}
+        onScheduledSendAtChange={(v) => setModalState((prev) => ({ ...prev, scheduledSendAt: v }))}
+        ccEmails={modalState.ccEmails}
+        onCcEmailsChange={(emails) => setModalState((prev) => ({ ...prev, ccEmails: emails }))}
         isSubmitting={isDispatching}
         onClose={() =>
           setModalState({
@@ -378,6 +401,9 @@ export const SupplierDispatchDetailPage: FC = () => {
             previewData: null,
             batchResult: null,
             note: '',
+            emailSendMode: 'SEND_NOW',
+            scheduledSendAt: '',
+            ccEmails: [],
           })
         }
         onConfirm={() => {

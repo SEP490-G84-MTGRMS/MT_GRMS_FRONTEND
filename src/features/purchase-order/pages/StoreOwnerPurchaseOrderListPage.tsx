@@ -1,10 +1,9 @@
-import { useState, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { FC } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Grid, Zap, Layers } from 'lucide-react';
-import { MOCK_PURCHASE_ORDERS } from '../lib/mockPoListData';
-import { MOCK_BRANCHES } from '../lib/mockData';
-import type { PurchaseOrderListItem, PoListFilterState } from '../types/po-list.types';
+import { Grid, Zap, Layers, Loader2 } from 'lucide-react';
+import { purchaseOrderApi } from '../api/purchaseOrderApi';
+import type { PurchaseOrderListItem, PoListFilterState, PurchaseOrderStatus } from '../types/po-list.types';
 import { PoListFilterBar } from '../components/po-list/PoListFilterBar';
 import { PoListTable } from '../components/po-list/PoListTable';
 import { PoDetailDrawer } from '../components/po-list/PoDetailDrawer';
@@ -22,54 +21,150 @@ const DEFAULT_FILTERS: PoListFilterState = {
   pageSize: 10,
 };
 
-const parseDateFromStr = (dateStr: string): Date | null => {
-  if (!dateStr) return null;
-  // formats: DD/MM/YYYY HH:mm or DD/MM/YYYY or YYYY-MM-DD
-  if (dateStr.includes('/')) {
-    const parts = dateStr.trim().split(' ')[0].split('/');
-    if (parts.length === 3) {
-      const day = parseInt(parts[0], 10);
-      const month = parseInt(parts[1], 10) - 1;
-      const year = parseInt(parts[2], 10);
-      return new Date(year, month, day);
-    }
-  } else if (dateStr.includes('-')) {
-    const parts = dateStr.trim().split('-');
-    if (parts.length === 3) {
-      const year = parseInt(parts[0], 10);
-      const month = parseInt(parts[1], 10) - 1;
-      const day = parseInt(parts[2], 10);
-      return new Date(year, month, day);
-    }
+const formatVnDateTime = (iso?: string): string => {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
+
+const formatVnDate = (iso?: string): string => {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso.slice(0, 10);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
+};
+
+/** Map backend PO status → badge status trên UI list. */
+const mapBackendStatus = (status: string): PurchaseOrderStatus => {
+  switch ((status || '').toUpperCase()) {
+    case 'PENDING_APPROVAL':
+    case 'DISPATCHED':
+    case 'SENT':
+      return 'SENT';
+    case 'APPROVED':
+    case 'CONFIRMED':
+      return 'CONFIRMED';
+    case 'PARTIALLY_RECEIVED':
+      return 'PARTIALLY_RECEIVED';
+    case 'RECEIVED':
+      return 'RECEIVED';
+    case 'CANCELLED':
+    case 'REJECTED':
+      return 'CANCELLED';
+    default:
+      return 'SENT';
   }
-  return null;
+};
+
+/** Map UI filter status → backend status (nếu có). */
+const mapFilterStatusToBackend = (status: PoListFilterState['status']): string | undefined => {
+  if (status === 'all') return undefined;
+  if (status === 'SENT') return 'PENDING_APPROVAL';
+  if (status === 'CONFIRMED') return 'APPROVED';
+  return status;
 };
 
 export const StoreOwnerPurchaseOrderListPage: FC = () => {
   const navigate = useNavigate();
 
-  // Master orders list
-  const [orders] = useState<PurchaseOrderListItem[]>(MOCK_PURCHASE_ORDERS);
+  const [orders, setOrders] = useState<PurchaseOrderListItem[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [isLoading, setIsLoading] = useState(false);
 
-  // Filter input states
   const [filterInputs, setFilterInputs] = useState<PoListFilterState>(DEFAULT_FILTERS);
   const [appliedFilters, setAppliedFilters] = useState<PoListFilterState>(DEFAULT_FILTERS);
 
-  // Pagination states
-  const [pageIndex, setPageIndex] = useState<number>(1);
-  const [pageSize, setPageSize] = useState<number>(10);
+  const [pageIndex, setPageIndex] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
-  // Drawer detail state
   const [selectedOrder, setSelectedOrder] = useState<PurchaseOrderListItem | null>(null);
 
-  // Toast notification
   const [toast, setToast] = useState<ToastState | null>(null);
   const showToast = (message: string, type: ToastState['type'] = 'success') => {
     setToast({ id: Date.now().toString(), message, type });
     setTimeout(() => setToast(null), 3000);
   };
 
-  // Unique suppliers list derived from orders
+  const loadOrders = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const result = await purchaseOrderApi.getPagedPurchaseOrders({
+        branchId: appliedFilters.branchId,
+        supplierId: appliedFilters.supplierId,
+        status: mapFilterStatusToBackend(appliedFilters.status),
+        dateFrom: appliedFilters.dateFrom || undefined,
+        dateTo: appliedFilters.dateTo || undefined,
+        pageIndex,
+        pageSize,
+      });
+
+      const keyword = appliedFilters.keyword.trim().toLowerCase();
+      let mapped: PurchaseOrderListItem[] = result.items.map((po) => {
+        const branchCode = po.branchCode || '';
+        const supplierCode = po.supplierCode || '';
+        return {
+          id: po.id,
+          poCode: po.code,
+          storeRefCode: branchCode || po.branchName,
+          supplierId: po.supplierId,
+          supplierCode,
+          supplierName: po.supplierName,
+          branchId: po.branchId,
+          branchCode,
+          branchName: po.branchName,
+          createdSource: 'Chủ cửa hàng (Dispatch Hub)',
+          lastUpdated: formatVnDateTime(po.createdAt),
+          expectedDelivery: formatVnDate(po.deliveryDate),
+          itemCount: po.details?.length ?? 0,
+          totalAmount: po.totalAmount,
+          status: mapBackendStatus(po.status),
+          note: po.note,
+          items: (po.details ?? []).map((d) => ({
+            id: d.id,
+            name: d.productName,
+            sku: d.sku,
+            unit: d.unit,
+            orderedQty: d.orderedQty,
+            price: d.unitPrice,
+            total: d.lineAmount,
+          })),
+        };
+      });
+
+      if (keyword) {
+        mapped = mapped.filter((o) => {
+          const matchCode = o.poCode.toLowerCase().includes(keyword);
+          const matchStore = o.storeRefCode.toLowerCase().includes(keyword);
+          const matchSup =
+            o.supplierName.toLowerCase().includes(keyword) || o.supplierCode.toLowerCase().includes(keyword);
+          const matchBranch =
+            o.branchName.toLowerCase().includes(keyword) || o.branchCode.toLowerCase().includes(keyword);
+          const matchItems = o.items.some(
+            (it) => it.name.toLowerCase().includes(keyword) || it.sku.toLowerCase().includes(keyword)
+          );
+          return matchCode || matchStore || matchSup || matchBranch || matchItems;
+        });
+      }
+
+      setOrders(mapped);
+      setTotalCount(keyword ? mapped.length : result.totalItems);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Không tải được danh sách PO.';
+      showToast(message, 'error');
+      setOrders([]);
+      setTotalCount(0);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [appliedFilters, pageIndex, pageSize]);
+
+  useEffect(() => {
+    void loadOrders();
+  }, [loadOrders]);
+
   const supplierOptions = useMemo(() => {
     const map = new Map<string, { id: string; code: string; name: string }>();
     orders.forEach((o) => {
@@ -80,90 +175,31 @@ export const StoreOwnerPurchaseOrderListPage: FC = () => {
     return Array.from(map.values());
   }, [orders]);
 
-  // Handle Search button
+  const branchOptions = useMemo(() => {
+    const map = new Map<string, { id: string; code: string; name: string }>();
+    orders.forEach((o) => {
+      if (!map.has(o.branchId)) {
+        map.set(o.branchId, { id: o.branchId, code: o.branchCode, name: o.branchName });
+      }
+    });
+    return Array.from(map.values());
+  }, [orders]);
+
   const handleSearch = () => {
     setAppliedFilters(filterInputs);
     setPageIndex(1);
   };
 
-  // Handle Reset button
   const handleReset = () => {
     setFilterInputs(DEFAULT_FILTERS);
     setAppliedFilters(DEFAULT_FILTERS);
     setPageIndex(1);
   };
 
-  // Filtered orders list
-  const filteredOrders = useMemo(() => {
-    return orders.filter((o) => {
-      // 1. Branch filter
-      if (appliedFilters.branchId !== 'all') {
-        if (o.branchId !== appliedFilters.branchId && o.branchCode !== appliedFilters.branchId) {
-          return false;
-        }
-      }
-
-      // 2. Supplier filter
-      if (appliedFilters.supplierId !== 'all') {
-        if (o.supplierId !== appliedFilters.supplierId && o.supplierCode !== appliedFilters.supplierId) {
-          return false;
-        }
-      }
-
-      // 3. Status filter
-      if (appliedFilters.status !== 'all') {
-        if (o.status !== appliedFilters.status) return false;
-      }
-
-      // 4. Date From filter (matches lastUpdated or expectedDelivery)
-      if (appliedFilters.dateFrom) {
-        const from = new Date(appliedFilters.dateFrom);
-        from.setHours(0, 0, 0, 0);
-        const orderDate = parseDateFromStr(o.lastUpdated) || parseDateFromStr(o.expectedDelivery);
-        if (!orderDate || orderDate < from) return false;
-      }
-
-      // 5. Date To filter
-      if (appliedFilters.dateTo) {
-        const to = new Date(appliedFilters.dateTo);
-        to.setHours(23, 59, 59, 999);
-        const orderDate = parseDateFromStr(o.lastUpdated) || parseDateFromStr(o.expectedDelivery);
-        if (!orderDate || orderDate > to) return false;
-      }
-
-      // 6. Keyword filter
-      if (appliedFilters.keyword.trim()) {
-        const kw = appliedFilters.keyword.trim().toLowerCase();
-        const matchCode = o.poCode.toLowerCase().includes(kw);
-        const matchStore = o.storeRefCode.toLowerCase().includes(kw);
-        const matchSup = o.supplierName.toLowerCase().includes(kw) || o.supplierCode.toLowerCase().includes(kw);
-        const matchBranch = o.branchName.toLowerCase().includes(kw) || o.branchCode.toLowerCase().includes(kw);
-        const matchCreator = o.createdSource.toLowerCase().includes(kw);
-        const matchItems = o.items.some(
-          (it) => it.name.toLowerCase().includes(kw) || it.sku.toLowerCase().includes(kw)
-        );
-
-        if (!matchCode && !matchStore && !matchSup && !matchBranch && !matchCreator && !matchItems) {
-          return false;
-        }
-      }
-
-      return true;
-    });
-  }, [orders, appliedFilters]);
-
-  // Paginated orders
-  const pagedOrders = useMemo(() => {
-    const start = (pageIndex - 1) * pageSize;
-    return filteredOrders.slice(start, start + pageSize);
-  }, [filteredOrders, pageIndex, pageSize]);
-
   return (
     <div className="po-matrix-container" style={{ width: '100%' }}>
-      {/* Toast Notification */}
       <AdminToast toast={toast} onClose={() => setToast(null)} />
 
-      {/* ── Page Header ── */}
       <div
         style={{
           display: 'flex',
@@ -188,10 +224,10 @@ export const StoreOwnerPurchaseOrderListPage: FC = () => {
           >
             <Layers size={22} color="var(--blue-primary, #0f766e)" />
             <span>Danh sách đơn mua hàng (PO)</span>
+            {isLoading && <Loader2 size={16} className="animate-spin" style={{ color: '#0f766e' }} />}
           </h1>
         </div>
 
-        {/* Quick Link Navigation Buttons */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <button
             type="button"
@@ -217,22 +253,18 @@ export const StoreOwnerPurchaseOrderListPage: FC = () => {
         </div>
       </div>
 
-      {/* ── UNIFIED FILTER BAR ── */}
       <PoListFilterBar
         filterInputs={filterInputs}
-        onFilterInputChange={(newFilters) =>
-          setFilterInputs((prev) => ({ ...prev, ...newFilters }))
-        }
+        onFilterInputChange={(newFilters) => setFilterInputs((prev) => ({ ...prev, ...newFilters }))}
         onSearch={handleSearch}
         onReset={handleReset}
-        branches={MOCK_BRANCHES}
+        branches={branchOptions}
         suppliers={supplierOptions}
       />
 
-      {/* ── MAIN DATA TABLE WITH PAGING ── */}
       <PoListTable
-        orders={pagedOrders}
-        totalCount={filteredOrders.length}
+        orders={orders}
+        totalCount={totalCount}
         pageIndex={pageIndex}
         pageSize={pageSize}
         onPageChange={(page) => setPageIndex(page)}
@@ -246,7 +278,6 @@ export const StoreOwnerPurchaseOrderListPage: FC = () => {
         }}
       />
 
-      {/* ── SLIDE-OVER DRAWER CHI TIẾT PO ── */}
       <PoDetailDrawer
         order={selectedOrder}
         isOpen={Boolean(selectedOrder)}

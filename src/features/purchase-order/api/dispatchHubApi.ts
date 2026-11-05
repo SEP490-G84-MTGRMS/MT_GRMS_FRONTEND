@@ -6,6 +6,9 @@ import type {
   SplitPoPreview,
   DispatchScope,
   SplitMatrixBatchResult,
+  DispatchSupplierDetail,
+  DispatchEmailOptions,
+  SupplierDispatchPackage,
 } from '../types/po.types';
 import { purchaseOrderApi } from './purchaseOrderApi';
 
@@ -15,6 +18,14 @@ export interface DispatchHubCounts {
   today: number;
   later: number;
   completed: number;
+}
+
+export interface DispatchSupplierHubResult {
+  serverNow: string;
+  viewFrom: string;
+  durationDays: number;
+  suppliers: SupplierDispatchGroup[];
+  counts: DispatchHubCounts;
 }
 
 export interface DispatchHubResult {
@@ -99,6 +110,266 @@ function toDateKey(value: string): string {
 }
 
 export const dispatchHubApi = {
+  /** Hub theo NCC (multi-branch) — dùng cho trang list dispatch-hub. */
+  async getSupplierHub(params?: {
+    keyword?: string;
+    urgency?: string;
+    durationDays?: number;
+  }): Promise<DispatchSupplierHubResult> {
+    const res = await httpClient.get<ApiResponse<{
+      serverNow: string;
+      viewFrom: string;
+      durationDays: number;
+      suppliers: Array<{
+        supplierId: string;
+        code: string;
+        name: string;
+        cutoffTimeStr: string;
+        countdownDisplay: string;
+        remainingMinutes?: number;
+        urgency: string;
+        expectedDelivery: string;
+        status: string;
+        linkedBranchCount: number;
+        branchesWithQty: number;
+        skuCount: number;
+        totalQty: number;
+        totalAmount: number;
+        branches: Array<{
+          branchId: string;
+          branchCode: string;
+          branchName: string;
+          skuCount: number;
+          totalQty: number;
+          totalAmount: number;
+          status: string;
+        }>;
+      }>;
+      counts: DispatchHubCounts;
+    }>>('/purchase-orders/dispatch-hub/suppliers', {
+      params: {
+        Keyword: params?.keyword || undefined,
+        Urgency: params?.urgency && params.urgency !== 'all' ? params.urgency : undefined,
+        DurationDays: params?.durationDays ?? 14,
+      },
+    });
+
+    if (!res.data?.success || !res.data.data) {
+      throw new Error(res.data?.message || 'Không tải được hub chốt đơn.');
+    }
+
+    const d = res.data.data;
+    return {
+      serverNow: d.serverNow,
+      viewFrom: d.viewFrom,
+      durationDays: d.durationDays,
+      counts: {
+        all: d.counts?.all ?? 0,
+        critical: d.counts?.critical ?? 0,
+        today: d.counts?.today ?? 0,
+        later: d.counts?.later ?? 0,
+        completed: d.counts?.completed ?? 0,
+      },
+      suppliers: (d.suppliers || []).map((s) => ({
+        id: s.supplierId,
+        code: s.code,
+        name: s.name,
+        categoryTags: [],
+        cutoffTimeStr: s.cutoffTimeStr,
+        countdownDisplay: s.countdownDisplay,
+        remainingMinutes: s.remainingMinutes,
+        urgency: mapUrgency(s.urgency),
+        expectedDelivery: s.expectedDelivery,
+        minOrderValue: 0,
+        items: [],
+        note: '',
+        status: s.status === 'dispatched' ? 'dispatched' : 'draft',
+        linkedBranchCount: s.linkedBranchCount ?? 0,
+        branchesWithQty: s.branchesWithQty ?? 0,
+        skuCount: s.skuCount ?? 0,
+        totalQty: s.totalQty ?? 0,
+        totalAmount: s.totalAmount ?? 0,
+        branches: (s.branches || []).map((b) => ({
+          branchId: b.branchId,
+          branchCode: b.branchCode,
+          branchName: b.branchName,
+          skuCount: b.skuCount ?? 0,
+          totalQty: b.totalQty ?? 0,
+          totalAmount: b.totalAmount ?? 0,
+          status: b.status,
+        })),
+      })),
+    };
+  },
+
+  /** Chi tiết 1 NCC — sản phẩm nhóm theo cửa hàng. */
+  async getSupplierDetail(supplierId: string, durationDays = 14): Promise<DispatchSupplierDetail> {
+    const res = await httpClient.get<ApiResponse<{
+      supplierId: string;
+      code: string;
+      name: string;
+      email?: string;
+      serverNow: string;
+      viewFrom: string;
+      durationDays: number;
+      cutoffTimeStr: string;
+      countdownDisplay: string;
+      remainingMinutes?: number;
+      urgency: string;
+      status: string;
+      branches: Array<{
+        branchId: string;
+        branchCode: string;
+        branchName: string;
+        status: string;
+        items: Array<{
+          id: string;
+          productId: string;
+          name: string;
+          sku: string;
+          unit: string;
+          price: number;
+          qty: number;
+          deliveryDate: string;
+          cutoffSchedule: string;
+          dayStatus: string;
+        }>;
+      }>;
+    }>>(`/purchase-orders/dispatch-hub/suppliers/${supplierId}`, {
+      params: { DurationDays: durationDays },
+    });
+
+    if (!res.data?.success || !res.data.data) {
+      throw new Error(res.data?.message || 'Không tải được chi tiết NCC.');
+    }
+
+    const d = res.data.data;
+    return {
+      supplierId: d.supplierId,
+      code: d.code,
+      name: d.name,
+      email: d.email,
+      serverNow: d.serverNow,
+      viewFrom: d.viewFrom,
+      durationDays: d.durationDays,
+      cutoffTimeStr: d.cutoffTimeStr,
+      countdownDisplay: d.countdownDisplay,
+      remainingMinutes: d.remainingMinutes,
+      urgency: mapUrgency(d.urgency),
+      status: d.status,
+      branches: (d.branches || []).map((b) => ({
+        branchId: b.branchId,
+        branchCode: b.branchCode,
+        branchName: b.branchName,
+        status: b.status,
+        items: (b.items || []).map((it) => ({
+          id: it.id,
+          productId: it.productId,
+          name: it.name,
+          sku: it.sku,
+          unit: it.unit,
+          price: it.price,
+          qty: it.qty,
+          deliveryDate: toDateKey(it.deliveryDate),
+          cutoffSchedule: it.cutoffSchedule,
+          dayStatus: it.dayStatus,
+        })),
+      })),
+    };
+  },
+
+  /** Preview chốt 1 NCC trên mọi cửa hàng liên kết. */
+  async previewSupplierSplit(
+    supplierId: string,
+    scope: DispatchScope,
+    weekStartDate?: string,
+    note?: string
+  ): Promise<SplitMatrixBatchResult> {
+    const res = await httpClient.post<ApiResponse<SplitMatrixBatchResult>>(
+      '/purchase-orders/matrix/split/preview',
+      {
+        branchId: '00000000-0000-0000-0000-000000000000',
+        supplierId,
+        scope,
+        weekStartDate,
+        note,
+      }
+    );
+
+    if (!res.data?.success || !res.data.data) {
+      throw new Error(res.data?.message || 'Không thể xem trước dữ liệu chốt PO.');
+    }
+
+    return res.data.data;
+  },
+
+  /** Chốt 1 NCC trên mọi cửa hàng liên kết theo Scope (+ email options). */
+  async dispatchSupplierByScope(
+    supplierId: string,
+    scope: DispatchScope,
+    weekStartDate?: string,
+    note?: string,
+    emailOptions?: DispatchEmailOptions
+  ): Promise<SplitMatrixBatchResult> {
+    const res = await httpClient.post<ApiResponse<SplitMatrixBatchResult>>(
+      '/purchase-orders/matrix/split',
+      {
+        branchId: '00000000-0000-0000-0000-000000000000',
+        supplierId,
+        scope,
+        weekStartDate,
+        note,
+        emailSendMode: emailOptions?.emailSendMode ?? 'SEND_NOW',
+        scheduledSendAt: emailOptions?.scheduledSendAt,
+        ccEmails: emailOptions?.ccEmails ?? [],
+      }
+    );
+
+    if (!res.data?.success || !res.data.data) {
+      throw new Error(res.data?.message || 'Không thể chốt đơn mua hàng.');
+    }
+
+    return res.data.data;
+  },
+
+  async getDispatchPackage(packageId: string): Promise<SupplierDispatchPackage> {
+    const res = await httpClient.get<ApiResponse<SupplierDispatchPackage>>(
+      `/purchase-orders/dispatch-packages/${packageId}`
+    );
+    if (!res.data?.success || !res.data.data) {
+      throw new Error(res.data?.message || 'Không tải được trạng thái package.');
+    }
+    return res.data.data;
+  },
+
+  async downloadDispatchPackage(packageId: string): Promise<Blob> {
+    const res = await httpClient.get(`/purchase-orders/dispatch-packages/${packageId}/download`, {
+      responseType: 'blob',
+    });
+    return res.data as Blob;
+  },
+
+  async cancelPackageSchedule(packageId: string): Promise<SupplierDispatchPackage> {
+    const res = await httpClient.post<ApiResponse<SupplierDispatchPackage>>(
+      `/purchase-orders/dispatch-packages/${packageId}/cancel-schedule`
+    );
+    if (!res.data?.success || !res.data.data) {
+      throw new Error(res.data?.message || 'Không hủy được lịch gửi.');
+    }
+    return res.data.data;
+  },
+
+  async retryPackageEmail(packageId: string): Promise<SupplierDispatchPackage> {
+    const res = await httpClient.post<ApiResponse<SupplierDispatchPackage>>(
+      `/purchase-orders/dispatch-packages/${packageId}/retry-email`
+    );
+    if (!res.data?.success || !res.data.data) {
+      throw new Error(res.data?.message || 'Không gửi lại email được.');
+    }
+    return res.data.data;
+  },
+
+
   async getHub(params: {
     branchId: string;
     viewFrom?: string;

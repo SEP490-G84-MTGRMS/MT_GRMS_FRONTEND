@@ -212,7 +212,9 @@ export const OrderMatrixTable: FC<OrderMatrixTableProps> = ({
                     className={`po-th-date ${
                       isOff
                         ? 'po-th-off'
-                        : isLocked || isPoGenerated
+                        : isPoGenerated
+                        ? 'po-th-finalized'
+                        : isLocked
                         ? 'po-th-locked'
                         : isCutoffDue
                         ? 'po-th-cutoff-due'
@@ -237,10 +239,7 @@ export const OrderMatrixTable: FC<OrderMatrixTableProps> = ({
                     <div className="po-col-date-header">
                       <span className="po-col-dow">{d.dowName}</span>
                       <span className="po-col-short">{d.dateShort}</span>
-                      {/* Nghỉ/Khóa: chỉ tô xám header, không gắn chữ — hover xem title */}
-                      {isPoGenerated && (
-                        <span className="po-cutoff-tag po-tag-locked">Đã PO</span>
-                      )}
+                      {/* Off / khóa / đã chốt: chỉ đổi màu header — hover xem title */}
                     </div>
                   </th>
                 );

@@ -6,6 +6,7 @@ import type {
   SupplierDispatchGroup,
   DispatchScope,
   SplitMatrixBatchResult,
+  EmailSendMode,
 } from '../types/po.types';
 import { DispatchFilterBar, type DispatchTabType } from '../components/dispatch/DispatchFilterBar';
 import { SupplierDispatchTable } from '../components/dispatch/SupplierDispatchTable';
@@ -54,19 +55,31 @@ export const SupplierOrderDispatchHubPage: FC = () => {
   const [modalState, setModalState] = useState<{
     isOpen: boolean;
     supplier: SupplierDispatchGroup | null;
+    supplierEmail?: string;
     scope: DispatchScope;
     weekStartDate: string;
     previewData: SplitMatrixBatchResult | null;
+    isLoadingPreview: boolean;
+    previewError: string | null;
     batchResult: SplitMatrixBatchResult | null;
     note: string;
+    emailSendMode: EmailSendMode;
+    scheduledSendAt: string;
+    ccEmails: string[];
   }>({
     isOpen: false,
     supplier: null,
+    supplierEmail: undefined,
     scope: 'NEAREST',
     weekStartDate: getMondayOfThisWeek(),
     previewData: null,
+    isLoadingPreview: false,
+    previewError: null,
     batchResult: null,
     note: '',
+    emailSendMode: 'SEND_NOW',
+    scheduledSendAt: '',
+    ccEmails: [],
   });
 
   const fetchHub = useCallback(async () => {
@@ -100,40 +113,98 @@ export const SupplierOrderDispatchHubPage: FC = () => {
     return () => clearTimeout(t);
   }, [fetchHub, keyword]);
 
-  const openConfirmForSupplier = async (sup: SupplierDispatchGroup, scope: DispatchScope = 'NEAREST') => {
+  const loadPreview = useCallback(
+    async (supplierId: string, targetScope: DispatchScope, weekMonday?: string) => {
+      setModalState((prev) => ({
+        ...prev,
+        isLoadingPreview: true,
+        previewError: null,
+      }));
+
+      try {
+        const preview = await dispatchHubApi.previewSupplierSplit(
+          supplierId,
+          targetScope,
+          targetScope === 'WEEK' ? weekMonday : undefined
+        );
+        setModalState((prev) =>
+          prev.isOpen && prev.supplier?.id === supplierId
+            ? { ...prev, previewData: preview, isLoadingPreview: false }
+            : prev
+        );
+      } catch (err: any) {
+        setModalState((prev) =>
+          prev.isOpen && prev.supplier?.id === supplierId
+            ? {
+                ...prev,
+                previewData: null,
+                previewError: err?.message || 'Không thể xem trước dữ liệu chốt PO từ máy chủ.',
+                isLoadingPreview: false,
+              }
+            : prev
+        );
+      }
+    },
+    []
+  );
+
+  const openConfirmForSupplier = async (sup: SupplierDispatchGroup, initialScope: DispatchScope = 'NEAREST') => {
+    const monday = getMondayOfThisWeek();
     setModalState({
       isOpen: true,
       supplier: sup,
-      scope,
-      weekStartDate: getMondayOfThisWeek(),
+      supplierEmail: undefined,
+      scope: initialScope,
+      weekStartDate: monday,
       previewData: null,
+      isLoadingPreview: true,
+      previewError: null,
       batchResult: null,
       note: '',
+      emailSendMode: 'SEND_NOW',
+      scheduledSendAt: '',
+      ccEmails: [],
     });
 
-    try {
-      const preview = await dispatchHubApi.previewSupplierSplit(sup.id, scope);
-      setModalState((prev) =>
-        prev.isOpen && prev.supplier?.id === sup.id ? { ...prev, previewData: preview } : prev
-      );
-    } catch {
-      // preview optional
-    }
+    void dispatchHubApi
+      .getSupplierDetail(sup.id)
+      .then((d) => setModalState((prev) => (prev.isOpen ? { ...prev, supplierEmail: d.email } : prev)))
+      .catch(() => undefined);
+
+    await loadPreview(sup.id, initialScope, monday);
   };
 
-  const handleScopeChange = async (scope: DispatchScope) => {
+  const handleScopeChange = async (newScope: DispatchScope) => {
     const supplier = modalState.supplier;
     if (!supplier) return;
-    setModalState((prev) => ({ ...prev, scope, previewData: null, batchResult: null }));
-    try {
-      const preview = await dispatchHubApi.previewSupplierSplit(
-        supplier.id,
-        scope,
-        scope === 'WEEK' ? modalState.weekStartDate : undefined
+    setModalState((prev) => ({
+      ...prev,
+      scope: newScope,
+      previewData: null,
+      batchResult: null,
+    }));
+    await loadPreview(supplier.id, newScope, modalState.weekStartDate);
+  };
+
+  const handleWeekChange = async (newMonday: string) => {
+    const supplier = modalState.supplier;
+    if (!supplier) return;
+    setModalState((prev) => ({
+      ...prev,
+      weekStartDate: newMonday,
+      previewData: null,
+      batchResult: null,
+    }));
+    await loadPreview(supplier.id, 'WEEK', newMonday);
+  };
+
+  const handleRetryPreview = () => {
+    if (modalState.supplier) {
+      void loadPreview(
+        modalState.supplier.id,
+        modalState.scope,
+        modalState.scope === 'WEEK' ? modalState.weekStartDate : undefined
       );
-      setModalState((prev) => ({ ...prev, previewData: preview }));
-    } catch {
-      // ignore
     }
   };
 
@@ -145,7 +216,12 @@ export const SupplierOrderDispatchHubPage: FC = () => {
         modalState.supplier.id,
         modalState.scope,
         modalState.scope === 'WEEK' ? modalState.weekStartDate : undefined,
-        modalState.note.trim() || undefined
+        modalState.note.trim() || undefined,
+        {
+          emailSendMode: modalState.emailSendMode,
+          scheduledSendAt: modalState.emailSendMode === 'SCHEDULED_SEND' ? modalState.scheduledSendAt : undefined,
+          ccEmails: modalState.ccEmails,
+        }
       );
       setModalState((prev) => ({ ...prev, batchResult: result }));
       if (result.successCount > 0) {
@@ -247,34 +323,44 @@ export const SupplierOrderDispatchHubPage: FC = () => {
       <DispatchConfirmModal
         isOpen={modalState.isOpen}
         supplier={modalState.supplier}
+        supplierEmail={modalState.supplierEmail}
         scope={modalState.scope}
         onScopeChange={(s) => {
           void handleScopeChange(s);
         }}
         weekStartDate={modalState.weekStartDate}
         onWeekChange={(w) => {
-          setModalState((prev) => ({ ...prev, weekStartDate: w }));
-          if (modalState.scope === 'WEEK' && modalState.supplier) {
-            void dispatchHubApi
-              .previewSupplierSplit(modalState.supplier.id, 'WEEK', w)
-              .then((preview) => setModalState((prev) => ({ ...prev, previewData: preview })))
-              .catch(() => undefined);
-          }
+          void handleWeekChange(w);
         }}
         previewData={modalState.previewData}
+        isLoadingPreview={modalState.isLoadingPreview}
+        previewError={modalState.previewError}
+        onRetryPreview={handleRetryPreview}
         batchResult={modalState.batchResult}
         note={modalState.note}
         onNoteChange={(n) => setModalState((prev) => ({ ...prev, note: n }))}
+        emailSendMode={modalState.emailSendMode}
+        onEmailSendModeChange={(m) => setModalState((prev) => ({ ...prev, emailSendMode: m }))}
+        scheduledSendAt={modalState.scheduledSendAt}
+        onScheduledSendAtChange={(v) => setModalState((prev) => ({ ...prev, scheduledSendAt: v }))}
+        ccEmails={modalState.ccEmails}
+        onCcEmailsChange={(emails) => setModalState((prev) => ({ ...prev, ccEmails: emails }))}
         isSubmitting={isDispatching}
         onClose={() =>
           setModalState({
             isOpen: false,
             supplier: null,
+            supplierEmail: undefined,
             scope: 'NEAREST',
             weekStartDate: getMondayOfThisWeek(),
             previewData: null,
+            isLoadingPreview: false,
+            previewError: null,
             batchResult: null,
             note: '',
+            emailSendMode: 'SEND_NOW',
+            scheduledSendAt: '',
+            ccEmails: [],
           })
         }
         onConfirm={() => {
