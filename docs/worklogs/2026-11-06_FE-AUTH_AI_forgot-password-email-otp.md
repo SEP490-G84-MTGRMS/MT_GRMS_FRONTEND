@@ -46,3 +46,4 @@
 ## 5. Ghi Chú Cho Manager Khi Duyệt & Merge (Manager Merge Notes)
 - **Mức độ rủi ro**: Thấp (Low) — Chỉ tác động đến CSS layout của Stepper và render component `ForgotPasswordPage.tsx`.
 - **Thao tác hậu merge**: Không cần chạy thêm script hay migration database.
+
