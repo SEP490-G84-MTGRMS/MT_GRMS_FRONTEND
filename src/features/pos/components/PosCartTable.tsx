@@ -1,4 +1,4 @@
-﻿import { useState } from 'react';
+import { useState } from 'react';
 import type { FC } from 'react';
 import { X, Tag, AlertTriangle, ShoppingBag, Trash2 } from 'lucide-react';
 import type { CartItem } from '../types/pos.types';
@@ -88,11 +88,6 @@ export const PosCartTable: FC<Props> = ({
                       <div style={{ fontWeight: 600, color: '#0f172a' }}>{item.product.name}</div>
                       <div style={{ fontSize: 11, color: '#16a34a', marginTop: 2, display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
                         <span>&#10003; Tồn kho: {item.product.quantityOnHand}</span>
-                        {(item.batchCode || (item.product.batchCode && item.product.batchCode !== 'LÔ-FEFO')) && (
-                          <span style={{ backgroundColor: '#f0fdfa', color: '#0f766e', border: '1px solid #99f6e4', padding: '1px 5px', borderRadius: 3, fontWeight: 700, fontSize: 10.5 }}>
-                            Lô: {item.batchCode || item.product.batchCode}
-                          </span>
-                        )}
                       </div>
                     </td>
                     <td style={{ textAlign: 'center' }}>

@@ -389,7 +389,6 @@ export const PosCheckoutPage: FC = () => {
               basePrice: apiProduct.basePrice || apiProduct.sellingPrice || 0,
               costPrice: apiProduct.costPrice || 0,
               quantityOnHand: 999,
-              batchCode: 'LÔ-FEFO',
             };
             setProducts((prev) => [...prev, newProd]);
             handleAddToCart(newProd);
@@ -618,7 +617,7 @@ export const PosCheckoutPage: FC = () => {
         stt: i + 1,
         name: c.product.name,
         unitPrice: c.actualPrice,
-        batchCode: c.batchCode || c.product.batchCode || 'LÔ-FEFO',
+        batchCode: c.batchCode || c.product.batchCode || undefined,
         quantity: c.quantity,
         totalAmount: c.totalAmount,
       })),
