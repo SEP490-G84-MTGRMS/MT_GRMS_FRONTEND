@@ -205,6 +205,7 @@ export const OrderMatrixTable: FC<OrderMatrixTableProps> = ({
                 const isLocked = d.isLocked;
                 const isCutoffDue = d.cutoffStatus === 'CUTOFF_DUE';
                 const isPoGenerated = d.cutoffStatus === 'PO_GENERATED';
+                const isPoEditable = Boolean(d.poCode) && !isLocked && !isOff && !isPoGenerated;
 
                 return (
                   <th
@@ -218,13 +219,17 @@ export const OrderMatrixTable: FC<OrderMatrixTableProps> = ({
                         ? 'po-th-locked'
                         : isCutoffDue
                         ? 'po-th-cutoff-due'
+                        : isPoEditable
+                        ? 'po-th-cutoff-due'
                         : 'po-th-open'
                     }`}
                     title={
                       isOff
                         ? d.offReason || 'Nhà cung cấp không giao hàng ngày này'
                         : isPoGenerated
-                        ? `Đã chốt đơn PO (${d.poCode || 'Đã tạo'})`
+                        ? `Đã khóa PO (${d.poCode || 'Đã tạo'}) — quá giờ cutoff`
+                        : isPoEditable
+                        ? `Đã có PO ${d.poCode} — còn sửa được trước cutoff (${d.cutoffHour || 'Theo lịch'})`
                         : isCutoffDue
                         ? `ĐÃ ĐẾN HẠN CHỐT CUTOFF (${d.cutoffHour || 'Hạn chốt'}). Nhấp để chốt ngày này.`
                         : `Lịch giao hợp lệ (Cutoff: ${d.cutoffHour || 'Theo lịch'})`

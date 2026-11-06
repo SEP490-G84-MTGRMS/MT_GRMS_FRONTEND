@@ -33,6 +33,8 @@ export interface GrnBatchDetail {
 
 export interface GrnItemDetail {
   id: string;
+  productId?: string;
+  purchaseOrderDetailId?: string;
   productCode: string;
   productName: string;
   unit: string;
@@ -74,6 +76,7 @@ export interface GoodsReceiptListItem {
   totalAmount: number; // VNĐ
   status: GrnStatus;
   receiverName: string; // Phân công: NV. Văn A, Đức.DM...
+  hasMismatch?: boolean;
   items: GrnItemDetail[];
   notes?: string;
   cancelledReason?: string;
@@ -108,6 +111,7 @@ export type PaymentTerm =
 export type PaymentMethod = 'Credit' | 'Cash' | 'Bank';
 
 export interface PoLookupOption {
+  id: string;
   poCode: string;
   branchId: string;
   branchName: string;

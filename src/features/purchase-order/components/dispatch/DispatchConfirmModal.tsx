@@ -216,7 +216,7 @@ export const DispatchConfirmModal: FC<DispatchConfirmModalProps> = ({
     let missingPriceFound = false;
 
     for (const r of results) {
-      if (r.status === 'SUCCESS') {
+      if (r.status === 'SUCCESS' || r.status === 'AMENDED') {
         eligible.push(r);
         if (r.branchId) branchSet.add(r.branchId);
         skuSum += r.validLineCount || (r.lines ? r.lines.length : 0);
@@ -253,9 +253,14 @@ export const DispatchConfirmModal: FC<DispatchConfirmModalProps> = ({
 
       if (g.status === 'ALREADY_FINALIZED') {
         categoryKey = 'ALREADY_FINALIZED';
-        label = 'Đã chốt trước đó';
+        label = 'Đã khóa sau cutoff (không amend được)';
         badgeColor = '#0369a1';
         badgeBg = '#e0f2fe';
+      } else if (g.status === 'NO_CHANGES') {
+        categoryKey = 'NO_CHANGES';
+        label = 'Không có thay đổi so với PO hiện tại';
+        badgeColor = '#475569';
+        badgeBg = '#f1f5f9';
       } else if (g.errorCode === 'CUTOFF_EXPIRED') {
         categoryKey = 'CUTOFF_EXPIRED';
         label = 'Đã quá thời hạn Cutoff ngày giao';

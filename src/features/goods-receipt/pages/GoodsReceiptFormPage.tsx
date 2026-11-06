@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import type { FC } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
@@ -6,6 +6,7 @@ import {
   ArrowLeft,
   ShieldCheck,
   UserCheck,
+  Loader2,
 } from 'lucide-react';
 import type {
   GrnCostSummary,
@@ -13,10 +14,12 @@ import type {
   GrnStatus,
   PaymentMethod,
   PaymentTerm,
+  PoLookupOption,
   UserRole,
 } from '../types/grn.types';
-import { MOCK_AVAILABLE_POS, MOCK_GOODS_RECEIPTS } from '../lib/mockGrnData';
-import { GrnFormHeaderCard } from '../components/form/GrnFormHeaderCard';
+import { goodsReceiptApi, type BackendGoodsReceiptDto } from '../api/goodsReceiptApi';
+import { branchApi } from '../../purchase-order/api/branchApi';
+import { GrnFormHeaderCard, type GrnBranchOption } from '../components/form/GrnFormHeaderCard';
 import { GrnProductEntryTable } from '../components/form/GrnProductEntryTable';
 import { GrnCostSummaryCard } from '../components/form/GrnCostSummaryCard';
 import { GrnFormActionBar } from '../components/form/GrnFormActionBar';
@@ -25,6 +28,37 @@ import { GrnPrintPreviewModal } from '../components/form/GrnPrintPreviewModal';
 import { AdminToast, type ToastState } from '../../admin/components';
 import '../../purchase-order/purchase-order.css';
 
+const mapPaymentMethod = (method: PaymentMethod): string => {
+  if (method === 'Cash') return 'CASH';
+  if (method === 'Bank') return 'BANK';
+  return 'AP';
+};
+
+const mapDtoToItems = (dto: BackendGoodsReceiptDto): GrnItemDetail[] =>
+  (dto.lines ?? []).map((l) => ({
+    id: l.id,
+    productId: l.productId,
+    purchaseOrderDetailId: l.purchaseOrderDetailId,
+    productCode: l.productCode,
+    productName: l.productName,
+    unit: l.unit,
+    orderedQty: l.orderedQty,
+    receivedQty: l.deliveredQty,
+    acceptedQty: l.acceptedQty,
+    rejectedQty: l.rejectedQty,
+    shortageQty: l.shortageQty,
+    differenceQty: l.differenceQty,
+    unitPrice: l.unitPrice,
+    lineTotal: l.lineAmount,
+    batchCode: l.batchCode,
+    manufactureDate: l.manufactureDate,
+    expiryDate: l.expiryDate,
+    hasBatches: l.hasBatches,
+    rejectionReason: l.rejectionReason as any,
+    rejectionNote: l.rejectionNote,
+    note: l.note,
+  }));
+
 export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
   defaultRole = 'store_owner',
 }) => {
@@ -32,46 +66,31 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
   const { id } = useParams<{ id: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // Role management
   const roleParam = searchParams.get('role') as UserRole | null;
   const [role, setRole] = useState<UserRole>(roleParam || defaultRole);
-  const employeeBranchId = searchParams.get('branch') || 'BR-01';
+  const employeeBranchId = searchParams.get('branch') || '';
 
-  // Read mode vs Edit/Create mode
   const isViewMode = Boolean(id && id !== 'create');
-  const existingReceipt = useMemo(() => {
-    if (!id || id === 'create') return null;
-    return MOCK_GOODS_RECEIPTS.find((r) => r.id === id || r.code === id) || null;
-  }, [id]);
+  const listPath =
+    role === 'employee'
+      ? `/employee/goods-receipts?branch=${encodeURIComponent(employeeBranchId)}&role=employee`
+      : '/store-owner/goods-receipts';
 
-  // Master Form State
-  const [grnNo] = useState<string>(() => {
-    if (existingReceipt) return existingReceipt.code;
-    return `GRN-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-009`;
-  });
+  const [availablePos, setAvailablePos] = useState<PoLookupOption[]>([]);
+  const [branches, setBranches] = useState<GrnBranchOption[]>([]);
+  const [selectedPoId, setSelectedPoId] = useState<string>('');
+  const [supplierId, setSupplierId] = useState<string>('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
-  const [branchId, setBranchId] = useState<string>(() => {
-    if (existingReceipt) return existingReceipt.branchId;
-    return role === 'employee' ? employeeBranchId : 'BR-01';
-  });
-
-  const [poReference, setPoReference] = useState<string>(() => {
-    if (existingReceipt) return existingReceipt.poReference;
-    return searchParams.get('poCode') || searchParams.get('po') || '';
-  });
-
-  const [supplierName, setSupplierName] = useState<string>(() => {
-    if (existingReceipt) return existingReceipt.supplierName;
-    return '';
-  });
-
-  const [supplierCode, setSupplierCode] = useState<string>(() => {
-    if (existingReceipt) return existingReceipt.supplierCode;
-    return '';
-  });
-
+  const [grnNo, setGrnNo] = useState<string>('(Tự sinh khi lưu)');
+  const [branchId, setBranchId] = useState<string>(employeeBranchId || '');
+  const [poReference, setPoReference] = useState<string>(
+    () => searchParams.get('poCode') || searchParams.get('po') || ''
+  );
+  const [supplierName, setSupplierName] = useState('');
+  const [supplierCode, setSupplierCode] = useState('');
   const [receiptTime] = useState<string>(() => {
-    if (existingReceipt) return existingReceipt.receiveDate;
     const now = new Date();
     const d = String(now.getDate()).padStart(2, '0');
     const m = String(now.getMonth() + 1).padStart(2, '0');
@@ -80,31 +99,18 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
     const mm = String(now.getMinutes()).padStart(2, '0');
     return `${d}/${m}/${y} ${hh}:${mm}`;
   });
-
-  const [invoiceNo, setInvoiceNo] = useState<string>('INV-998822');
-  const [createdBy] = useState<string>(() => {
-    if (existingReceipt) return existingReceipt.receiverName;
-    return role === 'employee' ? 'NV. Văn A (Thủ kho)' : 'Đức.DM (Quản lý kho)';
-  });
-
+  const [invoiceNo, setInvoiceNo] = useState('');
+  const [createdBy] = useState(
+    role === 'employee' ? 'NV. Thủ kho' : 'Quản lý kho'
+  );
   const [paymentTerm, setPaymentTerm] = useState<PaymentTerm>('30');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('Credit');
-  const [notes, setNotes] = useState<string>(() => {
-    if (existingReceipt) return existingReceipt.notes || '';
-    return 'Nhập bổ sung đợt hàng cuối tuần theo đơn đặt hàng PO.';
-  });
+  const [notes, setNotes] = useState('');
+  const [items, setItems] = useState<GrnItemDetail[]>([]);
+  const [landedCost, setLandedCost] = useState(0);
+  const [discountAmount, setDiscountAmount] = useState(0);
+  const [vatPercent, setVatPercent] = useState(0);
 
-  const [items, setItems] = useState<GrnItemDetail[]>(() => {
-    if (existingReceipt) return existingReceipt.items;
-    return [];
-  });
-
-  // Cost calculation states
-  const [landedCost, setLandedCost] = useState<number>(30000);
-  const [discountAmount, setDiscountAmount] = useState<number>(0);
-  const [vatPercent, setVatPercent] = useState<number>(0);
-
-  // Modals & Toast State
   const [isMismatchModalOpen, setIsMismatchModalOpen] = useState(false);
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
   const [toast, setToast] = useState<ToastState | null>(null);
@@ -114,104 +120,198 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
     setTimeout(() => setToast(null), 3500);
   };
 
-  // When PO is chosen or loaded from URL parameter, bind items and supplier
-  useEffect(() => {
-    if (!poReference || isViewMode) return;
-
-    const matchedPo = MOCK_AVAILABLE_POS.find((p) => p.poCode === poReference);
-    if (matchedPo) {
-      setSupplierName(matchedPo.supplierName);
-      setSupplierCode(matchedPo.supplierCode);
-      if (role !== 'employee') {
-        setBranchId(matchedPo.branchId);
+  const loadExisting = useCallback(async () => {
+    if (!id || id === 'create') return;
+    setIsLoading(true);
+    try {
+      const dto = await goodsReceiptApi.getGoodsReceiptById(id);
+      if (!dto) {
+        showToast('Không tìm thấy phiếu nhập kho.', 'error');
+        navigate(listPath);
+        return;
       }
-      setItems(matchedPo.items.map((it) => ({ ...it })));
-      if (matchedPo.notes) {
-        setNotes((prev) => prev || matchedPo.notes || '');
+      setGrnNo(dto.code);
+      setBranchId(dto.branchId);
+      setPoReference(dto.purchaseOrderCode || '');
+      setSelectedPoId(dto.purchaseOrderId || '');
+      setSupplierId(dto.supplierId);
+      setSupplierName(dto.supplierName);
+      setSupplierCode(dto.supplierCode);
+      setInvoiceNo(dto.invoiceNo || '');
+      setNotes(dto.note || '');
+      setLandedCost(dto.freightFee || 0);
+      setDiscountAmount(dto.discountAmount || 0);
+      setVatPercent(dto.vatPercent || 0);
+      setItems(mapDtoToItems(dto));
+    } catch (err: any) {
+      showToast(err.message || 'Không thể tải phiếu nhập kho.', 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [id, listPath, navigate]);
+
+  const loadPoLookup = useCallback(async () => {
+    if (isViewMode) return;
+    try {
+      const branchFilter = role === 'employee' && employeeBranchId ? employeeBranchId : undefined;
+      const pos = await goodsReceiptApi.getPoLookup(branchFilter);
+      setAvailablePos(pos);
+
+      const paramPo = searchParams.get('poCode') || searchParams.get('po');
+      if (paramPo) {
+        const matched = pos.find((p) => p.poCode === paramPo);
+        if (matched) {
+          setPoReference(matched.poCode);
+          setSelectedPoId(matched.id);
+        }
       }
+    } catch (err: any) {
+      showToast(err.message || 'Không thể tải danh sách PO.', 'error');
     }
-  }, [poReference, isViewMode, role]);
+  }, [isViewMode, role, employeeBranchId, searchParams]);
 
-  // Initial load if query param has poCode
   useEffect(() => {
-    const paramPo = searchParams.get('poCode') || searchParams.get('po');
-    if (paramPo && !poReference) {
-      setPoReference(paramPo);
-    }
-  }, [searchParams, poReference]);
+    const loadBranches = async () => {
+      try {
+        const res = await branchApi.getBranches({ status: 'active', pageIndex: 1, pageSize: 100 });
+        const options = (res.items ?? []).map((b) => ({
+          id: b.id,
+          label: `${b.code || ''} — ${b.name}`.trim(),
+        }));
+        setBranches(options);
+        if (!branchId && options[0] && role !== 'employee') {
+          setBranchId(options[0].id);
+        }
+      } catch (err: any) {
+        showToast(err.message || 'Không thể tải danh sách chi nhánh.', 'error');
+      }
+    };
+    void loadBranches();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  // Financial Calculations
+  useEffect(() => {
+    void loadExisting();
+  }, [loadExisting]);
+
+  useEffect(() => {
+    void loadPoLookup();
+  }, [loadPoLookup]);
+
+  useEffect(() => {
+    if (!selectedPoId || isViewMode) return;
+    let cancelled = false;
+
+    const loadDetails = async () => {
+      try {
+        const details = await goodsReceiptApi.getPoReceiptDetails(selectedPoId);
+        if (!details || cancelled) return;
+
+        setSupplierId(details.supplierId);
+        setSupplierName(details.supplierName);
+        setSupplierCode(details.supplierCode);
+        if (role !== 'employee') {
+          setBranchId(details.branchId);
+        }
+        setItems(
+          details.items.map((it) => ({
+            id: it.purchaseOrderDetailId,
+            productId: it.productId,
+            purchaseOrderDetailId: it.purchaseOrderDetailId,
+            productCode: it.productCode,
+            productName: it.productName,
+            unit: it.unit,
+            hasBatches: it.hasBatches,
+            orderedQty: it.orderedQty,
+            receivedQty: it.orderedQty,
+            acceptedQty: it.orderedQty,
+            rejectedQty: 0,
+            shortageQty: 0,
+            differenceQty: 0,
+            unitPrice: it.unitPrice,
+            lineTotal: it.orderedQty * it.unitPrice,
+            batchCode: '',
+            expiryDate: '',
+          }))
+        );
+      } catch (err: any) {
+        showToast(err.response?.data?.message || err.message || 'Không thể tải chi tiết PO.', 'error');
+      }
+    };
+
+    void loadDetails();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedPoId, isViewMode, role]);
+
   const costs: GrnCostSummary = useMemo(() => {
     const goodsTotal = items.reduce((acc, it) => acc + it.lineTotal, 0);
     const subtotalAfterDiscount = Math.max(0, goodsTotal - discountAmount + landedCost);
     const vatAmount = Math.round(subtotalAfterDiscount * (vatPercent / 100));
     const grandTotal = subtotalAfterDiscount + vatAmount;
-
-    return {
-      goodsTotal,
-      landedCost,
-      discountAmount,
-      vatPercent,
-      vatAmount,
-      grandTotal,
-    };
+    return { goodsTotal, landedCost, discountAmount, vatPercent, vatAmount, grandTotal };
   }, [items, landedCost, discountAmount, vatPercent]);
 
-  // Item field change handler
   const handleItemChange = (itemId: string, field: keyof GrnItemDetail, value: any) => {
     setItems((prev) =>
       prev.map((it) => {
         if (it.id !== itemId) return it;
-
         const updated = { ...it, [field]: value };
         if (field === 'receivedQty') {
-          updated.differenceQty = updated.receivedQty - updated.orderedQty;
-          updated.lineTotal = updated.receivedQty * updated.unitPrice;
+          const received = Number(value) || 0;
+          updated.receivedQty = received;
+          updated.acceptedQty = received;
+          updated.rejectedQty = 0;
+          updated.differenceQty = received - updated.orderedQty;
+          updated.lineTotal = received * updated.unitPrice;
+        }
+        if (field === 'acceptedQty') {
+          const accepted = Number(value) || 0;
+          updated.acceptedQty = accepted;
+          updated.rejectedQty = Math.max(0, (updated.receivedQty || 0) - accepted);
+          updated.differenceQty = accepted - updated.orderedQty;
+          updated.lineTotal = accepted * updated.unitPrice;
         }
         if (field === 'unitPrice') {
-          updated.lineTotal = updated.receivedQty * updated.unitPrice;
+          updated.lineTotal = (updated.acceptedQty ?? updated.receivedQty) * Number(value);
         }
         return updated;
       })
     );
   };
 
-  // Add a new custom item row
   const handleAddNewRow = () => {
-    const newIdx = items.length + 1;
-    const newItem: GrnItemDetail = {
-      id: `item-custom-${Date.now()}`,
-      productCode: `SKU-0099${newIdx}`,
-      productName: `Sản phẩm nhập bổ sung ${newIdx}`,
-      unit: 'Gói',
-      orderedQty: 0,
-      receivedQty: 1,
-      acceptedQty: 1,
-      rejectedQty: 0,
-      differenceQty: 1,
-      unitPrice: 50000,
-      lineTotal: 50000,
-      batchCode: `BAT-BS-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}`,
-      expiryDate: '2027-12-31',
-    };
-    setItems((prev) => [...prev, newItem]);
-    showToast('Đã thêm 1 dòng hàng bổ sung vào phiếu nhập kho', 'info');
+    showToast('V1 chỉ hỗ trợ nhập kho theo dòng hàng của đơn PO.', 'info');
   };
 
-  // Remove a row
   const handleRemoveRow = (itemId: string) => {
     if (items.length <= 1) {
       showToast('Phiếu nhập kho phải có ít nhất 1 mặt hàng!', 'error');
       return;
     }
     setItems((prev) => prev.filter((it) => it.id !== itemId));
-    showToast('Đã xóa dòng hàng', 'info');
   };
 
-  // Validate items before completing receipt
+  const handlePoChange = (poCode: string) => {
+    setPoReference(poCode);
+    const matched = availablePos.find((p) => p.poCode === poCode);
+    setSelectedPoId(matched?.id || '');
+    if (!matched) {
+      setItems([]);
+      setSupplierId('');
+      setSupplierName('');
+      setSupplierCode('');
+    }
+  };
+
   const validateForm = (): boolean => {
-    if (!poReference) {
+    if (!selectedPoId || !poReference) {
       showToast('Vui lòng chọn Đơn đặt hàng PO nguồn trước khi hoàn tất!', 'error');
+      return false;
+    }
+    if (!branchId) {
+      showToast('Thiếu chi nhánh nhận hàng.', 'error');
       return false;
     }
     if (items.length === 0) {
@@ -219,70 +319,113 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
       return false;
     }
 
-    // Check mandatory batchCode & expiryDate
-    const missingBatch = items.some((it) => it.receivedQty > 0 && !it.batchCode?.trim());
+    const missingBatch = items.some(
+      (it) => it.hasBatches && (it.acceptedQty ?? it.receivedQty) > 0 && !it.batchCode?.trim()
+    );
     if (missingBatch) {
-      showToast('Tất cả mặt hàng có số lượng nhận phải được nhập Mã Lô (Batch No)!', 'error');
+      showToast('Sản phẩm quản lý HSD bắt buộc phải nhập Mã Lô!', 'error');
       return false;
     }
 
-    const missingExp = items.some((it) => it.receivedQty > 0 && !it.expiryDate?.trim());
+    const missingExp = items.some(
+      (it) => it.hasBatches && (it.acceptedQty ?? it.receivedQty) > 0 && !it.expiryDate?.trim()
+    );
     if (missingExp) {
-      showToast('Tất cả mặt hàng có số lượng nhận phải được chọn Hạn sử dụng (EXP Date)!', 'error');
+      showToast('Sản phẩm quản lý HSD bắt buộc phải chọn Hạn sử dụng!', 'error');
       return false;
     }
 
     return true;
   };
 
-  // Actions
-  const handleSaveDraft = () => {
-    if (!poReference) {
-      showToast('Vui lòng chọn đơn đặt hàng PO trước khi lưu nháp!', 'error');
-      return;
+  const buildCreateCommand = (autoComplete: boolean) => ({
+    purchaseOrderId: selectedPoId,
+    supplierId,
+    branchId,
+    invoiceNo: invoiceNo || undefined,
+    freightFee: landedCost,
+    discountAmount,
+    vatPercent,
+    paymentMethod: mapPaymentMethod(paymentMethod),
+    note: notes || undefined,
+    autoComplete,
+    lines: items.map((it) => {
+      const delivered = it.receivedQty || 0;
+      const accepted = Math.min(it.acceptedQty ?? delivered, delivered, it.orderedQty);
+      const rejected = Math.max(0, delivered - accepted);
+      return {
+        productId: it.productId,
+        purchaseOrderDetailId: it.purchaseOrderDetailId,
+        orderedQty: it.orderedQty,
+        deliveredQty: delivered,
+        acceptedQty: accepted,
+        rejectedQty: rejected,
+        unitPrice: it.unitPrice,
+        batchCode: it.batchCode || undefined,
+        manufactureDate: it.manufactureDate || undefined,
+        expiryDate: it.expiryDate || undefined,
+        rejectionReason: rejected > 0 ? it.rejectionReason || 'OTHER' : undefined,
+        rejectionNote: it.rejectionNote,
+        note: it.note,
+      };
+    }),
+  });
+
+  const submitReceipt = async (autoComplete: boolean) => {
+    if (!validateForm()) return;
+    setIsSaving(true);
+    try {
+      const created = await goodsReceiptApi.createGoodsReceipt(buildCreateCommand(autoComplete));
+      showToast(
+        autoComplete
+          ? `Hoàn tất nhập kho ${created.code}. Tồn kho đã được cập nhật.`
+          : `Đã lưu nháp phiếu ${created.code}.`,
+        'success'
+      );
+      setTimeout(() => navigate(listPath), 900);
+    } catch (err: any) {
+      showToast(err.response?.data?.message || err.message || 'Lưu phiếu nhập kho thất bại.', 'error');
+    } finally {
+      setIsSaving(false);
     }
-    showToast(`Đã lưu nháp phiếu nhập kho ${grnNo} thành công (Draft)!`, 'success');
-    setTimeout(() => {
-      navigate('/store-owner/goods-receipts');
-    }, 1200);
   };
 
-  const executeCompleteReceipt = (forcedStatus?: GrnStatus) => {
-    const hasMismatch = items.some((it) => it.differenceQty !== 0);
-    const finalStatus: GrnStatus = forcedStatus || (hasMismatch ? 'MISMATCH' : 'CONFIRMED');
+  const handleSaveDraft = () => {
+    void submitReceipt(false);
+  };
 
-    showToast(
-      `Hoàn tất nhập kho thành công! Phiếu ${grnNo} đã chuyển sang ${finalStatus}. Tồn kho và lô FEFO đã được cập nhật.`,
-      'success'
-    );
-    setTimeout(() => {
-      navigate('/store-owner/goods-receipts');
-    }, 1400);
+  const executeCompleteReceipt = (_forcedStatus?: GrnStatus) => {
+    void submitReceipt(true);
   };
 
   const handleComplete = () => {
     if (!validateForm()) return;
-
-    const hasMismatch = items.some((it) => it.differenceQty !== 0);
+    const hasMismatch = items.some((it) => (it.acceptedQty ?? it.receivedQty) !== it.orderedQty);
     if (hasMismatch) {
       setIsMismatchModalOpen(true);
       return;
     }
-
     executeCompleteReceipt('CONFIRMED');
   };
 
   const handleCompleteAndPrint = () => {
     if (!validateForm()) return;
-
-    const hasMismatch = items.some((it) => it.differenceQty !== 0);
+    const hasMismatch = items.some((it) => (it.acceptedQty ?? it.receivedQty) !== it.orderedQty);
     if (hasMismatch) {
       setIsMismatchModalOpen(true);
       return;
     }
-
     setIsPrintModalOpen(true);
   };
+
+  if (isLoading) {
+    return (
+      <div style={{ padding: 48, display: 'flex', justifyContent: 'center', gap: 8, color: '#64748b' }}>
+        <Loader2 size={18} className="animate-spin" />
+        Đang tải phiếu nhập kho...
+      </div>
+    );
+  }
 
   return (
     <div
@@ -295,10 +438,8 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
         gap: 14,
       }}
     >
-      {/* Toast feedback */}
       <AdminToast toast={toast} onClose={() => setToast(null)} />
 
-      {/* ── Top Header Navigation Bar ── */}
       <div
         style={{
           display: 'flex',
@@ -311,7 +452,7 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <button
             type="button"
-            onClick={() => navigate('/store-owner/goods-receipts')}
+            onClick={() => navigate(listPath)}
             style={{
               width: 34,
               height: 34,
@@ -323,7 +464,6 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
               alignItems: 'center',
               justifyContent: 'center',
               cursor: 'pointer',
-              boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
             }}
             title="Quay lại danh sách phiếu nhập kho"
           >
@@ -348,6 +488,7 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
                   ? `Chi tiết phiếu nhập kho ${grnNo}`
                   : 'Lập phiếu nhập kho từ đơn PO (Goods Receipt Note)'}
               </span>
+              {isSaving && <Loader2 size={16} className="animate-spin" color="#0d9488" />}
             </h1>
             <p style={{ margin: '2px 0 0 0', fontSize: 12.5, color: '#64748b' }}>
               Đối soát số lượng thực nhận, kiểm tra hạn sử dụng FEFO và tính chi phí nhập kho
@@ -355,7 +496,6 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
           </div>
         </div>
 
-        {/* Role Toggle Pill Switcher */}
         <div
           style={{
             display: 'flex',
@@ -365,7 +505,6 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
             borderRadius: 8,
             border: '1px solid #cbd5e1',
           }}
-          title="Chuyển đổi góc nhìn vai trò"
         >
           <button
             type="button"
@@ -395,16 +534,15 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
             <ShieldCheck size={14} />
             <span>Chủ cửa hàng</span>
           </button>
-
           <button
             type="button"
             onClick={() => {
               setRole('employee');
               const params = new URLSearchParams(searchParams);
               params.set('role', 'employee');
-              params.set('branch', employeeBranchId);
+              if (employeeBranchId) params.set('branch', employeeBranchId);
               setSearchParams(params, { replace: true });
-              setBranchId(employeeBranchId);
+              if (employeeBranchId) setBranchId(employeeBranchId);
             }}
             style={{
               height: 28,
@@ -423,17 +561,17 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
             }}
           >
             <UserCheck size={14} />
-            <span>Thủ kho ({employeeBranchId})</span>
+            <span>Thủ kho</span>
           </button>
         </div>
       </div>
 
-      {/* ── Block 1: Header Info Card ── */}
       <GrnFormHeaderCard
         grnNo={grnNo}
         branchId={branchId}
         poReference={poReference}
-        availablePos={MOCK_AVAILABLE_POS}
+        availablePos={availablePos}
+        branches={branches}
         supplierName={supplierName}
         supplierCode={supplierCode}
         receiptTime={receiptTime}
@@ -443,47 +581,45 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
         paymentMethod={paymentMethod}
         role={role}
         employeeBranchId={employeeBranchId}
-        readOnly={isViewMode}
+        readOnly={isViewMode || isSaving}
         onBranchChange={setBranchId}
-        onPoChange={setPoReference}
+        onPoChange={handlePoChange}
         onInvoiceNoChange={setInvoiceNo}
         onPaymentTermChange={setPaymentTerm}
         onPaymentMethodChange={setPaymentMethod}
       />
 
-      {/* ── Block 2: Product Entry & FEFO Table ── */}
       <GrnProductEntryTable
         items={items}
-        readOnly={isViewMode}
+        readOnly={isViewMode || isSaving}
         onItemChange={handleItemChange}
         onAddNewRow={handleAddNewRow}
         onRemoveRow={handleRemoveRow}
       />
 
-      {/* ── Block 3: Cost Summary & Notes ── */}
       <GrnCostSummaryCard
         notes={notes}
         costs={costs}
-        readOnly={isViewMode}
+        readOnly={isViewMode || isSaving}
         onNotesChange={setNotes}
         onLandedCostChange={setLandedCost}
         onDiscountChange={setDiscountAmount}
         onVatPercentChange={setVatPercent}
       />
 
-      {/* ── Block 4: Fixed Bottom Action Bar ── */}
       <GrnFormActionBar
-        readOnly={isViewMode}
-        onCancel={() => navigate('/store-owner/goods-receipts')}
+        readOnly={isViewMode || isSaving}
+        onCancel={() => navigate(listPath)}
         onSaveDraft={handleSaveDraft}
         onCompleteAndPrint={handleCompleteAndPrint}
         onComplete={handleComplete}
       />
 
-      {/* Mismatch Confirmation Modal */}
       <GrnMismatchConfirmModal
         isOpen={isMismatchModalOpen}
-        mismatchedItems={items.filter((it) => it.differenceQty !== 0)}
+        mismatchedItems={items.filter(
+          (it) => (it.acceptedQty ?? it.receivedQty) !== it.orderedQty
+        )}
         onClose={() => setIsMismatchModalOpen(false)}
         onConfirm={() => {
           setIsMismatchModalOpen(false);
@@ -491,7 +627,6 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
         }}
       />
 
-      {/* Print Preview Modal */}
       <GrnPrintPreviewModal
         isOpen={isPrintModalOpen}
         grnNo={grnNo}
@@ -509,4 +644,5 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
     </div>
   );
 };
+
 export default GoodsReceiptFormPage;

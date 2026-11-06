@@ -68,6 +68,8 @@ export const supplierBranchApi = {
           assignedAt: item.assignedAt ? item.assignedAt.split('T')[0] : (item.createdAt ? item.createdAt.split('T')[0] : '—'),
           status: item.status === 'Active' || item.status === 1 ? 'Active' : 'Inactive',
           inactiveReason: item.inactiveReason || undefined,
+          deliveryDays: Array.isArray(item.deliveryDays) ? item.deliveryDays : [],
+          deliveryDaysDisplay: item.deliveryDaysDisplay || '—',
         }));
 
         return { items, total: paged.totalItems };
@@ -104,7 +106,11 @@ export const supplierBranchApi = {
     try {
       const res = await httpClient.post<ApiResponse<any>>(
         '/suppliers/branch-assignments/batch-to-branch',
-        input
+        {
+          branchId: input.branchId,
+          supplierIds: input.supplierIds,
+          items: input.items,
+        }
       );
       if (res.data?.success) {
         return true;
@@ -155,6 +161,28 @@ export const supplierBranchApi = {
       throw new Error(res.data?.message || 'Không thể cập nhật trạng thái phân bổ.');
     } catch (err: any) {
       throw new Error(err.response?.data?.message || err.message || 'Không thể cập nhật trạng thái phân bổ.');
+    }
+  },
+
+  /**
+   * Cập nhật ngày giao theo thứ cho phân bổ NCC × cửa hàng.
+   */
+  async updateAssignmentDeliveryDays(
+    supplierId: string,
+    branchId: string,
+    deliveryDays: string[]
+  ): Promise<boolean> {
+    try {
+      const res = await httpClient.patch<ApiResponse<any>>(
+        `/suppliers/${supplierId}/branches/${branchId}/delivery-days`,
+        { deliveryDays }
+      );
+      if (res.data?.success) {
+        return true;
+      }
+      throw new Error(res.data?.message || 'Không thể cập nhật ngày giao hàng.');
+    } catch (err: any) {
+      throw new Error(err.response?.data?.message || err.message || 'Không thể cập nhật ngày giao hàng.');
     }
   },
 };

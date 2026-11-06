@@ -341,7 +341,8 @@ export interface SplitGroupResult {
   supplierName: string;
   supplierCode?: string;
   deliveryDate: string;
-  status: 'SUCCESS' | 'FAILED' | 'SKIPPED' | 'ALREADY_FINALIZED';
+  status: 'SUCCESS' | 'AMENDED' | 'NO_CHANGES' | 'FAILED' | 'SKIPPED' | 'ALREADY_FINALIZED';
+  revisionNumber?: number;
   purchaseOrderId?: string;
   purchaseOrderCode?: string;
   errorCode?: string;

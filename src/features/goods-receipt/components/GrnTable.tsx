@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react';
-import type { FC } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
+import type { FC, CSSProperties } from 'react';
 import {
   ArrowUpDown,
   Printer,
@@ -20,6 +20,7 @@ interface GrnTableProps {
   totalCount: number;
   pageIndex: number;
   pageSize: number;
+  isLoading?: boolean;
   onPageChange: (newPage: number) => void;
   onPageSizeChange: (newSize: number) => void;
   onSelectReceipt: (receipt: GoodsReceiptListItem) => void;
@@ -30,15 +31,15 @@ interface GrnTableProps {
 type SortField = 'code' | 'receiveDate' | 'branchName' | 'supplierName' | 'totalAmount' | 'status';
 type SortOrder = 'asc' | 'desc';
 
-const formatCurrency = (val: number): string => {
-  return new Intl.NumberFormat('vi-VN').format(val);
-};
+const formatCurrency = (val: number): string =>
+  new Intl.NumberFormat('vi-VN').format(val);
 
 export const GrnTable: FC<GrnTableProps> = ({
   receipts,
   totalCount,
   pageIndex,
   pageSize,
+  isLoading = false,
   onPageChange,
   onPageSizeChange,
   onSelectReceipt,
@@ -106,371 +107,252 @@ export const GrnTable: FC<GrnTableProps> = ({
   const startItem = totalCount === 0 ? 0 : (pageIndex - 1) * pageSize + 1;
   const endItem = Math.min(pageIndex * pageSize, totalCount);
 
-  const renderStatusBadge = (status: GrnStatus) => {
-    switch (status) {
-      case 'TODAY':
-        return (
-          <span
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              padding: '2px 8px',
-              borderRadius: 4,
-              fontSize: 11.5,
-              fontWeight: 700,
-              backgroundColor: '#e0f2fe',
-              color: '#0369a1',
-              border: '1px solid #bae6fd',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            Scheduled
-          </span>
-        );
-      case 'DRAFT':
-        return (
-          <span
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              padding: '2px 8px',
-              borderRadius: 4,
-              fontSize: 11.5,
-              fontWeight: 700,
-              backgroundColor: '#fef3c7',
-              color: '#b45309',
-              border: '1px solid #fde68a',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            Draft
-          </span>
-        );
-      case 'CONFIRMED':
-        return (
-          <span
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              padding: '2px 8px',
-              borderRadius: 4,
-              fontSize: 11.5,
-              fontWeight: 700,
-              backgroundColor: '#dcfce7',
-              color: '#15803d',
-              border: '1px solid #86efac',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            Confirmed
-          </span>
-        );
-      case 'MISMATCH':
-        return (
-          <span
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              padding: '2px 8px',
-              borderRadius: 4,
-              fontSize: 11.5,
-              fontWeight: 700,
-              backgroundColor: '#fee2e2',
-              color: '#dc2626',
-              border: '1px solid #fca5a5',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            Mismatch
-          </span>
-        );
-      case 'CANCELED':
-        return (
-          <span
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              padding: '2px 8px',
-              borderRadius: 4,
-              fontSize: 11.5,
-              fontWeight: 700,
-              backgroundColor: '#f1f5f9',
-              color: '#64748b',
-              border: '1px solid #cbd5e1',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            Cancelled
-          </span>
-        );
+  const headerRef = useRef<HTMLDivElement>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const [hasScrollY, setHasScrollY] = useState(false);
+
+  useEffect(() => {
+    const updateScrollState = () => {
+      if (bodyRef.current) {
+        setHasScrollY(bodyRef.current.scrollHeight > bodyRef.current.clientHeight);
+      }
+    };
+
+    updateScrollState();
+
+    let observer: ResizeObserver | null = null;
+    if (bodyRef.current && typeof ResizeObserver !== 'undefined') {
+      observer = new ResizeObserver(() => updateScrollState());
+      observer.observe(bodyRef.current);
+    }
+
+    window.addEventListener('resize', updateScrollState);
+    return () => {
+      window.removeEventListener('resize', updateScrollState);
+      if (observer) observer.disconnect();
+    };
+  }, [sortedReceipts, pageSize, isLoading]);
+
+  const handleBodyScroll = () => {
+    if (headerRef.current && bodyRef.current) {
+      headerRef.current.scrollLeft = bodyRef.current.scrollLeft;
     }
   };
 
-  return (
-    <div
-      style={{
-        position: 'relative',
-        width: '100%',
-        backgroundColor: '#ffffff',
-        border: '1px solid #e2e8f0',
-        borderRadius: 12,
-        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)',
-        overflow: 'hidden',
-        display: 'flex',
-        flexDirection: 'column',
-      }}
-    >
-      {/* ── Table Container with Sticky Header ── */}
-      <div
+  const tableColGroup = (
+    <colgroup>
+      <col style={{ width: '13%' }} />
+      <col style={{ width: '9%' }} />
+      <col style={{ width: '14%' }} />
+      <col style={{ width: '14%' }} />
+      <col style={{ width: '11%' }} />
+      <col style={{ width: '5%' }} />
+      <col style={{ width: '10%' }} />
+      <col style={{ width: '8%' }} />
+      <col style={{ width: '8%' }} />
+      <col style={{ width: '8%' }} />
+    </colgroup>
+  );
+
+  const tableFitStyle: CSSProperties = {
+    width: '100%',
+    minWidth: 0,
+    tableLayout: 'fixed',
+  };
+
+  const thBaseStyle: CSSProperties = {
+    backgroundColor: '#f8fafc',
+    padding: '8px 8px',
+    fontSize: 11.5,
+    fontWeight: 700,
+    color: '#334155',
+    textTransform: 'uppercase',
+    letterSpacing: '0.02em',
+    whiteSpace: 'nowrap',
+    boxSizing: 'border-box',
+  };
+
+  const cellEllipsis: CSSProperties = {
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  };
+
+  const formatDisplayDate = (rawDate: string, fallback: string) => {
+    if (/^\d{4}-\d{2}-\d{2}/.test(rawDate)) {
+      const [y, m, d] = rawDate.slice(0, 10).split('-');
+      return `${d}/${m}/${y}`;
+    }
+    return fallback;
+  };
+
+  const renderStatusBadge = (status: GrnStatus) => {
+    const styles: Record<string, CSSProperties> = {
+      TODAY: { backgroundColor: '#e0f2fe', color: '#0369a1', border: '1px solid #bae6fd' },
+      DRAFT: { backgroundColor: '#fef3c7', color: '#b45309', border: '1px solid #fde68a' },
+      CONFIRMED: { backgroundColor: '#dcfce7', color: '#15803d', border: '1px solid #86efac' },
+      COMPLETED: { backgroundColor: '#dcfce7', color: '#15803d', border: '1px solid #86efac' },
+      MISMATCH: { backgroundColor: '#fee2e2', color: '#dc2626', border: '1px solid #fca5a5' },
+      CANCELED: { backgroundColor: '#f1f5f9', color: '#64748b', border: '1px solid #cbd5e1' },
+      CANCELLED: { backgroundColor: '#f1f5f9', color: '#64748b', border: '1px solid #cbd5e1' },
+    };
+    const labels: Record<string, string> = {
+      TODAY: 'Scheduled',
+      DRAFT: 'Draft',
+      CONFIRMED: 'Confirmed',
+      COMPLETED: 'Confirmed',
+      MISMATCH: 'Mismatch',
+      CANCELED: 'Cancelled',
+      CANCELLED: 'Cancelled',
+    };
+
+    return (
+      <span
         style={{
-          width: '100%',
-          overflowX: 'auto',
-          maxHeight: 'calc(100vh - 280px)',
-          minHeight: 320,
+          display: 'inline-flex',
+          alignItems: 'center',
+          padding: '2px 8px',
+          borderRadius: 4,
+          fontSize: 11.5,
+          fontWeight: 700,
+          whiteSpace: 'nowrap',
+          ...styles[status],
         }}
       >
-        <table
-          style={{
-            width: '100%',
-            minWidth: 1250,
-            borderCollapse: 'separate',
-            borderSpacing: 0,
-            fontSize: 13,
-            textAlign: 'left',
-          }}
-        >
-          {/* Column widths */}
-          <colgroup>
-            <col style={{ width: '12%' }} />
-            <col style={{ width: '11%' }} />
-            <col style={{ width: '13%' }} />
-            <col style={{ width: '13%' }} />
-            <col style={{ width: '11%' }} />
-            <col style={{ width: '6%' }} />
-            <col style={{ width: '10%' }} />
-            <col style={{ width: '8%' }} />
-            <col style={{ width: '7%' }} />
-            <col style={{ width: '9%' }} />
-          </colgroup>
+        {labels[status] || status}
+      </span>
+    );
+  };
 
-          {/* Sticky Header */}
+  const actionBtnBase: CSSProperties = {
+    height: 26,
+    padding: '0 8px',
+    fontSize: 11,
+    fontWeight: 600,
+    borderRadius: 4,
+    cursor: 'pointer',
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 3,
+  };
+
+  return (
+    <div className="so-list-table-card">
+      <div
+        ref={headerRef}
+        className="so-list-table-head"
+        style={{ paddingRight: hasScrollY ? 6 : 0, overflowX: 'hidden' }}
+      >
+        <table className="so-list-table" style={tableFitStyle}>
+          {tableColGroup}
           <thead>
-            <tr
-              style={{
-                position: 'sticky',
-                top: 0,
-                zIndex: 10,
-                backgroundColor: '#f8fafc',
-                borderBottom: '1px solid #cbd5e1',
-                color: '#475569',
-                fontSize: 12,
-                fontWeight: 700,
-                textTransform: 'uppercase',
-                letterSpacing: 0.4,
-              }}
-            >
-              {/* 1. Mã GRN */}
-              <th
-                onClick={() => handleSort('code')}
-                style={{
-                  padding: '9px 10px',
-                  borderBottom: '1px solid #cbd5e1',
-                  cursor: 'pointer',
-                  userSelect: 'none',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span>MÃ PHIẾU GRN</span>
-                  <ArrowUpDown size={12} color="#94a3b8" />
-                </div>
-              </th>
-
-              {/* 2. Ngày nhận */}
-              <th
-                onClick={() => handleSort('receiveDate')}
-                style={{
-                  padding: '9px 10px',
-                  borderBottom: '1px solid #cbd5e1',
-                  cursor: 'pointer',
-                  userSelect: 'none',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span>NGÀY NHẬN</span>
-                  <ArrowUpDown size={12} color="#94a3b8" />
-                </div>
-              </th>
-
-              {/* 3. Chi nhánh */}
-              <th
-                onClick={() => handleSort('branchName')}
-                style={{
-                  padding: '9px 10px',
-                  borderBottom: '1px solid #cbd5e1',
-                  cursor: 'pointer',
-                  userSelect: 'none',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span>CHI NHÁNH</span>
-                  <ArrowUpDown size={12} color="#94a3b8" />
-                </div>
-              </th>
-
-              {/* 4. Nhà cung cấp */}
-              <th
-                onClick={() => handleSort('supplierName')}
-                style={{
-                  padding: '9px 10px',
-                  borderBottom: '1px solid #cbd5e1',
-                  cursor: 'pointer',
-                  userSelect: 'none',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span>NHÀ CUNG CẤP</span>
-                  <ArrowUpDown size={12} color="#94a3b8" />
-                </div>
-              </th>
-
-              {/* 5. Mã PO gốc */}
-              <th style={{ padding: '9px 10px', borderBottom: '1px solid #cbd5e1', whiteSpace: 'nowrap' }}>
-                PO GỐC
-              </th>
-
-              {/* 6. Số lượng dòng */}
-              <th style={{ padding: '9px 10px', textAlign: 'center', borderBottom: '1px solid #cbd5e1', whiteSpace: 'nowrap' }}>
-                SỐ DÒNG
-              </th>
-
-              {/* 7. Tổng tiền */}
+            <tr>
+              {(
+                [
+                  ['code', 'Mã GRN'],
+                  ['receiveDate', 'Ngày nhận'],
+                  ['branchName', 'Chi nhánh'],
+                  ['supplierName', 'Nhà cung cấp'],
+                ] as Array<[SortField, string]>
+              ).map(([field, label]) => (
+                <th
+                  key={field}
+                  onClick={() => handleSort(field)}
+                  style={{ ...thBaseStyle, cursor: 'pointer', userSelect: 'none' }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <span>{label}</span>
+                    <ArrowUpDown size={11} color={sortField === field ? '#0f766e' : '#94a3b8'} />
+                  </div>
+                </th>
+              ))}
+              <th style={thBaseStyle}>PO</th>
+              <th style={{ ...thBaseStyle, textAlign: 'center' }}>Dòng</th>
               <th
                 onClick={() => handleSort('totalAmount')}
-                style={{
-                  padding: '9px 10px',
-                  textAlign: 'right',
-                  borderBottom: '1px solid #cbd5e1',
-                  cursor: 'pointer',
-                  userSelect: 'none',
-                  whiteSpace: 'nowrap',
-                }}
+                style={{ ...thBaseStyle, cursor: 'pointer', userSelect: 'none', textAlign: 'right' }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 6 }}>
-                  <span>TỔNG TIỀN (VNĐ)</span>
-                  <ArrowUpDown size={12} color="#94a3b8" />
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4 }}>
+                  <span>Tổng tiền</span>
+                  <ArrowUpDown size={11} color={sortField === 'totalAmount' ? '#0f766e' : '#94a3b8'} />
                 </div>
               </th>
-
-              {/* 8. Trạng thái */}
               <th
                 onClick={() => handleSort('status')}
-                style={{
-                  padding: '9px 10px',
-                  textAlign: 'center',
-                  borderBottom: '1px solid #cbd5e1',
-                  cursor: 'pointer',
-                  userSelect: 'none',
-                  whiteSpace: 'nowrap',
-                }}
+                style={{ ...thBaseStyle, cursor: 'pointer', userSelect: 'none', textAlign: 'center' }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-                  <span>TRẠNG THÁI</span>
-                  <ArrowUpDown size={12} color="#94a3b8" />
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+                  <span>Trạng thái</span>
+                  <ArrowUpDown size={11} color={sortField === 'status' ? '#0f766e' : '#94a3b8'} />
                 </div>
               </th>
-
-              {/* 9. Người nhận */}
-              <th style={{ padding: '9px 10px', borderBottom: '1px solid #cbd5e1', whiteSpace: 'nowrap' }}>
-                NGƯỜI NHẬN
-              </th>
-
-              {/* 10. Thao tác */}
-              <th style={{ padding: '9px 10px', textAlign: 'center', borderBottom: '1px solid #cbd5e1', whiteSpace: 'nowrap' }}>
-                THAO TÁC
-              </th>
+              <th style={thBaseStyle}>Người nhận</th>
+              <th style={{ ...thBaseStyle, textAlign: 'center' }}>Thao tác</th>
             </tr>
           </thead>
+        </table>
+      </div>
 
-          {/* Table Body */}
+      <div
+        ref={bodyRef}
+        className="so-list-table-body supplier-table-scroll-container"
+        onScroll={handleBodyScroll}
+        style={{ overflowX: 'hidden' }}
+      >
+        <table className="so-list-table" style={tableFitStyle}>
+          {tableColGroup}
           <tbody>
-            {sortedReceipts.length === 0 ? (
+            {isLoading ? (
               <tr>
-                <td colSpan={10} style={{ padding: '50px 20px', textAlign: 'center', color: '#64748b' }}>
-                  <div
-                    style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: 12,
-                    }}
-                  >
-                    <PackageOpen size={44} color="#94a3b8" strokeWidth={1.5} />
-                    <div style={{ fontSize: 15, fontWeight: 700, color: '#334155' }}>
-                      Không tìm thấy phiếu nhập kho hoặc lịch nhận hàng nào
-                    </div>
-                    <div style={{ fontSize: 13, color: '#64748b', maxWidth: 440 }}>
-                      Không có bản ghi nào khớp với điều kiện lọc hiện tại. Vui lòng kiểm tra lại từ khóa hoặc khoảng ngày.
-                    </div>
+                <td colSpan={10} style={{ textAlign: 'center', padding: '48px 16px', color: '#64748b' }}>
+                  Đang tải danh sách phiếu nhập kho...
+                </td>
+              </tr>
+            ) : sortedReceipts.length === 0 ? (
+              <tr>
+                <td
+                  colSpan={10}
+                  style={{
+                    textAlign: 'center',
+                    padding: '48px 16px',
+                    color: '#64748b',
+                    fontSize: 13,
+                    borderBottom: '1px solid #f1f5f9',
+                  }}
+                >
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+                    <PackageOpen size={36} color="#cbd5e1" />
+                    <span style={{ fontWeight: 600, color: '#475569' }}>
+                      Không có phiếu nhập kho phù hợp bộ lọc
+                    </span>
+                    <span style={{ fontSize: 12, color: '#94a3b8' }}>
+                      Thử đổi điều kiện lọc hoặc tạo phiếu nhập kho từ PO.
+                    </span>
                     <button
                       type="button"
                       onClick={onResetFilters}
-                      style={{
-                        marginTop: 4,
-                        height: 32,
-                        padding: '0 14px',
-                        borderRadius: 6,
-                        border: '1px solid #cbd5e1',
-                        backgroundColor: '#ffffff',
-                        color: '#334155',
-                        fontSize: 12.5,
-                        fontWeight: 600,
-                        cursor: 'pointer',
-                      }}
+                      className="po-btn po-btn-secondary"
+                      style={{ marginTop: 8, height: 32, padding: '0 14px' }}
                     >
-                      Đặt lại bộ lọc tìm kiếm
+                      Đặt lại bộ lọc
                     </button>
                   </div>
                 </td>
               </tr>
             ) : (
               sortedReceipts.map((row) => {
+                const isMismatch = row.status === 'MISMATCH' || !!row.hasMismatch;
                 const isToday = row.status === 'TODAY';
-                const isMismatch = row.status === 'MISMATCH';
 
                 return (
                   <tr
                     key={row.id}
+                    className="so-list-row"
                     style={{
-                      borderBottom: '1px solid #f1f5f9',
-                      backgroundColor: isToday
-                        ? '#fcfdff'
-                        : isMismatch
-                        ? '#fffbfb'
-                        : '#ffffff',
-                      transition: 'background-color 0.15s ease',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = isToday
-                        ? '#f0f7ff'
-                        : isMismatch
-                        ? '#fff1f0'
-                        : '#f8fafc';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = isToday
-                        ? '#fcfdff'
-                        : isMismatch
-                        ? '#fffbfb'
-                        : '#ffffff';
+                      backgroundColor: isToday ? '#fcfdff' : isMismatch ? '#fffbfb' : undefined,
                     }}
                   >
-                    {/* 1. Mã GRN */}
-                    <td style={{ padding: '7px 10px', borderBottom: '1px solid #f1f5f9', whiteSpace: 'nowrap' }}>
+                    <td style={cellEllipsis} title={row.code}>
                       <button
                         type="button"
                         onClick={() => onSelectReceipt(row)}
@@ -481,114 +363,87 @@ export const GrnTable: FC<GrnTableProps> = ({
                           cursor: 'pointer',
                           color: '#0d9488',
                           fontWeight: 700,
-                          fontSize: 13,
+                          fontSize: 12.5,
                           fontFamily: 'monospace',
-                          textAlign: 'left',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: 5,
                           textDecoration: 'underline',
                           textUnderlineOffset: 3,
-                          whiteSpace: 'nowrap',
+                          maxWidth: '100%',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
                         }}
-                        title="Bấm để xem chi tiết đối soát phiếu này"
+                        title={row.code}
                       >
-                        <FileText size={13} color="#0d9488" />
-                        <span>{row.code}</span>
+                        {row.code}
                       </button>
                     </td>
 
-                    {/* 2. Ngày nhận */}
-                    <td style={{ padding: '7px 10px', fontSize: 12, borderBottom: '1px solid #f1f5f9', whiteSpace: 'nowrap' }}>
-                      <span style={{ fontWeight: 500, color: isToday ? '#0369a1' : '#1e293b' }}>
-                        {row.receiveDate}
-                      </span>
+                    <td
+                      style={{ ...cellEllipsis, fontSize: 12, fontWeight: 500, color: isToday ? '#0369a1' : '#1e293b' }}
+                      title={row.receiveDate}
+                    >
+                      {formatDisplayDate(row.rawDate, row.receiveDate)}
                     </td>
 
-                    {/* 3. Chi nhánh */}
-                    <td style={{ padding: '7px 10px', fontSize: 12.5, fontWeight: 500, color: '#1e293b', borderBottom: '1px solid #f1f5f9', whiteSpace: 'nowrap' }}>
+                    <td style={{ ...cellEllipsis, fontSize: 12.5, fontWeight: 500 }} title={row.branchName}>
                       {row.branchName}
                     </td>
 
-                    {/* 4. Nhà cung cấp */}
-                    <td style={{ padding: '7px 10px', fontSize: 12.5, borderBottom: '1px solid #f1f5f9', whiteSpace: 'nowrap' }}>
-                      <span style={{ fontWeight: 600, color: '#0f172a' }}>{row.supplierName}</span>{' '}
-                      <span style={{ fontSize: 11, color: '#64748b' }}>({row.supplierCode})</span>
+                    <td style={{ ...cellEllipsis, fontSize: 12.5, fontWeight: 600 }} title={row.supplierName}>
+                      {row.supplierName}
                     </td>
 
-                    {/* 5. PO gốc */}
-                    <td style={{ padding: '7px 10px', fontSize: 12, borderBottom: '1px solid #f1f5f9', whiteSpace: 'nowrap' }}>
+                    <td style={cellEllipsis} title={row.poReference}>
                       {row.poReference !== '—' && row.poReference !== '-' ? (
-                        <span style={{ color: '#0d9488', fontWeight: 600, fontFamily: 'monospace' }}>{row.poReference}</span>
+                        <span style={{ color: '#0d9488', fontWeight: 600, fontFamily: 'monospace', fontSize: 12 }}>
+                          {row.poReference}
+                        </span>
                       ) : (
                         <span style={{ color: '#94a3b8' }}>—</span>
                       )}
                     </td>
 
-                    {/* 6. Số lượng dòng */}
-                    <td style={{ padding: '7px 10px', textAlign: 'center', fontSize: 12.5, color: '#475569', borderBottom: '1px solid #f1f5f9', whiteSpace: 'nowrap' }}>
-                      {row.lineCount} dòng
+                    <td style={{ textAlign: 'center', fontSize: 12.5, color: '#475569' }}>
+                      {row.lineCount}
                     </td>
 
-                    {/* 7. Tổng tiền */}
                     <td
                       style={{
-                        padding: '7px 10px',
                         textAlign: 'right',
                         fontWeight: 700,
-                        fontSize: 13,
+                        fontSize: 12.5,
                         fontFamily: 'monospace',
-                        color: '#0f172a',
-                        borderBottom: '1px solid #f1f5f9',
-                        whiteSpace: 'nowrap',
+                        ...cellEllipsis,
                       }}
+                      title={formatCurrency(row.totalAmount)}
                     >
                       {formatCurrency(row.totalAmount)}
                     </td>
 
-                    {/* 8. Trạng thái */}
-                    <td style={{ padding: '7px 10px', textAlign: 'center', borderBottom: '1px solid #f1f5f9', whiteSpace: 'nowrap' }}>
-                      {renderStatusBadge(row.status)}
-                    </td>
+                    <td style={{ textAlign: 'center' }}>{renderStatusBadge(row.status)}</td>
 
-                    {/* 9. Người nhận */}
-                    <td style={{ padding: '7px 10px', fontSize: 12, color: '#475569', borderBottom: '1px solid #f1f5f9', whiteSpace: 'nowrap' }}>
+                    <td style={{ ...cellEllipsis, fontSize: 12, color: '#475569' }} title={row.receiverName}>
                       {row.receiverName}
                     </td>
 
-                    {/* 10. Thao tác */}
-                    <td style={{ padding: '7px 10px', textAlign: 'center', borderBottom: '1px solid #f1f5f9', whiteSpace: 'nowrap' }}>
-                      <div
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: 6,
-                          flexWrap: 'nowrap',
-                        }}
-                      >
+                    <td style={{ textAlign: 'center', overflow: 'visible' }}>
+                      <div className="so-list-actions" style={{ justifyContent: 'center', flexWrap: 'nowrap', gap: 4 }}>
                         {row.status === 'TODAY' && (
                           <button
                             type="button"
+                            className="so-list-action-btn"
                             onClick={() => onActionClick('RECEIVE_NOW', row)}
                             style={{
-                              height: 28,
-                              padding: '0 10px',
-                              fontSize: 11.5,
+                              ...actionBtnBase,
+                              height: 26,
+                              padding: '0 8px',
                               fontWeight: 700,
-                              borderRadius: 5,
                               border: 'none',
                               backgroundColor: 'var(--blue-primary, #0f766e)',
                               color: '#ffffff',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: 4,
-                              cursor: 'pointer',
                             }}
                             title="Bắt đầu kiểm đếm và nhận hàng ngay"
                           >
                             <ArrowRightCircle size={13} />
-                            <span>Nhập kho ngay</span>
                           </button>
                         )}
 
@@ -598,128 +453,72 @@ export const GrnTable: FC<GrnTableProps> = ({
                               type="button"
                               onClick={() => onActionClick('APPROVE_DRAFT', row)}
                               style={{
-                                height: 26,
-                                padding: '0 8px',
-                                fontSize: 11,
+                                ...actionBtnBase,
                                 fontWeight: 700,
-                                borderRadius: 4,
                                 border: 'none',
                                 backgroundColor: '#d97706',
                                 color: '#ffffff',
-                                cursor: 'pointer',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: 3,
                               }}
                               title="Duyệt hoàn tất phiếu nhập kho"
                             >
                               <FileCheck2 size={12} />
-                              <span>Duyệt</span>
                             </button>
                             <button
                               type="button"
+                              className="so-list-action-btn"
                               onClick={() => onActionClick('EDIT_DRAFT', row)}
-                              style={{
-                                height: 26,
-                                padding: '0 8px',
-                                fontSize: 11,
-                                fontWeight: 600,
-                                borderRadius: 4,
-                                border: '1px solid #cbd5e1',
-                                backgroundColor: '#ffffff',
-                                color: '#475569',
-                                cursor: 'pointer',
-                              }}
+                              style={actionBtnBase}
                               title="Sửa chi tiết phiếu kiểm đếm"
                             >
                               <FileEdit size={12} />
-                              <span>Sửa</span>
                             </button>
                           </>
                         )}
 
-                        {row.status === 'MISMATCH' && (
+                        {(row.status === 'MISMATCH' || (row.hasMismatch && row.status === 'CONFIRMED')) && (
                           <>
                             <button
                               type="button"
                               onClick={() => onActionClick('RESOLVE_MISMATCH', row)}
                               style={{
-                                height: 26,
-                                padding: '0 8px',
-                                fontSize: 11,
+                                ...actionBtnBase,
                                 fontWeight: 700,
-                                borderRadius: 4,
                                 backgroundColor: '#fee2e2',
                                 color: '#dc2626',
                                 border: '1px solid #fca5a5',
-                                cursor: 'pointer',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: 3,
                               }}
-                              title="Xem biên bản đối soát và xử lý lệch"
+                              title="Xử lý lệch"
                             >
                               <AlertCircle size={12} />
-                              <span>Xử lý lệch</span>
                             </button>
                             <button
                               type="button"
+                              className="so-list-action-btn"
                               onClick={() => onSelectReceipt(row)}
-                              style={{
-                                height: 26,
-                                padding: '0 8px',
-                                fontSize: 11,
-                                fontWeight: 600,
-                                borderRadius: 4,
-                                border: '1px solid #cbd5e1',
-                                backgroundColor: '#ffffff',
-                                color: '#475569',
-                                cursor: 'pointer',
-                              }}
-                              title="Xem chi tiết"
+                              style={actionBtnBase}
+                              title="Chi tiết"
                             >
-                              Chi tiết
+                              <FileText size={12} />
                             </button>
                           </>
                         )}
 
-                        {row.status === 'CONFIRMED' && (
+                        {(row.status === 'CONFIRMED' || row.status === 'COMPLETED') && !row.hasMismatch && (
                           <>
                             <button
                               type="button"
+                              className="so-list-action-btn"
                               onClick={() => onActionClick('VIEW_BATCH', row)}
-                              style={{
-                                height: 26,
-                                padding: '0 8px',
-                                fontSize: 11,
-                                fontWeight: 600,
-                                borderRadius: 4,
-                                border: '1px solid #cbd5e1',
-                                backgroundColor: '#ffffff',
-                                color: '#0d9488',
-                                cursor: 'pointer',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: 3,
-                              }}
-                              title="Xem danh sách lô hàng FEFO đã gán"
+                              style={{ ...actionBtnBase, color: '#0d9488' }}
+                              title="Xem lô FEFO"
                             >
                               <Layers size={12} />
-                              <span>Lô Batch</span>
                             </button>
                             <button
                               type="button"
+                              className="so-list-action-btn"
                               onClick={() => onActionClick('PRINT_RECEIPT', row)}
-                              style={{
-                                height: 26,
-                                padding: '0 8px',
-                                fontSize: 11,
-                                borderRadius: 4,
-                                border: '1px solid #cbd5e1',
-                                backgroundColor: '#ffffff',
-                                color: '#475569',
-                                cursor: 'pointer',
-                              }}
+                              style={actionBtnBase}
                               title="In phiếu nhập kho"
                             >
                               <Printer size={12} />
@@ -727,23 +526,15 @@ export const GrnTable: FC<GrnTableProps> = ({
                           </>
                         )}
 
-                        {row.status === 'CANCELED' && (
+                        {(row.status === 'CANCELED' || row.status === 'CANCELLED') && (
                           <button
                             type="button"
+                            className="so-list-action-btn"
                             onClick={() => onSelectReceipt(row)}
-                            style={{
-                              height: 26,
-                              padding: '0 8px',
-                              fontSize: 11,
-                              fontWeight: 600,
-                              borderRadius: 4,
-                              border: '1px solid #cbd5e1',
-                              backgroundColor: '#ffffff',
-                              color: '#64748b',
-                              cursor: 'pointer',
-                            }}
+                            style={{ ...actionBtnBase, color: '#64748b' }}
+                            title="Chi tiết"
                           >
-                            Chi tiết
+                            <FileText size={12} />
                           </button>
                         )}
                       </div>
@@ -756,103 +547,44 @@ export const GrnTable: FC<GrnTableProps> = ({
         </table>
       </div>
 
-      {/* ── Pagination Footer matching PoListTable exact structure ── */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          flexWrap: 'wrap',
-          gap: 12,
-          padding: '12px 18px',
-          borderTop: '1px solid #e2e8f0',
-          backgroundColor: '#f8fafc',
-          fontSize: 12.5,
-          color: '#475569',
-        }}
-      >
-        {/* Bên trái: Thông tin tổng số dòng + Chọn PageSize */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-          <span>
+      <div className="so-list-pager">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+          <div>
             Hiển thị <b>{startItem}</b> - <b>{endItem}</b> trong tổng số <b>{totalCount}</b> phiếu
-          </span>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span>Hiển thị:</span>
+          </div>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ color: '#64748b' }}>Bản ghi/trang:</span>
             <select
+              className="so-list-pager-select"
               value={pageSize}
               onChange={(e) => onPageSizeChange(Number(e.target.value))}
-              style={{
-                height: 28,
-                padding: '0 8px',
-                borderRadius: 5,
-                border: '1px solid #cbd5e1',
-                backgroundColor: '#ffffff',
-                color: '#0f172a',
-                fontSize: 12,
-                fontWeight: 600,
-                cursor: 'pointer',
-                outline: 'none',
-              }}
             >
               <option value={10}>10</option>
               <option value={20}>20</option>
               <option value={30}>30</option>
               <option value={50}>50</option>
             </select>
-            <span>dòng/trang</span>
           </div>
         </div>
 
-        {/* Bên phải: Nút Trước / Trang x / y / Sau */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <button
             type="button"
+            className="so-list-pager-btn"
             disabled={pageIndex <= 1}
             onClick={() => onPageChange(pageIndex - 1)}
-            style={{
-              height: 28,
-              padding: '0 8px',
-              borderRadius: 6,
-              border: '1px solid #cbd5e1',
-              backgroundColor: '#ffffff',
-              color: pageIndex <= 1 ? '#94a3b8' : '#334155',
-              cursor: pageIndex <= 1 ? 'not-allowed' : 'pointer',
-              opacity: pageIndex <= 1 ? 0.45 : 1,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 4,
-              fontSize: 12,
-              fontWeight: 600,
-            }}
           >
             <ChevronLeft size={13} />
             <span>Trước</span>
           </button>
-
           <span style={{ padding: '0 8px', fontWeight: 600, color: '#0f172a' }}>
             Trang {pageIndex} / {totalPages}
           </span>
-
           <button
             type="button"
+            className="so-list-pager-btn"
             disabled={pageIndex >= totalPages}
             onClick={() => onPageChange(pageIndex + 1)}
-            style={{
-              height: 28,
-              padding: '0 8px',
-              borderRadius: 6,
-              border: '1px solid #cbd5e1',
-              backgroundColor: '#ffffff',
-              color: pageIndex >= totalPages ? '#94a3b8' : '#334155',
-              cursor: pageIndex >= totalPages ? 'not-allowed' : 'pointer',
-              opacity: pageIndex >= totalPages ? 0.45 : 1,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 4,
-              fontSize: 12,
-              fontWeight: 600,
-            }}
           >
             <span>Sau</span>
             <ChevronRight size={13} />

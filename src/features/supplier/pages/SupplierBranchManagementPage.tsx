@@ -14,7 +14,10 @@ import {
 } from '../components/branches/SupplierBranchFilterBar';
 import { SupplierBranchTable } from '../components/branches/SupplierBranchTable';
 import { AssignBranchModal } from '../components/branches/AssignBranchModal';
-import { AssignmentStatusModal } from '../components/branches/AssignmentStatusModal';
+import {
+  EditAssignmentModal,
+  type EditAssignmentSavePayload,
+} from '../components/branches/EditAssignmentModal';
 import { AdminToast, type ToastState } from '../../admin/components';
 import { supplierBranchApi } from '../api/supplierBranchApi';
 import { supplierApi } from '../api/supplierApi';
@@ -53,8 +56,8 @@ export const SupplierBranchManagementPage: FC = () => {
 
   // Modals state
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
-  const [statusItem, setStatusItem] = useState<SupplierBranchAssignmentItem | null>(null);
-  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const [editItem, setEditItem] = useState<SupplierBranchAssignmentItem | null>(null);
+  const [isUpdatingEdit, setIsUpdatingEdit] = useState(false);
 
   // Toast notification state
   const [toast, setToast] = useState<ToastState | null>(null);
@@ -143,6 +146,16 @@ export const SupplierBranchManagementPage: FC = () => {
   const handleAssignBranches = async (input: AssignSuppliersToBranchInput) => {
     try {
       await supplierBranchApi.assignSuppliersToBranch(input);
+      if (input.status === 'Inactive') {
+        for (const supplierId of input.supplierIds) {
+          await supplierBranchApi.updateAssignmentStatus(
+            supplierId,
+            input.branchId,
+            'Inactive',
+            input.inactiveReason
+          );
+        }
+      }
       showToast(`Đã phân bổ thành công ${input.supplierIds.length} nhà cung cấp cho cửa hàng.`);
       setIsAssignModalOpen(false);
       await fetchAssignments();
@@ -151,33 +164,33 @@ export const SupplierBranchManagementPage: FC = () => {
     }
   };
 
-  const handleToggleStatus = (item: SupplierBranchAssignmentItem) => {
-    setStatusItem(item);
-  };
-
-  const handleConfirmStatus = async (reason?: string) => {
-    if (!statusItem) return;
-
-    const nextStatus = statusItem.status === 'Active' ? 'Inactive' : 'Active';
-    setIsUpdatingStatus(true);
+  const handleSaveEdit = async (payload: EditAssignmentSavePayload) => {
+    if (!editItem) return;
+    setIsUpdatingEdit(true);
     try {
-      await supplierBranchApi.updateAssignmentStatus(
-        statusItem.supplierId,
-        statusItem.branchId,
-        nextStatus,
-        reason
+      const statusChanged = payload.status !== editItem.status;
+      if (statusChanged) {
+        await supplierBranchApi.updateAssignmentStatus(
+          editItem.supplierId,
+          editItem.branchId,
+          payload.status,
+          payload.inactiveReason
+        );
+      }
+
+      await supplierBranchApi.updateAssignmentDeliveryDays(
+        editItem.supplierId,
+        editItem.branchId,
+        payload.deliveryDays
       );
-      showToast(
-        nextStatus === 'Inactive'
-          ? `Đã tạm ngưng phân bổ tại "${statusItem.branchName}".`
-          : `Đã kích hoạt phân bổ tại "${statusItem.branchName}".`
-      );
-      setStatusItem(null);
+
+      showToast(`Đã cập nhật phân bổ tại "${editItem.branchName}".`);
+      setEditItem(null);
       await fetchAssignments();
     } catch (err: any) {
-      showToast(err.message || 'Không thể cập nhật trạng thái phân bổ.', 'error');
+      showToast(err.message || 'Không thể cập nhật phân bổ.', 'error');
     } finally {
-      setIsUpdatingStatus(false);
+      setIsUpdatingEdit(false);
     }
   };
 
@@ -354,7 +367,7 @@ export const SupplierBranchManagementPage: FC = () => {
         pageSize={appliedFilters.pageSize}
         onPageChange={handlePageChange}
         onPageSizeChange={handlePageSizeChange}
-        onToggleStatus={handleToggleStatus}
+        onEdit={(item) => setEditItem(item)}
         onOpenAssignModal={() => setIsAssignModalOpen(true)}
       />
 
@@ -369,13 +382,13 @@ export const SupplierBranchManagementPage: FC = () => {
         onAssign={handleAssignBranches}
       />
 
-      <AssignmentStatusModal
-        item={statusItem}
-        isSubmitting={isUpdatingStatus}
+      <EditAssignmentModal
+        item={editItem}
+        isSubmitting={isUpdatingEdit}
         onClose={() => {
-          if (!isUpdatingStatus) setStatusItem(null);
+          if (!isUpdatingEdit) setEditItem(null);
         }}
-        onConfirm={handleConfirmStatus}
+        onSave={handleSaveEdit}
       />
     </div>
   );

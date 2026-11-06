@@ -9,6 +9,7 @@ import { PoListTable } from '../components/po-list/PoListTable';
 import { PoDetailDrawer } from '../components/po-list/PoDetailDrawer';
 import { AdminToast, type ToastState } from '../../admin/components';
 import '../purchase-order.css';
+import '../../supplier/supplier.css';
 
 const DEFAULT_FILTERS: PoListFilterState = {
   branchId: 'all',
@@ -197,43 +198,35 @@ export const StoreOwnerPurchaseOrderListPage: FC = () => {
   };
 
   return (
-    <div className="po-matrix-container" style={{ width: '100%' }}>
+    <div
+      className="po-matrix-container"
+      style={{
+        width: '100%',
+        height: '100%',
+        maxHeight: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        minHeight: 0,
+        flex: 1,
+        overflow: 'hidden',
+      }}
+    >
       <AdminToast toast={toast} onClose={() => setToast(null)} />
 
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          flexWrap: 'wrap',
-          gap: 12,
-          marginBottom: 10,
-        }}
-      >
+      <div className="so-list-header">
         <div>
-          <h1
-            style={{
-              fontSize: 20,
-              fontWeight: 800,
-              color: 'var(--text-main)',
-              margin: 0,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-            }}
-          >
+          <h1 className="so-list-title">
             <Layers size={22} color="var(--blue-primary, #0f766e)" />
             <span>Danh sách đơn mua hàng (PO)</span>
             {isLoading && <Loader2 size={16} className="animate-spin" style={{ color: '#0f766e' }} />}
           </h1>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div className="so-list-header-actions">
           <button
             type="button"
             onClick={() => navigate('/store-owner/purchase-orders/dispatch-hub')}
             className="po-btn po-btn-outline"
-            style={{ height: 32, padding: '0 14px' }}
             title="Chuyển sang Trung tâm chốt đơn & tách PO theo NCC"
           >
             <Zap size={14} color="#0d9488" />
@@ -244,7 +237,6 @@ export const StoreOwnerPurchaseOrderListPage: FC = () => {
             type="button"
             onClick={() => navigate('/store-owner/purchase-orders/create-matrix')}
             className="po-btn po-btn-secondary"
-            style={{ height: 32, padding: '0 14px' }}
             title="Mở Bảng lưới đặt hàng ma trận"
           >
             <Grid size={14} />
@@ -253,14 +245,16 @@ export const StoreOwnerPurchaseOrderListPage: FC = () => {
         </div>
       </div>
 
-      <PoListFilterBar
-        filterInputs={filterInputs}
-        onFilterInputChange={(newFilters) => setFilterInputs((prev) => ({ ...prev, ...newFilters }))}
-        onSearch={handleSearch}
-        onReset={handleReset}
-        branches={branchOptions}
-        suppliers={supplierOptions}
-      />
+      <div style={{ flexShrink: 0, marginBottom: 8 }}>
+        <PoListFilterBar
+          filterInputs={filterInputs}
+          onFilterInputChange={(newFilters) => setFilterInputs((prev) => ({ ...prev, ...newFilters }))}
+          onSearch={handleSearch}
+          onReset={handleReset}
+          branches={branchOptions}
+          suppliers={supplierOptions}
+        />
+      </div>
 
       <PoListTable
         orders={orders}

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { FC } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
@@ -7,6 +7,7 @@ import {
   ShieldCheck,
   UserCheck,
   Layers,
+  Loader2,
 } from 'lucide-react';
 import type {
   GoodsReceiptListItem,
@@ -14,8 +15,10 @@ import type {
   GrnFilterTab,
   UserRole,
 } from '../types/grn.types';
-import { MOCK_GOODS_RECEIPTS } from '../lib/mockGrnData';
-import { GrnFilterBar } from '../components/GrnFilterBar';
+import { goodsReceiptApi } from '../api/goodsReceiptApi';
+import { branchApi } from '../../purchase-order/api/branchApi';
+import { supplierApi } from '../../supplier/api/supplierApi';
+import { GrnFilterBar, type GrnFilterOption } from '../components/GrnFilterBar';
 import { GrnTable } from '../components/GrnTable';
 import { GrnDetailDrawer } from '../components/GrnDetailDrawer';
 import { AdminToast, type ToastState } from '../../admin/components';
@@ -30,7 +33,7 @@ const DEFAULT_FILTERS: GrnFilterState = {
   dateTo: '',
   tab: 'ALL',
   pageIndex: 1,
-  pageSize: 10,
+  pageSize: 20,
 };
 
 export const GoodsReceiptListPage: FC<{ defaultRole?: UserRole }> = ({
@@ -39,70 +42,157 @@ export const GoodsReceiptListPage: FC<{ defaultRole?: UserRole }> = ({
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // Role management (Store Owner vs Employee)
   const roleParam = searchParams.get('role') as UserRole | null;
   const [role, setRole] = useState<UserRole>(roleParam || defaultRole);
-  const employeeBranchId = searchParams.get('branch') || 'BR-01';
+  const branchParam = searchParams.get('branch') || '';
 
-  // Master State
-  const [receipts] = useState<GoodsReceiptListItem[]>(MOCK_GOODS_RECEIPTS);
+  const [branches, setBranches] = useState<GrnFilterOption[]>([]);
+  const [suppliers, setSuppliers] = useState<GrnFilterOption[]>([]);
+  const [receipts, setReceipts] = useState<GoodsReceiptListItem[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+  const [tabCounts, setTabCounts] = useState({ all: 0, today: 0, draft: 0, mismatch: 0 });
+
   const [activeTab, setActiveTab] = useState<GrnFilterTab>('ALL');
   const [filterInputs, setFilterInputs] = useState<GrnFilterState>(DEFAULT_FILTERS);
   const [appliedFilters, setAppliedFilters] = useState<GrnFilterState>(DEFAULT_FILTERS);
-  const [pageIndex, setPageIndex] = useState<number>(1);
-  const [pageSize, setPageSize] = useState<number>(10);
 
-  // Drawer & Toast State
   const [selectedReceipt, setSelectedReceipt] = useState<GoodsReceiptListItem | null>(null);
-  const [isDrawerOpen, setIsDrawerOpen] = useState<boolean>(false);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [toast, setToast] = useState<ToastState | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const employeeBranchId = useMemo(() => {
+    if (!branchParam) return branches[0]?.id || '';
+    const byId = branches.find((b) => b.id === branchParam);
+    if (byId) return byId.id;
+    const byLabel = branches.find(
+      (b) => b.label.toLowerCase().includes(branchParam.toLowerCase())
+    );
+    return byLabel?.id || branchParam;
+  }, [branchParam, branches]);
+
+  const employeeBranchLabel = useMemo(() => {
+    return branches.find((b) => b.id === employeeBranchId)?.label || employeeBranchId || 'Chi nhánh';
+  }, [branches, employeeBranchId]);
 
   const showToast = (message: string, type: ToastState['type'] = 'success') => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     setToast({ id: Date.now().toString(), message, type });
-    setTimeout(() => setToast(null), 3000);
+    toastTimerRef.current = setTimeout(() => setToast(null), 3000);
   };
 
-  // Switch role handler (Store Owner <-> Employee)
+  useEffect(() => {
+    const loadLookups = async () => {
+      try {
+        const [branchRes, supplierRes] = await Promise.all([
+          branchApi.getBranches({ status: 'active', pageIndex: 1, pageSize: 100 }),
+          supplierApi.getSuppliers({ status: 'Active', pageIndex: 1, pageSize: 100 }),
+        ]);
+        setBranches(
+          (branchRes.items ?? []).map((b) => ({
+            id: b.id,
+            label: `${b.code || ''} — ${b.name}`.trim(),
+          }))
+        );
+        setSuppliers(
+          (supplierRes.items ?? []).map((s) => ({
+            id: s.id,
+            label: `${s.code} — ${s.name}`,
+          }))
+        );
+      } catch (err: any) {
+        showToast(err.message || 'Không thể tải danh mục chi nhánh / NCC.', 'error');
+      }
+    };
+    void loadLookups();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const buildQuery = useCallback(
+    (overrides: Partial<GrnFilterState> = {}): Partial<GrnFilterState> => {
+      const base: GrnFilterState = {
+        ...appliedFilters,
+        tab: activeTab,
+        ...overrides,
+      };
+      if (role === 'employee' && employeeBranchId) {
+        base.branchId = employeeBranchId;
+      }
+      return base;
+    },
+    [appliedFilters, activeTab, role, employeeBranchId]
+  );
+
+  const fetchReceipts = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const query = buildQuery();
+      const res = await goodsReceiptApi.getGoodsReceipts(query);
+      setReceipts(res.items);
+      setTotalCount(res.totalCount);
+    } catch (err: any) {
+      setReceipts([]);
+      setTotalCount(0);
+      showToast(err.message || 'Không thể tải danh sách phiếu nhập kho.', 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [buildQuery]);
+
+  const fetchTabCounts = useCallback(async () => {
+    try {
+      const base = buildQuery({ pageIndex: 1, pageSize: 1, tab: 'ALL', status: 'ALL' });
+      const [allRes, todayRes, draftRes, mismatchRes] = await Promise.all([
+        goodsReceiptApi.getGoodsReceipts({ ...base, tab: 'ALL' }),
+        goodsReceiptApi.getGoodsReceipts({ ...base, tab: 'TODAY' }),
+        goodsReceiptApi.getGoodsReceipts({ ...base, tab: 'DRAFT' }),
+        goodsReceiptApi.getGoodsReceipts({ ...base, tab: 'MISMATCH' }),
+      ]);
+      setTabCounts({
+        all: allRes.totalCount,
+        today: todayRes.totalCount,
+        draft: draftRes.totalCount,
+        mismatch: mismatchRes.totalCount,
+      });
+    } catch {
+      // counts are non-critical
+    }
+  }, [buildQuery]);
+
+  useEffect(() => {
+    void fetchReceipts();
+  }, [fetchReceipts]);
+
+  useEffect(() => {
+    void fetchTabCounts();
+  }, [fetchTabCounts]);
+
   const handleToggleRole = (newRole: UserRole) => {
     setRole(newRole);
-    setPageIndex(1);
     const newParams = new URLSearchParams(searchParams);
     newParams.set('role', newRole);
+
     if (newRole === 'employee') {
-      newParams.set('branch', employeeBranchId);
-      setFilterInputs((prev) => ({ ...prev, branchId: employeeBranchId }));
-      setAppliedFilters((prev) => ({ ...prev, branchId: employeeBranchId }));
+      const branchId = employeeBranchId || branches[0]?.id || '';
+      if (branchId) newParams.set('branch', branchId);
+      setFilterInputs((prev) => ({ ...prev, branchId: branchId || 'ALL', pageIndex: 1 }));
+      setAppliedFilters((prev) => ({ ...prev, branchId: branchId || 'ALL', pageIndex: 1 }));
     } else {
       newParams.delete('branch');
-      setFilterInputs((prev) => ({ ...prev, branchId: 'ALL' }));
-      setAppliedFilters((prev) => ({ ...prev, branchId: 'ALL' }));
+      setFilterInputs((prev) => ({ ...prev, branchId: 'ALL', pageIndex: 1 }));
+      setAppliedFilters((prev) => ({ ...prev, branchId: 'ALL', pageIndex: 1 }));
     }
+
     setSearchParams(newParams, { replace: true });
     showToast(
-      `Đã chuyển sang góc nhìn ${newRole === 'store_owner' ? 'Chủ cửa hàng (Toàn chuỗi)' : 'Nhân viên kho (Chi nhánh ' + employeeBranchId + ')'}`,
+      `Đã chuyển sang góc nhìn ${
+        newRole === 'store_owner' ? 'Chủ cửa hàng (Toàn chuỗi)' : 'Nhân viên kho'
+      }`,
       'info'
     );
   };
 
-  // Base list scoped by role
-  const roleScopedReceipts = useMemo(() => {
-    if (role === 'employee') {
-      return receipts.filter((r) => r.branchId === employeeBranchId);
-    }
-    return receipts;
-  }, [receipts, role, employeeBranchId]);
-
-  // Tab counts (dynamically calculated from role-scoped list)
-  const tabCounts = useMemo(() => {
-    return {
-      all: roleScopedReceipts.length,
-      today: roleScopedReceipts.filter((r) => r.status === 'TODAY').length,
-      draft: roleScopedReceipts.filter((r) => r.status === 'DRAFT').length,
-      mismatch: roleScopedReceipts.filter((r) => r.status === 'MISMATCH').length,
-    };
-  }, [roleScopedReceipts]);
-
-  // Filter input change
   const handleFilterChange = <K extends keyof GrnFilterState>(
     key: K,
     value: GrnFilterState[K]
@@ -111,12 +201,11 @@ export const GoodsReceiptListPage: FC<{ defaultRole?: UserRole }> = ({
   };
 
   const handleSearch = () => {
-    setAppliedFilters({ ...filterInputs });
-    setPageIndex(1);
+    setAppliedFilters({ ...filterInputs, pageIndex: 1, tab: activeTab });
   };
 
   const handleReset = () => {
-    const resetBranch = role === 'employee' ? employeeBranchId : 'ALL';
+    const resetBranch = role === 'employee' && employeeBranchId ? employeeBranchId : 'ALL';
     const resetState: GrnFilterState = {
       ...DEFAULT_FILTERS,
       branchId: resetBranch,
@@ -124,116 +213,47 @@ export const GoodsReceiptListPage: FC<{ defaultRole?: UserRole }> = ({
     setFilterInputs(resetState);
     setAppliedFilters(resetState);
     setActiveTab('ALL');
-    setPageIndex(1);
   };
 
   const handleTabChange = (tab: GrnFilterTab) => {
     setActiveTab(tab);
-    setPageIndex(1);
+    setAppliedFilters((prev) => ({ ...prev, pageIndex: 1, tab }));
   };
 
-  // Filtered receipts
-  const filteredReceipts = useMemo(() => {
-    return roleScopedReceipts.filter((r) => {
-      // 1. Quick Tab Filter
-      if (activeTab === 'TODAY' && r.status !== 'TODAY') return false;
-      if (activeTab === 'DRAFT' && r.status !== 'DRAFT') return false;
-      if (activeTab === 'MISMATCH' && r.status !== 'MISMATCH') return false;
+  const handlePageChange = (page: number) => {
+    setAppliedFilters((prev) => ({ ...prev, pageIndex: page }));
+  };
 
-      // 2. Keyword Filter
-      if (appliedFilters.keyword.trim()) {
-        const kw = appliedFilters.keyword.trim().toLowerCase();
-        const matchKeyword =
-          r.code.toLowerCase().includes(kw) ||
-          r.poReference.toLowerCase().includes(kw) ||
-          r.supplierName.toLowerCase().includes(kw) ||
-          r.supplierCode.toLowerCase().includes(kw) ||
-          r.branchName.toLowerCase().includes(kw) ||
-          r.receiverName.toLowerCase().includes(kw) ||
-          r.items.some(
-            (it) =>
-              it.productCode.toLowerCase().includes(kw) ||
-              it.productName.toLowerCase().includes(kw) ||
-              (it.batchCode && it.batchCode.toLowerCase().includes(kw))
-          );
-        if (!matchKeyword) return false;
-      }
+  const handlePageSizeChange = (size: number) => {
+    setAppliedFilters((prev) => ({ ...prev, pageSize: size, pageIndex: 1 }));
+  };
 
-      // 3. Branch Filter (only for Store Owner)
-      if (role === 'store_owner' && appliedFilters.branchId !== 'ALL') {
-        if (r.branchId !== appliedFilters.branchId) return false;
-      }
-
-      // 4. Supplier Filter
-      if (appliedFilters.supplierId !== 'ALL') {
-        if (r.supplierId !== appliedFilters.supplierId) return false;
-      }
-
-      // 5. Status Filter
-      if (appliedFilters.status !== 'ALL') {
-        if (r.status !== appliedFilters.status) return false;
-      }
-
-      // 6. Date Range Filter
-      if (appliedFilters.dateFrom && r.rawDate < appliedFilters.dateFrom) {
-        return false;
-      }
-      if (appliedFilters.dateTo && r.rawDate > appliedFilters.dateTo) {
-        return false;
-      }
-
-      return true;
-    });
-  }, [roleScopedReceipts, activeTab, appliedFilters, role]);
-
-  // Paged items
-  const pagedReceipts = useMemo(() => {
-    const start = (pageIndex - 1) * pageSize;
-    return filteredReceipts.slice(start, start + pageSize);
-  }, [filteredReceipts, pageIndex, pageSize]);
-
-  // Drawer handlers
   const handleSelectReceipt = (receipt: GoodsReceiptListItem) => {
     setSelectedReceipt(receipt);
     setIsDrawerOpen(true);
   };
 
-  const handleCloseDrawer = () => {
-    setIsDrawerOpen(false);
-  };
+  const basePath = role === 'employee' ? '/employee/goods-receipts' : '/store-owner/goods-receipts';
+  const roleQuery =
+    role === 'employee'
+      ? `?branch=${encodeURIComponent(employeeBranchId)}&role=employee`
+      : '';
 
-  // Action handlers
   const handleActionClick = (action: string, receipt: GoodsReceiptListItem) => {
     if (action === 'RECEIVE_NOW') {
-      const targetUrl =
+      navigate(
         role === 'employee'
-          ? `/employee/goods-receipts/create?poCode=${receipt.poReference}&branch=${employeeBranchId}&role=employee`
-          : `/store-owner/goods-receipts/create?poCode=${receipt.poReference}`;
-      navigate(targetUrl);
+          ? `${basePath}/create?poCode=${encodeURIComponent(receipt.poReference)}&branch=${employeeBranchId}&role=employee`
+          : `${basePath}/create?poCode=${encodeURIComponent(receipt.poReference)}`
+      );
     } else if (action === 'APPROVE_DRAFT') {
-      const targetUrl =
-        role === 'employee'
-          ? `/employee/goods-receipts/${receipt.id}/confirm?branch=${employeeBranchId}&role=employee`
-          : `/store-owner/goods-receipts/${receipt.id}/confirm`;
-      navigate(targetUrl);
-    } else if (action === 'VIEW_DETAIL') {
-      const targetUrl =
-        role === 'employee'
-          ? `/employee/goods-receipts/${receipt.id}?branch=${employeeBranchId}&role=employee`
-          : `/store-owner/goods-receipts/${receipt.id}`;
-      navigate(targetUrl);
-    } else if (action === 'EDIT_DRAFT') {
-      const targetUrl =
-        role === 'employee'
-          ? `/employee/goods-receipts/${receipt.id}?branch=${employeeBranchId}&role=employee`
-          : `/store-owner/goods-receipts/${receipt.id}`;
-      navigate(targetUrl);
-    } else if (action === 'RESOLVE_MISMATCH') {
-      const targetUrl =
-        role === 'employee'
-          ? `/employee/goods-receipts/${receipt.id}?branch=${employeeBranchId}&role=employee`
-          : `/store-owner/goods-receipts/${receipt.id}`;
-      navigate(targetUrl);
+      navigate(`${basePath}/${receipt.id}/confirm${roleQuery}`);
+    } else if (
+      action === 'VIEW_DETAIL' ||
+      action === 'EDIT_DRAFT' ||
+      action === 'RESOLVE_MISMATCH'
+    ) {
+      navigate(`${basePath}/${receipt.id}${roleQuery}`);
     } else if (action === 'VIEW_BATCH') {
       setSelectedReceipt(receipt);
       setIsDrawerOpen(true);
@@ -244,41 +264,33 @@ export const GoodsReceiptListPage: FC<{ defaultRole?: UserRole }> = ({
   };
 
   return (
-    <div className="po-matrix-container" style={{ width: '100%' }}>
-      {/* Toast Notification */}
+    <div
+      className="po-matrix-container"
+      style={{
+        width: '100%',
+        height: '100%',
+        maxHeight: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        minHeight: 0,
+        flex: 1,
+        overflow: 'hidden',
+      }}
+    >
       <AdminToast toast={toast} onClose={() => setToast(null)} />
 
-      {/* ── Page Header with Title, Role Switcher and Actions ── */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          flexWrap: 'wrap',
-          gap: 12,
-          marginBottom: 10,
-        }}
-      >
+      <div className="so-list-header">
         <div>
-          <h1
-            style={{
-              fontSize: 20,
-              fontWeight: 800,
-              color: 'var(--text-main)',
-              margin: 0,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-            }}
-          >
+          <h1 className="so-list-title">
             <PackageCheck size={22} color="var(--blue-primary, #0f766e)" />
-            <span>Danh sách phiếu nhập kho (GRN) & Lịch nhận hàng</span>
+            <span>Danh sách phiếu nhập kho (GRN)</span>
+            {isLoading && (
+              <Loader2 size={16} className="animate-spin" style={{ color: 'var(--blue-primary, #0f766e)' }} />
+            )}
           </h1>
         </div>
 
-        {/* Right side: Role Switcher & Action Buttons */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-          {/* Role Switcher Pill */}
+        <div className="so-list-header-actions">
           <div
             style={{
               display: 'flex',
@@ -310,9 +322,8 @@ export const GoodsReceiptListPage: FC<{ defaultRole?: UserRole }> = ({
               }}
             >
               <ShieldCheck size={14} />
-              <span>Chủ cửa hàng (All)</span>
+              <span>Chủ cửa hàng</span>
             </button>
-
             <button
               type="button"
               onClick={() => handleToggleRole('employee')}
@@ -333,23 +344,20 @@ export const GoodsReceiptListPage: FC<{ defaultRole?: UserRole }> = ({
               }}
             >
               <UserCheck size={14} />
-              <span>Nhân viên ({employeeBranchId})</span>
+              <span>Nhân viên</span>
             </button>
           </div>
 
-          {/* Quick link to PO List */}
           <button
             type="button"
             onClick={() => navigate('/store-owner/purchase-orders/list')}
-            className="po-btn po-btn-outline"
-            style={{ height: 32, padding: '0 12px' }}
+            className="po-btn po-btn-secondary"
             title="Chuyển sang danh sách đơn mua hàng (PO)"
           >
-            <Layers size={14} color="#0d9488" />
+            <Layers size={14} />
             <span>Đơn mua hàng PO</span>
           </button>
 
-          {/* Action button */}
           <button
             type="button"
             onClick={() =>
@@ -359,49 +367,47 @@ export const GoodsReceiptListPage: FC<{ defaultRole?: UserRole }> = ({
                   : '/store-owner/goods-receipts/create'
               )
             }
-            className="po-btn po-btn-secondary"
-            style={{ height: 32, padding: '0 12px' }}
+            className="po-btn po-btn-primary"
           >
             <Plus size={14} />
-            <span>+ Nhập kho từ PO</span>
+            <span>Nhập kho từ PO</span>
           </button>
         </div>
       </div>
 
-      {/* ── UNIFIED FILTER BAR (Matching PoListFilterBar structure) ── */}
-      <GrnFilterBar
-        filterInputs={filterInputs}
-        role={role}
-        employeeBranchId={employeeBranchId}
-        activeTab={activeTab}
-        tabCounts={tabCounts}
-        onTabChange={handleTabChange}
-        onFilterChange={handleFilterChange}
-        onSearch={handleSearch}
-        onReset={handleReset}
-      />
+      <div style={{ flexShrink: 0, marginBottom: 8 }}>
+        <GrnFilterBar
+          filterInputs={filterInputs}
+          role={role}
+          employeeBranchLabel={employeeBranchLabel}
+          branches={branches}
+          suppliers={suppliers}
+          activeTab={activeTab}
+          tabCounts={tabCounts}
+          onTabChange={handleTabChange}
+          onFilterChange={handleFilterChange}
+          onSearch={handleSearch}
+          onReset={handleReset}
+        />
+      </div>
 
-      {/* ── MAIN DATA TABLE WITH PAGING (Matching PoListTable structure) ── */}
       <GrnTable
-        receipts={pagedReceipts}
-        totalCount={filteredReceipts.length}
-        pageIndex={pageIndex}
-        pageSize={pageSize}
-        onPageChange={(page) => setPageIndex(page)}
-        onPageSizeChange={(size) => {
-          setPageSize(size);
-          setPageIndex(1);
-        }}
+        receipts={receipts}
+        totalCount={totalCount}
+        pageIndex={appliedFilters.pageIndex}
+        pageSize={appliedFilters.pageSize}
+        isLoading={isLoading}
+        onPageChange={handlePageChange}
+        onPageSizeChange={handlePageSizeChange}
         onSelectReceipt={handleSelectReceipt}
         onActionClick={handleActionClick}
         onResetFilters={handleReset}
       />
 
-      {/* ── SLIDE-OVER DETAIL DRAWER (Matching PoDetailDrawer structure) ── */}
       <GrnDetailDrawer
         receipt={selectedReceipt}
         isOpen={isDrawerOpen}
-        onClose={handleCloseDrawer}
+        onClose={() => setIsDrawerOpen(false)}
         onPrint={(r) => showToast(`Đang in phiếu ${r.code}...`, 'success')}
         onAction={handleActionClick}
       />

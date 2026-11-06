@@ -15,13 +15,18 @@ import type {
   PoLookupOption,
   UserRole,
 } from '../../types/grn.types';
-import { MOCK_GRN_BRANCHES } from '../../lib/mockGrnData';
+
+export interface GrnBranchOption {
+  id: string;
+  label: string;
+}
 
 interface GrnFormHeaderCardProps {
   grnNo: string;
   branchId: string;
   poReference: string;
   availablePos: PoLookupOption[];
+  branches?: GrnBranchOption[];
   supplierName: string;
   supplierCode: string;
   receiptTime: string;
@@ -44,6 +49,7 @@ export const GrnFormHeaderCard: FC<GrnFormHeaderCardProps> = ({
   branchId,
   poReference,
   availablePos,
+  branches = [],
   supplierName,
   supplierCode,
   receiptTime,
@@ -52,7 +58,7 @@ export const GrnFormHeaderCard: FC<GrnFormHeaderCardProps> = ({
   paymentTerm,
   paymentMethod,
   role,
-  employeeBranchId = 'BR-01',
+  employeeBranchId = '',
   readOnly = false,
   onBranchChange,
   onPoChange,
@@ -61,6 +67,8 @@ export const GrnFormHeaderCard: FC<GrnFormHeaderCardProps> = ({
   onPaymentMethodChange,
 }) => {
   const isEmployee = role === 'employee';
+  const resolveBranchLabel = (id: string) =>
+    branches.find((b) => b.id === id)?.label || id || '—';
 
   return (
     <div
@@ -144,7 +152,7 @@ export const GrnFormHeaderCard: FC<GrnFormHeaderCardProps> = ({
               }}
             >
               <span>
-                {MOCK_GRN_BRANCHES.find((b) => b.id === (isEmployee ? employeeBranchId : branchId))?.name || branchId}
+                {resolveBranchLabel(isEmployee ? employeeBranchId || branchId : branchId)}
               </span>
               {isEmployee && (
                 <span
@@ -179,9 +187,10 @@ export const GrnFormHeaderCard: FC<GrnFormHeaderCardProps> = ({
                 cursor: 'pointer',
               }}
             >
-              {MOCK_GRN_BRANCHES.map((b) => (
+              <option value="">-- Chọn chi nhánh --</option>
+              {branches.map((b) => (
                 <option key={b.id} value={b.id}>
-                  {b.name}
+                  {b.label}
                 </option>
               ))}
             </select>

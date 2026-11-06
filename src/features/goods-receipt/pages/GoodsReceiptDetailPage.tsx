@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import type { FC } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
@@ -11,15 +11,17 @@ import {
   Truck,
   Percent,
   ReceiptText,
+  Loader2,
 } from 'lucide-react';
 import type {
+  GoodsReceiptListItem,
   GrnDetailItem,
   GrnPostSettings,
   GrnStatus,
   PoStatusPreview,
   UserRole,
 } from '../types/grn.types';
-import { MOCK_GOODS_RECEIPTS } from '../lib/mockGrnData';
+import { goodsReceiptApi, type BackendGoodsReceiptDto } from '../api/goodsReceiptApi';
 import { GrnDetailHeaderCard } from '../components/detail/GrnDetailHeaderCard';
 import { GrnStockFefoTable } from '../components/detail/GrnStockFefoTable';
 import { GrnPoRemainingTable } from '../components/detail/GrnPoRemainingTable';
@@ -34,6 +36,57 @@ const formatCurrency = (val: number): string => {
   return new Intl.NumberFormat('vi-VN').format(Math.round(val)) + ' đ';
 };
 
+const mapStatus = (status: string, hasMismatch: boolean): GrnStatus => {
+  if (status === 'CANCELLED') return 'CANCELED';
+  if (status === 'COMPLETED') return hasMismatch ? 'MISMATCH' : 'CONFIRMED';
+  return (status as GrnStatus) || 'DRAFT';
+};
+
+const mapDtoToReceipt = (dto: BackendGoodsReceiptDto): GoodsReceiptListItem => ({
+  id: dto.id,
+  code: dto.code,
+  type: 'FROM_PO',
+  typeLabel: 'Từ PO',
+  receiveDate: new Date(dto.receivedAtUtc).toLocaleString('vi-VN'),
+  rawDate: dto.receivedAtUtc.slice(0, 10),
+  branchId: dto.branchId,
+  branchName: dto.branchName || dto.branchCode,
+  supplierId: dto.supplierId,
+  supplierName: dto.supplierName,
+  supplierCode: dto.supplierCode,
+  poReference: dto.purchaseOrderCode || '-',
+  lineCount: dto.totalItems,
+  totalAmount: dto.grandTotal,
+  status: mapStatus(dto.status, !!dto.hasMismatch),
+  receiverName: dto.receiverName || dto.receiverUserId || '—',
+  hasMismatch: !!dto.hasMismatch,
+  notes: dto.note,
+  cancelledReason: dto.cancellationReason,
+  items: (dto.lines ?? []).map((l) => ({
+    id: l.id,
+    productId: l.productId,
+    purchaseOrderDetailId: l.purchaseOrderDetailId,
+    productCode: l.productCode,
+    productName: l.productName,
+    unit: l.unit,
+    orderedQty: l.orderedQty,
+    receivedQty: l.deliveredQty,
+    acceptedQty: l.acceptedQty,
+    rejectedQty: l.rejectedQty,
+    shortageQty: l.shortageQty,
+    differenceQty: l.differenceQty,
+    unitPrice: l.unitPrice,
+    lineTotal: l.lineAmount,
+    batchCode: l.batchCode,
+    manufactureDate: l.manufactureDate,
+    expiryDate: l.expiryDate,
+    hasBatches: l.hasBatches,
+    rejectionReason: l.rejectionReason as any,
+    rejectionNote: l.rejectionNote,
+    note: l.note,
+  })),
+});
+
 export const GoodsReceiptDetailPage: FC<{ defaultRole?: UserRole }> = ({
   defaultRole = 'store_owner',
 }) => {
@@ -41,141 +94,159 @@ export const GoodsReceiptDetailPage: FC<{ defaultRole?: UserRole }> = ({
   const { id } = useParams<{ id: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // Role management
   const roleParam = searchParams.get('role') as UserRole | null;
   const [role, setRole] = useState<UserRole>(roleParam || defaultRole);
-  const employeeBranchId = searchParams.get('branch') || 'BR-01';
+  const employeeBranchId = searchParams.get('branch') || '';
 
-  // Find receipt
-  const existingReceipt = useMemo(() => {
-    if (!id) return MOCK_GOODS_RECEIPTS[0];
-    return (
-      MOCK_GOODS_RECEIPTS.find((r) => r.id === id || r.code === id) ||
-      MOCK_GOODS_RECEIPTS[0]
-    );
-  }, [id]);
+  const [receipt, setReceipt] = useState<GoodsReceiptListItem | null>(null);
+  const [freightFee, setFreightFee] = useState(0);
+  const [discount, setDiscount] = useState(0);
+  const [vatPercent, setVatPercent] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+  const [status, setStatus] = useState<GrnStatus>('DRAFT');
+  const [items, setItems] = useState<GrnDetailItem[]>([]);
 
-  // Mode: confirmation vs view
   const isModeConfirmParam = searchParams.get('mode') === 'confirm';
-  const [status, setStatus] = useState<GrnStatus>(existingReceipt.status);
   const isConfirmationMode = isModeConfirmParam || status === 'DRAFT';
 
-  // Items with detail fields
-  const [items] = useState<GrnDetailItem[]>(() => {
-    return existingReceipt.items.map((it) => {
-      const isCatchWeight =
-        it.productCode === 'FR-THIT-01' ||
-        it.productName.toLowerCase().includes('xay') ||
-        it.productName.toLowerCase().includes('thịt');
-      const isGift =
-        it.productCode === 'BV-PEPSI-01' ||
-        it.unitPrice === 0 ||
-        it.productName.toLowerCase().includes('tặng');
-      const retail = it.unitPrice > 0 ? it.unitPrice * 1.35 : 10000;
-      return {
-        ...it,
-        retailPrice: retail,
-        isCatchWeight,
-        isGift,
-      };
-    });
-  });
-
-  // Freight & Financials
-  const [landedCost] = useState<number>(50000);
-  const [discount] = useState<number>(0);
-  const [vatPercent] = useState<number>(0);
-
-  const goodsTotal = useMemo(() => {
-    return items.reduce((sum, it) => sum + (it.receivedQty * (it.unitPrice || 0)), 0);
-  }, [items]);
-
-  const grandTotal = useMemo(() => {
-    const afterDiscount = Math.max(0, goodsTotal - discount);
-    const withFreight = afterDiscount + landedCost;
-    const vat = Math.round((withFreight * vatPercent) / 100);
-    return withFreight + vat;
-  }, [goodsTotal, discount, landedCost, vatPercent]);
-
-  // Total Labels count
-  const totalLabels = useMemo(() => {
-    return items.reduce((sum, it) => sum + Math.ceil(it.receivedQty || 0), 0);
-  }, [items]);
-
-  // PO status calculation: In V1, PO directly transitions to COMPLETED
-  const poStatusPreview: PoStatusPreview = 'COMPLETED';
-
-  // Post settings
   const [postSettings, setPostSettings] = useState<GrnPostSettings>({
     createApInvoice: true,
     printShelfLabels: true,
-    attachmentName: 'Bill_TuoiSach_2609.jpg',
-    attachmentSize: '1.2 MB',
+    attachmentName: undefined,
+    attachmentSize: undefined,
   });
 
-  // Toast & Modals
   const [toast, setToast] = useState<ToastState | null>(null);
-  const [isSuccessModalOpen, setIsSuccessModalOpen] = useState<boolean>(false);
-  const [isPrintLabelsModalOpen, setIsPrintLabelsModalOpen] = useState<boolean>(false);
-  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
+  const [isPrintLabelsModalOpen, setIsPrintLabelsModalOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const showToast = (message: string, type: ToastState['type'] = 'success') => {
     setToast({ id: Date.now().toString(), message, type });
     setTimeout(() => setToast(null), 3000);
   };
 
-  // Switch role handler matching GoodsReceiptFormPage
+  const loadReceipt = useCallback(async () => {
+    if (!id) return;
+    setIsLoading(true);
+    try {
+      const dto = await goodsReceiptApi.getGoodsReceiptById(id);
+      if (!dto) {
+        showToast('Không tìm thấy phiếu nhập kho.', 'error');
+        navigate(
+          role === 'employee'
+            ? `/employee/goods-receipts?branch=${employeeBranchId}&role=employee`
+            : '/store-owner/goods-receipts'
+        );
+        return;
+      }
+      const mapped = mapDtoToReceipt(dto);
+      setReceipt(mapped);
+      setStatus(mapped.status);
+      setFreightFee(dto.freightFee || 0);
+      setDiscount(dto.discountAmount || 0);
+      setVatPercent(dto.vatPercent || 0);
+      setItems(
+        mapped.items.map((it) => {
+          const retail = it.unitPrice > 0 ? it.unitPrice * 1.35 : 10000;
+          return {
+            ...it,
+            retailPrice: retail,
+            isCatchWeight: false,
+            isGift: it.unitPrice === 0,
+          };
+        })
+      );
+    } catch (err: any) {
+      showToast(err.message || 'Không thể tải chi tiết phiếu nhập kho.', 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [id, navigate, role, employeeBranchId]);
+
+  useEffect(() => {
+    void loadReceipt();
+  }, [loadReceipt]);
+
+  const goodsTotal = useMemo(
+    () => items.reduce((sum, it) => sum + (it.acceptedQty ?? it.receivedQty) * (it.unitPrice || 0), 0),
+    [items]
+  );
+
+  const grandTotal = useMemo(() => {
+    const afterDiscount = Math.max(0, goodsTotal - discount);
+    const withFreight = afterDiscount + freightFee;
+    const vat = Math.round((withFreight * vatPercent) / 100);
+    return withFreight + vat;
+  }, [goodsTotal, discount, freightFee, vatPercent]);
+
+  const totalLabels = useMemo(
+    () => items.reduce((sum, it) => sum + Math.ceil(it.acceptedQty ?? it.receivedQty ?? 0), 0),
+    [items]
+  );
+
+  const poStatusPreview: PoStatusPreview = 'COMPLETED';
+
   const handleToggleRole = (newRole: UserRole) => {
     setRole(newRole);
     const newParams = new URLSearchParams(searchParams);
     newParams.set('role', newRole);
     if (newRole === 'employee') {
-      newParams.set('branch', employeeBranchId);
+      if (employeeBranchId) newParams.set('branch', employeeBranchId);
     } else {
       newParams.delete('branch');
     }
     setSearchParams(newParams, { replace: true });
-    showToast(
-      `Đã chuyển sang góc nhìn ${newRole === 'store_owner' ? 'Chủ cửa hàng (Toàn chuỗi)' : 'Thủ kho (Chi nhánh ' + employeeBranchId + ')'}`,
-      'info'
-    );
   };
 
   const handlePostSettingChange = (key: keyof GrnPostSettings, value: boolean) => {
     setPostSettings((prev) => ({ ...prev, [key]: value }));
   };
 
-  // Confirm GRN Action
-  const handleConfirmGrn = () => {
+  const handleConfirmGrn = async () => {
+    if (!receipt) return;
     setIsSubmitting(true);
-    setTimeout(() => {
-      setIsSubmitting(false);
+    try {
+      await goodsReceiptApi.completeGoodsReceipt(receipt.id, receipt.notes);
       setStatus('CONFIRMED');
       setIsSuccessModalOpen(true);
-      showToast(`Đã duyệt hoàn tất phiếu ${existingReceipt.code}. Tồn kho và nợ AP đã được cập nhật!`, 'success');
-    }, 600);
+      showToast(`Đã duyệt hoàn tất phiếu ${receipt.code}. Tồn kho đã được cập nhật!`, 'success');
+    } catch (err: any) {
+      showToast(err.response?.data?.message || err.message || 'Hoàn tất phiếu thất bại.', 'error');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  // Navigations
   const handleBackToEdit = () => {
+    if (!receipt) return;
     const editUrl =
       role === 'employee'
-        ? `/employee/goods-receipts/create?poCode=${existingReceipt.poReference}&branch=${employeeBranchId}&role=employee`
-        : `/store-owner/goods-receipts/create?poCode=${existingReceipt.poReference}`;
+        ? `/employee/goods-receipts/${receipt.id}?branch=${employeeBranchId}&role=employee`
+        : `/store-owner/goods-receipts/${receipt.id}`;
     navigate(editUrl);
   };
 
   const handleBackToList = () => {
-    const listUrl =
+    navigate(
       role === 'employee'
         ? `/employee/goods-receipts?branch=${employeeBranchId}&role=employee`
-        : '/store-owner/goods-receipts';
-    navigate(listUrl);
+        : '/store-owner/goods-receipts'
+    );
   };
 
   const handlePrintGrn = () => {
     window.print();
   };
+
+  if (isLoading || !receipt) {
+    return (
+      <div style={{ padding: 48, display: 'flex', justifyContent: 'center', gap: 8, color: '#64748b' }}>
+        <Loader2 size={18} className="animate-spin" />
+        Đang tải chi tiết phiếu nhập kho...
+      </div>
+    );
+  }
 
   return (
     <div
@@ -188,10 +259,8 @@ export const GoodsReceiptDetailPage: FC<{ defaultRole?: UserRole }> = ({
         gap: 14,
       }}
     >
-      {/* Toast Notification */}
       <AdminToast toast={toast} onClose={() => setToast(null)} />
 
-      {/* ── Top Header Navigation Bar (Identical layout to GoodsReceiptFormPage) ── */}
       <div
         style={{
           display: 'flex',
@@ -216,7 +285,6 @@ export const GoodsReceiptDetailPage: FC<{ defaultRole?: UserRole }> = ({
               alignItems: 'center',
               justifyContent: 'center',
               cursor: 'pointer',
-              boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
             }}
             title="Quay lại danh sách phiếu nhập kho"
           >
@@ -239,7 +307,7 @@ export const GoodsReceiptDetailPage: FC<{ defaultRole?: UserRole }> = ({
               <span>
                 {isConfirmationMode
                   ? 'Xác nhận tổng quan phiếu nhập kho (Confirm GRN Summary)'
-                  : `Chi tiết phiếu nhập kho ${existingReceipt.code}`}
+                  : `Chi tiết phiếu nhập kho ${receipt.code}`}
               </span>
             </h1>
             <p style={{ margin: '2px 0 0 0', fontSize: 12.5, color: '#64748b' }}>
@@ -250,7 +318,6 @@ export const GoodsReceiptDetailPage: FC<{ defaultRole?: UserRole }> = ({
           </div>
         </div>
 
-        {/* Role Toggle Pill Switcher */}
         <div
           style={{
             display: 'flex',
@@ -260,7 +327,6 @@ export const GoodsReceiptDetailPage: FC<{ defaultRole?: UserRole }> = ({
             borderRadius: 8,
             border: '1px solid #cbd5e1',
           }}
-          title="Chuyển đổi góc nhìn vai trò"
         >
           <button
             type="button"
@@ -284,7 +350,6 @@ export const GoodsReceiptDetailPage: FC<{ defaultRole?: UserRole }> = ({
             <ShieldCheck size={14} />
             <span>Chủ cửa hàng</span>
           </button>
-
           <button
             type="button"
             onClick={() => handleToggleRole('employee')}
@@ -305,42 +370,38 @@ export const GoodsReceiptDetailPage: FC<{ defaultRole?: UserRole }> = ({
             }}
           >
             <UserCheck size={14} />
-            <span>Thủ kho ({employeeBranchId})</span>
+            <span>Thủ kho</span>
           </button>
         </div>
       </div>
 
-      {/* ── Block 1: Header Info Card ── */}
       <GrnDetailHeaderCard
-        grnNo={existingReceipt.code}
-        branchName={existingReceipt.branchName}
-        branchCode={existingReceipt.branchId}
-        supplierName={existingReceipt.supplierName}
-        supplierCode={existingReceipt.supplierCode}
-        poReference={existingReceipt.poReference}
-        receiverName={existingReceipt.receiverName}
+        grnNo={receipt.code}
+        branchName={receipt.branchName}
+        branchCode={receipt.branchId}
+        supplierName={receipt.supplierName}
+        supplierCode={receipt.supplierCode}
+        poReference={receipt.poReference}
+        receiverName={receipt.receiverName}
         status={status}
         goodsTotal={goodsTotal}
-        landedCost={landedCost}
+        landedCost={freightFee}
         discount={discount}
         vatPercent={vatPercent}
         grandTotal={grandTotal}
         paymentTerm="CREDIT_30"
-        receiptTime={existingReceipt.receiveDate}
+        receiptTime={receipt.receiveDate}
         isConfirmationMode={isConfirmationMode}
       />
 
-      {/* ── Block 2: Stock to Add & Batch FEFO Table ── */}
-      <GrnStockFefoTable items={items} totalLandedCost={landedCost} />
+      <GrnStockFefoTable items={items} totalLandedCost={freightFee} />
 
-      {/* ── Block 3: PO Status Update & Remaining Handling Table ── */}
       <GrnPoRemainingTable
-        poReference={existingReceipt.poReference}
+        poReference={receipt.poReference}
         items={items}
-        readOnly={!isConfirmationMode && status === 'CONFIRMED'}
+        readOnly={!isConfirmationMode && (status === 'CONFIRMED' || status === 'COMPLETED')}
       />
 
-      {/* ── Block 4: Bottom 2-Column Grid (Post Settings & Financial Breakdown) ── */}
       <div
         style={{
           display: 'grid',
@@ -348,16 +409,14 @@ export const GoodsReceiptDetailPage: FC<{ defaultRole?: UserRole }> = ({
           gap: 14,
         }}
       >
-        {/* Left Column: Post Settings & Attachments */}
         <GrnPostSettingsCard
           settings={postSettings}
           grandTotal={grandTotal}
           totalLabels={totalLabels}
           onSettingChange={handlePostSettingChange}
-          readOnly={!isConfirmationMode && status === 'CONFIRMED'}
+          readOnly={!isConfirmationMode && (status === 'CONFIRMED' || status === 'COMPLETED')}
         />
 
-        {/* Right Column: Financial Summary Card matching GrnCostSummaryCard */}
         <div
           style={{
             backgroundColor: '#ffffff',
@@ -371,7 +430,6 @@ export const GoodsReceiptDetailPage: FC<{ defaultRole?: UserRole }> = ({
           }}
         >
           <div>
-            {/* Title */}
             <div
               style={{
                 display: 'flex',
@@ -397,9 +455,7 @@ export const GoodsReceiptDetailPage: FC<{ defaultRole?: UserRole }> = ({
               </h2>
             </div>
 
-            {/* Financial Rows */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {/* Tiền hàng */}
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#475569' }}>
                 <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <ReceiptText size={14} color="#64748b" />
@@ -408,16 +464,14 @@ export const GoodsReceiptDetailPage: FC<{ defaultRole?: UserRole }> = ({
                 <strong style={{ color: '#1e293b' }}>{formatCurrency(goodsTotal)}</strong>
               </div>
 
-              {/* Phí VC */}
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#475569' }}>
                 <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <Truck size={14} color="#d97706" />
                   <span>Chi phí vận chuyển (Landed Cost):</span>
                 </span>
-                <strong style={{ color: '#d97706' }}>+{formatCurrency(landedCost)}</strong>
+                <strong style={{ color: '#d97706' }}>+{formatCurrency(freightFee)}</strong>
               </div>
 
-              {/* Chiết khấu */}
               {discount > 0 && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#475569' }}>
                   <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -428,20 +482,18 @@ export const GoodsReceiptDetailPage: FC<{ defaultRole?: UserRole }> = ({
                 </div>
               )}
 
-              {/* VAT */}
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#475569' }}>
                 <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <Percent size={14} color="#64748b" />
                   <span>Thuế VAT ({vatPercent}%):</span>
                 </span>
                 <strong style={{ color: '#1e293b' }}>
-                  +{formatCurrency(Math.round(((goodsTotal + landedCost - discount) * vatPercent) / 100))}
+                  +{formatCurrency(Math.round(((goodsTotal + freightFee - discount) * vatPercent) / 100))}
                 </strong>
               </div>
             </div>
           </div>
 
-          {/* Grand Total Highlight Box */}
           <div
             style={{
               marginTop: 18,
@@ -463,7 +515,6 @@ export const GoodsReceiptDetailPage: FC<{ defaultRole?: UserRole }> = ({
               </div>
               <span style={{ fontSize: 11.5, color: '#64748b' }}>Hạn thanh toán: Credit 30 days</span>
             </div>
-
             <div style={{ fontSize: 18, fontWeight: 900, color: '#0f766e' }}>
               {formatCurrency(grandTotal)}
             </div>
@@ -471,7 +522,6 @@ export const GoodsReceiptDetailPage: FC<{ defaultRole?: UserRole }> = ({
         </div>
       </div>
 
-      {/* ── Block 5: Sticky Bottom Action Bar ── */}
       <GrnDetailActionBar
         status={status}
         isConfirmationMode={isConfirmationMode}
@@ -483,12 +533,11 @@ export const GoodsReceiptDetailPage: FC<{ defaultRole?: UserRole }> = ({
         onPrintLabels={() => setIsPrintLabelsModalOpen(true)}
       />
 
-      {/* ── Modal Result Success ── */}
       <GrnDetailSuccessModal
         isOpen={isSuccessModalOpen}
-        grnNo={existingReceipt.code}
-        poReference={existingReceipt.poReference}
-        supplierName={existingReceipt.supplierName}
+        grnNo={receipt.code}
+        poReference={receipt.poReference}
+        supplierName={receipt.supplierName}
         grandTotal={grandTotal}
         totalLabels={totalLabels}
         poStatusPreview={poStatusPreview}
@@ -501,10 +550,9 @@ export const GoodsReceiptDetailPage: FC<{ defaultRole?: UserRole }> = ({
         }}
       />
 
-      {/* ── Modal Print Preview Stickers ── */}
       <GrnPrintPreviewModal
         isOpen={isPrintLabelsModalOpen}
-        grnNo={existingReceipt.code}
+        grnNo={receipt.code}
         items={items}
         onClose={() => setIsPrintLabelsModalOpen(false)}
         onPrint={() => {

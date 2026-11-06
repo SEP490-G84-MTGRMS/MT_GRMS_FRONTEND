@@ -112,6 +112,8 @@ const REASON_LABELS: Record<string, string> = {
   LEAD_TIME_VIOLATION: 'Chưa đủ LeadDays để giao ngày này',
   CUTOFF_PASSED: 'Đã đến hoặc qua giờ chốt đơn',
   PO_ALREADY_COMMITTED: 'Ngày này đã chốt PO',
+  PO_EXISTED_EDITABLE: 'Đã có PO — còn sửa trước cutoff',
+  PO_COMMITTED_CUTOFF_PASSED: 'PO đã khóa sau cutoff',
 };
 
 function fmtShortStr(d: Date): string {
@@ -175,10 +177,9 @@ function computeDayColumns(
         ? serverStatuses.find((ds) => ds.supplierId === supplierId)
         : undefined;
 
-    // Khi xem ALL: cột khóa nếu mọi NCC đều off/locked/finalized; PO nếu có bất kỳ FINALIZED
+    // Khi xem ALL: chỉ khóa cột khi MỌI NCC đều FINALIZED/LOCKED/OFF — PO trước cutoff vẫn editable.
     const allFinalized =
       isAll && serverStatuses.length > 0 && serverStatuses.every((ds) => ds.deliveryDateStatus === 'FINALIZED');
-    const anyFinalized = isAll && serverStatuses.some((ds) => ds.deliveryDateStatus === 'FINALIZED');
     const allOffOrLocked =
       isAll &&
       serverStatuses.length > 0 &&
@@ -199,7 +200,8 @@ function computeDayColumns(
       primaryReasonCode = serverForSupplier.primaryReasonCode;
       poCode = serverForSupplier.poCode;
       isOff = cutoffStatus === 'SUPPLIER_OFF';
-      isLocked = cutoffStatus === 'LOCKED' || cutoffStatus === 'PO_GENERATED' || lockedDates.has(k);
+      // PO_EXISTED_EDITABLE: có PoCode nhưng status OPEN/CUTOFF_DUE → vẫn sửa được
+      isLocked = cutoffStatus === 'LOCKED' || cutoffStatus === 'PO_GENERATED';
       offReason =
         (primaryReasonCode && REASON_LABELS[primaryReasonCode]) ||
         serverForSupplier.primaryReasonCode ||
@@ -211,15 +213,16 @@ function computeDayColumns(
         }
       }
     } else if (isAll && serverStatuses.length > 0) {
-      if (allFinalized || anyFinalized) {
+      poCode = serverStatuses.find((ds) => ds.poCode)?.poCode;
+      if (allFinalized) {
         cutoffStatus = 'PO_GENERATED';
         isLocked = true;
-        poCode = serverStatuses.find((ds) => ds.poCode)?.poCode;
       } else if (allOffOrLocked) {
         const locked = serverStatuses.some((ds) => ds.deliveryDateStatus === 'LOCKED');
-        cutoffStatus = locked ? 'LOCKED' : 'SUPPLIER_OFF';
+        const finalized = serverStatuses.some((ds) => ds.deliveryDateStatus === 'FINALIZED');
+        cutoffStatus = finalized ? 'PO_GENERATED' : locked ? 'LOCKED' : 'SUPPLIER_OFF';
         isOff = cutoffStatus === 'SUPPLIER_OFF';
-        isLocked = cutoffStatus === 'LOCKED' || lockedDates.has(k);
+        isLocked = cutoffStatus === 'LOCKED' || cutoffStatus === 'PO_GENERATED';
       } else if (serverStatuses.some((ds) => ds.deliveryDateStatus === 'CUTOFF_DUE')) {
         cutoffStatus = 'CUTOFF_DUE';
       } else {
@@ -265,7 +268,8 @@ function computeDayColumns(
       if (isAlreadyPo) poCode = `PO-${k.replace(/-/g, '')}-GEN`;
     }
 
-    if (lockedDates.has(k) && cutoffStatus !== 'PO_GENERATED') {
+    // lockedDates chỉ áp dụng khi BE đánh FINALIZED (sau cutoff) — không khóa PO còn amend được.
+    if (lockedDates.has(k) && !serverForSupplier && !(isAll && serverStatuses.length > 0)) {
       isLocked = true;
       cutoffStatus = 'PO_GENERATED';
     }
