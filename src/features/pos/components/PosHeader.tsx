@@ -13,8 +13,12 @@ import {
   Layers,
   Receipt,
   Package,
+  Bell,
+  ArrowLeftRight,
+  DoorOpen,
 } from 'lucide-react';
 import type { OrderTab, Product } from '../types/pos.types';
+import type { ShiftDetailResponse } from '../types/posShift.types';
 import { useAuthStore } from '../../../stores/useAuthStore';
 
 interface Props {
@@ -38,6 +42,11 @@ interface Props {
   selectedBranchId?: string;
   onSelectBranch?: (branchId: string) => void;
   onOpenInventoryLookup?: () => void;
+  pendingApprovalCount?: number;
+  onOpenApprovalDrawer?: () => void;
+  currentShift?: ShiftDetailResponse | null;
+  onOpenCashMovement?: () => void;
+  onOpenShift?: () => void;
 }
 
 export const PosHeader: FC<Props> = ({
@@ -61,6 +70,11 @@ export const PosHeader: FC<Props> = ({
   selectedBranchId,
   onSelectBranch,
   onOpenInventoryLookup,
+  pendingApprovalCount = 0,
+  onOpenApprovalDrawer,
+  currentShift,
+  onOpenCashMovement,
+  onOpenShift,
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -411,6 +425,126 @@ export const PosHeader: FC<Props> = ({
 
           
 
+          {/* Nút Phê duyệt của Chủ Cửa Hàng (Store Owner) */}
+          {isStoreOwner && onOpenApprovalDrawer && (
+            <button
+              type="button"
+              onClick={onOpenApprovalDrawer}
+              style={{
+                position: 'relative',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '5px 10px',
+                borderRadius: 6,
+                border: '1px solid #14b8a6',
+                backgroundColor: '#f0fdfa',
+                color: '#0f766e',
+                fontSize: 12.5,
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+              title="Duyệt chi két & Xác nhận nhận tiền rút két từ quầy"
+            >
+              <Bell size={15} />
+              <span>Duyệt Chi</span>
+              {typeof pendingApprovalCount === 'number' && pendingApprovalCount > 0 && (
+                <span
+                  style={{
+                    position: 'absolute',
+                    top: -6,
+                    right: -6,
+                    backgroundColor: '#ef4444',
+                    color: '#ffffff',
+                    fontSize: 10.5,
+                    fontWeight: 700,
+                    padding: '1px 5px',
+                    borderRadius: 10,
+                    border: '2px solid #ffffff',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                  }}
+                >
+                  {pendingApprovalCount}
+                </span>
+              )}
+            </button>
+          )}
+
+          {/* Trạng thái ca & Nút Thu/Chi cho Thu Ngân (Cashier) */}
+          {!isStoreOwner && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              {currentShift ? (
+                <>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 5,
+                      padding: '4px 8px',
+                      borderRadius: 6,
+                      backgroundColor: '#f1f5f9',
+                      border: '1px solid #cbd5e1',
+                      fontSize: 12,
+                      color: '#334155',
+                    }}
+                    title={`Ca đang mở: ${currentShift.shiftName}`}
+                  >
+                    <span style={{ width: 7, height: 7, borderRadius: '50%', backgroundColor: '#10b981' }} />
+                    <b>{currentShift.shiftCode}</b>
+                  </div>
+
+                  {onOpenCashMovement && (
+                    <button
+                      type="button"
+                      onClick={onOpenCashMovement}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 4,
+                        padding: '4px 8px',
+                        borderRadius: 6,
+                        border: '1px solid #cbd5e1',
+                        backgroundColor: '#ffffff',
+                        color: '#0f766e',
+                        fontSize: 12,
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                      }}
+                      title="Lập phiếu thu / chi tiền mặt két"
+                    >
+                      <ArrowLeftRight size={13} />
+                      <span>Thu/Chi</span>
+                    </button>
+                  )}
+                </>
+              ) : (
+                onOpenShift && (
+                  <button
+                    type="button"
+                    onClick={onOpenShift}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 4,
+                      padding: '4px 10px',
+                      borderRadius: 6,
+                      border: '1px solid #f59e0b',
+                      backgroundColor: '#fffbeb',
+                      color: '#b45309',
+                      fontSize: 12,
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                    }}
+                    title="Chưa mở ca - Bấm để mở ca bán hàng"
+                  >
+                    <DoorOpen size={14} />
+                    <span>Mở Ca</span>
+                  </button>
+                )
+              )}
+            </div>
+          )}
+
           <div
             className="pos-cashier-badge"
             style={{
@@ -529,24 +663,41 @@ export const PosHeader: FC<Props> = ({
                   </div>
                 </button>
 
-                <button
-                  type="button"
-                  className="pos-dropdown-item highlight"
-                  onClick={() => {
-                    setIsMenuOpen(false);
-                    if (onCloseShift) {
-                      onCloseShift();
-                    } else {
-                      navigate(location.pathname.startsWith('/employee') ? '/employee/pos/shift' : '/pos/shift');
-                    }
-                  }}
-                >
-                  <Clock size={16} className="text-teal-700" />
-                  <div className="item-content">
-                    <div className="item-title">Sổ ca & Chốt ca quầy</div>
-                    <div className="item-desc">Kiểm đếm két, thu chi & bàn giao ca</div>
-                  </div>
-                </button>
+                {isStoreOwner ? (
+                  <button
+                    type="button"
+                    className="pos-dropdown-item"
+                    onClick={() => {
+                      setIsMenuOpen(false);
+                      navigate('/pos/shift');
+                    }}
+                  >
+                    <Clock size={16} className="text-teal-700" />
+                    <div className="item-content">
+                      <div className="item-title">Lịch sử ca cửa hàng</div>
+                      <div className="item-desc">Xem nhật ký các ca làm việc & báo cáo két</div>
+                    </div>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="pos-dropdown-item highlight"
+                    onClick={() => {
+                      setIsMenuOpen(false);
+                      if (onCloseShift) {
+                        onCloseShift();
+                      } else {
+                        navigate(location.pathname.startsWith('/employee') ? '/employee/pos/shift' : '/pos/shift');
+                      }
+                    }}
+                  >
+                    <Clock size={16} className="text-teal-700" />
+                    <div className="item-content">
+                      <div className="item-title">Sổ ca & Chốt ca quầy</div>
+                      <div className="item-desc">Kiểm đếm két, thu chi & bàn giao ca</div>
+                    </div>
+                  </button>
+                )}
               </div>
             )}
           </div>

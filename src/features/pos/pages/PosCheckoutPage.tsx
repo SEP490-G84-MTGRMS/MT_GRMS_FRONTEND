@@ -1,6 +1,5 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import type { FC } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
 import { CheckCircle2 } from 'lucide-react';
 import type { OrderTab, CartItem, Product, Customer, ReceiptData } from '../types/pos.types';
 import {
@@ -25,6 +24,13 @@ import { PosInventoryLookupModal } from '../components/modals/PosInventoryLookup
 import { AN_NHIEN_BRANCHES } from '../mock/posMockData';
 import { useBarcodeScanner } from '../../../hooks/useBarcodeScanner';
 import { posOrderApi } from '../api/posOrderApi';
+import { posShiftApi } from '../api/posShiftApi';
+import type { ShiftDetailResponse } from '../types/posShift.types';
+import { OpenShiftModal } from '../components/modals/OpenShiftModal';
+import { CashMovementModal } from '../components/modals/CashMovementModal';
+import { CloseShiftModal } from '../components/modals/CloseShiftModal';
+import { OwnerCashApprovalDrawer } from '../components/drawers/OwnerCashApprovalDrawer';
+import { ZReportModal } from '../components/modals/ZReportModal';
 import { storeProductApi } from '../../product/api/storeProductApi';
 import { useAuthStore } from '../../../stores/useAuthStore';
 import '../pos.css';
@@ -88,8 +94,6 @@ const getInitialActiveTabId = (tenantId: string, initialTabs: OrderTab[]): numbe
 const DEFAULT_GROCERY_BRANCH_ID = 'cd5e8d1b-b08b-448d-beff-b85ea5873d52';
 
 export const PosCheckoutPage: FC = () => {
-  const navigate = useNavigate();
-  const location = useLocation();
   const { user } = useAuthStore();
   const currentTenantId = user?.tenantId || 'tenant_mt_mart_01';
   const isDefaultDemoStore = currentTenantId === 'tenant_mt_mart_01';
@@ -110,6 +114,16 @@ export const PosCheckoutPage: FC = () => {
   // Kho sản phẩm & danh sách khách hàng (Cách ly theo từng Cửa Hàng / Tenant)
   const [products, setProducts] = useState<Product[]>(getInitialProducts);
   const [customers, setCustomers] = useState<Customer[]>(getInitialCustomers);
+
+  const isStoreOwner = user?.role === 'STORE_OWNER' || user?.role === 'ADMIN';
+  const [currentShift, setCurrentShift] = useState<ShiftDetailResponse | null>(null);
+  const [isOpenShiftModalOpen, setIsOpenShiftModalOpen] = useState(false);
+  const [isCashMovementModalOpen, setIsCashMovementModalOpen] = useState(false);
+  const [isCloseShiftModalOpen, setIsCloseShiftModalOpen] = useState(false);
+  const [isOwnerApprovalDrawerOpen, setIsOwnerApprovalDrawerOpen] = useState(false);
+  const [isZReportModalOpen, setIsZReportModalOpen] = useState(false);
+  const [pendingApprovalCount, setPendingApprovalCount] = useState<number>(0);
+  const [closedShiftForZReport, setClosedShiftForZReport] = useState<ShiftDetailResponse | null>(null);
 
   // Tab Đa đơn hàng (Multi-tab orders) được lưu trữ riêng biệt theo từng TenantId
   const [tabs, setTabs] = useState<OrderTab[]>(() => getInitialTabs(currentTenantId));
@@ -155,6 +169,38 @@ export const PosCheckoutPage: FC = () => {
       setToastMessage((prev) => (prev?.text === text ? null : prev));
     }, 4000);
   };
+
+  // Kiểm tra ca làm việc & số lượng phê duyệt theo vai trò
+  const checkShiftStatus = useCallback(async () => {
+    if (!activeBranch?.id) return;
+    try {
+      const shift = await posShiftApi.getCurrentShift(activeBranch.id);
+      setCurrentShift(shift);
+
+      if (isStoreOwner) {
+        // Chủ cửa hàng: không bắt mở ca, đếm số lượng pending approval & unconfirmed drops
+        try {
+          const res = await posShiftApi.getPendingMovements(activeBranch.id);
+          const pendings = res.movements.filter((m) => m.status === 'PendingApproval' || m.status === 2);
+          const drops = res.movements.filter((m) => (m.category === 'CASH_DRAW' || m.category === 2) && !m.isConfirmedByOwner);
+          setPendingApprovalCount(pendings.length + drops.length);
+        } catch {
+          // ignore
+        }
+      } else {
+        // Thu ngân / Nhân viên: nếu chưa có ca mở thì bắt buộc mở ca
+        if (!shift) {
+          setIsOpenShiftModalOpen(true);
+        }
+      }
+    } catch {
+      // fallback
+    }
+  }, [activeBranch?.id, isStoreOwner]);
+
+  useEffect(() => {
+    checkShiftStatus();
+  }, [checkShiftStatus]);
 
   // Khi chuyển đổi tài khoản (TenantId thay đổi) -> reset và nạp dữ liệu riêng của Tenant đó
   useEffect(() => {
@@ -743,10 +789,12 @@ export const PosCheckoutPage: FC = () => {
         onToggleSalesMode={(mode) => setIsCatalogModalOpen(mode === 'normal')}
         onHoldOrder={handleHoldOrder}
         onPrintRecent={handlePrintRecent}
-        onCloseShift={() => {
-          const isEmployee = location.pathname.startsWith('/employee/pos');
-          navigate(isEmployee ? '/employee/pos/shift' : '/pos/shift');
-        }}
+        pendingApprovalCount={pendingApprovalCount}
+        onOpenApprovalDrawer={() => setIsOwnerApprovalDrawerOpen(true)}
+        currentShift={currentShift}
+        onOpenCashMovement={() => setIsCashMovementModalOpen(true)}
+        onCloseShift={() => setIsCloseShiftModalOpen(true)}
+        onOpenShift={() => setIsOpenShiftModalOpen(true)}
       />
 
       {/* 2. Main Body Split */}
@@ -887,6 +935,103 @@ setIsDebtWarningOpen(false);
           });
         }}
       />
+
+      {/* 4. Modals Quản lý Ca POS & Phân Quyền */}
+      <OpenShiftModal
+        isOpen={isOpenShiftModalOpen}
+        branchId={activeBranch.id}
+        branchName={activeBranch.name}
+        canCancel={isStoreOwner}
+        onCancel={() => setIsOpenShiftModalOpen(false)}
+        onShiftOpened={(newShift) => {
+          setCurrentShift(newShift);
+          setIsOpenShiftModalOpen(false);
+          showToast(`✅ Đã mở ${newShift.shiftName} (${newShift.shiftCode}) thành công!`);
+        }}
+      />
+
+      {currentShift && (
+        <CashMovementModal
+          isOpen={isCashMovementModalOpen}
+          shift={currentShift}
+          onClose={() => setIsCashMovementModalOpen(false)}
+          onMovementAdded={() => {
+            showToast('✅ Đã ghi nhận phiếu thu/chi két!');
+            checkShiftStatus();
+          }}
+        />
+      )}
+
+      {currentShift && (
+        <CloseShiftModal
+          isOpen={isCloseShiftModalOpen}
+          shift={currentShift}
+          onClose={() => setIsCloseShiftModalOpen(false)}
+          onShiftClosed={(closed) => {
+            setCurrentShift(null);
+            setIsCloseShiftModalOpen(false);
+            setClosedShiftForZReport(closed);
+            setIsZReportModalOpen(true);
+            showToast('✅ Đã chốt ca làm việc và kết toán thành công!');
+          }}
+        />
+      )}
+
+      <OwnerCashApprovalDrawer
+        isOpen={isOwnerApprovalDrawerOpen}
+        branchId={activeBranch.id}
+        onClose={() => setIsOwnerApprovalDrawerOpen(false)}
+        onActionComplete={() => {
+          showToast('✅ Đã cập nhật trạng thái duyệt chi!');
+          checkShiftStatus();
+        }}
+      />
+
+      {closedShiftForZReport && (
+        <ZReportModal
+          isOpen={isZReportModalOpen}
+          onClose={() => {
+            setIsZReportModalOpen(false);
+            setClosedShiftForZReport(null);
+            checkShiftStatus();
+          }}
+          shiftInfo={{
+            shiftCode: closedShiftForZReport.shiftCode,
+            shiftName: closedShiftForZReport.shiftName,
+            branchName: closedShiftForZReport.branchName || activeBranch.name,
+            posMachine: 'POS-01',
+            cashierName: user?.fullName || 'Thu ngân',
+            cashierCode: 'NV01',
+            supervisorName: 'Chủ Cửa Hàng',
+            startTime: closedShiftForZReport.openedAtUtc,
+            durationText: '1 ca',
+            status: 'closed',
+          }}
+          revenues={[
+            {
+              id: 'cash',
+              methodName: 'Tiền mặt',
+              methodDescription: 'Doanh thu tiền mặt tại két',
+              orderCount: closedShiftForZReport.totalOrdersCount,
+              amount: Math.max(0, closedShiftForZReport.expectedCash - closedShiftForZReport.openingFloat - closedShiftForZReport.totalCashIn + closedShiftForZReport.totalCashOut),
+              percentage: 60,
+              icon: 'Banknote',
+            },
+            {
+              id: 'bank',
+              methodName: 'Chuyển khoản / VietQR',
+              methodDescription: 'Doanh thu chuyển khoản qua ngân hàng',
+              orderCount: 0,
+              amount: closedShiftForZReport.totalBankRevenue || 0,
+              percentage: 40,
+              icon: 'CreditCard',
+            },
+          ]}
+          actualCash={closedShiftForZReport.actualCashCounted ?? 0}
+          theoreticalCash={closedShiftForZReport.expectedCash}
+          initialFloat={closedShiftForZReport.openingFloat}
+        />
+      )}
 
       {toastMessage && (
         <div
