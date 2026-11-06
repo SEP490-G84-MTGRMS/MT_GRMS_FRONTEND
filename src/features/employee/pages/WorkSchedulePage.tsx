@@ -16,7 +16,11 @@ import {
 import { AddScheduleModal } from '../components/AddScheduleModal';
 import { EmployeeDetailModal } from '../components/EmployeeDetailModal';
 import { ShiftConfigModal } from '../components/ShiftConfigModal';
-import { ScheduleScopeConfirmModal } from '../components/ScheduleScopeConfirmModal';
+import {
+  ScheduleScopeConfirmModal,
+  type ScheduleScopeType,
+  type ScheduleScopeDateRange,
+} from '../components/ScheduleScopeConfirmModal';
 import { TablePagination, NotificationModal } from '../../../components/common';
 import { employeeApi } from '../api/employeeApi';
 import { shiftConfigApi, type ShiftConfigDto } from '../api/shiftConfigApi';
@@ -444,11 +448,55 @@ export const WorkSchedulePage: React.FC = () => {
     }
   };
 
-  // 5. Xác nhận xóa ca trên Backend
-  const handleConfirmDelete = async () => {
+  // 5. Xác nhận xóa ca trên Backend theo phạm vi
+  const handleConfirmDelete = async (scope?: ScheduleScopeType, dateRange?: ScheduleScopeDateRange) => {
     if (!deletingAssignment) return;
     try {
+      setIsLoading(true);
+
+      // Luôn xóa ca hiện tại được bấm
       await scheduleApi.deleteSchedule(deletingAssignment.id);
+
+      // Nếu người dùng chọn Option 2 (following) hoặc Option 3 (all), fetch và xóa các ca cùng phạm vi
+      if ((scope === 'following' || scope === 'all') && dateRange?.fromDate && dateRange?.toDate) {
+        try {
+          const schedulesInRange = await scheduleApi.getSchedules({
+            employeeId: deletingAssignment.employeeId,
+            fromDate: dateRange.fromDate,
+            toDate: dateRange.toDate,
+            pageSize: 1000,
+          });
+
+          const targetDow = deletingAssignment.dayOfWeek;
+          const targetShiftId = deletingAssignment.shiftId;
+          const targetShiftName = deletingAssignment.shiftName?.toLowerCase().trim();
+
+          const DAY_MAP: Record<number, string> = {
+            0: 'CN', 1: 'T2', 2: 'T3', 3: 'T4', 4: 'T5', 5: 'T6', 6: 'T7'
+          };
+
+          const otherMatching = schedulesInRange.filter((s) => {
+            if (s.id === deletingAssignment.id) return false;
+            const dow = s.dayOfWeek || (s.workDate ? DAY_MAP[new Date(s.workDate).getDay()] : undefined);
+            const matchesDow = !targetDow || dow === targetDow;
+            const matchesShift = !targetShiftId || s.shiftId === targetShiftId || (s.shiftName && s.shiftName.toLowerCase().trim() === targetShiftName);
+            return matchesDow && matchesShift;
+          });
+
+          if (otherMatching.length > 0) {
+            await Promise.all(
+              otherMatching.map((s) =>
+                scheduleApi.deleteSchedule(s.id).catch((err) => {
+                  console.warn(`Lỗi xóa ca ${s.id}:`, err);
+                })
+              )
+            );
+          }
+        } catch (fetchErr) {
+          console.warn('Lỗi khi fetch và xóa các ca theo phạm vi:', fetchErr);
+        }
+      }
+
       setNotificationModal({
         isOpen: true,
         type: 'success',
@@ -464,6 +512,7 @@ export const WorkSchedulePage: React.FC = () => {
         message: err?.response?.data?.message || err?.message || 'Không thể xóa ca làm việc.',
       });
     } finally {
+      setIsLoading(false);
       setDeletingAssignment(null);
     }
   };
@@ -1367,21 +1416,40 @@ export const WorkSchedulePage: React.FC = () => {
         isOpen={!!deletingAssignment}
         onClose={() => setDeletingAssignment(null)}
         actionType="delete"
+        employeeId={deletingAssignment?.employeeId}
+        branchId={deletingAssignment?.branchId}
+        shiftId={deletingAssignment?.shiftId}
+        shiftName={deletingAssignment?.shiftName}
+        dayOfWeek={deletingAssignment?.dayOfWeek}
+        selectedDays={deletingAssignment?.dayOfWeek ? [deletingAssignment.dayOfWeek] : undefined}
         dateStr={
-          deletingAssignment?.dateStr
-            ? deletingAssignment.dateStr.includes('/2026')
-              ? deletingAssignment.dateStr
-              : `${deletingAssignment.dateStr}/2026`
-            : '16/10/2026'
+          deletingAssignment?.workDate
+            ? (() => {
+                const d = new Date(deletingAssignment.workDate);
+                const dd = String(d.getDate()).padStart(2, '0');
+                const mm = String(d.getMonth() + 1).padStart(2, '0');
+                return `${dd}/${mm}/${d.getFullYear()}`;
+              })()
+            : deletingAssignment?.dateStr
+              ? deletingAssignment.dateStr.includes('/2026')
+                ? deletingAssignment.dateStr
+                : `${deletingAssignment.dateStr}/2026`
+              : '16/10/2026'
         }
         startDateStr={
-          deletingAssignment?.dateStr
-            ? deletingAssignment.dateStr.includes('/2026')
-              ? deletingAssignment.dateStr
-              : `${deletingAssignment.dateStr}/2026`
-            : '16/10/2026'
+          deletingAssignment?.workDate
+            ? (() => {
+                const d = new Date(deletingAssignment.workDate);
+                const dd = String(d.getDate()).padStart(2, '0');
+                const mm = String(d.getMonth() + 1).padStart(2, '0');
+                return `${dd}/${mm}/${d.getFullYear()}`;
+              })()
+            : deletingAssignment?.dateStr
+              ? deletingAssignment.dateStr.includes('/2026')
+                ? deletingAssignment.dateStr
+                : `${deletingAssignment.dateStr}/2026`
+              : '16/10/2026'
         }
-        endDateStr="31/10/2026"
         onConfirm={handleConfirmDelete}
       />
 

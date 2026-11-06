@@ -71,6 +71,37 @@ const DAYS: DayItem[] = [
   { key: 'CN', label: 'Chủ nhật', date: '04/10' },
 ];
 
+const DAY_OF_WEEK_MAP: Record<number, 'CN' | 'T2' | 'T3' | 'T4' | 'T5' | 'T6' | 'T7'> = {
+  0: 'CN',
+  1: 'T2',
+  2: 'T3',
+  3: 'T4',
+  4: 'T5',
+  5: 'T6',
+  6: 'T7',
+};
+
+const getScheduleDayOfWeek = (s: ScheduleAssignment): 'T2' | 'T3' | 'T4' | 'T5' | 'T6' | 'T7' | 'CN' => {
+  if (s.dayOfWeek && ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'].includes(s.dayOfWeek)) {
+    return s.dayOfWeek as any;
+  }
+  if (s.workDate) {
+    const d = new Date(s.workDate);
+    if (!isNaN(d.getTime())) return DAY_OF_WEEK_MAP[d.getDay()] || 'T2';
+  }
+  if (s.dateStr) {
+    const parts = s.dateStr.split('/');
+    if (parts.length >= 2) {
+      const dd = parseInt(parts[0], 10);
+      const mm = parseInt(parts[1], 10) - 1;
+      const yyyy = parts.length >= 3 ? parseInt(parts[2], 10) : new Date().getFullYear();
+      const d = new Date(yyyy, mm, dd);
+      if (!isNaN(d.getTime())) return DAY_OF_WEEK_MAP[d.getDay()] || 'T2';
+    }
+  }
+  return 'T2';
+};
+
 export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
   isOpen,
   onClose,
@@ -93,7 +124,6 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
   const [showScopeModal, setShowScopeModal] = useState(false);
   const [scopeAction, setScopeAction] = useState<'update' | 'delete'>('update');
   const [pendingUpdatedItem, setPendingUpdatedItem] = useState<ScheduleAssignment | null>(null);
-  const [pendingExtraAssignments, setPendingExtraAssignments] = useState<ScheduleAssignment[]>([]);
 
   // Nhân viên chính
   const [employeeId, setEmployeeId] = useState(
@@ -392,10 +422,18 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
 
   // Ngày hiển thị trong popup xác nhận
   const displayDateFormatted = useMemo(() => {
+    if (editingAssignment?.workDate) {
+      const d = new Date(editingAssignment.workDate);
+      if (!isNaN(d.getTime())) {
+        const dd = String(d.getDate()).padStart(2, '0');
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        return `${dd}/${mm}/${d.getFullYear()}`;
+      }
+    }
     if (!editingAssignment?.dateStr) return '16/10/2026';
     const str = editingAssignment.dateStr;
-    if (str.includes('/2026')) return str;
-    return `${str}/2026`;
+    if (str.split('/').length === 3) return str;
+    return `${str}/${new Date().getFullYear()}`;
   }, [editingAssignment]);
 
   // Tên ngày hiện tại hiển thị ở subtitle
@@ -513,8 +551,18 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
       branches[0]?.name ||
       'Chi nhánh trung tâm';
 
-    // Nếu đang ở chế độ Cập nhật ca cụ thể -> mở popup xác nhận phạm vi thay đổi
+    // Nếu đang ở chế độ Cập nhật ca cụ thể
     if (isEditMode && editingAssignment) {
+      if (hasEndDate && !endDate) {
+        setSubmitError('Vui lòng chọn ngày kết thúc khi tích chọn Có ngày kết thúc.');
+        return;
+      }
+
+      if (hasEndDate && endDate && endDate < calculatedStartDate) {
+        setSubmitError('Ngày kết thúc không được nhỏ hơn ngày bắt đầu.');
+        return;
+      }
+
       const activeDay = selectedDays[0] || editingAssignment.dayOfWeek;
       const dayObj = activeDaysList.find((item) => item.key === activeDay);
 
@@ -533,39 +581,76 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
         branchName: branchNameFinal,
       };
 
-      const extraAssignments: ScheduleAssignment[] = [];
-      if (applyToOthers && selectedOtherEmpIds.length > 0) {
-        selectedOtherEmpIds.forEach((eId) => {
-          const empItem = employees.find((e) => e.id === eId);
-          if (!empItem) return;
-          const otherBranchId =
-            (empItem?.workingBranchIds && empItem.workingBranchIds[0]) ||
-            empItem?.salaryBranchId;
-          const otherBranchName =
-            empItem?.workingBranchNames?.[0] ||
-            empItem?.salaryBranchName ||
-            branches.find((b) => b.id === otherBranchId)?.name ||
-            branchNameFinal;
+      // Nếu có ngày kết thúc: trực tiếp update đến ngày kết thúc và KHÔNG hiện popup ScheduleScopeConfirmModal
+      if (hasEndDate && endDate) {
+        try {
+          setIsSubmitting(true);
+          setSubmitError(null);
 
-          extraAssignments.push({
-            id: `sa_${Date.now()}_${eId}_${activeDay}_${Math.floor(Math.random() * 1000)}`,
-            employeeId: empItem.id,
-            employeeName: empItem.fullName,
-            employeeCode: empItem.employeeCode,
-            shiftId: shiftIdFinal,
-            shiftName,
-            shiftTime,
-            shiftColor,
-            dayOfWeek: activeDay,
-            dateStr: dayObj?.date || '29/09',
-            branchId: otherBranchId,
-            branchName: otherBranchName,
-          });
-        });
+          // Cập nhật ca hiện tại
+          if (onUpdate) {
+            await onUpdate(updatedItem);
+          } else if (onSave) {
+            onSave([updatedItem]);
+          }
+
+          // Cập nhật tất cả các ca khác của nhân viên trong khoảng [calculatedStartDate, endDate]
+          // CHỈ UPDATE NHỮNG THỨ ĐƯỢC CHỌN (selectedDays)
+          const daysToUpdate = isRepeating ? selectedDays : [selectedDays[0] || updatedItem.dayOfWeek];
+          try {
+            const schedulesInRange = await scheduleApi.getSchedules({
+              employeeId: currentEmp.id,
+              branchId: currentEmpBranchId || undefined,
+              fromDate: calculatedStartDate,
+              toDate: endDate,
+              pageSize: 500,
+            });
+
+            const matchingOtherSchedules = schedulesInRange.filter((s) => {
+              if (s.id === editingAssignment.id) return false;
+              const dow = getScheduleDayOfWeek(s);
+              return daysToUpdate.includes(dow);
+            });
+
+            if (matchingOtherSchedules.length > 0) {
+              const formattedStart = rawStartTime ? (rawStartTime.length === 5 ? `${rawStartTime}:00` : rawStartTime) : undefined;
+              const formattedEnd = rawEndTime ? (rawEndTime.length === 5 ? `${rawEndTime}:00` : rawEndTime) : undefined;
+              const shiftConfigIdVal = shiftIdFinal !== 'custom' ? shiftIdFinal : undefined;
+
+              await Promise.all(
+                matchingOtherSchedules.map((s) =>
+                  scheduleApi.updateSchedule(s.id, {
+                    shiftName,
+                    shiftConfigId: shiftConfigIdVal,
+                    shiftCode: currentSelectedShift?.code || (shiftIdFinal !== 'custom' ? undefined : 'CUSTOM'),
+                    plannedStartTime: formattedStart,
+                    plannedEndTime: formattedEnd,
+                  }).catch((err) => {
+                    console.warn(`Lỗi khi cập nhật ca ${s.id}:`, err);
+                  })
+                )
+              );
+            }
+          } catch (rangeErr) {
+            console.warn('Lỗi khi cập nhật các ca cùng dải ngày kết thúc:', rangeErr);
+          }
+
+          if (onSuccess) {
+            await onSuccess();
+          }
+
+          onClose();
+        } catch (err: any) {
+          console.error('Lỗi khi cập nhật ca làm việc:', err);
+          setSubmitError(err?.response?.data?.message || err?.message || 'Cập nhật ca làm việc thất bại.');
+        } finally {
+          setIsSubmitting(false);
+        }
+        return;
       }
 
+      // Không có ngày kết thúc -> mở popup ScheduleScopeConfirmModal để chọn phạm vi
       setPendingUpdatedItem(updatedItem);
-      setPendingExtraAssignments(extraAssignments);
       setScopeAction('update');
       setShowScopeModal(true);
       return;
@@ -1211,206 +1296,208 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
               )}
             </div>
 
-            {/* ─── SECTION 3: THÊM LỊCH TƯƠNG TỰ CHO NHÂN VIÊN KHÁC ─── */}
-            <div style={{ borderTop: '1px solid #F1F5F9', paddingTop: 16 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div style={{ fontSize: 14, fontWeight: 700, color: '#0F172A' }}>
-                  Thêm lịch tương tự cho nhân viên khác
-                </div>
-                {/* Switch Toggle */}
-                <label style={{ position: 'relative', display: 'inline-block', width: 38, height: 22, cursor: 'pointer' }}>
-                  <input
-                    type="checkbox"
-                    checked={applyToOthers}
-                    onChange={(e) => setApplyToOthers(e.target.checked)}
-                    style={{ opacity: 0, width: 0, height: 0 }}
-                  />
-                  <span
-                    style={{
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      right: 0,
-                      bottom: 0,
-                      background: applyToOthers ? '#0F766E' : '#CBD5E1',
-                      borderRadius: 22,
-                      transition: '0.2s',
-                    }}
-                  />
-                  <span
-                    style={{
-                      position: 'absolute',
-                      height: 16,
-                      width: 16,
-                      left: applyToOthers ? 19 : 3,
-                      bottom: 3,
-                      background: '#FFFFFF',
-                      borderRadius: '50%',
-                      transition: '0.2s',
-                    }}
-                  />
-                </label>
-              </div>
-              <div style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>
-                {currentEmp?.workingBranchNames?.[0] || currentEmp?.salaryBranchName ? (
-                  <span>
-                    Chỉ áp dụng cho các nhân viên cùng chi nhánh (
-                    <strong style={{ color: '#0F766E' }}>
-                      {currentEmp?.workingBranchNames?.[0] || currentEmp?.salaryBranchName}
-                    </strong>
-                    )
-                  </span>
-                ) : (
-                  'Lịch làm việc sẽ được áp dụng cho các nhân viên cùng chi nhánh'
-                )}
-              </div>
-
-              {applyToOthers && (
-                <div style={{ marginTop: 12, position: 'relative' }}>
-                  {/* Ô tìm kiếm nhân viên */}
-                  <div
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 8,
-                      border: '1px solid #CBD5E1',
-                      borderRadius: 6,
-                      padding: '6px 12px',
-                      background: '#FFFFFF',
-                    }}
-                  >
-                    <Search size={15} color="#94A3B8" />
-                    <input
-                      type="text"
-                      placeholder="Tìm kiếm nhân viên cùng chi nhánh..."
-                      value={otherEmployeeSearch}
-                      onChange={(e) => {
-                        setOtherEmployeeSearch(e.target.value);
-                        setIsOtherEmpDropdownOpen(true);
-                      }}
-                      onFocus={() => setIsOtherEmpDropdownOpen(true)}
-                      style={{
-                        border: 'none',
-                        outline: 'none',
-                        width: '100%',
-                        fontSize: 13,
-                        color: '#1E293B',
-                      }}
-                    />
+            {/* ─── SECTION 3: THÊM LỊCH TƯƠNG TỰ CHO NHÂN VIÊN KHÁC (Chỉ hiển thị khi thêm mới, không hiển thị khi cập nhật) ─── */}
+            {!isEditMode && (
+              <div style={{ borderTop: '1px solid #F1F5F9', paddingTop: 16 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: '#0F172A' }}>
+                    Thêm lịch tương tự cho nhân viên khác
                   </div>
-
-                  {/* Tags nhân viên đã chọn */}
-                  {selectedOtherEmpIds.length > 0 && (
-                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
-                      {selectedOtherEmpIds.map((id) => {
-                        const emp = employees.find((e) => e.id === id);
-                        if (!emp) return null;
-                        return (
-                          <span
-                            key={id}
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: 4,
-                              background: '#F0FDFA',
-                              color: '#0F766E',
-                              border: '1px solid #99F6E4',
-                              borderRadius: 4,
-                              padding: '2px 8px',
-                              fontSize: 12,
-                              fontWeight: 500,
-                            }}
-                          >
-                            <span>{emp.fullName}</span>
-                            <span
-                              onClick={() => handleRemoveOtherEmp(id)}
-                              style={{ cursor: 'pointer', display: 'flex' }}
-                              title="Bỏ chọn"
-                            >
-                              <X size={12} />
-                            </span>
-                          </span>
-                        );
-                      })}
-                    </div>
-                  )}
-
-                  {/* Dropdown danh sách gợi ý nhân viên */}
-                  {isOtherEmpDropdownOpen && (
-                    <div
+                  {/* Switch Toggle */}
+                  <label style={{ position: 'relative', display: 'inline-block', width: 38, height: 22, cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={applyToOthers}
+                      onChange={(e) => setApplyToOthers(e.target.checked)}
+                      style={{ opacity: 0, width: 0, height: 0 }}
+                    />
+                    <span
                       style={{
                         position: 'absolute',
-                        top: '100%',
+                        top: 0,
                         left: 0,
                         right: 0,
-                        marginTop: 4,
-                        background: '#FFFFFF',
-                        border: '1px solid #E2E8F0',
-                        borderRadius: 8,
-                        boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
-                        maxHeight: 180,
-                        overflowY: 'auto',
-                        zIndex: 100,
+                        bottom: 0,
+                        background: applyToOthers ? '#0F766E' : '#CBD5E1',
+                        borderRadius: 22,
+                        transition: '0.2s',
                       }}
-                    >
-                      {candidateOtherEmployees.length ? (
-                        candidateOtherEmployees.map((e) => {
-                          const isChecked = selectedOtherEmpIds.includes(e.id);
-                          return (
-                            <div
-                              key={e.id}
-                              onClick={() => handleToggleOtherEmp(e.id)}
-                              style={{
-                                padding: '8px 12px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'space-between',
-                                cursor: 'pointer',
-                                background: isChecked ? '#F0FDFA' : '#FFFFFF',
-                                borderBottom: '1px solid #F1F5F9',
-                              }}
-                            >
-                              <div style={{ fontSize: 13, color: isChecked ? '#0F766E' : '#1E293B' }}>
-                                <span style={{ fontWeight: 600 }}>{e.fullName}</span>{' '}
-                                <span style={{ color: '#64748B' }}>({e.employeeCode})</span>
-                              </div>
-                              {isChecked && <Check size={14} color="#0F766E" />}
-                            </div>
-                          );
-                        })
-                      ) : (
-                        <div style={{ padding: 12, textAlign: 'center', color: '#94A3B8', fontSize: 12 }}>
-                          Không tìm thấy nhân viên cùng chi nhánh nào phù hợp
-                        </div>
-                      )}
-                      <div
-                        style={{
-                          padding: '6px 12px',
-                          background: '#F8FAFC',
-                          textAlign: 'right',
-                          borderTop: '1px solid #E2E8F0',
-                        }}
-                      >
-                        <button
-                          type="button"
-                          onClick={() => setIsOtherEmpDropdownOpen(false)}
-                          style={{
-                            border: 'none',
-                            background: 'transparent',
-                            color: '#0F766E',
-                            fontSize: 12,
-                            fontWeight: 600,
-                            cursor: 'pointer',
-                          }}
-                        >
-                          Đóng
-                        </button>
-                      </div>
-                    </div>
+                    />
+                    <span
+                      style={{
+                        position: 'absolute',
+                        height: 16,
+                        width: 16,
+                        left: applyToOthers ? 19 : 3,
+                        bottom: 3,
+                        background: '#FFFFFF',
+                        borderRadius: '50%',
+                        transition: '0.2s',
+                      }}
+                    />
+                  </label>
+                </div>
+                <div style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>
+                  {currentEmp?.workingBranchNames?.[0] || currentEmp?.salaryBranchName ? (
+                    <span>
+                      Chỉ áp dụng cho các nhân viên cùng chi nhánh (
+                      <strong style={{ color: '#0F766E' }}>
+                        {currentEmp?.workingBranchNames?.[0] || currentEmp?.salaryBranchName}
+                      </strong>
+                      )
+                    </span>
+                  ) : (
+                    'Lịch làm việc sẽ được áp dụng cho các nhân viên cùng chi nhánh'
                   )}
                 </div>
-              )}
-            </div>
+
+                {applyToOthers && (
+                  <div style={{ marginTop: 12, position: 'relative' }}>
+                    {/* Ô tìm kiếm nhân viên */}
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        border: '1px solid #CBD5E1',
+                        borderRadius: 6,
+                        padding: '6px 12px',
+                        background: '#FFFFFF',
+                      }}
+                    >
+                      <Search size={15} color="#94A3B8" />
+                      <input
+                        type="text"
+                        placeholder="Tìm kiếm nhân viên cùng chi nhánh..."
+                        value={otherEmployeeSearch}
+                        onChange={(e) => {
+                          setOtherEmployeeSearch(e.target.value);
+                          setIsOtherEmpDropdownOpen(true);
+                        }}
+                        onFocus={() => setIsOtherEmpDropdownOpen(true)}
+                        style={{
+                          border: 'none',
+                          outline: 'none',
+                          width: '100%',
+                          fontSize: 13,
+                          color: '#1E293B',
+                        }}
+                      />
+                    </div>
+
+                    {/* Tags nhân viên đã chọn */}
+                    {selectedOtherEmpIds.length > 0 && (
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
+                        {selectedOtherEmpIds.map((id) => {
+                          const emp = employees.find((e) => e.id === id);
+                          if (!emp) return null;
+                          return (
+                            <span
+                              key={id}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 4,
+                                background: '#F0FDFA',
+                                color: '#0F766E',
+                                border: '1px solid #99F6E4',
+                                borderRadius: 4,
+                                padding: '2px 8px',
+                                fontSize: 12,
+                                fontWeight: 500,
+                              }}
+                            >
+                              <span>{emp.fullName}</span>
+                              <span
+                                onClick={() => handleRemoveOtherEmp(id)}
+                                style={{ cursor: 'pointer', display: 'flex' }}
+                                title="Bỏ chọn"
+                              >
+                                <X size={12} />
+                              </span>
+                            </span>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {/* Dropdown danh sách gợi ý nhân viên */}
+                    {isOtherEmpDropdownOpen && (
+                      <div
+                        style={{
+                          position: 'absolute',
+                          top: '100%',
+                          left: 0,
+                          right: 0,
+                          marginTop: 4,
+                          background: '#FFFFFF',
+                          border: '1px solid #E2E8F0',
+                          borderRadius: 8,
+                          boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
+                          maxHeight: 180,
+                          overflowY: 'auto',
+                          zIndex: 100,
+                        }}
+                      >
+                        {candidateOtherEmployees.length ? (
+                          candidateOtherEmployees.map((e) => {
+                            const isChecked = selectedOtherEmpIds.includes(e.id);
+                            return (
+                              <div
+                                key={e.id}
+                                onClick={() => handleToggleOtherEmp(e.id)}
+                                style={{
+                                  padding: '8px 12px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'space-between',
+                                  cursor: 'pointer',
+                                  background: isChecked ? '#F0FDFA' : '#FFFFFF',
+                                  borderBottom: '1px solid #F1F5F9',
+                                }}
+                              >
+                                <div style={{ fontSize: 13, color: isChecked ? '#0F766E' : '#1E293B' }}>
+                                  <span style={{ fontWeight: 600 }}>{e.fullName}</span>{' '}
+                                  <span style={{ color: '#64748B' }}>({e.employeeCode})</span>
+                                </div>
+                                {isChecked && <Check size={14} color="#0F766E" />}
+                              </div>
+                            );
+                          })
+                        ) : (
+                          <div style={{ padding: 12, textAlign: 'center', color: '#94A3B8', fontSize: 12 }}>
+                            Không tìm thấy nhân viên cùng chi nhánh nào phù hợp
+                          </div>
+                        )}
+                        <div
+                          style={{
+                            padding: '6px 12px',
+                            background: '#F8FAFC',
+                            textAlign: 'right',
+                            borderTop: '1px solid #E2E8F0',
+                          }}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => setIsOtherEmpDropdownOpen(false)}
+                            style={{
+                              border: 'none',
+                              background: 'transparent',
+                              color: '#0F766E',
+                              fontSize: 12,
+                              fontWeight: 600,
+                              cursor: 'pointer',
+                            }}
+                          >
+                            Đóng
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Hiển thị lỗi nếu có từ backend */}
             {submitError && (
@@ -1522,26 +1609,128 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
         isOpen={showScopeModal}
         onClose={() => setShowScopeModal(false)}
         actionType={scopeAction}
+        employeeId={currentEmp?.id || editingAssignment?.employeeId}
+        branchId={currentEmpBranchId || editingAssignment?.branchId}
+        shiftId={editingAssignment?.shiftId}
+        shiftName={editingAssignment?.shiftName}
+        dayOfWeek={editingAssignment?.dayOfWeek}
         dateStr={displayDateFormatted}
         startDateStr={displayDateFormatted}
-        endDateStr="31/10/2026"
-        onConfirm={(_scope) => {
+        selectedDays={isRepeating ? selectedDays : [selectedDays[0] || (editingAssignment?.dayOfWeek || 'T2')]}
+        onConfirm={async (scope, dateRange) => {
           if (scopeAction === 'update' && pendingUpdatedItem) {
-            if (onUpdate) {
-              onUpdate(pendingUpdatedItem);
-            } else if (onSave) {
-              onSave([pendingUpdatedItem]);
-            }
-            if (pendingExtraAssignments.length > 0 && onSave) {
-              onSave(pendingExtraAssignments);
+            try {
+              setIsSubmitting(true);
+              setSubmitError(null);
+
+              // 1. Cập nhật ca hiện tại
+              if (onUpdate) {
+                await onUpdate(pendingUpdatedItem);
+              } else if (onSave) {
+                onSave([pendingUpdatedItem]);
+              }
+
+              // 2. Theo scope confirm (Following hoặc All): CHỈ UPDATE NHỮNG THỨ ĐƯỢC CHỌN (selectedDays)
+              if ((scope === 'following' || scope === 'all') && dateRange?.fromDate && dateRange?.toDate) {
+                const daysToUpdate = isRepeating ? selectedDays : [selectedDays[0] || pendingUpdatedItem.dayOfWeek];
+                const parts = (pendingUpdatedItem.shiftTime || '').split('-').map((s) => s.trim());
+                const rawStart = parts[0] || '08:00';
+                const rawEnd = parts[1] || '17:00';
+                const formattedStart = rawStart.length === 5 ? `${rawStart}:00` : rawStart;
+                const formattedEnd = rawEnd.length === 5 ? `${rawEnd}:00` : rawEnd;
+                const shiftConfigIdVal = pendingUpdatedItem.shiftId !== 'custom' ? pendingUpdatedItem.shiftId : undefined;
+
+                const schedulesInRange = await scheduleApi.getSchedules({
+                  employeeId: currentEmp?.id || pendingUpdatedItem.employeeId,
+                  fromDate: dateRange.fromDate,
+                  toDate: dateRange.toDate,
+                  pageSize: 1000,
+                });
+
+                const matchingOtherSchedules = schedulesInRange.filter((s) => {
+                  if (editingAssignment && s.id === editingAssignment.id) return false;
+                  const dow = getScheduleDayOfWeek(s);
+                  return daysToUpdate.includes(dow);
+                });
+
+                if (matchingOtherSchedules.length > 0) {
+                  await Promise.all(
+                    matchingOtherSchedules.map((s) =>
+                      scheduleApi.updateSchedule(s.id, {
+                        shiftName: pendingUpdatedItem.shiftName,
+                        shiftConfigId: shiftConfigIdVal,
+                        shiftCode: currentSelectedShift?.code || (pendingUpdatedItem.shiftId !== 'custom' ? undefined : 'CUSTOM'),
+                        plannedStartTime: formattedStart,
+                        plannedEndTime: formattedEnd,
+                      }).catch((err) => {
+                        console.warn(`Lỗi khi cập nhật ca ${s.id}:`, err);
+                      })
+                    )
+                  );
+                }
+              }
+
+              if (onSuccess) {
+                await onSuccess();
+              }
+              onClose();
+            } catch (err: any) {
+              console.error('Lỗi khi cập nhật theo phạm vi:', err);
+              setSubmitError(err?.response?.data?.message || err?.message || 'Cập nhật ca làm việc thất bại.');
+            } finally {
+              setIsSubmitting(false);
             }
           } else if (scopeAction === 'delete' && editingAssignment) {
-            if (onDelete) {
-              onDelete(editingAssignment.id);
+            try {
+              setIsSubmitting(true);
+              setSubmitError(null);
+
+              // 1. Luôn xóa ca hiện tại
+              if (onDelete) {
+                onDelete(editingAssignment.id);
+              } else {
+                await scheduleApi.deleteSchedule(editingAssignment.id);
+              }
+
+              // 2. Nếu chọn scope Following hoặc All: xóa các ca khớp phạm vi
+              if ((scope === 'following' || scope === 'all') && dateRange?.fromDate && dateRange?.toDate) {
+                const daysToDelete = isRepeating ? selectedDays : [selectedDays[0] || editingAssignment.dayOfWeek];
+                const targetShiftNameLower = (editingAssignment.shiftName || '').toLowerCase().trim();
+
+                const schedulesInRange = await scheduleApi.getSchedules({
+                  employeeId: editingAssignment.employeeId,
+                  fromDate: dateRange.fromDate,
+                  toDate: dateRange.toDate,
+                  pageSize: 1000,
+                });
+
+                const matchingOther = schedulesInRange.filter((s) => {
+                  if (s.id === editingAssignment.id) return false;
+                  const dow = getScheduleDayOfWeek(s);
+                  const matchesDow = daysToDelete.includes(dow);
+                  const matchesShift = !targetShiftNameLower || (s.shiftName && s.shiftName.toLowerCase().trim() === targetShiftNameLower) || s.shiftId === editingAssignment.shiftId;
+                  return matchesDow && matchesShift;
+                });
+
+                if (matchingOther.length > 0) {
+                  await Promise.all(
+                    matchingOther.map((s) => scheduleApi.deleteSchedule(s.id).catch(() => {}))
+                  );
+                }
+              }
+
+              if (onSuccess) {
+                await onSuccess();
+              }
+              onClose();
+            } catch (err: any) {
+              console.error('Lỗi khi xóa ca theo phạm vi:', err);
+              setSubmitError(err?.response?.data?.message || err?.message || 'Xóa ca làm việc thất bại.');
+            } finally {
+              setIsSubmitting(false);
             }
           }
           setShowScopeModal(false);
-          onClose();
         }}
       />
     </div>

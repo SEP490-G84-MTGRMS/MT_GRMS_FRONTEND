@@ -41,6 +41,7 @@ export interface WorkShift {
   shiftName: string; // Sáng (06:00 - 14:00), Chiều (14:00 - 22:00), Hành chính (08:00 - 17:00)
   dayOfWeek: 'T2' | 'T3' | 'T4' | 'T5' | 'T6' | 'T7' | 'CN';
   dateStr: string;
+  workDate?: string;
   branchId?: string;
   branchName: string;
   note?: string;
@@ -101,7 +102,7 @@ export interface Employee {
   citizenId?: string;
   address?: string;
   city?: string;
-  
+
   // Work info
   jobTitle?: string;
   departmentId?: string;
@@ -169,6 +170,7 @@ export interface ScheduleAssignment {
   shiftColor: string;
   dayOfWeek: 'T2' | 'T3' | 'T4' | 'T5' | 'T6' | 'T7' | 'CN';
   dateStr: string;
+  workDate?: string;
   branchId?: string;
   branchName: string;
 }
@@ -199,13 +201,13 @@ export interface PayslipDetailedRecord {
   employeeName: string; // Dung Phạm
   branchName: string; // Chi nhánh trung tâm
   periodMonth: string; // 2026-10
-  
+
   // Thông số công
   standardDays: number; // 26
   workedDays: number; // 24.5
   otHours: number; // 8.5
   contractBaseSalary: number; // 8,000,000
-  
+
   // Thu nhập (Earnings)
   baseSalaryEarned: number; // Lương ngày công
   overtimePay: number; // Lương tăng ca

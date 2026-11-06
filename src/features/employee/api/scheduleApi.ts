@@ -154,6 +154,7 @@ export const mapScheduleResponseToAssignment = (s: ScheduleResponse): ScheduleAs
     shiftColor: getShiftColor(s.shiftName || s.shiftCode),
     dayOfWeek,
     dateStr,
+    workDate: s.workDate,
     branchId: s.branchId,
     branchName: s.branchName || 'Chi nhánh',
   };
