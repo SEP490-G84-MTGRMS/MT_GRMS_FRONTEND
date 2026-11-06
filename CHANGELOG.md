@@ -4,6 +4,11 @@ Toàn bộ các thay đổi của repository Frontend React SPA được tổng 
 
 ---
 
+## [Unreleased] - 2026-11-06
+### Fixed
+- Sửa lỗi vỡ thanh tiến trình (Stepper) 3 bước trên màn hình Quên mật khẩu (`ForgotPasswordPage.tsx`): chuyển sang layout ngang chuẩn Responsive, căn nối tâm hoàn hảo giữa các vòng tròn số bước và icon Check hoàn thành với đường kẻ divider [FE-AUTH] [worklog: docs/worklogs/2026-11-06_FE-AUTH_AI_forgot-password-email-otp.md].
+- Đồng bộ hóa các endpoints xác thực quên mật khẩu, mã OTP và thiết lập lại mật khẩu qua chuẩn route `/api/auth/...`.
+
 ## [Unreleased] - 2026-11-05
 ### Fixed
 - Sửa lỗi trích xuất phản hồi API đăng ký `POST /api/v1/auth/register` trong `authService.ts`: giải nén `unwrapLogin(response.data)` từ vỏ bọc `ApiResponse`, khắc phục triệt để lỗi `Cannot read properties of undefined (reading 'tenantId')` trên màn hình Đăng ký [FE-AUTH] [worklog: docs/worklogs/2026-11-05_FE-AUTH_AI_fix-register-api-response-unwrapping.md].

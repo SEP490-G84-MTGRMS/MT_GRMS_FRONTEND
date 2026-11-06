@@ -12,6 +12,7 @@ import {
   Loader2,
   CheckCircle2,
   KeyRound,
+  Check,
 } from "lucide-react";
 import { authService } from "../../features/auth/authService";
 
@@ -187,33 +188,21 @@ export const ForgotPasswordPage: FC = () => {
         <div
           className={`auth-step-item ${currentStep === 1 ? "active" : ""} ${currentStep > 1 ? "completed" : ""}`}
         >
-          <div className="auth-step-circle">1</div>
+          <div className="auth-step-circle">
+            {currentStep > 1 ? <Check size={14} strokeWidth={2.8} /> : "1"}
+          </div>
           <span className="auth-step-label">Nhập Email</span>
         </div>
-        <div
-          style={{
-            flex: 1,
-            height: "2px",
-            background:
-              currentStep > 1 ? "var(--blue-primary)" : "var(--border-subtle)",
-            margin: "0 8px 18px 8px",
-          }}
-        />
+        <div className={`auth-step-divider ${currentStep > 1 ? "active" : ""}`} />
         <div
           className={`auth-step-item ${currentStep === 2 ? "active" : ""} ${currentStep > 2 ? "completed" : ""}`}
         >
-          <div className="auth-step-circle">2</div>
+          <div className="auth-step-circle">
+            {currentStep > 2 ? <Check size={14} strokeWidth={2.8} /> : "2"}
+          </div>
           <span className="auth-step-label">Mã OTP</span>
         </div>
-        <div
-          style={{
-            flex: 1,
-            height: "2px",
-            background:
-              currentStep > 2 ? "var(--blue-primary)" : "var(--border-subtle)",
-            margin: "0 8px 18px 8px",
-          }}
-        />
+        <div className={`auth-step-divider ${currentStep > 2 ? "active" : ""}`} />
         <div className={`auth-step-item ${currentStep === 3 ? "active" : ""}`}>
           <div className="auth-step-circle">3</div>
           <span className="auth-step-label">Mật khẩu mới</span>

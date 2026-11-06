@@ -715,7 +715,7 @@
 .auth-steps-progress {
   display: flex !important;
   flex-direction: row !important;
-  align-items: center !important;
+  align-items: flex-start !important;
   justify-content: space-between !important;
   margin: 18px 0 24px 0 !important;
   width: 100% !important;
@@ -726,11 +726,12 @@
   display: flex !important;
   flex-direction: column !important;
   align-items: center !important;
-  gap: 6px !important;
+  gap: 8px !important;
   position: relative !important;
   z-index: 2 !important;
   cursor: default !important;
   flex-shrink: 0 !important;
+  min-width: 68px !important;
 }
 
 .auth-step-circle {
@@ -758,9 +759,9 @@
 }
 
 .auth-step-item.completed .auth-step-circle {
-  background-color: #059669 !important;
+  background-color: var(--blue-primary, #0F766E) !important;
   color: #ffffff !important;
-  border-color: #059669 !important;
+  border-color: var(--blue-primary, #0F766E) !important;
 }
 
 .auth-step-label {
@@ -784,7 +785,9 @@
 .auth-step-divider {
   flex: 1 !important;
   height: 2px !important;
-  margin: 0 10px 22px 10px !important;
+  margin-top: 15px !important;
+  margin-left: 8px !important;
+  margin-right: 8px !important;
   background-color: #E5E7EB !important;
   transition: background-color 0.25s ease !important;
 }
