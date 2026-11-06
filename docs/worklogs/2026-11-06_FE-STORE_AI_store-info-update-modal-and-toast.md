@@ -29,6 +29,7 @@
   - Hiệu ứng loading spinner `Loader2` và vô hiệu hóa nút submit khi đang lưu.
 - [`src/pages/store/components/StoreInfoTab.tsx`](file:///d:/FPT_University/Final/Grade/new/project/MT_GRMS_FRONTEND/src/pages/store/components/StoreInfoTab.tsx):
   - Bổ sung nút **"Cập nhật thông tin"** trên thanh tiêu đề và nút **"Chỉnh sửa"** trong `profile-card-header`.
+  - Thay thế đoạn text mô tả tĩnh cũ ("Quản lý tên thương hiệu...") bằng dải metadata định danh lấy trực tiếp từ data thật: Mã gian hàng (`code`/`tenantId`), Tên miền con (`subdomain.mt-grms.vn`) và Trạng thái hoạt động (`ACTIVE`).
   - Tích hợp `EditStoreInfoModal` cho phép người dùng click để cập nhật thông tin trong cửa sổ modal.
   - Vẫn duy trì khả năng chỉnh sửa trực tiếp và lưu với nút "Lưu thay đổi" ở cuối form.
   - Thêm Toast thông báo nổi (`toastMessage`) ở góc dưới cùng bên phải màn hình khi cập nhật thành công hoặc gặp lỗi.

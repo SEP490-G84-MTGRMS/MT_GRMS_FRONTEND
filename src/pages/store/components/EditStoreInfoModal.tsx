@@ -70,7 +70,7 @@ export const EditStoreInfoModal: FC<EditStoreInfoModalProps> = ({
           <div>
             <div className="store-modal-title">Cập nhật thông tin gian hàng</div>
             <p style={{ fontSize: 13, color: '#64748B', margin: '4px 0 0 0' }}>
-              Cập nhật tên thương hiệu, mã số thuế, hotline và địa chỉ trụ sở của chuỗi.
+              Cập nhật tên chuỗi cửa hàng, mã số thuế, hotline và địa chỉ trụ sở chính.
             </p>
           </div>
           <button

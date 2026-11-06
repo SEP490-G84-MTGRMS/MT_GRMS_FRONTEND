@@ -132,9 +132,51 @@ export const StoreInfoTab: FC<StoreInfoTabProps> = ({
           <h2 style={{ fontSize: 20, fontWeight: 800, color: '#0F172A', margin: 0 }}>
             Thông tin gian hàng
           </h2>
-          <p style={{ fontSize: 13, color: '#64748B', margin: '4px 0 0 0' }}>
-            Quản lý tên thương hiệu, tên miền con, mã số thuế và thông tin liên hệ pháp lý của chuỗi cửa hàng.
-          </p>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+              marginTop: 6,
+              fontSize: 13,
+              color: '#64748B',
+              flexWrap: 'wrap',
+            }}
+          >
+            <span>
+              Mã gian hàng:{' '}
+              <strong style={{ fontFamily: 'var(--font-mono)', color: '#0F172A' }}>
+                {storeInfo.code || storeInfo.tenantId}
+              </strong>
+            </span>
+            <span style={{ color: '#CBD5E1' }}>•</span>
+            <span>
+              Tên miền:{' '}
+              <strong style={{ color: 'var(--blue-primary)', fontFamily: 'var(--font-mono)' }}>
+                {storeInfo.subdomain}.mt-grms.vn
+              </strong>
+            </span>
+            <span style={{ color: '#CBD5E1' }}>•</span>
+            <span
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 5,
+                color: '#008738',
+                fontWeight: 600,
+              }}
+            >
+              <span
+                style={{
+                  width: 7,
+                  height: 7,
+                  borderRadius: '50%',
+                  backgroundColor: '#00C853',
+                }}
+              />
+              {storeInfo.status === 'ACTIVE' ? 'Đang hoạt động' : storeInfo.status}
+            </span>
+          </div>
         </div>
 
         {/* Nút Cập nhật thông tin mở Modal */}

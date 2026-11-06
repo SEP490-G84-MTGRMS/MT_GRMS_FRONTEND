@@ -34,7 +34,7 @@ describe('StoreInfoTab & EditStoreInfoModal', () => {
     fireEvent.click(updateBtn);
 
     expect(screen.getByRole('heading', { level: 2, name: /Thông tin gian hàng/i })).toBeInTheDocument();
-    expect(screen.getByText('Cập nhật tên thương hiệu, mã số thuế, hotline và địa chỉ trụ sở của chuỗi.')).toBeInTheDocument();
+    expect(screen.getByText('Cập nhật tên chuỗi cửa hàng, mã số thuế, hotline và địa chỉ trụ sở chính.')).toBeInTheDocument();
   });
 
   it('submits update successfully and calls onUpdateStoreInfo', async () => {
