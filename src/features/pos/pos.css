@@ -42,9 +42,10 @@
 }
 
 .pos-header-left {
+  display: flex;
+  align-items: center;
   flex-shrink: 0;
-  min-width: 140px;
-  max-width: 260px;
+  white-space: nowrap;
 }
 
 .pos-header-branding {
@@ -67,8 +68,9 @@
 .pos-header-center-search {
   display: flex;
   align-items: center;
-  flex: 1;
-  max-width: 520px;
+  flex: 1 1 180px;
+  min-width: 140px;
+  max-width: 440px;
   position: relative;
 }
 

@@ -874,15 +874,16 @@ export const InvoiceManagementPage: FC = () => {
                       <th style={{ width: 36, textAlign: 'center' }}>
                         <input type="checkbox" />
                       </th>
-                      <th style={{ width: 185 }}>Mã hóa đơn</th>
-                      <th style={{ width: 135 }}>Thời gian lập</th>
-                      <th style={{ minWidth: 150 }}>Khách hàng</th>
-                      <th style={{ textAlign: 'right', width: 110 }}>Tổng tiền hàng</th>
-                      <th style={{ textAlign: 'right', width: 85 }}>Giảm giá</th>
-                      <th style={{ textAlign: 'right', width: 110 }}>Khách đã trả</th>
-                      <th style={{ textAlign: 'center', width: 130 }}>Phương thức TT</th>
-                      <th style={{ textAlign: 'center', width: 140 }}>Trạng thái</th>
-                      <th style={{ textAlign: 'center', width: 220 }}>Thao tác</th>
+                      <th style={{ width: 175 }}>Mã hóa đơn</th>
+                      <th style={{ width: 130 }}>Thời gian lập</th>
+                      <th style={{ minWidth: 140 }}>Khách hàng</th>
+                      <th style={{ minWidth: 130 }}>Người tạo</th>
+                      <th style={{ textAlign: 'right', width: 105 }}>Tổng tiền hàng</th>
+                      <th style={{ textAlign: 'right', width: 80 }}>Giảm giá</th>
+                      <th style={{ textAlign: 'right', width: 105 }}>Khách đã trả</th>
+                      <th style={{ textAlign: 'center', width: 125 }}>Phương thức TT</th>
+                      <th style={{ textAlign: 'center', width: 135 }}>Trạng thái</th>
+                      <th style={{ textAlign: 'center', width: 210 }}>Thao tác</th>
                     </tr>
                   </thead>
                   {paginatedInvoices.map((inv) => {
@@ -934,6 +935,14 @@ export const InvoiceManagementPage: FC = () => {
                                 {inv.customerPhone}
                               </div>
                             )}
+                          </td>
+                          <td>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                              <User size={13} className="text-teal-700" style={{ flexShrink: 0 }} />
+                              <span style={{ fontWeight: 600, color: '#334155', fontSize: 12 }}>
+                                {inv.cashierName || 'Phạm Thị Yến'}
+                              </span>
+                            </div>
                           </td>
                           <td style={{ textAlign: 'right', fontWeight: 600 }}>
                             {inv.totalMerchandiseAmount.toLocaleString('vi-VN')}
@@ -1087,7 +1096,7 @@ export const InvoiceManagementPage: FC = () => {
                         {/* ACCORDION CHI TIẾT */}
                         {isExpanded && (
                           <tr>
-                            <td colSpan={10} style={{ padding: 12, backgroundColor: '#f8fafc' }}>
+                            <td colSpan={11} style={{ padding: 12, backgroundColor: '#f8fafc' }}>
                               <div
                                 style={{
                                   backgroundColor: '#ffffff',

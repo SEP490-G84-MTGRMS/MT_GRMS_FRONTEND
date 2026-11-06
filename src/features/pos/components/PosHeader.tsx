@@ -270,10 +270,10 @@ export const PosHeader: FC<Props> = ({
       <div className="pos-header-top-row">
         {/* Cột trái: Chi nhánh & Quầy (STORE_OWNER đổi được, EMPLOYEE cố định) */}
         <div className="pos-header-left">
-          <div className="pos-header-branding" onClick={() => navigate(posBasePath)} style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+          <div className="pos-header-branding" onClick={() => navigate(posBasePath)} style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', whiteSpace: 'nowrap' }}>
             {isStoreOwner && branches.length > 0 ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ fontSize: 12, fontWeight: 700, color: '#0f766e' }}>Chi nhánh:</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}>
+                <span style={{ fontSize: 12.5, fontWeight: 700, color: '#0f766e', whiteSpace: 'nowrap', flexShrink: 0 }}>Chi nhánh:</span>
                 <select
                   value={selectedBranchId || branches[0]?.id}
                   onClick={(e) => e.stopPropagation()}
@@ -288,6 +288,9 @@ export const PosHeader: FC<Props> = ({
                     fontSize: 12.5,
                     outline: 'none',
                     cursor: 'pointer',
+                    maxWidth: 240,
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
                   }}
                   title="Chủ tiệm chuyển đổi chi nhánh bán hàng"
                 >
@@ -297,10 +300,10 @@ export const PosHeader: FC<Props> = ({
                     </option>
                   ))}
                 </select>
-                <span style={{ fontSize: 11.5, color: '#64748b' }}>&bull; Quầy #01</span>
+                <span style={{ fontSize: 12, color: '#64748b', whiteSpace: 'nowrap', flexShrink: 0 }}>&bull; Quầy #01</span>
               </div>
             ) : (
-              <div className="pos-header-subtitle" style={{ fontSize: 13, fontWeight: 600, color: '#0f766e', margin: 0 }}>
+              <div className="pos-header-subtitle" style={{ fontSize: 13, fontWeight: 600, color: '#0f766e', margin: 0, whiteSpace: 'nowrap' }}>
                 Chi nhánh: <b>{branchName || (user?.tenantName ? user.tenantName.split(' ')[0] + ' Ba Đình' : 'An Nhiên Mart - Chi nhánh Ba Đình')}</b> &bull; Quầy #01
               </div>
             )}
