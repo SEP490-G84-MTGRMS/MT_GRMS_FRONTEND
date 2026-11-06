@@ -3,17 +3,25 @@
 - **Ngày thực hiện**: 2026-11-06
 - **Mã task / Tính năng**: FE-STORE (Store Info Management)
 - **Tác giả**: AI Coding Assistant
-- **Mô tả ngắn**: Bổ sung nút "Cập nhật thông tin", tạo modal `EditStoreInfoModal`, trạng thái loading `isSaving`, và thông báo nổi Toast khi cập nhật thông tin chuỗi gian hàng (Tên chuỗi, MST, Hotline, Tỉnh/TP, Địa chỉ).
+- **Mô tả ngắn**: Bổ sung nút "Cập nhật thông tin", tạo modal `EditStoreInfoModal`, trạng thái loading `isSaving`, thông báo nổi Toast khi cập nhật thông tin chuỗi gian hàng, và tích hợp API thật `GET /api/tenant/subscriptions/history` cho tab Lịch sử mua hàng (thay thế mock data).
 
 ---
 
 ## 1. Mục đích (Why)
 - Trước đó, tab "Thông tin gian hàng" (`/store-owner/subscriptions?tab=store-info`) chỉ hiển thị các trường nhập liệu tĩnh, không có nút "Cập nhật thông tin" rõ ràng trên card header, không có modal chỉnh sửa chuyên nghiệp, và thông báo lưu thành công bị khuất ở đầu trang.
-- Giúp chủ cửa hàng dễ dàng cập nhật thông tin pháp lý & nhận diện chuỗi cửa hàng (MST, Địa chỉ, Tỉnh thành, Hotline) sau khi tạo tài khoản.
+- Tab "Lịch sử mua hàng" (`/store-owner/subscriptions?tab=order-history`) trước đó chỉ sử dụng dữ liệu giả định cứng (`mockOrders`) mà không hề kết nối tới API backend, khiến chủ cửa hàng không xem được hợp đồng và giao dịch mua gói dịch vụ thật.
+- Giúp chủ cửa hàng dễ dàng cập nhật thông tin pháp lý & nhận diện chuỗi cửa hàng (MST, Địa chỉ, Tỉnh thành, Hotline) sau khi tạo tài khoản, đồng thời theo dõi chính xác lịch sử đăng ký/gia hạn gói dịch vụ.
 
 ---
 
 ## 2. Danh sách tệp & Nội dung thay đổi (What)
+- [`src/pages/store/api/storeApi.ts`](file:///d:/FPT_University/Final/Grade/new/project/MT_GRMS_FRONTEND/src/pages/store/api/storeApi.ts):
+  - Khai báo interface `SubscriptionOrderHistoryItem`.
+  - Bổ sung hàm API `getSubscriptionHistory()` gọi `GET /api/tenant/subscriptions/history`.
+- [`src/pages/store/components/OrderHistoryTab.tsx`](file:///d:/FPT_University/Final/Grade/new/project/MT_GRMS_FRONTEND/src/pages/store/components/OrderHistoryTab.tsx):
+  - Xóa bỏ toàn bộ dữ liệu mock cứng (`mockOrders`).
+  - Tích hợp hook `useEffect` và state `isLoading`, `errorMessage` để tải dữ liệu lịch sử mua hàng từ API thật.
+  - Bổ sung nút "Làm mới", thông báo lỗi có thể retry, spinner loading và empty state thân thiện khi chưa có giao dịch.
 - [`src/pages/store/components/EditStoreInfoModal.tsx`](file:///d:/FPT_University/Final/Grade/new/project/MT_GRMS_FRONTEND/src/pages/store/components/EditStoreInfoModal.tsx) *(Mới)*:
   - Tạo mới component Modal chỉnh sửa thông tin gian hàng với header, body form, và footer.
   - Hỗ trợ nhập và cập nhật: Tên chuỗi *, MST, Hotline, Tỉnh/Thành phố, Địa chỉ trụ sở chính.
