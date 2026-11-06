@@ -1,4 +1,6 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import { AN_NHIEN_BRANCHES } from '../mock/posMockData';
+import { useAuthStore } from '../../../stores/useAuthStore';
 import type { FC } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
@@ -56,6 +58,66 @@ export const InventoryLookupPage: FC = () => {
   const [transferFromBranch, setTransferFromBranch] = useState('Tổng Kho Trung Tâm Mê Linh');
   const [transferQty, setTransferQty] = useState<number>(50);
   const [transferNotes, setTransferNotes] = useState('');
+
+  // Thông tin phân quyền & Chi nhánh tài khoản
+  const { user } = useAuthStore();
+  const isStoreOwner = user?.role === 'STORE_OWNER';
+
+  // Chi nhánh nhân viên trực thuộc (cố định)
+  const employeeBranchId = useMemo(() => {
+    if (user?.branchId) return user.branchId;
+    if (user?.phone === '0917778888') return 'BR-AN-01'; // Phạm Thị Yến -> Ba Đình
+    if (user?.phone === '0916667777') return 'BR-AN-02'; // Lê Hoàng Nam -> Cầu Giấy
+    return 'BR-AN-01';
+  }, [user]);
+
+  // STORE_OWNER có quyền chọn chi nhánh bất kỳ; EMPLOYEE bị khóa cố định theo chi nhánh được gán
+  const [selectedBranchId, setSelectedBranchId] = useState<string>(() => {
+    return isStoreOwner ? 'BR-AN-01' : employeeBranchId;
+  });
+
+  // Đồng bộ khi user đổi vai trò hoặc chi nhánh
+  useEffect(() => {
+    if (!isStoreOwner) {
+      setSelectedBranchId(employeeBranchId);
+    }
+  }, [isStoreOwner, employeeBranchId]);
+
+  const currentBranch = useMemo(() => {
+    return AN_NHIEN_BRANCHES.find((b) => b.id === selectedBranchId) || AN_NHIEN_BRANCHES[0];
+  }, [selectedBranchId]);
+
+  // Ánh xạ danh sách chi nhánh tồn kho theo chuỗi An Nhiên Mart
+  const displayedBranchStocks = useMemo(() => {
+    return selectedProduct.branchStocks.map((b) => {
+      let branchName = b.branchName;
+      let branchId = b.branchId;
+      let address = b.address;
+
+      if (b.branchId === 'BR-01') {
+        branchId = 'BR-AN-01';
+        branchName = 'An Nhiên Mart - Chi nhánh Ba Đình';
+        address = '120 Hoàng Hoa Thám, Tây Hồ, Hà Nội';
+      } else if (b.branchId === 'BR-02') {
+        branchId = 'BR-AN-02';
+        branchName = 'An Nhiên Mart - Chi nhánh Cầu Giấy';
+        address = '268 Cầu Giấy, Q. Cầu Giấy, Hà Nội';
+      } else if (b.branchId === 'BR-03') {
+        branchId = 'BR-AN-03';
+        branchName = 'An Nhiên Mart - Chi nhánh Đống Đa';
+        address = '85 Chùa Bộc, Q. Đống Đa, Hà Nội';
+      }
+
+      const isCurrent = branchId === selectedBranchId;
+      return {
+        ...b,
+        branchId,
+        branchName,
+        address,
+        isCurrentBranch: isCurrent,
+      };
+    });
+  }, [selectedProduct, selectedBranchId]);
 
   // Toast feedback
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -154,7 +216,7 @@ export const InventoryLookupPage: FC = () => {
           <div className="unified-header-title-box">
             <h1 className="unified-header-title">Tra Cứu Tồn Kho &amp; Lô Hạn Dùng FEFO</h1>
             <div className="unified-header-subtitle">
-              Chi nhánh trung tâm &bull; Xuất trước hết hạn trước &bull; Đồng bộ thời gian thực
+              {currentBranch?.name || 'Chi nhánh trung tâm'} &bull; Xuất trước hết hạn trước &bull; Đồng bộ thời gian thực
             </div>
           </div>
         </div>
@@ -182,8 +244,22 @@ export const InventoryLookupPage: FC = () => {
             <span>Bán Hàng [F1]</span>
           </button>
 
-          <div className="pos-cashier-badge">
-            NV: <b>Nguyễn Bá Sơn (NV004)</b>
+          <div
+            className="pos-cashier-badge"
+            style={{
+              border: isStoreOwner ? '1px solid #10b981' : '1px solid #cbd5e1',
+              backgroundColor: isStoreOwner ? '#ecfdf5' : '#f8fafc',
+            }}
+          >
+            {isStoreOwner ? (
+              <span style={{ color: '#047857', fontWeight: 700 }}>
+                👑 {user?.fullName || 'Trần Quốc An'} (Chủ Chuỗi)
+              </span>
+            ) : (
+              <span style={{ color: '#334155' }}>
+                NV: <b>{user?.fullName || 'Thu ngân'}</b> ({currentBranch?.name.split(' - ')[1] || 'Ba Đình'})
+              </span>
+            )}
           </div>
         </div>
       </header>
@@ -218,9 +294,54 @@ export const InventoryLookupPage: FC = () => {
         <div className="shift-content-layout">
           {/* THANH TRẠNG THÁI (INFO BAR CARD) CHUẨN POS */}
           <div className="shift-info-bar-card">
-            <div className="info-bar-item">
+            <div className="info-bar-item" style={{ minWidth: 260 }}>
               <span className="info-label">Điểm bán quầy:</span>
-              <span className="info-value font-semibold">Chi nhánh trung tâm (Quầy #01)</span>
+              {isStoreOwner ? (
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <select
+                    value={selectedBranchId}
+                    onChange={(e) => {
+                      setSelectedBranchId(e.target.value);
+                      showToast(`Đã chuyển tra cứu tồn kho sang: ${AN_NHIEN_BRANCHES.find(b => b.id === e.target.value)?.name}`);
+                    }}
+                    style={{
+                      padding: '3px 8px',
+                      borderRadius: 6,
+                      border: '1.5px solid #0f766e',
+                      backgroundColor: '#f0fdfa',
+                      color: '#0f766e',
+                      fontWeight: 700,
+                      fontSize: 12.5,
+                      outline: 'none',
+                      cursor: 'pointer',
+                    }}
+                    title="Chủ cửa hàng đổi chi nhánh tra cứu tồn kho"
+                  >
+                    {AN_NHIEN_BRANCHES.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ) : (
+                <span className="info-value font-semibold text-slate-800">
+                  {currentBranch?.name}
+                  <span
+                    style={{
+                      marginLeft: 8,
+                      fontSize: 11,
+                      padding: '2px 6px',
+                      borderRadius: 4,
+                      backgroundColor: '#f1f5f9',
+                      color: '#475569',
+                      border: '1px solid #cbd5e1',
+                    }}
+                  >
+                    Cố định theo tài khoản
+                  </span>
+                </span>
+              )}
             </div>
             <div className="info-bar-item">
               <span className="info-label">Nguyên tắc xuất kho:</span>
@@ -307,7 +428,8 @@ export const InventoryLookupPage: FC = () => {
                   <tbody>
                     {filteredProducts.map((p) => {
                       const isSelected = selectedProduct.productId === p.productId;
-                      const avail = p.branchStocks[0]?.availableStock || 0;
+                      const branchStockIndex = selectedBranchId === 'BR-AN-02' ? 1 : selectedBranchId === 'BR-AN-03' ? 2 : 0;
+                      const avail = p.branchStocks[branchStockIndex]?.availableStock ?? (p.branchStocks[0]?.availableStock || 0);
                       return (
                         <tr
                           key={p.productId}
@@ -449,7 +571,7 @@ export const InventoryLookupPage: FC = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {selectedProduct.branchStocks.map((b) => (
+                  {displayedBranchStocks.map((b) => (
                     <tr
                       key={b.branchId}
                       style={b.isCurrentBranch ? { backgroundColor: '#f0fdfa' } : undefined}

@@ -33,7 +33,7 @@ type BackendLoginPayload = {
 
 function mapRole(roleName?: string): UserProfile['role'] {
   const role = (roleName || '').toUpperCase();
-  if (role === 'CASHIER') return 'CASHIER';
+  if (role === 'CASHIER' || role === 'EMPLOYEE' || role === 'STAFF') return 'CASHIER';
   if (role === 'MANAGER' || role === 'BRANCH_MANAGER') return 'MANAGER';
   if (role === 'STORE_OWNER') return 'STORE_OWNER';
   if (role === 'EMPLOYEE' || role === 'STAFF') return 'EMPLOYEE';
@@ -230,6 +230,40 @@ export const DEMO_ACCOUNTS = [
       branchId: 'BR-001',
       phone: '0988 765 432',
       isAdmin: false,
+    },
+  },
+  {
+    roleLabel: 'Chủ Cửa Hàng An Nhiên (Tenant Mới - An Nhiên Mart)',
+    username: '0918889999',
+    email: 'chucuahang.annhien@gmail.com',
+    password: '123456',
+    tenantCode: 'tenant_an_nhien_02',
+    user: {
+      id: 'usr_owner_annhien_02',
+      email: 'chucuahang.annhien@gmail.com',
+      fullName: 'Trần Quốc An (Chủ tiệm An Nhiên)',
+      role: 'STORE_OWNER' as const,
+      tenantId: 'tenant_an_nhien_02',
+      tenantName: 'Cửa Hàng Thực Phẩm Sạch An Nhiên (An Nhiên Mart)',
+      branchId: 'b1000000-0000-0000-0000-000000000001',
+      phone: '0918889999',
+    },
+  },
+  {
+    roleLabel: 'Nhân Viên Bán Hàng An Nhiên (Employee/Cashier - An Nhiên Mart)',
+    username: '0917778888',
+    email: 'nhanvien.annhien@gmail.com',
+    password: '123456',
+    tenantCode: 'tenant_an_nhien_02',
+    user: {
+      id: 'usr_employee_annhien_02',
+      email: 'nhanvien.annhien@gmail.com',
+      fullName: 'Phạm Thị Yến (Nhân viên bán hàng An Nhiên)',
+      role: 'CASHIER' as const,
+      tenantId: 'tenant_an_nhien_02',
+      tenantName: 'Cửa Hàng Thực Phẩm Sạch An Nhiên (An Nhiên Mart)',
+      branchId: 'b1000000-0000-0000-0000-000000000001',
+      phone: '0917778888',
     },
   },
 ];

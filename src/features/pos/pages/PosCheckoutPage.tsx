@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import type { FC } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { CheckCircle2 } from 'lucide-react';
@@ -7,6 +7,8 @@ import {
   mockProducts,
   initialCategories,
   mockCustomers,
+  mockProductsAnNhien,
+  mockCustomersAnNhien,
   createInitialCartItem,
 } from '../mock/posMockData';
 import { PosHeader } from '../components/PosHeader';
@@ -19,8 +21,11 @@ import { BelowCostWarningModal } from '../components/modals/BelowCostWarningModa
 import { DebtLimitWarningModal } from '../components/modals/DebtLimitWarningModal';
 import { OrderDiscountModal } from '../components/modals/OrderDiscountModal';
 import { PosReceiptModal } from '../components/PosReceiptModal';
+import { PosInventoryLookupModal } from '../components/modals/PosInventoryLookupModal';
+import { AN_NHIEN_BRANCHES } from '../mock/posMockData';
 import { useBarcodeScanner } from '../../../hooks/useBarcodeScanner';
 import { posOrderApi } from '../api/posOrderApi';
+import { storeProductApi } from '../../product/api/storeProductApi';
 import { useAuthStore } from '../../../stores/useAuthStore';
 import '../pos.css';
 
@@ -31,7 +36,16 @@ const getInitialTabs = (tenantId: string): OrderTab[] => {
     if (saved) {
       const parsed = JSON.parse(saved);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed;
+        return parsed.map((tab: any) => ({
+          ...tab,
+          cart: (tab.cart || []).map((c: any) => ({
+            ...c,
+            product: {
+              ...(c.product || {}),
+              spec: '',
+            },
+          })),
+        }));
       }
     }
   } catch (err) {
@@ -71,22 +85,69 @@ const getInitialActiveTabId = (tenantId: string, initialTabs: OrderTab[]): numbe
   return initialTabs[0]?.id || 1;
 };
 
+const DEFAULT_GROCERY_BRANCH_ID = 'cd5e8d1b-b08b-448d-beff-b85ea5873d52';
+
 export const PosCheckoutPage: FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuthStore();
   const currentTenantId = user?.tenantId || 'tenant_mt_mart_01';
   const isDefaultDemoStore = currentTenantId === 'tenant_mt_mart_01';
+  const isAnNhienStore = currentTenantId === 'tenant_an_nhien_02';
+
+  const getInitialProducts = () => {
+    if (isDefaultDemoStore) return mockProducts;
+    if (isAnNhienStore) return mockProductsAnNhien;
+    return [];
+  };
+
+  const getInitialCustomers = () => {
+    if (isDefaultDemoStore) return mockCustomers;
+    if (isAnNhienStore) return mockCustomersAnNhien;
+    return [];
+  };
 
   // Kho sản phẩm & danh sách khách hàng (Cách ly theo từng Cửa Hàng / Tenant)
-  // Chỉ cửa hàng mẫu MT-Mart mới nạp mock ban đầu; Chủ cửa hàng khác bắt đầu với dữ liệu trống
-  const [products, setProducts] = useState<Product[]>(() => (isDefaultDemoStore ? mockProducts : []));
-  const [customers, setCustomers] = useState<Customer[]>(() => (isDefaultDemoStore ? mockCustomers : []));
+  const [products, setProducts] = useState<Product[]>(getInitialProducts);
+  const [customers, setCustomers] = useState<Customer[]>(getInitialCustomers);
 
   // Tab Đa đơn hàng (Multi-tab orders) được lưu trữ riêng biệt theo từng TenantId
   const [tabs, setTabs] = useState<OrderTab[]>(() => getInitialTabs(currentTenantId));
   const [activeTabId, setActiveTabId] = useState<number>(() => getInitialActiveTabId(currentTenantId, tabs));
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'info' | 'error' } | null>(null);
+  const [isInventoryLookupOpen, setIsInventoryLookupOpen] = useState(false);
+
+  // Danh sách các chi nhánh có sẵn theo cửa hàng
+  const availableBranches = useMemo(() => {
+    if (isAnNhienStore) return AN_NHIEN_BRANCHES;
+    return [
+      { id: DEFAULT_GROCERY_BRANCH_ID, code: 'BR-01', name: 'Chi nhánh Cầu Giấy (Trung tâm)', address: 'Hà Nội', phone: '0901234567' },
+      { id: 'BR-02', code: 'BR-02', name: 'Chi nhánh Ba Đình', address: 'Hà Nội', phone: '0907654321' },
+      { id: 'BR-03', code: 'BR-03', name: 'Chi nhánh Đống Đa', address: 'Hà Nội', phone: '0908889999' },
+    ];
+  }, [isAnNhienStore]);
+
+  // Khởi tạo chi nhánh theo phân công vai trò
+  const [activeBranch, setActiveBranch] = useState<{ id: string; name: string; address?: string; phone?: string }>(() => {
+    if (isAnNhienStore) {
+      if (user?.role === 'EMPLOYEE' && (user?.phone === '0916667777' || user?.fullName?.includes('Cầu Giấy'))) {
+        return AN_NHIEN_BRANCHES[1] || AN_NHIEN_BRANCHES[0];
+      }
+      return AN_NHIEN_BRANCHES[0];
+    }
+    return {
+      id: DEFAULT_GROCERY_BRANCH_ID,
+      name: 'Chi nhánh Cầu Giấy (Trung tâm)',
+    };
+  });
+
+  const handleSelectBranch = (branchId: string) => {
+    const target = availableBranches.find((b: { id: string; name: string }) => b.id === branchId);
+    if (target) {
+      setActiveBranch(target);
+      showToast(`Đã chuyển điểm bán sang: ${target.name}`, 'info');
+    }
+  };
 
   const showToast = (text: string, type: 'success' | 'info' | 'error' = 'success') => {
     setToastMessage({ text, type });
@@ -100,13 +161,8 @@ export const PosCheckoutPage: FC = () => {
     const freshTabs = getInitialTabs(currentTenantId);
     setTabs(freshTabs);
     setActiveTabId(getInitialActiveTabId(currentTenantId, freshTabs));
-    if (!isDefaultDemoStore) {
-      setProducts([]);
-      setCustomers([]);
-    } else {
-      setProducts(mockProducts);
-      setCustomers(mockCustomers);
-    }
+    setProducts(getInitialProducts());
+    setCustomers(getInitialCustomers());
   }, [currentTenantId, isDefaultDemoStore]);
 
   // Tự động đồng bộ giỏ hàng và các hóa đơn vào localStorage theo TenantId
@@ -138,36 +194,73 @@ export const PosCheckoutPage: FC = () => {
   const [isOrderDiscountOpen, setIsOrderDiscountOpen] = useState(false);
   const [receiptData, setReceiptData] = useState<ReceiptData | null>(null);
   const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
+  const autoPrint = typeof window !== 'undefined' && localStorage.getItem('mtgrms_pos_auto_print') === 'true';
 
   // Tab hiện tại
   const currentTab = tabs.find((t) => t.id === activeTabId) || tabs[0];
 
-  // Nạp dữ liệu thực tế từ Backend CSDL (PostgreSQL) theo Tenant hiện tại
+  // Nạp dữ liệu thực tế từ Backend CSDL (PostgreSQL) theo Tenant & Chi nhánh hiện tại (BranchProducts)
   useEffect(() => {
     let isMounted = true;
     const fetchBackendData = async () => {
       try {
+        let currentBranchId = user?.branchId || DEFAULT_GROCERY_BRANCH_ID;
+        try {
+          const summaries = await storeProductApi.getStoreSummaries();
+          if (summaries && summaries.length > 0) {
+            const matched = user?.branchId
+              ? summaries.find((s) => s.id === user.branchId) || summaries[0]
+              : summaries[0];
+            currentBranchId = matched.id;
+            if (isMounted) {
+              setActiveBranch({
+                id: matched.id,
+                name: matched.name || matched.code,
+                address: matched.address,
+                phone: matched.phone,
+              });
+            }
+          }
+        } catch {
+          // Fallback to default grocery branch
+        }
+
         const [apiProducts, apiCustomers] = await Promise.all([
-          posOrderApi.getAllProducts().catch(() => null),
+          posOrderApi.getAllProducts(currentBranchId).catch(() => null),
           posOrderApi.getAllCustomers().catch(() => null),
         ]);
 
         if (isMounted) {
-          if (apiProducts) {
-            if (isDefaultDemoStore) {
-              setProducts(apiProducts.length > 0 ? apiProducts : mockProducts);
-            } else {
-              // Cửa hàng khác: Tuyệt đối không hiển thị sản phẩm của MT-Mart
-              setProducts(apiProducts);
-            }
+          if (apiProducts && apiProducts.length > 0) {
+            setProducts(apiProducts);
+            setTabs((prevTabs) =>
+              prevTabs.map((tab) => ({
+                ...tab,
+                cart: tab.cart.map((cartItem) => {
+                  const fresh = apiProducts.find(
+                    (p) => p.id === cartItem.product.id || (p.barcode && p.barcode === cartItem.product.barcode)
+                  );
+                  if (!fresh) return cartItem;
+                  const matchedUnit =
+                    fresh.unitPrices?.find(
+                      (u) => (cartItem.unitId && u.unitId === cartItem.unitId) || u.unitName === cartItem.unit
+                    ) || fresh.unitPrices?.find((u) => u.isBaseUnit);
+                  return {
+                    ...cartItem,
+                    product: { ...fresh, spec: '' },
+                    unit: matchedUnit ? matchedUnit.unitName : fresh.baseUnit,
+                    unitId: matchedUnit?.unitId ?? cartItem.unitId,
+                  };
+                }),
+              }))
+            );
+          } else {
+            setProducts(getInitialProducts());
           }
-          if (apiCustomers) {
-            if (isDefaultDemoStore) {
-              setCustomers(apiCustomers.length > 0 ? apiCustomers : mockCustomers);
-            } else {
-              // Cửa hàng khác: Tuyệt đối không hiển thị khách hàng của MT-Mart
-              setCustomers(apiCustomers);
-            }
+          if (apiCustomers && apiCustomers.length > 0) {
+            setCustomers(apiCustomers);
+          } else {
+            setCustomers(getInitialCustomers());
           }
         }
       } catch (err) {
@@ -179,7 +272,7 @@ export const PosCheckoutPage: FC = () => {
     return () => {
       isMounted = false;
     };
-  }, [currentTenantId, isDefaultDemoStore]);
+  }, [currentTenantId, isDefaultDemoStore, user?.branchId]);
 
   // Helper cập nhật Tab hiện tại
   const updateCurrentTab = (updater: Partial<OrderTab>) => {
@@ -307,8 +400,11 @@ export const PosCheckoutPage: FC = () => {
   };
 
   // Cart operations
-  const handleAddToCart = (product: Product) => {
-    const existingIndex = currentTab.cart.findIndex((item) => item.product.id === product.id);
+    const handleAddToCart = (product: Product, batchCode?: string, expiryDate?: string) => {
+    const targetBatch = batchCode || product.batchCode;
+    const existingIndex = currentTab.cart.findIndex(
+      (item) => item.product.id === product.id && (targetBatch ? (item.batchCode || item.product.batchCode) === targetBatch : true)
+    );
     if (existingIndex >= 0) {
       const updatedCart = [...currentTab.cart];
       const target = updatedCart[existingIndex];
@@ -320,7 +416,14 @@ export const PosCheckoutPage: FC = () => {
       };
       updateCurrentTab({ cart: updatedCart });
     } else {
-      const newItem = createInitialCartItem(product, 1, 0);
+      const prodToInsert: Product = targetBatch
+        ? { ...product, batchCode: targetBatch, expiryDate: expiryDate || product.expiryDate }
+        : product;
+      const newItem = {
+        ...createInitialCartItem(prodToInsert, 1, 0),
+        batchCode: targetBatch,
+        expiryDate: expiryDate || product.expiryDate,
+      };
       updateCurrentTab({ cart: [...currentTab.cart, newItem] });
     }
   };
@@ -341,6 +444,28 @@ export const PosCheckoutPage: FC = () => {
 
   const handleRemoveItem = (id: string) => {
     const updatedCart = currentTab.cart.filter((item) => item.id !== id);
+    updateCurrentTab({ cart: updatedCart });
+  };
+
+  const handleUpdateItemUnit = (id: string, unitName: string, price: number, unitId?: string) => {
+    const updatedCart = currentTab.cart.map((item) => {
+      if (item.id === id) {
+        const discountVnd =
+          item.discountType === 'vnd'
+            ? item.discountPerItem
+            : Math.round((price * item.discountPerItem) / 100);
+        const actualPrice = Math.max(0, price - discountVnd);
+        return {
+          ...item,
+          unit: unitName,
+          unitId,
+          unitPrice: price,
+          actualPrice,
+          totalAmount: actualPrice * item.quantity,
+        };
+      }
+      return item;
+    });
     updateCurrentTab({ cart: updatedCart });
   };
 
@@ -407,11 +532,8 @@ export const PosCheckoutPage: FC = () => {
   const pointsDeduction = currentTab.usePoints && currentTab.customer ? maxPointAmount : 0;
   const finalAmount = Math.max(0, subTotalBeforePoints - pointsDeduction);
 
-  // Tạo dữ liệu hóa đơn in POS-58
+  // Tạo dữ liệu hóa đơn in POS-58 (Loại bỏ VAT, nạp động Tenant/Chi nhánh)
   const buildReceiptData = (debtNote?: string): ReceiptData => {
-    const vat = Math.round(finalAmount * 0.01); // VAT 1% siêu thị mini / tạp hóa
-    const totalWithVat = finalAmount + vat;
-
     let paymentMethodText = 'Tiền mặt';
     if (currentTab.paymentMethod === 'vietqr') {
       paymentMethodText = 'Chuyển khoản VietQR';
@@ -419,39 +541,50 @@ export const PosCheckoutPage: FC = () => {
       paymentMethodText = 'Ghi nợ (Bán nợ)';
     }
 
+    const tenantOrStoreName = user?.tenantName ? user.tenantName.toUpperCase() : (activeBranch.name || 'SIÊU THỊ MINI');
+    const storeAddress = activeBranch.address || (isAnNhienStore ? '120 Hoàng Hoa Thám, Ba Đình, Hà Nội' : '123 Xuân Thủy, Cầu Giấy, Hà Nội');
+    const storePhone = activeBranch.phone || (isAnNhienStore ? '024 3822 9988' : '0987.654.321');
+    const hotline = activeBranch.phone || (user as any)?.tenantHotline || storePhone;
+
+    const cashierDisplayName = user?.role === 'STORE_OWNER'
+      ? `Chủ cửa hàng: ${user.fullName || 'Admin'}`
+      : (user?.fullName || 'Thu ngân POS');
+
     return {
-      storeName: user?.tenantName ? user.tenantName.toUpperCase() : 'SIÊU THỊ MINI MT-GROCERY',
-      storeAddress: '123 Xuân Thủy, Cầu Giấy, Hà Nội',
-      storePhone: '0987.654.321',
-      hotline: '1900 6868',
+      storeName: tenantOrStoreName,
+      storeAddress,
+      storePhone,
+      hotline,
       orderCode: `HD${Math.floor(100000 + Math.random() * 900000)}`,
       createdAt: new Date().toLocaleString('vi-VN'),
-      cashierName: user?.fullName || 'Thu ngân POS',
+      cashierName: cashierDisplayName,
       posMachine: 'POS#01',
-      branchName: 'Chi nhánh Cầu Giấy',
+      branchName: activeBranch.name,
       customer: currentTab.customer
         ? {
             name: currentTab.customer.name,
             phone: currentTab.customer.phone,
             address: currentTab.customer.address,
+            loyaltyPoints: currentTab.customer.loyaltyPoints,
           }
         : null,
       items: currentTab.cart.map((c, i) => ({
         stt: i + 1,
         name: c.product.name,
         unitPrice: c.actualPrice,
-        batchCode: c.product.batchCode || 'LÔ-FEFO',
+        batchCode: c.batchCode || c.product.batchCode || 'LÔ-FEFO',
         quantity: c.quantity,
         totalAmount: c.totalAmount,
       })),
       totalItemAmount,
       orderDiscountAmount,
       pointsDiscountAmount: pointsDeduction,
-      vatAmount: vat,
-      finalAmount: totalWithVat,
+      vatAmount: 0,
+      finalAmount,
       finalAmountInWords: '',
       paymentMethodText,
-      debtAmount: currentTab.paymentMethod === 'debt' ? totalWithVat : undefined,
+      cashTendered: currentTab.cashTendered || finalAmount,
+      debtAmount: currentTab.paymentMethod === 'debt' ? finalAmount : undefined,
       debtNote,
       earnedPoints: Math.floor(finalAmount / 10000), // 10k = 1 điểm
     };
@@ -466,13 +599,15 @@ export const PosCheckoutPage: FC = () => {
       const isBank = currentTab.paymentMethod === 'vietqr';
       const paymentMethod = isDebt ? 'CREDIT' : isBank ? 'BANK' : 'CASH';
 
-      const branchId = '01a185f3-d197-72c1-b6e7-cdb5d5363467';
+      const branchId = activeBranch.id || DEFAULT_GROCERY_BRANCH_ID;
       const items = currentTab.cart.map((c) => ({
         productId: c.product.id || 'aaaaaaaa-1111-1111-1111-111111111111',
         productName: c.product.name,
         unitPrice: c.actualPrice,
         quantity: c.quantity,
         discountAmount: Math.max(0, (c.unitPrice - c.actualPrice) * c.quantity),
+        unitId: c.unitId,
+        unitName: c.unit,
       }));
 
       const backendOrder = await posOrderApi.createOrder({
@@ -485,6 +620,7 @@ export const PosCheckoutPage: FC = () => {
         managerBypassCode: managerBypass ? 'MGR-BYPASS-2026' : undefined,
         note: currentTab.note || debtNote || undefined,
         creatorRole: user?.role,
+        cashierName: user?.role === 'STORE_OWNER' ? `Chủ cửa hàng: ${user.fullName || 'Admin'}` : (user?.fullName || 'Thu ngân POS'),
       });
 
       createdOrderId = backendOrder.id;
@@ -508,14 +644,18 @@ export const PosCheckoutPage: FC = () => {
       }
       setReceiptData(receipt);
 
-      // In trực tiếp 1-click tới máy in POS-58
-      posOrderApi.printDirect(receipt).then((res) => {
-        if (res.success) {
-          showToast(`✅ Đã thanh toán đơn ${receipt.orderCode} & in trực tiếp ra máy in POS-58!`);
-        } else {
-          showToast(`⚠️ ${res.message}`, 'error');
-        }
-      });
+      // Chỉ tự động gửi lệnh in trực tiếp nếu người dùng bật tùy chọn autoPrint
+      if (autoPrint) {
+        posOrderApi.printDirect(receipt).then((res) => {
+          if (res.success) {
+            showToast(`✅ Đã thanh toán đơn ${receipt.orderCode} & in trực tiếp ra máy in POS-58!`);
+          } else {
+            showToast(`⚠️ ${res.message}`, 'error');
+          }
+        });
+      } else {
+        showToast(`✅ Đã thanh toán thành công đơn hàng ${receipt.orderCode}!`);
+      }
 
       setIsReceiptModalOpen(true);
     } catch (apiErr: unknown) {
@@ -584,6 +724,11 @@ export const PosCheckoutPage: FC = () => {
     <div className="pos-page-wrapper">
       {/* 1. Header Toolbar */}
       <PosHeader
+        branchName={activeBranch.name}
+        branches={availableBranches}
+        selectedBranchId={activeBranch.id}
+        onSelectBranch={handleSelectBranch}
+        onOpenInventoryLookup={() => setIsInventoryLookupOpen(true)}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         onBarcodeSubmit={handleBarcodeSubmit}
@@ -604,29 +749,6 @@ export const PosCheckoutPage: FC = () => {
         }}
       />
 
-      {/* Thông báo độc lập dữ liệu cho cửa hàng mới (Tenant Isolation) */}
-      {!isDefaultDemoStore && products.length === 0 && (
-        <div style={{
-          margin: '8px 16px 0 16px',
-          padding: '8px 14px',
-          backgroundColor: '#f0fdf4',
-          border: '1px solid #bbf7d0',
-          borderRadius: 6,
-          fontSize: 12.5,
-          color: '#166534',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between'
-        }}>
-          <span>
-            🏪 <b>{user?.tenantName || 'Cửa hàng của bạn'}</b>: Dữ liệu phân lập an toàn (Multi-tenant). Kho hàng của tiệm này chưa có sản phẩm nào.
-          </span>
-          <span style={{ fontSize: 11.5, color: '#15803d', fontWeight: 600 }}>
-            🔒 Độc lập 100% &bull; Không chia sẻ dữ liệu với cửa hàng khác
-          </span>
-        </div>
-      )}
-
       {/* 2. Main Body Split */}
       <div className="pos-main-body">
         {/* Cột trái: Giỏ hàng + Catalog */}
@@ -636,6 +758,7 @@ export const PosCheckoutPage: FC = () => {
             onUpdateQuantity={handleUpdateQuantity}
             onRemoveItem={handleRemoveItem}
             onUpdateItemDiscount={handleUpdateItemDiscount}
+            onUpdateItemUnit={handleUpdateItemUnit}
             onOpenBelowCostWarning={(item) => setBelowCostWarningItem(item)}
             onOpenCatalogModal={() => setIsCatalogModalOpen(true)}
             orderNote={currentTab.note}
@@ -680,8 +803,14 @@ export const PosCheckoutPage: FC = () => {
         isOpen={isAddCustomerOpen}
         onClose={() => setIsAddCustomerOpen(false)}
         onSave={(newCust) => {
-          setCustomers((prev) => [newCust, ...prev]);
+          setCustomers((prev) => [newCust, ...prev.filter((c) => c.id !== newCust.id && c.phone !== newCust.phone)]);
           updateCurrentTab({ customer: newCust });
+          showToast(`✅ Đã lưu khách hàng "${newCust.name}" vào CSDL thành công!`);
+          posOrderApi.getAllCustomers().then((apiCusts) => {
+            if (apiCusts && apiCusts.length > 0) {
+              setCustomers(apiCusts);
+            }
+          }).catch(() => {});
         }}
       />
 
@@ -726,6 +855,18 @@ export const PosCheckoutPage: FC = () => {
         onApprove={(note) => {
 setIsDebtWarningOpen(false);
           executeCompleteCheckout(note, true);
+        }}
+      />
+
+            <PosInventoryLookupModal
+        isOpen={isInventoryLookupOpen}
+        onClose={() => setIsInventoryLookupOpen(false)}
+        currentBranchName={activeBranch.name}
+        products={products}
+        onSelectBatchToCart={(prod, batchCode, expDate) => {
+          handleAddToCart(prod, batchCode, expDate);
+          setIsInventoryLookupOpen(false);
+          showToast(`Đã thêm sản phẩm "${prod.name}" (Lô: ${batchCode}) vào giỏ hàng`, 'success');
         }}
       />
 

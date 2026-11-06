@@ -26,6 +26,14 @@ export class ProductDTO {
   allocatedQty?: number;
   batchCode?: string;
   expiryDate?: string;
+  shelfLocation?: string;
+  unitPrices?: Array<{
+    unitId?: string;
+    unitName: string;
+    conversionRate: number;
+    price: number;
+    isBaseUnit?: boolean;
+  }>;
 
   constructor(init?: Partial<ProductDTO>) {
     Object.assign(this, init);
@@ -40,6 +48,7 @@ export class CartItemDTO {
   id: string = '';
   product: ProductDTO = new ProductDTO();
   unit: string = '';
+  unitId?: string;
   quantity: number = 1;
   unitPrice: number = 0;
   discountPerItem: number = 0;
@@ -47,6 +56,8 @@ export class CartItemDTO {
   actualPrice: number = 0;
   totalAmount: number = 0;
   isBelowCostApproved?: boolean;
+  batchCode?: string;
+  expiryDate?: string;
 
   constructor(init?: Partial<CartItemDTO>) {
     Object.assign(this, init);
@@ -145,6 +156,7 @@ export class ReceiptCustomerDTO {
   name: string = '';
   phone: string = '';
   address?: string;
+  loyaltyPoints?: number;
 
   constructor(init?: Partial<ReceiptCustomerDTO>) {
     Object.assign(this, init);
@@ -175,6 +187,7 @@ export class ReceiptDataDTO {
   finalAmount: number = 0;
   finalAmountInWords: string = '';
   paymentMethodText: string = 'Tiền mặt';
+  cashTendered?: number;
   earnedPoints: number = 0;
   debtAmount?: number;
   remainingDebt?: number;

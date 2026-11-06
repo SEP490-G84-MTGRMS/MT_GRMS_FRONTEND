@@ -13,6 +13,9 @@ interface Props {
 export const PosReceiptModal: FC<Props> = ({ isOpen, receiptData, onClose }) => {
   const [isPrinting, setIsPrinting] = useState(false);
   const [printStatus, setPrintStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [autoPrint, setAutoPrint] = useState<boolean>(() => {
+    return localStorage.getItem('mtgrms_pos_auto_print') === 'true';
+  });
 
   if (!isOpen || !receiptData) return null;
 
@@ -84,179 +87,195 @@ export const PosReceiptModal: FC<Props> = ({ isOpen, receiptData, onClose }) => 
           className="pos-modal-body"
           style={{ background: '#f8fafc', padding: '16px', maxHeight: '70vh', overflowY: 'auto' }}
         >
-          {/* Khổ giấy in nhiệt chuẩn 43mm siêu thị mini */}
+          {/* Khổ giấy in nhiệt chuẩn siêu thị bán lẻ */}
           <div className="z-report-paper printable-receipt" id="pos-receipt-print-area">
-            {/* 1. Header Cửa Hàng Tạp Hóa / Siêu Thị Mini */}
-            <div className="text-center mb-3">
-              <div className="font-bold text-xs tracking-wider text-slate-800 uppercase">
-                {receiptData.storeName || 'SIÊU THỊ MINI MT-GROCERY'}
+            {/* 1. Header Cửa Hàng / Siêu Thị Chuẩn Bán Lẻ */}
+            <div className="text-center mb-2.5">
+              <div className="font-bold text-sm tracking-wide text-slate-900 uppercase">
+                {receiptData.storeName || 'SIÊU THỊ THỰC PHẨM'}
               </div>
-              <div className="text-[11.5px] text-slate-500 mt-0.5">
-                Đ/c: {receiptData.storeAddress} &bull; ĐT: {receiptData.storePhone}
+              <div className="text-[11.5px] text-slate-600 mt-1 leading-snug">
+                Địa chỉ: {receiptData.storeAddress}
               </div>
-              <div className="text-[11px] text-slate-400 mt-0.5">
-                Hotline CSKH: {receiptData.hotline} | Wifi: MT-GROCERY
+              <div className="text-[11.5px] text-slate-600 mt-0.5">
+                Hotline: {receiptData.hotline || receiptData.storePhone || '024 3822 9988'}
               </div>
-              <h3 className="font-bold text-sm tracking-wider uppercase text-teal-800 mt-2">
-                HÓA ĐƠN BÁN LẺ (POS)
+
+              <h3 className="font-bold text-base tracking-wider uppercase text-slate-900 mt-2.5 mb-1">
+                HÓA ĐƠN BÁN LẺ
               </h3>
-              <div className="text-[11.5px] font-mono text-slate-500 font-medium mt-0.5">
-                Số HĐ: #{receiptData.orderCode}
+              <div className="text-[11.5px] font-mono text-slate-600">
+                HĐ: {receiptData.orderCode}
               </div>
             </div>
 
-            <div className="z-report-divider" />
-
-            {/* 2. Thông tin giao dịch & Khách hàng */}
-            <div className="space-y-1.5 text-xs">
-              <div className="flex justify-between items-center gap-2">
-                <span className="text-slate-500 flex-1 min-w-0">Thời gian:</span>
-                <span className="font-mono text-slate-700 whitespace-nowrap shrink-0">
-                  {receiptData.createdAt}
-                </span>
+            {/* 2. Thông tin ngày bán & Thu ngân */}
+            <div className="space-y-1 text-xs border-b border-dashed border-slate-300 pb-2 mb-2">
+              <div className="flex justify-between items-center text-slate-700">
+                <span>Ngày bán:</span>
+                <span className="font-mono text-slate-800">{receiptData.createdAt}</span>
               </div>
-              <div className="flex justify-between items-center gap-2">
-                <span className="text-slate-500 flex-1 min-w-0">Thu ngân:</span>
-                <span className="font-semibold text-slate-800 whitespace-nowrap shrink-0">
-                  {receiptData.cashierName} ({receiptData.posMachine})
-                </span>
+              <div className="flex justify-between items-center text-slate-700">
+                <span>Thu ngân:</span>
+                <span className="font-semibold text-slate-800">{receiptData.cashierName}</span>
               </div>
-              <div className="flex justify-between items-center gap-2">
-                <span className="text-slate-500 flex-1 min-w-0">Khách hàng:</span>
-                <span className="font-semibold text-slate-800 whitespace-nowrap shrink-0">
-                  {receiptData.customer?.name || 'Khách vãng lai'}
-                </span>
-              </div>
-              {receiptData.customer?.phone && (
-                <div className="flex justify-between items-center gap-2">
-                  <span className="text-slate-500 flex-1 min-w-0">Số điện thoại:</span>
-                  <span className="font-mono text-slate-700 whitespace-nowrap shrink-0">
-                    {receiptData.customer.phone}
-                  </span>
-                </div>
-              )}
             </div>
 
-            <div className="z-report-divider" />
-
-            {/* 3. Danh Sách Mặt Hàng Chuẩn Tạp Hóa / Siêu Thị Mini */}
-            <div className="text-xs">
-              <div className="flex justify-between items-center pb-1 text-slate-500 font-semibold border-b border-dashed border-slate-300 mb-1.5">
-                <span className="flex-1 min-w-0">Tên hàng hóa</span>
-                <span className="w-12 text-center shrink-0">SL</span>
-                <span className="w-16 text-right shrink-0">Đơn giá</span>
-                <span className="w-18 text-right shrink-0">Thành tiền</span>
-              </div>
-
-              <div className="space-y-1.5">
-                {receiptData.items.map((item, idx) => (
-                  <div key={idx} className="flex justify-between items-center gap-2">
-                    <div className="flex-1 min-w-0 pr-1">
-                      <div className="font-medium text-slate-800 leading-snug truncate">
+            {/* 3. Danh Sách Mặt Hàng Dạng Bảng Chuẩn Siêu Thị */}
+            <div className="text-xs mb-2">
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr className="border-b border-dashed border-slate-400 text-slate-700 font-semibold text-[11.5px]">
+                    <th className="text-left py-1 w-6 font-semibold">STT</th>
+                    <th className="text-left py-1 font-semibold">Hàng hóa</th>
+                    <th className="text-center py-1 w-10 font-semibold">S.Lg</th>
+                    <th className="text-right py-1 w-16 font-semibold">Đơn giá</th>
+                    <th className="text-right py-1 w-18 font-semibold">Thành tiền</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-dashed divide-slate-200">
+                  {receiptData.items.map((item, idx) => (
+                    <tr key={idx} className="align-top text-[11.5px]">
+                      <td className="py-1.5 text-slate-500 font-mono">{idx + 1}</td>
+                      <td className="py-1.5 pr-1 font-medium text-slate-900">
                         {item.name}
-                      </div>
-                      {item.batchCode && (
-                        <div className="text-[10px] text-slate-400 font-mono">
-                          Lô: {item.batchCode}
-                        </div>
-                      )}
-                    </div>
-                    <span className="w-12 text-center text-slate-600 shrink-0 font-mono">
-                      {item.quantity}
-                    </span>
-                    <span className="w-16 text-right text-slate-600 shrink-0 font-mono tabular-nums">
-                      {item.unitPrice.toLocaleString('vi-VN')}
-                    </span>
-                    <span className="w-18 text-right font-medium text-slate-800 shrink-0 font-mono tabular-nums">
-                      {item.totalAmount.toLocaleString('vi-VN')}
-                    </span>
-                  </div>
-                ))}
-              </div>
+                      </td>
+                      <td className="py-1.5 text-center text-slate-700 font-mono">{item.quantity}</td>
+                      <td className="py-1.5 text-right text-slate-700 font-mono tabular-nums">
+                        {item.unitPrice.toLocaleString('vi-VN')}
+                      </td>
+                      <td className="py-1.5 text-right font-semibold text-slate-900 font-mono tabular-nums">
+                        {item.totalAmount.toLocaleString('vi-VN')}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="border-t border-b border-dashed border-slate-400 font-semibold text-xs">
+                    <td colSpan={2} className="py-1 text-slate-800">Tổng cộng:</td>
+                    <td className="py-1 text-center font-mono text-slate-900">
+                      {receiptData.items.reduce((sum, it) => sum + (it.quantity || 0), 0)}
+                    </td>
+                    <td className="py-1"></td>
+                    <td className="py-1 text-right font-semibold font-mono text-slate-900 tabular-nums">
+                      {receiptData.totalItemAmount.toLocaleString('vi-VN')}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
             </div>
 
-            <div className="z-report-divider" />
-
-            {/* 4. Tổng Kết Tiền Hàng */}
-            <div className="space-y-1.5 text-xs">
-              <div className="flex justify-between items-center gap-2 text-slate-700">
-                <span className="flex-1 min-w-0">Tổng tiền hàng:</span>
-                <span className="font-mono tabular-nums font-semibold whitespace-nowrap shrink-0">
-                  {receiptData.totalItemAmount.toLocaleString('vi-VN')} đ
-                </span>
-              </div>
+            {/* 4. Tổng Kết Tiền Hàng & Thanh Toán (Hoàn Toàn Không Có VAT) */}
+            <div className="space-y-1.5 text-xs py-2 border-b border-dashed border-slate-300">
               {receiptData.orderDiscountAmount > 0 && (
-                <div className="flex justify-between items-center gap-2 text-rose-700">
-                  <span className="flex-1 min-w-0">Chiết khấu / Giảm giá:</span>
-                  <span className="font-mono tabular-nums font-semibold whitespace-nowrap shrink-0">
+                <div className="flex justify-between items-center text-rose-600">
+                  <span>Tiền chiết khấu:</span>
+                  <span className="font-mono tabular-nums font-semibold">
                     - {receiptData.orderDiscountAmount.toLocaleString('vi-VN')} đ
                   </span>
                 </div>
               )}
               {receiptData.pointsDiscountAmount > 0 && (
-                <div className="flex justify-between items-center gap-2 text-emerald-700">
-                  <span className="flex-1 min-w-0">Dùng điểm tích lũy:</span>
-                  <span className="font-mono tabular-nums font-semibold whitespace-nowrap shrink-0">
+                <div className="flex justify-between items-center text-emerald-600">
+                  <span>Dùng điểm tích lũy:</span>
+                  <span className="font-mono tabular-nums font-semibold">
                     - {receiptData.pointsDiscountAmount.toLocaleString('vi-VN')} đ
                   </span>
                 </div>
               )}
-              {receiptData.vatAmount > 0 && (
-                <div className="flex justify-between items-center gap-2 text-slate-700">
-                  <span className="text-slate-500 flex-1 min-w-0">Thuế GTGT (VAT 1%):</span>
-                  <span className="font-mono tabular-nums whitespace-nowrap shrink-0">
-                    + {receiptData.vatAmount.toLocaleString('vi-VN')} đ
-                  </span>
-                </div>
-              )}
 
-              {/* Dòng tổng thanh toán nổi bật */}
-              <div className="flex justify-between items-center gap-2 font-bold text-sm text-teal-800 pt-1.5 border-t border-dashed border-slate-300">
-                <span className="flex-1 min-w-0">TỔNG THANH TOÁN:</span>
-                <span className="font-mono tabular-nums whitespace-nowrap shrink-0">
+              {/* Dòng tổng phải trả nổi bật */}
+              <div className="flex justify-between items-center text-sm font-bold text-slate-900 pt-1 border-t border-dashed border-slate-300">
+                <span>TỔNG PHẢI TRẢ:</span>
+                <span className="font-mono tabular-nums text-base text-teal-800">
                   {receiptData.finalAmount.toLocaleString('vi-VN')} đ
                 </span>
               </div>
 
-              <div className="flex justify-between items-center gap-2 text-slate-700 pt-1">
-                <span className="text-slate-500 flex-1 min-w-0">Phương thức:</span>
-                <span className="font-semibold text-slate-800 whitespace-nowrap shrink-0">
-                  {receiptData.paymentMethodText}
-                </span>
+              {/* Khối Tiền khách trả chi tiết */}
+              <div className="pt-1 text-slate-700 space-y-1">
+                <div className="flex justify-between items-center">
+                  <span>Tiền khách trả:</span>
+                  <span className="text-[11px] text-slate-500 font-medium">({receiptData.paymentMethodText})</span>
+                </div>
+                {receiptData.paymentMethodText.includes('Tiền mặt') ? (
+                  <>
+                    <div className="flex justify-between items-center pl-4 text-slate-600">
+                      <span>Tiền mặt:</span>
+                      <span className="font-mono tabular-nums">
+                        {(receiptData.cashTendered || receiptData.finalAmount).toLocaleString('vi-VN')} đ
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center text-slate-700 font-medium">
+                      <span>Tiền còn dư:</span>
+                      <span className="font-mono tabular-nums text-slate-900">
+                        {Math.max(0, (receiptData.cashTendered || receiptData.finalAmount) - receiptData.finalAmount).toLocaleString('vi-VN')} đ
+                      </span>
+                    </div>
+                  </>
+                ) : receiptData.debtAmount ? (
+                  <>
+                    <div className="flex justify-between items-center pl-4 text-amber-700 font-medium">
+                      <span>Ghi nợ đơn:</span>
+                      <span className="font-mono tabular-nums">
+                        {receiptData.debtAmount.toLocaleString('vi-VN')} đ
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center text-amber-800 font-bold">
+                      <span>Còn nợ:</span>
+                      <span className="font-mono tabular-nums">
+                        {receiptData.debtAmount.toLocaleString('vi-VN')} đ
+                      </span>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex justify-between items-center pl-4 text-slate-600">
+                      <span>Chuyển khoản:</span>
+                      <span className="font-mono tabular-nums">
+                        {receiptData.finalAmount.toLocaleString('vi-VN')} đ
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center text-slate-700">
+                      <span>Tiền còn dư:</span>
+                      <span className="font-mono tabular-nums">0 đ</span>
+                    </div>
+                  </>
+                )}
               </div>
-              {receiptData.debtAmount !== undefined && receiptData.debtAmount > 0 && (
-                <div className="flex justify-between items-center gap-2 text-amber-800 bg-amber-50 p-1.5 rounded border border-amber-200 mt-1">
-                  <span className="flex-1 min-w-0 font-medium">Số tiền ghi nợ đơn:</span>
-                  <span className="font-mono tabular-nums font-bold text-amber-900 whitespace-nowrap shrink-0">
-                    {receiptData.debtAmount.toLocaleString('vi-VN')} đ
-                  </span>
-                </div>
-              )}
-              {receiptData.earnedPoints > 0 && (
-                <div className="flex justify-between items-center gap-2 text-teal-700">
-                  <span className="flex-1 min-w-0">Điểm tích lũy cộng thêm:</span>
-                  <span className="font-mono font-semibold whitespace-nowrap shrink-0">
-                    +{receiptData.earnedPoints} điểm
-                  </span>
-                </div>
-              )}
             </div>
 
-            <div className="z-report-divider" />
+            {/* 5. Khối Thông Tin Khách Hàng (Chuẩn Hóa Ở Chân Bill) */}
+            <div className="py-2.5 border-b border-dashed border-slate-300 text-xs">
+              <div className="font-bold text-center text-slate-800 uppercase tracking-wide mb-1.5">
+                THÔNG TIN KHÁCH HÀNG
+              </div>
+              <div className="space-y-1 text-slate-700">
+                <div className="flex items-start">
+                  <span className="w-28 shrink-0 text-slate-500">Tên khách hàng:</span>
+                  <span className="font-medium text-slate-900">{receiptData.customer?.name || 'Khách hàng lẻ'}</span>
+                </div>
+                <div className="flex items-start">
+                  <span className="w-28 shrink-0 text-slate-500">Địa chỉ:</span>
+                  <span className="text-slate-800">{receiptData.customer?.address || '---'}</span>
+                </div>
+                <div className="flex items-start">
+                  <span className="w-28 shrink-0 text-slate-500">Số điện thoại:</span>
+                  <span className="font-mono text-slate-800">{receiptData.customer?.phone || '---'}</span>
+                </div>
+                <div className="flex items-start">
+                  <span className="w-28 shrink-0 text-slate-500">Tổng điểm tích lũy:</span>
+                  <span className="font-mono font-semibold text-teal-700">
+                    {receiptData.customer?.loyaltyPoints ?? (receiptData.earnedPoints || 0)} điểm
+                  </span>
+                </div>
+              </div>
+            </div>
 
-            {/* 5. Chân Hóa Đơn Tạp Hóa / Siêu Thị Mini */}
-            <div className="text-center text-xs mt-2">
-              <div className="text-[11px] text-slate-600">
-                Quý khách vui lòng kiểm tra kỹ hóa đơn & hàng hóa trước khi rời quầy!
-              </div>
-              <div className="text-[10.5px] text-slate-500 mt-0.5">
-                Đổi trả trong 24h kèm hóa đơn (sản phẩm còn nguyên tem mác).
-              </div>
-              <div className="font-semibold text-slate-800 mt-1 text-xs">
+            {/* 6. Chân Hóa Đơn Chuẩn Siêu Thị */}
+            <div className="text-center text-xs mt-3">
+              <div className="font-bold text-slate-800 text-xs uppercase">
                 CẢM ƠN QUÝ KHÁCH & HẸN GẶP LẠI!
-              </div>
-              <div className="text-[10px] text-slate-400 italic mt-0.5 font-mono">
-                [Hóa đơn điện tử khởi tạo từ máy tính tiền MT-GRMS]
               </div>
             </div>
           </div>
@@ -264,10 +283,21 @@ export const PosReceiptModal: FC<Props> = ({ isOpen, receiptData, onClose }) => 
 
         {/* Footer Modal: In trực tiếp 1-Click không popup */}
         <div className="pos-modal-footer flex items-center justify-between gap-2">
-          <button type="button" className="pos-btn-secondary-pill" onClick={onClose}>
-            Đóng / Bán đơn tiếp theo
-          </button>
+          <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#475569', cursor: 'pointer', userSelect: 'none' }}>
+            <input
+              type="checkbox"
+              checked={autoPrint}
+              onChange={(e) => {
+                setAutoPrint(e.target.checked);
+                localStorage.setItem('mtgrms_pos_auto_print', String(e.target.checked));
+              }}
+            />
+            <span>Tự động in bill sau khi thanh toán</span>
+          </label>
           <div className="flex items-center gap-2">
+            <button type="button" className="pos-btn-secondary-pill" onClick={onClose}>
+              Đóng
+            </button>
             <button
               type="button"
               className="pos-btn-primary-pill flex items-center gap-1.5 bg-teal-600 hover:bg-teal-700 text-white font-medium"

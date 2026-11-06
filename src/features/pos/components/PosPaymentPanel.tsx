@@ -80,12 +80,34 @@ export const PosPaymentPanel: FC<Props> = ({
   const changeAmount = Math.max(0, cashTendered - finalAmount);
 
   // Tìm kiếm khách hàng thuần túy CHỈ BẰNG SỐ ĐIỆN THOẠI (SĐT)
-  const phoneQuery = customerSearchInput.replace(/\D/g, '');
+  // Helper chuẩn hóa tiếng Việt không dấu
+  const removeVietnameseTones = (str: string) => {
+    return str
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/đ/g, 'd')
+      .replace(/Đ/g, 'D')
+      .toLowerCase();
+  };
+
+  // Tìm kiếm khách hàng theo Tên (không dấu/có dấu), Số điện thoại và Mã KH
+  const qRaw = customerSearchInput.trim();
+  const qLower = qRaw.toLowerCase();
+  const qClean = removeVietnameseTones(qRaw);
+  const phoneQuery = qRaw.replace(/\D/g, '');
 
   const filteredCustomers = customerSearchList.filter((c) => {
-    if (!phoneQuery) return false;
+    if (!qRaw) return false;
     const cleanPhone = (c.phone || '').replace(/\D/g, '');
-    return cleanPhone.includes(phoneQuery);
+    const matchPhone = phoneQuery.length > 0 && cleanPhone.includes(phoneQuery);
+
+    const custNameRaw = c.name || '';
+    const matchNameExact = custNameRaw.toLowerCase().includes(qLower);
+    const matchNameNoTone = removeVietnameseTones(custNameRaw).includes(qClean);
+
+    const matchCode = (c.code || '').toLowerCase().includes(qLower);
+
+    return matchPhone || matchNameExact || matchNameNoTone || matchCode;
   });
 
   return (
@@ -104,21 +126,19 @@ export const PosPaymentPanel: FC<Props> = ({
 
       <hr className="pos-divider" />
 
-      {/* 1. KHÁCH HÀNG (F4) - CHỈ TÌM BẰNG SỐ ĐIỆN THOẠI */}
+      {/* 1. KHÁCH HÀNG (F4) - TÌM KIẾM ĐA TIÊU CHÍ */}
       <fieldset className="pos-fieldset">
         <legend className="pos-legend">
-          <b>Khách hàng (F4) - Chỉ tìm bằng SĐT</b>
+          <b>Khách hàng (F4) - Tên hoặc SĐT</b>
         </legend>
 
         <div style={{ display: 'flex', gap: 6, position: 'relative' }} ref={dropdownRef}>
           <input
-            type="tel"
+            type="text"
             id="customer_search"
             value={customerSearchInput}
             onChange={(e) => {
-              // Chỉ cho phép nhập số điện thoại
-              const val = e.target.value.replace(/[^\d\s.-]/g, '');
-              setCustomerSearchInput(val);
+              setCustomerSearchInput(e.target.value);
               setIsSearchingCustomer(true);
             }}
             onKeyDown={(e) => {
@@ -134,7 +154,7 @@ export const PosPaymentPanel: FC<Props> = ({
                 setIsSearchingCustomer(true);
               }
             }}
-            placeholder="Nhập số điện thoại khách hàng (F4)..."
+            placeholder="Tìm theo Tên, SĐT, Mã KH (F4)..."
             className="pos-input"
             style={{ flex: 1 }}
           />
@@ -148,7 +168,7 @@ export const PosPaymentPanel: FC<Props> = ({
             <Plus size={14} />
           </button>
 
-          {/* Dropdown tìm kiếm khách hàng chỉ theo SĐT */}
+          {/* Dropdown tìm kiếm khách hàng */}
           {isSearchingCustomer && customerSearchInput.trim() && (
             <div className="pos-customer-dropdown">
               {filteredCustomers.length > 0 ? (
@@ -163,10 +183,10 @@ export const PosPaymentPanel: FC<Props> = ({
                     }}
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: 13, fontWeight: 700, color: '#0f766e' }}>
+                      <b style={{ color: '#0f766e', fontSize: 13 }}>{cust.name}</b>
+                      <span style={{ fontSize: 12.5, fontWeight: 600, color: '#334155' }}>
                         📞 {cust.phone}
                       </span>
-                      <b style={{ color: '#1e293b' }}>{cust.name}</b>
                     </div>
                     <div style={{ fontSize: 11.5, color: '#16a34a', display: 'flex', justifyContent: 'space-between', marginTop: 3 }}>
                       <span>Mã: {cust.code} &bull; {cust.membershipTier}</span>
@@ -176,7 +196,7 @@ export const PosPaymentPanel: FC<Props> = ({
                 ))
               ) : (
                 <div style={{ padding: 12, fontSize: 12, color: '#64748b', textAlign: 'center' }}>
-                  Không tìm thấy khách hàng với SĐT &quot;{customerSearchInput}&quot;. Bấm [+] để thêm mới.
+                  Không tìm thấy khách hàng phù hợp với &quot;{customerSearchInput}&quot;. Bấm [+] để thêm mới.
                 </div>
               )}
             </div>

@@ -194,7 +194,7 @@ export class InvoiceDTO {
   debtPaymentRecords: DebtPaymentRecordDTO[] = []; // Lịch sử các đợt thu nợ
   
   // Phương thức thanh toán
-  paymentMethod: 'VIETQR' | 'CASH' | 'DEBT' | 'MIXED' = 'VIETQR';
+  paymentMethod: 'VIETQR' | 'CASH' | 'DEBT' | 'CREDIT' | 'MIXED' = 'VIETQR';
   paymentMethodLabel: string = 'VietQR (MBBank)';
   referenceCode?: string = '';         // Mã tham chiếu giao dịch ngân hàng
   

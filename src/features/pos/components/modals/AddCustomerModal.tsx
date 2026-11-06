@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import type { FC } from 'react';
+import { Loader2, AlertCircle } from 'lucide-react';
 import type { Customer } from '../../types/pos.types';
+import { customerApi } from '../../../customer-crm/api/customerApi';
 
 interface Props {
   isOpen: boolean;
@@ -18,48 +20,81 @@ export const AddCustomerModal: FC<Props> = ({ isOpen, onClose, onSave }) => {
   const [area, setArea] = useState('');
   const [ward, setWard] = useState('');
   const [note, setNote] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
-  const handleSubmit = () => {
-    if (!name.trim() || !phone.trim()) {
-      alert('Vui lòng nhập Tên KH (*) và Số điện thoại (*)!');
+  const handleSubmit = async () => {
+    if (isSubmitting) return;
+    setErrorMessage(null);
+
+    const trimmedName = name.trim();
+    const trimmedPhone = phone.trim();
+
+    if (!trimmedName || !trimmedPhone) {
+      setErrorMessage('Vui lòng nhập Tên KH (*) và Số điện thoại (*)!');
       return;
     }
 
-    const newCust: Customer = {
-      id: `kh-${Date.now()}`,
-      code: `KH${Math.floor(100000 + Math.random() * 900000)}`,
-      name: name.trim(),
-      phone: phone.trim(),
-      email: email.trim() || undefined,
-      group: 'Khách lẻ',
-      dob: dob || undefined,
-      gender,
-      address: address.trim() || undefined,
-      area: area.trim() || undefined,
-      ward: ward.trim() || undefined,
-      note: note.trim() || undefined,
-      loyaltyPoints: 0,
-      membershipTier: 'Standard',
-      debtLimit: 0,
-      debtCount: 0,
-      totalDebtPurchased: 0,
-      currentDebt: 0,
-      allowDebt: true,
-    };
+    const fullAddress = [address.trim(), ward.trim(), area.trim()].filter(Boolean).join(', ');
 
-    onSave(newCust);
-    // Reset form
-    setName('');
-    setPhone('');
-    setEmail('');
-    setDob('');
-    setAddress('');
-    setArea('');
-    setWard('');
-    setNote('');
-    onClose();
+    try {
+      setIsSubmitting(true);
+      const created = await customerApi.createCustomer({
+        fullName: trimmedName,
+        phoneNumber: trimmedPhone,
+        email: email.trim() || undefined,
+        address: fullAddress || undefined,
+        debtLimit: 0,
+        membershipTier: 'Standard',
+      });
+
+      const cAny = created as any;
+      const newCust: Customer = {
+        id: created.id,
+        code: cAny.code || cAny.customerCode || `KH${Math.floor(100000 + Math.random() * 900000)}`,
+        name: created.fullName || trimmedName,
+        phone: created.phoneNumber || trimmedPhone,
+        email: created.email || email.trim() || undefined,
+        group: created.membershipTier || 'Khách lẻ',
+        dob: dob || undefined,
+        gender,
+        address: created.address || fullAddress || undefined,
+        area: area.trim() || undefined,
+        ward: ward.trim() || undefined,
+        note: note.trim() || undefined,
+        loyaltyPoints: created.loyaltyPoints ?? 0,
+        membershipTier: created.membershipTier || 'Standard',
+        debtLimit: created.debtLimit ?? 0,
+        debtCount: 0,
+        totalDebtPurchased: 0,
+        currentDebt: created.currentDebtAR ?? 0,
+        allowDebt: Boolean((created.debtLimit ?? 0) > 0 || cAny.allowDebt),
+      };
+
+      onSave(newCust);
+      // Reset form
+      setName('');
+      setPhone('');
+      setEmail('');
+      setDob('');
+      setAddress('');
+      setArea('');
+      setWard('');
+      setNote('');
+      setErrorMessage(null);
+      onClose();
+    } catch (err: any) {
+      console.error('Lỗi lưu khách hàng vào CSDL:', err);
+      const backendMsg =
+        err?.response?.data?.message ||
+        err?.message ||
+        'Không thể lưu khách hàng vào cơ sở dữ liệu. Vui lòng kiểm tra kết nối!';
+      setErrorMessage(backendMsg);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -90,6 +125,25 @@ export const AddCustomerModal: FC<Props> = ({ isOpen, onClose, onSave }) => {
 
         {/* Body chuẩn khung bảng lưới 100% giống Ảnh 2 */}
         <div className="pos-modal-body" style={{ padding: '16px' }}>
+          {errorMessage && (
+            <div
+              style={{
+                marginBottom: 12,
+                padding: '8px 12px',
+                backgroundColor: '#fef2f2',
+                border: '1px solid #f87171',
+                borderRadius: 4,
+                color: '#b91c1c',
+                fontSize: 12,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+              }}
+            >
+              <AlertCircle size={16} style={{ flexShrink: 0 }} />
+              <span>{errorMessage}</span>
+            </div>
+          )}
           <div
             style={{
               border: '2px solid #cbd5e1',
@@ -332,18 +386,29 @@ export const AddCustomerModal: FC<Props> = ({ isOpen, onClose, onSave }) => {
           <button
             type="button"
             onClick={handleSubmit}
+            disabled={isSubmitting}
             style={{
               padding: '6px 16px',
               border: '1px solid #1e293b',
-              backgroundColor: '#334155',
+              backgroundColor: isSubmitting ? '#64748b' : '#334155',
               color: '#ffffff',
               fontWeight: 700,
               fontSize: 13,
-              cursor: 'pointer',
+              cursor: isSubmitting ? 'not-allowed' : 'pointer',
               borderRadius: 0,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
             }}
           >
-            ✓ Lưu khách hàng
+            {isSubmitting ? (
+              <>
+                <Loader2 size={14} className="animate-spin" />
+                <span>Đang lưu vào CSDL...</span>
+              </>
+            ) : (
+              <span>✓ Lưu khách hàng</span>
+            )}
           </button>
         </div>
       </div>

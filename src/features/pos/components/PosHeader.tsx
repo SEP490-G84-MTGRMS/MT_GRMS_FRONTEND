@@ -33,6 +33,11 @@ interface Props {
   onHoldOrder?: () => void;
   onPrintRecent?: () => void;
   onCloseShift?: () => void;
+  branchName?: string;
+  branches?: Array<{ id: string; name: string; address?: string }>;
+  selectedBranchId?: string;
+  onSelectBranch?: (branchId: string) => void;
+  onOpenInventoryLookup?: () => void;
 }
 
 export const PosHeader: FC<Props> = ({
@@ -51,6 +56,11 @@ export const PosHeader: FC<Props> = ({
   onHoldOrder,
   onPrintRecent,
   onCloseShift,
+  branchName,
+  branches = [],
+  selectedBranchId,
+  onSelectBranch,
+  onOpenInventoryLookup,
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -242,12 +252,42 @@ export const PosHeader: FC<Props> = ({
     <header className="pos-header-container">
       {/* 1. HÀNG TRÊN CÙNG: Brand + Quét mã / Search + Chế độ + Thu ngân + Menu Hamburger */}
       <div className="pos-header-top-row">
-        {/* Cột trái: Chi nhánh & Quầy gọn gàng */}
+        {/* Cột trái: Chi nhánh & Quầy (STORE_OWNER đổi được, EMPLOYEE cố định) */}
         <div className="pos-header-left">
-          <div className="pos-header-branding" onClick={() => navigate(posBasePath)} style={{ cursor: 'pointer' }}>
-            <div className="pos-header-subtitle" style={{ fontSize: 13, fontWeight: 600, color: '#0f766e', margin: 0 }}>
-              Chi nhánh: <b>{user?.tenantName ? user.tenantName.split(' ')[0] + ' Trung Tâm' : 'Chi nhánh trung tâm'}</b> &bull; Quầy #01
-            </div>
+          <div className="pos-header-branding" onClick={() => navigate(posBasePath)} style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+            {isStoreOwner && branches.length > 0 ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: '#0f766e' }}>Chi nhánh:</span>
+                <select
+                  value={selectedBranchId || branches[0]?.id}
+                  onClick={(e) => e.stopPropagation()}
+                  onChange={(e) => onSelectBranch?.(e.target.value)}
+                  style={{
+                    padding: '4px 8px',
+                    borderRadius: 6,
+                    border: '1.5px solid #0f766e',
+                    backgroundColor: '#f0fdfa',
+                    color: '#0f766e',
+                    fontWeight: 700,
+                    fontSize: 12.5,
+                    outline: 'none',
+                    cursor: 'pointer',
+                  }}
+                  title="Chủ tiệm chuyển đổi chi nhánh bán hàng"
+                >
+                  {branches.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.name}
+                    </option>
+                  ))}
+                </select>
+                <span style={{ fontSize: 11.5, color: '#64748b' }}>&bull; Quầy #01</span>
+              </div>
+            ) : (
+              <div className="pos-header-subtitle" style={{ fontSize: 13, fontWeight: 600, color: '#0f766e', margin: 0 }}>
+                Chi nhánh: <b>{branchName || (user?.tenantName ? user.tenantName.split(' ')[0] + ' Ba Đình' : 'An Nhiên Mart - Chi nhánh Ba Đình')}</b> &bull; Quầy #01
+              </div>
+            )}
           </div>
         </div>
 
@@ -369,6 +409,8 @@ export const PosHeader: FC<Props> = ({
             </div>
           )}
 
+          
+
           <div
             className="pos-cashier-badge"
             style={{
@@ -458,13 +500,17 @@ export const PosHeader: FC<Props> = ({
                   className="pos-dropdown-item"
                   onClick={() => {
                     setIsMenuOpen(false);
-                    navigate(location.pathname.startsWith('/employee') ? '/employee/inventory-lookup' : '/pos/inventory-lookup');
+                    if (onOpenInventoryLookup) {
+                      onOpenInventoryLookup();
+                    } else {
+                      navigate(location.pathname.startsWith('/employee') ? '/employee/inventory-lookup' : '/pos/inventory-lookup');
+                    }
                   }}
                 >
                   <Layers size={16} className="text-teal-700" />
                   <div className="item-content">
                     <div className="item-title">Tra cứu tồn kho & Lô FEFO</div>
-                    <div className="item-desc">Tồn đa chi nhánh, hạn dùng & xả hàng</div>
+                    <div className="item-desc">Tồn đa chi nhánh, hạn dùng & chọn bán lô</div>
                   </div>
                 </button>
 
