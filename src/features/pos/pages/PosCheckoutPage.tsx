@@ -941,7 +941,7 @@ setIsDebtWarningOpen(false);
         isOpen={isOpenShiftModalOpen}
         branchId={activeBranch.id}
         branchName={activeBranch.name}
-        canCancel={isStoreOwner}
+        canCancel={true}
         onCancel={() => setIsOpenShiftModalOpen(false)}
         onShiftOpened={(newShift) => {
           setCurrentShift(newShift);

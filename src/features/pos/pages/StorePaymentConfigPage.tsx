@@ -14,11 +14,13 @@ import {
   ShieldCheck,
   Save,
   Monitor,
-  ArrowRight
+  ArrowRight,
+  Bell
 } from 'lucide-react';
 import { useAuthStore } from '../../../stores/useAuthStore';
 import { VIETNAMESE_BANKS, type StorePaymentConfigData } from '../components/modals/PaymentConfigModal';
 import { posShiftApi } from '../api/posShiftApi';
+import { OwnerCashApprovalDrawer } from '../components/drawers/OwnerCashApprovalDrawer';
 
 export const StorePaymentConfigPage: FC = () => {
   const { user } = useAuthStore();
@@ -35,6 +37,9 @@ export const StorePaymentConfigPage: FC = () => {
   const [copiedWebhook, setCopiedWebhook] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const [isApprovalDrawerOpen, setIsApprovalDrawerOpen] = useState(false);
+  const [pendingApprovalsCount, setPendingApprovalsCount] = useState(0);
+  const [unconfirmedDropsCount, setUnconfirmedDropsCount] = useState(0);
 
   const webhookUrl = `${window.location.origin.replace(':5173', ':5000')}/api/v1/payments/sepay-webhook`;
 
@@ -75,7 +80,16 @@ export const StorePaymentConfigPage: FC = () => {
         setCashOutShiftTotalLimit(cfg.cashOutShiftTotalLimit ?? 0);
       }
     }).catch(() => {});
+
+    loadPendingMovements();
   }, [currentTenantId]);
+
+  const loadPendingMovements = () => {
+    posShiftApi.getPendingMovements('').then((summary) => {
+      setPendingApprovalsCount(summary.pendingApprovalsCount || 0);
+      setUnconfirmedDropsCount(summary.unconfirmedDropsCount || 0);
+    }).catch(() => {});
+  };
 
   const handleCopyWebhook = () => {
     navigator.clipboard?.writeText(webhookUrl);
@@ -447,6 +461,54 @@ export const StorePaymentConfigPage: FC = () => {
                   <span style={{ fontSize: 13, fontWeight: 700, color: '#64748b' }}>đ</span>
                 </div>
               </div>
+
+              {/* Nút mở Drawer duyệt chi trực tiếp từ trang Cấu hình thanh toán */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '12px 16px',
+                  backgroundColor: '#f0fdfa',
+                  border: '1.5px solid #99f6e4',
+                  borderRadius: 10,
+                  marginTop: 6,
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: 13.5, fontWeight: 700, color: '#0f766e', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <Bell size={16} />
+                    <span>Duyệt Phiếu Chi Két & Xác Nhận Rút Két Quầy POS</span>
+                  </div>
+                  <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
+                    {pendingApprovalsCount + unconfirmedDropsCount > 0
+                      ? `Có ${pendingApprovalsCount} phiếu chi chờ duyệt và ${unconfirmedDropsCount} khoản nộp tiền rút két`
+                      : 'Hiện không có phiếu chi hay khoản rút két nào đang chờ xử lý'}
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setIsApprovalDrawerOpen(true)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    padding: '8px 16px',
+                    borderRadius: 8,
+                    backgroundColor: '#0f766e',
+                    color: '#ffffff',
+                    border: 'none',
+                    fontWeight: 700,
+                    fontSize: 13,
+                    cursor: 'pointer',
+                    boxShadow: '0 2px 6px rgba(15, 118, 110, 0.2)',
+                  }}
+                >
+                  <Bell size={14} />
+                  <span>Xử lý duyệt ({pendingApprovalsCount + unconfirmedDropsCount})</span>
+                </button>
+              </div>
             </div>
 
             {/* Toggle */}
@@ -762,6 +824,16 @@ export const StorePaymentConfigPage: FC = () => {
           </div>
         </div>
       </div>
+
+      <OwnerCashApprovalDrawer
+        isOpen={isApprovalDrawerOpen}
+        onClose={() => {
+          setIsApprovalDrawerOpen(false);
+          loadPendingMovements();
+        }}
+        branchId=""
+        onActionComplete={loadPendingMovements}
+      />
     </div>
   );
 };

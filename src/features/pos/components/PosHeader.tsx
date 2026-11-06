@@ -425,50 +425,29 @@ export const PosHeader: FC<Props> = ({
 
           
 
-          {/* Nút Phê duyệt của Chủ Cửa Hàng (Store Owner) */}
-          {isStoreOwner && onOpenApprovalDrawer && (
-            <button
-              type="button"
-              onClick={onOpenApprovalDrawer}
-              style={{
-                position: 'relative',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6,
-                padding: '5px 10px',
-                borderRadius: 6,
-                border: '1px solid #14b8a6',
-                backgroundColor: '#f0fdfa',
-                color: '#0f766e',
-                fontSize: 12.5,
-                fontWeight: 600,
-                cursor: 'pointer',
-              }}
-              title="Duyệt chi két & Xác nhận nhận tiền rút két từ quầy"
-            >
-              <Bell size={15} />
-              <span>Duyệt Chi</span>
-              {typeof pendingApprovalCount === 'number' && pendingApprovalCount > 0 && (
-                <span
-                  style={{
-                    position: 'absolute',
-                    top: -6,
-                    right: -6,
-                    backgroundColor: '#ef4444',
-                    color: '#ffffff',
-                    fontSize: 10.5,
-                    fontWeight: 700,
-                    padding: '1px 5px',
-                    borderRadius: 10,
-                    border: '2px solid #ffffff',
-                    boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
-                  }}
-                >
-                  {pendingApprovalCount}
-                </span>
-              )}
-            </button>
-          )}
+          {/* Lối tắt trực tiếp Quản lý đơn hàng & Đổi trả cho thu ngân */}
+          <button
+            type="button"
+            onClick={() => navigate(location.pathname.startsWith('/employee') ? '/employee/orders' : '/pos/orders')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 5,
+              padding: '5px 10px',
+              borderRadius: 6,
+              border: '1px solid #cbd5e1',
+              backgroundColor: '#ffffff',
+              color: '#334155',
+              fontSize: 12.5,
+              fontWeight: 600,
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+            }}
+            title="Quản lý hóa đơn & Xử lý đổi trả hàng"
+          >
+            <Receipt size={14} className="text-teal-700" />
+            <span>Đơn hàng & Đổi trả</span>
+          </button>
 
           {/* Trạng thái ca & Nút Thu/Chi cho Thu Ngân (Cashier) */}
           {!isStoreOwner && (
@@ -658,10 +637,29 @@ export const PosHeader: FC<Props> = ({
                 >
                   <Receipt size={16} className="text-teal-700" />
                   <div className="item-content">
-                    <div className="item-title">Quản lý hóa đơn & Đặt trước</div>
-                    <div className="item-desc">Lịch sử hóa đơn, in lại bill & giữ kho</div>
+                    <div className="item-title">Quản lý đơn hàng & Đổi trả</div>
+                    <div className="item-desc">Tra cứu hóa đơn, in lại bill & xử lý đổi trả</div>
                   </div>
                 </button>
+
+                {isStoreOwner && onOpenApprovalDrawer && (
+                  <button
+                    type="button"
+                    className="pos-dropdown-item"
+                    onClick={() => {
+                      setIsMenuOpen(false);
+                      onOpenApprovalDrawer();
+                    }}
+                  >
+                    <Bell size={16} className="text-teal-700" />
+                    <div className="item-content">
+                      <div className="item-title">
+                        Duyệt chi két & Rút két {typeof pendingApprovalCount === 'number' && pendingApprovalCount > 0 ? `(${pendingApprovalCount})` : ''}
+                      </div>
+                      <div className="item-desc">Phê duyệt phiếu chi vượt hạn mức từ thu ngân</div>
+                    </div>
+                  </button>
+                )}
 
                 {isStoreOwner ? (
                   <button
