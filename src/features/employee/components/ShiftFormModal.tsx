@@ -83,7 +83,7 @@ export const ShiftFormModal: React.FC<ShiftFormModalProps> = ({
 
   return (
     <div className="emp-modal-overlay">
-      <div className="emp-modal-card" style={{ maxWidth: 560 }}>
+      <div className="emp-modal-card">
         <div className="emp-modal-header">
           <h3>{shift ? `Cập nhật ca: ${shift.name}` : 'Tạo mới ca làm việc'}</h3>
           <button type="button" className="emp-modal-close-btn" onClick={onClose}>

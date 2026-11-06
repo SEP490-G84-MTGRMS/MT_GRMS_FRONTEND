@@ -7,9 +7,6 @@ import {
   MoreHorizontal,
   Download,
   RefreshCw,
-  Users,
-  DollarSign,
-  Hourglass,
   Check,
   Inbox,
   Building2,
@@ -133,20 +130,6 @@ export const PayslipManagementPage: React.FC = () => {
     });
   }, [payslips, periodMonth, statusFilter, selectedBranch, keyword]);
 
-  // Statistics KPI
-  const stats = useMemo(() => {
-    const totalCount = filteredPayslips.length;
-    const totalNet = filteredPayslips.reduce((sum, item) => sum + item.netSalary, 0);
-    const unpaidNet = filteredPayslips
-      .filter((item) => item.status === 'UNPAID')
-      .reduce((sum, item) => sum + item.netSalary, 0);
-    const paidNet = filteredPayslips
-      .filter((item) => item.status === 'PAID')
-      .reduce((sum, item) => sum + item.netSalary, 0);
-
-    return { totalCount, totalNet, unpaidNet, paidNet };
-  }, [filteredPayslips]);
-
   // Selection
   const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.checked) {
@@ -221,9 +204,9 @@ export const PayslipManagementPage: React.FC = () => {
         </h2>
       </div>
       <div className="emp-header-bar">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
           {/* Ô tìm kiếm bo tròn full pill */}
-          <div className="emp-search-box">
+          <div className="emp-search-box" style={{ width: 250 }}>
             <span className="emp-search-icon">
               <Search size={16} />
             </span>
@@ -235,239 +218,28 @@ export const PayslipManagementPage: React.FC = () => {
             />
           </div>
 
-          {/* Điều hướng kỳ tháng đồng bộ */}
-          <div className="emp-date-navigator">
-            <button
-              type="button"
-              className="emp-date-navigator-btn"
-              onClick={handlePrevMonth}
-              title="Tháng trước"
-            >
-              &lt;
-            </button>
-            <span className="emp-date-navigator-label">{monthLabel}</span>
-            <button
-              type="button"
-              className="emp-date-navigator-btn"
-              onClick={handleNextMonth}
-              title="Tháng sau"
-            >
-              &gt;
-            </button>
-          </div>
-        </div>
-
-        {/* Nút hành động chuẩn */}
-        <div className="emp-header-actions">
-          <button
-            type="button"
-            className="emp-btn emp-btn-primary"
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
-            onClick={() => setIsCreateOpen(true)}
-          >
-            <Plus size={16} />
-            <span>Khởi tạo bảng lương</span>
-          </button>
-
-          <button
-            type="button"
-            className="emp-btn emp-btn-secondary"
-            onClick={handleBatchPay}
-            disabled={selectedIds.length === 0}
-            style={{
-              opacity: selectedIds.length === 0 ? 0.6 : 1,
-              cursor: selectedIds.length === 0 ? 'not-allowed' : 'pointer',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6,
-            }}
-          >
-            <CreditCard size={15} />
-            <span>Chi trả hàng loạt {selectedIds.length > 0 ? `(${selectedIds.length})` : ''}</span>
-          </button>
-
-          <button
-            type="button"
-            className="emp-btn emp-btn-secondary"
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
-            onClick={() => window.print()}
-          >
-            <Printer size={15} />
-            <span>In danh sách</span>
-          </button>
-
-          {/* Action Dropdown */}
-          <div style={{ position: 'relative' }}>
-            <button
-              type="button"
-              className="emp-btn emp-btn-secondary"
-              style={{ width: 40, padding: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
-              onClick={() => setShowActionDropdown(!showActionDropdown)}
-            >
-              <MoreHorizontal size={18} />
-            </button>
-
-            {showActionDropdown && (
-              <div
-                style={{
-                  position: 'absolute',
-                  top: 46,
-                  right: 0,
-                  background: '#FFFFFF',
-                  borderRadius: 12,
-                  boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
-                  border: '1px solid #E2E8F0',
-                  minWidth: 180,
-                  zIndex: 200,
-                  overflow: 'hidden',
-                }}
-              >
-                <button
-                  type="button"
-                  style={{
-                    width: '100%',
-                    padding: '10px 16px',
-                    textAlign: 'left',
-                    background: 'transparent',
-                    border: 'none',
-                    fontSize: 13,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 8,
-                  }}
-                  onClick={() => {
-                    alert(`Đang xuất bảng lương ${filteredPayslips.length} nhân sự ra tệp Excel (.xlsx)...`);
-                    setShowActionDropdown(false);
-                  }}
-                >
-                  <Download size={14} />
-                  <span>Xuất file Excel</span>
-                </button>
-                <button
-                  type="button"
-                  style={{
-                    width: '100%',
-                    padding: '10px 16px',
-                    textAlign: 'left',
-                    background: 'transparent',
-                    border: 'none',
-                    fontSize: 13,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 8,
-                  }}
-                  onClick={() => {
-                    setIsCreateOpen(true);
-                    setShowActionDropdown(false);
-                  }}
-                >
-                  <RefreshCw size={14} />
-                  <span>Tính lại lương tháng</span>
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* ─── 2. MAIN LAYOUT: SIDEBAR LỌC (TRÁI) + NỘI DUNG (PHẢI) ─── */}
-      <div className="emp-main-layout">
-        {/* SIDEBAR BỘ LỌC CHUẨN */}
-        <aside className="emp-filter-sidebar">
-          {/* Nhóm 1: Kỳ lương */}
-          <div className="emp-filter-group">
-            <div className="emp-filter-title">
-              <span>Kỳ tính lương</span>
-            </div>
-            <input
-              type="month"
-              className="emp-filter-select"
-              value={periodMonth}
-              onChange={(e) => setPeriodMonth(e.target.value)}
-            />
-          </div>
-
-          {/* Nhóm 2: Trạng thái thanh toán */}
-          <div className="emp-filter-group">
-            <div className="emp-filter-title">
-              <span>Trạng thái</span>
-            </div>
-            <label className="emp-radio-label">
-              <input
-                type="radio"
-                name="payroll_status"
-                checked={statusFilter === 'ALL'}
-                onChange={() => setStatusFilter('ALL')}
-              />
-              <span>Tất cả</span>
-            </label>
-            <label className="emp-radio-label">
-              <input
-                type="radio"
-                name="payroll_status"
-                checked={statusFilter === 'UNPAID'}
-                onChange={() => setStatusFilter('UNPAID')}
-              />
-              <span>Chưa thanh toán (Unpaid)</span>
-            </label>
-            <label className="emp-radio-label">
-              <input
-                type="radio"
-                name="payroll_status"
-                checked={statusFilter === 'PAID'}
-                onChange={() => setStatusFilter('PAID')}
-              />
-              <span>Đã thanh toán (Paid)</span>
-            </label>
-          </div>
-
-          {/* Nhóm 3: Chi nhánh (Searchable Dropdown tối ưu khi có nhiều chi nhánh) */}
-          <div className="emp-filter-group" ref={branchDropdownRef} style={{ position: 'relative' }}>
-            <div
-              className="emp-filter-title"
-              style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}
-            >
-              <span>Chi nhánh</span>
-              {selectedBranch !== 'ALL' && (
-                <button
-                  type="button"
-                  onClick={() => setSelectedBranch('ALL')}
-                  style={{
-                    background: 'transparent',
-                    border: 'none',
-                    color: '#0F766E',
-                    fontSize: 11,
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    padding: 0,
-                  }}
-                  title="Đặt lại về Tất cả chi nhánh"
-                >
-                  Xóa lọc
-                </button>
-              )}
-            </div>
-
-            {/* Ô hiển thị chi nhánh được chọn (Click để mở dropdown) */}
+          {/* Bộ lọc Chi nhánh (Searchable Dropdown giống WorkSchedulePage & AttendancePage) */}
+          <div ref={branchDropdownRef} style={{ position: 'relative' }}>
             <div
               onClick={() => setIsBranchDropdownOpen(!isBranchDropdownOpen)}
               style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '8px 12px',
+                height: 36,
+                minWidth: 200,
+                padding: '0 12px',
                 background: '#FFFFFF',
                 border: isBranchDropdownOpen ? '1px solid #0F766E' : '1px solid #CBD5E1',
                 borderRadius: 8,
                 cursor: 'pointer',
-                transition: 'all 0.15s ease',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 8,
                 boxShadow: isBranchDropdownOpen ? '0 0 0 3px rgba(15, 118, 110, 0.12)' : 'none',
+                transition: 'all 0.15s ease',
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, flex: 1 }}>
-                <Building2 size={16} color={selectedBranch === 'ALL' ? '#64748B' : '#0F766E'} style={{ flexShrink: 0 }} />
+                <Building2 size={15} color={selectedBranch === 'ALL' ? '#64748B' : '#0F766E'} style={{ flexShrink: 0 }} />
                 <span
                   style={{
                     fontSize: 13,
@@ -481,38 +253,35 @@ export const PayslipManagementPage: React.FC = () => {
                   {selectedBranch === 'ALL' ? 'Tất cả chi nhánh' : selectedBranch}
                 </span>
               </div>
-
               <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
                 {selectedBranch !== 'ALL' && (
-                  <button
-                    type="button"
+                  <span
                     onClick={(e) => {
                       e.stopPropagation();
                       setSelectedBranch('ALL');
                     }}
                     title="Bỏ chọn chi nhánh"
                     style={{
-                      background: 'transparent',
-                      border: 'none',
-                      color: '#94A3B8',
-                      cursor: 'pointer',
-                      padding: 2,
-                      display: 'flex',
+                      display: 'inline-flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      borderRadius: 4,
+                      cursor: 'pointer',
+                      borderRadius: '50%',
+                      width: 16,
+                      height: 16,
+                      color: '#94A3B8',
                     }}
                     onMouseEnter={(e) => (e.currentTarget.style.color = '#EF4444')}
                     onMouseLeave={(e) => (e.currentTarget.style.color = '#94A3B8')}
                   >
-                    <X size={14} />
-                  </button>
+                    <X size={13} />
+                  </span>
                 )}
                 <ChevronDown
                   size={15}
                   color="#64748B"
                   style={{
-                    transform: isBranchDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                    transform: isBranchDropdownOpen ? 'rotate(180deg)' : 'none',
                     transition: 'transform 0.2s ease',
                   }}
                 />
@@ -526,13 +295,13 @@ export const PayslipManagementPage: React.FC = () => {
                   position: 'absolute',
                   top: '100%',
                   left: 0,
-                  right: 0,
                   marginTop: 6,
+                  width: 280,
                   background: '#FFFFFF',
                   borderRadius: 8,
                   border: '1px solid #CBD5E1',
                   boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
-                  zIndex: 100,
+                  zIndex: 200,
                   overflow: 'hidden',
                 }}
               >
@@ -712,287 +481,377 @@ export const PayslipManagementPage: React.FC = () => {
             )}
           </div>
 
-          {/* Nút đặt lại */}
+          {/* Điều hướng kỳ tháng đồng bộ */}
+          <div className="emp-date-navigator">
+            <button
+              type="button"
+              className="emp-date-navigator-btn"
+              onClick={handlePrevMonth}
+              title="Tháng trước"
+            >
+              &lt;
+            </button>
+            <span className="emp-date-navigator-label">{monthLabel}</span>
+            <button
+              type="button"
+              className="emp-date-navigator-btn"
+              onClick={handleNextMonth}
+              title="Tháng sau"
+            >
+              &gt;
+            </button>
+          </div>
+
+          {/* Bộ lọc trạng thái thanh toán */}
+          <select
+            className="emp-filter-select"
+            style={{ height: 36, fontSize: 13, width: 160 }}
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value as 'ALL' | 'UNPAID' | 'PAID')}
+          >
+            <option value="ALL">Tất cả trạng thái</option>
+            <option value="UNPAID">Chưa thanh toán</option>
+            <option value="PAID">Đã thanh toán</option>
+          </select>
+
+          {/* Nút đặt lại bộ lọc */}
+          {(keyword || statusFilter !== 'ALL' || selectedBranch !== 'ALL' || periodMonth !== '2026-10') && (
+            <button
+              type="button"
+              className="emp-btn emp-btn-secondary"
+              onClick={handleResetFilters}
+              title="Đặt lại toàn bộ bộ lọc"
+              style={{ height: 36, padding: '0 12px', fontSize: 13, color: '#64748B' }}
+            >
+              Đặt lại
+            </button>
+          )}
+        </div>
+
+        {/* Nút hành động chuẩn */}
+        <div className="emp-header-actions">
           <button
             type="button"
-            className="emp-btn emp-btn-secondary"
-            style={{ width: '100%', marginTop: 8 }}
-            onClick={handleResetFilters}
+            className="emp-btn emp-btn-primary"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+            onClick={() => setIsCreateOpen(true)}
           >
-            Đặt lại bộ lọc
+            <Plus size={16} />
+            <span>Khởi tạo bảng lương</span>
           </button>
-        </aside>
+          {/* Action Dropdown */}
+          <div style={{ position: 'relative' }}>
+            <button
+              type="button"
+              className="emp-btn emp-btn-secondary"
+              style={{ width: 40, padding: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+              onClick={() => setShowActionDropdown(!showActionDropdown)}
+            >
+              <MoreHorizontal size={18} />
+            </button>
 
-        {/* NỘI DUNG CHÍNH (PHẢI) */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 }}>
-          {/* ─── 2.1 THẺ THỐNG KÊ KPI ĐỒNG NHẤT HỆ THỐNG ─── */}
-          <div className="emp-kpi-grid">
-            {/* Card 1: Tổng số phiếu */}
-            <div className="emp-kpi-card">
-              <div className="emp-kpi-header">
-                <span className="emp-kpi-label">Số phiếu lương</span>
-                <div className="emp-kpi-icon emp-kpi-icon--teal" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Users size={18} color="#0F766E" />
-                </div>
+            {showActionDropdown && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: 46,
+                  right: 0,
+                  background: '#FFFFFF',
+                  borderRadius: 12,
+                  boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+                  border: '1px solid #E2E8F0',
+                  minWidth: 180,
+                  zIndex: 200,
+                  overflow: 'hidden',
+                }}
+              >
+                <button
+                  type="button"
+                  style={{
+                    width: '100%',
+                    padding: '10px 16px',
+                    textAlign: 'left',
+                    background: 'transparent',
+                    border: 'none',
+                    fontSize: 13,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                  }}
+                  onClick={() => {
+                    alert(`Đang xuất bảng lương ${filteredPayslips.length} nhân sự ra tệp Excel (.xlsx)...`);
+                    setShowActionDropdown(false);
+                  }}
+                >
+                  <Download size={14} />
+                  <span>Xuất file Excel</span>
+                </button>
+                <button
+                  type="button"
+                  style={{
+                    width: '100%',
+                    padding: '10px 16px',
+                    textAlign: 'left',
+                    background: 'transparent',
+                    border: 'none',
+                    fontSize: 13,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                  }}
+                  onClick={() => {
+                    window.print();
+                    setShowActionDropdown(false);
+                  }}
+                >
+                  <Printer size={14} />
+                  <span>In danh sách</span>
+                </button>
+                <button
+                  type="button"
+                  style={{
+                    width: '100%',
+                    padding: '10px 16px',
+                    textAlign: 'left',
+                    background: 'transparent',
+                    border: 'none',
+                    fontSize: 13,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                  }}
+                  onClick={() => {
+                    setIsCreateOpen(true);
+                    setShowActionDropdown(false);
+                  }}
+                >
+                  <RefreshCw size={14} />
+                  <span>Tính lại lương tháng</span>
+                </button>
+                <button
+                  type="button"
+                  className="emp-btn emp-btn-secondary"
+                  onClick={handleBatchPay}
+                  disabled={selectedIds.length === 0}
+                  style={{
+                    border: 'none',
+                    opacity: selectedIds.length === 0 ? 0.6 : 1,
+                    cursor: selectedIds.length === 0 ? 'not-allowed' : 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                  }}
+                >
+                  <CreditCard size={15} />
+                  <span>Chi trả hàng loạt {selectedIds.length > 0 ? `(${selectedIds.length})` : ''}</span>
+                </button>
               </div>
-              <div className="emp-kpi-value">{stats.totalCount}</div>
-              <div className="emp-kpi-sub">Nhân sự trong kỳ {monthLabel}</div>
-            </div>
-
-            {/* Card 2: Tổng quỹ lương */}
-            <div className="emp-kpi-card">
-              <div className="emp-kpi-header">
-                <span className="emp-kpi-label">Tổng quỹ thực nhận</span>
-                <div className="emp-kpi-icon emp-kpi-icon--blue" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <DollarSign size={18} color="#1D4ED8" />
-                </div>
-              </div>
-              <div className="emp-kpi-value" style={{ color: '#1D4ED8' }}>
-                {formatVND(stats.totalNet)}
-              </div>
-              <div className="emp-kpi-sub">SUM(NetSalary) tháng</div>
-            </div>
-
-            {/* Card 3: Chưa thanh toán */}
-            <div className="emp-kpi-card">
-              <div className="emp-kpi-header">
-                <span className="emp-kpi-label">Chưa chi trả</span>
-                <div className="emp-kpi-icon emp-kpi-icon--amber" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Hourglass size={18} color="#D97706" />
-                </div>
-              </div>
-              <div className="emp-kpi-value" style={{ color: '#D97706' }}>
-                {formatVND(stats.unpaidNet)}
-              </div>
-              <div className="emp-kpi-sub">Cần duyệt chi qua VietQR/Quỹ</div>
-            </div>
-
-            {/* Card 4: Đã thanh toán */}
-            <div className="emp-kpi-card">
-              <div className="emp-kpi-header">
-                <span className="emp-kpi-label">Đã thanh toán</span>
-                <div className="emp-kpi-icon emp-kpi-icon--emerald" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Check size={18} color="#059669" />
-                </div>
-              </div>
-              <div className="emp-kpi-value" style={{ color: '#059669' }}>
-                {formatVND(stats.paidNet)}
-              </div>
-              <div className="emp-kpi-sub">Đã ghi nhận bút toán chi</div>
-            </div>
-          </div>
-
-          {/* ─── 2.2 BẢNG DỮ LIỆU PHIẾU LƯƠNG CHUẨN KIOTVIET ─── */}
-          <div className="emp-table-container" style={{ overflowX: 'auto', background: '#FFFFFF' }}>
-            <table className="emp-table" style={{ width: '100%', minWidth: 880 }}>
-              <thead>
-                <tr>
-                  <th style={{ width: 44, textAlign: 'center' }}>
-                    <input
-                      type="checkbox"
-                      style={{ accentColor: '#0F766E' }}
-                      checked={
-                        filteredPayslips.length > 0 &&
-                        selectedIds.length === filteredPayslips.length
-                      }
-                      onChange={handleSelectAll}
-                    />
-                  </th>
-                  <th style={{ width: 95, whiteSpace: 'nowrap' }}>Mã NV</th>
-                  <th style={{ minWidth: 200, whiteSpace: 'nowrap' }}>Nhân viên</th>
-                  <th style={{ width: 110, textAlign: 'center', whiteSpace: 'nowrap' }}>Kỳ lương</th>
-                  <th style={{ width: 120, textAlign: 'right', whiteSpace: 'nowrap' }}>Lương cơ sở</th>
-                  <th style={{ width: 130, textAlign: 'right', whiteSpace: 'nowrap' }}>Thực nhận (Net)</th>
-                  <th style={{ width: 140, textAlign: 'center', whiteSpace: 'nowrap' }}>Trạng thái</th>
-                  <th style={{ width: 100, textAlign: 'center', whiteSpace: 'nowrap' }}>Ngày trả</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredPayslips.length === 0 ? (
-                  <tr>
-                    <td
-                      colSpan={8}
-                      style={{
-                        textAlign: 'center',
-                        padding: '50px 20px',
-                        color: '#94A3B8',
-                      }}
-                    >
-                      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
-                        <Inbox size={36} color="#94A3B8" />
-                      </div>
-                      <div style={{ fontSize: 14, fontWeight: 600 }}>
-                        Không có phiếu lương nào phù hợp
-                      </div>
-                      <div style={{ fontSize: 12, marginTop: 4 }}>
-                        Vui lòng thử thay đổi kỳ lương hoặc chọn lại các tiêu chí lọc bên trái.
-                      </div>
-                    </td>
-                  </tr>
-                ) : (
-                  filteredPayslips.map((item) => {
-                    const isSelected = selectedIds.includes(item.id);
-                    const isPaid = item.status === 'PAID';
-                    const initials = item.employeeName
-                      .split(' ')
-                      .pop()
-                      ?.charAt(0)
-                      .toUpperCase() || 'E';
-
-                    return (
-                      <tr
-                        key={item.id}
-                        onClick={() => setViewingPayslip(item)}
-                        title="Nhấn để xem chi tiết phiếu lương"
-                        style={{
-                          background: isSelected ? '#F0FDFA' : undefined,
-                          cursor: 'pointer',
-                        }}
-                      >
-                        <td
-                          style={{ textAlign: 'center', width: 44 }}
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <input
-                            type="checkbox"
-                            style={{ accentColor: '#0F766E' }}
-                            checked={isSelected}
-                            onChange={() => handleToggleRow(item.id)}
-                          />
-                        </td>
-                        <td style={{ whiteSpace: 'nowrap' }}>
-                          <span
-                            style={{
-                              fontWeight: 700,
-                              color: '#0F766E',
-                              background: '#F0FDFA',
-                              padding: '3px 8px',
-                              borderRadius: 6,
-                              border: '1px solid #CCFBF1',
-                              fontSize: 12.5,
-                            }}
-                          >
-                            {item.employeeCode}
-                          </span>
-                        </td>
-                        <td>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                            <div className="emp-avatar-cell" style={{ flexShrink: 0 }}>
-                              {initials}
-                            </div>
-                            <div style={{ minWidth: 0 }}>
-                              <div style={{ fontWeight: 600, color: '#0F172A', fontSize: 13.5, lineHeight: 1.3 }}>
-                                {item.employeeName}
-                              </div>
-                              <div
-                                style={{
-                                  fontSize: 12,
-                                  color: '#64748B',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: 4,
-                                  marginTop: 2,
-                                  whiteSpace: 'nowrap',
-                                }}
-                                title={item.branchName}
-                              >
-                                <Building2 size={12} color="#94A3B8" style={{ flexShrink: 0 }} />
-                                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                  {item.branchName}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                        </td>
-                        <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
-                          <span
-                            style={{
-                              display: 'inline-block',
-                              padding: '3px 8px',
-                              borderRadius: 6,
-                              background: '#F1F5F9',
-                              color: '#334155',
-                              fontWeight: 600,
-                              fontSize: 12,
-                            }}
-                          >
-                            {item.periodMonth.split('-').length === 2
-                              ? `Tháng ${item.periodMonth.split('-')[1]}/${item.periodMonth.split('-')[0]}`
-                              : item.periodMonth}
-                          </span>
-                        </td>
-
-                        <td
-                          style={{
-                            textAlign: 'right',
-                            color: '#64748B',
-                            fontVariantNumeric: 'tabular-nums',
-                            whiteSpace: 'nowrap',
-                          }}
-                        >
-                          {formatVND(item.contractBaseSalary)}
-                        </td>
-                        <td
-                          style={{
-                            textAlign: 'right',
-                            fontWeight: 800,
-                            color: '#047857',
-                            fontSize: 14,
-                            fontVariantNumeric: 'tabular-nums',
-                            whiteSpace: 'nowrap',
-                          }}
-                        >
-                          {formatVND(item.netSalary)}
-                        </td>
-                        <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
-                          {isPaid ? (
-                            <span
-                              style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: 5,
-                                fontSize: 13,
-                                fontWeight: 600,
-                                color: '#059669',
-                              }}
-                            >
-                              <Check size={14} strokeWidth={2.5} />
-                              <span>Đã thanh toán</span>
-                            </span>
-                          ) : (
-                            <span
-                              style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: 5,
-                                fontSize: 13,
-                                fontWeight: 600,
-                                color: '#D97706',
-                              }}
-                            >
-                              <Clock size={14} strokeWidth={2.2} />
-                              <span>Chưa thanh toán</span>
-                            </span>
-                          )}
-                        </td>
-                        <td style={{ textAlign: 'center', fontSize: 12, color: '#64748B', whiteSpace: 'nowrap' }}>
-                          {formatDate(item.paidAt)}
-                        </td>
-
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
+            )}
           </div>
         </div>
+      </div>
+
+      {/* ─── BẢNG DỮ LIỆU PHIẾU LƯƠNG CHUẨN KIOTVIET (FULL WIDTH) ─── */}
+      <div className="emp-table-container" style={{ overflowX: 'auto', background: '#FFFFFF' }}>
+        <table className="emp-table" style={{ width: '100%', minWidth: 880 }}>
+          <thead>
+            <tr>
+              <th style={{ width: 44, textAlign: 'center' }}>
+                <input
+                  type="checkbox"
+                  style={{ accentColor: '#0F766E' }}
+                  checked={
+                    filteredPayslips.length > 0 &&
+                    selectedIds.length === filteredPayslips.length
+                  }
+                  onChange={handleSelectAll}
+                />
+              </th>
+              <th style={{ width: 120, whiteSpace: 'nowrap' }}>Mã NV</th>
+              <th style={{ minWidth: 200, whiteSpace: 'nowrap' }}>Nhân viên</th>
+              <th style={{ width: 110, textAlign: 'center', whiteSpace: 'nowrap' }}>Kỳ lương</th>
+              <th style={{ width: 150, textAlign: 'right', whiteSpace: 'nowrap' }}>Lương cơ sở</th>
+              <th style={{ width: 200, textAlign: 'right', whiteSpace: 'nowrap' }}>Thực nhận (Net)</th>
+              <th style={{ width: 220, textAlign: 'center', whiteSpace: 'nowrap' }}>Trạng thái</th>
+              <th style={{ width: 140, textAlign: 'center', whiteSpace: 'nowrap' }}>Ngày trả</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredPayslips.length === 0 ? (
+              <tr>
+                <td
+                  colSpan={8}
+                  style={{
+                    textAlign: 'center',
+                    padding: '50px 20px',
+                    color: '#94A3B8',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
+                    <Inbox size={36} color="#94A3B8" />
+                  </div>
+                  <div style={{ fontSize: 14, fontWeight: 600 }}>
+                    Không có phiếu lương nào phù hợp
+                  </div>
+                  <div style={{ fontSize: 12, marginTop: 4 }}>
+                    Vui lòng thử thay đổi kỳ lương hoặc chọn lại các tiêu chí lọc bên trái.
+                  </div>
+                </td>
+              </tr>
+            ) : (
+              filteredPayslips.map((item) => {
+                const isSelected = selectedIds.includes(item.id);
+                const isPaid = item.status === 'PAID';
+                const initials = item.employeeName
+                  .split(' ')
+                  .pop()
+                  ?.charAt(0)
+                  .toUpperCase() || 'E';
+
+                return (
+                  <tr
+                    key={item.id}
+                    onClick={() => setViewingPayslip(item)}
+                    title="Nhấn để xem chi tiết phiếu lương"
+                    style={{
+                      background: isSelected ? '#F0FDFA' : undefined,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <td
+                      style={{ textAlign: 'center', width: 44 }}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <input
+                        type="checkbox"
+                        style={{ accentColor: '#0F766E' }}
+                        checked={isSelected}
+                        onChange={() => handleToggleRow(item.id)}
+                      />
+                    </td>
+                    <td style={{ whiteSpace: 'nowrap', fontWeight: 600, color: '#0F766E' }}>
+                      {item.employeeCode}
+                    </td>
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <div className="emp-avatar-cell" style={{ flexShrink: 0 }}>
+                          {initials}
+                        </div>
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontWeight: 600, color: '#0F172A', fontSize: 13.5, lineHeight: 1.3 }}>
+                            {item.employeeName}
+                          </div>
+                          <div
+                            style={{
+                              fontSize: 12,
+                              color: '#64748B',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 4,
+                              marginTop: 2,
+                              whiteSpace: 'nowrap',
+                            }}
+                            title={item.branchName}
+                          >
+                            <Building2 size={12} color="#94A3B8" style={{ flexShrink: 0 }} />
+                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {item.branchName}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                    <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
+                      <span
+                        style={{
+                          display: 'inline-block',
+                          padding: '3px 8px',
+                          borderRadius: 6,
+                          background: '#F1F5F9',
+                          color: '#334155',
+                          fontWeight: 600,
+                          fontSize: 12,
+                        }}
+                      >
+                        {item.periodMonth.split('-').length === 2
+                          ? `Tháng ${item.periodMonth.split('-')[1]}/${item.periodMonth.split('-')[0]}`
+                          : item.periodMonth}
+                      </span>
+                    </td>
+
+                    <td
+                      style={{
+                        textAlign: 'right',
+                        color: '#64748B',
+                        fontVariantNumeric: 'tabular-nums',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {formatVND(item.contractBaseSalary)}
+                    </td>
+                    <td
+                      style={{
+                        textAlign: 'right',
+                        fontWeight: 800,
+                        color: '#047857',
+                        fontSize: 14,
+                        fontVariantNumeric: 'tabular-nums',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {formatVND(item.netSalary)}
+                    </td>
+                    <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
+                      {isPaid ? (
+                        <span
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 5,
+                            fontSize: 13,
+                            fontWeight: 600,
+                            color: '#059669',
+                          }}
+                        >
+                          <Check size={14} strokeWidth={2.5} />
+                          <span>Đã thanh toán</span>
+                        </span>
+                      ) : (
+                        <span
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 5,
+                            fontSize: 13,
+                            fontWeight: 600,
+                            color: '#D97706',
+                          }}
+                        >
+                          <Clock size={14} strokeWidth={2.2} />
+                          <span>Chưa thanh toán</span>
+                        </span>
+                      )}
+                    </td>
+                    <td style={{ textAlign: 'center', fontSize: 12, color: '#64748B', whiteSpace: 'nowrap' }}>
+                      {formatDate(item.paidAt)}
+                    </td>
+
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
       </div>
 
       {/* ─── 3. MODALS ─── */}
       <CreatePayslipModal
         isOpen={isCreateOpen}
         onClose={() => setIsCreateOpen(false)}
+        branches={branches}
         onCreatePayslip={(newSlip) => setPayslips((prev) => [newSlip, ...prev])}
       />
 
@@ -1012,7 +871,7 @@ export const PayslipManagementPage: React.FC = () => {
         payslip={payingPayslip}
         onConfirmPayment={handleConfirmPayment}
       />
-    </div>
+    </div >
   );
 };
 

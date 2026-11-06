@@ -462,9 +462,10 @@
   background: #FFFFFF;
   border-radius: var(--emp-radius-xl);
   box-shadow: var(--emp-shadow-modal);
-  width: 100%;
-  max-width: 950px;
-  max-height: 90vh;
+  width: 900px;
+  max-width: 95vw;
+  height: 85vh;
+  max-height: 85vh;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -853,4 +854,17 @@
   white-space: nowrap;
   letter-spacing: normal;
   line-height: 20px;
+}
+
+@keyframes empSpin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.emp-spin-icon {
+  animation: empSpin 1s linear infinite;
 }

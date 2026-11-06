@@ -14,13 +14,13 @@ import {
   Calendar,
   X,
 } from 'lucide-react';
-import type { ProductItem, Category, UomConversion } from '../types';
+import type { ProductItem, Category } from '../types';
 import { categoryApi } from '../api/categoryApi';
 import { CategoryModal } from '../components/CategoryModal';
 import { ProductFormModal } from '../components/ProductFormModal';
 import { ProductDetailModal } from '../components/ProductDetailModal';
 import { ProductDeleteConfirmModal } from '../components/ProductDeleteConfirmModal';
-import { TablePagination } from '../../../components/common';
+import { TablePagination, NotificationModal } from '../../../components/common';
 import { useAuthStore } from '../../../stores/useAuthStore';
 import { AdminToast, type ToastState } from '../../admin/components';
 import '../product.css';
@@ -295,12 +295,21 @@ export const ProductListPage: React.FC = () => {
   // Toast
   const [toast, setToast] = useState<ToastState | null>(null);
 
+  // Notification Modal (Success / Error alerts)
+  const [notificationModal, setNotificationModal] = useState<{
+    isOpen: boolean;
+    type?: 'success' | 'error' | 'warning' | 'info';
+    title: string;
+    message: string | React.ReactNode;
+    itemCode?: string;
+  } | null>(null);
+
   const showToast = (message: string, type: ToastState['type'] = 'success') => {
     setToast({ id: Date.now().toString(), message, type });
     setTimeout(() => setToast(null), 3000);
   };
 
-// Category Actions
+  // Category Actions
 
   const handleSaveCategory = async (
     name: string,
@@ -319,11 +328,11 @@ export const ProductListPage: React.FC = () => {
           prev.map((c) =>
             c.id === id
               ? {
-                  ...c,
-                  name: updatedDto.name,
-                  code: updatedDto.code || updatedDto.categoryCode || c.code,
-                  description: updatedDto.description,
-                }
+                ...c,
+                name: updatedDto.name,
+                code: updatedDto.code || updatedDto.categoryCode || c.code,
+                description: updatedDto.description,
+              }
               : c
           )
         );
@@ -442,6 +451,13 @@ export const ProductListPage: React.FC = () => {
         }
 
         showToast(`Cập nhật hàng hóa "${data.productName}" thành công.`);
+        setNotificationModal({
+          isOpen: true,
+          type: 'success',
+          title: 'Cập nhật hàng hóa thành công',
+          message: `Thông tin hàng hóa "${data.productName}" đã được cập nhật thành công vào hệ thống.`,
+          itemCode: data.productCode,
+        });
         if (selectedProduct && selectedProduct.id === productToEdit.id) {
           setSelectedProduct({ ...selectedProduct, ...data } as ProductItem);
         }
@@ -482,6 +498,13 @@ export const ProductListPage: React.FC = () => {
         }
 
         showToast(`Tạo mới hàng hóa "${created.name || data.productName}" thành công.`);
+        setNotificationModal({
+          isOpen: true,
+          type: 'success',
+          title: 'Tạo mới hàng hóa thành công',
+          message: `Hàng hóa "${created.name || data.productName}" đã được thêm mới thành công vào danh mục.`,
+          itemCode: created.productCode || data.productCode,
+        });
       }
 
       // Làm mới danh mục và danh sách sản phẩm từ backend
@@ -511,6 +534,13 @@ export const ProductListPage: React.FC = () => {
     try {
       await productApi.deleteProduct(productToDelete.id);
       showToast(`Đã xóa hàng hóa "${productToDelete.productName}" thành công.`);
+      setNotificationModal({
+        isOpen: true,
+        type: 'success',
+        title: 'Xóa hàng hóa thành công',
+        message: `Đã xóa hàng hóa "${productToDelete.productName}" khỏi danh mục kinh doanh.`,
+        itemCode: productToDelete.productCode,
+      });
       if (selectedProduct?.id === productToDelete.id) {
         setIsDetailModalOpen(false);
         setSelectedProduct(null);
@@ -545,6 +575,12 @@ export const ProductListPage: React.FC = () => {
         }
       }
       showToast(`Đã xóa thành công ${successCount} hàng hóa đã chọn.`);
+      setNotificationModal({
+        isOpen: true,
+        type: 'success',
+        title: 'Xóa hàng hóa thành công',
+        message: `Đã xóa thành công ${successCount} hàng hóa đã chọn khỏi danh mục kinh doanh.`,
+      });
       setSelectedProductIds([]);
       setIsBulkDeleteOpen(false);
       if (selectedProduct && selectedProductIds.includes(selectedProduct.id)) {
@@ -1036,13 +1072,13 @@ export const ProductListPage: React.FC = () => {
                             <input
                               type="checkbox"
                               checked={isChecked}
-                              onChange={() => {}} // Handled at row click
+                              onChange={() => { }} // Handled at row click
                               style={{ accentColor: '#0F766E', width: 16, height: 16 }}
                             />
                             <span style={{ fontWeight: isChecked ? 600 : 400, color: isChecked ? '#134E4A' : '#1E293B' }}>
                               {c.name}
                             </span>
-                            
+
                           </label>
                           {c.productCount !== undefined && (
                             <span style={{ fontSize: 11, color: '#64748B', fontWeight: 600, flexShrink: 0 }}>
@@ -1305,376 +1341,376 @@ export const ProductListPage: React.FC = () => {
 
       {/* 2. Main Body: Full-width Table */}
       <div className="product-table-wrapper" style={{ width: '100%' }}>
-          {/* Summary bar */}
-          <div className="product-table-summary-bar">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <div>
-                Đang hiển thị <b>{filteredProducts.length}</b> mặt hàng
-              </div>
-              {selectedProductIds.length > 0 && (
-                <div
+        {/* Summary bar */}
+        <div className="product-table-summary-bar">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div>
+              Đang hiển thị <b>{filteredProducts.length}</b> mặt hàng
+            </div>
+            {selectedProductIds.length > 0 && (
+              <div
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  padding: '3px 10px',
+                  backgroundColor: '#FEF2F2',
+                  border: '1px solid #FECACA',
+                  borderRadius: 6,
+                }}
+              >
+                <span style={{ fontSize: 12.5, fontWeight: 600, color: '#991B1B' }}>
+                  Đã chọn {selectedProductIds.length} hàng hóa
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setIsBulkDeleteOpen(true)}
                   style={{
+                    padding: '2px 8px',
+                    fontSize: 12,
+                    borderRadius: 4,
                     display: 'inline-flex',
                     alignItems: 'center',
-                    gap: 8,
-                    padding: '3px 10px',
-                    backgroundColor: '#FEF2F2',
-                    border: '1px solid #FECACA',
-                    borderRadius: 6,
+                    gap: 4,
+                    backgroundColor: '#EF4444',
+                    color: '#FFFFFF',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontWeight: 600,
                   }}
                 >
-                  <span style={{ fontSize: 12.5, fontWeight: 600, color: '#991B1B' }}>
-                    Đã chọn {selectedProductIds.length} hàng hóa
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setIsBulkDeleteOpen(true)}
-                    style={{
-                      padding: '2px 8px',
-                      fontSize: 12,
-                      borderRadius: 4,
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 4,
-                      backgroundColor: '#EF4444',
-                      color: '#FFFFFF',
-                      border: 'none',
-                      cursor: 'pointer',
-                      fontWeight: 600,
-                    }}
-                  >
-                    <Trash2 size={13} />
-                    Xóa đã chọn
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedProductIds([])}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      color: '#64748B',
-                      fontSize: 12,
-                      cursor: 'pointer',
-                      textDecoration: 'underline',
-                      padding: '0 4px',
-                    }}
-                  >
-                    Bỏ chọn
-                  </button>
-                </div>
-              )}
-            </div>
-
+                  <Trash2 size={13} />
+                  Xóa đã chọn
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedProductIds([])}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#64748B',
+                    fontSize: 12,
+                    cursor: 'pointer',
+                    textDecoration: 'underline',
+                    padding: '0 4px',
+                  }}
+                >
+                  Bỏ chọn
+                </button>
+              </div>
+            )}
           </div>
 
-          {/* Table */}
-          <div style={{ overflowX: 'auto' }}>
-            <table className="product-main-table">
-              <thead>
-                <tr>
-                  <th style={{ width: 36, textAlign: 'center' }}>
-                    <input
-                      type="checkbox"
-                      checked={
-                        filteredProducts.length > 0 &&
-                        selectedProductIds.length === filteredProducts.length
+        </div>
+
+        {/* Table */}
+        <div style={{ overflowX: 'auto' }}>
+          <table className="product-main-table">
+            <thead>
+              <tr>
+                <th style={{ width: 36, textAlign: 'center' }}>
+                  <input
+                    type="checkbox"
+                    checked={
+                      filteredProducts.length > 0 &&
+                      selectedProductIds.length === filteredProducts.length
+                    }
+                    onChange={() => {
+                      if (selectedProductIds.length === filteredProducts.length) {
+                        setSelectedProductIds([]);
+                      } else {
+                        setSelectedProductIds(filteredProducts.map((p) => p.id));
                       }
-                      onChange={() => {
-                        if (selectedProductIds.length === filteredProducts.length) {
-                          setSelectedProductIds([]);
-                        } else {
-                          setSelectedProductIds(filteredProducts.map((p) => p.id));
-                        }
-                      }}
-                    />
-                  </th>
-                  <th style={{ width: 36, textAlign: 'center' }}>★</th>
-                  <th style={{ width: 180, minWidth: 150 }}>Mã hàng</th>
-                  <th>Tên hàng hóa</th>
-                  <th style={{ width: 110 }}>Đơn vị tính</th>
-                  <th style={{ textAlign: 'right', width: 120 }}>Giá bán</th>
-                  {userRole === 'StoreOwner' && (
-                    <th style={{ textAlign: 'right', width: 120 }}>Giá vốn</th>
-                  )}
-                  <th style={{ textAlign: 'center', width: 130 }}>Trạng thái</th>
-                  <th style={{ width: 130 }}>Thời gian tạo</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredProducts.map((p) => {
-                  const isChecked = selectedProductIds.includes(p.id);
-                  const isSelected = selectedProduct?.id === p.id && isDetailModalOpen;
+                    }}
+                  />
+                </th>
+                <th style={{ width: 36, textAlign: 'center' }}>★</th>
+                <th style={{ width: 180, minWidth: 150 }}>Mã hàng</th>
+                <th>Tên hàng hóa</th>
+                <th style={{ width: 110 }}>Đơn vị tính</th>
+                <th style={{ textAlign: 'right', width: 120 }}>Giá bán</th>
+                {userRole === 'StoreOwner' && (
+                  <th style={{ textAlign: 'right', width: 120 }}>Giá vốn</th>
+                )}
+                <th style={{ textAlign: 'center', width: 130 }}>Trạng thái</th>
+                <th style={{ width: 130 }}>Thời gian tạo</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredProducts.map((p) => {
+                const isChecked = selectedProductIds.includes(p.id);
+                const isSelected = selectedProduct?.id === p.id && isDetailModalOpen;
 
-                  // Tính toán đơn vị tính đang chọn và giá tương ứng (Ảnh 2 - REQ-07)
-                  const allUnits = [
-                    { unitName: p.baseUnit || 'Cái', price: p.sellingPrice ?? 0, barcode: p.barcode, productCode: p.productCode },
-                    ...(p.uomConversions || []),
-                  ];
-                  const currentUnitName = selectedUnits[p.id] || p.baseUnit || 'Cái';
-                  const currentUom = p.uomConversions?.find((u) => u.unitName === currentUnitName);
-                  const displayPrice = currentUom ? currentUom.price : (p.sellingPrice ?? 0);
-                  const displayCode = currentUom?.productCode || p.productCode;
-                  const otherUnits = allUnits.filter((u) => u.unitName !== currentUnitName);
+                // Tính toán đơn vị tính đang chọn và giá tương ứng (Ảnh 2 - REQ-07)
+                const allUnits = [
+                  { unitName: p.baseUnit || 'Cái', price: p.sellingPrice ?? 0, barcode: p.barcode, productCode: p.productCode },
+                  ...(p.uomConversions || []),
+                ];
+                const currentUnitName = selectedUnits[p.id] || p.baseUnit || 'Cái';
+                const currentUom = p.uomConversions?.find((u) => u.unitName === currentUnitName);
+                const displayPrice = currentUom ? currentUom.price : (p.sellingPrice ?? 0);
+                const displayCode = currentUom?.productCode || p.productCode;
+                const otherUnits = allUnits.filter((u) => u.unitName !== currentUnitName);
 
-                  return (
-                    <tr
-                      key={p.id}
-                      onClick={() => {
-                        setSelectedProduct(p);
-                        setIsDetailModalOpen(true);
-                      }}
-                      style={{
-                        cursor: 'pointer',
-                        backgroundColor: isSelected
-                          ? '#f0fdfa'
-                          : p.status === 'Discontinued'
-                            ? '#f8fafc'
-                            : undefined,
-                        opacity: p.status === 'Discontinued' ? 0.75 : 1,
-                      }}
-                    >
-                      <td style={{ textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          onChange={() => {
-                            if (isChecked) {
-                              setSelectedProductIds(selectedProductIds.filter((id) => id !== p.id));
-                            } else {
-                              setSelectedProductIds([...selectedProductIds, p.id]);
-                            }
-                          }}
-                        />
-                      </td>
-                      <td style={{ textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
-                        <button
-                          type="button"
-                          className={`favorite-star-btn ${p.isFavorite ? 'active' : ''}`}
-                          onClick={(e) => handleToggleFavorite(p.id, e)}
-                          title="Đánh dấu yêu thích"
-                        >
-                          {p.isFavorite ? '★' : '☆'}
-                        </button>
-                      </td>
-                      <td style={{ minWidth: 180, width: 220 }}>
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
-                          {p.imageUrl ? (
-                            <img
-                              src={p.imageUrl}
-                              alt=""
-                              style={{ width: 28, height: 28, borderRadius: 4, objectFit: 'cover', border: '1px solid #e2e8f0', flexShrink: 0 }}
-                            />
-                          ) : (
-                            <div
-                              style={{
-                                width: 28,
-                                height: 28,
-                                borderRadius: 4,
-                                backgroundColor: '#f1f5f9',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                fontSize: 13,
-                                color: '#94a3b8',
-                                flexShrink: 0,
-                              }}
-                            >
-                              📦
-                            </div>
-                          )}
-                          <span className="product-code-link">
-                            {displayCode}
-                          </span>
-                        </div>
-                      </td>
-                      {/* Tên hàng hóa */}
-                      <td>
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                          <span style={{ fontWeight: 600, color: '#1e293b' }}>
-                            {p.productName}
-                          </span>
-                          {p.isCombo && <span className="badge-combo">Combo</span>}
-                          {p.status === 'Discontinued' && (
-                            <span
-                              style={{
-                                marginLeft: 6,
-                                fontSize: 11,
-                                color: '#dc2626',
-                                background: '#fee2e2',
-                                padding: '2px 6px',
-                                borderRadius: 4,
-                              }}
-                            >
-                              Ngừng kinh doanh
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      {/* Đơn vị tính (chứa option chuyển đổi ĐVT) */}
-                      <td>
-                        {p.uomConversions && p.uomConversions.length > 0 ? (
-                          <div className="unit-dropdown-container" style={{ position: 'relative', display: 'inline-block' }}>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setActiveUnitDropdownId(activeUnitDropdownId === p.id ? null : p.id);
-                              }}
-                              style={{
-                                background: '#F0FDFA',
-                                border: '1px solid #CCFBF1',
-                                color: '#0F766E',
-                                fontWeight: 700,
-                                fontSize: 13,
-                                cursor: 'pointer',
-                                padding: '3px 8px',
-                                borderRadius: 6,
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: 4,
-                                transition: 'all 0.15s ease',
-                              }}
-                              title="Bấm để chuyển đổi đơn vị tính"
-                            >
-                              <span>{currentUnitName}</span>
-                              <ChevronDown
-                                size={13}
-                                style={{
-                                  transform: activeUnitDropdownId === p.id ? 'rotate(180deg)' : 'none',
-                                  transition: 'transform 0.15s ease',
-                                }}
-                              />
-                            </button>
-
-                            {activeUnitDropdownId === p.id && otherUnits.length > 0 && (
-                              <div
-                                onClick={(e) => e.stopPropagation()}
-                                style={{
-                                  position: 'absolute',
-                                  top: '100%',
-                                  left: 0,
-                                  zIndex: 50,
-                                  marginTop: 4,
-                                  minWidth: 100,
-                                  background: '#ffffff',
-                                  borderRadius: 8,
-                                  boxShadow: '0 4px 16px rgba(0, 0, 0, 0.12)',
-                                  border: '1px solid #E2E8F0',
-                                  padding: '4px 0',
-                                }}
-                              >
-                                {allUnits.map((u) => {
-                                  const isSelected = u.unitName === currentUnitName;
-                                  return (
-                                    <button
-                                      key={u.unitName}
-                                      type="button"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setSelectedUnits((prev) => ({ ...prev, [p.id]: u.unitName }));
-                                        setActiveUnitDropdownId(null);
-                                      }}
-                                      style={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'space-between',
-                                        width: '100%',
-                                        padding: '6px 12px',
-                                        fontSize: 12.5,
-                                        background: isSelected ? '#F0FDFA' : 'transparent',
-                                        color: isSelected ? '#0F766E' : '#334155',
-                                        fontWeight: isSelected ? 700 : 500,
-                                        border: 'none',
-                                        cursor: 'pointer',
-                                        whiteSpace: 'nowrap',
-                                        textAlign: 'left',
-                                        gap: 8,
-                                      }}
-                                      onMouseEnter={(e) => {
-                                        if (!isSelected) (e.currentTarget as HTMLElement).style.background = '#f8fafc';
-                                      }}
-                                      onMouseLeave={(e) => {
-                                        if (!isSelected) (e.currentTarget as HTMLElement).style.background = 'transparent';
-                                      }}
-                                    >
-                                      <span>{u.unitName}</span>
-                                      {u.unitName === (p.baseUnit || 'Cái') ? (
-                                        <span style={{ fontSize: 10, color: '#0F766E', background: '#CCFBF1', padding: '1px 4px', borderRadius: 4 }}>
-                                          Cơ bản
-                                        </span>
-                                      ) : null}
-                                    </button>
-                                  );
-                                })}
-                              </div>
-                            )}
-                          </div>
+                return (
+                  <tr
+                    key={p.id}
+                    onClick={() => {
+                      setSelectedProduct(p);
+                      setIsDetailModalOpen(true);
+                    }}
+                    style={{
+                      cursor: 'pointer',
+                      backgroundColor: isSelected
+                        ? '#f0fdfa'
+                        : p.status === 'Discontinued'
+                          ? '#f8fafc'
+                          : undefined,
+                      opacity: p.status === 'Discontinued' ? 0.75 : 1,
+                    }}
+                  >
+                    <td style={{ textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={() => {
+                          if (isChecked) {
+                            setSelectedProductIds(selectedProductIds.filter((id) => id !== p.id));
+                          } else {
+                            setSelectedProductIds([...selectedProductIds, p.id]);
+                          }
+                        }}
+                      />
+                    </td>
+                    <td style={{ textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
+                      <button
+                        type="button"
+                        className={`favorite-star-btn ${p.isFavorite ? 'active' : ''}`}
+                        onClick={(e) => handleToggleFavorite(p.id, e)}
+                        title="Đánh dấu yêu thích"
+                      >
+                        {p.isFavorite ? '★' : '☆'}
+                      </button>
+                    </td>
+                    <td style={{ minWidth: 180, width: 220 }}>
+                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
+                        {p.imageUrl ? (
+                          <img
+                            src={p.imageUrl}
+                            alt=""
+                            style={{ width: 28, height: 28, borderRadius: 4, objectFit: 'cover', border: '1px solid #e2e8f0', flexShrink: 0 }}
+                          />
                         ) : (
-                          <span style={{ fontWeight: 600, color: '#0F766E' }}>
-                            {p.baseUnit || 'Cái'}
-                          </span>
+                          <div
+                            style={{
+                              width: 28,
+                              height: 28,
+                              borderRadius: 4,
+                              backgroundColor: '#f1f5f9',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: 13,
+                              color: '#94a3b8',
+                              flexShrink: 0,
+                            }}
+                          >
+                            📦
+                          </div>
                         )}
-                      </td>
-                      <td style={{ textAlign: 'right', fontWeight: 600 }}>
-                        {(displayPrice ?? 0).toLocaleString('vi-VN')} đ
-                      </td>
-                      {userRole === 'StoreOwner' && (
-                        <td style={{ textAlign: 'right', color: '#64748b' }}>
-                          {p.costPrice != null ? `${Number(p.costPrice).toLocaleString('vi-VN')} đ` : '—'}
-                        </td>
-                      )}
-                      <td style={{ textAlign: 'center' }}>
-                        <span
-                          style={{
-                            fontSize: 11.5,
-                            fontWeight: 700,
-                            padding: '2px 8px',
-                            borderRadius: 9999,
-                            backgroundColor: p.status === 'Active' ? '#CCFBF1' : '#FEE2E2',
-                            color: p.status === 'Active' ? '#0F766E' : '#DC2626',
-                          }}
-                        >
-                          {p.status === 'Active' ? 'Đang bán' : 'Ngừng kinh doanh'}
+                        <span className="product-code-link">
+                          {displayCode}
                         </span>
-                      </td>
-                      <td style={{ fontSize: 12.5, color: '#64748b' }}>{p.createdAt}</td>
-                    </tr>
-                  );
-                })}
-
-                {filteredProducts.length === 0 && (
-                  <tr>
-                    <td
-                      colSpan={userRole === 'StoreOwner' ? 9 : 8}
-                      style={{ padding: '40px 20px', textAlign: 'center', color: '#94a3b8' }}
-                    >
-                      <Package size={40} style={{ margin: '0 auto 10px auto', opacity: 0.5 }} />
-                      <div style={{ fontSize: 15, fontWeight: 600 }}>Không tìm thấy sản phẩm nào</div>
-                      <div style={{ fontSize: 13, marginTop: 4 }}>
-                        Vui lòng thử tìm với từ khóa khác hoặc đặt lại bộ lọc.
                       </div>
                     </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+                    {/* Tên hàng hóa */}
+                    <td>
+                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                        <span style={{ fontWeight: 600, color: '#1e293b' }}>
+                          {p.productName}
+                        </span>
+                        {p.isCombo && <span className="badge-combo">Combo</span>}
+                        {p.status === 'Discontinued' && (
+                          <span
+                            style={{
+                              marginLeft: 6,
+                              fontSize: 11,
+                              color: '#dc2626',
+                              background: '#fee2e2',
+                              padding: '2px 6px',
+                              borderRadius: 4,
+                            }}
+                          >
+                            Ngừng kinh doanh
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    {/* Đơn vị tính (chứa option chuyển đổi ĐVT) */}
+                    <td>
+                      {p.uomConversions && p.uomConversions.length > 0 ? (
+                        <div className="unit-dropdown-container" style={{ position: 'relative', display: 'inline-block' }}>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setActiveUnitDropdownId(activeUnitDropdownId === p.id ? null : p.id);
+                            }}
+                            style={{
+                              background: '#F0FDFA',
+                              border: '1px solid #CCFBF1',
+                              color: '#0F766E',
+                              fontWeight: 700,
+                              fontSize: 13,
+                              cursor: 'pointer',
+                              padding: '3px 8px',
+                              borderRadius: 6,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 4,
+                              transition: 'all 0.15s ease',
+                            }}
+                            title="Bấm để chuyển đổi đơn vị tính"
+                          >
+                            <span>{currentUnitName}</span>
+                            <ChevronDown
+                              size={13}
+                              style={{
+                                transform: activeUnitDropdownId === p.id ? 'rotate(180deg)' : 'none',
+                                transition: 'transform 0.15s ease',
+                              }}
+                            />
+                          </button>
 
-          {/* Enterprise Standard TablePagination */}
-          <TablePagination
-            currentPage={pageIndex}
-            pageSize={pageSize}
-            totalItems={totalCount}
-            pageSizeOptions={[10, 20, 50]}
-            onPageChange={(page) => setPageIndex(page)}
-            onPageSizeChange={(newSize) => {
-              setPageSize(newSize);
-              setPageIndex(1);
-            }}
-            itemLabel="hàng hóa"
-            isLoading={isLoading}
-          />
+                          {activeUnitDropdownId === p.id && otherUnits.length > 0 && (
+                            <div
+                              onClick={(e) => e.stopPropagation()}
+                              style={{
+                                position: 'absolute',
+                                top: '100%',
+                                left: 0,
+                                zIndex: 50,
+                                marginTop: 4,
+                                minWidth: 100,
+                                background: '#ffffff',
+                                borderRadius: 8,
+                                boxShadow: '0 4px 16px rgba(0, 0, 0, 0.12)',
+                                border: '1px solid #E2E8F0',
+                                padding: '4px 0',
+                              }}
+                            >
+                              {allUnits.map((u) => {
+                                const isSelected = u.unitName === currentUnitName;
+                                return (
+                                  <button
+                                    key={u.unitName}
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setSelectedUnits((prev) => ({ ...prev, [p.id]: u.unitName }));
+                                      setActiveUnitDropdownId(null);
+                                    }}
+                                    style={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'space-between',
+                                      width: '100%',
+                                      padding: '6px 12px',
+                                      fontSize: 12.5,
+                                      background: isSelected ? '#F0FDFA' : 'transparent',
+                                      color: isSelected ? '#0F766E' : '#334155',
+                                      fontWeight: isSelected ? 700 : 500,
+                                      border: 'none',
+                                      cursor: 'pointer',
+                                      whiteSpace: 'nowrap',
+                                      textAlign: 'left',
+                                      gap: 8,
+                                    }}
+                                    onMouseEnter={(e) => {
+                                      if (!isSelected) (e.currentTarget as HTMLElement).style.background = '#f8fafc';
+                                    }}
+                                    onMouseLeave={(e) => {
+                                      if (!isSelected) (e.currentTarget as HTMLElement).style.background = 'transparent';
+                                    }}
+                                  >
+                                    <span>{u.unitName}</span>
+                                    {u.unitName === (p.baseUnit || 'Cái') ? (
+                                      <span style={{ fontSize: 10, color: '#0F766E', background: '#CCFBF1', padding: '1px 4px', borderRadius: 4 }}>
+                                        Cơ bản
+                                      </span>
+                                    ) : null}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <span style={{ fontWeight: 600, color: '#0F766E' }}>
+                          {p.baseUnit || 'Cái'}
+                        </span>
+                      )}
+                    </td>
+                    <td style={{ textAlign: 'right', fontWeight: 600 }}>
+                      {(displayPrice ?? 0).toLocaleString('vi-VN')} đ
+                    </td>
+                    {userRole === 'StoreOwner' && (
+                      <td style={{ textAlign: 'right', color: '#64748b' }}>
+                        {p.costPrice != null ? `${Number(p.costPrice).toLocaleString('vi-VN')} đ` : '—'}
+                      </td>
+                    )}
+                    <td style={{ textAlign: 'center' }}>
+                      <span
+                        style={{
+                          fontSize: 11.5,
+                          fontWeight: 700,
+                          padding: '2px 8px',
+                          borderRadius: 9999,
+                          backgroundColor: p.status === 'Active' ? '#CCFBF1' : '#FEE2E2',
+                          color: p.status === 'Active' ? '#0F766E' : '#DC2626',
+                        }}
+                      >
+                        {p.status === 'Active' ? 'Đang bán' : 'Ngừng kinh doanh'}
+                      </span>
+                    </td>
+                    <td style={{ fontSize: 12.5, color: '#64748b' }}>{p.createdAt}</td>
+                  </tr>
+                );
+              })}
+
+              {filteredProducts.length === 0 && (
+                <tr>
+                  <td
+                    colSpan={userRole === 'StoreOwner' ? 9 : 8}
+                    style={{ padding: '40px 20px', textAlign: 'center', color: '#94a3b8' }}
+                  >
+                    <Package size={40} style={{ margin: '0 auto 10px auto', opacity: 0.5 }} />
+                    <div style={{ fontSize: 15, fontWeight: 600 }}>Không tìm thấy sản phẩm nào</div>
+                    <div style={{ fontSize: 13, marginTop: 4 }}>
+                      Vui lòng thử tìm với từ khóa khác hoặc đặt lại bộ lọc.
+                    </div>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
+
+        {/* Enterprise Standard TablePagination */}
+        <TablePagination
+          currentPage={pageIndex}
+          pageSize={pageSize}
+          totalItems={totalCount}
+          pageSizeOptions={[10, 20, 50]}
+          onPageChange={(page) => setPageIndex(page)}
+          onPageSizeChange={(newSize) => {
+            setPageSize(newSize);
+            setPageIndex(1);
+          }}
+          itemLabel="hàng hóa"
+          isLoading={isLoading}
+        />
+      </div>
 
       {/* 3. Product Form Modal (Add / Edit Standard Product) */}
       <ProductFormModal
@@ -1734,6 +1770,18 @@ export const ProductListPage: React.FC = () => {
         onSave={handleSaveCategory}
         onDelete={handleDeleteCategory}
       />
+
+      {/* 8. Notification Modal (Success / Alert popup) */}
+      {notificationModal && (
+        <NotificationModal
+          isOpen={notificationModal.isOpen}
+          onClose={() => setNotificationModal(null)}
+          type={notificationModal.type}
+          title={notificationModal.title}
+          message={notificationModal.message}
+          itemCode={notificationModal.itemCode}
+        />
+      )}
     </div>
   );
 };
