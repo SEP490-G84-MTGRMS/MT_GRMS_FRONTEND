@@ -106,6 +106,7 @@ export const OpenShiftModal: FC<Props> = ({
         style={{
           width: '100%',
           maxWidth: 540,
+          maxHeight: 'min(90vh, 740px)',
           backgroundColor: '#ffffff',
           borderRadius: 16,
           boxShadow: '0 20px 40px -8px rgba(0, 0, 0, 0.25)',
@@ -125,6 +126,7 @@ export const OpenShiftModal: FC<Props> = ({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
+            flexShrink: 0,
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -173,13 +175,32 @@ export const OpenShiftModal: FC<Props> = ({
         </div>
 
         {/* Form Body */}
-        <form onSubmit={handleSubmit}>
-          <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 18 }}>
+        <form
+          onSubmit={handleSubmit}
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            flex: 1,
+            minHeight: 0,
+            overflow: 'hidden',
+          }}
+        >
+          <div
+            style={{
+              padding: '20px 24px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 18,
+              overflowY: 'auto',
+              flex: 1,
+            }}
+          >
             {errorMsg && (
               <div
                 style={{
                   display: 'flex',
-                  alignItems: 'center',
+                  alignItems: 'flex-start',
+                  justifyContent: 'space-between',
                   gap: 10,
                   padding: '12px 14px',
                   borderRadius: 10,
@@ -188,10 +209,30 @@ export const OpenShiftModal: FC<Props> = ({
                   color: '#b91c1c',
                   fontSize: 13,
                   lineHeight: 1.45,
+                  wordBreak: 'break-word',
                 }}
               >
-                <AlertCircle size={18} style={{ flexShrink: 0 }} />
-                <span>{errorMsg}</span>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, flex: 1 }}>
+                  <AlertCircle size={18} style={{ flexShrink: 0, marginTop: 2 }} />
+                  <span>{errorMsg}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setErrorMsg('')}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#ef4444',
+                    cursor: 'pointer',
+                    padding: 2,
+                    display: 'flex',
+                    alignItems: 'center',
+                    flexShrink: 0,
+                  }}
+                  title="Đóng thông báo"
+                >
+                  <X size={16} />
+                </button>
               </div>
             )}
 
@@ -449,6 +490,7 @@ export const OpenShiftModal: FC<Props> = ({
               display: 'flex',
               justifyContent: 'flex-end',
               gap: 12,
+              flexShrink: 0,
             }}
           >
             {canCancel && onCancel && (
