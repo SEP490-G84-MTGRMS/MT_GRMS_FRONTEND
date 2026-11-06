@@ -331,11 +331,7 @@ const NAV_GROUPS: NavGroup[] = [
       {
         title: "Nhân sự & Hồ sơ",
         items: [
-          { label: "Danh sách nhân viên", to: "/store-owner/employees" },
-          {
-            label: "Hồ sơ & Hợp đồng",
-            to: "/store-owner/employees?view=profiles",
-          },
+          { label: "Danh sách nhân viên", to: "/store-owner/employees" }
         ],
       },
       {
@@ -343,21 +339,15 @@ const NAV_GROUPS: NavGroup[] = [
         items: [
           {
             label: "Lịch làm việc chi nhánh",
-            to: "/store-owner/employees/schedule",
-            badge: "Lịch",
-            badgeType: "blue",
+            to: "/store-owner/employees/schedule"
           },
           {
             label: "Cấu hình ca làm việc",
-            to: "/store-owner/employees/shifts",
-            badge: "Mới",
-            badgeType: "blue",
+            to: "/store-owner/employees/shifts"
           },
           {
-            label: "Bảng chấm công GPS/QR",
-            to: "/store-owner/employees/attendance",
-            badge: "GPS/QR",
-            badgeType: "blue",
+            label: "Bảng chấm công",
+            to: "/store-owner/employees/attendance"
           },
         ],
       },
@@ -369,11 +359,7 @@ const NAV_GROUPS: NavGroup[] = [
             to: "/store-owner/employees/payroll",
             badge: "Mới",
             badgeType: "red",
-          },
-          {
-            label: "Cấu hình ca làm việc",
-            to: "/store-owner/employees/shifts",
-          },
+          }
         ],
       },
     ],

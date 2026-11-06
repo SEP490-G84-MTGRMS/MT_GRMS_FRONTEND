@@ -129,6 +129,24 @@ export const employeeApi = {
   },
 
   /**
+   * Cập nhật tài khoản đăng nhập Identity cho nhân viên
+   * Backend: PUT /api/v1/employees/{id}/identity-account
+   */
+  async updateIdentityAccount(
+    id: string,
+    payload: CreateIdentityAccountPayload
+  ): Promise<{ userId: string; username: string; role: string }> {
+    const res = await httpClient.put<
+      ApiResponse<{ userId: string; username: string; role: string; message: string }>
+    >(`/employees/${id}/identity-account`, payload);
+
+    if (res.data?.success && res.data.data) {
+      return res.data.data;
+    }
+    throw new Error(res.data?.message || 'Cập nhật tài khoản thất bại.');
+  },
+
+  /**
    * Xóa mềm nhân viên
    * Backend: DELETE /api/v1/employees/{id}
    */

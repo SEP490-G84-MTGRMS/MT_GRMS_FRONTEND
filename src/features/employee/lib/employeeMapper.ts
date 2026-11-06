@@ -75,6 +75,10 @@ export interface CreateEmployeePayload {
   bankName?: string;
   bankAccountHolder?: string;
   avatarUrl?: string;
+  userId?: string;
+  userName?: string;
+  password?: string;
+  role?: string;
 }
 
 export interface UpdateEmployeePayload extends CreateEmployeePayload {}
@@ -82,7 +86,8 @@ export interface UpdateEmployeePayload extends CreateEmployeePayload {}
 export interface CreateIdentityAccountPayload {
   username: string;
   password: string;
-  role: string;
+  role?: string;
+  displayName?: string;
 }
 
 export interface EmployeeQueryFilterParams {
@@ -197,7 +202,7 @@ export const mapBackendDetailToEmployee = (dto: EmployeeBackendDetailDto): Emplo
  * Chuyển đổi từ dữ liệu form sang CreateEmployeePayload gửi lên Backend
  */
 export const mapFormToCreatePayload = (
-  emp: Partial<Employee>,
+  emp: Partial<Employee> & { password?: string; role?: string },
   salaryConfig?: SalaryConfig,
   branchId?: string
 ): CreateEmployeePayload => {
@@ -246,5 +251,9 @@ export const mapFormToCreatePayload = (
     bankName: emp.bankName?.trim() || undefined,
     bankAccountHolder: emp.bankAccountHolder?.trim() || undefined,
     avatarUrl: emp.avatarUrl?.trim() || undefined,
+    userId: emp.userId?.trim() || undefined,
+    userName: emp.userName?.trim() || undefined,
+    password: emp.password?.trim() || undefined,
+    role: emp.role?.trim() || undefined,
   };
 };

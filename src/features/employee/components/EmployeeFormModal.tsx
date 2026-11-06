@@ -72,6 +72,7 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
   const [workingBranchId, setWorkingBranchId] = useState<string>('');
   const [userId, setUserId] = useState('');
   const [userName, setUserName] = useState('');
+  const [userPassword, setUserPassword] = useState('');
   const [note, setNote] = useState('');
 
   // Bank info
@@ -282,9 +283,12 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
     setAllowances([...allowances, newAl]);
   };
 
-  const handleCreateUserSuccess = (user: { id: string; username: string }) => {
+  const handleCreateUserSuccess = (user: { id: string; username: string; password?: string }) => {
     setUserId(user.id);
     setUserName(user.username);
+    if (user.password) {
+      setUserPassword(user.password);
+    }
   };
 
   const handleSave = async (isAddNew: boolean = false) => {
@@ -338,6 +342,10 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
         bankAccountHolder,
         avatarUrl,
         salaryBranchId: targetBranchId,
+        userId: userId && !userId.startsWith('temp_') ? userId : undefined,
+        userName: userName.trim() || undefined,
+        password: userPassword.trim() || undefined,
+        role: 'STAFF',
       },
       {
         salaryType,
@@ -358,6 +366,24 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
         savedEmp = await employeeApi.updateEmployee(employee.id, payload);
       } else {
         savedEmp = await employeeApi.createEmployee(payload);
+        // Failsafe: nếu backend đang chạy phiên bản cũ chưa tự động tạo user trong createEmployee
+        if (savedEmp.id && userName && !savedEmp.userName) {
+          try {
+            const accRes = await employeeApi.createIdentityAccount(savedEmp.id, {
+              username: userName.trim(),
+              password: userPassword.trim() || 'Staff@123456',
+              role: 'STAFF',
+              displayName: fullName,
+            });
+            savedEmp = {
+              ...savedEmp,
+              userId: accRes.userId,
+              userName: accRes.username || userName,
+            };
+          } catch (accountErr) {
+            console.error('Lỗi khi tự động cấp tài khoản cho nhân viên mới:', accountErr);
+          }
+        }
       }
 
       onSave(savedEmp, isAddNew);
@@ -371,6 +397,9 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
         setEmail('');
         setCitizenId('');
         setDateOfBirth('');
+        setUserId('');
+        setUserName('');
+        setUserPassword('');
         setFormError(null);
       }
     } catch (err: any) {
@@ -807,20 +836,22 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
                     <div className="emp-form-group">
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <label className="emp-form-label">Tài khoản đăng nhập</label>
-                        <button
-                          type="button"
-                          style={{
-                            background: 'transparent',
-                            border: 'none',
-                            color: '#0F766E',
-                            fontWeight: 600,
-                            fontSize: 12,
-                            cursor: 'pointer',
-                          }}
-                          onClick={() => setShowCreateUser(true)}
-                        >
-                          + Tạo tài khoản
-                        </button>
+                        {!userName && (
+                          <button
+                            type="button"
+                            style={{
+                              background: 'transparent',
+                              border: 'none',
+                              color: '#0F766E',
+                              fontWeight: 600,
+                              fontSize: 12,
+                              cursor: 'pointer',
+                            }}
+                            onClick={() => setShowCreateUser(true)}
+                          >
+                            + Tạo tài khoản
+                          </button>
+                        )}
                       </div>
                       <input
                         type="text"
@@ -828,7 +859,12 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
                         placeholder="Chưa liên kết tài khoản"
                         value={userName || (userId ? `ID: ${userId}` : '')}
                         readOnly
-                        style={{ backgroundColor: '#F8FAFC' }}
+                        onClick={() => setShowCreateUser(true)}
+                        style={{
+                          backgroundColor: '#F8FAFC',
+                          cursor: 'pointer',
+                        }}
+                        title={userName ? 'Nhấn để cập nhật thông tin tài khoản' : 'Nhấn để tạo tài khoản'}
                       />
                     </div>
 
@@ -1272,6 +1308,12 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
         isOpen={showCreateUser}
         onClose={() => setShowCreateUser(false)}
         employeeId={employee?.id}
+        employeeName={employee?.fullName || fullName}
+        employeeCode={employee?.employeeCode}
+        phone={phone}
+        initialUsername={userName}
+        branchName={branches.find((b) => b.id === workingBranchId)?.name}
+        deferSave={true}
         onSuccess={handleCreateUserSuccess}
       />
       <CreateAllowanceModal

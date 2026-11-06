@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { Pencil, Download, Banknote, Loader2 } from 'lucide-react';
 import type { Employee, DebtTransaction } from '../types';
 import { employeeApi } from '../api/employeeApi';
+import { CreateUserModal } from './CreateUserModal';
 
 interface EmployeeDetailModalProps {
   isOpen: boolean;
@@ -62,6 +63,7 @@ export const EmployeeDetailModal: React.FC<EmployeeDetailModalProps> = ({
     }
   }, [isOpen, initialTab]);
   const [scheduleView, setScheduleView] = useState<'table' | 'list'>('table');
+  const [showCreateUser, setShowCreateUser] = useState(false);
 
   // Schedule Filter State (Chỉ theo tuần)
   const [scheduleWeek, setScheduleWeek] = useState<number>(1);
@@ -360,7 +362,27 @@ export const EmployeeDetailModal: React.FC<EmployeeDetailModalProps> = ({
                     </div>
                     <div>
                       <span style={{ color: '#64748B' }}>Tài khoản phần mềm:</span>
-                      <div style={{ fontWeight: 600 }}>{employee.userName || 'Chưa cấp tài khoản'}</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 2 }}>
+                        <span style={{ fontWeight: 600 }}>{employee.userName || 'Chưa cấp tài khoản'}</span>
+                        {!employee.userName && (
+                          <button
+                            type="button"
+                            onClick={() => setShowCreateUser(true)}
+                            style={{
+                              background: '#F0FDFA',
+                              border: '1px solid #99F6E4',
+                              color: '#0F766E',
+                              borderRadius: 4,
+                              padding: '2px 8px',
+                              fontSize: 11,
+                              fontWeight: 600,
+                              cursor: 'pointer',
+                            }}
+                          >
+                            + Cấp tài khoản
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -974,6 +996,23 @@ export const EmployeeDetailModal: React.FC<EmployeeDetailModalProps> = ({
             </form>
           </div>
         </div>
+      )}
+
+      {employee && (
+        <CreateUserModal
+          isOpen={showCreateUser}
+          onClose={() => setShowCreateUser(false)}
+          employeeId={employee.id}
+          employeeName={employee.fullName}
+          employeeCode={employee.employeeCode}
+          phone={employee.phone}
+          initialUsername={employee.userName}
+          branchName={employee.salaryBranchName}
+          onSuccess={(u) => {
+            setDetail((prev) => (prev ? { ...prev, userId: u.id, userName: u.username } : prev));
+            setShowCreateUser(false);
+          }}
+        />
       )}
     </>
   );

@@ -8,11 +8,6 @@ import type {
   DebtTransaction,
   Branch,
 } from '../types';
-import {
-  MOCK_EMPLOYEES,
-  MOCK_WORK_SHIFTS,
-  MOCK_BRANCHES,
-} from '../services/mockData';
 import { AddScheduleModal } from '../components/AddScheduleModal';
 import { EmployeeDetailModal } from '../components/EmployeeDetailModal';
 import { ShiftConfigModal } from '../components/ShiftConfigModal';
@@ -190,13 +185,11 @@ export const WorkSchedulePage: React.FC = () => {
     const fetchBranches = async () => {
       try {
         const branchList = await employeeApi.getBranches();
-        if (isMounted && branchList.length > 0) {
-          setBranches(branchList);
-        } else if (isMounted) {
-          setBranches(MOCK_BRANCHES);
+        if (isMounted) {
+          setBranches(branchList || []);
         }
       } catch {
-        if (isMounted) setBranches(MOCK_BRANCHES);
+        if (isMounted) setBranches([]);
       }
     };
     fetchBranches();
@@ -227,24 +220,13 @@ export const WorkSchedulePage: React.FC = () => {
         }),
       ]);
 
-      if (empResult.status === 'fulfilled' && empResult.value.items.length > 0) {
+      if (empResult.status === 'fulfilled' && empResult.value?.items) {
         setEmployees(empResult.value.items);
-      } else if (empResult.status === 'fulfilled') {
-        setEmployees([]);
       } else {
-        const mockFiltered =
-          selectedBranchIds.length > 0
-            ? MOCK_EMPLOYEES.filter(
-              (e) =>
-                (e.salaryBranchId && selectedBranchIds.includes(e.salaryBranchId)) ||
-                (e.workingBranchIds &&
-                  e.workingBranchIds.some((id) => selectedBranchIds.includes(id)))
-            )
-            : MOCK_EMPLOYEES;
-        setEmployees(mockFiltered);
+        setEmployees([]);
       }
 
-      if (shiftResult.status === 'fulfilled' && shiftResult.value.items.length > 0) {
+      if (shiftResult.status === 'fulfilled' && shiftResult.value?.items) {
         const mapped: WorkShiftDefinition[] = shiftResult.value.items.map((c: ShiftConfigDto) => ({
           id: c.id,
           name: c.shiftName,
@@ -260,14 +242,12 @@ export const WorkSchedulePage: React.FC = () => {
           branchNames: c.branchNames || (c.branchName ? [c.branchName] : []),
         }));
         setShifts(mapped);
-      } else if (shiftResult.status === 'fulfilled') {
-        setShifts([]);
       } else {
-        setShifts(MOCK_WORK_SHIFTS);
+        setShifts([]);
       }
     } catch {
-      setEmployees(MOCK_EMPLOYEES);
-      setShifts(MOCK_WORK_SHIFTS);
+      setEmployees([]);
+      setShifts([]);
     }
   }, [selectedBranchIds]);
 
