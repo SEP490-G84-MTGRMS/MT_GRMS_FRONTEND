@@ -101,6 +101,7 @@ import { TaxSnapshotPage } from '../features/tax-snapshot';
 import { FinanceOverviewPage } from '../features/finance/pages/FinanceOverviewPage';
 import { StoreSettingsHubPage } from '../pages/store/StoreSettingsHubPage';
 import { AccountManagementPage } from '../pages/store/AccountManagementPage';
+import { StorePaymentConfigPage } from '../features/pos/pages/StorePaymentConfigPage';
 
 export const router = createBrowserRouter([
   {
@@ -319,6 +320,10 @@ export const router = createBrowserRouter([
         element: <StoreSettingsHubPage />,
       },
       {
+        path: 'payment-config',
+        element: <StorePaymentConfigPage />,
+      },
+      {
         path: 'account',
         element: <AccountManagementPage />,
       },
@@ -510,6 +515,10 @@ export const router = createBrowserRouter([
         path: 'invoices',
         element: <InvoiceManagementPage />,
       },
+          {
+            path: 'payment-config',
+            element: <StorePaymentConfigPage />,
+          },
     ],
   },
 
