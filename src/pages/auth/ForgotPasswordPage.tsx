@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { FC, FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
@@ -32,6 +32,16 @@ export const ForgotPasswordPage: FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [resendCountdown, setResendCountdown] = useState(0);
+
+  // Đếm ngược thời gian cho phép gửi lại mã OTP (60s)
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout>;
+    if (resendCountdown > 0) {
+      timer = setTimeout(() => setResendCountdown((prev) => prev - 1), 1000);
+    }
+    return () => clearTimeout(timer);
+  }, [resendCountdown]);
 
   // Bước 1: Gửi yêu cầu OTP
   const handleRequestOtp = async (e: FormEvent) => {
@@ -50,7 +60,8 @@ export const ForgotPasswordPage: FC = () => {
       const res = await authService.requestPasswordReset(email.trim());
       setSuccessMessage(res.message);
       setCurrentStep(2);
-      setOtpCode("889966");
+      setOtpCode(""); // Xóa rỗng để người dùng nhập OTP thực nhận từ email
+      setResendCountdown(60);
     } catch (err: unknown) {
       const msg =
         err instanceof Error
@@ -62,22 +73,55 @@ export const ForgotPasswordPage: FC = () => {
     }
   };
 
-  // Bước 2: Kiểm tra OTP
-  const handleVerifyOtp = (e: FormEvent) => {
+  // Gửi lại mã OTP
+  const handleResendOtp = async () => {
+    if (resendCountdown > 0 || isLoading) return;
+    setErrorMessage(null);
+
+    try {
+      setIsLoading(true);
+      const res = await authService.requestPasswordReset(email.trim());
+      setSuccessMessage(res.message);
+      setResendCountdown(60);
+    } catch (err: unknown) {
+      const msg =
+        err instanceof Error
+          ? err.message
+          : "Không thể gửi lại mã xác thực. Vui lòng thử lại.";
+      setErrorMessage(msg);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Bước 2: Kiểm tra OTP qua Backend API
+  const handleVerifyOtp = async (e: FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
 
-    if (!otpCode.trim() || otpCode.trim().length < 4) {
+    if (!otpCode.trim() || otpCode.trim().length !== 6) {
       setErrorMessage(
-        "Vui lòng nhập mã OTP xác thực hợp lệ (tối thiểu 4 - 6 ký tự).",
+        "Vui lòng nhập chính xác mã OTP xác thực gồm 6 chữ số.",
       );
       return;
     }
 
-    setSuccessMessage(
-      "Mã xác thực chính xác! Vui lòng thiết lập mật khẩu đăng nhập mới.",
-    );
-    setCurrentStep(3);
+    try {
+      setIsLoading(true);
+      await authService.verifyOtp(email.trim(), otpCode.trim());
+      setSuccessMessage(
+        "Mã xác thực chính xác! Vui lòng thiết lập mật khẩu đăng nhập mới.",
+      );
+      setCurrentStep(3);
+    } catch (err: unknown) {
+      const msg =
+        err instanceof Error
+          ? err.message
+          : "Mã OTP không chính xác hoặc đã hết hạn.";
+      setErrorMessage(msg);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // Bước 3: Đặt lại mật khẩu mới
@@ -265,18 +309,23 @@ export const ForgotPasswordPage: FC = () => {
               <button
                 type="button"
                 className="auth-link-text"
+                disabled={resendCountdown > 0 || isLoading}
                 style={{
                   background: "none",
                   border: "none",
-                  cursor: "pointer",
+                  cursor: resendCountdown > 0 ? "not-allowed" : "pointer",
                   padding: 0,
                   fontSize: "11px",
+                  color:
+                    resendCountdown > 0
+                      ? "var(--text-secondary)"
+                      : "var(--blue-primary)",
                 }}
-                onClick={() =>
-                  setSuccessMessage(`Đã gửi lại mã OTP đến ${email}`)
-                }
+                onClick={handleResendOtp}
               >
-                Gửi lại mã?
+                {resendCountdown > 0
+                  ? `Gửi lại mã (${resendCountdown}s)`
+                  : "Gửi lại mã?"}
               </button>
             </div>
             <div className="auth-input-container">
@@ -287,7 +336,7 @@ export const ForgotPasswordPage: FC = () => {
                 id="otp-input"
                 type="text"
                 className="auth-styled-input auth-otp-input"
-                placeholder="889966"
+                placeholder="VD: 123456"
                 maxLength={6}
                 value={otpCode}
                 onChange={(e) => setOtpCode(e.target.value)}
@@ -303,8 +352,17 @@ export const ForgotPasswordPage: FC = () => {
             className="auth-cta-primary-btn"
             disabled={isLoading}
           >
-            <span>XÁC THỰC MÃ OTP</span>
-            <ArrowRight size={18} strokeWidth={2.2} />
+            {isLoading ? (
+              <>
+                <Loader2 size={18} className="animate-spin" />
+                <span>Đang kiểm tra OTP...</span>
+              </>
+            ) : (
+              <>
+                <span>XÁC THỰC MÃ OTP</span>
+                <ArrowRight size={18} strokeWidth={2.2} />
+              </>
+            )}
           </button>
 
           <button

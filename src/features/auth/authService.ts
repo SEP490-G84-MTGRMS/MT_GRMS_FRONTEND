@@ -424,12 +424,27 @@ export const authService = {
         { email }
       );
       return response.data;
-    } catch {
-      await new Promise(resolve => setTimeout(resolve, 300));
-      return {
-        success: true,
-        message: 'Mã OTP xác thực đã được gửi về email của bạn (mô phỏng).',
-      };
+    } catch (err: unknown) {
+      const errorMsg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+        || 'Không thể gửi mã xác thực. Vui lòng kiểm tra lại địa chỉ email.';
+      throw new Error(errorMsg);
+    }
+  },
+
+  /**
+   * Xác thực mã OTP 6 số
+   */
+  async verifyOtp(email: string, otpCode: string): Promise<{ success: boolean; message: string }> {
+    try {
+      const response = await httpClient.post<{ success: boolean; message: string }>(
+        '/auth/verify-otp',
+        { email, otpCode }
+      );
+      return response.data;
+    } catch (err: unknown) {
+      const errorMsg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+        || 'Mã OTP không chính xác hoặc đã hết hạn.';
+      throw new Error(errorMsg);
     }
   },
 
@@ -447,12 +462,10 @@ export const authService = {
         payload
       );
       return response.data;
-    } catch {
-      await new Promise(resolve => setTimeout(resolve, 300));
-      return {
-        success: true,
-        message: 'Đổi mật khẩu thành công. Vui lòng đăng nhập lại.',
-      };
+    } catch (err: unknown) {
+      const errorMsg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+        || 'Không thể cập nhật mật khẩu mới. Vui lòng thử lại.';
+      throw new Error(errorMsg);
     }
   },
 
