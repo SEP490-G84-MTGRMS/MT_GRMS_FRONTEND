@@ -104,11 +104,11 @@ export const PosHeader: FC<Props> = ({
   const trimmedQuery = searchQuery.trim().toLowerCase();
   const matchingProducts = trimmedQuery
     ? products.filter(
-        (p) =>
-          p.name.toLowerCase().includes(trimmedQuery) ||
-          p.sku.toLowerCase().includes(trimmedQuery) ||
-          p.barcode.toLowerCase().includes(trimmedQuery)
-      )
+      (p) =>
+        p.name.toLowerCase().includes(trimmedQuery) ||
+        p.sku.toLowerCase().includes(trimmedQuery) ||
+        p.barcode.toLowerCase().includes(trimmedQuery)
+    )
     : [];
 
   const checkScrollable = useCallback(() => {
@@ -428,7 +428,7 @@ export const PosHeader: FC<Props> = ({
             </div>
           )}
 
-          
+
 
           {/* Trạng thái ca làm việc cho Thu Ngân (Cashier) */}
           {!isStoreOwner && (

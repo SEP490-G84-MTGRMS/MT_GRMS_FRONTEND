@@ -14,13 +14,10 @@ import {
   ShieldCheck,
   Save,
   Monitor,
-  ArrowRight,
-  Bell
+  ArrowRight
 } from 'lucide-react';
 import { useAuthStore } from '../../../stores/useAuthStore';
 import { VIETNAMESE_BANKS, type StorePaymentConfigData } from '../components/modals/PaymentConfigModal';
-import { posShiftApi } from '../api/posShiftApi';
-import { OwnerCashApprovalDrawer } from '../components/drawers/OwnerCashApprovalDrawer';
 
 export const StorePaymentConfigPage: FC = () => {
   const { user } = useAuthStore();
@@ -31,15 +28,10 @@ export const StorePaymentConfigPage: FC = () => {
   const [bankAccountName, setBankAccountName] = useState('NGUYEN AN NHIEN');
   const [sepayApiKey, setSepayApiKey] = useState('sepay_apikey_annhien_secret_key_8899');
   const [isActive, setIsActive] = useState(true);
-  const [cashOutApprovalThreshold, setCashOutApprovalThreshold] = useState<number>(200000);
-  const [cashOutShiftTotalLimit, setCashOutShiftTotalLimit] = useState<number>(0);
   const [showApiKey, setShowApiKey] = useState(false);
   const [copiedWebhook, setCopiedWebhook] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
-  const [isApprovalDrawerOpen, setIsApprovalDrawerOpen] = useState(false);
-  const [pendingApprovalsCount, setPendingApprovalsCount] = useState(0);
-  const [unconfirmedDropsCount, setUnconfirmedDropsCount] = useState(0);
 
   const webhookUrl = `${window.location.origin.replace(':5173', ':5000')}/api/v1/payments/sepay-webhook`;
 
@@ -72,24 +64,7 @@ export const StorePaymentConfigPage: FC = () => {
       setBankAccountName('MT GROCERY STORE');
       setSepayApiKey('sepay_apikey_mtmart_secret_key');
     }
-
-    // Tải cấu hình hạn mức duyệt chi két từ Backend
-    posShiftApi.getCashMovementSettings().then((cfg) => {
-      if (cfg) {
-        setCashOutApprovalThreshold(cfg.cashOutApprovalThreshold ?? 200000);
-        setCashOutShiftTotalLimit(cfg.cashOutShiftTotalLimit ?? 0);
-      }
-    }).catch(() => {});
-
-    loadPendingMovements();
   }, [currentTenantId]);
-
-  const loadPendingMovements = () => {
-    posShiftApi.getPendingMovements('').then((summary) => {
-      setPendingApprovalsCount(summary.pendingApprovalsCount || 0);
-      setUnconfirmedDropsCount(summary.unconfirmedDropsCount || 0);
-    }).catch(() => {});
-  };
 
   const handleCopyWebhook = () => {
     navigator.clipboard?.writeText(webhookUrl);
@@ -120,16 +95,7 @@ export const StorePaymentConfigPage: FC = () => {
       await fetch('/api/v1/payments/config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...configData,
-          cashOutApprovalThreshold,
-          cashOutShiftTotalLimit,
-        }),
-      });
-
-      await posShiftApi.updateCashMovementSettings({
-        cashOutApprovalThreshold,
-        cashOutShiftTotalLimit,
+        body: JSON.stringify(configData),
       });
     } catch {
       // Backend offline: Vẫn hoạt động hoàn hảo nhờ Offline-First
@@ -384,129 +350,6 @@ export const StorePaymentConfigPage: FC = () => {
                 >
                   {copiedWebhook ? <Check size={16} /> : <Copy size={16} />}
                   <span>{copiedWebhook ? 'Đã chép' : 'Sao chép'}</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Card Hạn Mức Phê Duyệt Thu Chi Két POS */}
-            <div
-              style={{
-                borderTop: '1px solid #e2e8f0',
-                paddingTop: 16,
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 12,
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, fontWeight: 800, color: '#0f766e' }}>
-                <ShieldCheck size={18} />
-                <span>Hạn Mức Phê Duyệt Thu Chi Két POS (Chủ Cửa Hàng)</span>
-              </div>
-              <p style={{ fontSize: 12.5, color: '#64748b', margin: 0, lineHeight: 1.5 }}>
-                Kiểm soát rủi ro thất thoát tiền mặt tại quầy thu ngân. Khi nhân viên chi tiền mặt vượt quá hạn mức này, hệ thống sẽ tự động yêu cầu Chủ cửa hàng phê duyệt trên POS trước khi xuất quỹ.
-              </p>
-
-              <div>
-                <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#334155', marginBottom: 6 }}>
-                  Hạn mức duyệt chi tự động cho mỗi lần chi (VNĐ):
-                </label>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <input
-                    type="number"
-                    min={0}
-                    step={10000}
-                    className="pos-input"
-                    value={cashOutApprovalThreshold}
-                    onChange={(e) => setCashOutApprovalThreshold(Number(e.target.value) || 0)}
-                    style={{ width: '100%', height: 40, fontSize: 14, fontWeight: 700, fontFamily: 'monospace' }}
-                  />
-                  <span style={{ fontSize: 13, fontWeight: 700, color: '#64748b' }}>đ</span>
-                </div>
-                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
-                  {[0, 100000, 200000, 500000, 1000000].map((val) => (
-                    <button
-                      key={val}
-                      type="button"
-                      onClick={() => setCashOutApprovalThreshold(val)}
-                      style={{
-                        padding: '3px 8px',
-                        fontSize: 11.5,
-                        borderRadius: 4,
-                        border: cashOutApprovalThreshold === val ? '1px solid #0f766e' : '1px solid #cbd5e1',
-                        backgroundColor: cashOutApprovalThreshold === val ? '#ccfbf1' : '#ffffff',
-                        color: cashOutApprovalThreshold === val ? '#0f766e' : '#475569',
-                        cursor: 'pointer',
-                      }}
-                    >
-                      {val === 0 ? '0 đ (Bắt buộc duyệt hết)' : `${val.toLocaleString('vi-VN')} đ`}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#334155', marginBottom: 6 }}>
-                  Hạn mức tổng chi vặt tối đa trong 1 ca làm việc (0 = Không giới hạn):
-                </label>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <input
-                    type="number"
-                    min={0}
-                    step={100000}
-                    className="pos-input"
-                    value={cashOutShiftTotalLimit}
-                    onChange={(e) => setCashOutShiftTotalLimit(Number(e.target.value) || 0)}
-                    style={{ width: '100%', height: 40, fontSize: 14, fontWeight: 700, fontFamily: 'monospace' }}
-                  />
-                  <span style={{ fontSize: 13, fontWeight: 700, color: '#64748b' }}>đ</span>
-                </div>
-              </div>
-
-              {/* Nút mở Drawer duyệt chi trực tiếp từ trang Cấu hình thanh toán */}
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '12px 16px',
-                  backgroundColor: '#f0fdfa',
-                  border: '1.5px solid #99f6e4',
-                  borderRadius: 10,
-                  marginTop: 6,
-                }}
-              >
-                <div>
-                  <div style={{ fontSize: 13.5, fontWeight: 700, color: '#0f766e', display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <Bell size={16} />
-                    <span>Duyệt Phiếu Chi Két & Xác Nhận Rút Két Quầy POS</span>
-                  </div>
-                  <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
-                    {pendingApprovalsCount + unconfirmedDropsCount > 0
-                      ? `Có ${pendingApprovalsCount} phiếu chi chờ duyệt và ${unconfirmedDropsCount} khoản nộp tiền rút két`
-                      : 'Hiện không có phiếu chi hay khoản rút két nào đang chờ xử lý'}
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => setIsApprovalDrawerOpen(true)}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 6,
-                    padding: '8px 16px',
-                    borderRadius: 8,
-                    backgroundColor: '#0f766e',
-                    color: '#ffffff',
-                    border: 'none',
-                    fontWeight: 700,
-                    fontSize: 13,
-                    cursor: 'pointer',
-                    boxShadow: '0 2px 6px rgba(15, 118, 110, 0.2)',
-                  }}
-                >
-                  <Bell size={14} />
-                  <span>Xử lý duyệt ({pendingApprovalsCount + unconfirmedDropsCount})</span>
                 </button>
               </div>
             </div>
@@ -824,16 +667,6 @@ export const StorePaymentConfigPage: FC = () => {
           </div>
         </div>
       </div>
-
-      <OwnerCashApprovalDrawer
-        isOpen={isApprovalDrawerOpen}
-        onClose={() => {
-          setIsApprovalDrawerOpen(false);
-          loadPendingMovements();
-        }}
-        branchId=""
-        onActionComplete={loadPendingMovements}
-      />
     </div>
   );
 };

@@ -47,8 +47,8 @@ export const InvoiceManagementPage: FC = () => {
   const salesPath = location.pathname.startsWith('/employee/pos')
     ? '/employee/pos'
     : location.pathname.startsWith('/employee')
-    ? '/employee/pos'
-    : '/pos';
+      ? '/employee/pos'
+      : '/pos';
 
   // Chế độ xem: 'invoices' (Hóa đơn bán lẻ) vs 'preorders' (Đơn đặt trước)
   const [activeTab, setActiveTab] = useState<'invoices' | 'preorders'>('invoices');
@@ -131,8 +131,8 @@ export const InvoiceManagementPage: FC = () => {
             o.paymentMethod === 'VIETQR'
               ? 'Chuyển khoản VietQR'
               : (o.paymentMethod === 'DEBT' || o.paymentMethod === 'CREDIT')
-              ? 'Ghi nợ'
-              : 'Tiền mặt',
+                ? 'Ghi nợ'
+                : 'Tiền mặt',
           totalMerchandiseAmount: o.totalAmount,
           totalDiscount: o.discountAmount,
           finalPaidAmount: (o.paymentMethod === 'DEBT' || o.paymentMethod === 'CREDIT') ? (o.depositAmount || 0) : o.finalAmount,
@@ -189,14 +189,14 @@ export const InvoiceManagementPage: FC = () => {
                 o.status === 'Completed'
                   ? 'COMPLETED'
                   : o.status === 'Cancelled'
-                  ? 'CANCELLED'
-                  : 'RESERVED',
+                    ? 'CANCELLED'
+                    : 'RESERVED',
               statusLabel:
                 o.status === 'Completed'
                   ? 'Đã hoàn thành'
                   : o.status === 'Cancelled'
-                  ? 'Đã hủy'
-                  : 'Đang giữ kho',
+                    ? 'Đã hủy'
+                    : 'Đang giữ kho',
               items: (o.items || []).map((it: any) => ({
                 itemId: it.id,
                 productId: it.productId,
@@ -348,8 +348,8 @@ export const InvoiceManagementPage: FC = () => {
               o.paymentMethod === 'VIETQR'
                 ? 'VietQR'
                 : (o.paymentMethod === 'DEBT' || o.paymentMethod === 'CREDIT')
-                ? 'Ghi nợ'
-                : 'Tiền mặt',
+                  ? 'Ghi nợ'
+                  : 'Tiền mặt',
             totalMerchandiseAmount: o.totalAmount,
             totalDiscount: o.discountAmount,
             finalPaidAmount: (o.paymentMethod === 'DEBT' || o.paymentMethod === 'CREDIT') ? (o.depositAmount || 0) : o.finalAmount,
@@ -587,7 +587,7 @@ export const InvoiceManagementPage: FC = () => {
     setPrintingInvoice(invoice);
   };
 
-    // Hoàn tất đơn đặt trước
+  // Hoàn tất đơn đặt trước
   // Hoàn tất đơn đặt trước sau khi thanh toán nốt phần còn lại
   const handleConfirmFulfillPreOrder = async (
     preOrderId: string,
@@ -613,11 +613,11 @@ export const InvoiceManagementPage: FC = () => {
       prev.map((p) =>
         p.preOrderId === preOrderId
           ? {
-              ...p,
-              remainingAmount: 0,
-              status: 'COMPLETED',
-              statusLabel: 'Đã hoàn thành',
-            }
+            ...p,
+            remainingAmount: 0,
+            status: 'COMPLETED',
+            statusLabel: 'Đã hoàn thành',
+          }
           : p
       )
     );
@@ -961,9 +961,8 @@ export const InvoiceManagementPage: FC = () => {
                           </td>
                           <td style={{ textAlign: 'center' }}>
                             <span
-                              className={`pos-method-pill ${
-                                inv.paymentMethod === 'VIETQR' ? 'vietqr' : isDebtMethod ? 'debt' : 'cash'
-                              }`}
+                              className={`pos-method-pill ${inv.paymentMethod === 'VIETQR' ? 'vietqr' : isDebtMethod ? 'debt' : 'cash'
+                                }`}
                               style={
                                 isDebtMethod
                                   ? { backgroundColor: '#fffbeb', color: '#b45309', border: '1px solid #fde68a' }
@@ -982,9 +981,8 @@ export const InvoiceManagementPage: FC = () => {
                           </td>
                           <td style={{ textAlign: 'center' }}>
                             <span
-                              className={`pos-status-pill ${
-                                isCompleted ? 'completed' : isDebt ? 'debt' : 'cancelled'
-                              }`}
+                              className={`pos-status-pill ${isCompleted ? 'completed' : isDebt ? 'debt' : 'cancelled'
+                                }`}
                               style={
                                 isDebt
                                   ? { backgroundColor: '#fef2f2', color: '#b91c1c', border: '1px solid #fecaca' }

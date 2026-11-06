@@ -1,4 +1,4 @@
-﻿import { useState, useRef, useEffect, useCallback, Fragment } from "react";
+import { useState, useRef, useEffect, useCallback, Fragment } from "react";
 import type { FC } from "react";
 import { NavLink, Link, useLocation, useNavigate } from "react-router-dom";
 import {
@@ -22,6 +22,7 @@ import {
   FileText,
   CreditCard,
   Boxes,
+  ShieldCheck,
 } from "lucide-react";
 import { useAuthStore } from "../../stores/useAuthStore";
 import {
@@ -1596,7 +1597,93 @@ export const AppTopNav: FC = () => {
                         }}
                       />
 
-                      {/* Mục 2: Gói dịch vụ MT-GRMS */}
+                      {/* Mục 2: Hạn Mức & Duyệt Chi Két POS */}
+                      <Link
+                        to="/store-owner/pos-cash-control"
+                        onClick={() => setSettingsMenuOpen(false)}
+                        style={{
+                          display: "flex",
+                          alignItems: "flex-start",
+                          gap: 12,
+                          padding: "10px 16px",
+                          textDecoration: "none",
+                          color: "inherit",
+                          transition: "background-color 0.15s ease",
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = "#f0fdfa";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = "transparent";
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: 36,
+                            height: 36,
+                            borderRadius: 8,
+                            backgroundColor: "#ccfbf1",
+                            color: "#0f766e",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            flexShrink: 0,
+                            marginTop: 1,
+                          }}
+                        >
+                          <ShieldCheck size={18} />
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 6,
+                            }}
+                          >
+                            <span
+                              style={{
+                                fontSize: 13.5,
+                                fontWeight: 700,
+                                color: "#0f766e",
+                              }}
+                            >
+                              Hạn Mức & Duyệt Chi Két POS
+                            </span>
+                            <span
+                              style={{
+                                fontSize: 10,
+                                fontWeight: 700,
+                                backgroundColor: "#0f766e",
+                                color: "#ffffff",
+                                padding: "1px 6px",
+                                borderRadius: 10,
+                              }}
+                            >
+                              POS
+                            </span>
+                          </div>
+                          <div
+                            style={{
+                              fontSize: 12,
+                              color: "#64748b",
+                              marginTop: 2,
+                            }}
+                          >
+                            Hạn mức chi vặt tự động, phê duyệt rút két & chi phát sinh
+                          </div>
+                        </div>
+                      </Link>
+
+                      <div
+                        style={{
+                          height: 1,
+                          backgroundColor: "#f1f5f9",
+                          margin: "6px 16px",
+                        }}
+                      />
+
+                      {/* Mục 3: Gói dịch vụ MT-GRMS */}
                       <Link
                         to="/store-owner/subscriptions"
                         onClick={() => setSettingsMenuOpen(false)}
