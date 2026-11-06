@@ -357,8 +357,6 @@ const NAV_GROUPS: NavGroup[] = [
           {
             label: "Bảng tính lương tháng",
             to: "/store-owner/employees/payroll",
-            badge: "Mới",
-            badgeType: "red",
           }
         ],
       },
