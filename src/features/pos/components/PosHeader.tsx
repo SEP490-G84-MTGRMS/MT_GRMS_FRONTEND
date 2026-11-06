@@ -81,7 +81,9 @@ export const PosHeader: FC<Props> = ({
   const { user } = useAuthStore();
   const isStoreOwner = user?.role === 'STORE_OWNER';
   const roleLabel = isStoreOwner ? 'Chủ cửa hàng' : 'Nhân viên';
-  const cashierDisplayName = user?.fullName || (isStoreOwner ? 'Trần Văn Chủ' : 'Lê Thị Thu Ngân');
+  const rawCashierName = user?.fullName || (isStoreOwner ? 'Trần Văn Chủ' : 'Lê Thị Thu Ngân');
+  // Rút gọn phần chú thích chức vụ/cửa hàng trong ngoặc đơn để không làm tràn thanh tiêu đề
+  const cashierDisplayName = rawCashierName.replace(/\s*\([^)]*\)/g, '').trim();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -486,10 +488,16 @@ export const PosHeader: FC<Props> = ({
               backgroundColor: isStoreOwner ? '#ecfdf5' : '#f8fafc',
               color: isStoreOwner ? '#065f46' : '#334155',
               fontSize: 12.5,
+              maxWidth: 240,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
             }}
-            title={isStoreOwner ? "Quyền Chủ cửa hàng: Được phép bán nợ" : "Quyền Thu ngân: Ẩn nút bán nợ"}
+            title={`${roleLabel}: ${rawCashierName} (${isStoreOwner ? 'Được phép bán nợ' : 'Ẩn nút bán nợ'})`}
           >
-            <span>{roleLabel}: <b>{cashierDisplayName}</b></span>
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {roleLabel}: <b>{cashierDisplayName}</b>
+            </span>
           </div>
 
           {/* Menu Hamburger 3 gạch */}

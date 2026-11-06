@@ -119,8 +119,8 @@ export const InvoiceManagementPage: FC = () => {
         const mappedInvoices: InvoiceDTO[] = invoiceOrders.map((o: any) => ({
           invoiceId: o.orderCode || o.id,
           createdAt: o.orderDate ? new Date(o.orderDate).toLocaleString('vi-VN') : '',
-          branchId: o.branchId || '',
-          branchName: o.branchName || 'Chi nhánh trung tâm',
+          branchId: o.branchId || 'cd5e8d1b-b08b-448d-beff-b85ea5873d52',
+          branchName: o.branchName || 'An Nhiên Mart - Chi nhánh Ba Đình',
           cashierId: '',
           cashierName: o.cashierName || user?.fullName || (isStoreOwner ? 'Chủ cửa hàng' : 'Thu ngân'),
           customerId: o.customerId,
@@ -153,9 +153,16 @@ export const InvoiceManagementPage: FC = () => {
             totalAmount: it.totalLineAmount || it.quantity * it.unitPrice,
           })),
         }));
-        if (mappedInvoices.length > 0) {
-          setInvoices(mappedInvoices);
-        }
+
+        // Hợp nhất đơn hàng Backend với danh sách hóa đơn lịch sử chi nhánh (ca trước) để luôn có dữ liệu đổi trả
+        const combinedInvoices = [...mappedInvoices];
+        const existingCodes = new Set(mappedInvoices.map((i) => i.invoiceId));
+        getInitialInvoices().forEach((initInv) => {
+          if (!existingCodes.has(initInv.invoiceId)) {
+            combinedInvoices.push(initInv);
+          }
+        });
+        setInvoices(combinedInvoices);
 
         // 2. Phân loại và nạp danh sách Đơn đặt trước giữ kho
         const preOrderItems = res.items.filter(
@@ -236,9 +243,7 @@ export const InvoiceManagementPage: FC = () => {
     });
 
     const list = Array.from(map.entries()).map(([id, name]) => ({ id, name }));
-    return isStoreOwner
-      ? [{ id: 'ALL', name: 'Tất cả chi nhánh (Toàn chuỗi)' }, ...list]
-      : list;
+    return [{ id: 'ALL', name: isStoreOwner ? 'Tất cả chi nhánh (Toàn chuỗi)' : 'Toàn bộ chi nhánh' }, ...list];
   }, [invoices, preOrders, isAnNhienStore, isStoreOwner]);
 
   // Modal Xác nhận hủy hóa đơn
@@ -500,18 +505,32 @@ export const InvoiceManagementPage: FC = () => {
   // Lọc Hóa đơn
   const filteredInvoices = useMemo(() => {
     return invoices.filter((inv) => {
+      // Khi đang gõ tìm kiếm mã hóa đơn hoặc SĐT khách để đổi/trả hàng -> Tìm trên toàn bộ hóa đơn
+      const isSearching = searchQuery.trim().length > 0;
+
       const matchBranch =
+        isSearching ||
         branchFilter === 'ALL' ||
         inv.branchId === branchFilter ||
-        (branchFilter === 'BR-01' && (inv.branchId === 'BR-01' || inv.branchName?.includes('Cầu Giấy'))) ||
+        // Ba Đình
+        ((branchFilter === 'BR-AN-01' || branchFilter === 'cd5e8d1b-b08b-448d-beff-b85ea5873d52') &&
+          (inv.branchId === 'BR-AN-01' || inv.branchId === 'cd5e8d1b-b08b-448d-beff-b85ea5873d52' || inv.branchName?.includes('Ba Đình'))) ||
+        // Cầu Giấy
+        ((branchFilter === 'BR-01' || branchFilter === 'BR-AN-02') &&
+          (inv.branchId === 'BR-01' || inv.branchId === 'BR-AN-02' || inv.branchName?.includes('Cầu Giấy'))) ||
+        // Thanh Xuân
         (branchFilter === 'BR-02' && (inv.branchId === 'BR-02' || inv.branchName?.includes('Thanh Xuân'))) ||
+        // Đống Đa
+        (branchFilter === 'BR-AN-03' && (inv.branchId === 'BR-AN-03' || inv.branchName?.includes('Đống Đa'))) ||
+        // Quận 1
         (branchFilter === 'BR-03' && (inv.branchId === 'BR-03' || inv.branchName?.includes('Quận 1')));
 
+      const cleanQuery = searchQuery.trim().toLowerCase();
       const matchSearch =
         !searchQuery.trim() ||
-        inv.invoiceId.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        inv.customerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (inv.customerPhone && inv.customerPhone.includes(searchQuery.trim()));
+        inv.invoiceId.toLowerCase().includes(cleanQuery) ||
+        inv.customerName.toLowerCase().includes(cleanQuery) ||
+        (inv.customerPhone && inv.customerPhone.replace(/\D/g, '').includes(cleanQuery.replace(/\D/g, '')));
 
       const matchMethod =
         paymentMethodFilter === 'ALL' ||
@@ -716,19 +735,18 @@ export const InvoiceManagementPage: FC = () => {
                     height: 36,
                     paddingLeft: 32,
                     fontWeight: 600,
-                    backgroundColor: !isStoreOwner ? '#f8fafc' : '#ffffff',
+                    backgroundColor: '#ffffff',
                     borderColor: '#cbd5e1',
                     color: '#0f172a',
-                    cursor: !isStoreOwner ? 'not-allowed' : 'pointer',
+                    cursor: 'pointer',
                   }}
                   value={branchFilter}
-                  disabled={!isStoreOwner}
                   onChange={(e) => {
                     setBranchFilter(e.target.value);
                     setInvoicePage(1);
                     setPreOrderPage(1);
                   }}
-                  title={!isStoreOwner ? 'Tài khoản thu ngân bị cố định theo chi nhánh được gán' : 'Lọc hóa đơn theo chi nhánh'}
+                  title="Lọc hóa đơn theo chi nhánh hoặc xem toàn bộ để đổi trả hàng"
                 >
                   {availableBranches.map((b) => (
                     <option key={b.id} value={b.id}>

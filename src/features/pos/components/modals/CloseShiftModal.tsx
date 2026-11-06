@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import type { FC } from 'react';
-import { Lock, AlertCircle, CheckCircle, Calculator, X } from 'lucide-react';
+import { Lock, AlertCircle, CheckCircle, X, CreditCard, Banknote, TrendingUp, Sparkles } from 'lucide-react';
 import { posShiftApi } from '../../api/posShiftApi';
 import type { ShiftDetailResponse, ShiftCashMovementDto } from '../../types/posShift.types';
 
@@ -19,6 +19,16 @@ export const CloseShiftModal: FC<Props> = ({
   onClose,
   onShiftClosed,
 }) => {
+  const [currentShiftData, setCurrentShiftData] = useState<ShiftDetailResponse>(shift);
+
+  // Chế độ kiểm đếm: 'quick' = Nhập nhanh tổng tiền mặt, 'detail' = Đếm 9 mệnh giá
+  const [countMode, setCountMode] = useState<'quick' | 'detail'>('quick');
+
+  // Giá trị nhập nhanh tổng tiền mặt
+  const [quickCashAmount, setQuickCashAmount] = useState<number>(() => {
+    return shift.expectedCash || (shift.openingFloat + shift.totalCashIn - shift.totalCashOut);
+  });
+
   // Bảng kiểm đếm 9 mệnh giá
   const [counts, setCounts] = useState<{ [denom: number]: number }>({
     500000: 0,
@@ -47,6 +57,7 @@ export const CloseShiftModal: FC<Props> = ({
     try {
       const refreshed = await posShiftApi.getShiftById(shift.id);
       if (refreshed) {
+        setCurrentShiftData(refreshed);
         setMovements(refreshed.cashMovements || []);
       }
     } catch {
@@ -60,12 +71,15 @@ export const CloseShiftModal: FC<Props> = ({
     }
   }, [isOpen, shift.id]);
 
-  // Tổng tiền kiểm đếm thực tế H
-  const actualCashCounted = useMemo(() => {
+  // Tiền đếm từ 9 mệnh giá
+  const detailCashCounted = useMemo(() => {
     return DENOMINATIONS.reduce((sum, denom) => {
       return sum + denom * (counts[denom] || 0);
     }, 0);
   }, [counts]);
+
+  // Tổng tiền kiểm đếm thực tế H theo chế độ được chọn
+  const actualCashCounted = countMode === 'quick' ? quickCashAmount : detailCashCounted;
 
   // Tự động phân bổ khi H thay đổi
   useEffect(() => {
@@ -80,13 +94,16 @@ export const CloseShiftModal: FC<Props> = ({
 
   if (!isOpen) return null;
 
+  // Tiền lý thuyết và doanh thu bán hàng
+  const expectedCash = currentShiftData.expectedCash || (currentShiftData.openingFloat + currentShiftData.totalCashIn - currentShiftData.totalCashOut);
+  const cashSales = Math.max(0, expectedCash - currentShiftData.openingFloat - currentShiftData.totalCashIn + currentShiftData.totalCashOut);
+  const bankRevenue = currentShiftData.totalBankRevenue || 0;
+  const totalShiftRevenue = cashSales + bankRevenue;
+  const discrepancy = actualCashCounted - expectedCash;
+
   // Kiểm tra phiếu pending
   const pendingMovements = movements.filter((m) => m.status === 'PendingApproval' || m.status === 2);
   const hasPending = pendingMovements.length > 0;
-
-  // Tính chênh lệch kết ca
-  const expectedCash = shift.expectedCash || (shift.openingFloat + shift.totalCashIn - shift.totalCashOut);
-  const discrepancy = actualCashCounted - expectedCash;
 
   // Kiểm tra Invariant
   const allocatedSum = retainedFloat + droppedToSafe;
@@ -143,29 +160,63 @@ export const CloseShiftModal: FC<Props> = ({
 
   return (
     <div className="pos-modal-overlay">
-      <div className="pos-modal-dialog" style={{ maxWidth: 680, maxHeight: '92vh', display: 'flex', flexDirection: 'column' }} onClick={(e) => e.stopPropagation()}>
+      <div
+        className="pos-modal-dialog"
+        style={{
+          maxWidth: 680,
+          maxHeight: 'min(92vh, 760px)',
+          display: 'flex',
+          flexDirection: 'column',
+          backgroundColor: '#ffffff',
+          borderRadius: 14,
+          boxShadow: '0 20px 40px -15px rgba(0,0,0,0.3)',
+          overflow: 'hidden',
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
-        <div className="pos-modal-header" style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: 12 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <div style={{ padding: 6, borderRadius: 8, backgroundColor: '#fee2e2', color: '#b91c1c' }}>
+        <div
+          className="pos-modal-header"
+          style={{
+            borderBottom: '1px solid #e2e8f0',
+            padding: '14px 20px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            backgroundColor: '#ffffff',
+            flexShrink: 0,
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ padding: 8, borderRadius: 8, backgroundColor: '#fee2e2', color: '#b91c1c' }}>
               <Lock size={20} />
             </div>
             <div>
-              <h2 className="pos-modal-title" style={{ fontSize: 16, fontWeight: 700, margin: 0 }}>
-                Chốt Ca Bán Hàng & Kết Toán Tiền Mặt
+              <h2 className="pos-modal-title" style={{ fontSize: 16, fontWeight: 700, margin: 0, color: '#0f172a' }}>
+                Chốt Ca Bán Hàng &amp; Kết Toán Tiền Mặt
               </h2>
               <p style={{ margin: 0, fontSize: 12, color: '#64748b' }}>
-                Mã ca: <b>{shift.shiftCode}</b> • Tên ca: <b>{shift.shiftName}</b>
+                Mã ca: <b style={{ color: '#0f766e' }}>{currentShiftData.shiftCode}</b> &bull; Tên ca: <b>{currentShiftData.shiftName}</b>
               </p>
             </div>
           </div>
-          <button type="button" className="pos-modal-close-btn" onClick={onClose}>
-            <X size={18} />
+          <button type="button" className="pos-modal-close-btn" onClick={onClose} style={{ cursor: 'pointer', background: 'none', border: 'none', padding: 4 }}>
+            <X size={18} className="text-slate-500" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
-          <div className="pos-modal-body" style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+          <div
+            className="pos-modal-body"
+            style={{
+              flex: 1,
+              overflowY: 'auto',
+              padding: '16px 20px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 14,
+            }}
+          >
             {errorMsg && (
               <div style={{ padding: '8px 12px', borderRadius: 6, backgroundColor: '#fef2f2', color: '#b91c1c', fontSize: 13, border: '1px solid #fecaca' }}>
                 {errorMsg}
@@ -231,97 +282,266 @@ export const CloseShiftModal: FC<Props> = ({
               </div>
             )}
 
-            {/* BẢNG KIỂM ĐẾM 9 MỆNH GIÁ */}
-            <div style={{ border: '1px solid #e2e8f0', borderRadius: 8, overflow: 'hidden' }}>
-              <div
-                style={{
-                  padding: '8px 12px',
-                  backgroundColor: '#f8fafc',
-                  borderBottom: '1px solid #e2e8f0',
-                  fontWeight: 700,
-                  fontSize: 13,
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <Calculator size={16} className="text-teal-700" />
-                  <span>Kiểm đếm 9 mệnh giá tiền mặt Việt Nam Đồng</span>
-                </div>
-                <span style={{ fontSize: 12, color: '#64748b' }}>Nhập số lượng tờ</span>
+            {/* 1. KHỐI TỔNG HỢP DOANH THU CA: TIỀN MẶT VS CHUYỂN KHOẢN VIETQR */}
+            <div
+              style={{
+                borderRadius: 10,
+                border: '1px solid #cbd5e1',
+                backgroundColor: '#f8fafc',
+                padding: '12px 14px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 10,
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>
+                  📊 Tổng hợp doanh thu &amp; phương thức thanh toán trong ca
+                </span>
+                <span style={{ fontSize: 12, color: '#64748b' }}>
+                  Đã hoàn thành: <b>{currentShiftData.totalOrdersCount || 0} đơn hàng</b>
+                </span>
               </div>
 
-              <div style={{ padding: '10px 12px', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px 12px' }}>
-                {DENOMINATIONS.map((denom) => {
-                  const count = counts[denom] || 0;
-                  const totalLine = denom * count;
-                  return (
-                    <div
-                      key={denom}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        padding: '6px 8px',
-                        borderRadius: 6,
-                        backgroundColor: count > 0 ? '#f0fdf4' : '#ffffff',
-                        border: count > 0 ? '1px solid #86efac' : '1px solid #e2e8f0',
-                      }}
-                    >
-                      <span style={{ fontSize: 12.5, fontWeight: 600, color: '#334155' }}>
-                        {denom >= 1000 ? `${denom / 1000}k` : denom}
-                      </span>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <input
-                          type="number"
-                          min={0}
-                          value={count === 0 ? '' : count}
-                          onChange={(e) => handleCountChange(denom, parseInt(e.target.value, 10) || 0)}
-                          placeholder="0"
-                          style={{
-                            width: 52,
-                            padding: '3px 4px',
-                            textAlign: 'right',
-                            fontSize: 12.5,
-                            fontFamily: 'monospace',
-                            borderRadius: 4,
-                            border: '1px solid #cbd5e1',
-                          }}
-                        />
-                        <span style={{ fontSize: 11, color: '#64748b', minWidth: 42, textAlign: 'right' }}>
-                          {totalLine > 0 ? `${(totalLine / 1000).toLocaleString('vi-VN')}k` : '0'}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
+                {/* Cột 1: Doanh thu Tiền mặt */}
+                <div style={{ padding: '8px 10px', backgroundColor: '#ffffff', borderRadius: 8, border: '1px solid #e2e8f0' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11.5, color: '#475569', fontWeight: 600 }}>
+                    <Banknote size={14} className="text-emerald-600" />
+                    <span>Bán hàng tiền mặt</span>
+                  </div>
+                  <div style={{ fontSize: 15, fontWeight: 800, color: '#059669', marginTop: 4, fontFamily: 'monospace' }}>
+                    {cashSales.toLocaleString('vi-VN')} đ
+                  </div>
+                  <div style={{ fontSize: 10.5, color: '#94a3b8', marginTop: 2 }}>Cộng dồn vào két tiền mặt</div>
+                </div>
+
+                {/* Cột 2: Doanh thu Chuyển khoản VietQR */}
+                <div style={{ padding: '8px 10px', backgroundColor: '#ffffff', borderRadius: 8, border: '1px solid #bfdbfe' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11.5, color: '#1e40af', fontWeight: 600 }}>
+                    <CreditCard size={14} className="text-blue-600" />
+                    <span>Chuyển khoản / VietQR</span>
+                  </div>
+                  <div style={{ fontSize: 15, fontWeight: 800, color: '#2563eb', marginTop: 4, fontFamily: 'monospace' }}>
+                    {bankRevenue.toLocaleString('vi-VN')} đ
+                  </div>
+                  <div style={{ fontSize: 10.5, color: '#64748b', marginTop: 2 }}>Đã vào tài khoản NH (ngoài két)</div>
+                </div>
+
+                {/* Cột 3: Tổng doanh thu toàn ca */}
+                <div style={{ padding: '8px 10px', backgroundColor: '#f0fdf4', borderRadius: 8, border: '1px solid #86efac' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11.5, color: '#166534', fontWeight: 600 }}>
+                    <TrendingUp size={14} className="text-emerald-700" />
+                    <span>Tổng doanh thu ca</span>
+                  </div>
+                  <div style={{ fontSize: 15, fontWeight: 800, color: '#15803d', marginTop: 4, fontFamily: 'monospace' }}>
+                    {totalShiftRevenue.toLocaleString('vi-VN')} đ
+                  </div>
+                  <div style={{ fontSize: 10.5, color: '#166534', marginTop: 2 }}>Tiền mặt + Chuyển khoản</div>
+                </div>
               </div>
             </div>
 
-            {/* BẢNG ĐỐI SOÁT G vs H */}
+            {/* 2. KHỐI KẾT TOÁN TIỀN MẶT TRONG KÉT */}
+            <div style={{ border: '1px solid #cbd5e1', borderRadius: 10, padding: '12px 14px', backgroundColor: '#ffffff' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                <div style={{ fontWeight: 700, fontSize: 13, color: '#0f172a' }}>
+                  💵 Kiểm đếm tiền mặt thực tế trong két (H)
+                </div>
+
+                {/* Tabs chuyển đổi giữa Nhập nhanh tổng tiền mặt và Đếm chi tiết 9 mệnh giá */}
+                <div style={{ display: 'flex', gap: 4, backgroundColor: '#f1f5f9', padding: 2, borderRadius: 6 }}>
+                  <button
+                    type="button"
+                    onClick={() => setCountMode('quick')}
+                    style={{
+                      padding: '4px 10px',
+                      fontSize: 12,
+                      fontWeight: 600,
+                      borderRadius: 4,
+                      border: 'none',
+                      backgroundColor: countMode === 'quick' ? '#0f766e' : 'transparent',
+                      color: countMode === 'quick' ? '#ffffff' : '#64748b',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Nhập nhanh tổng tiền
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCountMode('detail')}
+                    style={{
+                      padding: '4px 10px',
+                      fontSize: 12,
+                      fontWeight: 600,
+                      borderRadius: 4,
+                      border: 'none',
+                      backgroundColor: countMode === 'detail' ? '#0f766e' : 'transparent',
+                      color: countMode === 'detail' ? '#ffffff' : '#64748b',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Đếm 9 mệnh giá
+                  </button>
+                </div>
+              </div>
+
+              {countMode === 'quick' ? (
+                /* CHẾ ĐỘ 1: NHẬP NHANH TỔNG TIỀN MẶT */
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div style={{ flex: 1, position: 'relative' }}>
+                      <input
+                        type="number"
+                        min={0}
+                        step={1000}
+                        value={quickCashAmount === 0 ? '' : quickCashAmount}
+                        onChange={(e) => setQuickCashAmount(Math.max(0, parseInt(e.target.value, 10) || 0))}
+                        placeholder="Nhập tổng số tiền mặt thực đếm trong két..."
+                        style={{
+                          width: '100%',
+                          height: 42,
+                          padding: '0 36px 0 12px',
+                          fontSize: 16,
+                          fontWeight: 700,
+                          fontFamily: 'monospace',
+                          color: '#0f766e',
+                          borderRadius: 6,
+                          border: '2px solid #0f766e',
+                          outline: 'none',
+                          boxSizing: 'border-box',
+                        }}
+                        autoFocus
+                      />
+                      <span style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', fontWeight: 700, color: '#64748b' }}>
+                        đ
+                      </span>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setQuickCashAmount(expectedCash)}
+                      style={{
+                        height: 42,
+                        padding: '0 12px',
+                        borderRadius: 6,
+                        border: '1px solid #10b981',
+                        backgroundColor: '#ecfdf5',
+                        color: '#047857',
+                        fontSize: 12,
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        whiteSpace: 'nowrap',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 4,
+                      }}
+                      title="Gán bằng đúng tiền lý thuyết hệ thống"
+                    >
+                      <Sparkles size={14} />
+                      <span>Khớp lý thuyết</span>
+                    </button>
+                  </div>
+
+                  {/* Nút bấm nhanh các mệnh giá thường gặp */}
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+                    <span style={{ fontSize: 11.5, color: '#64748b' }}>Chọn nhanh:</span>
+                    {[500000, 1000000, 1500000, 2000000, 3000000, 5000000].map((amt) => (
+                      <button
+                        key={amt}
+                        type="button"
+                        onClick={() => setQuickCashAmount(amt)}
+                        style={{
+                          padding: '3px 8px',
+                          borderRadius: 4,
+                          border: '1px solid #cbd5e1',
+                          backgroundColor: quickCashAmount === amt ? '#0f766e' : '#ffffff',
+                          color: quickCashAmount === amt ? '#ffffff' : '#334155',
+                          fontSize: 11.5,
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        {amt >= 1000000 ? `${amt / 1000000} Triệu` : `${amt / 1000}k`}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                /* CHẾ ĐỘ 2: BẢNG KIỂM ĐẾM 9 MỆNH GIÁ */
+                <div style={{ border: '1px solid #e2e8f0', borderRadius: 8, overflow: 'hidden' }}>
+                  <div style={{ padding: '8px 10px', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px 10px' }}>
+                    {DENOMINATIONS.map((denom) => {
+                      const count = counts[denom] || 0;
+                      const totalLine = denom * count;
+                      return (
+                        <div
+                          key={denom}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '4px 6px',
+                            borderRadius: 6,
+                            backgroundColor: count > 0 ? '#f0fdf4' : '#ffffff',
+                            border: count > 0 ? '1px solid #86efac' : '1px solid #e2e8f0',
+                          }}
+                        >
+                          <span style={{ fontSize: 12, fontWeight: 600, color: '#334155' }}>
+                            {denom >= 1000 ? `${denom / 1000}k` : denom}
+                          </span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <input
+                              type="number"
+                              min={0}
+                              value={count === 0 ? '' : count}
+                              onChange={(e) => handleCountChange(denom, parseInt(e.target.value, 10) || 0)}
+                              placeholder="0"
+                              style={{
+                                width: 48,
+                                padding: '2px 4px',
+                                textAlign: 'right',
+                                fontSize: 12,
+                                fontFamily: 'monospace',
+                                borderRadius: 4,
+                                border: '1px solid #cbd5e1',
+                              }}
+                            />
+                            <span style={{ fontSize: 10.5, color: '#64748b', minWidth: 38, textAlign: 'right' }}>
+                              {totalLine > 0 ? `${(totalLine / 1000).toLocaleString('vi-VN')}k` : '0'}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* 3. BẢNG ĐỐI SOÁT G vs H */}
             <div
               style={{
                 backgroundColor: '#f8fafc',
                 border: '1px solid #e2e8f0',
                 borderRadius: 8,
-                padding: '12px 14px',
+                padding: '10px 14px',
                 display: 'flex',
                 flexDirection: 'column',
                 gap: 6,
-                fontSize: 13,
+                fontSize: 12.5,
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: '#64748b' }}>Tiền mặt lý thuyết hệ thống (G = A + B + C - D - E):</span>
-                <span style={{ fontWeight: 700, fontFamily: 'monospace' }}>
+                <span style={{ color: '#64748b' }}>Tiền mặt lý thuyết hệ thống (G = Đầu ca + Bán hàng TM + Thu - Chi):</span>
+                <span style={{ fontWeight: 700, fontFamily: 'monospace', color: '#1e293b' }}>
                   {expectedCash.toLocaleString('vi-VN')} đ
                 </span>
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: '#64748b' }}>Tiền mặt thực tế kiểm đếm (H):</span>
-                <span style={{ fontWeight: 700, fontFamily: 'monospace', color: '#0f766e', fontSize: 14 }}>
+                <span style={{ fontWeight: 800, fontFamily: 'monospace', color: '#0f766e', fontSize: 14 }}>
                   {actualCashCounted.toLocaleString('vi-VN')} đ
                 </span>
               </div>
@@ -348,7 +568,7 @@ export const CloseShiftModal: FC<Props> = ({
               </div>
             </div>
 
-            {/* PHÂN BỔ TIỀN MẶT & RÀNG BUỘC BẤT BIẾN */}
+            {/* 4. PHÂN BỔ TIỀN MẶT & RÀNG BUỘC BẤT BIẾN */}
             <div style={{ border: '1px solid #cbd5e1', borderRadius: 8, padding: '12px 14px', backgroundColor: '#ffffff' }}>
               <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 10, color: '#1e293b' }}>
                 Phân bổ tiền mặt sau chốt ca (Bắt buộc Retained + Dropped == H)
@@ -387,7 +607,7 @@ export const CloseShiftModal: FC<Props> = ({
               )}
             </div>
 
-            {/* Người nhận bàn giao & ghi chú */}
+            {/* 5. NGƯỜI NHẬN BÀN GIAO & GHI CHÚ */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <div className="modal-form-group">
                 <label className="modal-label" style={{ fontSize: 12 }}>Người nhận ca tiếp theo (*):</label>
@@ -423,6 +643,7 @@ export const CloseShiftModal: FC<Props> = ({
               padding: '12px 20px',
               borderTop: '1px solid #e2e8f0',
               backgroundColor: '#f8fafc',
+              flexShrink: 0,
             }}
           >
             <button
