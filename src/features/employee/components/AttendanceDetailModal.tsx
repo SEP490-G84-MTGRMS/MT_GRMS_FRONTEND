@@ -1,108 +1,249 @@
 import React, { useState, useEffect } from 'react';
 import {
   Clock,
-  MapPin,
-  Smartphone,
+  Building2,
   Trash2,
-  RefreshCw,
   Info,
   X,
+  Loader2,
 } from 'lucide-react';
 import type { AttendanceRecord } from '../types';
+import { shiftConfigApi, type ShiftConfigDto } from '../api/shiftConfigApi';
+import { scheduleApi, type ScheduleResponse, type UpdateSchedulePayload } from '../api/scheduleApi';
 
-interface AttendanceDetailModalProps {
+export interface AttendanceDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
   record: AttendanceRecord | null;
   onUpdateStatus?: (recordId: string, newStatus: AttendanceRecord['status']) => void;
+  onSaved?: () => void;
 }
-
-type TabType = 'setup' | 'history' | 'all';
-
-interface TabItem {
-  key: TabType;
-  label: string;
-}
-
-const TABS: TabItem[] = [
-  { key: 'setup', label: 'Chấm công' },
-  { key: 'history', label: 'Lịch sử chấm công' },
-];
-
-const SHIFT_OPTIONS = [
-  'Ca sáng (06:00 - 14:15)',
-  'Ca chiều (14:00 - 22:15)',
-  'Ca đêm (22:00 - 06:15)',
-  'Ca tùy chọn (Linh hoạt)',
-];
 
 interface AttendanceDetailModalContentProps {
   record: AttendanceRecord;
   onClose: () => void;
   onUpdateStatus?: (recordId: string, newStatus: AttendanceRecord['status']) => void;
+  onSaved?: () => void;
 }
+
+const extractHHmm = (t?: string | null): string => {
+  if (!t) return '';
+  if (t.includes('T')) {
+    const d = new Date(t);
+    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  }
+  const parts = t.trim().split(':');
+  if (parts.length >= 2) {
+    return `${parts[0].padStart(2, '0')}:${parts[1].padStart(2, '0')}`;
+  }
+  return t.substring(0, 5);
+};
 
 const AttendanceDetailModalContent: React.FC<AttendanceDetailModalContentProps> = ({
   record,
   onClose,
   onUpdateStatus,
+  onSaved,
 }) => {
-  // Active navigation tab
-  const [activeTab, setActiveTab] = useState<TabType>('setup');
+  // Backend shift configs & schedule states
+  const [availableShifts, setAvailableShifts] = useState<ShiftConfigDto[]>([]);
+  const [selectedShiftId, setSelectedShiftId] = useState<string>('');
+  const [isLoadingShifts, setIsLoadingShifts] = useState<boolean>(false);
+  const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [, setScheduleDetail] = useState<ScheduleResponse | null>(null);
 
   // Form states
-  const [selectedShift, setSelectedShift] = useState(record.shiftName || SHIFT_OPTIONS[0]);
-  const [note, setNote] = useState('');
+  const [note, setNote] = useState(record.note || '');
   const [attendanceType, setAttendanceType] = useState<'working' | 'paid_leave' | 'unpaid_leave'>('working');
 
-  // Check-in / Check-out states
+  // Check-in / Check-out states - Mặc định theo dữ liệu ca làm việc của record
   const [hasCheckIn, setHasCheckIn] = useState<boolean>(true);
-  const [checkInTime, setCheckInTime] = useState<string>(record.checkInTime || '06:00');
+  const [checkInTime, setCheckInTime] = useState<string>(
+    record.checkInTime || record.plannedStartTime || '08:00'
+  );
   const [hasCheckOut, setHasCheckOut] = useState<boolean>(true);
-  const [checkOutTime, setCheckOutTime] = useState<string>(record.checkOutTime || '14:15');
+  const [checkOutTime, setCheckOutTime] = useState<string>(
+    record.checkOutTime || record.plannedEndTime || '17:00'
+  );
 
-  
-  // Sync state when record changes
+  // Sync khi record thay đổi
   useEffect(() => {
-    setSelectedShift(record.shiftName || SHIFT_OPTIONS[0]);
-    setCheckInTime(record.checkInTime || '06:00');
-    setCheckOutTime(record.checkOutTime || '14:15');
+    setNote(record.note || '');
+    setCheckInTime(record.checkInTime || record.plannedStartTime || '08:00');
+    setCheckOutTime(record.checkOutTime || record.plannedEndTime || '17:00');
     setHasCheckIn(!!record.checkInTime || record.status === 'ontime' || record.status === 'late');
     setHasCheckOut(!!record.checkOutTime || record.status === 'ontime' || record.status === 'early');
   }, [record]);
 
-  
-  // Save changes
-  const handleSave = () => {
-    if (onUpdateStatus) {
-      if (attendanceType === 'paid_leave' || attendanceType === 'unpaid_leave') {
-        onUpdateStatus(record.id, 'absent');
-      } else {
-        onUpdateStatus(record.id, 'ontime');
+  // 1. Fetch danh sách cấu hình ca thực tế của chi nhánh từ backend ShiftConfigsController
+  useEffect(() => {
+    let isMounted = true;
+    const fetchBranchShifts = async () => {
+      setIsLoadingShifts(true);
+      try {
+        const shiftList = await shiftConfigApi.getShiftConfigsByBranch(record.branchId, true);
+        if (!isMounted) return;
+        setAvailableShifts(shiftList);
+
+        // Khớp ca hiện tại với danh sách cấu hình ca của chi nhánh
+        const matched = shiftList.find(
+          (s) =>
+            s.id === record.shiftConfigId ||
+            s.shiftCode === record.shiftCode ||
+            s.shiftName.trim().toLowerCase() === record.shiftName.trim().toLowerCase()
+        );
+
+        const currentShift = matched || (shiftList.length > 0 ? shiftList[0] : null);
+        if (currentShift) {
+          setSelectedShiftId(currentShift.id);
+          // Mặc định input Chấm công Vào / Ra dựa trên ca làm việc của dropdown nếu chưa check-in thực tế
+          if (!record.checkInTime && currentShift.startTime) {
+            setCheckInTime(extractHHmm(currentShift.startTime));
+          }
+          if (!record.checkOutTime && currentShift.endTime) {
+            setCheckOutTime(extractHHmm(currentShift.endTime));
+          }
+        }
+      } catch (err) {
+        console.warn('Lỗi khi tải cấu hình ca của chi nhánh:', err);
+      } finally {
+        if (isMounted) setIsLoadingShifts(false);
+      }
+    };
+
+    fetchBranchShifts();
+    return () => {
+      isMounted = false;
+    };
+  }, [record.branchId, record.shiftConfigId, record.shiftCode, record.shiftName, record.checkInTime, record.checkOutTime]);
+
+  // 2. Fetch chi tiết lịch làm việc thực tế từ backend SchedulesController (GET /api/v1/schedules/{id})
+  useEffect(() => {
+    let isMounted = true;
+    const fetchSchedule = async () => {
+      if (!record.id) return;
+      try {
+        const schedule = await scheduleApi.getScheduleById(record.id);
+        if (!isMounted) return;
+        setScheduleDetail(schedule);
+
+        if (schedule.checkInTime) {
+          setCheckInTime(extractHHmm(schedule.checkInTime));
+          setHasCheckIn(true);
+        } else {
+          if (schedule.plannedStartTime) {
+            setCheckInTime(extractHHmm(schedule.plannedStartTime));
+          }
+          setHasCheckIn(!!record.checkInTime || record.status === 'ontime' || record.status === 'late');
+        }
+
+        if (schedule.checkOutTime) {
+          setCheckOutTime(extractHHmm(schedule.checkOutTime));
+          setHasCheckOut(true);
+        } else {
+          if (schedule.plannedEndTime) {
+            setCheckOutTime(extractHHmm(schedule.plannedEndTime));
+          }
+          setHasCheckOut(!!record.checkOutTime || record.status === 'ontime' || record.status === 'early');
+        }
+
+        if (schedule.status === 'Cancelled') {
+          setAttendanceType('unpaid_leave');
+        }
+
+        if (schedule.approvalReason) {
+          setNote(schedule.approvalReason);
+        }
+      } catch (err) {
+        console.warn('Không lấy được chi tiết lịch trực tiếp, sử dụng dữ liệu record:', err);
+      }
+    };
+
+    fetchSchedule();
+    return () => {
+      isMounted = false;
+    };
+  }, [record.id, record.checkInTime, record.checkOutTime, record.status]);
+
+  // Chọn ca làm việc từ dropdown: Tự động cập nhật input Vào / Ra mặc định dựa trên ca vừa chọn
+  const handleSelectShift = (shiftId: string) => {
+    setSelectedShiftId(shiftId);
+    const targetShift = availableShifts.find((s) => s.id === shiftId);
+    if (targetShift) {
+      if (targetShift.startTime) {
+        setCheckInTime(extractHHmm(targetShift.startTime));
+      }
+      if (targetShift.endTime) {
+        setCheckOutTime(extractHHmm(targetShift.endTime));
       }
     }
-    alert(`Đã lưu thiết lập chấm công thành công cho nhân viên ${record.employeeName}!`);
-    onClose();
   };
 
-  const handleResetAttendance = () => {
+  // Lưu thay đổi ca làm việc và trạng thái chấm công
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      const selectedShiftObj = availableShifts.find((s) => s.id === selectedShiftId);
+
+      const payload: UpdateSchedulePayload = {
+        shiftConfigId: selectedShiftObj?.id || record.shiftConfigId,
+        shiftCode: selectedShiftObj?.shiftCode || record.shiftCode,
+        shiftName: selectedShiftObj?.shiftName || record.shiftName,
+        plannedStartTime: selectedShiftObj?.startTime
+          ? `${selectedShiftObj.startTime.substring(0, 5)}:00`
+          : undefined,
+        plannedEndTime: selectedShiftObj?.endTime
+          ? `${selectedShiftObj.endTime.substring(0, 5)}:00`
+          : undefined,
+        durationHours: selectedShiftObj?.durationHours,
+        status:
+          attendanceType === 'paid_leave' || attendanceType === 'unpaid_leave'
+            ? 'Cancelled'
+            : undefined,
+      };
+
+      if (record.id) {
+        await scheduleApi.updateSchedule(record.id, payload).catch((err) => {
+          console.warn('Lỗi gọi updateSchedule backend:', err);
+        });
+      }
+
+      if (onUpdateStatus) {
+        if (attendanceType === 'paid_leave' || attendanceType === 'unpaid_leave') {
+          onUpdateStatus(record.id, 'absent');
+        } else {
+          onUpdateStatus(record.id, 'ontime');
+        }
+      }
+
+      if (onSaved) {
+        onSaved();
+      }
+
+      alert(`Đã lưu thiết lập chấm công thành công cho nhân viên ${record.employeeName}!`);
+      onClose();
+    } catch (err: any) {
+      console.error('Lỗi khi lưu thiết lập chấm công:', err);
+      alert(err?.message || 'Có lỗi xảy ra khi lưu thiết lập chấm công.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Hủy kết quả chấm công
+  const handleResetAttendance = async () => {
     if (window.confirm(`Bạn có chắc chắn muốn hủy kết quả chấm công của ${record.employeeName}?`)) {
+      if (record.id) {
+        await scheduleApi.updateSchedule(record.id, { status: 'Pending' }).catch(() => {});
+      }
       if (onUpdateStatus) {
         onUpdateStatus(record.id, 'not_checked');
       }
+      if (onSaved) {
+        onSaved();
+      }
       onClose();
     }
-  };
-
-  const handleChangeShift = () => {
-    const nextShift =
-      selectedShift === SHIFT_OPTIONS[0]
-        ? SHIFT_OPTIONS[1]
-        : selectedShift === SHIFT_OPTIONS[1]
-        ? SHIFT_OPTIONS[2]
-        : SHIFT_OPTIONS[0];
-    setSelectedShift(nextShift);
-    alert(`Đã đổi sang ca làm việc: ${nextShift}`);
   };
 
   // Status Badge Label
@@ -139,6 +280,11 @@ const AttendanceDetailModalContent: React.FC<AttendanceDetailModalContentProps> 
               <span style={{ color: '#CBD5E1' }}>|</span>
               <span>{record.employeeCode}</span>
               <span style={{ color: '#CBD5E1' }}>|</span>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: '#0F766E', fontWeight: 600 }}>
+                <Building2 size={13} />
+                {record.branchName || record.gpsLocation || 'Chi nhánh'}
+              </span>
+              <span style={{ color: '#CBD5E1' }}>|</span>
               {getStatusDisplay()}
             </div>
           </div>
@@ -149,7 +295,7 @@ const AttendanceDetailModalContent: React.FC<AttendanceDetailModalContentProps> 
 
         {/* Modal Body */}
         <div className="emp-modal-body" style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {/* Thông tin chung: Thời gian, Ca làm việc, Ghi chú */}
+          {/* Thông tin chung: Thời gian, Chi nhánh, Ca làm việc, Ghi chú */}
           <div
             style={{
               display: 'flex',
@@ -167,213 +313,177 @@ const AttendanceDetailModalContent: React.FC<AttendanceDetailModalContentProps> 
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', alignItems: 'center', gap: 12 }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: '#0F172A' }}>Chi nhánh</span>
+              <span style={{ fontSize: 13, color: '#0F766E', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                <Building2 size={15} />
+                {record.branchName || record.gpsLocation || 'Chi nhánh mặc định'}
+              </span>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', alignItems: 'center', gap: 12 }}>
               <span style={{ fontSize: 13, fontWeight: 700, color: '#0F172A' }}>Ca làm việc</span>
               <select
                 className="emp-form-select"
-                style={{ height: 36, maxWidth: 300, fontSize: 13 }}
-                value={selectedShift}
-                onChange={(e) => setSelectedShift(e.target.value)}
+                style={{ height: 36, maxWidth: 380, fontSize: 13 }}
+                value={selectedShiftId}
+                onChange={(e) => handleSelectShift(e.target.value)}
+                disabled={isLoadingShifts}
               >
-                {SHIFT_OPTIONS.map((sh) => (
-                  <option key={sh} value={sh}>
-                    {sh}
-                  </option>
-                ))}
+                {isLoadingShifts ? (
+                  <option value="">Đang tải ca làm việc từ chi nhánh...</option>
+                ) : availableShifts.length === 0 ? (
+                  <option value="">{record.shiftName || 'Không có ca mẫu cấu hình'}</option>
+                ) : (
+                  availableShifts.map((sc) => {
+                    const timeStr = `${sc.startTime ? sc.startTime.substring(0, 5) : ''} - ${sc.endTime ? sc.endTime.substring(0, 5) : ''}`;
+                    return (
+                      <option key={sc.id} value={sc.id}>
+                        {sc.shiftName} ({timeStr}){sc.durationHours ? ` • ${sc.durationHours}h` : ''}
+                      </option>
+                    );
+                  })
+                )}
               </select>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', alignItems: 'flex-start', gap: 12 }}>
-              <span style={{ fontSize: 13, fontWeight: 700, color: '#0F172A', marginTop: 8 }}>Ghi chú</span>
-              <textarea
-                className="emp-form-input"
-                rows={2}
-                placeholder="Nhập ghi chú chấm công (nếu có)..."
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                style={{ resize: 'vertical', fontSize: 13 }}
-              />
+              <span style={{ fontSize: 13, fontWeight: 700, color: '#0F172A', paddingTop: 8 }}>Ghi chú</span>
+              <div style={{ maxWidth: 380, width: '100%' }}>
+                <textarea
+                  className="emp-form-textarea"
+                  rows={3}
+                  placeholder="Nhập ghi chú hoặc lý do điều chỉnh công (nếu có)..."
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  style={{
+                    fontSize: 13,
+                    minHeight: 68,
+                    maxHeight: 120,
+                    lineHeight: 1.5,
+                    resize: 'vertical',
+                    padding: '8px 12px',
+                    borderRadius: 6,
+                    border: '1px solid #CBD5E1',
+                    background: '#FFFFFF',
+                    width: '100%',
+                    boxSizing: 'border-box',
+                    transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
+                  }}
+                  onFocus={(e) => {
+                    e.currentTarget.style.borderColor = '#0F766E';
+                    e.currentTarget.style.boxShadow = '0 0 0 3px rgba(15, 118, 110, 0.1)';
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.style.borderColor = '#CBD5E1';
+                    e.currentTarget.style.boxShadow = 'none';
+                  }}
+                />
+              </div>
             </div>
           </div>
 
-          {/* Quick Anchor Navigation Tabs */}
+          {/* THIẾT LẬP CHẤM CÔNG */}
           <div
             style={{
-              display: 'flex',
-              gap: 20,
-              borderBottom: '1.5px solid #E2E8F0',
-              paddingBottom: 4,
+              background: '#FFFFFF',
+              border: '1px solid #E2E8F0',
+              borderRadius: 10,
+              padding: '16px 20px',
             }}
           >
-            {TABS.map((tab) => {
-              const isActive = activeTab === tab.key;
-              return (
-                <button
-                  key={tab.key}
-                  type="button"
-                  onClick={() => setActiveTab(tab.key)}
-                  style={{
-                    background: 'transparent',
-                    border: 'none',
-                    borderBottom: isActive ? '2.5px solid #0F766E' : '2.5px solid transparent',
-                    color: isActive ? '#0F766E' : '#64748B',
-                    fontWeight: isActive ? 700 : 500,
-                    fontSize: 13,
-                    padding: '6px 4px',
-                    cursor: 'pointer',
-                    transition: 'all 0.15s ease',
-                    marginBottom: -5.5,
-                  }}
-                >
-                  {tab.label}
-                </button>
-              );
-            })}
+            <div style={{ fontWeight: 700, fontSize: 14, color: '#0F172A', marginBottom: 12 }}>
+              Thiết lập chấm công
+            </div>
+
+            {/* Radio Group: Đi làm, Nghỉ phép hưởng lương, Nghỉ không lương */}
+            <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', marginBottom: 16 }}>
+              <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+                <input
+                  type="radio"
+                  name="attType"
+                  checked={attendanceType === 'working'}
+                  onChange={() => setAttendanceType('working')}
+                  style={{ accentColor: '#0F766E' }}
+                />
+                <span>Đi làm</span>
+              </label>
+
+              <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#475569', cursor: 'pointer' }}>
+                <input
+                  type="radio"
+                  name="attType"
+                  checked={attendanceType === 'paid_leave'}
+                  onChange={() => setAttendanceType('paid_leave')}
+                  style={{ accentColor: '#0F766E' }}
+                />
+                <span>Nghỉ phép hưởng lương</span>
+                <Info size={13} color="#94A3B8" />
+              </label>
+
+              <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#475569', cursor: 'pointer' }}>
+                <input
+                  type="radio"
+                  name="attType"
+                  checked={attendanceType === 'unpaid_leave'}
+                  onChange={() => setAttendanceType('unpaid_leave')}
+                  style={{ accentColor: '#0F766E' }}
+                />
+                <span>Nghỉ không lương</span>
+                <Info size={13} color="#94A3B8" />
+              </label>
+            </div>
+
+            {/* Thiết lập giờ Vào / Ra */}
+            {attendanceType === 'working' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, paddingTop: 4 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, width: 80, fontSize: 13, fontWeight: 600, color: '#0F172A', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={hasCheckIn}
+                      onChange={(e) => setHasCheckIn(e.target.checked)}
+                      style={{ accentColor: '#0F766E' }}
+                    />
+                    <span>Vào</span>
+                  </label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <input
+                      type="time"
+                      className="emp-form-input"
+                      value={checkInTime}
+                      onChange={(e) => setCheckInTime(e.target.value)}
+                      disabled={!hasCheckIn}
+                      style={{ width: 130, height: 34, fontSize: 13 }}
+                    />
+                    <Clock size={15} color="#64748B" />
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, width: 80, fontSize: 13, fontWeight: 600, color: '#0F172A', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={hasCheckOut}
+                      onChange={(e) => setHasCheckOut(e.target.checked)}
+                      style={{ accentColor: '#0F766E' }}
+                    />
+                    <span>Ra</span>
+                  </label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <input
+                      type="time"
+                      className="emp-form-input"
+                      value={checkOutTime}
+                      onChange={(e) => setCheckOutTime(e.target.value)}
+                      disabled={!hasCheckOut}
+                      style={{ width: 130, height: 34, fontSize: 13 }}
+                    />
+                    <Clock size={15} color="#64748B" />
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
-
-          {/* 1. THIẾT LẬP CHẤM CÔNG */}
-          {(activeTab === 'setup' || activeTab === 'all') && (
-            <div
-              style={{
-                background: '#FFFFFF',
-                border: '1px solid #E2E8F0',
-                borderRadius: 10,
-                padding: '16px 20px',
-              }}
-            >
-              <div style={{ fontWeight: 700, fontSize: 14, color: '#0F172A', marginBottom: 12 }}>
-                1. Thiết lập chấm công
-              </div>
-
-              {/* Radio Group: Đi làm, Nghỉ phép hưởng lương, Nghỉ không lương */}
-              <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', marginBottom: 16 }}>
-                <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
-                  <input
-                    type="radio"
-                    name="attType"
-                    checked={attendanceType === 'working'}
-                    onChange={() => setAttendanceType('working')}
-                    style={{ accentColor: '#0F766E' }}
-                  />
-                  <span>Đi làm</span>
-                </label>
-
-                <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#475569', cursor: 'pointer' }}>
-                  <input
-                    type="radio"
-                    name="attType"
-                    checked={attendanceType === 'paid_leave'}
-                    onChange={() => setAttendanceType('paid_leave')}
-                    style={{ accentColor: '#0F766E' }}
-                  />
-                  <span>Nghỉ phép hưởng lương</span>
-                  <Info size={13} color="#94A3B8" />
-                </label>
-
-                <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#475569', cursor: 'pointer' }}>
-                  <input
-                    type="radio"
-                    name="attType"
-                    checked={attendanceType === 'unpaid_leave'}
-                    onChange={() => setAttendanceType('unpaid_leave')}
-                    style={{ accentColor: '#0F766E' }}
-                  />
-                  <span>Nghỉ không lương</span>
-                  <Info size={13} color="#94A3B8" />
-                </label>
-              </div>
-
-              {/* Thiết lập giờ Vào / Ra */}
-              {attendanceType === 'working' && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, paddingTop: 4 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, width: 80, fontSize: 13, fontWeight: 600, color: '#0F172A', cursor: 'pointer' }}>
-                      <input
-                        type="checkbox"
-                        checked={hasCheckIn}
-                        onChange={(e) => setHasCheckIn(e.target.checked)}
-                        style={{ accentColor: '#0F766E' }}
-                      />
-                      <span>Vào</span>
-                    </label>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <input
-                        type="time"
-                        className="emp-form-input"
-                        value={checkInTime}
-                        onChange={(e) => setCheckInTime(e.target.value)}
-                        disabled={!hasCheckIn}
-                        style={{ width: 130, height: 34, fontSize: 13 }}
-                      />
-                      <Clock size={15} color="#64748B" />
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, width: 80, fontSize: 13, fontWeight: 600, color: '#0F172A', cursor: 'pointer' }}>
-                      <input
-                        type="checkbox"
-                        checked={hasCheckOut}
-                        onChange={(e) => setHasCheckOut(e.target.checked)}
-                        style={{ accentColor: '#0F766E' }}
-                      />
-                      <span>Ra</span>
-                    </label>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <input
-                        type="time"
-                        className="emp-form-input"
-                        value={checkOutTime}
-                        onChange={(e) => setCheckOutTime(e.target.value)}
-                        disabled={!hasCheckOut}
-                        style={{ width: 130, height: 34, fontSize: 13 }}
-                      />
-                      <Clock size={15} color="#64748B" />
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* 2. LỊCH SỬ CHẤM CÔNG (LOG GPS / QUẸT THẺ) */}
-          {(activeTab === 'history' || activeTab === 'all') && (
-            <div
-              style={{
-                background: '#F8FAFC',
-                border: '1px solid #E2E8F0',
-                borderRadius: 10,
-                padding: '16px 20px',
-              }}
-            >
-              <div style={{ fontWeight: 700, fontSize: 14, color: '#0F172A', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span>2. Lịch sử chấm công (Log GPS / Quẹt thẻ)</span>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 13 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <MapPin size={15} color="#0F766E" />
-                  <span style={{ color: '#475569' }}>Vị trí GPS:</span>
-                  <span style={{ fontWeight: 600, color: '#0F172A' }}>
-                    {record.gpsLocation || 'Số 42 Cầu Giấy (Cách shop 25m - Hợp lệ)'}
-                  </span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <Smartphone size={15} color="#64748B" />
-                  <span style={{ color: '#475569' }}>Thiết bị di động:</span>
-                  <span style={{ fontWeight: 600, color: '#0F172A' }}>
-                    {record.deviceInfo || 'iPhone 14 Pro Max (IMEI: 358921...)'}
-                  </span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <Clock size={15} color="#0F766E" />
-                  <span style={{ color: '#475569' }}>Tổng giờ làm tính toán:</span>
-                  <span style={{ fontWeight: 700, color: '#0F766E' }}>
-                    {record.workHours ? `${record.workHours} giờ công` : '8.25 giờ công'}
-                  </span>
-                </div>
-              </div>
-            </div>
-          )}
-
         </div>
 
         {/* Footer Modal chuẩn Design System */}
@@ -387,8 +497,8 @@ const AttendanceDetailModalContent: React.FC<AttendanceDetailModalContentProps> 
             background: '#F8FAFC',
           }}
         >
-          {/* Nút bên trái: Hủy & Đổi ca */}
-          <div style={{ display: 'flex', gap: 8 }}>
+          {/* Nút bên trái: Hủy kết quả */}
+          <div>
             <button
               type="button"
               className="emp-btn emp-btn-secondary"
@@ -402,26 +512,10 @@ const AttendanceDetailModalContent: React.FC<AttendanceDetailModalContentProps> 
                 background: '#FEF2F2',
               }}
               onClick={handleResetAttendance}
+              disabled={isSaving}
             >
               <Trash2 size={14} />
               <span>Hủy</span>
-            </button>
-            <button
-              type="button"
-              className="emp-btn emp-btn-secondary"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 6,
-                fontSize: 13,
-                color: '#0F766E',
-                borderColor: '#99F6E4',
-                background: '#F0FDFA',
-              }}
-              onClick={handleChangeShift}
-            >
-              <RefreshCw size={14} />
-              <span>Đổi ca</span>
             </button>
           </div>
 
@@ -431,6 +525,7 @@ const AttendanceDetailModalContent: React.FC<AttendanceDetailModalContentProps> 
               type="button"
               className="emp-btn emp-btn-secondary"
               onClick={onClose}
+              disabled={isSaving}
               style={{ fontSize: 13, minWidth: 90 }}
             >
               Bỏ qua
@@ -439,9 +534,11 @@ const AttendanceDetailModalContent: React.FC<AttendanceDetailModalContentProps> 
               type="button"
               className="emp-btn emp-btn-primary"
               onClick={handleSave}
-              style={{ fontSize: 13, minWidth: 90 }}
+              disabled={isSaving}
+              style={{ fontSize: 13, minWidth: 90, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
             >
-              Lưu
+              {isSaving && <Loader2 size={14} className="emp-spin" />}
+              <span>{isSaving ? 'Đang lưu...' : 'Lưu'}</span>
             </button>
           </div>
         </div>
@@ -455,6 +552,7 @@ export const AttendanceDetailModal: React.FC<AttendanceDetailModalProps> = ({
   onClose,
   record,
   onUpdateStatus,
+  onSaved,
 }) => {
   if (!isOpen || !record) return null;
 
@@ -463,6 +561,7 @@ export const AttendanceDetailModal: React.FC<AttendanceDetailModalProps> = ({
       record={record}
       onClose={onClose}
       onUpdateStatus={onUpdateStatus}
+      onSaved={onSaved}
     />
   );
 };

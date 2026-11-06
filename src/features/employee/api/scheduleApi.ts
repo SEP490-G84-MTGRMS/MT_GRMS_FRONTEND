@@ -162,6 +162,45 @@ export const mapScheduleResponseToAssignment = (s: ScheduleResponse): ScheduleAs
 
 export const scheduleApi = {
   /**
+   * Tra cứu danh sách lịch làm việc đầy đủ từ backend (bao gồm thông tin chấm công, check-in, check-out, đi muộn)
+   * Backend: GET /api/v1/schedules
+   */
+  async getRawSchedules(filter: ScheduleQueryFilter = {}): Promise<ScheduleResponse[]> {
+    const params: Record<string, any> = {};
+
+    if (filter.branchId && filter.branchId !== '' && filter.branchId !== 'all') {
+      params.branchId = filter.branchId;
+    }
+    if (filter.employeeId && filter.employeeId !== '') {
+      params.employeeId = filter.employeeId;
+    }
+    if (filter.fromDate) {
+      params.fromDate = filter.fromDate;
+    }
+    if (filter.toDate) {
+      params.toDate = filter.toDate;
+    }
+    if (filter.status) {
+      params.status = filter.status;
+    }
+    if (filter.keyword) {
+      params.keyword = filter.keyword;
+    }
+    if (filter.page) {
+      params.page = filter.page;
+    }
+    if (filter.pageSize) {
+      params.pageSize = filter.pageSize;
+    }
+
+    const res = await httpClient.get<ApiResponse<ScheduleResponse[]>>('/schedules', { params });
+    if (res.data?.success && Array.isArray(res.data.data)) {
+      return res.data.data;
+    }
+    return [];
+  },
+
+  /**
    * Tra cứu danh sách lịch làm việc từ backend
    * Backend: GET /api/v1/schedules
    */
@@ -234,6 +273,18 @@ export const scheduleApi = {
       return res.data.data.map(mapScheduleResponseToAssignment);
     }
     throw new Error(res.data?.message || 'Khởi tạo ca làm việc lặp lại thất bại.');
+  },
+
+  /**
+   * Lấy chi tiết lịch làm việc theo ID
+   * Backend: GET /api/v1/schedules/{id}
+   */
+  async getScheduleById(id: string): Promise<ScheduleResponse> {
+    const res = await httpClient.get<ApiResponse<ScheduleResponse>>(`/schedules/${id}`);
+    if (res.data?.success && res.data.data) {
+      return res.data.data;
+    }
+    throw new Error(res.data?.message || 'Không tìm thấy ca làm việc.');
   },
 
   /**

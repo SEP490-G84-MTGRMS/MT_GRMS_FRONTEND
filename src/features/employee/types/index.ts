@@ -183,15 +183,24 @@ export interface AttendanceRecord {
   avatarUrl?: string;
   shiftId: string;
   shiftName: string;
+  shiftConfigId?: string;
+  shiftCode?: string;
+  workDateIso?: string;
+  branchId?: string;
+  branchName?: string;
   dayOfWeek: 'T2' | 'T3' | 'T4' | 'T5' | 'T6' | 'T7' | 'CN';
   dateStr: string;
   checkInTime?: string;
   checkOutTime?: string;
-  status: 'ontime' | 'late' | 'early' | 'not_checked' | 'absent';
+  plannedStartTime?: string;
+  plannedEndTime?: string;
+  status: 'ontime' | 'late' | 'early' | 'not_checked' | 'absent' | 'missing';
   lateMinutes?: number;
   workHours?: number;
   gpsLocation?: string;
   deviceInfo?: string;
+  approvalStatus?: string;
+  note?: string;
 }
 
 export interface PayslipDetailedRecord {

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { employeeApi } from '../api/employeeApi';
+import { scheduleApi } from '../api/scheduleApi';
 import { httpClient } from '../../../api/httpClient';
 import {
   mapBackendSummaryToEmployee,
@@ -296,6 +297,55 @@ describe('employeeApi', () => {
     const success = await employeeApi.deleteEmployee('emp-1');
     expect(httpClient.delete).toHaveBeenCalledWith('/employees/emp-1');
     expect(success).toBe(true);
+  });
+
+  it('scheduleApi.getRawSchedules: gọi GET /schedules và trả về đầy đủ ScheduleResponse[]', async () => {
+    const mockSchedules = [
+      {
+        id: 'sch-1',
+        employeeId: 'emp-1',
+        employeeCode: 'NV001',
+        employeeName: 'Nguyễn Văn A',
+        branchId: 'branch-1',
+        workDate: '2026-11-06T00:00:00Z',
+        shiftCode: 'CA_SANG',
+        shiftName: 'Ca sáng',
+        plannedStartTime: '06:00:00',
+        plannedEndTime: '14:00:00',
+        durationHours: 8,
+        checkInTime: '2026-11-06T06:05:00Z',
+        checkOutTime: '2026-11-06T14:00:00Z',
+        lateMinutes: 5,
+        earlyLeaveMinutes: 0,
+        actualWorkHours: 7.9,
+        status: 'Completed',
+        approvalStatus: 'Pending',
+      },
+    ];
+
+    (httpClient.get as any).mockResolvedValueOnce({
+      data: {
+        success: true,
+        data: mockSchedules,
+      },
+    });
+
+    const res = await scheduleApi.getRawSchedules({
+      fromDate: '2026-11-02',
+      toDate: '2026-11-08',
+      branchId: 'branch-1',
+    });
+
+    expect(httpClient.get).toHaveBeenCalledWith('/schedules', {
+      params: {
+        fromDate: '2026-11-02',
+        toDate: '2026-11-08',
+        branchId: 'branch-1',
+      },
+    });
+    expect(res).toHaveLength(1);
+    expect(res[0].shiftName).toBe('Ca sáng');
+    expect(res[0].lateMinutes).toBe(5);
   });
 });
 

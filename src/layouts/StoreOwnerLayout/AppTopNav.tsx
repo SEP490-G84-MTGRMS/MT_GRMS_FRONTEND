@@ -342,12 +342,12 @@ const NAV_GROUPS: NavGroup[] = [
             to: "/store-owner/employees/schedule"
           },
           {
-            label: "Cấu hình ca làm việc",
-            to: "/store-owner/employees/shifts"
-          },
-          {
             label: "Bảng chấm công",
             to: "/store-owner/employees/attendance"
+          },
+          {
+            label: "Cấu hình ca làm việc",
+            to: "/store-owner/employees/shifts"
           },
         ],
       },
