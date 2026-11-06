@@ -25,6 +25,9 @@
   - Vẫn duy trì khả năng chỉnh sửa trực tiếp và lưu với nút "Lưu thay đổi" ở cuối form.
   - Thêm Toast thông báo nổi (`toastMessage`) ở góc dưới cùng bên phải màn hình khi cập nhật thành công hoặc gặp lỗi.
   - Khóa (read-only) và gắn badge cho các trường cố định hệ thống (Subdomain, Email hệ thống).
+- [`src/pages/store/components/BranchManagementTab.tsx`](file:///d:/FPT_University/Final/Grade/new/project/MT_GRMS_FRONTEND/src/pages/store/components/BranchManagementTab.tsx):
+  - Tối ưu hóa triệt để Network request: tách riêng `fetchQuota()` (chỉ gọi 1 lần khi mount hoặc khi thêm/sửa chi nhánh) khỏi `fetchBranches()`.
+  - Bổ sung cơ chế Debounce 350ms khi gõ tìm kiếm (`keyword`) hoặc đổi bộ lọc trạng thái, ngăn chặn triệt để tình trạng spam 20+ request liên tiếp ("rác network").
 - [`src/pages/store/StoreSettingsHubPage.tsx`](file:///d:/FPT_University/Final/Grade/new/project/MT_GRMS_FRONTEND/src/pages/store/StoreSettingsHubPage.tsx):
   - Nâng cấp hàm `handleUpdateStoreInfo` trả về `Promise<boolean>` để thông báo kết quả chính xác cho `StoreInfoTab` và modal.
 - [`src/pages/store/__tests__/StoreInfoTab.test.tsx`](file:///d:/FPT_University/Final/Grade/new/project/MT_GRMS_FRONTEND/src/pages/store/__tests__/StoreInfoTab.test.tsx) *(Mới)*:
@@ -48,3 +51,4 @@
 ## 5. Ghi chú cho Manager (Manager Merge Notes)
 - **Mức độ rủi ro**: Thấp (Low).
 - **Lưu ý**: Tận dụng triệt để các class CSS có sẵn trong `store-hub.css`, giao diện đồng nhất với `AccountProfileTab`.
+
