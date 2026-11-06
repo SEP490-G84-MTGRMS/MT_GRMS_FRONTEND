@@ -425,77 +425,27 @@ export const PosHeader: FC<Props> = ({
 
           
 
-          {/* Lối tắt trực tiếp Quản lý đơn hàng & Đổi trả cho thu ngân */}
-          <button
-            type="button"
-            onClick={() => navigate(location.pathname.startsWith('/employee') ? '/employee/orders' : '/pos/orders')}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 5,
-              padding: '5px 10px',
-              borderRadius: 6,
-              border: '1px solid #cbd5e1',
-              backgroundColor: '#ffffff',
-              color: '#334155',
-              fontSize: 12.5,
-              fontWeight: 600,
-              cursor: 'pointer',
-              whiteSpace: 'nowrap',
-            }}
-            title="Quản lý hóa đơn & Xử lý đổi trả hàng"
-          >
-            <Receipt size={14} className="text-teal-700" />
-            <span>Đơn hàng & Đổi trả</span>
-          </button>
-
-          {/* Trạng thái ca & Nút Thu/Chi cho Thu Ngân (Cashier) */}
+          {/* Trạng thái ca làm việc cho Thu Ngân (Cashier) */}
           {!isStoreOwner && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               {currentShift ? (
-                <>
-                  <div
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 5,
-                      padding: '4px 8px',
-                      borderRadius: 6,
-                      backgroundColor: '#f1f5f9',
-                      border: '1px solid #cbd5e1',
-                      fontSize: 12,
-                      color: '#334155',
-                    }}
-                    title={`Ca đang mở: ${currentShift.shiftName}`}
-                  >
-                    <span style={{ width: 7, height: 7, borderRadius: '50%', backgroundColor: '#10b981' }} />
-                    <b>{currentShift.shiftCode}</b>
-                  </div>
-
-                  {onOpenCashMovement && (
-                    <button
-                      type="button"
-                      onClick={onOpenCashMovement}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 4,
-                        padding: '4px 8px',
-                        borderRadius: 6,
-                        border: '1px solid #cbd5e1',
-                        backgroundColor: '#ffffff',
-                        color: '#0f766e',
-                        fontSize: 12,
-                        fontWeight: 600,
-                        cursor: 'pointer',
-                      }}
-                      title="Lập phiếu thu / chi tiền mặt két"
-                    >
-                      <ArrowLeftRight size={13} />
-                      <span>Thu/Chi</span>
-                    </button>
-                  )}
-                </>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 5,
+                    padding: '4px 8px',
+                    borderRadius: 6,
+                    backgroundColor: '#f1f5f9',
+                    border: '1px solid #cbd5e1',
+                    fontSize: 12,
+                    color: '#334155',
+                  }}
+                  title={`Ca đang mở: ${currentShift.shiftName}`}
+                >
+                  <span style={{ width: 7, height: 7, borderRadius: '50%', backgroundColor: '#10b981' }} />
+                  <b>{currentShift.shiftCode}</b>
+                </div>
               ) : (
                 onOpenShift && (
                   <button
@@ -641,6 +591,30 @@ export const PosHeader: FC<Props> = ({
                     <div className="item-desc">Tra cứu hóa đơn, in lại bill & xử lý đổi trả</div>
                   </div>
                 </button>
+
+                {onOpenCashMovement && (
+                  <button
+                    type="button"
+                    className="pos-dropdown-item"
+                    onClick={() => {
+                      setIsMenuOpen(false);
+                      if (!currentShift) {
+                        alert('Quầy chưa mở ca làm việc. Vui lòng mở ca trước khi lập phiếu thu/chi két.');
+                        onOpenShift?.();
+                        return;
+                      }
+                      onOpenCashMovement();
+                    }}
+                  >
+                    <ArrowLeftRight size={16} className="text-teal-700" />
+                    <div className="item-content">
+                      <div className="item-title">Thu / Chi tiền mặt két</div>
+                      <div className="item-desc">
+                        {currentShift ? 'Lập phiếu gửi tiền, rút tiền hoặc chi phát sinh tại két' : 'Cần mở ca trước khi thu/chi két'}
+                      </div>
+                    </div>
+                  </button>
+                )}
 
                 {isStoreOwner && onOpenApprovalDrawer && (
                   <button
