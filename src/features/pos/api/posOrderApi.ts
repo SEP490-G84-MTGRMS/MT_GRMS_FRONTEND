@@ -1,4 +1,5 @@
 import { httpClient } from '../../../api/httpClient';
+import { generateUuidV7 } from '../../../utils/uuid';
 import type { Product, Customer } from '../types/pos.types';
 
 export interface OrderItemCreateDto {
@@ -174,10 +175,7 @@ export const posOrderApi = {
    * Tạo đơn hàng bán lẻ POS, tự động trừ kho FEFO, tích điểm và xử lý công nợ
    */
   createOrder: async (data: OrderCreateRequest): Promise<OrderResponse> => {
-    const idempotencyKey =
-      typeof crypto !== 'undefined' && crypto.randomUUID
-        ? crypto.randomUUID()
-        : 'pos-' + Date.now() + '-' + Math.random().toString(36).substring(2, 9);
+    const idempotencyKey = generateUuidV7();
     const response = await httpClient.post<any>('/orders', data, {
       headers: {
         'Idempotency-Key': idempotencyKey,

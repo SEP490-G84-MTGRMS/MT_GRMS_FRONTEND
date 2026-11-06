@@ -10,6 +10,7 @@ import type {
   CashTransitItem,
 } from '../types/cashbook.types';
 import { financeHttpClient } from '../../../api/financeHttpClient';
+import { generateUuidV7 } from '../../../utils/uuid';
 
 export interface BackendCashbookEntryResponse {
   id: string;
@@ -546,7 +547,7 @@ export const cashbookService = {
     }
 
     if (!isMockMode()) {
-      const idempotencyKey = crypto.randomUUID();
+      const idempotencyKey = generateUuidV7();
       const res = await financeHttpClient.post<{ data: BackendCashbookEntryResponse }>(
         '/cashbook/receipts',
         {
@@ -617,7 +618,7 @@ export const cashbookService = {
     }
 
     if (!isMockMode()) {
-      const idempotencyKey = crypto.randomUUID();
+      const idempotencyKey = generateUuidV7();
       const res = await financeHttpClient.post<{ data: BackendCashbookEntryResponse }>(
         '/cashbook/payments',
         {
@@ -697,7 +698,7 @@ export const cashbookService = {
   ): Promise<LedgerTransaction> {
     if (!isMockMode()) {
       try {
-        const idempotencyKey = crypto.randomUUID();
+        const idempotencyKey = generateUuidV7();
         const res = await financeHttpClient.post<{ data: BackendCashbookEntryResponse }>(
           `/cashbook/entries/${transactionId}/void`,
           { reason: reason.trim() },
@@ -802,7 +803,7 @@ export const cashbookService = {
 
     if (!isMockMode()) {
       try {
-        const idempotencyKey = crypto.randomUUID();
+        const idempotencyKey = generateUuidV7();
         const res = await financeHttpClient.post<{
           data: { payment: BackendCashbookEntryResponse; receipt: BackendCashbookEntryResponse };
         }>(
@@ -921,7 +922,7 @@ export const cashbookService = {
     if (!isMockMode()) {
       try {
         if (diff === 0) return null;
-        const idempotencyKey = crypto.randomUUID();
+        const idempotencyKey = generateUuidV7();
         const res = await financeHttpClient.post<{ data: BackendCashbookEntryResponse | null }>(
           '/cashbook/reconcile',
           {

@@ -1,6 +1,7 @@
-﻿import { EXPENSE_CATEGORY_LABELS } from '../types/expense.types';
+import { EXPENSE_CATEGORY_LABELS } from '../types/expense.types';
 import { cashbookService } from '../../cashbook/services/cashbookService';
 import { financeHttpClient } from '../../../api/financeHttpClient';
+import { generateUuidV7 } from '../../../utils/uuid';
 import type { ApiResponse, PagedResult } from '../../../api/types';
 import type {
   CreateExpenseRequest,
@@ -9,13 +10,6 @@ import type {
   PayExpenseRequest,
   ServiceExpenseDto,
 } from '../types/expense.types';
-
-function generateUUID(): string {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-    return crypto.randomUUID();
-  }
-  return 'idemp-' + Date.now() + '-' + Math.random().toString(36).substring(2, 9);
-}
 
 function isGuid(val?: string): boolean {
   if (!val) return false;
@@ -303,7 +297,7 @@ export const createServiceExpense = async (
   data: CreateExpenseRequest
 ): Promise<ServiceExpenseDto> => {
   if (import.meta.env.MODE !== 'test') {
-    const idempotencyKey = generateUUID();
+    const idempotencyKey = generateUuidV7();
     const payload = {
       branchId: isGuid(data.branchId) ? data.branchId : null,
       beneficiaryName: data.vendorName,
@@ -363,7 +357,7 @@ export const payServiceExpense = async (
   data: PayExpenseRequest
 ): Promise<ServiceExpenseDto> => {
   if (import.meta.env.MODE !== 'test' && isGuid(expenseId)) {
-    const idempotencyKey = generateUUID();
+    const idempotencyKey = generateUuidV7();
 
     // Tự động approve nếu đang chờ duyệt
     await financeHttpClient

@@ -1,4 +1,5 @@
 import { httpClient } from '../../../api/httpClient';
+import { generateUuidV7 } from '../../../utils/uuid';
 import type {
   ShiftDetailResponse,
   OpenShiftRequest,
@@ -12,24 +13,13 @@ import type {
   PendingMovementsSummaryResponse,
 } from '../types/posShift.types';
 
-const generateUuid = (): string => {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-    return crypto.randomUUID();
-  }
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0;
-    const v = c === 'x' ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
-};
-
 export const posShiftApi = {
   /**
-   * Mở ca làm việc POS mới (Yêu cầu Idempotency-Key)
+   * Mở ca làm việc POS mới (Yêu cầu Idempotency-Key UUIDv7)
    */
   async openShift(request: OpenShiftRequest): Promise<ShiftDetailResponse> {
     const res = await httpClient.post('/pos/shifts/open', request, {
-      headers: { 'Idempotency-Key': generateUuid() },
+      headers: { 'Idempotency-Key': generateUuidV7() },
     });
     return res.data?.data || res.data;
   },
@@ -64,7 +54,7 @@ export const posShiftApi = {
    */
   async addCashMovement(shiftId: string, request: CashMovementRequest): Promise<ShiftCashMovementDto> {
     const res = await httpClient.post(`/pos/shifts/${shiftId}/cash-movements`, request, {
-      headers: { 'Idempotency-Key': generateUuid() },
+      headers: { 'Idempotency-Key': generateUuidV7() },
     });
     return res.data?.data || res.data;
   },
@@ -74,7 +64,7 @@ export const posShiftApi = {
    */
   async closeShift(shiftId: string, request: CloseShiftRequest): Promise<ShiftDetailResponse> {
     const res = await httpClient.post(`/pos/shifts/${shiftId}/close`, request, {
-      headers: { 'Idempotency-Key': generateUuid() },
+      headers: { 'Idempotency-Key': generateUuidV7() },
     });
     return res.data?.data || res.data;
   },
@@ -84,7 +74,7 @@ export const posShiftApi = {
    */
   async confirmHandover(shiftId: string, request: ConfirmHandoverRequest): Promise<ShiftDetailResponse> {
     const res = await httpClient.post(`/pos/shifts/${shiftId}/confirm-handover`, request, {
-      headers: { 'Idempotency-Key': generateUuid() },
+      headers: { 'Idempotency-Key': generateUuidV7() },
     });
     return res.data?.data || res.data;
   },
@@ -112,7 +102,7 @@ export const posShiftApi = {
    */
   async approveCashMovement(movementId: string, note?: string): Promise<ShiftCashMovementDto> {
     const res = await httpClient.post(`/pos/cash-movements/${movementId}/approve`, { note }, {
-      headers: { 'Idempotency-Key': generateUuid() },
+      headers: { 'Idempotency-Key': generateUuidV7() },
     });
     return res.data?.data || res.data;
   },
@@ -122,7 +112,7 @@ export const posShiftApi = {
    */
   async rejectCashMovement(movementId: string, reason: string): Promise<ShiftCashMovementDto> {
     const res = await httpClient.post(`/pos/cash-movements/${movementId}/reject`, { reason }, {
-      headers: { 'Idempotency-Key': generateUuid() },
+      headers: { 'Idempotency-Key': generateUuidV7() },
     });
     return res.data?.data || res.data;
   },
@@ -132,7 +122,7 @@ export const posShiftApi = {
    */
   async cancelCashMovement(movementId: string): Promise<ShiftCashMovementDto> {
     const res = await httpClient.post(`/pos/cash-movements/${movementId}/cancel`, {}, {
-      headers: { 'Idempotency-Key': generateUuid() },
+      headers: { 'Idempotency-Key': generateUuidV7() },
     });
     return res.data?.data || res.data;
   },
@@ -142,7 +132,7 @@ export const posShiftApi = {
    */
   async confirmCashDrop(movementId: string): Promise<ShiftCashMovementDto> {
     const res = await httpClient.post(`/pos/cash-movements/${movementId}/confirm-drop`, {}, {
-      headers: { 'Idempotency-Key': generateUuid() },
+      headers: { 'Idempotency-Key': generateUuidV7() },
     });
     return res.data?.data || res.data;
   },
@@ -170,7 +160,7 @@ export const posShiftApi = {
    */
   async updateCashMovementSettings(request: UpdateCashMovementSettingsRequest): Promise<CashMovementSettingsDto> {
     const res = await httpClient.put('/pos/settings/cash-movement', request, {
-      headers: { 'Idempotency-Key': generateUuid() },
+      headers: { 'Idempotency-Key': generateUuidV7() },
     });
     return res.data?.data || res.data;
   },

@@ -1,5 +1,6 @@
 import { financeHttpClient } from '../../../api/financeHttpClient';
 import type { ApiResponse } from '../../../api/types';
+import { generateUuidV7 } from '../../../utils/uuid';
 
 export interface CreateOrderItemDto {
   productId: string;
@@ -62,20 +63,13 @@ export interface OrderResponse {
   debtInvoice?: CustomerDebtInvoiceDto;
 }
 
-function generateUUID(): string {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-    return crypto.randomUUID();
-  }
-  return 'idemp-' + Date.now() + '-' + Math.random().toString(36).substring(2, 9);
-}
-
 export const posOrderApi = {
   /**
    * Tạo đơn hàng POS (hỗ trợ Tiền mặt, Ngân hàng VietQR, và Bán nợ công nợ khách hàng)
    * Tự động kiểm tra hạn mức tín dụng, sinh bút toán nợ và phiếu thu Sổ quỹ
    */
   async createOrder(request: CreateOrderRequest): Promise<OrderResponse> {
-    const idempotencyKey = generateUUID();
+    const idempotencyKey = generateUuidV7();
 
     const res = await financeHttpClient.post<ApiResponse<OrderResponse>>(
       '/orders',
