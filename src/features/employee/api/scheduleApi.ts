@@ -121,6 +121,15 @@ export interface PublishSchedulesResponse {
   message: string;
 }
 
+export type ManualAttendanceType = 1 | 2 | 3; // 1: Working (Đi làm), 2: PaidLeave (Nghỉ phép có lương), 3: UnpaidLeave (Nghỉ phép không lương)
+
+export interface ManualAttendancePayload {
+  attendanceType: ManualAttendanceType;
+  checkInTime?: string | null;  // "HH:mm" hoặc "HH:mm:ss"
+  checkOutTime?: string | null; // "HH:mm" hoặc "HH:mm:ss"
+  note?: string | null;
+}
+
 export const getShiftColor = (nameOrCode: string = ''): string => {
   const lower = nameOrCode.toLowerCase();
   if (lower.includes('sáng') || lower.includes('sang')) return '#3B82F6';
@@ -318,6 +327,18 @@ export const scheduleApi = {
       return res.data.data;
     }
     throw new Error(res.data?.message || 'Ban hành ca thất bại.');
+  },
+
+  /**
+   * Chấm công thủ công (Đi làm, Nghỉ phép có lương, Nghỉ phép không lương)
+   * Backend: POST /api/v1/schedules/{id}/attendance
+   */
+  async recordManualAttendance(id: string, payload: ManualAttendancePayload): Promise<ScheduleResponse> {
+    const res = await httpClient.post<ApiResponse<ScheduleResponse>>(`/schedules/${id}/attendance`, payload);
+    if (res.data?.success && res.data.data) {
+      return res.data.data;
+    }
+    throw new Error(res.data?.message || 'Chấm công thủ công thất bại.');
   },
 };
 

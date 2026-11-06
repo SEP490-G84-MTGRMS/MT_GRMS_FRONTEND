@@ -9,7 +9,12 @@ import {
 } from 'lucide-react';
 import type { AttendanceRecord } from '../types';
 import { shiftConfigApi, type ShiftConfigDto } from '../api/shiftConfigApi';
-import { scheduleApi, type ScheduleResponse, type UpdateSchedulePayload } from '../api/scheduleApi';
+import {
+  scheduleApi,
+  type ScheduleResponse,
+  type UpdateSchedulePayload,
+  type ManualAttendancePayload,
+} from '../api/scheduleApi';
 
 export interface AttendanceDetailModalProps {
   isOpen: boolean;
@@ -179,38 +184,67 @@ const AttendanceDetailModalContent: React.FC<AttendanceDetailModalContentProps> 
     }
   };
 
-  // Lưu thay đổi ca làm việc và trạng thái chấm công
+  // Lưu thay đổi ca làm việc và thực hiện chấm công thủ công
   const handleSave = async () => {
     setIsSaving(true);
     try {
+      // 1. Cập nhật cấu hình ca nếu người dùng chọn ca khác từ dropdown
       const selectedShiftObj = availableShifts.find((s) => s.id === selectedShiftId);
-
-      const payload: UpdateSchedulePayload = {
-        shiftConfigId: selectedShiftObj?.id || record.shiftConfigId,
-        shiftCode: selectedShiftObj?.shiftCode || record.shiftCode,
-        shiftName: selectedShiftObj?.shiftName || record.shiftName,
-        plannedStartTime: selectedShiftObj?.startTime
-          ? `${selectedShiftObj.startTime.substring(0, 5)}:00`
-          : undefined,
-        plannedEndTime: selectedShiftObj?.endTime
-          ? `${selectedShiftObj.endTime.substring(0, 5)}:00`
-          : undefined,
-        durationHours: selectedShiftObj?.durationHours,
-        status:
-          attendanceType === 'paid_leave' || attendanceType === 'unpaid_leave'
-            ? 'Cancelled'
+      if (selectedShiftObj && selectedShiftObj.id !== record.shiftConfigId && record.id) {
+        const updatePayload: UpdateSchedulePayload = {
+          shiftConfigId: selectedShiftObj.id,
+          shiftCode: selectedShiftObj.shiftCode,
+          shiftName: selectedShiftObj.shiftName,
+          plannedStartTime: selectedShiftObj.startTime
+            ? `${selectedShiftObj.startTime.substring(0, 5)}:00`
             : undefined,
-      };
-
-      if (record.id) {
-        await scheduleApi.updateSchedule(record.id, payload).catch((err) => {
+          plannedEndTime: selectedShiftObj.endTime
+            ? `${selectedShiftObj.endTime.substring(0, 5)}:00`
+            : undefined,
+          durationHours: selectedShiftObj.durationHours,
+        };
+        await scheduleApi.updateSchedule(record.id, updatePayload).catch((err) => {
           console.warn('Lỗi gọi updateSchedule backend:', err);
         });
       }
 
-      if (onUpdateStatus) {
+      // 2. Chấm công thủ công theo 3 tiêu chí: Đi làm, Nghỉ phép có lương, Nghỉ phép không lương
+      const attendanceTypeMap = {
+        working: 1 as const,
+        paid_leave: 2 as const,
+        unpaid_leave: 3 as const,
+      };
+
+      const manualPayload: ManualAttendancePayload = {
+        attendanceType: attendanceTypeMap[attendanceType],
+        checkInTime:
+          attendanceType === 'working' && hasCheckIn && checkInTime
+            ? `${checkInTime.substring(0, 5)}:00`
+            : null,
+        checkOutTime:
+          attendanceType === 'working' && hasCheckOut && checkOutTime
+            ? `${checkOutTime.substring(0, 5)}:00`
+            : null,
+        note: note.trim() || null,
+      };
+
+      let recordedResult: ScheduleResponse | null = null;
+      if (record.id) {
+        recordedResult = await scheduleApi.recordManualAttendance(record.id, manualPayload);
+      }
+
+      // 3. Cập nhật trạng thái hiển thị của record lên component cha
+      if (onUpdateStatus && record.id) {
         if (attendanceType === 'paid_leave' || attendanceType === 'unpaid_leave') {
           onUpdateStatus(record.id, 'absent');
+        } else if (recordedResult) {
+          if (recordedResult.lateMinutes > 0) {
+            onUpdateStatus(record.id, 'late');
+          } else if (recordedResult.earlyLeaveMinutes > 0) {
+            onUpdateStatus(record.id, 'early');
+          } else {
+            onUpdateStatus(record.id, 'ontime');
+          }
         } else {
           onUpdateStatus(record.id, 'ontime');
         }
