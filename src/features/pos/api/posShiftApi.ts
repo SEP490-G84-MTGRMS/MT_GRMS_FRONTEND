@@ -12,12 +12,25 @@ import type {
   PendingMovementsSummaryResponse,
 } from '../types/posShift.types';
 
+const generateUuid = (): string => {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+};
+
 export const posShiftApi = {
   /**
-   * Mở ca làm việc POS mới
+   * Mở ca làm việc POS mới (Yêu cầu Idempotency-Key)
    */
   async openShift(request: OpenShiftRequest): Promise<ShiftDetailResponse> {
-    const res = await httpClient.post('/pos/shifts/open', request);
+    const res = await httpClient.post('/pos/shifts/open', request, {
+      headers: { 'Idempotency-Key': generateUuid() },
+    });
     return res.data?.data || res.data;
   },
 
@@ -47,26 +60,32 @@ export const posShiftApi = {
   },
 
   /**
-   * Thêm phiếu thu/chi trong ca (Nạp tiền, Chi vặt, Rút két nộp chủ...)
+   * Thêm phiếu thu/chi trong ca (Nạp tiền, Chi vặt, Rút két nộp chủ...) (Yêu cầu Idempotency-Key)
    */
   async addCashMovement(shiftId: string, request: CashMovementRequest): Promise<ShiftCashMovementDto> {
-    const res = await httpClient.post(`/pos/shifts/${shiftId}/cash-movements`, request);
+    const res = await httpClient.post(`/pos/shifts/${shiftId}/cash-movements`, request, {
+      headers: { 'Idempotency-Key': generateUuid() },
+    });
     return res.data?.data || res.data;
   },
 
   /**
-   * Chốt ca bán hàng POS và kết toán kiểm đếm
+   * Chốt ca bán hàng POS và kết toán kiểm đếm (Yêu cầu Idempotency-Key)
    */
   async closeShift(shiftId: string, request: CloseShiftRequest): Promise<ShiftDetailResponse> {
-    const res = await httpClient.post(`/pos/shifts/${shiftId}/close`, request);
+    const res = await httpClient.post(`/pos/shifts/${shiftId}/close`, request, {
+      headers: { 'Idempotency-Key': generateUuid() },
+    });
     return res.data?.data || res.data;
   },
 
   /**
-   * Xác nhận bàn giao ca (CONFIRMED hoặc DISPUTED)
+   * Xác nhận bàn giao ca (CONFIRMED hoặc DISPUTED) (Yêu cầu Idempotency-Key)
    */
   async confirmHandover(shiftId: string, request: ConfirmHandoverRequest): Promise<ShiftDetailResponse> {
-    const res = await httpClient.post(`/pos/shifts/${shiftId}/confirm-handover`, request);
+    const res = await httpClient.post(`/pos/shifts/${shiftId}/confirm-handover`, request, {
+      headers: { 'Idempotency-Key': generateUuid() },
+    });
     return res.data?.data || res.data;
   },
 
@@ -89,34 +108,42 @@ export const posShiftApi = {
   },
 
   /**
-   * Chủ cửa hàng phê duyệt phiếu chi
+   * Chủ cửa hàng phê duyệt phiếu chi (Yêu cầu Idempotency-Key)
    */
   async approveCashMovement(movementId: string, note?: string): Promise<ShiftCashMovementDto> {
-    const res = await httpClient.post(`/pos/cash-movements/${movementId}/approve`, { note });
+    const res = await httpClient.post(`/pos/cash-movements/${movementId}/approve`, { note }, {
+      headers: { 'Idempotency-Key': generateUuid() },
+    });
     return res.data?.data || res.data;
   },
 
   /**
-   * Chủ cửa hàng từ chối phiếu chi
+   * Chủ cửa hàng từ chối phiếu chi (Yêu cầu Idempotency-Key)
    */
   async rejectCashMovement(movementId: string, reason: string): Promise<ShiftCashMovementDto> {
-    const res = await httpClient.post(`/pos/cash-movements/${movementId}/reject`, { reason });
+    const res = await httpClient.post(`/pos/cash-movements/${movementId}/reject`, { reason }, {
+      headers: { 'Idempotency-Key': generateUuid() },
+    });
     return res.data?.data || res.data;
   },
 
   /**
-   * Nhân viên hủy yêu cầu chi đang pending
+   * Nhân viên hủy yêu cầu chi đang pending (Yêu cầu Idempotency-Key)
    */
   async cancelCashMovement(movementId: string): Promise<ShiftCashMovementDto> {
-    const res = await httpClient.post(`/pos/cash-movements/${movementId}/cancel`);
+    const res = await httpClient.post(`/pos/cash-movements/${movementId}/cancel`, {}, {
+      headers: { 'Idempotency-Key': generateUuid() },
+    });
     return res.data?.data || res.data;
   },
 
   /**
-   * Chủ cửa hàng xác nhận đã nhận tiền rút két (CashDrop)
+   * Chủ cửa hàng xác nhận đã nhận tiền rút két (CashDrop) (Yêu cầu Idempotency-Key)
    */
   async confirmCashDrop(movementId: string): Promise<ShiftCashMovementDto> {
-    const res = await httpClient.post(`/pos/cash-movements/${movementId}/confirm-drop`);
+    const res = await httpClient.post(`/pos/cash-movements/${movementId}/confirm-drop`, {}, {
+      headers: { 'Idempotency-Key': generateUuid() },
+    });
     return res.data?.data || res.data;
   },
 
@@ -139,10 +166,12 @@ export const posShiftApi = {
   },
 
   /**
-   * Cập nhật cấu hình hạn mức duyệt chi két
+   * Cập nhật cấu hình hạn mức duyệt chi két (Yêu cầu Idempotency-Key)
    */
   async updateCashMovementSettings(request: UpdateCashMovementSettingsRequest): Promise<CashMovementSettingsDto> {
-    const res = await httpClient.put('/pos/settings/cash-movement', request);
+    const res = await httpClient.put('/pos/settings/cash-movement', request, {
+      headers: { 'Idempotency-Key': generateUuid() },
+    });
     return res.data?.data || res.data;
   },
 };

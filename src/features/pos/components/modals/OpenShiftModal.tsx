@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import type { FC } from 'react';
-import { DoorOpen, AlertCircle, CheckCircle } from 'lucide-react';
+import { DoorOpen, AlertCircle, CheckCircle2, Banknote, X } from 'lucide-react';
 import { posShiftApi } from '../../api/posShiftApi';
 import type { ShiftDetailResponse } from '../../types/posShift.types';
 import { useAuthStore } from '../../../../stores/useAuthStore';
@@ -18,7 +18,7 @@ interface Props {
 export const OpenShiftModal: FC<Props> = ({
   isOpen,
   branchId,
-  branchName = 'Chi nhánh chính',
+  branchName = 'Chi nhánh Ba Đình',
   tillId = 'cd5e8d1b-b08b-448d-beff-b85ea5873d52',
   onShiftOpened,
   onCancel,
@@ -53,7 +53,6 @@ export const OpenShiftModal: FC<Props> = ({
           setOpeningFloat(expected);
         }
       } catch {
-        // Fallback default
         setOpeningFloatExpected(1500000);
         setOpeningFloat(1500000);
       }
@@ -90,170 +89,366 @@ export const OpenShiftModal: FC<Props> = ({
   };
 
   return (
-    <div className="pos-modal-overlay">
-      <div className="pos-modal-dialog" style={{ maxWidth: 520 }} onClick={(e) => e.stopPropagation()}>
-        <div className="pos-modal-header" style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: 12 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <div style={{ padding: 6, borderRadius: 8, backgroundColor: '#ccfbf1', color: '#0f766e' }}>
-              <DoorOpen size={20} />
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 1100,
+        backgroundColor: 'rgba(15, 23, 42, 0.65)',
+        backdropFilter: 'blur(4px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 16,
+      }}
+    >
+      <div
+        style={{
+          width: '100%',
+          maxWidth: 540,
+          backgroundColor: '#ffffff',
+          borderRadius: 16,
+          boxShadow: '0 20px 40px -8px rgba(0, 0, 0, 0.25)',
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+          animation: 'fadeIn 0.2s ease-out',
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header sang trọng với tông màu Teal chủ đạo */}
+        <div
+          style={{
+            padding: '18px 24px',
+            backgroundColor: '#f8fafc',
+            borderBottom: '1px solid #e2e8f0',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div
+              style={{
+                width: 42,
+                height: 42,
+                borderRadius: 12,
+                backgroundColor: '#ccfbf1',
+                color: '#0f766e',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 2px 6px rgba(15, 118, 110, 0.15)',
+              }}
+            >
+              <DoorOpen size={22} strokeWidth={2.2} />
             </div>
             <div>
-              <h2 className="pos-modal-title" style={{ fontSize: 16, fontWeight: 700, margin: 0 }}>
+              <h2 style={{ fontSize: 17, fontWeight: 800, margin: 0, color: '#0f172a' }}>
                 Mở Ca Làm Việc POS
               </h2>
-              <p style={{ margin: 0, fontSize: 12, color: '#64748b' }}>
-                {branchName} • Thu ngân: <b>{user?.fullName || 'Thu ngân'}</b>
+              <p style={{ margin: '3px 0 0', fontSize: 12.5, color: '#64748b' }}>
+                <span style={{ fontWeight: 600, color: '#0f766e' }}>{branchName}</span> • Thu ngân:{' '}
+                <b style={{ color: '#1e293b' }}>{user?.fullName || 'Thu ngân'}</b>
               </p>
             </div>
           </div>
+
           {canCancel && onCancel && (
-            <button type="button" className="pos-modal-close-btn" onClick={onCancel}>
-              &times;
+            <button
+              type="button"
+              onClick={onCancel}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#94a3b8',
+                cursor: 'pointer',
+                padding: 6,
+                borderRadius: 8,
+              }}
+            >
+              <X size={20} />
             </button>
           )}
         </div>
 
+        {/* Form Body */}
         <form onSubmit={handleSubmit}>
-          <div className="pos-modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14, paddingTop: 16 }}>
+          <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 18 }}>
             {errorMsg && (
               <div
                 style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: 8,
-                  padding: '8px 12px',
-                  borderRadius: 6,
+                  gap: 10,
+                  padding: '12px 14px',
+                  borderRadius: 10,
                   backgroundColor: '#fef2f2',
                   border: '1px solid #fecaca',
                   color: '#b91c1c',
                   fontSize: 13,
+                  lineHeight: 1.45,
                 }}
               >
-                <AlertCircle size={16} />
+                <AlertCircle size={18} style={{ flexShrink: 0 }} />
                 <span>{errorMsg}</span>
               </div>
             )}
 
-            <div className="modal-form-group">
-              <label className="modal-label" style={{ fontWeight: 600, fontSize: 13, color: '#334155' }}>
+            {/* Tên ca */}
+            <div>
+              <label
+                style={{
+                  display: 'block',
+                  fontSize: 13,
+                  fontWeight: 700,
+                  color: '#334155',
+                  marginBottom: 6,
+                }}
+              >
                 Tên ca làm việc (*):
               </label>
               <input
                 type="text"
                 value={shiftName}
                 onChange={(e) => setShiftName(e.target.value)}
-                className="modal-input"
                 placeholder="VD: Ca Sáng - 06/11/2026"
+                style={{
+                  width: '100%',
+                  height: 42,
+                  padding: '0 14px',
+                  borderRadius: 8,
+                  border: '1.5px solid #cbd5e1',
+                  fontSize: 14,
+                  fontWeight: 600,
+                  color: '#1e293b',
+                  backgroundColor: '#ffffff',
+                  outline: 'none',
+                  boxSizing: 'border-box',
+                }}
+                onFocus={(e) => {
+                  e.target.style.borderColor = '#0f766e';
+                  e.target.style.boxShadow = '0 0 0 3px rgba(15, 118, 110, 0.12)';
+                }}
+                onBlur={(e) => {
+                  e.target.style.borderColor = '#cbd5e1';
+                  e.target.style.boxShadow = 'none';
+                }}
                 required
               />
             </div>
 
-            {/* Thông tin tiền mặt kế thừa từ ca trước */}
+            {/* CARD KIỂM KÊ TIỀN MẶT ĐẦU CA */}
             <div
               style={{
-                backgroundColor: '#f8fafc',
-                border: '1px solid #e2e8f0',
-                borderRadius: 8,
-                padding: '12px 14px',
+                borderRadius: 12,
+                border: '1.5px solid #ccfbf1',
+                backgroundColor: '#f0fdfa',
+                padding: '16px 18px',
                 display: 'flex',
                 flexDirection: 'column',
-                gap: 8,
+                gap: 14,
               }}
             >
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-                <span style={{ color: '#64748b' }}>Tiền ca trước bàn giao lại két (A_expected):</span>
-                <span style={{ fontWeight: 700, color: '#0f766e', fontFamily: 'monospace' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#0f766e', fontSize: 13, fontWeight: 700 }}>
+                  <Banknote size={17} />
+                  <span>Kế thừa tiền bàn giao ca trước (A_expected):</span>
+                </div>
+                <div
+                  style={{
+                    padding: '3px 10px',
+                    borderRadius: 6,
+                    backgroundColor: '#ffffff',
+                    border: '1px solid #99f6e4',
+                    fontFamily: 'monospace',
+                    fontWeight: 800,
+                    fontSize: 14,
+                    color: '#0f766e',
+                  }}
+                >
                   {openingFloatExpected.toLocaleString('vi-VN')} đ
-                </span>
+                </div>
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <label className="modal-label" style={{ fontWeight: 600, fontSize: 13, margin: 0, color: '#1e293b' }}>
-                  Tiền mặt thực tế đếm được (A) (*):
+              {/* Ô NHẬP TIỀN THỰC TẾ TRONG KÉT */}
+              <div>
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: 13,
+                    fontWeight: 700,
+                    color: '#134e4a',
+                    marginBottom: 6,
+                  }}
+                >
+                  Tiền mặt thực tế trong két khi mở ca (A) (*):
                 </label>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
                   <input
                     type="number"
                     min={0}
                     step={1000}
                     value={openingFloat === 0 ? '' : openingFloat}
                     onChange={(e) => setOpeningFloat(Number(e.target.value) || 0)}
-                    className="modal-input font-mono font-bold"
-                    style={{ width: 160, textAlign: 'right', fontSize: 14, color: '#0f766e' }}
+                    placeholder="0"
+                    style={{
+                      width: '100%',
+                      height: 48,
+                      padding: '0 48px 0 16px',
+                      borderRadius: 10,
+                      border: '2px solid #0f766e',
+                      fontSize: 18,
+                      fontWeight: 800,
+                      fontFamily: 'monospace',
+                      color: '#0f766e',
+                      backgroundColor: '#ffffff',
+                      outline: 'none',
+                      boxSizing: 'border-box',
+                      boxShadow: '0 2px 4px rgba(15, 118, 110, 0.08)',
+                    }}
+                    onFocus={(e) => {
+                      e.target.style.boxShadow = '0 0 0 4px rgba(15, 118, 110, 0.2)';
+                    }}
+                    onBlur={(e) => {
+                      e.target.style.boxShadow = '0 2px 4px rgba(15, 118, 110, 0.08)';
+                    }}
                     required
                   />
-                  <span style={{ fontSize: 13, fontWeight: 600, color: '#64748b' }}>đ</span>
+                  <span
+                    style={{
+                      position: 'absolute',
+                      right: 14,
+                      fontSize: 15,
+                      fontWeight: 800,
+                      color: '#0f766e',
+                      pointerEvents: 'none',
+                    }}
+                  >
+                    đ
+                  </span>
                 </div>
               </div>
 
-              {/* Chênh lệch */}
+              {/* Nút bấm chọn số tiền nhanh */}
+              <div>
+                <div style={{ fontSize: 11.5, fontWeight: 600, color: '#115e59', marginBottom: 6 }}>
+                  Chọn nhanh số tiền thông dụng:
+                </div>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  {[500000, 1000000, 1500000, 2000000, 3000000].map((val) => {
+                    const isSelected = openingFloat === val;
+                    return (
+                      <button
+                        key={val}
+                        type="button"
+                        onClick={() => setOpeningFloat(val)}
+                        style={{
+                          padding: '6px 12px',
+                          fontSize: 12.5,
+                          fontWeight: 700,
+                          borderRadius: 6,
+                          border: isSelected ? '1.5px solid #0f766e' : '1px solid #99f6e4',
+                          backgroundColor: isSelected ? '#0f766e' : '#ffffff',
+                          color: isSelected ? '#ffffff' : '#0f766e',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease',
+                        }}
+                      >
+                        {val >= 1000000 ? `${val / 1000000} Triệu` : `${val / 1000}k`}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Chênh lệch đầu ca */}
               <div
                 style={{
                   display: 'flex',
                   justifyContent: 'space-between',
-                  fontSize: 12.5,
-                  paddingTop: 4,
-                  borderTop: '1px dashed #cbd5e1',
+                  alignItems: 'center',
+                  paddingTop: 10,
+                  borderTop: '1px dashed #99f6e4',
                 }}
               >
-                <span style={{ color: '#64748b' }}>Chênh lệch đầu ca (A - A_expected):</span>
+                <span style={{ fontSize: 12.5, fontWeight: 600, color: '#134e4a' }}>
+                  Chênh lệch đầu ca (A - A_expected):
+                </span>
                 <span
                   style={{
-                    fontWeight: 700,
+                    padding: '3px 10px',
+                    borderRadius: 6,
+                    fontSize: 12.5,
+                    fontWeight: 800,
                     fontFamily: 'monospace',
-                    color: discrepancy === 0 ? '#10b981' : discrepancy > 0 ? '#0284c7' : '#ef4444',
+                    backgroundColor: discrepancy === 0 ? '#dcfce7' : discrepancy > 0 ? '#e0f2fe' : '#fee2e2',
+                    color: discrepancy === 0 ? '#15803d' : discrepancy > 0 ? '#0369a1' : '#b91c1c',
+                    border: discrepancy === 0 ? '1px solid #86efac' : discrepancy > 0 ? '1px solid #7dd3fc' : '1px solid #fca5a5',
                   }}
                 >
-                  {discrepancy > 0 ? `+${discrepancy.toLocaleString('vi-VN')}` : discrepancy.toLocaleString('vi-VN')} đ
-                  {discrepancy === 0 && ' (Khớp 100%)'}
+                  {discrepancy === 0 ? (
+                    '✓ Khớp 100% (0 đ)'
+                  ) : discrepancy > 0 ? (
+                    `+${discrepancy.toLocaleString('vi-VN')} đ (Thừa tiền)`
+                  ) : (
+                    `${discrepancy.toLocaleString('vi-VN')} đ (Thiếu tiền)`
+                  )}
                 </span>
               </div>
             </div>
 
-            {/* Nút bấm mệnh giá nhanh */}
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-              {[500000, 1000000, 1500000, 2000000, 3000000].map((val) => (
-                <button
-                  key={val}
-                  type="button"
-                  onClick={() => setOpeningFloat(val)}
-                  style={{
-                    padding: '4px 8px',
-                    fontSize: 12,
-                    borderRadius: 4,
-                    border: openingFloat === val ? '1px solid #0f766e' : '1px solid #cbd5e1',
-                    backgroundColor: openingFloat === val ? '#ccfbf1' : '#ffffff',
-                    color: openingFloat === val ? '#0f766e' : '#475569',
-                    cursor: 'pointer',
-                  }}
-                >
-                  {val.toLocaleString('vi-VN')} đ
-                </button>
-              ))}
-            </div>
-
-            <div className="modal-form-group">
-              <label className="modal-label" style={{ fontSize: 12.5, color: '#64748b' }}>
+            {/* Ghi chú */}
+            <div>
+              <label
+                style={{
+                  display: 'block',
+                  fontSize: 12.5,
+                  fontWeight: 600,
+                  color: '#64748b',
+                  marginBottom: 6,
+                }}
+              >
                 Ghi chú mở ca (tùy chọn):
               </label>
               <textarea
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                className="modal-input"
                 rows={2}
-                placeholder="Ví dụ: Đã nhận tiền lẻ 10k, 20k đầy đủ..."
+                placeholder="VD: Két có đủ mệnh giá tiền lẻ 10k, 20k, 50k..."
+                style={{
+                  width: '100%',
+                  padding: '10px 14px',
+                  borderRadius: 8,
+                  border: '1.5px solid #cbd5e1',
+                  fontSize: 13,
+                  color: '#1e293b',
+                  backgroundColor: '#ffffff',
+                  outline: 'none',
+                  boxSizing: 'border-box',
+                  resize: 'none',
+                }}
+                onFocus={(e) => {
+                  e.target.style.borderColor = '#0f766e';
+                  e.target.style.boxShadow = '0 0 0 3px rgba(15, 118, 110, 0.12)';
+                }}
+                onBlur={(e) => {
+                  e.target.style.borderColor = '#cbd5e1';
+                  e.target.style.boxShadow = 'none';
+                }}
               />
             </div>
           </div>
 
+          {/* Footer nút hành động */}
           <div
-            className="pos-modal-footer"
             style={{
+              padding: '16px 24px',
+              backgroundColor: '#f8fafc',
+              borderTop: '1px solid #e2e8f0',
               display: 'flex',
               justifyContent: 'flex-end',
-              gap: 10,
-              paddingTop: 12,
-              borderTop: '1px solid #e2e8f0',
+              gap: 12,
             }}
           >
             {canCancel && onCancel && (
@@ -261,12 +456,13 @@ export const OpenShiftModal: FC<Props> = ({
                 type="button"
                 onClick={onCancel}
                 style={{
-                  padding: '8px 16px',
-                  borderRadius: 6,
-                  border: '1px solid #cbd5e1',
+                  padding: '10px 20px',
+                  borderRadius: 8,
+                  border: '1.5px solid #cbd5e1',
                   backgroundColor: '#ffffff',
                   color: '#475569',
                   fontWeight: 600,
+                  fontSize: 13.5,
                   cursor: 'pointer',
                 }}
               >
@@ -280,19 +476,22 @@ export const OpenShiftModal: FC<Props> = ({
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: 6,
-                padding: '8px 20px',
-                borderRadius: 6,
+                gap: 8,
+                padding: '10px 24px',
+                borderRadius: 8,
                 backgroundColor: '#0f766e',
                 color: '#ffffff',
                 border: 'none',
-                fontWeight: 600,
-                cursor: isLoading ? 'not-allowed' : 'pointer',
-                opacity: isLoading ? 0.7 : 1,
+                fontWeight: 700,
+                fontSize: 14,
+                cursor: isLoading || openingFloat < 0 ? 'not-allowed' : 'pointer',
+                opacity: isLoading || openingFloat < 0 ? 0.7 : 1,
+                boxShadow: '0 2px 8px rgba(15, 118, 110, 0.3)',
+                transition: 'all 0.15s ease',
               }}
             >
-              <CheckCircle size={16} />
-              <span>{isLoading ? 'Đang mở ca...' : 'Bắt Đầu Ca Bán Hàng'}</span>
+              <CheckCircle2 size={18} />
+              <span>{isLoading ? 'Đang kích hoạt ca...' : 'Bắt Đầu Ca Bán Hàng'}</span>
             </button>
           </div>
         </form>
