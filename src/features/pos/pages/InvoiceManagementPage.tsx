@@ -63,22 +63,39 @@ export const InvoiceManagementPage: FC = () => {
   const { user } = useAuthStore();
   const currentTenantId = user?.tenantId || 'tenant_mt_mart_01';
   const isDefaultDemoStore = currentTenantId === 'tenant_mt_mart_01';
+  const isAnNhienStore = currentTenantId === 'tenant_an_nhien_02';
 
-  // Quyền hạn tài khoản: Chỉ STORE_OWNER (Chủ cửa hàng) mới có quyền xem toàn chuỗi và hủy hóa đơn đã thanh toán
-  const isStoreOwner = user?.role === 'STORE_OWNER';
-  const isStoreOwnerOrManager = isStoreOwner;
-  const activeBranchId = user?.branchId || 'BR-01';
+  // Quyền hạn tài khoản: Chỉ STORE_OWNER / ADMIN mới có quyền xem toàn chuỗi và hủy hóa đơn đã thanh toán
+  const isStoreOwner = user?.role === 'STORE_OWNER' || user?.role === 'ADMIN';
+  const isStoreOwnerOrManager = isStoreOwner || user?.role === 'MANAGER';
 
-  // Bộ lọc chi nhánh (Multi-Branch Filter)
-  const [branchFilter, setBranchFilter] = useState<string>('ALL');
+  // Chi nhánh được giao ca của nhân viên
+  const assignedBranch = useMemo(() => {
+    if (user?.branchId) {
+      if (isAnNhienStore) {
+        const found = AN_NHIEN_BRANCHES.find((b) => b.id === user.branchId);
+        if (found) return found;
+      }
+      return { id: user.branchId, name: 'Chi nhánh được phân công' };
+    }
+    if (isAnNhienStore) {
+      if (user?.fullName?.includes('Nam') || user?.fullName?.includes('Cầu Giấy')) {
+        return AN_NHIEN_BRANCHES[1] || { id: 'BR-AN-02', name: 'An Nhiên Mart - Chi nhánh Cầu Giấy' };
+      }
+      return AN_NHIEN_BRANCHES[0] || { id: 'BR-AN-01', name: 'An Nhiên Mart - Chi nhánh Ba Đình' };
+    }
+    return { id: 'BR-01', name: 'Chi nhánh Cầu Giấy (Trung tâm)' };
+  }, [user, isAnNhienStore]);
+
+  // Bộ lọc chi nhánh (Multi-Branch Filter): Nhân viên luôn cố định theo chi nhánh được giao ca
+  const [branchFilter, setBranchFilter] = useState<string>(() => (isStoreOwner ? 'ALL' : assignedBranch.id));
 
   // Nếu không phải Chủ cửa hàng (Thu ngân / Quản lý quầy), cố định theo chi nhánh được phân công
   useEffect(() => {
     if (!isStoreOwner) {
-      setBranchFilter(activeBranchId);
+      setBranchFilter(assignedBranch.id);
     }
-  }, [isStoreOwner, activeBranchId]);
-  const isAnNhienStore = currentTenantId === 'tenant_an_nhien_02';
+  }, [isStoreOwner, assignedBranch.id]);
 
   const getInitialInvoices = () => {
     if (isDefaultDemoStore) return mockInvoicesList;
@@ -222,6 +239,11 @@ export const InvoiceManagementPage: FC = () => {
 
   // Danh sách các chi nhánh có trong hệ thống (Tự động hợp nhất từ CSDL & cấu hình chuỗi)
   const availableBranches = useMemo(() => {
+    if (!isStoreOwner) {
+      // Nhân viên thu ngân chỉ thấy chi nhánh được phân công của mình
+      return [assignedBranch];
+    }
+
     const map = new Map<string, string>();
     if (isAnNhienStore) {
       AN_NHIEN_BRANCHES.forEach((b) => map.set(b.id, b.name));
@@ -243,8 +265,8 @@ export const InvoiceManagementPage: FC = () => {
     });
 
     const list = Array.from(map.entries()).map(([id, name]) => ({ id, name }));
-    return [{ id: 'ALL', name: isStoreOwner ? 'Tất cả chi nhánh (Toàn chuỗi)' : 'Toàn bộ chi nhánh' }, ...list];
-  }, [invoices, preOrders, isAnNhienStore, isStoreOwner]);
+    return [{ id: 'ALL', name: 'Tất cả chi nhánh (Toàn chuỗi)' }, ...list];
+  }, [invoices, preOrders, isAnNhienStore, isStoreOwner, assignedBranch]);
 
   // Modal Xác nhận hủy hóa đơn
   const [cancelModalInvoice, setCancelModalInvoice] = useState<InvoiceDTO | null>(null);
@@ -425,11 +447,11 @@ export const InvoiceManagementPage: FC = () => {
       const newPreOrder: PreOrderDTO = {
         preOrderId: createdCode || `PO-${Math.floor(1000 + Math.random() * 9000)}`,
         createdAt: new Date().toLocaleString('vi-VN'),
-        branchId: branchFilter !== 'ALL' ? branchFilter : 'BR-01',
+        branchId: branchFilter !== 'ALL' ? branchFilter : assignedBranch.id,
         branchName:
           branchFilter !== 'ALL'
-            ? availableBranches.find((b) => b.id === branchFilter)?.name || 'Chi nhánh Cầu Giấy (Trung tâm)'
-            : 'Chi nhánh Cầu Giấy (Trung tâm)',
+            ? availableBranches.find((b) => b.id === branchFilter)?.name || assignedBranch.name
+            : assignedBranch.name,
         customerName: data.customerName,
         customerPhone: data.customerPhone,
         pickupAppointment: new Date(data.expectedPickupDate).toLocaleString('vi-VN'),
@@ -505,25 +527,31 @@ export const InvoiceManagementPage: FC = () => {
   // Lọc Hóa đơn
   const filteredInvoices = useMemo(() => {
     return invoices.filter((inv) => {
-      // Khi đang gõ tìm kiếm mã hóa đơn hoặc SĐT khách để đổi/trả hàng -> Tìm trên toàn bộ hóa đơn
-      const isSearching = searchQuery.trim().length > 0;
+      // Khi là Chủ cửa hàng đang gõ tìm kiếm -> Cho phép tìm toàn chuỗi
+      // Nhưng nếu là Nhân viên -> BẮT BUỘC chỉ tìm trong chi nhánh của mình
+      const isSearching = isStoreOwner && searchQuery.trim().length > 0;
 
-      const matchBranch =
-        isSearching ||
-        branchFilter === 'ALL' ||
-        inv.branchId === branchFilter ||
-        // Ba Đình
-        ((branchFilter === 'BR-AN-01' || branchFilter === 'cd5e8d1b-b08b-448d-beff-b85ea5873d52') &&
-          (inv.branchId === 'BR-AN-01' || inv.branchId === 'cd5e8d1b-b08b-448d-beff-b85ea5873d52' || inv.branchName?.includes('Ba Đình'))) ||
-        // Cầu Giấy
-        ((branchFilter === 'BR-01' || branchFilter === 'BR-AN-02') &&
-          (inv.branchId === 'BR-01' || inv.branchId === 'BR-AN-02' || inv.branchName?.includes('Cầu Giấy'))) ||
-        // Thanh Xuân
-        (branchFilter === 'BR-02' && (inv.branchId === 'BR-02' || inv.branchName?.includes('Thanh Xuân'))) ||
-        // Đống Đa
-        (branchFilter === 'BR-AN-03' && (inv.branchId === 'BR-AN-03' || inv.branchName?.includes('Đống Đa'))) ||
-        // Quận 1
-        (branchFilter === 'BR-03' && (inv.branchId === 'BR-03' || inv.branchName?.includes('Quận 1')));
+      const matchBranch = !isStoreOwner
+        ? // Nhân viên: BẮT BUỘC chỉ khớp chi nhánh được giao ca
+          (inv.branchId === branchFilter ||
+           ((branchFilter === 'BR-AN-01' || branchFilter === 'cd5e8d1b-b08b-448d-beff-b85ea5873d52') &&
+             (inv.branchId === 'BR-AN-01' || inv.branchId === 'cd5e8d1b-b08b-448d-beff-b85ea5873d52' || inv.branchName?.includes('Ba Đình'))) ||
+           ((branchFilter === 'BR-01' || branchFilter === 'BR-AN-02') &&
+             (inv.branchId === 'BR-01' || inv.branchId === 'BR-AN-02' || inv.branchName?.includes('Cầu Giấy'))) ||
+           (branchFilter === 'BR-02' && (inv.branchId === 'BR-02' || inv.branchName?.includes('Thanh Xuân'))) ||
+           (branchFilter === 'BR-AN-03' && (inv.branchId === 'BR-AN-03' || inv.branchName?.includes('Đống Đa'))) ||
+           (branchFilter === 'BR-03' && (inv.branchId === 'BR-03' || inv.branchName?.includes('Quận 1'))))
+        : // Chủ cửa hàng:
+          (isSearching ||
+           branchFilter === 'ALL' ||
+           inv.branchId === branchFilter ||
+           ((branchFilter === 'BR-AN-01' || branchFilter === 'cd5e8d1b-b08b-448d-beff-b85ea5873d52') &&
+             (inv.branchId === 'BR-AN-01' || inv.branchId === 'cd5e8d1b-b08b-448d-beff-b85ea5873d52' || inv.branchName?.includes('Ba Đình'))) ||
+           ((branchFilter === 'BR-01' || branchFilter === 'BR-AN-02') &&
+             (inv.branchId === 'BR-01' || inv.branchId === 'BR-AN-02' || inv.branchName?.includes('Cầu Giấy'))) ||
+           (branchFilter === 'BR-02' && (inv.branchId === 'BR-02' || inv.branchName?.includes('Thanh Xuân'))) ||
+           (branchFilter === 'BR-AN-03' && (inv.branchId === 'BR-AN-03' || inv.branchName?.includes('Đống Đa'))) ||
+           (branchFilter === 'BR-03' && (inv.branchId === 'BR-03' || inv.branchName?.includes('Quận 1'))));
 
       const cleanQuery = searchQuery.trim().toLowerCase();
       const matchSearch =
@@ -542,7 +570,7 @@ export const InvoiceManagementPage: FC = () => {
 
       return matchBranch && matchSearch && matchMethod && matchStatus;
     });
-  }, [invoices, searchQuery, paymentMethodFilter, statusFilter, branchFilter]);
+  }, [invoices, searchQuery, paymentMethodFilter, statusFilter, branchFilter, isStoreOwner]);
 
   // Phân trang dữ liệu Hóa đơn
   const paginatedInvoices = useMemo(() => {
@@ -553,12 +581,28 @@ export const InvoiceManagementPage: FC = () => {
   // Lọc Đơn đặt trước
   const filteredPreOrders = useMemo(() => {
     return preOrders.filter((p) => {
-      const matchBranch =
-        branchFilter === 'ALL' ||
-        p.branchId === branchFilter ||
-        (branchFilter === 'BR-01' && (p.branchId === 'BR-01' || p.branchName?.includes('Cầu Giấy'))) ||
-        (branchFilter === 'BR-02' && (p.branchId === 'BR-02' || p.branchName?.includes('Thanh Xuân'))) ||
-        (branchFilter === 'BR-03' && (p.branchId === 'BR-03' || p.branchName?.includes('Quận 1')));
+      const isSearching = isStoreOwner && searchQuery.trim().length > 0;
+
+      const matchBranch = !isStoreOwner
+        ? // Nhân viên: BẮT BUỘC chỉ hiển thị đơn đặt trước của chi nhánh mình
+          (p.branchId === branchFilter ||
+           ((branchFilter === 'BR-AN-01' || branchFilter === 'cd5e8d1b-b08b-448d-beff-b85ea5873d52') &&
+             (p.branchId === 'BR-AN-01' || p.branchId === 'cd5e8d1b-b08b-448d-beff-b85ea5873d52' || p.branchName?.includes('Ba Đình'))) ||
+           ((branchFilter === 'BR-01' || branchFilter === 'BR-AN-02') &&
+             (p.branchId === 'BR-01' || p.branchId === 'BR-AN-02' || p.branchName?.includes('Cầu Giấy'))) ||
+           (branchFilter === 'BR-02' && (p.branchId === 'BR-02' || p.branchName?.includes('Thanh Xuân'))) ||
+           (branchFilter === 'BR-AN-03' && (p.branchId === 'BR-AN-03' || p.branchName?.includes('Đống Đa'))) ||
+           (branchFilter === 'BR-03' && (p.branchId === 'BR-03' || p.branchName?.includes('Quận 1'))))
+        : (isSearching ||
+           branchFilter === 'ALL' ||
+           p.branchId === branchFilter ||
+           ((branchFilter === 'BR-AN-01' || branchFilter === 'cd5e8d1b-b08b-448d-beff-b85ea5873d52') &&
+             (p.branchId === 'BR-AN-01' || p.branchId === 'cd5e8d1b-b08b-448d-beff-b85ea5873d52' || p.branchName?.includes('Ba Đình'))) ||
+           ((branchFilter === 'BR-01' || branchFilter === 'BR-AN-02') &&
+             (p.branchId === 'BR-01' || p.branchId === 'BR-AN-02' || p.branchName?.includes('Cầu Giấy'))) ||
+           (branchFilter === 'BR-02' && (p.branchId === 'BR-02' || p.branchName?.includes('Thanh Xuân'))) ||
+           (branchFilter === 'BR-AN-03' && (p.branchId === 'BR-AN-03' || p.branchName?.includes('Đống Đa'))) ||
+           (branchFilter === 'BR-03' && (p.branchId === 'BR-03' || p.branchName?.includes('Quận 1'))));
 
       const matchSearch =
         !searchQuery.trim() ||
@@ -568,7 +612,7 @@ export const InvoiceManagementPage: FC = () => {
 
       return matchBranch && matchSearch;
     });
-  }, [preOrders, searchQuery, branchFilter]);
+  }, [preOrders, searchQuery, branchFilter, isStoreOwner]);
 
   // Phân trang Đơn đặt trước
   const paginatedPreOrders = useMemo(() => {
@@ -728,44 +772,67 @@ export const InvoiceManagementPage: FC = () => {
           <div className="pos-shift-card">
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center' }}>
               {/* LỌC THEO CHI NHÁNH (MULTI-BRANCH FILTER) */}
-              <div style={{ position: 'relative', minWidth: 260 }}>
-                <select
-                  className="filter-select w-full"
+              {!isStoreOwner ? (
+                <div
                   style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 8,
                     height: 36,
-                    paddingLeft: 32,
-                    fontWeight: 600,
-                    backgroundColor: '#ffffff',
-                    borderColor: '#cbd5e1',
-                    color: '#0f172a',
-                    cursor: 'pointer',
-                  }}
-                  value={branchFilter}
-                  onChange={(e) => {
-                    setBranchFilter(e.target.value);
-                    setInvoicePage(1);
-                    setPreOrderPage(1);
-                  }}
-                  title="Lọc hóa đơn theo chi nhánh hoặc xem toàn bộ để đổi trả hàng"
-                >
-                  {availableBranches.map((b) => (
-                    <option key={b.id} value={b.id}>
-                      {b.name}
-                    </option>
-                  ))}
-                </select>
-                <Building2
-                  size={15}
-                  style={{
-                    position: 'absolute',
-                    left: 10,
-                    top: '50%',
-                    transform: 'translateY(-50%)',
+                    padding: '0 14px',
+                    backgroundColor: '#f0fdfa',
+                    border: '1.5px solid #99f6e4',
+                    borderRadius: 8,
+                    fontSize: 13,
+                    fontWeight: 700,
                     color: '#0f766e',
-                    pointerEvents: 'none',
+                    whiteSpace: 'nowrap',
                   }}
-                />
-              </div>
+                  title="Chi nhánh được giao ca làm việc của bạn"
+                >
+                  <Building2 size={15} className="text-teal-700" />
+                  <span>Chi nhánh: {assignedBranch.name}</span>
+                </div>
+              ) : (
+                <div style={{ position: 'relative', minWidth: 260 }}>
+                  <select
+                    className="filter-select w-full"
+                    style={{
+                      height: 36,
+                      paddingLeft: 32,
+                      fontWeight: 600,
+                      backgroundColor: '#ffffff',
+                      borderColor: '#cbd5e1',
+                      color: '#0f172a',
+                      cursor: 'pointer',
+                    }}
+                    value={branchFilter}
+                    onChange={(e) => {
+                      setBranchFilter(e.target.value);
+                      setInvoicePage(1);
+                      setPreOrderPage(1);
+                    }}
+                    title="Lọc hóa đơn theo chi nhánh hoặc xem toàn bộ để đổi trả hàng"
+                  >
+                    {availableBranches.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.name}
+                      </option>
+                    ))}
+                  </select>
+                  <Building2
+                    size={15}
+                    style={{
+                      position: 'absolute',
+                      left: 10,
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      color: '#0f766e',
+                      pointerEvents: 'none',
+                    }}
+                  />
+                </div>
+              )}
 
               {/* Ô TÌM KIẾM TỪ KHÓA */}
               <div style={{ position: 'relative', display: 'flex', alignItems: 'center', flex: 1, minWidth: 220 }}>
@@ -1746,8 +1813,8 @@ export const InvoiceManagementPage: FC = () => {
         customers={user?.tenantId === 'tenant_an_nhien_02' ? mockCustomersAnNhien : mockCustomers}
         branchName={
           branchFilter !== 'ALL'
-            ? availableBranches.find((b) => b.id === branchFilter)?.name || 'Chi nhánh Cầu Giấy (Trung tâm)'
-            : 'Chi nhánh Cầu Giấy (Trung tâm)'
+            ? availableBranches.find((b) => b.id === branchFilter)?.name || assignedBranch.name
+            : assignedBranch.name
         }
         onConfirm={handleConfirmCreatePreOrder}
       />
