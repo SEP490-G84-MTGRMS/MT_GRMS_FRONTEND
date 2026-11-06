@@ -1,40 +1,34 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import type { FC } from 'react';
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams, useLocation } from 'react-router-dom';
 import {
   PackageCheck,
   ArrowLeft,
   ShieldCheck,
   UserCheck,
-  Calculator,
-  CreditCard,
-  Truck,
-  Percent,
-  ReceiptText,
   Loader2,
 } from 'lucide-react';
 import type {
   GoodsReceiptListItem,
   GrnDetailItem,
+  GrnItemDetail,
   GrnPostSettings,
   GrnStatus,
+  GrnCostSummary,
   PoStatusPreview,
   UserRole,
 } from '../types/grn.types';
 import { goodsReceiptApi, type BackendGoodsReceiptDto } from '../api/goodsReceiptApi';
 import { GrnDetailHeaderCard } from '../components/detail/GrnDetailHeaderCard';
-import { GrnStockFefoTable } from '../components/detail/GrnStockFefoTable';
-import { GrnPoRemainingTable } from '../components/detail/GrnPoRemainingTable';
+import { GrnProductEntryTable } from '../components/form/GrnProductEntryTable';
+import { GrnCostSummaryCard } from '../components/form/GrnCostSummaryCard';
 import { GrnPostSettingsCard } from '../components/detail/GrnPostSettingsCard';
 import { GrnDetailActionBar } from '../components/detail/GrnDetailActionBar';
 import { GrnDetailSuccessModal } from '../components/detail/GrnDetailSuccessModal';
+import { GrnMismatchConfirmModal } from '../components/form/GrnMismatchConfirmModal';
 import { GrnPrintPreviewModal } from '../components/form/GrnPrintPreviewModal';
 import { AdminToast, type ToastState } from '../../admin/components';
 import '../../purchase-order/purchase-order.css';
-
-const formatCurrency = (val: number): string => {
-  return new Intl.NumberFormat('vi-VN').format(Math.round(val)) + ' đ';
-};
 
 const mapStatus = (status: string, hasMismatch: boolean): GrnStatus => {
   if (status === 'CANCELLED') return 'CANCELED';
@@ -91,6 +85,7 @@ export const GoodsReceiptDetailPage: FC<{ defaultRole?: UserRole }> = ({
   defaultRole = 'store_owner',
 }) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { id } = useParams<{ id: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -102,12 +97,14 @@ export const GoodsReceiptDetailPage: FC<{ defaultRole?: UserRole }> = ({
   const [freightFee, setFreightFee] = useState(0);
   const [discount, setDiscount] = useState(0);
   const [vatPercent, setVatPercent] = useState(0);
+  const [notes, setNotes] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
   const [status, setStatus] = useState<GrnStatus>('DRAFT');
   const [items, setItems] = useState<GrnDetailItem[]>([]);
 
-  const isModeConfirmParam = searchParams.get('mode') === 'confirm';
-  const isConfirmationMode = isModeConfirmParam || status === 'DRAFT';
+  // Nhận diện chế độ xác nhận nếu vào URL :id/confirm hoặc param ?mode=confirm hoặc phiếu đang DRAFT
+  const isConfirmRoute = location.pathname.endsWith('/confirm') || searchParams.get('mode') === 'confirm';
+  const isConfirmationMode = isConfirmRoute || status === 'DRAFT';
 
   const [postSettings, setPostSettings] = useState<GrnPostSettings>({
     createApInvoice: true,
@@ -119,6 +116,7 @@ export const GoodsReceiptDetailPage: FC<{ defaultRole?: UserRole }> = ({
   const [toast, setToast] = useState<ToastState | null>(null);
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
   const [isPrintLabelsModalOpen, setIsPrintLabelsModalOpen] = useState(false);
+  const [isMismatchModalOpen, setIsMismatchModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const showToast = (message: string, type: ToastState['type'] = 'success') => {
@@ -146,6 +144,7 @@ export const GoodsReceiptDetailPage: FC<{ defaultRole?: UserRole }> = ({
       setFreightFee(dto.freightFee || 0);
       setDiscount(dto.discountAmount || 0);
       setVatPercent(dto.vatPercent || 0);
+      setNotes(dto.note || '');
       setItems(
         mapped.items.map((it) => {
           const retail = it.unitPrice > 0 ? it.unitPrice * 1.35 : 10000;
@@ -168,20 +167,53 @@ export const GoodsReceiptDetailPage: FC<{ defaultRole?: UserRole }> = ({
     void loadReceipt();
   }, [loadReceipt]);
 
-  const goodsTotal = useMemo(
-    () => items.reduce((sum, it) => sum + (it.acceptedQty ?? it.receivedQty) * (it.unitPrice || 0), 0),
-    [items]
-  );
+  // Cập nhật số lượng và tính toán từng dòng hàng tương tự trang Create
+  const handleItemChange = (itemId: string, field: keyof GrnItemDetail, value: any) => {
+    setItems((prev) =>
+      prev.map((it) => {
+        if (it.id !== itemId) return it;
+        const updated = { ...it, [field]: value };
+        if (field === 'receivedQty') {
+          const received = Number(value) || 0;
+          updated.receivedQty = received;
+          updated.acceptedQty = received;
+          updated.rejectedQty = 0;
+          updated.differenceQty = received - updated.orderedQty;
+          updated.lineTotal = received * updated.unitPrice;
+        }
+        if (field === 'acceptedQty') {
+          const accepted = Number(value) || 0;
+          updated.acceptedQty = accepted;
+          updated.rejectedQty = Math.max(0, (updated.receivedQty || 0) - accepted);
+          updated.differenceQty = accepted - updated.orderedQty;
+          updated.lineTotal = accepted * updated.unitPrice;
+        }
+        if (field === 'unitPrice') {
+          updated.lineTotal = (updated.acceptedQty ?? updated.receivedQty) * Number(value);
+        }
+        return updated;
+      })
+    );
+  };
 
-  const grandTotal = useMemo(() => {
-    const afterDiscount = Math.max(0, goodsTotal - discount);
-    const withFreight = afterDiscount + freightFee;
-    const vat = Math.round((withFreight * vatPercent) / 100);
-    return withFreight + vat;
-  }, [goodsTotal, discount, freightFee, vatPercent]);
+  const costs: GrnCostSummary = useMemo(() => {
+    const goodsTotal = items.reduce(
+      (sum, it) => sum + (it.acceptedQty !== undefined ? it.acceptedQty : it.receivedQty || 0) * (it.unitPrice || 0),
+      0
+    );
+    const subtotalAfterDiscount = Math.max(0, goodsTotal - discount + freightFee);
+    const vatAmount = Math.round(subtotalAfterDiscount * (vatPercent / 100));
+    const grandTotal = subtotalAfterDiscount + vatAmount;
+    return { goodsTotal, landedCost: freightFee, discountAmount: discount, vatPercent, vatAmount, grandTotal };
+  }, [items, discount, freightFee, vatPercent]);
 
   const totalLabels = useMemo(
     () => items.reduce((sum, it) => sum + Math.ceil(it.acceptedQty ?? it.receivedQty ?? 0), 0),
+    [items]
+  );
+
+  const mismatchedItems = useMemo(
+    () => items.filter((it) => it.differenceQty !== 0 || (it.rejectedQty || 0) > 0),
     [items]
   );
 
@@ -203,365 +235,298 @@ export const GoodsReceiptDetailPage: FC<{ defaultRole?: UserRole }> = ({
     setPostSettings((prev) => ({ ...prev, [key]: value }));
   };
 
-  const handleConfirmGrn = async () => {
-    if (!receipt) return;
-    setIsSubmitting(true);
-    try {
-      await goodsReceiptApi.completeGoodsReceipt(receipt.id, receipt.notes);
-      setStatus('CONFIRMED');
-      setIsSuccessModalOpen(true);
-      showToast(`Đã duyệt hoàn tất phiếu ${receipt.code}. Tồn kho đã được cập nhật!`, 'success');
-    } catch (err: any) {
-      showToast(err.response?.data?.message || err.message || 'Hoàn tất phiếu thất bại.', 'error');
-    } finally {
-      setIsSubmitting(false);
+    const proceedCompleteGrn = async () => {
+      if (!receipt) return;
+      setIsSubmitting(true);
+      try {
+        await goodsReceiptApi.completeGoodsReceipt(receipt.id, notes);
+        setStatus('CONFIRMED');
+        setIsSuccessModalOpen(true);
+        showToast(`Đã duyệt hoàn tất phiếu ${receipt.code}. Tồn kho chi nhánh đã được cập nhật!`, 'success');
+      } catch (err: any) {
+        showToast(err.response?.data?.message || err.message || 'Hoàn tất phiếu thất bại.', 'error');
+      } finally {
+        setIsSubmitting(false);
+      }
+    };
+
+    const handleConfirmClick = () => {
+      // Nếu có hàng lệch hoặc hàng bị từ chối, bật modal xác nhận xử lý chênh lệch
+      if (mismatchedItems.length > 0) {
+        setIsMismatchModalOpen(true);
+        return;
+      }
+      void proceedCompleteGrn();
+    };
+
+    const handleBackToEdit = () => {
+      if (!receipt) return;
+      const editUrl =
+        role === 'employee'
+          ? `/employee/goods-receipts/${receipt.id}?branch=${employeeBranchId}&role=employee`
+          : `/store-owner/goods-receipts/${receipt.id}`;
+      navigate(editUrl);
+    };
+
+    const handleBackToList = () => {
+      navigate(
+        role === 'employee'
+          ? `/employee/goods-receipts?branch=${employeeBranchId}&role=employee`
+          : '/store-owner/goods-receipts'
+      );
+    };
+
+    const handlePrintGrn = () => {
+      window.print();
+    };
+
+    if (isLoading || !receipt) {
+      return (
+        <div style={{ padding: 48, display: 'flex', justifyContent: 'center', gap: 8, color: '#64748b' }}>
+          <Loader2 size={18} className="animate-spin" />
+          Đang tải chi tiết phiếu nhập kho...
+        </div>
+      );
     }
-  };
 
-  const handleBackToEdit = () => {
-    if (!receipt) return;
-    const editUrl =
-      role === 'employee'
-        ? `/employee/goods-receipts/${receipt.id}?branch=${employeeBranchId}&role=employee`
-        : `/store-owner/goods-receipts/${receipt.id}`;
-    navigate(editUrl);
-  };
+    const isReadOnly = !isConfirmationMode && (status === 'CONFIRMED' || status === 'COMPLETED');
 
-  const handleBackToList = () => {
-    navigate(
-      role === 'employee'
-        ? `/employee/goods-receipts?branch=${employeeBranchId}&role=employee`
-        : '/store-owner/goods-receipts'
-    );
-  };
-
-  const handlePrintGrn = () => {
-    window.print();
-  };
-
-  if (isLoading || !receipt) {
     return (
-      <div style={{ padding: 48, display: 'flex', justifyContent: 'center', gap: 8, color: '#64748b' }}>
-        <Loader2 size={18} className="animate-spin" />
-        Đang tải chi tiết phiếu nhập kho...
-      </div>
-    );
-  }
-
-  return (
-    <div
-      style={{
-        padding: '16px 24px 32px 24px',
-        backgroundColor: '#f8fafc',
-        minHeight: 'calc(100vh - 60px)',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 14,
-      }}
-    >
-      <AdminToast toast={toast} onClose={() => setToast(null)} />
-
       <div
         style={{
+          padding: '16px 24px 32px 24px',
+          backgroundColor: '#f8fafc',
+          minHeight: 'calc(100vh - 60px)',
           display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          flexWrap: 'wrap',
-          gap: 12,
+          flexDirection: 'column',
+          gap: 14,
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <button
-            type="button"
-            onClick={handleBackToList}
-            style={{
-              width: 34,
-              height: 34,
-              borderRadius: 8,
-              border: '1px solid #cbd5e1',
-              backgroundColor: '#ffffff',
-              color: '#334155',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
-            }}
-            title="Quay lại danh sách phiếu nhập kho"
-          >
-            <ArrowLeft size={16} />
-          </button>
+        <AdminToast toast={toast} onClose={() => setToast(null)} />
 
-          <div>
-            <h1
-              style={{
-                fontSize: 18,
-                fontWeight: 800,
-                color: '#0f172a',
-                margin: 0,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-              }}
-            >
-              <PackageCheck size={20} color="#0d9488" />
-              <span>
-                {isConfirmationMode
-                  ? 'Xác nhận tổng quan phiếu nhập kho (Confirm GRN Summary)'
-                  : `Chi tiết phiếu nhập kho ${receipt.code}`}
-              </span>
-            </h1>
-            <p style={{ margin: '2px 0 0 0', fontSize: 12.5, color: '#64748b' }}>
-              {isConfirmationMode
-                ? 'Đối soát số lượng thực nhận, xử lý lượng thiếu đơn PO và xác nhận cập nhật kho'
-                : 'Lịch sử nhập kho, thông tin lô FEFO và chứng từ công nợ liên kết'}
-            </p>
-          </div>
-        </div>
-
+        {/* ── TOP TITLE & ROLE SWITCHER BAR ── */}
         <div
           style={{
             display: 'flex',
             alignItems: 'center',
-            backgroundColor: '#f1f5f9',
-            padding: 2,
-            borderRadius: 8,
-            border: '1px solid #cbd5e1',
-          }}
-        >
-          <button
-            type="button"
-            onClick={() => handleToggleRole('store_owner')}
-            style={{
-              height: 28,
-              padding: '0 10px',
-              fontSize: 12,
-              fontWeight: role === 'store_owner' ? 700 : 500,
-              backgroundColor: role === 'store_owner' ? '#ffffff' : 'transparent',
-              color: role === 'store_owner' ? '#0f766e' : '#475569',
-              borderRadius: 6,
-              border: 'none',
-              boxShadow: role === 'store_owner' ? '0 1px 2px rgba(0,0,0,0.08)' : 'none',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 5,
-            }}
-          >
-            <ShieldCheck size={14} />
-            <span>Chủ cửa hàng</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => handleToggleRole('employee')}
-            style={{
-              height: 28,
-              padding: '0 10px',
-              fontSize: 12,
-              fontWeight: role === 'employee' ? 700 : 500,
-              backgroundColor: role === 'employee' ? '#ffffff' : 'transparent',
-              color: role === 'employee' ? '#059669' : '#475569',
-              borderRadius: 6,
-              border: 'none',
-              boxShadow: role === 'employee' ? '0 1px 2px rgba(0,0,0,0.08)' : 'none',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 5,
-            }}
-          >
-            <UserCheck size={14} />
-            <span>Thủ kho</span>
-          </button>
-        </div>
-      </div>
-
-      <GrnDetailHeaderCard
-        grnNo={receipt.code}
-        branchName={receipt.branchName}
-        branchCode={receipt.branchId}
-        supplierName={receipt.supplierName}
-        supplierCode={receipt.supplierCode}
-        poReference={receipt.poReference}
-        receiverName={receipt.receiverName}
-        status={status}
-        goodsTotal={goodsTotal}
-        landedCost={freightFee}
-        discount={discount}
-        vatPercent={vatPercent}
-        grandTotal={grandTotal}
-        paymentTerm="CREDIT_30"
-        receiptTime={receipt.receiveDate}
-        isConfirmationMode={isConfirmationMode}
-      />
-
-      <GrnStockFefoTable items={items} totalLandedCost={freightFee} />
-
-      <GrnPoRemainingTable
-        poReference={receipt.poReference}
-        items={items}
-        readOnly={!isConfirmationMode && (status === 'CONFIRMED' || status === 'COMPLETED')}
-      />
-
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))',
-          gap: 14,
-        }}
-      >
-        <GrnPostSettingsCard
-          settings={postSettings}
-          grandTotal={grandTotal}
-          totalLabels={totalLabels}
-          onSettingChange={handlePostSettingChange}
-          readOnly={!isConfirmationMode && (status === 'CONFIRMED' || status === 'COMPLETED')}
-        />
-
-        <div
-          style={{
-            backgroundColor: '#ffffff',
-            border: '1px solid #e2e8f0',
-            borderRadius: 10,
-            padding: '16px 20px',
-            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)',
-            display: 'flex',
-            flexDirection: 'column',
             justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: 12,
           }}
         >
-          <div>
-            <div
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <button
+              type="button"
+              onClick={handleBackToList}
               style={{
+                width: 34,
+                height: 34,
+                borderRadius: 8,
+                border: '1px solid #cbd5e1',
+                backgroundColor: '#ffffff',
+                color: '#334155',
                 display: 'flex',
                 alignItems: 'center',
-                gap: 8,
-                paddingBottom: 12,
-                marginBottom: 16,
-                borderBottom: '1px solid #f1f5f9',
+                justifyContent: 'center',
+                cursor: 'pointer',
               }}
+              title="Quay lại danh sách phiếu nhập kho"
             >
-              <Calculator size={16} color="#0d9488" />
-              <h2
+              <ArrowLeft size={16} />
+            </button>
+
+            <div>
+              <h1
                 style={{
-                  fontSize: 14,
-                  fontWeight: 700,
+                  fontSize: 18,
+                  fontWeight: 800,
                   color: '#0f172a',
-                  textTransform: 'uppercase',
-                  letterSpacing: 0.3,
                   margin: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
                 }}
               >
-                Tổng kết tài chính &amp; Công nợ phải trả
-              </h2>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#475569' }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <ReceiptText size={14} color="#64748b" />
-                  <span>Tổng tiền hàng (Base items):</span>
+                <PackageCheck size={20} color="#0d9488" />
+                <span>
+                  {isConfirmationMode
+                    ? 'Xác nhận tổng quan phiếu nhập kho (Confirm GRN Summary)'
+                    : `Chi tiết phiếu nhập kho ${receipt.code}`}
                 </span>
-                <strong style={{ color: '#1e293b' }}>{formatCurrency(goodsTotal)}</strong>
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#475569' }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <Truck size={14} color="#d97706" />
-                  <span>Chi phí vận chuyển (Landed Cost):</span>
-                </span>
-                <strong style={{ color: '#d97706' }}>+{formatCurrency(freightFee)}</strong>
-              </div>
-
-              {discount > 0 && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#475569' }}>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <Percent size={14} color="#dc2626" />
-                    <span>Chiết khấu NCC:</span>
-                  </span>
-                  <strong style={{ color: '#dc2626' }}>-{formatCurrency(discount)}</strong>
-                </div>
-              )}
-
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#475569' }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <Percent size={14} color="#64748b" />
-                  <span>Thuế VAT ({vatPercent}%):</span>
-                </span>
-                <strong style={{ color: '#1e293b' }}>
-                  +{formatCurrency(Math.round(((goodsTotal + freightFee - discount) * vatPercent) / 100))}
-                </strong>
-              </div>
+              </h1>
+              <p style={{ margin: '2px 0 0 0', fontSize: 12.5, color: '#64748b' }}>
+                {isConfirmationMode
+                    ? 'Đối soát số lượng thực nhận, kiểm tra tình trạng hàng hóa và xác nhận cập nhật kho chi nhánh'
+                    : 'Lịch sử nhập kho, thông tin lô FEFO và chứng từ công nợ liên kết'}
+              </p>
             </div>
           </div>
 
           <div
             style={{
-              marginTop: 18,
-              padding: '12px 16px',
-              backgroundColor: '#f0fdfa',
-              border: '1.5px solid #99f6e4',
-              borderRadius: 8,
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'space-between',
+              backgroundColor: '#f1f5f9',
+              padding: 2,
+              borderRadius: 8,
+              border: '1px solid #cbd5e1',
             }}
           >
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <CreditCard size={17} color="#0f766e" />
-                <span style={{ fontSize: 13, fontWeight: 700, color: '#0f766e', textTransform: 'uppercase' }}>
-                  Tổng công nợ ghi nhận (AP)
-                </span>
-              </div>
-              <span style={{ fontSize: 11.5, color: '#64748b' }}>Hạn thanh toán: Credit 30 days</span>
-            </div>
-            <div style={{ fontSize: 18, fontWeight: 900, color: '#0f766e' }}>
-              {formatCurrency(grandTotal)}
-            </div>
+            <button
+              type="button"
+              onClick={() => handleToggleRole('store_owner')}
+              style={{
+                height: 28,
+                padding: '0 10px',
+                fontSize: 12,
+                fontWeight: role === 'store_owner' ? 700 : 500,
+                backgroundColor: role === 'store_owner' ? '#ffffff' : 'transparent',
+                color: role === 'store_owner' ? '#0f766e' : '#475569',
+                borderRadius: 6,
+                border: 'none',
+                boxShadow: role === 'store_owner' ? '0 1px 2px rgba(0,0,0,0.08)' : 'none',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 5,
+              }}
+            >
+              <ShieldCheck size={14} />
+              <span>Chủ cửa hàng</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleToggleRole('employee')}
+              style={{
+                height: 28,
+                padding: '0 10px',
+                fontSize: 12,
+                fontWeight: role === 'employee' ? 700 : 500,
+                backgroundColor: role === 'employee' ? '#ffffff' : 'transparent',
+                color: role === 'employee' ? '#059669' : '#475569',
+                borderRadius: 6,
+                border: 'none',
+                boxShadow: role === 'employee' ? '0 1px 2px rgba(0,0,0,0.08)' : 'none',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 5,
+              }}
+            >
+              <UserCheck size={14} />
+              <span>Thủ kho</span>
+            </button>
           </div>
         </div>
+
+        {/* ── 1. HEADER CARD (Thông tin chung & Đối soát Đơn PO gốc) ── */}
+        <GrnDetailHeaderCard
+          grnNo={receipt.code}
+          branchName={receipt.branchName}
+          branchCode={receipt.branchId}
+          supplierName={receipt.supplierName}
+          supplierCode={receipt.supplierCode}
+          poReference={receipt.poReference}
+          receiverName={receipt.receiverName}
+          status={status}
+          goodsTotal={costs.goodsTotal}
+          landedCost={costs.landedCost}
+          discount={costs.discountAmount}
+          vatPercent={costs.vatPercent}
+          grandTotal={costs.grandTotal}
+          paymentTerm="CREDIT_30"
+          receiptTime={receipt.receiveDate}
+          isConfirmationMode={isConfirmationMode}
+        />
+
+          {/* ── 2. UNIFIED PRODUCT ENTRY & RECONCILIATION TABLE (Chuẩn UI của Create) ── */}
+      <GrnProductEntryTable
+          items={items}
+          readOnly={isReadOnly}
+          onItemChange={handleItemChange}
+        />
+
+        {/* ── 3. COST SUMMARY & POST SETTINGS (2 Columns) ── */}
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))',
+            gap: 14,
+          }}
+        >
+          <GrnCostSummaryCard
+            notes={notes}
+            costs={costs}
+            readOnly={isReadOnly}
+            onNotesChange={setNotes}
+            onLandedCostChange={setFreightFee}
+            onDiscountChange={setDiscount}
+            onVatPercentChange={setVatPercent}
+          />
+
+          <GrnPostSettingsCard
+            settings={postSettings}
+            grandTotal={costs.grandTotal}
+            totalLabels={totalLabels}
+            onSettingChange={handlePostSettingChange}
+            readOnly={isReadOnly}
+          />
+        </div>
+
+        {/* ── 4. STICKY ACTION BAR ── */}
+        <GrnDetailActionBar
+          status={status}
+          isConfirmationMode={isConfirmationMode}
+          isSubmitting={isSubmitting}
+          onBackToEdit={handleBackToEdit}
+          onBackToList={handleBackToList}
+          onConfirmGrn={handleConfirmClick}
+          onPrintGrn={handlePrintGrn}
+          onPrintLabels={() => setIsPrintLabelsModalOpen(true)}
+        />
+
+        {/* ── 5. MISMATCH CONFIRMATION MODAL ── */}
+        <GrnMismatchConfirmModal
+          isOpen={isMismatchModalOpen}
+          mismatchedItems={mismatchedItems}
+          onClose={() => setIsMismatchModalOpen(false)}
+          onConfirm={() => {
+            setIsMismatchModalOpen(false);
+            void proceedCompleteGrn();
+          }}
+        />
+
+        {/* ── 6. SUCCESS RESULT MODAL ── */}
+        <GrnDetailSuccessModal
+          isOpen={isSuccessModalOpen}
+          grnNo={receipt.code}
+          poReference={receipt.poReference}
+          supplierName={receipt.supplierName}
+          grandTotal={costs.grandTotal}
+          totalLabels={totalLabels}
+          poStatusPreview={poStatusPreview}
+          onClose={() => setIsSuccessModalOpen(false)}
+          onGoToList={handleBackToList}
+          onPrintGrn={handlePrintGrn}
+          onPrintLabels={() => {
+            setIsSuccessModalOpen(false);
+            setIsPrintLabelsModalOpen(true);
+          }}
+        />
+
+        {/* ── 7. PRINT LABELS PREVIEW MODAL ── */}
+        <GrnPrintPreviewModal
+          isOpen={isPrintLabelsModalOpen}
+          grnNo={receipt.code}
+          items={items}
+          onClose={() => setIsPrintLabelsModalOpen(false)}
+          onPrint={() => {
+            setIsPrintLabelsModalOpen(false);
+            showToast(`Đã gửi lệnh in ${totalLabels} tem dán kệ thành công!`, 'success');
+          }}
+        />
       </div>
+    );
+  };
 
-      <GrnDetailActionBar
-        status={status}
-        isConfirmationMode={isConfirmationMode}
-        isSubmitting={isSubmitting}
-        onBackToEdit={handleBackToEdit}
-        onBackToList={handleBackToList}
-        onConfirmGrn={handleConfirmGrn}
-        onPrintGrn={handlePrintGrn}
-        onPrintLabels={() => setIsPrintLabelsModalOpen(true)}
-      />
-
-      <GrnDetailSuccessModal
-        isOpen={isSuccessModalOpen}
-        grnNo={receipt.code}
-        poReference={receipt.poReference}
-        supplierName={receipt.supplierName}
-        grandTotal={grandTotal}
-        totalLabels={totalLabels}
-        poStatusPreview={poStatusPreview}
-        onClose={() => setIsSuccessModalOpen(false)}
-        onGoToList={handleBackToList}
-        onPrintGrn={handlePrintGrn}
-        onPrintLabels={() => {
-          setIsSuccessModalOpen(false);
-          setIsPrintLabelsModalOpen(true);
-        }}
-      />
-
-      <GrnPrintPreviewModal
-        isOpen={isPrintLabelsModalOpen}
-        grnNo={receipt.code}
-        items={items}
-        onClose={() => setIsPrintLabelsModalOpen(false)}
-        onPrint={() => {
-          setIsPrintLabelsModalOpen(false);
-          showToast(`Đã gửi lệnh in ${totalLabels} tem dán kệ thành công!`, 'success');
-        }}
-      />
-    </div>
-  );
-};
-
-export default GoodsReceiptDetailPage;
+  export default GoodsReceiptDetailPage;

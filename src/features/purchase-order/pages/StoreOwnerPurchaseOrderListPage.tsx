@@ -267,6 +267,9 @@ export const StoreOwnerPurchaseOrderListPage: FC = () => {
           setPageIndex(1);
         }}
         onViewDetail={(order) => setSelectedOrder(order)}
+        onReceiveGoods={(order) => {
+          navigate(`/store-owner/goods-receipts/create?poCode=${encodeURIComponent(order.poCode)}&po=${encodeURIComponent(order.id)}`);
+        }}
         onEditOrder={(order) => {
           showToast(`Đang mở giao diện chỉnh sửa đơn ${order.poCode}`, 'info');
         }}

@@ -7,6 +7,7 @@ import {
   ChevronLeft,
   ChevronRight,
   FileText,
+  PackageCheck,
 } from 'lucide-react';
 import type { PurchaseOrderListItem, PurchaseOrderStatus } from '../../types/po-list.types';
 
@@ -19,6 +20,7 @@ interface PoListTableProps {
   onPageSizeChange?: (size: number) => void;
   onViewDetail: (order: PurchaseOrderListItem) => void;
   onEditOrder?: (order: PurchaseOrderListItem) => void;
+  onReceiveGoods?: (order: PurchaseOrderListItem) => void;
 }
 
 type SortField =
@@ -43,6 +45,7 @@ export const PoListTable: FC<PoListTableProps> = ({
   onPageSizeChange,
   onViewDetail,
   onEditOrder,
+  onReceiveGoods,
 }) => {
   const [sortField, setSortField] = useState<SortField | null>(null);
   const [sortDir, setSortDir] = useState<SortDirection>('asc');
@@ -565,6 +568,32 @@ export const PoListTable: FC<PoListTableProps> = ({
                           <Eye size={12} />
                           <span>Chi tiết</span>
                         </button>
+
+                        {(order.status === 'CONFIRMED' || order.status === 'SENT' || order.status === 'PARTIALLY_RECEIVED') && onReceiveGoods && (
+                          <button
+                            type="button"
+                            onClick={() => onReceiveGoods(order)}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 4,
+                              height: 28,
+                              padding: '0 8px',
+                              borderRadius: 6,
+                              fontSize: 12,
+                              fontWeight: 700,
+                              backgroundColor: '#0f766e',
+                              border: 'none',
+                              color: '#ffffff',
+                              cursor: 'pointer',
+                              whiteSpace: 'nowrap',
+                            }}
+                            title="Tiến hành kiểm đếm và nhận hàng từ nhà cung cấp cho đơn PO này"
+                          >
+                            <PackageCheck size={12} />
+                            <span>Nhận hàng</span>
+                          </button>
+                        )}
 
                         {(order.status === 'SENT' || order.status === 'CONFIRMED') && onEditOrder && (
                           <button

@@ -351,26 +351,11 @@ export const GoodsReceiptListPage: FC<{ defaultRole?: UserRole }> = ({
           <button
             type="button"
             onClick={() => navigate('/store-owner/purchase-orders/list')}
-            className="po-btn po-btn-secondary"
-            title="Chuyển sang danh sách đơn mua hàng (PO)"
+            className="po-btn po-btn-primary"
+            title="Mở danh sách đơn mua hàng (PO) để kiểm đếm & nhận hàng khi NCC giao đến"
           >
             <Layers size={14} />
-            <span>Đơn mua hàng PO</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() =>
-              navigate(
-                role === 'employee'
-                  ? `/employee/goods-receipts/create?branch=${employeeBranchId}&role=employee`
-                  : '/store-owner/goods-receipts/create'
-              )
-            }
-            className="po-btn po-btn-primary"
-          >
-            <Plus size={14} />
-            <span>Nhập kho từ PO</span>
+            <span>Nhận hàng từ Đơn PO</span>
           </button>
         </div>
       </div>
