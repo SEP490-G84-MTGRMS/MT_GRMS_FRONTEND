@@ -33,7 +33,7 @@ export const StorePaymentConfigPage: FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
 
-  const webhookUrl = `${window.location.origin.replace(':5173', ':5000')}/api/v1/payments/sepay-webhook`;
+  const webhookUrl = `${window.location.origin.replace(':5173', ':5000')}/api/payments/sepay-webhook`;
 
   useEffect(() => {
     const storageKey = `pos_payment_config_${currentTenantId}`;
@@ -92,7 +92,7 @@ export const StorePaymentConfigPage: FC = () => {
     localStorage.setItem(storageKey, JSON.stringify(configData));
 
     try {
-      await fetch('/api/v1/payments/config', {
+      await fetch('/api/payments/config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(configData),

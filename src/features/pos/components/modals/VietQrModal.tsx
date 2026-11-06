@@ -107,7 +107,7 @@ export const VietQrModal: FC<Props> = ({
   const handleCheckPayment = async () => {
     setIsChecking(true);
     try {
-      const res = await fetch(`/api/v1/payments/check-order/${orderCode}`);
+      const res = await fetch(`/api/payments/check-order/${orderCode}`);
       if (res.ok) {
         const data = await res.json();
         if (data.isPaid) {
