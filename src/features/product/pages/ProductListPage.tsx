@@ -14,7 +14,7 @@ import {
   Calendar,
   X,
 } from 'lucide-react';
-import type { ProductItem, Category } from '../types';
+import type { ProductItem, Category, UomConversion } from '../types';
 import { categoryApi } from '../api/categoryApi';
 import { CategoryModal } from '../components/CategoryModal';
 import { ProductFormModal } from '../components/ProductFormModal';
