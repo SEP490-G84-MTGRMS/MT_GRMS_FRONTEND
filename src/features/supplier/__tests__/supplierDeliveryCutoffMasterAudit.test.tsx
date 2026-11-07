@@ -9,7 +9,6 @@ describe('MASTER AUDIT SUITE – Supplier Delivery & Cutoff Configuration', () =
     code: 'SUP-DEL-001',
     name: 'Công ty Thực Phẩm Tươi Sống Nam An',
     supplierType: 'Goods',
-    category: 'FRESH',
     contactPerson: 'Trần Văn Nam',
     phone: '0901234567',
     paymentTermDays: 30,
@@ -22,8 +21,6 @@ describe('MASTER AUDIT SUITE – Supplier Delivery & Cutoff Configuration', () =
   };
 
   const initialValidConfig: SupplierDeliveryConfig = {
-    leadTimeDays: 2,
-    leadTimeUnit: 'BUSINESS_DAYS',
     minOrderQuantity: 10,
     activeDeliveryDays: [1, 2, 3, 4, 5], // T2 to T6
     cutoffTime: '17:00',
@@ -38,86 +35,7 @@ describe('MASTER AUDIT SUITE – Supplier Delivery & Cutoff Configuration', () =
     vi.clearAllMocks();
   });
 
-  // =========================================================================
-  // 3. LEAD TIME TESTING (TC-LT-001 to TC-LT-008)
-  // =========================================================================
-  describe('3. Lead Time Configuration (TC-LT-001..008)', () => {
-    it('TC-LT-001: Correctly loads existing Lead Time and unit from initialConfig', () => {
-      render(
-        <SupplierDeliveryConfigTab
-          supplier={mockSupplier}
-          initialConfig={initialValidConfig}
-        />
-      );
-
-      const leadTimeInput = screen.getByTestId('input-lead-time') as HTMLInputElement;
-      const unitSelect = screen.getByTestId('select-lead-time-unit') as HTMLSelectElement;
-
-      expect(leadTimeInput.value).toBe('2');
-      expect(unitSelect.value).toBe('BUSINESS_DAYS');
-    });
-
-    it('TC-LT-002: Accepts valid numeric values (0, 1, 7, 30)', () => {
-      render(
-        <SupplierDeliveryConfigTab
-          supplier={mockSupplier}
-          initialConfig={initialValidConfig}
-        />
-      );
-
-      const leadTimeInput = screen.getByTestId('input-lead-time') as HTMLInputElement;
-
-      fireEvent.change(leadTimeInput, { target: { value: '0' } });
-      expect(leadTimeInput.value).toBe('0');
-
-      fireEvent.change(leadTimeInput, { target: { value: '7' } });
-      expect(leadTimeInput.value).toBe('7');
-
-      fireEvent.change(leadTimeInput, { target: { value: '30' } });
-      expect(leadTimeInput.value).toBe('30');
-    });
-
-    it('TC-LT-003: Rejects invalid values (> 30 days) upon saving', async () => {
-      const onSaveMock = vi.fn().mockResolvedValue(undefined);
-      render(
-        <SupplierDeliveryConfigTab
-          supplier={mockSupplier}
-          initialConfig={initialValidConfig}
-          onSaveConfig={onSaveMock}
-        />
-      );
-
-      const leadTimeInput = screen.getByTestId('input-lead-time');
-      fireEvent.change(leadTimeInput, { target: { value: '45' } }); // exceeds max 30
-
-      const saveBtn = screen.getByTestId('btn-save-delivery-config');
-      fireEvent.click(saveBtn);
-
-      await waitFor(() => {
-        expect(screen.getByTestId('save-delivery-error-alert').textContent).toContain(
-          'Thời gian chuẩn bị (Lead Time) phải nằm trong khoảng từ 0 đến 30 ngày.'
-        );
-      });
-      expect(onSaveMock).not.toHaveBeenCalled();
-    });
-
-    it('TC-LT-004: Unit selection between Business Days and Calendar Days persists', () => {
-      render(
-        <SupplierDeliveryConfigTab
-          supplier={mockSupplier}
-          initialConfig={initialValidConfig}
-        />
-      );
-
-      const unitSelect = screen.getByTestId('select-lead-time-unit') as HTMLSelectElement;
-
-      fireEvent.change(unitSelect, { target: { value: 'CALENDAR_DAYS' } });
-      expect(unitSelect.value).toBe('CALENDAR_DAYS');
-
-      fireEvent.change(unitSelect, { target: { value: 'BUSINESS_DAYS' } });
-      expect(unitSelect.value).toBe('BUSINESS_DAYS');
-    });
-  });
+  // Lead Time UI đã bỏ — chỉ còn cutoff / ngày giao / MOQ
 
   // =========================================================================
   // 4. MOQ TESTING (TC-MOQ-001 to TC-MOQ-007)
@@ -411,8 +329,6 @@ describe('MASTER AUDIT SUITE – Supplier Delivery & Cutoff Configuration', () =
         />
       );
 
-      // Modify Lead Time & Cutoff
-      fireEvent.change(screen.getByTestId('input-lead-time'), { target: { value: '3' } });
       fireEvent.change(screen.getByTestId('input-cutoff-time'), { target: { value: '16:00' } });
 
       const saveBtn = screen.getByTestId('btn-save-delivery-config');
@@ -421,7 +337,6 @@ describe('MASTER AUDIT SUITE – Supplier Delivery & Cutoff Configuration', () =
       await waitFor(() => {
         expect(onSaveMock).toHaveBeenCalledWith(
           expect.objectContaining({
-            leadTimeDays: 3,
             cutoffTime: '16:00',
             activeDeliveryDays: [1, 2, 3, 4, 5],
           })

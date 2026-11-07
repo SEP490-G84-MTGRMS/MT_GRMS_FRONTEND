@@ -49,7 +49,6 @@ export const mapBackendSupplierToFrontend = (item: any): SupplierSummary => ({
   name: item.name || '',
   tradeName: item.tradeName || item.name || '',
   supplierType: typeMapBackendToFrontend(item.supplierType),
-  category: item.categoryCode || item.categoryName || 'FRESH',
   contactPerson: item.contactPerson || '',
   phone: item.phone || '',
   email: item.email || undefined,
@@ -86,7 +85,6 @@ export const supplierApi = {
         searchTerm: filter?.searchTerm || undefined,
         supplierType: typeMapFrontendToBackend(filter?.supplierType),
         status: statusMapFrontendToBackend(filter?.status),
-        category: filter?.category || undefined,
         pageIndex: filter?.pageIndex || 1,
         pageSize: filter?.pageSize || 15,
       };
@@ -200,7 +198,6 @@ export const supplierApi = {
       code: input.code || undefined,
       name: input.name,
       supplierType: typeMapFrontendToBackend(input.supplierType) || 1,
-      categoryCode: input.category || 'FRESH',
       status: statusMapFrontendToBackend(input.status) || 1,
       phone: input.phone,
       email: input.email || undefined,

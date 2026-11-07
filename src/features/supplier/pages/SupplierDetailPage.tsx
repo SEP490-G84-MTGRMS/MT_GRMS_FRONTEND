@@ -61,7 +61,6 @@ function mapJsDaysToNames(days: number[]): string[] {
 function mapApiToDeliveryConfig(data: any, fallback: SupplierDeliveryConfig): SupplierDeliveryConfig {
   return {
     ...fallback,
-    leadTimeDays: data.leadTimeDays ?? fallback.leadTimeDays,
     minOrderQuantity: data.minOrderQuantity ?? 0,
     cutoffTime: data.orderCutoffTime || data.cutoffTime || fallback.cutoffTime,
     activeDeliveryDays: mapDeliveryDaysToJs(data.deliveryDays),
@@ -78,8 +77,6 @@ function mapApiToDeliveryConfig(data: any, fallback: SupplierDeliveryConfig): Su
 
 function mapDeliveryConfigToApi(cfg: SupplierDeliveryConfig) {
   return {
-    leadTimeHours: Math.max(0, cfg.leadTimeDays * 24),
-    leadTimeDays: cfg.leadTimeDays,
     cutoffTime: cfg.cutoffTime,
     orderCutoffTime: cfg.cutoffTime,
     deliveryDays: mapJsDaysToNames(cfg.activeDeliveryDays),
@@ -137,8 +134,6 @@ export const SupplierDetailPage: FC<Props> = ({
 
   // Dynamic delivery config state
   const [deliveryConfig, setDeliveryConfig] = useState<SupplierDeliveryConfig>({
-    leadTimeDays: 1,
-    leadTimeUnit: 'BUSINESS_DAYS',
     minOrderQuantity: 0,
     activeDeliveryDays: [1, 2, 3, 4, 5, 6],
     cutoffTime: '17:00',

@@ -617,20 +617,6 @@ export const AssignBranchModal: FC<AssignBranchModalProps> = ({
                         >
                           SĐT
                         </th>
-                        <th
-                          style={{
-                            padding: '8px 10px',
-                            textAlign: 'left',
-                            fontSize: 11.5,
-                            fontWeight: 700,
-                            color: '#475569',
-                            textTransform: 'uppercase',
-                            letterSpacing: '0.02em',
-                            whiteSpace: 'nowrap',
-                          }}
-                        >
-                          Ngành hàng
-                        </th>
                       </tr>
                     </thead>
                     <tbody>
@@ -695,9 +681,6 @@ export const AssignBranchModal: FC<AssignBranchModalProps> = ({
                               }}
                             >
                               {sup.phone || '—'}
-                            </td>
-                            <td style={{ padding: '8px 10px', verticalAlign: 'middle', fontSize: 12.5, color: '#64748b' }}>
-                              {sup.category || '—'}
                             </td>
                           </tr>
                         );

@@ -37,7 +37,7 @@ const GUID_RE =
 
 const DEFAULT_DELIVERY: SupplierDeliveryConfig = {
   supplierId: '',
-  leadDays: 1,
+  leadDays: 0,
   cutoffHour: '15:00',
   lockHour: '16:00',
   activeDeliveryDays: [1, 2, 3, 4, 5, 6],
@@ -58,7 +58,7 @@ function suppliersFromMatrix(
       openAp: 0,
       config: {
         supplierId: sc.supplierId,
-        leadDays: sc.leadTimeDays,
+        leadDays: 0,
         cutoffHour: sc.cutoffTime,
         lockHour: sc.cutoffTime,
         activeDeliveryDays: sc.activeDeliveryDays,
@@ -163,8 +163,7 @@ function computeDayColumns(
   const list: DayColInfo[] = [];
   const isAll = supplierId === 'ALL';
   const supConfig = supplierConfigs?.find((sc) => sc.supplierId === supplierId);
-  const leadDays = supConfig?.leadTimeDays ?? (isAll ? 0 : DEFAULT_DELIVERY.leadDays);
-  const earliestAllowed = isAll ? today : fmtDateStr(addDaysToDate(parseDateStr(today), leadDays));
+  const earliestAllowed = today;
 
   for (let i = 0; i < durationDays; i++) {
     const d = addDaysToDate(viewFrom, i);

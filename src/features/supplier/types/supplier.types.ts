@@ -1,7 +1,5 @@
 export type SupplierType = 'Goods' | 'Service' | 'Both';
 
-export type SupplierCategory = 'FRESH' | 'AMBIENT' | 'FROZEN' | 'UTILITIES' | 'RENT' | 'LOGISTICS';
-
 export type SupplierStatus = 'Active' | 'Inactive';
 
 export interface SupplierSummary {
@@ -10,7 +8,6 @@ export interface SupplierSummary {
   name: string;
   tradeName?: string;
   supplierType: SupplierType;
-  category: SupplierCategory;
   contactPerson: string;
   phone: string;
   email?: string;
@@ -75,7 +72,6 @@ export interface SupplierFilterState {
   contactPerson?: string;
   phone?: string;
   supplierType: string;
-  category: string;
   debtStatus: string;
   ratingFilter: string;
   status: string;
@@ -95,7 +91,6 @@ export interface CreateSupplierInput {
   name: string;
   tradeName?: string;
   supplierType: SupplierType;
-  category: SupplierCategory;
   contactPerson: string;
   phone: string;
   status?: SupplierStatus;
@@ -147,8 +142,6 @@ export interface HolidayDateRange {
 }
 
 export interface SupplierDeliveryConfig {
-  leadTimeDays: number;
-  leadTimeUnit: 'BUSINESS_DAYS' | 'CALENDAR_DAYS';
   minOrderQuantity: number;
   activeDeliveryDays: number[]; // 0 = Sun, 1 = Mon, ..., 6 = Sat
   cutoffTime: string; // e.g. "14:00" or "16:00"

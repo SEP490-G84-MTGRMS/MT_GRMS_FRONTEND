@@ -36,7 +36,6 @@ export interface OrderMatrixSupplierDeliveryConfig {
   isActive: boolean;
   isAssignedToBranch: boolean;
   inactiveReason?: string;
-  leadTimeDays: number;
   cutoffTime: string;
   activeDeliveryDays: number[]; // 0: CN, 1: T2, ..., 6: T7
   blackoutDates: string[]; // YYYY-MM-DD

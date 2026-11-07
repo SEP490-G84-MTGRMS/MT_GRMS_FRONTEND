@@ -190,7 +190,6 @@ export const SupplierFilterBar: FC<Props> = ({ filters, onSearch, onReset }) => 
         pageIndex: 1,
         pageSize: 8,
         supplierType: '',
-        category: '',
         debtStatus: '',
         ratingFilter: '',
         status: '',
@@ -357,7 +356,6 @@ export const SupplierFilterBar: FC<Props> = ({ filters, onSearch, onReset }) => 
       contactPersons: [],
       phones: [],
       supplierType: '',
-      category: '',
       debtStatus: '',
       ratingFilter: '',
       status: '',
@@ -381,7 +379,6 @@ export const SupplierFilterBar: FC<Props> = ({ filters, onSearch, onReset }) => 
       queries.contactPerson.trim() ||
       queries.phone.trim() ||
       draftFilters.supplierType ||
-      draftFilters.category ||
       draftFilters.status
   );
 
@@ -688,23 +685,6 @@ export const SupplierFilterBar: FC<Props> = ({ filters, onSearch, onReset }) => 
               <option value="Goods">Hàng hóa</option>
               <option value="Service">Dịch vụ</option>
               <option value="Both">Cả hai</option>
-            </select>
-          </div>
-
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-            <label style={labelStyle}>Ngành hàng:</label>
-            <select
-              value={draftFilters.category || ''}
-              onChange={(e) => setDraftFilters((prev) => ({ ...prev, category: e.target.value }))}
-              style={{ ...selectStyle(Boolean(draftFilters.category)), minWidth: 160 }}
-            >
-              <option value="">-- Tất cả ngành hàng --</option>
-              <option value="FRESH">Nông sản tươi (FRESH)</option>
-              <option value="AMBIENT">Đồ khô / Tạp hóa (AMBIENT)</option>
-              <option value="FROZEN">Đông lạnh (FROZEN)</option>
-              <option value="UTILITIES">Điện nước (UTILITIES)</option>
-              <option value="RENT">Mặt bằng (RENT)</option>
-              <option value="LOGISTICS">Vận chuyển (LOGISTICS)</option>
             </select>
           </div>
 

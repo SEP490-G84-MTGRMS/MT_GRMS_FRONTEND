@@ -1,6 +1,6 @@
 import type { FC } from 'react';
 import type { SupplierDeliveryConfig } from '../../types/po.types';
-import { Info, Clock, Lock, Calendar } from 'lucide-react';
+import { Info, Clock, Lock } from 'lucide-react';
 
 interface OrderMatrixSupplierInfoProps {
   supplierName: string;
@@ -19,18 +19,13 @@ export const OrderMatrixSupplierInfo: FC<OrderMatrixSupplierInfoProps> = ({
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap', marginTop: 4 }}>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-          <Calendar size={13} />
-          Lead time: <b>{config.leadDays} ngày</b>
-        </span>
-        <span>•</span>
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
           <Clock size={13} />
-          Cutoff chốt đơn: <b>{config.cutoffHour}</b> (ngày trước ngày giao)
+          Cutoff chốt đơn: <b>{config.cutoffHour}</b> (cùng ngày giao)
         </span>
         <span>•</span>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
           <Lock size={13} />
-          Khóa chốt sửa đơn: <b>{config.lockHour}</b> (ngày trước ngày giao)
+          Khóa sửa đơn: <b>{config.lockHour}</b>
         </span>
       </div>
       {config.deliveryNote && (

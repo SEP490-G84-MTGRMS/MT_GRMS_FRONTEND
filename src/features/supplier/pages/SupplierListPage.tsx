@@ -31,7 +31,6 @@ const DEFAULT_FILTERS: SupplierFilterState = {
   contactPersons: [],
   phones: [],
   supplierType: '',
-  category: '',
   debtStatus: '',
   ratingFilter: '',
   status: '',

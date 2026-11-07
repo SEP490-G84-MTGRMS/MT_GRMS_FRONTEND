@@ -60,7 +60,6 @@ export interface MatrixBackendResponse {
     isActive: boolean;
     isAssignedToBranch: boolean;
     inactiveReason?: string;
-    leadTimeDays: number;
     cutoffTime: string;
     activeDeliveryDays: number[];
     blackoutDates: string[];
@@ -247,7 +246,6 @@ export const purchaseOrderApi = {
           isActive: sc.isActive,
           isAssignedToBranch: sc.isAssignedToBranch,
           inactiveReason: sc.inactiveReason,
-          leadTimeDays: sc.leadTimeDays || 1,
           cutoffTime: sc.cutoffTime || '15:00',
           activeDeliveryDays: sc.activeDeliveryDays || [1, 2, 3, 4, 5, 6],
           blackoutDates: sc.blackoutDates || [],

@@ -10,8 +10,6 @@ interface Props {
 }
 
 const DEFAULT_CONFIG: SupplierDeliveryConfig = {
-  leadTimeDays: 1,
-  leadTimeUnit: 'BUSINESS_DAYS',
   minOrderQuantity: 0,
   activeDeliveryDays: [1, 2, 3, 4, 5, 6],
   cutoffTime: '17:00',
@@ -59,10 +57,6 @@ export const SupplierDeliveryConfigTab: FC<Props> = ({
   const validate = (): string | null => {
     if (!config.activeDeliveryDays || config.activeDeliveryDays.length === 0) {
       return 'Vui lòng chọn ít nhất một ngày giao hàng hoạt động trong tuần (Active Delivery Days).';
-    }
-
-    if (config.leadTimeDays < 0 || config.leadTimeDays > 30) {
-      return 'Thời gian chuẩn bị (Lead Time) phải nằm trong khoảng từ 0 đến 30 ngày.';
     }
 
     if (config.minOrderQuantity < 0) {
@@ -162,39 +156,12 @@ export const SupplierDeliveryConfigTab: FC<Props> = ({
               Lịch Giao Hàng &amp; Thời Gian Cutoff
             </h2>
             <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-              Cấu hình thời gian chuẩn bị đơn (Lead time), ngày giao hàng hoạt động và giờ chốt đơn hằng ngày.
+              Cấu hình ngày giao hàng hoạt động và giờ chốt đơn hằng ngày.
             </div>
           </div>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16, marginBottom: 20 }}>
-          <div className="form-group">
-            <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <Clock size={14} color="var(--blue-primary)" />
-              <span>Thời gian chuẩn bị (Lead Time)</span>
-            </label>
-            <div style={{ display: 'flex', gap: 10 }}>
-              <input
-                type="number" min="0" max="30"
-                data-testid="input-lead-time"
-                value={config.leadTimeDays}
-                onChange={(e) => setConfig({ ...config, leadTimeDays: Math.max(0, parseInt(e.target.value) || 0) })}
-                className="admin-search-input"
-                style={{ width: 80, height: 40, textAlign: 'center', fontFamily: 'var(--font-mono)' }}
-              />
-              <select
-                data-testid="select-lead-time-unit"
-                value={config.leadTimeUnit}
-                onChange={(e) => setConfig({ ...config, leadTimeUnit: e.target.value as any })}
-                className="form-select"
-                style={{ height: 40, flex: 1 }}
-              >
-                <option value="BUSINESS_DAYS">Ngày làm việc (Business Days)</option>
-                <option value="CALENDAR_DAYS">Ngày dương lịch (Calendar Days)</option>
-              </select>
-            </div>
-          </div>
-
           <div className="form-group">
             <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <Package size={14} color="var(--blue-primary)" />
