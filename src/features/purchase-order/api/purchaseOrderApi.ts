@@ -5,14 +5,18 @@ import type {
   MatrixCellMap,
   SplitPoPreview,
   GeneratedPO,
+  OrderMatrixDayStatus,
+  OrderMatrixSupplierDeliveryConfig,
 } from '../types/po.types';
 
 export interface MatrixBackendResponse {
   branchId: string;
   branchName: string;
+  branchIsActive?: boolean;
   supplierId?: string;
   viewFrom: string;
   durationDays: number;
+  serverNow?: string;
   products: Array<{
     id: string;
     supplierId: string;
@@ -24,6 +28,7 @@ export interface MatrixBackendResponse {
     unit: string;
     price: number;
     moq: number;
+    orderMultiple?: number;
     soh: number;
     salesPerDay: number;
     safetyStock: number;
@@ -44,7 +49,8 @@ export interface MatrixBackendResponse {
     productId: string;
     deliveryDate: string;
     employeeQty: number;
-    storeQty?: number;
+    storeQty?: number | null;
+    isOwnerAdjusted?: boolean;
     finalQty: number;
   }>;
   supplierConfigs?: Array<{
@@ -58,6 +64,15 @@ export interface MatrixBackendResponse {
     cutoffTime: string;
     activeDeliveryDays: number[];
     blackoutDates: string[];
+  }>;
+  dayStatuses?: Array<{
+    supplierId: string;
+    deliveryDate: string;
+    deliveryDateStatus: string;
+    cutoffDateTime?: string;
+    primaryReasonCode?: string;
+    poCode?: string;
+    poId?: string;
   }>;
   draftPoId?: string;
   status: string;
@@ -74,7 +89,87 @@ export interface SplitPoGroupRequest {
   }>;
 }
 
+export interface OrderMatrixApiResult {
+  products: OrderMatrixProduct[];
+  cellMap: MatrixCellMap;
+  supplierConfigs: OrderMatrixSupplierDeliveryConfig[];
+  dayStatuses: OrderMatrixDayStatus[];
+  branchIsActive: boolean;
+  serverNow: string;
+  draftPoId?: string;
+  status: string;
+}
+
+function toDateKey(value: string): string {
+  return value.slice(0, 10);
+}
+
+export interface PurchaseOrderListApiItem {
+  id: string;
+  code: string;
+  branchId: string;
+  branchName: string;
+  branchCode?: string;
+  supplierId: string;
+  supplierName: string;
+  supplierCode?: string;
+  deliveryDate?: string;
+  status: string;
+  totalQty: number;
+  totalAmount: number;
+  note?: string;
+  createdAt: string;
+  details: Array<{
+    id: string;
+    productId: string;
+    productName: string;
+    sku: string;
+    unit: string;
+    orderedQty: number;
+    unitPrice: number;
+    lineAmount: number;
+  }>;
+}
+
+export interface PurchaseOrderPagedResult {
+  items: PurchaseOrderListApiItem[];
+  page: number;
+  pageSize: number;
+  totalItems: number;
+}
+
 export const purchaseOrderApi = {
+  /**
+   * Danh sách PO đã chốt (không gồm DRAFT) — phân trang + lọc.
+   */
+  async getPagedPurchaseOrders(params: {
+    branchId?: string;
+    supplierId?: string;
+    status?: string;
+    dateFrom?: string;
+    dateTo?: string;
+    pageIndex?: number;
+    pageSize?: number;
+  }): Promise<PurchaseOrderPagedResult> {
+    const res = await httpClient.get<ApiResponse<PurchaseOrderPagedResult>>('/purchase-orders', {
+      params: {
+        BranchId: params.branchId && params.branchId !== 'all' ? params.branchId : undefined,
+        SupplierId: params.supplierId && params.supplierId !== 'all' ? params.supplierId : undefined,
+        Status: params.status && params.status !== 'all' ? params.status : undefined,
+        DateFrom: params.dateFrom || undefined,
+        DateTo: params.dateTo || undefined,
+        PageIndex: params.pageIndex ?? 1,
+        PageSize: params.pageSize ?? 10,
+      },
+    });
+
+    if (res.data?.success && res.data.data) {
+      return res.data.data;
+    }
+
+    throw new Error(res.data?.message || 'Không tải được danh sách đơn mua hàng.');
+  },
+
   /**
    * Lấy dữ liệu lưới ma trận đặt hàng từ backend
    */
@@ -83,11 +178,7 @@ export const purchaseOrderApi = {
     supplierId: string | null | undefined,
     viewFrom: string,
     durationDays: number
-  ): Promise<{
-    products: OrderMatrixProduct[];
-    cellMap: MatrixCellMap;
-    supplierConfigs: import('../types/po.types').OrderMatrixSupplierDeliveryConfig[];
-  }> {
+  ): Promise<OrderMatrixApiResult> {
     try {
       const res = await httpClient.get<ApiResponse<MatrixBackendResponse>>('/purchase-orders/matrix', {
         params: {
@@ -110,6 +201,7 @@ export const purchaseOrderApi = {
           unit: p.unit,
           price: p.price,
           moq: p.moq,
+          orderMultiple: p.orderMultiple ?? 1,
           soh: p.soh,
           sales: p.salesPerDay,
           safetyStock: p.safetyStock,
@@ -123,20 +215,28 @@ export const purchaseOrderApi = {
           supplierBranchInactiveReason: p.supplierBranchInactiveReason,
           isBranchProductActive: p.isBranchProductActive ?? true,
           branchProductInactiveReason: p.branchProductInactiveReason,
-          isRowDisabled: p.isRowDisabled ?? (!p.isProductActive || !p.isSupplierActive || !p.isSupplierProductActive || !p.isSupplierBranchActive || !p.isBranchProductActive),
+          isRowDisabled:
+            p.isRowDisabled ??
+            (!p.isProductActive ||
+              !p.isSupplierActive ||
+              !p.isSupplierProductActive ||
+              !p.isSupplierBranchActive ||
+              !p.isBranchProductActive),
           rowDisabledReason: p.rowDisabledReason,
         }));
 
         const cellMap: MatrixCellMap = {};
         d.cells.forEach((c) => {
           if (!cellMap[c.productId]) cellMap[c.productId] = {};
-          const dKey = c.deliveryDate.slice(0, 10);
+          const dKey = toDateKey(c.deliveryDate);
+          const isOwnerAdjusted = Boolean(c.isOwnerAdjusted || (c.storeQty !== null && c.storeQty !== undefined));
           cellMap[c.productId][dKey] = {
             employeeQty: c.employeeQty,
             storeQty: c.storeQty ?? null,
             finalQty: c.finalQty,
-            isOwnerOverridden: c.storeQty !== null && c.storeQty !== undefined,
-            modifiedBy: c.storeQty !== null && c.storeQty !== undefined ? 'store_owner' : 'employee',
+            isOwnerAdjusted,
+            isOwnerOverridden: isOwnerAdjusted,
+            modifiedBy: isOwnerAdjusted ? 'store_owner' : 'employee',
           };
         });
 
@@ -153,7 +253,16 @@ export const purchaseOrderApi = {
           blackoutDates: sc.blackoutDates || [],
         }));
 
-        // Đồng bộ dữ liệu cellMap từ backend vào localStorage
+        const dayStatuses: OrderMatrixDayStatus[] = (d.dayStatuses || []).map((ds) => ({
+          supplierId: ds.supplierId,
+          deliveryDate: toDateKey(ds.deliveryDate),
+          deliveryDateStatus: ds.deliveryDateStatus,
+          cutoffDateTime: ds.cutoffDateTime,
+          primaryReasonCode: ds.primaryReasonCode,
+          poCode: ds.poCode,
+          poId: ds.poId,
+        }));
+
         if (Object.keys(cellMap).length > 0) {
           try {
             const localKey = `matrix_draft_${branchId}_${supplierId || 'ALL'}`;
@@ -163,13 +272,21 @@ export const purchaseOrderApi = {
           }
         }
 
-        return { products, cellMap, supplierConfigs };
+        return {
+          products,
+          cellMap,
+          supplierConfigs,
+          dayStatuses,
+          branchIsActive: d.branchIsActive ?? true,
+          serverNow: d.serverNow || new Date().toISOString(),
+          draftPoId: d.draftPoId,
+          status: d.status || 'DRAFT',
+        };
       }
     } catch {
       // Fallback
     }
 
-    // Backend offline hoặc mã Branch mock: Nạp bản thảo đã lưu từ localStorage
     const localKey = `matrix_draft_${branchId}_${supplierId || 'ALL'}`;
     let cachedMap: MatrixCellMap = {};
     try {
@@ -181,7 +298,15 @@ export const purchaseOrderApi = {
       // ignore
     }
 
-    return { products: [], cellMap: cachedMap, supplierConfigs: [] };
+    return {
+      products: [],
+      cellMap: cachedMap,
+      supplierConfigs: [],
+      dayStatuses: [],
+      branchIsActive: true,
+      serverNow: new Date().toISOString(),
+      status: 'DRAFT',
+    };
   },
 
   /**
@@ -195,7 +320,6 @@ export const purchaseOrderApi = {
     cellMap: MatrixCellMap,
     note?: string
   ): Promise<void> {
-    // 1. Lưu ngay lập tức vào localStorage để đảm bảo dữ liệu không bao giờ bị mất
     const localKey = `matrix_draft_${branchId}_${supplierId || 'ALL'}`;
     try {
       localStorage.setItem(localKey, JSON.stringify(cellMap));
@@ -203,25 +327,36 @@ export const purchaseOrderApi = {
       console.warn('Cannot save to localStorage', e);
     }
 
-    // 2. Gửi đồng bộ lên Backend API
     try {
       const cells: Array<{
         productId: string;
         deliveryDate: string;
         employeeQty: number;
-        storeQty?: number;
+        storeQty: number | null;
+        isOwnerAdjusted: boolean;
         finalQty: number;
       }> = [];
 
       Object.entries(cellMap).forEach(([productId, dayMap]) => {
         Object.entries(dayMap).forEach(([dateKey, cell]) => {
-          if (cell.finalQty > 0 || cell.employeeQty > 0 || (cell.storeQty !== null && cell.storeQty > 0)) {
+          const isOwnerAdjusted = Boolean(
+            cell.isOwnerAdjusted || cell.isOwnerOverridden || (cell.storeQty !== null && cell.storeQty !== undefined)
+          );
+          // Gửi cả ô restore (storeQty=null, isOwnerAdjusted=false) và ô có số lượng
+          if (
+            cell.finalQty > 0 ||
+            cell.employeeQty > 0 ||
+            cell.storeQty !== null ||
+            isOwnerAdjusted ||
+            cell.modifiedBy === 'store_owner'
+          ) {
             cells.push({
               productId,
               deliveryDate: dateKey,
-              employeeQty: cell.employeeQty,
-              storeQty: cell.storeQty ?? undefined,
-              finalQty: cell.finalQty,
+              employeeQty: cell.employeeQty ?? 0,
+              storeQty: cell.storeQty ?? null,
+              isOwnerAdjusted,
+              finalQty: cell.finalQty ?? 0,
             });
           }
         });
@@ -247,53 +382,41 @@ export const purchaseOrderApi = {
   async splitMatrixPo(
     branchId: string,
     splitPos: SplitPoPreview[],
-    note?: string
+    note?: string,
+    parentDraftId?: string
   ): Promise<GeneratedPO[]> {
-    try {
-      const groups: SplitPoGroupRequest[] = splitPos.map((sp) => ({
-        supplierId: sp.supplierId,
-        deliveryDate: sp.deliveryDate,
-        items: sp.items.map((i) => ({
-          productId: i.productId,
-          quantity: i.finalQty,
-          unitPrice: i.price,
-          unit: i.unit,
-        })),
+    const groups: SplitPoGroupRequest[] = splitPos.map((sp) => ({
+      supplierId: sp.supplierId,
+      deliveryDate: sp.deliveryDate,
+      items: sp.items.map((i) => ({
+        productId: i.productId,
+        quantity: i.finalQty,
+        unitPrice: i.price,
+        unit: i.unit,
+      })),
+    }));
+
+    const res = await httpClient.post<ApiResponse<any[]>>('/purchase-orders/matrix/split', {
+      branchId,
+      parentDraftId,
+      note,
+      groups,
+    });
+
+    if (res.data?.success && res.data.data) {
+      return res.data.data.map((po: any) => ({
+        id: po.id,
+        orderCode: po.code,
+        supplierId: po.supplierId,
+        branchId: po.branchId,
+        deliveryDate: po.deliveryDate?.slice(0, 10) || '',
+        totalQuantity: po.totalQty,
+        totalAmount: po.totalAmount,
+        status: po.status,
+        itemCount: po.details?.length || 0,
       }));
-
-      const res = await httpClient.post<ApiResponse<any[]>>('/purchase-orders/matrix/split', {
-        branchId,
-        note,
-        groups,
-      });
-
-      if (res.data?.success && res.data.data) {
-        return res.data.data.map((po: any) => ({
-          id: po.id,
-          orderCode: po.code,
-          supplierId: po.supplierId,
-          branchId: po.branchId,
-          deliveryDate: po.deliveryDate?.slice(0, 10) || '',
-          totalQuantity: po.totalQty,
-          totalAmount: po.totalAmount,
-          status: po.status,
-          itemCount: po.details?.length || 0,
-        }));
-      }
-    } catch {
-      // Offline fallback
     }
 
-    return splitPos.map((sp) => ({
-      id: sp.id,
-      orderCode: sp.id,
-      supplierId: sp.supplierId,
-      branchId: sp.branchId,
-      deliveryDate: sp.deliveryDate,
-      totalQuantity: sp.totalQuantity,
-      totalAmount: sp.totalAmount,
-      status: 'PENDING_APPROVAL',
-      itemCount: sp.items.length,
-    }));
+    throw new Error(res.data?.message || 'Không thể chốt PO từ ma trận.');
   },
 };

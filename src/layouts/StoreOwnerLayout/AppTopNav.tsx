@@ -200,32 +200,22 @@ const NAV_GROUPS: NavGroup[] = [
           {
             label: "Đặt hàng ma trận",
             to: "/store-owner/purchase-orders/create-matrix",
-            badge: "Chủ",
-            badgeType: "blue",
           },
           {
             label: "Chốt đơn với nhà cung cấp",
             to: "/store-owner/purchase-orders/dispatch-hub",
-            badge: "Hub",
-            badgeType: "blue",
           },
           {
             label: "Danh sách đơn mua hàng (PO)",
             to: "/store-owner/purchase-orders/list",
-            badge: "PO",
-            badgeType: "blue",
           },
           {
             label: "Phiếu nhập kho (GRN) & Lịch nhận",
             to: "/store-owner/goods-receipts",
-            badge: "GRN",
-            badgeType: "blue",
           },
           {
             label: "Trả hàng nhà cung cấp (RTV)",
             to: "/store-owner/supplier-returns",
-            badge: "RTV",
-            badgeType: "blue",
           },
         ],
       },

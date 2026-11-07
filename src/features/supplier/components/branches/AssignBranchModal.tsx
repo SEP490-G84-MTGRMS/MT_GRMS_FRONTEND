@@ -1,12 +1,36 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import type { FC } from 'react';
-import { X, Check, Store, Search, Loader2, AlertCircle } from 'lucide-react';
+import { X, Check, Store, Search, Loader2, AlertCircle, CalendarDays } from 'lucide-react';
 import type {
   SupplierSummary,
   SupplierBranchAssignmentItem,
   AssignSuppliersToBranchInput,
 } from '../../types/supplier.types';
 import type { BranchListItem } from '../../../purchase-order/types/po.types';
+import { supplierApi } from '../../api/supplierApi';
+import { StatusToggle } from '../StatusToggle';
+
+const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
+const WEEKDAY_OPTIONS = [
+  { val: 1, label: 'T2' },
+  { val: 2, label: 'T3' },
+  { val: 3, label: 'T4' },
+  { val: 4, label: 'T5' },
+  { val: 5, label: 'T6' },
+  { val: 6, label: 'T7' },
+  { val: 0, label: 'CN' },
+] as const;
+
+function mapDeliveryDaysToJs(days?: string[]): number[] {
+  if (!days?.length) return [1, 2, 3, 4, 5, 6];
+  return days
+    .map((day) => DAY_NAMES.indexOf(day as (typeof DAY_NAMES)[number]))
+    .filter((index) => index >= 0);
+}
+
+function mapJsDaysToNames(days: number[]): string[] {
+  return days.map((day) => DAY_NAMES[day]).filter(Boolean);
+}
 
 interface AssignBranchModalProps {
   isOpen: boolean;
@@ -29,9 +53,13 @@ export const AssignBranchModal: FC<AssignBranchModalProps> = ({
 }) => {
   const [selectedBranchId, setSelectedBranchId] = useState<string>('');
   const [selectedSupplierIds, setSelectedSupplierIds] = useState<string[]>([]);
+  const [deliveryDaysBySupplier, setDeliveryDaysBySupplier] = useState<Record<string, number[]>>({});
+  const [loadingDeliveryFor, setLoadingDeliveryFor] = useState<string | null>(null);
   const [supplierSearch, setSupplierSearch] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string>('');
+  const [status, setStatus] = useState<'Active' | 'Inactive'>('Active');
+  const [inactiveReason, setInactiveReason] = useState('');
 
   // Khởi tạo trạng thái khi mở modal
   useEffect(() => {
@@ -43,9 +71,12 @@ export const AssignBranchModal: FC<AssignBranchModalProps> = ({
 
       setSelectedBranchId(defaultBranchId);
       setSelectedSupplierIds([]);
+      setDeliveryDaysBySupplier({});
       setSupplierSearch('');
       setErrorMsg('');
       setIsSubmitting(false);
+      setStatus('Active');
+      setInactiveReason('');
     }
   }, [isOpen, initialBranchId, branches]);
 
@@ -53,9 +84,27 @@ export const AssignBranchModal: FC<AssignBranchModalProps> = ({
   const handleBranchChange = (newBranchId: string) => {
     setSelectedBranchId(newBranchId);
     setSelectedSupplierIds([]);
+    setDeliveryDaysBySupplier({});
     setSupplierSearch('');
     setErrorMsg('');
   };
+
+  const ensureDeliveryDaysForSupplier = useCallback(async (supplierId: string) => {
+    setDeliveryDaysBySupplier((prev) => {
+      if (prev[supplierId]) return prev;
+      return { ...prev, [supplierId]: [1, 2, 3, 4, 5, 6] };
+    });
+    setLoadingDeliveryFor(supplierId);
+    try {
+      const cfg = await supplierApi.getDeliveryConfig(supplierId);
+      const days = mapDeliveryDaysToJs(cfg?.deliveryDays);
+      setDeliveryDaysBySupplier((prev) => ({ ...prev, [supplierId]: days.length ? days : [1, 2, 3, 4, 5, 6] }));
+    } catch {
+      // giữ mặc định Mon-Sat
+    } finally {
+      setLoadingDeliveryFor((cur) => (cur === supplierId ? null : cur));
+    }
+  }, []);
 
   // Chi nhánh hiện đang được chọn
   const currentBranch = useMemo(() => {
@@ -97,13 +146,27 @@ export const AssignBranchModal: FC<AssignBranchModalProps> = ({
     );
   }, [availableSuppliers, supplierSearch]);
 
+  const selectedSuppliers = useMemo(
+    () => selectedSupplierIds.map((id) => suppliers.find((s) => s.id === id)).filter(Boolean) as SupplierSummary[],
+    [selectedSupplierIds, suppliers]
+  );
+
   if (!isOpen) return null;
 
   // Toggle chọn một nhà cung cấp
   const handleToggleSupplier = (supplierId: string) => {
-    setSelectedSupplierIds((prev) =>
-      prev.includes(supplierId) ? prev.filter((id) => id !== supplierId) : [...prev, supplierId]
-    );
+    setSelectedSupplierIds((prev) => {
+      if (prev.includes(supplierId)) {
+        setDeliveryDaysBySupplier((daysMap) => {
+          const next = { ...daysMap };
+          delete next[supplierId];
+          return next;
+        });
+        return prev.filter((id) => id !== supplierId);
+      }
+      void ensureDeliveryDaysForSupplier(supplierId);
+      return [...prev, supplierId];
+    });
     setErrorMsg('');
   };
 
@@ -111,12 +174,26 @@ export const AssignBranchModal: FC<AssignBranchModalProps> = ({
   const handleSelectAll = () => {
     const selectableIds = filteredAvailableSuppliers.map((s) => s.id);
     setSelectedSupplierIds((prev) => Array.from(new Set([...prev, ...selectableIds])));
+    selectableIds.forEach((id) => {
+      void ensureDeliveryDaysForSupplier(id);
+    });
     setErrorMsg('');
   };
 
   // Bỏ chọn tất cả
   const handleDeselectAll = () => {
     setSelectedSupplierIds([]);
+    setDeliveryDaysBySupplier({});
+  };
+
+  const handleToggleDeliveryDay = (supplierId: string, dayVal: number) => {
+    setDeliveryDaysBySupplier((prev) => {
+      const current = prev[supplierId] ?? [1, 2, 3, 4, 5, 6];
+      const exists = current.includes(dayVal);
+      const next = exists ? current.filter((d) => d !== dayVal) : [...current, dayVal];
+      return { ...prev, [supplierId]: next };
+    });
+    setErrorMsg('');
   };
 
   // Submit form phân bổ
@@ -141,12 +218,31 @@ export const AssignBranchModal: FC<AssignBranchModalProps> = ({
       return;
     }
 
+    const missingDays = selectedSupplierIds.some(
+      (id) => !deliveryDaysBySupplier[id] || deliveryDaysBySupplier[id].length === 0
+    );
+    if (missingDays) {
+      setErrorMsg('Mỗi nhà cung cấp cần chọn ít nhất 1 ngày giao hàng trong tuần.');
+      return;
+    }
+
+    if (status === 'Inactive' && !inactiveReason.trim()) {
+      setErrorMsg('Vui lòng nhập lý do khi đặt trạng thái Disable.');
+      return;
+    }
+
     try {
       setIsSubmitting(true);
       setErrorMsg('');
       await onAssign({
         branchId: selectedBranchId,
         supplierIds: selectedSupplierIds,
+        items: selectedSupplierIds.map((supplierId) => ({
+          supplierId,
+          deliveryDays: mapJsDaysToNames(deliveryDaysBySupplier[supplierId] || []),
+        })),
+        status,
+        inactiveReason: status === 'Inactive' ? inactiveReason.trim() : undefined,
       });
       onClose();
     } catch (err: any) {
@@ -269,6 +365,41 @@ export const AssignBranchModal: FC<AssignBranchModalProps> = ({
                 <span>{errorMsg}</span>
               </div>
             )}
+
+            {/* Trạng thái phân bổ */}
+            <div style={{ marginBottom: 18 }}>
+              <StatusToggle
+                checked={status === 'Active'}
+                disabled={isSubmitting}
+                onChange={(next) => {
+                  setStatus(next ? 'Active' : 'Inactive');
+                  setErrorMsg('');
+                }}
+              />
+              {status === 'Inactive' && (
+                <div style={{ marginTop: 10 }}>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#475569', marginBottom: 4 }}>
+                    Lý do tạm ngưng
+                  </label>
+                  <textarea
+                    value={inactiveReason}
+                    onChange={(e) => setInactiveReason(e.target.value)}
+                    rows={2}
+                    placeholder="Nhập lý do..."
+                    disabled={isSubmitting}
+                    style={{
+                      width: '100%',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: 8,
+                      padding: 10,
+                      fontSize: 13,
+                      resize: 'vertical',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                </div>
+              )}
+            </div>
 
             {/* Bước 1: Chọn cửa hàng / chi nhánh */}
             <div style={{ marginBottom: 18 }}>
@@ -575,6 +706,98 @@ export const AssignBranchModal: FC<AssignBranchModalProps> = ({
                   </table>
                 )}
               </div>
+
+              {/* Ngày giao theo thứ — prefill từ base NCC, cho sửa theo cửa hàng */}
+              {selectedSuppliers.length > 0 && (
+                <div
+                  style={{
+                    marginTop: 16,
+                    padding: 14,
+                    borderRadius: 10,
+                    border: '1px solid #ccfbf1',
+                    backgroundColor: '#f0fdfa',
+                  }}
+                >
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      marginBottom: 10,
+                      fontSize: 13,
+                      fontWeight: 700,
+                      color: '#0f766e',
+                    }}
+                  >
+                    <CalendarDays size={16} />
+                    <span>Ngày giao hàng theo thứ (theo từng NCC tại cửa hàng này)</span>
+                  </div>
+                  <p style={{ margin: '0 0 12px', fontSize: 12, color: '#64748b' }}>
+                    Mặc định lấy từ cấu hình Delivery Date của NCC — bạn có thể tick thêm/bớt theo cửa hàng.
+                  </p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    {selectedSuppliers.map((sup) => {
+                      const days = deliveryDaysBySupplier[sup.id] ?? [];
+                      const isLoading = loadingDeliveryFor === sup.id;
+                      return (
+                        <div
+                          key={sup.id}
+                          style={{
+                            background: '#ffffff',
+                            border: '1px solid #e2e8f0',
+                            borderRadius: 8,
+                            padding: '10px 12px',
+                          }}
+                        >
+                          <div
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              gap: 8,
+                              marginBottom: 8,
+                            }}
+                          >
+                            <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a' }}>
+                              <span style={{ fontFamily: 'monospace', color: '#0f766e' }}>{sup.code}</span>
+                              {' · '}
+                              {sup.name}
+                            </div>
+                            {isLoading && (
+                              <span style={{ fontSize: 11, color: '#94a3b8' }}>Đang tải lịch NCC…</span>
+                            )}
+                          </div>
+                          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                            {WEEKDAY_OPTIONS.map((day) => {
+                              const isChecked = days.includes(day.val);
+                              return (
+                                <button
+                                  key={day.val}
+                                  type="button"
+                                  onClick={() => handleToggleDeliveryDay(sup.id, day.val)}
+                                  style={{
+                                    padding: '6px 12px',
+                                    borderRadius: 999,
+                                    fontSize: 12,
+                                    fontWeight: 600,
+                                    cursor: 'pointer',
+                                    border: isChecked ? '1px solid #0f766e' : '1px solid #e2e8f0',
+                                    background: isChecked ? '#ccfbf1' : '#ffffff',
+                                    color: isChecked ? '#0f766e' : '#64748b',
+                                  }}
+                                >
+                                  {isChecked ? '✓ ' : ''}
+                                  {day.label}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
               {/* Toolbar đếm số lượng & Chọn tất cả */}
               <div

@@ -11,7 +11,7 @@ interface SupplierBranchTableProps {
   pageSize: number;
   onPageChange: (page: number) => void;
   onPageSizeChange: (pageSize: number) => void;
-  onToggleStatus: (item: SupplierBranchAssignmentItem) => void;
+  onEdit: (item: SupplierBranchAssignmentItem) => void;
   onOpenAssignModal: () => void;
 }
 
@@ -20,6 +20,7 @@ type SortField =
   | 'branchName'
   | 'supplierCode'
   | 'supplierName'
+  | 'deliveryDays'
   | 'status';
 type SortDirection = 'asc' | 'desc';
 
@@ -30,7 +31,7 @@ export const SupplierBranchTable: FC<SupplierBranchTableProps> = ({
   pageSize,
   onPageChange,
   onPageSizeChange,
-  onToggleStatus,
+  onEdit,
   onOpenAssignModal,
 }) => {
   const [sortField, setSortField] = useState<SortField | null>(null);
@@ -77,6 +78,10 @@ export const SupplierBranchTable: FC<SupplierBranchTableProps> = ({
         case 'supplierName':
           valA = a.supplierName.toLowerCase();
           valB = b.supplierName.toLowerCase();
+          break;
+        case 'deliveryDays':
+          valA = (a.deliveryDaysDisplay || '').toLowerCase();
+          valB = (b.deliveryDaysDisplay || '').toLowerCase();
           break;
         case 'status':
           valA = a.status;
@@ -126,15 +131,15 @@ export const SupplierBranchTable: FC<SupplierBranchTableProps> = ({
     };
   }, [sortedAssignments, pageSize]);
 
-  // 6 cột đồng bộ 100% tỉ lệ với màn hình Quản lý Nhà Cung Cấp
   const tableColGroup = (
     <colgroup>
-      <col style={{ width: '13%' }} /> {/* MÃ CỬA HÀNG */}
-      <col style={{ width: '25%' }} /> {/* TÊN CỬA HÀNG / CHI NHÁNH */}
-      <col style={{ width: '14%' }} /> {/* MÃ NCC */}
-      <col style={{ width: '24%' }} /> {/* TÊN NHÀ CUNG CẤP */}
+      <col style={{ width: '11%' }} /> {/* MÃ CỬA HÀNG */}
+      <col style={{ width: '20%' }} /> {/* TÊN CỬA HÀNG / CHI NHÁNH */}
+      <col style={{ width: '11%' }} /> {/* MÃ NCC */}
+      <col style={{ width: '18%' }} /> {/* TÊN NHÀ CUNG CẤP */}
+      <col style={{ width: '14%' }} /> {/* NGÀY GIAO */}
       <col style={{ width: '12%' }} /> {/* TRẠNG THÁI */}
-      <col style={{ width: '12%' }} /> {/* THAO TÁC */}
+      <col style={{ width: '14%' }} /> {/* THAO TÁC */}
     </colgroup>
   );
 
@@ -198,6 +203,7 @@ export const SupplierBranchTable: FC<SupplierBranchTableProps> = ({
               {renderSortableHeader('Tên Cửa Hàng / Chi Nhánh', 'branchName')}
               {renderSortableHeader('Mã NCC', 'supplierCode')}
               {renderSortableHeader('Tên Nhà Cung Cấp', 'supplierName')}
+              {renderSortableHeader('Ngày giao', 'deliveryDays')}
               {renderSortableHeader('Trạng Thái', 'status', 'center')}
               <th style={{ ...thBaseStyle, textAlign: 'right' }}>Thao Tác</th>
             </tr>
@@ -219,13 +225,13 @@ export const SupplierBranchTable: FC<SupplierBranchTableProps> = ({
                 <SupplierBranchTableRow
                   key={item.id}
                   item={item}
-                  onToggleStatus={onToggleStatus}
+                  onEdit={onEdit}
                 />
               ))
             ) : (
               <tr>
                 <td
-                  colSpan={6}
+                  colSpan={7}
                   style={{
                     textAlign: 'center',
                     padding: '48px 16px',

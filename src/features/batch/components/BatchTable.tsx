@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react';
-import type { FC } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
+import type { FC, CSSProperties } from 'react';
 import {
   ArrowUpDown,
   ChevronLeft,
@@ -8,7 +8,6 @@ import {
   Eye,
   Tag,
   Trash2,
-  Calendar,
   AlertTriangle,
 } from 'lucide-react';
 import type { BatchItem, BatchStatus } from '../types/batch.types';
@@ -26,11 +25,30 @@ interface BatchTableProps {
   onResetFilters: () => void;
 }
 
-type SortField = 'productName' | 'sku' | 'expiryDate' | 'daysLeft' | 'qtyCurrent' | 'costPrice' | 'status';
+type SortField =
+  | 'productName'
+  | 'sku'
+  | 'batchCode'
+  | 'expiryDate'
+  | 'daysLeft'
+  | 'qtyCurrent'
+  | 'costPrice'
+  | 'status';
 type SortOrder = 'asc' | 'desc';
 
-const formatCurrency = (val: number): string => {
-  return new Intl.NumberFormat('vi-VN').format(val) + ' đ';
+const formatCurrency = (val: number): string =>
+  new Intl.NumberFormat('vi-VN').format(val) + ' đ';
+
+const thBaseStyle: CSSProperties = {
+  backgroundColor: '#f8fafc',
+  padding: '10px 12px',
+  fontSize: 12,
+  fontWeight: 700,
+  color: '#334155',
+  textTransform: 'uppercase',
+  letterSpacing: '0.03em',
+  whiteSpace: 'nowrap',
+  boxSizing: 'border-box',
 };
 
 export const BatchTable: FC<BatchTableProps> = ({
@@ -46,7 +64,11 @@ export const BatchTable: FC<BatchTableProps> = ({
   onResetFilters,
 }) => {
   const [sortField, setSortField] = useState<SortField | null>('expiryDate');
-  const [sortOrder, setSortOrder] = useState<SortOrder>('asc'); // Mặc định FEFO: date gần nhất lên đầu
+  const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
+
+  const headerRef = useRef<HTMLDivElement>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const [hasScrollY, setHasScrollY] = useState(false);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -78,6 +100,10 @@ export const BatchTable: FC<BatchTableProps> = ({
           valA = a.sku.toLowerCase();
           valB = b.sku.toLowerCase();
           break;
+        case 'batchCode':
+          valA = a.batchCode.toLowerCase();
+          valB = b.batchCode.toLowerCase();
+          break;
         case 'expiryDate':
           valA = a.rawExpiryDate;
           valB = b.rawExpiryDate;
@@ -106,89 +132,79 @@ export const BatchTable: FC<BatchTableProps> = ({
     });
   }, [batches, sortField, sortOrder]);
 
+  useEffect(() => {
+    const updateScrollState = () => {
+      if (bodyRef.current) {
+        setHasScrollY(bodyRef.current.scrollHeight > bodyRef.current.clientHeight);
+      }
+    };
+    updateScrollState();
+    let observer: ResizeObserver | null = null;
+    if (bodyRef.current && typeof ResizeObserver !== 'undefined') {
+      observer = new ResizeObserver(updateScrollState);
+      observer.observe(bodyRef.current);
+    }
+    window.addEventListener('resize', updateScrollState);
+    return () => {
+      window.removeEventListener('resize', updateScrollState);
+      observer?.disconnect();
+    };
+  }, [sortedBatches, pageSize]);
+
+  const handleBodyScroll = () => {
+    if (headerRef.current && bodyRef.current) {
+      headerRef.current.scrollLeft = bodyRef.current.scrollLeft;
+    }
+  };
+
   const totalPages = Math.ceil(totalCount / pageSize) || 1;
   const startItem = totalCount === 0 ? 0 : (pageIndex - 1) * pageSize + 1;
   const endItem = Math.min(pageIndex * pageSize, totalCount);
 
+  const tableColGroup = (
+    <colgroup>
+      <col style={{ width: '9%' }} />
+      <col style={{ width: '14%' }} />
+      <col style={{ width: '10%' }} />
+      <col style={{ width: '8%' }} />
+      <col style={{ width: '7%' }} />
+      <col style={{ width: '8%' }} />
+      <col style={{ width: '11%' }} />
+      <col style={{ width: '7%' }} />
+      <col style={{ width: '6%' }} />
+      <col style={{ width: '5%' }} />
+      <col style={{ width: '4%' }} />
+      <col style={{ width: '7%' }} />
+      <col style={{ width: '7%' }} />
+      <col style={{ width: '7%' }} />
+    </colgroup>
+  );
+
   const renderStatusBadge = (status: BatchStatus) => {
-    switch (status) {
-      case 'Expired':
-        return (
-          <span
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              padding: '2px 8px',
-              borderRadius: 12,
-              fontSize: 11,
-              fontWeight: 700,
-              backgroundColor: '#ffe4e6',
-              color: '#be123c',
-              border: '1px solid #fecdd3',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            Expired
-          </span>
-        );
-      case 'Critical':
-        return (
-          <span
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              padding: '2px 8px',
-              borderRadius: 12,
-              fontSize: 11,
-              fontWeight: 700,
-              backgroundColor: '#fef3c7',
-              color: '#b45309',
-              border: '1px solid #fde68a',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            Critical
-          </span>
-        );
-      case 'Warning':
-        return (
-          <span
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              padding: '2px 8px',
-              borderRadius: 12,
-              fontSize: 11,
-              fontWeight: 700,
-              backgroundColor: '#dbeafe',
-              color: '#1d4ed8',
-              border: '1px solid #bfdbfe',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            Warning
-          </span>
-        );
-      case 'Normal':
-        return (
-          <span
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              padding: '2px 8px',
-              borderRadius: 12,
-              fontSize: 11,
-              fontWeight: 700,
-              backgroundColor: '#dcfce7',
-              color: '#15803d',
-              border: '1px solid #bbf7d0',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            Normal
-          </span>
-        );
-    }
+    const map: Record<BatchStatus, { color: string; label: string }> = {
+      Expired: { color: '#be123c', label: 'Expired' },
+      Critical: { color: '#b45309', label: 'Critical' },
+      Warning: { color: '#1d4ed8', label: 'Warning' },
+      Normal: { color: '#15803d', label: 'Normal' },
+    };
+    const s = map[status];
+    return (
+      <span
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          fontSize: 12,
+          fontWeight: 700,
+          color: s.color,
+          background: 'none',
+          border: 'none',
+          padding: 0,
+          whiteSpace: 'nowrap',
+        }}
+      >
+        {s.label}
+      </span>
+    );
   };
 
   const renderDaysLeft = (days: number) => {
@@ -203,262 +219,141 @@ export const BatchTable: FC<BatchTableProps> = ({
             alignItems: 'center',
             gap: 3,
           }}
-          title="Đã hết hạn sử dụng!"
         >
           <AlertTriangle size={12} color="#e11d48" />
-          <span>{days} ngày</span>
+          {days}
         </span>
       );
     }
     if (days <= 3) {
       return (
-        <span style={{ color: '#d97706', fontWeight: 800, fontFamily: 'monospace' }} title="Cực kỳ cận date!">
-          {days} ngày
-        </span>
+        <span style={{ color: '#d97706', fontWeight: 800, fontFamily: 'monospace' }}>{days}</span>
       );
     }
     if (days <= 30) {
       return (
-        <span style={{ color: '#2563eb', fontWeight: 700, fontFamily: 'monospace' }} title="Cận hạn sử dụng (FEFO)">
-          {days} ngày
-        </span>
+        <span style={{ color: '#2563eb', fontWeight: 700, fontFamily: 'monospace' }}>{days}</span>
       );
     }
     return (
-      <span style={{ color: '#334155', fontWeight: 600, fontFamily: 'monospace' }}>
-        {days} ngày
-      </span>
+      <span style={{ color: '#334155', fontWeight: 600, fontFamily: 'monospace' }}>{days}</span>
     );
   };
 
-  return (
-    <div
+  const SortTh: FC<{
+    field: SortField;
+    label: string;
+    align?: 'left' | 'right' | 'center';
+  }> = ({ field, label, align = 'left' }) => (
+    <th
+      onClick={() => handleSort(field)}
       style={{
-        position: 'relative',
-        width: '100%',
-        backgroundColor: '#ffffff',
-        border: '1px solid #e2e8f0',
-        borderRadius: 12,
-        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)',
-        overflow: 'hidden',
-        display: 'flex',
-        flexDirection: 'column',
+        ...thBaseStyle,
+        cursor: 'pointer',
+        userSelect: 'none',
+        textAlign: align,
       }}
     >
-      {/* ── Bảng dữ liệu có Sticky Header và cuộn ngang ── */}
       <div
         style={{
-          width: '100%',
-          overflowX: 'auto',
-          maxHeight: 'calc(100vh - 320px)',
-          minHeight: 340,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent:
+            align === 'right' ? 'flex-end' : align === 'center' ? 'center' : 'flex-start',
+          gap: 4,
         }}
       >
-        <table
-          style={{
-            width: '100%',
-            minWidth: 1480,
-            borderCollapse: 'separate',
-            borderSpacing: 0,
-            fontSize: 13,
-            textAlign: 'left',
-          }}
-        >
-          {/* Định nghĩa độ rộng cột */}
-          <colgroup>
-            <col style={{ width: '3%' }} />  {/* 1. # */}
-            <col style={{ width: '18%' }} /> {/* 2. Tên SP */}
-            <col style={{ width: '12%' }} /> {/* 3. Mã Lô & SKU */}
-            <col style={{ width: '8%' }} />  {/* 4. Chi nhánh */}
-            <col style={{ width: '14%' }} /> {/* 5. Nhà cung cấp */}
-            <col style={{ width: '9%' }} />  {/* 6. HSD */}
-            <col style={{ width: '9%' }} />  {/* 7. Days Left */}
-            <col style={{ width: '7%' }} />  {/* 8. Qty */}
-            <col style={{ width: '8%' }} />  {/* 9. Giá vốn */}
-            <col style={{ width: '6%' }} />  {/* 10. Trạng thái */}
-            <col style={{ width: 240 }} />  {/* 11. Thao tác */}
-          </colgroup>
+        <span>{label}</span>
+        <ArrowUpDown size={12} color={sortField === field ? '#0f766e' : '#94a3b8'} />
+      </div>
+    </th>
+  );
 
-          {/* Sticky Header */}
+  return (
+    <div className="so-list-table-card">
+      <div
+        ref={headerRef}
+        className="so-list-table-head"
+        style={{ paddingRight: hasScrollY ? 6 : 0, overflowX: 'hidden' }}
+      >
+        <table className="so-list-table" style={{ minWidth: '100%', width: '100%' }}>
+          {tableColGroup}
           <thead>
-            <tr
-              style={{
-                position: 'sticky',
-                top: 0,
-                zIndex: 10,
-                backgroundColor: '#f8fafc',
-                borderBottom: '1px solid #cbd5e1',
-                color: '#475569',
-                fontSize: 12,
-                fontWeight: 700,
-                textTransform: 'uppercase',
-                letterSpacing: 0.4,
-              }}
-            >
-              <th style={{ padding: '9px 8px', textAlign: 'center', borderBottom: '1px solid #cbd5e1' }}>#</th>
-
-              {/* Tên SP */}
-              <th
-                onClick={() => handleSort('productName')}
-                style={{ padding: '9px 10px', borderBottom: '1px solid #cbd5e1', cursor: 'pointer', userSelect: 'none' }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span>SẢN PHẨM</span>
-                  <ArrowUpDown size={12} color="#94a3b8" />
-                </div>
-              </th>
-
-              {/* Mã Lô & SKU */}
-              <th
-                onClick={() => handleSort('sku')}
-                style={{ padding: '9px 10px', borderBottom: '1px solid #cbd5e1', cursor: 'pointer', userSelect: 'none' }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span>MÃ LÔ & SKU</span>
-                  <ArrowUpDown size={12} color="#94a3b8" />
-                </div>
-              </th>
-
-              {/* Chi nhánh */}
-              <th style={{ padding: '9px 10px', borderBottom: '1px solid #cbd5e1' }}>CHI NHÁNH</th>
-
-              {/* NCC */}
-              <th style={{ padding: '9px 10px', borderBottom: '1px solid #cbd5e1' }}>NHÀ CUNG CẤP</th>
-
-              {/* HSD */}
-              <th
-                onClick={() => handleSort('expiryDate')}
-                style={{ padding: '9px 10px', textAlign: 'center', borderBottom: '1px solid #cbd5e1', cursor: 'pointer', userSelect: 'none' }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
-                  <Calendar size={12} color="#94a3b8" />
-                  <span>HẠN DÙNG (FEFO)</span>
-                  <ArrowUpDown size={12} color="#94a3b8" />
-                </div>
-              </th>
-
-              {/* Days Left */}
-              <th
-                onClick={() => handleSort('daysLeft')}
-                style={{ padding: '9px 10px', textAlign: 'right', borderBottom: '1px solid #cbd5e1', cursor: 'pointer', userSelect: 'none' }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 5 }}>
-                  <span>SỐ NGÀY CÒN</span>
-                  <ArrowUpDown size={12} color="#94a3b8" />
-                </div>
-              </th>
-
-              {/* Tồn kho Qty */}
-              <th
-                onClick={() => handleSort('qtyCurrent')}
-                style={{ padding: '9px 10px', textAlign: 'right', borderBottom: '1px solid #cbd5e1', cursor: 'pointer', userSelect: 'none' }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 5 }}>
-                  <span>TỒN LÔ</span>
-                  <ArrowUpDown size={12} color="#94a3b8" />
-                </div>
-              </th>
-
-              {/* Giá vốn */}
-              <th
-                onClick={() => handleSort('costPrice')}
-                style={{ padding: '9px 10px', textAlign: 'right', borderBottom: '1px solid #cbd5e1', cursor: 'pointer', userSelect: 'none' }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 5 }}>
-                  <span>GIÁ VỐN</span>
-                  <ArrowUpDown size={12} color="#94a3b8" />
-                </div>
-              </th>
-
-              {/* Trạng thái */}
-              <th
-                onClick={() => handleSort('status')}
-                style={{ padding: '9px 10px', textAlign: 'center', borderBottom: '1px solid #cbd5e1', cursor: 'pointer', userSelect: 'none' }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
-                  <span>TRẠNG THÁI</span>
-                  <ArrowUpDown size={12} color="#94a3b8" />
-                </div>
-              </th>
-
-              {/* Thao tác */}
-              <th style={{ padding: '9px 10px', textAlign: 'center', borderBottom: '1px solid #cbd5e1' }}>THAO TÁC</th>
+            <tr>
+              <SortTh field="sku" label="Mã SKU" />
+              <SortTh field="productName" label="Tên sản phẩm" />
+              <SortTh field="batchCode" label="Mã lô" />
+              <th style={thBaseStyle}>Ngành hàng</th>
+              <th style={thBaseStyle}>Vị trí kệ</th>
+              <th style={thBaseStyle}>Chi nhánh</th>
+              <th style={thBaseStyle}>Nhà cung cấp</th>
+              <SortTh field="expiryDate" label="Hạn dùng" align="center" />
+              <SortTh field="daysLeft" label="Còn (ngày)" align="right" />
+              <SortTh field="qtyCurrent" label="Tồn" align="right" />
+              <th style={{ ...thBaseStyle, textAlign: 'center' }}>ĐVT</th>
+              <SortTh field="costPrice" label="Giá vốn" align="right" />
+              <SortTh field="status" label="Trạng thái" align="center" />
+              <th style={{ ...thBaseStyle, textAlign: 'right' }}>Thao tác</th>
             </tr>
           </thead>
+        </table>
+      </div>
 
-          {/* Table Body */}
+      <div
+        ref={bodyRef}
+        className="so-list-table-body"
+        onScroll={handleBodyScroll}
+        style={{ overflowX: 'hidden' }}
+      >
+        <table className="so-list-table" style={{ minWidth: '100%', width: '100%' }}>
+          {tableColGroup}
           <tbody>
             {sortedBatches.length === 0 ? (
               <tr>
-                <td colSpan={11} style={{ padding: '50px 20px', textAlign: 'center', color: '#64748b' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
-                    <PackageOpen size={44} color="#94a3b8" strokeWidth={1.5} />
-                    <div style={{ fontSize: 15, fontWeight: 700, color: '#334155' }}>
+                <td
+                  colSpan={14}
+                  style={{
+                    padding: '48px 16px',
+                    textAlign: 'center',
+                    color: '#64748b',
+                    borderBottom: '1px solid #f1f5f9',
+                  }}
+                >
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: 8,
+                    }}
+                  >
+                    <PackageOpen size={36} color="#cbd5e1" />
+                    <span style={{ fontWeight: 600, color: '#475569' }}>
                       Không tìm thấy lô hàng nào phù hợp với bộ lọc
-                    </div>
-                    <div style={{ fontSize: 13, color: '#64748b', maxWidth: 440 }}>
-                      Vui lòng thử lại với từ khóa khác hoặc bấm nút bên dưới để khôi phục danh sách đầy đủ.
-                    </div>
+                    </span>
+                    <span style={{ fontSize: 12, color: '#94a3b8' }}>
+                      Thử đổi điều kiện hoặc đặt lại bộ lọc.
+                    </span>
                     <button
                       type="button"
+                      className="po-btn po-btn-secondary"
                       onClick={onResetFilters}
-                      style={{
-                        marginTop: 4,
-                        height: 32,
-                        padding: '0 14px',
-                        borderRadius: 6,
-                        border: '1px solid #cbd5e1',
-                        backgroundColor: '#ffffff',
-                        color: '#334155',
-                        fontSize: 12.5,
-                        fontWeight: 600,
-                        cursor: 'pointer',
-                      }}
+                      style={{ marginTop: 8, height: 32, padding: '0 14px' }}
                     >
-                      Đặt lại bộ lọc tìm kiếm
+                      Đặt lại bộ lọc
                     </button>
                   </div>
                 </td>
               </tr>
             ) : (
-              sortedBatches.map((row, idx) => {
-                const isExpired = row.status === 'Expired';
-                const isCritical = row.status === 'Critical';
-
+              sortedBatches.map((row) => {
                 return (
-                  <tr
-                    key={row.id}
-                    style={{
-                      borderBottom: '1px solid #f1f5f9',
-                      backgroundColor: isExpired
-                        ? '#fffbfb'
-                        : isCritical
-                        ? '#fffdfa'
-                        : '#ffffff',
-                      transition: 'background-color 0.15s ease',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = isExpired
-                        ? '#fff1f0'
-                        : isCritical
-                        ? '#fffbeb'
-                        : '#f8fafc';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = isExpired
-                        ? '#fffbfb'
-                        : isCritical
-                        ? '#fffdfa'
-                        : '#ffffff';
-                    }}
-                  >
-                    {/* 1. STT */}
-                    <td style={{ padding: '8px 8px', textAlign: 'center', fontSize: 12, color: '#64748b', borderBottom: '1px solid #f1f5f9' }}>
-                      {startItem + idx}
+                  <tr key={row.id} className="so-list-row">
+                    <td style={{ fontFamily: 'var(--font-mono, monospace)', fontSize: 12, color: '#334155' }}>
+                      {row.sku}
                     </td>
 
-                    {/* 2. Tên sản phẩm */}
-                    <td style={{ padding: '8px 10px', borderBottom: '1px solid #f1f5f9' }}>
+                    <td className="so-list-td--wrap">
                       <button
                         type="button"
                         onClick={() => onSelectBatch(row)}
@@ -467,181 +362,121 @@ export const BatchTable: FC<BatchTableProps> = ({
                           border: 'none',
                           padding: 0,
                           cursor: 'pointer',
-                          color: '#0d9488',
-                          fontWeight: 700,
-                          fontSize: 13,
                           textAlign: 'left',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: 6,
-                          textDecoration: 'underline',
-                          textUnderlineOffset: 3,
                         }}
-                        title="Bấm để xem chi tiết lượt hàng và vị trí quầy kệ"
+                        title="Xem chi tiết lô"
                       >
-                        <span>{row.productName}</span>
+                        <div className="so-list-name" style={{ color: '#0d9488' }}>
+                          {row.productName}
+                        </div>
                       </button>
-                      <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
-                        {row.categoryName} • Kệ: <b>{row.shelfLocation}</b>
-                      </div>
                     </td>
 
-                    {/* 3. Mã lô & SKU */}
-                    <td style={{ padding: '8px 10px', borderBottom: '1px solid #f1f5f9' }}>
-                      <div style={{ fontFamily: 'monospace', fontWeight: 700, color: '#0f172a', fontSize: 12.5 }}>
-                        {row.batchCode}
-                      </div>
-                      <div style={{ fontSize: 11, color: '#64748b' }}>
-                        SKU: {row.sku}
-                      </div>
-                    </td>
-
-                    {/* 4. Chi nhánh */}
-                    <td style={{ padding: '8px 10px', borderBottom: '1px solid #f1f5f9' }}>
+                    <td>
                       <span
                         style={{
-                          display: 'inline-block',
-                          padding: '2px 6px',
-                          borderRadius: 4,
-                          fontSize: 11,
-                          fontWeight: 600,
-                          backgroundColor: row.branchId === 'BR-01' ? '#f0fdf4' : '#eff6ff',
-                          color: row.branchId === 'BR-01' ? '#15803d' : '#1d4ed8',
-                          border: `1px solid ${row.branchId === 'BR-01' ? '#bbf7d0' : '#bfdbfe'}`,
+                          fontFamily: 'var(--font-mono, monospace)',
+                          fontSize: 12,
+                          fontWeight: 700,
+                          color: '#0f172a',
                         }}
                       >
-                        {row.branchId}
+                        {row.batchCode}
                       </span>
                     </td>
 
-                    {/* 5. Nhà cung cấp */}
-                    <td style={{ padding: '8px 10px', fontSize: 12.5, color: '#334155', borderBottom: '1px solid #f1f5f9' }}>
-                      {row.supplierName}
+                    <td style={{ color: '#475569', fontSize: 12 }}>{row.categoryName}</td>
+
+                    <td>
+                      <span
+                        style={{
+                          fontFamily: 'var(--font-mono, monospace)',
+                          fontSize: 12,
+                          fontWeight: 600,
+                          color: '#334155',
+                        }}
+                      >
+                        {row.shelfLocation}
+                      </span>
                     </td>
 
-                    {/* 6. Hạn sử dụng */}
-                    <td style={{ padding: '8px 10px', textAlign: 'center', fontSize: 12.5, fontWeight: 600, color: '#1e293b', borderBottom: '1px solid #f1f5f9' }}>
+                    <td style={{ color: '#475569', fontSize: 12 }} title={row.branchName}>
+                      {row.branchName}
+                    </td>
+
+                    <td className="so-list-td--wrap">
+                      <div className="so-list-name" style={{ fontWeight: 500 }}>
+                        {row.supplierName}
+                      </div>
+                    </td>
+
+                    <td style={{ textAlign: 'center', fontWeight: 600, color: '#1e293b' }}>
                       {row.expiryDate}
                     </td>
 
-                    {/* 7. Số ngày còn lại (Days Left) */}
-                    <td style={{ padding: '8px 10px', textAlign: 'right', fontSize: 12.5, borderBottom: '1px solid #f1f5f9' }}>
-                      {renderDaysLeft(row.daysLeft)}
+                    <td style={{ textAlign: 'right' }}>{renderDaysLeft(row.daysLeft)}</td>
+
+                    <td
+                      style={{
+                        textAlign: 'right',
+                        fontFamily: 'monospace',
+                        fontWeight: 800,
+                        color: '#0f172a',
+                      }}
+                    >
+                      {row.qtyCurrent}
                     </td>
 
-                    {/* 8. Số lượng tồn */}
-                    <td style={{ padding: '8px 10px', textAlign: 'right', fontSize: 13, borderBottom: '1px solid #f1f5f9' }}>
-                      <span style={{ fontWeight: 800, color: '#0f172a', fontFamily: 'monospace' }}>
-                        {row.qtyCurrent}
-                      </span>{' '}
-                      <span style={{ fontSize: 11, color: '#64748b' }}>{row.unit}</span>
+                    <td style={{ textAlign: 'center', fontWeight: 600, color: '#475569' }}>
+                      {row.unit}
                     </td>
 
-                    {/* 9. Đơn giá vốn */}
-                    <td style={{ padding: '8px 10px', textAlign: 'right', fontSize: 12.5, fontFamily: 'monospace', color: '#475569', borderBottom: '1px solid #f1f5f9' }}>
+                    <td
+                      style={{
+                        textAlign: 'right',
+                        fontFamily: 'monospace',
+                        color: '#475569',
+                      }}
+                    >
                       {formatCurrency(row.costPrice)}
                     </td>
 
-                    {/* 10. Trạng thái */}
-                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #f1f5f9' }}>
-                      {renderStatusBadge(row.status)}
-                    </td>
+                    <td style={{ textAlign: 'center' }}>{renderStatusBadge(row.status)}</td>
 
-                    {/* 11. Thao tác */}
-                    <td
-                      style={{
-                        padding: '8px 10px',
-                        textAlign: 'center',
-                        borderBottom: '1px solid #f1f5f9',
-                        minWidth: 240,
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      <div
-                        style={{
-                          display: 'inline-flex',
-                          flexWrap: 'nowrap',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: 6,
-                          whiteSpace: 'nowrap',
-                        }}
-                      >
+                    <td style={{ textAlign: 'right' }}>
+                      <div className="so-list-actions">
                         <button
                           type="button"
+                          className="so-list-action-btn so-list-action-btn--icon so-list-action-btn--success"
                           onClick={() => onSelectBatch(row)}
-                          style={{
-                            height: 32,
-                            padding: '0 12px',
-                            fontSize: 12.5,
-                            fontWeight: 600,
-                            borderRadius: 6,
-                            border: '1px solid #cbd5e1',
-                            backgroundColor: '#ffffff',
-                            color: '#0d9488',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: 6,
-                            cursor: 'pointer',
-                            whiteSpace: 'nowrap',
-                          }}
-                          title="Xem chi tiết lô hàng"
+                          title="Chi tiết"
+                          aria-label="Chi tiết"
                         >
                           <Eye size={14} />
-                          <span>Chi tiết</span>
                         </button>
-
-                        {row.status === 'Warning' || row.status === 'Critical' ? (
+                        {(row.status === 'Warning' || row.status === 'Critical') && (
                           <button
                             type="button"
+                            className="so-list-action-btn so-list-action-btn--icon"
                             onClick={() => onDiscountClick(row)}
-                            style={{
-                              height: 32,
-                              padding: '0 12px',
-                              fontSize: 12.5,
-                              fontWeight: 700,
-                              borderRadius: 6,
-                              border: '1px solid #bfdbfe',
-                              backgroundColor: '#eff6ff',
-                              color: '#1d4ed8',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: 6,
-                              cursor: 'pointer',
-                              whiteSpace: 'nowrap',
-                            }}
-                            title="Áp dụng chiết khấu giảm giá kích cầu FEFO"
+                            title="Giảm giá FEFO"
+                            aria-label="Giảm giá"
+                            style={{ color: '#1d4ed8', borderColor: '#bfdbfe' }}
                           >
                             <Tag size={14} />
-                            <span>Giảm giá</span>
                           </button>
-                        ) : null}
-
-                        {row.status === 'Expired' || row.status === 'Critical' ? (
+                        )}
+                        {(row.status === 'Expired' || row.status === 'Critical') && (
                           <button
                             type="button"
+                            className="so-list-action-btn so-list-action-btn--icon so-list-action-btn--danger"
                             onClick={() => onWriteOffClick(row)}
-                            style={{
-                              height: 32,
-                              padding: '0 12px',
-                              fontSize: 12.5,
-                              fontWeight: 700,
-                              borderRadius: 6,
-                              border: 'none',
-                              backgroundColor: '#fee2e2',
-                              color: '#dc2626',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: 6,
-                              cursor: 'pointer',
-                              whiteSpace: 'nowrap',
-                            }}
-                            title="Lập phiếu xuất hủy hàng quá hạn / hư hỏng"
+                            title="Xuất hủy"
+                            aria-label="Xuất hủy"
                           >
                             <Trash2 size={14} />
-                            <span>Xuất hủy</span>
                           </button>
-                        ) : null}
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -652,105 +487,47 @@ export const BatchTable: FC<BatchTableProps> = ({
         </table>
       </div>
 
-      {/* ── Phân trang Footer chuẩn GrnTable ── */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          flexWrap: 'wrap',
-          gap: 12,
-          padding: '12px 18px',
-          borderTop: '1px solid #e2e8f0',
-          backgroundColor: '#f8fafc',
-          fontSize: 12.5,
-          color: '#475569',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-          <span>
-            Hiển thị <b>{startItem}</b> - <b>{endItem}</b> trong tổng số <b>{totalCount}</b> lô hàng
-          </span>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span>Hiển thị:</span>
+      <div className="so-list-pager">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+          <div>
+            Hiển thị <b>{startItem}</b> - <b>{endItem}</b> trên <b>{totalCount}</b> lô hàng
+          </div>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ color: '#64748b' }}>Bản ghi/trang:</span>
             <select
+              className="so-list-pager-select"
               value={pageSize}
               onChange={(e) => onPageSizeChange(Number(e.target.value))}
-              style={{
-                height: 28,
-                padding: '0 8px',
-                borderRadius: 5,
-                border: '1px solid #cbd5e1',
-                backgroundColor: '#ffffff',
-                color: '#0f172a',
-                fontSize: 12,
-                fontWeight: 600,
-                cursor: 'pointer',
-                outline: 'none',
-              }}
             >
               <option value={10}>10</option>
               <option value={20}>20</option>
               <option value={30}>30</option>
               <option value={50}>50</option>
             </select>
-            <span>dòng / trang</span>
           </div>
         </div>
 
-        {/* Nút lùi/tiến trang */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <button
             type="button"
+            className="so-list-pager-btn"
             disabled={pageIndex <= 1}
             onClick={() => onPageChange(pageIndex - 1)}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              height: 28,
-              minWidth: 28,
-              padding: '0 8px',
-              borderRadius: 5,
-              border: '1px solid #cbd5e1',
-              backgroundColor: pageIndex <= 1 ? '#f1f5f9' : '#ffffff',
-              color: pageIndex <= 1 ? '#94a3b8' : '#334155',
-              cursor: pageIndex <= 1 ? 'not-allowed' : 'pointer',
-              fontSize: 12,
-              fontWeight: 600,
-            }}
           >
-            <ChevronLeft size={14} />
+            <ChevronLeft size={13} />
             <span>Trước</span>
           </button>
-
-          <span style={{ fontSize: 12, fontWeight: 700, color: '#0f766e', padding: '0 6px' }}>
+          <span style={{ padding: '0 8px', fontWeight: 600, color: '#0f172a' }}>
             Trang {pageIndex} / {totalPages}
           </span>
-
           <button
             type="button"
+            className="so-list-pager-btn"
             disabled={pageIndex >= totalPages}
             onClick={() => onPageChange(pageIndex + 1)}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              height: 28,
-              minWidth: 28,
-              padding: '0 8px',
-              borderRadius: 5,
-              border: '1px solid #cbd5e1',
-              backgroundColor: pageIndex >= totalPages ? '#f1f5f9' : '#ffffff',
-              color: pageIndex >= totalPages ? '#94a3b8' : '#334155',
-              cursor: pageIndex >= totalPages ? 'not-allowed' : 'pointer',
-              fontSize: 12,
-              fontWeight: 600,
-            }}
           >
             <span>Sau</span>
-            <ChevronRight size={14} />
+            <ChevronRight size={13} />
           </button>
         </div>
       </div>

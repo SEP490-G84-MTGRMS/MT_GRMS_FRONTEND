@@ -27,11 +27,12 @@ export const PoListFilterBar: FC<PoListFilterBarProps> = ({
         border: '1px solid #e2e8f0',
         borderRadius: 8,
         padding: '12px 16px',
-        marginBottom: 12,
+        marginBottom: 0,
         boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)',
         display: 'flex',
         flexDirection: 'column',
         gap: 10,
+        flexShrink: 0,
       }}
     >
       {/* ── Dòng 1: Tìm kiếm + Chi nhánh + Nhà cung cấp + Trạng thái ── */}

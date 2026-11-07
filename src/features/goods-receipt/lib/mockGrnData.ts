@@ -769,6 +769,7 @@ export const MOCK_GOODS_RECEIPTS: GoodsReceiptListItem[] = [
 
 export const MOCK_AVAILABLE_POS: PoLookupOption[] = [
   {
+    id: 'mock-po-001',
     poCode: 'PO-20261009-001',
     branchId: 'BR-01',
     branchName: 'BR-01 (CH Nguyễn Trãi)',
@@ -850,6 +851,7 @@ export const MOCK_AVAILABLE_POS: PoLookupOption[] = [
     ],
   },
   {
+    id: 'mock-po-002',
     poCode: 'PO-20261010-002',
     branchId: 'BR-02',
     branchName: 'BR-02 (CH Thủ Đức)',
@@ -915,6 +917,7 @@ export const MOCK_AVAILABLE_POS: PoLookupOption[] = [
     ],
   },
   {
+    id: 'mock-po-007',
     poCode: 'PO-20261009-007',
     branchId: 'DC-01',
     branchName: 'DC-01 (Kho tổng DC1)',
@@ -967,6 +970,7 @@ export const MOCK_AVAILABLE_POS: PoLookupOption[] = [
     ],
   },
   {
+    id: 'mock-po-010',
     poCode: 'PO-20261012-010',
     branchId: 'BR-01',
     branchName: 'BR-01 (CH Nguyễn Trãi)',
