@@ -10,6 +10,11 @@ export const StoreOwnerLayout: FC = () => {
     return <Navigate to="/auth/login" replace />;
   }
 
+  // Role Guard: Nhân viên không được phép truy cập cổng quản trị của Chủ cửa hàng
+  if (user.role === 'EMPLOYEE') {
+    return <Navigate to="/employee/schedule" replace />;
+  }
+
   return (
     <div
       style={{

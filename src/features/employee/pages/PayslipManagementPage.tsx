@@ -29,9 +29,13 @@ import { CreatePayslipModal } from '../components/CreatePayslipModal';
 import { PayslipDetailModal } from '../components/PayslipDetailModal';
 import { PayslipPaymentModal } from '../components/PayslipPaymentModal';
 import { ConfirmModal, NotificationModal } from '../../../components/common';
+import { useAuthStore } from '../../../stores/useAuthStore';
 import '../employee.css';
 
 export const PayslipManagementPage: React.FC = () => {
+  const { user } = useAuthStore();
+  const isOwnerOrAdmin = user?.role === 'STORE_OWNER' || user?.role === 'ADMIN' || user?.isAdmin;
+
   const [payslips, setPayslips] = useState<PayslipDetailedRecord[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
@@ -796,7 +800,7 @@ export const PayslipManagementPage: React.FC = () => {
 
         {/* Nút hành động */}
         <div className="emp-header-actions">
-          {selectedIds.length > 0 && (
+          {isOwnerOrAdmin && selectedIds.length > 0 && (
             <button
               type="button"
               className="emp-btn emp-btn-primary"
@@ -839,29 +843,31 @@ export const PayslipManagementPage: React.FC = () => {
                   overflow: 'hidden',
                 }}
               >
-                <button
-                  type="button"
-                  style={{
-                    width: '100%',
-                    padding: '10px 16px',
-                    textAlign: 'left',
-                    background: 'transparent',
-                    border: 'none',
-                    fontSize: 13,
-                    cursor: isRecalculating ? 'not-allowed' : 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 8,
-                    color: '#0F766E',
-                    fontWeight: 600,
-                    borderBottom: '1px solid #F1F5F9',
-                  }}
-                  onClick={handleRecalculateUnpaid}
-                  disabled={isRecalculating}
-                >
-                  <RefreshCw size={14} className={isRecalculating ? 'animate-spin' : ''} />
-                  <span>{isRecalculating ? 'Đang tính lại...' : `Tính lại lương kỳ ${monthLabel}`}</span>
-                </button>
+                {isOwnerOrAdmin && (
+                  <button
+                    type="button"
+                    style={{
+                      width: '100%',
+                      padding: '10px 16px',
+                      textAlign: 'left',
+                      background: 'transparent',
+                      border: 'none',
+                      fontSize: 13,
+                      cursor: isRecalculating ? 'not-allowed' : 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      color: '#0F766E',
+                      fontWeight: 600,
+                      borderBottom: '1px solid #F1F5F9',
+                    }}
+                    onClick={handleRecalculateUnpaid}
+                    disabled={isRecalculating}
+                  >
+                    <RefreshCw size={14} className={isRecalculating ? 'animate-spin' : ''} />
+                    <span>{isRecalculating ? 'Đang tính lại...' : `Tính lại lương kỳ ${monthLabel}`}</span>
+                  </button>
+                )}
                 <button
                   type="button"
                   style={{
@@ -1170,7 +1176,7 @@ export const PayslipManagementPage: React.FC = () => {
                           <Check size={14} strokeWidth={2.5} />
                           <span>Đã thanh toán</span>
                         </span>
-                      ) : (
+                      ) : isOwnerOrAdmin ? (
                         <button
                           type="button"
                           onClick={(e) => {
@@ -1195,6 +1201,23 @@ export const PayslipManagementPage: React.FC = () => {
                           <Clock size={13} strokeWidth={2.2} />
                           <span>Chi trả ngay</span>
                         </button>
+                      ) : (
+                        <span
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 5,
+                            fontSize: 12,
+                            fontWeight: 600,
+                            color: '#D97706',
+                            background: '#FEF3C7',
+                            padding: '3px 8px',
+                            borderRadius: 6,
+                          }}
+                        >
+                          <Clock size={13} strokeWidth={2} />
+                          <span>Chưa thanh toán</span>
+                        </span>
                       )}
                     </td>
                     <td style={{ textAlign: 'center', fontSize: 12, color: '#64748B', whiteSpace: 'nowrap' }}>
