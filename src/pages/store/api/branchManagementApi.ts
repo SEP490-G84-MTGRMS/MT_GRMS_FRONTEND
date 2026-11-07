@@ -29,7 +29,9 @@ export interface BranchItemResponse {
   name: string;
   address: string;
   phone?: string;
+  email?: string;
   managerName?: string;
+  isHeadquarter?: boolean;
   status: 'Active' | 'Inactive' | string;
   pendingOrdersCount: number;
   lastOrderDate?: string;
@@ -41,6 +43,7 @@ export interface CreateBranchPayload {
   name: string;
   address: string;
   phone?: string;
+  email?: string;
   managerName?: string;
   isHeadquarter?: boolean;
 }
@@ -49,6 +52,7 @@ export interface UpdateBranchPayload {
   name: string;
   address: string;
   phone?: string;
+  email?: string;
   managerName?: string;
   isHeadquarter?: boolean;
 }

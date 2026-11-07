@@ -4,6 +4,11 @@ Toàn bộ các thay đổi của repository Frontend React SPA được tổng 
 
 ---
 
+## [Unreleased] - 2026-11-07
+### Added
+- **Nâng cấp và tinh gọn Modal Thêm/Sửa chi nhánh (`BranchFormModal.tsx`)**: Tự động sinh mã chi nhánh 100% theo thứ tự chuỗi (`BR-01` -> `BR-02`), khóa cố định không bắt người dùng nhập tay; bổ sung tùy chọn "Đặt làm cơ sở chính (Trụ sở chính)" cho cả 2 màn hình Thêm mới và Chỉnh sửa; bổ sung Email liên hệ, tùy chọn Đồng bộ danh mục hàng hóa & cảnh báo hạn mức Quota; loại bỏ các trường mở rộng không cần thiết để form gọn gàng, thao tác nhanh [FE-STORE] [worklog: docs/worklogs/2026-11-07_FE-STORE_AI_enhance-branch-create-modal.md].
+- Tích hợp thanh hạn mức Quota và nút mở nhanh modal "Nâng cấp gói" ngay trong form tạo chi nhánh khi tài khoản đạt giới hạn số lượng điểm bán.
+
 ## [Unreleased] - 2026-11-06
 ### Added
 - Bổ sung chức năng **Cập nhật thông tin gian hàng**: thêm nút "Cập nhật thông tin", tạo component `EditStoreInfoModal`, trạng thái loading `isSaving`, và thông báo nổi Toast khi lưu dữ liệu gian hàng (MST, Hotline, Tỉnh/TP, Địa chỉ) [FE-STORE] [worklog: docs/worklogs/2026-11-06_FE-STORE_AI_store-info-update-modal-and-toast.md].

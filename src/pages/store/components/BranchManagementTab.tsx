@@ -384,6 +384,9 @@ export const BranchManagementTab: FC<BranchManagementTabProps> = ({
       {(activeModal === 'create' || activeModal === 'edit') && (
         <BranchFormModal
           branch={selectedBranch}
+          quota={quota}
+          existingBranches={branches}
+          onUpgrade={() => setActiveModal('upgrade')}
           onClose={() => {
             setActiveModal(null);
             setSelectedBranch(null);
