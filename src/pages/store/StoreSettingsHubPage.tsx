@@ -82,8 +82,8 @@ export const StoreSettingsHubPage: FC = () => {
   };
 
   // Nạp tiền ví
-  const handleTopupSuccess = (amount: number) => {
-    const newBal = storeInfo.walletBalance + amount;
+  const handleTopupSuccess = (amount: number, newBalance?: number) => {
+    const newBal = newBalance !== undefined ? newBalance : storeInfo.walletBalance + amount;
     const newTx: WalletTransaction = {
       id: `tx-${Date.now()}`,
       transactionCode: `WAL-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(100 + Math.random() * 900)}`,
@@ -158,7 +158,7 @@ export const StoreSettingsHubPage: FC = () => {
   };
 
   // Cập nhật thông tin store
-  const handleUpdateStoreInfo = async (updated: Partial<StoreInfo>) => {
+  const handleUpdateStoreInfo = async (updated: Partial<StoreInfo>): Promise<boolean> => {
     try {
       const res = await storeApi.updateStoreInfo({
         name: updated.name || storeInfo.name,
@@ -169,12 +169,13 @@ export const StoreSettingsHubPage: FC = () => {
       });
       if (res.success && res.data) {
         setStoreInfo((prev) => mapBackendStoreToFrontend(res.data, prev.walletBalance));
-        return;
+        return true;
       }
-    } catch {
-      // fallback local update
+      return false;
+    } catch (error) {
+      console.error('Update store info error:', error);
+      return false;
     }
-    setStoreInfo((prev) => ({ ...prev, ...updated }));
   };
 
   return (

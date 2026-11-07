@@ -8,6 +8,7 @@ import {
   Building2,
   Warehouse,
   ShieldCheck,
+  AlertTriangle,
 } from 'lucide-react';
 import type { SubscriptionPlanItem, StoreInfo } from '../storeData';
 import { storeApi } from '../api/storeApi';
@@ -54,6 +55,11 @@ export const SubscriptionCheckoutModal: FC<SubscriptionCheckoutModalProps> = ({
   const hasEnoughWalletBalance = storeInfo.walletBalance >= grandTotal;
 
   const handleConfirmPayment = async () => {
+    if (paymentMethod === 'Wallet' && !hasEnoughWalletBalance) {
+      alert(`Số dư ví gian hàng không đủ (thiếu ${new Intl.NumberFormat('vi-VN').format(grandTotal - storeInfo.walletBalance)} đ). Vui lòng chọn Quét mã VietQR hoặc Nạp thêm tiền vào ví.`);
+      return;
+    }
+
     setIsProcessing(true);
     try {
       const res = await storeApi.purchaseSubscription({
@@ -79,7 +85,13 @@ export const SubscriptionCheckoutModal: FC<SubscriptionCheckoutModalProps> = ({
         }, 1000);
         return;
       }
-    } catch (err) {
+
+      if (!res.success) {
+        setIsProcessing(false);
+        alert(res.message || 'Thanh toán không thành công.');
+        return;
+      }
+    } catch (err: unknown) {
       console.warn('API purchase fallback triggered:', err);
     }
 
@@ -100,40 +112,77 @@ export const SubscriptionCheckoutModal: FC<SubscriptionCheckoutModalProps> = ({
       <div
         className="store-modal-dialog"
         onClick={(e) => e.stopPropagation()}
-        style={{ maxWidth: 640 }}
+        style={{ maxWidth: 640, fontFamily: 'var(--font-sans)' }}
       >
         {/* Header */}
-        <div className="store-modal-header">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span
+        <div className="store-modal-header" style={{ padding: '20px 24px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div
               style={{
-                width: 10,
-                height: 10,
-                borderRadius: '50%',
-                backgroundColor: plan.themeColor,
+                width: 36,
+                height: 36,
+                borderRadius: 12,
+                backgroundColor: 'var(--blue-light)',
+                border: '1px solid var(--blue-border)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'var(--blue-primary)',
+                flexShrink: 0,
               }}
-            />
-            <div className="store-modal-title">
-              Đăng ký & Nâng cấp: {plan.name}
+            >
+              <ShieldCheck size={20} strokeWidth={2.3} />
+            </div>
+            <div>
+              <div
+                className="store-modal-title"
+                style={{
+                  fontSize: 18,
+                  fontWeight: 800,
+                  color: '#0F172A',
+                  letterSpacing: '-0.01em',
+                  fontFamily: 'var(--font-sans)',
+                }}
+              >
+                Đăng ký & Nâng cấp: {plan.name}
+              </div>
+              <div style={{ fontSize: 12.5, color: '#64748B', marginTop: 2 }}>
+                Gia hạn gói dịch vụ SaaS chính thức cho chuỗi cửa hàng
+              </div>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
+            aria-label="Đóng"
             style={{
-              background: 'none',
+              width: 32,
+              height: 32,
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
               border: 'none',
+              background: 'transparent',
               cursor: 'pointer',
               color: '#64748B',
-              padding: 4,
+              transition: 'all 0.15s ease',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = '#F1F5F9';
+              e.currentTarget.style.color = '#0F172A';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent';
+              e.currentTarget.style.color = '#64748B';
             }}
           >
-            <X size={20} />
+            <X size={19} strokeWidth={2.2} />
           </button>
         </div>
 
         {/* Body */}
-        <div className="store-modal-body">
+        <div className="store-modal-body" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: 20 }}>
           {isCompleted ? (
             <div
               style={{
@@ -145,18 +194,32 @@ export const SubscriptionCheckoutModal: FC<SubscriptionCheckoutModalProps> = ({
                 gap: 16,
               }}
             >
-              <CheckCircle2 size={54} color="#00C853" strokeWidth={2.2} />
+              <div
+                style={{
+                  width: 68,
+                  height: 68,
+                  borderRadius: '50%',
+                  backgroundColor: '#ECFDF5',
+                  border: '2px solid #A7F3D0',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#059669',
+                }}
+              >
+                <CheckCircle2 size={38} strokeWidth={2.4} />
+              </div>
               <div style={{ fontSize: 20, fontWeight: 800, color: '#0F172A' }}>
                 Gia hạn & Kích hoạt Thành công!
               </div>
-              <div style={{ fontSize: 14, color: '#475569', maxWidth: 420 }}>
+              <div style={{ fontSize: 14, color: '#475569', maxWidth: 440, lineHeight: 1.6 }}>
                 Hệ thống đã nâng cấp gian hàng của bạn lên <strong>{plan.name}</strong> với thời hạn{' '}
-                <strong>{months + bonusMonths} tháng</strong>. Dữ liệu đã được đồng bộ tự động.
+                <strong>{months + bonusMonths} tháng</strong>. Dữ liệu và hạn mức chi nhánh đã được đồng bộ tự động.
               </div>
             </div>
           ) : (
             <>
-              {/* 1. Chọn thời hạn thuê bao */}
+              {/* 1. Chọn chu kỳ đăng ký */}
               <div>
                 <label
                   style={{
@@ -165,25 +228,30 @@ export const SubscriptionCheckoutModal: FC<SubscriptionCheckoutModalProps> = ({
                     color: '#334155',
                     marginBottom: 10,
                     display: 'block',
+                    fontFamily: 'var(--font-sans)',
                   }}
                 >
                   1. Chọn chu kỳ đăng ký
                 </label>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+                  {/* 1 Năm */}
                   <button
                     type="button"
                     onClick={() => setCycle('12m')}
                     style={{
-                      padding: '14px 10px',
+                      padding: '16px 12px 14px 12px',
                       borderRadius: 16,
-                      border: cycle === '12m' ? '2px solid #0066FF' : '1px solid #E2E8F0',
-                      backgroundColor: cycle === '12m' ? '#F0F6FF' : '#FFFFFF',
+                      border: cycle === '12m' ? '2px solid var(--blue-primary)' : '1.5px solid #E2E8F0',
+                      backgroundColor: cycle === '12m' ? 'var(--blue-light)' : '#FFFFFF',
+                      boxShadow: cycle === '12m' ? '0 4px 14px rgba(15, 118, 110, 0.12)' : 'none',
                       cursor: 'pointer',
                       textAlign: 'center',
                       display: 'flex',
                       flexDirection: 'column',
                       gap: 4,
                       position: 'relative',
+                      transition: 'all 0.15s ease',
+                      fontFamily: 'var(--font-sans)',
                     }}
                   >
                     <span
@@ -191,12 +259,14 @@ export const SubscriptionCheckoutModal: FC<SubscriptionCheckoutModalProps> = ({
                         position: 'absolute',
                         top: -10,
                         right: 8,
-                        backgroundColor: '#FF3B30',
+                        backgroundColor: 'var(--blue-primary)',
                         color: '#FFFFFF',
                         fontSize: 10,
                         fontWeight: 800,
-                        padding: '2px 8px',
+                        padding: '2px 9px',
                         borderRadius: 'var(--radius-pill)',
+                        letterSpacing: '0.02em',
+                        boxShadow: '0 2px 6px rgba(15, 118, 110, 0.3)',
                       }}
                     >
                       TẶNG 1 THÁNG
@@ -204,25 +274,29 @@ export const SubscriptionCheckoutModal: FC<SubscriptionCheckoutModalProps> = ({
                     <span style={{ fontSize: 14, fontWeight: 700, color: '#0F172A' }}>
                       1 Năm (12 tháng)
                     </span>
-                    <span style={{ fontSize: 12, color: '#0066FF', fontWeight: 600 }}>
+                    <span style={{ fontSize: 12, color: 'var(--blue-primary)', fontWeight: 600 }}>
                       + 1 tháng miễn phí
                     </span>
                   </button>
 
+                  {/* 2 Năm */}
                   <button
                     type="button"
                     onClick={() => setCycle('24m')}
                     style={{
-                      padding: '14px 10px',
+                      padding: '16px 12px 14px 12px',
                       borderRadius: 16,
-                      border: cycle === '24m' ? '2px solid #0066FF' : '1px solid #E2E8F0',
-                      backgroundColor: cycle === '24m' ? '#F0F6FF' : '#FFFFFF',
+                      border: cycle === '24m' ? '2px solid var(--blue-primary)' : '1.5px solid #E2E8F0',
+                      backgroundColor: cycle === '24m' ? 'var(--blue-light)' : '#FFFFFF',
+                      boxShadow: cycle === '24m' ? '0 4px 14px rgba(15, 118, 110, 0.12)' : 'none',
                       cursor: 'pointer',
                       textAlign: 'center',
                       display: 'flex',
                       flexDirection: 'column',
                       gap: 4,
                       position: 'relative',
+                      transition: 'all 0.15s ease',
+                      fontFamily: 'var(--font-sans)',
                     }}
                   >
                     <span
@@ -230,12 +304,14 @@ export const SubscriptionCheckoutModal: FC<SubscriptionCheckoutModalProps> = ({
                         position: 'absolute',
                         top: -10,
                         right: 8,
-                        backgroundColor: '#FF9500',
+                        backgroundColor: '#059669',
                         color: '#FFFFFF',
                         fontSize: 10,
                         fontWeight: 800,
-                        padding: '2px 8px',
+                        padding: '2px 9px',
                         borderRadius: 'var(--radius-pill)',
+                        letterSpacing: '0.02em',
+                        boxShadow: '0 2px 6px rgba(5, 150, 105, 0.3)',
                       }}
                     >
                       TẶNG 3 THÁNG
@@ -243,37 +319,41 @@ export const SubscriptionCheckoutModal: FC<SubscriptionCheckoutModalProps> = ({
                     <span style={{ fontSize: 14, fontWeight: 700, color: '#0F172A' }}>
                       2 Năm (24 tháng)
                     </span>
-                    <span style={{ fontSize: 12, color: '#0066FF', fontWeight: 600 }}>
+                    <span style={{ fontSize: 12, color: 'var(--blue-primary)', fontWeight: 600 }}>
                       + 3 tháng miễn phí
                     </span>
                   </button>
 
+                  {/* 6 Tháng */}
                   <button
                     type="button"
                     onClick={() => setCycle('6m')}
                     style={{
-                      padding: '14px 10px',
+                      padding: '16px 12px 14px 12px',
                       borderRadius: 16,
-                      border: cycle === '6m' ? '2px solid #0066FF' : '1px solid #E2E8F0',
-                      backgroundColor: cycle === '6m' ? '#F0F6FF' : '#FFFFFF',
+                      border: cycle === '6m' ? '2px solid var(--blue-primary)' : '1.5px solid #E2E8F0',
+                      backgroundColor: cycle === '6m' ? 'var(--blue-light)' : '#FFFFFF',
+                      boxShadow: cycle === '6m' ? '0 4px 14px rgba(15, 118, 110, 0.12)' : 'none',
                       cursor: 'pointer',
                       textAlign: 'center',
                       display: 'flex',
                       flexDirection: 'column',
                       gap: 4,
+                      transition: 'all 0.15s ease',
+                      fontFamily: 'var(--font-sans)',
                     }}
                   >
                     <span style={{ fontSize: 14, fontWeight: 700, color: '#0F172A' }}>
                       6 Tháng
                     </span>
-                    <span style={{ fontSize: 12, color: '#64748B' }}>
+                    <span style={{ fontSize: 12, color: '#64748B', fontWeight: 500 }}>
                       Tiêu chuẩn
                     </span>
                   </button>
                 </div>
               </div>
 
-              {/* 2. Tiện ích bổ sung */}
+              {/* 2. Tiện ích mở rộng */}
               <div>
                 <label
                   style={{
@@ -282,6 +362,7 @@ export const SubscriptionCheckoutModal: FC<SubscriptionCheckoutModalProps> = ({
                     color: '#334155',
                     marginBottom: 10,
                     display: 'block',
+                    fontFamily: 'var(--font-sans)',
                   }}
                 >
                   2. Tiện ích mở rộng (Tùy chọn)
@@ -290,21 +371,36 @@ export const SubscriptionCheckoutModal: FC<SubscriptionCheckoutModalProps> = ({
                   {/* Thêm chi nhánh */}
                   <div
                     style={{
-                      border: '1px solid #E2E8F0',
+                      border: '1.5px solid #E2E8F0',
                       borderRadius: 16,
                       padding: '12px 16px',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'space-between',
+                      backgroundColor: '#FFFFFF',
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <Building2 size={18} color="#0066FF" />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <div
+                        style={{
+                          width: 34,
+                          height: 34,
+                          borderRadius: 10,
+                          backgroundColor: 'var(--blue-light)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: 'var(--blue-primary)',
+                          flexShrink: 0,
+                        }}
+                      >
+                        <Building2 size={18} strokeWidth={2.2} />
+                      </div>
                       <div>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: '#0F172A' }}>
+                        <div style={{ fontSize: 13.5, fontWeight: 700, color: '#0F172A' }}>
                           Chi nhánh
                         </div>
-                        <div style={{ fontSize: 11, color: '#64748B' }}>
+                        <div style={{ fontSize: 11.5, color: '#64748B', fontWeight: 500 }}>
                           +270k /tháng
                         </div>
                       </div>
@@ -317,15 +413,31 @@ export const SubscriptionCheckoutModal: FC<SubscriptionCheckoutModalProps> = ({
                           width: 28,
                           height: 28,
                           borderRadius: '50%',
-                          border: '1px solid #CBD5E1',
+                          border: '1.5px solid #CBD5E1',
                           background: '#FFFFFF',
-                          cursor: 'pointer',
+                          cursor: extraBranches > 0 ? 'pointer' : 'default',
                           fontWeight: 700,
+                          fontSize: 15,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: extraBranches > 0 ? '#0F172A' : '#94A3B8',
+                          transition: 'all 0.15s ease',
                         }}
                       >
                         -
                       </button>
-                      <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700 }}>
+                      <span
+                        style={{
+                          fontFamily: 'var(--font-sans)',
+                          fontVariantNumeric: 'tabular-nums',
+                          fontWeight: 700,
+                          fontSize: 14,
+                          minWidth: 20,
+                          textAlign: 'center',
+                          color: '#0F172A',
+                        }}
+                      >
                         {extraBranches}
                       </span>
                       <button
@@ -335,10 +447,16 @@ export const SubscriptionCheckoutModal: FC<SubscriptionCheckoutModalProps> = ({
                           width: 28,
                           height: 28,
                           borderRadius: '50%',
-                          border: '1px solid #CBD5E1',
-                          background: '#FFFFFF',
+                          border: '1.5px solid var(--blue-primary)',
+                          background: 'var(--blue-light)',
                           cursor: 'pointer',
                           fontWeight: 700,
+                          fontSize: 15,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: 'var(--blue-primary)',
+                          transition: 'all 0.15s ease',
                         }}
                       >
                         +
@@ -349,21 +467,36 @@ export const SubscriptionCheckoutModal: FC<SubscriptionCheckoutModalProps> = ({
                   {/* Thêm kho hàng */}
                   <div
                     style={{
-                      border: '1px solid #E2E8F0',
+                      border: '1.5px solid #E2E8F0',
                       borderRadius: 16,
                       padding: '12px 16px',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'space-between',
+                      backgroundColor: '#FFFFFF',
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <Warehouse size={18} color="#0066FF" />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <div
+                        style={{
+                          width: 34,
+                          height: 34,
+                          borderRadius: 10,
+                          backgroundColor: 'var(--blue-light)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: 'var(--blue-primary)',
+                          flexShrink: 0,
+                        }}
+                      >
+                        <Warehouse size={18} strokeWidth={2.2} />
+                      </div>
                       <div>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: '#0F172A' }}>
+                        <div style={{ fontSize: 13.5, fontWeight: 700, color: '#0F172A' }}>
                           Kho phụ
                         </div>
-                        <div style={{ fontSize: 11, color: '#64748B' }}>
+                        <div style={{ fontSize: 11.5, color: '#64748B', fontWeight: 500 }}>
                           +150k /tháng
                         </div>
                       </div>
@@ -376,15 +509,31 @@ export const SubscriptionCheckoutModal: FC<SubscriptionCheckoutModalProps> = ({
                           width: 28,
                           height: 28,
                           borderRadius: '50%',
-                          border: '1px solid #CBD5E1',
+                          border: '1.5px solid #CBD5E1',
                           background: '#FFFFFF',
-                          cursor: 'pointer',
+                          cursor: extraWarehouses > 0 ? 'pointer' : 'default',
                           fontWeight: 700,
+                          fontSize: 15,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: extraWarehouses > 0 ? '#0F172A' : '#94A3B8',
+                          transition: 'all 0.15s ease',
                         }}
                       >
                         -
                       </button>
-                      <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700 }}>
+                      <span
+                        style={{
+                          fontFamily: 'var(--font-sans)',
+                          fontVariantNumeric: 'tabular-nums',
+                          fontWeight: 700,
+                          fontSize: 14,
+                          minWidth: 20,
+                          textAlign: 'center',
+                          color: '#0F172A',
+                        }}
+                      >
                         {extraWarehouses}
                       </span>
                       <button
@@ -394,10 +543,16 @@ export const SubscriptionCheckoutModal: FC<SubscriptionCheckoutModalProps> = ({
                           width: 28,
                           height: 28,
                           borderRadius: '50%',
-                          border: '1px solid #CBD5E1',
-                          background: '#FFFFFF',
+                          border: '1.5px solid var(--blue-primary)',
+                          background: 'var(--blue-light)',
                           cursor: 'pointer',
                           fontWeight: 700,
+                          fontSize: 15,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: 'var(--blue-primary)',
+                          transition: 'all 0.15s ease',
                         }}
                       >
                         +
@@ -407,7 +562,7 @@ export const SubscriptionCheckoutModal: FC<SubscriptionCheckoutModalProps> = ({
                 </div>
               </div>
 
-              {/* 3. Chọn phương thức thanh toán */}
+              {/* 3. Phương thức thanh toán */}
               <div>
                 <label
                   style={{
@@ -416,6 +571,7 @@ export const SubscriptionCheckoutModal: FC<SubscriptionCheckoutModalProps> = ({
                     color: '#334155',
                     marginBottom: 10,
                     display: 'block',
+                    fontFamily: 'var(--font-sans)',
                   }}
                 >
                   3. Phương thức thanh toán
@@ -426,23 +582,48 @@ export const SubscriptionCheckoutModal: FC<SubscriptionCheckoutModalProps> = ({
                     type="button"
                     onClick={() => setPaymentMethod('Wallet')}
                     style={{
-                      padding: '14px',
+                      padding: '14px 16px',
                       borderRadius: 16,
-                      border: paymentMethod === 'Wallet' ? '2px solid #0066FF' : '1px solid #E2E8F0',
-                      backgroundColor: paymentMethod === 'Wallet' ? '#F0F6FF' : '#FFFFFF',
+                      border: paymentMethod === 'Wallet' ? '2px solid var(--blue-primary)' : '1.5px solid #E2E8F0',
+                      backgroundColor: paymentMethod === 'Wallet' ? 'var(--blue-light)' : '#FFFFFF',
+                      boxShadow: paymentMethod === 'Wallet' ? '0 4px 14px rgba(15, 118, 110, 0.12)' : 'none',
                       cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
                       gap: 12,
                       textAlign: 'left',
+                      transition: 'all 0.15s ease',
+                      fontFamily: 'var(--font-sans)',
                     }}
                   >
-                    <Wallet size={22} color={paymentMethod === 'Wallet' ? '#0066FF' : '#64748B'} />
+                    <div
+                      style={{
+                        width: 36,
+                        height: 36,
+                        borderRadius: 10,
+                        backgroundColor: paymentMethod === 'Wallet' ? 'var(--blue-subtle)' : '#F1F5F9',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: paymentMethod === 'Wallet' ? 'var(--blue-primary)' : '#64748B',
+                        flexShrink: 0,
+                      }}
+                    >
+                      <Wallet size={20} strokeWidth={2.2} />
+                    </div>
                     <div>
                       <div style={{ fontSize: 13.5, fontWeight: 700, color: '#0F172A' }}>
                         Trừ tiền Ví gian hàng
                       </div>
-                      <div style={{ fontSize: 11.5, color: '#64748B', fontFamily: 'var(--font-mono)' }}>
+                      <div
+                        style={{
+                          fontSize: 12,
+                          color: '#059669',
+                          fontWeight: 600,
+                          fontVariantNumeric: 'tabular-nums',
+                          marginTop: 2,
+                        }}
+                      >
                         Số dư: {new Intl.NumberFormat('vi-VN').format(storeInfo.walletBalance)} đ
                       </div>
                     </div>
@@ -453,23 +634,40 @@ export const SubscriptionCheckoutModal: FC<SubscriptionCheckoutModalProps> = ({
                     type="button"
                     onClick={() => setPaymentMethod('VietQR')}
                     style={{
-                      padding: '14px',
+                      padding: '14px 16px',
                       borderRadius: 16,
-                      border: paymentMethod === 'VietQR' ? '2px solid #0066FF' : '1px solid #E2E8F0',
-                      backgroundColor: paymentMethod === 'VietQR' ? '#F0F6FF' : '#FFFFFF',
+                      border: paymentMethod === 'VietQR' ? '2px solid var(--blue-primary)' : '1.5px solid #E2E8F0',
+                      backgroundColor: paymentMethod === 'VietQR' ? 'var(--blue-light)' : '#FFFFFF',
+                      boxShadow: paymentMethod === 'VietQR' ? '0 4px 14px rgba(15, 118, 110, 0.12)' : 'none',
                       cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
                       gap: 12,
                       textAlign: 'left',
+                      transition: 'all 0.15s ease',
+                      fontFamily: 'var(--font-sans)',
                     }}
                   >
-                    <QrCode size={22} color={paymentMethod === 'VietQR' ? '#0066FF' : '#64748B'} />
+                    <div
+                      style={{
+                        width: 36,
+                        height: 36,
+                        borderRadius: 10,
+                        backgroundColor: paymentMethod === 'VietQR' ? 'var(--blue-subtle)' : '#F1F5F9',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: paymentMethod === 'VietQR' ? 'var(--blue-primary)' : '#64748B',
+                        flexShrink: 0,
+                      }}
+                    >
+                      <QrCode size={20} strokeWidth={2.2} />
+                    </div>
                     <div>
                       <div style={{ fontSize: 13.5, fontWeight: 700, color: '#0F172A' }}>
                         Quét mã VietQR
                       </div>
-                      <div style={{ fontSize: 11.5, color: '#64748B' }}>
+                      <div style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>
                         Chuyển khoản Napas247
                       </div>
                     </div>
@@ -479,15 +677,28 @@ export const SubscriptionCheckoutModal: FC<SubscriptionCheckoutModalProps> = ({
                 {paymentMethod === 'Wallet' && !hasEnoughWalletBalance && (
                   <div
                     style={{
-                      marginTop: 8,
-                      fontSize: 12,
+                      marginTop: 10,
+                      padding: '10px 14px',
+                      borderRadius: 12,
+                      backgroundColor: '#FEF2F2',
+                      border: '1px solid #FECACA',
+                      fontSize: 12.5,
                       color: '#DC2626',
-                      fontWeight: 600,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      lineHeight: 1.45,
+                      fontFamily: 'var(--font-sans)',
                     }}
                   >
-                    ⚠️ Số dư ví không đủ (thiếu{' '}
-                    {new Intl.NumberFormat('vi-VN').format(grandTotal - storeInfo.walletBalance)} đ).
-                    Vui lòng chọn hình thức <strong>Quét mã VietQR</strong> hoặc Nạp thêm ví.
+                    <AlertTriangle size={16} strokeWidth={2.2} style={{ flexShrink: 0 }} />
+                    <span>
+                      Số dư ví không đủ (còn thiếu{' '}
+                      <strong style={{ fontVariantNumeric: 'tabular-nums' }}>
+                        {new Intl.NumberFormat('vi-VN').format(grandTotal - storeInfo.walletBalance)} đ
+                      </strong>
+                      ). Vui lòng chọn hình thức <strong>Quét mã VietQR</strong> hoặc nạp thêm ví.
+                    </span>
                   </div>
                 )}
               </div>
@@ -496,30 +707,32 @@ export const SubscriptionCheckoutModal: FC<SubscriptionCheckoutModalProps> = ({
               <div
                 style={{
                   backgroundColor: '#F8FAFC',
-                  borderRadius: 16,
+                  border: '1px solid #EDF2F9',
+                  borderRadius: 18,
                   padding: '16px 20px',
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: 8,
+                  gap: 10,
+                  fontFamily: 'var(--font-sans)',
                 }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#475569' }}>
                   <span>Gói {plan.name} ({months} tháng + tặng {bonusMonths} tháng):</span>
-                  <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>
+                  <span style={{ fontWeight: 600, fontVariantNumeric: 'tabular-nums', color: '#1E293B' }}>
                     {new Intl.NumberFormat('vi-VN').format(basePrice)} đ
                   </span>
                 </div>
                 {(extraBranches > 0 || extraWarehouses > 0) && (
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#475569' }}>
                     <span>Tiện ích chi nhánh & kho ({months} tháng):</span>
-                    <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>
+                    <span style={{ fontWeight: 600, fontVariantNumeric: 'tabular-nums', color: '#1E293B' }}>
                       {new Intl.NumberFormat('vi-VN').format(branchAddonPrice + warehouseAddonPrice)} đ
                     </span>
                   </div>
                 )}
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#475569' }}>
                   <span>Thuế GTGT (VAT 10%):</span>
-                  <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>
+                  <span style={{ fontWeight: 600, fontVariantNumeric: 'tabular-nums', color: '#1E293B' }}>
                     {new Intl.NumberFormat('vi-VN').format(vatAmount)} đ
                   </span>
                 </div>
@@ -527,15 +740,23 @@ export const SubscriptionCheckoutModal: FC<SubscriptionCheckoutModalProps> = ({
                   style={{
                     display: 'flex',
                     justifyContent: 'space-between',
-                    fontSize: 16,
-                    fontWeight: 800,
-                    color: '#0F172A',
-                    paddingTop: 8,
-                    borderTop: '1px dashed #CBD5E1',
+                    alignItems: 'baseline',
+                    paddingTop: 10,
+                    borderTop: '1px solid #E2E8F0',
                   }}
                 >
-                  <span>Tổng tiền thanh toán:</span>
-                  <span style={{ color: '#0066FF', fontFamily: 'var(--font-mono)', fontSize: 18 }}>
+                  <span style={{ fontSize: 15, fontWeight: 700, color: '#0F172A' }}>
+                    Tổng tiền thanh toán:
+                  </span>
+                  <span
+                    style={{
+                      color: 'var(--blue-primary)',
+                      fontVariantNumeric: 'tabular-nums',
+                      fontSize: 21,
+                      fontWeight: 800,
+                      letterSpacing: '-0.02em',
+                    }}
+                  >
                     {new Intl.NumberFormat('vi-VN').format(grandTotal)} đ
                   </span>
                 </div>
@@ -548,9 +769,10 @@ export const SubscriptionCheckoutModal: FC<SubscriptionCheckoutModalProps> = ({
                   gap: 8,
                   fontSize: 12,
                   color: '#64748B',
+                  fontFamily: 'var(--font-sans)',
                 }}
               >
-                <ShieldCheck size={16} color="#00C853" />
+                <ShieldCheck size={16} color="var(--blue-primary)" />
                 <span>Cam kết an toàn dữ liệu, hóa đơn điện tử tự động gửi về email sau khi thanh toán.</span>
               </div>
             </>
@@ -564,14 +786,24 @@ export const SubscriptionCheckoutModal: FC<SubscriptionCheckoutModalProps> = ({
               type="button"
               onClick={onClose}
               style={{
-                padding: '10px 20px',
+                padding: '11px 22px',
                 borderRadius: 'var(--radius-pill)',
-                border: '1px solid #CBD5E1',
+                border: '1.5px solid #CBD5E1',
                 backgroundColor: '#FFFFFF',
                 color: '#475569',
                 fontSize: 14,
                 fontWeight: 600,
                 cursor: 'pointer',
+                fontFamily: 'var(--font-sans)',
+                transition: 'all 0.15s ease',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = '#F8FAFC';
+                e.currentTarget.style.borderColor = '#94A3B8';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = '#FFFFFF';
+                e.currentTarget.style.borderColor = '#CBD5E1';
               }}
             >
               Hủy bỏ
@@ -581,9 +813,12 @@ export const SubscriptionCheckoutModal: FC<SubscriptionCheckoutModalProps> = ({
               onClick={handleConfirmPayment}
               disabled={isProcessing || (paymentMethod === 'Wallet' && !hasEnoughWalletBalance)}
               style={{
-                padding: '10px 24px',
+                padding: '11px 28px',
                 borderRadius: 'var(--radius-pill)',
-                backgroundColor: 'var(--blue-primary)',
+                backgroundColor:
+                  paymentMethod === 'Wallet' && !hasEnoughWalletBalance
+                    ? '#94A3B8'
+                    : 'var(--blue-primary)',
                 color: '#FFFFFF',
                 border: 'none',
                 fontSize: 14,
@@ -592,10 +827,12 @@ export const SubscriptionCheckoutModal: FC<SubscriptionCheckoutModalProps> = ({
                   paymentMethod === 'Wallet' && !hasEnoughWalletBalance
                     ? 'not-allowed'
                     : 'pointer',
-                opacity:
-                  paymentMethod === 'Wallet' && !hasEnoughWalletBalance ? 0.6 : 1,
-                boxShadow: '0 4px 14px rgba(15, 118, 110, 0.28)',
-                transition: 'background-color 0.15s ease',
+                boxShadow:
+                  paymentMethod === 'Wallet' && !hasEnoughWalletBalance
+                    ? 'none'
+                    : '0 4px 16px rgba(15, 118, 110, 0.32)',
+                transition: 'all 0.15s ease',
+                fontFamily: 'var(--font-sans)',
               }}
               onMouseEnter={(e) => {
                 if (paymentMethod !== 'Wallet' || hasEnoughWalletBalance) {
@@ -603,7 +840,9 @@ export const SubscriptionCheckoutModal: FC<SubscriptionCheckoutModalProps> = ({
                 }
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'var(--blue-primary)';
+                if (paymentMethod !== 'Wallet' || hasEnoughWalletBalance) {
+                  e.currentTarget.style.backgroundColor = 'var(--blue-primary)';
+                }
               }}
             >
               {isProcessing ? 'Đang kích hoạt...' : 'Xác nhận thanh toán'}

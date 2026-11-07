@@ -41,6 +41,8 @@ export interface WorkShift {
   shiftName: string; // Sáng (06:00 - 14:00), Chiều (14:00 - 22:00), Hành chính (08:00 - 17:00)
   dayOfWeek: 'T2' | 'T3' | 'T4' | 'T5' | 'T6' | 'T7' | 'CN';
   dateStr: string;
+  workDate?: string;
+  branchId?: string;
   branchName: string;
   note?: string;
 }
@@ -100,8 +102,9 @@ export interface Employee {
   citizenId?: string;
   address?: string;
   city?: string;
-  
+
   // Work info
+  jobTitle?: string;
   departmentId?: string;
   departmentName?: string;
   startDate?: string;
@@ -133,13 +136,15 @@ export interface Employee {
 export interface EmployeeFilterState {
   keyword: string;
   status: 'all' | 'active' | 'inactive';
-  workingBranchId: string;
+  workingBranchId?: string;
+  selectedBranchIds?: string[];
   salaryBranchId?: string;
   departmentId?: string;
 }
 
 export interface WorkShiftDefinition {
   id: string;
+  code?: string;
   name: string; // Ca sáng, Ca chiều, Ca tối, Ca hành chính
   startTime: string; // 07:00
   endTime: string; // 12:30
@@ -150,6 +155,8 @@ export interface WorkShiftDefinition {
   status: 'active' | 'inactive';
   branchId?: string;
   branchName?: string;
+  branchIds?: string[];
+  branchNames?: string[];
 }
 
 export interface ScheduleAssignment {
@@ -163,6 +170,8 @@ export interface ScheduleAssignment {
   shiftColor: string;
   dayOfWeek: 'T2' | 'T3' | 'T4' | 'T5' | 'T6' | 'T7' | 'CN';
   dateStr: string;
+  workDate?: string;
+  branchId?: string;
   branchName: string;
 }
 
@@ -174,15 +183,24 @@ export interface AttendanceRecord {
   avatarUrl?: string;
   shiftId: string;
   shiftName: string;
+  shiftConfigId?: string;
+  shiftCode?: string;
+  workDateIso?: string;
+  branchId?: string;
+  branchName?: string;
   dayOfWeek: 'T2' | 'T3' | 'T4' | 'T5' | 'T6' | 'T7' | 'CN';
   dateStr: string;
   checkInTime?: string;
   checkOutTime?: string;
-  status: 'ontime' | 'late' | 'early' | 'not_checked' | 'absent';
+  plannedStartTime?: string;
+  plannedEndTime?: string;
+  status: 'ontime' | 'late' | 'early' | 'not_checked' | 'absent' | 'missing';
   lateMinutes?: number;
   workHours?: number;
   gpsLocation?: string;
   deviceInfo?: string;
+  approvalStatus?: string;
+  note?: string;
 }
 
 export interface PayslipDetailedRecord {
@@ -192,32 +210,50 @@ export interface PayslipDetailedRecord {
   employeeName: string; // Dung Phạm
   branchName: string; // Chi nhánh trung tâm
   periodMonth: string; // 2026-10
-  
-  // Thông số công
+
+  // Thông số công & Cấu hình lương
+  salaryType?: 'MONTHLY' | 'HOURLY' | 'SHIFT';
+  baseRate?: number;
   standardDays: number; // 26
+  standardDayHours?: number; // 8.0
   workedDays: number; // 24.5
+  totalWorkHours?: number; // 196
+  totalShifts?: number; // 25
+  totalLateMinutes?: number;
+  totalEarlyLeaveMinutes?: number;
   otHours: number; // 8.5
-  contractBaseSalary: number; // 8,000,000
-  
+  contractBaseSalary: number; // 8,000,000 (tương thích ngược với baseRate)
+
   // Thu nhập (Earnings)
-  baseSalaryEarned: number; // Lương ngày công
+  baseSalaryEarned: number; // Lương ngày công / ca / giờ
   overtimePay: number; // Lương tăng ca
-  lunchAllowance: number; // Phụ cấp ăn trưa
-  travelAllowance: number; // Phụ cấp đi lại
-  bonus: number; // Thưởng doanh số / chuyên cần
+  totalAllowance?: number; // Tổng các khoản phụ cấp
+  allowancesDetailJson?: string; // Snapshot JSON danh sách phụ cấp
+  allowances?: Array<{ name: string; amount: number }>; // Danh sách parsed để hiển thị
+  lunchAllowance: number; // Phụ cấp ăn trưa (tương thích ngược)
+  travelAllowance: number; // Phụ cấp đi lại (tương thích ngược)
+  bonus?: number; // Thưởng doanh số / chuyên cần (tùy chọn)
   totalEarnings: number; // Tổng thu nhập trước trừ
 
   // Khấu trừ (Deductions)
   advanceDeduction: number; // Trừ tạm ứng
-  socialInsurance: number; // BHXH (10.5%)
-  violationDeduction: number; // Giảm trừ vi phạm
+  remainingDebt?: number; // Tạm ứng còn nợ lại sau kỳ
+  socialInsurance: number; // Tổng trích đóng bảo hiểm (10.5%)
+  bhxh?: number; // Bảo hiểm xã hội (8%)
+  bhyt?: number; // Bảo hiểm y tế (1,5%)
+  bhtn?: number; // Bảo hiểm thất nghiệp (1%)
+  violationDeduction?: number; // Giảm trừ vi phạm (tùy chọn)
   totalDeductions: number; // Tổng giảm trừ
 
   // Thực lĩnh & Thanh toán
   netSalary: number; // Thực nhận = Earnings - Deductions
   status: 'UNPAID' | 'PAID';
   paidAt?: string; // Ngày trả
-  paymentMethod?: 'VIETQR' | 'CASH';
+  paymentMethod?: 'VIETQR' | 'CASH' | 'BANK_TRANSFER';
+  paidBy?: string; // Người chi trả
+  cashbookVoucherCode?: string; // Mã phiếu chi sổ quỹ (PC-xxxx)
+  approvedBy?: string; // Người duyệt
+  note?: string; // Ghi chú phiếu lương
   bankName?: string;
   bankAccountNumber?: string;
   bankAccountName?: string;

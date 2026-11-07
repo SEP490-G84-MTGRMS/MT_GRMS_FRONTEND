@@ -23,13 +23,18 @@ import {
   Building2,
 } from 'lucide-react';
 import { TablePagination } from '../../../components/common';
-import { mockInvoicesList, mockPreOrdersList } from '../mock/inventoryMockData';
+import {
+  mockInvoicesList,
+  mockPreOrdersList,
+  mockInvoicesAnNhien,
+  mockPreOrdersAnNhien,
+} from '../mock/inventoryMockData';
 import type { InvoiceDTO, PreOrderDTO, DebtPaymentRecordDTO } from '../types/inventory.types';
 import { CollectDebtModal } from '../components/modals/CollectDebtModal';
 import { ReturnExchangeModal } from '../components/modals/ReturnExchangeModal';
 import { CreatePreOrderModal } from '../components/modals/CreatePreOrderModal';
 import { FulfillPreOrderModal } from '../components/modals/FulfillPreOrderModal';
-import { mockProducts, mockCustomers } from '../mock/posMockData';
+import { mockProducts, mockCustomers, mockProductsAnNhien, mockCustomersAnNhien, AN_NHIEN_BRANCHES } from '../mock/posMockData';
 import { posOrderApi } from '../api/posOrderApi';
 import { useAuthStore } from '../../../stores/useAuthStore';
 import '../pos.css';
@@ -51,7 +56,7 @@ export const InvoiceManagementPage: FC = () => {
   // Bộ lọc
   const [searchQuery, setSearchQuery] = useState('');
   const [timePreset, setTimePreset] = useState<'today' | 'yesterday' | 'week' | 'month'>('today');
-  const [paymentMethodFilter, setPaymentMethodFilter] = useState<'ALL' | 'VIETQR' | 'CASH' | 'DEBT'>('ALL');
+  const [paymentMethodFilter, setPaymentMethodFilter] = useState<'ALL' | 'VIETQR' | 'CASH' | 'DEBT' | 'CREDIT'>('ALL');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'COMPLETED' | 'CANCELLED' | 'DEBT'>('ALL');
 
   // Danh sách hóa đơn có thể hủy / cập nhật trạng thái (Phân lập theo Cửa Hàng / Tenant)
@@ -73,19 +78,27 @@ export const InvoiceManagementPage: FC = () => {
       setBranchFilter(activeBranchId);
     }
   }, [isStoreOwner, activeBranchId]);
+  const isAnNhienStore = currentTenantId === 'tenant_an_nhien_02';
 
-  const [invoices, setInvoices] = useState<InvoiceDTO[]>(() => (isDefaultDemoStore ? mockInvoicesList : []));
-  const [preOrders, setPreOrders] = useState<PreOrderDTO[]>(() => (isDefaultDemoStore ? mockPreOrdersList : []));
+  const getInitialInvoices = () => {
+    if (isDefaultDemoStore) return mockInvoicesList;
+    if (isAnNhienStore) return mockInvoicesAnNhien;
+    return [];
+  };
+
+  const getInitialPreOrders = () => {
+    if (isDefaultDemoStore) return mockPreOrdersList;
+    if (isAnNhienStore) return mockPreOrdersAnNhien;
+    return [];
+  };
+
+  const [invoices, setInvoices] = useState<InvoiceDTO[]>(getInitialInvoices);
+  const [preOrders, setPreOrders] = useState<PreOrderDTO[]>(getInitialPreOrders);
 
   // Khi chuyển tài khoản hoặc đăng nhập chủ cửa hàng khác -> Reset danh sách hóa đơn
   useEffect(() => {
-    if (!isDefaultDemoStore) {
-      setInvoices([]);
-      setPreOrders([]);
-    } else {
-      setInvoices(mockInvoicesList);
-      setPreOrders(mockPreOrdersList);
-    }
+    setInvoices(getInitialInvoices());
+    setPreOrders(getInitialPreOrders());
   }, [currentTenantId, isDefaultDemoStore]);
 
   // Nạp dữ liệu thực tế từ Backend API theo Tenant
@@ -96,10 +109,8 @@ export const InvoiceManagementPage: FC = () => {
       .then((res) => {
         if (!isMounted) return;
         if (!res || !res.items || res.items.length === 0) {
-          if (!isDefaultDemoStore) {
-            setInvoices([]);
-            setPreOrders([]);
-          }
+          setInvoices(getInitialInvoices());
+          setPreOrders(getInitialPreOrders());
           return;
         }
 
@@ -111,7 +122,7 @@ export const InvoiceManagementPage: FC = () => {
           branchId: o.branchId || '',
           branchName: o.branchName || 'Chi nhánh trung tâm',
           cashierId: '',
-          cashierName: 'Thu ngân quầy',
+          cashierName: o.cashierName || user?.fullName || (isStoreOwner ? 'Chủ cửa hàng' : 'Thu ngân'),
           customerId: o.customerId,
           customerName: o.customerName || 'Khách lẻ',
           customerPhone: o.customerPhone || '',
@@ -119,17 +130,17 @@ export const InvoiceManagementPage: FC = () => {
           paymentMethodLabel:
             o.paymentMethod === 'VIETQR'
               ? 'Chuyển khoản VietQR'
-              : o.paymentMethod === 'DEBT'
+              : (o.paymentMethod === 'DEBT' || o.paymentMethod === 'CREDIT')
               ? 'Ghi nợ'
               : 'Tiền mặt',
           totalMerchandiseAmount: o.totalAmount,
           totalDiscount: o.discountAmount,
-          finalPaidAmount: o.finalAmount,
-          debtAmount: o.paymentMethod === 'DEBT' ? o.finalAmount : 0,
-          paidDebtAmount: 0,
+          finalPaidAmount: (o.paymentMethod === 'DEBT' || o.paymentMethod === 'CREDIT') ? (o.depositAmount || 0) : o.finalAmount,
+          debtAmount: (o.paymentMethod === 'DEBT' || o.paymentMethod === 'CREDIT') ? Math.max(0, o.finalAmount - (o.depositAmount || 0)) : 0,
+          paidDebtAmount: (o.paymentMethod === 'DEBT' || o.paymentMethod === 'CREDIT') ? (o.depositAmount || 0) : 0,
           debtPaymentRecords: [],
-          status: o.status === 'Cancelled' ? 'CANCELLED' : o.paymentMethod === 'DEBT' ? 'DEBT' : 'COMPLETED',
-          statusLabel: o.status === 'Cancelled' ? 'Đã hủy' : o.paymentMethod === 'DEBT' ? 'Ghi nợ' : 'Hoàn thành',
+          status: o.status === 'Cancelled' ? 'CANCELLED' : (o.paymentMethod === 'DEBT' || o.paymentMethod === 'CREDIT') ? 'DEBT' : 'COMPLETED',
+          statusLabel: o.status === 'Cancelled' ? 'Đã hủy' : (o.paymentMethod === 'DEBT' || o.paymentMethod === 'CREDIT') ? 'Ghi nợ' : 'Hoàn thành',
           items: (o.items || []).map((it: any) => ({
             itemId: it.id,
             productId: it.productId,
@@ -205,9 +216,13 @@ export const InvoiceManagementPage: FC = () => {
   // Danh sách các chi nhánh có trong hệ thống (Tự động hợp nhất từ CSDL & cấu hình chuỗi)
   const availableBranches = useMemo(() => {
     const map = new Map<string, string>();
-    map.set('BR-01', 'Chi nhánh Cầu Giấy (Trung tâm)');
-    map.set('BR-02', 'Chi nhánh Thanh Xuân');
-    map.set('BR-03', 'Chi nhánh Quận 1');
+    if (isAnNhienStore) {
+      AN_NHIEN_BRANCHES.forEach((b) => map.set(b.id, b.name));
+    } else {
+      map.set('BR-01', 'Chi nhánh Cầu Giấy (Trung tâm)');
+      map.set('BR-02', 'Chi nhánh Thanh Xuân');
+      map.set('BR-03', 'Chi nhánh Quận 1');
+    }
 
     invoices.forEach((inv) => {
       if (inv.branchId && inv.branchName) {
@@ -220,11 +235,11 @@ export const InvoiceManagementPage: FC = () => {
       }
     });
 
-    return [
-      { id: 'ALL', name: '🏢 Tất cả chi nhánh (Toàn chuỗi)' },
-      ...Array.from(map.entries()).map(([id, name]) => ({ id, name })),
-    ];
-  }, [invoices, preOrders]);
+    const list = Array.from(map.entries()).map(([id, name]) => ({ id, name }));
+    return isStoreOwner
+      ? [{ id: 'ALL', name: 'Tất cả chi nhánh (Toàn chuỗi)' }, ...list]
+      : list;
+  }, [invoices, preOrders, isAnNhienStore, isStoreOwner]);
 
   // Modal Xác nhận hủy hóa đơn
   const [cancelModalInvoice, setCancelModalInvoice] = useState<InvoiceDTO | null>(null);
@@ -319,20 +334,25 @@ export const InvoiceManagementPage: FC = () => {
             branchId: o.branchId || '',
             branchName: o.branchName || 'Chi nhánh trung tâm',
             cashierId: '',
-            cashierName: 'Thu ngân quầy',
+            cashierName: o.cashierName || user?.fullName || (isStoreOwner ? 'Chủ cửa hàng' : 'Thu ngân'),
             customerId: o.customerId,
             customerName: o.customerName || 'Khách lẻ',
             customerPhone: o.customerPhone || '',
             paymentMethod: o.paymentMethod || 'CASH',
-            paymentMethodLabel: o.paymentMethod === 'VIETQR' ? 'VietQR' : o.paymentMethod === 'DEBT' ? 'Ghi nợ' : 'Tiền mặt',
+            paymentMethodLabel:
+              o.paymentMethod === 'VIETQR'
+                ? 'VietQR'
+                : (o.paymentMethod === 'DEBT' || o.paymentMethod === 'CREDIT')
+                ? 'Ghi nợ'
+                : 'Tiền mặt',
             totalMerchandiseAmount: o.totalAmount,
             totalDiscount: o.discountAmount,
-            finalPaidAmount: o.finalAmount,
-            debtAmount: o.paymentMethod === 'DEBT' ? o.finalAmount : 0,
-            paidDebtAmount: 0,
+            finalPaidAmount: (o.paymentMethod === 'DEBT' || o.paymentMethod === 'CREDIT') ? (o.depositAmount || 0) : o.finalAmount,
+            debtAmount: (o.paymentMethod === 'DEBT' || o.paymentMethod === 'CREDIT') ? Math.max(0, o.finalAmount - (o.depositAmount || 0)) : 0,
+            paidDebtAmount: (o.paymentMethod === 'DEBT' || o.paymentMethod === 'CREDIT') ? (o.depositAmount || 0) : 0,
             debtPaymentRecords: [],
-            status: o.status === 'Cancelled' ? 'CANCELLED' : o.paymentMethod === 'DEBT' ? 'DEBT' : 'COMPLETED',
-            statusLabel: o.status === 'Cancelled' ? 'Đã hủy' : o.paymentMethod === 'DEBT' ? 'Ghi nợ' : 'Đã thanh toán',
+            status: o.status === 'Cancelled' ? 'CANCELLED' : (o.paymentMethod === 'DEBT' || o.paymentMethod === 'CREDIT') ? 'DEBT' : 'COMPLETED',
+            statusLabel: o.status === 'Cancelled' ? 'Đã hủy' : (o.paymentMethod === 'DEBT' || o.paymentMethod === 'CREDIT') ? 'Ghi nợ' : 'Đã thanh toán',
             note: o.note || '',
             items: (o.items || []).map((it: any) => ({
               itemId: it.id,
@@ -360,7 +380,14 @@ export const InvoiceManagementPage: FC = () => {
     customerName: string;
     customerPhone: string;
     expectedPickupDate: string;
-    items: Array<{ productId: string; quantity: number; unitPrice: number; productName: string }>;
+    items: Array<{
+      productId: string;
+      quantity: number;
+      unitPrice: number;
+      productName: string;
+      unitId?: string;
+      unitName?: string;
+    }>;
     depositAmount: number;
     paymentMethod: string;
     note?: string;
@@ -369,12 +396,15 @@ export const InvoiceManagementPage: FC = () => {
       let createdCode: string | null = null;
       try {
         const res = await posOrderApi.createPreOrder({
-          branchId: '01a185f3-d197-72c1-b6e7-cdb5d5363467',
+          branchId: 'cd5e8d1b-b08b-448d-beff-b85ea5873d52',
           customerId: data.customerId,
           items: data.items.map((i) => ({
             productId: i.productId,
             quantity: i.quantity,
             unitPrice: i.unitPrice,
+            productName: i.productName,
+            unitId: i.unitId,
+            unitName: i.unitName,
           })),
           depositAmount: data.depositAmount,
           expectedPickupDate: data.expectedPickupDate,
@@ -409,7 +439,7 @@ export const InvoiceManagementPage: FC = () => {
           productId: it.productId,
           productName: it.productName,
           sku: '',
-          unitName: 'Cái',
+          unitName: it.unitName || 'Cái',
           quantity: it.quantity,
           unitPrice: it.unitPrice,
           discountAmount: 0,
@@ -484,7 +514,10 @@ export const InvoiceManagementPage: FC = () => {
         (inv.customerPhone && inv.customerPhone.includes(searchQuery.trim()));
 
       const matchMethod =
-        paymentMethodFilter === 'ALL' || inv.paymentMethod === paymentMethodFilter;
+        paymentMethodFilter === 'ALL' ||
+        (paymentMethodFilter === 'DEBT'
+          ? inv.paymentMethod === 'DEBT' || inv.paymentMethod === 'CREDIT'
+          : inv.paymentMethod === paymentMethodFilter);
 
       const matchStatus = statusFilter === 'ALL' || inv.status === statusFilter;
 
@@ -593,7 +626,7 @@ export const InvoiceManagementPage: FC = () => {
             <h1 className="unified-header-title">Quản Lý Hóa Đơn &amp; Đơn Đặt Hàng</h1>
             <div className="unified-header-subtitle">
               {branchFilter === 'ALL'
-                ? '🏢 Toàn chuỗi cửa hàng (3 Chi nhánh)'
+                ? 'Toàn chuỗi cửa hàng (3 Chi nhánh)'
                 : availableBranches.find((b) => b.id === branchFilter)?.name || 'Chi nhánh Cầu Giấy (Trung tâm)'}{' '}
               &bull; Bán lẻ &bull; Đơn đặt trước giữ kho
             </div>
@@ -635,7 +668,11 @@ export const InvoiceManagementPage: FC = () => {
           </button>
 
           <div className="pos-cashier-badge">
-            NV: <b>Nguyễn Bá Sơn (NV004)</b>
+            {isStoreOwner ? (
+              <span>Chủ cửa hàng: <b>{user?.fullName || 'Chủ hệ thống'}</b></span>
+            ) : (
+              <span>NV: <b>{user?.fullName || 'Nhân viên thu ngân'}</b></span>
+            )}
           </div>
         </div>
       </header>
@@ -819,21 +856,22 @@ export const InvoiceManagementPage: FC = () => {
                       <th style={{ width: 36, textAlign: 'center' }}>
                         <input type="checkbox" />
                       </th>
-                      <th style={{ width: 120 }}>Mã hóa đơn</th>
-                      <th style={{ width: 140 }}>Thời gian lập</th>
-                      <th>Khách hàng</th>
-                      <th style={{ textAlign: 'right' }}>Tổng tiền hàng</th>
-                      <th style={{ textAlign: 'right' }}>Giảm giá</th>
-                      <th style={{ textAlign: 'right' }}>Khách đã trả</th>
-                      <th>Phương thức TT</th>
-                      <th>Trạng thái</th>
-                      <th style={{ textAlign: 'center', width: 170 }}>Thao tác</th>
+                      <th style={{ width: 185 }}>Mã hóa đơn</th>
+                      <th style={{ width: 135 }}>Thời gian lập</th>
+                      <th style={{ minWidth: 150 }}>Khách hàng</th>
+                      <th style={{ textAlign: 'right', width: 110 }}>Tổng tiền hàng</th>
+                      <th style={{ textAlign: 'right', width: 85 }}>Giảm giá</th>
+                      <th style={{ textAlign: 'right', width: 110 }}>Khách đã trả</th>
+                      <th style={{ textAlign: 'center', width: 130 }}>Phương thức TT</th>
+                      <th style={{ textAlign: 'center', width: 140 }}>Trạng thái</th>
+                      <th style={{ textAlign: 'center', width: 220 }}>Thao tác</th>
                     </tr>
                   </thead>
                   {paginatedInvoices.map((inv) => {
                     const isExpanded = expandedInvoiceId === inv.invoiceId;
-                    const isCompleted = inv.status === 'COMPLETED';
-                    const isDebt = inv.status === 'DEBT' || (inv.debtAmount !== undefined && inv.debtAmount > 0);
+                    const isDebt = (inv.debtAmount !== undefined && inv.debtAmount > 0) || (inv.status === 'DEBT' && (!inv.debtAmount || inv.debtAmount > 0));
+                    const isDebtMethod = inv.paymentMethod === 'DEBT' || inv.paymentMethod === 'CREDIT';
+                    const isCompleted = !isDebt && (inv.status === 'COMPLETED' || (isDebtMethod && (inv.debtAmount || 0) <= 0));
 
                     return (
                       <tbody key={inv.invoiceId}>
@@ -866,7 +904,6 @@ export const InvoiceManagementPage: FC = () => {
                                   gap: 3,
                                 }}
                               >
-                                <Building2 size={10} className="text-teal-600" />
                                 {inv.branchName || 'Chi nhánh Cầu Giấy (Trung tâm)'}
                               </span>
                             </div>
@@ -893,22 +930,22 @@ export const InvoiceManagementPage: FC = () => {
                               color: isCompleted ? '#15803d' : isDebt ? '#d97706' : '#dc2626',
                             }}
                           >
-                            {inv.finalPaidAmount.toLocaleString('vi-VN')}
+                            {(isDebt ? (inv.paidDebtAmount || 0) : inv.finalPaidAmount).toLocaleString('vi-VN')}
                           </td>
-                          <td>
+                          <td style={{ textAlign: 'center' }}>
                             <span
                               className={`pos-method-pill ${
-                                inv.paymentMethod === 'VIETQR' ? 'vietqr' : inv.paymentMethod === 'DEBT' ? 'debt' : 'cash'
+                                inv.paymentMethod === 'VIETQR' ? 'vietqr' : isDebtMethod ? 'debt' : 'cash'
                               }`}
                               style={
-                                inv.paymentMethod === 'DEBT'
+                                isDebtMethod
                                   ? { backgroundColor: '#fffbeb', color: '#b45309', border: '1px solid #fde68a' }
                                   : undefined
                               }
                             >
                               {inv.paymentMethod === 'VIETQR' ? (
                                 <QrCode size={12} />
-                              ) : inv.paymentMethod === 'DEBT' ? (
+                              ) : isDebtMethod ? (
                                 <CreditCard size={12} />
                               ) : (
                                 <Banknote size={12} />
@@ -916,7 +953,7 @@ export const InvoiceManagementPage: FC = () => {
                               <span>{inv.paymentMethodLabel}</span>
                             </span>
                           </td>
-                          <td>
+                          <td style={{ textAlign: 'center' }}>
                             <span
                               className={`pos-status-pill ${
                                 isCompleted ? 'completed' : isDebt ? 'debt' : 'cancelled'
@@ -1043,7 +1080,7 @@ export const InvoiceManagementPage: FC = () => {
                               >
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                                   <div style={{ fontSize: 12.5, fontWeight: 700, color: '#0f766e' }}>
-                                    Chi tiết mặt hàng trong hóa đơn {inv.invoiceId} &bull; Thu ngân: <b>{inv.cashierName} ({inv.cashierId})</b>
+                                    Chi tiết mặt hàng trong hóa đơn {inv.invoiceId} &bull; Thu ngân: <b>{inv.cashierName}{inv.cashierId ? ` (${inv.cashierId})` : ''}</b>
                                     {inv.referenceCode && (
                                       <span style={{ color: '#0284c7', marginLeft: 8 }}>
                                         | Mã GD: {inv.referenceCode}
@@ -1113,14 +1150,14 @@ export const InvoiceManagementPage: FC = () => {
                                 <table className="pos-shift-table">
                                   <thead>
                                     <tr>
-                                      <th>Mã SKU</th>
+                                      <th style={{ width: 140 }}>Mã SKU</th>
                                       <th>Tên mặt hàng</th>
-                                      <th>Mã Lô (FEFO)</th>
-                                      <th>ĐVT</th>
-                                      <th style={{ textAlign: 'right' }}>Số lượng</th>
-                                      <th style={{ textAlign: 'right' }}>Đơn giá</th>
-                                      <th style={{ textAlign: 'right' }}>Giảm giá</th>
-                                      <th style={{ textAlign: 'right' }}>Thành tiền</th>
+                                      <th style={{ width: 120, textAlign: 'center' }}>Mã Lô (FEFO)</th>
+                                      <th style={{ width: 70, textAlign: 'center' }}>ĐVT</th>
+                                      <th style={{ width: 80, textAlign: 'right' }}>Số lượng</th>
+                                      <th style={{ width: 110, textAlign: 'right' }}>Đơn giá</th>
+                                      <th style={{ width: 90, textAlign: 'right' }}>Giảm giá</th>
+                                      <th style={{ width: 120, textAlign: 'right' }}>Thành tiền</th>
                                     </tr>
                                   </thead>
                                   <tbody>
@@ -1128,12 +1165,12 @@ export const InvoiceManagementPage: FC = () => {
                                       <tr key={item.itemId}>
                                         <td style={{ color: '#0f766e', fontWeight: 600 }}>{item.sku}</td>
                                         <td><b>{item.productName}</b></td>
-                                        <td>
+                                        <td style={{ textAlign: 'center' }}>
                                           <span style={{ background: '#f1f5f9', padding: '2px 6px', borderRadius: 4, fontSize: 11 }}>
                                             {item.batchId || 'LOT-AUTO'}
                                           </span>
                                         </td>
-                                        <td>{item.unitName}</td>
+                                        <td style={{ textAlign: 'center' }}>{item.unitName}</td>
                                         <td style={{ textAlign: 'right', fontWeight: 600 }}>{item.quantity}</td>
                                         <td style={{ textAlign: 'right' }}>{item.unitPrice.toLocaleString('vi-VN')} đ</td>
                                         <td style={{ textAlign: 'right', color: item.discountAmount > 0 ? '#dc2626' : '#94a3b8' }}>
@@ -1148,7 +1185,7 @@ export const InvoiceManagementPage: FC = () => {
                                 </table>
 
                                 {/* THEO DÕI CÔNG NỢ & LỊCH SỬ THU NỢ CỦA HÓA ĐƠN */}
-                                {(inv.debtAmount !== undefined || (inv.debtPaymentRecords && inv.debtPaymentRecords.length > 0)) && (
+                                {(isDebt || (inv.debtAmount !== undefined && inv.debtAmount > 0) || (inv.debtPaymentRecords && inv.debtPaymentRecords.length > 0)) && (
                                   <div style={{ marginTop: 12, padding: 10, borderRadius: 6, backgroundColor: '#fefce8', border: '1px solid #fef08a' }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: inv.debtPaymentRecords && inv.debtPaymentRecords.length > 0 ? 8 : 0 }}>
                                       <div>
@@ -1263,15 +1300,15 @@ export const InvoiceManagementPage: FC = () => {
                 <table className="pos-shift-table">
                   <thead>
                     <tr>
-                      <th style={{ width: 140 }}>Mã đơn đặt trước</th>
-                      <th>Khách hàng</th>
-                      <th>Thời gian hẹn nhận hàng</th>
-                      <th style={{ textAlign: 'right' }}>Tổng tiền đơn</th>
-                      <th style={{ textAlign: 'right' }}>Tiền cọc</th>
-                      <th style={{ textAlign: 'right' }}>Còn phải thu</th>
-                      <th>Phân bổ giữ kho</th>
-                      <th>Trạng thái</th>
-                      <th style={{ textAlign: 'center', width: 160 }}>Thao tác quầy</th>
+                      <th style={{ width: 180 }}>Mã đơn đặt trước</th>
+                      <th style={{ minWidth: 150 }}>Khách hàng</th>
+                      <th style={{ width: 140 }}>Thời gian hẹn nhận hàng</th>
+                      <th style={{ width: 110, textAlign: 'right' }}>Tổng tiền đơn</th>
+                      <th style={{ width: 90, textAlign: 'right' }}>Tiền cọc</th>
+                      <th style={{ width: 110, textAlign: 'right' }}>Còn phải thu</th>
+                      <th style={{ width: 120 }}>Phân bổ giữ kho</th>
+                      <th style={{ width: 130, textAlign: 'center' }}>Trạng thái</th>
+                      <th style={{ width: 180, textAlign: 'center' }}>Thao tác quầy</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1294,7 +1331,6 @@ export const InvoiceManagementPage: FC = () => {
                                 gap: 3,
                               }}
                             >
-                              <Building2 size={10} className="text-teal-600" />
                               {pre.branchName || 'Chi nhánh Cầu Giấy (Trung tâm)'}
                             </span>
                           </div>
@@ -1681,8 +1717,8 @@ export const InvoiceManagementPage: FC = () => {
       <CreatePreOrderModal
         isOpen={isCreatePreOrderModalOpen}
         onClose={() => setIsCreatePreOrderModalOpen(false)}
-        availableProducts={mockProducts}
-        customers={mockCustomers}
+        availableProducts={user?.tenantId === 'tenant_an_nhien_02' ? mockProductsAnNhien : mockProducts}
+        customers={user?.tenantId === 'tenant_an_nhien_02' ? mockCustomersAnNhien : mockCustomers}
         branchName={
           branchFilter !== 'ALL'
             ? availableBranches.find((b) => b.id === branchFilter)?.name || 'Chi nhánh Cầu Giấy (Trung tâm)'

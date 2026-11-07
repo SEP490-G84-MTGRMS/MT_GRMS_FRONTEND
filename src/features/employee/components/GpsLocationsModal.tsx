@@ -188,7 +188,7 @@ export const GpsLocationsModal: React.FC<GpsLocationsModalProps> = ({ isOpen, on
 
   return (
     <div className="emp-modal-overlay" style={{ zIndex: 1100 }}>
-      <div className="emp-modal-card" style={{ maxWidth: 940 }}>
+      <div className="emp-modal-card">
         {/* Header Modal chuẩn Design System */}
         <div className="emp-modal-header" style={{ background: '#F8FAFC' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -428,7 +428,7 @@ export const GpsLocationsModal: React.FC<GpsLocationsModalProps> = ({ isOpen, on
       {/* Modal Con: Thêm / Sửa địa chỉ GPS */}
       {showFormModal && (
         <div className="emp-modal-overlay" style={{ zIndex: 1200 }}>
-          <div className="emp-modal-card" style={{ maxWidth: 520 }}>
+          <div className="emp-modal-card">
             <div className="emp-modal-header" style={{ background: '#F8FAFC' }}>
               <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#0F172A', display: 'flex', alignItems: 'center', gap: 8 }}>
                 <MapPin size={18} color="#0F766E" />

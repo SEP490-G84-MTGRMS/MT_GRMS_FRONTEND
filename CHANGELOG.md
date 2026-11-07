@@ -4,11 +4,31 @@ Toàn bộ các thay đổi của repository Frontend React SPA được tổng 
 
 ---
 
-## [Unreleased] - 2026-11-03
+## [Unreleased] - 2026-11-06
+### Added
+- Bổ sung chức năng **Cập nhật thông tin gian hàng**: thêm nút "Cập nhật thông tin", tạo component `EditStoreInfoModal`, trạng thái loading `isSaving`, và thông báo nổi Toast khi lưu dữ liệu gian hàng (MST, Hotline, Tỉnh/TP, Địa chỉ) [FE-STORE] [worklog: docs/worklogs/2026-11-06_FE-STORE_AI_store-info-update-modal-and-toast.md].
+- Tích hợp API thật cho màn hình **Lịch sử mua hàng** (`OrderHistoryTab.tsx`): loại bỏ mock data cứng, kết nối `storeApi.getSubscriptionHistory()`, hiển thị hợp đồng thật, thời hạn, trạng thái và empty state khi chưa có giao dịch [FE-STORE] [worklog: docs/worklogs/2026-11-06_FE-STORE_AI_store-info-update-modal-and-toast.md].
+
+### Changed
+- Tối ưu hóa hiệu năng và network trong tab Chi nhánh (`BranchManagementTab.tsx`): debounce 350ms khi gõ tìm kiếm hoặc đổi filter, tách riêng quota fetch khỏi search list, triệt tiêu tình trạng gọi API liên tiếp [FE-STORE] [worklog: docs/worklogs/2026-11-06_FE-STORE_AI_store-info-update-modal-and-toast.md].
+
+### Fixed
+- Sửa lỗi vỡ thanh tiến trình (Stepper) 3 bước trên màn hình Quên mật khẩu (`ForgotPasswordPage.tsx`): chuyển sang layout ngang chuẩn Responsive, căn nối tâm hoàn hảo giữa các vòng tròn số bước và icon Check hoàn thành với đường kẻ divider [FE-AUTH] [worklog: docs/worklogs/2026-11-06_FE-AUTH_AI_forgot-password-email-otp.md].
+- Đồng bộ hóa các endpoints xác thực quên mật khẩu, mã OTP và thiết lập lại mật khẩu qua chuẩn route `/api/auth/...`.
+
+## [Unreleased] - 2026-11-05
+### Fixed
+- Sửa lỗi trích xuất phản hồi API đăng ký `POST /api/v1/auth/register` trong `authService.ts`: giải nén `unwrapLogin(response.data)` từ vỏ bọc `ApiResponse`, khắc phục triệt để lỗi `Cannot read properties of undefined (reading 'tenantId')` trên màn hình Đăng ký [FE-AUTH] [worklog: docs/worklogs/2026-11-05_FE-AUTH_AI_fix-register-api-response-unwrapping.md].
+- Phòng vệ kiểm tra null-safe cho `user` trước khi truy cập `user.tenantId` trong `useAuthStore.ts`.
+
+## [Unreleased] - 2026-11-04
+### Added
+- Tích hợp cổng thanh toán VietQR SePay thật, tái thiết kế giao diện Modal Nạp ví (`StoreWalletTopupModal`) theo chuẩn Deep Teal (`#0F766E`), tích hợp cơ chế Polling 3s/lần tự động cập nhật số dư, và đồng bộ tab Sổ cái `WalletLedgerTab` [FE-WALLET] [worklog: docs/worklogs/2026-11-04_FE-WALLET_AI_sepay-wallet-topup-modal.md].
 ### Added
 - Thêm component Dropdown **Chọn chi nhánh** (`BranchSelectorDropdown`) trên thanh header chính (`AppTopNav`), hỗ trợ chọn từng chi nhánh hoặc xem toàn hệ thống [worklog: docs/worklogs/2026-11-03_FE-STORE_AI_remove-wallet-topup-from-status-bar.md].
 
 ### Changed
+- Đồng bộ hóa 100% typography (Be Vietnam Pro, tabular-nums) và bảng màu thương hiệu Deep Teal (#0F766E) cho modal Đăng ký gói (SubscriptionCheckoutModal) và bảng giá (SubscriptionPricingCards) [FE-STORE] [worklog: docs/worklogs/2026-11-04_FE-STORE_AI_unify-typography-and-checkout-modal-theme.md].
 - Sửa layout bảng gói cước dịch vụ (pricing-cards-grid) mở rộng 100% toàn chiều ngang, loại bỏ max-width 1040px và khoảng trắng thừa bên phải màn hình [FE-STORE] [worklog: docs/worklogs/2026-11-04_FE-STORE_AI_expand-pricing-grid-full-width.md].
 - Hợp nhất an toàn nhánh feature/store-owner-confige-management vào dev, giải quyết xung đột httpClient, authService, LoginPage, AppTopNav, Navbar và hoàn thiện build [worklog: docs/worklogs/2026-11-03_MERGE-DEV_AI_resolve-store-owner-config-merge.md].
 - Loại bỏ hoàn toàn mục và tab **"Bản xác nhận dịch vụ"** khỏi thanh điều hướng bên trái và trang Hub Cài đặt gian hàng (`StoreSettingsHubPage`) [worklog: docs/worklogs/2026-11-03_FE-STORE_AI_remove-service-confirmation-tab.md].

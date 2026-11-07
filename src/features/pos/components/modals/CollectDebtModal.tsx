@@ -148,6 +148,27 @@ export const CollectDebtModal: FC<Props> = ({
             </div>
           </div>
 
+          {remainingDebt <= 0 && (
+            <div
+              style={{
+                padding: '10px 14px',
+                borderRadius: 6,
+                backgroundColor: '#ecfdf5',
+                border: '1px solid #a7f3d0',
+                color: '#065f46',
+                marginBottom: 14,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                fontSize: 13,
+                fontWeight: 600,
+              }}
+            >
+              <CheckCircle2 size={18} color="#059669" />
+              <span>Hóa đơn này đã được tất toán toàn bộ nợ. Hiện không còn nợ cần thu!</span>
+            </div>
+          )}
+
           <form onSubmit={handleSubmit}>
             {/* Nhập số tiền thu */}
             <div style={{ marginBottom: 14 }}>
@@ -156,14 +177,15 @@ export const CollectDebtModal: FC<Props> = ({
                 <button
                   type="button"
                   onClick={handleFullPayment}
+                  disabled={remainingDebt <= 0}
                   style={{
                     fontSize: 11.5,
                     padding: '2px 8px',
                     borderRadius: 4,
                     border: '1px solid #93c5fd',
-                    backgroundColor: '#eff6ff',
-                    color: '#1d4ed8',
-                    cursor: 'pointer',
+                    backgroundColor: remainingDebt <= 0 ? '#f1f5f9' : '#eff6ff',
+                    color: remainingDebt <= 0 ? '#94a3b8' : '#1d4ed8',
+                    cursor: remainingDebt <= 0 ? 'not-allowed' : 'pointer',
                     fontWeight: 600,
                   }}
                 >
@@ -181,11 +203,13 @@ export const CollectDebtModal: FC<Props> = ({
                     paddingRight: 40,
                     fontSize: 16,
                     fontWeight: 700,
-                    color: '#0f172a',
+                    color: remainingDebt <= 0 ? '#94a3b8' : '#0f172a',
+                    backgroundColor: remainingDebt <= 0 ? '#f8fafc' : undefined,
                   }}
-                  min={1000}
-                  max={remainingDebt}
-                  required
+                  min={remainingDebt > 0 ? Math.min(1000, remainingDebt) : undefined}
+                  max={remainingDebt > 0 ? remainingDebt : undefined}
+                  disabled={remainingDebt <= 0}
+                  required={remainingDebt > 0}
                 />
                 <span
                   style={{
@@ -346,14 +370,15 @@ export const CollectDebtModal: FC<Props> = ({
               </button>
               <button
                 type="submit"
+                disabled={remainingDebt <= 0 || payAmount <= 0}
                 className="pos-btn"
                 style={{
                   padding: '8px 20px',
-                  backgroundColor: '#16a34a',
+                  backgroundColor: remainingDebt <= 0 ? '#94a3b8' : '#16a34a',
                   color: '#ffffff',
                   border: 'none',
                   borderRadius: 6,
-                  cursor: 'pointer',
+                  cursor: remainingDebt <= 0 ? 'not-allowed' : 'pointer',
                   fontWeight: 700,
                   display: 'flex',
                   alignItems: 'center',
@@ -361,7 +386,11 @@ export const CollectDebtModal: FC<Props> = ({
                 }}
               >
                 <CheckCircle2 size={16} />
-                <span>Xác Nhận Thu Nợ ({payAmount.toLocaleString('vi-VN')} đ)</span>
+                <span>
+                  {remainingDebt <= 0
+                    ? 'Đã Tất Toán Nợ'
+                    : `Xác Nhận Thu Nợ (${payAmount.toLocaleString('vi-VN')} đ)`}
+                </span>
               </button>
             </div>
           </form>
