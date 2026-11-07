@@ -1,39 +1,57 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   Search,
-  MapPin,
-  QrCode,
   ClipboardCheck,
-  Download,
   Check,
-  AlertTriangle,
   Clock,
-  Smartphone,
+  RefreshCw,
+  AlertCircle,
+  Building2,
+  ChevronDown,
+  X,
 } from 'lucide-react';
-import type { AttendanceRecord, ApprovalRequest } from '../types';
-import {
-  MOCK_WORK_SHIFTS,
-  MOCK_ATTENDANCE_RECORDS,
-  MOCK_APPROVAL_REQUESTS,
-} from '../services/mockData';
+import type { AttendanceRecord, ApprovalRequest, Branch } from '../types';
+import { scheduleApi, getShiftColor, type ScheduleResponse } from '../api/scheduleApi';
+import { shiftConfigApi, type ShiftConfigDto } from '../api/shiftConfigApi';
+import { employeeApi } from '../api/employeeApi';
 import { AttendanceDetailModal } from '../components/AttendanceDetailModal';
 import { ApprovalRequestsModal } from '../components/ApprovalRequestsModal';
-import { GpsLocationsModal } from '../components/GpsLocationsModal';
 import '../employee.css';
 
+interface ShiftRowItem {
+  id: string;
+  code?: string;
+  name: string;
+  startTime: string;
+  endTime: string;
+  color: string;
+}
+
+const DAY_KEYS: Array<'CN' | 'T2' | 'T3' | 'T4' | 'T5' | 'T6' | 'T7'> = [
+  'CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'
+];
+
 const getWeekDates = (offsetWeeks: number) => {
-  // Mốc mặc định: Thứ Hai 14/10/2026 (Tuần 3 - Th. 10 2026)
-  const baseMonday = new Date(2026, 9, 14);
+  const now = new Date();
+  const currentDay = now.getDay();
+  const distanceToMonday = (currentDay + 6) % 7;
+  const baseMonday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - distanceToMonday);
+
   const monday = new Date(baseMonday);
   monday.setDate(baseMonday.getDate() + offsetWeeks * 7);
 
-  // Tính tuần trong tháng
-  const firstDay = new Date(monday.getFullYear(), monday.getMonth(), 1);
-  const firstDayOffset = (firstDay.getDay() + 6) % 7; // Thứ 2 là 0, CN là 6
-  const weekNumber = Math.ceil((monday.getDate() + firstDayOffset) / 7);
-  const month = monday.getMonth() + 1;
-  const year = monday.getFullYear();
-  const label = `Tuần ${weekNumber} - Th. ${month} ${year}`;
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+
+  const fromDd = String(monday.getDate()).padStart(2, '0');
+  const fromMm = String(monday.getMonth() + 1).padStart(2, '0');
+  const fromYyyy = monday.getFullYear();
+
+  const toDd = String(sunday.getDate()).padStart(2, '0');
+  const toMm = String(sunday.getMonth() + 1).padStart(2, '0');
+  const toYyyy = sunday.getFullYear();
+
+  const label = `${fromDd}/${fromMm}/${fromYyyy} - ${toDd}/${toMm}/${toYyyy}`;
 
   const dayKeys: Array<'T2' | 'T3' | 'T4' | 'T5' | 'T6' | 'T7' | 'CN'> = [
     'T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN',
@@ -43,24 +61,184 @@ const getWeekDates = (offsetWeeks: number) => {
   const days = dayKeys.map((key, index) => {
     const cur = new Date(monday);
     cur.setDate(monday.getDate() + index);
+    const isToday =
+      cur.getFullYear() === now.getFullYear() &&
+      cur.getMonth() === now.getMonth() &&
+      cur.getDate() === now.getDate();
+
+    const yyyy = cur.getFullYear();
+    const mm = String(cur.getMonth() + 1).padStart(2, '0');
+    const dd = String(cur.getDate()).padStart(2, '0');
+    const dateIso = `${yyyy}-${mm}-${dd}`;
+    const dateDisplay = `${dd}/${mm}`;
+
     return {
       key,
       label: dayNames[index],
       date: cur.getDate(),
-      isToday: offsetWeeks === 0 && key === 'T6',
+      dateStr: dateDisplay,
+      dateIso,
+      isToday,
+      fullDate: cur,
     };
   });
 
-  return { label, days };
+  const fromDateIso = `${fromYyyy}-${fromMm}-${fromDd}`;
+  const toDateIso = `${toYyyy}-${toMm}-${toDd}`;
+
+  return { label, days, monday, sunday, fromDateIso, toDateIso };
+};
+
+const formatTime = (isoOrTime?: string | null): string | undefined => {
+  if (!isoOrTime) return undefined;
+  if (isoOrTime.includes('T')) {
+    const parts = isoOrTime.split('T')[1];
+    return parts ? parts.substring(0, 5) : undefined;
+  }
+  if (isoOrTime.includes(':')) {
+    return isoOrTime.substring(0, 5);
+  }
+  return isoOrTime;
+};
+
+const mapScheduleToAttendanceRecord = (s: ScheduleResponse): AttendanceRecord => {
+  const d = new Date(s.workDate);
+  const dayOfWeek = DAY_KEYS[d.getDay()] || 'T2';
+  const dd = String(d.getDate()).padStart(2, '0');
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dateStr = `${dd}/${mm}`;
+
+  const checkInTime = formatTime(s.checkInTime);
+  const checkOutTime = formatTime(s.checkOutTime);
+
+  // Status mapping
+  let status: AttendanceRecord['status'] = 'not_checked';
+  if (s.status === 'Cancelled') {
+    status = 'absent';
+  } else if (s.checkInTime && !s.checkOutTime) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const scheduleDate = new Date(s.workDate);
+    scheduleDate.setHours(0, 0, 0, 0);
+    if (scheduleDate < today) {
+      status = 'missing'; // Chấm công thiếu
+    } else if (s.lateMinutes > 0) {
+      status = 'late';
+    } else {
+      status = 'ontime';
+    }
+  } else if (s.lateMinutes > 0) {
+    status = 'late';
+  } else if (s.earlyLeaveMinutes > 0) {
+    status = 'early';
+  } else if (s.checkInTime) {
+    status = 'ontime';
+  } else {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const scheduleDate = new Date(s.workDate);
+    scheduleDate.setHours(0, 0, 0, 0);
+    if (scheduleDate < today) {
+      status = 'absent';
+    } else {
+      status = 'not_checked';
+    }
+  }
+
+  const workDateIso = s.workDate ? s.workDate.substring(0, 10) : '';
+
+  return {
+    id: s.id,
+    employeeId: s.employeeId,
+    employeeName: s.employeeName || 'Nhân viên',
+    employeeCode: s.employeeCode || '',
+    avatarUrl: s.employeeAvatarUrl || undefined,
+    shiftId: s.shiftConfigId || s.shiftCode || s.shiftName,
+    shiftConfigId: s.shiftConfigId || undefined,
+    shiftCode: s.shiftCode || '',
+    shiftName: s.shiftName || 'Ca làm việc',
+    dayOfWeek,
+    dateStr,
+    workDateIso,
+    branchId: s.branchId,
+    branchName: s.branchName || 'Chi nhánh',
+    checkInTime,
+    checkOutTime,
+    plannedStartTime: formatTime(s.plannedStartTime),
+    plannedEndTime: formatTime(s.plannedEndTime),
+    status,
+    lateMinutes: s.lateMinutes || 0,
+    workHours: s.actualWorkHours > 0 ? s.actualWorkHours : (s.durationHours || 0),
+    gpsLocation: s.branchName || 'Chi nhánh',
+    deviceInfo: s.checkInMethod || (s.checkInFaceImageUrl ? 'Khuôn mặt (FaceID)' : 'QR Code / GPS'),
+    approvalStatus: String(s.approvalStatus ?? ''),
+    note: s.approvalReason || undefined,
+  };
 };
 
 export const AttendancePage: React.FC = () => {
-  const [records, setRecords] = useState<AttendanceRecord[]>(MOCK_ATTENDANCE_RECORDS);
-  const [shifts] = useState(MOCK_WORK_SHIFTS);
-  const [approvalRequests, setApprovalRequests] = useState<ApprovalRequest[]>(MOCK_APPROVAL_REQUESTS);
+  // Backend data states
+  const [records, setRecords] = useState<AttendanceRecord[]>([]);
+  const [shifts, setShifts] = useState<ShiftRowItem[]>([]);
+  const [approvalRequests, setApprovalRequests] = useState<ApprovalRequest[]>([]);
+  const [branches, setBranches] = useState<Branch[]>([]);
 
+  // Branch multi-select dropdown states (giống WorkSchedulePage)
+  const [selectedBranchIds, setSelectedBranchIds] = useState<string[]>([]);
+  const [isBranchDropdownOpen, setIsBranchDropdownOpen] = useState(false);
+  const [branchSearchKeyword, setBranchSearchKeyword] = useState('');
+  const branchDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Click outside to close branch dropdown
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        branchDropdownRef.current &&
+        !branchDropdownRef.current.contains(event.target as Node)
+      ) {
+        setIsBranchDropdownOpen(false);
+      }
+    };
+
+    if (isBranchDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isBranchDropdownOpen]);
+
+  const filteredBranches = useMemo(() => {
+    return branches.filter((b) =>
+      b.name.toLowerCase().includes(branchSearchKeyword.toLowerCase())
+    );
+  }, [branches, branchSearchKeyword]);
+
+  const handleBranchToggle = (branchId: string) => {
+    setSelectedBranchIds((prev) =>
+      prev.includes(branchId) ? prev.filter((id) => id !== branchId) : [...prev, branchId]
+    );
+  };
+
+  const handleRemoveBranchTag = (e: React.MouseEvent, branchId: string) => {
+    e.stopPropagation();
+    setSelectedBranchIds((prev) => prev.filter((id) => id !== branchId));
+  };
+
+  const handleSelectAllBranches = () => {
+    setSelectedBranchIds(branches.map((b) => b.id));
+  };
+
+  const handleClearAllBranches = () => {
+    setSelectedBranchIds([]);
+  };
+
+  // Loading & error states
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Filters & Navigation
   const [searchEmployee, setSearchEmployee] = useState('');
-  const [periodType, setPeriodType] = useState<'week' | 'month'>('week');
   const [weekOffset, setWeekOffset] = useState(0);
 
   const weekData = useMemo(() => getWeekDates(weekOffset), [weekOffset]);
@@ -68,18 +246,145 @@ export const AttendancePage: React.FC = () => {
 
   const handlePrevWeek = () => setWeekOffset((prev) => prev - 1);
   const handleNextWeek = () => setWeekOffset((prev) => prev + 1);
+  const handleCurrentWeek = () => setWeekOffset(0);
 
   // Modals state
   const [selectedRecord, setSelectedRecord] = useState<AttendanceRecord | null>(null);
   const [showApprovalModal, setShowApprovalModal] = useState(false);
-  const [showQrModal, setShowQrModal] = useState(false);
-  const [showGpsModal, setShowGpsModal] = useState(false);
 
-  const filteredRecords = records.filter((r) =>
-    r.employeeName.toLowerCase().includes(searchEmployee.toLowerCase()) ||
-    r.employeeCode.toLowerCase().includes(searchEmployee.toLowerCase())
-  );
+  // 1. Fetch danh sách chi nhánh (chạy 1 lần khi mount)
+  useEffect(() => {
+    let isMounted = true;
+    employeeApi.getBranches().then((branchList) => {
+      if (isMounted && branchList && branchList.length > 0) {
+        setBranches(branchList);
+      }
+    }).catch(() => {
+      // Ignored
+    });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
+  // 2. Fetch ca làm việc (ShiftConfigs) và Lịch/Chấm công (Schedules) thực tế từ backend
+  const fetchAttendanceData = useCallback(async () => {
+    setIsLoading(true);
+    setErrorMessage(null);
+
+    try {
+      // Lấy danh sách cấu hình ca làm việc
+      const shiftConfigsPromise = shiftConfigApi.getShiftConfigsPaged({
+        page: 1,
+        pageSize: 100,
+        isActive: true,
+        branchId: selectedBranchIds.length === 1 ? selectedBranchIds[0] : undefined,
+        branchIds: selectedBranchIds.length > 1 ? selectedBranchIds : undefined,
+      }).catch((err) => {
+        console.warn('Lỗi khi tải cấu hình ca:', err);
+        return { items: [] as ShiftConfigDto[], totalItems: 0, page: 1, pageSize: 100 };
+      });
+
+      // Lấy danh sách lịch & chấm công theo tuần
+      const schedulesPromise = scheduleApi.getRawSchedules({
+        fromDate: weekData.fromDateIso,
+        toDate: weekData.toDateIso,
+        branchId: selectedBranchIds.length === 1 ? selectedBranchIds[0] : undefined,
+        pageSize: 1000,
+      });
+
+      const [shiftRes, rawSchedulesData] = await Promise.all([shiftConfigsPromise, schedulesPromise]);
+
+      let rawSchedules = rawSchedulesData;
+      if (selectedBranchIds.length > 1) {
+        rawSchedules = rawSchedules.filter((s) => selectedBranchIds.includes(s.branchId));
+      }
+
+      // Map danh sách ca làm việc
+      const shiftRows: ShiftRowItem[] = (shiftRes.items || []).map((sc) => ({
+        id: sc.id,
+        code: sc.shiftCode,
+        name: sc.shiftName,
+        startTime: sc.startTime ? sc.startTime.substring(0, 5) : '00:00',
+        endTime: sc.endTime ? sc.endTime.substring(0, 5) : '00:00',
+        color: getShiftColor(sc.shiftName || sc.shiftCode),
+      }));
+
+      // Bổ sung các ca phát sinh từ schedules nếu chưa có trong danh sách cấu hình
+      const existingShiftKeys = new Set(shiftRows.map((s) => s.id));
+      rawSchedules.forEach((s) => {
+        const key = s.shiftConfigId || s.shiftCode || s.shiftName;
+        if (key && !existingShiftKeys.has(key) && !shiftRows.some((item) => item.name === s.shiftName)) {
+          shiftRows.push({
+            id: key,
+            code: s.shiftCode,
+            name: s.shiftName || 'Ca làm việc',
+            startTime: s.plannedStartTime ? s.plannedStartTime.substring(0, 5) : '00:00',
+            endTime: s.plannedEndTime ? s.plannedEndTime.substring(0, 5) : '00:00',
+            color: getShiftColor(s.shiftName || s.shiftCode),
+          });
+          existingShiftKeys.add(key);
+        }
+      });
+
+      setShifts(shiftRows);
+
+      // Map danh sách chấm công
+      const mappedRecords: AttendanceRecord[] = rawSchedules.map(mapScheduleToAttendanceRecord);
+      setRecords(mappedRecords);
+
+      // Map yêu cầu duyệt chấm công
+      const pendingRequests: ApprovalRequest[] = rawSchedules
+        .filter(
+          (s) =>
+            s.approvalStatus === 'Pending' ||
+            (s.approvalStatus as unknown) === 1 ||
+            String(s.approvalStatus).toLowerCase() === 'pending'
+        )
+        .map((s) => ({
+          id: s.id,
+          type: 'attendance',
+          employeeId: s.employeeId,
+          employeeName: s.employeeName || 'Nhân viên',
+          avatarUrl: s.employeeAvatarUrl || undefined,
+          branchName: s.branchName || 'Chi nhánh',
+          title: s.approvalType || 'Yêu cầu duyệt công',
+          description:
+            s.approvalReason ||
+            `Chấm công ca ${s.shiftName} (${s.workDate ? s.workDate.substring(0, 10) : ''})`,
+          createdAt: s.createdAt || new Date().toISOString(),
+          status: 'pending',
+        }));
+      setApprovalRequests(pendingRequests);
+    } catch (error: any) {
+      console.error('Lỗi khi tải dữ liệu chấm công từ backend:', error);
+      setErrorMessage(
+        error?.message || 'Không thể tải dữ liệu điểm danh từ máy chủ. Vui lòng kiểm tra kết nối API.'
+      );
+      setRecords([]);
+      setShifts([]);
+      setApprovalRequests([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [weekData.fromDateIso, weekData.toDateIso, selectedBranchIds]);
+
+  useEffect(() => {
+    fetchAttendanceData();
+  }, [fetchAttendanceData]);
+
+  // Client-side filtering by employee name or code
+  const filteredRecords = useMemo(() => {
+    if (!searchEmployee.trim()) return records;
+    const lower = searchEmployee.toLowerCase().trim();
+    return records.filter(
+      (r) =>
+        r.employeeName.toLowerCase().includes(lower) ||
+        r.employeeCode.toLowerCase().includes(lower)
+    );
+  }, [records, searchEmployee]);
+
+  // Cập nhật trạng thái thủ công từ modal chi tiết
   const handleUpdateRecordStatus = (recordId: string, newStatus: AttendanceRecord['status']) => {
     setRecords((prev) =>
       prev.map((r) => (r.id === recordId ? { ...r, status: newStatus } : r))
@@ -93,7 +398,11 @@ export const AttendancePage: React.FC = () => {
     setApprovalRequests((prev) =>
       prev.map((r) => (ids.includes(r.id) ? { ...r, status: 'approved' } : r))
     );
-    alert(`Đã duyệt ${ids.length} yêu cầu thành công!`);
+    // Đồng bộ lại trạng thái của các record được duyệt
+    setRecords((prev) =>
+      prev.map((r) => (ids.includes(r.id) ? { ...r, status: 'ontime' } : r))
+    );
+    alert(`Đã duyệt ${ids.length} yêu cầu chấm công thành công!`);
   };
 
   const handleRejectRequests = (ids: string[]) => {
@@ -110,13 +419,32 @@ export const AttendancePage: React.FC = () => {
   return (
     <div className="emp-page-container">
       {/* ─── HEADER BAR ─── */}
-      <div>
-        <h2 className="emp-header-title">
-          <span>Bảng chấm công</span>
-        </h2>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+        <div>
+          <h2 className="emp-header-title" style={{ margin: 0 }}>
+            <span>Bảng chấm công</span>
+          </h2>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <button
+            type="button"
+            className="emp-btn emp-btn-secondary"
+            onClick={fetchAttendanceData}
+            disabled={isLoading}
+            title="Tải lại dữ liệu"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+          >
+            <RefreshCw size={15} className={isLoading ? 'emp-spin' : ''} />
+            <span>Tải lại</span>
+          </button>
+        </div>
       </div>
-      <div className="emp-header-bar">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+
+      {/* ─── TOOLBAR & FILTERS ─── */}
+      <div className="emp-header-bar" style={{ flexWrap: 'wrap', gap: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          {/* Tìm kiếm */}
           <div className="emp-search-box" style={{ width: 220 }}>
             <span className="emp-search-icon">
               <Search size={16} />
@@ -129,15 +457,334 @@ export const AttendancePage: React.FC = () => {
             />
           </div>
 
-          <select
-            className="emp-filter-select"
-            style={{ width: 130 }}
-            value={periodType}
-            onChange={(e) => setPeriodType(e.target.value as 'week' | 'month')}
-          >
-            <option value="week">Theo tuần</option>
-            <option value="month">Theo tháng</option>
-          </select>
+          {/* Lọc Chi nhánh làm việc (Searchable Multi-Select Dropdown giống WorkSchedulePage) */}
+          <div ref={branchDropdownRef} style={{ position: 'relative', minWidth: 240, maxWidth: 360 }}>
+            <div
+              onClick={() => setIsBranchDropdownOpen((prev) => !prev)}
+              style={{
+                height: 40,
+                padding: '4px 10px',
+                border: `1px solid ${isBranchDropdownOpen ? '#0F766E' : '#CBD5E1'}`,
+                borderRadius: 8,
+                background: '#FFFFFF',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 8,
+                transition: 'all 0.15s ease',
+                boxShadow: isBranchDropdownOpen ? '0 0 0 3px rgba(15, 118, 110, 0.15)' : 'none',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'nowrap', overflow: 'hidden', flex: 1 }}>
+                <Building2 size={16} color="#64748B" style={{ flexShrink: 0 }} />
+
+                {selectedBranchIds.length === 0 ? (
+                  <span style={{ color: '#475569', fontSize: 13, whiteSpace: 'nowrap' }}>
+                    Tất cả chi nhánh ({branches.length})
+                  </span>
+                ) : selectedBranchIds.length === branches.length && branches.length > 1 ? (
+                  <span
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      padding: '2px 8px',
+                      borderRadius: 6,
+                      fontSize: 12,
+                      fontWeight: 600,
+                      background: '#F0FDFA',
+                      color: '#0F766E',
+                      border: '1px solid #99F6E4',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    Tất cả chi nhánh ({branches.length})
+                  </span>
+                ) : (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, overflow: 'hidden' }}>
+                    {branches
+                      .filter((b) => selectedBranchIds.includes(b.id))
+                      .slice(0, 1)
+                      .map((b) => (
+                        <span
+                          key={b.id}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 4,
+                            padding: '2px 8px',
+                            borderRadius: 6,
+                            fontSize: 12,
+                            fontWeight: 500,
+                            background: '#F0FDFA',
+                            color: '#0F766E',
+                            border: '1px solid #99F6E4',
+                            whiteSpace: 'nowrap',
+                            maxWidth: 150,
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                          }}
+                        >
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{b.name}</span>
+                          <span
+                            onClick={(e) => handleRemoveBranchTag(e, b.id)}
+                            title="Gỡ chi nhánh"
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              cursor: 'pointer',
+                              borderRadius: '50%',
+                              width: 14,
+                              height: 14,
+                              color: '#0F766E',
+                              fontWeight: 700,
+                              flexShrink: 0,
+                            }}
+                          >
+                            <X size={11} />
+                          </span>
+                        </span>
+                      ))}
+                    {selectedBranchIds.length > 1 && (
+                      <span
+                        style={{
+                          padding: '2px 6px',
+                          borderRadius: 6,
+                          fontSize: 11,
+                          fontWeight: 600,
+                          background: '#F1F5F9',
+                          color: '#475569',
+                          whiteSpace: 'nowrap',
+                          flexShrink: 0,
+                        }}
+                      >
+                        +{selectedBranchIds.length - 1} khác
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#64748B', flexShrink: 0 }}>
+                <ChevronDown
+                  size={16}
+                  style={{
+                    transform: isBranchDropdownOpen ? 'rotate(180deg)' : 'none',
+                    transition: 'transform 0.2s ease',
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Dropdown Panel */}
+            {isBranchDropdownOpen && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '100%',
+                  left: 0,
+                  marginTop: 6,
+                  width: 320,
+                  background: '#FFFFFF',
+                  border: '1px solid #E2E8F0',
+                  borderRadius: 10,
+                  boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
+                  zIndex: 1000,
+                  overflow: 'hidden',
+                }}
+              >
+                {/* Search Input Bar */}
+                <div style={{ padding: '8px 10px', borderBottom: '1px solid #F1F5F9' }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      background: '#F8FAFC',
+                      border: '1px solid #E2E8F0',
+                      borderRadius: 6,
+                      padding: '5px 10px',
+                    }}
+                  >
+                    <Search size={14} color="#94A3B8" />
+                    <input
+                      type="text"
+                      value={branchSearchKeyword}
+                      onChange={(e) => setBranchSearchKeyword(e.target.value)}
+                      placeholder="Tìm kiếm chi nhánh theo tên..."
+                      style={{
+                        border: 'none',
+                        background: 'transparent',
+                        outline: 'none',
+                        width: '100%',
+                        fontSize: 13,
+                        color: '#1E293B',
+                      }}
+                      autoFocus
+                    />
+                    {branchSearchKeyword && (
+                      <button
+                        type="button"
+                        onClick={() => setBranchSearchKeyword('')}
+                        style={{
+                          border: 'none',
+                          background: 'transparent',
+                          cursor: 'pointer',
+                          color: '#94A3B8',
+                          padding: 0,
+                          display: 'flex',
+                        }}
+                      >
+                        <X size={14} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Quick Selection Actions */}
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    padding: '6px 12px',
+                    background: '#F8FAFC',
+                    borderBottom: '1px solid #F1F5F9',
+                    fontSize: 12,
+                  }}
+                >
+                  <span style={{ color: '#64748B' }}>
+                    Tìm thấy {filteredBranches.length} chi nhánh
+                  </span>
+                  <div style={{ display: 'flex', gap: 12 }}>
+                    <button
+                      type="button"
+                      onClick={handleSelectAllBranches}
+                      style={{
+                        border: 'none',
+                        background: 'transparent',
+                        color: '#0F766E',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        padding: 0,
+                        fontSize: 12,
+                      }}
+                    >
+                      Chọn tất cả ({branches.length})
+                    </button>
+                    <span style={{ color: '#CBD5E1' }}>|</span>
+                    <button
+                      type="button"
+                      onClick={handleClearAllBranches}
+                      style={{
+                        border: 'none',
+                        background: 'transparent',
+                        color: '#64748B',
+                        fontWeight: 500,
+                        cursor: 'pointer',
+                        padding: 0,
+                        fontSize: 12,
+                      }}
+                    >
+                      Bỏ chọn tất cả
+                    </button>
+                  </div>
+                </div>
+
+                {/* Branches List */}
+                <div style={{ maxHeight: 210, overflowY: 'auto', padding: '4px 0' }}>
+                  {filteredBranches.length ? (
+                    filteredBranches.map((b) => {
+                      const isChecked = selectedBranchIds.includes(b.id);
+                      return (
+                        <div
+                          key={b.id}
+                          onClick={() => handleBranchToggle(b.id)}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '8px 12px',
+                            cursor: 'pointer',
+                            background: isChecked ? '#F0FDFA' : 'transparent',
+                            transition: 'background 0.12s ease',
+                          }}
+                          onMouseEnter={(e) => {
+                            if (!isChecked) e.currentTarget.style.background = '#F8FAFC';
+                          }}
+                          onMouseLeave={(e) => {
+                            if (!isChecked) e.currentTarget.style.background = 'transparent';
+                          }}
+                        >
+                          <label
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 10,
+                              cursor: 'pointer',
+                              fontSize: 13,
+                              width: '100%',
+                            }}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={() => { }}
+                              style={{ accentColor: '#0F766E', width: 16, height: 16 }}
+                            />
+                            <span style={{ fontWeight: isChecked ? 600 : 400, color: isChecked ? '#134E4A' : '#1E293B' }}>
+                              {b.name}
+                            </span>
+                            {b.isMain && (
+                              <span
+                                style={{
+                                  fontSize: 10,
+                                  padding: '1px 6px',
+                                  borderRadius: 4,
+                                  background: '#E2E8F0',
+                                  color: '#475569',
+                                  fontWeight: 600,
+                                }}
+                              >
+                                Trụ sở
+                              </span>
+                            )}
+                          </label>
+
+                          {isChecked && <Check size={15} color="#0F766E" />}
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div style={{ padding: '16px 12px', textAlign: 'center', color: '#94A3B8', fontSize: 13 }}>
+                      Không tìm thấy chi nhánh nào phù hợp
+                    </div>
+                  )}
+                </div>
+
+                {/* Footer */}
+                <div
+                  style={{
+                    padding: '8px 12px',
+                    background: '#F8FAFC',
+                    borderTop: '1px solid #F1F5F9',
+                    display: 'flex',
+                    justifyContent: 'flex-end',
+                  }}
+                >
+                  <button
+                    type="button"
+                    className="emp-btn emp-btn-primary"
+                    style={{ height: 28, padding: '0 14px', fontSize: 12 }}
+                    onClick={() => setIsBranchDropdownOpen(false)}
+                  >
+                    Xong ({selectedBranchIds.length})
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* Điều hướng tuần */}
           <div className="emp-date-navigator">
@@ -149,7 +796,14 @@ export const AttendancePage: React.FC = () => {
             >
               &lt;
             </button>
-            <span className="emp-date-navigator-label">{weekData.label}</span>
+            <span
+              className="emp-date-navigator-label"
+              onClick={handleCurrentWeek}
+              style={{ cursor: 'pointer' }}
+              title="Nhấn để về tuần hiện tại"
+            >
+              {weekData.label}
+            </span>
             <button
               type="button"
               className="emp-date-navigator-btn"
@@ -159,29 +813,31 @@ export const AttendancePage: React.FC = () => {
               &gt;
             </button>
           </div>
+
+          {/* Nút Tuần này */}
+          <button
+            type="button"
+            className="emp-btn emp-btn-secondary"
+            onClick={handleCurrentWeek}
+            title="Quay về tuần hiện tại (Thứ Hai - Chủ Nhật)"
+            style={{
+              height: 36,
+              padding: '0 12px',
+              fontSize: 13,
+              fontWeight: 500,
+              color: weekOffset === 0 ? '#0F766E' : '#475569',
+              borderColor: weekOffset === 0 ? '#0F766E' : '#CBD5E1',
+              backgroundColor: weekOffset === 0 ? '#F0FDFA' : '#FFFFFF',
+              boxShadow: weekOffset === 0 ? '0 0 0 1px rgba(15, 118, 110, 0.2)' : 'none',
+              cursor: 'pointer',
+              transition: 'all 0.15s ease',
+            }}
+          >
+            Tuần này
+          </button>
         </div>
 
-        <div className="emp-header-actions">
-          <button
-            type="button"
-            className="emp-btn emp-btn-secondary"
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
-            onClick={() => setShowGpsModal(true)}
-          >
-            <MapPin size={15} />
-            <span>Địa chỉ GPS</span>
-          </button>
-
-          <button
-            type="button"
-            className="emp-btn emp-btn-secondary"
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
-            onClick={() => setShowQrModal(true)}
-          >
-            <QrCode size={15} />
-            <span>Mã QR GPS</span>
-          </button>
-
+        <div className="emp-header-actions" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <button
             type="button"
             className="emp-btn emp-btn-secondary emp-approval-btn"
@@ -194,137 +850,315 @@ export const AttendancePage: React.FC = () => {
               <span className="emp-pending-badge">{pendingAttendanceCount}</span>
             )}
           </button>
-
-          <button
-            type="button"
-            className="emp-btn emp-btn-primary"
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
-            onClick={() => alert('Xuất bảng chấm công ra file Excel')}
-          >
-            <Download size={15} />
-            <span>Xuất Excel</span>
-          </button>
         </div>
       </div>
 
-      {/* Ma trận bảng chấm công theo ca */}
-      <div className="emp-table-container">
-        <table className="emp-table">
-          <thead>
-            <tr>
-              <th style={{ width: 220 }}>Ca làm việc</th>
+      {/* Thông báo lỗi nếu có */}
+      {errorMessage && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            background: '#FEF2F2',
+            border: '1px solid #FECACA',
+            borderRadius: 8,
+            padding: '12px 16px',
+            marginBottom: 16,
+            color: '#B91C1C',
+            fontSize: 13,
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <AlertCircle size={18} />
+            <span>{errorMessage}</span>
+          </div>
+          <button
+            type="button"
+            className="emp-btn emp-btn-secondary"
+            style={{ fontSize: 12, padding: '4px 10px' }}
+            onClick={fetchAttendanceData}
+          >
+            Thử lại
+          </button>
+        </div>
+      )}
+
+      {/* ─── MA TRẬN BẢNG CHẤM CÔNG THEO CA VÀ NGÀY ─── */}
+      <div className="emp-table-container" style={{ overflowX: 'auto' }}>
+        {isLoading ? (
+          <div style={{ padding: 48, textAlign: 'center', color: '#64748B' }}>
+            <RefreshCw size={28} className="emp-spin" style={{ margin: '0 auto 12px', display: 'block', color: '#0F766E' }} />
+            <div style={{ fontWeight: 600 }}>Đang tải dữ liệu điểm danh thực tế từ máy chủ...</div>
+          </div>
+        ) : shifts.length === 0 && filteredRecords.length === 0 ? (
+          <div style={{ padding: 48, textAlign: 'center', color: '#64748B' }}>
+            <Clock size={36} style={{ margin: '0 auto 12px', display: 'block', color: '#CBD5E1' }} />
+            <div style={{ fontWeight: 700, fontSize: 15, color: '#0F172A' }}>
+              Không có dữ liệu ca làm việc hoặc chấm công
+            </div>
+            <p style={{ fontSize: 13, color: '#64748B', marginTop: 4 }}>
+              Không tìm thấy ca làm việc nào trong tuần này ({weekData.label}). Hãy phân ca trước tại mục &quot;Lịch làm việc&quot;.
+            </p>
+            <button
+              type="button"
+              className="emp-btn emp-btn-secondary"
+              style={{ marginTop: 12 }}
+              onClick={fetchAttendanceData}
+            >
+              Tải lại trang
+            </button>
+          </div>
+        ) : (
+          <table className="emp-table" style={{ tableLayout: 'fixed', width: '100%', minWidth: 1100 }}>
+            <colgroup>
+              <col style={{ width: 200 }} />
               {DAYS_HEADER.map((d) => (
-                <th
-                  key={d.key}
-                  style={{
-                    textAlign: 'center',
-                    background: d.isToday ? '#E0F2FE' : undefined,
-                    color: d.isToday ? '#0369A1' : undefined,
-                  }}
-                >
-                  <div>{d.label}</div>
-                  <div style={{ fontSize: 15, fontWeight: 700 }}>
-                    {d.date} {d.isToday && <small style={{ fontSize: 10, display: 'block' }}>(Hôm nay)</small>}
-                  </div>
-                </th>
+                <col key={d.key} style={{ width: 'calc((100% - 200px) / 7)' }} />
               ))}
-            </tr>
-          </thead>
-          <tbody>
-            {shifts.map((sh) => (
-              <tr key={sh.id} style={{ minHeight: 90 }}>
-                {/* Cột ca */}
-                <td style={{ verticalAlign: 'top', padding: 12 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span
-                      style={{
-                        width: 10,
-                        height: 10,
-                        borderRadius: 9999,
-                        background: sh.color,
-                        display: 'inline-block',
-                      }}
-                    />
-                    <span style={{ fontWeight: 700, color: '#0F172A' }}>{sh.name}</span>
-                  </div>
-                  <div style={{ fontSize: 12, color: '#0F766E', marginTop: 4 }}>
-                    {sh.startTime} - {sh.endTime}
-                  </div>
-                </td>
-
-                {/* 7 ngày trong tuần */}
-                {DAYS_HEADER.map((day) => {
-                  const dayRecords = filteredRecords.filter(
-                    (r) => r.shiftId === sh.id && r.dayOfWeek === day.key
-                  );
-
-                  return (
-                    <td
-                      key={day.key}
-                      style={{
-                        verticalAlign: 'top',
-                        padding: 8,
-                        background: day.isToday ? '#F0F9FF' : undefined,
-                      }}
-                    >
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                        {dayRecords.map((att) => (
-                          <div
-                            key={att.id}
-                            style={{
-                              background: '#FFFFFF',
-                              border: '1px solid #E2E8F0',
-                              borderRadius: 8,
-                              padding: '6px 8px',
-                              cursor: 'pointer',
-                              boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-                              transition: 'transform 0.15s ease',
-                            }}
-                            onClick={() => setSelectedRecord(att)}
-                            title="Bấm để xem chi tiết chấm công"
-                          >
-                            <div style={{ fontWeight: 600, fontSize: 12, color: '#0F172A' }}>
-                              {att.employeeName}
-                            </div>
-                            <div style={{ fontSize: 11, color: '#64748B', marginTop: 2 }}>
-                              {att.checkInTime ? `${att.checkInTime} - ${att.checkOutTime || '...'}` : 'Chưa check-in'}
-                            </div>
-                            <div style={{ marginTop: 4 }}>
-                              {att.status === 'ontime' && (
-                                <span style={{ fontSize: 10, color: '#059669', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
-                                  <Check size={11} />
-                                  <span>Đúng giờ</span>
-                                </span>
-                              )}
-                              {att.status === 'late' && (
-                                <span style={{ fontSize: 10, color: '#D97706', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
-                                  <AlertTriangle size={11} />
-                                  <span>Muộn {att.lateMinutes}p</span>
-                                </span>
-                              )}
-                              {att.status === 'early' && (
-                                <span style={{ fontSize: 10, color: '#B45309', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
-                                  <Clock size={11} />
-                                  <span>Về sớm</span>
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-
-                        {dayRecords.length === 0 && (
-                          <div style={{ fontSize: 11, color: '#CBD5E1', textAlign: 'center', padding: 8 }}>
-                            -
-                          </div>
-                        )}
-                      </div>
-                    </td>
-                  );
-                })}
+            </colgroup>
+            <thead>
+              <tr>
+                <th style={{ width: 200, textAlign: 'left' }}>Ca làm việc</th>
+                {DAYS_HEADER.map((d) => (
+                  <th
+                    key={d.key}
+                    style={{
+                      width: 'calc((100% - 200px) / 7)',
+                      textAlign: 'center',
+                      background: d.isToday ? '#E0F2FE' : undefined,
+                      color: d.isToday ? '#0369A1' : undefined,
+                    }}
+                  >
+                    <div>{d.label}</div>
+                    <div style={{ fontSize: 15, fontWeight: 700 }}>{d.date}</div>
+                  </th>
+                ))}
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {shifts.map((sh) => (
+                <tr key={sh.id} style={{ minHeight: 90 }}>
+                  {/* Cột thông tin Ca */}
+                  <td style={{ verticalAlign: 'top', padding: 12 }}>
+                    <div style={{ fontWeight: 700, color: '#0F172A' }}>{sh.name}</div>
+                    <div style={{ fontSize: 12, color: '#64748B', marginTop: 4 }}>
+                      {sh.startTime} - {sh.endTime}
+                    </div>
+                  </td>
+
+                  {/* 7 ngày trong tuần */}
+                  {DAYS_HEADER.map((day) => {
+                    const dayRecords = filteredRecords.filter((r) => {
+                      const matchDay = r.workDateIso ? r.workDateIso === day.dateIso : r.dayOfWeek === day.key;
+                      const matchShift =
+                        (r.shiftConfigId && r.shiftConfigId === sh.id) ||
+                        (r.shiftCode && sh.code && r.shiftCode.toLowerCase() === sh.code.toLowerCase()) ||
+                        (r.shiftName && sh.name && r.shiftName.toLowerCase() === sh.name.toLowerCase()) ||
+                        r.shiftId === sh.id;
+                      return matchDay && matchShift;
+                    });
+
+                    return (
+                      <td
+                        key={day.key}
+                        style={{
+                          verticalAlign: 'top',
+                          padding: 8,
+                          background: day.isToday ? '#F0F9FF' : undefined,
+                        }}
+                      >
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                          {dayRecords.map((att) => (
+                            <div
+                              key={att.id}
+                              style={{
+                                background: '#FFFFFF',
+                                border: '1px solid #E2E8F0',
+                                borderRadius: 8,
+                                padding: '6px 8px',
+                                cursor: 'pointer',
+                                boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                                transition: 'all 0.15s ease',
+                              }}
+                              onClick={() => setSelectedRecord(att)}
+                              title="Bấm để xem chi tiết chấm công"
+                            >
+                              <div style={{ fontWeight: 600, fontSize: 12, color: '#0F172A' }}>
+                                {att.employeeName}
+                              </div>
+                              <div style={{ fontSize: 11, color: '#64748B', marginTop: 2 }}>
+                                {att.checkInTime ? `${att.checkInTime} - ${att.checkOutTime || '...'}` : 'Chưa check-in'}
+                              </div>
+                              <div style={{ marginTop: 4 }}>
+                                {att.status === 'ontime' && (
+                                  <span style={{ fontSize: 11, color: '#2563EB', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                                    <span style={{ width: 13, height: 13, borderRadius: '50%', background: '#2563EB', color: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                                      <Check size={9} strokeWidth={3} />
+                                    </span>
+                                    <span>Đúng giờ</span>
+                                  </span>
+                                )}
+                                {(att.status === 'late' || att.status === 'early') && (
+                                  <span style={{ fontSize: 11, color: '#9333EA', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                                    <span style={{ width: 13, height: 13, borderRadius: '50%', background: '#A855F7', color: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                                      <Check size={9} strokeWidth={3} />
+                                    </span>
+                                    <span>{att.status === 'late' ? `Muộn ${att.lateMinutes}p` : 'Về sớm'}</span>
+                                  </span>
+                                )}
+                                {att.status === 'missing' && (
+                                  <span style={{ fontSize: 11, color: '#DC2626', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                                    <span style={{ width: 13, height: 13, borderRadius: '50%', background: '#EF4444', color: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                                      <Check size={9} strokeWidth={3} />
+                                    </span>
+                                    <span>Chấm công thiếu</span>
+                                  </span>
+                                )}
+                                {att.status === 'not_checked' && (
+                                  <span style={{ fontSize: 11, color: '#EA580C', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                                    <span style={{ width: 13, height: 13, borderRadius: '50%', background: '#F97316', color: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                                      <Check size={9} strokeWidth={3} />
+                                    </span>
+                                    <span>Chưa chấm công</span>
+                                  </span>
+                                )}
+                                {att.status === 'absent' && (
+                                  <span style={{ fontSize: 11, color: '#64748B', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                                    <span style={{ width: 13, height: 13, borderRadius: '50%', background: '#94A3B8', color: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                                      <Check size={9} strokeWidth={3} />
+                                    </span>
+                                    <span>Nghỉ làm</span>
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+
+                          {dayRecords.length === 0 && (
+                            <div style={{ fontSize: 11, color: '#CBD5E1', textAlign: 'center', padding: 8 }}>
+                              -
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {/* ─── CHÚ THÍCH TRẠNG THÁI CHẤM CÔNG (LEGEND) ─── */}
+      <div style={{ display: 'flex', justifyContent: 'flex-start', marginTop: 16 }}>
+        <div
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 28,
+            background: '#FFFFFF',
+            border: '1px solid #E2E8F0',
+            borderRadius: 9999,
+            padding: '8px 24px',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+            fontSize: 13,
+            color: '#334155',
+            flexWrap: 'wrap',
+          }}
+        >
+          {/* Đúng giờ */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span
+              style={{
+                width: 8,
+                height: 8,
+                borderRadius: '50%',
+                background: '#1677FF',
+                display: 'inline-block',
+                flexShrink: 0,
+              }}
+            />
+            <span style={{ fontWeight: 500 }}>Đúng giờ</span>
+          </div>
+
+          {/* Đi muộn / Về sớm */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span
+              style={{
+                width: 17,
+                height: 17,
+                borderRadius: '50%',
+                background: '#A855F7',
+                color: '#FFFFFF',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Check size={11} strokeWidth={3} />
+            </span>
+            <span style={{ fontWeight: 500 }}>Đi muộn / Về sớm</span>
+          </div>
+
+          {/* Chấm công thiếu */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span
+              style={{
+                width: 17,
+                height: 17,
+                borderRadius: '50%',
+                background: '#EF4444',
+                color: '#FFFFFF',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Check size={11} strokeWidth={3} />
+            </span>
+            <span style={{ fontWeight: 500 }}>Chấm công thiếu</span>
+          </div>
+
+          {/* Chưa chấm công */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span
+              style={{
+                width: 17,
+                height: 17,
+                borderRadius: '50%',
+                background: '#F97316',
+                color: '#FFFFFF',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Check size={11} strokeWidth={3} />
+            </span>
+            <span style={{ fontWeight: 500 }}>Chưa chấm công</span>
+          </div>
+
+          {/* Nghỉ làm */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span
+              style={{
+                width: 17,
+                height: 17,
+                borderRadius: '50%',
+                background: '#94A3B8',
+                color: '#FFFFFF',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Check size={11} strokeWidth={3} />
+            </span>
+            <span style={{ fontWeight: 500 }}>Nghỉ làm</span>
+          </div>
+        </div>
       </div>
 
       {/* Modal chi tiết chấm công */}
@@ -333,6 +1167,7 @@ export const AttendancePage: React.FC = () => {
         onClose={() => setSelectedRecord(null)}
         record={selectedRecord}
         onUpdateStatus={handleUpdateRecordStatus}
+        onSaved={fetchAttendanceData}
       />
 
       {/* Modal Duyệt chấm công */}
@@ -342,53 +1177,6 @@ export const AttendancePage: React.FC = () => {
         requests={approvalRequests}
         onApprove={handleApproveRequests}
         onReject={handleRejectRequests}
-      />
-
-      {/* Popup Mã QR Check-in */}
-      {showQrModal && (
-        <div className="emp-modal-overlay">
-          <div className="emp-modal-card" style={{ maxWidth: 420, textAlign: 'center' }}>
-            <div className="emp-modal-header">
-              <h3>Mã QR Check-in Nhân viên</h3>
-              <button type="button" className="emp-modal-close-btn" onClick={() => setShowQrModal(false)}>
-                &times;
-              </button>
-            </div>
-            <div className="emp-modal-body" style={{ padding: 24 }}>
-              <div
-                style={{
-                  width: 200,
-                  height: 200,
-                  margin: '0 auto',
-                  background: '#F8FAFC',
-                  border: '2px solid #0F766E',
-                  borderRadius: 16,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <Smartphone size={64} color="#0F766E" />
-              </div>
-              <p style={{ marginTop: 16, fontSize: 13, color: '#475569' }}>
-                Quét mã QR bằng ứng dụng nhân viên khi có mặt tại cửa hàng để ghi nhận chấm công tự động.
-              </p>
-              <div style={{ fontWeight: 700, color: '#0F766E', fontSize: 14 }}>
-                Chi nhánh trung tâm - Bán kính: 200m
-              </div>
-            </div>
-            <div className="emp-modal-footer">
-              <button type="button" className="emp-btn emp-btn-secondary" onClick={() => setShowQrModal(false)}>
-                Đóng
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-      {/* Popup Địa chỉ chấm công chuẩn theo hình ảnh */}
-      <GpsLocationsModal
-        isOpen={showGpsModal}
-        onClose={() => setShowGpsModal(false)}
       />
     </div>
   );

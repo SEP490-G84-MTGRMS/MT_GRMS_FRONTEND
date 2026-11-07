@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Check, Lightbulb, Banknote } from 'lucide-react';
+import { Copy, Check, CreditCard, Banknote } from 'lucide-react';
 import type { PayslipDetailedRecord } from '../types';
 
 interface PayslipPaymentModalProps {
@@ -9,7 +9,7 @@ interface PayslipPaymentModalProps {
   onConfirmPayment: (payslipId: string, paymentMethod: 'VIETQR' | 'CASH', notes?: string) => void;
 }
 
-// Chuyển đổi số tiền thành chữ tiếng Việt
+// Chuyển đổi số tiền thành chữ tiếng Việt chuẩn
 function numberToVietnameseWords(n: number): string {
   if (n === 0) return 'Không đồng';
   const units = ['', 'nghìn', 'triệu', 'tỷ', 'nghìn tỷ', 'triệu tỷ'];
@@ -75,13 +75,13 @@ export const PayslipPaymentModal: React.FC<PayslipPaymentModalProps> = ({
 
   const formatVND = (num?: number) => {
     if (num === undefined || num === null) return '0 đ';
-    return `${num.toLocaleString('vi-VN')} đ`;
+    return `${Math.round(num).toLocaleString('vi-VN')} đ`;
   };
 
-  const transferContent = `${payslip.id} LUONG ${payslip.periodMonth}`;
   const wordsAmount = numberToVietnameseWords(payslip.netSalary);
 
-  const handleCopy = (text: string) => {
+  const handleCopyAccount = (text: string) => {
+    if (!text) return;
     navigator.clipboard?.writeText(text);
     setIsCopied(true);
     setTimeout(() => setIsCopied(false), 2000);
@@ -95,15 +95,32 @@ export const PayslipPaymentModal: React.FC<PayslipPaymentModalProps> = ({
 
   return (
     <div className="emp-modal-overlay">
-      <div className="emp-modal-card" style={{ maxWidth: 820 }}>
+      <div className="emp-modal-card" style={{ maxWidth: 580 }}>
         {/* Header */}
-        <div className="emp-modal-header">
+        <div
+          className="emp-modal-header"
+          style={{
+            padding: '18px 24px',
+            borderBottom: '1px solid #E2E8F0',
+            background: '#FFFFFF',
+          }}
+        >
           <div>
-            <h3 style={{ margin: 0, color: '#0F766E' }}>Thanh toán Phiếu lương nhân viên</h3>
-            <div style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>
-              Xác nhận phương thức chi trả tiền lương và tự động ghi nhận bút toán chi quỹ.
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#0F172A' }}>
+                Xác nhận thanh toán lương
+              </h3>
+              <span style={{ fontSize: 13, color: '#64748B', fontWeight: 600 }}>
+                #{payslip.id}
+              </span>
+            </div>
+            <div style={{ fontSize: 12, color: '#64748B', marginTop: 3 }}>
+              Nhân viên: <strong style={{ color: '#1E293B' }}>{payslip.employeeName}</strong> ({payslip.employeeCode})
+              <span style={{ margin: '0 8px', color: '#CBD5E1' }}>•</span>
+              Kỳ lương: <strong style={{ color: '#1E293B' }}>{payslip.periodMonth}</strong>
             </div>
           </div>
+
           <button type="button" className="emp-modal-close-btn" onClick={onClose}>
             &times;
           </button>
@@ -111,66 +128,62 @@ export const PayslipPaymentModal: React.FC<PayslipPaymentModalProps> = ({
 
         {/* Form Body */}
         <form onSubmit={handleSubmit}>
-          <div className="emp-modal-body">
-            {/* 1. Tóm tắt thông tin thanh toán */}
-            <div className="emp-section-card" style={{ background: '#F8FAFC', border: '1px solid #CBD5E1' }}>
-              <div className="emp-section-title">1. Thông tin phiếu lương cần chi trả</div>
-              <div className="emp-grid-3" style={{ fontSize: 13, marginBottom: 16 }}>
-                <div>
-                  <span style={{ color: '#64748B' }}>Mã phiếu lương:</span>
-                  <div style={{ fontWeight: 700, color: '#0F766E' }}>{payslip.id}</div>
+          <div className="emp-modal-body" style={{ padding: '20px 24px', background: '#FAFAFA' }}>
+            {/* Khối tóm tắt số tiền chi trả */}
+            <div
+              style={{
+                background: '#FFFFFF',
+                border: '1px solid #E2E8F0',
+                borderRadius: 10,
+                padding: '14px 18px',
+                marginBottom: 16,
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+              }}
+            >
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  Số tiền thực chi
                 </div>
-                <div>
-                  <span style={{ color: '#64748B' }}>Kỳ lương:</span>
-                  <div style={{ fontWeight: 600 }}>{payslip.periodMonth}</div>
-                </div>
-                <div>
-                  <span style={{ color: '#64748B' }}>Nhân viên thụ hưởng:</span>
-                  <div style={{ fontWeight: 700, color: '#0F172A' }}>
-                    {payslip.employeeName} ({payslip.employeeCode})
-                  </div>
-                </div>
-                <div>
-                  <span style={{ color: '#64748B' }}>Chi nhánh:</span>
-                  <div style={{ fontWeight: 500 }}>{payslip.branchName || 'Chi nhánh trung tâm'}</div>
-                </div>
-                <div>
-                  <span style={{ color: '#64748B' }}>Công thực tế:</span>
-                  <div style={{ fontWeight: 600 }}>{payslip.workedDays} công ({payslip.otHours || 0}h OT)</div>
+                <div style={{ fontSize: 12, color: '#64748B', fontStyle: 'italic', marginTop: 2 }}>
+                  Bằng chữ: {wordsAmount}
                 </div>
               </div>
 
-              {/* Banner Số tiền */}
-              <div
-                style={{
-                  background: '#ECFDF5',
-                  border: '1.5px dashed #059669',
-                  borderRadius: 12,
-                  padding: '14px 20px',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                }}
-              >
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: '#065F46', textTransform: 'uppercase' }}>
-                    Số tiền thực nhận cần chi trả (NetSalary)
-                  </div>
-                  <div style={{ fontSize: 12, color: '#047857', fontStyle: 'italic', marginTop: 4 }}>
-                    Bằng chữ: {wordsAmount}
-                  </div>
-                </div>
-                <div style={{ fontSize: 26, fontWeight: 800, color: '#047857' }}>
-                  {formatVND(payslip.netSalary)}
-                </div>
+              <div style={{ fontSize: 24, fontWeight: 800, color: '#0F766E' }}>
+                {formatVND(payslip.netSalary)}
               </div>
             </div>
 
-            {/* 2. Phương thức thanh toán */}
-            <div className="emp-section-card">
-              <div className="emp-section-title">2. Lựa chọn phương thức thanh toán</div>
-              <div style={{ display: 'flex', gap: 24, marginBottom: 16 }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontWeight: 600 }}>
+            {/* Chọn phương thức thanh toán */}
+            <div
+              style={{
+                background: '#FFFFFF',
+                border: '1px solid #E2E8F0',
+                borderRadius: 10,
+                padding: '16px 18px',
+                marginBottom: 16,
+              }}
+            >
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#334155', marginBottom: 12 }}>
+                Phương thức thanh toán
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
+                <label
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 10,
+                    padding: '10px 14px',
+                    borderRadius: 8,
+                    border: `1.5px solid ${method === 'VIETQR' ? '#0F766E' : '#E2E8F0'}`,
+                    background: method === 'VIETQR' ? '#F0FDFA' : '#FFFFFF',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                  }}
+                >
                   <input
                     type="radio"
                     name="paymentMethod"
@@ -179,9 +192,25 @@ export const PayslipPaymentModal: React.FC<PayslipPaymentModalProps> = ({
                     onChange={() => setMethod('VIETQR')}
                     style={{ accentColor: '#0F766E' }}
                   />
-                  <span>Chuyển khoản nhanh VietQR / Ngân hàng (Khuyên dùng)</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, color: method === 'VIETQR' ? '#0F766E' : '#334155' }}>
+                    <CreditCard size={16} />
+                    <span>Chuyển khoản / QR</span>
+                  </div>
                 </label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontWeight: 600 }}>
+
+                <label
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 10,
+                    padding: '10px 14px',
+                    borderRadius: 8,
+                    border: `1.5px solid ${method === 'CASH' ? '#0F766E' : '#E2E8F0'}`,
+                    background: method === 'CASH' ? '#F0FDFA' : '#FFFFFF',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                  }}
+                >
                   <input
                     type="radio"
                     name="paymentMethod"
@@ -190,153 +219,102 @@ export const PayslipPaymentModal: React.FC<PayslipPaymentModalProps> = ({
                     onChange={() => setMethod('CASH')}
                     style={{ accentColor: '#0F766E' }}
                   />
-                  <span>Tiền mặt tại quầy (CASH)</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, color: method === 'CASH' ? '#0F766E' : '#334155' }}>
+                    <Banknote size={16} />
+                    <span>Tiền mặt</span>
+                  </div>
                 </label>
               </div>
 
-              {/* Panel VietQR */}
-              {method === 'VIETQR' && (
+              {/* Thông tin tài khoản Chuyển khoản / QR: CHỈ HIỂN THỊ ĐÚNG 3 DÒNG THEO YÊU CẦU */}
+              {method === 'VIETQR' ? (
                 <div
                   style={{
-                    display: 'grid',
-                    gridTemplateColumns: '220px 1fr',
-                    gap: 20,
-                    padding: 16,
-                    background: '#F0F9FF',
-                    border: '1px solid #BAE6FD',
-                    borderRadius: 12,
-                  }}
-                >
-                  {/* Mã QR giả lập */}
-                  <div
-                    style={{
-                      background: '#FFFFFF',
-                      border: '1px solid #0284C7',
-                      borderRadius: 12,
-                      padding: 12,
-                      textAlign: 'center',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    <div style={{ fontSize: 11, fontWeight: 700, color: '#0369A1', marginBottom: 8 }}>
-                      VIETQR &bull; NAPAS 247
-                    </div>
-                    {/* QR Code SVG / Box */}
-                    <div
-                      style={{
-                        width: 140,
-                        height: 140,
-                        background: '#0F172A',
-                        color: '#FFFFFF',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        borderRadius: 8,
-                        padding: 8,
-                      }}
-                    >
-                      <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                        <rect x="3" y="3" width="7" height="7"></rect>
-                        <rect x="14" y="3" width="7" height="7"></rect>
-                        <rect x="3" y="14" width="7" height="7"></rect>
-                        <rect x="14" y="14" width="3" height="3"></rect>
-                        <rect x="18" y="18" width="3" height="3"></rect>
-                      </svg>
-                      <span style={{ fontSize: 10, marginTop: 4, letterSpacing: 1 }}>QUÉT MÃ TRẢ LƯƠNG</span>
-                    </div>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: '#0284C7', marginTop: 8 }}>
-                      {formatVND(payslip.netSalary)}
-                    </div>
-                    <div style={{ fontSize: 10, color: '#64748B', marginTop: 2 }}>{transferContent}</div>
-                  </div>
-
-                  {/* Thông tin tài khoản nhận */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10, fontSize: 13 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #E2E8F0', paddingBottom: 6 }}>
-                      <span style={{ color: '#64748B' }}>Ngân hàng thụ hưởng:</span>
-                      <span style={{ fontWeight: 700, color: '#0F172A' }}>
-                        {payslip.bankName || 'Vietcombank (VCB)'}
-                      </span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #E2E8F0', paddingBottom: 6 }}>
-                      <span style={{ color: '#64748B' }}>Số tài khoản (STK):</span>
-                      <span style={{ fontWeight: 800, color: '#0F766E', fontSize: 15 }}>
-                        {payslip.bankAccountNumber || '01234567890'}
-                      </span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #E2E8F0', paddingBottom: 6 }}>
-                      <span style={{ color: '#64748B' }}>Chủ tài khoản:</span>
-                      <span style={{ fontWeight: 700, textTransform: 'uppercase' }}>
-                        {payslip.bankAccountName || payslip.employeeName}
-                      </span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #E2E8F0', paddingBottom: 6 }}>
-                      <span style={{ color: '#64748B' }}>Nội dung chuyển khoản:</span>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <code style={{ background: '#E2E8F0', padding: '2px 6px', borderRadius: 4, fontWeight: 700 }}>
-                          {transferContent}
-                        </code>
-                        <button
-                          type="button"
-                          className="emp-btn-subtle"
-                          style={{ padding: '2px 8px', fontSize: 11 }}
-                          onClick={() => handleCopy(transferContent)}
-                        >
-                          {isCopied ? (
-                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                              <Check size={12} />
-                              <span>Đã chép</span>
-                            </span>
-                          ) : (
-                            'Sao chép'
-                          )}
-                        </button>
-                      </div>
-                    </div>
-                    <div style={{ fontSize: 12, color: '#0284C7', fontStyle: 'italic', marginTop: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <Lightbulb size={14} />
-                      <span>Tiền sẽ được chuyển thẳng vào tài khoản của nhân viên và tự động đánh dấu đã thanh toán.</span>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Panel CASH */}
-              {method === 'CASH' && (
-                <div
-                  style={{
-                    padding: 16,
-                    background: '#FEFCE8',
-                    border: '1px solid #FEF08A',
-                    borderRadius: 12,
+                    background: '#F8FAFC',
+                    border: '1px solid #E2E8F0',
+                    borderRadius: 8,
+                    padding: '14px 16px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 10,
                     fontSize: 13,
                   }}
                 >
-                  <div style={{ fontWeight: 700, color: '#854D0E', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <Banknote size={16} />
-                    <span>Chi trả lương trực tiếp bằng tiền mặt tại quỹ quầy</span>
+                  {/* 1. Ngân hàng thụ hưởng */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ color: '#64748B' }}>Ngân hàng thụ hưởng:</span>
+                    <strong style={{ color: '#0F172A' }}>
+                      {payslip.bankName || 'Techcombank'}
+                    </strong>
                   </div>
-                  <div style={{ color: '#713F12', lineHeight: 1.5 }}>
-                    Nhân viên ký nhận trực tiếp vào phiếu chi lương. Hệ thống sẽ tạo một bút toán chi vào Sổ quỹ tiền mặt
-                    tại chi nhánh <b>{payslip.branchName || 'Chi nhánh trung tâm'}</b> với số tiền <b>{formatVND(payslip.netSalary)}</b>.
+
+                  {/* 2. Số tài khoản (STK) */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ color: '#64748B' }}>Số tài khoản (STK):</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontWeight: 800, color: '#0F766E', fontSize: 14, letterSpacing: '0.5px' }}>
+                        {payslip.bankAccountNumber || 'Chưa cập nhật'}
+                      </span>
+                      {payslip.bankAccountNumber && (
+                        <button
+                          type="button"
+                          onClick={() => handleCopyAccount(payslip.bankAccountNumber!)}
+                          style={{
+                            border: '1px solid #CBD5E1',
+                            background: '#FFFFFF',
+                            borderRadius: 4,
+                            padding: '2px 6px',
+                            fontSize: 11,
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 4,
+                            color: isCopied ? '#059669' : '#475569',
+                          }}
+                          title="Sao chép số tài khoản"
+                        >
+                          {isCopied ? <Check size={12} /> : <Copy size={12} />}
+                          <span>{isCopied ? 'Đã sao chép' : 'Sao chép'}</span>
+                        </button>
+                      )}
+                    </div>
                   </div>
+
+                  {/* 3. Chủ tài khoản */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ color: '#64748B' }}>Chủ tài khoản:</span>
+                    <strong style={{ color: '#0F172A', textTransform: 'uppercase' }}>
+                      {payslip.bankAccountName || payslip.employeeName}
+                    </strong>
+                  </div>
+                </div>
+              ) : (
+                <div
+                  style={{
+                    background: '#F8FAFC',
+                    border: '1px solid #E2E8F0',
+                    borderRadius: 8,
+                    padding: '12px 16px',
+                    fontSize: 12,
+                    color: '#475569',
+                    lineHeight: 1.5,
+                  }}
+                >
+                  Thanh toán trực tiếp bằng tiền mặt từ quỹ quầy chi nhánh <strong>{payslip.branchName || 'Chi nhánh'}</strong>. Hệ thống sẽ tự động hạch toán Phiếu chi tương ứng vào Sổ quỹ.
                 </div>
               )}
             </div>
 
-            {/* 3. Ghi chú thêm */}
-            <div className="emp-section-card">
-              <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#334155', marginBottom: 6 }}>
-                Ghi chú thanh toán / Chứng từ chi:
+            {/* Ghi chú chi tiền */}
+            <div style={{ marginTop: 8 }}>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#475569', marginBottom: 6 }}>
+                Ghi chú thanh toán (Tùy chọn)
               </label>
               <input
                 type="text"
-                className="emp-input"
-                placeholder="VD: Chi trả lương kỳ 10/2026 qua VietQR lúc 09:30"
+                className="emp-form-input"
+                style={{ width: '100%', boxSizing: 'border-box' }}
+                placeholder={`Ví dụ: Đã chi trả lương kỳ ${payslip.periodMonth}`}
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
               />
@@ -344,13 +322,23 @@ export const PayslipPaymentModal: React.FC<PayslipPaymentModalProps> = ({
           </div>
 
           {/* Footer */}
-          <div className="emp-modal-footer">
-            <button type="button" className="emp-btn-subtle" onClick={onClose}>
-              Hủy bỏ
+          <div
+            className="emp-modal-footer"
+            style={{
+              padding: '14px 24px',
+              background: '#FFFFFF',
+              borderTop: '1px solid #E2E8F0',
+              display: 'flex',
+              justifyContent: 'flex-end',
+              gap: 10,
+            }}
+          >
+            <button type="button" className="emp-btn emp-btn-secondary" onClick={onClose}>
+              Hủy
             </button>
-            <button type="submit" className="emp-btn-primary" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-              <Check size={16} />
-              <span>Xác nhận đã thanh toán ({formatVND(payslip.netSalary)})</span>
+            <button type="submit" className="emp-btn emp-btn-primary" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              <Check size={15} />
+              <span>Xác nhận thanh toán</span>
             </button>
           </div>
         </form>

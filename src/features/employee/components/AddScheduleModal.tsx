@@ -1,27 +1,59 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { Search, X, Check } from 'lucide-react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { Search, X, Check, Clock, ChevronDown } from 'lucide-react';
 import type {
   Employee,
   WorkShiftDefinition,
   Branch,
   ScheduleAssignment,
 } from '../types';
+import { shiftConfigApi, type ShiftConfigDto } from '../api/shiftConfigApi';
+import { scheduleApi, type CreateRecurringSchedulePayload } from '../api/scheduleApi';
 import { ScheduleScopeConfirmModal } from './ScheduleScopeConfirmModal';
 
 interface AddScheduleModalProps {
   isOpen: boolean;
   onClose: () => void;
   employees: Employee[];
-  shifts: WorkShiftDefinition[];
+  shifts?: WorkShiftDefinition[];
   branches: Branch[];
   defaultEmployeeId?: string;
   defaultDayOfWeek?: 'T2' | 'T3' | 'T4' | 'T5' | 'T6' | 'T7' | 'CN';
   defaultDateStr?: string;
+  defaultStartDate?: string;
+  weekDays?: Array<{
+    key: 'T2' | 'T3' | 'T4' | 'T5' | 'T6' | 'T7' | 'CN';
+    label: string;
+    date: string | number;
+    dateStr?: string;
+    dateIso?: string;
+    fullDate?: any;
+    isToday?: boolean;
+  }>;
   editingAssignment?: ScheduleAssignment | null;
-  onSave: (assignments: ScheduleAssignment[]) => void;
+  onSave?: (assignments: ScheduleAssignment[]) => void;
   onUpdate?: (updatedAssignment: ScheduleAssignment) => void;
   onDelete?: (assignmentId: string) => void;
+  onSuccess?: () => void;
 }
+
+const SHIFT_COLORS: Record<string, string> = {
+  'ca sáng': '#F59E0B',
+  'ca chiều': '#3B82F6',
+  'ca tối': '#8B5CF6',
+  'ca đêm': '#6366F1',
+  'ca hành chính': '#10B981',
+  'ca gãy': '#EC4899',
+};
+
+const getShiftColor = (shiftName: string): string => {
+  const lower = (shiftName || '').toLowerCase();
+  for (const [key, color] of Object.entries(SHIFT_COLORS)) {
+    if (lower.includes(key)) {
+      return color;
+    }
+  }
+  return '#0F766E';
+};
 
 interface DayItem {
   key: 'T2' | 'T3' | 'T4' | 'T5' | 'T6' | 'T7' | 'CN';
@@ -39,6 +71,37 @@ const DAYS: DayItem[] = [
   { key: 'CN', label: 'Chủ nhật', date: '04/10' },
 ];
 
+const DAY_OF_WEEK_MAP: Record<number, 'CN' | 'T2' | 'T3' | 'T4' | 'T5' | 'T6' | 'T7'> = {
+  0: 'CN',
+  1: 'T2',
+  2: 'T3',
+  3: 'T4',
+  4: 'T5',
+  5: 'T6',
+  6: 'T7',
+};
+
+const getScheduleDayOfWeek = (s: ScheduleAssignment): 'T2' | 'T3' | 'T4' | 'T5' | 'T6' | 'T7' | 'CN' => {
+  if (s.dayOfWeek && ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'].includes(s.dayOfWeek)) {
+    return s.dayOfWeek as any;
+  }
+  if (s.workDate) {
+    const d = new Date(s.workDate);
+    if (!isNaN(d.getTime())) return DAY_OF_WEEK_MAP[d.getDay()] || 'T2';
+  }
+  if (s.dateStr) {
+    const parts = s.dateStr.split('/');
+    if (parts.length >= 2) {
+      const dd = parseInt(parts[0], 10);
+      const mm = parseInt(parts[1], 10) - 1;
+      const yyyy = parts.length >= 3 ? parseInt(parts[2], 10) : new Date().getFullYear();
+      const d = new Date(yyyy, mm, dd);
+      if (!isNaN(d.getTime())) return DAY_OF_WEEK_MAP[d.getDay()] || 'T2';
+    }
+  }
+  return 'T2';
+};
+
 export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
   isOpen,
   onClose,
@@ -47,10 +110,13 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
   branches,
   defaultEmployeeId,
   defaultDayOfWeek,
+  defaultStartDate,
+  weekDays,
   editingAssignment,
   onSave,
   onUpdate,
   onDelete,
+  onSuccess,
 }) => {
   const isEditMode = !!editingAssignment;
 
@@ -58,25 +124,190 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
   const [showScopeModal, setShowScopeModal] = useState(false);
   const [scopeAction, setScopeAction] = useState<'update' | 'delete'>('update');
   const [pendingUpdatedItem, setPendingUpdatedItem] = useState<ScheduleAssignment | null>(null);
-  const [pendingExtraAssignments, setPendingExtraAssignments] = useState<ScheduleAssignment[]>([]);
 
   // Nhân viên chính
   const [employeeId, setEmployeeId] = useState(
     editingAssignment?.employeeId || defaultEmployeeId || (employees[0]?.id || '')
   );
 
+  // Trạng thái gửi API & Báo lỗi
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  // Thông tin nhân viên chính
+  const currentEmp = useMemo(() => {
+    return employees.find((e) => e.id === employeeId) || employees[0];
+  }, [employees, employeeId]);
+
+  // Danh sách các BranchId của Employee hiện tại đang làm
+  const currentEmpBranchIds = useMemo(() => {
+    const list: string[] = [];
+    if (currentEmp?.workingBranchIds && Array.isArray(currentEmp.workingBranchIds)) {
+      list.push(...currentEmp.workingBranchIds.filter(Boolean));
+    }
+    if (currentEmp?.salaryBranchId && !list.includes(currentEmp.salaryBranchId)) {
+      list.push(currentEmp.salaryBranchId);
+    }
+    return list;
+  }, [currentEmp]);
+
+  const currentEmpBranchId = useMemo(() => {
+    return currentEmpBranchIds[0] || undefined;
+  }, [currentEmpBranchIds]);
+
+  // Danh sách cấu hình ca làm việc fetch từ ShiftConfigsController
+  const [shiftsData, setShiftsData] = useState<WorkShiftDefinition[]>(shifts || []);
+  const [isLoadingShifts, setIsLoadingShifts] = useState(false);
+
+  // Danh sách ca khả dụng: Kiểm tra theo cả branchId và danh sách branchIds của ca làm việc
+  const activeShifts = useMemo(() => {
+    const base = shiftsData.length > 0 ? shiftsData : (shifts || []);
+    if (currentEmpBranchIds.length === 0) return base;
+
+    return base.filter((s) => {
+      if (s.id === 'custom') return true;
+      // Ca không gắn chi nhánh nào (áp dụng toàn hệ thống)
+      if (!s.branchId && (!s.branchIds || s.branchIds.length === 0)) return true;
+
+      // Danh sách branchId mà ca làm việc này áp dụng
+      const shiftBranchIds =
+        s.branchIds && s.branchIds.length > 0
+          ? s.branchIds
+          : s.branchId
+          ? [s.branchId]
+          : [];
+
+      // Kiểm tra xem ca làm việc có thuộc bất kỳ chi nhánh nào của nhân viên hiện tại không
+      return currentEmpBranchIds.some((empBId) => shiftBranchIds.includes(empBId));
+    });
+  }, [shiftsData, shifts, currentEmpBranchIds]);
+
   // Ca làm việc: id của shift hoặc 'custom'
   const [selectedShiftId, setSelectedShiftId] = useState<string>(
-    editingAssignment?.shiftId || shifts[0]?.id || 'custom'
+    editingAssignment?.shiftId || activeShifts[0]?.id || 'custom'
   );
   const [customStartTime, setCustomStartTime] = useState('00:00');
   const [customEndTime, setCustomEndTime] = useState('00:00');
+  const [isShiftDropdownOpen, setIsShiftDropdownOpen] = useState(false);
+  const [shiftSearchKeyword, setShiftSearchKeyword] = useState('');
+  const shiftDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Fetch cấu hình ca làm việc từ ShiftConfigsController theo branchId & branchIds của Employee hiện tại
+  useEffect(() => {
+    if (!isOpen) return;
+    let isSubscribed = true;
+
+    const fetchShiftConfigs = async () => {
+      setIsLoadingShifts(true);
+      try {
+        // Gọi API ShiftConfigsController truyền cả branchId và branchIds của Employee hiện tại
+        const res = await shiftConfigApi.getShiftConfigsPaged({
+          isActive: true,
+          pageSize: 100,
+          branchId: currentEmpBranchId,
+          branchIds: currentEmpBranchIds.length > 0 ? currentEmpBranchIds : undefined,
+        });
+
+        if (!isSubscribed) return;
+
+        const items = res.items || [];
+        if (items.length > 0) {
+          const mapped: WorkShiftDefinition[] = items.map((c: ShiftConfigDto) => ({
+            id: c.id,
+            code: c.shiftCode,
+            name: c.shiftName,
+            startTime: (c.startTime || '00:00').substring(0, 5),
+            endTime: (c.endTime || '00:00').substring(0, 5),
+            totalHours: c.durationHours,
+            checkInAllowance: `${(c.allowedCheckInStart || '00:00').substring(0, 5)} - ${(c.allowedCheckInEnd || '00:00').substring(0, 5)}`,
+            color: getShiftColor(c.shiftName),
+            status: c.isActive ? 'active' : 'inactive',
+            branchId: c.branchId,
+            branchName: c.branchName || undefined,
+            branchIds: c.branchIds || (c.branchId ? [c.branchId] : []),
+            branchNames: c.branchNames || (c.branchName ? [c.branchName] : []),
+          }));
+          setShiftsData(mapped);
+        } else {
+          // Lọc từ props shifts theo branchIds của Employee nếu API trả rỗng
+          const fallback = (shifts || []).filter((s) => {
+            if (s.id === 'custom') return true;
+            if (!s.branchId && (!s.branchIds || s.branchIds.length === 0)) return true;
+            if (currentEmpBranchIds.length === 0) return true;
+            const shiftBranchIds =
+              s.branchIds && s.branchIds.length > 0
+                ? s.branchIds
+                : s.branchId
+                ? [s.branchId]
+                : [];
+            return currentEmpBranchIds.some((empBId) => shiftBranchIds.includes(empBId));
+          });
+          setShiftsData(fallback);
+        }
+      } catch (err) {
+        console.warn('Lỗi khi fetch ca làm việc từ ShiftConfigsController, dùng shifts dự phòng:', err);
+        const fallback = (shifts || []).filter((s) => {
+          if (s.id === 'custom') return true;
+          if (!s.branchId && (!s.branchIds || s.branchIds.length === 0)) return true;
+          if (currentEmpBranchIds.length === 0) return true;
+          const shiftBranchIds =
+            s.branchIds && s.branchIds.length > 0
+              ? s.branchIds
+              : s.branchId
+              ? [s.branchId]
+              : [];
+          return currentEmpBranchIds.some((empBId) => shiftBranchIds.includes(empBId));
+        });
+        setShiftsData(fallback);
+      } finally {
+        if (isSubscribed) {
+          setIsLoadingShifts(false);
+        }
+      }
+    };
+
+    fetchShiftConfigs();
+
+    return () => {
+      isSubscribed = false;
+    };
+  }, [isOpen, currentEmp?.id, currentEmpBranchId, currentEmpBranchIds]);
+
+  // Tự động gán ca hợp lệ theo BranchId mới khi đổi nhân viên
+  useEffect(() => {
+    if (!editingAssignment && activeShifts.length > 0) {
+      const exists = activeShifts.some((s) => s.id === selectedShiftId);
+      if (!exists && selectedShiftId !== 'custom') {
+        setSelectedShiftId(activeShifts[0].id);
+      }
+    }
+  }, [activeShifts, editingAssignment, selectedShiftId]);
+
+  // Đóng dropdown ca làm việc khi click ra ngoài
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        shiftDropdownRef.current &&
+        !shiftDropdownRef.current.contains(event.target as Node)
+      ) {
+        setIsShiftDropdownOpen(false);
+      }
+    };
+
+    if (isShiftDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isShiftDropdownOpen]);
 
   // Lặp lại hàng tuần
   const [isRepeating, setIsRepeating] = useState(true);
   const [selectedDays, setSelectedDays] = useState<Array<'T2' | 'T3' | 'T4' | 'T5' | 'T6' | 'T7' | 'CN'>>(
     editingAssignment ? [editingAssignment.dayOfWeek] : defaultDayOfWeek ? [defaultDayOfWeek] : ['T3']
   );
+  const [hasEndDate, setHasEndDate] = useState(false);
   const [endDate, setEndDate] = useState('');
 
   // Thêm lịch tương tự cho nhân viên khác
@@ -85,8 +316,60 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
   const [selectedOtherEmpIds, setSelectedOtherEmpIds] = useState<string[]>([]);
   const [isOtherEmpDropdownOpen, setIsOtherEmpDropdownOpen] = useState(false);
 
+  // Danh sách các ngày trong tuần (ưu tiên dùng weekDays truyền từ bảng lịch làm việc)
+  const activeDaysList = useMemo(() => {
+    if (weekDays && weekDays.length > 0) {
+      return weekDays.map((w) => ({
+        key: w.key,
+        label: w.label,
+        date: w.dateStr || String(w.date),
+        dateIso: w.dateIso || '',
+      }));
+    }
+    return DAYS.map((d) => ({
+      key: d.key,
+      label: d.label,
+      date: d.date,
+      dateIso: '',
+    }));
+  }, [weekDays]);
+
+  // Ngày bắt đầu tính toán (ISO YYYY-MM-DD)
+  const calculatedStartDate: string = useMemo(() => {
+    if (defaultStartDate) return defaultStartDate;
+    const activeKey = selectedDays[0] || defaultDayOfWeek || 'T2';
+    const dayObj = activeDaysList.find((d) => d.key === activeKey);
+    if (dayObj && dayObj.dateIso) {
+      return dayObj.dateIso;
+    }
+    const now = new Date();
+    const yyyy = now.getFullYear();
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const dd = String(now.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  }, [defaultStartDate, selectedDays, defaultDayOfWeek, activeDaysList]);
+
+  // Ngày cuối cùng của tháng sau (hiển thị khi không chọn ngày kết thúc)
+  const endOfNextMonthDisplay = useMemo(() => {
+    const d = new Date(calculatedStartDate);
+    if (isNaN(d.getTime())) return '';
+    const currentMonth = new Date(d.getFullYear(), d.getMonth(), 1);
+    const nextMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1);
+    const daysInNextMonth = new Date(nextMonth.getFullYear(), nextMonth.getMonth() + 1, 0).getDate();
+    const endOfNextMonth = new Date(nextMonth.getFullYear(), nextMonth.getMonth(), daysInNextMonth);
+    const dd = String(endOfNextMonth.getDate()).padStart(2, '0');
+    const mm = String(endOfNextMonth.getMonth() + 1).padStart(2, '0');
+    const yyyy = endOfNextMonth.getFullYear();
+    return `${dd}/${mm}/${yyyy}`;
+  }, [calculatedStartDate]);
+
   useEffect(() => {
     if (!isOpen) return;
+
+    setSubmitError(null);
+    setIsSubmitting(false);
+    setHasEndDate(false);
+    setEndDate('');
 
     if (editingAssignment) {
       setEmployeeId(editingAssignment.employeeId);
@@ -108,23 +391,49 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
       if (defaultDayOfWeek) {
         setSelectedDays([defaultDayOfWeek]);
       }
-      setSelectedShiftId(shifts[0]?.id || 'custom');
+      setSelectedShiftId(activeShifts[0]?.id || 'custom');
       setApplyToOthers(false);
       setSelectedOtherEmpIds([]);
     }
-  }, [isOpen, editingAssignment, defaultEmployeeId, defaultDayOfWeek, employees, shifts]);
+  }, [isOpen, editingAssignment, defaultEmployeeId, defaultDayOfWeek, employees, activeShifts]);
 
-  // Thông tin nhân viên chính
-  const currentEmp = useMemo(() => {
-    return employees.find((e) => e.id === employeeId) || employees[0];
-  }, [employees, employeeId]);
+  // Thông tin ca hiện tại đang chọn
+  const currentSelectedShift = useMemo(() => {
+    if (selectedShiftId === 'custom') return null;
+    return activeShifts.find((s) => s.id === selectedShiftId);
+  }, [activeShifts, selectedShiftId]);
+
+  const filteredShiftsList = useMemo(() => {
+    return activeShifts
+      .filter((s) => s.id !== 'custom')
+      .filter(
+        (s) =>
+          s.name.toLowerCase().includes(shiftSearchKeyword.toLowerCase()) ||
+          s.startTime.includes(shiftSearchKeyword) ||
+          s.endTime.includes(shiftSearchKeyword)
+      );
+  }, [activeShifts, shiftSearchKeyword]);
+
+  const showCustomOption =
+    !shiftSearchKeyword.trim() ||
+    'ca tùy chọn thời gian'.includes(shiftSearchKeyword.toLowerCase()) ||
+    'tùy chọn'.includes(shiftSearchKeyword.toLowerCase()) ||
+    'custom'.includes(shiftSearchKeyword.toLowerCase());
 
   // Ngày hiển thị trong popup xác nhận
   const displayDateFormatted = useMemo(() => {
+    if (editingAssignment?.workDate) {
+      const d = new Date(editingAssignment.workDate);
+      if (!isNaN(d.getTime())) {
+        const dd = String(d.getDate()).padStart(2, '0');
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        return `${dd}/${mm}/${d.getFullYear()}`;
+      }
+    }
     if (!editingAssignment?.dateStr) return '16/10/2026';
     const str = editingAssignment.dateStr;
-    if (str.includes('/2026')) return str;
-    return `${str}/2026`;
+    if (str.split('/').length === 3) return str;
+    return `${str}/${new Date().getFullYear()}`;
   }, [editingAssignment]);
 
   // Tên ngày hiện tại hiển thị ở subtitle
@@ -161,13 +470,40 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
     return `Lặp lại ${names.join(', ')} hàng tuần`;
   }, [selectedDays]);
 
-  // Danh sách nhân viên khác để tìm kiếm
-  const candidateOtherEmployees = (employees || [])
-    .filter((e) => e.id !== employeeId)
-    .filter((e) =>
-      (e.fullName || '').toLowerCase().includes(otherEmployeeSearch.trim().toLowerCase()) ||
-      (e.employeeCode || '').toLowerCase().includes(otherEmployeeSearch.trim().toLowerCase())
+  // Danh sách nhân viên khác để tìm kiếm (chỉ lấy nhân viên cùng chi nhánh với nhân viên hiện tại)
+  const candidateOtherEmployees = useMemo(() => {
+    return (employees || [])
+      .filter((e) => e.id !== employeeId)
+      .filter((e) => {
+        if (currentEmpBranchIds.length === 0) return true;
+        return currentEmpBranchIds.some(
+          (bId) =>
+            e.salaryBranchId === bId ||
+            (e.workingBranchIds && e.workingBranchIds.includes(bId))
+        );
+      })
+      .filter(
+        (e) =>
+          (e.fullName || '').toLowerCase().includes(otherEmployeeSearch.trim().toLowerCase()) ||
+          (e.employeeCode || '').toLowerCase().includes(otherEmployeeSearch.trim().toLowerCase())
+      );
+  }, [employees, employeeId, currentEmpBranchIds, otherEmployeeSearch]);
+
+  // Khi đổi nhân viên chính (hoặc chi nhánh), tự động lọc bỏ các nhân viên khác không cùng chi nhánh
+  useEffect(() => {
+    if (currentEmpBranchIds.length === 0 || selectedOtherEmpIds.length === 0) return;
+    setSelectedOtherEmpIds((prev) =>
+      prev.filter((id) => {
+        const emp = employees.find((e) => e.id === id);
+        if (!emp) return false;
+        return currentEmpBranchIds.some(
+          (bId) =>
+            emp.salaryBranchId === bId ||
+            (emp.workingBranchIds && emp.workingBranchIds.includes(bId))
+        );
+      })
     );
+  }, [currentEmpBranchIds, employees]);
 
   const handleToggleOtherEmp = (empId: string) => {
     if (selectedOtherEmpIds.includes(empId)) {
@@ -181,7 +517,7 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
     setSelectedOtherEmpIds(selectedOtherEmpIds.filter((id) => id !== empId));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentEmp) return;
 
@@ -194,9 +530,9 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
     if (selectedShiftId === 'custom') {
       shiftName = 'Ca tùy chọn thời gian';
       shiftTime = `${customStartTime} - ${customEndTime}`;
-      shiftColor = '#0284C7';
+      shiftColor = '#0F766E';
     } else {
-      const sh = shifts.find((s) => s.id === selectedShiftId);
+      const sh = activeShifts.find((s) => s.id === selectedShiftId);
       if (sh) {
         shiftName = sh.name;
         shiftTime = `${sh.startTime} - ${sh.endTime}`;
@@ -204,12 +540,31 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
       }
     }
 
-    const branchNameFinal = branches[0]?.name || 'Chi nhánh trung tâm';
+    const parts = (shiftTime || '').split('-').map((s) => s.trim());
+    const rawStartTime = parts[0] || (selectedShiftId === 'custom' ? customStartTime : currentSelectedShift?.startTime) || '08:00';
+    const rawEndTime = parts[1] || (selectedShiftId === 'custom' ? customEndTime : currentSelectedShift?.endTime) || '17:00';
 
-    // Nếu đang ở chế độ Cập nhật ca cụ thể -> mở popup xác nhận phạm vi thay đổi
+    const branchNameFinal =
+      currentEmp?.workingBranchNames?.[0] ||
+      currentEmp?.salaryBranchName ||
+      branches.find((b) => b.id === currentEmpBranchId)?.name ||
+      branches[0]?.name ||
+      'Chi nhánh trung tâm';
+
+    // Nếu đang ở chế độ Cập nhật ca cụ thể
     if (isEditMode && editingAssignment) {
+      if (hasEndDate && !endDate) {
+        setSubmitError('Vui lòng chọn ngày kết thúc khi tích chọn Có ngày kết thúc.');
+        return;
+      }
+
+      if (hasEndDate && endDate && endDate < calculatedStartDate) {
+        setSubmitError('Ngày kết thúc không được nhỏ hơn ngày bắt đầu.');
+        return;
+      }
+
       const activeDay = selectedDays[0] || editingAssignment.dayOfWeek;
-      const dayObj = DAYS.find((item) => item.key === activeDay);
+      const dayObj = activeDaysList.find((item) => item.key === activeDay);
 
       const updatedItem: ScheduleAssignment = {
         ...editingAssignment,
@@ -222,32 +577,80 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
         shiftColor,
         dayOfWeek: activeDay,
         dateStr: dayObj?.date || editingAssignment.dateStr,
+        branchId: currentEmpBranchId,
         branchName: branchNameFinal,
       };
 
-      const extraAssignments: ScheduleAssignment[] = [];
-      if (applyToOthers && selectedOtherEmpIds.length > 0) {
-        selectedOtherEmpIds.forEach((eId) => {
-          const empItem = employees.find((e) => e.id === eId);
-          if (!empItem) return;
-          extraAssignments.push({
-            id: `sa_${Date.now()}_${eId}_${activeDay}_${Math.floor(Math.random() * 1000)}`,
-            employeeId: empItem.id,
-            employeeName: empItem.fullName,
-            employeeCode: empItem.employeeCode,
-            shiftId: shiftIdFinal,
-            shiftName,
-            shiftTime,
-            shiftColor,
-            dayOfWeek: activeDay,
-            dateStr: dayObj?.date || '29/09',
-            branchName: branchNameFinal,
-          });
-        });
+      // Nếu có ngày kết thúc: trực tiếp update đến ngày kết thúc và KHÔNG hiện popup ScheduleScopeConfirmModal
+      if (hasEndDate && endDate) {
+        try {
+          setIsSubmitting(true);
+          setSubmitError(null);
+
+          // Cập nhật ca hiện tại
+          if (onUpdate) {
+            await onUpdate(updatedItem);
+          } else if (onSave) {
+            onSave([updatedItem]);
+          }
+
+          // Cập nhật tất cả các ca khác của nhân viên trong khoảng [calculatedStartDate, endDate]
+          // CHỈ UPDATE NHỮNG THỨ ĐƯỢC CHỌN (selectedDays)
+          const daysToUpdate = isRepeating ? selectedDays : [selectedDays[0] || updatedItem.dayOfWeek];
+          try {
+            const schedulesInRange = await scheduleApi.getSchedules({
+              employeeId: currentEmp.id,
+              branchId: currentEmpBranchId || undefined,
+              fromDate: calculatedStartDate,
+              toDate: endDate,
+              pageSize: 500,
+            });
+
+            const matchingOtherSchedules = schedulesInRange.filter((s) => {
+              if (s.id === editingAssignment.id) return false;
+              const dow = getScheduleDayOfWeek(s);
+              return daysToUpdate.includes(dow);
+            });
+
+            if (matchingOtherSchedules.length > 0) {
+              const formattedStart = rawStartTime ? (rawStartTime.length === 5 ? `${rawStartTime}:00` : rawStartTime) : undefined;
+              const formattedEnd = rawEndTime ? (rawEndTime.length === 5 ? `${rawEndTime}:00` : rawEndTime) : undefined;
+              const shiftConfigIdVal = shiftIdFinal !== 'custom' ? shiftIdFinal : undefined;
+
+              await Promise.all(
+                matchingOtherSchedules.map((s) =>
+                  scheduleApi.updateSchedule(s.id, {
+                    shiftName,
+                    shiftConfigId: shiftConfigIdVal,
+                    shiftCode: currentSelectedShift?.code || (shiftIdFinal !== 'custom' ? undefined : 'CUSTOM'),
+                    plannedStartTime: formattedStart,
+                    plannedEndTime: formattedEnd,
+                  }).catch((err) => {
+                    console.warn(`Lỗi khi cập nhật ca ${s.id}:`, err);
+                  })
+                )
+              );
+            }
+          } catch (rangeErr) {
+            console.warn('Lỗi khi cập nhật các ca cùng dải ngày kết thúc:', rangeErr);
+          }
+
+          if (onSuccess) {
+            await onSuccess();
+          }
+
+          onClose();
+        } catch (err: any) {
+          console.error('Lỗi khi cập nhật ca làm việc:', err);
+          setSubmitError(err?.response?.data?.message || err?.message || 'Cập nhật ca làm việc thất bại.');
+        } finally {
+          setIsSubmitting(false);
+        }
+        return;
       }
 
+      // Không có ngày kết thúc -> mở popup ScheduleScopeConfirmModal để chọn phạm vi
       setPendingUpdatedItem(updatedItem);
-      setPendingExtraAssignments(extraAssignments);
       setScopeAction('update');
       setShowScopeModal(true);
       return;
@@ -259,39 +662,67 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
       targetEmpIds.push(...selectedOtherEmpIds);
     }
 
-    const allAssignments: ScheduleAssignment[] = [];
+    if (hasEndDate && !endDate) {
+      setSubmitError('Vui lòng chọn ngày kết thúc khi tích chọn Có ngày kết thúc.');
+      return;
+    }
 
-    targetEmpIds.forEach((eId) => {
-      const empItem = employees.find((e) => e.id === eId);
-      if (!empItem) return;
+    if (hasEndDate && endDate) {
+      if (endDate < calculatedStartDate) {
+        setSubmitError('Ngày kết thúc không được nhỏ hơn ngày bắt đầu.');
+        return;
+      }
+    }
 
-      selectedDays.forEach((d) => {
-        const dayObj = DAYS.find((item) => item.key === d);
-        allAssignments.push({
-          id: `sa_${Date.now()}_${eId}_${d}_${Math.floor(Math.random() * 1000)}`,
-          employeeId: empItem.id,
-          employeeName: empItem.fullName,
-          employeeCode: empItem.employeeCode,
-          shiftId: shiftIdFinal,
-          shiftName: shiftName,
-          shiftTime: shiftTime,
-          shiftColor: shiftColor,
-          dayOfWeek: d,
-          dateStr: dayObj?.date || '29/09',
-          branchName: branchNameFinal,
-        });
-      });
-    });
+    try {
+      setIsSubmitting(true);
+      setSubmitError(null);
 
-    onSave(allAssignments);
-    onClose();
+      // Gọi API khởi tạo ca làm việc từ Backend (có ngày kết thúc -> tạo đến ngày chỉ định, không có ngày kết thúc -> tạo đến hết tháng sau)
+      const payload: CreateRecurringSchedulePayload = {
+        employeeId: currentEmp.id,
+        branchId: currentEmpBranchId || branches[0]?.id || '',
+        startDate: calculatedStartDate,
+        hasEndDate: hasEndDate && !!endDate,
+        endDate: hasEndDate && endDate ? endDate : null,
+        repeatDays: isRepeating ? selectedDays : [selectedDays[0] || 'T2'],
+        additionalEmployeeIds: applyToOthers && selectedOtherEmpIds.length > 0 ? selectedOtherEmpIds : [],
+        shiftConfigId: shiftIdFinal !== 'custom' ? shiftIdFinal : undefined,
+        shiftCode: currentSelectedShift?.code || (shiftIdFinal !== 'custom' ? undefined : 'CUSTOM'),
+        shiftName: shiftName,
+        plannedStartTime: rawStartTime ? (rawStartTime.length === 5 ? `${rawStartTime}:00` : rawStartTime) : undefined,
+        plannedEndTime: rawEndTime ? (rawEndTime.length === 5 ? `${rawEndTime}:00` : rawEndTime) : undefined,
+        durationHours: currentSelectedShift?.totalHours,
+        isCheckInNextDay: rawEndTime <= rawStartTime,
+      };
+
+      const resultAssignments = await scheduleApi.createRecurringSchedule(payload);
+
+      if (onSuccess) {
+        await onSuccess();
+      }
+      if (onSave) {
+        onSave(resultAssignments);
+      }
+
+      onClose();
+    } catch (err: any) {
+      console.error('Lỗi khởi tạo ca làm việc:', err);
+      const msg =
+        err?.response?.data?.message ||
+        err?.message ||
+        'Không thể khởi tạo ca làm việc. Vui lòng kiểm tra lại thời gian ca.';
+      setSubmitError(msg);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   if (!isOpen) return null;
 
   return (
     <div className="emp-modal-overlay">
-      <div className="emp-modal-card" style={{ maxWidth: 560, padding: 0, overflow: 'hidden' }}>
+      <div className="emp-modal-card" style={{ padding: 0, overflow: 'hidden' }}>
         {/* Header Modal theo mockup */}
         <div
           style={{
@@ -371,132 +802,333 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
           >
             {/* ─── SECTION 1: CHỌN CA LÀM VIỆC ─── */}
             <div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: '#0F172A', marginBottom: 10 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#0F172A', marginBottom: 8 }}>
                 Chọn ca làm việc
               </div>
-              <div
-                style={{
-                  border: '1px solid #CBD5E1',
-                  borderRadius: 8,
-                  overflow: 'hidden',
-                  background: '#FFFFFF',
-                }}
-              >
-                {/* Danh sách các ca mặc định cố định */}
-                {shifts.filter((sh) => sh.id !== 'custom').map((sh) => {
-                  const isSelected = selectedShiftId === sh.id;
-                  return (
-                    <div
-                      key={sh.id}
-                      onClick={() => setSelectedShiftId(sh.id)}
-                      style={{
-                        padding: '12px 16px',
-                        borderBottom: '1px solid #E2E8F0',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 12,
-                        background: isSelected ? '#EFF6FF' : '#FFFFFF',
-                        transition: 'background 0.15s ease',
-                      }}
-                    >
-                      <div
-                        style={{
-                          width: 14,
-                          height: 14,
-                          borderRadius: 3,
-                          background: isSelected ? '#2563EB' : sh.color || '#3B82F6',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          flexShrink: 0,
-                        }}
-                      >
-                        {isSelected && <Check size={10} color="#FFFFFF" strokeWidth={3} />}
-                      </div>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 14, fontWeight: 700, color: isSelected ? '#1D4ED8' : '#1E293B' }}>
-                          {sh.name}
-                        </div>
-                        <div style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>
-                          {sh.startTime} - {sh.endTime}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
 
-                {/* Ca tùy chỉnh */}
+              {/* Custom Searchable Shift Dropdown */}
+              <div ref={shiftDropdownRef} style={{ position: 'relative' }}>
                 <div
-                  onClick={() => setSelectedShiftId('custom')}
+                  onClick={() => setIsShiftDropdownOpen((prev) => !prev)}
                   style={{
-                    padding: '12px 16px',
+                    height: 42,
+                    padding: '6px 14px',
+                    border: `1px solid ${isShiftDropdownOpen ? '#0F766E' : '#CBD5E1'}`,
+                    borderRadius: 8,
+                    background: '#FFFFFF',
                     cursor: 'pointer',
-                    background: selectedShiftId === 'custom' ? '#EFF6FF' : '#FFFFFF',
-                    transition: 'background 0.15s ease',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 8,
+                    transition: 'all 0.15s ease',
+                    boxShadow: isShiftDropdownOpen ? '0 0 0 3px rgba(15, 118, 110, 0.15)' : 'none',
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <div
-                      style={{
-                        width: 14,
-                        height: 14,
-                        borderRadius: 3,
-                        background: selectedShiftId === 'custom' ? '#2563EB' : '#94A3B8',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        flexShrink: 0,
-                      }}
-                    >
-                      {selectedShiftId === 'custom' && <Check size={10} color="#FFFFFF" strokeWidth={3} />}
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 14, fontWeight: 700, color: selectedShiftId === 'custom' ? '#1D4ED8' : '#1E293B' }}>
-                        Ca tùy chọn thời gian
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, overflow: 'hidden', flex: 1 }}>
+                    <Clock size={16} color="#64748B" style={{ flexShrink: 0 }} />
+
+                    {selectedShiftId === 'custom' ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, overflow: 'hidden' }}>
+                        <span
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            padding: '2px 8px',
+                            borderRadius: 6,
+                            fontSize: 12,
+                            fontWeight: 600,
+                            background: '#F0FDFA',
+                            color: '#0F766E',
+                            border: '1px solid #99F6E4',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          Ca tùy chọn
+                        </span>
+                        <span style={{ fontSize: 13, color: '#334155', fontWeight: 500 }}>
+                          {customStartTime} - {customEndTime}
+                        </span>
                       </div>
-                      <div style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>
-                        {selectedShiftId === 'custom' ? `${customStartTime} - ${customEndTime}` : '00:00 - 00:00'}
+                    ) : currentSelectedShift ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, overflow: 'hidden' }}>
+                        <span style={{ fontSize: 13, fontWeight: 600, color: '#0F172A' }}>
+                          {currentSelectedShift.name}
+                        </span>
+                        <span style={{ fontSize: 12, color: '#64748B' }}>
+                          ({currentSelectedShift.startTime} - {currentSelectedShift.endTime})
+                        </span>
                       </div>
-                    </div>
+                    ) : (
+                      <span style={{ color: '#94A3B8', fontSize: 13 }}>Chọn ca làm việc...</span>
+                    )}
                   </div>
 
-                  {/* Input nhập giờ khi chọn Ca tùy chỉnh */}
-                  {selectedShiftId === 'custom' && (
-                    <div
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 12,
-                        marginTop: 10,
-                        paddingLeft: 26,
-                      }}
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <span style={{ fontSize: 12, color: '#64748B' }}>Từ:</span>
+                  <ChevronDown
+                    size={16}
+                    style={{
+                      transform: isShiftDropdownOpen ? 'rotate(180deg)' : 'none',
+                      transition: 'transform 0.2s ease',
+                      color: '#64748B',
+                      flexShrink: 0,
+                    }}
+                  />
+                </div>
+
+                {/* Dropdown Panel */}
+                {isShiftDropdownOpen && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: '100%',
+                      left: 0,
+                      right: 0,
+                      marginTop: 6,
+                      background: '#FFFFFF',
+                      border: '1px solid #E2E8F0',
+                      borderRadius: 10,
+                      boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
+                      zIndex: 1000,
+                      overflow: 'hidden',
+                    }}
+                  >
+                    {/* Search Input Bar */}
+                    <div style={{ padding: '8px 10px', borderBottom: '1px solid #F1F5F9' }}>
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 8,
+                          background: '#F8FAFC',
+                          border: '1px solid #E2E8F0',
+                          borderRadius: 6,
+                          padding: '5px 10px',
+                        }}
+                      >
+                        <Search size={14} color="#94A3B8" />
                         <input
-                          type="time"
-                          value={customStartTime}
-                          onChange={(e) => setCustomStartTime(e.target.value)}
-                          className="emp-form-input"
-                          style={{ width: 110, height: 32, padding: '2px 8px', fontSize: 13 }}
+                          type="text"
+                          value={shiftSearchKeyword}
+                          onChange={(e) => setShiftSearchKeyword(e.target.value)}
+                          placeholder="Tìm kiếm ca làm việc..."
+                          style={{
+                            border: 'none',
+                            background: 'transparent',
+                            outline: 'none',
+                            width: '100%',
+                            fontSize: 13,
+                            color: '#1E293B',
+                          }}
+                          autoFocus
                         />
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <span style={{ fontSize: 12, color: '#64748B' }}>Đến:</span>
-                        <input
-                          type="time"
-                          value={customEndTime}
-                          onChange={(e) => setCustomEndTime(e.target.value)}
-                          className="emp-form-input"
-                          style={{ width: 110, height: 32, padding: '2px 8px', fontSize: 13 }}
-                        />
+                        {shiftSearchKeyword && (
+                          <button
+                            type="button"
+                            onClick={() => setShiftSearchKeyword('')}
+                            style={{
+                              border: 'none',
+                              background: 'transparent',
+                              cursor: 'pointer',
+                              color: '#94A3B8',
+                              padding: 0,
+                              display: 'flex',
+                            }}
+                          >
+                            <X size={14} />
+                          </button>
+                        )}
                       </div>
                     </div>
-                  )}
-                </div>
+
+                    {/* Quick Count & Status */}
+                    <div
+                      style={{
+                        padding: '6px 12px',
+                        background: '#F8FAFC',
+                        borderBottom: '1px solid #F1F5F9',
+                        fontSize: 12,
+                        color: '#64748B',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                      }}
+                    >
+                      <span>
+                        Tìm thấy {filteredShiftsList.length + (showCustomOption ? 1 : 0)} ca làm việc
+                      </span>
+                      {isLoadingShifts && (
+                        <span style={{ fontSize: 11, color: '#0F766E', fontWeight: 500 }}>
+                          Đang đồng bộ ShiftConfig...
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Shifts List */}
+                    <div style={{ maxHeight: 220, overflowY: 'auto', padding: '4px 0' }}>
+                      {isLoadingShifts && filteredShiftsList.length === 0 && (
+                        <div style={{ padding: '16px 12px', textAlign: 'center', color: '#64748B', fontSize: 13 }}>
+                          Đang tải danh sách ca từ ShiftConfig...
+                        </div>
+                      )}
+
+                      {filteredShiftsList.map((sh) => {
+                        const isSelected = selectedShiftId === sh.id;
+                        return (
+                          <div
+                            key={sh.id}
+                            onClick={() => {
+                              setSelectedShiftId(sh.id);
+                              setIsShiftDropdownOpen(false);
+                            }}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              padding: '10px 14px',
+                              cursor: 'pointer',
+                              background: isSelected ? '#F0FDFA' : 'transparent',
+                              transition: 'background 0.12s ease',
+                            }}
+                            onMouseEnter={(e) => {
+                              if (!isSelected) e.currentTarget.style.background = '#F8FAFC';
+                            }}
+                            onMouseLeave={(e) => {
+                              if (!isSelected) e.currentTarget.style.background = 'transparent';
+                            }}
+                          >
+                            <div>
+                              <div
+                                style={{
+                                  fontSize: 13,
+                                  fontWeight: isSelected ? 700 : 600,
+                                  color: isSelected ? '#0F766E' : '#1E293B',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: 6,
+                                }}
+                              >
+                                <span>{sh.name}</span>
+                                {sh.branchNames && sh.branchNames.length > 1 ? (
+                                  <span
+                                    style={{
+                                      fontSize: 10,
+                                      padding: '1px 6px',
+                                      background: '#F1F5F9',
+                                      color: '#475569',
+                                      borderRadius: 4,
+                                      fontWeight: 500,
+                                    }}
+                                  >
+                                    {sh.branchNames.length} chi nhánh
+                                  </span>
+                                ) : (sh.branchNames?.[0] || sh.branchName) ? (
+                                  <span
+                                    style={{
+                                      fontSize: 10,
+                                      padding: '1px 6px',
+                                      background: '#F1F5F9',
+                                      color: '#475569',
+                                      borderRadius: 4,
+                                      fontWeight: 500,
+                                    }}
+                                  >
+                                    {sh.branchNames?.[0] || sh.branchName}
+                                  </span>
+                                ) : null}
+                              </div>
+                              <div style={{ fontSize: 11, color: '#64748B', marginTop: 1 }}>
+                                {sh.startTime} - {sh.endTime} ({sh.totalHours}h)
+                              </div>
+                            </div>
+
+                            {isSelected && <Check size={16} color="#0F766E" />}
+                          </div>
+                        );
+                      })}
+
+                      {/* Option Ca tùy chọn */}
+                      {showCustomOption && (
+                        <div
+                          onClick={() => {
+                            setSelectedShiftId('custom');
+                            setIsShiftDropdownOpen(false);
+                          }}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '10px 14px',
+                            cursor: 'pointer',
+                            borderTop: '1px dashed #E2E8F0',
+                            background: selectedShiftId === 'custom' ? '#F0FDFA' : 'transparent',
+                            transition: 'background 0.12s ease',
+                          }}
+                          onMouseEnter={(e) => {
+                            if (selectedShiftId !== 'custom') e.currentTarget.style.background = '#F8FAFC';
+                          }}
+                          onMouseLeave={(e) => {
+                            if (selectedShiftId !== 'custom') e.currentTarget.style.background = 'transparent';
+                          }}
+                        >
+                          <div>
+                            <div style={{ fontSize: 13, fontWeight: selectedShiftId === 'custom' ? 700 : 600, color: selectedShiftId === 'custom' ? '#0F766E' : '#1E293B' }}>
+                              Ca tùy chọn
+                            </div>
+                            <div style={{ fontSize: 11, color: '#64748B', marginTop: 1 }}>
+                              Tự do thiết lập giờ bắt đầu và kết thúc
+                            </div>
+                          </div>
+
+                          {selectedShiftId === 'custom' && <Check size={16} color="#0F766E" />}
+                        </div>
+                      )}
+
+                      {!filteredShiftsList.length && !showCustomOption && (
+                        <div style={{ padding: '16px 12px', textAlign: 'center', color: '#94A3B8', fontSize: 13 }}>
+                          Không tìm thấy ca làm việc nào phù hợp
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
+
+              {/* Khung nhập giờ bắt đầu - kết thúc khi chọn Ca tùy chọn */}
+              {selectedShiftId === 'custom' && (
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 16,
+                    marginTop: 10,
+                    padding: '12px 16px',
+                    background: '#F0FDFA',
+                    border: '1px solid #99F6E4',
+                    borderRadius: 8,
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: '#0F766E' }}>Giờ bắt đầu:</span>
+                    <input
+                      type="time"
+                      value={customStartTime}
+                      onChange={(e) => setCustomStartTime(e.target.value)}
+                      className="emp-form-input"
+                      style={{ width: 110, height: 34, padding: '2px 8px', fontSize: 13 }}
+                    />
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: '#0F766E' }}>Giờ kết thúc:</span>
+                    <input
+                      type="time"
+                      value={customEndTime}
+                      onChange={(e) => setCustomEndTime(e.target.value)}
+                      className="emp-form-input"
+                      style={{ width: 110, height: 34, padding: '2px 8px', fontSize: 13 }}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* ─── SECTION 2: LẶP LẠI HÀNG TUẦN ─── */}
@@ -520,7 +1152,7 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
                       left: 0,
                       right: 0,
                       bottom: 0,
-                      background: isRepeating ? '#2563EB' : '#CBD5E1',
+                      background: isRepeating ? '#0F766E' : '#CBD5E1',
                       borderRadius: 22,
                       transition: '0.2s',
                     }}
@@ -547,7 +1179,7 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
                 <div style={{ marginTop: 14 }}>
                   {/* Danh sách các nút ngày */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                    {DAYS.map((d) => {
+                    {activeDaysList.map((d) => {
                       const isSelected = selectedDays.includes(d.key);
                       return (
                         <button
@@ -556,10 +1188,10 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
                           onClick={() => handleToggleDay(d.key)}
                           style={{
                             padding: '6px 12px',
-                            border: isSelected ? '2px solid #2563EB' : '1px solid #CBD5E1',
+                            border: isSelected ? '2px solid #0F766E' : '1px solid #CBD5E1',
                             borderRadius: 4,
-                            background: isSelected ? '#EFF6FF' : '#FFFFFF',
-                            color: isSelected ? '#1D4ED8' : '#334155',
+                            background: isSelected ? '#F0FDFA' : '#FFFFFF',
+                            color: isSelected ? '#0F766E' : '#334155',
                             fontWeight: isSelected ? 700 : 500,
                             fontSize: 12,
                             cursor: 'pointer',
@@ -577,7 +1209,7 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
                       style={{
                         background: 'transparent',
                         border: 'none',
-                        color: '#2563EB',
+                        color: '#0F766E',
                         fontSize: 12,
                         fontWeight: 600,
                         cursor: 'pointer',
@@ -585,7 +1217,7 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
                         textDecoration: 'underline',
                       }}
                     >
-                      {selectedDays.length === DAYS.length ? 'Bỏ chọn' : 'Chọn tất cả'}
+                      {selectedDays.length === activeDaysList.length ? 'Bỏ chọn' : 'Chọn tất cả'}
                     </button>
                   </div>
 
@@ -593,222 +1225,315 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
                     {repeatSummaryText}
                   </div>
 
-                  {/* Ngày kết thúc & Làm việc ngày lễ */}
+                  {/* Tùy chọn Có ngày kết thúc */}
                   <div
                     style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
                       marginTop: 14,
-                      flexWrap: 'wrap',
-                      gap: 12,
+                      padding: '12px 14px',
+                      background: '#F8FAFC',
+                      borderRadius: 8,
+                      border: '1px solid #E2E8F0',
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ fontSize: 13, fontWeight: 600, color: '#334155' }}>Kết thúc:</span>
-                      <input
-                        type="date"
-                        value={endDate}
-                        onChange={(e) => setEndDate(e.target.value)}
-                        className="emp-form-input"
-                        style={{ height: 32, width: 150, fontSize: 13 }}
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* ─── SECTION 3: THÊM LỊCH TƯƠNG TỰ CHO NHÂN VIÊN KHÁC ─── */}
-            <div style={{ borderTop: '1px solid #F1F5F9', paddingTop: 16 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div style={{ fontSize: 14, fontWeight: 700, color: '#0F172A' }}>
-                  Thêm lịch tương tự cho nhân viên khác
-                </div>
-                {/* Switch Toggle */}
-                <label style={{ position: 'relative', display: 'inline-block', width: 38, height: 22, cursor: 'pointer' }}>
-                  <input
-                    type="checkbox"
-                    checked={applyToOthers}
-                    onChange={(e) => setApplyToOthers(e.target.checked)}
-                    style={{ opacity: 0, width: 0, height: 0 }}
-                  />
-                  <span
-                    style={{
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      right: 0,
-                      bottom: 0,
-                      background: applyToOthers ? '#2563EB' : '#CBD5E1',
-                      borderRadius: 22,
-                      transition: '0.2s',
-                    }}
-                  />
-                  <span
-                    style={{
-                      position: 'absolute',
-                      height: 16,
-                      width: 16,
-                      left: applyToOthers ? 19 : 3,
-                      bottom: 3,
-                      background: '#FFFFFF',
-                      borderRadius: '50%',
-                      transition: '0.2s',
-                    }}
-                  />
-                </label>
-              </div>
-              <div style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>
-                Lịch làm việc sẽ được áp dụng cho các nhân viên được chọn
-              </div>
-
-              {applyToOthers && (
-                <div style={{ marginTop: 12, position: 'relative' }}>
-                  {/* Ô tìm kiếm nhân viên */}
-                  <div
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 8,
-                      border: '1px solid #CBD5E1',
-                      borderRadius: 6,
-                      padding: '6px 12px',
-                      background: '#FFFFFF',
-                    }}
-                  >
-                    <Search size={15} color="#94A3B8" />
-                    <input
-                      type="text"
-                      placeholder="Tìm kiếm nhân viên..."
-                      value={otherEmployeeSearch}
-                      onChange={(e) => {
-                        setOtherEmployeeSearch(e.target.value);
-                        setIsOtherEmpDropdownOpen(true);
-                      }}
-                      onFocus={() => setIsOtherEmpDropdownOpen(true)}
-                      style={{
-                        border: 'none',
-                        outline: 'none',
-                        width: '100%',
-                        fontSize: 13,
-                        color: '#1E293B',
-                      }}
-                    />
-                  </div>
-
-                  {/* Tags nhân viên đã chọn */}
-                  {selectedOtherEmpIds.length > 0 && (
-                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
-                      {selectedOtherEmpIds.map((id) => {
-                        const emp = employees.find((e) => e.id === id);
-                        if (!emp) return null;
-                        return (
-                          <span
-                            key={id}
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: 4,
-                              background: '#EFF6FF',
-                              color: '#1D4ED8',
-                              border: '1px solid #BFDBFE',
-                              borderRadius: 4,
-                              padding: '2px 8px',
-                              fontSize: 12,
-                              fontWeight: 500,
-                            }}
-                          >
-                            <span>{emp.fullName}</span>
-                            <span
-                              onClick={() => handleRemoveOtherEmp(id)}
-                              style={{ cursor: 'pointer', display: 'flex' }}
-                              title="Bỏ chọn"
-                            >
-                              <X size={12} />
-                            </span>
-                          </span>
-                        );
-                      })}
-                    </div>
-                  )}
-
-                  {/* Dropdown danh sách gợi ý nhân viên */}
-                  {isOtherEmpDropdownOpen && (
                     <div
                       style={{
-                        position: 'absolute',
-                        top: '100%',
-                        left: 0,
-                        right: 0,
-                        marginTop: 4,
-                        background: '#FFFFFF',
-                        border: '1px solid #E2E8F0',
-                        borderRadius: 8,
-                        boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
-                        maxHeight: 180,
-                        overflowY: 'auto',
-                        zIndex: 100,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        flexWrap: 'wrap',
+                        gap: 10,
                       }}
                     >
-                      {candidateOtherEmployees.length ? (
-                        candidateOtherEmployees.map((e) => {
-                          const isChecked = selectedOtherEmpIds.includes(e.id);
-                          return (
-                            <div
-                              key={e.id}
-                              onClick={() => handleToggleOtherEmp(e.id)}
-                              style={{
-                                padding: '8px 12px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'space-between',
-                                cursor: 'pointer',
-                                background: isChecked ? '#EFF6FF' : '#FFFFFF',
-                                borderBottom: '1px solid #F1F5F9',
-                              }}
-                            >
-                              <div style={{ fontSize: 13, color: isChecked ? '#1D4ED8' : '#1E293B' }}>
-                                <span style={{ fontWeight: 600 }}>{e.fullName}</span>{' '}
-                                <span style={{ color: '#64748B' }}>({e.employeeCode})</span>
-                              </div>
-                              {isChecked && <Check size={14} color="#2563EB" />}
-                            </div>
-                          );
-                        })
-                      ) : (
-                        <div style={{ padding: 12, textAlign: 'center', color: '#94A3B8', fontSize: 12 }}>
-                          Không tìm thấy nhân viên nào phù hợp
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', userSelect: 'none' }}>
+                        <input
+                          type="checkbox"
+                          checked={hasEndDate}
+                          onChange={(e) => {
+                            setHasEndDate(e.target.checked);
+                            if (!e.target.checked) setEndDate('');
+                          }}
+                          style={{ width: 16, height: 16, accentColor: '#0F766E', cursor: 'pointer' }}
+                        />
+                        <span style={{ fontSize: 13, fontWeight: 600, color: '#1E293B' }}>
+                          Có ngày kết thúc
+                        </span>
+                      </label>
+
+                      {hasEndDate && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span style={{ fontSize: 13, color: '#64748B' }}>Đến ngày:</span>
+                          <input
+                            type="date"
+                            value={endDate}
+                            min={calculatedStartDate}
+                            onChange={(e) => {
+                              setEndDate(e.target.value);
+                              setSubmitError(null);
+                            }}
+                            className="emp-form-input"
+                            style={{ height: 32, width: 150, fontSize: 13 }}
+                            required={hasEndDate}
+                          />
                         </div>
                       )}
-                      <div
-                        style={{
-                          padding: '6px 12px',
-                          background: '#F8FAFC',
-                          textAlign: 'right',
-                          borderTop: '1px solid #E2E8F0',
-                        }}
-                      >
-                        <button
-                          type="button"
-                          onClick={() => setIsOtherEmpDropdownOpen(false)}
-                          style={{
-                            border: 'none',
-                            background: 'transparent',
-                            color: '#2563EB',
-                            fontSize: 12,
-                            fontWeight: 600,
-                            cursor: 'pointer',
-                          }}
-                        >
-                          Đóng
-                        </button>
-                      </div>
                     </div>
-                  )}
+
+                    <div style={{ marginTop: 8, fontSize: 12, lineHeight: '18px' }}>
+                      {hasEndDate && endDate ? (
+                        <div style={{ color: '#D97706', display: 'flex', alignItems: 'center', gap: 6, fontWeight: 500 }}>
+                          <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#F59E0B', display: 'inline-block' }} />
+                          Có ngày kết thúc: Hệ thống sẽ tạo lịch đến ngày <strong>{endDate.split('-').reverse().join('/')}</strong>.
+                        </div>
+                      ) : (
+                        <div style={{ color: '#0F766E', display: 'flex', alignItems: 'center', gap: 6, fontWeight: 500 }}>
+                          <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#0F766E', display: 'inline-block' }} />
+                          Không kết thúc: Hệ thống sẽ tự động tạo lịch đến hết tháng hiện tại và tháng sau (đến ngày <strong>{endOfNextMonthDisplay}</strong>).
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
+
+            {/* ─── SECTION 3: THÊM LỊCH TƯƠNG TỰ CHO NHÂN VIÊN KHÁC (Chỉ hiển thị khi thêm mới, không hiển thị khi cập nhật) ─── */}
+            {!isEditMode && (
+              <div style={{ borderTop: '1px solid #F1F5F9', paddingTop: 16 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: '#0F172A' }}>
+                    Thêm lịch tương tự cho nhân viên khác
+                  </div>
+                  {/* Switch Toggle */}
+                  <label style={{ position: 'relative', display: 'inline-block', width: 38, height: 22, cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={applyToOthers}
+                      onChange={(e) => setApplyToOthers(e.target.checked)}
+                      style={{ opacity: 0, width: 0, height: 0 }}
+                    />
+                    <span
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        background: applyToOthers ? '#0F766E' : '#CBD5E1',
+                        borderRadius: 22,
+                        transition: '0.2s',
+                      }}
+                    />
+                    <span
+                      style={{
+                        position: 'absolute',
+                        height: 16,
+                        width: 16,
+                        left: applyToOthers ? 19 : 3,
+                        bottom: 3,
+                        background: '#FFFFFF',
+                        borderRadius: '50%',
+                        transition: '0.2s',
+                      }}
+                    />
+                  </label>
+                </div>
+                <div style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>
+                  {currentEmp?.workingBranchNames?.[0] || currentEmp?.salaryBranchName ? (
+                    <span>
+                      Chỉ áp dụng cho các nhân viên cùng chi nhánh (
+                      <strong style={{ color: '#0F766E' }}>
+                        {currentEmp?.workingBranchNames?.[0] || currentEmp?.salaryBranchName}
+                      </strong>
+                      )
+                    </span>
+                  ) : (
+                    'Lịch làm việc sẽ được áp dụng cho các nhân viên cùng chi nhánh'
+                  )}
+                </div>
+
+                {applyToOthers && (
+                  <div style={{ marginTop: 12, position: 'relative' }}>
+                    {/* Ô tìm kiếm nhân viên */}
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        border: '1px solid #CBD5E1',
+                        borderRadius: 6,
+                        padding: '6px 12px',
+                        background: '#FFFFFF',
+                      }}
+                    >
+                      <Search size={15} color="#94A3B8" />
+                      <input
+                        type="text"
+                        placeholder="Tìm kiếm nhân viên cùng chi nhánh..."
+                        value={otherEmployeeSearch}
+                        onChange={(e) => {
+                          setOtherEmployeeSearch(e.target.value);
+                          setIsOtherEmpDropdownOpen(true);
+                        }}
+                        onFocus={() => setIsOtherEmpDropdownOpen(true)}
+                        style={{
+                          border: 'none',
+                          outline: 'none',
+                          width: '100%',
+                          fontSize: 13,
+                          color: '#1E293B',
+                        }}
+                      />
+                    </div>
+
+                    {/* Tags nhân viên đã chọn */}
+                    {selectedOtherEmpIds.length > 0 && (
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
+                        {selectedOtherEmpIds.map((id) => {
+                          const emp = employees.find((e) => e.id === id);
+                          if (!emp) return null;
+                          return (
+                            <span
+                              key={id}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 4,
+                                background: '#F0FDFA',
+                                color: '#0F766E',
+                                border: '1px solid #99F6E4',
+                                borderRadius: 4,
+                                padding: '2px 8px',
+                                fontSize: 12,
+                                fontWeight: 500,
+                              }}
+                            >
+                              <span>{emp.fullName}</span>
+                              <span
+                                onClick={() => handleRemoveOtherEmp(id)}
+                                style={{ cursor: 'pointer', display: 'flex' }}
+                                title="Bỏ chọn"
+                              >
+                                <X size={12} />
+                              </span>
+                            </span>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {/* Dropdown danh sách gợi ý nhân viên */}
+                    {isOtherEmpDropdownOpen && (
+                      <div
+                        style={{
+                          position: 'absolute',
+                          top: '100%',
+                          left: 0,
+                          right: 0,
+                          marginTop: 4,
+                          background: '#FFFFFF',
+                          border: '1px solid #E2E8F0',
+                          borderRadius: 8,
+                          boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
+                          maxHeight: 180,
+                          overflowY: 'auto',
+                          zIndex: 100,
+                        }}
+                      >
+                        {candidateOtherEmployees.length ? (
+                          candidateOtherEmployees.map((e) => {
+                            const isChecked = selectedOtherEmpIds.includes(e.id);
+                            return (
+                              <div
+                                key={e.id}
+                                onClick={() => handleToggleOtherEmp(e.id)}
+                                style={{
+                                  padding: '8px 12px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'space-between',
+                                  cursor: 'pointer',
+                                  background: isChecked ? '#F0FDFA' : '#FFFFFF',
+                                  borderBottom: '1px solid #F1F5F9',
+                                }}
+                              >
+                                <div style={{ fontSize: 13, color: isChecked ? '#0F766E' : '#1E293B' }}>
+                                  <span style={{ fontWeight: 600 }}>{e.fullName}</span>{' '}
+                                  <span style={{ color: '#64748B' }}>({e.employeeCode})</span>
+                                </div>
+                                {isChecked && <Check size={14} color="#0F766E" />}
+                              </div>
+                            );
+                          })
+                        ) : (
+                          <div style={{ padding: 12, textAlign: 'center', color: '#94A3B8', fontSize: 12 }}>
+                            Không tìm thấy nhân viên cùng chi nhánh nào phù hợp
+                          </div>
+                        )}
+                        <div
+                          style={{
+                            padding: '6px 12px',
+                            background: '#F8FAFC',
+                            textAlign: 'right',
+                            borderTop: '1px solid #E2E8F0',
+                          }}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => setIsOtherEmpDropdownOpen(false)}
+                            style={{
+                              border: 'none',
+                              background: 'transparent',
+                              color: '#0F766E',
+                              fontSize: 12,
+                              fontWeight: 600,
+                              cursor: 'pointer',
+                            }}
+                          >
+                            Đóng
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Hiển thị lỗi nếu có từ backend */}
+            {submitError && (
+              <div
+                style={{
+                  background: '#FEF2F2',
+                  border: '1px solid #FCA5A5',
+                  color: '#991B1B',
+                  padding: '10px 14px',
+                  borderRadius: 8,
+                  fontSize: 13,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 8,
+                  marginTop: 10,
+                }}
+              >
+                <span>{submitError}</span>
+                <button
+                  type="button"
+                  onClick={() => setSubmitError(null)}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: '#991B1B',
+                    cursor: 'pointer',
+                    fontSize: 16,
+                    padding: 0,
+                    lineHeight: 1,
+                  }}
+                >
+                  &times;
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Footer nút Bỏ qua & Lưu / Cập nhật */}
@@ -855,6 +1580,7 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
                 type="button"
                 className="emp-btn emp-btn-secondary"
                 onClick={onClose}
+                disabled={isSubmitting}
                 style={{ minWidth: 80, height: 36, fontSize: 13 }}
               >
                 Bỏ qua
@@ -862,9 +1588,16 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
               <button
                 type="submit"
                 className="emp-btn emp-btn-primary"
-                style={{ minWidth: 80, height: 36, fontSize: 13 }}
+                disabled={isSubmitting}
+                style={{
+                  minWidth: 80,
+                  height: 36,
+                  fontSize: 13,
+                  opacity: isSubmitting ? 0.7 : 1,
+                  cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                }}
               >
-                {isEditMode ? 'Cập nhật' : 'Lưu'}
+                {isSubmitting ? 'Đang lưu...' : isEditMode ? 'Cập nhật' : 'Lưu'}
               </button>
             </div>
           </div>
@@ -876,26 +1609,128 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
         isOpen={showScopeModal}
         onClose={() => setShowScopeModal(false)}
         actionType={scopeAction}
+        employeeId={currentEmp?.id || editingAssignment?.employeeId}
+        branchId={currentEmpBranchId || editingAssignment?.branchId}
+        shiftId={editingAssignment?.shiftId}
+        shiftName={editingAssignment?.shiftName}
+        dayOfWeek={editingAssignment?.dayOfWeek}
         dateStr={displayDateFormatted}
         startDateStr={displayDateFormatted}
-        endDateStr="31/10/2026"
-        onConfirm={(_scope) => {
+        selectedDays={isRepeating ? selectedDays : [selectedDays[0] || (editingAssignment?.dayOfWeek || 'T2')]}
+        onConfirm={async (scope, dateRange) => {
           if (scopeAction === 'update' && pendingUpdatedItem) {
-            if (onUpdate) {
-              onUpdate(pendingUpdatedItem);
-            } else {
-              onSave([pendingUpdatedItem]);
-            }
-            if (pendingExtraAssignments.length > 0) {
-              onSave(pendingExtraAssignments);
+            try {
+              setIsSubmitting(true);
+              setSubmitError(null);
+
+              // 1. Cập nhật ca hiện tại
+              if (onUpdate) {
+                await onUpdate(pendingUpdatedItem);
+              } else if (onSave) {
+                onSave([pendingUpdatedItem]);
+              }
+
+              // 2. Theo scope confirm (Following hoặc All): CHỈ UPDATE NHỮNG THỨ ĐƯỢC CHỌN (selectedDays)
+              if ((scope === 'following' || scope === 'all') && dateRange?.fromDate && dateRange?.toDate) {
+                const daysToUpdate = isRepeating ? selectedDays : [selectedDays[0] || pendingUpdatedItem.dayOfWeek];
+                const parts = (pendingUpdatedItem.shiftTime || '').split('-').map((s) => s.trim());
+                const rawStart = parts[0] || '08:00';
+                const rawEnd = parts[1] || '17:00';
+                const formattedStart = rawStart.length === 5 ? `${rawStart}:00` : rawStart;
+                const formattedEnd = rawEnd.length === 5 ? `${rawEnd}:00` : rawEnd;
+                const shiftConfigIdVal = pendingUpdatedItem.shiftId !== 'custom' ? pendingUpdatedItem.shiftId : undefined;
+
+                const schedulesInRange = await scheduleApi.getSchedules({
+                  employeeId: currentEmp?.id || pendingUpdatedItem.employeeId,
+                  fromDate: dateRange.fromDate,
+                  toDate: dateRange.toDate,
+                  pageSize: 1000,
+                });
+
+                const matchingOtherSchedules = schedulesInRange.filter((s) => {
+                  if (editingAssignment && s.id === editingAssignment.id) return false;
+                  const dow = getScheduleDayOfWeek(s);
+                  return daysToUpdate.includes(dow);
+                });
+
+                if (matchingOtherSchedules.length > 0) {
+                  await Promise.all(
+                    matchingOtherSchedules.map((s) =>
+                      scheduleApi.updateSchedule(s.id, {
+                        shiftName: pendingUpdatedItem.shiftName,
+                        shiftConfigId: shiftConfigIdVal,
+                        shiftCode: currentSelectedShift?.code || (pendingUpdatedItem.shiftId !== 'custom' ? undefined : 'CUSTOM'),
+                        plannedStartTime: formattedStart,
+                        plannedEndTime: formattedEnd,
+                      }).catch((err) => {
+                        console.warn(`Lỗi khi cập nhật ca ${s.id}:`, err);
+                      })
+                    )
+                  );
+                }
+              }
+
+              if (onSuccess) {
+                await onSuccess();
+              }
+              onClose();
+            } catch (err: any) {
+              console.error('Lỗi khi cập nhật theo phạm vi:', err);
+              setSubmitError(err?.response?.data?.message || err?.message || 'Cập nhật ca làm việc thất bại.');
+            } finally {
+              setIsSubmitting(false);
             }
           } else if (scopeAction === 'delete' && editingAssignment) {
-            if (onDelete) {
-              onDelete(editingAssignment.id);
+            try {
+              setIsSubmitting(true);
+              setSubmitError(null);
+
+              // 1. Luôn xóa ca hiện tại
+              if (onDelete) {
+                onDelete(editingAssignment.id);
+              } else {
+                await scheduleApi.deleteSchedule(editingAssignment.id);
+              }
+
+              // 2. Nếu chọn scope Following hoặc All: xóa các ca khớp phạm vi
+              if ((scope === 'following' || scope === 'all') && dateRange?.fromDate && dateRange?.toDate) {
+                const daysToDelete = isRepeating ? selectedDays : [selectedDays[0] || editingAssignment.dayOfWeek];
+                const targetShiftNameLower = (editingAssignment.shiftName || '').toLowerCase().trim();
+
+                const schedulesInRange = await scheduleApi.getSchedules({
+                  employeeId: editingAssignment.employeeId,
+                  fromDate: dateRange.fromDate,
+                  toDate: dateRange.toDate,
+                  pageSize: 1000,
+                });
+
+                const matchingOther = schedulesInRange.filter((s) => {
+                  if (s.id === editingAssignment.id) return false;
+                  const dow = getScheduleDayOfWeek(s);
+                  const matchesDow = daysToDelete.includes(dow);
+                  const matchesShift = !targetShiftNameLower || (s.shiftName && s.shiftName.toLowerCase().trim() === targetShiftNameLower) || s.shiftId === editingAssignment.shiftId;
+                  return matchesDow && matchesShift;
+                });
+
+                if (matchingOther.length > 0) {
+                  await Promise.all(
+                    matchingOther.map((s) => scheduleApi.deleteSchedule(s.id).catch(() => {}))
+                  );
+                }
+              }
+
+              if (onSuccess) {
+                await onSuccess();
+              }
+              onClose();
+            } catch (err: any) {
+              console.error('Lỗi khi xóa ca theo phạm vi:', err);
+              setSubmitError(err?.response?.data?.message || err?.message || 'Xóa ca làm việc thất bại.');
+            } finally {
+              setIsSubmitting(false);
             }
           }
           setShowScopeModal(false);
-          onClose();
         }}
       />
     </div>

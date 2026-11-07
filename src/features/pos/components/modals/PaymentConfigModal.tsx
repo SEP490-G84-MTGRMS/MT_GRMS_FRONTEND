@@ -68,7 +68,7 @@ export const PaymentConfigModal: FC<Props> = ({ isOpen, onClose, onSaveSuccess }
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
 
   // Sinh Webhook URL tự động
-  const webhookUrl = `${window.location.origin.replace(':5173', ':5000')}/api/v1/payments/sepay-webhook`;
+  const webhookUrl = `${window.location.origin.replace(':5173', ':5000')}/api/payments/sepay-webhook`;
 
   // Tải cấu hình từ localStorage / API khi mở Modal
   useEffect(() => {
@@ -136,7 +136,7 @@ export const PaymentConfigModal: FC<Props> = ({ isOpen, onClose, onSaveSuccess }
 
     // 2. Gửi request lưu Backend API
     try {
-      await fetch('/api/v1/payments/config', {
+      await fetch('/api/payments/config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(configData),

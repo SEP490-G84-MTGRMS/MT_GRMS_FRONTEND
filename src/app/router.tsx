@@ -4,6 +4,7 @@ import { WebStoreLayout } from '../layouts/WebStoreLayout';
 import { AuthLayout } from '../layouts/AuthLayout';
 import { HomePage } from '../pages/HomePage';
 import { StoreOwnerLayout } from '../layouts/StoreOwnerLayout';
+import { EmployeeLayout } from '../layouts/EmployeeLayout';
 import { AdminLayout } from '../layouts/AdminLayout';
 import { AdminDashboardPage } from '../pages/admin/AdminDashboardPage';
 import { StoreOwnerDashboardPage } from '../features/store-owner-dashboard/pages/StoreOwnerDashboardPage';
@@ -66,6 +67,7 @@ import {
 import {
   EmployeeListPage,
   WorkSchedulePage,
+  ShiftConfigPage,
   AttendancePage,
   PayslipManagementPage,
 } from '../features/employee';
@@ -489,6 +491,10 @@ export const router = createBrowserRouter([
         element: <WorkSchedulePage />,
       },
       {
+        path: 'employees/shifts',
+        element: <ShiftConfigPage />,
+      },
+      {
         path: 'employees/attendance',
         element: <AttendancePage />,
       },
@@ -617,6 +623,10 @@ export const router = createBrowserRouter([
         element: <WorkSchedulePage />,
       },
       {
+        path: 'employees/shifts',
+        element: <ShiftConfigPage />,
+      },
+      {
         path: 'employees/attendance',
         element: <AttendancePage />,
       },
@@ -706,12 +716,36 @@ export const router = createBrowserRouter([
         element: <WorkSchedulePage />,
       },
       {
+        path: 'shifts',
+        element: <ShiftConfigPage />,
+      },
+      {
         path: 'attendance',
         element: <AttendancePage />,
       },
       {
         path: 'payroll',
         element: <PayslipManagementPage />,
+      },
+    ],
+  },
+
+  // ─── EMPLOYEE PORTAL (/employee) ───
+  {
+    path: '/employee',
+    element: <EmployeeLayout />,
+    children: [
+      {
+        index: true,
+        element: <Navigate to="/employee/schedule" replace />,
+      },
+      {
+        path: 'schedule',
+        element: <WorkSchedulePage />,
+      },
+      {
+        path: 'attendance',
+        element: <AttendancePage />,
       },
     ],
   },

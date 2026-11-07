@@ -277,11 +277,7 @@ const NAV_GROUPS: NavGroup[] = [
       {
         title: "Nhân sự & Hồ sơ",
         items: [
-          { label: "Danh sách nhân viên", to: "/store-owner/employees" },
-          {
-            label: "Hồ sơ & Hợp đồng",
-            to: "/store-owner/employees?view=profiles",
-          },
+          { label: "Danh sách nhân viên", to: "/store-owner/employees" }
         ],
       },
       {
@@ -289,15 +285,15 @@ const NAV_GROUPS: NavGroup[] = [
         items: [
           {
             label: "Lịch làm việc chi nhánh",
-            to: "/store-owner/employees/schedule",
-            badge: "Lịch",
-            badgeType: "blue",
+            to: "/store-owner/employees/schedule"
           },
           {
-            label: "Bảng chấm công GPS/QR",
-            to: "/store-owner/employees/attendance",
-            badge: "GPS/QR",
-            badgeType: "blue",
+            label: "Bảng chấm công",
+            to: "/store-owner/employees/attendance"
+          },
+          {
+            label: "Cấu hình ca làm việc",
+            to: "/store-owner/employees/shifts"
           },
         ],
       },
@@ -307,13 +303,7 @@ const NAV_GROUPS: NavGroup[] = [
           {
             label: "Bảng tính lương tháng",
             to: "/store-owner/employees/payroll",
-            badge: "Mới",
-            badgeType: "red",
-          },
-          {
-            label: "Thiết lập ca & Phụ cấp",
-            to: "/store-owner/employees/schedule?view=shifts",
-          },
+          }
         ],
       },
     ],
@@ -556,10 +546,15 @@ const NavDropdown: FC<DropdownProps> = ({
       return (
         (currPath === toPath || currPath.startsWith(toPath + "/")) &&
         !currPath.includes("/schedule") &&
+        !currPath.includes("/shifts") &&
         !currPath.includes("/attendance") &&
         !currPath.includes("/payroll") &&
         !hasOtherView
       );
+    }
+
+    if (toPath === "/store-owner/employees/shifts") {
+      return currPath === toPath || currPath.startsWith(toPath + "/");
     }
 
     if (toPath === "/store-owner/employees/schedule") {

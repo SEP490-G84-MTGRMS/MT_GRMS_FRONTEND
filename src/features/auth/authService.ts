@@ -420,37 +420,53 @@ export const authService = {
    */
   async register(payload: RegisterPayload): Promise<AuthResponse> {
     try {
-      const response = await httpClient.post<AuthResponse>('/auth/register', payload);
-      return response.data;
-    } catch {
-      await new Promise(resolve => setTimeout(resolve, 400));
-      const cleanStoreSlug = (payload.storeName || 'tiemmoi')
-        .toLowerCase()
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .replace(/[^a-z0-9]/g, '_')
-        .replace(/_+/g, '_')
-        .slice(0, 20);
-      const newTenantId = `tenant_${cleanStoreSlug}_${Date.now().toString(36)}`;
-      const newUser: UserProfile = {
-        id: `usr_new_${Date.now()}`,
-        email: payload.email || `${payload.phone}@mtgrms.vn`,
-        fullName: payload.fullName,
-        role: 'STORE_OWNER',
-        tenantId: newTenantId,
-        tenantName: payload.storeName,
-        phone: payload.phone,
-        isAdmin: false,
-      };
+      const response = await httpClient.post<any>('/auth/register', payload);
 
-      localStorage.setItem('tenant_id', newTenantId);
+      const unwrap = unwrapLogin(response.data);
+      if (unwrap) {
+        if (unwrap.user?.tenantId) {
+          localStorage.setItem('tenant_id', unwrap.user.tenantId);
+        }
+        return unwrap;
+      }
 
-      return {
-        accessToken: `mt_token_${Date.now()}_registered`,
-        refreshToken: `mt_refresh_${Date.now()}_registered`,
-        expiresIn: 3600,
-        user: newUser,
-      };
+      const raw = response.data?.data || response.data;
+      if (raw?.accessToken && raw?.user) {
+        const user = mapLoginUser(raw.user);
+        if (user.tenantId) {
+          localStorage.setItem('tenant_id', user.tenantId);
+        }
+        return {
+          accessToken: raw.accessToken,
+          refreshToken: raw.refreshToken,
+          expiresIn: 7200,
+          user,
+        };
+      }
+
+      throw new Error('Dữ liệu phản hồi từ máy chủ không hợp lệ.');
+    } catch (err: any) {
+      if (err instanceof ApiError) {
+        throw err;
+      }
+
+      const status =
+        err.response?.status ??
+        err.response?.data?.statusCode ??
+        err.response?.data?.status ??
+        (err.code === 'ERR_NETWORK' ? 0 : 500);
+
+      const errorCode =
+        err.response?.data?.errorCode ??
+        (status === 400 ? 'BAD_REQUEST' : 'REGISTER_FAILED');
+
+      const message =
+        err.response?.data?.message ??
+        (status === 400
+          ? 'Thông tin đăng ký không hợp lệ hoặc số điện thoại/email đã tồn tại.'
+          : err.message || 'Không thể kết nối đến máy chủ. Vui lòng kiểm tra lại đường truyền.');
+
+      throw new ApiError(status, message, errorCode, err.response?.data, err.response);
     }
   },
 
@@ -464,12 +480,27 @@ export const authService = {
         { email }
       );
       return response.data;
-    } catch {
-      await new Promise(resolve => setTimeout(resolve, 300));
-      return {
-        success: true,
-        message: 'Mã OTP xác thực đã được gửi về email của bạn (mô phỏng).',
-      };
+    } catch (err: unknown) {
+      const errorMsg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+        || 'Không thể gửi mã xác thực. Vui lòng kiểm tra lại địa chỉ email.';
+      throw new Error(errorMsg);
+    }
+  },
+
+  /**
+   * Xác thực mã OTP 6 số
+   */
+  async verifyOtp(email: string, otpCode: string): Promise<{ success: boolean; message: string }> {
+    try {
+      const response = await httpClient.post<{ success: boolean; message: string }>(
+        '/auth/verify-otp',
+        { email, otpCode }
+      );
+      return response.data;
+    } catch (err: unknown) {
+      const errorMsg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+        || 'Mã OTP không chính xác hoặc đã hết hạn.';
+      throw new Error(errorMsg);
     }
   },
 
@@ -487,12 +518,10 @@ export const authService = {
         payload
       );
       return response.data;
-    } catch {
-      await new Promise(resolve => setTimeout(resolve, 300));
-      return {
-        success: true,
-        message: 'Đổi mật khẩu thành công. Vui lòng đăng nhập lại.',
-      };
+    } catch (err: unknown) {
+      const errorMsg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+        || 'Không thể cập nhật mật khẩu mới. Vui lòng thử lại.';
+      throw new Error(errorMsg);
     }
   },
 
