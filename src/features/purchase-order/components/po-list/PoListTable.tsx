@@ -7,7 +7,6 @@ import {
   ChevronLeft,
   ChevronRight,
   FileText,
-  PackageCheck,
 } from 'lucide-react';
 import type { PurchaseOrderListItem, PurchaseOrderStatus } from '../../types/po-list.types';
 
@@ -20,7 +19,6 @@ interface PoListTableProps {
   onPageSizeChange?: (size: number) => void;
   onViewDetail: (order: PurchaseOrderListItem) => void;
   onEditOrder?: (order: PurchaseOrderListItem) => void;
-  onReceiveGoods?: (order: PurchaseOrderListItem) => void;
 }
 
 type SortField =
@@ -45,7 +43,6 @@ export const PoListTable: FC<PoListTableProps> = ({
   onPageSizeChange,
   onViewDetail,
   onEditOrder,
-  onReceiveGoods,
 }) => {
   const [sortField, setSortField] = useState<SortField | null>(null);
   const [sortDir, setSortDir] = useState<SortDirection>('asc');
@@ -160,136 +157,80 @@ export const PoListTable: FC<PoListTableProps> = ({
 
   const tableColGroup = (
     <colgroup>
-      <col style={{ width: '11%' }} />
+      <col style={{ width: '10%' }} />
+      <col style={{ width: '6%' }} />
+      <col style={{ width: '12%' }} />
       <col style={{ width: '7%' }} />
       <col style={{ width: '12%' }} />
+      <col style={{ width: '9%' }} />
       <col style={{ width: '8%' }} />
-      <col style={{ width: '14%' }} />
-      <col style={{ width: '12%' }} />
+      <col style={{ width: '8%' }} />
+      <col style={{ width: '5%' }} />
       <col style={{ width: '9%' }} />
       <col style={{ width: '8%' }} />
       <col style={{ width: '6%' }} />
-      <col style={{ width: '9%' }} />
-      <col style={{ width: '9%' }} />
-      <col style={{ width: '9%' }} />
     </colgroup>
   );
 
+  const tableFitStyle: CSSProperties = {
+    width: '100%',
+    minWidth: 0,
+    tableLayout: 'fixed',
+  };
+
   const thBaseStyle: CSSProperties = {
     backgroundColor: '#f8fafc',
-    padding: '10px 12px',
-    fontSize: 12,
+    padding: '8px 8px',
+    fontSize: 11.5,
     fontWeight: 700,
     color: '#334155',
     textTransform: 'uppercase',
-    letterSpacing: '0.03em',
+    letterSpacing: '0.02em',
     whiteSpace: 'nowrap',
     boxSizing: 'border-box',
   };
 
+  const cellWrap: CSSProperties = {
+    whiteSpace: 'normal',
+    overflowWrap: 'anywhere',
+    wordBreak: 'break-word',
+    lineHeight: 1.35,
+  };
+
   const renderStatusBadge = (status: PurchaseOrderStatus) => {
-    switch (status) {
-      case 'SENT':
-        return (
-          <span
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 4,
-              padding: '2px 8px',
-              borderRadius: 4,
-              fontSize: 11.5,
-              fontWeight: 700,
-              backgroundColor: '#fef3c7',
-              color: '#b45309',
-              border: '1px solid #fde68a',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            🟡 Đã gửi NCC
-          </span>
-        );
-      case 'CONFIRMED':
-        return (
-          <span
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 4,
-              padding: '2px 8px',
-              borderRadius: 4,
-              fontSize: 11.5,
-              fontWeight: 700,
-              backgroundColor: '#dcfce7',
-              color: '#15803d',
-              border: '1px solid #86efac',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            🟢 NCC đã chốt
-          </span>
-        );
-      case 'PARTIALLY_RECEIVED':
-        return (
-          <span
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 4,
-              padding: '2px 8px',
-              borderRadius: 4,
-              fontSize: 11.5,
-              fontWeight: 700,
-              backgroundColor: '#e0e7ff',
-              color: '#4338ca',
-              border: '1px solid #c7d2fe',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            🟣 Nhận 1 phần
-          </span>
-        );
-      case 'RECEIVED':
-        return (
-          <span
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 4,
-              padding: '2px 8px',
-              borderRadius: 4,
-              fontSize: 11.5,
-              fontWeight: 700,
-              backgroundColor: '#e0f2fe',
-              color: '#0369a1',
-              border: '1px solid #bae6fd',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            🔵 Đã nhập kho
-          </span>
-        );
-      case 'CANCELLED':
-        return (
-          <span
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 4,
-              padding: '2px 8px',
-              borderRadius: 4,
-              fontSize: 11.5,
-              fontWeight: 700,
-              backgroundColor: '#fee2e2',
-              color: '#dc2626',
-              border: '1px solid #fca5a5',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            🔴 Đã hủy
-          </span>
-        );
-    }
+    const colors: Record<string, string> = {
+      SENT: '#b45309',
+      CONFIRMED: '#15803d',
+      PARTIALLY_RECEIVED: '#4338ca',
+      RECEIVED: '#0369a1',
+      CANCELLED: '#dc2626',
+    };
+    const labels: Record<string, string> = {
+      SENT: 'Đã gửi',
+      CONFIRMED: 'Đã chốt',
+      PARTIALLY_RECEIVED: 'Nhận 1 phần',
+      RECEIVED: 'Đã nhập',
+      CANCELLED: 'Đã hủy',
+    };
+
+    return (
+      <span
+        style={{
+          display: 'inline-block',
+          fontSize: 12,
+          fontWeight: 700,
+          maxWidth: '100%',
+          color: colors[status] || '#334155',
+          background: 'none',
+          border: 'none',
+          padding: 0,
+          ...cellWrap,
+        }}
+        title={labels[status] || status}
+      >
+        {labels[status] || status}
+      </span>
+    );
   };
 
   return (
@@ -297,9 +238,9 @@ export const PoListTable: FC<PoListTableProps> = ({
       <div
         ref={headerRef}
         className="so-list-table-head"
-        style={{ paddingRight: hasScrollY ? 6 : 0 }}
+        style={{ paddingRight: hasScrollY ? 6 : 0, overflowX: 'hidden' }}
       >
-        <table className="so-list-table" style={{ minWidth: 1360 }}>
+        <table className="so-list-table" style={tableFitStyle}>
           {tableColGroup}
           <thead>
             <tr>
@@ -307,9 +248,9 @@ export const PoListTable: FC<PoListTableProps> = ({
                 onClick={() => handleSort('poCode')}
                 style={{ ...thBaseStyle, cursor: 'pointer', userSelect: 'none' }}
               >
-                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                   <span>Mã PO</span>
-                  <ArrowUpDown size={12} color={sortField === 'poCode' ? '#0d9488' : '#94a3b8'} />
+                  <ArrowUpDown size={11} color={sortField === 'poCode' ? '#0d9488' : '#94a3b8'} />
                 </div>
               </th>
 
@@ -317,9 +258,9 @@ export const PoListTable: FC<PoListTableProps> = ({
                 onClick={() => handleSort('branchCode')}
                 style={{ ...thBaseStyle, cursor: 'pointer', userSelect: 'none' }}
               >
-                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                   <span>Mã CN</span>
-                  <ArrowUpDown size={12} color={sortField === 'branchCode' ? '#0d9488' : '#94a3b8'} />
+                  <ArrowUpDown size={11} color={sortField === 'branchCode' ? '#0d9488' : '#94a3b8'} />
                 </div>
               </th>
 
@@ -327,9 +268,9 @@ export const PoListTable: FC<PoListTableProps> = ({
                 onClick={() => handleSort('branch')}
                 style={{ ...thBaseStyle, cursor: 'pointer', userSelect: 'none' }}
               >
-                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                  <span>Chi nhánh nhận</span>
-                  <ArrowUpDown size={12} color={sortField === 'branch' ? '#0d9488' : '#94a3b8'} />
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                  <span>Chi nhánh</span>
+                  <ArrowUpDown size={11} color={sortField === 'branch' ? '#0d9488' : '#94a3b8'} />
                 </div>
               </th>
 
@@ -337,9 +278,9 @@ export const PoListTable: FC<PoListTableProps> = ({
                 onClick={() => handleSort('supplierCode')}
                 style={{ ...thBaseStyle, cursor: 'pointer', userSelect: 'none' }}
               >
-                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                   <span>Mã NCC</span>
-                  <ArrowUpDown size={12} color={sortField === 'supplierCode' ? '#0d9488' : '#94a3b8'} />
+                  <ArrowUpDown size={11} color={sortField === 'supplierCode' ? '#0d9488' : '#94a3b8'} />
                 </div>
               </th>
 
@@ -347,21 +288,21 @@ export const PoListTable: FC<PoListTableProps> = ({
                 onClick={() => handleSort('supplier')}
                 style={{ ...thBaseStyle, cursor: 'pointer', userSelect: 'none' }}
               >
-                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                   <span>Nhà cung cấp</span>
-                  <ArrowUpDown size={12} color={sortField === 'supplier' ? '#0d9488' : '#94a3b8'} />
+                  <ArrowUpDown size={11} color={sortField === 'supplier' ? '#0d9488' : '#94a3b8'} />
                 </div>
               </th>
 
-              <th style={thBaseStyle}>Nguồn tạo / Người nhập</th>
+              <th style={thBaseStyle}>Nguồn tạo</th>
 
               <th
                 onClick={() => handleSort('lastUpdated')}
                 style={{ ...thBaseStyle, cursor: 'pointer', userSelect: 'none' }}
               >
-                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                  <span>Ngày sửa cuối</span>
-                  <ArrowUpDown size={12} color={sortField === 'lastUpdated' ? '#0d9488' : '#94a3b8'} />
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                  <span>Ngày sửa</span>
+                  <ArrowUpDown size={11} color={sortField === 'lastUpdated' ? '#0d9488' : '#94a3b8'} />
                 </div>
               </th>
 
@@ -369,9 +310,9 @@ export const PoListTable: FC<PoListTableProps> = ({
                 onClick={() => handleSort('expectedDelivery')}
                 style={{ ...thBaseStyle, cursor: 'pointer', userSelect: 'none' }}
               >
-                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                  <span>Dự kiến giao</span>
-                  <ArrowUpDown size={12} color={sortField === 'expectedDelivery' ? '#0d9488' : '#94a3b8'} />
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                  <span>Giao hàng</span>
+                  <ArrowUpDown size={11} color={sortField === 'expectedDelivery' ? '#0d9488' : '#94a3b8'} />
                 </div>
               </th>
 
@@ -380,8 +321,8 @@ export const PoListTable: FC<PoListTableProps> = ({
                 style={{ ...thBaseStyle, textAlign: 'center', cursor: 'pointer', userSelect: 'none' }}
               >
                 <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4, width: '100%' }}>
-                  <span>Số SKU</span>
-                  <ArrowUpDown size={12} color={sortField === 'itemCount' ? '#0d9488' : '#94a3b8'} />
+                  <span>SKU</span>
+                  <ArrowUpDown size={11} color={sortField === 'itemCount' ? '#0d9488' : '#94a3b8'} />
                 </div>
               </th>
 
@@ -389,9 +330,9 @@ export const PoListTable: FC<PoListTableProps> = ({
                 onClick={() => handleSort('totalAmount')}
                 style={{ ...thBaseStyle, textAlign: 'right', cursor: 'pointer', userSelect: 'none' }}
               >
-                <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-end', gap: 6, width: '100%' }}>
+                <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4, width: '100%' }}>
                   <span>Tổng tiền</span>
-                  <ArrowUpDown size={12} color={sortField === 'totalAmount' ? '#0d9488' : '#94a3b8'} />
+                  <ArrowUpDown size={11} color={sortField === 'totalAmount' ? '#0d9488' : '#94a3b8'} />
                 </div>
               </th>
 
@@ -401,11 +342,11 @@ export const PoListTable: FC<PoListTableProps> = ({
               >
                 <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4, width: '100%' }}>
                   <span>Trạng thái</span>
-                  <ArrowUpDown size={12} color={sortField === 'status' ? '#0d9488' : '#94a3b8'} />
+                  <ArrowUpDown size={11} color={sortField === 'status' ? '#0d9488' : '#94a3b8'} />
                 </div>
               </th>
 
-              <th style={{ ...thBaseStyle, textAlign: 'right' }}>Thao tác</th>
+              <th style={{ ...thBaseStyle, textAlign: 'center' }}>Thao tác</th>
             </tr>
           </thead>
         </table>
@@ -415,8 +356,9 @@ export const PoListTable: FC<PoListTableProps> = ({
         ref={bodyRef}
         className="so-list-table-body supplier-table-scroll-container"
         onScroll={handleBodyScroll}
+        style={{ overflowX: 'hidden' }}
       >
-        <table className="so-list-table" style={{ minWidth: 1360 }}>
+        <table className="so-list-table" style={tableFitStyle}>
           {tableColGroup}
           <tbody>
             {sortedOrders.length === 0 ? (
@@ -444,156 +386,151 @@ export const PoListTable: FC<PoListTableProps> = ({
                     onClick={() => onViewDetail(order)}
                     style={{ cursor: 'pointer' }}
                   >
-                    <td className="so-list-td">
+                    <td className="so-list-td so-list-td--wrap" style={cellWrap} title={order.poCode}>
                       <span
                         style={{
                           fontFamily: 'monospace',
-                          fontSize: 12.5,
+                          fontSize: 12,
                           fontWeight: 700,
                           color: '#0284c7',
+                          ...cellWrap,
                         }}
                       >
                         {order.poCode}
                       </span>
                     </td>
 
-                    <td className="so-list-td">
+                    <td className="so-list-td so-list-td--wrap" style={cellWrap} title={branchCode}>
                       <span
                         style={{
                           fontFamily: 'monospace',
                           fontSize: 12,
                           fontWeight: 600,
                           color: '#475569',
+                          ...cellWrap,
                         }}
                       >
                         {branchCode}
                       </span>
                     </td>
 
-                    <td className="so-list-td so-list-td--wrap">
-                      <span style={{ fontSize: 12.5, color: '#334155', fontWeight: 500 }}>
+                    <td className="so-list-td so-list-td--wrap" style={cellWrap} title={order.branchName}>
+                      <span style={{ fontSize: 12.5, color: '#334155', fontWeight: 500, ...cellWrap }}>
                         {order.branchName}
                       </span>
                     </td>
 
-                    <td className="so-list-td">
-                      <span style={{ fontFamily: 'monospace', fontSize: 12, color: '#64748b' }}>
+                    <td className="so-list-td so-list-td--wrap" style={cellWrap} title={order.supplierCode || '—'}>
+                      <span style={{ fontFamily: 'monospace', fontSize: 12, color: '#64748b', ...cellWrap }}>
                         {order.supplierCode || '—'}
                       </span>
                     </td>
 
-                    <td className="so-list-td so-list-td--wrap">
-                      <span style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>
+                    <td className="so-list-td so-list-td--wrap" style={cellWrap} title={order.supplierName}>
+                      <span style={{ fontSize: 12.5, fontWeight: 700, color: '#0f172a', ...cellWrap }}>
                         {order.supplierName}
                       </span>
                     </td>
 
-                    <td className="so-list-td so-list-td--wrap">
-                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: '#475569', fontSize: 12 }}>
-                        <FileText size={13} color="#94a3b8" />
-                        <span>{order.createdSource}</span>
+                    <td className="so-list-td so-list-td--wrap" style={cellWrap} title={order.createdSource}>
+                      <div
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'flex-start',
+                          gap: 4,
+                          color: '#475569',
+                          fontSize: 12,
+                          maxWidth: '100%',
+                          ...cellWrap,
+                        }}
+                      >
+                        <FileText size={12} color="#94a3b8" style={{ flexShrink: 0, marginTop: 2 }} />
+                        <span style={cellWrap}>{order.createdSource}</span>
                       </div>
                     </td>
 
-                    <td className="so-list-td">
-                      <span style={{ fontSize: 12, color: '#64748b' }}>{order.lastUpdated}</span>
+                    <td className="so-list-td so-list-td--wrap" style={cellWrap} title={order.lastUpdated}>
+                      <span style={{ fontSize: 12, color: '#64748b', ...cellWrap }}>{order.lastUpdated}</span>
                     </td>
 
-                    <td className="so-list-td">
-                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, color: '#0f172a', fontSize: 12.5, fontWeight: 600 }}>
-                        <Truck size={14} color="#0d9488" />
-                        <span>{order.expectedDelivery}</span>
+                    <td className="so-list-td so-list-td--wrap" style={cellWrap} title={order.expectedDelivery}>
+                      <div
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'flex-start',
+                          gap: 4,
+                          color: '#0f172a',
+                          fontSize: 12,
+                          fontWeight: 600,
+                          maxWidth: '100%',
+                          ...cellWrap,
+                        }}
+                      >
+                        <Truck size={12} color="#0d9488" style={{ flexShrink: 0, marginTop: 2 }} />
+                        <span style={cellWrap}>{order.expectedDelivery}</span>
                       </div>
                     </td>
 
                     <td className="so-list-td" style={{ textAlign: 'center' }}>
                       <span
                         style={{
-                          fontSize: 12,
+                          fontSize: 11.5,
                           fontWeight: 700,
-                          padding: '2px 8px',
-                          borderRadius: 4,
-                          backgroundColor: '#f1f5f9',
                           color: '#475569',
-                          border: '1px solid #e2e8f0',
                         }}
+                        title={`${order.itemCount} SKU`}
                       >
-                        {order.itemCount} SKU
+                        {order.itemCount}
                       </span>
                     </td>
 
-                    <td className="so-list-td" style={{ textAlign: 'right' }}>
+                    <td
+                      className="so-list-td so-list-td--wrap"
+                      style={{ textAlign: 'right', ...cellWrap }}
+                      title={`${order.totalAmount.toLocaleString('vi-VN')} đ`}
+                    >
                       <span
                         style={{
-                          fontSize: 13.5,
+                          fontSize: 12.5,
                           fontWeight: 800,
                           color: '#059669',
                           fontFamily: 'monospace',
+                          ...cellWrap,
                         }}
                       >
-                        {order.totalAmount.toLocaleString('vi-VN')} đ
+                        {order.totalAmount.toLocaleString('vi-VN')}
                       </span>
                     </td>
 
-                    <td className="so-list-td" style={{ textAlign: 'center' }}>
+                    <td className="so-list-td so-list-td--wrap" style={{ textAlign: 'center', ...cellWrap }}>
                       {renderStatusBadge(order.status)}
                     </td>
 
                     <td
                       className="so-list-td so-list-td--actions"
-                      style={{ textAlign: 'right' }}
+                      style={{ textAlign: 'center', overflow: 'visible' }}
                       onClick={(e) => e.stopPropagation()}
                     >
-                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, justifyContent: 'flex-end' }}>
+                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, justifyContent: 'center' }}>
                         <button
                           type="button"
                           onClick={() => onViewDetail(order)}
                           style={{
                             display: 'inline-flex',
                             alignItems: 'center',
-                            gap: 4,
-                            height: 28,
-                            padding: '0 8px',
+                            justifyContent: 'center',
+                            width: 26,
+                            height: 26,
                             borderRadius: 6,
-                            fontSize: 12,
-                            fontWeight: 600,
                             backgroundColor: '#ffffff',
                             border: '1px solid #cbd5e1',
                             color: '#334155',
                             cursor: 'pointer',
-                            whiteSpace: 'nowrap',
                           }}
                           title="Xem chi tiết đơn mua hàng"
                         >
                           <Eye size={12} />
-                          <span>Chi tiết</span>
                         </button>
-
-                        {(order.status === 'CONFIRMED' || order.status === 'SENT' || order.status === 'PARTIALLY_RECEIVED') && onReceiveGoods && (
-                          <button
-                            type="button"
-                            onClick={() => onReceiveGoods(order)}
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: 4,
-                              height: 28,
-                              padding: '0 8px',
-                              borderRadius: 6,
-                              fontSize: 12,
-                              fontWeight: 700,
-                              backgroundColor: '#0f766e',
-                              border: 'none',
-                              color: '#ffffff',
-                              cursor: 'pointer',
-                              whiteSpace: 'nowrap',
-                            }}
-                            title="Tiến hành kiểm đếm và nhận hàng từ nhà cung cấp cho đơn PO này"
-                          >
-                            <PackageCheck size={12} />
-                            <span>Nhận hàng</span>
-                          </button>
-                        )}
 
                         {(order.status === 'SENT' || order.status === 'CONFIRMED') && onEditOrder && (
                           <button
@@ -603,8 +540,8 @@ export const PoListTable: FC<PoListTableProps> = ({
                               display: 'inline-flex',
                               alignItems: 'center',
                               justifyContent: 'center',
-                              width: 28,
-                              height: 28,
+                              width: 26,
+                              height: 26,
                               borderRadius: 6,
                               backgroundColor: '#ffffff',
                               border: '1px solid #cbd5e1',

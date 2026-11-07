@@ -180,6 +180,8 @@ export interface BranchListItem {
   managerEmail?: string;
   stockQty: number; // Số lượng tồn kho thực tế
   orderQty: number; // Số lượng đặt hàng hiện tại của chi nhánh
+  /** Số SKU đang có số lượng > 0 trên Order Matrix (draft) của chi nhánh */
+  matrixProductCount: number;
   inventoryStatus?: BranchInventoryStatus;
   inventoryNote?: string;
   orderSummary: string;

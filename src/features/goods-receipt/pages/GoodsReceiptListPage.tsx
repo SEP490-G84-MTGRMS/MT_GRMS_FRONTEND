@@ -3,10 +3,9 @@ import type { FC } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   PackageCheck,
-  Plus,
   ShieldCheck,
   UserCheck,
-  Layers,
+  Plus,
   Loader2,
 } from 'lucide-react';
 import type {
@@ -350,12 +349,18 @@ export const GoodsReceiptListPage: FC<{ defaultRole?: UserRole }> = ({
 
           <button
             type="button"
-            onClick={() => navigate('/store-owner/purchase-orders/list')}
+            onClick={() =>
+              navigate(
+                role === 'employee'
+                  ? `${basePath}/create?branch=${encodeURIComponent(employeeBranchId)}&role=employee`
+                  : `${basePath}/create`
+              )
+            }
             className="po-btn po-btn-primary"
-            title="Mở danh sách đơn mua hàng (PO) để kiểm đếm & nhận hàng khi NCC giao đến"
+            title="Lập phiếu nhập kho từ đơn PO"
           >
-            <Layers size={14} />
-            <span>Nhận hàng từ Đơn PO</span>
+            <Plus size={14} />
+            <span>Lập phiếu nhập kho</span>
           </button>
         </div>
       </div>

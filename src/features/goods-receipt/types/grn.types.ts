@@ -3,6 +3,7 @@ export type GrnStatus = 'DRAFT' | 'COMPLETED' | 'CANCELLED' | 'TODAY' | 'CONFIRM
 export type GrnType = 'FROM_PO' | 'TODAY_DELIVERY';
 
 export type RejectionReason =
+  | 'SHORT_DELIVERY'
   | 'DAMAGE'
   | 'EXPIRED'
   | 'NEAR_EXPIRY'
@@ -12,6 +13,7 @@ export type RejectionReason =
   | 'OTHER';
 
 export const REJECTION_REASON_LABELS: Record<RejectionReason, string> = {
+  SHORT_DELIVERY: 'NCC giao thiếu so với PO',
   DAMAGE: 'Hàng hư hỏng / móp méo',
   EXPIRED: 'Hàng đã hết hạn sử dụng',
   NEAR_EXPIRY: 'Hàng cận hạn không đạt chuẩn',
@@ -46,14 +48,18 @@ export interface GrnItemDetail {
   differenceQty: number; // Chênh lệch thực tế nhập vs đặt = acceptedQty - orderedQty
   rejectionReason?: RejectionReason; // Lý do từ chối nếu có hàng hỏng
   rejectionNote?: string; // Ghi chú lý do từ chối nếu là OTHER
-  hasBatches?: boolean; // Sản phẩm có quản lý HSD hay không
-  batches?: GrnBatchDetail[]; // Danh sách nhiều lô cho 1 sản phẩm
+  hasBatches?: boolean; // Gợi ý từ Product catalog
+  /** User tick trên phiếu: bật thì bắt buộc MFG + EXP */
+  manageBatch?: boolean;
+  /** Dòng tách lô từ dòng PO gốc — có thể xóa */
+  isSplitLine?: boolean;
+  batches?: GrnBatchDetail[];
   unitPrice: number;
   lineTotal: number;
-  batchCode?: string; // Mã lô hàng FEFO (vd: B26-1008)
-  manufactureDate?: string; // Ngày sản xuất
-  expiryDate?: string; // Hạn sử dụng (vd: 2027-10-08)
-  note?: string; // Ghi chú
+  batchCode?: string;
+  manufactureDate?: string;
+  expiryDate?: string;
+  note?: string;
 }
 
 export type GrnRemainingOption = 'cancel' | 'backorder';

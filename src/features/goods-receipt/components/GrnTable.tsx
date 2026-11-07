@@ -187,14 +187,14 @@ export const GrnTable: FC<GrnTableProps> = ({
   };
 
   const renderStatusBadge = (status: GrnStatus) => {
-    const styles: Record<string, CSSProperties> = {
-      TODAY: { backgroundColor: '#e0f2fe', color: '#0369a1', border: '1px solid #bae6fd' },
-      DRAFT: { backgroundColor: '#fef3c7', color: '#b45309', border: '1px solid #fde68a' },
-      CONFIRMED: { backgroundColor: '#dcfce7', color: '#15803d', border: '1px solid #86efac' },
-      COMPLETED: { backgroundColor: '#dcfce7', color: '#15803d', border: '1px solid #86efac' },
-      MISMATCH: { backgroundColor: '#fee2e2', color: '#dc2626', border: '1px solid #fca5a5' },
-      CANCELED: { backgroundColor: '#f1f5f9', color: '#64748b', border: '1px solid #cbd5e1' },
-      CANCELLED: { backgroundColor: '#f1f5f9', color: '#64748b', border: '1px solid #cbd5e1' },
+    const colors: Record<string, string> = {
+      TODAY: '#0369a1',
+      DRAFT: '#b45309',
+      CONFIRMED: '#15803d',
+      COMPLETED: '#15803d',
+      MISMATCH: '#dc2626',
+      CANCELED: '#64748b',
+      CANCELLED: '#64748b',
     };
     const labels: Record<string, string> = {
       TODAY: 'Scheduled',
@@ -211,12 +211,13 @@ export const GrnTable: FC<GrnTableProps> = ({
         style={{
           display: 'inline-flex',
           alignItems: 'center',
-          padding: '2px 8px',
-          borderRadius: 4,
-          fontSize: 11.5,
+          fontSize: 12,
           fontWeight: 700,
           whiteSpace: 'nowrap',
-          ...styles[status],
+          color: colors[status] || '#334155',
+          background: 'none',
+          border: 'none',
+          padding: 0,
         }}
       >
         {labels[status] || status}
@@ -341,17 +342,9 @@ export const GrnTable: FC<GrnTableProps> = ({
               </tr>
             ) : (
               sortedReceipts.map((row) => {
-                const isMismatch = row.status === 'MISMATCH' || !!row.hasMismatch;
                 const isToday = row.status === 'TODAY';
-
                 return (
-                  <tr
-                    key={row.id}
-                    className="so-list-row"
-                    style={{
-                      backgroundColor: isToday ? '#fcfdff' : isMismatch ? '#fffbfb' : undefined,
-                    }}
-                  >
+                  <tr key={row.id} className="so-list-row">
                     <td style={cellEllipsis} title={row.code}>
                       <button
                         type="button"

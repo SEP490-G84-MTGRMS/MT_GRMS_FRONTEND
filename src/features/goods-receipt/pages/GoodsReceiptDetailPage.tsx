@@ -94,7 +94,6 @@ export const GoodsReceiptDetailPage: FC<{ defaultRole?: UserRole }> = ({
   const employeeBranchId = searchParams.get('branch') || '';
 
   const [receipt, setReceipt] = useState<GoodsReceiptListItem | null>(null);
-  const [freightFee, setFreightFee] = useState(0);
   const [discount, setDiscount] = useState(0);
   const [vatPercent, setVatPercent] = useState(0);
   const [notes, setNotes] = useState<string>('');
@@ -141,7 +140,6 @@ export const GoodsReceiptDetailPage: FC<{ defaultRole?: UserRole }> = ({
       const mapped = mapDtoToReceipt(dto);
       setReceipt(mapped);
       setStatus(mapped.status);
-      setFreightFee(dto.freightFee || 0);
       setDiscount(dto.discountAmount || 0);
       setVatPercent(dto.vatPercent || 0);
       setNotes(dto.note || '');
@@ -201,11 +199,11 @@ export const GoodsReceiptDetailPage: FC<{ defaultRole?: UserRole }> = ({
       (sum, it) => sum + (it.acceptedQty !== undefined ? it.acceptedQty : it.receivedQty || 0) * (it.unitPrice || 0),
       0
     );
-    const subtotalAfterDiscount = Math.max(0, goodsTotal - discount + freightFee);
+    const subtotalAfterDiscount = Math.max(0, goodsTotal - discount);
     const vatAmount = Math.round(subtotalAfterDiscount * (vatPercent / 100));
     const grandTotal = subtotalAfterDiscount + vatAmount;
-    return { goodsTotal, landedCost: freightFee, discountAmount: discount, vatPercent, vatAmount, grandTotal };
-  }, [items, discount, freightFee, vatPercent]);
+    return { goodsTotal, landedCost: 0, discountAmount: discount, vatPercent, vatAmount, grandTotal };
+  }, [items, discount, vatPercent]);
 
   const totalLabels = useMemo(
     () => items.reduce((sum, it) => sum + Math.ceil(it.acceptedQty ?? it.receivedQty ?? 0), 0),
@@ -430,7 +428,6 @@ export const GoodsReceiptDetailPage: FC<{ defaultRole?: UserRole }> = ({
           receiverName={receipt.receiverName}
           status={status}
           goodsTotal={costs.goodsTotal}
-          landedCost={costs.landedCost}
           discount={costs.discountAmount}
           vatPercent={costs.vatPercent}
           grandTotal={costs.grandTotal}
@@ -459,7 +456,6 @@ export const GoodsReceiptDetailPage: FC<{ defaultRole?: UserRole }> = ({
             costs={costs}
             readOnly={isReadOnly}
             onNotesChange={setNotes}
-            onLandedCostChange={setFreightFee}
             onDiscountChange={setDiscount}
             onVatPercentChange={setVatPercent}
           />

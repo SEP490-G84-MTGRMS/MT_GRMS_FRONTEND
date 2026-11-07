@@ -1,6 +1,5 @@
 import { useEffect } from 'react';
 import type { FC } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
   X,
   Truck,
@@ -8,7 +7,6 @@ import {
   Factory,
   MessageSquare,
   PackageOpen,
-  PackageCheck,
 } from 'lucide-react';
 import type { PurchaseOrderListItem, PurchaseOrderStatus } from '../../types/po-list.types';
 
@@ -19,8 +17,6 @@ interface PoDetailDrawerProps {
 }
 
 export const PoDetailDrawer: FC<PoDetailDrawerProps> = ({ order, isOpen, onClose }) => {
-  const navigate = useNavigate();
-
   // Handle ESC key to close drawer
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -575,6 +571,7 @@ export const PoDetailDrawer: FC<PoDetailDrawerProps> = ({ order, isOpen, onClose
               </span>
             </div>
           </div>
+
         </div>
       </div>
     </div>

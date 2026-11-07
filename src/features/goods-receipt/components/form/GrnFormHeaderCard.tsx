@@ -148,26 +148,11 @@ export const GrnFormHeaderCard: FC<GrnFormHeaderCardProps> = ({
                 color: '#1e293b',
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'space-between',
               }}
             >
               <span>
-                {resolveBranchLabel(isEmployee ? employeeBranchId || branchId : branchId)}
+                {resolveBranchLabel(branchId || employeeBranchId)}
               </span>
-              {isEmployee && (
-                <span
-                  style={{
-                    fontSize: 10.5,
-                    padding: '1px 6px',
-                    borderRadius: 4,
-                    backgroundColor: '#e2e8f0',
-                    color: '#475569',
-                    fontWeight: 700,
-                  }}
-                >
-                  Cố định
-                </span>
-              )}
             </div>
           ) : (
             <select
@@ -296,7 +281,7 @@ export const GrnFormHeaderCard: FC<GrnFormHeaderCardProps> = ({
           )}
         </div>
 
-        {/* 4. Nhà cung cấp */}
+        {/* 4. Mã nhà cung cấp */}
         <div>
           <label
             style={{
@@ -310,7 +295,42 @@ export const GrnFormHeaderCard: FC<GrnFormHeaderCardProps> = ({
             }}
           >
             <Building2 size={13} color="#64748b" />
-            <span>Nhà cung cấp:</span>
+            <span>Mã nhà cung cấp:</span>
+          </label>
+          <div
+            style={{
+              height: 34,
+              padding: '0 10px',
+              backgroundColor: '#f8fafc',
+              border: '1px solid #cbd5e1',
+              borderRadius: 6,
+              fontSize: 12.5,
+              fontWeight: 700,
+              fontFamily: 'monospace',
+              color: '#0f172a',
+              display: 'flex',
+              alignItems: 'center',
+            }}
+          >
+            <span>{supplierCode || '—'}</span>
+          </div>
+        </div>
+
+        {/* 5. Tên nhà cung cấp */}
+        <div>
+          <label
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 5,
+              fontSize: 12,
+              fontWeight: 600,
+              color: '#475569',
+              marginBottom: 5,
+            }}
+          >
+            <Building2 size={13} color="#64748b" />
+            <span>Tên nhà cung cấp:</span>
           </label>
           <div
             style={{
@@ -324,28 +344,19 @@ export const GrnFormHeaderCard: FC<GrnFormHeaderCardProps> = ({
               color: '#0f172a',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'space-between',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
             }}
+            title={supplierName || undefined}
           >
-            <span>{supplierName || '— Chưa chọn PO —'}</span>
-            {supplierCode && (
-              <span
-                style={{
-                  fontSize: 11,
-                  fontFamily: 'monospace',
-                  padding: '1px 6px',
-                  borderRadius: 4,
-                  backgroundColor: '#e2e8f0',
-                  color: '#475569',
-                }}
-              >
-                {supplierCode}
-              </span>
-            )}
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {supplierName || '— Chưa chọn PO —'}
+            </span>
           </div>
         </div>
 
-        {/* 5. Ngày giờ nhận hàng */}
+        {/* 6. Ngày giờ nhận hàng */}
         <div>
           <label
             style={{
@@ -380,7 +391,7 @@ export const GrnFormHeaderCard: FC<GrnFormHeaderCardProps> = ({
           />
         </div>
 
-        {/* 6. Số hóa đơn / Phiếu giao hàng */}
+        {/* 7. Số hóa đơn / Phiếu giao hàng */}
         <div>
           <label
             style={{
@@ -417,7 +428,7 @@ export const GrnFormHeaderCard: FC<GrnFormHeaderCardProps> = ({
           />
         </div>
 
-        {/* 7. Người lập phiếu */}
+        {/* 8. Người lập phiếu */}
         <div>
           <label
             style={{
@@ -452,7 +463,7 @@ export const GrnFormHeaderCard: FC<GrnFormHeaderCardProps> = ({
           />
         </div>
 
-        {/* 8. Hạn thanh toán */}
+        {/* 9. Hạn thanh toán */}
         <div>
           <label
             style={{
@@ -492,7 +503,7 @@ export const GrnFormHeaderCard: FC<GrnFormHeaderCardProps> = ({
           </select>
         </div>
 
-        {/* 9. Hình thức thanh toán */}
+        {/* 10. Hình thức thanh toán */}
         <div>
           <label
             style={{

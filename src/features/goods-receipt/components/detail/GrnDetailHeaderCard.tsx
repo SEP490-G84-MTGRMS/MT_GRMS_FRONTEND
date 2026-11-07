@@ -24,7 +24,6 @@ interface GrnDetailHeaderCardProps {
   receiverName: string;
   status: GrnStatus;
   goodsTotal: number;
-  landedCost: number;
   discount: number;
   vatPercent: number;
   grandTotal: number;
@@ -67,7 +66,6 @@ export const GrnDetailHeaderCard: FC<GrnDetailHeaderCardProps> = ({
   receiverName,
   status,
   goodsTotal,
-  landedCost,
   discount,
   grandTotal,
   paymentTerm = 'CREDIT_30',
@@ -505,11 +503,6 @@ export const GrnDetailHeaderCard: FC<GrnDetailHeaderCardProps> = ({
           <div>
             <span style={{ color: '#64748b' }}>Tiền hàng: </span>
             <strong style={{ color: '#1e293b' }}>{formatCurrency(goodsTotal)}</strong>
-          </div>
-          <div style={{ color: '#cbd5e1' }}>|</div>
-          <div>
-            <span style={{ color: '#64748b' }}>Phí VC (Landed Cost): </span>
-            <strong style={{ color: '#d97706' }}>+{formatCurrency(landedCost)}</strong>
           </div>
           {discount > 0 && (
             <>
