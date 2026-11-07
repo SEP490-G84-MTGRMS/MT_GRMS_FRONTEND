@@ -29,7 +29,6 @@ import type { ShiftDetailResponse } from '../types/posShift.types';
 import { OpenShiftModal } from '../components/modals/OpenShiftModal';
 import { CashMovementModal } from '../components/modals/CashMovementModal';
 import { CloseShiftModal } from '../components/modals/CloseShiftModal';
-import { OwnerCashApprovalDrawer } from '../components/drawers/OwnerCashApprovalDrawer';
 import { ZReportModal } from '../components/modals/ZReportModal';
 import { storeProductApi } from '../../product/api/storeProductApi';
 import { useAuthStore } from '../../../stores/useAuthStore';
@@ -120,7 +119,6 @@ export const PosCheckoutPage: FC = () => {
   const [isOpenShiftModalOpen, setIsOpenShiftModalOpen] = useState(false);
   const [isCashMovementModalOpen, setIsCashMovementModalOpen] = useState(false);
   const [isCloseShiftModalOpen, setIsCloseShiftModalOpen] = useState(false);
-  const [isOwnerApprovalDrawerOpen, setIsOwnerApprovalDrawerOpen] = useState(false);
   const [isZReportModalOpen, setIsZReportModalOpen] = useState(false);
   const [pendingApprovalCount, setPendingApprovalCount] = useState<number>(0);
   const [closedShiftForZReport, setClosedShiftForZReport] = useState<ShiftDetailResponse | null>(null);
@@ -808,11 +806,10 @@ export const PosCheckoutPage: FC = () => {
         onHoldOrder={handleHoldOrder}
         onPrintRecent={handlePrintRecent}
         pendingApprovalCount={pendingApprovalCount}
-        onOpenApprovalDrawer={() => setIsOwnerApprovalDrawerOpen(true)}
         currentShift={currentShift}
-        onOpenCashMovement={() => setIsCashMovementModalOpen(true)}
-        onCloseShift={() => setIsCloseShiftModalOpen(true)}
-        onOpenShift={() => setIsOpenShiftModalOpen(true)}
+        onOpenCashMovement={isStoreOwner ? undefined : () => setIsCashMovementModalOpen(true)}
+        onCloseShift={isStoreOwner ? undefined : () => setIsCloseShiftModalOpen(true)}
+        onOpenShift={isStoreOwner ? undefined : () => setIsOpenShiftModalOpen(true)}
       />
 
       {/* 2. Main Body Split */}
@@ -968,7 +965,7 @@ setIsDebtWarningOpen(false);
         }}
       />
 
-      {currentShift && (
+      {!isStoreOwner && currentShift && (
         <CashMovementModal
           isOpen={isCashMovementModalOpen}
           shift={currentShift}
@@ -980,7 +977,7 @@ setIsDebtWarningOpen(false);
         />
       )}
 
-      {currentShift && (
+      {!isStoreOwner && currentShift && (
         <CloseShiftModal
           isOpen={isCloseShiftModalOpen}
           shift={currentShift}
@@ -994,16 +991,6 @@ setIsDebtWarningOpen(false);
           }}
         />
       )}
-
-      <OwnerCashApprovalDrawer
-        isOpen={isOwnerApprovalDrawerOpen}
-        branchId={activeBranch.id}
-        onClose={() => setIsOwnerApprovalDrawerOpen(false)}
-        onActionComplete={() => {
-          showToast('✅ Đã cập nhật trạng thái duyệt chi!');
-          checkShiftStatus();
-        }}
-      />
 
       {closedShiftForZReport && (
         <ZReportModal

@@ -13,9 +13,9 @@ import {
   Layers,
   Receipt,
   Package,
-  Bell,
   ArrowLeftRight,
   DoorOpen,
+  ShieldCheck,
 } from 'lucide-react';
 import type { OrderTab, Product } from '../types/pos.types';
 import type { ShiftDetailResponse } from '../types/posShift.types';
@@ -43,7 +43,6 @@ interface Props {
   onSelectBranch?: (branchId: string) => void;
   onOpenInventoryLookup?: () => void;
   pendingApprovalCount?: number;
-  onOpenApprovalDrawer?: () => void;
   currentShift?: ShiftDetailResponse | null;
   onOpenCashMovement?: () => void;
   onOpenShift?: () => void;
@@ -71,7 +70,6 @@ export const PosHeader: FC<Props> = ({
   onSelectBranch,
   onOpenInventoryLookup,
   pendingApprovalCount = 0,
-  onOpenApprovalDrawer,
   currentShift,
   onOpenCashMovement,
   onOpenShift,
@@ -603,7 +601,8 @@ export const PosHeader: FC<Props> = ({
                   </div>
                 </button>
 
-                {onOpenCashMovement && (
+                {/* 1. Thu / Chi tiền mặt két: CHỈ dành cho Nhân viên thu ngân trực tiếp quản lý ca bán hàng */}
+                {!isStoreOwner && onOpenCashMovement && (
                   <button
                     type="button"
                     className="pos-dropdown-item"
@@ -627,21 +626,22 @@ export const PosHeader: FC<Props> = ({
                   </button>
                 )}
 
-                {isStoreOwner && onOpenApprovalDrawer && (
+                {/* 2. Với Chủ Cửa Hàng: Điều hướng ra ngoài trang quản lý Hạn Mức & Phê Duyệt Chi Két tập trung */}
+                {isStoreOwner && (
                   <button
                     type="button"
                     className="pos-dropdown-item"
                     onClick={() => {
                       setIsMenuOpen(false);
-                      onOpenApprovalDrawer();
+                      navigate('/store-owner/pos-cash-control');
                     }}
                   >
-                    <Bell size={16} className="text-teal-700" />
+                    <ShieldCheck size={16} className="text-teal-700" />
                     <div className="item-content">
                       <div className="item-title">
-                        Duyệt chi két & Rút két {typeof pendingApprovalCount === 'number' && pendingApprovalCount > 0 ? `(${pendingApprovalCount})` : ''}
+                        Hạn mức & Duyệt chi két {typeof pendingApprovalCount === 'number' && pendingApprovalCount > 0 ? `(${pendingApprovalCount})` : ''}
                       </div>
-                      <div className="item-desc">Phê duyệt phiếu chi vượt hạn mức từ thu ngân</div>
+                      <div className="item-desc">Đến trang thiết lập hạn mức & phê duyệt thu chi két bên ngoài</div>
                     </div>
                   </button>
                 )}

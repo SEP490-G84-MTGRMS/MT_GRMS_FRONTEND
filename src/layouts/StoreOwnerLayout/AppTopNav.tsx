@@ -31,6 +31,7 @@ import {
   NotificationDrawer,
 } from "../../features/notifications";
 import { BranchSelectorDropdown } from "./BranchSelectorDropdown";
+import { posShiftApi } from "../../features/pos/api/posShiftApi";
 /* ─── Data ─── */
 
 interface NavSubItem {
@@ -857,6 +858,26 @@ export const AppTopNav: FC = () => {
   const [settingsMenuOpen, setSettingsMenuOpen] = useState(false);
   const settingsMenuRef = useRef<HTMLDivElement | null>(null);
   const settingsTimerRef = useRef<number | null>(null);
+  const [pendingCashApprovalCount, setPendingCashApprovalCount] = useState<number>(0);
+
+  useEffect(() => {
+    if (user?.role === 'STORE_OWNER') {
+      const fetchPending = async () => {
+        try {
+          const res = await posShiftApi.getPendingMovements('');
+          if (res?.movements) {
+            const count = res.movements.filter(
+              (m) => m.status === 'PendingApproval' || m.status === 2 || ((m.category === 'CASH_DRAW' || m.category === 2) && !m.isConfirmedByOwner)
+            ).length;
+            setPendingCashApprovalCount(count);
+          }
+        } catch {
+          // ignore
+        }
+      };
+      fetchPending();
+    }
+  }, [user?.role, location.pathname]);
 
   const clearSettingsTimer = useCallback(() => {
     if (settingsTimerRef.current !== null) {
@@ -1424,6 +1445,7 @@ export const AppTopNav: FC = () => {
                   setSettingsMenuOpen((v) => !v);
                 }}
                 style={{
+                  position: "relative",
                   width: 32,
                   height: 32,
                   borderRadius: "50%",
@@ -1447,11 +1469,29 @@ export const AppTopNav: FC = () => {
                     ? "rgba(255, 255, 255, 0.4)"
                     : "transparent";
                 }}
-                title="Thiết lập gian hàng, thanh toán & Gói dịch vụ"
+                title={
+                  pendingCashApprovalCount > 0
+                    ? `Cài đặt (${pendingCashApprovalCount} phiếu chi/rút két chờ duyệt)`
+                    : "Thiết lập gian hàng, thanh toán & Gói dịch vụ"
+                }
                 aria-expanded={settingsMenuOpen}
                 aria-haspopup="true"
               >
                 <Settings size={18} strokeWidth={2} />
+                {pendingCashApprovalCount > 0 && (
+                  <span
+                    style={{
+                      position: "absolute",
+                      top: 2,
+                      right: 2,
+                      width: 8,
+                      height: 8,
+                      borderRadius: "50%",
+                      backgroundColor: "#ef4444",
+                      border: "1.5px solid #0f766e",
+                    }}
+                  />
+                )}
               </button>
 
               {settingsMenuOpen && (
@@ -1645,18 +1685,33 @@ export const AppTopNav: FC = () => {
                             >
                               Hạn Mức & Duyệt Chi Két POS
                             </span>
-                            <span
-                              style={{
-                                fontSize: 10,
-                                fontWeight: 700,
-                                backgroundColor: "#0f766e",
-                                color: "#ffffff",
-                                padding: "1px 6px",
-                                borderRadius: 10,
-                              }}
-                            >
-                              POS
-                            </span>
+                            {pendingCashApprovalCount > 0 ? (
+                              <span
+                                style={{
+                                  fontSize: 10,
+                                  fontWeight: 700,
+                                  backgroundColor: "#ef4444",
+                                  color: "#ffffff",
+                                  padding: "1px 7px",
+                                  borderRadius: 10,
+                                }}
+                              >
+                                {pendingCashApprovalCount} cần duyệt
+                              </span>
+                            ) : (
+                              <span
+                                style={{
+                                  fontSize: 10,
+                                  fontWeight: 700,
+                                  backgroundColor: "#0f766e",
+                                  color: "#ffffff",
+                                  padding: "1px 6px",
+                                  borderRadius: 10,
+                                }}
+                              >
+                                POS
+                              </span>
+                            )}
                           </div>
                           <div
                             style={{
@@ -1665,7 +1720,7 @@ export const AppTopNav: FC = () => {
                               marginTop: 2,
                             }}
                           >
-                            Hạn mức chi vặt tự động, phê duyệt rút két & chi phát sinh
+                            Thiết lập hạn mức, phê duyệt chi két & xác nhận tiền rút két
                           </div>
                         </div>
                       </Link>
