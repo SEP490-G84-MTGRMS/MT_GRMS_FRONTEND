@@ -24,6 +24,8 @@ export interface OrderCreateRequest {
   creatorRole?: string | null;
   cashierName?: string | null;
   shiftId?: string | null;
+  pointsRedeemed?: number | null;
+  voucherCode?: string | null;
 }
 
 export interface OrderItemResponse {
