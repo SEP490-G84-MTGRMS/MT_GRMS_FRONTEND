@@ -23,10 +23,6 @@ export interface AttendancePolicyDto {
   lateThresholdMinutes: number;
   enableEarlyLeaveThreshold: boolean;
   earlyLeaveThresholdMinutes: number;
-  enableOtBeforeShift: boolean;
-  otBeforeShiftMinutes: number;
-  enableOtAfterShift: boolean;
-  otAfterShiftMinutes: number;
   isCustomized: boolean;
 }
 
@@ -38,10 +34,6 @@ export interface UpsertAttendancePolicyPayload {
   lateThresholdMinutes: number;
   enableEarlyLeaveThreshold: boolean;
   earlyLeaveThresholdMinutes: number;
-  enableOtBeforeShift: boolean;
-  otBeforeShiftMinutes: number;
-  enableOtAfterShift: boolean;
-  otAfterShiftMinutes: number;
 }
 
 export interface CopyAttendancePolicyPayload {

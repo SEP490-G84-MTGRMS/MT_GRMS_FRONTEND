@@ -20,12 +20,6 @@ export interface AttendanceConfig {
   lateThresholdMinutes: number;
   enableEarlyLeaveThreshold: boolean;
   earlyLeaveThresholdMinutes: number;
-
-  // 3. Cài đặt làm thêm giờ
-  enableOtBeforeShift: boolean;
-  otBeforeShiftMinutes: number;
-  enableOtAfterShift: boolean;
-  otAfterShiftMinutes: number;
 }
 
 export const DEFAULT_ATTENDANCE_CONFIG: AttendanceConfig = {
@@ -55,10 +49,6 @@ export const DEFAULT_ATTENDANCE_CONFIG: AttendanceConfig = {
   lateThresholdMinutes: 0,
   enableEarlyLeaveThreshold: true,
   earlyLeaveThresholdMinutes: 0,
-  enableOtBeforeShift: true,
-  otBeforeShiftMinutes: 0,
-  enableOtAfterShift: true,
-  otAfterShiftMinutes: 0,
 };
 
 export type AttendanceConfigsByBranch = Record<string, AttendanceConfig>;
@@ -122,10 +112,6 @@ export const AttendanceConfigModal: React.FC<AttendanceConfigModalProps> = ({
         lateThresholdMinutes: dto.lateThresholdMinutes ?? 0,
         enableEarlyLeaveThreshold: dto.enableEarlyLeaveThreshold ?? true,
         earlyLeaveThresholdMinutes: dto.earlyLeaveThresholdMinutes ?? 0,
-        enableOtBeforeShift: dto.enableOtBeforeShift ?? true,
-        otBeforeShiftMinutes: dto.otBeforeShiftMinutes ?? 0,
-        enableOtAfterShift: dto.enableOtAfterShift ?? true,
-        otAfterShiftMinutes: dto.otAfterShiftMinutes ?? 0,
       });
       setRules(parsedRules);
       setIsCustomized(Boolean(dto.isCustomized));
@@ -209,10 +195,6 @@ export const AttendanceConfigModal: React.FC<AttendanceConfigModalProps> = ({
         lateThresholdMinutes: currentConfig.lateThresholdMinutes,
         enableEarlyLeaveThreshold: currentConfig.enableEarlyLeaveThreshold,
         earlyLeaveThresholdMinutes: currentConfig.earlyLeaveThresholdMinutes,
-        enableOtBeforeShift: currentConfig.enableOtBeforeShift,
-        otBeforeShiftMinutes: currentConfig.otBeforeShiftMinutes,
-        enableOtAfterShift: currentConfig.enableOtAfterShift,
-        otAfterShiftMinutes: currentConfig.otAfterShiftMinutes,
       };
       await attendancePolicyApi.upsertPolicy(selectedBranchId, payload);
 
@@ -252,10 +234,6 @@ export const AttendanceConfigModal: React.FC<AttendanceConfigModalProps> = ({
         lateThresholdMinutes: currentConfig.lateThresholdMinutes,
         enableEarlyLeaveThreshold: currentConfig.enableEarlyLeaveThreshold,
         earlyLeaveThresholdMinutes: currentConfig.earlyLeaveThresholdMinutes,
-        enableOtBeforeShift: currentConfig.enableOtBeforeShift,
-        otBeforeShiftMinutes: currentConfig.otBeforeShiftMinutes,
-        enableOtAfterShift: currentConfig.enableOtAfterShift,
-        otAfterShiftMinutes: currentConfig.otAfterShiftMinutes,
       };
 
       await attendancePolicyApi.upsertPolicy(selectedBranchId, payload);
@@ -912,149 +890,20 @@ export const AttendanceConfigModal: React.FC<AttendanceConfigModalProps> = ({
               </div>
             </div>
 
-            {/* ─── SECTION 3: CÀI ĐẶT LÀM THÊM GIỜ ─── */}
-            <div>
-              <div style={{ fontSize: 14.5, fontWeight: 700, color: '#0F172A', marginBottom: 4 }}>
-                Cài đặt làm thêm giờ
+            {/* ─── THÔNG BÁO VỀ CHÍNH SÁCH LÀM THÊM GIỜ (OT) ─── */}
+            <div
+              style={{
+                backgroundColor: '#F8FAFC',
+                border: '1px solid #E2E8F0',
+                borderRadius: 8,
+                padding: '14px 16px',
+              }}
+            >
+              <div style={{ fontSize: 13.5, fontWeight: 700, color: '#0F172A', marginBottom: 4 }}>
+                Chính sách làm thêm giờ (OT)
               </div>
-              <div style={{ fontSize: 12.5, color: '#64748B', marginBottom: 16 }}>
-                Tính làm thêm giờ cho nhân viên khi vào ca sớm hoặc tan ca muộn tại {currentBranchName}
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                {/* Tính làm thêm giờ trước ca */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13 }}>
-                  <label
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 8,
-                      minWidth: 180,
-                      cursor: 'pointer',
-                      color: '#334155',
-                    }}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={currentConfig.enableOtBeforeShift}
-                      onChange={(e) =>
-                        setCurrentConfig((prev) => ({
-                          ...prev,
-                          enableOtBeforeShift: e.target.checked,
-                        }))
-                      }
-                      style={{
-                        width: 16,
-                        height: 16,
-                        accentColor: 'var(--blue-primary, #0F766E)',
-                        cursor: 'pointer',
-                      }}
-                    />
-                    <span>Tính làm thêm giờ trước ca</span>
-                  </label>
-                  <input
-                    type="number"
-                    min={0}
-                    max={240}
-                    value={currentConfig.otBeforeShiftMinutes}
-                    disabled={!currentConfig.enableOtBeforeShift}
-                    onChange={(e) =>
-                      setCurrentConfig((prev) => ({
-                        ...prev,
-                        otBeforeShiftMinutes: Number(e.target.value) || 0,
-                      }))
-                    }
-                    style={{
-                      width: 70,
-                      height: 32,
-                      textAlign: 'center',
-                      border: '1px solid #CBD5E1',
-                      borderRadius: 6,
-                      fontSize: 13,
-                      outline: 'none',
-                      backgroundColor: currentConfig.enableOtBeforeShift ? '#FFFFFF' : '#F1F5F9',
-                    }}
-                  />
-                  <span style={{ color: '#334155' }}>phút</span>
-                  <span
-                    title="Chỉ bắt đầu tính làm thêm giờ (OT) trước ca nếu nhân viên check-in sớm hơn ngưỡng này."
-                    style={{
-                      cursor: 'help',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      color: '#94A3B8',
-                    }}
-                  >
-                    <Info size={15} />
-                  </span>
-                </div>
-
-                {/* Tính làm thêm giờ sau ca */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13 }}>
-                  <label
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 8,
-                      minWidth: 180,
-                      cursor: 'pointer',
-                      color: '#334155',
-                    }}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={currentConfig.enableOtAfterShift}
-                      onChange={(e) =>
-                        setCurrentConfig((prev) => ({
-                          ...prev,
-                          enableOtAfterShift: e.target.checked,
-                        }))
-                      }
-                      style={{
-                        width: 16,
-                        height: 16,
-                        accentColor: 'var(--blue-primary, #0F766E)',
-                        cursor: 'pointer',
-                      }}
-                    />
-                    <span>Tính làm thêm giờ sau ca</span>
-                  </label>
-                  <input
-                    type="number"
-                    min={0}
-                    max={240}
-                    value={currentConfig.otAfterShiftMinutes}
-                    disabled={!currentConfig.enableOtAfterShift}
-                    onChange={(e) =>
-                      setCurrentConfig((prev) => ({
-                        ...prev,
-                        otAfterShiftMinutes: Number(e.target.value) || 0,
-                      }))
-                    }
-                    style={{
-                      width: 70,
-                      height: 32,
-                      textAlign: 'center',
-                      border: '1px solid #CBD5E1',
-                      borderRadius: 6,
-                      fontSize: 13,
-                      outline: 'none',
-                      backgroundColor: currentConfig.enableOtAfterShift ? '#FFFFFF' : '#F1F5F9',
-                    }}
-                  />
-                  <span style={{ color: '#334155' }}>phút</span>
-                  <span
-                    title="Chỉ bắt đầu tính làm thêm giờ (OT) sau ca nếu nhân viên check-out muộn hơn ngưỡng này."
-                    style={{
-                      cursor: 'help',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      color: '#94A3B8',
-                    }}
-                  >
-                    <Info size={15} />
-                  </span>
-                </div>
+              <div style={{ fontSize: 12.5, color: '#64748B', lineHeight: 1.5 }}>
+                Hệ thống không tự động tính OT từ giờ check-in/out tự do. Để được ghi nhận thời gian làm thêm, nhân viên bắt buộc phải làm Đơn xin làm thêm giờ và được Chủ cửa hàng phê duyệt theo quy định.
               </div>
             </div>
             </>
