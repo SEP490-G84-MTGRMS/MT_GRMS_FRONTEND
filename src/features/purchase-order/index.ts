@@ -21,6 +21,7 @@ export * from './components/dispatch/SupplierDispatchTable';
 export * from './components/dispatch/SupplierDispatchDrawer';
 export * from './components/dispatch/DispatchConfirmModal';
 export * from './pages/SupplierOrderDispatchHubPage';
+export * from './pages/SupplierDispatchDetailPage';
 export * from './types/po-list.types';
 export * from './lib/mockPoListData';
 export * from './components/po-list/PoListFilterBar';

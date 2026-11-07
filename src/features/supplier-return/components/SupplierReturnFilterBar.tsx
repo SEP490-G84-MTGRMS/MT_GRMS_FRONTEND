@@ -1,6 +1,7 @@
-import type { CSSProperties, FC } from 'react';
-import { Search, RotateCcw, Plus } from 'lucide-react';
-import type { SupplierReturnFilterState } from '../types/supplierReturn.types';
+import type { FC } from 'react';
+import { Search, RotateCcw, X, Building, Store, Filter } from 'lucide-react';
+import type { SupplierReturnFilterState, SupplierReturnStatus } from '../types/supplierReturn.types';
+import '../../../styles/so-list-page.css';
 
 interface Props {
   draft: SupplierReturnFilterState;
@@ -12,21 +13,18 @@ interface Props {
   onChange: (patch: Partial<SupplierReturnFilterState>) => void;
   onSearch: () => void;
   onReset: () => void;
-  onCreateNew: () => void;
+  onCreateNew?: () => void;
 }
 
-const selectStyle = (active: boolean): CSSProperties => ({
-  height: 34,
-  padding: '0 10px',
-  borderRadius: 6,
-  border: active ? '1px solid #0d9488' : '1px solid #cbd5e1',
-  fontSize: 12,
-  fontWeight: 600,
-  color: active ? '#0f766e' : '#334155',
-  backgroundColor: active ? '#f0fdfa' : '#ffffff',
-  cursor: 'pointer',
-  outline: 'none',
-});
+const STATUS_OPTIONS: { value: '' | SupplierReturnStatus; label: string }[] = [
+  { value: '', label: 'Tất cả trạng thái' },
+  { value: 'DRAFT', label: 'Bản nháp' },
+  { value: 'PENDING_SUPPLIER', label: 'Chờ NCC duyệt' },
+  { value: 'APPROVED', label: 'Đã duyệt (Chờ giao)' },
+  { value: 'COMPLETED', label: 'Đã bàn giao' },
+  { value: 'REJECTED', label: 'NCC từ chối' },
+  { value: 'CANCELLED', label: 'Đã hủy' },
+];
 
 export const SupplierReturnFilterBar: FC<Props> = ({
   draft,
@@ -38,137 +36,154 @@ export const SupplierReturnFilterBar: FC<Props> = ({
   onChange,
   onSearch,
   onReset,
-  onCreateNew,
 }) => {
-  const hasActive = Boolean(
+  const hasActiveFilters = Boolean(
     draft.keyword.trim() || draft.branchId || draft.supplierId || draft.status
   );
 
   return (
-    <div
-      style={{
-        background: '#f8fafc',
-        border: '1px solid #e2e8f0',
-        borderRadius: 8,
-        padding: '10px 12px',
-        marginBottom: 8,
-        flexShrink: 0,
-      }}
-    >
-      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10 }}>
-        {/* Search Input */}
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flex: '1 1 240px', minWidth: 220 }}>
+    <div className="so-list-filter">
+      {/* ── Row 1: Search Input (Full text) ── */}
+      <div className="so-list-filter-row">
+        <div style={{ flex: '1 1 360px', position: 'relative', display: 'flex', alignItems: 'center' }}>
+          <Search
+            size={15}
+            color="#94a3b8"
+            style={{ position: 'absolute', left: 10, pointerEvents: 'none' }}
+          />
           <input
             type="text"
+            className="so-list-filter-input"
             value={draft.keyword}
             onChange={(e) => onChange({ keyword: e.target.value })}
             onKeyDown={(e) => e.key === 'Enter' && onSearch()}
-            placeholder="Tìm mã phiếu trả, mã GRN, NCC..."
+            placeholder="Tìm kiếm theo mã phiếu trả (RTV), mã phiếu nhập gốc (GRN), tên nhà cung cấp..."
             style={{
-              flex: 1,
-              height: 34,
-              padding: '0 12px',
-              borderRadius: 6,
-              border: '1px solid #cbd5e1',
-              fontSize: 13,
-              outline: 'none',
+              width: '100%',
+              paddingLeft: 32,
+              paddingRight: draft.keyword ? 30 : 10,
             }}
           />
-        </div>
-
-        {/* Branch Filter */}
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-          <label style={{ fontSize: 12, fontWeight: 600, color: '#475569' }}>Chi nhánh:</label>
-          <select
-            value={draft.branchId}
-            disabled={lockBranch}
-            onChange={(e) => onChange({ branchId: e.target.value })}
-            style={selectStyle(Boolean(draft.branchId))}
-          >
-            <option value="">Tất cả chi nhánh</option>
-            {branches.map((b) => (
-              <option key={b.id} value={b.id}>{b.name}</option>
-            ))}
-          </select>
-        </div>
-
-        {/* Supplier Filter */}
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-          <label style={{ fontSize: 12, fontWeight: 600, color: '#475569' }}>Nhà cung cấp:</label>
-          <select
-            value={draft.supplierId}
-            onChange={(e) => onChange({ supplierId: e.target.value })}
-            style={selectStyle(Boolean(draft.supplierId))}
-          >
-            <option value="">Tất cả nhà cung cấp</option>
-            {suppliers.map((s) => (
-              <option key={s.id} value={s.id}>{s.name}</option>
-            ))}
-          </select>
-        </div>
-
-        {/* Status Filter */}
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-          <label style={{ fontSize: 12, fontWeight: 600, color: '#475569' }}>Trạng thái:</label>
-          <select
-            value={draft.status}
-            onChange={(e) => onChange({ status: e.target.value as SupplierReturnFilterState['status'] })}
-            style={selectStyle(Boolean(draft.status))}
-          >
-            <option value="">Tất cả trạng thái</option>
-            <option value="DRAFT">Khởi tạo (DRAFT)</option>
-            <option value="PENDING_SUPPLIER">Chờ phản hồi NCC</option>
-            <option value="APPROVED">Đã duyệt (Chờ bàn giao)</option>
-            <option value="REJECTED">Từ chối toàn bộ</option>
-            <option value="COMPLETED">Đã hoàn tất</option>
-            <option value="CANCELLED">Đã hủy</option>
-          </select>
-        </div>
-
-        {/* Search & Reset Buttons */}
-        <button
-          type="button"
-          className="po-btn po-btn-primary"
-          style={{ height: 34, padding: '0 12px' }}
-          onClick={onSearch}
-        >
-          <Search size={14} />
-          <span>Tìm kiếm</span>
-        </button>
-        <button
-          type="button"
-          className="po-btn po-btn-secondary"
-          style={{ height: 34, padding: '0 12px' }}
-          onClick={onReset}
-          disabled={!hasActive}
-        >
-          <RotateCcw size={14} />
-          <span>Đặt lại</span>
-        </button>
-
-        {/* Create New Return Button */}
-        <div style={{ marginLeft: 'auto' }}>
-          <button
-            type="button"
-            className="po-btn po-btn-primary"
-            style={{
-              height: 34,
-              padding: '0 14px',
-              backgroundColor: '#0f766e',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6,
-            }}
-            onClick={onCreateNew}
-          >
-            <Plus size={16} />
-            <span>+ Lập phiếu trả hàng</span>
-          </button>
+          {draft.keyword && (
+            <button
+              type="button"
+              onClick={() => {
+                onChange({ keyword: '' });
+              }}
+              title="Xóa từ khóa"
+              style={{
+                position: 'absolute',
+                right: 8,
+                background: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                color: '#94a3b8',
+                display: 'flex',
+                alignItems: 'center',
+                padding: 2,
+              }}
+            >
+              <X size={14} />
+            </button>
+          )}
         </div>
       </div>
 
-      <div style={{ marginTop: 8, fontSize: 12, fontWeight: 600, color: '#475569' }}>
-        Hiển thị {totalFiltered}/{totalAll} phiếu trả hàng
+      {/* ── Row 2: Select Filters & Search/Reset Actions (Footer) ── */}
+      <div className="so-list-filter-row so-list-filter-row--footer">
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '10px 16px' }}>
+          {/* Dropdown Chi nhánh */}
+          <div className="so-list-filter-field">
+            <label className="so-list-filter-label" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <Store size={13} color="#64748b" />
+              <span>Chi nhánh:</span>
+            </label>
+            <select
+              className={`so-list-filter-select ${draft.branchId ? 'so-list-filter-select--active' : ''}`}
+              value={draft.branchId}
+              disabled={lockBranch}
+              onChange={(e) => onChange({ branchId: e.target.value })}
+            >
+              <option value="">Tất cả chi nhánh</option>
+              {branches.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Dropdown Nhà cung cấp */}
+          <div className="so-list-filter-field">
+            <label className="so-list-filter-label" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <Building size={13} color="#64748b" />
+              <span>Nhà cung cấp:</span>
+            </label>
+            <select
+              className={`so-list-filter-select ${draft.supplierId ? 'so-list-filter-select--active' : ''}`}
+              value={draft.supplierId}
+              onChange={(e) => onChange({ supplierId: e.target.value })}
+            >
+              <option value="">Tất cả nhà cung cấp</option>
+              {suppliers.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Dropdown Trạng thái */}
+          <div className="so-list-filter-field">
+            <label className="so-list-filter-label" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <Filter size={13} color="#64748b" />
+              <span>Trạng thái:</span>
+            </label>
+            <select
+              className={`so-list-filter-select ${draft.status ? 'so-list-filter-select--active' : ''}`}
+              value={draft.status}
+              onChange={(e) => onChange({ status: e.target.value as SupplierReturnStatus | '' })}
+            >
+              {STATUS_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Active filter badge counter */}
+          {hasActiveFilters && (
+            <div className="so-list-filter-badge">
+              Đang lọc: {totalFiltered} / {totalAll} phiếu
+            </div>
+          )}
+        </div>
+
+        {/* Nút Tìm kiếm & Đặt lại */}
+        <div className="so-list-filter-actions">
+          <button
+            type="button"
+            className="so-list-filter-search"
+            onClick={onSearch}
+            title="Áp dụng bộ lọc tìm kiếm"
+          >
+            <Search size={14} />
+            <span>Tìm kiếm</span>
+          </button>
+
+          <button
+            type="button"
+            className="so-list-filter-reset"
+            onClick={onReset}
+            disabled={!hasActiveFilters}
+            title="Khôi phục bộ lọc mặc định"
+            style={{ opacity: hasActiveFilters ? 1 : 0.6 }}
+          >
+            <RotateCcw size={14} />
+            <span>Đặt lại</span>
+          </button>
+        </div>
       </div>
     </div>
   );

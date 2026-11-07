@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import type { FC, FormEvent } from 'react';
 import { X, Plus, Loader2, AlertCircle } from 'lucide-react';
 import type { CreateSupplierInput, SupplierCategory, SupplierStatus } from '../types/supplier.types';
+import { StatusToggle } from './StatusToggle';
 import '../supplier.css';
 
 interface Props {
@@ -407,77 +408,13 @@ export const CreateSupplierModal: FC<Props> = ({ isOpen, onClose, onSubmit }) =>
               </select>
             </div>
 
-            {/* Row 4: Trạng thái hoạt động (Active / Inactive) */}
+            {/* Row 4: Trạng thái hoạt động */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, width: '100%' }}>
-              <label style={{ fontSize: 13, fontWeight: 600, color: '#334155', display: 'block', minWidth: 'auto' }}>
-                Trạng Thái Hoạt Động <span style={{ color: '#dc2626' }}>*</span>
-              </label>
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: '1fr 1fr',
-                  gap: 12,
-                  width: '100%',
-                }}
-              >
-                {/* Option Active */}
-                <div
-                  onClick={() => setStatus('Active')}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 10,
-                    padding: '9px 14px',
-                    borderRadius: 8,
-                    cursor: 'pointer',
-                    border: status === 'Active' ? '2px solid #0f766e' : '1px solid #cbd5e1',
-                    backgroundColor: status === 'Active' ? '#f0fdfa' : '#ffffff',
-                    transition: 'all 0.15s ease',
-                  }}
-                >
-                  <div
-                    style={{
-                      width: 16,
-                      height: 16,
-                      borderRadius: '50%',
-                      border: status === 'Active' ? '5px solid #0f766e' : '2px solid #94a3b8',
-                      backgroundColor: '#ffffff',
-                    }}
-                  />
-                  <span style={{ fontSize: 13.5, fontWeight: 600, color: status === 'Active' ? '#0f766e' : '#334155' }}>
-                    Đang hoạt động
-                  </span>
-                </div>
-
-                {/* Option Inactive */}
-                <div
-                  onClick={() => setStatus('Inactive')}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 10,
-                    padding: '9px 14px',
-                    borderRadius: 8,
-                    cursor: 'pointer',
-                    border: status === 'Inactive' ? '2px solid #dc2626' : '1px solid #cbd5e1',
-                    backgroundColor: status === 'Inactive' ? '#fef2f2' : '#ffffff',
-                    transition: 'all 0.15s ease',
-                  }}
-                >
-                  <div
-                    style={{
-                      width: 16,
-                      height: 16,
-                      borderRadius: '50%',
-                      border: status === 'Inactive' ? '5px solid #dc2626' : '2px solid #94a3b8',
-                      backgroundColor: '#ffffff',
-                    }}
-                  />
-                  <span style={{ fontSize: 13.5, fontWeight: 600, color: status === 'Inactive' ? '#dc2626' : '#334155' }}>
-                    Ngưng hoạt động
-                  </span>
-                </div>
-              </div>
+              <StatusToggle
+                checked={status === 'Active'}
+                onChange={(next) => setStatus(next ? 'Active' : 'Inactive')}
+                disabled={isSubmitting}
+              />
             </div>
 
             {/* Row 5: Địa chỉ kho / cửa hàng */}

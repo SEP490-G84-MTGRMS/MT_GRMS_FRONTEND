@@ -23,6 +23,7 @@ import {
   BranchOrderListPage,
   EmployeeOrderMatrixPage,
   SupplierOrderDispatchHubPage,
+  SupplierDispatchDetailPage,
   StoreOwnerPurchaseOrderListPage,
 } from '../features/purchase-order';
 
@@ -394,6 +395,10 @@ export const router = createBrowserRouter([
         element: <SupplierOrderDispatchHubPage />,
       },
       {
+        path: 'purchase-orders/dispatch-hub/:supplierId',
+        element: <SupplierDispatchDetailPage />,
+      },
+      {
         path: 'purchase-orders/cutoff-hub',
         element: <SupplierOrderDispatchHubPage />,
       },
@@ -419,7 +424,7 @@ export const router = createBrowserRouter([
       },
       {
         path: 'goods-receipts/:id/confirm',
-        element: <GoodsReceiptDetailPage defaultRole="store_owner" />,
+        element: <GoodsReceiptFormPage defaultRole="store_owner" />,
       },
       {
         path: 'purchase-orders/receipts',
@@ -1023,7 +1028,7 @@ export const router = createBrowserRouter([
       },
       {
         path: 'goods-receipts/:id/confirm',
-        element: <GoodsReceiptDetailPage defaultRole="employee" />,
+        element: <GoodsReceiptFormPage defaultRole="employee" />,
       },
     ],
   },
@@ -1051,7 +1056,7 @@ export const router = createBrowserRouter([
       },
       {
         path: ':id/confirm',
-        element: <GoodsReceiptDetailPage defaultRole="store_owner" />,
+        element: <GoodsReceiptFormPage defaultRole="store_owner" />,
       },
     ],
   },
@@ -1077,7 +1082,7 @@ export const router = createBrowserRouter([
       },
       {
         path: ':id/confirm',
-        element: <GoodsReceiptDetailPage defaultRole="employee" />,
+        element: <GoodsReceiptFormPage defaultRole="employee" />,
       },
     ],
   },

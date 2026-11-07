@@ -571,6 +571,7 @@ export const PoDetailDrawer: FC<PoDetailDrawerProps> = ({ order, isOpen, onClose
               </span>
             </div>
           </div>
+
         </div>
       </div>
     </div>

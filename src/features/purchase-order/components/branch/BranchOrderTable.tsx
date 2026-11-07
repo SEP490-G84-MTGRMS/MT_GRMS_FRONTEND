@@ -2,8 +2,6 @@ import { useState, useMemo, useRef, useEffect } from 'react';
 import type { FC } from 'react';
 import {
   Building2,
-  MapPin,
-  Phone,
   Eye,
   ShoppingCart,
   ChevronLeft,
@@ -23,7 +21,14 @@ interface BranchOrderTableProps {
   onOrder: (branchId: string) => void;
 }
 
-type SortField = 'code' | 'name' | 'managerName' | 'pendingCount' | 'status' | 'lastUpdated';
+type SortField =
+  | 'code'
+  | 'name'
+  | 'managerName'
+  | 'matrixProductCount'
+  | 'pendingCount'
+  | 'status'
+  | 'lastUpdated';
 type SortDirection = 'asc' | 'desc';
 
 export const BranchOrderTable: FC<BranchOrderTableProps> = ({
@@ -72,6 +77,10 @@ export const BranchOrderTable: FC<BranchOrderTableProps> = ({
         case 'managerName':
           valA = a.managerName.toLowerCase();
           valB = b.managerName.toLowerCase();
+          break;
+        case 'matrixProductCount':
+          valA = a.matrixProductCount ?? 0;
+          valB = b.matrixProductCount ?? 0;
           break;
         case 'pendingCount':
           valA = a.pendingCount ?? 0;
@@ -134,12 +143,13 @@ export const BranchOrderTable: FC<BranchOrderTableProps> = ({
   const tableColGroup = (
     <colgroup>
       <col style={{ width: '8%' }} />
-      <col style={{ width: '25%' }} />
-      <col style={{ width: '16%' }} />
-      <col style={{ width: '11%' }} />
-      <col style={{ width: '12%' }} />
-      <col style={{ width: '10%' }} />
       <col style={{ width: '18%' }} />
+      <col style={{ width: '14%' }} />
+      <col style={{ width: '12%' }} />
+      <col style={{ width: '11%' }} />
+      <col style={{ width: '11%' }} />
+      <col style={{ width: '10%' }} />
+      <col style={{ width: '16%' }} />
     </colgroup>
   );
 
@@ -263,7 +273,7 @@ export const BranchOrderTable: FC<BranchOrderTableProps> = ({
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <span>Tên Chi Nhánh & Địa Chỉ</span>
+                  <span>Tên Chi Nhánh</span>
                   <ArrowUpDown size={12} color={sortField === 'name' ? '#0f766e' : '#94a3b8'} />
                 </div>
               </th>
@@ -279,6 +289,23 @@ export const BranchOrderTable: FC<BranchOrderTableProps> = ({
                 <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                   <span>Người Quản Lý</span>
                   <ArrowUpDown size={12} color={sortField === 'managerName' ? '#0f766e' : '#94a3b8'} />
+                </div>
+              </th>
+
+              <th
+                onClick={() => handleSort('matrixProductCount')}
+                style={{
+                  ...thBaseStyle,
+                  cursor: 'pointer',
+                  userSelect: 'none',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span>SP trên Matrix</span>
+                  <ArrowUpDown
+                    size={12}
+                    color={sortField === 'matrixProductCount' ? '#0f766e' : '#94a3b8'}
+                  />
                 </div>
               </th>
 
@@ -361,7 +388,7 @@ export const BranchOrderTable: FC<BranchOrderTableProps> = ({
             {sortedBranches.length === 0 ? (
               <tr>
                 <td
-                  colSpan={7}
+                  colSpan={8}
                   style={{
                     padding: '48px 16px',
                     textAlign: 'center',
@@ -412,58 +439,68 @@ export const BranchOrderTable: FC<BranchOrderTableProps> = ({
                     </span>
                   </td>
 
-                  {/* 2. Tên & Địa chỉ */}
+                  {/* 2. Tên chi nhánh */}
+                  <td
+                    style={{
+                      padding: '10px 12px',
+                      verticalAlign: 'middle',
+                      borderBottom: '1px solid #f1f5f9',
+                      fontWeight: 600,
+                      color: '#0f172a',
+                      fontSize: 13,
+                      lineHeight: 1.35,
+                      whiteSpace: 'normal',
+                      wordBreak: 'break-word',
+                    }}
+                    title={b.name}
+                  >
+                    {b.name}
+                  </td>
+
+                  {/* 3. Người quản lý */}
+                  <td
+                    style={{
+                      padding: '10px 12px',
+                      verticalAlign: 'middle',
+                      borderBottom: '1px solid #f1f5f9',
+                      fontWeight: 600,
+                      color: '#1e293b',
+                      fontSize: 12.5,
+                      whiteSpace: 'normal',
+                      wordBreak: 'break-word',
+                    }}
+                  >
+                    {b.managerName || '—'}
+                  </td>
+
+                  {/* 4. SP đang nhập trên Order Matrix */}
                   <td style={{ padding: '10px 12px', verticalAlign: 'middle', borderBottom: '1px solid #f1f5f9' }}>
-                    <div style={{ fontWeight: 600, color: '#0f172a', fontSize: 13, lineHeight: 1.35 }}>
-                      {b.name}
-                    </div>
-                    <div
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 4,
-                        color: '#64748b',
-                        fontSize: 11.5,
-                        marginTop: 2,
-                      }}
-                    >
-                      <MapPin size={11} style={{ flexShrink: 0, color: '#94a3b8' }} />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       <span
                         style={{
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                        }}
-                        title={b.address}
-                      >
-                        {b.address}
-                      </span>
-                    </div>
-                  </td>
-
-                  {/* 3. Người quản lý & SĐT */}
-                  <td style={{ padding: '10px 12px', verticalAlign: 'middle', borderBottom: '1px solid #f1f5f9' }}>
-                    <div style={{ fontWeight: 600, color: '#1e293b', fontSize: 12.5, lineHeight: 1.3 }}>
-                      {b.managerName || '—'}
-                    </div>
-                    {b.managerPhone && b.managerPhone !== '—' && (
-                      <div
-                        style={{
-                          display: 'flex',
+                          display: 'inline-flex',
                           alignItems: 'center',
-                          gap: 4,
-                          color: '#64748b',
-                          fontSize: 11.5,
-                          marginTop: 2,
+                          justifyContent: 'center',
+                          minWidth: 26,
+                          height: 22,
+                          padding: '0 8px',
+                          borderRadius: 11,
+                          fontSize: 12,
+                          fontWeight: 700,
+                          backgroundColor: (b.matrixProductCount ?? 0) > 0 ? '#ecfdf5' : '#f1f5f9',
+                          color: (b.matrixProductCount ?? 0) > 0 ? '#047857' : '#64748b',
+                          border:
+                            (b.matrixProductCount ?? 0) > 0 ? '1px solid #a7f3d0' : '1px solid #e2e8f0',
                         }}
+                        title="Số sản phẩm đang có số lượng trên Order Matrix"
                       >
-                        <Phone size={11} style={{ flexShrink: 0, color: '#94a3b8' }} />
-                        <span>{b.managerPhone}</span>
-                      </div>
-                    )}
+                        {b.matrixProductCount ?? 0}
+                      </span>
+                      <span style={{ fontSize: 11.5, color: '#64748b' }}>SP</span>
+                    </div>
                   </td>
 
-                  {/* 4. Đơn PO đang chờ */}
+                  {/* 5. Đơn PO đang chờ */}
                   <td style={{ padding: '10px 12px', verticalAlign: 'middle', borderBottom: '1px solid #f1f5f9' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       <span

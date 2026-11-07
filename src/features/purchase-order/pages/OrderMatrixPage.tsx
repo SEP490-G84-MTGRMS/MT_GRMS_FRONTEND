@@ -3,12 +3,14 @@ import type { FC } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import type {
   DayColInfo,
+  DayCutoffStatus,
   MatrixCellMap,
   MatrixCellData,
   SplitPoPreview,
   SplitPoItem,
   OrderMatrixProduct,
   OrderMatrixSupplierDeliveryConfig,
+  OrderMatrixDayStatus,
   BranchOption,
   SupplierOption,
   SupplierDeliveryConfig,
@@ -17,6 +19,13 @@ import { OrderMatrixHeader } from '../components/matrix/OrderMatrixHeader';
 import { OrderMatrixFilterBar } from '../components/matrix/OrderMatrixFilterBar';
 import { OrderMatrixTable } from '../components/matrix/OrderMatrixTable';
 import { OrderMatrixSplitModal } from '../components/matrix/OrderMatrixSplitModal';
+import { OrderMatrixImportPreviewModal } from '../components/matrix/OrderMatrixImportPreviewModal';
+import {
+  exportMatrixToExcel,
+  validateMatrixExcelFile,
+  applyMatrixExcelImport,
+  type ExcelValidationResult,
+} from '../lib/matrixExcelService';
 import { AdminToast, type ToastState } from '../../admin/components';
 import { purchaseOrderApi } from '../api/purchaseOrderApi';
 import { storeProductApi } from '../../product/api/storeProductApi';
@@ -71,9 +80,6 @@ function suppliersFromMatrix(
   return Array.from(map.values());
 }
 
-// Base mock reference date matching FE-05 prototype: Monday 2026-11-02
-const BASE_TODAY = '2026-11-02';
-
 function parseDateStr(s: string): Date {
   const [y, m, d] = s.split('-').map(Number);
   return new Date(y, m - 1, d);
@@ -85,6 +91,30 @@ function fmtDateStr(d: Date): string {
   const day = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
 }
+
+function todayKey(fromIso?: string): string {
+  if (fromIso) {
+    const d = new Date(fromIso);
+    if (!Number.isNaN(d.getTime())) return fmtDateStr(d);
+  }
+  return fmtDateStr(new Date());
+}
+
+const REASON_LABELS: Record<string, string> = {
+  BRANCH_INACTIVE: 'Chi nhánh đang ngừng hoạt động',
+  SUPPLIER_INACTIVE: 'Nhà cung cấp đang ngừng hoạt động',
+  SUPPLIER_BRANCH_ASSIGNMENT_INACTIVE: 'NCC chưa được gán hoặc đã ngừng phục vụ chi nhánh này',
+  PRODUCT_INACTIVE: 'Sản phẩm đã ngừng trên danh mục master',
+  SUPPLIER_PRODUCT_INACTIVE: 'NCC không còn cung ứng sản phẩm này',
+  BRANCH_PRODUCT_INACTIVE: 'Chi nhánh không kinh doanh sản phẩm này',
+  NOT_DELIVERY_DAY: 'Không phải ngày giao của NCC',
+  HOLIDAY_BLACKOUT: 'Ngày nghỉ/blackout của NCC',
+  LEAD_TIME_VIOLATION: 'Chưa đủ LeadDays để giao ngày này',
+  CUTOFF_PASSED: 'Đã đến hoặc qua giờ chốt đơn',
+  PO_ALREADY_COMMITTED: 'Ngày này đã chốt PO',
+  PO_EXISTED_EDITABLE: 'Đã có PO — còn sửa trước cutoff',
+  PO_COMMITTED_CUTOFF_PASSED: 'PO đã khóa sau cutoff',
+};
 
 function fmtShortStr(d: Date): string {
   return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`;
@@ -105,77 +135,143 @@ function diffInDays(d1: Date, d2: Date): number {
   return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 }
 
-// Compute dynamic day columns with cutoff rules per delivery date
+function mapServerStatus(status?: string): DayCutoffStatus {
+  switch ((status || '').toUpperCase()) {
+    case 'FINALIZED':
+      return 'PO_GENERATED';
+    case 'LOCKED':
+      return 'LOCKED';
+    case 'CUTOFF_DUE':
+      return 'CUTOFF_DUE';
+    case 'SUPPLIER_OFF':
+      return 'SUPPLIER_OFF';
+    default:
+      return 'OPEN';
+  }
+}
+
+// Compute dynamic day columns — ưu tiên DayStatuses từ BE (OpenSpec §4.4)
 function computeDayColumns(
   viewFrom: Date,
   durationDays: number,
   supplierId: string,
   lockedDates: Set<string>,
-  supplierConfigs?: OrderMatrixSupplierDeliveryConfig[]
+  supplierConfigs?: OrderMatrixSupplierDeliveryConfig[],
+  dayStatuses?: OrderMatrixDayStatus[],
+  today: string = todayKey()
 ): DayColInfo[] {
   const list: DayColInfo[] = [];
   const isAll = supplierId === 'ALL';
   const supConfig = supplierConfigs?.find((sc) => sc.supplierId === supplierId);
-  const baseDate = parseDateStr(BASE_TODAY);
-
   const leadDays = supConfig?.leadTimeDays ?? (isAll ? 0 : DEFAULT_DELIVERY.leadDays);
-  const earliestAllowed = isAll
-    ? BASE_TODAY
-    : fmtDateStr(addDaysToDate(baseDate, leadDays));
-
-  // Today + 1 is Tuesday 03/11 in this scenario -> cutoff due today at 15:00
-  const cutoffDueThreshold = fmtDateStr(addDaysToDate(baseDate, 1));
+  const earliestAllowed = isAll ? today : fmtDateStr(addDaysToDate(parseDateStr(today), leadDays));
 
   for (let i = 0; i < durationDays; i++) {
     const d = addDaysToDate(viewFrom, i);
     const k = fmtDateStr(d);
     const dow = d.getDay();
-    const isLeadBlocked = isAll ? false : k < earliestAllowed;
 
-    let isDayOff = false;
-    let isHoliday = false;
-    let isSupplierInactive = false;
-    let isSupplierNotAssigned = false;
+    const serverStatuses = (dayStatuses || []).filter((ds) => ds.deliveryDate === k);
+    const serverForSupplier =
+      !isAll
+        ? serverStatuses.find((ds) => ds.supplierId === supplierId)
+        : undefined;
+
+    // Khi xem ALL: chỉ khóa cột khi MỌI NCC đều FINALIZED/LOCKED/OFF — PO trước cutoff vẫn editable.
+    const allFinalized =
+      isAll && serverStatuses.length > 0 && serverStatuses.every((ds) => ds.deliveryDateStatus === 'FINALIZED');
+    const allOffOrLocked =
+      isAll &&
+      serverStatuses.length > 0 &&
+      serverStatuses.every((ds) =>
+        ['SUPPLIER_OFF', 'LOCKED', 'FINALIZED'].includes(ds.deliveryDateStatus)
+      );
+
+    let cutoffStatus: DayCutoffStatus = 'OPEN';
+    let isOff = false;
+    let isLocked = false;
     let offReason = '';
+    let poCode: string | undefined;
+    let primaryReasonCode: string | undefined;
+    let cutoffHour = supConfig?.cutoffTime || DEFAULT_DELIVERY.cutoffHour;
 
-    if (supConfig) {
-      if (!supConfig.isActive) {
-        isSupplierInactive = true;
-        offReason = supConfig.inactiveReason || 'Nhà cung cấp đang tạm dừng hoạt động';
-      } else if (!supConfig.isAssignedToBranch) {
-        isSupplierNotAssigned = true;
-        offReason = 'Nhà cung cấp chưa được phân bổ tới chi nhánh này';
+    if (serverForSupplier) {
+      cutoffStatus = mapServerStatus(serverForSupplier.deliveryDateStatus);
+      primaryReasonCode = serverForSupplier.primaryReasonCode;
+      poCode = serverForSupplier.poCode;
+      isOff = cutoffStatus === 'SUPPLIER_OFF';
+      // PO_EXISTED_EDITABLE: có PoCode nhưng status OPEN/CUTOFF_DUE → vẫn sửa được
+      isLocked = cutoffStatus === 'LOCKED' || cutoffStatus === 'PO_GENERATED';
+      offReason =
+        (primaryReasonCode && REASON_LABELS[primaryReasonCode]) ||
+        serverForSupplier.primaryReasonCode ||
+        '';
+      if (serverForSupplier.cutoffDateTime) {
+        const cd = new Date(serverForSupplier.cutoffDateTime);
+        if (!Number.isNaN(cd.getTime())) {
+          cutoffHour = `${String(cd.getHours()).padStart(2, '0')}:${String(cd.getMinutes()).padStart(2, '0')}`;
+        }
+      }
+    } else if (isAll && serverStatuses.length > 0) {
+      poCode = serverStatuses.find((ds) => ds.poCode)?.poCode;
+      if (allFinalized) {
+        cutoffStatus = 'PO_GENERATED';
+        isLocked = true;
+      } else if (allOffOrLocked) {
+        const locked = serverStatuses.some((ds) => ds.deliveryDateStatus === 'LOCKED');
+        const finalized = serverStatuses.some((ds) => ds.deliveryDateStatus === 'FINALIZED');
+        cutoffStatus = finalized ? 'PO_GENERATED' : locked ? 'LOCKED' : 'SUPPLIER_OFF';
+        isOff = cutoffStatus === 'SUPPLIER_OFF';
+        isLocked = cutoffStatus === 'LOCKED' || cutoffStatus === 'PO_GENERATED';
+      } else if (serverStatuses.some((ds) => ds.deliveryDateStatus === 'CUTOFF_DUE')) {
+        cutoffStatus = 'CUTOFF_DUE';
       } else {
-        isDayOff = supConfig.activeDeliveryDays ? !supConfig.activeDeliveryDays.includes(dow) : false;
-        isHoliday = supConfig.blackoutDates ? supConfig.blackoutDates.includes(k) : false;
+        cutoffStatus = 'OPEN';
       }
     } else {
-      isDayOff = isAll ? false : !DEFAULT_DELIVERY.activeDeliveryDays.includes(dow);
-      isHoliday = false;
+      // Fallback local khi chưa có DayStatuses
+      const isLeadBlocked = isAll ? false : k < earliestAllowed;
+      let isDayOff = false;
+      let isHoliday = false;
+      let isSupplierInactive = false;
+      let isSupplierNotAssigned = false;
+
+      if (supConfig) {
+        if (!supConfig.isActive) {
+          isSupplierInactive = true;
+          offReason = supConfig.inactiveReason || 'Nhà cung cấp đang tạm dừng hoạt động';
+        } else if (!supConfig.isAssignedToBranch) {
+          isSupplierNotAssigned = true;
+          offReason = 'Nhà cung cấp chưa được phân bổ tới chi nhánh này';
+        } else {
+          isDayOff = supConfig.activeDeliveryDays ? !supConfig.activeDeliveryDays.includes(dow) : false;
+          isHoliday = !!supConfig.blackoutDates?.includes(k);
+        }
+      } else if (!isAll) {
+        isDayOff = !DEFAULT_DELIVERY.activeDeliveryDays.includes(dow);
+      }
+
+      isOff = isSupplierInactive || isSupplierNotAssigned || isLeadBlocked || isDayOff || isHoliday;
+      if (!offReason) {
+        if (isLeadBlocked) offReason = REASON_LABELS.LEAD_TIME_VIOLATION;
+        else if (isDayOff) offReason = REASON_LABELS.NOT_DELIVERY_DAY;
+        else if (isHoliday) offReason = REASON_LABELS.HOLIDAY_BLACKOUT;
+      }
+
+      const isAlreadyPo = lockedDates.has(k);
+      const isPastLocked = !isOff && k < today;
+      isLocked = isAlreadyPo || isPastLocked;
+      if (isAlreadyPo) cutoffStatus = 'PO_GENERATED';
+      else if (isPastLocked) cutoffStatus = 'LOCKED';
+      else if (!isOff && k <= fmtDateStr(addDaysToDate(parseDateStr(today), 1))) cutoffStatus = 'CUTOFF_DUE';
+      else cutoffStatus = 'OPEN';
+      if (isAlreadyPo) poCode = `PO-${k.replace(/-/g, '')}-GEN`;
     }
 
-    const isOff = isSupplierInactive || isSupplierNotAssigned || isLeadBlocked || isDayOff || isHoliday;
-
-    if (!offReason) {
-      if (isLeadBlocked) offReason = 'Vi phạm thời gian chuẩn bị giao hàng (Lead time)';
-      else if (isDayOff) offReason = 'Nhà cung cấp không giao hàng vào thứ này';
-      else if (isHoliday) offReason = 'Ngày lễ/nghỉ của nhà cung cấp';
-    }
-
-    // Status resolution
-    const isAlreadyPo = lockedDates.has(k);
-    const isPastLocked = !isOff && k < BASE_TODAY;
-    const isLocked = isAlreadyPo || isPastLocked;
-
-    let cutoffStatus: DayColInfo['cutoffStatus'] = 'OPEN';
-    if (isAlreadyPo) {
+    // lockedDates chỉ áp dụng khi BE đánh FINALIZED (sau cutoff) — không khóa PO còn amend được.
+    if (lockedDates.has(k) && !serverForSupplier && !(isAll && serverStatuses.length > 0)) {
+      isLocked = true;
       cutoffStatus = 'PO_GENERATED';
-    } else if (isPastLocked) {
-      cutoffStatus = 'LOCKED';
-    } else if (!isOff && k <= cutoffDueThreshold) {
-      cutoffStatus = 'CUTOFF_DUE';
-    } else {
-      cutoffStatus = 'OPEN';
     }
 
     list.push({
@@ -186,9 +282,10 @@ function computeDayColumns(
       isOff,
       isLocked,
       offReason,
-      cutoffHour: supConfig?.cutoffTime || DEFAULT_DELIVERY.cutoffHour,
+      cutoffHour,
       cutoffStatus,
-      poCode: isAlreadyPo ? `PO-${k.replace(/-/g, '')}-GEN` : undefined,
+      poCode,
+      primaryReasonCode,
     });
   }
   return list;
@@ -223,10 +320,15 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
 
   // State: Duration Preset (7, 14, 21, 31 - Max 31 days per FE-05)
   const [durationDays, setDurationDays] = useState<number>(14);
-  const initialViewFrom = parseDateStr(BASE_TODAY);
+  const initialToday = todayKey();
+  const initialViewFrom = parseDateStr(initialToday);
 
   // Set of dates that have been locked or PO generated
   const [lockedDates, setLockedDates] = useState<Set<string>>(new Set());
+  const [dayStatuses, setDayStatuses] = useState<OrderMatrixDayStatus[]>([]);
+  const [serverToday, setServerToday] = useState<string>(initialToday);
+  const [branchIsActive, setBranchIsActive] = useState<boolean>(true);
+  const [draftPoId, setDraftPoId] = useState<string | undefined>();
 
   // State: Filter Scope
   const [branches, setBranches] = useState<BranchOption[]>([]);
@@ -237,9 +339,9 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
 
   const [selectedSupplierId, setSelectedSupplierId] = useState<string>(initialSupplier);
   const [viewFrom, setViewFrom] = useState<Date>(initialViewFrom);
-  const [dateFromInput, setDateFromInput] = useState<string>(BASE_TODAY);
+  const [dateFromInput, setDateFromInput] = useState<string>(initialToday);
   const [dateToInput, setDateToInput] = useState<string>(() =>
-    fmtDateStr(addDaysToDate(parseDateStr(BASE_TODAY), durationDays - 1))
+    fmtDateStr(addDaysToDate(parseDateStr(initialToday), durationDays - 1))
   );
 
   // State: Secondary Filters
@@ -255,14 +357,25 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
   const [supplierConfigs, setSupplierConfigs] = useState<OrderMatrixSupplierDeliveryConfig[]>([]);
   const [, setIsLoadingMatrix] = useState<boolean>(false);
 
+  const isCellEditable = (d: DayColInfo, product?: OrderMatrixProduct) => {
+    if (!branchIsActive) return false;
+    if (product?.isRowDisabled) return false;
+    if (d.isOff || d.isLocked) return false;
+    if (d.cutoffStatus === 'PO_GENERATED' || d.cutoffStatus === 'LOCKED' || d.cutoffStatus === 'SUPPLIER_OFF') {
+      return false;
+    }
+    return true;
+  };
+
   const [cellMap, setCellMap] = useState<MatrixCellMap>({});
 
   const [isDirty, setIsDirty] = useState<boolean>(false);
-  const [status, setStatus] = useState<string>('Draft');
   const [isSaving, setIsSaving] = useState<boolean>(false);
 
   // State: PO Split Modal
   const [isSplitModalOpen, setIsSplitModalOpen] = useState<boolean>(false);
+  const [importPreviewResult, setImportPreviewResult] = useState<ExcelValidationResult | null>(null);
+  const [isImportModalOpen, setIsImportModalOpen] = useState<boolean>(false);
 
   // State: Toast
   const [toast, setToast] = useState<ToastState | null>(null);
@@ -353,6 +466,16 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
 
         setMatrixProducts(res.products || []);
         setSupplierConfigs(res.supplierConfigs || []);
+        setDayStatuses(res.dayStatuses || []);
+        setBranchIsActive(res.branchIsActive ?? true);
+        setServerToday(todayKey(res.serverNow));
+        setDraftPoId(res.draftPoId);
+
+        const finalized = new Set<string>();
+        (res.dayStatuses || []).forEach((ds) => {
+          if (ds.deliveryDateStatus === 'FINALIZED') finalized.add(ds.deliveryDate);
+        });
+        setLockedDates(finalized);
 
         // Khôi phục số lượng ô đặt hàng: Ưu tiên dữ liệu từ Backend, nếu chưa có thì nạp từ LocalStorage
         let targetCells = res.cellMap || {};
@@ -374,10 +497,14 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
         setCellMap(buildEmptyCellMap(res.products || [], targetCells));
         const nextSuppliers = suppliersFromMatrix(res.products || [], res.supplierConfigs || []);
         setSuppliers(nextSuppliers);
+        if (res.branchIsActive === false) {
+          showToast('Chi nhánh đang ngừng hoạt động — ma trận chỉ xem, không chỉnh sửa/chốt.', 'warning');
+        }
       } catch {
         if (!isMounted) return;
         setMatrixProducts([]);
         setCellMap({});
+        setDayStatuses([]);
         showToast('Không tải được sản phẩm theo chi nhánh cho ma trận đặt hàng.', 'error');
       } finally {
         if (isMounted) setIsLoadingMatrix(false);
@@ -393,8 +520,29 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
 
   // Date columns calculated dynamically with supplier configurations
   const dayColumns: DayColInfo[] = useMemo(() => {
-    return computeDayColumns(viewFrom, durationDays, selectedSupplierId, lockedDates, supplierConfigs);
-  }, [viewFrom, durationDays, selectedSupplierId, lockedDates, supplierConfigs]);
+    return computeDayColumns(
+      viewFrom,
+      durationDays,
+      selectedSupplierId,
+      lockedDates,
+      supplierConfigs,
+      dayStatuses,
+      serverToday
+    );
+  }, [viewFrom, durationDays, selectedSupplierId, lockedDates, supplierConfigs, dayStatuses, serverToday]);
+
+  // Tóm tắt theo ngày — không dùng 1 status DRAFT cho cả màn
+  const daySummary = useMemo(() => {
+    let openDays = 0;
+    let finalizedDays = 0;
+    let lockedDays = 0;
+    dayColumns.forEach((d) => {
+      if (d.cutoffStatus === 'PO_GENERATED') finalizedDays++;
+      else if (d.isLocked || d.cutoffStatus === 'LOCKED') lockedDays++;
+      else if (!d.isOff) openDays++;
+    });
+    return { openDays, finalizedDays, lockedDays };
+  }, [dayColumns]);
 
   // Available Categories
   const availableCategories = useMemo(() => {
@@ -411,6 +559,18 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
 
   // Handle cell quantity change by Store Owner or Employee
   const handleCellChange = (productId: string, dateKey: string, val: number) => {
+    if (!branchIsActive) {
+      showToast('Chi nhánh đang ngừng hoạt động — không thể nhập số lượng.', 'warning');
+      return;
+    }
+    if (val < 0) return;
+    const product = matrixProducts.find((p) => p.id === productId);
+    const day = dayColumns.find((d) => d.dateKey === dateKey);
+    if (product?.isRowDisabled || (day && !isCellEditable(day, product))) {
+      showToast('Ô này không còn chỉnh sửa được.', 'warning');
+      return;
+    }
+
     setCellMap((prev) => {
       const prodMap = { ...(prev[productId] || {}) };
       const currentCell = prodMap[dateKey] || {
@@ -585,9 +745,9 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
   };
 
   const handleThisWeek = () => {
-    const base = parseDateStr(BASE_TODAY);
+    const base = parseDateStr(serverToday);
     setViewFrom(base);
-    setDateFromInput(BASE_TODAY);
+    setDateFromInput(serverToday);
     setDateToInput(fmtDateStr(addDaysToDate(base, durationDays - 1)));
   };
 
@@ -614,75 +774,133 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
     showToast(`Đã áp dụng khoảng thời gian ${diff} ngày (từ ${dateFromInput} đến ${dateToInput})`, 'success');
   };
 
-  // Auto-Suggest smart quantities based on SOH, Sales, and Safety Stock
+  // Auto-Suggest — chỉ ghi đúng trường theo role (OpenSpec §3 / §11.4)
   const handleAutoSuggest = () => {
     const newMap = { ...cellMap };
     let suggestedCount = 0;
+    let skippedOwner = 0;
 
     filteredProducts.forEach((p) => {
+      if (p.isRowDisabled) return;
       if (!newMap[p.id]) newMap[p.id] = {};
       dayColumns.forEach((d) => {
-        if (!d.isOff && !d.isLocked && d.cutoffStatus !== 'PO_GENERATED') {
-          const currentCell = newMap[p.id][d.dateKey];
-          const currentQty = currentCell?.finalQty || 0;
-          if (currentQty === 0) {
-            // Apply formula: max(MOQ, TargetStock - NetAvailable)
-            const forecastSales = p.sales * 2.5;
-            const targetStock = forecastSales + (p.safetyStock || 5);
-            const netAvailable = p.soh;
-            const rawSuggested = Math.max(0, targetStock - netAvailable);
-            const finalSuggested = Math.max(p.moq, Math.ceil(rawSuggested / 5) * 5);
+        if (!isCellEditable(d, p)) return;
+        const currentCell = newMap[p.id][d.dateKey] || {
+          employeeQty: 0,
+          storeQty: null,
+          finalQty: 0,
+          isOwnerAdjusted: false,
+        };
 
-            newMap[p.id][d.dateKey] = {
-              employeeQty: finalSuggested,
-              storeQty: null,
-              finalQty: finalSuggested,
-              suggestedQty: finalSuggested,
-              isOwnerOverridden: false,
-              modifiedBy: 'employee',
-            };
-            suggestedCount++;
-          }
+        // Không tự ghi đè Owner override nếu Employee thao tác
+        if (!isStoreOwner && (currentCell.isOwnerAdjusted || currentCell.storeQty !== null)) {
+          skippedOwner++;
+          return;
         }
+        if ((currentCell.finalQty || 0) > 0) return;
+
+        const forecastSales = (p.sales || 0) * 2.5;
+        const targetStock = forecastSales + (p.safetyStock || 5);
+        const rawSuggested = Math.max(0, targetStock - (p.soh || 0));
+        const multiple = p.orderMultiple && p.orderMultiple > 0 ? p.orderMultiple : 1;
+        let finalSuggested = Math.max(p.moq || 0, Math.ceil(rawSuggested / multiple) * multiple);
+
+        if (isStoreOwner) {
+          newMap[p.id][d.dateKey] = {
+            ...currentCell,
+            storeQty: finalSuggested,
+            isOwnerAdjusted: true,
+            isOwnerOverridden: true,
+            finalQty: finalSuggested,
+            suggestedQty: finalSuggested,
+            modifiedBy: 'store_owner',
+            modifiedAt: new Date().toISOString(),
+          };
+        } else {
+          newMap[p.id][d.dateKey] = {
+            ...currentCell,
+            employeeQty: finalSuggested,
+            storeQty: null,
+            isOwnerAdjusted: false,
+            isOwnerOverridden: false,
+            finalQty: finalSuggested,
+            suggestedQty: finalSuggested,
+            modifiedBy: 'employee',
+            modifiedAt: new Date().toISOString(),
+          };
+        }
+        suggestedCount++;
       });
     });
 
     setCellMap(newMap);
     setIsDirty(true);
+    const extra = skippedOwner > 0 ? ` (bỏ qua ${skippedOwner} ô đã có Owner override)` : '';
     showToast(
       suggestedCount > 0
-        ? `Đã áp dụng số lượng gợi ý thông minh cho ${suggestedCount} ô đặt hàng!`
-        : 'Tất cả các ô hợp lệ đã có số lượng đặt hàng.',
+        ? `Đã áp dụng Suggested Qty cho ${suggestedCount} ô${extra}.`
+        : 'Không có ô EDITABLE trống để áp dụng gợi ý.',
       suggestedCount > 0 ? 'success' : 'info'
     );
   };
 
-  // Copy Previous Week
+  // Copy tuần trước — chỉ cập nhật trường theo role, chỉ ô EDITABLE
   const handleCopyPrevWeek = () => {
     const newMap = { ...cellMap };
     let copyCount = 0;
+    let skipped = 0;
     const relevantProducts =
       selectedSupplierId === 'ALL'
         ? matrixProducts
         : matrixProducts.filter((p) => p.supplierId === selectedSupplierId);
 
     relevantProducts.forEach((p) => {
+      if (p.isRowDisabled) return;
       if (!newMap[p.id]) newMap[p.id] = {};
       dayColumns.forEach((d) => {
-        if (!d.isOff && !d.isLocked && d.cutoffStatus !== 'PO_GENERATED') {
-          const prevKey = fmtDateStr(addDaysToDate(d.date, -7));
-          const prevCell = cellMap[p.id]?.[prevKey];
-          if (prevCell && prevCell.finalQty > 0) {
-            newMap[p.id][d.dateKey] = {
-              employeeQty: prevCell.employeeQty,
-              storeQty: prevCell.storeQty,
-              finalQty: prevCell.finalQty,
-              isOwnerOverridden: prevCell.storeQty !== null,
-              modifiedBy: prevCell.modifiedBy,
-            };
-            copyCount++;
-          }
+        if (!isCellEditable(d, p)) {
+          skipped++;
+          return;
         }
+        const prevKey = fmtDateStr(addDaysToDate(d.date, -7));
+        const prevCell = cellMap[p.id]?.[prevKey];
+        if (!prevCell || prevCell.finalQty <= 0) return;
+
+        const currentCell = newMap[p.id][d.dateKey] || {
+          employeeQty: 0,
+          storeQty: null,
+          finalQty: 0,
+          isOwnerAdjusted: false,
+        };
+
+        if (isStoreOwner) {
+          const qty = prevCell.storeQty ?? prevCell.finalQty;
+          newMap[p.id][d.dateKey] = {
+            ...currentCell,
+            storeQty: qty,
+            isOwnerAdjusted: true,
+            isOwnerOverridden: true,
+            finalQty: qty,
+            modifiedBy: 'store_owner',
+            modifiedAt: new Date().toISOString(),
+          };
+        } else {
+          if (currentCell.isOwnerAdjusted || currentCell.storeQty !== null) {
+            skipped++;
+            return;
+          }
+          newMap[p.id][d.dateKey] = {
+            ...currentCell,
+            employeeQty: prevCell.employeeQty || prevCell.finalQty,
+            storeQty: null,
+            isOwnerAdjusted: false,
+            isOwnerOverridden: false,
+            finalQty: prevCell.employeeQty || prevCell.finalQty,
+            modifiedBy: 'employee',
+            modifiedAt: new Date().toISOString(),
+          };
+        }
+        copyCount++;
       });
     });
 
@@ -690,111 +908,71 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
     setIsDirty(true);
     showToast(
       copyCount > 0
-        ? `Đã sao chép thành công ${copyCount} ô số lượng từ tuần trước sang tuần này!`
-        : 'Không tìm thấy dữ liệu số lượng tuần trước để sao chép.',
+        ? `Đã sao chép ${copyCount} ô từ tuần trước${skipped ? `, bỏ qua ${skipped} ô không hợp lệ` : ''}.`
+        : 'Không tìm thấy dữ liệu tuần trước để sao chép vào ô EDITABLE.',
       copyCount > 0 ? 'success' : 'warning'
     );
   };
 
-  // Excel Download with 3-tier Quantity support
+  // Excel Download — Chuẩn CISCA / MT-GRMS .xlsx
   const handleExcelDownload = () => {
-    const relevantProducts =
-      selectedSupplierId === 'ALL'
-        ? matrixProducts
-        : matrixProducts.filter((p) => p.supplierId === selectedSupplierId);
-
-    const headers = [
-      'Nhà Cung Cấp',
-      'Ngành Hàng',
-      'Tên Sản Phẩm',
-      'Mã SKU',
-      'MOQ',
-      'ĐVT',
-      'Đơn Giá (VNĐ)',
-      ...dayColumns.map((d) => `${d.dowName} ${d.dateShort} [${d.dateKey}]`),
-      'Tổng SL Chốt',
-      'Thành Tiền (VNĐ)',
-    ];
-
-    let csvContent = headers.join(',') + '\n';
-
-    relevantProducts.forEach((p) => {
-      let rowQty = 0;
-      const dayCells = dayColumns.map((d) => {
-        const q = cellMap[p.id]?.[d.dateKey]?.finalQty || 0;
-        rowQty += q;
-        return q;
+    try {
+      const branch = branches.find((b) => b.id === selectedBranchId);
+      const supplier = suppliers.find((s) => s.id === selectedSupplierId);
+      exportMatrixToExcel(matrixProducts, dayColumns, cellMap, {
+        branch,
+        supplier,
+        supplierId: selectedSupplierId,
+        viewFrom,
+        viewTo: addDaysToDate(viewFrom, durationDays - 1),
+        exportedBy: isStoreOwner ? 'Store Owner' : 'Nhân viên chi nhánh',
+        isCellEditable,
       });
-      const rowAmt = rowQty * p.price;
-
-      const row = [
-        `"${(p.supplierName || p.supplierId).replace(/"/g, '""')}"`,
-        p.category,
-        `"${p.name.replace(/"/g, '""')}"`,
-        p.sku,
-        p.moq,
-        p.unit,
-        p.price,
-        ...dayCells,
-        rowQty,
-        rowAmt,
-      ];
-      csvContent += row.join(',') + '\n';
-    });
-
-    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `PO_Matrix_${selectedSupplierId}_${fmtDateStr(viewFrom)}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-    showToast('Đã xuất file bảng ma trận đặt hàng (.csv) thành công!', 'success');
+      showToast('Đã xuất file bảng ma trận đặt hàng (.xlsx) chuẩn doanh nghiệp thành công!', 'success');
+    } catch (err: any) {
+      showToast('Xuất file Excel thất bại: ' + (err?.message || err), 'error');
+    }
   };
 
-  // Excel Upload
-  const handleExcelUpload = (file: File) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const text = e.target?.result as string;
-      if (!text) return;
-      const lines = text.split('\n');
-      if (lines.length < 2) return;
-
-      const newMap = { ...cellMap };
-      let updatedItems = 0;
-
-      lines.slice(1).forEach((line) => {
-        const cols = line.split(',');
-        if (cols.length >= 7) {
-          const sku = cols[3]?.trim();
-          const targetProd = matrixProducts.find((p) => p.sku === sku);
-          if (targetProd && (selectedSupplierId === 'ALL' || targetProd.supplierId === selectedSupplierId)) {
-            if (!newMap[targetProd.id]) newMap[targetProd.id] = {};
-            dayColumns.forEach((d, idx) => {
-              if (!d.isOff && !d.isLocked && d.cutoffStatus !== 'PO_GENERATED') {
-                const val = parseFloat(cols[7 + idx]);
-                if (!isNaN(val) && val >= 0) {
-                  newMap[targetProd.id][d.dateKey] = {
-                    employeeQty: val,
-                    storeQty: null,
-                    finalQty: val,
-                    isOwnerOverridden: false,
-                    modifiedBy: 'employee',
-                  };
-                  updatedItems++;
-                }
-              }
-            });
-          }
-        }
+  // Excel Upload — 3 Giai đoạn: Validate -> Preview Modal -> Apply
+  const handleExcelUpload = async (file: File) => {
+    try {
+      const validationResult = await validateMatrixExcelFile({
+        file,
+        currentBranchId: selectedBranchId,
+        currentSupplierId: selectedSupplierId,
+        matrixProducts,
+        dayColumns,
+        cellMap,
+        supplierConfigs,
+        isCellEditable,
       });
 
-      setCellMap(newMap);
-      setIsDirty(true);
-      showToast(`Đã nạp thành công dữ liệu từ file "${file.name}" (${updatedItems} ô số lượng)!`, 'success');
-    };
-    reader.readAsText(file);
+      setImportPreviewResult(validationResult);
+      setIsImportModalOpen(true);
+    } catch (err: any) {
+      showToast('Kiểm tra file Excel thất bại: ' + (err?.message || err), 'error');
+    }
+  };
+
+  // Xử lý nạp dữ liệu từ Modal Preview sau khi đã kiểm tra không có lỗi
+  const handleConfirmApplyImport = () => {
+    if (!importPreviewResult || !importPreviewResult.valid) return;
+
+    const newMap = applyMatrixExcelImport(
+      importPreviewResult.cellsToApply,
+      cellMap,
+      isStoreOwner
+    );
+
+    setCellMap(newMap);
+    setIsDirty(true);
+    setIsImportModalOpen(false);
+
+    showToast(
+      'Nạp thành công ' + importPreviewResult.summary.validCells + ' ô số lượng từ file "' + importPreviewResult.fileName + '" vào Ma trận!',
+      'success'
+    );
   };
 
   // Compute PO Split Preview according to FE-05 rules:
@@ -814,16 +992,28 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
 
     activeSuppliers.forEach((sup) => {
       const supProducts = matrixProducts.filter((p) => p.supplierId === sup.id);
+      const supDayCols = computeDayColumns(
+        viewFrom,
+        durationDays,
+        sup.id,
+        lockedDates,
+        supplierConfigs,
+        dayStatuses,
+        serverToday
+      );
 
-      dayColumns.forEach((d) => {
-        if (d.isOff) return;
+      supDayCols.forEach((d) => {
+        // Không đưa ngày đã khóa/finalized/off hoặc sản phẩm inactive vào preview chốt
+        if (d.isOff || d.isLocked || d.cutoffStatus === 'PO_GENERATED' || d.cutoffStatus === 'LOCKED' || d.cutoffStatus === 'SUPPLIER_OFF') {
+          return;
+        }
 
-        // Gather products having finalQty > 0 for this date
         const items: SplitPoItem[] = [];
         let totalQty = 0;
         let totalAmount = 0;
 
         supProducts.forEach((p) => {
+          if (p.isRowDisabled) return;
           const cell = cellMap[p.id]?.[d.dateKey];
           const finalQty = cell?.finalQty || 0;
           if (finalQty > 0) {
@@ -871,35 +1061,75 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
     });
 
     return list;
-  }, [branches, suppliers, selectedBranchId, selectedSupplierId, dayColumns, cellMap, matrixProducts]);
+  }, [
+    branches,
+    suppliers,
+    selectedBranchId,
+    selectedSupplierId,
+    viewFrom,
+    durationDays,
+    lockedDates,
+    supplierConfigs,
+    dayStatuses,
+    serverToday,
+    cellMap,
+    matrixProducts,
+  ]);
 
   // Handle confirming PO Generation from Split Modal
   const handleConfirmGeneratePo = async (selectedPoIds: string[]) => {
+    if (!isStoreOwner) {
+      showToast('Chỉ Store Owner được phép chốt PO.', 'error');
+      return;
+    }
+    if (!branchIsActive) {
+      showToast('Chi nhánh đang ngừng hoạt động — không thể chốt PO.', 'error');
+      return;
+    }
+
     const selectedList = splitPos.filter((p) => selectedPoIds.includes(p.id));
     if (selectedList.length === 0) return;
 
+    const moqErrors: string[] = [];
+    selectedList.forEach((po) => {
+      po.items.forEach((item) => {
+        if (item.finalQty > 0 && item.finalQty < item.moq) {
+          moqErrors.push(`${item.sku} (${po.dateShort}): SL ${item.finalQty} < MOQ ${item.moq}`);
+        }
+      });
+    });
+    if (moqErrors.length > 0) {
+      showToast(`Chặn chốt — còn vi phạm MOQ: ${moqErrors.slice(0, 3).join('; ')}`, 'error');
+      return;
+    }
+
     try {
       setIsSaving(true);
-      const generated = await purchaseOrderApi.splitMatrixPo(selectedBranchId, selectedList);
+      const generated = await purchaseOrderApi.splitMatrixPo(
+        selectedBranchId,
+        selectedList,
+        undefined,
+        draftPoId
+      );
 
-      // Lock the finalized dates
       const newLocked = new Set(lockedDates);
-      selectedList.forEach((po) => {
-        newLocked.add(po.deliveryDate);
+      generated.forEach((po) => {
+        if (po.deliveryDate) newLocked.add(po.deliveryDate);
       });
+      selectedList.forEach((po) => newLocked.add(po.deliveryDate));
       setLockedDates(newLocked);
 
       setIsSplitModalOpen(false);
-      setStatus('Submitted / POs Generated');
       setIsDirty(false);
 
       const codes = generated.map((g) => g.orderCode).join(', ');
-      showToast(
-        `Đã phát hành và bóc tách thành công ${selectedList.length} đơn PO trên hệ thống (${codes})!`,
-        'success'
-      );
-    } catch {
-      showToast('Có lỗi xảy ra khi tạo PO, vui lòng thử lại!', 'error');
+      showToast(`Đã chốt thành công ${generated.length} PO (${codes}).`, 'success');
+    } catch (err: any) {
+      const msg =
+        err?.response?.data?.message ||
+        err?.message ||
+        'Có lỗi xảy ra khi tạo PO, vui lòng thử lại!';
+      showToast(msg, 'error');
     } finally {
       setIsSaving(false);
     }
@@ -916,7 +1146,6 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
         dateToInput,
         cellMap
       );
-      setStatus('Draft');
       setIsDirty(false);
       showToast('Bản thảo ma trận đặt hàng đã được lưu thành công trên hệ thống backend.', 'success');
     } catch (err: any) {
@@ -947,7 +1176,7 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
 
       {/* 1. Page Header */}
       <OrderMatrixHeader
-        status={status}
+        daySummary={daySummary}
         onBack={() => navigate('/store-owner/purchase-orders/branches')}
         onSave={handleSaveDraft}
         isSaving={isSaving}
@@ -1051,6 +1280,14 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
         splitPos={splitPos}
         branchName={branches.find((b) => b.id === selectedBranchId)?.name || 'Chi nhánh'}
         onConfirmGenerate={handleConfirmGeneratePo}
+      />
+
+      {/* 5. Excel Import Preview Modal (CISCA Style) */}
+      <OrderMatrixImportPreviewModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        result={importPreviewResult}
+        onConfirmApply={handleConfirmApplyImport}
       />
     </div>
   );
