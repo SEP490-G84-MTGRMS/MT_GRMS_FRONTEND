@@ -302,6 +302,10 @@ export const SupplierDetailPage: FC<Props> = ({
     }
     await supplierApi.updateDeliveryConfig(supplierId, mapDeliveryConfigToApi(newCfg));
     setDeliveryConfig(newCfg);
+    showToast(
+      `Đã lưu cấu hình lịch giao hàng và thời gian Cutoff thành công cho ${currentSupplier?.name || 'nhà cung cấp'}!`,
+      'success',
+    );
   };
 
   const handleLinkCustomer = (_supplierId: string, customerId: string) => {

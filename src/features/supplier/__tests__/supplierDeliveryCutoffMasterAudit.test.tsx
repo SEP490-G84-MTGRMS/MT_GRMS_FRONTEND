@@ -319,7 +319,7 @@ describe('MASTER AUDIT SUITE – Supplier Delivery & Cutoff Configuration', () =
   // 8. CONFIGURATION SAVE TESTING (TC-SAVE-001 to TC-SAVE-005)
   // =========================================================================
   describe('8. Configuration Save Testing (TC-SAVE-001..005)', () => {
-    it('TC-SAVE-001: Submits full configuration and displays success alert', async () => {
+    it('TC-SAVE-001: Submits full configuration (success toast handled by parent page)', async () => {
       const onSaveMock = vi.fn().mockResolvedValue(undefined);
       render(
         <SupplierDeliveryConfigTab
@@ -341,8 +341,8 @@ describe('MASTER AUDIT SUITE – Supplier Delivery & Cutoff Configuration', () =
             activeDeliveryDays: [1, 2, 3, 4, 5],
           })
         );
-        expect(screen.getByTestId('save-delivery-success-alert')).toBeDefined();
       });
+      expect(screen.queryByTestId('save-delivery-success-alert')).toBeNull();
     });
 
     it('TC-SAVE-004: API failure displays explicit error alert without false success', async () => {
