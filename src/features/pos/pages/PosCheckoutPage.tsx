@@ -666,6 +666,7 @@ export const PosCheckoutPage: FC = () => {
         note: currentTab.note || debtNote || undefined,
         creatorRole: user?.role,
         cashierName: user?.role === 'STORE_OWNER' ? `Chủ cửa hàng: ${user.fullName || 'Admin'}` : (user?.fullName || 'Thu ngân POS'),
+        shiftId: currentShift?.id || undefined,
       });
 
       createdOrderId = backendOrder.id;
@@ -701,6 +702,24 @@ export const PosCheckoutPage: FC = () => {
       } else {
         showToast(`✅ Đã thanh toán thành công đơn hàng ${receipt.orderCode}!`);
       }
+
+      // Lưu đơn vào danh sách ca làm việc để tổng hợp doanh thu chốt ca
+      if (currentShift?.id) {
+        try {
+          const shiftKey = `mtgrms_shift_orders_${currentShift.id}`;
+          const currentList = JSON.parse(localStorage.getItem(shiftKey) || '[]');
+          currentList.push({
+            orderCode: receipt.orderCode,
+            finalAmount: receipt.finalAmount,
+            paymentMethod: paymentMethod,
+            createdAt: new Date().toISOString(),
+          });
+          localStorage.setItem(shiftKey, JSON.stringify(currentList));
+        } catch {}
+      }
+
+      // Đồng bộ lại trạng thái ca và tiền lý thuyết
+      checkShiftStatus();
 
       setIsReceiptModalOpen(true);
     } catch (apiErr: unknown) {

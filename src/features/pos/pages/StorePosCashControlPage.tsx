@@ -14,10 +14,10 @@ import {
   X,
   Sliders,
   AlertTriangle,
-  Info
+  Info,
 } from 'lucide-react';
 import { posShiftApi } from '../api/posShiftApi';
-import type { ShiftCashMovementDto } from '../types/posShift.types';
+import type { ShiftCashMovementDto, ShiftDetailResponse } from '../types/posShift.types';
 import { useAuthStore } from '../../../stores/useAuthStore';
 import { AN_NHIEN_BRANCHES } from '../mock/posMockData';
 
@@ -39,11 +39,16 @@ export const StorePosCashControlPage: FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [pendingMovements, setPendingMovements] = useState<ShiftCashMovementDto[]>([]);
   const [unconfirmedDrops, setUnconfirmedDrops] = useState<ShiftCashMovementDto[]>([]);
+  const [pendingHandovers, setPendingHandovers] = useState<ShiftDetailResponse[]>([]);
 
-  // Modal từ chối
+  // Modal từ chối chi két
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [rejectionReason, setRejectionReason] = useState<string>('');
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
+
+  // Modal khiếu nại bàn giao ca
+  const [disputingShiftId, setDisputingShiftId] = useState<string | null>(null);
+  const [disputeReason, setDisputeReason] = useState<string>('');
 
   const availableBranches = useMemo(() => {
     if (isAnNhienStore) {
@@ -84,6 +89,24 @@ export const StorePosCashControlPage: FC = () => {
       } else {
         setPendingMovements([]);
         setUnconfirmedDrops([]);
+      }
+
+      // 3. Tải danh sách ca chờ xác nhận bàn giao (Closed & PENDING handover)
+      try {
+        let allClosedHandovers: ShiftDetailResponse[] = [];
+        if (selectedBranchId === 'ALL') {
+          const promises = availableBranches.map((b) => posShiftApi.getShiftHistory(b.id).catch(() => []));
+          const results = await Promise.all(promises);
+          allClosedHandovers = results.flat();
+        } else {
+          allClosedHandovers = await posShiftApi.getShiftHistory(selectedBranchId);
+        }
+        const handovers = (allClosedHandovers || []).filter(
+          (s) => (s.status === 'Closed' || s.status === 2) && (s.handoverStatus === 'PENDING' || s.handoverStatus === 1)
+        );
+        setPendingHandovers(handovers);
+      } catch (err) {
+        console.warn('Lỗi tải danh sách ca chờ bàn giao:', err);
       }
     } catch (err) {
       console.error('Lỗi tải dữ liệu kiểm soát quỹ POS:', err);
@@ -169,6 +192,45 @@ export const StorePosCashControlPage: FC = () => {
       await loadData();
     } catch (err: any) {
       alert(err.response?.data?.message || 'Không thể xác nhận nhận tiền rút két');
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  // Xác nhận nhận bàn giao ca và nhận đủ tiền nộp két an toàn
+  const handleConfirmHandover = async (shiftId: string) => {
+    if (!window.confirm('Bạn có chắc chắn muốn xác nhận bàn giao ca này và đã nhận đủ số tiền nộp két an toàn?')) {
+      return;
+    }
+    setActionLoadingId(shiftId);
+    try {
+      await posShiftApi.confirmHandover(shiftId, { status: 2 });
+      await loadData();
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Không thể xác nhận bàn giao ca');
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  // Xác nhận khiếu nại bàn giao ca
+  const handleDisputeHandoverConfirm = async () => {
+    if (!disputingShiftId) return;
+    if (!disputeReason.trim()) {
+      alert('Vui lòng nhập lý do khiếu nại bàn giao ca!');
+      return;
+    }
+    setActionLoadingId(disputingShiftId);
+    try {
+      await posShiftApi.confirmHandover(disputingShiftId, {
+        status: 3,
+        disputeReason: disputeReason.trim(),
+      });
+      setDisputingShiftId(null);
+      setDisputeReason('');
+      await loadData();
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Không thể ghi nhận khiếu nại');
     } finally {
       setActionLoadingId(null);
     }
@@ -372,7 +434,45 @@ export const StorePosCashControlPage: FC = () => {
           </div>
         </div>
 
-        {/* KPI 3: Hạn mức tự duyệt */}
+        {/* KPI 3: Ca chờ duyệt chốt ca & bàn giao */}
+        <div
+          style={{
+            backgroundColor: '#ffffff',
+            borderRadius: 12,
+            border: pendingHandovers.length > 0 ? '1.5px solid #fed7aa' : '1px solid #e2e8f0',
+            padding: '16px 20px',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+          }}
+        >
+          <div>
+            <div style={{ fontSize: 12.5, fontWeight: 700, color: '#64748b' }}>Ca chờ duyệt bàn giao</div>
+            <div style={{ fontSize: 24, fontWeight: 800, color: pendingHandovers.length > 0 ? '#ea580c' : '#0f172a', marginTop: 4 }}>
+              {pendingHandovers.length}
+            </div>
+            <div style={{ fontSize: 11.5, color: '#94a3b8', marginTop: 2 }}>
+              {pendingHandovers.length > 0 ? 'Chờ Chủ đối soát kết toán' : 'Không có ca tồn đọng'}
+            </div>
+          </div>
+          <div
+            style={{
+              width: 44,
+              height: 44,
+              borderRadius: 10,
+              backgroundColor: pendingHandovers.length > 0 ? '#ffedd5' : '#f1f5f9',
+              color: pendingHandovers.length > 0 ? '#ea580c' : '#64748b',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Clock size={22} />
+          </div>
+        </div>
+
+        {/* KPI 4: Hạn mức tự duyệt */}
         <div
           style={{
             backgroundColor: '#ffffff',
@@ -410,7 +510,7 @@ export const StorePosCashControlPage: FC = () => {
           </div>
         </div>
 
-        {/* KPI 4: Trần tổng chi / ca */}
+        {/* KPI 5: Trần tổng chi / ca */}
         <div
           style={{
             backgroundColor: '#ffffff',
@@ -937,6 +1037,217 @@ export const StorePosCashControlPage: FC = () => {
               </div>
             )}
           </div>
+
+          {/* PHẦN 3: Ca làm việc chờ Chủ phê duyệt & xác nhận bàn giao */}
+          <div
+            style={{
+              backgroundColor: '#ffffff',
+              borderRadius: 12,
+              border: '1px solid #e2e8f0',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+              overflow: 'hidden',
+            }}
+          >
+            <div
+              style={{
+                padding: '16px 20px',
+                borderBottom: '1px solid #e2e8f0',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                backgroundColor: '#fffbeb',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Clock size={20} className="text-amber-600" />
+                <h3 style={{ fontSize: 15, fontWeight: 800, color: '#92400e', margin: 0 }}>
+                  Ca Làm Việc Chờ Phê Duyệt Bàn Giao ({pendingHandovers.length})
+                </h3>
+              </div>
+              <span
+                style={{
+                  fontSize: 11.5,
+                  fontWeight: 700,
+                  padding: '3px 8px',
+                  borderRadius: 20,
+                  backgroundColor: pendingHandovers.length > 0 ? '#fef3c7' : '#f1f5f9',
+                  color: pendingHandovers.length > 0 ? '#b45309' : '#64748b',
+                }}
+              >
+                {pendingHandovers.length > 0 ? 'Chờ Chủ kiểm đếm & xác nhận' : 'Không có ca tồn'}
+              </span>
+            </div>
+
+            {pendingHandovers.length === 0 ? (
+              <div style={{ padding: '36px 20px', textAlign: 'center' }}>
+                <CheckCircle2 size={40} className="text-amber-500" style={{ margin: '0 auto 10px' }} />
+                <div style={{ fontSize: 14, fontWeight: 700, color: '#1e293b' }}>
+                  Không có ca làm việc nào đang chờ xác nhận bàn giao
+                </div>
+                <div style={{ fontSize: 12.5, color: '#64748b', marginTop: 4 }}>
+                  Mọi ca đã chốt của các quầy thu ngân đều đã được Chủ cửa hàng xác nhận và kết toán.
+                </div>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                {pendingHandovers.map((shift) => {
+                  const cashSales = Math.max(0, (shift.expectedCash || 0) - shift.openingFloat - (shift.totalCashIn || 0) + (shift.totalCashOut || 0));
+                  const disc = shift.discrepancy ?? 0;
+                  return (
+                    <div
+                      key={shift.id}
+                      style={{
+                        padding: 16,
+                        borderBottom: '1px solid #f1f5f9',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 12,
+                      }}
+                    >
+                      {/* Header ca */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 8 }}>
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <span style={{ fontSize: 14, fontWeight: 800, color: '#0f172a' }}>
+                              Ca: {shift.shiftCode} &bull; {shift.shiftName}
+                            </span>
+                            <span
+                              style={{
+                                fontSize: 11,
+                                fontWeight: 700,
+                                backgroundColor: '#fef3c7',
+                                color: '#b45309',
+                                padding: '2px 8px',
+                                borderRadius: 4,
+                              }}
+                            >
+                              Chờ bàn giao
+                            </span>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 4, fontSize: 12, color: '#64748b' }}>
+                            <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                              <User size={13} />
+                              Thu ngân: <b>{shift.cashierUserId}</b>
+                            </span>
+                            <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                              <Clock size={13} />
+                              Đóng ca: {shift.closedAtUtc ? new Date(shift.closedAtUtc).toLocaleString('vi-VN') : 'Vừa xong'}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Tiền nộp két sắt về Chủ */}
+                        <div style={{ textAlign: 'right' }}>
+                          <div style={{ fontSize: 18, fontWeight: 800, color: '#0f766e', fontFamily: 'monospace' }}>
+                            {(shift.droppedToSafeAmount || 0).toLocaleString('vi-VN')} đ
+                          </div>
+                          <span style={{ fontSize: 11, fontWeight: 700, color: '#0f766e' }}>Tiền mặt nộp két sắt về Chủ</span>
+                        </div>
+                      </div>
+
+                      {/* Doanh thu & Đối soát */}
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 8 }}>
+                        <div style={{ padding: '6px 10px', backgroundColor: '#f8fafc', borderRadius: 6, border: '1px solid #e2e8f0', fontSize: 12 }}>
+                          <div style={{ color: '#64748b' }}>Bán hàng TM</div>
+                          <div style={{ fontWeight: 700, color: '#059669', marginTop: 2 }}>
+                            {cashSales.toLocaleString('vi-VN')} đ
+                          </div>
+                        </div>
+
+                        <div style={{ padding: '6px 10px', backgroundColor: '#f8fafc', borderRadius: 6, border: '1px solid #e2e8f0', fontSize: 12 }}>
+                          <div style={{ color: '#64748b' }}>Chuyển khoản / QR</div>
+                          <div style={{ fontWeight: 700, color: '#2563eb', marginTop: 2 }}>
+                            {(shift.totalBankRevenue || 0).toLocaleString('vi-VN')} đ
+                          </div>
+                        </div>
+
+                        <div style={{ padding: '6px 10px', backgroundColor: '#f8fafc', borderRadius: 6, border: '1px solid #e2e8f0', fontSize: 12 }}>
+                          <div style={{ color: '#64748b' }}>Để lại két ca sau</div>
+                          <div style={{ fontWeight: 700, color: '#0f172a', marginTop: 2 }}>
+                            {(shift.retainedFloatAmount || 0).toLocaleString('vi-VN')} đ
+                          </div>
+                        </div>
+
+                        <div style={{ padding: '6px 10px', backgroundColor: '#f8fafc', borderRadius: 6, border: '1px solid #e2e8f0', fontSize: 12 }}>
+                          <div style={{ color: '#64748b' }}>Chênh lệch kết ca</div>
+                          <div
+                            style={{
+                              fontWeight: 700,
+                              color: disc === 0 ? '#10b981' : disc > 0 ? '#0284c7' : '#ef4444',
+                              marginTop: 2,
+                            }}
+                          >
+                            {disc > 0 ? `+${disc.toLocaleString('vi-VN')}` : disc.toLocaleString('vi-VN')} đ
+                            {disc === 0 ? ' (Khớp)' : ''}
+                          </div>
+                        </div>
+                      </div>
+
+                      {shift.notes && (
+                        <div
+                          style={{
+                            padding: '6px 10px',
+                            backgroundColor: '#f1f5f9',
+                            borderRadius: 6,
+                            fontSize: 12,
+                            color: '#475569',
+                          }}
+                        >
+                          <b>Ghi chú thu ngân:</b> {shift.notes}
+                        </div>
+                      )}
+
+                      {/* Actions */}
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 4 }}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDisputingShiftId(shift.id);
+                            setDisputeReason('');
+                          }}
+                          style={{
+                            padding: '6px 14px',
+                            borderRadius: 6,
+                            border: '1px solid #cbd5e1',
+                            backgroundColor: '#ffffff',
+                            color: '#e11d48',
+                            fontSize: 12.5,
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          Khiếu nại / Không khớp
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleConfirmHandover(shift.id)}
+                          disabled={actionLoadingId === shift.id}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 6,
+                            padding: '6px 18px',
+                            borderRadius: 6,
+                            border: 'none',
+                            backgroundColor: '#0f766e',
+                            color: '#ffffff',
+                            fontSize: 12.5,
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            boxShadow: '0 1px 3px rgba(15, 118, 110, 0.25)',
+                          }}
+                        >
+                          <Check size={14} />
+                          <span>{actionLoadingId === shift.id ? 'Đang xử lý...' : 'Xác nhận nhận tiền bàn giao'}</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -1024,6 +1335,96 @@ export const StorePosCashControlPage: FC = () => {
                 }}
               >
                 {actionLoadingId === rejectingId ? 'Đang từ chối...' : 'Xác nhận từ chối'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal khiếu nại bàn giao ca */}
+      {disputingShiftId && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.55)',
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 16,
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: '#ffffff',
+              borderRadius: 12,
+              maxWidth: 460,
+              width: '100%',
+              padding: 24,
+              boxShadow: '0 20px 25px -5px rgba(0,0,0,0.2)',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: '#e11d48' }}>
+              <AlertTriangle size={22} />
+              <h3 style={{ fontSize: 16, fontWeight: 800, margin: 0 }}>Ghi Nhận Khiếu Nại Bàn Giao Ca</h3>
+            </div>
+            <p style={{ fontSize: 13, color: '#64748b', marginTop: 8, lineHeight: 1.4 }}>
+              Nhập lý do khiếu nại hoặc chênh lệch tiền nộp két sắt thực tế so với báo cáo của thu ngân để lưu vết kiểm toán:
+            </p>
+
+            <textarea
+              rows={3}
+              placeholder="VD: Kiểm đếm thực tế phong bì nộp két sắt thiếu 50.000đ so với số tiền ghi nhận trong báo cáo..."
+              value={disputeReason}
+              onChange={(e) => setDisputeReason(e.target.value)}
+              style={{
+                width: '100%',
+                padding: 10,
+                borderRadius: 8,
+                border: '1.5px solid #cbd5e1',
+                fontSize: 13,
+                marginTop: 10,
+                resize: 'none',
+              }}
+            />
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 16 }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setDisputingShiftId(null);
+                  setDisputeReason('');
+                }}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: 6,
+                  border: '1px solid #cbd5e1',
+                  backgroundColor: '#ffffff',
+                  color: '#475569',
+                  fontWeight: 600,
+                  fontSize: 13,
+                  cursor: 'pointer',
+                }}
+              >
+                Hủy bỏ
+              </button>
+              <button
+                type="button"
+                onClick={handleDisputeHandoverConfirm}
+                disabled={actionLoadingId === disputingShiftId}
+                style={{
+                  padding: '8px 18px',
+                  borderRadius: 6,
+                  border: 'none',
+                  backgroundColor: '#e11d48',
+                  color: '#ffffff',
+                  fontWeight: 700,
+                  fontSize: 13,
+                  cursor: 'pointer',
+                }}
+              >
+                {actionLoadingId === disputingShiftId ? 'Đang ghi nhận...' : 'Lưu khiếu nại bàn giao'}
               </button>
             </div>
           </div>

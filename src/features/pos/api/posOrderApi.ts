@@ -23,6 +23,7 @@ export interface OrderCreateRequest {
   note?: string | null;
   creatorRole?: string | null;
   cashierName?: string | null;
+  shiftId?: string | null;
 }
 
 export interface OrderItemResponse {

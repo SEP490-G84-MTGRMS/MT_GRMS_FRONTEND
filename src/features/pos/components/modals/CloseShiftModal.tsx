@@ -53,6 +53,40 @@ export const CloseShiftModal: FC<Props> = ({
   // Danh sách phiếu và trạng thái chờ duyệt
   const [movements, setMovements] = useState<ShiftCashMovementDto[]>(shift.cashMovements || []);
 
+  // Đọc danh sách đơn hàng phát sinh trong ca từ cache local (hỗ trợ hiển thị tức thì & đối soát)
+  const shiftOrders = useMemo(() => {
+    try {
+      const cached = localStorage.getItem(`mtgrms_shift_orders_${shift.id}`);
+      if (cached) {
+        return JSON.parse(cached) as Array<{
+          id: string;
+          totalAmount?: number;
+          finalAmount?: number;
+          paymentMethod?: string | number;
+        }>;
+      }
+    } catch {
+      // ignore
+    }
+    return [];
+  }, [shift.id]);
+
+  const localCashSales = useMemo(() => {
+    return shiftOrders.reduce((sum, o) => {
+      const pm = String(o.paymentMethod || '').toUpperCase();
+      const isCash = pm === 'CASH' || pm === '1';
+      return sum + (isCash ? (o.finalAmount || o.totalAmount || 0) : 0);
+    }, 0);
+  }, [shiftOrders]);
+
+  const localBankSales = useMemo(() => {
+    return shiftOrders.reduce((sum, o) => {
+      const pm = String(o.paymentMethod || '').toUpperCase();
+      const isBank = pm === 'VIETQR' || pm === 'BANK_TRANSFER' || pm === '2' || pm === 'QR';
+      return sum + (isBank ? (o.finalAmount || o.totalAmount || 0) : 0);
+    }, 0);
+  }, [shiftOrders]);
+
   const refreshMovements = async () => {
     try {
       const refreshed = await posShiftApi.getShiftById(shift.id);
@@ -78,6 +112,31 @@ export const CloseShiftModal: FC<Props> = ({
     }, 0);
   }, [counts]);
 
+  // Số lượng đơn hàng đã bán trong ca
+  const ordersCount = Math.max(currentShiftData.totalOrdersCount || 0, shiftOrders.length);
+
+  // Doanh thu chuyển khoản / VietQR
+  const bankRevenue = (currentShiftData.totalBankRevenue && currentShiftData.totalBankRevenue > 0)
+    ? currentShiftData.totalBankRevenue
+    : localBankSales;
+
+  // Doanh thu tiền mặt bán hàng
+  const backendCashSales = Math.max(0, (currentShiftData.expectedCash || 0) - currentShiftData.openingFloat - (currentShiftData.totalCashIn || 0) + (currentShiftData.totalCashOut || 0));
+  const cashSales = backendCashSales > 0 ? backendCashSales : localCashSales;
+
+  // Tổng doanh thu toàn ca
+  const totalShiftRevenue = cashSales + bankRevenue;
+
+  // Tiền lý thuyết trong két (G) = Tiền đầu ca + Doanh thu tiền mặt + Thu két - Chi két
+  const expectedCash = (currentShiftData.openingFloat || 0) + cashSales + (currentShiftData.totalCashIn || 0) - (currentShiftData.totalCashOut || 0);
+
+  // Tự động đồng bộ quickCashAmount khi expectedCash cập nhật từ doanh số thực tế
+  useEffect(() => {
+    if (expectedCash > 0 && (quickCashAmount === 0 || quickCashAmount === (shift.openingFloat || 1500000))) {
+      setQuickCashAmount(expectedCash);
+    }
+  }, [expectedCash, shift.openingFloat]);
+
   // Tổng tiền kiểm đếm thực tế H theo chế độ được chọn
   const actualCashCounted = countMode === 'quick' ? quickCashAmount : detailCashCounted;
 
@@ -94,11 +153,6 @@ export const CloseShiftModal: FC<Props> = ({
 
   if (!isOpen) return null;
 
-  // Tiền lý thuyết và doanh thu bán hàng
-  const expectedCash = currentShiftData.expectedCash || (currentShiftData.openingFloat + currentShiftData.totalCashIn - currentShiftData.totalCashOut);
-  const cashSales = Math.max(0, expectedCash - currentShiftData.openingFloat - currentShiftData.totalCashIn + currentShiftData.totalCashOut);
-  const bankRevenue = currentShiftData.totalBankRevenue || 0;
-  const totalShiftRevenue = cashSales + bankRevenue;
   const discrepancy = actualCashCounted - expectedCash;
 
   // Kiểm tra phiếu pending
@@ -299,7 +353,7 @@ export const CloseShiftModal: FC<Props> = ({
                   📊 Tổng hợp doanh thu &amp; phương thức thanh toán trong ca
                 </span>
                 <span style={{ fontSize: 12, color: '#64748b' }}>
-                  Đã hoàn thành: <b>{currentShiftData.totalOrdersCount || 0} đơn hàng</b>
+                  Đã hoàn thành: <b style={{ color: '#0f766e' }}>{ordersCount} đơn hàng</b>
                 </span>
               </div>
 
@@ -631,6 +685,26 @@ export const CloseShiftModal: FC<Props> = ({
                 />
               </div>
             </div>
+
+            {/* Thông báo quy trình gửi báo cáo chốt ca đến Chủ cửa hàng */}
+            <div
+              style={{
+                padding: '10px 12px',
+                borderRadius: 8,
+                backgroundColor: '#f0fdfa',
+                border: '1px solid #99f6e4',
+                color: '#0f766e',
+                fontSize: 12,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+              }}
+            >
+              <CheckCircle size={16} className="text-teal-600 flex-shrink-0" />
+              <span>
+                <b>Quy trình chốt ca:</b> Khi bấm gửi, ca làm việc sẽ chuyển sang trạng thái <b>Chờ Chủ xác nhận bàn giao tiền két</b> (Pending Handover). Số tiền nộp két an toàn <b>{droppedToSafe.toLocaleString('vi-VN')} đ</b> và tiền để lại két <b>{retainedFloat.toLocaleString('vi-VN')} đ</b> sẽ được Chủ đối soát và phê duyệt trên hệ thống.
+              </span>
+            </div>
           </div>
 
           {/* Footer */}
@@ -678,7 +752,7 @@ export const CloseShiftModal: FC<Props> = ({
               }}
             >
               <CheckCircle size={16} />
-              <span>{isLoading ? 'Đang chốt ca...' : 'Chốt Ca & Bàn Giao'}</span>
+              <span>{isLoading ? 'Đang gửi...' : 'Gửi Báo Cáo Chốt Ca Cho Chủ Cửa Hàng'}</span>
             </button>
           </div>
         </form>
