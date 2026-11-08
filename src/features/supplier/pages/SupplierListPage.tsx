@@ -16,7 +16,11 @@ import { EditSupplierModal } from '../components/EditSupplierModal';
 import { SupplierDetailPage } from './SupplierDetailPage';
 import { AdminToast, type ToastState } from '../../admin/components';
 import { supplierApi } from '../api/supplierApi';
-import { exportSuppliersToExcel } from '../lib/supplierExcelExporter';
+import {
+  exportSuppliersToExcel,
+  formatDeliveryDaysForExcel,
+  type SupplierExportDeliveryInfo,
+} from '../lib/supplierExcelExporter';
 import '../../purchase-order/purchase-order.css';
 import '../supplier.css';
 
@@ -176,9 +180,28 @@ export const SupplierListPage: FC = () => {
         return;
       }
 
+      const deliveryResults = await Promise.allSettled(
+        res.items.map((s) => supplierApi.getDeliveryConfig(s.id))
+      );
+      const deliveryBySupplierId: Record<string, SupplierExportDeliveryInfo> = {};
+      res.items.forEach((s, idx) => {
+        const result = deliveryResults[idx];
+        if (result.status !== 'fulfilled' || !result.value) return;
+        const cfg = result.value;
+        const deliveryDays: string[] = Array.isArray(cfg.deliveryDays) ? cfg.deliveryDays : [];
+        deliveryBySupplierId[s.id] = {
+          deliveryDays,
+          deliveryDaysDisplay: formatDeliveryDaysForExcel(deliveryDays),
+          cutoffDayOffset: typeof cfg.cutoffDayOffset === 'number' ? cfg.cutoffDayOffset : null,
+          cutoffTime: cfg.cutoffTime || cfg.orderCutoffTime || null,
+          minOrderQuantity: typeof cfg.minOrderQuantity === 'number' ? cfg.minOrderQuantity : null,
+        };
+      });
+
       exportSuppliersToExcel(res.items, {
         storeName: 'HỆ THỐNG QUẢN LÝ BÁN LẺ MT-GRMS',
         exportedBy: isStoreOwner ? 'Quản lý cửa hàng (Store Owner)' : 'Nhân viên chi nhánh',
+        deliveryBySupplierId,
       });
 
       showToast(`Đã xuất ${res.items.length} nhà cung cấp ra tệp Excel (.xlsx) chuẩn định dạng.`, 'success');

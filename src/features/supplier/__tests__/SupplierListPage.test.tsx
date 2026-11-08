@@ -188,6 +188,7 @@ describe('Master Supplier Management — SupplierListPage Component Tests', () =
         expect.objectContaining({
           storeName: expect.any(String),
           exportedBy: expect.any(String),
+          deliveryBySupplierId: expect.any(Object),
         })
       );
     });

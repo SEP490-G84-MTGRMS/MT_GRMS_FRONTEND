@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import type { FC } from 'react';
-import { X, Check, Store, Search, Loader2, AlertCircle, CalendarDays } from 'lucide-react';
+import { X, Check, Store, Search, Loader2, AlertCircle } from 'lucide-react';
 import type {
   SupplierSummary,
   SupplierBranchAssignmentItem,
@@ -146,11 +146,6 @@ export const AssignBranchModal: FC<AssignBranchModalProps> = ({
     );
   }, [availableSuppliers, supplierSearch]);
 
-  const selectedSuppliers = useMemo(
-    () => selectedSupplierIds.map((id) => suppliers.find((s) => s.id === id)).filter(Boolean) as SupplierSummary[],
-    [selectedSupplierIds, suppliers]
-  );
-
   if (!isOpen) return null;
 
   // Toggle chọn một nhà cung cấp
@@ -276,7 +271,7 @@ export const AssignBranchModal: FC<AssignBranchModalProps> = ({
           backgroundColor: '#ffffff',
           borderRadius: 16,
           width: '100%',
-          maxWidth: 780,
+          maxWidth: 920,
           maxHeight: '90vh',
           display: 'flex',
           flexDirection: 'column',
@@ -365,41 +360,6 @@ export const AssignBranchModal: FC<AssignBranchModalProps> = ({
                 <span>{errorMsg}</span>
               </div>
             )}
-
-            {/* Trạng thái phân bổ */}
-            <div style={{ marginBottom: 18 }}>
-              <StatusToggle
-                checked={status === 'Active'}
-                disabled={isSubmitting}
-                onChange={(next) => {
-                  setStatus(next ? 'Active' : 'Inactive');
-                  setErrorMsg('');
-                }}
-              />
-              {status === 'Inactive' && (
-                <div style={{ marginTop: 10 }}>
-                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#475569', marginBottom: 4 }}>
-                    Lý do tạm ngưng
-                  </label>
-                  <textarea
-                    value={inactiveReason}
-                    onChange={(e) => setInactiveReason(e.target.value)}
-                    rows={2}
-                    placeholder="Nhập lý do..."
-                    disabled={isSubmitting}
-                    style={{
-                      width: '100%',
-                      border: '1px solid #e2e8f0',
-                      borderRadius: 8,
-                      padding: 10,
-                      fontSize: 13,
-                      resize: 'vertical',
-                      boxSizing: 'border-box',
-                    }}
-                  />
-                </div>
-              )}
-            </div>
 
             {/* Bước 1: Chọn cửa hàng / chi nhánh */}
             <div style={{ marginBottom: 18 }}>
@@ -548,7 +508,7 @@ export const AssignBranchModal: FC<AssignBranchModalProps> = ({
                     Không tìm thấy nhà cung cấp phù hợp với từ khóa "{supplierSearch}".
                   </div>
                 ) : (
-                  <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 640 }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 760 }}>
                     <thead>
                       <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
                         <th style={{ width: 42, padding: '8px 10px', textAlign: 'center' }}>
@@ -617,11 +577,28 @@ export const AssignBranchModal: FC<AssignBranchModalProps> = ({
                         >
                           SĐT
                         </th>
+                        <th
+                          style={{
+                            padding: '8px 10px',
+                            textAlign: 'left',
+                            fontSize: 11.5,
+                            fontWeight: 700,
+                            color: '#475569',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.02em',
+                            whiteSpace: 'nowrap',
+                            minWidth: 220,
+                          }}
+                        >
+                          Ngày giao
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
                       {filteredAvailableSuppliers.map((sup) => {
                         const isSelected = selectedSupplierIds.includes(sup.id);
+                        const days = deliveryDaysBySupplier[sup.id] ?? [];
+                        const isLoadingDays = loadingDeliveryFor === sup.id;
                         return (
                           <tr
                             key={sup.id}
@@ -682,6 +659,55 @@ export const AssignBranchModal: FC<AssignBranchModalProps> = ({
                             >
                               {sup.phone || '—'}
                             </td>
+                            <td
+                              style={{ padding: '6px 10px', verticalAlign: 'middle' }}
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              {isSelected ? (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                                    {WEEKDAY_OPTIONS.map((day) => {
+                                      const isChecked = days.includes(day.val);
+                                      return (
+                                        <label
+                                          key={day.val}
+                                          title={day.label}
+                                          style={{
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            gap: 3,
+                                            fontSize: 11,
+                                            fontWeight: 600,
+                                            color: isChecked ? '#0f766e' : '#64748b',
+                                            cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                                            userSelect: 'none',
+                                          }}
+                                        >
+                                          <input
+                                            type="checkbox"
+                                            checked={isChecked}
+                                            disabled={isSubmitting || isLoadingDays}
+                                            onChange={() => handleToggleDeliveryDay(sup.id, day.val)}
+                                            style={{
+                                              width: 13,
+                                              height: 13,
+                                              accentColor: '#0f766e',
+                                              cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                                            }}
+                                          />
+                                          {day.label}
+                                        </label>
+                                      );
+                                    })}
+                                  </div>
+                                  {isLoadingDays && (
+                                    <span style={{ fontSize: 10, color: '#94a3b8' }}>Đang tải lịch NCC…</span>
+                                  )}
+                                </div>
+                              ) : (
+                                <span style={{ fontSize: 11.5, color: '#94a3b8' }}>—</span>
+                              )}
+                            </td>
                           </tr>
                         );
                       })}
@@ -689,98 +715,6 @@ export const AssignBranchModal: FC<AssignBranchModalProps> = ({
                   </table>
                 )}
               </div>
-
-              {/* Ngày giao theo thứ — prefill từ base NCC, cho sửa theo cửa hàng */}
-              {selectedSuppliers.length > 0 && (
-                <div
-                  style={{
-                    marginTop: 16,
-                    padding: 14,
-                    borderRadius: 10,
-                    border: '1px solid #ccfbf1',
-                    backgroundColor: '#f0fdfa',
-                  }}
-                >
-                  <div
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 8,
-                      marginBottom: 10,
-                      fontSize: 13,
-                      fontWeight: 700,
-                      color: '#0f766e',
-                    }}
-                  >
-                    <CalendarDays size={16} />
-                    <span>Ngày giao hàng theo thứ (theo từng NCC tại cửa hàng này)</span>
-                  </div>
-                  <p style={{ margin: '0 0 12px', fontSize: 12, color: '#64748b' }}>
-                    Mặc định lấy từ cấu hình Delivery Date của NCC — bạn có thể tick thêm/bớt theo cửa hàng.
-                  </p>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                    {selectedSuppliers.map((sup) => {
-                      const days = deliveryDaysBySupplier[sup.id] ?? [];
-                      const isLoading = loadingDeliveryFor === sup.id;
-                      return (
-                        <div
-                          key={sup.id}
-                          style={{
-                            background: '#ffffff',
-                            border: '1px solid #e2e8f0',
-                            borderRadius: 8,
-                            padding: '10px 12px',
-                          }}
-                        >
-                          <div
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'space-between',
-                              gap: 8,
-                              marginBottom: 8,
-                            }}
-                          >
-                            <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a' }}>
-                              <span style={{ fontFamily: 'monospace', color: '#0f766e' }}>{sup.code}</span>
-                              {' · '}
-                              {sup.name}
-                            </div>
-                            {isLoading && (
-                              <span style={{ fontSize: 11, color: '#94a3b8' }}>Đang tải lịch NCC…</span>
-                            )}
-                          </div>
-                          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                            {WEEKDAY_OPTIONS.map((day) => {
-                              const isChecked = days.includes(day.val);
-                              return (
-                                <button
-                                  key={day.val}
-                                  type="button"
-                                  onClick={() => handleToggleDeliveryDay(sup.id, day.val)}
-                                  style={{
-                                    padding: '6px 12px',
-                                    borderRadius: 999,
-                                    fontSize: 12,
-                                    fontWeight: 600,
-                                    cursor: 'pointer',
-                                    border: isChecked ? '1px solid #0f766e' : '1px solid #e2e8f0',
-                                    background: isChecked ? '#ccfbf1' : '#ffffff',
-                                    color: isChecked ? '#0f766e' : '#64748b',
-                                  }}
-                                >
-                                  {isChecked ? '✓ ' : ''}
-                                  {day.label}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
 
               {/* Toolbar đếm số lượng & Chọn tất cả */}
               <div
@@ -794,7 +728,7 @@ export const AssignBranchModal: FC<AssignBranchModalProps> = ({
               >
                 <div>
                   <span style={{ fontSize: 11.5, color: '#64748b', display: 'block' }}>
-                    Chỉ hiển thị nhà cung cấp chưa được gán cho chi nhánh đã chọn.
+                    Chỉ hiển thị nhà cung cấp chưa được gán cho chi nhánh đã chọn. Tick ngày giao ngay trên từng dòng đã chọn.
                   </span>
                   <span
                     style={{
@@ -852,6 +786,47 @@ export const AssignBranchModal: FC<AssignBranchModalProps> = ({
                   </div>
                 )}
               </div>
+            </div>
+
+            {/* Trạng thái phân bổ — cuối popup */}
+            <div
+              style={{
+                marginTop: 18,
+                paddingTop: 16,
+                borderTop: '1px solid #e2e8f0',
+              }}
+            >
+              <StatusToggle
+                checked={status === 'Active'}
+                disabled={isSubmitting}
+                onChange={(next) => {
+                  setStatus(next ? 'Active' : 'Inactive');
+                  setErrorMsg('');
+                }}
+              />
+              {status === 'Inactive' && (
+                <div style={{ marginTop: 10 }}>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#475569', marginBottom: 4 }}>
+                    Lý do tạm ngưng
+                  </label>
+                  <textarea
+                    value={inactiveReason}
+                    onChange={(e) => setInactiveReason(e.target.value)}
+                    rows={2}
+                    placeholder="Nhập lý do..."
+                    disabled={isSubmitting}
+                    style={{
+                      width: '100%',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: 8,
+                      padding: 10,
+                      fontSize: 13,
+                      resize: 'vertical',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                </div>
+              )}
             </div>
           </div>
 

@@ -6,10 +6,10 @@ import dayjs from 'dayjs';
 const FONT_DISPLAY = 'Aptos Display';
 const FONT_BODY = 'Aptos';
 
-const COL_COUNT = 14;
+const COL_COUNT = 18;
 const LAST_COL = COL_COUNT - 1;
 
-const COL_WIDTHS = [7, 22, 28, 14, 17, 18, 17, 30, 15, 21, 20, 22, 32, 16];
+const COL_WIDTHS = [7, 22, 28, 14, 17, 18, 17, 30, 15, 21, 20, 22, 32, 28, 16, 14, 12, 16];
 
 const HEADER_LABELS = [
   'STT',
@@ -25,8 +25,39 @@ const HEADER_LABELS = [
   'Ngân hàng',
   'Số tài khoản',
   'Địa chỉ',
+  'Ngày giao hàng',
+  'Cutoff (ngày trước)',
+  'Giờ chốt đơn',
+  'MOQ',
   'Trạng thái',
 ];
+
+const DAY_ORDER = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const;
+const DAY_ABBREV: Record<string, string> = {
+  Mon: 'T2',
+  Tue: 'T3',
+  Wed: 'T4',
+  Thu: 'T5',
+  Fri: 'T6',
+  Sat: 'T7',
+  Sun: 'CN',
+};
+
+/** Thông tin giao hàng / cutoff gắn theo từng NCC khi xuất Excel. */
+export type SupplierExportDeliveryInfo = {
+  deliveryDays?: string[];
+  deliveryDaysDisplay?: string;
+  cutoffDayOffset?: number | null;
+  cutoffTime?: string | null;
+  minOrderQuantity?: number | null;
+};
+
+export function formatDeliveryDaysForExcel(days?: string[] | null): string {
+  if (!days?.length) return '';
+  return DAY_ORDER.filter((d) => days.some((x) => x?.toLowerCase() === d.toLowerCase()))
+    .map((d) => DAY_ABBREV[d])
+    .join(', ');
+}
 
 type CellStyle = Record<string, unknown>;
 
@@ -45,7 +76,12 @@ const borderFooterTop = {
   top: { style: 'medium', color: { rgb: '1F4E78' } },
 };
 
-export type ExportSuppliersExcelOptions = { storeName?: string; exportedBy?: string };
+export type ExportSuppliersExcelOptions = {
+  storeName?: string;
+  exportedBy?: string;
+  /** Map supplierId → cấu hình giao hàng / cutoff */
+  deliveryBySupplierId?: Record<string, SupplierExportDeliveryInfo>;
+};
 
 /** Tạo workbook danh sách NCC theo format mẫu Formatted (dùng chung cho download / test). */
 export function buildSuppliersWorkbook(
@@ -55,6 +91,7 @@ export function buildSuppliersWorkbook(
   const storeName = (options?.storeName || 'HỆ THỐNG QUẢN LÝ BÁN LẺ MT-GRMS').toUpperCase();
   const exportTime = dayjs().format('DD/MM/YYYY HH:mm:ss');
   const exportedBy = options?.exportedBy || 'Quản lý cửa hàng (Store Owner)';
+  const deliveryById = options?.deliveryBySupplierId ?? {};
 
   const ws: XLSX.WorkSheet = {};
   const merges: XLSX.Range[] = [];
@@ -244,9 +281,56 @@ export function buildSuppliersWorkbook(
       's',
       dataBaseStyle({ alignment: { horizontal: 'left', vertical: 'center', wrapText: true } })
     );
+
+    const delivery = deliveryById[s.id];
+    const deliveryDaysLabel =
+      delivery?.deliveryDaysDisplay ||
+      formatDeliveryDaysForExcel(delivery?.deliveryDays) ||
+      '';
+    const cutoffOffset =
+      delivery?.cutoffDayOffset === null || delivery?.cutoffDayOffset === undefined
+        ? ''
+        : Number(delivery.cutoffDayOffset);
+    const cutoffTime = delivery?.cutoffTime ? String(delivery.cutoffTime) : '';
+    const moq =
+      delivery?.minOrderQuantity === null || delivery?.minOrderQuantity === undefined
+        ? ''
+        : Number(delivery.minOrderQuantity);
+
     setCell(
       r,
       13,
+      deliveryDaysLabel,
+      's',
+      dataBaseStyle({ alignment: { horizontal: 'left', vertical: 'center', wrapText: true } })
+    );
+    setCell(
+      r,
+      14,
+      cutoffOffset === '' ? '' : cutoffOffset,
+      cutoffOffset === '' ? 's' : 'n',
+      dataBaseStyle({ alignment: { horizontal: 'center', vertical: 'center' } }),
+      cutoffOffset === '' ? undefined : '0'
+    );
+    setCell(
+      r,
+      15,
+      cutoffTime,
+      's',
+      dataBaseStyle({ alignment: { horizontal: 'center', vertical: 'center' } }),
+      '@'
+    );
+    setCell(
+      r,
+      16,
+      moq === '' ? '' : moq,
+      moq === '' ? 's' : 'n',
+      dataBaseStyle({ alignment: { horizontal: 'center', vertical: 'center' } }),
+      moq === '' ? undefined : '0'
+    );
+    setCell(
+      r,
+      17,
       statusLabel,
       's',
       dataBaseStyle({ alignment: { horizontal: 'center', vertical: 'center' } })
