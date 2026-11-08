@@ -10,15 +10,18 @@ interface StoreWalletTopupModalProps {
   onSuccess: (amount: number, newBalance?: number) => void;
 }
 
-const PRESET_AMOUNTS = [500000, 1000000, 2000000, 5000000];
+const PRESET_AMOUNTS = [50000, 100000, 200000];
 
 export const StoreWalletTopupModal: FC<StoreWalletTopupModalProps> = ({
   storeInfo,
   onClose,
   onSuccess,
 }) => {
-  const [selectedAmount, setSelectedAmount] = useState<number>(1000000);
-  const [customAmount, setCustomAmount] = useState<string>('');
+  // Mặc định chọn 50.000 đ, input cũng điền sẵn 50.000
+  const [amountInput, setAmountInput] = useState<string>('50.000');
+  const [isCustomMode, setIsCustomMode] = useState<boolean>(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
   const [isCopiedContent, setIsCopiedContent] = useState<boolean>(false);
   const [isCopiedAcc, setIsCopiedAcc] = useState<boolean>(false);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
@@ -29,9 +32,41 @@ export const StoreWalletTopupModal: FC<StoreWalletTopupModalProps> = ({
   const [topupOrder, setTopupOrder] = useState<TopupOrderResponse | null>(null);
   const [isLoadingOrder, setIsLoadingOrder] = useState<boolean>(false);
 
-  const amountToTopup = customAmount
-    ? parseInt(customAmount.replace(/\D/g, ''), 10) || 0
-    : selectedAmount;
+  const rawNumericAmount = parseInt(amountInput.replace(/\D/g, ''), 10) || 0;
+  const amountToTopup = rawNumericAmount;
+
+  // Xác định trạng thái active của các nút
+  const isPresetActive = (amt: number) => !isCustomMode && rawNumericAmount === amt;
+  const isCustomActive = isCustomMode || (!PRESET_AMOUNTS.includes(rawNumericAmount) && rawNumericAmount > 0);
+
+  const handleSelectPreset = (amt: number) => {
+    setIsCustomMode(false);
+    setAmountInput(new Intl.NumberFormat('vi-VN').format(amt));
+  };
+
+  const handleSelectCustom = () => {
+    setIsCustomMode(true);
+    setTimeout(() => {
+      inputRef.current?.focus();
+      inputRef.current?.select();
+    }, 50);
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value.replace(/\D/g, '');
+    if (!raw) {
+      setAmountInput('');
+      setIsCustomMode(true);
+      return;
+    }
+    const num = Number(raw);
+    setAmountInput(new Intl.NumberFormat('vi-VN').format(num));
+    if (PRESET_AMOUNTS.includes(num)) {
+      setIsCustomMode(false);
+    } else {
+      setIsCustomMode(true);
+    }
+  };
 
   // 1. Tạo đơn nạp tiền khi số tiền thay đổi (Debounce 400ms)
   useEffect(() => {
@@ -155,7 +190,7 @@ export const StoreWalletTopupModal: FC<StoreWalletTopupModalProps> = ({
       <div
         className="store-modal-dialog"
         onClick={(e) => e.stopPropagation()}
-        style={{ maxWidth: 580, fontFamily: 'var(--font-sans)', borderRadius: 24, overflow: 'hidden' }}
+        style={{ maxWidth: 630, width: '95%', fontFamily: 'var(--font-sans)', borderRadius: 24, overflow: 'hidden' }}
       >
         {/* Header */}
         <div
@@ -264,15 +299,12 @@ export const StoreWalletTopupModal: FC<StoreWalletTopupModalProps> = ({
                   }}
                 >
                   {PRESET_AMOUNTS.map((amt) => {
-                    const isSelected = !customAmount && selectedAmount === amt;
+                    const isSelected = isPresetActive(amt);
                     return (
                       <button
                         key={amt}
                         type="button"
-                        onClick={() => {
-                          setSelectedAmount(amt);
-                          setCustomAmount('');
-                        }}
+                        onClick={() => handleSelectPreset(amt)}
                         style={{
                           padding: '12px 6px',
                           borderRadius: 14,
@@ -281,7 +313,7 @@ export const StoreWalletTopupModal: FC<StoreWalletTopupModalProps> = ({
                             : '1.5px solid #E2E8F0',
                           backgroundColor: isSelected ? 'var(--blue-light)' : '#FFFFFF',
                           color: isSelected ? 'var(--blue-primary)' : '#1E293B',
-                          fontSize: 13,
+                          fontSize: 13.5,
                           fontWeight: 700,
                           cursor: 'pointer',
                           fontFamily: 'var(--font-mono)',
@@ -294,43 +326,77 @@ export const StoreWalletTopupModal: FC<StoreWalletTopupModalProps> = ({
                       </button>
                     );
                   })}
+                  {/* Nút Khác */}
+                  <button
+                    type="button"
+                    onClick={handleSelectCustom}
+                    style={{
+                      padding: '12px 6px',
+                      borderRadius: 14,
+                      border: isCustomActive
+                        ? '2px solid var(--blue-primary)'
+                        : '1.5px solid #E2E8F0',
+                      backgroundColor: isCustomActive ? 'var(--blue-light)' : '#FFFFFF',
+                      color: isCustomActive ? 'var(--blue-primary)' : '#1E293B',
+                      fontSize: 13.5,
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      fontFamily: 'var(--font-sans)',
+                      transition: 'all 0.15s ease',
+                      boxShadow: isCustomActive ? '0 2px 10px rgba(15, 118, 110, 0.12)' : 'none',
+                    }}
+                  >
+                    Khác
+                  </button>
                 </div>
 
-                {/* Hoặc tự nhập */}
+                {/* Ô nhập số tiền */}
                 <div style={{ marginTop: 12 }}>
-                  <input
-                    type="text"
-                    placeholder="Hoặc nhập số tiền khác (tối thiểu 50.000 đ)..."
-                    value={customAmount}
-                    onChange={(e) => {
-                      const val = e.target.value.replace(/\D/g, '');
-                      setCustomAmount(
-                        val ? new Intl.NumberFormat('vi-VN').format(Number(val)) : ''
-                      );
-                    }}
-                    style={{
-                      width: '100%',
-                      padding: '11px 16px',
-                      borderRadius: 'var(--radius-pill)',
-                      border: '1.5px solid #CBD5E1',
-                      fontSize: 13.5,
-                      fontFamily: 'var(--font-mono)',
-                      fontVariantNumeric: 'tabular-nums',
-                      boxSizing: 'border-box',
-                      outline: 'none',
-                      transition: 'border-color 0.15s ease',
-                    }}
-                    onFocus={(e) => {
-                      e.currentTarget.style.borderColor = 'var(--blue-primary)';
-                    }}
-                    onBlur={(e) => {
-                      e.currentTarget.style.borderColor = '#CBD5E1';
-                    }}
-                  />
+                  <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                    <input
+                      ref={inputRef}
+                      type="text"
+                      placeholder="Nhập số tiền cần nạp (tối thiểu 50.000 đ)..."
+                      value={amountInput}
+                      onChange={handleInputChange}
+                      style={{
+                        width: '100%',
+                        padding: '11px 48px 11px 16px',
+                        borderRadius: 14,
+                        border: '1.5px solid #CBD5E1',
+                        fontSize: 14.5,
+                        fontWeight: 700,
+                        fontFamily: 'var(--font-mono)',
+                        fontVariantNumeric: 'tabular-nums',
+                        boxSizing: 'border-box',
+                        outline: 'none',
+                        color: '#0F172A',
+                        transition: 'border-color 0.15s ease',
+                      }}
+                      onFocus={(e) => {
+                        e.currentTarget.style.borderColor = 'var(--blue-primary)';
+                      }}
+                      onBlur={(e) => {
+                        e.currentTarget.style.borderColor = '#CBD5E1';
+                      }}
+                    />
+                    <span
+                      style={{
+                        position: 'absolute',
+                        right: 16,
+                        fontSize: 13.5,
+                        fontWeight: 700,
+                        color: '#64748B',
+                        pointerEvents: 'none',
+                      }}
+                    >
+                      đ
+                    </span>
+                  </div>
                 </div>
               </div>
 
-              {/* Khung VietQR Chuyển khoản Thông minh */}
+              {/* Khung VietQR Chuyển khoản Thông minh với Mã QR to rõ nét */}
               <div
                 style={{
                   backgroundColor: '#F8FAFC',
@@ -338,40 +404,40 @@ export const StoreWalletTopupModal: FC<StoreWalletTopupModalProps> = ({
                   borderRadius: 20,
                   padding: '20px',
                   display: 'flex',
-                  gap: 20,
+                  gap: 22,
                   alignItems: 'center',
                 }}
               >
-                {/* QR Code SePay Image Box */}
+                {/* QR Code SePay Image Box - Kích thước lớn, dễ quét */}
                 <div
                   style={{
-                    width: 146,
-                    height: 146,
+                    width: 200,
+                    height: 200,
                     backgroundColor: '#FFFFFF',
                     border: '1.5px solid #CBD5E1',
-                    borderRadius: 16,
+                    borderRadius: 18,
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    padding: 6,
+                    padding: 8,
                     flexShrink: 0,
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.06)',
+                    boxShadow: '0 4px 14px rgba(0,0,0,0.06)',
                     position: 'relative',
                     overflow: 'hidden',
                   }}
                 >
                   {isLoadingOrder ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
-                      <Loader2 size={28} className="animate-spin text-teal-600" />
-                      <span style={{ fontSize: 10, color: '#64748B', fontWeight: 600 }}>Đang tạo QR...</span>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+                      <Loader2 size={32} className="animate-spin text-teal-600" />
+                      <span style={{ fontSize: 11, color: '#64748B', fontWeight: 600 }}>Đang tạo QR...</span>
                     </div>
                   ) : topupOrder?.qrUrl ? (
                     <>
                       <img
                         src={topupOrder.qrUrl}
                         alt="VietQR SePay Napas247"
-                        style={{ width: 110, height: 110, objectFit: 'contain' }}
+                        style={{ width: 160, height: 160, objectFit: 'contain' }}
                         onError={(e) => {
                           // Fallback nếu ảnh không tải được
                           e.currentTarget.style.display = 'none';
@@ -379,7 +445,7 @@ export const StoreWalletTopupModal: FC<StoreWalletTopupModalProps> = ({
                       />
                       <span
                         style={{
-                          fontSize: 9.5,
+                          fontSize: 10,
                           fontWeight: 800,
                           color: 'var(--blue-primary)',
                           letterSpacing: '0.04em',
@@ -390,14 +456,14 @@ export const StoreWalletTopupModal: FC<StoreWalletTopupModalProps> = ({
                       </span>
                     </>
                   ) : (
-                    <div style={{ fontSize: 11, color: '#DC2626', textAlign: 'center', padding: 8 }}>
-                      Vui lòng nhập số tiền ≥ 50k
+                    <div style={{ fontSize: 11.5, color: '#DC2626', textAlign: 'center', padding: 8 }}>
+                      Vui lòng nhập số tiền ≥ 50.000 đ
                     </div>
                   )}
                 </div>
 
                 {/* Thông tin chuyển khoản */}
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 7 }}>
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
                   <div>
                     <div style={{ fontSize: 11.5, color: '#64748B', fontWeight: 500 }}>Ngân hàng thụ hưởng</div>
                     <div style={{ fontSize: 13.5, fontWeight: 700, color: '#0F172A' }}>
@@ -444,7 +510,7 @@ export const StoreWalletTopupModal: FC<StoreWalletTopupModalProps> = ({
                         alignItems: 'center',
                         gap: 8,
                         backgroundColor: '#FFFFFF',
-                        padding: '4px 10px',
+                        padding: '5px 12px',
                         borderRadius: 10,
                         border: '1.5px solid #CBD5E1',
                         marginTop: 2,
@@ -453,7 +519,7 @@ export const StoreWalletTopupModal: FC<StoreWalletTopupModalProps> = ({
                       <span
                         style={{
                           fontFamily: 'var(--font-mono)',
-                          fontSize: 13,
+                          fontSize: 13.5,
                           fontWeight: 800,
                           color: '#DC2626',
                           letterSpacing: '0.02em',
@@ -476,6 +542,10 @@ export const StoreWalletTopupModal: FC<StoreWalletTopupModalProps> = ({
                         {isCopiedContent ? <Check size={15} color="#15803D" strokeWidth={2.5} /> : <Copy size={15} />}
                       </button>
                     </div>
+                  </div>
+
+                  <div style={{ fontSize: 11.5, color: '#64748B', marginTop: 2 }}>
+                    💡 Hệ thống tự động cộng tiền vào ví sau 3-5 giây khi chuyển khoản thành công.
                   </div>
                 </div>
               </div>

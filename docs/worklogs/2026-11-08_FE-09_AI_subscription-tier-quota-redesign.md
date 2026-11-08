@@ -41,6 +41,10 @@
    - Bỏ hình thức quét mã VietQR; cố định phương thức `Wallet` (Trừ tiền trực tiếp vào Ví gian hàng).
 5. `src/styles/store-hub.css`:
    - Bổ sung class `.checkout-modal-split` hỗ trợ Grid 2 cột (330px - 1fr) và tự động co dãn 1 cột trên màn hình nhỏ/tablet (max-width: 820px).
+6. `src/pages/store/components/StoreWalletTopupModal.tsx`:
+   - **Phóng to mã VietQR**: Nâng kích thước ảnh QR từ 110x110 lên 160x160 (hộp viền 200x200), mở rộng modal lên 630px, đảm bảo camera ứng dụng ngân hàng quét cực kỳ nhanh và chuẩn xác.
+   - **Chuẩn hóa các nút bội số**: Thay đổi mệnh giá thành 4 nút `50.000 đ`, `100.000 đ`, `200.000 đ` và `Khác`.
+   - **Đồng bộ 2 chiều Nút bấm & Ô nhập tiền**: Khi chọn 50k / 100k / 200k, ô input bên dưới tự động cập nhật đúng giá trị tương ứng (50.000 / 100.000 / 200.000); khi chọn `Khác` sẽ tự động focus và bôi đen ô input để người dùng nhập số tiền tùy ý.
 
 ---
 
