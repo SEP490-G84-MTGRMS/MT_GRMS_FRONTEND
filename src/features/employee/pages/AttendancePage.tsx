@@ -12,6 +12,8 @@ import {
   X,
   Eye,
   History,
+  LogIn,
+  LogOut,
 } from 'lucide-react';
 import type { AttendanceRecord, ApprovalRequest, Branch } from '../types';
 import { scheduleApi, getShiftColor, type ScheduleResponse } from '../api/scheduleApi';
@@ -1227,8 +1229,35 @@ export const AttendancePage: React.FC = () => {
                                           handleOpenCreateRequest(att, ScheduleRequestType.CheckInIncident);
                                         }}
                                       >
-                                        <AlertCircle size={14} color="#D97706" />
-                                        <span>Báo sự cố chấm công</span>
+                                        <LogIn size={14} color="#0F766E" />
+                                        <span>Sự cố Check-in (Vào ca)</span>
+                                      </button>
+
+                                      <button
+                                        type="button"
+                                        style={{
+                                          width: '100%',
+                                          padding: '8px 12px',
+                                          fontSize: 12.5,
+                                          cursor: 'pointer',
+                                          color: '#1E293B',
+                                          background: 'none',
+                                          border: 'none',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          gap: 8,
+                                          textAlign: 'left',
+                                          transition: 'background 0.12s ease',
+                                        }}
+                                        onMouseEnter={(e) => (e.currentTarget.style.background = '#F0FDFA')}
+                                        onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                                        onClick={() => {
+                                          setOpenMenuScheduleId(null);
+                                          handleOpenCreateRequest(att, ScheduleRequestType.CheckOutIncident);
+                                        }}
+                                      >
+                                        <LogOut size={14} color="#D97706" />
+                                        <span>Sự cố Check-out (Ra ca)</span>
                                       </button>
 
                                       <button

@@ -635,7 +635,8 @@ export const ApprovalRequestsPage: React.FC = () => {
             >
               <option value="ALL">Tất cả loại đơn</option>
               <option value={ScheduleRequestType.Overtime}>Làm thêm giờ (OT)</option>
-              <option value={ScheduleRequestType.CheckInIncident}>Sự cố chấm công</option>
+              <option value={ScheduleRequestType.CheckInIncident}>Sự cố Check-in (Vào ca)</option>
+              <option value={ScheduleRequestType.CheckOutIncident}>Sự cố Check-out (Ra ca)</option>
               <option value={ScheduleRequestType.ShiftSwap}>Đổi ca làm việc</option>
               <option value={ScheduleRequestType.LeaveRequest}>Xin nghỉ ca</option>
             </select>
@@ -841,10 +842,15 @@ export const ApprovalRequestsPage: React.FC = () => {
                         {req.requestType === ScheduleRequestType.CheckInIncident && (
                           <div style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>
                             {req.requestedCheckInTime && (
-                              <span>Vào: {new Date(req.requestedCheckInTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} </span>
+                              <span>Vào đề xuất: {new Date(req.requestedCheckInTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}</span>
                             )}
+                          </div>
+                        )}
+
+                        {req.requestType === ScheduleRequestType.CheckOutIncident && (
+                          <div style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>
                             {req.requestedCheckOutTime && (
-                              <span>• Ra: {new Date(req.requestedCheckOutTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}</span>
+                              <span>Ra đề xuất: {new Date(req.requestedCheckOutTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}</span>
                             )}
                           </div>
                         )}

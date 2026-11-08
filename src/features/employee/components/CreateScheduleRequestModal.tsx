@@ -7,9 +7,10 @@ import {
   AlertTriangle,
   ArrowRightLeft,
   CalendarOff,
-  Camera,
   Paperclip,
   Plus,
+  LogIn,
+  LogOut,
 } from 'lucide-react';
 import {
   ScheduleRequestType,
@@ -182,13 +183,6 @@ export const CreateScheduleRequestModal: React.FC<CreateScheduleRequestModalProp
     }
   };
 
-  const handleResetShiftTime = () => {
-    if (selectedSchedule) {
-      setCheckInTime(safeFormatTime(selectedSchedule.plannedStartTime, '08:00'));
-      setCheckOutTime(safeFormatTime(selectedSchedule.plannedEndTime, '17:00'));
-    }
-  };
-
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
@@ -277,6 +271,8 @@ export const CreateScheduleRequestModal: React.FC<CreateScheduleRequestModalProp
       } else if (requestType === ScheduleRequestType.CheckInIncident) {
         const datePrefix = (selectedSchedule.workDate || '').slice(0, 10);
         payload.requestedCheckInTime = `${datePrefix}T${checkInTime}:00`;
+      } else if (requestType === ScheduleRequestType.CheckOutIncident) {
+        const datePrefix = (selectedSchedule.workDate || '').slice(0, 10);
         payload.requestedCheckOutTime = `${datePrefix}T${checkOutTime}:00`;
       } else if (requestType === ScheduleRequestType.Overtime) {
         payload.requestedOvertimeMinutes = overtimeMinutes;
@@ -297,6 +293,18 @@ export const CreateScheduleRequestModal: React.FC<CreateScheduleRequestModalProp
 
   const requestOptions = [
     {
+      type: ScheduleRequestType.CheckInIncident,
+      icon: LogIn,
+      title: ScheduleRequestTypeLabels[ScheduleRequestType.CheckInIncident],
+      desc: 'Lỗi FaceID đầu ca / Mở ca bán hàng ngay',
+    },
+    {
+      type: ScheduleRequestType.CheckOutIncident,
+      icon: LogOut,
+      title: ScheduleRequestTypeLabels[ScheduleRequestType.CheckOutIncident],
+      desc: 'Lỗi FaceID cuối ca / Quên chấm công về',
+    },
+    {
       type: ScheduleRequestType.LeaveRequest,
       icon: CalendarOff,
       title: ScheduleRequestTypeLabels[ScheduleRequestType.LeaveRequest],
@@ -307,12 +315,6 @@ export const CreateScheduleRequestModal: React.FC<CreateScheduleRequestModalProp
       icon: ArrowRightLeft,
       title: ScheduleRequestTypeLabels[ScheduleRequestType.ShiftSwap],
       desc: 'Nhờ làm thay hoặc đổi ca',
-    },
-    {
-      type: ScheduleRequestType.CheckInIncident,
-      icon: Camera,
-      title: ScheduleRequestTypeLabels[ScheduleRequestType.CheckInIncident],
-      desc: 'Lỗi FaceID, camera hoặc quên chấm công',
     },
     {
       type: ScheduleRequestType.Overtime,
@@ -740,7 +742,7 @@ export const CreateScheduleRequestModal: React.FC<CreateScheduleRequestModalProp
               </div>
             )}
 
-            {/* 3. SỰ CỐ CHẤM CÔNG */}
+            {/* 3. SỰ CỐ CHECK-IN (VÀO CA) */}
             {requestType === ScheduleRequestType.CheckInIncident && (
               <div
                 style={{
@@ -755,11 +757,15 @@ export const CreateScheduleRequestModal: React.FC<CreateScheduleRequestModalProp
               >
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <span style={{ fontSize: 12, fontWeight: 600, color: '#334155' }}>
-                    Thời gian thực tế đề xuất
+                    Giờ vào ca thực tế đề xuất
                   </span>
                   <button
                     type="button"
-                    onClick={handleResetShiftTime}
+                    onClick={() => {
+                      if (selectedSchedule?.plannedStartTime) {
+                        setCheckInTime(safeFormatTime(selectedSchedule.plannedStartTime, '08:00'));
+                      }
+                    }}
                     style={{
                       border: 'none',
                       background: 'transparent',
@@ -774,33 +780,104 @@ export const CreateScheduleRequestModal: React.FC<CreateScheduleRequestModalProp
                   </button>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                  <div>
-                    <label style={{ fontSize: 12, color: '#64748B', display: 'block', marginBottom: 4 }}>
-                      Giờ vào thực tế
-                    </label>
-                    <input
-                      type="time"
-                      className="emp-form-input"
-                      value={checkInTime}
-                      onChange={(e) => setCheckInTime(e.target.value)}
-                      style={{ width: '100%', height: 38, fontSize: 13, background: '#FFFFFF' }}
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label style={{ fontSize: 12, color: '#64748B', display: 'block', marginBottom: 4 }}>
-                      Giờ ra thực tế
-                    </label>
-                    <input
-                      type="time"
-                      className="emp-form-input"
-                      value={checkOutTime}
-                      onChange={(e) => setCheckOutTime(e.target.value)}
-                      style={{ width: '100%', height: 38, fontSize: 13, background: '#FFFFFF' }}
-                      required
-                    />
-                  </div>
+                <div>
+                  <input
+                    type="time"
+                    className="emp-form-input"
+                    value={checkInTime}
+                    onChange={(e) => setCheckInTime(e.target.value)}
+                    style={{ width: '100%', height: 38, fontSize: 13, background: '#FFFFFF' }}
+                    required
+                  />
+                </div>
+
+                <div
+                  style={{
+                    padding: '8px 10px',
+                    background: '#ECFDF5',
+                    borderRadius: 6,
+                    border: '1px solid #A7F3D0',
+                    fontSize: 12,
+                    color: '#065F46',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                  }}
+                >
+                  <span>💡</span>
+                  <span>
+                    <strong>Mở ca ngay:</strong> Gửi đơn báo sự cố Check-in thành công sẽ tự động kích hoạt giờ vào ca để bạn có thể mở ca bán hàng POS ngay lập tức. Chủ cửa hàng sẽ đối soát ảnh minh chứng sau.
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* 4. SỰ CỐ CHECK-OUT (RA CA) */}
+            {requestType === ScheduleRequestType.CheckOutIncident && (
+              <div
+                style={{
+                  padding: 12,
+                  background: '#F8FAFC',
+                  borderRadius: 8,
+                  border: '1px solid #E2E8F0',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 10,
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: '#334155' }}>
+                    Giờ ra ca thực tế đề xuất
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (selectedSchedule?.plannedEndTime) {
+                        setCheckOutTime(safeFormatTime(selectedSchedule.plannedEndTime, '17:00'));
+                      }
+                    }}
+                    style={{
+                      border: 'none',
+                      background: 'transparent',
+                      color: '#0F766E',
+                      fontSize: 11,
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      textDecoration: 'underline',
+                    }}
+                  >
+                    Theo giờ ca chuẩn
+                  </button>
+                </div>
+
+                <div>
+                  <input
+                    type="time"
+                    className="emp-form-input"
+                    value={checkOutTime}
+                    onChange={(e) => setCheckOutTime(e.target.value)}
+                    style={{ width: '100%', height: 38, fontSize: 13, background: '#FFFFFF' }}
+                    required
+                  />
+                </div>
+
+                <div
+                  style={{
+                    padding: '8px 10px',
+                    background: '#EFF6FF',
+                    borderRadius: 6,
+                    border: '1px solid #BFDBFE',
+                    fontSize: 12,
+                    color: '#1E40AF',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                  }}
+                >
+                  <span>ℹ️</span>
+                  <span>
+                    <strong>Báo sự cố Check-out:</strong> Áp dụng khi bạn đã đóng ca POS Z-Report nhưng không thể quét FaceID ra về hoặc quên chấm công ra. Đơn sẽ được gửi cho Chủ duyệt để chốt giờ làm thực tế.
+                  </span>
                 </div>
               </div>
             )}

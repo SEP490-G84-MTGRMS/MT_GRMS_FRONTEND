@@ -1,6 +1,7 @@
 export const ScheduleRequestType = {
   Overtime: 'Overtime',
   CheckInIncident: 'CheckInIncident',
+  CheckOutIncident: 'CheckOutIncident',
   ShiftSwap: 'ShiftSwap',
   LeaveRequest: 'LeaveRequest',
 } as const;
@@ -32,7 +33,8 @@ export type ScheduleApprovalStatus = (typeof ScheduleApprovalStatus)[keyof typeo
 
 export const ScheduleRequestTypeLabels: Record<ScheduleRequestType, string> = {
   [ScheduleRequestType.Overtime]: 'Làm thêm giờ (OT)',
-  [ScheduleRequestType.CheckInIncident]: 'Sự cố chấm công',
+  [ScheduleRequestType.CheckInIncident]: 'Sự cố Check-in (Vào ca)',
+  [ScheduleRequestType.CheckOutIncident]: 'Sự cố Check-out (Ra ca)',
   [ScheduleRequestType.ShiftSwap]: 'Đổi ca làm việc',
   [ScheduleRequestType.LeaveRequest]: 'Xin nghỉ ca làm việc',
 };
