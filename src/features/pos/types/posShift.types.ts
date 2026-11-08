@@ -4,6 +4,25 @@ export type CashMovementStatus = 'Recorded' | 'PendingApproval' | 'Rejected' | '
 export type HandoverStatus = 'PENDING' | 'CONFIRMED' | 'DISPUTED' | 1 | 2 | 3;
 export type ShiftState = 'Open' | 'Closed' | 'Closing' | 'ForceClosed' | 1 | 2 | 3 | 4;
 
+export interface ShiftParticipantDto {
+  id: string;
+  shiftId: string;
+  userId: string;
+  userName?: string | null;
+  fullName?: string | null;
+  joinedAtUtc: string;
+  lastActiveAtUtc: string;
+}
+
+export interface ShiftCloseConfirmationDto {
+  id: string;
+  shiftId: string;
+  userId: string;
+  userName?: string | null;
+  confirmedCountedCash: number;
+  confirmedAtUtc: string;
+}
+
 export interface ShiftCashMovementDto {
   id: string;
   shiftId: string;
@@ -50,6 +69,12 @@ export interface ShiftDetailResponse {
   status: ShiftState;
   notes?: string | null;
   cashMovements: ShiftCashMovementDto[];
+  closingStartedByUserId?: string | null;
+  closingStartedAtUtc?: string | null;
+  closedByUserId?: string | null;
+  forceCloseReason?: string | null;
+  participants?: ShiftParticipantDto[];
+  closeConfirmations?: ShiftCloseConfirmationDto[];
 }
 
 export interface OpenShiftRequest {
@@ -121,5 +146,34 @@ export interface PendingMovementsSummaryResponse {
   pendingApprovalsCount: number;
   unconfirmedDropsCount: number;
   movements: ShiftCashMovementDto[];
+}
+
+export interface StartClosingShiftRequest {
+  notes?: string | null;
+}
+
+export interface CancelClosingShiftRequest {
+  reason?: string | null;
+}
+
+export interface UpdateCountedCashRequest {
+  countedCash: number;
+  notes?: string | null;
+}
+
+export interface ConfirmCloseShiftRequest {
+  actualCashCounted: number;
+  retainedFloatAmount: number;
+  droppedToSafeAmount: number;
+  receiverUserId?: string | null;
+  notes?: string | null;
+}
+
+export interface ForceCloseShiftRequest {
+  actualCashCounted: number;
+  retainedFloatAmount: number;
+  droppedToSafeAmount: number;
+  reason: string;
+  notes?: string | null;
 }
 
