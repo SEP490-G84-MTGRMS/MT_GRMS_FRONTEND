@@ -4,10 +4,14 @@ import {
   X,
   Wallet,
   CheckCircle2,
+  Check,
   Building2,
   ShieldCheck,
   AlertCircle,
   Users,
+  Sparkles,
+  Store,
+  Clock,
 } from 'lucide-react';
 import type { SubscriptionPlanItem, StoreInfo } from '../storeData';
 import { storeApi } from '../api/storeApi';
@@ -55,6 +59,42 @@ export const SubscriptionCheckoutModal: FC<SubscriptionCheckoutModalProps> = ({
 
   const hasEnoughWalletBalance = isTrialPlan ? true : storeInfo.walletBalance >= grandTotal;
   const missingAmount = Math.max(0, grandTotal - storeInfo.walletBalance);
+
+  // Chuẩn hóa danh sách tính năng bên cột trái
+  const planFeatures = (plan.features && plan.features.length > 0)
+    ? plan.features
+    : isTrialPlan
+    ? [
+        'Thời hạn sử dụng: 3 ngày miễn phí',
+        '1 tài khoản chủ cửa hàng quản trị',
+        'Mở khóa sẵn Quản lý nhân viên (Trải nghiệm)',
+        'Quản lý tồn kho theo Lô & Hạn sử dụng FEFO 3 mức màu',
+        'Quy đổi Thùng sang Lon 1 chạm',
+        'Quét mã vạch bán hàng & kiểm kho',
+        'Giải pháp thanh toán Napas VietQR tự động',
+        'Không tự động gia hạn sau khi hết hạn',
+      ]
+    : isPro
+    ? [
+        'Mặc định sẵn 2 chi nhánh kiêm kho hàng',
+        'Đã bao gồm sẵn Quản lý nhân viên (Không giới hạn tài khoản)',
+        'Quản lý tồn kho theo Lô & Hạn sử dụng FEFO 3 mức màu',
+        'Điều chuyển hàng hóa giữa các chi nhánh chuỗi',
+        'Báo cáo doanh thu & P&L đa chi nhánh',
+        'Giải pháp thanh toán Napas VietQR tự động',
+        'Hỗ trợ ưu tiên qua hotline kỹ thuật 24/7',
+      ]
+    : [
+        '1 tài khoản chủ cửa hàng quản trị',
+        'Quản lý tồn kho theo Lô & Hạn sử dụng FEFO 3 mức màu',
+        'Quy đổi Thùng sang Lon 1 chạm',
+        'Quét mã vạch bán hàng & kiểm kho',
+        'Giải pháp thanh toán Napas VietQR tự động',
+        'Tùy chọn mua thêm: Quản lý & Phân quyền nhân viên (+30k/tháng)',
+        'Không hỗ trợ quản lý chuỗi đa chi nhánh',
+      ];
+
+  const planDisplayName = plan.name.startsWith('Gói') ? plan.name : `Gói ${plan.name}`;
 
   const handleConfirmPayment = async () => {
     if (!isTrialPlan && !hasEnoughWalletBalance) {
@@ -117,16 +157,26 @@ export const SubscriptionCheckoutModal: FC<SubscriptionCheckoutModalProps> = ({
       <div
         className="store-modal-dialog"
         onClick={(e) => e.stopPropagation()}
-        style={{ maxWidth: 540, fontFamily: 'var(--font-sans)', borderRadius: 20 }}
+        style={{
+          maxWidth: 880,
+          width: '95%',
+          fontFamily: 'var(--font-sans)',
+          borderRadius: 20,
+          overflow: 'hidden',
+          maxHeight: '92vh',
+          display: 'flex',
+          flexDirection: 'column',
+        }}
       >
-        {/* Header */}
+        {/* Header tinh gọn, không bị dài hay trôi chữ */}
         <div
           style={{
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            padding: '18px 24px',
-            borderBottom: '1px solid #F1F5F9',
+            padding: '16px 24px',
+            borderBottom: '1px solid #EDF2F9',
+            backgroundColor: '#FFFFFF',
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -149,18 +199,18 @@ export const SubscriptionCheckoutModal: FC<SubscriptionCheckoutModalProps> = ({
               <h3
                 style={{
                   margin: 0,
-                  fontSize: 17,
+                  fontSize: 16.5,
                   fontWeight: 800,
                   color: '#0F172A',
                   letterSpacing: '-0.01em',
                 }}
               >
-                {isTrialPlan ? 'Kích hoạt Gói Dùng Thử' : `Đăng ký & Nâng cấp: ${plan.name}`}
+                {isTrialPlan ? 'Kích hoạt Gói Dùng Thử' : 'Đăng ký & Nâng cấp gói dịch vụ'}
               </h3>
-              <p style={{ margin: '2px 0 0 0', fontSize: 12.5, color: '#64748B' }}>
+              <p style={{ margin: '2px 0 0 0', fontSize: 12, color: '#64748B' }}>
                 {isTrialPlan
-                  ? 'Trải nghiệm 3 ngày miễn phí full tính năng'
-                  : 'Gia hạn gói dịch vụ SaaS cho gian hàng'}
+                  ? 'Trải nghiệm 3 ngày miễn phí full tính năng cho gian hàng'
+                  : 'Xác nhận chu kỳ dịch vụ và thanh toán qua Ví gian hàng'}
               </p>
             </div>
           </div>
@@ -194,596 +244,798 @@ export const SubscriptionCheckoutModal: FC<SubscriptionCheckoutModalProps> = ({
           </button>
         </div>
 
-        {/* Body */}
-        <div style={{ padding: '22px 24px', display: 'flex', flexDirection: 'column', gap: 18 }}>
-          {isCompleted ? (
+        {/* Modal Content */}
+        {isCompleted ? (
+          <div
+            style={{
+              padding: '48px 24px',
+              textAlign: 'center',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: 14,
+              backgroundColor: '#FFFFFF',
+            }}
+          >
             <div
               style={{
-                padding: '36px 16px',
-                textAlign: 'center',
+                width: 64,
+                height: 64,
+                borderRadius: '50%',
+                backgroundColor: '#ECFDF5',
+                border: '2px solid #A7F3D0',
                 display: 'flex',
-                flexDirection: 'column',
                 alignItems: 'center',
-                gap: 14,
+                justifyContent: 'center',
+                color: '#059669',
               }}
             >
-              <div
-                style={{
-                  width: 60,
-                  height: 60,
-                  borderRadius: '50%',
-                  backgroundColor: '#ECFDF5',
-                  border: '2px solid #A7F3D0',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#059669',
-                }}
-              >
-                <CheckCircle2 size={34} strokeWidth={2.4} />
-              </div>
-              <div style={{ fontSize: 18, fontWeight: 800, color: '#0F172A' }}>
-                {isTrialPlan ? 'Kích hoạt Dùng thử thành công!' : 'Thanh toán & Gia hạn thành công!'}
-              </div>
-              <p style={{ margin: 0, fontSize: 13.5, color: '#475569', lineHeight: 1.5 }}>
-                {isTrialPlan
-                  ? 'Gian hàng của bạn đã được kích hoạt 3 ngày trải nghiệm miễn phí với toàn bộ tính năng cao cấp.'
-                  : `Hệ thống đã nâng cấp gian hàng lên ${plan.name} với thời hạn ${months + bonusMonths} tháng.`}
-              </p>
+              <CheckCircle2 size={36} strokeWidth={2.4} />
             </div>
-          ) : isTrialPlan ? (
-            /* Luồng dành riêng cho Gói Dùng Thử */
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <div
-                style={{
-                  padding: '16px',
-                  backgroundColor: '#F8FAFC',
-                  borderRadius: 14,
-                  border: '1px solid #E2E8F0',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: 10,
-                }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13.5 }}>
-                  <span style={{ color: '#64748B' }}>Thời hạn dùng thử:</span>
-                  <span style={{ fontWeight: 700, color: '#0F172A' }}>3 ngày miễn phí</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13.5 }}>
-                  <span style={{ color: '#64748B' }}>Quy mô áp dụng:</span>
-                  <span style={{ fontWeight: 600, color: '#0F172A' }}>1 chi nhánh kiêm kho hàng</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13.5 }}>
-                  <span style={{ color: '#64748B' }}>Quyền lợi nhân viên:</span>
-                  <span style={{ fontWeight: 600, color: '#059669' }}>Mở khóa đầy đủ trải nghiệm</span>
-                </div>
+            <div style={{ fontSize: 18, fontWeight: 800, color: '#0F172A' }}>
+              {isTrialPlan ? 'Kích hoạt Dùng thử thành công!' : 'Thanh toán & Gia hạn thành công!'}
+            </div>
+            <p style={{ margin: 0, fontSize: 13.5, color: '#475569', lineHeight: 1.5, maxWidth: 420 }}>
+              {isTrialPlan
+                ? 'Gian hàng của bạn đã được kích hoạt 3 ngày trải nghiệm miễn phí với toàn bộ tính năng cao cấp.'
+                : `Hệ thống đã nâng cấp gian hàng lên ${plan.name} với thời hạn ${months + bonusMonths} tháng.`}
+            </p>
+          </div>
+        ) : (
+          /* Bố cục Split: Cột trái (Tính năng gói) & Cột phải (Cấu hình chu kỳ & Thanh toán) */
+          <div className="checkout-modal-split">
+            {/* ================= CỘT BÊN TRÁI: TÍNH NĂNG & QUYỀN LỢI GÓI CƯỚC ================= */}
+            <div
+              style={{
+                backgroundColor: '#F8FAFC',
+                borderRight: '1px solid #E2E8F0',
+                padding: '24px 20px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 16,
+              }}
+            >
+              {/* Badge & Tên gói */}
+              <div>
                 <div
                   style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    paddingTop: 10,
-                    borderTop: '1px dashed #CBD5E1',
-                    fontSize: 14,
-                  }}
-                >
-                  <span style={{ fontWeight: 700, color: '#0F172A' }}>Chi phí thanh toán:</span>
-                  <span style={{ fontWeight: 800, color: '#059669', fontSize: 16 }}>0 đ (Miễn phí)</span>
-                </div>
-              </div>
-            </div>
-          ) : (
-            /* Luồng mua Gói Thường / Gói Pro */
-            <>
-              {/* 1. Chọn chu kỳ: 3 tháng | 6 tháng | 1 năm */}
-              <div>
-                <label
-                  style={{
-                    fontSize: 13,
-                    fontWeight: 700,
-                    color: '#334155',
-                    marginBottom: 8,
-                    display: 'block',
-                  }}
-                >
-                  Chu kỳ gia hạn
-                </label>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
-                  {/* 3 Tháng */}
-                  <button
-                    type="button"
-                    onClick={() => setCycle('3m')}
-                    style={{
-                      padding: '14px 10px',
-                      borderRadius: 14,
-                      border: cycle === '3m' ? '2px solid var(--blue-primary)' : '1px solid #E2E8F0',
-                      backgroundColor: cycle === '3m' ? 'var(--blue-light)' : '#FFFFFF',
-                      cursor: 'pointer',
-                      textAlign: 'center',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: 2,
-                      transition: 'all 0.15s ease',
-                      fontFamily: 'var(--font-sans)',
-                    }}
-                  >
-                    <span style={{ fontSize: 14, fontWeight: 700, color: '#0F172A' }}>3 Tháng</span>
-                    <span style={{ fontSize: 11.5, color: '#64748B' }}>Linh hoạt</span>
-                  </button>
-
-                  {/* 6 Tháng */}
-                  <button
-                    type="button"
-                    onClick={() => setCycle('6m')}
-                    style={{
-                      padding: '14px 10px',
-                      borderRadius: 14,
-                      border: cycle === '6m' ? '2px solid var(--blue-primary)' : '1px solid #E2E8F0',
-                      backgroundColor: cycle === '6m' ? 'var(--blue-light)' : '#FFFFFF',
-                      cursor: 'pointer',
-                      textAlign: 'center',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: 2,
-                      transition: 'all 0.15s ease',
-                      fontFamily: 'var(--font-sans)',
-                    }}
-                  >
-                    <span style={{ fontSize: 14, fontWeight: 700, color: '#0F172A' }}>6 Tháng</span>
-                    <span style={{ fontSize: 11.5, color: '#059669', fontWeight: 600 }}>Phổ biến</span>
-                  </button>
-
-                  {/* 1 Năm */}
-                  <button
-                    type="button"
-                    onClick={() => setCycle('12m')}
-                    style={{
-                      padding: '14px 10px',
-                      borderRadius: 14,
-                      border: cycle === '12m' ? '2px solid var(--blue-primary)' : '1px solid #E2E8F0',
-                      backgroundColor: cycle === '12m' ? 'var(--blue-light)' : '#FFFFFF',
-                      cursor: 'pointer',
-                      textAlign: 'center',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: 2,
-                      position: 'relative',
-                      transition: 'all 0.15s ease',
-                      fontFamily: 'var(--font-sans)',
-                    }}
-                  >
-                    <span
-                      style={{
-                        position: 'absolute',
-                        top: -9,
-                        right: 6,
-                        backgroundColor: 'var(--blue-primary)',
-                        color: '#FFFFFF',
-                        fontSize: 9.5,
-                        fontWeight: 800,
-                        padding: '1.5px 7px',
-                        borderRadius: 'var(--radius-pill)',
-                        letterSpacing: '0.02em',
-                      }}
-                    >
-                      +1 THÁNG
-                    </span>
-                    <span style={{ fontSize: 14, fontWeight: 700, color: '#0F172A' }}>1 Năm</span>
-                    <span style={{ fontSize: 11.5, color: 'var(--blue-primary)', fontWeight: 600 }}>
-                      Tặng 1 tháng
-                    </span>
-                  </button>
-                </div>
-              </div>
-
-              {/* 2. Tiện ích mở rộng (Addons) */}
-              <div>
-                <label
-                  style={{
-                    fontSize: 13,
-                    fontWeight: 700,
-                    color: '#334155',
-                    marginBottom: 8,
-                    display: 'block',
-                  }}
-                >
-                  Tùy chọn mở rộng
-                </label>
-
-                {!isPro ? (
-                  /* Gói Thường: Checkbox Option Quản lý & Phân quyền nhân viên */
-                  <div
-                    onClick={() => setHasStaffAddon(!hasStaffAddon)}
-                    style={{
-                      border: hasStaffAddon ? '1.5px solid var(--blue-primary)' : '1px solid #E2E8F0',
-                      borderRadius: 14,
-                      padding: '12px 14px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      backgroundColor: hasStaffAddon ? 'var(--blue-light)' : '#FFFFFF',
-                      cursor: 'pointer',
-                      transition: 'all 0.15s ease',
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <div
-                        style={{
-                          width: 32,
-                          height: 32,
-                          borderRadius: 8,
-                          backgroundColor: hasStaffAddon ? 'var(--blue-primary)' : '#F1F5F9',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: hasStaffAddon ? '#FFFFFF' : '#64748B',
-                          flexShrink: 0,
-                        }}
-                      >
-                        <Users size={16} />
-                      </div>
-                      <div>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: '#0F172A' }}>
-                          Quản lý & Phân quyền nhân viên
-                        </div>
-                        <div style={{ fontSize: 11.5, color: '#64748B' }}>
-                          +30.000 đ/tháng (Không giới hạn tài khoản nhân viên)
-                        </div>
-                      </div>
-                    </div>
-                    <input
-                      type="checkbox"
-                      checked={hasStaffAddon}
-                      onChange={(e) => setHasStaffAddon(e.target.checked)}
-                      style={{ width: 18, height: 18, accentColor: 'var(--blue-primary)', cursor: 'pointer' }}
-                    />
-                  </div>
-                ) : (
-                  /* Gói Pro: Stepper Mua thêm chi nhánh */
-                  <div
-                    style={{
-                      border: '1px solid #E2E8F0',
-                      borderRadius: 14,
-                      padding: '12px 14px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      backgroundColor: '#FFFFFF',
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <div
-                        style={{
-                          width: 32,
-                          height: 32,
-                          borderRadius: 8,
-                          backgroundColor: 'var(--blue-light)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: 'var(--blue-primary)',
-                          flexShrink: 0,
-                        }}
-                      >
-                        <Building2 size={16} />
-                      </div>
-                      <div>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: '#0F172A' }}>
-                          Mua thêm chi nhánh
-                        </div>
-                        <div style={{ fontSize: 11.5, color: '#64748B' }}>
-                          +80.000 đ/tháng/chi nhánh (Mặc định sẵn 2 chi nhánh)
-                        </div>
-                      </div>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <button
-                        type="button"
-                        onClick={() => setExtraBranches(Math.max(0, extraBranches - 1))}
-                        style={{
-                          width: 26,
-                          height: 26,
-                          borderRadius: '50%',
-                          border: '1px solid #CBD5E1',
-                          background: '#FFFFFF',
-                          cursor: extraBranches > 0 ? 'pointer' : 'default',
-                          fontWeight: 700,
-                          fontSize: 14,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: extraBranches > 0 ? '#0F172A' : '#CBD5E1',
-                        }}
-                      >
-                        -
-                      </button>
-                      <span
-                        style={{
-                          fontWeight: 700,
-                          fontSize: 13.5,
-                          minWidth: 20,
-                          textAlign: 'center',
-                          color: '#0F172A',
-                          fontVariantNumeric: 'tabular-nums',
-                        }}
-                      >
-                        {extraBranches}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => setExtraBranches(extraBranches + 1)}
-                        style={{
-                          width: 26,
-                          height: 26,
-                          borderRadius: '50%',
-                          border: '1px solid var(--blue-primary)',
-                          background: 'var(--blue-light)',
-                          cursor: 'pointer',
-                          fontWeight: 700,
-                          fontSize: 14,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: 'var(--blue-primary)',
-                        }}
-                      >
-                        +
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* 3. Phương thức thanh toán (DUY NHẤT VÍ GIAN HÀNG) */}
-              <div>
-                <label
-                  style={{
-                    fontSize: 13,
-                    fontWeight: 700,
-                    color: '#334155',
-                    marginBottom: 8,
-                    display: 'block',
-                  }}
-                >
-                  Phương thức thanh toán
-                </label>
-                <div
-                  style={{
-                    border: '1.5px solid var(--blue-primary)',
-                    borderRadius: 14,
-                    padding: '12px 16px',
-                    backgroundColor: 'var(--blue-light)',
-                    display: 'flex',
+                    display: 'inline-flex',
                     alignItems: 'center',
-                    justifyContent: 'space-between',
+                    gap: 6,
+                    padding: '3px 10px',
+                    borderRadius: 20,
+                    backgroundColor: isTrialPlan ? '#E2E8F0' : isPro ? '#EBF5FF' : '#ECFDF5',
+                    color: isTrialPlan ? '#475569' : isPro ? 'var(--blue-primary)' : '#059669',
+                    fontSize: 11.5,
+                    fontWeight: 700,
+                    marginBottom: 8,
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <div
-                      style={{
-                        width: 36,
-                        height: 36,
-                        borderRadius: 10,
-                        backgroundColor: '#FFFFFF',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: 'var(--blue-primary)',
-                        flexShrink: 0,
-                        boxShadow: '0 2px 6px rgba(15, 118, 110, 0.1)',
-                      }}
-                    >
-                      <Wallet size={19} strokeWidth={2.2} />
-                    </div>
-                    <div>
-                      <div style={{ fontSize: 13.5, fontWeight: 700, color: '#0F172A' }}>
-                        Trừ tiền trực tiếp vào Ví gian hàng
-                      </div>
-                      <div
-                        style={{
-                          fontSize: 12,
-                          color: '#475569',
-                          marginTop: 1,
-                          fontVariantNumeric: 'tabular-nums',
-                        }}
-                      >
-                        Số dư hiện tại:{' '}
-                        <strong style={{ color: '#059669' }}>
-                          {new Intl.NumberFormat('vi-VN').format(storeInfo.walletBalance)} đ
-                        </strong>
-                      </div>
-                    </div>
-                  </div>
-                  {hasEnoughWalletBalance ? (
-                    <span
-                      style={{
-                        fontSize: 12,
-                        fontWeight: 700,
-                        color: '#059669',
-                        backgroundColor: '#ECFDF5',
-                        border: '1px solid #A7F3D0',
-                        padding: '3px 9px',
-                        borderRadius: 20,
-                      }}
-                    >
-                      ✓ Đủ số dư
-                    </span>
-                  ) : (
-                    <span
-                      style={{
-                        fontSize: 12,
-                        fontWeight: 700,
-                        color: '#DC2626',
-                        backgroundColor: '#FEF2F2',
-                        border: '1px solid #FECACA',
-                        padding: '3px 9px',
-                        borderRadius: 20,
-                      }}
-                    >
-                      Chưa đủ số dư
-                    </span>
-                  )}
+                  <Sparkles size={13} />
+                  {isTrialPlan ? 'Trải Nghiệm Miễn Phí' : isPro ? 'Chuỗi Cửa Hàng' : 'Cửa Hàng Độc Lập'}
                 </div>
 
-                {!hasEnoughWalletBalance && (
-                  <div
+                <h4
+                  style={{
+                    margin: '0 0 6px 0',
+                    fontSize: 17,
+                    fontWeight: 800,
+                    color: '#0F172A',
+                    letterSpacing: '-0.01em',
+                  }}
+                >
+                  {plan.name}
+                </h4>
+
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, marginBottom: 8 }}>
+                  <span
                     style={{
-                      marginTop: 8,
-                      padding: '8px 12px',
-                      borderRadius: 10,
-                      backgroundColor: '#FFF5F5',
-                      border: '1px solid #FED7D7',
-                      fontSize: 12,
-                      color: '#C53030',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 6,
+                      fontSize: 22,
+                      fontWeight: 900,
+                      color: isPro ? 'var(--blue-primary)' : '#0F172A',
+                      fontVariantNumeric: 'tabular-nums',
                     }}
                   >
-                    <AlertCircle size={15} style={{ flexShrink: 0 }} />
-                    <span>
-                      Số dư ví còn thiếu{' '}
-                      <strong>{new Intl.NumberFormat('vi-VN').format(missingAmount)} đ</strong>.
-                      Vui lòng nạp thêm tiền vào ví để hoàn tất giao dịch.
-                    </span>
-                  </div>
-                )}
+                    {isTrialPlan
+                      ? 'Miễn phí'
+                      : `${new Intl.NumberFormat('vi-VN').format(plan.monthlyPrice)} đ`}
+                  </span>
+                  <span style={{ fontSize: 12.5, color: '#64748B' }}>
+                    {isTrialPlan ? '/ 3 ngày' : '/ tháng'}
+                  </span>
+                </div>
+
+                <p style={{ margin: 0, fontSize: 12.5, color: '#64748B', lineHeight: 1.5 }}>
+                  {plan.tagline || (isTrialPlan
+                    ? 'Trải nghiệm toàn diện các tính năng cao cấp của MT-GRMS.'
+                    : isPro
+                    ? 'Dành cho chuỗi siêu thị bán lẻ, chuyên môn hóa quy trình kho chuỗi.'
+                    : 'Dành cho tiệm tạp hóa, siêu thị mini độc lập (1 điểm bán kiêm kho).')}
+                </p>
               </div>
 
-              {/* 4. Chi tiết thanh toán */}
+              {/* Thông tin quy mô & thời hạn */}
               <div
                 style={{
-                  backgroundColor: '#F8FAFC',
-                  border: '1px solid #EDF2F9',
-                  borderRadius: 14,
-                  padding: '14px 16px',
+                  backgroundColor: '#FFFFFF',
+                  borderRadius: 12,
+                  border: '1px solid #E2E8F0',
+                  padding: '12px 14px',
                   display: 'flex',
                   flexDirection: 'column',
                   gap: 8,
-                  fontSize: 13,
+                  fontSize: 12.5,
                 }}
               >
-                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748B' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#334155' }}>
+                  {isPro ? (
+                    <Building2 size={16} color="var(--blue-primary)" style={{ flexShrink: 0 }} />
+                  ) : (
+                    <Store size={16} color="#059669" style={{ flexShrink: 0 }} />
+                  )}
                   <span>
-                    Gói {plan.name} ({months} tháng{bonusMonths > 0 ? ' + tặng 1 tháng' : ''}):
-                  </span>
-                  <span style={{ fontWeight: 600, color: '#0F172A', fontVariantNumeric: 'tabular-nums' }}>
-                    {new Intl.NumberFormat('vi-VN').format(basePrice)} đ
-                  </span>
-                </div>
-
-                {(extraBranches > 0 || hasStaffAddon) && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748B' }}>
-                    <span>
-                      {extraBranches > 0
-                        ? `Thêm ${extraBranches} chi nhánh (${months} tháng)`
-                        : `Option Quản lý nhân viên (${months} tháng)`}:
-                    </span>
-                    <span style={{ fontWeight: 600, color: '#0F172A', fontVariantNumeric: 'tabular-nums' }}>
-                      {new Intl.NumberFormat('vi-VN').format(branchAddonPrice + staffAddonPrice)} đ
-                    </span>
-                  </div>
-                )}
-
-                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748B' }}>
-                  <span>Thuế GTGT (VAT 10%):</span>
-                  <span style={{ fontWeight: 600, color: '#0F172A', fontVariantNumeric: 'tabular-nums' }}>
-                    {new Intl.NumberFormat('vi-VN').format(vatAmount)} đ
+                    <strong>Quy mô:</strong>{' '}
+                    {isTrialPlan
+                      ? '1 chi nhánh kiêm kho hàng'
+                      : isPro
+                      ? 'Sẵn 2 chi nhánh kiêm kho hàng'
+                      : '1 chi nhánh kiêm kho hàng'}
                   </span>
                 </div>
-
-                <div
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'baseline',
-                    paddingTop: 8,
-                    borderTop: '1px solid #E2E8F0',
-                  }}
-                >
-                  <span style={{ fontSize: 14, fontWeight: 700, color: '#0F172A' }}>
-                    Tổng thanh toán:
-                  </span>
-                  <span
-                    style={{
-                      color: 'var(--blue-primary)',
-                      fontVariantNumeric: 'tabular-nums',
-                      fontSize: 19,
-                      fontWeight: 800,
-                      letterSpacing: '-0.02em',
-                    }}
-                  >
-                    {new Intl.NumberFormat('vi-VN').format(grandTotal)} đ
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#334155' }}>
+                  <Clock size={16} color="#64748B" style={{ flexShrink: 0 }} />
+                  <span>
+                    <strong>Thời hạn:</strong>{' '}
+                    {isTrialPlan ? '3 ngày trải nghiệm' : `${months} tháng${bonusMonths > 0 ? ' (+1 tháng)' : ''}`}
                   </span>
                 </div>
               </div>
-            </>
-          )}
-        </div>
 
-        {/* Footer */}
-        {!isCompleted && (
-          <div
-            style={{
-              padding: '14px 24px 18px 24px',
-              borderTop: '1px solid #F1F5F9',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'flex-end',
-              gap: 10,
-            }}
-          >
-            <button
-              type="button"
-              onClick={onClose}
+              {/* Danh sách tính năng bao gồm */}
+              <div>
+                <div
+                  style={{
+                    fontSize: 11.5,
+                    fontWeight: 700,
+                    color: '#64748B',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.04em',
+                    marginBottom: 10,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                  }}
+                >
+                  <CheckCircle2 size={14} color="#059669" />
+                  <span>Tính năng bao gồm ({planFeatures.length})</span>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
+                  {planFeatures.map((feat, idx) => (
+                    <div key={idx} style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                      <div
+                        style={{
+                          width: 17,
+                          height: 17,
+                          borderRadius: '50%',
+                          backgroundColor: '#ECFDF5',
+                          border: '1px solid #A7F3D0',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: '#059669',
+                          flexShrink: 0,
+                          marginTop: 2,
+                        }}
+                      >
+                        <Check size={11} strokeWidth={2.8} />
+                      </div>
+                      <span
+                        style={{
+                          fontSize: 12.5,
+                          color: '#334155',
+                          lineHeight: 1.45,
+                          fontWeight: 500,
+                        }}
+                      >
+                        {feat}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Ghi chú an toàn & bảo mật */}
+              <div
+                style={{
+                  marginTop: 'auto',
+                  padding: '10px 12px',
+                  backgroundColor: '#FFFFFF',
+                  borderRadius: 10,
+                  border: '1px solid #E2E8F0',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                }}
+              >
+                <ShieldCheck size={16} color="#059669" style={{ flexShrink: 0 }} />
+                <span style={{ fontSize: 11.5, color: '#64748B', lineHeight: 1.4 }}>
+                  Dữ liệu được sao lưu tự động & bảo mật đa tầng trên đám mây.
+                </span>
+              </div>
+            </div>
+
+            {/* ================= CỘT BÊN PHẢI: CẤU HÌNH CHU KỲ & THANH TOÁN ================= */}
+            <div
               style={{
-                padding: '9px 18px',
-                borderRadius: 'var(--radius-pill)',
-                border: '1px solid #CBD5E1',
+                padding: '24px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 18,
                 backgroundColor: '#FFFFFF',
-                color: '#475569',
-                fontSize: 13.5,
-                fontWeight: 600,
-                cursor: 'pointer',
-                fontFamily: 'var(--font-sans)',
               }}
             >
-              Hủy bỏ
-            </button>
-            <button
-              type="button"
-              onClick={handleConfirmPayment}
-              disabled={isProcessing || (!isTrialPlan && !hasEnoughWalletBalance)}
-              style={{
-                padding: '9px 24px',
-                borderRadius: 'var(--radius-pill)',
-                backgroundColor:
-                  !isTrialPlan && !hasEnoughWalletBalance
-                    ? '#CBD5E1'
-                    : 'var(--blue-primary)',
-                color: '#FFFFFF',
-                border: 'none',
-                fontSize: 13.5,
-                fontWeight: 700,
-                cursor:
-                  !isTrialPlan && !hasEnoughWalletBalance
-                    ? 'not-allowed'
-                    : 'pointer',
-                boxShadow:
-                  !isTrialPlan && !hasEnoughWalletBalance
-                    ? 'none'
-                    : '0 3px 12px rgba(15, 118, 110, 0.28)',
-                transition: 'all 0.15s ease',
-                fontFamily: 'var(--font-sans)',
-              }}
-            >
-              {isProcessing
-                ? 'Đang xử lý...'
-                : isTrialPlan
-                ? 'Kích hoạt dùng thử 3 ngày (0 đ)'
-                : hasEnoughWalletBalance
-                ? 'Xác nhận thanh toán'
-                : 'Số dư ví không đủ'}
-            </button>
+              {isTrialPlan ? (
+                /* Luồng kích hoạt Gói Dùng Thử */
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  <div>
+                    <h4 style={{ margin: '0 0 6px 0', fontSize: 15, fontWeight: 700, color: '#0F172A' }}>
+                      Xác nhận kích hoạt Dùng thử
+                    </h4>
+                    <p style={{ margin: 0, fontSize: 13, color: '#64748B' }}>
+                      Bắt đầu ngay 3 ngày trải nghiệm không giới hạn tính năng của nền tảng MT-GRMS.
+                    </p>
+                  </div>
+
+                  <div
+                    style={{
+                      padding: '16px',
+                      backgroundColor: '#F8FAFC',
+                      borderRadius: 14,
+                      border: '1px solid #E2E8F0',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 10,
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13.5 }}>
+                      <span style={{ color: '#64748B' }}>Thời hạn dùng thử:</span>
+                      <span style={{ fontWeight: 700, color: '#0F172A' }}>3 ngày miễn phí</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13.5 }}>
+                      <span style={{ color: '#64748B' }}>Quy mô áp dụng:</span>
+                      <span style={{ fontWeight: 600, color: '#0F172A' }}>1 chi nhánh kiêm kho hàng</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13.5 }}>
+                      <span style={{ color: '#64748B' }}>Quyền lợi nhân viên:</span>
+                      <span style={{ fontWeight: 600, color: '#059669' }}>Mở khóa đầy đủ trải nghiệm</span>
+                    </div>
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        paddingTop: 10,
+                        borderTop: '1px dashed #CBD5E1',
+                        fontSize: 14,
+                      }}
+                    >
+                      <span style={{ fontWeight: 700, color: '#0F172A' }}>Chi phí thanh toán:</span>
+                      <span style={{ fontWeight: 800, color: '#059669', fontSize: 16 }}>0 đ (Miễn phí)</span>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                /* Luồng cấu hình Gói Thường / Gói Pro */
+                <>
+                  {/* 1. Chọn chu kỳ: 3 tháng | 6 tháng | 1 năm */}
+                  <div>
+                    <label
+                      style={{
+                        fontSize: 13,
+                        fontWeight: 700,
+                        color: '#334155',
+                        marginBottom: 8,
+                        display: 'block',
+                      }}
+                    >
+                      1. Chọn chu kỳ gia hạn
+                    </label>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+                      {/* 3 Tháng */}
+                      <button
+                        type="button"
+                        onClick={() => setCycle('3m')}
+                        style={{
+                          padding: '12px 8px',
+                          borderRadius: 14,
+                          border: cycle === '3m' ? '2px solid var(--blue-primary)' : '1px solid #E2E8F0',
+                          backgroundColor: cycle === '3m' ? 'var(--blue-light)' : '#FFFFFF',
+                          cursor: 'pointer',
+                          textAlign: 'center',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: 2,
+                          transition: 'all 0.15s ease',
+                          fontFamily: 'var(--font-sans)',
+                        }}
+                      >
+                        <span style={{ fontSize: 13.5, fontWeight: 700, color: '#0F172A' }}>3 Tháng</span>
+                        <span style={{ fontSize: 11, color: '#64748B' }}>Linh hoạt</span>
+                      </button>
+
+                      {/* 6 Tháng */}
+                      <button
+                        type="button"
+                        onClick={() => setCycle('6m')}
+                        style={{
+                          padding: '12px 8px',
+                          borderRadius: 14,
+                          border: cycle === '6m' ? '2px solid var(--blue-primary)' : '1px solid #E2E8F0',
+                          backgroundColor: cycle === '6m' ? 'var(--blue-light)' : '#FFFFFF',
+                          cursor: 'pointer',
+                          textAlign: 'center',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: 2,
+                          transition: 'all 0.15s ease',
+                          fontFamily: 'var(--font-sans)',
+                        }}
+                      >
+                        <span style={{ fontSize: 13.5, fontWeight: 700, color: '#0F172A' }}>6 Tháng</span>
+                        <span style={{ fontSize: 11, color: '#059669', fontWeight: 600 }}>Phổ biến</span>
+                      </button>
+
+                      {/* 1 Năm */}
+                      <button
+                        type="button"
+                        onClick={() => setCycle('12m')}
+                        style={{
+                          padding: '12px 8px',
+                          borderRadius: 14,
+                          border: cycle === '12m' ? '2px solid var(--blue-primary)' : '1px solid #E2E8F0',
+                          backgroundColor: cycle === '12m' ? 'var(--blue-light)' : '#FFFFFF',
+                          cursor: 'pointer',
+                          textAlign: 'center',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: 2,
+                          position: 'relative',
+                          transition: 'all 0.15s ease',
+                          fontFamily: 'var(--font-sans)',
+                        }}
+                      >
+                        <span
+                          style={{
+                            position: 'absolute',
+                            top: -8,
+                            right: 6,
+                            backgroundColor: 'var(--blue-primary)',
+                            color: '#FFFFFF',
+                            fontSize: 9,
+                            fontWeight: 800,
+                            padding: '1.5px 6px',
+                            borderRadius: 'var(--radius-pill)',
+                            letterSpacing: '0.02em',
+                          }}
+                        >
+                          +1 THÁNG
+                        </span>
+                        <span style={{ fontSize: 13.5, fontWeight: 700, color: '#0F172A' }}>1 Năm</span>
+                        <span style={{ fontSize: 11, color: 'var(--blue-primary)', fontWeight: 600 }}>
+                          Tặng 1 tháng
+                        </span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* 2. Tiện ích mở rộng (Addons) */}
+                  <div>
+                    <label
+                      style={{
+                        fontSize: 13,
+                        fontWeight: 700,
+                        color: '#334155',
+                        marginBottom: 8,
+                        display: 'block',
+                      }}
+                    >
+                      2. Tùy chọn mở rộng
+                    </label>
+
+                    {!isPro ? (
+                      /* Gói Thường: Checkbox Option Quản lý & Phân quyền nhân viên */
+                      <div
+                        onClick={() => setHasStaffAddon(!hasStaffAddon)}
+                        style={{
+                          border: hasStaffAddon ? '1.5px solid var(--blue-primary)' : '1px solid #E2E8F0',
+                          borderRadius: 14,
+                          padding: '12px 14px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          backgroundColor: hasStaffAddon ? 'var(--blue-light)' : '#FFFFFF',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <div
+                            style={{
+                              width: 32,
+                              height: 32,
+                              borderRadius: 8,
+                              backgroundColor: hasStaffAddon ? 'var(--blue-primary)' : '#F1F5F9',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              color: hasStaffAddon ? '#FFFFFF' : '#64748B',
+                              flexShrink: 0,
+                            }}
+                          >
+                            <Users size={16} />
+                          </div>
+                          <div>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: '#0F172A' }}>
+                              Quản lý & Phân quyền nhân viên
+                            </div>
+                            <div style={{ fontSize: 11.5, color: '#64748B' }}>
+                              +30.000 đ/tháng (Không giới hạn tài khoản nhân viên)
+                            </div>
+                          </div>
+                        </div>
+                        <input
+                          type="checkbox"
+                          checked={hasStaffAddon}
+                          onChange={(e) => setHasStaffAddon(e.target.checked)}
+                          style={{ width: 18, height: 18, accentColor: 'var(--blue-primary)', cursor: 'pointer' }}
+                        />
+                      </div>
+                    ) : (
+                      /* Gói Pro: Stepper Mua thêm chi nhánh */
+                      <div
+                        style={{
+                          border: '1px solid #E2E8F0',
+                          borderRadius: 14,
+                          padding: '12px 14px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          backgroundColor: '#FFFFFF',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <div
+                            style={{
+                              width: 32,
+                              height: 32,
+                              borderRadius: 8,
+                              backgroundColor: 'var(--blue-light)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              color: 'var(--blue-primary)',
+                              flexShrink: 0,
+                            }}
+                          >
+                            <Building2 size={16} />
+                          </div>
+                          <div>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: '#0F172A' }}>
+                              Mua thêm chi nhánh
+                            </div>
+                            <div style={{ fontSize: 11.5, color: '#64748B' }}>
+                              +80.000 đ/tháng/chi nhánh (Mặc định sẵn 2 chi nhánh)
+                            </div>
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <button
+                            type="button"
+                            onClick={() => setExtraBranches(Math.max(0, extraBranches - 1))}
+                            style={{
+                              width: 26,
+                              height: 26,
+                              borderRadius: '50%',
+                              border: '1px solid #CBD5E1',
+                              background: '#FFFFFF',
+                              cursor: extraBranches > 0 ? 'pointer' : 'default',
+                              fontWeight: 700,
+                              fontSize: 14,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              color: extraBranches > 0 ? '#0F172A' : '#CBD5E1',
+                            }}
+                          >
+                            -
+                          </button>
+                          <span
+                            style={{
+                              fontWeight: 700,
+                              fontSize: 13.5,
+                              minWidth: 20,
+                              textAlign: 'center',
+                              color: '#0F172A',
+                              fontVariantNumeric: 'tabular-nums',
+                            }}
+                          >
+                            {extraBranches}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setExtraBranches(extraBranches + 1)}
+                            style={{
+                              width: 26,
+                              height: 26,
+                              borderRadius: '50%',
+                              border: '1px solid var(--blue-primary)',
+                              background: 'var(--blue-light)',
+                              cursor: 'pointer',
+                              fontWeight: 700,
+                              fontSize: 14,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              color: 'var(--blue-primary)',
+                            }}
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 3. Phương thức thanh toán (DUY NHẤT VÍ GIAN HÀNG) */}
+                  <div>
+                    <label
+                      style={{
+                        fontSize: 13,
+                        fontWeight: 700,
+                        color: '#334155',
+                        marginBottom: 8,
+                        display: 'block',
+                      }}
+                    >
+                      3. Phương thức thanh toán
+                    </label>
+                    <div
+                      style={{
+                        border: '1.5px solid var(--blue-primary)',
+                        borderRadius: 14,
+                        padding: '12px 14px',
+                        backgroundColor: 'var(--blue-light)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <div
+                          style={{
+                            width: 36,
+                            height: 36,
+                            borderRadius: 10,
+                            backgroundColor: '#FFFFFF',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: 'var(--blue-primary)',
+                            flexShrink: 0,
+                            boxShadow: '0 2px 6px rgba(15, 118, 110, 0.1)',
+                          }}
+                        >
+                          <Wallet size={19} strokeWidth={2.2} />
+                        </div>
+                        <div>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: '#0F172A' }}>
+                            Trừ tiền trực tiếp vào Ví gian hàng
+                          </div>
+                          <div
+                            style={{
+                              fontSize: 11.5,
+                              color: '#475569',
+                              marginTop: 1,
+                              fontVariantNumeric: 'tabular-nums',
+                            }}
+                          >
+                            Số dư hiện tại:{' '}
+                            <strong style={{ color: '#059669' }}>
+                              {new Intl.NumberFormat('vi-VN').format(storeInfo.walletBalance)} đ
+                            </strong>
+                          </div>
+                        </div>
+                      </div>
+                      {hasEnoughWalletBalance ? (
+                        <span
+                          style={{
+                            fontSize: 11.5,
+                            fontWeight: 700,
+                            color: '#059669',
+                            backgroundColor: '#ECFDF5',
+                            border: '1px solid #A7F3D0',
+                            padding: '3px 9px',
+                            borderRadius: 20,
+                          }}
+                        >
+                          ✓ Đủ số dư
+                        </span>
+                      ) : (
+                        <span
+                          style={{
+                            fontSize: 11.5,
+                            fontWeight: 700,
+                            color: '#DC2626',
+                            backgroundColor: '#FEF2F2',
+                            border: '1px solid #FECACA',
+                            padding: '3px 9px',
+                            borderRadius: 20,
+                          }}
+                        >
+                          Chưa đủ số dư
+                        </span>
+                      )}
+                    </div>
+
+                    {!hasEnoughWalletBalance && (
+                      <div
+                        style={{
+                          marginTop: 8,
+                          padding: '8px 12px',
+                          borderRadius: 10,
+                          backgroundColor: '#FFF5F5',
+                          border: '1px solid #FED7D7',
+                          fontSize: 11.5,
+                          color: '#C53030',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 6,
+                        }}
+                      >
+                        <AlertCircle size={15} style={{ flexShrink: 0 }} />
+                        <span>
+                          Số dư ví còn thiếu{' '}
+                          <strong>{new Intl.NumberFormat('vi-VN').format(missingAmount)} đ</strong>.
+                          Vui lòng nạp thêm tiền vào ví để hoàn tất giao dịch.
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 4. Chi tiết thanh toán */}
+                  <div
+                    style={{
+                      backgroundColor: '#F8FAFC',
+                      border: '1px solid #EDF2F9',
+                      borderRadius: 14,
+                      padding: '12px 14px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 7,
+                      fontSize: 12.5,
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748B' }}>
+                      <span>
+                        {planDisplayName} ({months} tháng{bonusMonths > 0 ? ' + tặng 1 tháng' : ''}):
+                      </span>
+                      <span style={{ fontWeight: 600, color: '#0F172A', fontVariantNumeric: 'tabular-nums' }}>
+                        {new Intl.NumberFormat('vi-VN').format(basePrice)} đ
+                      </span>
+                    </div>
+
+                    {(extraBranches > 0 || hasStaffAddon) && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748B' }}>
+                        <span>
+                          {extraBranches > 0
+                            ? `Thêm ${extraBranches} chi nhánh (${months} tháng)`
+                            : `Option Quản lý nhân viên (${months} tháng)`}:
+                        </span>
+                        <span style={{ fontWeight: 600, color: '#0F172A', fontVariantNumeric: 'tabular-nums' }}>
+                          {new Intl.NumberFormat('vi-VN').format(branchAddonPrice + staffAddonPrice)} đ
+                        </span>
+                      </div>
+                    )}
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748B' }}>
+                      <span>Thuế GTGT (VAT 10%):</span>
+                      <span style={{ fontWeight: 600, color: '#0F172A', fontVariantNumeric: 'tabular-nums' }}>
+                        {new Intl.NumberFormat('vi-VN').format(vatAmount)} đ
+                      </span>
+                    </div>
+
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'baseline',
+                        paddingTop: 8,
+                        borderTop: '1px solid #E2E8F0',
+                      }}
+                    >
+                      <span style={{ fontSize: 13.5, fontWeight: 700, color: '#0F172A' }}>
+                        Tổng thanh toán:
+                      </span>
+                      <span
+                        style={{
+                          color: 'var(--blue-primary)',
+                          fontVariantNumeric: 'tabular-nums',
+                          fontSize: 18,
+                          fontWeight: 800,
+                          letterSpacing: '-0.02em',
+                        }}
+                      >
+                        {new Intl.NumberFormat('vi-VN').format(grandTotal)} đ
+                      </span>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* Action Buttons */}
+              <div
+                style={{
+                  paddingTop: 8,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'flex-end',
+                  gap: 10,
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={onClose}
+                  style={{
+                    padding: '8px 18px',
+                    borderRadius: 'var(--radius-pill)',
+                    border: '1px solid #CBD5E1',
+                    backgroundColor: '#FFFFFF',
+                    color: '#475569',
+                    fontSize: 13,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    fontFamily: 'var(--font-sans)',
+                  }}
+                >
+                  Hủy bỏ
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmPayment}
+                  disabled={isProcessing || (!isTrialPlan && !hasEnoughWalletBalance)}
+                  style={{
+                    padding: '8px 22px',
+                    borderRadius: 'var(--radius-pill)',
+                    backgroundColor:
+                      !isTrialPlan && !hasEnoughWalletBalance
+                        ? '#CBD5E1'
+                        : 'var(--blue-primary)',
+                    color: '#FFFFFF',
+                    border: 'none',
+                    fontSize: 13,
+                    fontWeight: 700,
+                    cursor:
+                      !isTrialPlan && !hasEnoughWalletBalance
+                        ? 'not-allowed'
+                        : 'pointer',
+                    boxShadow:
+                      !isTrialPlan && !hasEnoughWalletBalance
+                        ? 'none'
+                        : '0 3px 12px rgba(15, 118, 110, 0.28)',
+                    transition: 'all 0.15s ease',
+                    fontFamily: 'var(--font-sans)',
+                  }}
+                >
+                  {isProcessing
+                    ? 'Đang xử lý...'
+                    : isTrialPlan
+                    ? 'Kích hoạt dùng thử 3 ngày (0 đ)'
+                    : hasEnoughWalletBalance
+                    ? 'Xác nhận thanh toán'
+                    : 'Số dư ví không đủ'}
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>
