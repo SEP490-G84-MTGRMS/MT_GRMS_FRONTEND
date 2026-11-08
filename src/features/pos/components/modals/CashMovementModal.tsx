@@ -49,12 +49,17 @@ export const CashMovementModal: FC<Props> = ({
 
   if (!isOpen) return null;
 
+  const currentDrawerCash = Math.max(0, shift.expectedCash ?? (shift.openingFloat + shift.totalCashIn - shift.totalCashOut));
   const isExceedThreshold = movementType === 'OUT' && category === 1 && amount > threshold;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (amount <= 0) {
       setErrorMsg('Số tiền phải lớn hơn 0');
+      return;
+    }
+    if (movementType === 'OUT' && amount > currentDrawerCash) {
+      setErrorMsg(`Số tiền chi (${amount.toLocaleString('vi-VN')} đ) vượt quá số tiền mặt hiện có trong két (${currentDrawerCash.toLocaleString('vi-VN')} đ)!`);
       return;
     }
     if (!reason.trim()) {
@@ -112,7 +117,7 @@ export const CashMovementModal: FC<Props> = ({
                 Thu / Chi Tiền Mặt Tại Két ({shift.shiftCode})
               </h2>
               <p style={{ margin: 0, fontSize: 12, color: '#64748b' }}>
-                Hạn mức duyệt chi tự động: <b>{threshold.toLocaleString('vi-VN')} đ</b>
+                Hạn mức duyệt chi: <b>{threshold.toLocaleString('vi-VN')} đ</b> &bull; Tiền mặt trong két: <b style={{ color: '#0f766e' }}>{currentDrawerCash.toLocaleString('vi-VN')} đ</b>
               </p>
             </div>
           </div>
@@ -233,31 +238,10 @@ export const CashMovementModal: FC<Props> = ({
                       fontSize: 13,
                       cursor: 'pointer',
                       textAlign: 'left',
+                      gridColumn: '1 / -1',
                     }}
                   >
                     [+] Nạp thêm tiền lẻ vào két
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setMovementType('IN');
-                      setCategory(4);
-                      setReason('Thu nợ khách hàng tiền mặt');
-                    }}
-                    style={{
-                      padding: '10px 12px',
-                      borderRadius: 6,
-                      border: movementType === 'IN' && category === 4 ? '2px solid #0284c7' : '1px solid #cbd5e1',
-                      backgroundColor: movementType === 'IN' && category === 4 ? '#f0f9ff' : '#ffffff',
-                      color: movementType === 'IN' && category === 4 ? '#0369a1' : '#334155',
-                      fontWeight: 600,
-                      fontSize: 13,
-                      cursor: 'pointer',
-                      textAlign: 'left',
-                    }}
-                  >
-                    [+] Thu nợ khách hàng
                   </button>
                 </div>
               </div>
