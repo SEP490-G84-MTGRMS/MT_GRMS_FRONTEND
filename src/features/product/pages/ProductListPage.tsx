@@ -251,6 +251,7 @@ export const ProductListPage: React.FC = () => {
               internalNote: p.internalNote ?? undefined,
               taxCategory: (p as any).taxCategory || 'STANDARD_1PCT',
               isFavorite: Boolean(p.isFavorite),
+              hasBatches: Boolean(p.hasBatches),
               uomConversions,
             };
           })
@@ -404,6 +405,7 @@ export const ProductListPage: React.FC = () => {
           description: data.description,
           internalNote: data.internalNote,
           isFavorite: data.isFavorite ?? productToEdit.isFavorite,
+          hasBatches: data.hasBatches ?? productToEdit.hasBatches ?? false,
         });
 
         // 1. Xóa các đơn vị quy đổi đã bị người dùng gỡ bỏ qua DELETE /api/v1/product-units/{id}
@@ -476,6 +478,7 @@ export const ProductListPage: React.FC = () => {
           description: data.description,
           internalNote: data.internalNote,
           isFavorite: data.isFavorite ?? false,
+          hasBatches: data.hasBatches ?? false,
         });
 
         // Thêm các đơn vị quy đổi cho sản phẩm vừa tạo qua POST /api/v1/products/{id}/units
@@ -1529,6 +1532,21 @@ export const ProductListPage: React.FC = () => {
                         <span style={{ fontWeight: 600, color: '#1e293b' }}>
                           {p.productName}
                         </span>
+                        {p.hasBatches && (
+                          <span
+                            style={{
+                              fontSize: 11,
+                              fontWeight: 600,
+                              color: '#1d4ed8',
+                              background: '#eff6ff',
+                              border: '1px solid #bfdbfe',
+                              padding: '2px 6px',
+                              borderRadius: 4,
+                            }}
+                          >
+                            Lô & HSD
+                          </span>
+                        )}
                         {p.isCombo && <span className="badge-combo">Combo</span>}
                         {p.status === 'Discontinued' && (
                           <span
