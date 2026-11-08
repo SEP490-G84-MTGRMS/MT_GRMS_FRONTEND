@@ -109,7 +109,8 @@ const REASON_LABELS: Record<string, string> = {
   BRANCH_PRODUCT_INACTIVE: 'Chi nhánh không kinh doanh sản phẩm này',
   NOT_DELIVERY_DAY: 'Không phải ngày giao của NCC',
   HOLIDAY_BLACKOUT: 'Ngày nghỉ/blackout của NCC',
-  LEAD_TIME_VIOLATION: 'Chưa đủ LeadDays để giao ngày này',
+  LEAD_TIME_VIOLATION: 'Lead time tối thiểu 1 ngày — không đặt giao hôm nay',
+  PAST_DELIVERY_DATE: 'Ngày giao đã qua',
   CUTOFF_PASSED: 'Đã đến hoặc qua giờ chốt đơn',
   PO_ALREADY_COMMITTED: 'Ngày này đã chốt PO',
   PO_EXISTED_EDITABLE: 'Đã có PO — còn sửa trước cutoff',
@@ -163,7 +164,8 @@ function computeDayColumns(
   const list: DayColInfo[] = [];
   const isAll = supplierId === 'ALL';
   const supConfig = supplierConfigs?.find((sc) => sc.supplierId === supplierId);
-  const earliestAllowed = today;
+  // Lead time ≥ 1 ngày: ngày giao sớm nhất = ngày mai
+  const earliestAllowed = fmtDateStr(addDaysToDate(parseDateStr(today), 1));
 
   for (let i = 0; i < durationDays; i++) {
     const d = addDaysToDate(viewFrom, i);
@@ -229,7 +231,8 @@ function computeDayColumns(
       }
     } else {
       // Fallback local khi chưa có DayStatuses
-      const isLeadBlocked = isAll ? false : k < earliestAllowed;
+      // Áp dụng cả khi xem ALL (fallback): hôm nay luôn bị chặn lead time
+      const isLeadBlocked = k < earliestAllowed;
       let isDayOff = false;
       let isHoliday = false;
       let isSupplierInactive = false;
@@ -344,7 +347,6 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
   );
 
   // State: Secondary Filters
-  const [categoryFilter, setCategoryFilter] = useState<string>('');
   const [keyword, setKeyword] = useState<string>('');
   const [moqOnly, setMoqOnly] = useState<boolean>(false);
   const [orderedOnly, setOrderedOnly] = useState<boolean>(false);
@@ -543,19 +545,6 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
     return { openDays, finalizedDays, lockedDays };
   }, [dayColumns]);
 
-  // Available Categories
-  const availableCategories = useMemo(() => {
-    const set = new Set<string>();
-    const prods =
-      selectedSupplierId === 'ALL'
-        ? matrixProducts
-        : matrixProducts.filter((p) => p.supplierId === selectedSupplierId);
-    prods.forEach((p) => {
-      if (p.category) set.add(p.category);
-    });
-    return Array.from(set);
-  }, [selectedSupplierId, matrixProducts]);
-
   // Handle cell quantity change by Store Owner or Employee
   const handleCellChange = (productId: string, dateKey: string, val: number) => {
     if (!branchIsActive) {
@@ -670,7 +659,6 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
     const kw = keyword.trim().toLowerCase();
     return matrixProducts.filter((p) => {
       if (selectedSupplierId !== 'ALL' && p.supplierId !== selectedSupplierId) return false;
-      if (categoryFilter && p.category !== categoryFilter) return false;
       if (kw && !p.name.toLowerCase().includes(kw) && !p.sku.toLowerCase().includes(kw)) {
         return false;
       }
@@ -699,7 +687,6 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
   }, [
     matrixProducts,
     selectedSupplierId,
-    categoryFilter,
     keyword,
     moqOnly,
     orderedOnly,
@@ -1207,7 +1194,6 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
         onSelectBranch={(id) => {
           setSelectedBranchId(id);
           setSelectedSupplierId('ALL');
-          setCategoryFilter('');
           setKeyword('');
           setCellMap({});
           setIsDirty(false);
@@ -1224,9 +1210,6 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
         onApplyRange={handleApplyRange}
         durationDays={durationDays}
         onSelectDuration={handleSelectDuration}
-        categories={availableCategories}
-        categoryFilter={categoryFilter}
-        onCategoryChange={(cat) => setCategoryFilter(cat)}
         keyword={keyword}
         onKeywordChange={(kw) => setKeyword(kw)}
         moqOnly={moqOnly}
@@ -1240,7 +1223,6 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
         showSoh={showSoh}
         onShowSohChange={(checked) => setShowSoh(checked)}
         onResetFilters={() => {
-          setCategoryFilter('');
           setKeyword('');
           setMoqOnly(false);
           setOrderedOnly(false);

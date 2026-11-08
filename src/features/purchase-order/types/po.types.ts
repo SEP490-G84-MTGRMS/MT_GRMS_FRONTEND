@@ -192,11 +192,15 @@ export interface BranchListItem {
 }
 
 export interface BranchFilterState {
-  keyword: string;
-  branchCode: string;
-  status: 'all' | 'active' | 'inactive';
-  dateFrom: string;
-  dateTo: string;
+  /** @deprecated dùng branchCodes / branchNames / addresses / phones */
+  keyword?: string;
+  /** @deprecated dùng branchCodes */
+  branchCode?: string;
+  branchCodes: string[];
+  branchNames: string[];
+  addresses: string[];
+  phones: string[];
+  status: string;
   pageIndex: number;
   pageSize: number;
 }

@@ -41,6 +41,17 @@ export const OrderMatrixTable: FC<OrderMatrixTableProps> = ({
 }) => {
   const fmt = (n: number) => new Intl.NumberFormat('vi-VN').format(n);
 
+  // Lead time ≥ 1 ngày: không cho nhập số lượng giao hôm nay / quá khứ
+  const earliestDeliveryDateKey = (() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() + 1);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  })();
+
   // Helper to extract cell data consistently
   const getCell = (productId: string, dateKey: string): MatrixCellData => {
     if (cellMap && cellMap[productId]?.[dateKey]) {
@@ -352,7 +363,10 @@ export const OrderMatrixTable: FC<OrderMatrixTableProps> = ({
                           let isCellOff = false;
                           let cellOffReason = '';
 
-                          if (supConfig) {
+                          if (d.dateKey < earliestDeliveryDateKey) {
+                            isCellOff = true;
+                            cellOffReason = 'Lead time tối thiểu 1 ngày — không đặt giao hôm nay / ngày quá khứ';
+                          } else if (supConfig) {
                             if (!supConfig.isActive) {
                               isCellOff = true;
                               cellOffReason = supConfig.inactiveReason || 'Nhà cung cấp đang tạm dừng hoạt động';

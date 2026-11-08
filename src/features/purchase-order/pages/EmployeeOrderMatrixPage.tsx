@@ -55,14 +55,14 @@ function computeDayColumns(
   const sup = MOCK_PO_SUPPLIERS.find((s) => s.id === supplierId) || MOCK_PO_SUPPLIERS[0];
   const config = sup.config;
   const baseDate = parseDateStr(BASE_TODAY);
-  const earliestAllowed = isAll
-    ? BASE_TODAY
-    : fmtDateStr(addDaysToDate(baseDate, config.leadDays));
+  // Lead time tối thiểu 1 ngày (không đặt giao hôm nay); nếu NCC có leadDays lớn hơn thì dùng leadDays
+  const minLeadDays = Math.max(1, Number(config.leadDays) || 0);
+  const earliestAllowed = fmtDateStr(addDaysToDate(baseDate, minLeadDays));
 
   for (let i = 0; i < viewMode; i++) {
     const d = addDaysToDate(viewFrom, i);
     const k = fmtDateStr(d);
-    const isLeadBlocked = isAll ? false : k < earliestAllowed;
+    const isLeadBlocked = k < earliestAllowed;
     const isDayOff = isAll ? d.getDay() === 0 : !config.activeDeliveryDays.includes(d.getDay());
     const isHoliday = isAll ? false : config.holidays.includes(k);
     const isOff = isLeadBlocked || isDayOff || isHoliday;
@@ -133,7 +133,6 @@ export const EmployeeOrderMatrixPage: FC = () => {
   );
 
   // State: Secondary Filters
-  const [categoryFilter, setCategoryFilter] = useState<string>('');
   const [keyword, setKeyword] = useState<string>('');
   const [moqOnly, setMoqOnly] = useState<boolean>(false);
   const [orderedOnly, setOrderedOnly] = useState<boolean>(false);
@@ -153,17 +152,6 @@ export const EmployeeOrderMatrixPage: FC = () => {
     setToast({ id: Date.now().toString(), message, type });
     setTimeout(() => setToast(null), 3200);
   };
-
-  // Available Categories for current supplier(s)
-  const availableCategories = useMemo(() => {
-    const set = new Set<string>();
-    const prods =
-      selectedSupplierId === 'ALL'
-        ? MOCK_MATRIX_PRODUCTS
-        : MOCK_MATRIX_PRODUCTS.filter((p) => p.supplierId === selectedSupplierId);
-    prods.forEach((p) => set.add(p.category));
-    return Array.from(set);
-  }, [selectedSupplierId]);
 
   // Date column list based on viewFrom and viewMode
   const dayColumns: DayColInfo[] = useMemo(() => {
@@ -185,7 +173,6 @@ export const EmployeeOrderMatrixPage: FC = () => {
     const kw = keyword.trim().toLowerCase();
     return MOCK_MATRIX_PRODUCTS.filter((p) => {
       if (selectedSupplierId !== 'ALL' && p.supplierId !== selectedSupplierId) return false;
-      if (categoryFilter && p.category !== categoryFilter) return false;
       if (kw && !p.name.toLowerCase().includes(kw) && !p.sku.toLowerCase().includes(kw)) {
         return false;
       }
@@ -202,7 +189,7 @@ export const EmployeeOrderMatrixPage: FC = () => {
       }
       return true;
     });
-  }, [selectedSupplierId, categoryFilter, keyword, moqOnly, orderedOnly, dayColumns, qtyMap]);
+  }, [selectedSupplierId, keyword, moqOnly, orderedOnly, dayColumns, qtyMap]);
 
   // Real-time Matrix Calculations
   const { moqFails } = useMemo(() => {
@@ -418,9 +405,6 @@ export const EmployeeOrderMatrixPage: FC = () => {
         onDateFromChange={(val) => setDateFromInput(val)}
         onDateToChange={(val) => setDateToInput(val)}
         onApplyRange={handleApplyRange}
-        categories={availableCategories}
-        categoryFilter={categoryFilter}
-        onCategoryChange={(cat) => setCategoryFilter(cat)}
         keyword={keyword}
         onKeywordChange={(kw) => setKeyword(kw)}
         moqOnly={moqOnly}
@@ -431,7 +415,6 @@ export const EmployeeOrderMatrixPage: FC = () => {
         showSoh={showSoh}
         onShowSohChange={(checked) => setShowSoh(checked)}
         onResetFilters={() => {
-          setCategoryFilter('');
           setKeyword('');
           setMoqOnly(false);
           setOrderedOnly(false);

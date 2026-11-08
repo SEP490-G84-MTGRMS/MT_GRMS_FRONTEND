@@ -62,7 +62,7 @@ const WEEKDAYS = [
 ];
 
 export const SupplierDeliveryConfigTab: FC<Props> = ({
-  supplier,
+  supplier: _supplier,
   initialConfig,
   onSaveConfig,
 }) => {
