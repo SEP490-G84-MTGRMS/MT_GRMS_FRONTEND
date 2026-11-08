@@ -37,9 +37,15 @@ export const mapBackendPlanToCardItem = (
     ? 'Mặc định sẵn 2 chi nhánh (Mua thêm: +80k/chi nhánh/tháng)'
     : '1 chi nhánh kiêm kho hàng';
 
+  // Trial note
+  const trialNote = isPro
+    ? 'Dùng thử 3 ngày Full tính năng Gói Pro cho tất cả tài khoản mới'
+    : 'Không áp dụng dùng thử riêng (vui lòng trải nghiệm Gói Pro)';
+
   // Features list
   const feats: string[] = [];
   if (isPro) {
+    feats.push('🎁 Dùng thử miễn phí 3 ngày: Full tính năng Gói Pro cho tài khoản mới');
     feats.push('Mặc định sẵn 2 chi nhánh kiêm kho hàng');
     feats.push('Đã bao gồm sẵn Quản lý nhân viên (Không giới hạn tài khoản)');
     feats.push('Quản lý tồn kho theo Lô & Hạn sử dụng FEFO 3 mức màu');
@@ -54,6 +60,7 @@ export const mapBackendPlanToCardItem = (
     feats.push('Quy đổi Thùng sang Lon 1 chạm');
     feats.push('Quét mã vạch bán hàng & kiểm kho');
     feats.push('Giải pháp thanh toán Napas VietQR tự động');
+    feats.push('Dùng thử: Không áp dụng (trải nghiệm qua Gói Pro)');
     feats.push('Không hỗ trợ quản lý chuỗi đa chi nhánh');
   }
 
@@ -80,6 +87,7 @@ export const mapBackendPlanToCardItem = (
     tagline,
     branchNote,
     warehouseNote: undefined,
+    trialNote,
     features: feats,
     highlight,
     themeColor,
@@ -308,8 +316,29 @@ export const SubscriptionPricingCards: FC<SubscriptionPricingCardsProps> = ({
             className={`pricing-card ${plan.highlight ? 'highlighted' : ''}`}
           >
             <div>
-              {/* Card Title */}
-              <div className="pricing-card-title">{plan.name}</div>
+              {/* Card Title & Trial Badge */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, gap: 8 }}>
+                <div className="pricing-card-title" style={{ margin: 0 }}>{plan.name}</div>
+                {plan.code === 'PRO' && (
+                  <span
+                    style={{
+                      fontSize: 12,
+                      fontWeight: 700,
+                      color: 'var(--blue-primary)',
+                      backgroundColor: '#E6FFFA',
+                      border: '1px solid #B2F5EA',
+                      padding: '3px 10px',
+                      borderRadius: 20,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 4,
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    ✨ Dùng thử 3 ngày
+                  </span>
+                )}
+              </div>
 
               {/* Price Row */}
               <div className="pricing-card-price-row">
@@ -330,9 +359,27 @@ export const SubscriptionPricingCards: FC<SubscriptionPricingCardsProps> = ({
               {/* Tagline */}
               <div className="pricing-card-tagline">{plan.tagline}</div>
 
-              {/* Branch / Warehouse Notes */}
-              <div style={{ minHeight: 48, marginBottom: 12 }}>
-                <div className="pricing-addon-note">{plan.branchNote}</div>
+              {/* Branch / Warehouse / Trial Notes */}
+              <div style={{ minHeight: 76, marginBottom: 14, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <div className="pricing-addon-note">
+                  <strong>Chi nhánh:</strong> {plan.branchNote}
+                </div>
+                {plan.trialNote && (
+                  <div
+                    className="pricing-addon-note"
+                    style={{
+                      color: plan.code === 'PRO' ? '#0F766E' : '#64748B',
+                      backgroundColor: plan.code === 'PRO' ? '#F0FDFA' : '#F8FAFC',
+                      border: `1px solid ${plan.code === 'PRO' ? '#CCFBF1' : '#E2E8F0'}`,
+                      borderRadius: 8,
+                      padding: '6px 10px',
+                      fontSize: 12.5,
+                      fontWeight: plan.code === 'PRO' ? 600 : 400,
+                    }}
+                  >
+                    <strong>Dùng thử:</strong> {plan.trialNote}
+                  </div>
+                )}
                 {plan.warehouseNote && (
                   <div className="pricing-addon-note" style={{ color: '#475569' }}>
                     {plan.warehouseNote}

@@ -66,6 +66,7 @@ export interface SubscriptionPlanItem {
   tagline: string;
   branchNote: string;
   warehouseNote?: string;
+  trialNote?: string;
   features: string[];
   highlight?: boolean;
   themeColor: string;
@@ -163,6 +164,7 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlanItem[] = [
     yearlyPrice: 99000 * 12,
     tagline: 'Dành cho tiệm tạp hóa, siêu thị mini độc lập (1 điểm bán kiêm kho tại chỗ).',
     branchNote: '1 chi nhánh kiêm kho hàng',
+    trialNote: 'Không áp dụng dùng thử riêng (vui lòng trải nghiệm Gói Pro)',
     features: [
       '1 tài khoản chủ cửa hàng quản trị',
       'Tùy chọn: Mua thêm Quản lý & Phân quyền nhân viên (+30k/tháng)',
@@ -170,6 +172,7 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlanItem[] = [
       'Quy đổi Thùng sang Lon 1 chạm',
       'Quét mã vạch bán hàng & kiểm kho',
       'Giải pháp thanh toán Napas VietQR tự động',
+      'Dùng thử: Không áp dụng (trải nghiệm qua Gói Pro)',
       'Không hỗ trợ quản lý chuỗi đa chi nhánh',
     ],
     themeColor: '#00C853',
@@ -185,8 +188,10 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlanItem[] = [
     yearlyPrice: 249000 * 12,
     tagline: 'Dành cho chuỗi siêu thị bán lẻ, chuyên môn hóa quy trình và điều chuyển kho chuỗi.',
     branchNote: 'Mặc định sẵn 2 chi nhánh (Mua thêm: +80k/chi nhánh/tháng)',
+    trialNote: 'Dùng thử 3 ngày Full tính năng Gói Pro cho tất cả tài khoản mới',
     highlight: true,
     features: [
+      '🎁 Dùng thử 3 ngày miễn phí: Full tính năng Gói Pro cho tài khoản mới',
       'Mặc định sẵn 2 chi nhánh kiêm kho hàng',
       'Đã bao gồm sẵn Quản lý nhân viên (Không giới hạn tài khoản)',
       'Quản lý tồn kho theo Lô & Hạn sử dụng FEFO 3 mức màu',

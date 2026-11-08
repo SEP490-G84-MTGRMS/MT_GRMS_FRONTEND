@@ -34,56 +34,60 @@ export const SubscriptionCheckoutModal: FC<SubscriptionCheckoutModalProps> = ({
 }) => {
   const isPro = (plan.code || plan.id || '').toUpperCase() === 'PRO';
 
-  // Billing cycle: '6m' | '12m' | '24m'
-  const [cycle, setCycle] = useState<'6m' | '12m' | '24m'>('12m');
+  // Billing cycle: 'trial3d' | '6m' | '12m' | '24m'
+  const [cycle, setCycle] = useState<'trial3d' | '6m' | '12m' | '24m'>('12m');
   const [extraBranches, setExtraBranches] = useState<number>(0);
   const [hasStaffAddon, setHasStaffAddon] = useState<boolean>(false);
   const [paymentMethod, setPaymentMethod] = useState<'Wallet' | 'VietQR'>('Wallet');
   const [isProcessing, setIsProcessing] = useState(false);
   const [isCompleted, setIsCompleted] = useState(false);
 
-  const months = cycle === '6m' ? 6 : cycle === '12m' ? 12 : 24;
-  const bonusMonths = cycle === '12m' ? 1 : cycle === '24m' ? 3 : 0;
+  const isTrial = cycle === 'trial3d';
+  const months = isTrial ? 0 : cycle === '6m' ? 6 : cycle === '12m' ? 12 : 24;
+  const bonusMonths = isTrial ? 0 : cycle === '12m' ? 1 : cycle === '24m' ? 3 : 0;
 
   // Calculation chuẩn:
+  // - Dùng thử: 0 đ
   // - Gói Pro: thêm chi nhánh +80k/chi nhánh/tháng
   // - Gói Thường: option quản lý nhân viên +30k/tháng
-  const basePrice = plan.monthlyPrice * months;
-  const branchAddonPrice = isPro ? extraBranches * 80000 * months : 0;
-  const staffAddonPrice = !isPro && hasStaffAddon ? 30000 * months : 0;
+  const basePrice = isTrial ? 0 : plan.monthlyPrice * months;
+  const branchAddonPrice = (isPro && !isTrial) ? extraBranches * 80000 * months : 0;
+  const staffAddonPrice = (!isPro && !isTrial && hasStaffAddon) ? 30000 * months : 0;
   const subTotal = basePrice + branchAddonPrice + staffAddonPrice;
   const vatAmount = Math.round(subTotal * 0.1); // VAT 10%
-  const grandTotal = subTotal + vatAmount;
+  const grandTotal = isTrial ? 0 : subTotal + vatAmount;
 
-  const hasEnoughWalletBalance = storeInfo.walletBalance >= grandTotal;
+  const hasEnoughWalletBalance = isTrial ? true : storeInfo.walletBalance >= grandTotal;
 
   const handleConfirmPayment = async () => {
-    if (paymentMethod === 'Wallet' && !hasEnoughWalletBalance) {
+    if (!isTrial && paymentMethod === 'Wallet' && !hasEnoughWalletBalance) {
       alert(`Số dư ví gian hàng không đủ (thiếu ${new Intl.NumberFormat('vi-VN').format(grandTotal - storeInfo.walletBalance)} đ). Vui lòng chọn Quét mã VietQR hoặc Nạp thêm tiền vào ví.`);
       return;
     }
 
     setIsProcessing(true);
     try {
-      const res = await storeApi.purchaseSubscription({
-        planCode: plan.code || plan.id,
-        months,
-        extraBranches: isPro ? extraBranches : 0,
-        hasStaffManagementAddon: isPro ? true : hasStaffAddon,
-        paymentMethod,
-      });
+      const res = isTrial
+        ? await storeApi.activateTrial()
+        : await storeApi.purchaseSubscription({
+            planCode: plan.code || plan.id,
+            months,
+            extraBranches: isPro ? extraBranches : 0,
+            hasStaffManagementAddon: isPro ? true : hasStaffAddon,
+            paymentMethod,
+          });
 
       if (res.success && res.data) {
         setIsProcessing(false);
         setIsCompleted(true);
         setTimeout(() => {
           onSuccess({
-            planName: res.data.planName || plan.name,
-            months: months + bonusMonths,
+            planName: res.data.planName || (isTrial ? 'Gói Pro (Dùng thử 3 ngày)' : plan.name),
+            months: isTrial ? 0 : months + bonusMonths,
             totalAmount: res.data.totalAmount || grandTotal,
-            paymentMethod,
+            paymentMethod: isTrial ? 'Wallet' : paymentMethod,
             subscriptionExpiresAt: res.data.subscriptionExpiresAt,
-            daysRemaining: res.data.daysRemaining,
+            daysRemaining: res.data.daysRemaining || (isTrial ? 3 : undefined),
           });
         }, 1000);
         return;
@@ -102,10 +106,11 @@ export const SubscriptionCheckoutModal: FC<SubscriptionCheckoutModalProps> = ({
     setIsCompleted(true);
     setTimeout(() => {
       onSuccess({
-        planName: plan.name,
-        months: months + bonusMonths,
+        planName: isTrial ? 'Gói Pro (Dùng thử 3 ngày)' : plan.name,
+        months: isTrial ? 0 : months + bonusMonths,
         totalAmount: grandTotal,
-        paymentMethod,
+        paymentMethod: isTrial ? 'Wallet' : paymentMethod,
+        daysRemaining: isTrial ? 3 : undefined,
       });
     }, 1000);
   };
@@ -222,6 +227,53 @@ export const SubscriptionCheckoutModal: FC<SubscriptionCheckoutModalProps> = ({
             </div>
           ) : (
             <>
+              {/* Option Dùng thử 3 ngày miễn phí cho Gói Pro */}
+              {isPro && (
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    backgroundColor: cycle === 'trial3d' ? '#E6FFFA' : '#F0FDFA',
+                    border: `1.5px solid ${cycle === 'trial3d' ? '#0F766E' : '#CCFBF1'}`,
+                    borderRadius: 14,
+                    padding: '12px 16px',
+                    marginBottom: 16,
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                    boxShadow: cycle === 'trial3d' ? '0 4px 14px rgba(15, 118, 110, 0.16)' : 'none',
+                  }}
+                  onClick={() => setCycle(cycle === 'trial3d' ? '12m' : 'trial3d')}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <span style={{ fontSize: 22 }}>🎁</span>
+                    <div>
+                      <div style={{ fontSize: 13.5, fontWeight: 700, color: '#0F766E' }}>
+                        Dùng thử 3 ngày Full tính năng Gói Pro (Miễn phí 0 đ)
+                      </div>
+                      <div style={{ fontSize: 12, color: '#0D9488' }}>
+                        Trải nghiệm không giới hạn nhân viên và đa chi nhánh cho tài khoản mới
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    style={{
+                      padding: '6px 14px',
+                      borderRadius: 'var(--radius-pill)',
+                      fontSize: 12.5,
+                      fontWeight: 700,
+                      backgroundColor: cycle === 'trial3d' ? '#0F766E' : '#FFFFFF',
+                      color: cycle === 'trial3d' ? '#FFFFFF' : '#0F766E',
+                      border: '1px solid #0F766E',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {cycle === 'trial3d' ? '✓ Đang chọn dùng thử' : 'Chọn dùng thử 3 ngày'}
+                  </button>
+                </div>
+              )}
+
               {/* 1. Chọn chu kỳ đăng ký */}
               <div>
                 <label
@@ -830,7 +882,11 @@ export const SubscriptionCheckoutModal: FC<SubscriptionCheckoutModalProps> = ({
                 }
               }}
             >
-              {isProcessing ? 'Đang kích hoạt...' : 'Xác nhận thanh toán'}
+              {isProcessing
+                ? 'Đang kích hoạt...'
+                : isTrial
+                ? 'Kích hoạt dùng thử 3 ngày miễn phí (0 đ)'
+                : 'Xác nhận thanh toán'}
             </button>
           </div>
         )}
