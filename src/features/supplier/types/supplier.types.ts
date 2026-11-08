@@ -170,6 +170,9 @@ export interface SupplierProductItem {
   importPrice?: number; // alias cho backward compatibility
   unit?: string;        // alias cho backward compatibility
   moq: number;
+  /** Số lượng thiếu hàng cho phép */
+  allowedShortageQty: number;
+  imageUrl?: string;
   isPrimary: boolean;
   supplierProductCode?: string;
   effectiveDate: string;
@@ -185,6 +188,7 @@ export interface MasterProduct {
   baseUoM: string;
   defaultWholesalePrice: number;
   defaultMoq: number;
+  imageUrl?: string;
 }
 
 export interface AssignProductInput {
@@ -193,6 +197,7 @@ export interface AssignProductInput {
   deliveryUoM: string;
   agreedPrice: number;
   moq: number;
+  allowedShortageQty?: number;
   isPrimary?: boolean;
   supplierProductCode?: string;
 }
@@ -202,6 +207,7 @@ export interface EditSupplierProductInput {
   deliveryUoM: string;
   agreedPrice: number;
   moq: number;
+  allowedShortageQty: number;
   isPrimary: boolean;
   supplierProductCode?: string;
   status: 'Active' | 'Inactive';

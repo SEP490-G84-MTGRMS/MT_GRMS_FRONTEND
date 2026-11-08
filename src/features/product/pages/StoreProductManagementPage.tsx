@@ -17,7 +17,7 @@ import { EditStoreProductModal } from '../components/EditStoreProductModal';
 import { AdminToast, type ToastState } from '../../admin/components';
 import { storeProductApi } from '../api/storeProductApi';
 import { supplierApi } from '../../supplier/api/supplierApi';
-import { Loader2, Package } from 'lucide-react';
+import { Building2, Loader2, Package } from 'lucide-react';
 import '../../purchase-order/purchase-order.css';
 import '../../supplier/supplier.css';
 
@@ -311,6 +311,14 @@ export const StoreProductManagementPage: FC = () => {
         </div>
 
         <div className="so-list-header-actions">
+          <Link
+            to="/store-owner/suppliers"
+            className="po-btn po-btn-secondary"
+            title="Quay lại danh sách nhà cung cấp"
+          >
+            <Building2 size={14} />
+            <span>Danh sách NCC</span>
+          </Link>
           <Link
             to="/store-owner/suppliers/branches"
             className="po-btn po-btn-secondary"
