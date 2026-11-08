@@ -175,5 +175,21 @@ export const employeeApi = {
     }
     return [];
   },
+
+  /**
+   * Lấy thông tin hồ sơ nhân viên của tài khoản người dùng đang đăng nhập
+   * Backend: GET /api/v1/employees/me
+   */
+  async getMyProfile(): Promise<Employee | null> {
+    try {
+      const res = await httpClient.get<ApiResponse<any>>('/employees/me');
+      if (res.data?.success && res.data.data) {
+        return mapBackendDetailToEmployee(res.data.data);
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  },
 };
 

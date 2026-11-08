@@ -249,6 +249,32 @@ export const scheduleApi = {
   },
 
   /**
+   * Tra cứu lịch làm việc của cá nhân người đăng nhập
+   * Backend: GET /api/v1/schedules/my-schedule
+   */
+  async getMySchedules(fromDate?: string, toDate?: string): Promise<ScheduleAssignment[]> {
+    const params: Record<string, string> = {};
+    if (fromDate) params.fromDate = fromDate;
+    if (toDate) params.toDate = toDate;
+    const res = await httpClient.get<ApiResponse<ScheduleResponse[]>>('/schedules/my-schedule', { params });
+    if (res.data?.success && Array.isArray(res.data.data)) {
+      return res.data.data.map(mapScheduleResponseToAssignment);
+    }
+    return [];
+  },
+
+  async getRawMySchedules(fromDate?: string, toDate?: string): Promise<ScheduleResponse[]> {
+    const params: Record<string, string> = {};
+    if (fromDate) params.fromDate = fromDate;
+    if (toDate) params.toDate = toDate;
+    const res = await httpClient.get<ApiResponse<ScheduleResponse[]>>('/schedules/my-schedule', { params });
+    if (res.data?.success && Array.isArray(res.data.data)) {
+      return res.data.data;
+    }
+    return [];
+  },
+
+  /**
    * Tạo một ca làm việc đơn lẻ
    * Backend: POST /api/v1/schedules
    */

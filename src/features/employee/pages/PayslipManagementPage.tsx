@@ -28,13 +28,26 @@ import {
 import { CreatePayslipModal } from '../components/CreatePayslipModal';
 import { PayslipDetailModal } from '../components/PayslipDetailModal';
 import { PayslipPaymentModal } from '../components/PayslipPaymentModal';
+import { useLocation } from 'react-router-dom';
 import { ConfirmModal, NotificationModal } from '../../../components/common';
 import { useAuthStore } from '../../../stores/useAuthStore';
 import '../employee.css';
 
 export const PayslipManagementPage: React.FC = () => {
   const { user } = useAuthStore();
-  const isOwnerOrAdmin = user?.role === 'STORE_OWNER' || user?.role === 'ADMIN' || user?.isAdmin;
+  const location = useLocation();
+  const roleUpper = (user?.role || '').toUpperCase();
+  const isStaffRole =
+    location.pathname.startsWith('/employee') ||
+    roleUpper === 'STAFF' ||
+    roleUpper === 'EMPLOYEE' ||
+    roleUpper === 'CASHIER' ||
+    (!user?.isAdmin && roleUpper !== 'STORE_OWNER' && roleUpper !== 'ADMIN');
+  const isOwnerOrAdmin = !isStaffRole && Boolean(
+    user?.isAdmin ||
+    roleUpper === 'STORE_OWNER' ||
+    roleUpper === 'ADMIN'
+  );
 
   const [payslips, setPayslips] = useState<PayslipDetailedRecord[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -140,9 +153,9 @@ export const PayslipManagementPage: React.FC = () => {
     try {
       const paged = await payslipApi.getPayslipsPaged({
         periodMonth,
-        branchId: selectedBranchId !== 'ALL' ? selectedBranchId : undefined,
-        status: statusFilter !== 'ALL' ? statusFilter : undefined,
-        keyword: keyword.trim() || undefined,
+        branchId: isOwnerOrAdmin && selectedBranchId !== 'ALL' ? selectedBranchId : undefined,
+        status: isOwnerOrAdmin && statusFilter !== 'ALL' ? statusFilter : undefined,
+        keyword: isOwnerOrAdmin && keyword.trim() ? keyword.trim() : undefined,
         page: 1,
         pageSize: 100,
       });
@@ -157,7 +170,7 @@ export const PayslipManagementPage: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [periodMonth, selectedBranchId, statusFilter, keyword]);
+  }, [periodMonth, selectedBranchId, statusFilter, keyword, isOwnerOrAdmin]);
 
   useEffect(() => {
     fetchPayslips();
@@ -215,6 +228,17 @@ export const PayslipManagementPage: React.FC = () => {
   };
 
   // Month navigation
+  const currentMonthIso = useMemo(() => {
+    const now = new Date();
+    const yyyy = now.getFullYear();
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    return `${yyyy}-${mm}`;
+  }, []);
+
+  const handleCurrentMonth = () => {
+    setPeriodMonth(currentMonthIso);
+  };
+
   const handlePrevMonth = () => {
     const [year, month] = periodMonth.split('-').map(Number);
     const d = new Date(year, month - 2, 1);
@@ -350,7 +374,7 @@ export const PayslipManagementPage: React.FC = () => {
       {/* ─── 1. HEADER BAR ─── */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
         <h2 className="emp-header-title">
-          <span>Bảng tính lương</span>
+          <span>{isOwnerOrAdmin ? 'Bảng tính lương' : 'Phiếu lương của tôi'}</span>
           <span className="count-badge">{payslips.length}</span>
         </h2>
 
@@ -367,188 +391,218 @@ export const PayslipManagementPage: React.FC = () => {
             <span>Tải lại</span>
           </button>
 
-          <button
-            type="button"
-            className="emp-btn emp-btn-primary"
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
-            onClick={() => setIsCreateOpen(true)}
-          >
-            <Plus size={16} />
-            <span>Khởi tạo bảng lương</span>
-          </button>
+          {isOwnerOrAdmin && (
+            <button
+              type="button"
+              className="emp-btn emp-btn-primary"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+              onClick={() => setIsCreateOpen(true)}
+            >
+              <Plus size={16} />
+              <span>Khởi tạo bảng lương</span>
+            </button>
+          )}
         </div>
       </div>
 
-      {/* ─── 2. FINANCIAL SUMMARY CARDS ─── */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-          gap: 16,
-        }}
-      >
-        {/* Card 1: Tổng quỹ lương */}
+      {/* ─── 2. FINANCIAL SUMMARY CARDS (Chỉ hiển thị cho Quản lý / Chủ cửa hàng) ─── */}
+      {isOwnerOrAdmin && (
         <div
           style={{
-            background: '#FFFFFF',
-            borderRadius: 12,
-            padding: '16px 20px',
-            border: '1px solid #E2E8F0',
-            boxShadow: '0 2px 4px rgba(15, 118, 110, 0.04)',
-            display: 'flex',
-            alignItems: 'center',
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
             gap: 16,
           }}
         >
+          {/* Card 1: Tổng quỹ lương */}
           <div
             style={{
-              width: 44,
-              height: 44,
-              borderRadius: 10,
-              background: '#CCFBF1',
-              color: '#0F766E',
+              background: '#FFFFFF',
+              borderRadius: 12,
+              padding: '16px 20px',
+              border: '1px solid #E2E8F0',
+              boxShadow: '0 2px 4px rgba(15, 118, 110, 0.04)',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0,
+              gap: 16,
             }}
           >
-            <DollarSign size={22} />
-          </div>
-          <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: 12, color: '#64748B', fontWeight: 500 }}>Tổng quỹ lương</div>
-            <div style={{ fontSize: 18, fontWeight: 700, color: '#0F172A', marginTop: 2 }}>
-              {formatVND(financialSummary.totalPayroll)}
+            <div
+              style={{
+                width: 44,
+                height: 44,
+                borderRadius: 10,
+                background: '#CCFBF1',
+                color: '#0F766E',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+              }}
+            >
+              <DollarSign size={22} />
+            </div>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 12, color: '#64748B', fontWeight: 500 }}>Tổng quỹ lương</div>
+              <div style={{ fontSize: 18, fontWeight: 700, color: '#0F172A', marginTop: 2 }}>
+                {formatVND(financialSummary.totalPayroll)}
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Card 2: Đã thanh toán */}
-        <div
-          style={{
-            background: '#FFFFFF',
-            borderRadius: 12,
-            padding: '16px 20px',
-            border: '1px solid #E2E8F0',
-            boxShadow: '0 2px 4px rgba(16, 185, 129, 0.04)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 16,
-          }}
-        >
+          {/* Card 2: Đã thanh toán */}
           <div
             style={{
-              width: 44,
-              height: 44,
-              borderRadius: 10,
-              background: '#ECFDF5',
-              color: '#059669',
+              background: '#FFFFFF',
+              borderRadius: 12,
+              padding: '16px 20px',
+              border: '1px solid #E2E8F0',
+              boxShadow: '0 2px 4px rgba(16, 185, 129, 0.04)',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0,
+              gap: 16,
             }}
           >
-            <Check size={22} />
-          </div>
-          <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: 12, color: '#64748B', fontWeight: 500 }}>Đã thanh toán</div>
-            <div style={{ fontSize: 18, fontWeight: 700, color: '#059669', marginTop: 2 }}>
-              {formatVND(financialSummary.totalPaid)}
+            <div
+              style={{
+                width: 44,
+                height: 44,
+                borderRadius: 10,
+                background: '#ECFDF5',
+                color: '#059669',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+              }}
+            >
+              <Check size={22} />
+            </div>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 12, color: '#64748B', fontWeight: 500 }}>Đã thanh toán</div>
+              <div style={{ fontSize: 18, fontWeight: 700, color: '#059669', marginTop: 2 }}>
+                {formatVND(financialSummary.totalPaid)}
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Card 3: Còn phải trả */}
-        <div
-          style={{
-            background: '#FFFFFF',
-            borderRadius: 12,
-            padding: '16px 20px',
-            border: '1px solid #E2E8F0',
-            boxShadow: '0 2px 4px rgba(245, 158, 11, 0.04)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 16,
-          }}
-        >
+          {/* Card 3: Còn phải trả */}
           <div
             style={{
-              width: 44,
-              height: 44,
-              borderRadius: 10,
-              background: '#FEF3C7',
-              color: '#D97706',
+              background: '#FFFFFF',
+              borderRadius: 12,
+              padding: '16px 20px',
+              border: '1px solid #E2E8F0',
+              boxShadow: '0 2px 4px rgba(245, 158, 11, 0.04)',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0,
+              gap: 16,
             }}
           >
-            <Clock size={22} />
-          </div>
-          <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: 12, color: '#64748B', fontWeight: 500 }}>Còn phải trả</div>
-            <div style={{ fontSize: 18, fontWeight: 700, color: '#D97706', marginTop: 2 }}>
-              {formatVND(financialSummary.totalRemaining)}
+            <div
+              style={{
+                width: 44,
+                height: 44,
+                borderRadius: 10,
+                background: '#FEF3C7',
+                color: '#D97706',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+              }}
+            >
+              <Clock size={22} />
+            </div>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 12, color: '#64748B', fontWeight: 500 }}>Còn phải trả</div>
+              <div style={{ fontSize: 18, fontWeight: 700, color: '#D97706', marginTop: 2 }}>
+                {formatVND(financialSummary.totalRemaining)}
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Card 4: Tổng nhân sự */}
-        <div
-          style={{
-            background: '#FFFFFF',
-            borderRadius: 12,
-            padding: '16px 20px',
-            border: '1px solid #E2E8F0',
-            boxShadow: '0 2px 4px rgba(59, 130, 246, 0.04)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 16,
-          }}
-        >
+          {/* Card 4: Tổng nhân sự */}
           <div
             style={{
-              width: 44,
-              height: 44,
-              borderRadius: 10,
-              background: '#EFF6FF',
-              color: '#2563EB',
+              background: '#FFFFFF',
+              borderRadius: 12,
+              padding: '16px 20px',
+              border: '1px solid #E2E8F0',
+              boxShadow: '0 2px 4px rgba(59, 130, 246, 0.04)',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0,
+              gap: 16,
             }}
           >
-            <Users size={22} />
-          </div>
-          <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: 12, color: '#64748B', fontWeight: 500 }}>Tổng nhân sự</div>
-            <div style={{ fontSize: 18, fontWeight: 700, color: '#0F172A', marginTop: 2 }}>
-              {financialSummary.totalEmployees} người
+            <div
+              style={{
+                width: 44,
+                height: 44,
+                borderRadius: 10,
+                background: '#EFF6FF',
+                color: '#2563EB',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+              }}
+            >
+              <Users size={22} />
+            </div>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 12, color: '#64748B', fontWeight: 500 }}>Tổng nhân sự</div>
+              <div style={{ fontSize: 18, fontWeight: 700, color: '#0F172A', marginTop: 2 }}>
+                {financialSummary.totalEmployees} người
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* ─── 3. FILTER & TOOLBAR ─── */}
       <div className="emp-header-bar">
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-          {/* Ô tìm kiếm */}
-          <div className="emp-search-box" style={{ width: 250 }}>
-            <span className="emp-search-icon">
-              <Search size={16} />
-            </span>
-            <input
-              type="text"
-              placeholder="Tìm theo mã, tên NV..."
-              value={keyword}
-              onChange={(e) => setKeyword(e.target.value)}
-            />
-          </div>
+          {/* Ô tìm kiếm (Chỉ hiển thị cho Chủ cửa hàng / Quản trị viên) */}
+          {isOwnerOrAdmin && (
+            <div className="emp-search-box" style={{ width: 280, position: 'relative' }}>
+              <span className="emp-search-icon">
+                <Search size={16} />
+              </span>
+              <input
+                type="text"
+                placeholder="Tìm theo mã, tên NV, ghi chú..."
+                value={keyword}
+                onChange={(e) => setKeyword(e.target.value)}
+                style={{ paddingRight: keyword ? 36 : 16 }}
+              />
+              {keyword && (
+                <button
+                  type="button"
+                  onClick={() => setKeyword('')}
+                  style={{
+                    position: 'absolute',
+                    right: 12,
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: 'none',
+                    border: 'none',
+                    color: '#94A3B8',
+                    cursor: 'pointer',
+                    padding: 2,
+                    fontSize: 18,
+                    lineHeight: 1,
+                  }}
+                  title="Xóa tìm kiếm"
+                >
+                  ×
+                </button>
+              )}
+            </div>
+          )}
 
-          {/* Bộ lọc Chi nhánh (Searchable Dropdown) */}
+          {/* Bộ lọc Chi nhánh (Chỉ hiển thị cho Chủ cửa hàng / Quản lý) */}
+          {isOwnerOrAdmin && (
           <div ref={branchDropdownRef} style={{ position: 'relative' }}>
             <div
               onClick={() => setIsBranchDropdownOpen(!isBranchDropdownOpen)}
@@ -750,6 +804,7 @@ export const PayslipManagementPage: React.FC = () => {
               </div>
             )}
           </div>
+          )}
 
           {/* Điều hướng kỳ tháng */}
           <div className="emp-date-navigator">
@@ -761,7 +816,14 @@ export const PayslipManagementPage: React.FC = () => {
             >
               &lt;
             </button>
-            <span className="emp-date-navigator-label">{monthLabel}</span>
+            <span
+              className="emp-date-navigator-label"
+              onClick={handleCurrentMonth}
+              style={{ cursor: 'pointer' }}
+              title="Nhấn để về tháng hiện tại"
+            >
+              {monthLabel}
+            </span>
             <button
               type="button"
               className="emp-date-navigator-btn"
@@ -772,20 +834,44 @@ export const PayslipManagementPage: React.FC = () => {
             </button>
           </div>
 
-          {/* Bộ lọc trạng thái thanh toán */}
-          <select
-            className="emp-filter-select"
-            style={{ height: 36, fontSize: 13, width: 160 }}
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value as 'ALL' | 'UNPAID' | 'PAID')}
+          {/* Nút Tháng này */}
+          <button
+            type="button"
+            className="emp-btn emp-btn-secondary"
+            onClick={handleCurrentMonth}
+            title="Quay về tháng hiện tại"
+            style={{
+              height: 36,
+              padding: '0 12px',
+              fontSize: 13,
+              fontWeight: 500,
+              color: periodMonth === currentMonthIso ? '#0F766E' : '#475569',
+              borderColor: periodMonth === currentMonthIso ? '#0F766E' : '#CBD5E1',
+              backgroundColor: periodMonth === currentMonthIso ? '#F0FDFA' : '#FFFFFF',
+              boxShadow: periodMonth === currentMonthIso ? '0 0 0 1px rgba(15, 118, 110, 0.2)' : 'none',
+              cursor: 'pointer',
+              transition: 'all 0.15s ease',
+            }}
           >
-            <option value="ALL">Tất cả trạng thái</option>
-            <option value="UNPAID">Chưa thanh toán</option>
-            <option value="PAID">Đã thanh toán</option>
-          </select>
+            Tháng này
+          </button>
+
+          {/* Bộ lọc trạng thái thanh toán (Chỉ dành cho Store Owner / Admin) */}
+          {isOwnerOrAdmin && (
+            <select
+              className="emp-filter-select"
+              style={{ height: 36, fontSize: 13, width: 160 }}
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as 'ALL' | 'UNPAID' | 'PAID')}
+            >
+              <option value="ALL">Tất cả trạng thái</option>
+              <option value="UNPAID">Chưa thanh toán</option>
+              <option value="PAID">Đã thanh toán</option>
+            </select>
+          )}
 
           {/* Nút đặt lại */}
-          {(keyword || statusFilter !== 'ALL' || selectedBranchId !== 'ALL') && (
+          {isOwnerOrAdmin && (keyword || statusFilter !== 'ALL' || selectedBranchId !== 'ALL') && (
             <button
               type="button"
               className="emp-btn emp-btn-secondary"
@@ -986,17 +1072,19 @@ export const PayslipManagementPage: React.FC = () => {
         <table className="emp-table" style={{ width: '100%', minWidth: 880 }}>
           <thead>
             <tr>
-              <th style={{ width: 44, textAlign: 'center' }}>
-                <input
-                  type="checkbox"
-                  style={{ accentColor: '#0F766E' }}
-                  checked={
-                    payslips.length > 0 &&
-                    selectedIds.length === payslips.length
-                  }
-                  onChange={handleSelectAll}
-                />
-              </th>
+              {isOwnerOrAdmin && (
+                <th style={{ width: 44, textAlign: 'center' }}>
+                  <input
+                    type="checkbox"
+                    style={{ accentColor: '#0F766E' }}
+                    checked={
+                      payslips.length > 0 &&
+                      selectedIds.length === payslips.length
+                    }
+                    onChange={handleSelectAll}
+                  />
+                </th>
+              )}
               <th style={{ width: 120, whiteSpace: 'nowrap' }}>Mã NV</th>
               <th style={{ minWidth: 200, whiteSpace: 'nowrap' }}>Nhân viên</th>
               <th style={{ width: 110, textAlign: 'center', whiteSpace: 'nowrap' }}>Kỳ lương</th>
@@ -1011,7 +1099,7 @@ export const PayslipManagementPage: React.FC = () => {
             {payslips.length === 0 && !isLoading ? (
               <tr>
                 <td
-                  colSpan={9}
+                  colSpan={isOwnerOrAdmin ? 9 : 8}
                   style={{
                     textAlign: 'center',
                     padding: '50px 20px',
@@ -1038,14 +1126,16 @@ export const PayslipManagementPage: React.FC = () => {
                         Chuyển về kỳ Tháng 10/2026 (Kỳ mẫu)
                       </button>
                     )}
-                    <button
-                      type="button"
-                      className="emp-btn emp-btn-primary"
-                      onClick={() => setIsCreateOpen(true)}
-                      style={{ fontSize: 12, height: 32 }}
-                    >
-                      + Khởi tạo bảng lương {monthLabel}
-                    </button>
+                    {isOwnerOrAdmin && (
+                      <button
+                        type="button"
+                        className="emp-btn emp-btn-primary"
+                        onClick={() => setIsCreateOpen(true)}
+                        style={{ fontSize: 12, height: 32 }}
+                      >
+                        + Khởi tạo bảng lương {monthLabel}
+                      </button>
+                    )}
                   </div>
                 </td>
               </tr>
@@ -1069,17 +1159,19 @@ export const PayslipManagementPage: React.FC = () => {
                       cursor: 'pointer',
                     }}
                   >
-                    <td
-                      style={{ textAlign: 'center', width: 44 }}
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <input
-                        type="checkbox"
-                        style={{ accentColor: '#0F766E' }}
-                        checked={isSelected}
-                        onChange={() => handleToggleRow(item.id)}
-                      />
-                    </td>
+                    {isOwnerOrAdmin && (
+                      <td
+                        style={{ textAlign: 'center', width: 44 }}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <input
+                          type="checkbox"
+                          style={{ accentColor: '#0F766E' }}
+                          checked={isSelected}
+                          onChange={() => handleToggleRow(item.id)}
+                        />
+                      </td>
+                    )}
                     <td style={{ whiteSpace: 'nowrap', fontWeight: 600, color: '#0F766E' }}>
                       {item.employeeCode}
                     </td>

@@ -1,8 +1,16 @@
+export const SystemRoles = {
+  ADMIN: 'ADMIN',
+  STORE_OWNER: 'STORE_OWNER',
+  STAFF: 'STAFF',
+} as const;
+
+export type SystemRole = (typeof SystemRoles)[keyof typeof SystemRoles];
+
 export interface UserProfile {
   id: string;
   email: string;
   fullName: string;
-  role: 'ADMIN' | 'MANAGER' | 'CASHIER' | 'STORE_OWNER' | 'EMPLOYEE';
+  role: SystemRole;
   tenantId: string;
   tenantName?: string;
   branchId?: string;

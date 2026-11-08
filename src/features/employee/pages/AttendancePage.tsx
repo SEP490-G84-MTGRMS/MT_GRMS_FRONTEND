@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import {
   Search,
   ClipboardCheck,
@@ -16,6 +17,7 @@ import { shiftConfigApi, type ShiftConfigDto } from '../api/shiftConfigApi';
 import { employeeApi } from '../api/employeeApi';
 import { AttendanceDetailModal } from '../components/AttendanceDetailModal';
 import { ApprovalRequestsModal } from '../components/ApprovalRequestsModal';
+import { useAuthStore } from '../../../stores/useAuthStore';
 import '../employee.css';
 
 interface ShiftRowItem {
@@ -177,6 +179,16 @@ const mapScheduleToAttendanceRecord = (s: ScheduleResponse): AttendanceRecord =>
 };
 
 export const AttendancePage: React.FC = () => {
+  const { user } = useAuthStore();
+  const location = useLocation();
+  const roleUpper = (user?.role || '').toUpperCase();
+  const isEmployeeRole =
+    location.pathname.startsWith('/employee') ||
+    roleUpper === 'STAFF' ||
+    roleUpper === 'EMPLOYEE' ||
+    roleUpper === 'CASHIER' ||
+    (!user?.isAdmin && roleUpper !== 'STORE_OWNER' && roleUpper !== 'ADMIN');
+
   // Backend data states
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
   const [shifts, setShifts] = useState<ShiftRowItem[]>([]);
@@ -285,13 +297,15 @@ export const AttendancePage: React.FC = () => {
         return { items: [] as ShiftConfigDto[], totalItems: 0, page: 1, pageSize: 100 };
       });
 
-      // Lấy danh sách lịch & chấm công theo tuần
-      const schedulesPromise = scheduleApi.getRawSchedules({
-        fromDate: weekData.fromDateIso,
-        toDate: weekData.toDateIso,
-        branchId: selectedBranchIds.length === 1 ? selectedBranchIds[0] : undefined,
-        pageSize: 1000,
-      });
+      // Lấy danh sách lịch & chấm công theo tuần (My-Schedules cho Employee, RawSchedules cho Owner)
+      const schedulesPromise = isEmployeeRole
+        ? scheduleApi.getRawMySchedules(weekData.fromDateIso, weekData.toDateIso)
+        : scheduleApi.getRawSchedules({
+          fromDate: weekData.fromDateIso,
+          toDate: weekData.toDateIso,
+          branchId: selectedBranchIds.length === 1 ? selectedBranchIds[0] : undefined,
+          pageSize: 1000,
+        });
 
       const [shiftRes, rawSchedulesData] = await Promise.all([shiftConfigsPromise, schedulesPromise]);
 
@@ -367,22 +381,33 @@ export const AttendancePage: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [weekData.fromDateIso, weekData.toDateIso, selectedBranchIds]);
+  }, [weekData.fromDateIso, weekData.toDateIso, selectedBranchIds, isEmployeeRole]);
 
   useEffect(() => {
     fetchAttendanceData();
   }, [fetchAttendanceData]);
 
-  // Client-side filtering by employee name or code
+  // Client-side filtering by employee name/code or shift name/date/note
   const filteredRecords = useMemo(() => {
     if (!searchEmployee.trim()) return records;
     const lower = searchEmployee.toLowerCase().trim();
-    return records.filter(
-      (r) =>
+    return records.filter((r) => {
+      if (isEmployeeRole) {
+        return (
+          r.shiftName.toLowerCase().includes(lower) ||
+          (r.shiftCode ? r.shiftCode.toLowerCase().includes(lower) : false) ||
+          r.dateStr.toLowerCase().includes(lower) ||
+          (r.note ? r.note.toLowerCase().includes(lower) : false)
+        );
+      }
+      return (
         r.employeeName.toLowerCase().includes(lower) ||
-        r.employeeCode.toLowerCase().includes(lower)
-    );
-  }, [records, searchEmployee]);
+        r.employeeCode.toLowerCase().includes(lower) ||
+        r.shiftName.toLowerCase().includes(lower) ||
+        (r.shiftCode ? r.shiftCode.toLowerCase().includes(lower) : false)
+      );
+    });
+  }, [records, searchEmployee, isEmployeeRole]);
 
   // Cập nhật trạng thái thủ công từ modal chi tiết
   const handleUpdateRecordStatus = (recordId: string, newStatus: AttendanceRecord['status']) => {
@@ -444,20 +469,46 @@ export const AttendancePage: React.FC = () => {
       {/* ─── TOOLBAR & FILTERS ─── */}
       <div className="emp-header-bar" style={{ flexWrap: 'wrap', gap: 12 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-          {/* Tìm kiếm */}
-          <div className="emp-search-box" style={{ width: 220 }}>
-            <span className="emp-search-icon">
-              <Search size={16} />
-            </span>
-            <input
-              type="text"
-              placeholder="Tìm kiếm nhân viên..."
-              value={searchEmployee}
-              onChange={(e) => setSearchEmployee(e.target.value)}
-            />
-          </div>
+          {/* Thanh tìm kiếm (Chỉ hiển thị cho Store Owner / Admin) */}
+          {!isEmployeeRole && (
+            <div className="emp-search-box" style={{ width: 280, position: 'relative' }}>
+              <span className="emp-search-icon">
+                <Search size={16} />
+              </span>
+              <input
+                type="text"
+                placeholder="Tìm theo mã, tên NV..."
+                value={searchEmployee}
+                onChange={(e) => setSearchEmployee(e.target.value)}
+                style={{ paddingRight: searchEmployee ? 36 : 16 }}
+              />
+              {searchEmployee && (
+                <button
+                  type="button"
+                  onClick={() => setSearchEmployee('')}
+                  style={{
+                    position: 'absolute',
+                    right: 12,
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: 'none',
+                    border: 'none',
+                    color: '#94A3B8',
+                    cursor: 'pointer',
+                    padding: 2,
+                    fontSize: 18,
+                    lineHeight: 1,
+                  }}
+                  title="Xóa tìm kiếm"
+                >
+                  ×
+                </button>
+              )}
+            </div>
+          )}
 
-          {/* Lọc Chi nhánh làm việc (Searchable Multi-Select Dropdown giống WorkSchedulePage) */}
+          {/* Lọc Chi nhánh làm việc (Chỉ dành cho Quản lý / StoreOwner) */}
+          {!isEmployeeRole && (
           <div ref={branchDropdownRef} style={{ position: 'relative', minWidth: 240, maxWidth: 360 }}>
             <div
               onClick={() => setIsBranchDropdownOpen((prev) => !prev)}
@@ -785,6 +836,7 @@ export const AttendancePage: React.FC = () => {
               </div>
             )}
           </div>
+          )}
 
           {/* Điều hướng tuần */}
           <div className="emp-date-navigator">
@@ -838,6 +890,7 @@ export const AttendancePage: React.FC = () => {
         </div>
 
         <div className="emp-header-actions" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {!isEmployeeRole && (
           <button
             type="button"
             className="emp-btn emp-btn-secondary emp-approval-btn"
@@ -850,6 +903,7 @@ export const AttendancePage: React.FC = () => {
               <span className="emp-pending-badge">{pendingAttendanceCount}</span>
             )}
           </button>
+          )}
         </div>
       </div>
 

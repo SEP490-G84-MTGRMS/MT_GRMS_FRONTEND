@@ -14,6 +14,7 @@ import {
   CheckCircle2,
   Store,
   Info,
+  FileText,
 } from 'lucide-react';
 import { useAuthStore } from '../../stores/useAuthStore';
 
@@ -566,6 +567,11 @@ export const AppTopNav: FC = () => {
     location.pathname === '/employees/attendance' ||
     location.pathname.startsWith('/employee/attendance');
 
+  const isPayrollActive =
+    location.pathname === '/employee/payroll' ||
+    location.pathname === '/employees/payroll' ||
+    location.pathname.startsWith('/employee/payroll');
+
   return (
     <>
       <nav
@@ -721,6 +727,42 @@ export const AppTopNav: FC = () => {
             >
               <Clock size={17} color="currentColor" />
               <span>Bảng chấm công</span>
+            </NavLink>
+
+            {/* 3. Phiếu lương của tôi */}
+            <NavLink
+              to="/employee/payroll"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 8,
+                padding: '0 16px',
+                height: '100%',
+                textDecoration: 'none',
+                fontSize: 13.5,
+                fontWeight: isPayrollActive ? 700 : 500,
+                color: '#ffffff',
+                backgroundColor: isPayrollActive
+                  ? 'rgba(0, 0, 0, 0.2)'
+                  : 'transparent',
+                borderBottom: isPayrollActive
+                  ? '3px solid #FCD34D'
+                  : '3px solid transparent',
+                transition: 'all 0.15s ease',
+                whiteSpace: 'nowrap',
+                boxSizing: 'border-box',
+              }}
+              onMouseEnter={(e) => {
+                if (!isPayrollActive)
+                  e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.12)';
+              }}
+              onMouseLeave={(e) => {
+                if (!isPayrollActive)
+                  e.currentTarget.style.backgroundColor = 'transparent';
+              }}
+            >
+              <FileText size={17} color="currentColor" />
+              <span>Phiếu lương của tôi</span>
             </NavLink>
           </div>
 
@@ -909,7 +951,7 @@ export const AppTopNav: FC = () => {
                       fontWeight: 600,
                     }}
                   >
-                    {user?.role || 'EMPLOYEE'}
+                    {user?.role || 'STAFF'}
                   </div>
                 </div>
                 <ChevronDown size={14} color="#ffffff" />

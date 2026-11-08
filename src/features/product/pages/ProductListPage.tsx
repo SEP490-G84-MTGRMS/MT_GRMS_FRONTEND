@@ -46,20 +46,19 @@ export const ProductListPage: React.FC = () => {
   const [totalCount, setTotalCount] = useState<number>(0);
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
-  // RBAC switch (StoreOwner vs Cashier) for BR-SEC-01 verification
+  // RBAC switch (StoreOwner vs Staff) for BR-SEC-01 verification
   const currentUser = useAuthStore((state) => state.user);
   const initialRole: 'StoreOwner' | 'Cashier' =
-    currentUser?.role === 'CASHIER' ? 'Cashier' : 'StoreOwner';
+    currentUser?.role === 'STAFF' ? 'Cashier' : 'StoreOwner';
   const [userRole, setUserRole] = useState<'StoreOwner' | 'Cashier'>(initialRole);
 
   // Sync role if auth state changes
   useEffect(() => {
-    if (currentUser?.role === 'CASHIER') {
+    if (currentUser?.role === 'STAFF') {
       setUserRole('Cashier');
     } else if (
       currentUser?.role === 'ADMIN' ||
-      currentUser?.role === 'STORE_OWNER' ||
-      currentUser?.role === 'MANAGER'
+      currentUser?.role === 'STORE_OWNER'
     ) {
       setUserRole('StoreOwner');
     }
