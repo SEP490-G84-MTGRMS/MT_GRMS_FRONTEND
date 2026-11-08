@@ -15,67 +15,83 @@ export const mapBackendPlanToCardItem = (
   index: number = 0
 ): SubscriptionPlanItem => {
   const code = (backend.code || backend.id || `PLAN-${index}`).toUpperCase();
+  const isTrial = code === 'TRIAL' || code.includes('TRIAL');
   const isPro = code === 'PRO';
-  
-  // Chuẩn hóa tên gói chính thức
-  const name = isPro
-    ? 'Gói Pro (Chuỗi Cửa Hàng)'
-    : 'Gói Thường (Cửa Hàng Độc Lập)';
-  
-  const monthlyPrice = Number(backend.monthlyPrice) || (isPro ? 249000 : 99000);
-  const yearlyPrice = Number(backend.yearlyPrice) || monthlyPrice * 12;
 
-  // Tagline
-  const tagline =
-    backend.description ||
-    (isPro
-      ? 'Dành cho chuỗi siêu thị bán lẻ, chuyên môn hóa quy trình và điều chuyển kho chuỗi.'
-      : 'Dành cho tiệm tạp hóa, siêu thị mini độc lập (1 điểm bán kiêm kho tại chỗ).');
+  let name = 'Gói Thường (Cửa Hàng Độc Lập)';
+  let monthlyPrice = 99000;
+  let yearlyPrice = 99000 * 12;
+  let tagline = 'Dành cho tiệm tạp hóa, siêu thị mini độc lập (1 điểm bán kiêm kho tại chỗ).';
+  let branchNote = '1 chi nhánh kiêm kho hàng';
+  let feats: string[] = [];
+  let themeColor = '#10B981';
+  let badgeBg = '#ECFDF5';
+  let buttonBg = '#E2E8F0';
+  let buttonText = '#0F172A';
+  let highlight = false;
 
-  // Branch note
-  const branchNote = isPro
-    ? 'Mặc định sẵn 2 chi nhánh (Mua thêm: +80k/chi nhánh/tháng)'
-    : '1 chi nhánh kiêm kho hàng';
-
-  // Trial note
-  const trialNote = isPro
-    ? 'Dùng thử 3 ngày Full tính năng Gói Pro cho tất cả tài khoản mới'
-    : 'Không áp dụng dùng thử riêng (vui lòng trải nghiệm Gói Pro)';
-
-  // Features list
-  const feats: string[] = [];
-  if (isPro) {
-    feats.push('🎁 Dùng thử miễn phí 3 ngày: Full tính năng Gói Pro cho tài khoản mới');
-    feats.push('Mặc định sẵn 2 chi nhánh kiêm kho hàng');
-    feats.push('Đã bao gồm sẵn Quản lý nhân viên (Không giới hạn tài khoản)');
-    feats.push('Quản lý tồn kho theo Lô & Hạn sử dụng FEFO 3 mức màu');
-    feats.push('Điều chuyển hàng hóa giữa các chi nhánh chuỗi');
-    feats.push('Báo cáo doanh thu & P&L đa chi nhánh');
-    feats.push('Giải pháp thanh toán Napas VietQR tự động');
-    feats.push('Hỗ trợ ưu tiên qua tổng đài 1900 6522');
+  if (isTrial) {
+    name = 'Gói Dùng Thử (Trải Nghiệm)';
+    monthlyPrice = 0;
+    yearlyPrice = 0;
+    tagline = 'Trải nghiệm toàn diện các tính năng cao cấp của MT-GRMS hoàn toàn miễn phí trong 3 ngày.';
+    branchNote = '1 chi nhánh kiêm kho hàng (3 ngày)';
+    feats = [
+      'Thời hạn sử dụng: 3 ngày miễn phí',
+      '1 tài khoản chủ cửa hàng quản trị',
+      'Mở khóa sẵn Quản lý nhân viên (Trải nghiệm)',
+      'Quản lý tồn kho theo Lô & Hạn sử dụng FEFO 3 mức màu',
+      'Quy đổi Thùng sang Lon 1 chạm',
+      'Quét mã vạch bán hàng & kiểm kho',
+      'Giải pháp thanh toán Napas VietQR tự động',
+      'Không tự động gia hạn sau khi hết hạn',
+    ];
+    themeColor = '#64748B';
+    badgeBg = '#F1F5F9';
+    buttonBg = '#F1F5F9';
+    buttonText = '#334155';
+    highlight = false;
+  } else if (isPro) {
+    name = 'Gói Pro (Chuỗi Cửa Hàng)';
+    monthlyPrice = Number(backend.monthlyPrice) || 249000;
+    yearlyPrice = Number(backend.yearlyPrice) || monthlyPrice * 12;
+    tagline = backend.description || 'Dành cho chuỗi siêu thị bán lẻ, chuyên môn hóa quy trình và điều chuyển kho chuỗi.';
+    branchNote = 'Mặc định sẵn 2 chi nhánh (Mua thêm: +80k/chi nhánh/tháng)';
+    feats = [
+      'Mặc định sẵn 2 chi nhánh kiêm kho hàng',
+      'Đã bao gồm sẵn Quản lý nhân viên (Không giới hạn tài khoản)',
+      'Quản lý tồn kho theo Lô & Hạn sử dụng FEFO 3 mức màu',
+      'Điều chuyển hàng hóa giữa các chi nhánh chuỗi',
+      'Báo cáo doanh thu & P&L đa chi nhánh',
+      'Giải pháp thanh toán Napas VietQR tự động',
+      'Hỗ trợ ưu tiên qua tổng đài 1900 6522',
+    ];
+    themeColor = 'var(--blue-primary)';
+    badgeBg = '#EBF5FF';
+    buttonBg = 'var(--blue-primary)';
+    buttonText = '#FFFFFF';
+    highlight = true;
   } else {
-    feats.push('1 tài khoản chủ cửa hàng quản trị');
-    feats.push('Tùy chọn: Mua thêm Quản lý & Phân quyền nhân viên (+30k/tháng)');
-    feats.push('Quản lý tồn kho theo Lô & Hạn sử dụng FEFO 3 mức màu');
-    feats.push('Quy đổi Thùng sang Lon 1 chạm');
-    feats.push('Quét mã vạch bán hàng & kiểm kho');
-    feats.push('Giải pháp thanh toán Napas VietQR tự động');
-    feats.push('Dùng thử: Không áp dụng (trải nghiệm qua Gói Pro)');
-    feats.push('Không hỗ trợ quản lý chuỗi đa chi nhánh');
-  }
-
-  // Styling & Theme
-  let themeColor = 'var(--blue-primary)';
-  let badgeBg = '#EBF5FF';
-  let buttonBg = 'var(--blue-primary)';
-  let buttonText = '#FFFFFF';
-  let highlight = isPro;
-
-  if (!isPro) {
+    // STANDARD
+    name = 'Gói Thường (Cửa Hàng Độc Lập)';
+    monthlyPrice = Number(backend.monthlyPrice) || 99000;
+    yearlyPrice = Number(backend.yearlyPrice) || monthlyPrice * 12;
+    tagline = backend.description || 'Dành cho tiệm tạp hóa, siêu thị mini độc lập (1 điểm bán kiêm kho tại chỗ).';
+    branchNote = '1 chi nhánh kiêm kho hàng';
+    feats = [
+      '1 tài khoản chủ cửa hàng quản trị',
+      'Tùy chọn: Mua thêm Quản lý & Phân quyền nhân viên (+30k/tháng)',
+      'Quản lý tồn kho theo Lô & Hạn sử dụng FEFO 3 mức màu',
+      'Quy đổi Thùng sang Lon 1 chạm',
+      'Quét mã vạch bán hàng & kiểm kho',
+      'Giải pháp thanh toán Napas VietQR tự động',
+      'Không hỗ trợ quản lý chuỗi đa chi nhánh',
+    ];
     themeColor = '#10B981';
     badgeBg = '#ECFDF5';
     buttonBg = '#E2E8F0';
     buttonText = '#0F172A';
+    highlight = false;
   }
 
   return {
@@ -87,7 +103,6 @@ export const mapBackendPlanToCardItem = (
     tagline,
     branchNote,
     warehouseNote: undefined,
-    trialNote,
     features: feats,
     highlight,
     themeColor,
@@ -112,23 +127,40 @@ export const SubscriptionPricingCards: FC<SubscriptionPricingCardsProps> = ({
     try {
       const res = await storeApi.getPricingPlans();
       if (res.success && Array.isArray(res.data) && res.data.length > 0) {
-        // Chỉ lấy đúng 2 gói chuẩn: STANDARD (Gói Thường 99k) và PRO (Gói Pro 249k)
+        // Lấy 3 gói cước chính thức: TRIAL (trái) -> STANDARD (giữa) -> PRO (phải)
         const officialData = res.data.filter((p) => {
           const c = (p.code || p.id || '').toUpperCase();
-          return c === 'STANDARD' || c === 'PRO';
+          return c === 'TRIAL' || c === 'STANDARD' || c === 'PRO';
         });
 
         if (officialData.length > 0) {
-          // Đảm bảo thứ tự hiển thị: Gói Thường trước, Gói Pro sau
+          // Sắp xếp thứ tự: TRIAL (1) -> STANDARD (2) -> PRO (3)
+          const orderMap: Record<string, number> = { TRIAL: 1, STANDARD: 2, PRO: 3 };
           officialData.sort((a, b) => {
             const codeA = (a.code || a.id || '').toUpperCase();
             const codeB = (b.code || b.id || '').toUpperCase();
-            if (codeA === 'STANDARD') return -1;
-            if (codeB === 'STANDARD') return 1;
-            return 0;
+            return (orderMap[codeA] || 99) - (orderMap[codeB] || 99);
           });
 
-          const mappedPlans = officialData.map((backendPlan, idx) =>
+          // Nếu API chưa trả về gói TRIAL thì bổ sung gói TRIAL vào đầu danh sách
+          const hasTrial = officialData.some((p) => (p.code || p.id || '').toUpperCase() === 'TRIAL');
+          let allPlansData = officialData;
+          if (!hasTrial) {
+            allPlansData = [
+              {
+                id: 'plan_trial',
+                code: 'TRIAL',
+                name: 'Gói Dùng Thử (Trải Nghiệm)',
+                description: 'Trải nghiệm toàn diện các tính năng cao cấp của MT-GRMS hoàn toàn miễn phí trong 3 ngày.',
+                monthlyPrice: 0,
+                yearlyPrice: 0,
+                status: 'ACTIVE',
+              },
+              ...officialData,
+            ];
+          }
+
+          const mappedPlans = allPlansData.map((backendPlan, idx) =>
             mapBackendPlanToCardItem(backendPlan, currentPlanName, idx)
           );
           setPlans(mappedPlans);
@@ -160,7 +192,7 @@ export const SubscriptionPricingCards: FC<SubscriptionPricingCardsProps> = ({
   if (isLoading) {
     return (
       <div className="pricing-cards-grid">
-        {[1, 2].map((i) => (
+        {[1, 2, 3].map((i) => (
           <div
             key={i}
             className="pricing-card"
@@ -316,7 +348,7 @@ export const SubscriptionPricingCards: FC<SubscriptionPricingCardsProps> = ({
             className={`pricing-card ${plan.highlight ? 'highlighted' : ''}`}
           >
             <div>
-              {/* Card Title & Trial Badge */}
+              {/* Card Title & Badge */}
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, gap: 8 }}>
                 <div className="pricing-card-title" style={{ margin: 0 }}>{plan.name}</div>
                 {plan.code === 'PRO' && (
@@ -335,7 +367,26 @@ export const SubscriptionPricingCards: FC<SubscriptionPricingCardsProps> = ({
                       whiteSpace: 'nowrap',
                     }}
                   >
-                    ✨ Dùng thử 3 ngày
+                    Phổ biến nhất
+                  </span>
+                )}
+                {plan.code === 'TRIAL' && (
+                  <span
+                    style={{
+                      fontSize: 12,
+                      fontWeight: 700,
+                      color: '#0F766E',
+                      backgroundColor: '#F0FDFA',
+                      border: '1px solid #CCFBF1',
+                      padding: '3px 10px',
+                      borderRadius: 20,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 4,
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    ✨ 3 ngày 0 đ
                   </span>
                 )}
               </div>
@@ -343,9 +394,12 @@ export const SubscriptionPricingCards: FC<SubscriptionPricingCardsProps> = ({
               {/* Price Row */}
               <div className="pricing-card-price-row">
                 {plan.monthlyPrice === 0 ? (
-                  <span className="pricing-card-price" style={{ color: '#10B981' }}>
-                    Miễn phí
-                  </span>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+                    <span className="pricing-card-price" style={{ color: '#0F766E' }}>
+                      Miễn phí
+                    </span>
+                    <span style={{ fontSize: 13, color: '#64748B', fontWeight: 600 }}>/ 3 ngày</span>
+                  </div>
                 ) : (
                   <>
                     <span className="pricing-card-price" style={{ fontFamily: 'var(--font-sans)', fontVariantNumeric: 'tabular-nums' }}>
@@ -359,32 +413,9 @@ export const SubscriptionPricingCards: FC<SubscriptionPricingCardsProps> = ({
               {/* Tagline */}
               <div className="pricing-card-tagline">{plan.tagline}</div>
 
-              {/* Branch / Warehouse / Trial Notes */}
-              <div style={{ minHeight: 76, marginBottom: 14, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <div className="pricing-addon-note">
-                  <strong>Chi nhánh:</strong> {plan.branchNote}
-                </div>
-                {plan.trialNote && (
-                  <div
-                    className="pricing-addon-note"
-                    style={{
-                      color: plan.code === 'PRO' ? '#0F766E' : '#64748B',
-                      backgroundColor: plan.code === 'PRO' ? '#F0FDFA' : '#F8FAFC',
-                      border: `1px solid ${plan.code === 'PRO' ? '#CCFBF1' : '#E2E8F0'}`,
-                      borderRadius: 8,
-                      padding: '6px 10px',
-                      fontSize: 12.5,
-                      fontWeight: plan.code === 'PRO' ? 600 : 400,
-                    }}
-                  >
-                    <strong>Dùng thử:</strong> {plan.trialNote}
-                  </div>
-                )}
-                {plan.warehouseNote && (
-                  <div className="pricing-addon-note" style={{ color: '#475569' }}>
-                    {plan.warehouseNote}
-                  </div>
-                )}
+              {/* Branch Notes */}
+              <div style={{ minHeight: 48, marginBottom: 14 }}>
+                <div className="pricing-addon-note">{plan.branchNote}</div>
               </div>
 
               {/* Features List */}

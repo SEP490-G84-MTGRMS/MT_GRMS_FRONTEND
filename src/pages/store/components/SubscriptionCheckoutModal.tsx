@@ -32,17 +32,20 @@ export const SubscriptionCheckoutModal: FC<SubscriptionCheckoutModalProps> = ({
   onClose,
   onSuccess,
 }) => {
+  const isTrialPlan = (plan.code || plan.id || '').toUpperCase() === 'TRIAL';
   const isPro = (plan.code || plan.id || '').toUpperCase() === 'PRO';
 
   // Billing cycle: 'trial3d' | '6m' | '12m' | '24m'
-  const [cycle, setCycle] = useState<'trial3d' | '6m' | '12m' | '24m'>('12m');
+  const [cycle, setCycle] = useState<'trial3d' | '6m' | '12m' | '24m'>(
+    isTrialPlan ? 'trial3d' : '12m'
+  );
   const [extraBranches, setExtraBranches] = useState<number>(0);
   const [hasStaffAddon, setHasStaffAddon] = useState<boolean>(false);
   const [paymentMethod, setPaymentMethod] = useState<'Wallet' | 'VietQR'>('Wallet');
   const [isProcessing, setIsProcessing] = useState(false);
   const [isCompleted, setIsCompleted] = useState(false);
 
-  const isTrial = cycle === 'trial3d';
+  const isTrial = isTrialPlan || cycle === 'trial3d';
   const months = isTrial ? 0 : cycle === '6m' ? 6 : cycle === '12m' ? 12 : 24;
   const bonusMonths = isTrial ? 0 : cycle === '12m' ? 1 : cycle === '24m' ? 3 : 0;
 

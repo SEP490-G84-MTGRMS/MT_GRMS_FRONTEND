@@ -10,7 +10,7 @@ Toàn bộ các thay đổi của repository Frontend React SPA được tổng 
 - **Nâng cấp Modal Thanh toán thích ứng (`SubscriptionCheckoutModal.tsx`)**: Loại bỏ hoàn toàn ô nhập "Kho phụ" do mỗi chi nhánh tự động kiêm kho hàng tại chỗ; bổ sung tùy chọn mua thêm Quản lý & Phân quyền nhân viên (+30k/tháng) cho Gói Thường và Stepper mua thêm chi nhánh (+80k/chi nhánh/tháng) cho Gói Pro [FE-09] [worklog: docs/worklogs/2026-11-08_FE-09_AI_subscription-tier-quota-redesign.md].
 - Bổ sung trường `hasStaffManagementAddon` trong payload API `storeApi.purchaseSubscription` [FE-09] [worklog: docs/worklogs/2026-11-08_FE-09_AI_subscription-tier-quota-redesign.md].
 - **Lọc và hiển thị chuẩn xác 2 gói cước từ API (`SubscriptionPricingCards.tsx`)**: Lọc API response chỉ nhận gói `STANDARD` và `PRO`, loại bỏ triệt để các thẻ gói cũ còn sót lại từ DB, căn chỉnh bố cục 2 thẻ trực quan và chuẩn hóa cơ chế fallback [FE-09] [worklog: docs/worklogs/2026-11-08_FE-09_AI_subscription-tier-quota-redesign.md].
-- **Bổ sung mục Dùng thử miễn phí 3 ngày (`SubscriptionPricingCards.tsx`, `SubscriptionCheckoutModal.tsx`)**: Hiển thị huy hiệu "✨ Dùng thử 3 ngày" và dòng tiêu chí dùng thử trên Gói Pro, tích hợp nút chọn dùng thử 3 ngày (0 đ) trong modal thanh toán [FE-09] [worklog: docs/worklogs/2026-11-08_FE-09_AI_subscription-tier-quota-redesign.md].
+- **Bổ sung thẻ Gói Dùng Thử riêng biệt bên trái (`SubscriptionPricingCards.tsx`, `storeData.ts`)**: Thêm thẻ "Gói Dùng Thử (Trải Nghiệm)" 0 đ / 3 ngày nằm bên trái ngoài cùng cạnh Gói Thường, mở khóa trải nghiệm đầy đủ tính năng và kích hoạt 1 chạm [FE-09] [worklog: docs/worklogs/2026-11-08_FE-09_AI_subscription-tier-quota-redesign.md].
 
 ## [Unreleased] - 2026-11-07
 ### Added
