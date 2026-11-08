@@ -1,6 +1,21 @@
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
-import { Search, Plus, User, RefreshCw, Building2, ChevronDown, Check, X } from 'lucide-react';
+import {
+  Search,
+  Plus,
+  User,
+  RefreshCw,
+  Building2,
+  ChevronDown,
+  Check,
+  X,
+  CalendarX,
+  ArrowLeftRight,
+  AlertCircle,
+  Clock,
+  History,
+  Edit3,
+} from 'lucide-react';
 import type {
   Employee,
   EmployeeStatus,
@@ -18,6 +33,9 @@ import {
   type ScheduleScopeDateRange,
 } from '../components/ScheduleScopeConfirmModal';
 import { TablePagination, NotificationModal } from '../../../components/common';
+import { CreateScheduleRequestModal } from '../components/CreateScheduleRequestModal';
+import { ScheduleRequestsHistoryModal } from '../components/ScheduleRequestsHistoryModal';
+import { ScheduleRequestType } from '../types/scheduleApprovalTypes';
 import { employeeApi } from '../api/employeeApi';
 import { shiftConfigApi, type ShiftConfigDto } from '../api/shiftConfigApi';
 import { scheduleApi, getShiftColor } from '../api/scheduleApi';
@@ -178,6 +196,49 @@ export const WorkSchedulePage: React.FC = () => {
 
   // Modal states
   const [showAddModal, setShowAddModal] = useState(false);
+  const [requestModalSchedule, setRequestModalSchedule] = useState<{
+    id: string;
+    workDate: string;
+    shiftName: string;
+    branchId: string;
+    plannedStartTime: string;
+    plannedEndTime: string;
+    employeeId: string;
+  } | null>(null);
+  const [requestModalInitialType, setRequestModalInitialType] = useState<ScheduleRequestType>(ScheduleRequestType.LeaveRequest);
+  const [showCreateRequestModal, setShowCreateRequestModal] = useState(false);
+  const [historyModalScheduleId, setHistoryModalScheduleId] = useState<string | null>(null);
+  const [historyModalTitle, setHistoryModalTitle] = useState<string>('');
+
+  const handleOpenCreateRequest = (
+    item: ScheduleAssignment,
+    defaultType: ScheduleRequestType = ScheduleRequestType.LeaveRequest
+  ) => {
+    setRequestModalSchedule({
+      id: item.id,
+      workDate: item.workDate || item.dateStr || '',
+      shiftName: item.shiftName,
+      branchId: item.branchId || branches[0]?.id || '',
+      plannedStartTime: item.shiftTime?.split('-')?.[0]?.trim() || '08:00',
+      plannedEndTime: item.shiftTime?.split('-')?.[1]?.trim() || '12:00',
+      employeeId: item.employeeId,
+    });
+    setRequestModalInitialType(defaultType);
+    setShowCreateRequestModal(true);
+  };
+
+  const handleOpenHistory = (item: ScheduleAssignment) => {
+    setHistoryModalScheduleId(item.id);
+    setHistoryModalTitle(`${item.shiftName} (${item.shiftTime}) - ${item.employeeName}`);
+  };
+
+  const [openMenuScheduleId, setOpenMenuScheduleId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const handleGlobalClick = () => setOpenMenuScheduleId(null);
+    window.addEventListener('click', handleGlobalClick);
+    return () => window.removeEventListener('click', handleGlobalClick);
+  }, []);
   const [editingAssignment, setEditingAssignment] = useState<ScheduleAssignment | null>(null);
   const [deletingAssignment, setDeletingAssignment] = useState<ScheduleAssignment | null>(null);
   const [showShiftConfigModal, setShowShiftConfigModal] = useState(false);
@@ -1212,7 +1273,8 @@ export const WorkSchedulePage: React.FC = () => {
                       </td>
 
                       {/* 7 Ngày trong tuần */}
-                      {DAYS_HEADER.map((day) => {
+                      {DAYS_HEADER.map((day, dayIndex) => {
+                        const isRightAligned = dayIndex >= 4;
                         const matched = assignments.filter(
                           (a) => a && (isEmployeeRole || a.employeeId === emp.id) && a.dayOfWeek === day.key
                         );
@@ -1227,54 +1289,270 @@ export const WorkSchedulePage: React.FC = () => {
                             }}
                           >
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'center' }}>
-                              {matched.map((item) => (
-                                <div
-                                  key={item.id}
-                                  onClick={() => handleEditAssignment(item)}
-                                  title="Nhấn để cập nhật ca làm việc này"
-                                  style={{
-                                    background: `${item.shiftColor}18`,
-                                    border: 'none',
-                                    color: item.shiftColor,
-                                    borderRadius: 6,
-                                    padding: '4px 8px',
-                                    fontSize: 11,
-                                    fontWeight: 700,
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: 4,
-                                    width: '90%',
-                                    justifyContent: 'space-between',
-                                    cursor: 'pointer',
-                                    transition: 'all 0.15s ease',
-                                  }}
-                                  onMouseEnter={(e) => {
-                                    e.currentTarget.style.filter = 'brightness(0.95)';
-                                    e.currentTarget.style.transform = 'translateY(-1px)';
-                                  }}
-                                  onMouseLeave={(e) => {
-                                    e.currentTarget.style.filter = 'none';
-                                    e.currentTarget.style.transform = 'none';
-                                  }}
-                                >
-                                  <span>{item.shiftName}</span>
-                                  <button
-                                    type="button"
-                                    style={{
-                                      background: 'transparent',
-                                      border: 'none',
-                                      color: item.shiftColor,
-                                      cursor: 'pointer',
-                                      fontSize: 12,
-                                      padding: 0,
-                                    }}
-                                    onClick={(e) => handleDeleteAssignment(item.id, e)}
-                                    title="Hủy ca"
-                                  >
-                                    &times;
-                                  </button>
-                                </div>
-                              ))}
+                              {matched.map((item) => {
+                                const isOnLeave = item.status?.toLowerCase() === 'onleave' || item.isLeave;
+                                const isMenuOpen = openMenuScheduleId === item.id;
+                                return (
+                                  <div key={item.id} style={{ position: 'relative', width: '90%' }}>
+                                    <div
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setOpenMenuScheduleId(isMenuOpen ? null : item.id);
+                                      }}
+                                      style={{
+                                        background: isOnLeave ? '#F3E8FF' : `${item.shiftColor}18`,
+                                        border: isOnLeave ? '1px dashed #A855F7' : 'none',
+                                        color: isOnLeave ? '#7E22CE' : item.shiftColor,
+                                        borderRadius: 6,
+                                        padding: '4px 8px',
+                                        fontSize: 11,
+                                        fontWeight: 700,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: 4,
+                                        width: '100%',
+                                        justifyContent: 'space-between',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.15s ease',
+                                      }}
+                                      title="Bấm để gửi yêu cầu hoặc thao tác ca làm"
+                                    >
+                                      <span>{isOnLeave ? `[Nghỉ] ${item.shiftName}` : item.shiftName}</span>
+                                      {!isEmployeeRole && (
+                                        <button
+                                          type="button"
+                                          style={{
+                                            background: 'transparent',
+                                            border: 'none',
+                                            color: isOnLeave ? '#7E22CE' : item.shiftColor,
+                                            cursor: 'pointer',
+                                            fontSize: 12,
+                                            padding: 0,
+                                          }}
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleDeleteAssignment(item.id, e);
+                                          }}
+                                          title="Hủy ca"
+                                        >
+                                          &times;
+                                        </button>
+                                      )}
+                                    </div>
+
+                                    {isMenuOpen && (
+                                      <div
+                                        style={{
+                                          position: 'absolute',
+                                          top: 'calc(100% + 4px)',
+                                          left: isRightAligned ? 'auto' : 0,
+                                          right: isRightAligned ? 0 : 'auto',
+                                          zIndex: 500,
+                                          background: '#FFFFFF',
+                                          boxShadow: '0 10px 25px -5px rgba(15, 23, 42, 0.15), 0 8px 10px -6px rgba(15, 23, 42, 0.1)',
+                                          borderRadius: 8,
+                                          border: '1px solid #E2E8F0',
+                                          minWidth: 205,
+                                          overflow: 'hidden',
+                                          textAlign: 'left',
+                                        }}
+                                        onClick={(e) => e.stopPropagation()}
+                                      >
+                                        {/* Dropdown Header */}
+                                        <div
+                                          style={{
+                                            padding: '8px 12px',
+                                            background: '#F8FAFC',
+                                            borderBottom: '1px solid #F1F5F9',
+                                            fontSize: 11,
+                                            fontWeight: 600,
+                                            color: '#475569',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'space-between',
+                                          }}
+                                        >
+                                          <span>{item.shiftName}</span>
+                                          {item.shiftTime && (
+                                            <span style={{ color: '#0F766E', fontWeight: 700 }}>{item.shiftTime}</span>
+                                          )}
+                                        </div>
+
+                                        <div style={{ padding: '4px 0' }}>
+                                          <button
+                                            type="button"
+                                            style={{
+                                              width: '100%',
+                                              padding: '8px 12px',
+                                              fontSize: 12.5,
+                                              cursor: 'pointer',
+                                              color: '#1E293B',
+                                              background: 'none',
+                                              border: 'none',
+                                              display: 'flex',
+                                              alignItems: 'center',
+                                              gap: 8,
+                                              textAlign: 'left',
+                                              transition: 'background 0.12s ease',
+                                            }}
+                                            onMouseEnter={(e) => (e.currentTarget.style.background = '#F0FDFA')}
+                                            onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                                            onClick={() => {
+                                              setOpenMenuScheduleId(null);
+                                              handleOpenCreateRequest(item, ScheduleRequestType.LeaveRequest);
+                                            }}
+                                          >
+                                            <CalendarX size={14} color="#0F766E" />
+                                            <span>Xin nghỉ ca</span>
+                                          </button>
+
+                                          <button
+                                            type="button"
+                                            style={{
+                                              width: '100%',
+                                              padding: '8px 12px',
+                                              fontSize: 12.5,
+                                              cursor: 'pointer',
+                                              color: '#1E293B',
+                                              background: 'none',
+                                              border: 'none',
+                                              display: 'flex',
+                                              alignItems: 'center',
+                                              gap: 8,
+                                              textAlign: 'left',
+                                              transition: 'background 0.12s ease',
+                                            }}
+                                            onMouseEnter={(e) => (e.currentTarget.style.background = '#F0FDFA')}
+                                            onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                                            onClick={() => {
+                                              setOpenMenuScheduleId(null);
+                                              handleOpenCreateRequest(item, ScheduleRequestType.ShiftSwap);
+                                            }}
+                                          >
+                                            <ArrowLeftRight size={14} color="#0F766E" />
+                                            <span>Xin đổi ca làm việc</span>
+                                          </button>
+
+                                          <button
+                                            type="button"
+                                            style={{
+                                              width: '100%',
+                                              padding: '8px 12px',
+                                              fontSize: 12.5,
+                                              cursor: 'pointer',
+                                              color: '#1E293B',
+                                              background: 'none',
+                                              border: 'none',
+                                              display: 'flex',
+                                              alignItems: 'center',
+                                              gap: 8,
+                                              textAlign: 'left',
+                                              transition: 'background 0.12s ease',
+                                            }}
+                                            onMouseEnter={(e) => (e.currentTarget.style.background = '#F0FDFA')}
+                                            onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                                            onClick={() => {
+                                              setOpenMenuScheduleId(null);
+                                              handleOpenCreateRequest(item, ScheduleRequestType.CheckInIncident);
+                                            }}
+                                          >
+                                            <AlertCircle size={14} color="#D97706" />
+                                            <span>Báo sự cố chấm công</span>
+                                          </button>
+
+                                          <button
+                                            type="button"
+                                            style={{
+                                              width: '100%',
+                                              padding: '8px 12px',
+                                              fontSize: 12.5,
+                                              cursor: 'pointer',
+                                              color: '#1E293B',
+                                              background: 'none',
+                                              border: 'none',
+                                              display: 'flex',
+                                              alignItems: 'center',
+                                              gap: 8,
+                                              textAlign: 'left',
+                                              transition: 'background 0.12s ease',
+                                            }}
+                                            onMouseEnter={(e) => (e.currentTarget.style.background = '#F0FDFA')}
+                                            onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                                            onClick={() => {
+                                              setOpenMenuScheduleId(null);
+                                              handleOpenCreateRequest(item, ScheduleRequestType.Overtime);
+                                            }}
+                                          >
+                                            <Clock size={14} color="#2563EB" />
+                                            <span>Làm thêm giờ (OT)</span>
+                                          </button>
+
+                                          <div style={{ height: 1, background: '#F1F5F9', margin: '4px 0' }} />
+
+                                          <button
+                                            type="button"
+                                            style={{
+                                              width: '100%',
+                                              padding: '8px 12px',
+                                              fontSize: 12.5,
+                                              cursor: 'pointer',
+                                              color: '#1E293B',
+                                              background: 'none',
+                                              border: 'none',
+                                              display: 'flex',
+                                              alignItems: 'center',
+                                              gap: 8,
+                                              textAlign: 'left',
+                                              transition: 'background 0.12s ease',
+                                            }}
+                                            onMouseEnter={(e) => (e.currentTarget.style.background = '#F0FDFA')}
+                                            onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                                            onClick={() => {
+                                              setOpenMenuScheduleId(null);
+                                              handleOpenHistory(item);
+                                            }}
+                                          >
+                                            <History size={14} color="#64748B" />
+                                            <span>Lịch sử các yêu cầu</span>
+                                          </button>
+
+                                          {!isEmployeeRole && (
+                                            <>
+                                              <div style={{ height: 1, background: '#F1F5F9', margin: '4px 0' }} />
+                                              <button
+                                                type="button"
+                                                style={{
+                                                  width: '100%',
+                                                  padding: '8px 12px',
+                                                  fontSize: 12.5,
+                                                  cursor: 'pointer',
+                                                  color: '#1E293B',
+                                                  background: 'none',
+                                                  border: 'none',
+                                                  display: 'flex',
+                                                  alignItems: 'center',
+                                                  gap: 8,
+                                                  textAlign: 'left',
+                                                  transition: 'background 0.12s ease',
+                                                }}
+                                                onMouseEnter={(e) => (e.currentTarget.style.background = '#F0FDFA')}
+                                                onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                                                onClick={() => {
+                                                  setOpenMenuScheduleId(null);
+                                                  handleEditAssignment(item);
+                                                }}
+                                              >
+                                                <Edit3 size={14} color="#0F766E" />
+                                                <span>Cập nhật ca làm</span>
+                                              </button>
+                                            </>
+                                          )}
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
 
                               <button
                                 type="button"
@@ -1370,7 +1648,8 @@ export const WorkSchedulePage: React.FC = () => {
                       </div>
                     </td>
 
-                    {DAYS_HEADER.map((day) => {
+                    {DAYS_HEADER.map((day, dayIndex) => {
+                      const isRightAligned = dayIndex >= 4;
                       const assignedEmps = assignments.filter(
                         (a) => a && (a.shiftId === sh.id || a.shiftName.toLowerCase() === sh.name.toLowerCase()) && a.dayOfWeek === day.key
                       );
@@ -1387,67 +1666,310 @@ export const WorkSchedulePage: React.FC = () => {
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'center' }}>
                             {assignedEmps.map((item) => {
                               if (!item) return null;
+                              const isOnLeave = item.status?.toLowerCase() === 'onleave' || item.isLeave;
+                              const isMenuOpen = openMenuScheduleId === ('shift_' + item.id);
+                              const isMyShift = !isEmployeeRole || (
+                                (user?.id && item.employeeId === user.id) ||
+                                (user?.fullName && item.employeeName?.trim().toLowerCase() === user.fullName.trim().toLowerCase()) ||
+                                (user?.email && item.employeeCode?.trim().toLowerCase() === user.email.split('@')[0].trim().toLowerCase())
+                              );
+
                               return (
-                                <div
-                                  key={item.id}
-                                  onClick={() => handleEditAssignment(item)}
-                                  title={
-                                    isEmployeeRole
-                                      ? `Ca làm việc của bạn: ${item.shiftName} (${item.shiftTime || ''})`
-                                      : `Nhấn để cập nhật ca làm của ${item.employeeName || ''}`
-                                  }
-                                  style={{
-                                    background: '#F0FDFA',
-                                    border: '1px solid #99F6E4',
-                                    borderRadius: 8,
-                                    padding: '5px 8px',
-                                    width: '92%',
-                                    maxWidth: 165,
-                                    cursor: 'pointer',
-                                    textAlign: 'center',
-                                    transition: 'all 0.15s ease',
-                                    boxShadow: '0 1px 2px rgba(15, 118, 110, 0.05)',
-                                  }}
-                                  onMouseEnter={(e) => {
-                                    e.currentTarget.style.background = '#CCFBF1';
-                                    e.currentTarget.style.borderColor = '#5EEAD4';
-                                  }}
-                                  onMouseLeave={(e) => {
-                                    e.currentTarget.style.background = '#F0FDFA';
-                                    e.currentTarget.style.borderColor = '#99F6E4';
-                                  }}
-                                >
+                                <div key={item.id} style={{ position: 'relative', width: '92%', maxWidth: 165 }}>
                                   <div
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setOpenMenuScheduleId(isMenuOpen ? null : ('shift_' + item.id));
+                                    }}
                                     style={{
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      gap: 4,
-                                      fontSize: 12,
-                                      fontWeight: 700,
-                                      color: '#0F766E',
-                                      whiteSpace: 'nowrap',
-                                      overflow: 'hidden',
-                                      textOverflow: 'ellipsis',
+                                      background: isOnLeave ? '#F3E8FF' : '#F0FDFA',
+                                      border: isOnLeave ? '1px dashed #A855F7' : '1px solid #99F6E4',
+                                      borderRadius: 8,
+                                      padding: '5px 8px',
+                                      width: '100%',
+                                      cursor: 'pointer',
+                                      textAlign: 'center',
+                                      transition: 'all 0.15s ease',
+                                      boxShadow: '0 1px 2px rgba(15, 118, 110, 0.05)',
                                     }}
                                   >
-                                    <User size={13} color="#0F766E" />
-                                    <span>{item.employeeName || ''}</span>
-                                  </div>
-                                  {sh.id === 'custom' && item.shiftTime && (
                                     <div
                                       style={{
-                                        fontSize: 10,
-                                        color: '#047857',
-                                        fontWeight: 600,
-                                        marginTop: 2,
-                                        background: '#DCFCE7',
-                                        borderRadius: 4,
-                                        padding: '1px 4px',
-                                        display: 'inline-block',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        gap: 4,
+                                        fontSize: 12,
+                                        fontWeight: 700,
+                                        color: isOnLeave ? '#7E22CE' : '#0F766E',
+                                        whiteSpace: 'nowrap',
+                                        overflow: 'hidden',
+                                        textOverflow: 'ellipsis',
                                       }}
                                     >
-                                      {item.shiftTime}
+                                      <User size={13} color={isOnLeave ? '#7E22CE' : '#0F766E'} />
+                                      <span>{isOnLeave ? `[Nghỉ] ${item.employeeName || ''}` : item.employeeName || ''}</span>
+                                    </div>
+                                    {sh.id === 'custom' && item.shiftTime && (
+                                      <div
+                                        style={{
+                                          fontSize: 10,
+                                          color: '#047857',
+                                          fontWeight: 600,
+                                          marginTop: 2,
+                                          background: '#DCFCE7',
+                                          borderRadius: 4,
+                                          padding: '1px 4px',
+                                          display: 'inline-block',
+                                        }}
+                                      >
+                                        {item.shiftTime}
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  {isMenuOpen && (
+                                    <div
+                                      style={{
+                                        position: 'absolute',
+                                        top: 'calc(100% + 4px)',
+                                        left: isRightAligned ? 'auto' : 0,
+                                        right: isRightAligned ? 0 : 'auto',
+                                        zIndex: 500,
+                                        background: '#FFFFFF',
+                                        boxShadow: '0 10px 25px -5px rgba(15, 23, 42, 0.15), 0 8px 10px -6px rgba(15, 23, 42, 0.1)',
+                                        borderRadius: 8,
+                                        border: '1px solid #E2E8F0',
+                                        minWidth: 205,
+                                        overflow: 'hidden',
+                                        textAlign: 'left',
+                                      }}
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      {/* Dropdown Header */}
+                                      <div
+                                        style={{
+                                          padding: '8px 12px',
+                                          background: '#F8FAFC',
+                                          borderBottom: '1px solid #F1F5F9',
+                                          fontSize: 11,
+                                          fontWeight: 600,
+                                          color: '#475569',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'space-between',
+                                        }}
+                                      >
+                                        <span style={{ maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                          {item.employeeName}
+                                        </span>
+                                        <span style={{ color: '#0F766E', fontWeight: 700 }}>
+                                          {item.shiftTime || sh.startTime}
+                                        </span>
+                                      </div>
+
+                                      <div style={{ padding: '4px 0' }}>
+                                        {isMyShift ? (
+                                          <>
+                                            <button
+                                              type="button"
+                                              style={{
+                                                width: '100%',
+                                                padding: '8px 12px',
+                                                fontSize: 12.5,
+                                                cursor: 'pointer',
+                                                color: '#1E293B',
+                                                background: 'none',
+                                                border: 'none',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: 8,
+                                                textAlign: 'left',
+                                                transition: 'background 0.12s ease',
+                                              }}
+                                              onMouseEnter={(e) => (e.currentTarget.style.background = '#F0FDFA')}
+                                              onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                                              onClick={() => {
+                                                setOpenMenuScheduleId(null);
+                                                handleOpenCreateRequest(item, ScheduleRequestType.LeaveRequest);
+                                              }}
+                                            >
+                                              <CalendarX size={14} color="#0F766E" />
+                                              <span>Xin nghỉ ca</span>
+                                            </button>
+
+                                            <button
+                                              type="button"
+                                              style={{
+                                                width: '100%',
+                                                padding: '8px 12px',
+                                                fontSize: 12.5,
+                                                cursor: 'pointer',
+                                                color: '#1E293B',
+                                                background: 'none',
+                                                border: 'none',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: 8,
+                                                textAlign: 'left',
+                                                transition: 'background 0.12s ease',
+                                              }}
+                                              onMouseEnter={(e) => (e.currentTarget.style.background = '#F0FDFA')}
+                                              onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                                              onClick={() => {
+                                                setOpenMenuScheduleId(null);
+                                                handleOpenCreateRequest(item, ScheduleRequestType.ShiftSwap);
+                                              }}
+                                            >
+                                              <ArrowLeftRight size={14} color="#0F766E" />
+                                              <span>Xin đổi ca làm việc</span>
+                                            </button>
+
+                                            <button
+                                              type="button"
+                                              style={{
+                                                width: '100%',
+                                                padding: '8px 12px',
+                                                fontSize: 12.5,
+                                                cursor: 'pointer',
+                                                color: '#1E293B',
+                                                background: 'none',
+                                                border: 'none',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: 8,
+                                                textAlign: 'left',
+                                                transition: 'background 0.12s ease',
+                                              }}
+                                              onMouseEnter={(e) => (e.currentTarget.style.background = '#F0FDFA')}
+                                              onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                                              onClick={() => {
+                                                setOpenMenuScheduleId(null);
+                                                handleOpenCreateRequest(item, ScheduleRequestType.CheckInIncident);
+                                              }}
+                                            >
+                                              <AlertCircle size={14} color="#D97706" />
+                                              <span>Báo sự cố chấm công</span>
+                                            </button>
+
+                                            <button
+                                              type="button"
+                                              style={{
+                                                width: '100%',
+                                                padding: '8px 12px',
+                                                fontSize: 12.5,
+                                                cursor: 'pointer',
+                                                color: '#1E293B',
+                                                background: 'none',
+                                                border: 'none',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: 8,
+                                                textAlign: 'left',
+                                                transition: 'background 0.12s ease',
+                                              }}
+                                              onMouseEnter={(e) => (e.currentTarget.style.background = '#F0FDFA')}
+                                              onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                                              onClick={() => {
+                                                setOpenMenuScheduleId(null);
+                                                handleOpenCreateRequest(item, ScheduleRequestType.Overtime);
+                                              }}
+                                            >
+                                              <Clock size={14} color="#2563EB" />
+                                              <span>Làm thêm giờ (OT)</span>
+                                            </button>
+                                          </>
+                                        ) : (
+                                          <button
+                                            type="button"
+                                            style={{
+                                              width: '100%',
+                                              padding: '8px 12px',
+                                              fontSize: 12.5,
+                                              cursor: 'pointer',
+                                              color: '#1E293B',
+                                              background: 'none',
+                                              border: 'none',
+                                              display: 'flex',
+                                              alignItems: 'center',
+                                              gap: 8,
+                                              textAlign: 'left',
+                                              transition: 'background 0.12s ease',
+                                            }}
+                                            onMouseEnter={(e) => (e.currentTarget.style.background = '#F0FDFA')}
+                                            onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                                            onClick={() => {
+                                              setOpenMenuScheduleId(null);
+                                              handleOpenCreateRequest(item, ScheduleRequestType.ShiftSwap);
+                                            }}
+                                            title={`Đổi ca với ${item.employeeName}`}
+                                          >
+                                            <ArrowLeftRight size={14} color="#0F766E" />
+                                            <span>Đổi ca với {item.employeeName?.split(' ').pop()}</span>
+                                          </button>
+                                        )}
+
+                                        <div style={{ height: 1, background: '#F1F5F9', margin: '4px 0' }} />
+
+                                        <button
+                                          type="button"
+                                          style={{
+                                            width: '100%',
+                                            padding: '8px 12px',
+                                            fontSize: 12.5,
+                                            cursor: 'pointer',
+                                            color: '#1E293B',
+                                            background: 'none',
+                                            border: 'none',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: 8,
+                                            textAlign: 'left',
+                                            transition: 'background 0.12s ease',
+                                          }}
+                                          onMouseEnter={(e) => (e.currentTarget.style.background = '#F0FDFA')}
+                                          onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                                          onClick={() => {
+                                            setOpenMenuScheduleId(null);
+                                            handleOpenHistory(item);
+                                          }}
+                                        >
+                                          <History size={14} color="#64748B" />
+                                          <span>Lịch sử các yêu cầu</span>
+                                        </button>
+
+                                        {!isEmployeeRole && (
+                                          <>
+                                            <div style={{ height: 1, background: '#F1F5F9', margin: '4px 0' }} />
+                                            <button
+                                              type="button"
+                                              style={{
+                                                width: '100%',
+                                                padding: '8px 12px',
+                                                fontSize: 12.5,
+                                                cursor: 'pointer',
+                                                color: '#1E293B',
+                                                background: 'none',
+                                                border: 'none',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: 8,
+                                                textAlign: 'left',
+                                                transition: 'background 0.12s ease',
+                                              }}
+                                              onMouseEnter={(e) => (e.currentTarget.style.background = '#F0FDFA')}
+                                              onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                                              onClick={() => {
+                                                setOpenMenuScheduleId(null);
+                                                handleEditAssignment(item);
+                                              }}
+                                            >
+                                              <Edit3 size={14} color="#0F766E" />
+                                              <span>Cập nhật ca làm</span>
+                                            </button>
+                                          </>
+                                        )}
+                                      </div>
                                     </div>
                                   )}
                                 </div>
@@ -1588,6 +2110,29 @@ export const WorkSchedulePage: React.FC = () => {
         type={notificationModal.type}
         title={notificationModal.title}
         message={notificationModal.message}
+      />
+
+      {/* Modal Gửi phiếu yêu cầu (Xin nghỉ, Đổi ca, Sự cố FaceID, OT) */}
+      <CreateScheduleRequestModal
+        isOpen={showCreateRequestModal}
+        onClose={() => {
+          setShowCreateRequestModal(false);
+          setRequestModalSchedule(null);
+        }}
+        schedule={requestModalSchedule}
+        initialType={requestModalInitialType}
+        onSuccess={fetchSchedules}
+      />
+
+      {/* Modal Lịch sử các yêu cầu đã gửi cho ca */}
+      <ScheduleRequestsHistoryModal
+        isOpen={!!historyModalScheduleId}
+        onClose={() => {
+          setHistoryModalScheduleId(null);
+          setHistoryModalTitle('');
+        }}
+        scheduleId={historyModalScheduleId}
+        shiftTitle={historyModalTitle}
       />
     </div>
   );

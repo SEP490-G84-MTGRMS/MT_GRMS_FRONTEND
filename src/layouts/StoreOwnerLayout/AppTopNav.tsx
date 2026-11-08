@@ -1,4 +1,4 @@
-﻿import { useState, useRef, useEffect, useCallback, Fragment } from "react";
+import { useState, useRef, useEffect, useCallback, Fragment } from "react";
 import type { FC } from "react";
 import { NavLink, Link, useLocation, useNavigate } from "react-router-dom";
 import {
@@ -289,6 +289,10 @@ const NAV_GROUPS: NavGroup[] = [
           {
             label: "Bảng chấm công",
             to: "/store-owner/employees/attendance"
+          },
+          {
+            label: "Duyệt đơn yêu cầu",
+            to: "/store-owner/employees/approval-requests"
           },
           {
             label: "Cấu hình ca làm việc",

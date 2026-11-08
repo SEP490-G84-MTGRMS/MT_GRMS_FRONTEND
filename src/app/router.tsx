@@ -70,6 +70,7 @@ import {
   ShiftConfigPage,
   AttendancePage,
   PayslipManagementPage,
+  ApprovalRequestsPage,
 } from '../features/employee';
 
 // 8. Promotions Feature
@@ -494,6 +495,10 @@ export const router = createBrowserRouter([
         element: <AttendancePage />,
       },
       {
+        path: 'employees/approval-requests',
+        element: <ApprovalRequestsPage />,
+      },
+      {
         path: 'employees/payroll',
         element: <PayslipManagementPage />,
       },
@@ -620,6 +625,10 @@ export const router = createBrowserRouter([
       {
         path: 'employees/attendance',
         element: <AttendancePage />,
+      },
+      {
+        path: 'employees/approval-requests',
+        element: <ApprovalRequestsPage />,
       },
       {
         path: 'employees/payroll',

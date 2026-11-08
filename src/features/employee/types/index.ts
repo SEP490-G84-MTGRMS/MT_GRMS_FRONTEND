@@ -173,6 +173,9 @@ export interface ScheduleAssignment {
   workDate?: string;
   branchId?: string;
   branchName: string;
+  status?: string;
+  isLeave?: boolean;
+  isPaidLeave?: boolean;
 }
 
 export interface AttendanceRecord {

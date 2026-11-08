@@ -24,3 +24,4 @@ export * from './pages/WorkSchedulePage';
 export * from './pages/ShiftConfigPage';
 export * from './pages/AttendancePage';
 export * from './pages/PayslipManagementPage';
+export * from './pages/ApprovalRequestsPage';

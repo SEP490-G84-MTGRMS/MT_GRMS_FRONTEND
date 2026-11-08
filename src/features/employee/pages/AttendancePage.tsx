@@ -10,6 +10,8 @@ import {
   Building2,
   ChevronDown,
   X,
+  Eye,
+  History,
 } from 'lucide-react';
 import type { AttendanceRecord, ApprovalRequest, Branch } from '../types';
 import { scheduleApi, getShiftColor, type ScheduleResponse } from '../api/scheduleApi';
@@ -17,6 +19,9 @@ import { shiftConfigApi, type ShiftConfigDto } from '../api/shiftConfigApi';
 import { employeeApi } from '../api/employeeApi';
 import { AttendanceDetailModal } from '../components/AttendanceDetailModal';
 import { ApprovalRequestsModal } from '../components/ApprovalRequestsModal';
+import { CreateScheduleRequestModal } from '../components/CreateScheduleRequestModal';
+import { ScheduleRequestsHistoryModal } from '../components/ScheduleRequestsHistoryModal';
+import { ScheduleRequestType } from '../types/scheduleApprovalTypes';
 import { useAuthStore } from '../../../stores/useAuthStore';
 import '../employee.css';
 
@@ -263,6 +268,43 @@ export const AttendancePage: React.FC = () => {
   // Modals state
   const [selectedRecord, setSelectedRecord] = useState<AttendanceRecord | null>(null);
   const [showApprovalModal, setShowApprovalModal] = useState(false);
+  const [requestModalSchedule, setRequestModalSchedule] = useState<{
+    id: string;
+    workDate: string;
+    shiftName: string;
+    branchId: string;
+    plannedStartTime: string;
+    plannedEndTime: string;
+    employeeId: string;
+  } | null>(null);
+  const [requestModalInitialType, setRequestModalInitialType] = useState<ScheduleRequestType>(ScheduleRequestType.CheckInIncident);
+  const [showCreateRequestModal, setShowCreateRequestModal] = useState(false);
+  const [historyModalScheduleId, setHistoryModalScheduleId] = useState<string | null>(null);
+  const [historyModalTitle, setHistoryModalTitle] = useState<string>('');
+  const [openMenuScheduleId, setOpenMenuScheduleId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const handleGlobalClick = () => setOpenMenuScheduleId(null);
+    window.addEventListener('click', handleGlobalClick);
+    return () => window.removeEventListener('click', handleGlobalClick);
+  }, []);
+
+  const handleOpenCreateRequest = (
+    att: AttendanceRecord,
+    type: ScheduleRequestType
+  ) => {
+    setRequestModalSchedule({
+      id: att.id,
+      workDate: att.dateStr || '',
+      shiftName: att.shiftName || 'Ca làm',
+      branchId: att.branchId || branches[0]?.id || '',
+      plannedStartTime: att.plannedStartTime?.substring(0, 5) || '08:00',
+      plannedEndTime: att.plannedEndTime?.substring(0, 5) || '17:00',
+      employeeId: att.employeeId,
+    });
+    setRequestModalInitialType(type);
+    setShowCreateRequestModal(true);
+  };
 
   // 1. Fetch danh sách chi nhánh (chạy 1 lần khi mount)
   useEffect(() => {
@@ -1002,7 +1044,8 @@ export const AttendancePage: React.FC = () => {
                   </td>
 
                   {/* 7 ngày trong tuần */}
-                  {DAYS_HEADER.map((day) => {
+                  {DAYS_HEADER.map((day, dayIndex) => {
+                    const isRightAligned = dayIndex >= 4;
                     const dayRecords = filteredRecords.filter((r) => {
                       const matchDay = r.workDateIso ? r.workDateIso === day.dateIso : r.dayOfWeek === day.key;
                       const matchShift =
@@ -1023,71 +1066,233 @@ export const AttendancePage: React.FC = () => {
                         }}
                       >
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                          {dayRecords.map((att) => (
-                            <div
-                              key={att.id}
-                              style={{
-                                background: '#FFFFFF',
-                                border: '1px solid #E2E8F0',
-                                borderRadius: 8,
-                                padding: '6px 8px',
-                                cursor: 'pointer',
-                                boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-                                transition: 'all 0.15s ease',
-                              }}
-                              onClick={() => setSelectedRecord(att)}
-                              title="Bấm để xem chi tiết chấm công"
-                            >
-                              <div style={{ fontWeight: 600, fontSize: 12, color: '#0F172A' }}>
-                                {att.employeeName}
+                          {dayRecords.map((att) => {
+                            const isMenuOpen = openMenuScheduleId === att.id;
+                            return (
+                              <div key={att.id} style={{ position: 'relative', width: '100%' }}>
+                                <div
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setOpenMenuScheduleId(isMenuOpen ? null : att.id);
+                                  }}
+                                  style={{
+                                    background: '#FFFFFF',
+                                    border: '1px solid #E2E8F0',
+                                    borderRadius: 8,
+                                    padding: '6px 8px',
+                                    cursor: 'pointer',
+                                    boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                                    transition: 'all 0.15s ease',
+                                  }}
+                                  title="Bấm để xem chi tiết hoặc gửi yêu cầu"
+                                >
+                                  <div style={{ fontWeight: 600, fontSize: 12, color: '#0F172A' }}>
+                                    {att.employeeName}
+                                  </div>
+                                  <div style={{ fontSize: 11, color: '#64748B', marginTop: 2 }}>
+                                    {att.checkInTime ? `${att.checkInTime} - ${att.checkOutTime || '...'}` : 'Chưa check-in'}
+                                  </div>
+                                  <div style={{ marginTop: 4 }}>
+                                    {att.status === 'ontime' && (
+                                      <span style={{ fontSize: 11, color: '#2563EB', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                                        <span style={{ width: 13, height: 13, borderRadius: '50%', background: '#2563EB', color: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                                          <Check size={9} strokeWidth={3} />
+                                        </span>
+                                        <span>Đúng giờ</span>
+                                      </span>
+                                    )}
+                                    {(att.status === 'late' || att.status === 'early') && (
+                                      <span style={{ fontSize: 11, color: '#9333EA', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                                        <span style={{ width: 13, height: 13, borderRadius: '50%', background: '#A855F7', color: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                                          <Check size={9} strokeWidth={3} />
+                                        </span>
+                                        <span>{att.status === 'late' ? `Muộn ${att.lateMinutes}p` : 'Về sớm'}</span>
+                                      </span>
+                                    )}
+                                    {att.status === 'missing' && (
+                                      <span style={{ fontSize: 11, color: '#DC2626', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                                        <span style={{ width: 13, height: 13, borderRadius: '50%', background: '#EF4444', color: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                                          <Check size={9} strokeWidth={3} />
+                                        </span>
+                                        <span>Chấm công thiếu</span>
+                                      </span>
+                                    )}
+                                    {att.status === 'not_checked' && (
+                                      <span style={{ fontSize: 11, color: '#EA580C', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                                        <span style={{ width: 13, height: 13, borderRadius: '50%', background: '#F97316', color: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                                          <Check size={9} strokeWidth={3} />
+                                        </span>
+                                        <span>Chưa chấm công</span>
+                                      </span>
+                                    )}
+                                    {att.status === 'absent' && (
+                                      <span style={{ fontSize: 11, color: '#64748B', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                                        <span style={{ width: 13, height: 13, borderRadius: '50%', background: '#94A3B8', color: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                                          <Check size={9} strokeWidth={3} />
+                                        </span>
+                                        <span>Nghỉ làm</span>
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+
+                                {isMenuOpen && (
+                                  <div
+                                    style={{
+                                      position: 'absolute',
+                                      top: 'calc(100% + 4px)',
+                                      left: isRightAligned ? 'auto' : 0,
+                                      right: isRightAligned ? 0 : 'auto',
+                                      zIndex: 500,
+                                      background: '#FFFFFF',
+                                      boxShadow: '0 10px 25px -5px rgba(15, 23, 42, 0.15), 0 8px 10px -6px rgba(15, 23, 42, 0.1)',
+                                      borderRadius: 8,
+                                      border: '1px solid #E2E8F0',
+                                      minWidth: 210,
+                                      overflow: 'hidden',
+                                      textAlign: 'left',
+                                    }}
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    {/* Dropdown Header */}
+                                    <div
+                                      style={{
+                                        padding: '8px 12px',
+                                        background: '#F8FAFC',
+                                        borderBottom: '1px solid #F1F5F9',
+                                        fontSize: 11,
+                                        fontWeight: 600,
+                                        color: '#475569',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'space-between',
+                                      }}
+                                    >
+                                      <span style={{ maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                        {att.employeeName}
+                                      </span>
+                                      <span style={{ color: '#0F766E', fontWeight: 700 }}>
+                                        {att.checkInTime || sh.startTime}
+                                      </span>
+                                    </div>
+
+                                    <div style={{ padding: '4px 0' }}>
+                                      <button
+                                        type="button"
+                                        style={{
+                                          width: '100%',
+                                          padding: '8px 12px',
+                                          fontSize: 12.5,
+                                          cursor: 'pointer',
+                                          color: '#1E293B',
+                                          background: 'none',
+                                          border: 'none',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          gap: 8,
+                                          textAlign: 'left',
+                                          transition: 'background 0.12s ease',
+                                        }}
+                                        onMouseEnter={(e) => (e.currentTarget.style.background = '#F0FDFA')}
+                                        onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                                        onClick={() => {
+                                          setOpenMenuScheduleId(null);
+                                          setSelectedRecord(att);
+                                        }}
+                                      >
+                                        <Eye size={14} color="#0F766E" />
+                                        <span>Xem chi tiết chấm công</span>
+                                      </button>
+
+                                      <button
+                                        type="button"
+                                        style={{
+                                          width: '100%',
+                                          padding: '8px 12px',
+                                          fontSize: 12.5,
+                                          cursor: 'pointer',
+                                          color: '#1E293B',
+                                          background: 'none',
+                                          border: 'none',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          gap: 8,
+                                          textAlign: 'left',
+                                          transition: 'background 0.12s ease',
+                                        }}
+                                        onMouseEnter={(e) => (e.currentTarget.style.background = '#F0FDFA')}
+                                        onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                                        onClick={() => {
+                                          setOpenMenuScheduleId(null);
+                                          handleOpenCreateRequest(att, ScheduleRequestType.CheckInIncident);
+                                        }}
+                                      >
+                                        <AlertCircle size={14} color="#D97706" />
+                                        <span>Báo sự cố chấm công</span>
+                                      </button>
+
+                                      <button
+                                        type="button"
+                                        style={{
+                                          width: '100%',
+                                          padding: '8px 12px',
+                                          fontSize: 12.5,
+                                          cursor: 'pointer',
+                                          color: '#1E293B',
+                                          background: 'none',
+                                          border: 'none',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          gap: 8,
+                                          textAlign: 'left',
+                                          transition: 'background 0.12s ease',
+                                        }}
+                                        onMouseEnter={(e) => (e.currentTarget.style.background = '#F0FDFA')}
+                                        onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                                        onClick={() => {
+                                          setOpenMenuScheduleId(null);
+                                          handleOpenCreateRequest(att, ScheduleRequestType.Overtime);
+                                        }}
+                                      >
+                                        <Clock size={14} color="#2563EB" />
+                                        <span>Làm thêm giờ (OT)</span>
+                                      </button>
+
+                                      <div style={{ height: 1, background: '#F1F5F9', margin: '4px 0' }} />
+
+                                      <button
+                                        type="button"
+                                        style={{
+                                          width: '100%',
+                                          padding: '8px 12px',
+                                          fontSize: 12.5,
+                                          cursor: 'pointer',
+                                          color: '#1E293B',
+                                          background: 'none',
+                                          border: 'none',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          gap: 8,
+                                          textAlign: 'left',
+                                          transition: 'background 0.12s ease',
+                                        }}
+                                        onMouseEnter={(e) => (e.currentTarget.style.background = '#F0FDFA')}
+                                        onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                                        onClick={() => {
+                                          setOpenMenuScheduleId(null);
+                                          setHistoryModalScheduleId(att.id);
+                                          setHistoryModalTitle(`${att.shiftName} - ${att.employeeName}`);
+                                        }}
+                                      >
+                                        <History size={14} color="#64748B" />
+                                        <span>Lịch sử các yêu cầu của ca</span>
+                                      </button>
+                                    </div>
+                                  </div>
+                                )}
                               </div>
-                              <div style={{ fontSize: 11, color: '#64748B', marginTop: 2 }}>
-                                {att.checkInTime ? `${att.checkInTime} - ${att.checkOutTime || '...'}` : 'Chưa check-in'}
-                              </div>
-                              <div style={{ marginTop: 4 }}>
-                                {att.status === 'ontime' && (
-                                  <span style={{ fontSize: 11, color: '#2563EB', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                                    <span style={{ width: 13, height: 13, borderRadius: '50%', background: '#2563EB', color: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
-                                      <Check size={9} strokeWidth={3} />
-                                    </span>
-                                    <span>Đúng giờ</span>
-                                  </span>
-                                )}
-                                {(att.status === 'late' || att.status === 'early') && (
-                                  <span style={{ fontSize: 11, color: '#9333EA', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                                    <span style={{ width: 13, height: 13, borderRadius: '50%', background: '#A855F7', color: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
-                                      <Check size={9} strokeWidth={3} />
-                                    </span>
-                                    <span>{att.status === 'late' ? `Muộn ${att.lateMinutes}p` : 'Về sớm'}</span>
-                                  </span>
-                                )}
-                                {att.status === 'missing' && (
-                                  <span style={{ fontSize: 11, color: '#DC2626', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                                    <span style={{ width: 13, height: 13, borderRadius: '50%', background: '#EF4444', color: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
-                                      <Check size={9} strokeWidth={3} />
-                                    </span>
-                                    <span>Chấm công thiếu</span>
-                                  </span>
-                                )}
-                                {att.status === 'not_checked' && (
-                                  <span style={{ fontSize: 11, color: '#EA580C', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                                    <span style={{ width: 13, height: 13, borderRadius: '50%', background: '#F97316', color: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
-                                      <Check size={9} strokeWidth={3} />
-                                    </span>
-                                    <span>Chưa chấm công</span>
-                                  </span>
-                                )}
-                                {att.status === 'absent' && (
-                                  <span style={{ fontSize: 11, color: '#64748B', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                                    <span style={{ width: 13, height: 13, borderRadius: '50%', background: '#94A3B8', color: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
-                                      <Check size={9} strokeWidth={3} />
-                                    </span>
-                                    <span>Nghỉ làm</span>
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          ))}
+                            );
+                          })}
 
                           {dayRecords.length === 0 && (
                             <div style={{ fontSize: 11, color: '#CBD5E1', textAlign: 'center', padding: 8 }}>
@@ -1232,6 +1437,32 @@ export const AttendancePage: React.FC = () => {
         onApprove={handleApproveRequests}
         onReject={handleRejectRequests}
       />
+
+      {/* Modal Tạo yêu cầu (Xin nghỉ, Đổi ca, Sự cố FaceID, Làm thêm giờ OT) */}
+      {requestModalSchedule && (
+        <CreateScheduleRequestModal
+          isOpen={showCreateRequestModal}
+          onClose={() => {
+            setShowCreateRequestModal(false);
+            setRequestModalSchedule(null);
+          }}
+          schedule={requestModalSchedule}
+          initialType={requestModalInitialType}
+          onSuccess={() => {
+            fetchAttendanceData();
+          }}
+        />
+      )}
+
+      {/* Modal Lịch sử yêu cầu của ca */}
+      {historyModalScheduleId && (
+        <ScheduleRequestsHistoryModal
+          isOpen={!!historyModalScheduleId}
+          onClose={() => setHistoryModalScheduleId(null)}
+          scheduleId={historyModalScheduleId}
+          shiftTitle={historyModalTitle}
+        />
+      )}
     </div>
   );
 };
