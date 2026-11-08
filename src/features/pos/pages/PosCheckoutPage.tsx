@@ -117,6 +117,7 @@ export const PosCheckoutPage: FC = () => {
 
   const isStoreOwner = user?.role === 'STORE_OWNER' || user?.role === 'ADMIN';
   const [currentShift, setCurrentShift] = useState<ShiftDetailResponse | null>(null);
+  const isShiftClosing = currentShift?.status === 'Closing' || currentShift?.status === 2 || currentShift?.status === 3;
   const [isOpenShiftModalOpen, setIsOpenShiftModalOpen] = useState(false);
   const [isCashMovementModalOpen, setIsCashMovementModalOpen] = useState(false);
   const [isCloseShiftModalOpen, setIsCloseShiftModalOpen] = useState(false);
@@ -187,9 +188,11 @@ export const PosCheckoutPage: FC = () => {
           // ignore
         }
       } else {
-        // Thu ngân / Nhân viên: nếu chưa có ca mở thì bắt buộc mở ca
+        // Thu ngân / Nhân viên: nếu chưa có ca mở thì bắt buộc mở ca, nếu đã có ca thì tự động vào ca
         if (!shift) {
           setIsOpenShiftModalOpen(true);
+        } else {
+          setIsOpenShiftModalOpen(false);
         }
       }
     } catch {
@@ -835,6 +838,11 @@ export const PosCheckoutPage: FC = () => {
   };
 
   const handleCheckoutSubmit = () => {
+    if (isShiftClosing) {
+      alert('⚠️ Ca bán hàng của chi nhánh đang trong trạng thái kiểm đếm chốt ca (Closing). Hệ thống tạm thời khóa thanh toán đơn hàng trên mọi máy quầy.');
+      return;
+    }
+
     if (currentTab.cart.length === 0) {
       alert('Giỏ hàng đang trống! Vui lòng thêm sản phẩm trước khi thanh toán.');
       return;
@@ -907,6 +915,49 @@ export const PosCheckoutPage: FC = () => {
         onOpenShift={isStoreOwner ? undefined : () => setIsOpenShiftModalOpen(true)}
       />
 
+      {/* Cảnh báo khóa chốt ca bán hàng (Closing Lockdown) */}
+      {isShiftClosing && (
+        <div
+          style={{
+            backgroundColor: '#fef2f2',
+            borderBottom: '2px solid #ef4444',
+            color: '#991b1b',
+            padding: '10px 20px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            fontWeight: 500,
+            fontSize: '14px',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+            zIndex: 10,
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '18px' }}>⚠️</span>
+            <span>
+              <strong>Ca bán hàng đang được kiểm đếm chốt ca (Closing).</strong> Hệ thống tạm thời khóa thanh toán đơn hàng trên mọi máy quầy để bảo toàn số liệu tiền két.
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsCloseShiftModalOpen(true)}
+            style={{
+              padding: '6px 14px',
+              backgroundColor: '#dc2626',
+              color: '#ffffff',
+              border: 'none',
+              borderRadius: '6px',
+              fontWeight: 600,
+              cursor: 'pointer',
+              fontSize: '13px',
+              flexShrink: 0,
+            }}
+          >
+            Xem bảng kiểm đếm &amp; Chốt ca
+          </button>
+        </div>
+      )}
+
       {/* 2. Main Body Split */}
       <div className="pos-main-body">
         {/* Cột trái: Giỏ hàng + Catalog */}
@@ -957,6 +1008,8 @@ export const PosCheckoutPage: FC = () => {
             onOpenVietQrModal={() => setIsVietQrOpen(true)}
             onSubmitCheckout={handleCheckoutSubmit}
             customerSearchList={customers}
+            isCheckoutDisabled={isShiftClosing}
+            disabledReason={isShiftClosing ? 'Ca đang kiểm đếm chốt ca (Closing)' : undefined}
           />
         </div>
       </div>
