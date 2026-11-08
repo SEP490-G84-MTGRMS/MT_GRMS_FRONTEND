@@ -180,6 +180,38 @@ export const CloseShiftModal: FC<Props> = ({
     }
   };
 
+  const isShiftClosing = currentShiftData.status === 'Closing' || currentShiftData.status === 2;
+  const isShiftOpen = currentShiftData.status === 'Open' || currentShiftData.status === 1;
+
+  const handleStartClosing = async () => {
+    setIsLoading(true);
+    setErrorMsg(null);
+    try {
+      const updated = await posShiftApi.startClosingShift(shift.id, { notes: notes.trim() || undefined });
+      setCurrentShiftData(updated);
+      alert('🔒 Đã chuyển sang trạng thái kiểm đếm chốt ca (Closing). Toàn bộ quầy POS thuộc chi nhánh đã tạm thời khóa bán hàng để bảo toàn tiền két.');
+    } catch (err: any) {
+      setErrorMsg(err.response?.data?.message || err.message || 'Lỗi khi bắt đầu chốt ca');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleCancelClosing = async () => {
+    if (!window.confirm('Bạn có chắc muốn hủy chốt ca và mở lại quầy cho các thu ngân tiếp tục bán hàng?')) return;
+    setIsLoading(true);
+    setErrorMsg(null);
+    try {
+      const updated = await posShiftApi.cancelClosingShift(shift.id, { reason: notes.trim() || 'Thu ngân mở lại quầy' });
+      setCurrentShiftData(updated);
+      alert('✅ Đã hủy chốt ca. Quầy POS của chi nhánh đã được mở lại để tiếp tục bán hàng.');
+    } catch (err: any) {
+      setErrorMsg(err.response?.data?.message || err.message || 'Lỗi khi hủy chốt ca');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (hasPending) {
@@ -196,7 +228,7 @@ export const CloseShiftModal: FC<Props> = ({
     setErrorMsg(null);
 
     try {
-      const closed = await posShiftApi.closeShift(shift.id, {
+      const closed = await posShiftApi.confirmCloseShift(shift.id, {
         actualCashCounted,
         retainedFloatAmount: retainedFloat,
         droppedToSafeAmount: droppedToSafe,
@@ -274,6 +306,49 @@ export const CloseShiftModal: FC<Props> = ({
             {errorMsg && (
               <div style={{ padding: '8px 12px', borderRadius: 6, backgroundColor: '#fef2f2', color: '#b91c1c', fontSize: 13, border: '1px solid #fecaca' }}>
                 {errorMsg}
+              </div>
+            )}
+
+            {/* TRẠNG THÁI CLOSING LOCKDOWN BANNER */}
+            {isShiftClosing && (
+              <div
+                style={{
+                  padding: '10px 14px',
+                  borderRadius: 8,
+                  backgroundColor: '#fef3c7',
+                  border: '1px solid #f59e0b',
+                  color: '#92400e',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 8,
+                  fontSize: 13,
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Lock size={16} />
+                  <span>
+                    <strong>Trạng thái: Đang kiểm đếm chốt ca (Closing).</strong> Toàn bộ quầy POS chi nhánh đang tạm khóa thanh toán.
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  disabled={isLoading}
+                  onClick={handleCancelClosing}
+                  style={{
+                    padding: '4px 10px',
+                    backgroundColor: '#ffffff',
+                    border: '1px solid #d97706',
+                    color: '#b45309',
+                    borderRadius: 6,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    fontSize: 12,
+                    flexShrink: 0,
+                  }}
+                >
+                  Hủy chốt ca &amp; Mở lại bán
+                </button>
               </div>
             )}
 
@@ -735,6 +810,54 @@ export const CloseShiftModal: FC<Props> = ({
               Hủy bỏ
             </button>
 
+            {isShiftOpen && (
+              <button
+                type="button"
+                disabled={isLoading}
+                onClick={handleStartClosing}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  padding: '8px 16px',
+                  borderRadius: 6,
+                  border: '1px solid #d97706',
+                  backgroundColor: '#fffbeb',
+                  color: '#b45309',
+                  fontWeight: 600,
+                  cursor: isLoading ? 'not-allowed' : 'pointer',
+                }}
+                title="Tạm khóa bán hàng toàn chi nhánh để đếm tiền"
+              >
+                <Lock size={15} />
+                <span>Bắt Đầu Kiểm Đếm (Khóa Bán Quầy)</span>
+              </button>
+            )}
+
+            {isShiftClosing && (
+              <button
+                type="button"
+                disabled={isLoading}
+                onClick={handleCancelClosing}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  padding: '8px 16px',
+                  borderRadius: 6,
+                  border: '1px solid #ef4444',
+                  backgroundColor: '#fef2f2',
+                  color: '#b91c1c',
+                  fontWeight: 600,
+                  cursor: isLoading ? 'not-allowed' : 'pointer',
+                }}
+                title="Mở lại quầy để tiếp tục bán hàng"
+              >
+                <X size={15} />
+                <span>Hủy Chốt Ca &amp; Mở Lại Bán</span>
+              </button>
+            )}
+
             <button
               type="submit"
               disabled={isLoading || hasPending || !isAllocationValid}
@@ -752,7 +875,7 @@ export const CloseShiftModal: FC<Props> = ({
               }}
             >
               <CheckCircle size={16} />
-              <span>{isLoading ? 'Đang gửi...' : 'Gửi Báo Cáo Chốt Ca Cho Chủ Cửa Hàng'}</span>
+              <span>{isLoading ? 'Đang gửi...' : (isShiftClosing ? 'Xác Nhận & Hoàn Tất Đóng Ca' : 'Gửi Báo Cáo Chốt Ca Cho Chủ Cửa Hàng')}</span>
             </button>
           </div>
         </form>
