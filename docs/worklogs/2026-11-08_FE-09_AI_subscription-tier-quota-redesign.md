@@ -1,4 +1,4 @@
-# Worklog: Giao Diện Gói Cước Mới (Thêm Thẻ Gói Dùng Thử Bên Trái Cạnh Gói Thường)
+# Worklog: Giao Diện Gói Cước Mới & Tối Giản Modal Thanh Toán
 
 - **Ngày thực hiện**: 2026-11-08
 - **Tác giả**: AI Assistant (Pair Programming)
@@ -11,7 +11,11 @@
   1. **Gói Dùng Thử (Trải Nghiệm)**: Nằm bên trái ngoài cùng, giá 0 đ / 3 ngày, mở khóa sẵn quản lý nhân viên và các tính năng cốt lõi để khách hàng trải nghiệm.
   2. **Gói Thường (Cửa Hàng Độc Lập)**: 99.000 đ/tháng, nằm ở giữa.
   3. **Gói Pro (Chuỗi Cửa Hàng)**: 249.000 đ/tháng, nằm bên phải ngoài cùng (highlight).
-- Bỏ các dòng phụ gây rối layout bên trong thẻ và hoàn thiện giao diện 3 thẻ cân đối, hiện đại.
+- **Tối giản hóa giao diện Modal Đăng ký & Gia hạn gói (`SubscriptionCheckoutModal`)**:
+  - Giao diện cũ có quá nhiều chi tiết rối mắt (banner quảng cáo dùng thử lặp lại bên trong modal gói Pro, mã QR VietQR phức tạp, các chu kỳ quá dài lên tới 24 tháng).
+  - Tinh gọn chu kỳ gia hạn chỉ còn: **3 Tháng** (Linh hoạt), **6 Tháng** (Phổ biến), và **1 Năm** (12 tháng + tặng 1 tháng). Bỏ chu kỳ 24 tháng.
+  - Bỏ hình thức quét mã VietQR trong modal mua gói, chuyển hoàn toàn sang **thanh toán trừ tiền trực tiếp vào Ví gian hàng** (Store Wallet).
+  - Hiển thị trực quan số dư ví, trạng thái đủ/thiếu tiền và cảnh báo số tiền cần nạp thêm nếu chưa đủ số dư.
 
 ---
 
@@ -28,16 +32,20 @@
    - Nút bấm tự động đổi sang `Trải nghiệm dùng thử` hoặc `✓ Gói hiện tại đang dùng`.
    - Cập nhật skeleton loading từ 2 sang 3 thẻ.
 4. `src/pages/store/components/SubscriptionCheckoutModal.tsx`:
-   - Tự động nhận diện khi người dùng bấm vào thẻ Gói Dùng Thử để kích hoạt chế độ dùng thử 3 ngày miễn phí (0 đ).
+   - Bỏ toàn bộ box quảng cáo khuyến mãi dùng thử lồng ghép bên trong modal Gói Pro.
+   - Cập nhật 3 nút chu kỳ rõ ràng, gọn gàng: `3m` (3 Tháng), `6m` (6 Tháng), `12m` (1 Năm + 1 tháng tặng). Bỏ chu kỳ `24m`.
+   - Bỏ hình thức quét mã VietQR; cố định phương thức `Wallet` (Trừ tiền trực tiếp vào Ví gian hàng).
+   - Thiết kế card ví gọn gàng hiển thị số dư ví hiện tại, badge `✓ Đủ số dư` hoặc `Chưa đủ số dư` kèm thông báo số tiền còn thiếu.
+   - Tối giản phần hóa đơn chi tiết thanh toán và nút xác nhận theo chuẩn thiết kế sạch, hiện đại.
 
 ---
 
 ## 3. Kết Quả Kiểm Thử (Verification)
 - `npm run build` tại `project/MT_GRMS_FRONTEND`:
-  - `tsc -b && vite build` -> Thành công 100% (0 errors, 2572 modules transformed, built in 1.47s).
+  - `tsc -b && vite build` -> Thành công 100% (0 errors, 2572 modules transformed, built in 1.72s).
 
 ---
 
 ## 4. Ghi Chú Cho Manager Khi Duyệt & Merge (Manager Merge Notes)
 - **Mức độ rủi ro**: Thấp (Low).
-- **Trải nghiệm người dùng**: Giao diện hiển thị 3 thẻ rõ ràng, trực quan, hỗ trợ khách hàng đăng ký trải nghiệm ngay với 1 cú click.
+- **Trải nghiệm người dùng**: Giao diện hiển thị 3 thẻ rõ ràng, trực quan. Modal thanh toán gọn nhẹ, chỉ tập trung vào chu kỳ thực tế (3m, 6m, 1y) và thanh toán qua ví, giảm thiểu thao tác thừa cho chủ cửa hàng.
