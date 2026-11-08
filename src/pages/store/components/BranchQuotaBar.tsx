@@ -110,7 +110,9 @@ export const BranchQuotaBar: FC<BranchQuotaBarProps> = ({
                 </span>
               ) : (
                 <span style={{ color: '#DC2626', fontWeight: 600 }}>
-                  Đã đạt giới hạn tối đa {maxBranches}/{maxBranches} chi nhánh của gói hiện tại
+                  {usedBranches > maxBranches
+                    ? `Đã sử dụng ${usedBranches}/${maxBranches} chi nhánh (Vượt quá hạn mức ${usedBranches - maxBranches} chi nhánh)`
+                    : `Đã đạt giới hạn tối đa ${maxBranches}/${maxBranches} chi nhánh của gói hiện tại`}
                 </span>
               )}
             </div>

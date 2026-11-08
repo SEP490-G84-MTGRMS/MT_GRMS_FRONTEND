@@ -94,9 +94,14 @@ export const BranchManagementTab: FC<BranchManagementTabProps> = ({
       const res = await branchManagementApi.toggleStatus(branch.id, nextActive);
       if (res.success) {
         await Promise.all([fetchQuota(), fetchBranches(keyword, statusFilter)]);
+      } else {
+        alert(res.message || 'Không thể thay đổi trạng thái chi nhánh.');
       }
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('Toggle status error:', err);
+      const anyErr = err as { response?: { data?: { message?: string } }; message?: string };
+      const msg = anyErr?.response?.data?.message || anyErr?.message || 'Lỗi khi thay đổi trạng thái chi nhánh.';
+      alert(msg);
     }
   };
 

@@ -48,6 +48,9 @@
      - **Cột Phải**: Chứa khu vực chọn mệnh giá nhanh (50k, 100k, 200k, Khác), ô nhập số tiền đồng bộ 2 chiều, bảng thông tin chuyển khoản (MB Bank, STK, nội dung WAL) và card tổng số tiền thanh toán.
    - **Mở rộng chiều ngang Modal**: Nâng `maxWidth` lên 780px giúp cả 2 cột rộng rãi, dễ nhìn và quét mã tức thì.
    - **Đồng bộ 2 chiều Nút bấm & Ô nhập tiền**: Bấm 50k / 100k / 200k tự động điền input tương ứng; bấm `Khác` tự động focus vào input để người dùng gõ số tiền tùy ý.
+7. `src/pages/store/components/BranchQuotaBar.tsx` & `src/pages/store/components/BranchManagementTab.tsx`:
+   - Cập nhật QuotaBar hiển thị cảnh báo đỏ khi số chi nhánh thực tế vượt quá hạn mức gói (`Đã sử dụng {used}/{max} chi nhánh (Vượt quá hạn mức {diff} chi nhánh)`).
+   - Xử lý bắt lỗi ngoại lệ `QUOTA_EXCEEDED` tại `handleToggleStatus`: hiển thị thông báo alert rõ ràng khi cố bật lại chi nhánh vượt quá hạn mức gói.
 
 ---
 
