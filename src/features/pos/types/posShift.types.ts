@@ -177,3 +177,20 @@ export interface ForceCloseShiftRequest {
   notes?: string | null;
 }
 
+export interface CashierShiftInfo {
+  scheduleId?: string | null;
+  shiftCode?: string | null;
+  shiftName?: string | null;
+  plannedStartTime?: string | null;
+  plannedEndTime?: string | null;
+}
+
+export interface CashierShiftEligibilityDto {
+  isAllowed: boolean;
+  isExempt: boolean;
+  role?: string | null;
+  employeeName?: string | null;
+  reason?: string | null;
+  activeSchedule?: CashierShiftInfo | null;
+}
+

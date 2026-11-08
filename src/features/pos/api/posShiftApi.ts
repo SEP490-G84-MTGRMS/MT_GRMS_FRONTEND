@@ -16,6 +16,7 @@ import type {
   UpdateCountedCashRequest,
   ConfirmCloseShiftRequest,
   ForceCloseShiftRequest,
+  CashierShiftEligibilityDto,
 } from '../types/posShift.types';
 
 export const posShiftApi = {
@@ -216,6 +217,16 @@ export const posShiftApi = {
   async forceCloseShift(shiftId: string, request: ForceCloseShiftRequest): Promise<ShiftDetailResponse> {
     const res = await httpClient.post(`/pos/shifts/${shiftId}/force-close`, request, {
       headers: { 'Idempotency-Key': generateUuidV7() },
+    });
+    return res.data?.data || res.data;
+  },
+
+  /**
+   * Kiểm tra xem thu ngân hiện tại có đủ điều kiện trực ca (có lịch làm việc hợp lệ) để bán hàng POS hay không (REQ-STRICT-SCHEDULE-VALIDATION)
+   */
+  async checkCashierEligibility(branchId?: string): Promise<CashierShiftEligibilityDto> {
+    const res = await httpClient.get('/pos/shifts/cashier-eligibility', {
+      params: { branchId },
     });
     return res.data?.data || res.data;
   },

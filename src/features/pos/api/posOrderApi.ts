@@ -302,7 +302,7 @@ export const posOrderApi = {
   /**
    * Hoàn tất giao hàng đơn đặt trước
    */
-  fulfillPreOrder: async (orderId: string, data: { paymentMethod: string; amountPaid: number; note?: string }): Promise<any> => {
+  fulfillPreOrder: async (orderId: string, data: { paymentMethod: string; amountPaid: number; note?: string; cashierName?: string; shiftId?: string }): Promise<any> => {
     const res = await httpClient.put(`/orders/${orderId}/fulfill`, data);
     return res.data;
   },
