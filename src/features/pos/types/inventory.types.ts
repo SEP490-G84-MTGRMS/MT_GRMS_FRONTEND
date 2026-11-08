@@ -219,6 +219,9 @@ export class PreOrderDTO {
   createdAt: string = '';           // Ngày tạo
   branchId: string = 'BR-01';
   branchName: string = 'Chi nhánh Cầu Giấy (Trung tâm)';
+  cashierName: string = '';         // Người lập đơn cọc
+  fulfilledByCashierName?: string;  // Người giao hàng & hoàn tất
+  fulfilledAt?: string;             // Thời gian giao hàng
   pickupAppointment: string = '';   // Thời gian hẹn đến quầy lấy hàng
   customerName: string = '';
   customerPhone: string = '';

@@ -686,6 +686,10 @@ export const mockProductsAnNhien: Product[] = [
     quantityOnHand: 80,
     batchCode: 'BATCH-AN-GAO-2612',
     expiryDate: '2027-10-01',
+    unitPrices: [
+      { unitId: 'an-unit-01-tui', unitName: 'Túi', conversionRate: 1, price: 55000, isBaseUnit: true },
+      { unitId: 'an-unit-01-thung', unitName: 'Thùng (10 túi)', conversionRate: 10, price: 520000, isBaseUnit: false },
+    ],
   },
   {
     id: 'f0000002-0000-0000-0000-000000000002',
@@ -701,6 +705,10 @@ export const mockProductsAnNhien: Product[] = [
     quantityOnHand: 50,
     batchCode: 'BATCH-AN-TRUNG-2611',
     expiryDate: '2026-11-20',
+    unitPrices: [
+      { unitId: 'an-unit-02-hop', unitName: 'Hộp', conversionRate: 1, price: 45000, isBaseUnit: true },
+      { unitId: 'an-unit-02-thung', unitName: 'Thùng (12 hộp)', conversionRate: 12, price: 510000, isBaseUnit: false },
+    ],
   },
   {
     id: 'f0000003-0000-0000-0000-000000000003',
@@ -716,6 +724,10 @@ export const mockProductsAnNhien: Product[] = [
     quantityOnHand: 60,
     batchCode: 'BATCH-AN-MAM-2708',
     expiryDate: '2028-05-01',
+    unitPrices: [
+      { unitId: 'an-unit-03-chai', unitName: 'Chai', conversionRate: 1, price: 85000, isBaseUnit: true },
+      { unitId: 'an-unit-03-thung', unitName: 'Thùng (6 chai)', conversionRate: 6, price: 490000, isBaseUnit: false },
+    ],
   },
   {
     id: 'f0000004-0000-0000-0000-000000000004',
@@ -731,6 +743,10 @@ export const mockProductsAnNhien: Product[] = [
     quantityOnHand: 40,
     batchCode: 'BATCH-AN-TAO-2611',
     expiryDate: '2026-11-27',
+    unitPrices: [
+      { unitId: 'an-unit-04-kg', unitName: 'Kg', conversionRate: 1, price: 125000, isBaseUnit: true },
+      { unitId: 'an-unit-04-thung', unitName: 'Thùng (10 kg)', conversionRate: 10, price: 1180000, isBaseUnit: false },
+    ],
   },
   {
     id: 'f0000005-0000-0000-0000-000000000005',
@@ -746,6 +762,10 @@ export const mockProductsAnNhien: Product[] = [
     quantityOnHand: 90,
     batchCode: 'BATCH-AN-SUA-2611',
     expiryDate: '2026-11-12',
+    unitPrices: [
+      { unitId: 'an-unit-05-chai', unitName: 'Chai', conversionRate: 1, price: 39000, isBaseUnit: true },
+      { unitId: 'an-unit-05-thung', unitName: 'Thùng (12 chai)', conversionRate: 12, price: 450000, isBaseUnit: false },
+    ],
   },
   {
     id: '01a191cf-1c93-7a8d-87f0-ea3e96376a0a',

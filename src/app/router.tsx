@@ -105,6 +105,7 @@ import { FinanceOverviewPage } from '../features/finance/pages/FinanceOverviewPa
 import { StoreSettingsHubPage } from '../pages/store/StoreSettingsHubPage';
 import { AccountManagementPage } from '../pages/store/AccountManagementPage';
 import { StorePaymentConfigPage } from '../features/pos/pages/StorePaymentConfigPage';
+import { StorePosCashControlPage } from '../features/pos/pages/StorePosCashControlPage';
 
 export const router = createBrowserRouter([
   {
@@ -327,6 +328,10 @@ export const router = createBrowserRouter([
         element: <StorePaymentConfigPage />,
       },
       {
+        path: 'pos-cash-control',
+        element: <StorePosCashControlPage />,
+      },
+      {
         path: 'account',
         element: <AccountManagementPage />,
       },
@@ -529,6 +534,14 @@ export const router = createBrowserRouter([
           {
             path: 'payment-config',
             element: <StorePaymentConfigPage />,
+          },
+          {
+            path: 'pos-cash-control',
+            element: <StorePosCashControlPage />,
+          },
+          {
+            path: 'shifts',
+            element: <PosShiftPage />,
           },
     ],
   },

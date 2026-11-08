@@ -1,4 +1,4 @@
-﻿import { useState } from 'react';
+import { useState } from 'react';
 import type { FC } from 'react';
 import { X, Tag, AlertTriangle, ShoppingBag, Trash2 } from 'lucide-react';
 import type { CartItem } from '../types/pos.types';
@@ -14,6 +14,7 @@ interface Props {
   onOpenCatalogModal?: () => void;
   orderNote: string;
   onOrderNoteChange: (note: string) => void;
+  appliedPromotions?: string[];
 }
 
 export const PosCartTable: FC<Props> = ({
@@ -26,6 +27,7 @@ export const PosCartTable: FC<Props> = ({
   onOpenBelowCostWarning,
   orderNote,
   onOrderNoteChange,
+  appliedPromotions = [],
 }) => {
   const [activeDiscountItemId, setActiveDiscountItemId] = useState<string | null>(null);
 
@@ -88,11 +90,6 @@ export const PosCartTable: FC<Props> = ({
                       <div style={{ fontWeight: 600, color: '#0f172a' }}>{item.product.name}</div>
                       <div style={{ fontSize: 11, color: '#16a34a', marginTop: 2, display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
                         <span>&#10003; Tồn kho: {item.product.quantityOnHand}</span>
-                        {(item.batchCode || (item.product.batchCode && item.product.batchCode !== 'LÔ-FEFO')) && (
-                          <span style={{ backgroundColor: '#f0fdfa', color: '#0f766e', border: '1px solid #99f6e4', padding: '1px 5px', borderRadius: 3, fontWeight: 700, fontSize: 10.5 }}>
-                            Lô: {item.batchCode || item.product.batchCode}
-                          </span>
-                        )}
                       </div>
                     </td>
                     <td style={{ textAlign: 'center' }}>
@@ -246,12 +243,16 @@ export const PosCartTable: FC<Props> = ({
             )}
 
             {/* Dải khuyến mại tự động hóa đơn */}
-            {cart.length > 0 && (
+            {cart.length > 0 && appliedPromotions && appliedPromotions.length > 0 && (
               <tr style={{ backgroundColor: '#fdf2f8' }}>
                 <td colSpan={9} style={{ padding: '8px 12px', color: '#db2777', fontWeight: 600 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <Tag size={14} className="text-pink-600" />
-                    <span>Khuyến mại hóa đơn: Giảm giá tự động 7.00% theo chương trình khách hàng</span>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    {appliedPromotions.map((promo, idx) => (
+                      <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <Tag size={14} className="text-pink-600" />
+                        <span>Khuyến mại: {promo}</span>
+                      </div>
+                    ))}
                   </div>
                 </td>
               </tr>

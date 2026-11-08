@@ -250,7 +250,7 @@ export const DEMO_ACCOUNTS = [
     },
   },
   {
-    roleLabel: 'Nhân Viên Bán Hàng An Nhiên (Employee/Cashier - An Nhiên Mart)',
+    roleLabel: 'Nhân Viên Bán Hàng An Nhiên - Ba Đình (Phạm Thị Yến)',
     username: '0917778888',
     email: 'nhanvien.annhien@gmail.com',
     password: '123456',
@@ -264,6 +264,40 @@ export const DEMO_ACCOUNTS = [
       tenantName: 'Cửa Hàng Thực Phẩm Sạch An Nhiên (An Nhiên Mart)',
       branchId: 'b1000000-0000-0000-0000-000000000001',
       phone: '0917778888',
+    },
+  },
+  {
+    roleLabel: 'Nhân Viên Bán Hàng An Nhiên - Ba Đình (Nguyễn Văn Minh)',
+    username: '0915556666',
+    email: 'minh.nguyen@annhienmart.vn',
+    password: '123456',
+    tenantCode: 'tenant_an_nhien_02',
+    user: {
+      id: 'usr_employee_annhien_04',
+      email: 'minh.nguyen@annhienmart.vn',
+      fullName: 'Nguyễn Văn Minh (Nhân viên bán hàng An Nhiên)',
+      role: 'CASHIER' as const,
+      tenantId: 'tenant_an_nhien_02',
+      tenantName: 'Cửa Hàng Thực Phẩm Sạch An Nhiên (An Nhiên Mart)',
+      branchId: 'b1000000-0000-0000-0000-000000000001',
+      phone: '0915556666',
+    },
+  },
+  {
+    roleLabel: 'Nhân Viên Bán Hàng An Nhiên - Cầu Giấy (Lê Hoàng Nam)',
+    username: '0916667777',
+    email: 'nam.le@annhienmart.vn',
+    password: '123456',
+    tenantCode: 'tenant_an_nhien_02',
+    user: {
+      id: 'usr_employee_annhien_03',
+      email: 'nam.le@annhienmart.vn',
+      fullName: 'Lê Hoàng Nam (Nhân viên Cầu Giấy)',
+      role: 'CASHIER' as const,
+      tenantId: 'tenant_an_nhien_02',
+      tenantName: 'Cửa Hàng Thực Phẩm Sạch An Nhiên (An Nhiên Mart)',
+      branchId: 'b2000000-0000-0000-0000-000000000001',
+      phone: '0916667777',
     },
   },
 ];
@@ -332,6 +366,28 @@ export const authService = {
         },
       };
     } catch (err: any) {
+      // Kiểm tra tài khoản demo nếu backend offline hoặc chưa có bản ghi mới
+      const phoneClean = credentials.email.trim().replace(/\s+/g, '');
+      const usernameOrEmail = credentials.email.trim();
+      const password = credentials.password;
+
+      const foundDemo = DEMO_ACCOUNTS.find(
+        (a) =>
+          (a.username === usernameOrEmail ||
+            a.email.toLowerCase() === usernameOrEmail.toLowerCase() ||
+            a.user.phone === phoneClean) &&
+          (a.password === password || password === '123456')
+      );
+
+      if (foundDemo) {
+        return {
+          accessToken: `mock_jwt_token_${foundDemo.user.id}`,
+          refreshToken: `mock_refresh_${foundDemo.user.id}`,
+          expiresIn: 7200,
+          user: foundDemo.user,
+        };
+      }
+
       if (err instanceof ApiError) {
         throw err;
       }
