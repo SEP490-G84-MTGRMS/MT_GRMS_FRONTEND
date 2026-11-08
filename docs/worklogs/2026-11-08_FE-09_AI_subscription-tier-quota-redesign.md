@@ -24,7 +24,9 @@
 2. `src/pages/store/api/storeApi.ts`:
    - Bổ sung trường `hasStaffManagementAddon?: boolean` trong payload `PurchaseSubscriptionPayload`.
 3. `src/pages/store/components/SubscriptionPricingCards.tsx`:
-   - Cập nhật hàm `mapBackendPlanToCardItem`: Hiển thị 2 thẻ đối xứng cho Gói Thường (99k) và Gói Pro (249k), làm nổi bật các tính năng cốt lõi.
+   - Cập nhật hàm `fetchPlans`: Lọc nghiêm ngặt API response chỉ nhận gói `STANDARD` và `PRO`, sắp xếp Gói Thường trước, Gói Pro sau. Bổ sung cơ chế fallback an toàn sang `SUBSCRIPTION_PLANS` nếu máy chủ chưa nạp dữ liệu.
+   - Cập nhật hàm `mapBackendPlanToCardItem`: Chuẩn hóa tiêu đề và quyền lợi cho 2 thẻ: Gói Thường (99k) và Gói Pro (249k).
+   - Tối ưu skeleton loading từ 4 thẻ thành 2 thẻ tương ứng.
 4. `src/pages/store/components/SubscriptionCheckoutModal.tsx`:
    - Bỏ hoàn toàn trường "Kho phụ".
    - Tự động hiển thị Option nhân viên cho Gói Thường và Stepper thêm chi nhánh cho Gói Pro.
@@ -41,3 +43,4 @@
 ## 4. Ghi Chú Cho Manager Khi Duyệt & Merge (Manager Merge Notes)
 - **Mức độ rủi ro**: Thấp (Low).
 - **Trải nghiệm người dùng**: Giao diện gọn gàng, rõ ràng và tính tiền minh bạch theo đúng chuẩn SaaS.
+

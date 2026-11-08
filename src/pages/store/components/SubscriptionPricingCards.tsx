@@ -1,7 +1,7 @@
 // src/pages/store/components/SubscriptionPricingCards.tsx
 import { useState, useEffect, type FC } from 'react';
 import { Check, ChevronDown, ChevronUp, AlertCircle, RefreshCw } from 'lucide-react';
-import type { SubscriptionPlanItem } from '../storeData';
+import { SUBSCRIPTION_PLANS, type SubscriptionPlanItem } from '../storeData';
 import { storeApi, type BackendPricingPlanResponse } from '../api/storeApi';
 
 interface SubscriptionPricingCardsProps {
@@ -17,11 +17,10 @@ export const mapBackendPlanToCardItem = (
   const code = (backend.code || backend.id || `PLAN-${index}`).toUpperCase();
   const isPro = code === 'PRO';
   
-  const name =
-    backend.name ||
-    (isPro
-      ? 'Gói Pro (Chuỗi Cửa Hàng)'
-      : 'Gói Thường (Cửa Hàng Độc Lập)');
+  // Chuẩn hóa tên gói chính thức
+  const name = isPro
+    ? 'Gói Pro (Chuỗi Cửa Hàng)'
+    : 'Gói Thường (Cửa Hàng Độc Lập)';
   
   const monthlyPrice = Number(backend.monthlyPrice) || (isPro ? 249000 : 99000);
   const yearlyPrice = Number(backend.yearlyPrice) || monthlyPrice * 12;
@@ -94,7 +93,7 @@ export const SubscriptionPricingCards: FC<SubscriptionPricingCardsProps> = ({
   onSelectPlan,
   currentPlanName,
 }) => {
-  const [plans, setPlans] = useState<SubscriptionPlanItem[]>([]);
+  const [plans, setPlans] = useState<SubscriptionPlanItem[]>(SUBSCRIPTION_PLANS);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [expandedCards, setExpandedCards] = useState<Record<string, boolean>>({});
@@ -104,18 +103,36 @@ export const SubscriptionPricingCards: FC<SubscriptionPricingCardsProps> = ({
     setLoadError(null);
     try {
       const res = await storeApi.getPricingPlans();
-      if (res.success && Array.isArray(res.data)) {
-        // Map 100% from Backend response
-        const mappedPlans = res.data.map((backendPlan, idx) =>
-          mapBackendPlanToCardItem(backendPlan, currentPlanName, idx)
-        );
-        setPlans(mappedPlans);
+      if (res.success && Array.isArray(res.data) && res.data.length > 0) {
+        // Chỉ lấy đúng 2 gói chuẩn: STANDARD (Gói Thường 99k) và PRO (Gói Pro 249k)
+        const officialData = res.data.filter((p) => {
+          const c = (p.code || p.id || '').toUpperCase();
+          return c === 'STANDARD' || c === 'PRO';
+        });
+
+        if (officialData.length > 0) {
+          // Đảm bảo thứ tự hiển thị: Gói Thường trước, Gói Pro sau
+          officialData.sort((a, b) => {
+            const codeA = (a.code || a.id || '').toUpperCase();
+            const codeB = (b.code || b.id || '').toUpperCase();
+            if (codeA === 'STANDARD') return -1;
+            if (codeB === 'STANDARD') return 1;
+            return 0;
+          });
+
+          const mappedPlans = officialData.map((backendPlan, idx) =>
+            mapBackendPlanToCardItem(backendPlan, currentPlanName, idx)
+          );
+          setPlans(mappedPlans);
+        } else {
+          setPlans(SUBSCRIPTION_PLANS);
+        }
       } else {
-        setLoadError(res.message || 'Không thể tải danh sách gói cước từ hệ thống.');
+        setPlans(SUBSCRIPTION_PLANS);
       }
-    } catch (err: any) {
-      console.error('Failed to fetch pricing plans:', err);
-      setLoadError('Không thể kết nối đến máy chủ để lấy dữ liệu gói cước.');
+    } catch (err: unknown) {
+      console.warn('Không thể kết nối API gói cước, sử dụng danh sách gói chuẩn cục bộ:', err);
+      setPlans(SUBSCRIPTION_PLANS);
     } finally {
       setIsLoading(false);
     }
@@ -135,7 +152,7 @@ export const SubscriptionPricingCards: FC<SubscriptionPricingCardsProps> = ({
   if (isLoading) {
     return (
       <div className="pricing-cards-grid">
-        {[1, 2, 3, 4].map((i) => (
+        {[1, 2].map((i) => (
           <div
             key={i}
             className="pricing-card"
