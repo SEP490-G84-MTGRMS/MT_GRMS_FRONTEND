@@ -99,5 +99,10 @@ export const branchManagementApi = {
     const res = await httpClient.patch<ApiResponse<BranchItemResponse>>(`/branches/${id}/status`, { isActive });
     return res.data;
   },
+
+  async deleteBranch(id: string): Promise<ApiResponse<boolean>> {
+    const res = await httpClient.delete<ApiResponse<boolean>>(`/branches/${id}`);
+    return res.data;
+  },
 };
 

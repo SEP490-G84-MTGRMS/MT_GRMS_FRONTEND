@@ -11,6 +11,7 @@ import {
   User,
   CheckCircle2,
   XCircle,
+  Trash2,
 } from 'lucide-react';
 import {
   branchManagementApi,
@@ -101,6 +102,32 @@ export const BranchManagementTab: FC<BranchManagementTabProps> = ({
       console.error('Toggle status error:', err);
       const anyErr = err as { response?: { data?: { message?: string } }; message?: string };
       const msg = anyErr?.response?.data?.message || anyErr?.message || 'Lỗi khi thay đổi trạng thái chi nhánh.';
+      alert(msg);
+    }
+  };
+
+  const handleDeleteBranch = async (branch: BranchItemResponse) => {
+    if (branch.isHeadquarter) {
+      alert('Không thể xóa chi nhánh chính (Trụ sở chính) của chuỗi cửa hàng.');
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Bạn có chắc chắn muốn xóa chi nhánh "${branch.name}" (${branch.code})?\n\nHành động này sẽ xóa chi nhánh và giải phóng hạn mức chi nhánh đang sử dụng của chuỗi cửa hàng.`
+    );
+    if (!confirmed) return;
+
+    try {
+      const res = await branchManagementApi.deleteBranch(branch.id);
+      if (res.success) {
+        await Promise.all([fetchQuota(), fetchBranches(keyword, statusFilter)]);
+      } else {
+        alert(res.message || 'Không thể xóa chi nhánh.');
+      }
+    } catch (err: unknown) {
+      console.error('Delete branch error:', err);
+      const anyErr = err as { response?: { data?: { message?: string } }; message?: string };
+      const msg = anyErr?.response?.data?.message || anyErr?.message || 'Lỗi khi xóa chi nhánh.';
       alert(msg);
     }
   };
@@ -374,6 +401,29 @@ export const BranchManagementTab: FC<BranchManagementTabProps> = ({
                           title={isActive ? 'Tạm ngưng hoạt động' : 'Kích hoạt hoạt động'}
                         >
                           <Power size={15} />
+                        </button>
+
+                        {/* Xóa chi nhánh */}
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteBranch(b)}
+                          disabled={b.isHeadquarter}
+                          style={{
+                            width: 32,
+                            height: 32,
+                            borderRadius: 8,
+                            border: `1px solid ${b.isHeadquarter ? '#E2E8F0' : '#FECACA'}`,
+                            background: b.isHeadquarter ? '#F8FAFC' : '#FEF2F2',
+                            color: b.isHeadquarter ? '#CBD5E1' : '#EF4444',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            cursor: b.isHeadquarter ? 'not-allowed' : 'pointer',
+                            opacity: b.isHeadquarter ? 0.6 : 1,
+                          }}
+                          title={b.isHeadquarter ? 'Không thể xóa chi nhánh chính (Trụ sở chính)' : 'Xóa chi nhánh'}
+                        >
+                          <Trash2 size={15} />
                         </button>
                       </div>
                     </td>

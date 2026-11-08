@@ -63,3 +63,20 @@
 ## 4. Ghi Chú Cho Manager Khi Duyệt & Merge (Manager Merge Notes)
 - **Mức độ rủi ro**: Thấp (Low).
 - **Trải nghiệm người dùng**: Giao diện hiển thị 3 thẻ rõ ràng, trực quan. Modal thanh toán gọn nhẹ, chỉ tập trung vào chu kỳ thực tế (3m, 6m, 1y) và thanh toán qua ví, giảm thiểu thao tác thừa cho chủ cửa hàng.
+
+---
+
+### Bổ sung: Nút Xóa Chi Nhánh (Delete Branch Action) trong Quản lý Chi nhánh
+1. **Mục đích**:
+   - Cho phép người dùng trực tiếp xóa các chi nhánh thừa (soft delete) khỏi danh sách để giảm số lượng chi nhánh về hạn mức tối đa của gói cước.
+   - Bảo vệ chi nhánh chính (Trụ sở chính) bằng cách vô hiệu hóa nút xóa và hiển thị tooltip cảnh báo rõ ràng.
+
+2. **Chi tiết tệp thay đổi**:
+   - `src/pages/store/api/branchManagementApi.ts`: Thêm hàm `deleteBranch(id: string)` gọi `DELETE /branches/{id}`.
+   - `src/pages/store/components/BranchManagementTab.tsx`:
+     - Bổ sung hàm `handleDeleteBranch` với hộp thoại xác nhận chi tiết, cảnh báo giải phóng hạn mức quota chi nhánh, tự động re-fetch quota và danh sách chi nhánh sau khi xóa.
+     - Bổ sung nút bấm `Trash2` ở cột "Thao tác" với màu đỏ nhạt/đỏ nổi bật, disable nếu là chi nhánh chính (`isHeadquarter`).
+
+3. **Kiểm thử**:
+   - Chạy `npx vite build` -> Thành công không có lỗi (built in 1.75s).
+
