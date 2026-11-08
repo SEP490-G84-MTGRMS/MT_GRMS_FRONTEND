@@ -12,6 +12,7 @@ import {
   CheckCircle2,
   XCircle,
   Trash2,
+  Eye,
 } from 'lucide-react';
 import {
   branchManagementApi,
@@ -21,6 +22,7 @@ import {
 import { BranchQuotaBar } from './BranchQuotaBar';
 import { BranchFormModal } from './BranchFormModal';
 import { BranchUpgradeModal } from './BranchUpgradeModal';
+import { BranchDetailModal } from './BranchDetailModal';
 
 interface BranchManagementTabProps {
   onGoToSubscriptions: () => void;
@@ -35,7 +37,7 @@ export const BranchManagementTab: FC<BranchManagementTabProps> = ({
   const [keyword, setKeyword] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
-  const [activeModal, setActiveModal] = useState<'create' | 'edit' | 'upgrade' | null>(null);
+  const [activeModal, setActiveModal] = useState<'create' | 'edit' | 'upgrade' | 'detail' | null>(null);
   const [selectedBranch, setSelectedBranch] = useState<BranchItemResponse | null>(null);
 
   // 1. Tải hạn mức chi nhánh (Quota) - chỉ cần gọi 1 lần khi mount hoặc khi thêm/sửa chi nhánh
@@ -269,10 +271,18 @@ export const BranchManagementTab: FC<BranchManagementTabProps> = ({
                 return (
                   <tr
                     key={b.id}
+                    onClick={() => {
+                      setSelectedBranch(b);
+                      setActiveModal('detail');
+                    }}
                     style={{
                       borderBottom: '1px solid #F1F5F9',
                       transition: 'background-color 0.15s ease',
+                      cursor: 'pointer',
                     }}
+                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#F8FAFC')}
+                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                    title="Bấm vào hàng để xem chi tiết thông số chi nhánh"
                   >
                     {/* Mã */}
                     <td style={{ padding: '14px 20px' }}>
@@ -285,6 +295,8 @@ export const BranchManagementTab: FC<BranchManagementTabProps> = ({
                           borderRadius: 6,
                           background: '#EBF5FF',
                           color: '#0066FF',
+                          display: 'inline-block',
+                          boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
                         }}
                       >
                         {b.code}
@@ -293,8 +305,31 @@ export const BranchManagementTab: FC<BranchManagementTabProps> = ({
 
                     {/* Tên & Địa chỉ */}
                     <td style={{ padding: '14px 20px' }}>
-                      <div style={{ fontWeight: 700, color: '#0F172A', fontSize: 14 }}>
-                        {b.name}
+                      <div
+                        style={{
+                          fontWeight: 700,
+                          color: '#0F172A',
+                          fontSize: 14,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 6,
+                        }}
+                      >
+                        <span>{b.name}</span>
+                        {b.isHeadquarter && (
+                          <span
+                            style={{
+                              fontSize: 11,
+                              fontWeight: 700,
+                              color: '#B45309',
+                              backgroundColor: '#FEF3C7',
+                              padding: '1px 6px',
+                              borderRadius: 4,
+                            }}
+                          >
+                            Trụ sở chính
+                          </span>
+                        )}
                       </div>
                       <div
                         style={{
@@ -357,7 +392,34 @@ export const BranchManagementTab: FC<BranchManagementTabProps> = ({
 
                     {/* Thao tác */}
                     <td style={{ padding: '14px 20px', textAlign: 'center' }}>
-                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                      <div
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {/* Xem chi tiết */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedBranch(b);
+                            setActiveModal('detail');
+                          }}
+                          style={{
+                            width: 32,
+                            height: 32,
+                            borderRadius: 8,
+                            border: '1px solid #CBD5E1',
+                            background: '#F0FDFA',
+                            color: '#0F766E',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            cursor: 'pointer',
+                          }}
+                          title="Xem chi tiết các thông số chi nhánh"
+                        >
+                          <Eye size={15} />
+                        </button>
+
                         {/* Sửa */}
                         <button
                           type="button"
@@ -461,6 +523,21 @@ export const BranchManagementTab: FC<BranchManagementTabProps> = ({
           onGoToUpgrade={() => {
             setActiveModal(null);
             onGoToSubscriptions();
+          }}
+        />
+      )}
+
+      {/* Modal Chi tiết chi nhánh */}
+      {activeModal === 'detail' && selectedBranch && (
+        <BranchDetailModal
+          branch={selectedBranch}
+          onClose={() => {
+            setActiveModal(null);
+            setSelectedBranch(null);
+          }}
+          onEdit={(branchToEdit) => {
+            setSelectedBranch(branchToEdit);
+            setActiveModal('edit');
           }}
         />
       )}

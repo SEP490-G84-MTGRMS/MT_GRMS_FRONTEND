@@ -80,3 +80,24 @@
 3. **Kiểm thử**:
    - Chạy `npx vite build` -> Thành công không có lỗi (built in 1.75s).
 
+---
+
+### Bổ sung: Modal Xem Chi Tiết & Thông Số Tổng Quát Chi Nhánh (Branch Detail Modal)
+1. **Mục đích**:
+   - Cho phép người dùng bấm vào hàng chi nhánh hoặc nút icon "Con mắt" (Eye) để xem modal chi tiết:
+     - Phần trên: Toàn bộ thông tin cơ bản của chi nhánh (Mã, Tên, Trụ sở chính, Địa chỉ, Hotline, Email, Quản lý phụ trách, Ngày tạo).
+     - Phần dưới: Các thông số tổng quát hoạt động (Tổng số lượng SKU sản phẩm kinh doanh, tổng tồn kho thực tế SOH, cảnh báo thiếu hàng, tổng nhân sự chi nhánh, số nhân viên active, đơn hàng chờ).
+     - Kèm bảng chuyển tab xem nhanh danh sách sản phẩm và danh sách nhân sự trực thuộc chi nhánh.
+
+2. **Chi tiết tệp thay đổi**:
+   - `src/pages/store/api/branchManagementApi.ts`: Khai báo `BranchDetailResponse`, `BranchEmployeeSummaryItem`, `BranchProductSummaryItem` và hàm `getBranchDetail(id)`.
+   - `src/pages/store/components/BranchDetailModal.tsx`: Tạo mới component modal chi tiết chuẩn giao diện MT-GRMS với bố cục chia 2 phần (thông tin cơ bản ở trên, KPI cards và tabs danh sách ở dưới).
+   - `src/pages/store/components/BranchManagementTab.tsx`:
+     - Bổ sung sự kiện click vào hàng chi nhánh (`cursor: pointer`, hover feedback).
+     - Bổ sung nút icon `Eye` trong cột "Thao tác" (ngăn nổi bọt sự kiện `e.stopPropagation()`).
+     - Tích hợp `BranchDetailModal` và điều hướng sửa nhanh chi nhánh từ modal.
+
+3. **Kiểm thử**:
+   - Chạy `npx vite build` -> Thành công không có lỗi (built in 1.92s).
+
+

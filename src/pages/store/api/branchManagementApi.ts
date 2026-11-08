@@ -38,6 +38,47 @@ export interface BranchItemResponse {
   createdAt: string;
 }
 
+export interface BranchEmployeeSummaryItem {
+  id: string;
+  employeeCode: string;
+  fullName: string;
+  phone: string;
+  status: string;
+  startDate?: string;
+}
+
+export interface BranchProductSummaryItem {
+  productId: string;
+  sku: string;
+  barcode?: string;
+  productName: string;
+  unit: string;
+  sellingPrice: number;
+  status: string;
+}
+
+export interface BranchDetailResponse {
+  id: string;
+  code: string;
+  name: string;
+  address: string;
+  phone?: string;
+  email?: string;
+  managerName?: string;
+  isHeadquarter: boolean;
+  status: string;
+  createdAt: string;
+  totalProducts: number;
+  totalStock: number;
+  lowStockCount: number;
+  totalEmployees: number;
+  activeEmployees: number;
+  pendingOrdersCount: number;
+  lastOrderDate?: string;
+  recentEmployees: BranchEmployeeSummaryItem[];
+  recentProducts: BranchProductSummaryItem[];
+}
+
 export interface CreateBranchPayload {
   branchCode: string;
   name: string;
@@ -82,6 +123,11 @@ export const branchManagementApi = {
 
   async getBranchById(id: string): Promise<ApiResponse<BranchItemResponse>> {
     const res = await httpClient.get<ApiResponse<BranchItemResponse>>(`/branches/${id}`);
+    return res.data;
+  },
+
+  async getBranchDetail(id: string): Promise<ApiResponse<BranchDetailResponse>> {
+    const res = await httpClient.get<ApiResponse<BranchDetailResponse>>(`/branches/${id}/detail`);
     return res.data;
   },
 
