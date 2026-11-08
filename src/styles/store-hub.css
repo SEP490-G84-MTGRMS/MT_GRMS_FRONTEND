@@ -459,3 +459,18 @@
   }
 }
 
+/* Split Layout for Store Wallet Topup Modal */
+.topup-modal-split {
+  display: grid;
+  grid-template-columns: 290px 1fr;
+  gap: 20px;
+  align-items: stretch;
+}
+
+@media (max-width: 720px) {
+  .topup-modal-split {
+    grid-template-columns: 1fr;
+  }
+}
+
+

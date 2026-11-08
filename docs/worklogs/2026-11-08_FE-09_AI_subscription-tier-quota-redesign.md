@@ -41,10 +41,13 @@
    - Bỏ hình thức quét mã VietQR; cố định phương thức `Wallet` (Trừ tiền trực tiếp vào Ví gian hàng).
 5. `src/styles/store-hub.css`:
    - Bổ sung class `.checkout-modal-split` hỗ trợ Grid 2 cột (330px - 1fr) và tự động co dãn 1 cột trên màn hình nhỏ/tablet (max-width: 820px).
+   - Bổ sung class `.topup-modal-split` hỗ trợ bố cục 2 cột (290px - 1fr) cho modal nạp ví.
 6. `src/pages/store/components/StoreWalletTopupModal.tsx`:
-   - **Phóng to mã VietQR**: Nâng kích thước ảnh QR từ 110x110 lên 160x160 (hộp viền 200x200), mở rộng modal lên 630px, đảm bảo camera ứng dụng ngân hàng quét cực kỳ nhanh và chuẩn xác.
-   - **Chuẩn hóa các nút bội số**: Thay đổi mệnh giá thành 4 nút `50.000 đ`, `100.000 đ`, `200.000 đ` và `Khác`.
-   - **Đồng bộ 2 chiều Nút bấm & Ô nhập tiền**: Khi chọn 50k / 100k / 200k, ô input bên dưới tự động cập nhật đúng giá trị tương ứng (50.000 / 100.000 / 200.000); khi chọn `Khác` sẽ tự động focus và bôi đen ô input để người dùng nhập số tiền tùy ý.
+   - **Tái cấu trúc bố cục 2 cột Split View**:
+     - **Cột Trái**: Mã QR VietQR Napas247 siêu lớn (ảnh 230x230, khung chứa 250x250) trải dài toàn bộ chiều cao từ ngang tầm nút chọn mệnh giá ở trên xuống tới đáy của khung thanh toán ở dưới.
+     - **Cột Phải**: Chứa khu vực chọn mệnh giá nhanh (50k, 100k, 200k, Khác), ô nhập số tiền đồng bộ 2 chiều, bảng thông tin chuyển khoản (MB Bank, STK, nội dung WAL) và card tổng số tiền thanh toán.
+   - **Mở rộng chiều ngang Modal**: Nâng `maxWidth` lên 780px giúp cả 2 cột rộng rãi, dễ nhìn và quét mã tức thì.
+   - **Đồng bộ 2 chiều Nút bấm & Ô nhập tiền**: Bấm 50k / 100k / 200k tự động điền input tương ứng; bấm `Khác` tự động focus vào input để người dùng gõ số tiền tùy ý.
 
 ---
 
