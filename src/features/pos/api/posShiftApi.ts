@@ -11,6 +11,11 @@ import type {
   CashMovementSettingsDto,
   UpdateCashMovementSettingsRequest,
   PendingMovementsSummaryResponse,
+  StartClosingShiftRequest,
+  CancelClosingShiftRequest,
+  UpdateCountedCashRequest,
+  ConfirmCloseShiftRequest,
+  ForceCloseShiftRequest,
 } from '../types/posShift.types';
 
 export const posShiftApi = {
@@ -160,6 +165,56 @@ export const posShiftApi = {
    */
   async updateCashMovementSettings(request: UpdateCashMovementSettingsRequest): Promise<CashMovementSettingsDto> {
     const res = await httpClient.put('/pos/settings/cash-movement', request, {
+      headers: { 'Idempotency-Key': generateUuidV7() },
+    });
+    return res.data?.data || res.data;
+  },
+
+  /**
+   * Bắt đầu kiểm đếm chốt ca (chuyển sang Closing và khóa bán hàng toàn chi nhánh)
+   */
+  async startClosingShift(shiftId: string, request?: StartClosingShiftRequest): Promise<ShiftDetailResponse> {
+    const res = await httpClient.post(`/pos/shifts/${shiftId}/start-closing`, request || {}, {
+      headers: { 'Idempotency-Key': generateUuidV7() },
+    });
+    return res.data?.data || res.data;
+  },
+
+  /**
+   * Hủy kiểm đếm chốt ca (trả ca về Open để tiếp tục bán hàng)
+   */
+  async cancelClosingShift(shiftId: string, request?: CancelClosingShiftRequest): Promise<ShiftDetailResponse> {
+    const res = await httpClient.post(`/pos/shifts/${shiftId}/cancel-closing`, request || {}, {
+      headers: { 'Idempotency-Key': generateUuidV7() },
+    });
+    return res.data?.data || res.data;
+  },
+
+  /**
+   * Cập nhật số tiền thực đếm trong két khi ca đang Closing
+   */
+  async updateCountedCash(shiftId: string, request: UpdateCountedCashRequest): Promise<ShiftDetailResponse> {
+    const res = await httpClient.put(`/pos/shifts/${shiftId}/counted-cash`, request, {
+      headers: { 'Idempotency-Key': generateUuidV7() },
+    });
+    return res.data?.data || res.data;
+  },
+
+  /**
+   * Nhân viên xác nhận số đếm và đóng ca chung
+   */
+  async confirmCloseShift(shiftId: string, request: ConfirmCloseShiftRequest): Promise<ShiftDetailResponse> {
+    const res = await httpClient.post(`/pos/shifts/${shiftId}/confirm-close`, request, {
+      headers: { 'Idempotency-Key': generateUuidV7() },
+    });
+    return res.data?.data || res.data;
+  },
+
+  /**
+   * Chủ cửa hàng đóng ca cưỡng bức kèm số đếm và lý do bắt buộc
+   */
+  async forceCloseShift(shiftId: string, request: ForceCloseShiftRequest): Promise<ShiftDetailResponse> {
+    const res = await httpClient.post(`/pos/shifts/${shiftId}/force-close`, request, {
       headers: { 'Idempotency-Key': generateUuidV7() },
     });
     return res.data?.data || res.data;
