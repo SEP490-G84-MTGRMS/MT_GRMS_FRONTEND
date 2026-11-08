@@ -31,6 +31,8 @@ interface Props {
   onOpenVietQrModal: () => void;
   onSubmitCheckout: () => void;
   customerSearchList: Customer[];
+  isCheckoutDisabled?: boolean;
+  disabledReason?: string;
 }
 
 export const PosPaymentPanel: FC<Props> = ({
@@ -60,6 +62,8 @@ export const PosPaymentPanel: FC<Props> = ({
   onOpenVietQrModal,
   onSubmitCheckout,
   customerSearchList,
+  isCheckoutDisabled = false,
+  disabledReason,
 }) => {
   const { user } = useAuthStore();
   const isStoreOwner = user?.role === 'STORE_OWNER';
@@ -516,9 +520,18 @@ export const PosPaymentPanel: FC<Props> = ({
       {/* NÚT THANH TOÁN TO TOÀN CHIỀU RỘNG (Luôn cố định đáy) */}
       <button
         type="button"
+        disabled={isCheckoutDisabled}
         className={`pos-checkout-big-btn ${paymentMethod === 'debt' ? 'pos-btn-debt' : ''}`}
-        style={paymentMethod === 'debt' ? { backgroundColor: '#d97706', borderColor: '#b45309' } : undefined}
+        style={
+          isCheckoutDisabled
+            ? { backgroundColor: '#9ca3af', borderColor: '#6b7280', cursor: 'not-allowed', opacity: 0.7 }
+            : paymentMethod === 'debt'
+            ? { backgroundColor: '#d97706', borderColor: '#b45309' }
+            : undefined
+        }
+        title={disabledReason}
         onClick={() => {
+          if (isCheckoutDisabled) return;
           if (paymentMethod === 'vietqr') {
             onOpenVietQrModal();
           } else {
@@ -526,7 +539,9 @@ export const PosPaymentPanel: FC<Props> = ({
           }
         }}
       >
-        {paymentMethod === 'debt'
+        {isCheckoutDisabled && disabledReason
+          ? `KHÓA BÁN HÀNG (${disabledReason})`
+          : paymentMethod === 'debt'
           ? `GHI NỢ ĐƠN HÀNG (${finalAmount.toLocaleString('vi-VN')} đ)`
           : `THANH TOÁN (${finalAmount.toLocaleString('vi-VN')} đ)`}
       </button>
