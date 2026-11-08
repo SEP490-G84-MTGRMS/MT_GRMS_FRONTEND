@@ -4,6 +4,12 @@ Toàn bộ các thay đổi của repository Frontend React SPA được tổng 
 
 ---
 
+## [Unreleased] - 2026-11-08
+### Added
+- **Chuẩn hóa giao diện 2 Gói cước SaaS mới (Gói Thường 99k & Gói Pro 249k)**: Xóa bỏ gói miễn phí vĩnh viễn (0đ), cập nhật bảng giá đối xứng `SubscriptionPricingCards.tsx` và `storeData.ts` tập trung vào giá trị cốt lõi của siêu thị tạp hóa [FE-09] [worklog: docs/worklogs/2026-11-08_FE-09_AI_subscription-tier-quota-redesign.md].
+- **Nâng cấp Modal Thanh toán thích ứng (`SubscriptionCheckoutModal.tsx`)**: Loại bỏ hoàn toàn ô nhập "Kho phụ" do mỗi chi nhánh tự động kiêm kho hàng tại chỗ; bổ sung tùy chọn mua thêm Quản lý & Phân quyền nhân viên (+30k/tháng) cho Gói Thường và Stepper mua thêm chi nhánh (+80k/chi nhánh/tháng) cho Gói Pro [FE-09] [worklog: docs/worklogs/2026-11-08_FE-09_AI_subscription-tier-quota-redesign.md].
+- Bổ sung trường `hasStaffManagementAddon` trong payload API `storeApi.purchaseSubscription` [FE-09] [worklog: docs/worklogs/2026-11-08_FE-09_AI_subscription-tier-quota-redesign.md].
+
 ## [Unreleased] - 2026-11-07
 ### Added
 - **Nâng cấp và tinh gọn Modal Thêm/Sửa chi nhánh (`BranchFormModal.tsx`)**: Tự động sinh mã chi nhánh 100% theo thứ tự chuỗi (`BR-01` -> `BR-02`), khóa cố định không bắt người dùng nhập tay; bổ sung tùy chọn "Đặt làm cơ sở chính (Trụ sở chính)" cho cả 2 màn hình Thêm mới và Chỉnh sửa; bổ sung Email liên hệ, tùy chọn Đồng bộ danh mục hàng hóa & cảnh báo hạn mức Quota; loại bỏ các trường mở rộng không cần thiết để form gọn gàng, thao tác nhanh [FE-STORE] [worklog: docs/worklogs/2026-11-07_FE-STORE_AI_enhance-branch-create-modal.md].

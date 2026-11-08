@@ -6,7 +6,6 @@ import {
   Wallet,
   CheckCircle2,
   Building2,
-  Warehouse,
   ShieldCheck,
   AlertTriangle,
 } from 'lucide-react';
@@ -33,10 +32,12 @@ export const SubscriptionCheckoutModal: FC<SubscriptionCheckoutModalProps> = ({
   onClose,
   onSuccess,
 }) => {
+  const isPro = (plan.code || plan.id || '').toUpperCase() === 'PRO';
+
   // Billing cycle: '6m' | '12m' | '24m'
   const [cycle, setCycle] = useState<'6m' | '12m' | '24m'>('12m');
   const [extraBranches, setExtraBranches] = useState<number>(0);
-  const [extraWarehouses, setExtraWarehouses] = useState<number>(0);
+  const [hasStaffAddon, setHasStaffAddon] = useState<boolean>(false);
   const [paymentMethod, setPaymentMethod] = useState<'Wallet' | 'VietQR'>('Wallet');
   const [isProcessing, setIsProcessing] = useState(false);
   const [isCompleted, setIsCompleted] = useState(false);
@@ -44,11 +45,13 @@ export const SubscriptionCheckoutModal: FC<SubscriptionCheckoutModalProps> = ({
   const months = cycle === '6m' ? 6 : cycle === '12m' ? 12 : 24;
   const bonusMonths = cycle === '12m' ? 1 : cycle === '24m' ? 3 : 0;
 
-  // Calculation
+  // Calculation chuẩn:
+  // - Gói Pro: thêm chi nhánh +80k/chi nhánh/tháng
+  // - Gói Thường: option quản lý nhân viên +30k/tháng
   const basePrice = plan.monthlyPrice * months;
-  const branchAddonPrice = extraBranches * 270000 * months;
-  const warehouseAddonPrice = extraWarehouses * 150000 * months;
-  const subTotal = basePrice + branchAddonPrice + warehouseAddonPrice;
+  const branchAddonPrice = isPro ? extraBranches * 80000 * months : 0;
+  const staffAddonPrice = !isPro && hasStaffAddon ? 30000 * months : 0;
+  const subTotal = basePrice + branchAddonPrice + staffAddonPrice;
   const vatAmount = Math.round(subTotal * 0.1); // VAT 10%
   const grandTotal = subTotal + vatAmount;
 
@@ -65,8 +68,8 @@ export const SubscriptionCheckoutModal: FC<SubscriptionCheckoutModalProps> = ({
       const res = await storeApi.purchaseSubscription({
         planCode: plan.code || plan.id,
         months,
-        extraBranches,
-        extraWarehouses,
+        extraBranches: isPro ? extraBranches : 0,
+        hasStaffManagementAddon: isPro ? true : hasStaffAddon,
         paymentMethod,
       });
 
@@ -365,201 +368,181 @@ export const SubscriptionCheckoutModal: FC<SubscriptionCheckoutModalProps> = ({
                     fontFamily: 'var(--font-sans)',
                   }}
                 >
-                  2. Tiện ích mở rộng (Tùy chọn)
+                  2. Tiện ích mở rộng
                 </label>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                  {/* Thêm chi nhánh */}
-                  <div
-                    style={{
-                      border: '1.5px solid #E2E8F0',
-                      borderRadius: 16,
-                      padding: '12px 16px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      backgroundColor: '#FFFFFF',
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                      <div
-                        style={{
-                          width: 34,
-                          height: 34,
-                          borderRadius: 10,
-                          backgroundColor: 'var(--blue-light)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: 'var(--blue-primary)',
-                          flexShrink: 0,
-                        }}
-                      >
-                        <Building2 size={18} strokeWidth={2.2} />
-                      </div>
-                      <div>
-                        <div style={{ fontSize: 13.5, fontWeight: 700, color: '#0F172A' }}>
-                          Chi nhánh
-                        </div>
-                        <div style={{ fontSize: 11.5, color: '#64748B', fontWeight: 500 }}>
-                          +270k /tháng
-                        </div>
-                      </div>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <button
-                        type="button"
-                        onClick={() => setExtraBranches(Math.max(0, extraBranches - 1))}
-                        style={{
-                          width: 28,
-                          height: 28,
-                          borderRadius: '50%',
-                          border: '1.5px solid #CBD5E1',
-                          background: '#FFFFFF',
-                          cursor: extraBranches > 0 ? 'pointer' : 'default',
-                          fontWeight: 700,
-                          fontSize: 15,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: extraBranches > 0 ? '#0F172A' : '#94A3B8',
-                          transition: 'all 0.15s ease',
-                        }}
-                      >
-                        -
-                      </button>
-                      <span
-                        style={{
-                          fontFamily: 'var(--font-sans)',
-                          fontVariantNumeric: 'tabular-nums',
-                          fontWeight: 700,
-                          fontSize: 14,
-                          minWidth: 20,
-                          textAlign: 'center',
-                          color: '#0F172A',
-                        }}
-                      >
-                        {extraBranches}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => setExtraBranches(extraBranches + 1)}
-                        style={{
-                          width: 28,
-                          height: 28,
-                          borderRadius: '50%',
-                          border: '1.5px solid var(--blue-primary)',
-                          background: 'var(--blue-light)',
-                          cursor: 'pointer',
-                          fontWeight: 700,
-                          fontSize: 15,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: 'var(--blue-primary)',
-                          transition: 'all 0.15s ease',
-                        }}
-                      >
-                        +
-                      </button>
-                    </div>
-                  </div>
 
-                  {/* Thêm kho hàng */}
+                {!isPro ? (
+                  /* Gói Thường: Checkbox Option Quản lý & Phân quyền nhân viên */
                   <div
+                    onClick={() => setHasStaffAddon(!hasStaffAddon)}
                     style={{
-                      border: '1.5px solid #E2E8F0',
+                      border: hasStaffAddon ? '2px solid var(--blue-primary)' : '1.5px solid #E2E8F0',
                       borderRadius: 16,
-                      padding: '12px 16px',
+                      padding: '14px 18px',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'space-between',
-                      backgroundColor: '#FFFFFF',
+                      backgroundColor: hasStaffAddon ? 'var(--blue-light)' : '#FFFFFF',
+                      boxShadow: hasStaffAddon ? '0 4px 14px rgba(15, 118, 110, 0.12)' : 'none',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
                       <div
                         style={{
-                          width: 34,
-                          height: 34,
-                          borderRadius: 10,
-                          backgroundColor: 'var(--blue-light)',
+                          width: 38,
+                          height: 38,
+                          borderRadius: 12,
+                          backgroundColor: hasStaffAddon ? 'var(--blue-primary)' : '#F1F5F9',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          color: 'var(--blue-primary)',
+                          color: hasStaffAddon ? '#FFFFFF' : '#64748B',
                           flexShrink: 0,
+                          transition: 'all 0.15s ease',
                         }}
                       >
-                        <Warehouse size={18} strokeWidth={2.2} />
+                        <ShieldCheck size={22} strokeWidth={2.2} />
                       </div>
                       <div>
-                        <div style={{ fontSize: 13.5, fontWeight: 700, color: '#0F172A' }}>
-                          Kho phụ
+                        <div style={{ fontSize: 14, fontWeight: 700, color: '#0F172A' }}>
+                          Mua thêm tính năng Quản lý & Phân quyền nhân viên
                         </div>
-                        <div style={{ fontSize: 11.5, color: '#64748B', fontWeight: 500 }}>
-                          +150k /tháng
+                        <div style={{ fontSize: 12, color: '#64748B', fontWeight: 500, marginTop: 2 }}>
+                          +30.000 đ /tháng (Không giới hạn tài khoản nhân viên & ca làm việc)
                         </div>
                       </div>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <button
-                        type="button"
-                        onClick={() => setExtraWarehouses(Math.max(0, extraWarehouses - 1))}
-                        style={{
-                          width: 28,
-                          height: 28,
-                          borderRadius: '50%',
-                          border: '1.5px solid #CBD5E1',
-                          background: '#FFFFFF',
-                          cursor: extraWarehouses > 0 ? 'pointer' : 'default',
-                          fontWeight: 700,
-                          fontSize: 15,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: extraWarehouses > 0 ? '#0F172A' : '#94A3B8',
-                          transition: 'all 0.15s ease',
-                        }}
-                      >
-                        -
-                      </button>
-                      <span
-                        style={{
-                          fontFamily: 'var(--font-sans)',
-                          fontVariantNumeric: 'tabular-nums',
-                          fontWeight: 700,
-                          fontSize: 14,
-                          minWidth: 20,
-                          textAlign: 'center',
-                          color: '#0F172A',
-                        }}
-                      >
-                        {extraWarehouses}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => setExtraWarehouses(extraWarehouses + 1)}
-                        style={{
-                          width: 28,
-                          height: 28,
-                          borderRadius: '50%',
-                          border: '1.5px solid var(--blue-primary)',
-                          background: 'var(--blue-light)',
-                          cursor: 'pointer',
-                          fontWeight: 700,
-                          fontSize: 15,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: 'var(--blue-primary)',
-                          transition: 'all 0.15s ease',
-                        }}
-                      >
-                        +
-                      </button>
+                    <input
+                      type="checkbox"
+                      checked={hasStaffAddon}
+                      onChange={(e) => setHasStaffAddon(e.target.checked)}
+                      style={{
+                        width: 20,
+                        height: 20,
+                        accentColor: 'var(--blue-primary)',
+                        cursor: 'pointer',
+                      }}
+                    />
+                  </div>
+                ) : (
+                  /* Gói Pro: Thông báo Full nhân viên + Stepper Mua thêm chi nhánh */
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    <div
+                      style={{
+                        padding: '10px 14px',
+                        borderRadius: 12,
+                        backgroundColor: '#ECFDF5',
+                        border: '1px solid #A7F3D0',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 10,
+                        color: '#059669',
+                        fontSize: 12.5,
+                        fontWeight: 600,
+                      }}
+                    >
+                      <CheckCircle2 size={18} />
+                      <span>Đã bao gồm sẵn tính năng Quản lý & Phân quyền nhân viên không giới hạn</span>
+                    </div>
+
+                    <div
+                      style={{
+                        border: '1.5px solid #E2E8F0',
+                        borderRadius: 16,
+                        padding: '12px 16px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        backgroundColor: '#FFFFFF',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <div
+                          style={{
+                            width: 36,
+                            height: 36,
+                            borderRadius: 10,
+                            backgroundColor: 'var(--blue-light)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: 'var(--blue-primary)',
+                            flexShrink: 0,
+                          }}
+                        >
+                          <Building2 size={18} strokeWidth={2.2} />
+                        </div>
+                        <div>
+                          <div style={{ fontSize: 13.5, fontWeight: 700, color: '#0F172A' }}>
+                            Mua thêm Chi nhánh (Sẵn có 2 chi nhánh)
+                          </div>
+                          <div style={{ fontSize: 11.5, color: '#64748B', fontWeight: 500 }}>
+                            +80.000 đ /tháng /chi nhánh (Vừa bán hàng vừa kiêm kho)
+                          </div>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <button
+                          type="button"
+                          onClick={() => setExtraBranches(Math.max(0, extraBranches - 1))}
+                          style={{
+                            width: 28,
+                            height: 28,
+                            borderRadius: '50%',
+                            border: '1.5px solid #CBD5E1',
+                            background: '#FFFFFF',
+                            cursor: extraBranches > 0 ? 'pointer' : 'default',
+                            fontWeight: 700,
+                            fontSize: 15,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: extraBranches > 0 ? '#0F172A' : '#94A3B8',
+                            transition: 'all 0.15s ease',
+                          }}
+                        >
+                          -
+                        </button>
+                        <span
+                          style={{
+                            fontFamily: 'var(--font-sans)',
+                            fontVariantNumeric: 'tabular-nums',
+                            fontWeight: 700,
+                            fontSize: 14,
+                            minWidth: 20,
+                            textAlign: 'center',
+                            color: '#0F172A',
+                          }}
+                        >
+                          {extraBranches}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setExtraBranches(extraBranches + 1)}
+                          style={{
+                            width: 28,
+                            height: 28,
+                            borderRadius: '50%',
+                            border: '1.5px solid var(--blue-primary)',
+                            background: 'var(--blue-light)',
+                            cursor: 'pointer',
+                            fontWeight: 700,
+                            fontSize: 15,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: 'var(--blue-primary)',
+                            transition: 'all 0.15s ease',
+                          }}
+                        >
+                          +
+                        </button>
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
               </div>
 
               {/* 3. Phương thức thanh toán */}
@@ -722,11 +705,13 @@ export const SubscriptionCheckoutModal: FC<SubscriptionCheckoutModalProps> = ({
                     {new Intl.NumberFormat('vi-VN').format(basePrice)} đ
                   </span>
                 </div>
-                {(extraBranches > 0 || extraWarehouses > 0) && (
+                {(extraBranches > 0 || hasStaffAddon) && (
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#475569' }}>
-                    <span>Tiện ích chi nhánh & kho ({months} tháng):</span>
+                    <span>
+                      {extraBranches > 0 ? `Tiện ích thêm ${extraBranches} chi nhánh` : 'Tiện ích Quản lý nhân viên'} ({months} tháng):
+                    </span>
                     <span style={{ fontWeight: 600, fontVariantNumeric: 'tabular-nums', color: '#1E293B' }}>
-                      {new Intl.NumberFormat('vi-VN').format(branchAddonPrice + warehouseAddonPrice)} đ
+                      {new Intl.NumberFormat('vi-VN').format(branchAddonPrice + staffAddonPrice)} đ
                     </span>
                   </div>
                 )}

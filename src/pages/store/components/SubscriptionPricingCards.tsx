@@ -15,72 +15,47 @@ export const mapBackendPlanToCardItem = (
   index: number = 0
 ): SubscriptionPlanItem => {
   const code = (backend.code || backend.id || `PLAN-${index}`).toUpperCase();
+  const isPro = code === 'PRO';
+  
   const name =
     backend.name ||
-    (code === 'FREE'
-      ? 'Gói Cơ Bản (Miễn Phí)'
-      : code === 'PRO'
-      ? 'Gói Doanh Nghiệp (Toàn Năng)'
-      : `Gói ${code}`);
-  const monthlyPrice = Number(backend.monthlyPrice) || 0;
+    (isPro
+      ? 'Gói Pro (Chuỗi Cửa Hàng)'
+      : 'Gói Thường (Cửa Hàng Độc Lập)');
+  
+  const monthlyPrice = Number(backend.monthlyPrice) || (isPro ? 249000 : 99000);
   const yearlyPrice = Number(backend.yearlyPrice) || monthlyPrice * 12;
-
-  const isFree = monthlyPrice === 0 || code === 'FREE';
-  const isPro = code === 'PRO' || monthlyPrice >= 900000;
 
   // Tagline
   const tagline =
     backend.description ||
-    (isFree
-      ? 'Dành cho mô hình kinh doanh nhỏ, người bắt đầu kinh doanh hoặc bán hàng online.'
-      : isPro
-      ? 'Dành cho mô hình kinh doanh chuyên nghiệp, chuyên môn hóa quy trình.'
-      : 'Dành cho chuỗi cửa hàng quản lý đa chi nhánh và cần dịch vụ cao cấp.');
+    (isPro
+      ? 'Dành cho chuỗi siêu thị bán lẻ, chuyên môn hóa quy trình và điều chuyển kho chuỗi.'
+      : 'Dành cho tiệm tạp hóa, siêu thị mini độc lập (1 điểm bán kiêm kho tại chỗ).');
 
   // Branch note
-  const maxBranches = backend.quotas?.maxBranches ?? (isFree ? 1 : 10);
-  const branchNote =
-    maxBranches <= 1
-      ? '1 chi nhánh /tháng'
-      : `Quản lý đa chi nhánh: tối đa ${maxBranches} chi nhánh`;
+  const branchNote = isPro
+    ? 'Mặc định sẵn 2 chi nhánh (Mua thêm: +80k/chi nhánh/tháng)'
+    : '1 chi nhánh kiêm kho hàng';
 
-  // Warehouse note
-  const warehouseNote = maxBranches > 1 ? 'Quản lý đa kho: 150k/ +1 kho' : undefined;
-
-  // Features list extraction
+  // Features list
   const feats: string[] = [];
-  const maxStaff = backend.quotas?.maxEmployees ?? (isFree ? 3 : 100);
-  feats.push(
-    maxStaff <= 5 ? `${maxStaff} tài khoản truy cập` : 'Không giới hạn tài khoản truy cập'
-  );
-  feats.push('Không giới hạn tính năng cơ bản');
-  feats.push('Không phí khởi tạo');
-
-  if (backend.features?.fefoExpiryAlert) {
-    feats.push('Cảnh báo cận date & xuất hàng FEFO');
-  }
-  if (backend.features?.vietQrDynamic) {
-    feats.push('Giải pháp thanh toán Napas VietQR tự động');
-  }
-  if (backend.features?.multiUnitConversion) {
-    feats.push('Quy đổi Thùng sang Lon 1 chạm');
-  }
-  if (backend.features?.debtZaloBook) {
-    feats.push('Sổ nợ khách quen & nhắc nợ Zalo');
-  }
-  if (backend.features?.barcodeScanning) {
-    feats.push('Quét mã vạch bán hàng & kiểm kho');
-  }
-  if (backend.features?.financialReporting) {
-    feats.push('Báo cáo tài chính & P&L chuyên sâu');
-  }
-
-  // Support hotline
   if (isPro) {
+    feats.push('Mặc định sẵn 2 chi nhánh kiêm kho hàng');
+    feats.push('Đã bao gồm sẵn Quản lý nhân viên (Không giới hạn tài khoản)');
+    feats.push('Quản lý tồn kho theo Lô & Hạn sử dụng FEFO 3 mức màu');
+    feats.push('Điều chuyển hàng hóa giữa các chi nhánh chuỗi');
+    feats.push('Báo cáo doanh thu & P&L đa chi nhánh');
+    feats.push('Giải pháp thanh toán Napas VietQR tự động');
     feats.push('Hỗ trợ ưu tiên qua tổng đài 1900 6522');
-    feats.push('Hỗ trợ liên kết các hãng vận chuyển');
   } else {
-    feats.push('Hỗ trợ kỹ thuật trực tuyến MT-GRMS');
+    feats.push('1 tài khoản chủ cửa hàng quản trị');
+    feats.push('Tùy chọn: Mua thêm Quản lý & Phân quyền nhân viên (+30k/tháng)');
+    feats.push('Quản lý tồn kho theo Lô & Hạn sử dụng FEFO 3 mức màu');
+    feats.push('Quy đổi Thùng sang Lon 1 chạm');
+    feats.push('Quét mã vạch bán hàng & kiểm kho');
+    feats.push('Giải pháp thanh toán Napas VietQR tự động');
+    feats.push('Không hỗ trợ quản lý chuỗi đa chi nhánh');
   }
 
   // Styling & Theme
@@ -88,26 +63,13 @@ export const mapBackendPlanToCardItem = (
   let badgeBg = '#EBF5FF';
   let buttonBg = 'var(--blue-primary)';
   let buttonText = '#FFFFFF';
-  let highlight = false;
+  let highlight = isPro;
 
-  if (isFree) {
+  if (!isPro) {
     themeColor = '#10B981';
     badgeBg = '#ECFDF5';
     buttonBg = '#E2E8F0';
     buttonText = '#0F172A';
-    highlight = false;
-  } else if (isPro) {
-    themeColor = 'var(--blue-primary)';
-    badgeBg = '#EBF5FF';
-    buttonBg = 'var(--blue-primary)';
-    buttonText = '#FFFFFF';
-    highlight = true;
-  } else {
-    themeColor = 'var(--blue-primary)';
-    badgeBg = 'var(--blue-light)';
-    buttonBg = 'var(--blue-primary)';
-    buttonText = '#FFFFFF';
-    highlight = false;
   }
 
   return {
@@ -118,7 +80,7 @@ export const mapBackendPlanToCardItem = (
     yearlyPrice,
     tagline,
     branchNote,
-    warehouseNote,
+    warehouseNote: undefined,
     features: feats,
     highlight,
     themeColor,

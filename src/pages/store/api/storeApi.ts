@@ -141,6 +141,7 @@ export interface PurchaseSubscriptionPayload {
   planCode: string;
   months?: number;
   extraBranches?: number;
+  hasStaffManagementAddon?: boolean;
   extraWarehouses?: number;
   paymentMethod?: 'Wallet' | 'VietQR';
 }
