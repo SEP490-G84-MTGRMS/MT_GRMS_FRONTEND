@@ -4,8 +4,6 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import {
   ArrowLeft,
   Menu,
-  Bookmark,
-  Printer,
   Clock,
   Plus,
   ChevronLeft,
@@ -15,7 +13,6 @@ import {
   Package,
   ArrowLeftRight,
   DoorOpen,
-  ShieldCheck,
 } from 'lucide-react';
 import type { OrderTab, Product } from '../types/pos.types';
 import type { ShiftDetailResponse } from '../types/posShift.types';
@@ -34,15 +31,12 @@ interface Props {
   onAddTab?: () => void;
   salesMode?: 'fast' | 'normal';
   onToggleSalesMode?: (mode: 'fast' | 'normal') => void;
-  onHoldOrder?: () => void;
-  onPrintRecent?: () => void;
   onCloseShift?: () => void;
   branchName?: string;
   branches?: Array<{ id: string; name: string; address?: string }>;
   selectedBranchId?: string;
   onSelectBranch?: (branchId: string) => void;
   onOpenInventoryLookup?: () => void;
-  pendingApprovalCount?: number;
   currentShift?: ShiftDetailResponse | null;
   onOpenCashMovement?: () => void;
   onOpenShift?: () => void;
@@ -61,15 +55,12 @@ export const PosHeader: FC<Props> = ({
   onAddTab,
   salesMode = 'fast',
   onToggleSalesMode,
-  onHoldOrder,
-  onPrintRecent,
   onCloseShift,
   branchName,
   branches = [],
   selectedBranchId,
   onSelectBranch,
   onOpenInventoryLookup,
-  pendingApprovalCount = 0,
   currentShift,
   onOpenCashMovement,
   onOpenShift,
@@ -298,11 +289,10 @@ export const PosHeader: FC<Props> = ({
                     </option>
                   ))}
                 </select>
-                <span style={{ fontSize: 12, color: '#64748b', whiteSpace: 'nowrap', flexShrink: 0 }}>&bull; Quầy #01</span>
               </div>
             ) : (
               <div className="pos-header-subtitle" style={{ fontSize: 13, fontWeight: 600, color: '#0f766e', margin: 0, whiteSpace: 'nowrap' }}>
-                Chi nhánh: <b>{branchName || (user?.tenantName ? user.tenantName.split(' ')[0] + ' Ba Đình' : 'An Nhiên Mart - Chi nhánh Ba Đình')}</b> &bull; Quầy #01
+                Chi nhánh: <b>{branchName || (user?.tenantName ? user.tenantName.split(' ')[0] + ' Ba Đình' : 'An Nhiên Mart - Chi nhánh Ba Đình')}</b>
               </div>
             )}
           </div>
@@ -542,36 +532,6 @@ export const PosHeader: FC<Props> = ({
                   className="pos-dropdown-item"
                   onClick={() => {
                     setIsMenuOpen(false);
-                    onHoldOrder?.();
-                  }}
-                >
-                  <Bookmark size={16} className="text-teal-700" />
-                  <div className="item-content">
-                    <div className="item-title">Giữ đơn hàng (Recall)</div>
-                    <div className="item-desc">Tạm lưu giỏ hàng hiện tại vào bộ nhớ</div>
-                  </div>
-                </button>
-
-                <button
-                  type="button"
-                  className="pos-dropdown-item"
-                  onClick={() => {
-                    setIsMenuOpen(false);
-                    onPrintRecent?.();
-                  }}
-                >
-                  <Printer size={16} className="text-teal-700" />
-                  <div className="item-content">
-                    <div className="item-title">In bill gần nhất</div>
-                    <div className="item-desc">Xem và in lại hóa đơn vừa thanh toán</div>
-                  </div>
-                </button>
-
-                <button
-                  type="button"
-                  className="pos-dropdown-item"
-                  onClick={() => {
-                    setIsMenuOpen(false);
                     if (onOpenInventoryLookup) {
                       onOpenInventoryLookup();
                     } else {
@@ -626,42 +586,7 @@ export const PosHeader: FC<Props> = ({
                   </button>
                 )}
 
-                {/* 2. Với Chủ Cửa Hàng: Điều hướng ra ngoài trang quản lý Hạn Mức & Phê Duyệt Chi Két tập trung */}
-                {isStoreOwner && (
-                  <button
-                    type="button"
-                    className="pos-dropdown-item"
-                    onClick={() => {
-                      setIsMenuOpen(false);
-                      navigate('/store-owner/pos-cash-control');
-                    }}
-                  >
-                    <ShieldCheck size={16} className="text-teal-700" />
-                    <div className="item-content">
-                      <div className="item-title">
-                        Hạn mức & Duyệt chi két {typeof pendingApprovalCount === 'number' && pendingApprovalCount > 0 ? `(${pendingApprovalCount})` : ''}
-                      </div>
-                      <div className="item-desc">Đến trang thiết lập hạn mức & phê duyệt thu chi két bên ngoài</div>
-                    </div>
-                  </button>
-                )}
-
-                {isStoreOwner ? (
-                  <button
-                    type="button"
-                    className="pos-dropdown-item"
-                    onClick={() => {
-                      setIsMenuOpen(false);
-                      navigate('/pos/shift');
-                    }}
-                  >
-                    <Clock size={16} className="text-teal-700" />
-                    <div className="item-content">
-                      <div className="item-title">Lịch sử ca cửa hàng</div>
-                      <div className="item-desc">Xem nhật ký các ca làm việc & báo cáo két</div>
-                    </div>
-                  </button>
-                ) : (
+                {!isStoreOwner && (
                   <button
                     type="button"
                     className="pos-dropdown-item highlight"

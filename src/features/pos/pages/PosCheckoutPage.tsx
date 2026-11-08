@@ -25,11 +25,10 @@ import { AN_NHIEN_BRANCHES } from '../mock/posMockData';
 import { useBarcodeScanner } from '../../../hooks/useBarcodeScanner';
 import { posOrderApi } from '../api/posOrderApi';
 import { posShiftApi } from '../api/posShiftApi';
-import type { ShiftDetailResponse } from '../types/posShift.types';
+import type { ShiftDetailResponse, CashierShiftEligibilityDto } from '../types/posShift.types';
 import { OpenShiftModal } from '../components/modals/OpenShiftModal';
 import { CashMovementModal } from '../components/modals/CashMovementModal';
 import { CloseShiftModal } from '../components/modals/CloseShiftModal';
-import { ZReportModal } from '../components/modals/ZReportModal';
 import { storeProductApi } from '../../product/api/storeProductApi';
 import { promotionApi, type LoyaltyConfigDto, type CartGiftItemDto } from '../../promotion/api/promotionApi';
 import { useAuthStore } from '../../../stores/useAuthStore';
@@ -117,13 +116,11 @@ export const PosCheckoutPage: FC = () => {
 
   const isStoreOwner = user?.role === 'STORE_OWNER' || user?.role === 'ADMIN';
   const [currentShift, setCurrentShift] = useState<ShiftDetailResponse | null>(null);
+  const [cashierEligibility, setCashierEligibility] = useState<CashierShiftEligibilityDto | null>(null);
   const isShiftClosing = currentShift?.status === 'Closing' || currentShift?.status === 2 || currentShift?.status === 3;
   const [isOpenShiftModalOpen, setIsOpenShiftModalOpen] = useState(false);
   const [isCashMovementModalOpen, setIsCashMovementModalOpen] = useState(false);
   const [isCloseShiftModalOpen, setIsCloseShiftModalOpen] = useState(false);
-  const [isZReportModalOpen, setIsZReportModalOpen] = useState(false);
-  const [pendingApprovalCount, setPendingApprovalCount] = useState<number>(0);
-  const [closedShiftForZReport, setClosedShiftForZReport] = useState<ShiftDetailResponse | null>(null);
 
   // Tab Đa đơn hàng (Multi-tab orders) được lưu trữ riêng biệt theo từng TenantId
   const [tabs, setTabs] = useState<OrderTab[]>(() => getInitialTabs(currentTenantId));
@@ -170,27 +167,30 @@ export const PosCheckoutPage: FC = () => {
     }, 4000);
   };
 
-  // Kiểm tra ca làm việc & số lượng phê duyệt theo vai trò
+  // Kiểm tra ca làm việc & số lượng phê duyệt theo vai trò & quyền trực ca (REQ-STRICT-SCHEDULE-VALIDATION)
   const checkShiftStatus = useCallback(async () => {
     if (!activeBranch?.id) return;
     try {
+      // 1. Kiểm tra tính đủ điều kiện trực ca của thu ngân
+      let eligibility: CashierShiftEligibilityDto | null = null;
+      try {
+        eligibility = await posShiftApi.checkCashierEligibility(activeBranch.id);
+        setCashierEligibility(eligibility);
+      } catch (e) {
+        console.warn('Lỗi kiểm tra lịch trực thu ngân:', e);
+      }
+
       const shift = await posShiftApi.getCurrentShift(activeBranch.id);
       setCurrentShift(shift);
 
-      if (isStoreOwner) {
-        // Chủ cửa hàng: không bắt mở ca, đếm số lượng pending approval & unconfirmed drops
-        try {
-          const res = await posShiftApi.getPendingMovements(activeBranch.id);
-          const pendings = res.movements.filter((m) => m.status === 'PendingApproval' || m.status === 2);
-          const drops = res.movements.filter((m) => (m.category === 'CASH_DRAW' || m.category === 2) && !m.isConfirmedByOwner);
-          setPendingApprovalCount(pendings.length + drops.length);
-        } catch {
-          // ignore
-        }
-      } else {
-        // Thu ngân / Nhân viên: nếu chưa có ca mở thì bắt buộc mở ca, nếu đã có ca thì tự động vào ca
+      if (!isStoreOwner) {
+        // Thu ngân / Nhân viên: nếu chưa có ca mở thì bắt buộc mở ca (nếu đủ điều kiện trực ca)
         if (!shift) {
-          setIsOpenShiftModalOpen(true);
+          if (eligibility && !eligibility.isAllowed) {
+            setIsOpenShiftModalOpen(false);
+          } else {
+            setIsOpenShiftModalOpen(true);
+          }
         } else {
           setIsOpenShiftModalOpen(false);
         }
@@ -455,7 +455,12 @@ export const PosCheckoutPage: FC = () => {
   };
 
   // Cart operations
-    const handleAddToCart = (product: Product, batchCode?: string, expiryDate?: string) => {
+  const handleAddToCart = (product: Product, batchCode?: string, expiryDate?: string) => {
+    if (!currentShift) {
+      alert('⛔ Quầy bán hàng hiện chưa có ca làm việc nào đang mở. Vui lòng mở ca làm việc và kiểm đếm tiền đầu ca trước khi bán hàng!');
+      setIsOpenShiftModalOpen(true);
+      return;
+    }
     const targetBatch = batchCode || product.batchCode;
     const existingIndex = currentTab.cart.findIndex(
       (item) => item.product.id === product.id && (targetBatch ? (item.batchCode || item.product.batchCode) === targetBatch : true)
@@ -838,6 +843,17 @@ export const PosCheckoutPage: FC = () => {
   };
 
   const handleCheckoutSubmit = () => {
+    if (!currentShift) {
+      alert('⛔ Quầy hiện chưa có ca làm việc nào đang mở. Vui lòng mở ca làm việc và kiểm đếm tiền đầu ca trước khi thanh toán đơn hàng!');
+      setIsOpenShiftModalOpen(true);
+      return;
+    }
+
+    if (cashierEligibility && !cashierEligibility.isAllowed) {
+      alert(`⛔ ${cashierEligibility.reason || 'Bạn không có lịch làm việc trong ca hiện tại của chi nhánh.'}`);
+      return;
+    }
+
     if (isShiftClosing) {
       alert('⚠️ Ca bán hàng của chi nhánh đang trong trạng thái kiểm đếm chốt ca (Closing). Hệ thống tạm thời khóa thanh toán đơn hàng trên mọi máy quầy.');
       return;
@@ -867,24 +883,6 @@ export const PosCheckoutPage: FC = () => {
     executeCompleteCheckout();
   };
 
-  const handleHoldOrder = () => {
-    if (currentTab.cart.length === 0) {
-      alert('Không có món hàng nào trong đơn để giữ!');
-      return;
-    }
-    alert(`Đơn hàng "${currentTab.name}" đã được lưu vào bộ nhớ tạm (Recall).`);
-  };
-
-  const handlePrintRecent = () => {
-    if (receiptData) {
-      setIsReceiptModalOpen(true);
-    } else {
-      const demoReceipt = buildReceiptData();
-      setReceiptData(demoReceipt);
-      setIsReceiptModalOpen(true);
-    }
-  };
-
   return (
     <div className="pos-page-wrapper">
       {/* 1. Header Toolbar */}
@@ -906,14 +904,95 @@ export const PosCheckoutPage: FC = () => {
         onAddTab={handleAddTab}
         salesMode={isCatalogModalOpen ? 'normal' : 'fast'}
         onToggleSalesMode={(mode) => setIsCatalogModalOpen(mode === 'normal')}
-        onHoldOrder={handleHoldOrder}
-        onPrintRecent={handlePrintRecent}
-        pendingApprovalCount={pendingApprovalCount}
         currentShift={currentShift}
-        onOpenCashMovement={isStoreOwner ? undefined : () => setIsCashMovementModalOpen(true)}
-        onCloseShift={isStoreOwner ? undefined : () => setIsCloseShiftModalOpen(true)}
-        onOpenShift={isStoreOwner ? undefined : () => setIsOpenShiftModalOpen(true)}
+        onOpenCashMovement={() => setIsCashMovementModalOpen(true)}
+        onCloseShift={() => setIsCloseShiftModalOpen(true)}
+        onOpenShift={() => {
+          if (!isStoreOwner && cashierEligibility && !cashierEligibility.isAllowed) {
+            alert(`⛔ ${cashierEligibility.reason || 'Bạn không có lịch làm việc trong ca hiện tại của chi nhánh.'}`);
+            return;
+          }
+          setIsOpenShiftModalOpen(true);
+        }}
       />
+
+      {/* Cảnh báo chưa mở ca làm việc (Shift Guard) */}
+      {!currentShift && (
+        <div
+          style={{
+            backgroundColor: '#fffbe6',
+            border: '1px solid #ffe58f',
+            color: '#d46b08',
+            padding: '10px 16px',
+            borderRadius: '8px',
+            margin: '10px 16px 0 16px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            fontSize: '14px',
+            boxShadow: '0 2px 4px rgba(212, 107, 8, 0.08)',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '18px' }}>⚠️</span>
+            <div>
+              <strong style={{ display: 'block' }}>Quầy bán hàng hiện chưa có ca làm việc nào đang mở</strong>
+              <span style={{ fontSize: '12px', color: '#873800' }}>
+                Bắt buộc phải mở ca làm việc và kiểm đếm tiền đầu ca trước khi thực hiện bán hàng hoặc thanh toán.
+              </span>
+            </div>
+          </div>
+          <button
+            type="button"
+            className="pos-btn-primary"
+            style={{ padding: '6px 14px', fontSize: '13px' }}
+            onClick={() => setIsOpenShiftModalOpen(true)}
+          >
+            + Mở ca làm việc ngay
+          </button>
+        </div>
+      )}
+
+      {/* Cảnh báo nếu thu ngân không có lịch trực ca hợp lệ (REQ-POS-UI-SCHEDULE-ALERT) */}
+      {cashierEligibility && !cashierEligibility.isAllowed && (
+        <div
+          style={{
+            backgroundColor: '#fff1f0',
+            border: '1px solid #ffa39e',
+            color: '#cf1322',
+            padding: '10px 16px',
+            borderRadius: '8px',
+            margin: '10px 16px 0 16px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            fontSize: '14px',
+            boxShadow: '0 2px 4px rgba(207, 19, 34, 0.08)',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '18px' }}>⛔</span>
+            <div>
+              <strong style={{ display: 'block' }}>Không đủ điều kiện bán hàng trong ca hiện tại</strong>
+              <span style={{ fontSize: '12px', color: '#a8071a' }}>
+                {cashierEligibility.reason || 'Bạn không có lịch làm việc trong ca hiện tại của chi nhánh.'}
+              </span>
+            </div>
+          </div>
+          <span
+            style={{
+              backgroundColor: '#ffccc7',
+              color: '#820014',
+              fontSize: '12px',
+              fontWeight: 600,
+              padding: '4px 10px',
+              borderRadius: '4px',
+            }}
+          >
+            Khóa thanh toán POS
+          </span>
+        </div>
+      )}
 
       {/* Cảnh báo khóa chốt ca bán hàng (Closing Lockdown) */}
       {isShiftClosing && (
@@ -972,6 +1051,7 @@ export const PosCheckoutPage: FC = () => {
             onOpenCatalogModal={() => setIsCatalogModalOpen(true)}
             orderNote={currentTab.note}
             onOrderNoteChange={(note) => updateCurrentTab({ note })}
+            appliedPromotions={appliedPromotions}
           />
         </div>
 
@@ -1008,8 +1088,14 @@ export const PosCheckoutPage: FC = () => {
             onOpenVietQrModal={() => setIsVietQrOpen(true)}
             onSubmitCheckout={handleCheckoutSubmit}
             customerSearchList={customers}
-            isCheckoutDisabled={isShiftClosing}
-            disabledReason={isShiftClosing ? 'Ca đang kiểm đếm chốt ca (Closing)' : undefined}
+            isCheckoutDisabled={isShiftClosing || (cashierEligibility !== null && !cashierEligibility.isAllowed)}
+            disabledReason={
+              isShiftClosing
+                ? 'Ca đang kiểm đếm chốt ca (Closing)'
+                : (cashierEligibility && !cashierEligibility.isAllowed
+                    ? (cashierEligibility.reason || 'Bạn không có lịch làm việc trong ca hiện tại của chi nhánh.')
+                    : undefined)
+            }
           />
         </div>
       </div>
@@ -1126,7 +1212,7 @@ setIsDebtWarningOpen(false);
         }}
       />
 
-      {!isStoreOwner && currentShift && (
+      {currentShift && (
         <CashMovementModal
           isOpen={isCashMovementModalOpen}
           shift={currentShift}
@@ -1138,64 +1224,17 @@ setIsDebtWarningOpen(false);
         />
       )}
 
-      {!isStoreOwner && currentShift && (
+      {currentShift && (
         <CloseShiftModal
           isOpen={isCloseShiftModalOpen}
           shift={currentShift}
           onClose={() => setIsCloseShiftModalOpen(false)}
-          onShiftClosed={(closed) => {
+          onShiftClosed={(_closed) => {
             setCurrentShift(null);
             setIsCloseShiftModalOpen(false);
-            setClosedShiftForZReport(closed);
-            setIsZReportModalOpen(true);
             showToast('✅ Đã chốt ca làm việc và kết toán thành công!');
-          }}
-        />
-      )}
-
-      {closedShiftForZReport && (
-        <ZReportModal
-          isOpen={isZReportModalOpen}
-          onClose={() => {
-            setIsZReportModalOpen(false);
-            setClosedShiftForZReport(null);
             checkShiftStatus();
           }}
-          shiftInfo={{
-            shiftCode: closedShiftForZReport.shiftCode,
-            shiftName: closedShiftForZReport.shiftName,
-            branchName: closedShiftForZReport.branchName || activeBranch.name,
-            posMachine: 'POS-01',
-            cashierName: user?.fullName || 'Thu ngân',
-            cashierCode: 'NV01',
-            supervisorName: 'Chủ Cửa Hàng',
-            startTime: closedShiftForZReport.openedAtUtc,
-            durationText: '1 ca',
-            status: 'closed',
-          }}
-          revenues={[
-            {
-              id: 'cash',
-              methodName: 'Tiền mặt',
-              methodDescription: 'Doanh thu tiền mặt tại két',
-              orderCount: closedShiftForZReport.totalOrdersCount,
-              amount: Math.max(0, closedShiftForZReport.expectedCash - closedShiftForZReport.openingFloat - closedShiftForZReport.totalCashIn + closedShiftForZReport.totalCashOut),
-              percentage: 60,
-              icon: 'Banknote',
-            },
-            {
-              id: 'bank',
-              methodName: 'Chuyển khoản / VietQR',
-              methodDescription: 'Doanh thu chuyển khoản qua ngân hàng',
-              orderCount: 0,
-              amount: closedShiftForZReport.totalBankRevenue || 0,
-              percentage: 40,
-              icon: 'CreditCard',
-            },
-          ]}
-          actualCash={closedShiftForZReport.actualCashCounted ?? 0}
-          theoreticalCash={closedShiftForZReport.expectedCash}
-          initialFloat={closedShiftForZReport.openingFloat}
         />
       )}
 
