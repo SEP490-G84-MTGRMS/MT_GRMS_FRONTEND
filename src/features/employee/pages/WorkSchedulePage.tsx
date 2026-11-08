@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
-import { Search, Plus, User, RefreshCw, Building2, ChevronDown, Check, X } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Search, Plus, User, RefreshCw, Building2, ChevronDown, Check, X, Clock } from 'lucide-react';
 import type {
   Employee,
   EmployeeStatus,
@@ -83,6 +84,7 @@ const getWeekDates = (offsetWeeks: number) => {
 };
 
 export const WorkSchedulePage: React.FC = () => {
+  const navigate = useNavigate();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [shifts, setShifts] = useState<WorkShiftDefinition[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
@@ -956,6 +958,34 @@ export const WorkSchedulePage: React.FC = () => {
             <option value="by_employee">Xem theo nhân viên</option>
             <option value="by_shift">Xem theo ca</option>
           </select>
+
+          <button
+            type="button"
+            className="emp-btn emp-btn-secondary"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              height: 36,
+              padding: '0 12px',
+              fontSize: 13,
+              fontWeight: 600,
+              color: '#0F766E',
+              borderColor: '#99F6E4',
+              backgroundColor: '#F0FDFA',
+              cursor: 'pointer',
+              borderRadius: 8,
+              transition: 'all 0.15s ease',
+            }}
+            onClick={() => {
+              const branchParam = selectedBranchIds.length === 1 ? selectedBranchIds[0] : (selectedBranchIds[0] || '');
+              navigate(branchParam ? `/store-owner/shifts?branchId=${branchParam}` : '/store-owner/shifts');
+            }}
+            title="Xem nhật ký lịch sử ca bán hàng và bàn giao quầy thu ngân"
+          >
+            <Clock size={15} />
+            <span>Lịch sử giao ca</span>
+          </button>
 
           <button
             type="button"

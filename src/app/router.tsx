@@ -539,6 +539,10 @@ export const router = createBrowserRouter([
             path: 'pos-cash-control',
             element: <StorePosCashControlPage />,
           },
+          {
+            path: 'shifts',
+            element: <PosShiftPage />,
+          },
     ],
   },
 
