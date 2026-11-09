@@ -55,8 +55,8 @@ export const LoginPage: FC = () => {
       // Điều hướng thông minh theo vai trò
       if (res.user.isAdmin || res.user.role === "ADMIN") {
         navigate("/admin/dashboard");
-      } else if (res.user.role === "CASHIER") {
-        navigate("/pos");
+      } else if (res.user.role === "STAFF") {
+        navigate("/employee/schedule");
       } else {
         navigate("/store-owner/dashboard");
       }

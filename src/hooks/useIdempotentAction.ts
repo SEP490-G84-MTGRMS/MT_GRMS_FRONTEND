@@ -1,4 +1,5 @@
 import { useRef, useCallback } from 'react';
+import { generateUuidV7 } from '../utils/uuid';
 
 /**
  * Custom Hook quản lý Idempotency-Key cho các thao tác tài chính, két quỹ, chi phí
@@ -6,7 +7,7 @@ import { useRef, useCallback } from 'react';
  * Tự động đổi key mới khi người dùng chỉnh sửa dữ liệu biểu mẫu (tránh lỗi 409 IDEMPOTENCY_PAYLOAD_MISMATCH)
  */
 export function useIdempotentAction() {
-  const currentKeyRef = useRef<string>(crypto.randomUUID());
+  const currentKeyRef = useRef<string>(generateUuidV7());
   const lastPayloadHashRef = useRef<string>('');
 
   /**
@@ -28,7 +29,7 @@ export function useIdempotentAction() {
 
     // Nếu payload thay đổi so với lần submit trước -> sinh key mới
     if (newHash !== lastPayloadHashRef.current) {
-      currentKeyRef.current = crypto.randomUUID();
+      currentKeyRef.current = generateUuidV7();
       lastPayloadHashRef.current = newHash;
     }
 
@@ -39,7 +40,7 @@ export function useIdempotentAction() {
    * Cưỡng chế làm mới key (sau khi giao dịch đã thành công hoàn toàn)
    */
   const resetKey = useCallback(() => {
-    currentKeyRef.current = crypto.randomUUID();
+    currentKeyRef.current = generateUuidV7();
     lastPayloadHashRef.current = '';
   }, []);
 

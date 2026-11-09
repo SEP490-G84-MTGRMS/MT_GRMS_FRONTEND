@@ -1,7 +1,7 @@
 import { cashbookService } from '../../cashbook/services/cashbookService';
 import type { CashAccount } from '../../cashbook/types/cashbook.types';
 import { type FC, useState, useEffect } from 'react';
-import { CloseIcon, TrendingUpIcon } from '../../admin/components';
+import { CloseIcon, TrendingUpIcon, AlertTriangleIcon } from '../../admin/components';
 import {
   EXPENSE_CATEGORY_LABELS,
   type PayExpenseRequest,
@@ -42,9 +42,11 @@ export const PayExpenseModal: FC<PayExpenseModalProps> = ({
   const [note, setNote] = useState('');
   const [cashAccounts, setCashAccounts] = useState<CashAccount[]>([]);
   const [selectedAccountId, setSelectedAccountId] = useState('');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (isOpen) {
+      setErrorMessage(null);
       void cashbookService.getCashAccounts().then((accounts) => {
         setCashAccounts(accounts);
         const filtered = accounts.filter((a) =>
@@ -59,14 +61,32 @@ export const PayExpenseModal: FC<PayExpenseModalProps> = ({
     }
   }, [isOpen, paymentMethod]);
 
-
   if (!isOpen || !item) return null;
+
+  const selectedAccount =
+    cashAccounts.find((a) => a.id === selectedAccountId) ||
+    (cashAccounts.length > 0 ? cashAccounts[0] : null);
+
+  // Business Rule GBR-CSH-03: Poka-yoke chống chi vượt số dư khả dụng
+  const isInsufficientBalance = (item?.amount || 0) > (selectedAccount?.currentBalance || 0);
+  const isCashOverdraft = paymentMethod === 'Cash' && isInsufficientBalance;
+  const isBankOverdraft = paymentMethod === 'BankTransfer' && isInsufficientBalance;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSubmitting) return;
 
+    if (isInsufficientBalance) {
+      setErrorMessage(
+        paymentMethod === 'Cash'
+          ? `Số tiền chi (${formatCurrency(item.amount)}) vượt quá số dư két hiện có (${formatCurrency(selectedAccount?.currentBalance || 0)}). Không thể xuất quỹ âm tiền theo Rule GBR-CSH-03.`
+          : `Số dư tài khoản ngân hàng (${formatCurrency(selectedAccount?.currentBalance || 0)}) không đủ để thanh toán khoản chi (${formatCurrency(item.amount)}).`
+      );
+      return;
+    }
+
     try {
+      setErrorMessage(null);
       await onSubmit(item.expenseId, {
         paymentMethod,
         paidFromAccountId: selectedAccountId || undefined,
@@ -75,8 +95,14 @@ export const PayExpenseModal: FC<PayExpenseModalProps> = ({
         note: note.trim() || undefined,
       });
       onClose();
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('Pay expense failed:', err);
+      const errObj = err as { response?: { data?: { message?: string } }; message?: string };
+      const serverMsg =
+        errObj?.response?.data?.message ||
+        errObj?.message ||
+        'Không thể thực hiện xuất quỹ chi trả. Vui lòng kiểm tra lại số dư tài khoản.';
+      setErrorMessage(serverMsg);
     }
   };
 
@@ -233,6 +259,92 @@ export const PayExpenseModal: FC<PayExpenseModalProps> = ({
               </div>
             )}
 
+            {/* Poka-yoke: Business Rule GBR-CSH-03 Alert Banner */}
+            {isCashOverdraft && (
+              <div
+                style={{
+                  padding: '12px 14px',
+                  background: '#FEF2F2',
+                  borderRadius: '12px',
+                  border: '1px solid #FECACA',
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: '10px',
+                  color: '#991B1B',
+                  fontSize: '0.8rem',
+                  lineHeight: 1.45,
+                }}
+              >
+                <div style={{ flexShrink: 0, marginTop: '2px' }}>
+                  <AlertTriangleIcon size={16} color="#DC2626" />
+                </div>
+                <div>
+                  <div style={{ fontWeight: 700, color: '#B91C1C', marginBottom: '2px' }}>
+                    Vi phạm Rule GBR-CSH-03 (Chống âm két tiền mặt)
+                  </div>
+                  <div>
+                    Số tiền chi (<strong>{formatCurrency(item.amount)}</strong>) vượt quá số dư két tiền mặt hiện có (<strong>{formatCurrency(selectedAccount?.currentBalance || 0)}</strong>).
+                  </div>
+                  <div style={{ marginTop: '4px', fontSize: '0.75rem', color: '#7F1D1D' }}>
+                    💡 <strong>Giải pháp:</strong> Chuyển sang phương thức <strong>Chuyển khoản NH</strong> hoặc nạp thêm tiền vào két quầy trước khi thanh toán.
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Bank Overdraft Alert Banner */}
+            {isBankOverdraft && (
+              <div
+                style={{
+                  padding: '12px 14px',
+                  background: '#FEF2F2',
+                  borderRadius: '12px',
+                  border: '1px solid #FECACA',
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: '10px',
+                  color: '#991B1B',
+                  fontSize: '0.8rem',
+                  lineHeight: 1.45,
+                }}
+              >
+                <div style={{ flexShrink: 0, marginTop: '2px' }}>
+                  <AlertTriangleIcon size={16} color="#DC2626" />
+                </div>
+                <div>
+                  <div style={{ fontWeight: 700, color: '#B91C1C', marginBottom: '2px' }}>
+                    Tài khoản ngân hàng không đủ số dư
+                  </div>
+                  <div>
+                    Số tiền chi (<strong>{formatCurrency(item.amount)}</strong>) vượt quá số dư khả dụng của tài khoản ngân hàng (<strong>{formatCurrency(selectedAccount?.currentBalance || 0)}</strong>).
+                  </div>
+                  <div style={{ marginTop: '4px', fontSize: '0.75rem', color: '#7F1D1D' }}>
+                    💡 <strong>Giải pháp:</strong> Vui lòng nộp thêm tiền vào tài khoản ngân hàng hoặc chọn nguồn chi khác.
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Backend Server Error Banner */}
+            {errorMessage && (
+              <div
+                style={{
+                  padding: '10px 14px',
+                  background: '#FEF2F2',
+                  borderRadius: '8px',
+                  border: '1px solid #FECACA',
+                  color: '#B91C1C',
+                  fontSize: '0.82rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                }}
+              >
+                <AlertTriangleIcon size={14} color="#DC2626" />
+                <span>{errorMessage}</span>
+              </div>
+            )}
+
             {/* Cashbook Integration Checkbox */}
             <div
               style={{
@@ -295,8 +407,23 @@ export const PayExpenseModal: FC<PayExpenseModalProps> = ({
             </button>
             <button
               type="submit"
-              disabled={isSubmitting}
+              disabled={isSubmitting || isInsufficientBalance}
               className="btn-primary-pill"
+              style={
+                isInsufficientBalance
+                  ? {
+                      opacity: 0.55,
+                      cursor: 'not-allowed',
+                      background: '#94A3B8',
+                      boxShadow: 'none',
+                    }
+                  : undefined
+              }
+              title={
+                isInsufficientBalance
+                  ? 'Không thể thanh toán do tài khoản nguồn không đủ số dư'
+                  : undefined
+              }
             >
               <span>{isSubmitting ? 'Đang xử lý...' : 'Xác nhận thanh toán'}</span>
             </button>

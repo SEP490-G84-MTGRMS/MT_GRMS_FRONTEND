@@ -71,6 +71,7 @@ import {
   ShiftConfigPage,
   AttendancePage,
   PayslipManagementPage,
+  ApprovalRequestsPage,
 } from '../features/employee';
 
 // 8. Promotions Feature
@@ -104,7 +105,9 @@ import { TaxSnapshotPage } from '../features/tax-snapshot';
 import { FinanceOverviewPage } from '../features/finance/pages/FinanceOverviewPage';
 import { StoreSettingsHubPage } from '../pages/store/StoreSettingsHubPage';
 import { AccountManagementPage } from '../pages/store/AccountManagementPage';
+import { ProtectedRoute } from '../components/auth/ProtectedRoute';
 import { StorePaymentConfigPage } from '../features/pos/pages/StorePaymentConfigPage';
+import { StorePosCashControlPage } from '../features/pos/pages/StorePosCashControlPage';
 
 export const router = createBrowserRouter([
   {
@@ -327,6 +330,10 @@ export const router = createBrowserRouter([
         element: <StorePaymentConfigPage />,
       },
       {
+        path: 'pos-cash-control',
+        element: <StorePosCashControlPage />,
+      },
+      {
         path: 'account',
         element: <AccountManagementPage />,
       },
@@ -388,7 +395,7 @@ export const router = createBrowserRouter([
       },
       {
         path: 'purchase-orders/employee-matrix',
-        element: <OrderMatrixPage forcedRole="EMPLOYEE" />,
+        element: <OrderMatrixPage forcedRole="STAFF" />,
       },
       {
         path: 'purchase-orders/dispatch-hub',
@@ -464,31 +471,67 @@ export const router = createBrowserRouter([
       },
       {
         path: 'reports/pnl',
-        element: <ReportsPnlDashboardPage />,
+        element: (
+          <ProtectedRoute allowedRoles={['STORE_OWNER', 'ADMIN', 'StoreOwner', 'Admin']}>
+            <ReportsPnlDashboardPage />
+          </ProtectedRoute>
+        ),
       },
-        {
-          path: 'finance',
-          element: <FinanceOverviewPage />,
-        },
-        {
-          path: 'finance/*',
-          element: <Navigate to="/store-owner/finance" replace />,
-        },
+      {
+        path: 'pnl',
+        element: <Navigate to="/store-owner/reports/pnl" replace />,
+      },
+      {
+        path: 'finance',
+        element: (
+          <ProtectedRoute allowedRoles={['STORE_OWNER', 'ADMIN', 'StoreOwner', 'Admin']}>
+            <FinanceOverviewPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'finance/*',
+        element: <Navigate to="/store-owner/finance" replace />,
+      },
       {
         path: 'cashbook',
-        element: <CashbookPage />,
+        element: (
+          <ProtectedRoute allowedRoles={['STORE_OWNER', 'ADMIN', 'StoreOwner', 'Admin']}>
+            <CashbookPage />
+          </ProtectedRoute>
+        ),
       },
       {
         path: 'tax-snapshots',
-        element: <TaxSnapshotPage />,
+        element: (
+          <ProtectedRoute allowedRoles={['STORE_OWNER', 'ADMIN', 'StoreOwner', 'Admin']}>
+            <TaxSnapshotPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'tax',
+        element: <Navigate to="/store-owner/tax-snapshots" replace />,
+      },
+      {
+        path: 'accounting-books',
+        element: <Navigate to="/store-owner/tax-snapshots" replace />,
       },
       {
         path: 'employees',
-        element: <EmployeeListPage />,
+        element: (
+          <ProtectedRoute allowedRoles={['STORE_OWNER', 'ADMIN', 'StoreOwner', 'Admin']}>
+            <EmployeeListPage />
+          </ProtectedRoute>
+        ),
       },
       {
         path: 'employees/schedule',
-        element: <WorkSchedulePage />,
+        element: (
+          <ProtectedRoute allowedRoles={['STORE_OWNER', 'ADMIN', 'StoreOwner', 'Admin']}>
+            <WorkSchedulePage />
+          </ProtectedRoute>
+        ),
       },
       {
         path: 'employees/shifts',
@@ -496,11 +539,23 @@ export const router = createBrowserRouter([
       },
       {
         path: 'employees/attendance',
-        element: <AttendancePage />,
+        element: (
+          <ProtectedRoute allowedRoles={['STORE_OWNER', 'ADMIN', 'StoreOwner', 'Admin']}>
+            <AttendancePage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'employees/approval-requests',
+        element: <ApprovalRequestsPage />,
       },
       {
         path: 'employees/payroll',
-        element: <PayslipManagementPage />,
+        element: (
+          <ProtectedRoute allowedRoles={['STORE_OWNER', 'ADMIN', 'StoreOwner', 'Admin']}>
+            <PayslipManagementPage />
+          </ProtectedRoute>
+        ),
       },
       {
         path: 'promotions',
@@ -529,6 +584,14 @@ export const router = createBrowserRouter([
           {
             path: 'payment-config',
             element: <StorePaymentConfigPage />,
+          },
+          {
+            path: 'pos-cash-control',
+            element: <StorePosCashControlPage />,
+          },
+          {
+            path: 'shifts',
+            element: <PosShiftPage />,
           },
     ],
   },
@@ -625,6 +688,10 @@ export const router = createBrowserRouter([
       {
         path: 'employees/attendance',
         element: <AttendancePage />,
+      },
+      {
+        path: 'employees/approval-requests',
+        element: <ApprovalRequestsPage />,
       },
       {
         path: 'employees/payroll',
@@ -743,6 +810,10 @@ export const router = createBrowserRouter([
         path: 'attendance',
         element: <AttendancePage />,
       },
+      {
+        path: 'payroll',
+        element: <PayslipManagementPage />,
+      },
     ],
   },
 
@@ -808,6 +879,18 @@ export const router = createBrowserRouter([
   {
     path: '/tax-snapshots/*',
     element: <Navigate to="/store-owner/tax-snapshots" replace />,
+  },
+  {
+    path: '/tax',
+    element: <Navigate to="/store-owner/tax-snapshots" replace />,
+  },
+  {
+    path: '/accounting-books',
+    element: <Navigate to="/store-owner/tax-snapshots" replace />,
+  },
+  {
+    path: '/pnl',
+    element: <Navigate to="/store-owner/reports/pnl" replace />,
   },
 
   // Cashbook Shortcut (FE-17)
@@ -932,7 +1015,7 @@ export const router = createBrowserRouter([
           },
           {
             path: 'create-matrix',
-            element: <OrderMatrixPage forcedRole="EMPLOYEE" />,
+            element: <OrderMatrixPage forcedRole="STAFF" />,
           },
         ],
       },
@@ -941,7 +1024,7 @@ export const router = createBrowserRouter([
         children: [
           {
             path: 'purchase-orders/create-matrix',
-            element: <OrderMatrixPage forcedRole="EMPLOYEE" />,
+            element: <OrderMatrixPage forcedRole="STAFF" />,
           },
         ],
       },

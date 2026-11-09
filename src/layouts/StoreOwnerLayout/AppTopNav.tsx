@@ -1,4 +1,4 @@
-﻿import { useState, useRef, useEffect, useCallback, Fragment } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo, Fragment } from "react";
 import type { FC } from "react";
 import { NavLink, Link, useLocation, useNavigate } from "react-router-dom";
 import {
@@ -22,6 +22,7 @@ import {
   FileText,
   CreditCard,
   Boxes,
+  ShieldCheck,
 } from "lucide-react";
 import { useAuthStore } from "../../stores/useAuthStore";
 import {
@@ -30,6 +31,7 @@ import {
   NotificationDrawer,
 } from "../../features/notifications";
 import { BranchSelectorDropdown } from "./BranchSelectorDropdown";
+import { posShiftApi } from "../../features/pos/api/posShiftApi";
 /* ─── Data ─── */
 
 interface NavSubItem {
@@ -279,6 +281,10 @@ const NAV_GROUPS: NavGroup[] = [
           {
             label: "Bảng chấm công",
             to: "/store-owner/employees/attendance"
+          },
+          {
+            label: "Duyệt đơn yêu cầu",
+            to: "/store-owner/employees/approval-requests"
           },
           {
             label: "Cấu hình ca làm việc",
@@ -838,6 +844,21 @@ export const AppTopNav: FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuthStore();
+  const userRole = (user?.role || "").toUpperCase();
+  const isEmployee =
+    userRole === "EMPLOYEE" ||
+    userRole === "CASHIER" ||
+    userRole === "STAFF";
+
+  const visibleNavGroups = useMemo(() => {
+    if (isEmployee) {
+      // Ẩn hoàn toàn menu Tài chính, Nhân sự và Cấu hình gói cước gian hàng đối với Employee
+      return NAV_GROUPS.filter(
+        (g) => g.id !== "finance" && g.id !== "employees" && g.id !== "store"
+      );
+    }
+    return NAV_GROUPS;
+  }, [isEmployee]);
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
@@ -846,6 +867,26 @@ export const AppTopNav: FC = () => {
   const [settingsMenuOpen, setSettingsMenuOpen] = useState(false);
   const settingsMenuRef = useRef<HTMLDivElement | null>(null);
   const settingsTimerRef = useRef<number | null>(null);
+  const [pendingCashApprovalCount, setPendingCashApprovalCount] = useState<number>(0);
+
+  useEffect(() => {
+    if (user?.role === 'STORE_OWNER') {
+      const fetchPending = async () => {
+        try {
+          const res = await posShiftApi.getPendingMovements('');
+          if (res?.movements) {
+            const count = res.movements.filter(
+              (m) => m.status === 'PendingApproval' || m.status === 2 || ((m.category === 'CASH_DRAW' || m.category === 2) && !m.isConfirmedByOwner)
+            ).length;
+            setPendingCashApprovalCount(count);
+          }
+        } catch {
+          // ignore
+        }
+      };
+      fetchPending();
+    }
+  }, [user?.role, location.pathname]);
 
   const clearSettingsTimer = useCallback(() => {
     if (settingsTimerRef.current !== null) {
@@ -1165,7 +1206,7 @@ export const AppTopNav: FC = () => {
               flex: 1,
             }}
           >
-            {NAV_GROUPS.map((group) => {
+            {visibleNavGroups.map((group) => {
               const active = isGroupActive(group);
               const isOpen = openMenu === group.id;
               const ref = getAnchorRef(group.id);
@@ -1413,6 +1454,7 @@ export const AppTopNav: FC = () => {
                   setSettingsMenuOpen((v) => !v);
                 }}
                 style={{
+                  position: "relative",
                   width: 32,
                   height: 32,
                   borderRadius: "50%",
@@ -1436,11 +1478,29 @@ export const AppTopNav: FC = () => {
                     ? "rgba(255, 255, 255, 0.4)"
                     : "transparent";
                 }}
-                title="Thiết lập gian hàng, thanh toán & Gói dịch vụ"
+                title={
+                  pendingCashApprovalCount > 0
+                    ? `Cài đặt (${pendingCashApprovalCount} phiếu chi/rút két chờ duyệt)`
+                    : "Thiết lập gian hàng, thanh toán & Gói dịch vụ"
+                }
                 aria-expanded={settingsMenuOpen}
                 aria-haspopup="true"
               >
                 <Settings size={18} strokeWidth={2} />
+                {pendingCashApprovalCount > 0 && (
+                  <span
+                    style={{
+                      position: "absolute",
+                      top: 2,
+                      right: 2,
+                      width: 8,
+                      height: 8,
+                      borderRadius: "50%",
+                      backgroundColor: "#ef4444",
+                      border: "1.5px solid #0f766e",
+                    }}
+                  />
+                )}
               </button>
 
               {settingsMenuOpen && (
@@ -1581,7 +1641,108 @@ export const AppTopNav: FC = () => {
                         }}
                       />
 
-                      {/* Mục 2: Gói dịch vụ MT-GRMS */}
+                      {/* Mục 2: Hạn Mức & Duyệt Chi Két POS */}
+                      <Link
+                        to="/store-owner/pos-cash-control"
+                        onClick={() => setSettingsMenuOpen(false)}
+                        style={{
+                          display: "flex",
+                          alignItems: "flex-start",
+                          gap: 12,
+                          padding: "10px 16px",
+                          textDecoration: "none",
+                          color: "inherit",
+                          transition: "background-color 0.15s ease",
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = "#f0fdfa";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = "transparent";
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: 36,
+                            height: 36,
+                            borderRadius: 8,
+                            backgroundColor: "#ccfbf1",
+                            color: "#0f766e",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            flexShrink: 0,
+                            marginTop: 1,
+                          }}
+                        >
+                          <ShieldCheck size={18} />
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 6,
+                            }}
+                          >
+                            <span
+                              style={{
+                                fontSize: 13.5,
+                                fontWeight: 700,
+                                color: "#0f766e",
+                              }}
+                            >
+                              Hạn Mức & Duyệt Chi Két POS
+                            </span>
+                            {pendingCashApprovalCount > 0 ? (
+                              <span
+                                style={{
+                                  fontSize: 10,
+                                  fontWeight: 700,
+                                  backgroundColor: "#ef4444",
+                                  color: "#ffffff",
+                                  padding: "1px 7px",
+                                  borderRadius: 10,
+                                }}
+                              >
+                                {pendingCashApprovalCount} cần duyệt
+                              </span>
+                            ) : (
+                              <span
+                                style={{
+                                  fontSize: 10,
+                                  fontWeight: 700,
+                                  backgroundColor: "#0f766e",
+                                  color: "#ffffff",
+                                  padding: "1px 6px",
+                                  borderRadius: 10,
+                                }}
+                              >
+                                POS
+                              </span>
+                            )}
+                          </div>
+                          <div
+                            style={{
+                              fontSize: 12,
+                              color: "#64748b",
+                              marginTop: 2,
+                            }}
+                          >
+                            Thiết lập hạn mức, phê duyệt chi két & xác nhận tiền rút két
+                          </div>
+                        </div>
+                      </Link>
+
+                      <div
+                        style={{
+                          height: 1,
+                          backgroundColor: "#f1f5f9",
+                          margin: "6px 16px",
+                        }}
+                      />
+
+                      {/* Mục 3: Gói dịch vụ MT-GRMS */}
                       <Link
                         to="/store-owner/subscriptions"
                         onClick={() => setSettingsMenuOpen(false)}
@@ -1779,39 +1940,41 @@ export const AppTopNav: FC = () => {
 
                     <div style={{ height: 1, backgroundColor: "#F1F5F9" }} />
 
-                    {/* Ví gian hàng & Hợp đồng */}
-                    <Link
-                      to="/store-owner/account?tab=wallet"
-                      onClick={() => setAccountMenuOpen(false)}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 12,
-                        padding: "11px 16px",
-                        textDecoration: "none",
-                        color: "#1E293B",
-                        backgroundColor: "transparent",
-                        transition: "background-color 0.15s ease",
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = "#F8FAFC";
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = "transparent";
-                      }}
-                    >
-                      <Wallet size={18} strokeWidth={1.9} color="#334155" />
-                      <span
+                    {/* Ví gian hàng & Hợp đồng (chỉ dành cho Chủ gian hàng & Admin) */}
+                    {!isEmployee && (
+                      <Link
+                        to="/store-owner/account?tab=wallet"
+                        onClick={() => setAccountMenuOpen(false)}
                         style={{
-                          flex: 1,
-                          fontSize: 13.5,
-                          fontWeight: 500,
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 12,
+                          padding: "11px 16px",
+                          textDecoration: "none",
                           color: "#1E293B",
+                          backgroundColor: "transparent",
+                          transition: "background-color 0.15s ease",
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = "#F8FAFC";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = "transparent";
                         }}
                       >
-                        Ví tiền
-                      </span>
-                    </Link>
+                        <Wallet size={18} strokeWidth={1.9} color="#334155" />
+                        <span
+                          style={{
+                            flex: 1,
+                            fontSize: 13.5,
+                            fontWeight: 500,
+                            color: "#1E293B",
+                          }}
+                        >
+                          Ví tiền
+                        </span>
+                      </Link>
+                    )}
 
                     <Link
                       to="/store-owner/account?tab=terms"
@@ -1972,7 +2135,7 @@ export const AppTopNav: FC = () => {
                 Quản lý Chuỗi Tạp Hóa
               </div>
             </div>
-            {NAV_GROUPS.map((group) => (
+            {visibleNavGroups.map((group) => (
               <div key={group.id} style={{ padding: "0 12px 4px" }}>
                 {group.to ? (
                   <NavLink

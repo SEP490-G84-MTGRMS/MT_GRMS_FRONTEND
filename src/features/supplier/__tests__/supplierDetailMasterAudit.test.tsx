@@ -290,8 +290,8 @@ describe('MASTER AUDIT SUITE – Supplier Detail Management', () => {
         />
       );
 
-      const inactiveOption = screen.getByTestId('radio-status-inactive');
-      fireEvent.click(inactiveOption);
+      const statusSwitch = screen.queryByTestId('radio-status-inactive') || screen.getByRole('switch');
+      fireEvent.click(statusSwitch);
 
       const submitBtn = screen.getByTestId('btn-save-general-info');
       fireEvent.click(submitBtn);

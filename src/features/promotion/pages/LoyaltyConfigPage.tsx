@@ -5,6 +5,7 @@ import { AdminToast, type ToastState } from '../../admin/components';
 import { LoyaltyConfigForm } from '../components/loyalty/LoyaltyConfigForm';
 import { LoyaltyLedgerTable } from '../components/loyalty/LoyaltyLedgerTable';
 import { AdjustPointsModal } from '../components/loyalty/AdjustPointsModal';
+import { promotionApi } from '../api/promotionApi';
 import {
   INITIAL_LOYALTY_CONFIG,
   INITIAL_POINT_LEDGER,
@@ -20,6 +21,28 @@ export const LoyaltyConfigPage: FC = () => {
   const [config, setConfig] = useState<LoyaltySystemConfig>(INITIAL_LOYALTY_CONFIG);
   const [ledger, setLedger] = useState<PointLedgerItem[]>(INITIAL_POINT_LEDGER);
   const [isAdjustModalOpen, setIsAdjustModalOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    promotionApi.getLoyaltyConfig()
+      .then((data) => {
+        if (data) {
+          setConfig((prev) => ({
+            ...prev,
+            isEnabled: data.isEnabled,
+            earningRateAmount: data.earningRateAmount,
+            earningPoints: data.earningPoints,
+            redemptionRatePoints: data.redemptionRatePoints,
+            redemptionRateAmount: data.redemptionRateAmount,
+            minRedemptionPoints: data.minRedemptionPoints,
+            allowPointsWithPromotions: data.allowPointsWithPromotions,
+          }));
+        }
+      })
+      .catch(() => {
+        // Fallback to default initial config
+      });
+  }, []);
 
   // Active Tab from query param or default to 'config'
   const tabParam = searchParams.get('tab');
@@ -64,8 +87,24 @@ export const LoyaltyConfigPage: FC = () => {
     }
   }, [viewParam, activeTab]);
 
-  const handleSaveConfig = () => {
-    showToast('Đã lưu thành công chính sách tích điểm & hạng thẻ!');
+  const handleSaveConfig = async () => {
+    try {
+      setIsSaving(true);
+      await promotionApi.updateLoyaltyConfig({
+        isEnabled: config.isEnabled,
+        earningRateAmount: config.earningRateAmount,
+        earningPoints: config.earningPoints,
+        redemptionRatePoints: config.redemptionRatePoints,
+        redemptionRateAmount: config.redemptionRateAmount,
+        minRedemptionPoints: config.minRedemptionPoints,
+        allowPointsWithPromotions: config.allowPointsWithPromotions,
+      });
+      showToast('Đã lưu thành công chính sách tích điểm & đổi thưởng!');
+    } catch {
+      showToast('Lỗi khi lưu cấu hình tích điểm', 'error');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleSaveAdjustment = (entry: PointLedgerItem) => {
@@ -143,10 +182,10 @@ export const LoyaltyConfigPage: FC = () => {
               <button
                 onClick={handleSaveConfig}
                 className="btn-primary-pill loyalty-save-btn-top"
-                disabled={!config.isEnabled}
+                disabled={!config.isEnabled || isSaving}
               >
                 <Save size={15} />
-                <span>Lưu thiết lập</span>
+                <span>{isSaving ? 'Đang lưu...' : 'Lưu thiết lập'}</span>
               </button>
             </div>
           )}

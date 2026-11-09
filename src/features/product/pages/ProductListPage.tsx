@@ -46,20 +46,19 @@ export const ProductListPage: React.FC = () => {
   const [totalCount, setTotalCount] = useState<number>(0);
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
-  // RBAC switch (StoreOwner vs Cashier) for BR-SEC-01 verification
+  // RBAC switch (StoreOwner vs Staff) for BR-SEC-01 verification
   const currentUser = useAuthStore((state) => state.user);
   const initialRole: 'StoreOwner' | 'Cashier' =
-    currentUser?.role === 'CASHIER' ? 'Cashier' : 'StoreOwner';
+    currentUser?.role === 'STAFF' ? 'Cashier' : 'StoreOwner';
   const [userRole, setUserRole] = useState<'StoreOwner' | 'Cashier'>(initialRole);
 
   // Sync role if auth state changes
   useEffect(() => {
-    if (currentUser?.role === 'CASHIER') {
+    if (currentUser?.role === 'STAFF') {
       setUserRole('Cashier');
     } else if (
       currentUser?.role === 'ADMIN' ||
-      currentUser?.role === 'STORE_OWNER' ||
-      currentUser?.role === 'MANAGER'
+      currentUser?.role === 'STORE_OWNER'
     ) {
       setUserRole('StoreOwner');
     }
@@ -251,6 +250,7 @@ export const ProductListPage: React.FC = () => {
               internalNote: p.internalNote ?? undefined,
               taxCategory: (p as any).taxCategory || 'STANDARD_1PCT',
               isFavorite: Boolean(p.isFavorite),
+              hasBatches: Boolean(p.hasBatches),
               uomConversions,
             };
           })
@@ -390,7 +390,7 @@ export const ProductListPage: React.FC = () => {
   ) => {
     try {
       if (productToEdit) {
-        // Cập nhật sản phẩm qua PUT /api/v1/products/{id}
+        // Cập nhật sản phẩm qua PUT /api/products/{id}
         await productApi.updateProduct(productToEdit.id, {
           name: data.productName || productToEdit.productName,
           categoryId: data.categoryId || productToEdit.categoryId,
@@ -404,9 +404,10 @@ export const ProductListPage: React.FC = () => {
           description: data.description,
           internalNote: data.internalNote,
           isFavorite: data.isFavorite ?? productToEdit.isFavorite,
+          hasBatches: data.hasBatches ?? productToEdit.hasBatches ?? false,
         });
 
-        // 1. Xóa các đơn vị quy đổi đã bị người dùng gỡ bỏ qua DELETE /api/v1/product-units/{id}
+        // 1. Xóa các đơn vị quy đổi đã bị người dùng gỡ bỏ qua DELETE /api/product-units/{id}
         if (deletedUnitIds && deletedUnitIds.length > 0) {
           for (const unitId of deletedUnitIds) {
             try {
@@ -434,7 +435,7 @@ export const ProductListPage: React.FC = () => {
                 console.warn('Lỗi khi thêm đơn vị quy đổi:', unitErr);
               }
             } else {
-              // Cập nhật đơn vị quy đổi hiện có qua PUT /api/v1/product-units/{id}
+              // Cập nhật đơn vị quy đổi hiện có qua PUT /api/product-units/{id}
               try {
                 await productApi.updateProductUnit(uom.id, {
                   unitName: uom.unitName,
@@ -462,7 +463,7 @@ export const ProductListPage: React.FC = () => {
           setSelectedProduct({ ...selectedProduct, ...data } as ProductItem);
         }
       } else {
-        // Tạo mới sản phẩm trên Backend qua POST /api/v1/products
+        // Tạo mới sản phẩm trên Backend qua POST /api/products
         const created = await productApi.createProduct({
           name: data.productName!,
           categoryId: data.categoryId!,
@@ -476,9 +477,10 @@ export const ProductListPage: React.FC = () => {
           description: data.description,
           internalNote: data.internalNote,
           isFavorite: data.isFavorite ?? false,
+          hasBatches: data.hasBatches ?? false,
         });
 
-        // Thêm các đơn vị quy đổi cho sản phẩm vừa tạo qua POST /api/v1/products/{id}/units
+        // Thêm các đơn vị quy đổi cho sản phẩm vừa tạo qua POST /api/products/{id}/units
         if (data.uomConversions && data.uomConversions.length > 0) {
           const validUnits = data.uomConversions.filter((u) => u.unitName && u.unitName.trim() !== '');
           for (const uom of validUnits) {
@@ -1529,6 +1531,21 @@ export const ProductListPage: React.FC = () => {
                         <span style={{ fontWeight: 600, color: '#1e293b' }}>
                           {p.productName}
                         </span>
+                        {p.hasBatches && (
+                          <span
+                            style={{
+                              fontSize: 11,
+                              fontWeight: 600,
+                              color: '#1d4ed8',
+                              background: '#eff6ff',
+                              border: '1px solid #bfdbfe',
+                              padding: '2px 6px',
+                              borderRadius: 4,
+                            }}
+                          >
+                            Lô & HSD
+                          </span>
+                        )}
                         {p.isCombo && <span className="badge-combo">Combo</span>}
                         {p.status === 'Discontinued' && (
                           <span

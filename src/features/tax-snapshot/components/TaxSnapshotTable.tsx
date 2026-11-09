@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import type { FC } from 'react';
-import { Eye, FileCheck, CheckCircle2, Trash2, FileSpreadsheet } from 'lucide-react';
+import { Eye, FileCheck, CheckCircle2, Trash2, FileSpreadsheet, ShieldCheck, ShieldAlert } from 'lucide-react';
 import { formatTaxPeriodLabel, type TaxSnapshot } from '../types/taxSnapshot';
 import { TaxSnapshotStatusBadge } from './TaxSnapshotStatusBadge';
 import { TablePagination } from '../../../components/common/TablePagination';
+import { taxSnapshotApi } from '../api/taxSnapshotApi';
 
 interface Props {
   snapshots: TaxSnapshot[];
@@ -30,6 +31,26 @@ export const TaxSnapshotTable: FC<Props> = ({
 }) => {
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [pageSize, setPageSize] = useState<number>(10);
+  const [verifyingId, setVerifyingId] = useState<string | null>(null);
+  const [integrityResults, setIntegrityResults] = useState<Record<string, { isIntegrityValid: boolean; message: string }>>({});
+
+  const handleVerifyIntegrity = async (s: TaxSnapshot) => {
+    try {
+      setVerifyingId(s.id);
+      const res = await taxSnapshotApi.verifyIntegrity(s.id);
+      setIntegrityResults((prev) => ({ ...prev, [s.id]: res }));
+    } catch (err: unknown) {
+      setIntegrityResults((prev) => ({
+        ...prev,
+        [s.id]: {
+          isIntegrityValid: false,
+          message: err instanceof Error ? err.message : 'Không thể xác minh chữ ký số.',
+        },
+      }));
+    } finally {
+      setVerifyingId(null);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -94,7 +115,31 @@ export const TaxSnapshotTable: FC<Props> = ({
                   {(s.ordersCount ?? 0).toLocaleString('vi-VN')} đơn
                 </td>
                 <td>
-                  <TaxSnapshotStatusBadge status={s.status || 'draft'} />
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
+                    <TaxSnapshotStatusBadge status={s.status || (s.finalizedAtUtc ? 'Finalized' : 'draft')} />
+                    {integrityResults[s.id] && (
+                      <span
+                        style={{
+                          fontSize: '0.68rem',
+                          fontWeight: 700,
+                          color: integrityResults[s.id].isIntegrityValid ? '#059669' : '#DC2626',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 3,
+                        }}
+                      >
+                        {integrityResults[s.id].isIntegrityValid ? (
+                          <>
+                            <ShieldCheck size={11} /> Toàn vẹn HMAC
+                          </>
+                        ) : (
+                          <>
+                            <ShieldAlert size={11} /> Sai lệch chữ ký!
+                          </>
+                        )}
+                      </span>
+                    )}
+                  </div>
                 </td>
                 <td style={{ fontSize: '0.78rem', color: '#64748B' }}>
                   {s.generatedAt || s.finalizedAtUtc ? new Date(s.generatedAt || s.finalizedAtUtc!).toLocaleDateString('vi-VN') : '—'}
@@ -107,6 +152,25 @@ export const TaxSnapshotTable: FC<Props> = ({
                       title="Xem chi tiết & bảng kê"
                     >
                       <Eye size={15} />
+                    </button>
+
+                    <button
+                      onClick={() => handleVerifyIntegrity(s)}
+                      disabled={verifyingId === s.id}
+                      className="tax-action-btn"
+                      style={{
+                        color:
+                          integrityResults[s.id]?.isIntegrityValid === false
+                            ? '#DC2626'
+                            : '#0F766E',
+                      }}
+                      title="Kiểm tra tính toàn vẹn chữ ký số HMAC-SHA256"
+                    >
+                      {integrityResults[s.id]?.isIntegrityValid === false ? (
+                        <ShieldAlert size={15} />
+                      ) : (
+                        <ShieldCheck size={15} />
+                      )}
                     </button>
 
                     {onExport && (

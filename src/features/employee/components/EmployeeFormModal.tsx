@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Camera, Trash2, Search, ChevronDown, X, Check, Building2, AlertTriangle, RotateCw } from 'lucide-react';
+import { Camera, Trash2, Search, ChevronDown, X, Check, Building2, AlertTriangle, RotateCw, Plus } from 'lucide-react';
 import type {
   Employee,
   Branch,
@@ -10,6 +10,7 @@ import { CreateUserModal } from './CreateUserModal';
 import { CreateAllowanceModal } from './CreateAllowanceModal';
 import { employeeApi } from '../api/employeeApi';
 import { mapFormToCreatePayload } from '../lib/employeeMapper';
+import { extractDescriptorFromImage } from '../lib/faceIdService';
 import { uploadImageToCloudinary } from '../../../utils/cloudinary';
 
 interface EmployeeFormModalProps {
@@ -60,8 +61,14 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [avatarUrl, setAvatarUrl] = useState('');
+  const [faceDescriptor, setFaceDescriptor] = useState<string | null>(null);
+  const [faceImageUrls, setFaceImageUrls] = useState<string[]>([]);
+  const [faceDescriptorsList, setFaceDescriptorsList] = useState<number[][]>([]);
+  const [faceScanStatus, setFaceScanStatus] = useState<'idle' | 'scanning' | 'success' | 'warning'>('idle');
+  const [faceScanMessage, setFaceScanMessage] = useState<string | null>(null);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const avatarInputRef = useRef<HTMLInputElement>(null);
+  const trainingInputRef = useRef<HTMLInputElement>(null);
   const [gender, setGender] = useState<'male' | 'female'>('male');
   const [dateOfBirth, setDateOfBirth] = useState('');
   const [citizenId, setCitizenId] = useState('');
@@ -99,6 +106,56 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
       setPhone(employee.phone || '');
       setEmail(employee.email || '');
       setAvatarUrl(employee.avatarUrl || '');
+      setFaceDescriptor(employee.faceDescriptor || null);
+
+      // Parse danh sách ảnh mẫu FaceImageUrls
+      let initialImages: string[] = [];
+      if (employee.faceImageUrls) {
+        try {
+          if (Array.isArray(employee.faceImageUrls)) {
+            initialImages = employee.faceImageUrls;
+          } else if (typeof employee.faceImageUrls === 'string') {
+            if (employee.faceImageUrls.startsWith('[')) {
+              initialImages = JSON.parse(employee.faceImageUrls);
+            } else {
+              initialImages = [employee.faceImageUrls];
+            }
+          }
+        } catch {
+          initialImages = [];
+        }
+      }
+      if (initialImages.length === 0 && employee.avatarUrl) {
+        initialImages = [employee.avatarUrl];
+      }
+      setFaceImageUrls(initialImages);
+
+      // Parse danh sách vector FaceDescriptors (hỗ trợ cả mảng 1D [128] và 2D [[128], [128]])
+      let initialDescriptors: number[][] = [];
+      if (employee.faceDescriptor) {
+        try {
+          const parsed = JSON.parse(employee.faceDescriptor);
+          if (Array.isArray(parsed)) {
+            if (parsed.length > 0 && Array.isArray(parsed[0])) {
+              initialDescriptors = parsed as number[][];
+            } else if (parsed.length === 128 && typeof parsed[0] === 'number') {
+              initialDescriptors = [parsed as number[]];
+            }
+          }
+        } catch {
+          initialDescriptors = [];
+        }
+      }
+      setFaceDescriptorsList(initialDescriptors);
+
+      if (initialDescriptors.length > 0) {
+        setFaceScanStatus('success');
+        setFaceScanMessage(`Đã kích hoạt FaceID (${initialDescriptors.length} mẫu khuôn mặt)`);
+      } else {
+        setFaceScanStatus('idle');
+        setFaceScanMessage(null);
+      }
+
       setGender(employee.gender || 'male');
       setDateOfBirth(employee.dateOfBirth || '');
       setCitizenId(employee.citizenId || '');
@@ -146,6 +203,11 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
       setPhone('');
       setEmail('');
       setAvatarUrl('');
+      setFaceDescriptor(null);
+      setFaceImageUrls([]);
+      setFaceDescriptorsList([]);
+      setFaceScanStatus('idle');
+      setFaceScanMessage(null);
       setGender('male');
       setDateOfBirth('');
       setCitizenId('');
@@ -219,10 +281,47 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
     try {
       setIsUploadingAvatar(true);
       setFormError(null);
+      setFaceScanStatus('scanning');
+      setFaceScanMessage('Đang tải ảnh và trích xuất vector khuôn mặt...');
       const secureUrl = await uploadImageToCloudinary(file, 'mtgrms/employees');
       setAvatarUrl(secureUrl);
+
+      // Tự động trích xuất vector FaceID từ ảnh đại diện
+      try {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.src = secureUrl;
+        await new Promise((resolve, reject) => {
+          img.onload = resolve;
+          img.onerror = reject;
+        });
+
+        const descriptor = await extractDescriptorFromImage(img);
+        if (descriptor && descriptor.length === 128) {
+          // Thêm/cập nhật ảnh đại diện vào vị trí đầu tiên của danh sách huấn luyện đa ảnh
+          const remainingUrls = faceImageUrls.filter((u) => u !== secureUrl);
+          const newUrls = [secureUrl, ...remainingUrls].slice(0, 4);
+          const newDescriptors = [descriptor, ...faceDescriptorsList.slice(1)].slice(0, 4);
+
+          setFaceImageUrls(newUrls);
+          setFaceDescriptorsList(newDescriptors);
+          const jsonDesc = JSON.stringify(newDescriptors);
+          setFaceDescriptor(jsonDesc);
+          setFaceScanStatus('success');
+          setFaceScanMessage(`Đã nhận diện FaceID thành công (${newDescriptors.length} mẫu khuôn mặt).`);
+        } else {
+          setFaceScanStatus('warning');
+          setFaceScanMessage('Không phát hiện khuôn mặt rõ ràng trong ảnh đại diện. Vui lòng chọn ảnh chụp thẳng, rõ nét.');
+        }
+      } catch (scanErr) {
+        console.warn('Lỗi trích xuất khuôn mặt từ avatar:', scanErr);
+        setFaceScanStatus('warning');
+        setFaceScanMessage('Không thể trích xuất FaceID từ ảnh này.');
+      }
     } catch (err: any) {
       setFormError(err?.message || 'Không thể tải ảnh đại diện lên Cloudinary. Vui lòng thử lại.');
+      setFaceScanStatus('idle');
+      setFaceScanMessage(null);
     } finally {
       setIsUploadingAvatar(false);
       if (avatarInputRef.current) {
@@ -231,11 +330,104 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
     }
   };
 
+  const handleTrainingImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (faceImageUrls.length >= 4) {
+      setFormError('Hệ thống chỉ hỗ trợ tối đa 4 ảnh mẫu huấn luyện FaceID.');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setFormError('Kích thước ảnh không được vượt quá 5MB.');
+      return;
+    }
+
+    try {
+      setIsUploadingAvatar(true);
+      setFormError(null);
+      setFaceScanStatus('scanning');
+      setFaceScanMessage('Đang tải ảnh mẫu và trích xuất vector khuôn mặt...');
+      const secureUrl = await uploadImageToCloudinary(file, 'mtgrms/employees');
+
+      try {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.src = secureUrl;
+        await new Promise((resolve, reject) => {
+          img.onload = resolve;
+          img.onerror = reject;
+        });
+
+        const descriptor = await extractDescriptorFromImage(img);
+        if (descriptor && descriptor.length === 128) {
+          const newUrls = [...faceImageUrls, secureUrl].slice(0, 4);
+          const newDescriptors = [...faceDescriptorsList, descriptor].slice(0, 4);
+          if (!avatarUrl) {
+            setAvatarUrl(secureUrl);
+          }
+          setFaceImageUrls(newUrls);
+          setFaceDescriptorsList(newDescriptors);
+          setFaceDescriptor(JSON.stringify(newDescriptors));
+          setFaceScanStatus('success');
+          setFaceScanMessage(`Đã thêm mẫu FaceID thành công (${newDescriptors.length}/4 mẫu).`);
+        } else {
+          setFormError('Không phát hiện khuôn mặt rõ nét trong ảnh mẫu này. Vui lòng chọn góc mặt rõ ràng hơn.');
+          setFaceScanStatus('warning');
+          setFaceScanMessage('Ảnh mẫu không nhận diện được khuôn mặt.');
+        }
+      } catch (scanErr) {
+        console.warn('Lỗi trích xuất khuôn mặt từ ảnh mẫu:', scanErr);
+        setFormError('Không thể trích xuất đặc trưng khuôn mặt từ ảnh này.');
+      }
+    } catch (err: any) {
+      setFormError(err?.message || 'Không thể tải ảnh mẫu lên Cloudinary.');
+    } finally {
+      setIsUploadingAvatar(false);
+      if (trainingInputRef.current) {
+        trainingInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handleRemoveTrainingImage = (index: number) => {
+    const removedUrl = faceImageUrls[index];
+    const newUrls = faceImageUrls.filter((_, i) => i !== index);
+    const newDescriptors = faceDescriptorsList.filter((_, i) => i !== index);
+
+    setFaceImageUrls(newUrls);
+    setFaceDescriptorsList(newDescriptors);
+
+    if (avatarUrl === removedUrl) {
+      setAvatarUrl(newUrls.length > 0 ? newUrls[0] : '');
+    }
+
+    if (newDescriptors.length > 0) {
+      setFaceDescriptor(JSON.stringify(newDescriptors));
+      setFaceScanStatus('success');
+      setFaceScanMessage(`Còn lại ${newDescriptors.length} mẫu khuôn mặt FaceID`);
+    } else {
+      setFaceDescriptor(null);
+      setFaceScanStatus('idle');
+      setFaceScanMessage(null);
+    }
+  };
+
   const handleRemoveAvatar = (e: React.MouseEvent) => {
     e.stopPropagation();
-    setAvatarUrl('');
-    if (avatarInputRef.current) {
-      avatarInputRef.current.value = '';
+    if (faceImageUrls.length > 1) {
+      handleRemoveTrainingImage(0);
+    } else {
+      setAvatarUrl('');
+      setFaceDescriptor(null);
+      setFaceImageUrls([]);
+      setFaceDescriptorsList([]);
+      setFaceScanStatus('idle');
+      setFaceScanMessage(null);
+      if (avatarInputRef.current) {
+        avatarInputRef.current.value = '';
+      }
     }
   };
 
@@ -326,6 +518,14 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
       return;
     }
 
+    const effectiveAvatar = avatarUrl || (faceImageUrls.length > 0 ? faceImageUrls[0] : undefined);
+    const effectiveFaceDesc = faceDescriptorsList.length > 0
+      ? JSON.stringify(faceDescriptorsList)
+      : faceDescriptor;
+    const effectiveFaceUrls = faceImageUrls.length > 0
+      ? JSON.stringify(faceImageUrls)
+      : (effectiveAvatar ? JSON.stringify([effectiveAvatar]) : undefined);
+
     const payload = mapFormToCreatePayload(
       {
         fullName,
@@ -340,7 +540,9 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
         bankAccountNumber,
         bankName: effectiveBankName,
         bankAccountHolder,
-        avatarUrl,
+        avatarUrl: effectiveAvatar,
+        faceDescriptor: effectiveFaceDesc,
+        faceImageUrls: effectiveFaceUrls,
         salaryBranchId: targetBranchId,
         userId: userId && !userId.startsWith('temp_') ? userId : undefined,
         userName: userName.trim() || undefined,
@@ -397,6 +599,12 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
         setEmail('');
         setCitizenId('');
         setDateOfBirth('');
+        setAvatarUrl('');
+        setFaceDescriptor(null);
+        setFaceImageUrls([]);
+        setFaceDescriptorsList([]);
+        setFaceScanStatus('idle');
+        setFaceScanMessage(null);
         setUserId('');
         setUserName('');
         setUserPassword('');
@@ -532,8 +740,8 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
                       </div>
                     </div>
 
-                    {/* Upload Avatar */}
-                    <div style={{ width: 140, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                    {/* Upload Avatar & FaceID Multi-image Training */}
+                    <div style={{ width: 170, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                       <input
                         ref={avatarInputRef}
                         type="file"
@@ -541,11 +749,18 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
                         style={{ display: 'none' }}
                         onChange={handleAvatarUpload}
                       />
+                      <input
+                        ref={trainingInputRef}
+                        type="file"
+                        accept="image/png,image/jpeg,image/jpg,image/webp"
+                        style={{ display: 'none' }}
+                        onChange={handleTrainingImageUpload}
+                      />
 
                       <div
                         className="emp-avatar-upload-box"
                         onClick={() => !isUploadingAvatar && avatarInputRef.current?.click()}
-                        title={avatarUrl ? 'Nhấn để thay đổi ảnh' : 'Nhấn để tải ảnh đại diện lên'}
+                        title={avatarUrl ? 'Nhấn để thay đổi ảnh đại diện chính' : 'Nhấn để tải ảnh đại diện lên'}
                       >
                         {isUploadingAvatar ? (
                           <div style={{ textAlign: 'center', padding: 8 }}>
@@ -593,7 +808,7 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
                                 fontWeight: 600,
                               }}
                             >
-                              Đổi ảnh
+                              Đổi ảnh chính
                             </div>
                           </>
                         ) : (
@@ -605,9 +820,130 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
                           </div>
                         )}
                       </div>
-                      <small style={{ fontSize: 11, color: '#94A3B8', marginTop: 6, textAlign: 'center' }}>
-                        JPG, PNG, WEBP (Tối đa 5MB)
+                      <small style={{ fontSize: 11, color: '#94A3B8', marginTop: 4, textAlign: 'center' }}>
+                        Ảnh đại diện chính
                       </small>
+
+                      {/* FaceID Multi-image Training Gallery */}
+                      <div
+                        style={{
+                          width: '100%',
+                          marginTop: 10,
+                          padding: '8px 10px',
+                          background: '#F8FAFC',
+                          borderRadius: 8,
+                          border: '1px solid #E2E8F0',
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            marginBottom: 6,
+                          }}
+                        >
+                          <span style={{ fontSize: 11, fontWeight: 700, color: '#334155' }}>
+                            Mẫu FaceID ({faceImageUrls.length}/4)
+                          </span>
+                          {faceImageUrls.length < 4 && (
+                            <button
+                              type="button"
+                              onClick={() => !isUploadingAvatar && trainingInputRef.current?.click()}
+                              style={{
+                                background: '#ECFDF5',
+                                border: '1px solid #A7F3D0',
+                                borderRadius: 4,
+                                color: '#0F766E',
+                                fontSize: 10,
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                padding: '2px 6px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 2,
+                              }}
+                              title="Tải thêm ảnh mẫu khuôn mặt khác để nhận diện chuẩn hơn (ngưỡng 65%)"
+                            >
+                              <Plus size={11} /> Thêm ảnh
+                            </button>
+                          )}
+                        </div>
+
+                        {faceImageUrls.length > 0 ? (
+                          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                            {faceImageUrls.map((imgUrl, idx) => (
+                              <div
+                                key={idx}
+                                onClick={() => setAvatarUrl(imgUrl)}
+                                style={{
+                                  position: 'relative',
+                                  width: 32,
+                                  height: 32,
+                                  borderRadius: 6,
+                                  overflow: 'hidden',
+                                  border: imgUrl === avatarUrl ? '2px solid #0F766E' : '1px solid #CBD5E1',
+                                  cursor: 'pointer',
+                                  background: '#E2E8F0',
+                                }}
+                                title={`Mẫu ${idx + 1}${imgUrl === avatarUrl ? ' (Đang là avatar chính)' : ' (Bấm để chọn làm avatar)'}`}
+                              >
+                                <img
+                                  src={imgUrl}
+                                  alt={`Sample ${idx + 1}`}
+                                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                />
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleRemoveTrainingImage(idx);
+                                  }}
+                                  style={{
+                                    position: 'absolute',
+                                    top: 1,
+                                    right: 1,
+                                    width: 13,
+                                    height: 13,
+                                    borderRadius: '50%',
+                                    background: 'rgba(0,0,0,0.65)',
+                                    color: '#FFF',
+                                    border: 'none',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    cursor: 'pointer',
+                                    padding: 0,
+                                  }}
+                                  title="Xóa mẫu ảnh này"
+                                >
+                                  <X size={8} />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div style={{ fontSize: 10, color: '#94A3B8', textAlign: 'center', padding: '2px 0' }}>
+                            Chưa có dữ liệu mẫu
+                          </div>
+                        )}
+                      </div>
+
+                      {faceScanStatus === 'scanning' && (
+                        <span style={{ fontSize: 11, color: '#0F766E', marginTop: 6, textAlign: 'center', display: 'block', fontWeight: 600 }}>
+                          {faceScanMessage || 'Đang trích xuất FaceID...'}
+                        </span>
+                      )}
+                      {faceScanStatus === 'success' && (
+                        <span style={{ fontSize: 11, color: '#059669', marginTop: 6, textAlign: 'center', display: 'block', fontWeight: 600 }}>
+                          ✓ {faceScanMessage || 'Đã kích hoạt FaceID'}
+                        </span>
+                      )}
+                      {faceScanStatus === 'warning' && (
+                        <span style={{ fontSize: 11, color: '#D97706', marginTop: 6, textAlign: 'center', display: 'block', fontWeight: 500 }} title={faceScanMessage || ''}>
+                          ⚠ {faceScanMessage || 'Chưa nhận diện được mặt'}
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>

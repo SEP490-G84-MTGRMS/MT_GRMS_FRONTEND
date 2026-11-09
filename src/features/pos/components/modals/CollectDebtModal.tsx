@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import type { FC } from 'react';
 import { Banknote, QrCode, History, DollarSign, CheckCircle2 } from 'lucide-react';
 import type { Invoice } from '../../types/inventory.types';
+import { useAuthStore } from '../../../../stores/useAuthStore';
 
 interface Props {
   isOpen: boolean;
@@ -24,10 +25,13 @@ export const CollectDebtModal: FC<Props> = ({
   onClose,
   onCollectDebt,
 }) => {
+  const { user } = useAuthStore();
+  const currentCashierName = user?.role === 'STORE_OWNER'
+    ? `Chủ cửa hàng: ${user?.fullName || 'Admin'}`
+    : (user?.fullName || 'Thu ngân POS');
   const [payAmount, setPayAmount] = useState<number>(0);
   const [payMethod, setPayMethod] = useState<'CASH' | 'VIETQR'>('CASH');
   const [note, setNote] = useState<string>('Khách ghé thanh toán nợ tại quầy');
-  const [cashierName] = useState<string>('Nguyễn Bá Sơn');
 
   useEffect(() => {
     if (invoice) {
@@ -68,7 +72,7 @@ export const CollectDebtModal: FC<Props> = ({
       amount: payAmount,
       method: payMethod,
       note: note.trim() || 'Thu nợ đơn bán lẻ',
-      cashierName,
+      cashierName: currentCashierName,
     });
     onClose();
   };

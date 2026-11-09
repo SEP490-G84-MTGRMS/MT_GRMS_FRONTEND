@@ -1,4 +1,6 @@
 import { type FC, useState, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { useAuthStore } from '../../../stores/useAuthStore';
 import {
   AdminToast,
   type ToastState,
@@ -28,6 +30,13 @@ import { calculatePeriodRange } from '../utils/datePeriodUtils';
 import '../service-expenses.css';
 
 export const ServiceExpensesPage: FC = () => {
+  const [searchParams] = useSearchParams();
+  const user = useAuthStore((state) => state.user);
+  const isEmployee =
+    user?.role === 'STAFF' ||
+    (user?.role as unknown as string) === 'EMPLOYEE' ||
+    (user?.role as unknown as string) === 'CASHIER';
+  const urlSearch = searchParams.get('search') || searchParams.get('keyword') || '';
   const [periodLabel, setPeriodLabel] = useState('Tháng 10/2026');
   const [filters, setFilters] = useState<ExpenseFilterParams>(() => {
     const range = calculatePeriodRange('this-month');
@@ -37,7 +46,7 @@ export const ServiceExpensesPage: FC = () => {
       branchId: '',
       category: '',
       status: '',
-      keyword: '',
+      keyword: urlSearch,
       fromDate: range.fromDate,
       toDate: range.toDate,
     };
@@ -115,8 +124,15 @@ export const ServiceExpensesPage: FC = () => {
     expenseId: string,
     data: PayExpenseRequest
   ) => {
-    await payExpenseMutation.mutateAsync({ expenseId, data });
-    showToast('Đã hoàn tất thanh toán và hạch toán dòng tiền Sổ quỹ!', 'success');
+    try {
+      await payExpenseMutation.mutateAsync({ expenseId, data });
+      showToast('Đã hoàn tất thanh toán và hạch toán dòng tiền Sổ quỹ!', 'success');
+    } catch (err: unknown) {
+      const errObj = err as { response?: { data?: { message?: string } }; message?: string };
+      const msg = errObj?.response?.data?.message || errObj?.message || 'Lỗi khi xuất quỹ thanh toán chi phí';
+      showToast(msg, 'error');
+      throw err;
+    }
   };
 
   const handleCancelClick = async (item: ServiceExpenseDto) => {
@@ -220,6 +236,7 @@ export const ServiceExpensesPage: FC = () => {
         onViewBill={(url, title) => setPreviewBill({ url, title })}
         onPay={(item) => setPayingItem(item)}
         onCancel={handleCancelClick}
+        canManageExpenses={!isEmployee}
       />
 
       {/* Create Modal */}

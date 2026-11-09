@@ -13,8 +13,17 @@ interface Props {
   onOpenOrderDiscountModal: () => void;
   couponCode: string;
   onCouponCodeChange: (code: string) => void;
+  couponDiscountAmount?: number;
+  onValidateCoupon?: () => void;
+  isValidatingCoupon?: boolean;
+  couponStatusText?: string;
   usePoints: boolean;
   onToggleUsePoints: (use: boolean) => void;
+  pointsDeduction?: number;
+  pointsToRedeem?: number;
+  minPointsRequired?: number;
+  appliedPromotions?: string[];
+  giftItems?: { productName: string; quantity: number; reason?: string }[];
   paymentMethod: 'cash' | 'vietqr' | 'debt';
   onPaymentMethodChange: (method: 'cash' | 'vietqr' | 'debt') => void;
   cashTendered: number;
@@ -22,6 +31,8 @@ interface Props {
   onOpenVietQrModal: () => void;
   onSubmitCheckout: () => void;
   customerSearchList: Customer[];
+  isCheckoutDisabled?: boolean;
+  disabledReason?: string;
 }
 
 export const PosPaymentPanel: FC<Props> = ({
@@ -33,8 +44,17 @@ export const PosPaymentPanel: FC<Props> = ({
   onOpenOrderDiscountModal,
   couponCode,
   onCouponCodeChange,
+  couponDiscountAmount: externalCouponDiscount,
+  onValidateCoupon,
+  isValidatingCoupon,
+  couponStatusText,
   usePoints,
   onToggleUsePoints,
+  pointsDeduction: externalPointsDeduction,
+  pointsToRedeem = 0,
+  minPointsRequired = 20,
+  appliedPromotions = [],
+  giftItems = [],
   paymentMethod,
   onPaymentMethodChange,
   cashTendered,
@@ -42,6 +62,8 @@ export const PosPaymentPanel: FC<Props> = ({
   onOpenVietQrModal,
   onSubmitCheckout,
   customerSearchList,
+  isCheckoutDisabled = false,
+  disabledReason,
 }) => {
   const { user } = useAuthStore();
   const isStoreOwner = user?.role === 'STORE_OWNER';
@@ -69,12 +91,15 @@ export const PosPaymentPanel: FC<Props> = ({
 
   // Tính toán các khoản giảm giá và thành tiền
   const orderDiscountAmount = Math.round((totalItemAmount * orderDiscountPercent) / 100);
-  const couponDiscountAmount = couponCode.trim().toUpperCase() === 'VIP10' ? 20000 : 0;
+  const couponDiscountAmount = externalCouponDiscount !== undefined
+    ? externalCouponDiscount
+    : (couponCode.trim().toUpperCase() === 'VIP10' ? 20000 : 0);
   const subTotalBeforePoints = Math.max(0, totalItemAmount - orderDiscountAmount - couponDiscountAmount);
 
-  // Điểm tích lũy: mỗi điểm = 100đ
-  const maxPointAmount = customer ? Math.min(customer.loyaltyPoints * 100, subTotalBeforePoints) : 0;
-  const pointsDeduction = usePoints && customer ? maxPointAmount : 0;
+  // Điểm tích lũy
+  const pointsDeduction = externalPointsDeduction !== undefined
+    ? externalPointsDeduction
+    : (usePoints && customer ? Math.min(customer.loyaltyPoints * 1000, subTotalBeforePoints) : 0);
 
   const finalAmount = Math.max(0, subTotalBeforePoints - pointsDeduction);
   const changeAmount = Math.max(0, cashTendered - finalAmount);
@@ -266,23 +291,67 @@ export const PosPaymentPanel: FC<Props> = ({
                 >
                   Giảm giá ({orderDiscountPercent}%) [KM]:
                 </span>
+                {appliedPromotions && appliedPromotions.length > 0 && (
+                  <div style={{ fontSize: 11, color: '#0d9488', marginTop: 2 }}>
+                    {appliedPromotions.map((p, idx) => (
+                      <div key={idx}>🎁 {p}</div>
+                    ))}
+                  </div>
+                )}
               </td>
               <td style={{ textAlign: 'right', color: '#dc2626' }}>
                 -{orderDiscountAmount.toLocaleString('vi-VN')} đ
               </td>
             </tr>
+            {giftItems && giftItems.length > 0 && (
+              <tr>
+                <td colSpan={2} style={{ background: '#f0fdf4', padding: '4px 8px', borderRadius: 4 }}>
+                  <div style={{ fontSize: 11.5, color: '#15803d', fontWeight: 600 }}>
+                    Quà tặng khuyến mãi kèm theo:
+                  </div>
+                  {giftItems.map((g, idx) => (
+                    <div key={idx} style={{ fontSize: 11, color: '#166534', display: 'flex', justifyContent: 'space-between' }}>
+                      <span>✦ {g.productName} (x{g.quantity})</span>
+                      <span style={{ fontWeight: 600 }}>0 đ</span>
+                    </div>
+                  ))}
+                </td>
+              </tr>
+            )}
             <tr>
-              <td>Mã coupon:</td>
+              <td>Mã Voucher:</td>
               <td style={{ textAlign: 'right' }}>
-                <input
-                  type="text"
-                  value={couponCode}
-                  onChange={(e) => onCouponCodeChange(e.target.value)}
-                  placeholder="Nhập mã..."
-                  style={{ width: 80, fontSize: 12, padding: '2px 4px', textAlign: 'center' }}
-                  className="pos-input"
-                />{' '}
-                {couponDiscountAmount > 0 ? `-${couponDiscountAmount.toLocaleString('vi-VN')} đ` : '0 đ'}
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                  <input
+                    type="text"
+                    value={couponCode}
+                    onChange={(e) => onCouponCodeChange(e.target.value)}
+                    placeholder="Mã voucher..."
+                    style={{ width: 95, fontSize: 12, padding: '2px 4px', textAlign: 'center' }}
+                    className="pos-input"
+                  />
+                  {onValidateCoupon && (
+                    <button
+                      type="button"
+                      className="pos-btn-secondary"
+                      onClick={onValidateCoupon}
+                      disabled={!couponCode.trim() || isValidatingCoupon}
+                      style={{ fontSize: 11, padding: '2px 6px', height: 26 }}
+                    >
+                      {isValidatingCoupon ? '...' : 'Áp dụng'}
+                    </button>
+                  )}
+                </div>
+                {couponStatusText && (
+                  <div style={{ fontSize: 11, color: couponDiscountAmount > 0 ? '#16a34a' : '#dc2626', marginTop: 2 }}>
+                    {couponStatusText}
+                  </div>
+                )}
+                {couponDiscountAmount > 0 && (
+                  <div style={{ color: '#16a34a', fontWeight: 600, fontSize: 12, marginTop: 2 }}>
+                    -{couponDiscountAmount.toLocaleString('vi-VN')} đ
+                  </div>
+                )}
               </td>
             </tr>
             <tr>
@@ -297,10 +366,17 @@ export const PosPaymentPanel: FC<Props> = ({
                   <input
                     type="checkbox"
                     checked={usePoints}
-                    disabled={!customer || customer.loyaltyPoints === 0}
+                    disabled={!customer || customer.loyaltyPoints < minPointsRequired}
                     onChange={(e) => onToggleUsePoints(e.target.checked)}
                   />
-                  <span>Dùng điểm ({pointsDeduction.toLocaleString('vi-VN')}):</span>
+                  <span>
+                    Dùng điểm ({pointsToRedeem} điểm):
+                    {customer && customer.loyaltyPoints < minPointsRequired && (
+                      <span style={{ display: 'block', fontSize: 10.5, color: '#94a3b8' }}>
+                        (Tối thiểu {minPointsRequired} điểm)
+                      </span>
+                    )}
+                  </span>
                 </label>
               </td>
               <td style={{ textAlign: 'right', color: '#16a34a' }}>
@@ -444,9 +520,18 @@ export const PosPaymentPanel: FC<Props> = ({
       {/* NÚT THANH TOÁN TO TOÀN CHIỀU RỘNG (Luôn cố định đáy) */}
       <button
         type="button"
+        disabled={isCheckoutDisabled}
         className={`pos-checkout-big-btn ${paymentMethod === 'debt' ? 'pos-btn-debt' : ''}`}
-        style={paymentMethod === 'debt' ? { backgroundColor: '#d97706', borderColor: '#b45309' } : undefined}
+        style={
+          isCheckoutDisabled
+            ? { backgroundColor: '#9ca3af', borderColor: '#6b7280', cursor: 'not-allowed', opacity: 0.7 }
+            : paymentMethod === 'debt'
+            ? { backgroundColor: '#d97706', borderColor: '#b45309' }
+            : undefined
+        }
+        title={disabledReason}
         onClick={() => {
+          if (isCheckoutDisabled) return;
           if (paymentMethod === 'vietqr') {
             onOpenVietQrModal();
           } else {
@@ -454,7 +539,9 @@ export const PosPaymentPanel: FC<Props> = ({
           }
         }}
       >
-        {paymentMethod === 'debt'
+        {isCheckoutDisabled && disabledReason
+          ? `KHÓA BÁN HÀNG (${disabledReason})`
+          : paymentMethod === 'debt'
           ? `GHI NỢ ĐƠN HÀNG (${finalAmount.toLocaleString('vi-VN')} đ)`
           : `THANH TOÁN (${finalAmount.toLocaleString('vi-VN')} đ)`}
       </button>

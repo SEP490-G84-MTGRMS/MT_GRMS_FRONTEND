@@ -323,7 +323,7 @@ function buildEmptyCellMap(
 }
 
 export interface OrderMatrixPageProps {
-  forcedRole?: 'STORE_OWNER' | 'EMPLOYEE';
+  forcedRole?: 'STORE_OWNER' | 'STAFF' | 'EMPLOYEE';
 }
 
 export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
@@ -411,16 +411,16 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
   // State: Toast
   const [toast, setToast] = useState<ToastState | null>(null);
 
-  // Role State: Xác định quyền thao tác Store Owner vs Employee
+  // Role State: Xác định quyền thao tác Store Owner vs Staff
   // Ưu tiên: 1. forcedRole từ Route, 2. param ?role=, 3. userRole trong AuthStore
   const roleParam = searchParams.get('role');
   const userRole = useAuthStore((s) => s.user?.role);
   const isStoreOwner = useMemo(() => {
     if (forcedRole === 'STORE_OWNER') return true;
-    if (forcedRole === 'EMPLOYEE') return false;
+    if (forcedRole === 'STAFF' || forcedRole === 'EMPLOYEE') return false;
     if (roleParam === 'employee' || roleParam === 'staff') return false;
     if (roleParam === 'owner' || roleParam === 'store_owner') return true;
-    return userRole !== 'EMPLOYEE' && userRole !== 'CASHIER';
+    return userRole === 'STORE_OWNER' || userRole === 'ADMIN';
   }, [forcedRole, roleParam, userRole]);
 
   const showToast = (message: string, type: ToastState['type'] = 'success') => {

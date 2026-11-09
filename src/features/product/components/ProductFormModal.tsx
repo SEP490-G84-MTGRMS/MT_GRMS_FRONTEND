@@ -110,6 +110,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   const [costPrice, setCostPrice] = useState<number>(0);
   const [sellingPrice, setSellingPrice] = useState<number>(0);
   const [isFavorite, setIsFavorite] = useState<boolean>(false);
+  const [hasBatches, setHasBatches] = useState<boolean>(false);
 
   // Trạng thái lưu (loading)
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
@@ -145,6 +146,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         setCostPrice(productToEdit.costPrice || 0);
         setSellingPrice(productToEdit.sellingPrice || 0);
         setIsFavorite(productToEdit.isFavorite ?? false);
+        setHasBatches(productToEdit.hasBatches ?? false);
         setIsSubmitting(false);
 
         setBaseUnit(productToEdit.baseUnit || '');
@@ -196,6 +198,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         setSellingPrice(0);
 
         setIsFavorite(false);
+        setHasBatches(false);
         setIsSubmitting(false);
 
         setBaseUnit('');
@@ -368,6 +371,7 @@ try {
         sellingPrice,
         costPrice: userRole === 'StoreOwner' ? costPrice : productToEdit?.costPrice ?? 0,
         isFavorite,
+        hasBatches,
         description: description.trim() || undefined,
         internalNote: internalNote.trim() || undefined,
         uomConversions,
@@ -391,6 +395,7 @@ try {
         setDescription('');
         setInternalNote('');
         setIsFavorite(false);
+        setHasBatches(false);
         setWarningMsg('');
         setValidationPopupMsg('');
         setPreviewImageModalUrl(null);
@@ -1275,7 +1280,16 @@ try {
             </div>
 
             {/* Thuộc tính nâng cao: Quản lý theo lô & Bán chạy */}
-            <div style={{ display: 'flex', gap: 24, marginTop: 14 }}>
+            <div style={{ display: 'flex', gap: 24, marginTop: 14, flexWrap: 'wrap' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, color: '#334155' }}>
+                <input
+                  type="checkbox"
+                  checked={hasBatches}
+                  onChange={(e) => setHasBatches(e.target.checked)}
+                />
+                <span style={{ fontWeight: 500 }}>Quản lý theo lô & hạn sử dụng (FEFO)</span>
+              </label>
+
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, color: '#334155' }}>
                 <input
                   type="checkbox"
