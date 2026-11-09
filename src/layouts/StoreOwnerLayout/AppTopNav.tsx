@@ -283,6 +283,10 @@ const NAV_GROUPS: NavGroup[] = [
             to: "/store-owner/employees/attendance"
           },
           {
+            label: "Duyệt đơn yêu cầu",
+            to: "/store-owner/employees/approval-requests"
+          },
+          {
             label: "Cấu hình ca làm việc",
             to: "/store-owner/employees/shifts"
           },

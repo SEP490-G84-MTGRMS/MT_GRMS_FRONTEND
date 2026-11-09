@@ -1041,6 +1041,23 @@ export const EmployeeListPage: React.FC = () => {
                                         <td>
                       <div className="emp-name-badge">
                         <span>{emp.fullName}</span>
+                        {emp.hasFaceId && (
+                          <span
+                            style={{
+                              marginLeft: 6,
+                              padding: '2px 6px',
+                              borderRadius: 4,
+                              fontSize: 10.5,
+                              fontWeight: 600,
+                              backgroundColor: '#ECFDF5',
+                              color: '#059669',
+                              border: '1px solid #A7F3D0',
+                            }}
+                            title="Đã kích hoạt chấm công AI FaceID"
+                          >
+                            FaceID
+                          </span>
+                        )}
                         {emp.hasWarning && (
                           <span className="emp-warning-icon" title="Có cảnh báo">
                             <AlertTriangle size={14} color="#F59E0B" />

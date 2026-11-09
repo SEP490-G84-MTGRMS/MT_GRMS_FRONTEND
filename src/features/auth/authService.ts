@@ -1,12 +1,14 @@
 import { httpClient } from '../../api/httpClient';
 import type { ApiResponse } from '../../api/types';
-import { ApiError } from './authTypes';
-import type {
-  AuthResponse,
-  LoginCredentials,
-  RegisterPayload,
-  ResetPasswordPayload,
-  UserProfile,
+import {
+  ApiError,
+  SystemRoles,
+  type SystemRole,
+  type AuthResponse,
+  type LoginCredentials,
+  type RegisterPayload,
+  type ResetPasswordPayload,
+  type UserProfile,
 } from './authTypes';
 
 const SEED_TENANT_ID = 'tenant_mt_mart_01';
@@ -31,14 +33,11 @@ type BackendLoginPayload = {
   user: BackendLoginUser;
 };
 
-function mapRole(roleName?: string): UserProfile['role'] {
+function mapRole(roleName?: string): SystemRole {
   const role = (roleName || '').toUpperCase();
-  if (role === 'CASHIER' || role === 'EMPLOYEE' || role === 'STAFF') return 'CASHIER';
-  if (role === 'MANAGER' || role === 'BRANCH_MANAGER') return 'MANAGER';
-  if (role === 'STORE_OWNER') return 'STORE_OWNER';
-  if (role === 'EMPLOYEE' || role === 'STAFF') return 'EMPLOYEE';
-  if (role === 'ADMIN') return 'ADMIN';
-  return 'STORE_OWNER';
+  if (role === SystemRoles.ADMIN) return SystemRoles.ADMIN;
+  if (role === SystemRoles.STORE_OWNER) return SystemRoles.STORE_OWNER;
+  return SystemRoles.STAFF;
 }
 
 function mapLoginUser(user: BackendLoginUser): UserProfile {
@@ -49,7 +48,7 @@ function mapLoginUser(user: BackendLoginUser): UserProfile {
     id: user.id,
     email: user.email,
     fullName: user.fullName,
-    role: (isUserAdmin ? 'ADMIN' : mapRole(user.roleName || user.role)) as UserProfile['role'],
+    role: isUserAdmin ? SystemRoles.ADMIN : mapRole(user.roleName || user.role),
     tenantId: user.tenantId || SEED_TENANT_ID,
     branchId: user.branchId || undefined,
     phone: user.phone,
@@ -90,16 +89,16 @@ export const DEMO_ACCOUNTS = [
     },
   },
   {
-    roleLabel: '👷‍♂️ Nhân Viên Đặt Hàng (Employee)',
+    roleLabel: '👷‍♂️ Nhân Viên Cửa Hàng (Staff)',
     username: 'staff_employee',
-    email: 'employee@mtgrms.vn',
+    email: 'staff@mtgrms.vn',
     password: 'Staff@123456',
     tenantCode: SEED_TENANT_ID,
     user: {
-      id: 'user-employee-001',
-      email: 'employee@mtgrms.vn',
-      fullName: 'Nhân Viên Cửa Hàng (Employee)',
-      role: 'EMPLOYEE' as const,
+      id: 'user-staff-001',
+      email: 'staff@mtgrms.vn',
+      fullName: 'Nhân Viên Cửa Hàng (Staff)',
+      role: SystemRoles.STAFF,
       tenantId: SEED_TENANT_ID,
       tenantName: 'Cửa hàng MT-GRMS',
       branchId: undefined,
@@ -117,7 +116,7 @@ export const DEMO_ACCOUNTS = [
       id: 'usr_store_owner',
       email: 'chucuahang@mtmart.vn',
       fullName: 'Trần Văn Chủ (Chủ cửa hàng)',
-      role: 'STORE_OWNER' as const,
+      role: SystemRoles.STORE_OWNER,
       tenantId: 'tenant_mt_mart_01',
       tenantName: 'Chuỗi Siêu Thị Thực Phẩm Sạch MT-Mart',
       branchId: 'BR-HCM-01',
@@ -126,7 +125,7 @@ export const DEMO_ACCOUNTS = [
     },
   },
   {
-    roleLabel: 'Nhân viên thu ngân (Cashier - Ẩn nút bán nợ)',
+    roleLabel: 'Nhân viên bán hàng (Staff - POS)',
     username: 'nhanvien',
     email: 'nhanvien@mtmart.vn',
     password: '123456',
@@ -135,7 +134,7 @@ export const DEMO_ACCOUNTS = [
       id: 'usr_staff_cashier',
       email: 'nhanvien@mtmart.vn',
       fullName: 'Lê Thị Thu Ngân (Nhân viên bán hàng)',
-      role: 'CASHIER' as const,
+      role: SystemRoles.STAFF,
       tenantId: 'tenant_mt_mart_01',
       tenantName: 'Chuỗi Siêu Thị Thực Phẩm Sạch MT-Mart',
       branchId: 'BR-HCM-01',
@@ -153,7 +152,7 @@ export const DEMO_ACCOUNTS = [
       id: 'usr_owner_ankhang_02',
       email: 'chucuahang2@ankhang.vn',
       fullName: 'Hoàng Văn An (Chủ tiệm An Khang)',
-      role: 'STORE_OWNER' as const,
+      role: SystemRoles.STORE_OWNER,
       tenantId: 'tenant_ankhang_02',
       tenantName: 'Cửa Hàng Thực Phẩm Sạch An Khang',
       branchId: 'BR-AK-01',
@@ -171,7 +170,7 @@ export const DEMO_ACCOUNTS = [
       id: 'usr_super_admin',
       email: 'admin@mtgrms.vn',
       fullName: 'Hệ Thống Super Admin',
-      role: 'ADMIN' as const,
+      role: SystemRoles.ADMIN,
       tenantId: 'tenant_mt_mart_01',
       tenantName: 'Chuỗi Bán Lẻ Thực Phẩm Sạch MT-Mart',
       branchId: 'BR-001',
@@ -188,7 +187,7 @@ export const DEMO_ACCOUNTS = [
       id: 'usr_store_manager',
       email: 'hung.nguyen@mtmart.vn',
       fullName: 'Nguyễn Văn Hùng (Chủ Cửa Hàng)',
-      role: 'STORE_OWNER' as const,
+      role: SystemRoles.STORE_OWNER,
       tenantId: 'tenant_mt_mart_01',
       tenantName: 'Chuỗi Siêu Thị Thực Phẩm Sạch MT-Mart',
       branchId: 'BR-HCM-01',
@@ -206,7 +205,7 @@ export const DEMO_ACCOUNTS = [
       id: 'user-cashier-001',
       email: 'cashier@mtgrms.vn',
       fullName: 'Lê Thị Thảo (Thu Ngân POS)',
-      role: 'CASHIER' as const,
+      role: SystemRoles.STAFF,
       tenantId: 'tenant_mt_mart_01',
       tenantName: 'Chuỗi Siêu Thị Thực Phẩm Sạch MT-Mart',
       branchId: 'BR-001',
@@ -224,7 +223,7 @@ export const DEMO_ACCOUNTS = [
       id: 'usr_cashier',
       email: 'thao.le@mtmart.vn',
       fullName: 'Lê Thị Thảo (Thu Ngân POS)',
-      role: 'CASHIER' as const,
+      role: SystemRoles.STAFF,
       tenantId: 'tenant_mt_mart_01',
       tenantName: 'Chuỗi Bán Lẻ Thực Phẩm Sạch MT',
       branchId: 'BR-001',
@@ -242,7 +241,7 @@ export const DEMO_ACCOUNTS = [
       id: 'usr_owner_annhien_02',
       email: 'chucuahang.annhien@gmail.com',
       fullName: 'Trần Quốc An (Chủ tiệm An Nhiên)',
-      role: 'STORE_OWNER' as const,
+      role: SystemRoles.STORE_OWNER,
       tenantId: 'tenant_an_nhien_02',
       tenantName: 'Cửa Hàng Thực Phẩm Sạch An Nhiên (An Nhiên Mart)',
       branchId: 'b1000000-0000-0000-0000-000000000001',
@@ -250,7 +249,7 @@ export const DEMO_ACCOUNTS = [
     },
   },
   {
-    roleLabel: 'Nhân Viên Bán Hàng An Nhiên - Ba Đình (Phạm Thị Yến)',
+    roleLabel: 'Nhân Viên Bán Hàng An Nhiên (Staff - An Nhiên Mart)',
     username: '0917778888',
     email: 'nhanvien.annhien@gmail.com',
     password: '123456',
@@ -259,7 +258,7 @@ export const DEMO_ACCOUNTS = [
       id: 'usr_employee_annhien_02',
       email: 'nhanvien.annhien@gmail.com',
       fullName: 'Phạm Thị Yến (Nhân viên bán hàng An Nhiên)',
-      role: 'CASHIER' as const,
+      role: SystemRoles.STAFF,
       tenantId: 'tenant_an_nhien_02',
       tenantName: 'Cửa Hàng Thực Phẩm Sạch An Nhiên (An Nhiên Mart)',
       branchId: 'b1000000-0000-0000-0000-000000000001',
@@ -276,7 +275,7 @@ export const DEMO_ACCOUNTS = [
       id: 'usr_employee_annhien_04',
       email: 'minh.nguyen@annhienmart.vn',
       fullName: 'Nguyễn Văn Minh (Nhân viên bán hàng An Nhiên)',
-      role: 'CASHIER' as const,
+      role: 'STAFF' as const,
       tenantId: 'tenant_an_nhien_02',
       tenantName: 'Cửa Hàng Thực Phẩm Sạch An Nhiên (An Nhiên Mart)',
       branchId: 'b1000000-0000-0000-0000-000000000001',
@@ -293,7 +292,7 @@ export const DEMO_ACCOUNTS = [
       id: 'usr_employee_annhien_03',
       email: 'nam.le@annhienmart.vn',
       fullName: 'Lê Hoàng Nam (Nhân viên Cầu Giấy)',
-      role: 'CASHIER' as const,
+      role: 'STAFF' as const,
       tenantId: 'tenant_an_nhien_02',
       tenantName: 'Cửa Hàng Thực Phẩm Sạch An Nhiên (An Nhiên Mart)',
       branchId: 'b2000000-0000-0000-0000-000000000001',
@@ -358,7 +357,9 @@ export const authService = {
           id: loginData.user?.id || 'usr_admin',
           email: loginData.user?.email || 'admin@mtgrms.vn',
           fullName: loginData.user?.fullName || 'Super Admin',
-          role: (isUserAdmin ? 'ADMIN' : (loginData.user?.role || loginData.user?.roleName || 'STORE_OWNER')) as UserProfile['role'],
+          role: isUserAdmin
+            ? SystemRoles.ADMIN
+            : mapRole(loginData.user?.roleName || loginData.user?.role),
           tenantId: loginData.user?.tenantId || 'DEFAULT',
           branchId: loginData.user?.branchId,
           phone: loginData.user?.phone || phoneClean,
@@ -408,8 +409,8 @@ export const authService = {
         (status === 401
           ? 'Tài khoản hoặc mật khẩu không chính xác.'
           : status === 400
-          ? 'Thông tin đăng nhập không hợp lệ.'
-          : 'Không thể kết nối đến máy chủ. Vui lòng kiểm tra lại đường truyền.');
+            ? 'Thông tin đăng nhập không hợp lệ.'
+            : 'Không thể kết nối đến máy chủ. Vui lòng kiểm tra lại đường truyền.');
 
       throw new ApiError(status, message, errorCode, err.response?.data, err.response);
     }

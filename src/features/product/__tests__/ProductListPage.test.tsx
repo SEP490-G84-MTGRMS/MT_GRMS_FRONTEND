@@ -142,13 +142,13 @@ describe('ProductListPage - Task T6 BR-SEC-01 Phân quyền Giá vốn theo Vai 
     expect(screen.getByText(costPriceRegex)).toBeDefined();
   });
 
-  it('Ẩn hoàn toàn cột "Giá vốn" (cả th và td) khi vai trò người dùng là CASHIER / Cashier', async () => {
+  it('Ẩn hoàn toàn cột "Giá vốn" (cả th và td) khi vai trò người dùng là STAFF / Cashier', async () => {
     useAuthStore.setState({
       user: {
         id: 'usr-cashier',
         email: 'cashier@mtgrms.vn',
         fullName: 'Thu Ngân Quầy',
-        role: 'CASHIER',
+        role: 'STAFF',
         tenantId: 'tenant_mt_mart_01',
       },
       token: 'mock-token',

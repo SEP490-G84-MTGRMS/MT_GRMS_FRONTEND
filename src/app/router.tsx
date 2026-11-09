@@ -71,6 +71,7 @@ import {
   ShiftConfigPage,
   AttendancePage,
   PayslipManagementPage,
+  ApprovalRequestsPage,
 } from '../features/employee';
 
 // 8. Promotions Feature
@@ -393,7 +394,7 @@ export const router = createBrowserRouter([
       },
       {
         path: 'purchase-orders/employee-matrix',
-        element: <OrderMatrixPage forcedRole="EMPLOYEE" />,
+        element: <OrderMatrixPage forcedRole="STAFF" />,
       },
       {
         path: 'purchase-orders/dispatch-hub',
@@ -502,6 +503,10 @@ export const router = createBrowserRouter([
       {
         path: 'employees/attendance',
         element: <AttendancePage />,
+      },
+      {
+        path: 'employees/approval-requests',
+        element: <ApprovalRequestsPage />,
       },
       {
         path: 'employees/payroll',
@@ -640,6 +645,10 @@ export const router = createBrowserRouter([
         element: <AttendancePage />,
       },
       {
+        path: 'employees/approval-requests',
+        element: <ApprovalRequestsPage />,
+      },
+      {
         path: 'employees/payroll',
         element: <PayslipManagementPage />,
       },
@@ -755,6 +764,10 @@ export const router = createBrowserRouter([
       {
         path: 'attendance',
         element: <AttendancePage />,
+      },
+      {
+        path: 'payroll',
+        element: <PayslipManagementPage />,
       },
     ],
   },
@@ -945,7 +958,7 @@ export const router = createBrowserRouter([
           },
           {
             path: 'create-matrix',
-            element: <OrderMatrixPage forcedRole="EMPLOYEE" />,
+            element: <OrderMatrixPage forcedRole="STAFF" />,
           },
         ],
       },
@@ -954,7 +967,7 @@ export const router = createBrowserRouter([
         children: [
           {
             path: 'purchase-orders/create-matrix',
-            element: <OrderMatrixPage forcedRole="EMPLOYEE" />,
+            element: <OrderMatrixPage forcedRole="STAFF" />,
           },
         ],
       },
