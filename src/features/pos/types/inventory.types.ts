@@ -202,6 +202,10 @@ export class InvoiceDTO {
   status: 'COMPLETED' | 'CANCELLED' | 'RETURNED' | 'DEBT' = 'COMPLETED';
   statusLabel: string = 'Hoàn thành';
   
+  // Nguồn gốc đơn hàng
+  isPreOrder?: boolean = false;
+  orderOrigin?: 'RETAIL' | 'PRE_ORDER' = 'RETAIL';
+  
   // Danh sách dòng hàng
   items: InvoiceItemDTO[] = [];
 
