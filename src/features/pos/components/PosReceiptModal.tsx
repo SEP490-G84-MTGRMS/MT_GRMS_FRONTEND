@@ -121,6 +121,13 @@ export const PosReceiptModal: FC<Props> = ({ isOpen, receiptData, onClose }) => 
               </div>
             </div>
 
+            {/* Thông báo thiếu kho quà tặng nếu có */}
+            {receiptData.giftStockWarning && (
+              <div className="mb-2 px-2.5 py-1.5 rounded bg-amber-50 border border-amber-200 text-[11px] text-amber-800">
+                ⚠️ {receiptData.giftStockWarning}
+              </div>
+            )}
+
             {/* 3. Danh Sách Mặt Hàng Dạng Bảng Chuẩn Siêu Thị */}
             <div className="text-xs mb-2">
               <table className="w-full border-collapse">
@@ -138,14 +145,23 @@ export const PosReceiptModal: FC<Props> = ({ isOpen, receiptData, onClose }) => 
                     <tr key={idx} className="align-top text-[11.5px]">
                       <td className="py-1.5 text-slate-500 font-mono">{idx + 1}</td>
                       <td className="py-1.5 pr-1 font-medium text-slate-900">
-                        {item.name}
+                        {item.isGift ? (
+                          <div>
+                            <span>{item.name}</span>
+                            <span className="ml-1 inline-block px-1.5 py-0.2 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-semibold">
+                              🎁 Quà tặng KM
+                            </span>
+                          </div>
+                        ) : (
+                          item.name
+                        )}
                       </td>
                       <td className="py-1.5 text-center text-slate-700 font-mono">{item.quantity}</td>
                       <td className="py-1.5 text-right text-slate-700 font-mono tabular-nums">
-                        {item.unitPrice.toLocaleString('vi-VN')}
+                        {item.isGift ? '0' : item.unitPrice.toLocaleString('vi-VN')}
                       </td>
                       <td className="py-1.5 text-right font-semibold text-slate-900 font-mono tabular-nums">
-                        {item.totalAmount.toLocaleString('vi-VN')}
+                        {item.isGift ? '0' : item.totalAmount.toLocaleString('vi-VN')}
                       </td>
                     </tr>
                   ))}
@@ -167,17 +183,38 @@ export const PosReceiptModal: FC<Props> = ({ isOpen, receiptData, onClose }) => 
 
             {/* 4. Tổng Kết Tiền Hàng & Thanh Toán (Hoàn Toàn Không Có VAT) */}
             <div className="space-y-1.5 text-xs py-2 border-b border-dashed border-slate-300">
-              {receiptData.orderDiscountAmount > 0 && (
-                <div className="flex justify-between items-center text-rose-600">
-                  <span>Tiền chiết khấu:</span>
+              {(receiptData.orderDiscountAmount > 0 || Boolean(receiptData.appliedPromotionSummary)) && (
+                <div>
+                  {receiptData.orderDiscountAmount > 0 && (
+                    <div className="flex justify-between items-center text-rose-600">
+                      <span>Khuyến mãi / Chiết khấu:</span>
+                      <span className="font-mono tabular-nums font-semibold">
+                        - {receiptData.orderDiscountAmount.toLocaleString('vi-VN')} đ
+                      </span>
+                    </div>
+                  )}
+                  {receiptData.appliedPromotionSummary && (
+                    <div className="text-[11px] text-teal-700 font-medium">
+                      🎁 CTKM: {receiptData.appliedPromotionSummary}
+                    </div>
+                  )}
+                </div>
+              )}
+              {(Boolean(receiptData.voucherDiscountAmount && receiptData.voucherDiscountAmount > 0) || Boolean(receiptData.appliedVoucherCode)) && (
+                <div className="flex justify-between items-center text-indigo-700">
+                  <span>
+                    Mã Voucher{receiptData.appliedVoucherCode ? ` (${receiptData.appliedVoucherCode})` : ''}:
+                  </span>
                   <span className="font-mono tabular-nums font-semibold">
-                    - {receiptData.orderDiscountAmount.toLocaleString('vi-VN')} đ
+                    - {(receiptData.voucherDiscountAmount || 0).toLocaleString('vi-VN')} đ
                   </span>
                 </div>
               )}
               {receiptData.pointsDiscountAmount > 0 && (
                 <div className="flex justify-between items-center text-emerald-600">
-                  <span>Dùng điểm tích lũy:</span>
+                  <span>
+                    Dùng điểm tích lũy{receiptData.pointsRedeemed ? ` (${receiptData.pointsRedeemed} điểm)` : ''}:
+                  </span>
                   <span className="font-mono tabular-nums font-semibold">
                     - {receiptData.pointsDiscountAmount.toLocaleString('vi-VN')} đ
                   </span>

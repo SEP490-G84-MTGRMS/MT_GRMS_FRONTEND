@@ -139,13 +139,16 @@ export class InvoiceItemDTO {
   unitName: string = 'Hộp';
   quantity: number = 1;
   unitPrice: number = 0;
+  actualPrice?: number;
   discountAmount: number = 0;
   totalAmount: number = 0;          // = quantity * unitPrice - discountAmount
+  isGift?: boolean = false;
+  promotionId?: string | null = null;
 
   constructor(init?: Partial<InvoiceItemDTO>) {
     Object.assign(this, init);
     if (init && init.totalAmount === undefined) {
-      this.totalAmount = Math.max(0, this.quantity * this.unitPrice - this.discountAmount);
+      this.totalAmount = this.isGift ? 0 : Math.max(0, this.quantity * this.unitPrice - this.discountAmount);
     }
   }
 }
@@ -173,6 +176,7 @@ export class DebtPaymentRecordDTO {
  * Hóa đơn bán lẻ tại quầy POS (hỗ trợ Tiền mặt, Chuyển khoản VietQR, và Ghi nợ / Bán nợ)
  */
 export class InvoiceDTO {
+  orderUuid?: string = '';          // Guid gốc trên Backend
   invoiceId: string = '';           // HD000041
   createdAt: string = '';           // DD/MM/YYYY HH:mm
   branchId: string = '';
@@ -182,11 +186,21 @@ export class InvoiceDTO {
   customerId?: string = '';
   customerName: string = 'Khách lẻ';
   customerPhone?: string = '';
+  note?: string = '';
   
   // Tổng tiền
   totalMerchandiseAmount: number = 0;  // Tổng tiền hàng
   totalDiscount: number = 0;           // Tổng giảm giá
   finalPaidAmount: number = 0;         // Tiền khách đã trả (thực tế nhận)
+
+  // Phân rã Khuyến mãi / Voucher / Điểm tích lũy (REQ-ORD-PROMO-01)
+  appliedPromotionId?: string | null = null;
+  appliedPromotionSummary?: string | null = null;
+  promotionDiscountAmount?: number = 0;
+  appliedVoucherCode?: string | null = null;
+  voucherDiscountAmount?: number = 0;
+  pointsRedeemed?: number = 0;
+  pointsDiscountAmount?: number = 0;
   
   // Quản lý công nợ hóa đơn
   debtAmount: number = 0;              // Số tiền còn nợ (0 = không nợ / đã trả hết)
@@ -202,6 +216,10 @@ export class InvoiceDTO {
   status: 'COMPLETED' | 'CANCELLED' | 'RETURNED' | 'DEBT' = 'COMPLETED';
   statusLabel: string = 'Hoàn thành';
   
+  // Nguồn gốc đơn hàng
+  isPreOrder?: boolean = false;
+  orderOrigin?: 'RETAIL' | 'PRE_ORDER' = 'RETAIL';
+  
   // Danh sách dòng hàng
   items: InvoiceItemDTO[] = [];
 
@@ -215,6 +233,7 @@ export class InvoiceDTO {
  * Đơn đặt trước và giữ kho tại quầy (Store pickup)
  */
 export class PreOrderDTO {
+  orderUuid?: string = '';          // Guid gốc trên Backend
   preOrderId: string = '';          // PRE-2026-008
   createdAt: string = '';           // Ngày tạo
   branchId: string = 'BR-01';
@@ -227,6 +246,9 @@ export class PreOrderDTO {
   customerPhone: string = '';
   
   // Tiền đặt cọc & Thanh toán
+  totalMerchandiseAmount?: number = 0;
+  discountAmount?: number = 0;
+  appliedPromotionSummary?: string | null = null;
   totalOrderAmount: number = 0;
   depositAmount: number = 0;        // Tiền cọc trước
   remainingAmount: number = 0;      // Tiền còn phải thu khi nhận

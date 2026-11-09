@@ -1,5 +1,5 @@
 import type { FC } from 'react';
-import { Award, Coins, ArrowDownLeft, Sparkles, AlertCircle } from 'lucide-react';
+import { Coins, ArrowDownLeft, Sparkles, AlertCircle } from 'lucide-react';
 import type { LoyaltySystemConfig } from '../../types/promotion.types';
 
 interface LoyaltyConfigFormProps {
@@ -14,18 +14,6 @@ export const LoyaltyConfigForm: FC<LoyaltyConfigFormProps> = ({
 }) => {
   const handleUpdateField = (field: keyof LoyaltySystemConfig, value: unknown) => {
     onChange({ ...config, [field]: value });
-  };
-
-  const handleUpdateTierMultiplier = (index: number, multiplier: number) => {
-    const nextTiers = [...config.tiers];
-    nextTiers[index] = { ...nextTiers[index], pointMultiplier: multiplier };
-    onChange({ ...config, tiers: nextTiers });
-  };
-
-  const handleUpdateTierMinSpending = (index: number, spending: number) => {
-    const nextTiers = [...config.tiers];
-    nextTiers[index] = { ...nextTiers[index], minSpending: spending };
-    onChange({ ...config, tiers: nextTiers });
   };
 
   return (
@@ -97,7 +85,7 @@ export const LoyaltyConfigForm: FC<LoyaltyConfigFormProps> = ({
                 <strong>Minh họa tích điểm:</strong> Đơn <strong>200.000 đ</strong> của khách sẽ được tích lũy{' '}
                 <strong className="text-teal-700 font-bold">
                   +{Math.floor(200000 / (config.earningRateAmount || 10000))} điểm
-                </strong> (hệ số chuẩn 1.0x).
+                </strong>.
               </div>
             </div>
           </div>
@@ -164,98 +152,6 @@ export const LoyaltyConfigForm: FC<LoyaltyConfigFormProps> = ({
                 <span>Cho phép tiêu điểm song song với các Voucher &amp; CTKM khác</span>
               </label>
             </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Card 3: Khối 4 Hạng thẻ thành viên */}
-      <div className="promotion-card loyalty-card" id="membership-tiers-section">
-        <div className="promotion-card-header loyalty-card-header-compact">
-          <div className="flex items-center gap-2">
-            <Award size={18} color="#0F766E" />
-            <div>
-              <h3 className="loyalty-card-title">
-                3. Chính sách 4 Hạng thẻ thành viên &amp; Hệ số nhân điểm
-              </h3>
-              <p className="loyalty-card-subtitle">
-                Khách hàng tự động thăng hạng khi đạt mốc chi tiêu tích lũy. Hạng thẻ cao hơn được nhân hệ số tích điểm nhanh hơn.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="loyalty-card-body p-0">
-          <div className="table-responsive">
-            <table className="promotion-table loyalty-tiers-table">
-              <thead>
-                <tr>
-                  <th style={{ width: 190 }}>Hạng thành viên</th>
-                  <th style={{ width: 250 }}>Mốc chi tiêu tích lũy</th>
-                  <th style={{ width: 160 }}>Hệ số nhân điểm</th>
-                  <th>Quyền lợi &amp; Ưu đãi áp dụng</th>
-                </tr>
-              </thead>
-              <tbody>
-                {config.tiers.map((tier, idx) => (
-                  <tr key={tier.id}>
-                    <td>
-                      <div
-                        className="loyalty-tier-badge"
-                        style={{ backgroundColor: `${tier.colorHex}18`, color: tier.colorHex }}
-                      >
-                        <div className="loyalty-tier-dot" style={{ backgroundColor: tier.colorHex }} />
-                        <span>{tier.tierName}</span>
-                      </div>
-                    </td>
-
-                    <td>
-                      {idx === 0 ? (
-                        <div className="tier-default-spending">
-                          <span className="font-bold text-slate-800 text-sm">0 đ</span>
-                          <span className="text-xs text-teal-600 font-medium">(Mặc định khi đăng ký)</span>
-                        </div>
-                      ) : (
-                        <div className="loyalty-input-wrapper" style={{ maxWidth: 190 }}>
-                          <input
-                            type="number"
-                            value={tier.minSpending}
-                            onChange={(e) => handleUpdateTierMinSpending(idx, Number(e.target.value))}
-                            className="loyalty-input-field text-right font-bold text-slate-800"
-                            disabled={!config.isEnabled}
-                            step={500000}
-                            min={0}
-                          />
-                          <span className="loyalty-input-addon">đ</span>
-                        </div>
-                      )}
-                    </td>
-
-                    <td>
-                      <div className="loyalty-input-wrapper" style={{ maxWidth: 130 }}>
-                        <input
-                          type="number"
-                          step="0.1"
-                          min="1"
-                          max="5"
-                          value={tier.pointMultiplier}
-                          onChange={(e) => handleUpdateTierMultiplier(idx, Number(e.target.value))}
-                          className="loyalty-input-field text-center font-bold text-sm"
-                          style={{ color: tier.colorHex }}
-                          disabled={!config.isEnabled}
-                        />
-                        <span className="loyalty-input-addon">lần</span>
-                      </div>
-                    </td>
-
-                    <td>
-                      <span className="tier-benefits-desc">
-                        {tier.benefitsDescription}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
           </div>
         </div>
       </div>

@@ -247,7 +247,14 @@ export const PromotionTable: FC<PromotionTableProps> = ({
                                           <span className="tier-badge-number">Bậc {tier.tierLevel}</span>
                                         </td>
                                         <td style={{ padding: '10px 14px' }}>
-                                          {tier.minOrderValue !== undefined ? (
+                                          {item.type === 'BUY_X_GET_Y' ? (
+                                            <div>
+                                              <span style={{ color: '#64748b' }}>Mua từ </span>
+                                              <strong style={{ color: '#0f172a' }}>
+                                                {tier.requiredQty || 1} × {tier.buyProductName || 'sản phẩm bất kỳ'}
+                                              </strong>
+                                            </div>
+                                          ) : tier.minOrderValue !== undefined ? (
                                             <div>
                                               <span style={{ color: '#64748b' }}>Đơn hàng từ </span>
                                               <strong style={{ color: '#0f172a' }}>{tier.minOrderValue.toLocaleString('vi-VN')} đ</strong>
@@ -263,37 +270,43 @@ export const PromotionTable: FC<PromotionTableProps> = ({
                                         </td>
                                         <td style={{ padding: '10px 14px' }}>
                                           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                                            {tier.discountType === 'PERCENT' ? (
-                                              <div className="voucher-discount-tag tag-percent">
-                                                <Percent size={13} />
-                                                <span>Giảm {tier.discountValue}%</span>
-                                              </div>
-                                            ) : (
-                                              <div className="voucher-discount-tag tag-fixed">
-                                                <Tag size={13} />
-                                                <span>Giảm {tier.discountValue.toLocaleString('vi-VN')} đ</span>
-                                              </div>
+                                            {item.type !== 'BUY_X_GET_Y' && (
+                                              tier.discountType === 'PERCENT' ? (
+                                                <div className="voucher-discount-tag tag-percent">
+                                                  <Percent size={13} />
+                                                  <span>Giảm {tier.discountValue}%</span>
+                                                </div>
+                                              ) : (
+                                                <div className="voucher-discount-tag tag-fixed">
+                                                  <Tag size={13} />
+                                                  <span>Giảm {tier.discountValue.toLocaleString('vi-VN')} đ</span>
+                                                </div>
+                                              )
                                             )}
-                                            {tier.giftProductName && (
+                                            {(tier.giftProductName || item.type === 'BUY_X_GET_Y') && (
                                               <div className="tier-gift-box" style={{ margin: 0, padding: '2px 6px', fontSize: '0.74rem' }}>
                                                 <Gift size={12} />
-                                                <span>Tặng {tier.giftQty || 1} x {tier.giftProductName}</span>
+                                                <span>
+                                                  Tặng {tier.giftQty || 1} {tier.giftUnit || 'Cái'} {tier.giftProductName || 'Quà tặng KM'}
+                                                </span>
                                               </div>
                                             )}
                                           </div>
                                         </td>
                                         <td style={{ padding: '10px 14px' }}>
-                                          {tier.maxDiscount !== undefined ? (
+                                          {tier.maxDiscount !== undefined && item.type !== 'BUY_X_GET_Y' ? (
                                             <strong style={{ color: '#0f172a' }}>{tier.maxDiscount.toLocaleString('vi-VN')} đ</strong>
                                           ) : (
                                             <span style={{ color: '#94a3b8' }}>Không giới hạn</span>
                                           )}
                                         </td>
                                         <td style={{ padding: '10px 14px', color: '#475569' }}>
-                                          {tier.discountType === 'PERCENT'
+                                          {item.type === 'BUY_X_GET_Y'
+                                            ? `Mua đủ ${tier.requiredQty || 1} ${tier.buyProductName || 'sản phẩm bất kỳ'} tặng ngay ${tier.giftQty || 1} ${tier.giftUnit || ''} ${tier.giftProductName || 'quà tặng'} (0 đ)`
+                                            : tier.discountType === 'PERCENT'
                                             ? `Giảm ${tier.discountValue}% trên tổng tiền hàng${tier.maxDiscount ? ` (tối đa ${tier.maxDiscount.toLocaleString('vi-VN')} đ)` : ''}`
                                             : `Trừ trực tiếp ${tier.discountValue.toLocaleString('vi-VN')} đ vào hóa đơn`}
-                                          {tier.giftProductName && ` kèm quà tặng ${tier.giftProductName}`}
+                                          {item.type !== 'BUY_X_GET_Y' && tier.giftProductName && ` kèm quà tặng ${tier.giftProductName}`}
                                         </td>
                                       </tr>
                                     ))}

@@ -26,6 +26,8 @@
    - Điều hướng thông minh: `ADMIN` -> `/admin/dashboard`, `STAFF`/`CASHIER`/`EMPLOYEE` -> `/pos`, `STORE_OWNER` -> `/store-owner/dashboard`.
 4. **`src/layouts/AdminLayout/AdminLayout.tsx`**:
    - Đổi key `localStorage.getItem('admin_sidebar_open')` thành `ui_sidebar_open` (tự động dọn dẹp key cũ `admin_sidebar_open`).
+5. **`src/api/financeHttpClient.ts`**:
+   - Bổ sung `withCredentials: true` và loại bỏ đọc `localStorage.getItem('access_token')` để đồng bộ với cơ chế xác thực HttpOnly Cookie, tránh lỗi `401 Unauthorized` trên các API tài chính.
 
 ---
 

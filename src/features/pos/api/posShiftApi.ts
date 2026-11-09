@@ -146,9 +146,13 @@ export const posShiftApi = {
   /**
    * Lấy danh sách các phiếu chờ chủ xử lý
    */
-  async getPendingMovements(branchId: string): Promise<PendingMovementsSummaryResponse> {
+  async getPendingMovements(branchId?: string): Promise<PendingMovementsSummaryResponse> {
+    const params: Record<string, string> = {};
+    if (branchId && branchId !== 'ALL' && branchId.trim() !== '') {
+      params.branchId = branchId;
+    }
     const res = await httpClient.get('/pos/cash-movements/pending', {
-      params: { branchId },
+      params,
     });
     return res.data?.data || res.data || { pendingApprovalsCount: 0, unconfirmedDropsCount: 0, movements: [] };
   },

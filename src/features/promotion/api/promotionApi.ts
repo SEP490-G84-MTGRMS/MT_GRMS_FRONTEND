@@ -84,6 +84,9 @@ export interface CartGiftItemDto {
   productName: string;
   quantity: number;
   reason: string;
+  promotionId?: string;
+  unitName?: string;
+  equivalentValue?: number;
 }
 
 export interface CartItemDiscountDto {
@@ -118,6 +121,7 @@ export interface EvaluateCartResponse {
   giftItems: CartGiftItemDto[];
   voucherResult?: ValidateVoucherResponse | null;
   itemDiscounts?: CartItemDiscountDto[];
+  appliedPromotionId?: string | null;
 }
 
 export interface VoucherBatchDto {

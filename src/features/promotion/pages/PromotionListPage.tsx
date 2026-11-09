@@ -5,12 +5,11 @@ import { PromotionFilterBar } from '../components/promotions/PromotionFilterBar'
 import { PromotionTable } from '../components/promotions/PromotionTable';
 import { PromotionModal } from '../components/promotions/PromotionModal';
 import { promotionApi, type PromotionDto } from '../api/promotionApi';
-import { INITIAL_PROMOTIONS } from '../mock/promotionMockData';
 import type { PromotionItem, PromotionFilterState, PromotionType } from '../types/promotion.types';
 import '../promotion.css';
 
 export const PromotionListPage: FC = () => {
-  const [promotions, setPromotions] = useState<PromotionItem[]>(INITIAL_PROMOTIONS);
+  const [promotions, setPromotions] = useState<PromotionItem[]>([]);
   const [filter, setFilter] = useState<PromotionFilterState>({
     searchTerm: '',
     type: 'ALL',
@@ -20,26 +19,78 @@ export const PromotionListPage: FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingPromo, setEditingPromo] = useState<PromotionItem | null>(null);
 
-  const mapDtoToItem = useCallback((dto: PromotionDto): PromotionItem => ({
-    id: dto.id,
-    code: dto.promotionCode,
-    name: dto.promotionName,
-    type: (dto.type as PromotionType) || 'ORDER_DISCOUNT',
-    startDate: dto.startDate?.slice(0, 10) || '',
-    endDate: dto.endDate?.slice(0, 10) || '',
-    status: dto.isActive ? 'ACTIVE' : 'PAUSED',
-    branches: [dto.targetBranches || 'ALL'],
-    tiers: dto.conditions?.length
-      ? dto.conditions.map((c, i) => ({
-          id: c.id || `tier-${i}`,
-          tierLevel: i + 1,
-          minOrderValue: dto.minOrderValue,
-          discountType: (dto.discountValue <= 100 ? 'PERCENT' : 'FIXED_AMOUNT') as 'PERCENT' | 'FIXED_AMOUNT',
-          discountValue: c.discountValue ?? dto.discountValue,
-          maxDiscount: dto.maxDiscountAmount,
-          giftProductName: c.productName,
-          giftQty: c.minQty,
-        }))
+  const mapDtoToItem = useCallback((dto: PromotionDto): PromotionItem => {
+    let parsedTiers: any[] | null = null;
+    let cleanDescription = dto.description || '';
+    if (dto.description && dto.description.includes('[TIERS_JSON]')) {
+      const match = dto.description.match(/\[TIERS_JSON\]([\s\S]*?)\[\/TIERS_JSON\]/);
+      if (match && match[1]) {
+        try {
+          parsedTiers = JSON.parse(match[1]);
+          cleanDescription = dto.description.replace(/\[TIERS_JSON\][\s\S]*?\[\/TIERS_JSON\]/g, '').trim();
+        } catch (e) {
+          console.warn('Failed to parse tiers from description:', e);
+        }
+      }
+    }
+
+    let fallbackTiers: any[] = [];
+    if (!parsedTiers && dto.conditions?.length) {
+      if (dto.type === 'BUY_X_GET_Y') {
+        const buyCond = dto.conditions.find((c) => c.productRole === 'BUY');
+        const giftConds = dto.conditions.filter((c) => c.productRole === 'GIFT');
+        const targetGiftConds = giftConds.length > 0 ? giftConds : dto.conditions;
+        fallbackTiers = targetGiftConds.map((c, i) => {
+          let unit = 'Cái';
+          if (c.note && c.note.startsWith('ĐVT: ')) {
+            unit = c.note.replace('ĐVT: ', '').trim();
+          }
+          return {
+            id: c.id || `tier-${i}`,
+            tierLevel: i + 1,
+            discountType: 'PERCENT' as const,
+            discountValue: 0,
+            buyProductId:
+              buyCond?.productId && buyCond.productId !== '00000000-0000-0000-0000-000000000000'
+                ? buyCond.productId
+                : undefined,
+            buyProductName: buyCond?.productName,
+            requiredQty: buyCond?.minQty || c.minQty || 1,
+            giftProductId:
+              c.productId && c.productId !== '00000000-0000-0000-0000-000000000000' ? c.productId : undefined,
+            giftProductName: c.productName,
+            giftUnit: unit,
+            giftQty: buyCond ? c.minQty || 1 : 1,
+          };
+        });
+      } else {
+        fallbackTiers = dto.conditions.map((c, i) => {
+          let unit = 'Cái';
+          if (c.note && c.note.startsWith('ĐVT: ')) {
+            unit = c.note.replace('ĐVT: ', '').trim();
+          }
+          return {
+            id: c.id || `tier-${i}`,
+            tierLevel: i + 1,
+            minOrderValue: dto.minOrderValue,
+            discountType: (dto.discountValue <= 100 ? 'PERCENT' : 'FIXED_AMOUNT') as 'PERCENT' | 'FIXED_AMOUNT',
+            discountValue: c.discountValue ?? dto.discountValue,
+            maxDiscount: dto.maxDiscountAmount,
+            requiredQty: c.minQty,
+            giftProductId:
+              c.productId && c.productId !== '00000000-0000-0000-0000-000000000000' ? c.productId : undefined,
+            giftProductName: c.productName,
+            giftUnit: unit,
+            giftQty: c.minQty,
+          };
+        });
+      }
+    }
+
+    const tiers = parsedTiers && parsedTiers.length > 0
+      ? parsedTiers
+      : fallbackTiers.length > 0
+      ? fallbackTiers
       : [
           {
             id: `tier-1`,
@@ -48,14 +99,27 @@ export const PromotionListPage: FC = () => {
             discountType: (dto.discountValue <= 100 ? 'PERCENT' : 'FIXED_AMOUNT') as 'PERCENT' | 'FIXED_AMOUNT',
             discountValue: dto.discountValue,
             maxDiscount: dto.maxDiscountAmount,
+            giftUnit: 'Cái',
           },
-        ],
-    usageCount: dto.usedCount,
-    budgetLimit: dto.budgetLimit,
-    totalDiscountGiven: dto.totalDiscountGiven,
-    description: dto.description || '',
-    createdAt: dto.createdAt?.slice(0, 10) || '',
-  }), []);
+        ];
+
+    return {
+      id: dto.id,
+      code: dto.promotionCode,
+      name: dto.promotionName,
+      type: (dto.type as PromotionType) || 'ORDER_DISCOUNT',
+      startDate: dto.startDate?.slice(0, 10) || '',
+      endDate: dto.endDate?.slice(0, 10) || '',
+      status: dto.isActive ? 'ACTIVE' : 'PAUSED',
+      branches: [dto.targetBranches || 'ALL'],
+      tiers,
+      usageCount: dto.usedCount,
+      budgetLimit: dto.budgetLimit,
+      totalDiscountGiven: dto.totalDiscountGiven,
+      description: cleanDescription,
+      createdAt: dto.createdAt?.slice(0, 10) || '',
+    };
+  }, []);
 
   const loadPromotions = useCallback(async () => {
     try {
@@ -64,11 +128,11 @@ export const PromotionListPage: FC = () => {
         type: filter.type !== 'ALL' ? filter.type : undefined,
         status: filter.status !== 'ALL' ? filter.status : undefined,
       });
-      if (res?.items && res.items.length > 0) {
+      if (res?.items) {
         setPromotions(res.items.map(mapDtoToItem));
       }
-    } catch {
-      // Keep initial promotions on network/mock error
+    } catch (err) {
+      console.warn('Lỗi tải danh sách khuyến mãi:', err);
     }
   }, [filter.searchTerm, filter.type, filter.status, mapDtoToItem]);
 
@@ -169,6 +233,53 @@ export const PromotionListPage: FC = () => {
       const minOrderVal = firstTier ? (firstTier.minOrderValue || 0) : 0;
       const maxDiscount = firstTier ? firstTier.maxDiscount : undefined;
 
+      const conditions: Array<{
+        productId: string;
+        productName?: string;
+        productRole: 'BUY' | 'GIFT' | 'DISCOUNT';
+        minQty: number;
+        discountValue?: number;
+        note?: string;
+      }> = [];
+
+      if (savedPromo.type === 'BUY_X_GET_Y') {
+        for (const [idx, t] of (savedPromo.tiers || []).entries()) {
+          if (t.buyProductId) {
+            conditions.push({
+              productId: t.buyProductId,
+              productName: t.buyProductName,
+              productRole: 'BUY',
+              minQty: t.requiredQty || 1,
+              discountValue: 0,
+            });
+          }
+          conditions.push({
+            productId: t.giftProductId || '00000000-0000-0000-0000-000000000000',
+            productName: t.giftProductName || `Quà tặng bậc ${idx + 1}`,
+            productRole: 'GIFT',
+            minQty: t.giftQty || 1,
+            discountValue: 0,
+            note: t.giftUnit ? `ĐVT: ${t.giftUnit}` : undefined,
+          });
+        }
+      } else {
+        for (const t of savedPromo.tiers || []) {
+          conditions.push({
+            productId: t.giftProductId || '00000000-0000-0000-0000-000000000000',
+            productName: t.giftProductName,
+            productRole: 'DISCOUNT',
+            minQty: t.requiredQty || t.giftQty || 1,
+            discountValue: t.discountValue,
+            note: t.giftUnit ? `ĐVT: ${t.giftUnit}` : undefined,
+          });
+        }
+      }
+
+      // Serialize tiers into description metadata so all tiers persist across DB reloads
+      const tiersJson = JSON.stringify(savedPromo.tiers || []);
+      const cleanDesc = (savedPromo.description || '').replace(/\[TIERS_JSON\][\s\S]*?\[\/TIERS_JSON\]/g, '').trim();
+      const descriptionWithTiers = cleanDesc ? `${cleanDesc}\n[TIERS_JSON]${tiersJson}[/TIERS_JSON]` : `[TIERS_JSON]${tiersJson}[/TIERS_JSON]`;
+
       if (editingPromo) {
         await promotionApi.updatePromotion(savedPromo.id, {
           promotionName: savedPromo.name,
@@ -180,9 +291,10 @@ export const PromotionListPage: FC = () => {
           startDate: savedPromo.startDate || new Date().toISOString(),
           endDate: savedPromo.endDate || new Date().toISOString(),
           isActive: savedPromo.status === 'ACTIVE',
-          description: savedPromo.description,
+          description: descriptionWithTiers,
           targetBranches: savedPromo.branches.join(','),
           budgetLimit: savedPromo.budgetLimit,
+          conditions,
         });
       } else {
         await promotionApi.createPromotion({
@@ -196,24 +308,25 @@ export const PromotionListPage: FC = () => {
           startDate: savedPromo.startDate || new Date().toISOString(),
           endDate: savedPromo.endDate || new Date().toISOString(),
           isActive: true,
-          description: savedPromo.description,
+          description: descriptionWithTiers,
           targetBranches: savedPromo.branches.join(','),
           budgetLimit: savedPromo.budgetLimit,
+          conditions,
         });
       }
-    } catch {
-      // Ignored for optimistic UI
+      await loadPromotions();
+    } catch (err: any) {
+      console.error('Lỗi khi lưu chương trình khuyến mãi:', err);
+      setPromotions((prev) => {
+        const idx = prev.findIndex((p) => p.id === savedPromo.id);
+        if (idx >= 0) {
+          const next = [...prev];
+          next[idx] = savedPromo;
+          return next;
+        }
+        return [savedPromo, ...prev];
+      });
     }
-
-    setPromotions((prev) => {
-      const idx = prev.findIndex((p) => p.id === savedPromo.id);
-      if (idx >= 0) {
-        const next = [...prev];
-        next[idx] = savedPromo;
-        return next;
-      }
-      return [savedPromo, ...prev];
-    });
     showToast(`Đã lưu chương trình "${savedPromo.name}" thành công!`);
   };
 
@@ -253,7 +366,7 @@ export const PromotionListPage: FC = () => {
       <PromotionFilterBar
         filter={filter}
         onFilterChange={setFilter}
-        onRefresh={() => setPromotions(INITIAL_PROMOTIONS)}
+        onRefresh={loadPromotions}
       />
 
       {/* Table */}

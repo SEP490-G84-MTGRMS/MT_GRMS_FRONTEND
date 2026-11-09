@@ -506,8 +506,8 @@ export const PosHeader: FC<Props> = ({
 
             {isMenuOpen && (
               <div className="pos-hamburger-dropdown">
-                {/* Lối tắt quay lại Dashboard cho Chủ Cửa Hàng */}
-                {isStoreOwner && (
+                {/* Lối tắt quay lại Dashboard cho Chủ Cửa Hàng hoặc Nhân Viên */}
+                {isStoreOwner ? (
                   <>
                     <button
                       type="button"
@@ -521,6 +521,24 @@ export const PosHeader: FC<Props> = ({
                       <div className="item-content">
                         <div className="item-title">Về Dashboard Chủ Cửa Hàng</div>
                         <div className="item-desc">Quay lại trang tổng quan bán lẻ & quản trị</div>
+                      </div>
+                    </button>
+                    <div style={{ height: 1, backgroundColor: '#e2e8f0', margin: '4px 0' }} />
+                  </>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      className="pos-dropdown-item"
+                      onClick={() => {
+                        setIsMenuOpen(false);
+                        navigate('/employee/schedule');
+                      }}
+                    >
+                      <ArrowLeft size={16} className="text-teal-700" />
+                      <div className="item-content">
+                        <div className="item-title">Về Dashboard Nhân Viên</div>
+                        <div className="item-desc">Xem lịch làm việc, bảng chấm công & đơn hàng</div>
                       </div>
                     </button>
                     <div style={{ height: 1, backgroundColor: '#e2e8f0', margin: '4px 0' }} />
