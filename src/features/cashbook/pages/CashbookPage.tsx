@@ -47,7 +47,7 @@ export const CashbookPage: FC = () => {
     branchId: 'ALL',
     accountId: 'ALL',
     transactionType: 'ALL',
-    datePeriod: 'this_month',
+    datePeriod: urlSearch ? 'all' : 'this_month',
     searchQuery: urlSearch,
   });
 
@@ -56,6 +56,9 @@ export const CashbookPage: FC = () => {
       setFilters((prev) => ({
         ...prev,
         searchQuery: urlSearch,
+        datePeriod: 'all',
+        startDate: undefined,
+        endDate: undefined,
       }));
     }
   }, [urlSearch]);
@@ -729,6 +732,8 @@ export const CashbookPage: FC = () => {
                 transactionType: 'ALL',
                 datePeriod: 'this_month',
                 searchQuery: '',
+                startDate: undefined,
+                endDate: undefined,
               })
             }
           />

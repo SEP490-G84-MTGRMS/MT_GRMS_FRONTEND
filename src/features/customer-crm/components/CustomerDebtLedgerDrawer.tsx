@@ -370,10 +370,30 @@ export const CustomerDebtLedgerDrawer: FC<CustomerDebtLedgerDrawerProps> = ({
                     >
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                         {item.referenceDocId && (
-                          <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-                            <FileText className="w-3 h-3 text-slate-400" />
-                            Đơn: <strong>{item.referenceDocId}</strong>
-                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              onClose();
+                              navigate('/store-owner/invoices?search=' + encodeURIComponent(item.referenceDocId || ''));
+                            }}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              color: '#2563EB',
+                              background: '#EFF6FF',
+                              border: '1px solid #DBEAFE',
+                              padding: '2px 8px',
+                              borderRadius: '6px',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              fontSize: '0.75rem',
+                            }}
+                            title="Bấm để xem chi tiết hóa đơn/đơn hàng trên trang Quản lý Hóa đơn"
+                          >
+                            <FileText className="w-3 h-3 text-blue-500" />
+                            <span>Đơn: {item.referenceDocId} ↗</span>
+                          </button>
                         )}
                         {item.cashTransactionCode && (
                           <button

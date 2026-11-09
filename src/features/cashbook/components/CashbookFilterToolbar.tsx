@@ -58,6 +58,7 @@ export const CashbookFilterToolbar: FC<CashbookFilterToolbarProps> = ({
   ];
 
   const periodOptions: { id: CashbookFilterParams['datePeriod']; label: string }[] = [
+    { id: 'all', label: 'Tất cả thời gian' },
     { id: 'this_month', label: 'Tháng này' },
     { id: 'today', label: 'Hôm nay' },
     { id: 'last_7_days', label: '7 ngày qua' },

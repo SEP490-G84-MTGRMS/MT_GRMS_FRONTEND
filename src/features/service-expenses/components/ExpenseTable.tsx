@@ -271,7 +271,10 @@ export const ExpenseTable: FC<ExpenseTableProps> = ({
                     {item.status === 'Paid' && (
                       <button
                         type="button"
-                        onClick={() => navigate('/store-owner/cashbook?search=' + encodeURIComponent(item.expenseId))}
+                        onClick={() => {
+                          const targetSearch = (item as any).voucherCode || item.invoiceNumber || item.expenseId;
+                          navigate('/store-owner/cashbook?search=' + encodeURIComponent(targetSearch));
+                        }}
                         title="Xem phiếu chi dòng tiền trong Sổ quỹ Cashbook"
                         style={{
                           background: '#F0FDFA',

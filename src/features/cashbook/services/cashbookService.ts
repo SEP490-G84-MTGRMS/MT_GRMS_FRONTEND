@@ -348,6 +348,7 @@ function mapBackendEntryToLedgerTransaction(
     description: entry.description || '',
     referenceDocType,
     referenceDocId: entry.referenceCode || entry.sourceId || undefined,
+    sourceId: entry.sourceId,
     sourceModuleName,
     isAutomated: entry.sourceType !== 'MANUAL',
     isCompensating,
@@ -483,6 +484,7 @@ export const cashbookService = {
           tx.description.toLowerCase().includes(q) ||
           tx.category.toLowerCase().includes(q) ||
           (tx.referenceDocId && tx.referenceDocId.toLowerCase().includes(q)) ||
+          (tx.sourceId && tx.sourceId.toLowerCase().includes(q)) ||
           (tx.id && tx.id.toLowerCase().includes(q))
       );
     }
@@ -514,8 +516,7 @@ export const cashbookService = {
       if (params.branchId && params.branchId !== 'ALL') queryParams.branchId = params.branchId;
       if (params.startDate) queryParams.fromDate = params.startDate;
       if (params.endDate) queryParams.toDate = params.endDate;
-      const isGuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(params.searchQuery?.trim() || '');
-      if (params.searchQuery && params.searchQuery.trim() && !isGuid) {
+      if (params.searchQuery && params.searchQuery.trim()) {
         queryParams.keyword = params.searchQuery.trim();
       }
 
@@ -553,6 +554,7 @@ export const cashbookService = {
             tx.description.toLowerCase().includes(q) ||
             tx.category.toLowerCase().includes(q) ||
             (tx.referenceDocId && tx.referenceDocId.toLowerCase().includes(q)) ||
+            (tx.sourceId && tx.sourceId.toLowerCase().includes(q)) ||
             (tx.id && tx.id.toLowerCase().includes(q))
         );
       }

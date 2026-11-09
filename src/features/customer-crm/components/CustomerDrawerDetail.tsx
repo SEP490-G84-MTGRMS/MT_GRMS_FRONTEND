@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import type { FC } from 'react';
 import {
   X,
@@ -38,6 +39,7 @@ export const CustomerDrawerDetail: FC<CustomerDrawerDetailProps> = ({
   onOpenCollect,
   onViewLedger,
 }) => {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'info' | 'invoices' | 'payments'>('info');
 
   if (!customer) return null;
@@ -268,7 +270,30 @@ export const CustomerDrawerDetail: FC<CustomerDrawerDetailProps> = ({
                     }}
                   >
                     <div>
-                      <div style={{ fontWeight: 700, color: 'var(--text-main, #111827)' }}>{inv.id}</div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onClose();
+                          navigate('/store-owner/invoices?search=' + encodeURIComponent(inv.id));
+                        }}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          padding: 0,
+                          fontWeight: 700,
+                          color: '#0F766E',
+                          cursor: 'pointer',
+                          textAlign: 'left',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          fontSize: '0.84rem',
+                        }}
+                        className="hover:underline"
+                        title="Bấm để xem chi tiết hóa đơn/đơn hàng trên trang Quản lý Hóa đơn"
+                      >
+                        {inv.id} ↗
+                      </button>
                       <div style={{ fontSize: '0.74rem', color: '#94a3b8' }}>{inv.date}</div>
                     </div>
                     <div style={{ textAlign: 'right' }}>

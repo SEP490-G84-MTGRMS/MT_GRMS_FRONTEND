@@ -64,6 +64,7 @@ export interface LedgerTransaction {
   description: string;
   referenceDocType: ReferenceDocType;
   referenceDocId?: string;
+  sourceId?: string | null;
   sourceModuleName?: SourceModuleName;
   linkedTransactionId?: string;
   isAutomated: boolean;
@@ -95,7 +96,7 @@ export interface CashbookFilterParams {
   branchId?: string;
   accountId?: string;
   transactionType?: TransactionType | 'ALL';
-  datePeriod?: 'today' | 'last_7_days' | 'this_month' | 'last_month' | 'custom';
+  datePeriod?: 'today' | 'last_7_days' | 'this_month' | 'last_month' | 'custom' | 'all';
   startDate?: string;
   endDate?: string;
   searchQuery?: string;
