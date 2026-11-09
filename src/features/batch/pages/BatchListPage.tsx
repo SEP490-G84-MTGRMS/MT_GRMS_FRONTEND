@@ -29,7 +29,7 @@ const DEFAULT_FILTERS: BatchFilterState = {
   branchId: 'ALL',
   status: 'ALL',
   pageIndex: 1,
-  pageSize: 10,
+  pageSize: 20,
 };
 
 export const BatchListPage: FC<{ defaultRole?: UserRole }> = ({
@@ -50,7 +50,7 @@ export const BatchListPage: FC<{ defaultRole?: UserRole }> = ({
   const [filterInputs, setFilterInputs] = useState<BatchFilterState>(DEFAULT_FILTERS);
   const [appliedFilters, setAppliedFilters] = useState<BatchFilterState>(DEFAULT_FILTERS);
   const [pageIndex, setPageIndex] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(20);
 
   const [selectedBatch, setSelectedBatch] = useState<BatchItem | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);

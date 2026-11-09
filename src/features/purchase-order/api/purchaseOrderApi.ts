@@ -122,6 +122,9 @@ export interface PurchaseOrderListApiItem {
   totalAmount: number;
   note?: string;
   createdAt: string;
+  activeGoodsReceiptId?: string | null;
+  activeGoodsReceiptCode?: string | null;
+  activeGoodsReceiptStatus?: string | null;
   details: Array<{
     id: string;
     productId: string;

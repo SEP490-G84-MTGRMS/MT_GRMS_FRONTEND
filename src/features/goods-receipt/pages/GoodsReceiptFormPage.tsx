@@ -195,19 +195,24 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
 
   const loadPoLookup = useCallback(async () => {
     if (!isCreateMode) return;
+
+    const paramPoCode = searchParams.get('poCode');
+    const paramPoIdRaw = searchParams.get('po');
+    // Chỉ nhận GUID đầy đủ — tránh JSON.stringify(order) / id cắt cụt từ link cũ
+    const paramPoId =
+      paramPoIdRaw &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(paramPoIdRaw)
+        ? paramPoIdRaw
+        : null;
+
+    // Gắn mã PO từ URL ngay — tránh select trống trong lúc chờ API / khi PO chưa có trong lookup
+    if (paramPoCode) {
+      setPoReference(paramPoCode);
+    }
+
     try {
       const branchFilter = role === 'employee' && employeeBranchId ? employeeBranchId : undefined;
       const pos = await goodsReceiptApi.getPoLookup(branchFilter);
-      setAvailablePos(pos);
-
-      const paramPoCode = searchParams.get('poCode');
-      const paramPoIdRaw = searchParams.get('po');
-      // Chỉ nhận GUID đầy đủ — tránh JSON.stringify(order) / id cắt cụt từ link cũ
-      const paramPoId =
-        paramPoIdRaw &&
-        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(paramPoIdRaw)
-          ? paramPoIdRaw
-          : null;
 
       const matched = pos.find(
         (p) =>
@@ -216,19 +221,39 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
       );
 
       if (matched) {
+        setAvailablePos(pos);
         setPoReference(matched.poCode);
         setSelectedPoId(matched.id);
         return;
       }
 
-      // PO không còn trong lookup (đã có phiếu / sai trạng thái) — vẫn thử load theo id
-      // để API trả lỗi rõ, thay vì để bảng sản phẩm trống im lặng.
+      // PO deep-link chưa nằm trong lookup → vẫn hiện mã trên select + load chi tiết theo id
       if (paramPoId) {
+        const stubPos =
+          paramPoCode && !pos.some((p) => p.poCode === paramPoCode)
+            ? [
+                {
+                  id: paramPoId,
+                  poCode: paramPoCode,
+                  branchId: '',
+                  branchName: '',
+                  supplierId: '',
+                  supplierName: '',
+                  supplierCode: '',
+                  orderDate: '',
+                  expectedDeliveryDate: '',
+                  items: [],
+                } as PoLookupOption,
+                ...pos,
+              ]
+            : pos;
+        setAvailablePos(stubPos);
         if (paramPoCode) setPoReference(paramPoCode);
         setSelectedPoId(paramPoId);
         return;
       }
 
+      setAvailablePos(pos);
       if (paramPoCode) {
         setPoReference(paramPoCode);
         showToast(
@@ -278,6 +303,29 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
       try {
         const details = await goodsReceiptApi.getPoReceiptDetails(selectedPoId);
         if (!details || cancelled) return;
+
+        // Deep-link ?po=&poCode= : luôn gắn mã PO gốc (kể cả khi PO chưa nằm trong po-lookup)
+        if (details.code) {
+          setPoReference(details.code);
+          setAvailablePos((prev) => {
+            if (prev.some((p) => p.id === details.id || p.poCode === details.code)) return prev;
+            return [
+              {
+                id: details.id,
+                poCode: details.code,
+                branchId: details.branchId,
+                branchName: details.branchName || details.branchCode || '',
+                supplierId: details.supplierId,
+                supplierName: details.supplierName,
+                supplierCode: details.supplierCode,
+                orderDate: '',
+                expectedDeliveryDate: '',
+                items: [],
+              },
+              ...prev,
+            ];
+          });
+        }
 
         setSupplierId(details.supplierId);
         setSupplierName(details.supplierName);
