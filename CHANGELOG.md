@@ -9,6 +9,7 @@ Toàn bộ các thay đổi của repository Frontend React SPA được tổng 
 ### Fixed
 - **Tái thiết kế lưới ô nhập liệu Modal Chi tiết chi nhánh (`BranchDetailModal.tsx`)**: Chuyển đổi từ bố cục auto-fit minmax sang hệ thống lưới 2 cột kỷ luật (`1fr 1fr`), chuẩn hóa chiều cao 38px cho tất cả các control, khắc phục triệt để hiện tượng xô lệch hàng, co ép tên chi nhánh và tràn chữ checkbox Trụ sở chính [FE-BRANCH] [worklog: docs/worklogs/2026-11-09_FE-BRANCH_AI_redesign-branch-detail-modal-inputs.md].
 - **Cải tiến cơ chế đồng bộ dữ liệu & phản hồi lưu thay đổi (`BranchDetailModal.tsx`)**: Bổ sung fallback giữ nguyên form khi API detail chậm hoặc gặp sự cố, đồng bộ tức thời huy hiệu Trụ sở chính trên header, hiển thị trạng thái loading spinner khi lưu và thông báo badge xanh "Đã lưu thành công!" [FE-BRANCH] [worklog: docs/worklogs/2026-11-09_FE-BRANCH_AI_redesign-branch-detail-modal-inputs.md].
+- **Loại bỏ nút Sửa trong cột Thao tác (`BranchManagementTab.tsx`)**: Lược bỏ nút icon bút chì thừa do chức năng chỉnh sửa đã được hợp nhất trực tiếp bên trong modal Chi tiết chi nhánh, giúp cột Thao tác tinh gọn và thoáng mắt [FE-BRANCH] [worklog: docs/worklogs/2026-11-09_FE-BRANCH_AI_redesign-branch-detail-modal-inputs.md].
 
 ## [Unreleased] - 2026-11-08
 ### Added

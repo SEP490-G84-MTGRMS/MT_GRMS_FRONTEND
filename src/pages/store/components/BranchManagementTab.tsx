@@ -3,7 +3,6 @@ import { useState, useEffect, type FC } from 'react';
 import {
   Search,
   Building2,
-  Edit2,
   Power,
   RefreshCw,
   MapPin,
@@ -418,30 +417,6 @@ export const BranchManagementTab: FC<BranchManagementTabProps> = ({
                           title="Xem chi tiết các thông số chi nhánh"
                         >
                           <Eye size={15} />
-                        </button>
-
-                        {/* Sửa */}
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSelectedBranch(b);
-                            setActiveModal('detail');
-                          }}
-                          style={{
-                            width: 32,
-                            height: 32,
-                            borderRadius: 8,
-                            border: '1px solid #CBD5E1',
-                            background: '#FFFFFF',
-                            color: '#334155',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            cursor: 'pointer',
-                          }}
-                          title="Chỉnh sửa thông tin chi nhánh"
-                        >
-                          <Edit2 size={15} />
                         </button>
 
                         {/* Toggle Status */}

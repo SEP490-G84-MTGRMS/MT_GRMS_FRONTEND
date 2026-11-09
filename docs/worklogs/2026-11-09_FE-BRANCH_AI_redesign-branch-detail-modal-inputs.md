@@ -40,6 +40,12 @@
   - Khi lưu thành công hiển thị badge xanh "Đã lưu thành công!" kèm icon CheckCircle2 ở cả góc trên thông tin cơ bản và chân trang.
   - Tự động gọi callback `onSuccess()` để danh sách chi nhánh và hạn mức bên ngoài cập nhật tức thì.
 
+### 2.2. `src/pages/store/components/BranchManagementTab.tsx`
+- **Loại bỏ nút Sửa (icon Edit2) thừa trong cột Thao tác**: Vì modal Chi tiết chi nhánh hiện đã tích hợp sẵn các ô input chỉnh sửa trực tiếp và nút "Lưu thay đổi" (All-in-One), nút "Sửa" riêng biệt trước đây trở nên dư thừa. Đã loại bỏ nút này để thanh thao tác gọn gàng, chỉ gồm:
+  - Xem chi tiết (icon Con mắt `Eye`).
+  - Bật / Tạm dừng hoạt động (icon Nguồn `Power`).
+  - Xóa chi nhánh (icon Thùng rác `Trash2`).
+
 ---
 
 ## 3. Điểm Nhấn Kỹ Thuật (Technical Highlights)
@@ -60,3 +66,4 @@
 ## 5. Ghi Chú Dành Cho Quản Lý Khi Merge (Manager Merge Notes)
 - **Mức độ rủi ro**: Thấp (Low).
 - **Tác động phụ**: Không ảnh hưởng đến các màn hình khác trong hệ thống.
+
