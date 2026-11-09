@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import type { FC, FormEvent } from 'react';
+import type { CSSProperties, FC, FormEvent } from 'react';
 import { X, Plus, Loader2, AlertCircle } from 'lucide-react';
-import type { CreateSupplierInput, SupplierCategory, SupplierStatus } from '../types/supplier.types';
+import type { CreateSupplierInput, SupplierStatus } from '../types/supplier.types';
 import { StatusToggle } from './StatusToggle';
 import '../supplier.css';
 
@@ -11,13 +11,46 @@ interface Props {
   onSubmit: (input: CreateSupplierInput) => Promise<void>;
 }
 
+const LABEL_WIDTH = 168;
+
+const labelStyle: CSSProperties = {
+  fontSize: 13,
+  fontWeight: 600,
+  color: '#334155',
+  width: LABEL_WIDTH,
+  minWidth: LABEL_WIDTH,
+  paddingTop: 10,
+  lineHeight: 1.3,
+  flexShrink: 0,
+};
+
+const fieldColStyle: CSSProperties = {
+  flex: 1,
+  minWidth: 0,
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 4,
+};
+
+const inputStyle: CSSProperties = {
+  width: '100%',
+  height: 38,
+  fontSize: 13.5,
+  boxSizing: 'border-box',
+};
+
+const errorStyle: CSSProperties = {
+  fontSize: 12,
+  color: '#dc2626',
+  display: 'block',
+};
+
 export const CreateSupplierModal: FC<Props> = ({ isOpen, onClose, onSubmit }) => {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [contactPerson, setContactPerson] = useState('');
   const [email, setEmail] = useState('');
   const [taxCode, setTaxCode] = useState('');
-  const [category, setCategory] = useState<SupplierCategory>('FRESH');
   const [address, setAddress] = useState('');
   const [note, setNote] = useState('');
   const [status, setStatus] = useState<SupplierStatus>('Active');
@@ -34,7 +67,6 @@ export const CreateSupplierModal: FC<Props> = ({ isOpen, onClose, onSubmit }) =>
       setContactPerson('');
       setEmail('');
       setTaxCode('');
-      setCategory('FRESH');
       setAddress('');
       setNote('');
       setStatus('Active');
@@ -129,7 +161,6 @@ export const CreateSupplierModal: FC<Props> = ({ isOpen, onClose, onSubmit }) =>
         contactPerson: contactPerson.trim() || name.trim(),
         email: email.trim() || undefined,
         taxCode: taxCode.trim() || undefined,
-        category,
         address: address.trim() || undefined,
         note: note.trim() || undefined,
         status,
@@ -150,7 +181,7 @@ export const CreateSupplierModal: FC<Props> = ({ isOpen, onClose, onSubmit }) =>
       <div
         className="modal-box"
         style={{
-          maxWidth: 580,
+          maxWidth: 640,
           width: '95%',
           maxHeight: '90vh',
           display: 'flex',
@@ -245,222 +276,165 @@ export const CreateSupplierModal: FC<Props> = ({ isOpen, onClose, onSubmit }) =>
               </div>
             )}
 
-            {/* 1. Tên NCC */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, width: '100%' }}>
-              <label style={{ fontSize: 13, fontWeight: 600, color: '#334155', display: 'block', minWidth: 'auto' }}>
+            {/* Label + input cùng hàng */}
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, width: '100%' }}>
+              <label style={labelStyle}>
                 Tên Nhà Cung Cấp <span style={{ color: '#dc2626' }}>*</span>
               </label>
-              <input
-                type="text"
-                placeholder="VD: Nông Sản Sạch Ba Miền"
-                value={name}
-                onChange={(e) => {
-                  setName(e.target.value);
-                  if (fieldErrors.name) setFieldErrors((prev) => ({ ...prev, name: '' }));
-                }}
-                className={`form-input ${fieldErrors.name ? 'form-input--error' : ''}`}
-                style={{
-                  width: '100%',
-                  height: 38,
-                  fontSize: 13.5,
-                  boxSizing: 'border-box',
-                  borderColor: fieldErrors.name ? '#dc2626' : undefined,
-                }}
-                autoFocus
-              />
-              {fieldErrors.name && (
-                <span style={{ fontSize: 12, color: '#dc2626', marginTop: 3, display: 'block' }}>
-                  {fieldErrors.name}
-                </span>
-              )}
+              <div style={fieldColStyle}>
+                <input
+                  type="text"
+                  placeholder="VD: Nông Sản Sạch Ba Miền"
+                  value={name}
+                  onChange={(e) => {
+                    setName(e.target.value);
+                    if (fieldErrors.name) setFieldErrors((prev) => ({ ...prev, name: '' }));
+                  }}
+                  className={`form-input ${fieldErrors.name ? 'form-input--error' : ''}`}
+                  style={{
+                    ...inputStyle,
+                    borderColor: fieldErrors.name ? '#dc2626' : undefined,
+                  }}
+                  autoFocus
+                />
+                {fieldErrors.name && <span style={errorStyle}>{fieldErrors.name}</span>}
+              </div>
             </div>
 
-            {/* 2. Số điện thoại */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, width: '100%' }}>
-              <label style={{ fontSize: 13, fontWeight: 600, color: '#334155', display: 'block', minWidth: 'auto' }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, width: '100%' }}>
+              <label style={labelStyle}>
                 Số Điện Thoại <span style={{ color: '#dc2626' }}>*</span>
               </label>
-              <input
-                type="tel"
-                placeholder="VD: 0912345678"
-                value={phone}
-                onChange={(e) => {
-                  setPhone(e.target.value);
-                  if (fieldErrors.phone) setFieldErrors((prev) => ({ ...prev, phone: '' }));
-                }}
-                className={`form-input ${fieldErrors.phone ? 'form-input--error' : ''}`}
-                style={{
-                  width: '100%',
-                  height: 38,
-                  fontSize: 13.5,
-                  fontFamily: 'var(--font-mono, monospace)',
-                  boxSizing: 'border-box',
-                  borderColor: fieldErrors.phone ? '#dc2626' : undefined,
-                }}
-              />
-              {fieldErrors.phone && (
-                <span style={{ fontSize: 12, color: '#dc2626', marginTop: 3, display: 'block' }}>
-                  {fieldErrors.phone}
-                </span>
-              )}
+              <div style={fieldColStyle}>
+                <input
+                  type="tel"
+                  placeholder="VD: 0912345678"
+                  value={phone}
+                  onChange={(e) => {
+                    setPhone(e.target.value);
+                    if (fieldErrors.phone) setFieldErrors((prev) => ({ ...prev, phone: '' }));
+                  }}
+                  className={`form-input ${fieldErrors.phone ? 'form-input--error' : ''}`}
+                  style={{
+                    ...inputStyle,
+                    fontFamily: 'var(--font-mono, monospace)',
+                    borderColor: fieldErrors.phone ? '#dc2626' : undefined,
+                  }}
+                />
+                {fieldErrors.phone && <span style={errorStyle}>{fieldErrors.phone}</span>}
+              </div>
             </div>
 
-            {/* 3. Người liên hệ */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, width: '100%' }}>
-              <label style={{ fontSize: 13, fontWeight: 600, color: '#334155', display: 'block', minWidth: 'auto' }}>
-                Người Liên Hệ
-              </label>
-              <input
-                type="text"
-                placeholder="VD: Anh Nam (Phòng Kinh Doanh)"
-                value={contactPerson}
-                onChange={(e) => {
-                  setContactPerson(e.target.value);
-                  if (fieldErrors.contactPerson) setFieldErrors((prev) => ({ ...prev, contactPerson: '' }));
-                }}
-                className="form-input"
-                style={{ width: '100%', height: 38, fontSize: 13.5, boxSizing: 'border-box' }}
-              />
-              {fieldErrors.contactPerson && (
-                <span style={{ fontSize: 12, color: '#dc2626', marginTop: 3, display: 'block' }}>
-                  {fieldErrors.contactPerson}
-                </span>
-              )}
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, width: '100%' }}>
+              <label style={labelStyle}>Người Liên Hệ</label>
+              <div style={fieldColStyle}>
+                <input
+                  type="text"
+                  placeholder="VD: Anh Nam (Phòng Kinh Doanh)"
+                  value={contactPerson}
+                  onChange={(e) => {
+                    setContactPerson(e.target.value);
+                    if (fieldErrors.contactPerson) setFieldErrors((prev) => ({ ...prev, contactPerson: '' }));
+                  }}
+                  className="form-input"
+                  style={inputStyle}
+                />
+                {fieldErrors.contactPerson && (
+                  <span style={errorStyle}>{fieldErrors.contactPerson}</span>
+                )}
+              </div>
             </div>
 
-            {/* 4. Email liên hệ */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, width: '100%' }}>
-              <label style={{ fontSize: 13, fontWeight: 600, color: '#334155', display: 'block', minWidth: 'auto' }}>
-                Email Liên Hệ
-              </label>
-              <input
-                type="email"
-                placeholder="VD: contact@nongsanbamien.vn"
-                value={email}
-                onChange={(e) => {
-                  setEmail(e.target.value);
-                  if (fieldErrors.email) setFieldErrors((prev) => ({ ...prev, email: '' }));
-                }}
-                className={`form-input ${fieldErrors.email ? 'form-input--error' : ''}`}
-                style={{
-                  width: '100%',
-                  height: 38,
-                  fontSize: 13.5,
-                  fontFamily: 'var(--font-mono, monospace)',
-                  boxSizing: 'border-box',
-                  borderColor: fieldErrors.email ? '#dc2626' : undefined,
-                }}
-              />
-              {fieldErrors.email && (
-                <span style={{ fontSize: 12, color: '#dc2626', marginTop: 3, display: 'block' }}>
-                  {fieldErrors.email}
-                </span>
-              )}
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, width: '100%' }}>
+              <label style={labelStyle}>Email Liên Hệ</label>
+              <div style={fieldColStyle}>
+                <input
+                  type="email"
+                  placeholder="VD: contact@nongsanbamien.vn"
+                  value={email}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    if (fieldErrors.email) setFieldErrors((prev) => ({ ...prev, email: '' }));
+                  }}
+                  className={`form-input ${fieldErrors.email ? 'form-input--error' : ''}`}
+                  style={{
+                    ...inputStyle,
+                    fontFamily: 'var(--font-mono, monospace)',
+                    borderColor: fieldErrors.email ? '#dc2626' : undefined,
+                  }}
+                />
+                {fieldErrors.email && <span style={errorStyle}>{fieldErrors.email}</span>}
+              </div>
             </div>
 
-            {/* 5. Mã số thuế */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, width: '100%' }}>
-              <label style={{ fontSize: 13, fontWeight: 600, color: '#334155', display: 'block', minWidth: 'auto' }}>
-                Mã Số Thuế
-              </label>
-              <input
-                type="text"
-                placeholder="VD: 0312345678 (tùy chọn)"
-                value={taxCode}
-                onChange={(e) => {
-                  setTaxCode(e.target.value);
-                  if (fieldErrors.taxCode) setFieldErrors((prev) => ({ ...prev, taxCode: '' }));
-                }}
-                className={`form-input ${fieldErrors.taxCode ? 'form-input--error' : ''}`}
-                style={{
-                  width: '100%',
-                  height: 38,
-                  fontSize: 13.5,
-                  boxSizing: 'border-box',
-                  fontFamily: 'var(--font-mono, monospace)',
-                  borderColor: fieldErrors.taxCode ? '#dc2626' : undefined,
-                }}
-              />
-              {fieldErrors.taxCode && (
-                <span style={{ fontSize: 12, color: '#dc2626', marginTop: 3, display: 'block' }}>
-                  {fieldErrors.taxCode}
-                </span>
-              )}
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, width: '100%' }}>
+              <label style={labelStyle}>Mã Số Thuế</label>
+              <div style={fieldColStyle}>
+                <input
+                  type="text"
+                  placeholder="VD: 0312345678 (tùy chọn)"
+                  value={taxCode}
+                  onChange={(e) => {
+                    setTaxCode(e.target.value);
+                    if (fieldErrors.taxCode) setFieldErrors((prev) => ({ ...prev, taxCode: '' }));
+                  }}
+                  className={`form-input ${fieldErrors.taxCode ? 'form-input--error' : ''}`}
+                  style={{
+                    ...inputStyle,
+                    fontFamily: 'var(--font-mono, monospace)',
+                    borderColor: fieldErrors.taxCode ? '#dc2626' : undefined,
+                  }}
+                />
+                {fieldErrors.taxCode && <span style={errorStyle}>{fieldErrors.taxCode}</span>}
+              </div>
             </div>
 
-            {/* Row 3: Phân loại ngành hàng */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, width: '100%' }}>
-              <label style={{ fontSize: 13, fontWeight: 600, color: '#334155', display: 'block', minWidth: 'auto' }}>
-                Phân Loại Ngành Hàng
-              </label>
-              <select
-                value={category}
-                onChange={(e) => setCategory(e.target.value as SupplierCategory)}
-                className="form-select"
-                style={{ width: '100%', height: 38, fontSize: 13.5, boxSizing: 'border-box' }}
-              >
-                <option value="FRESH">FRESH (Nông sản & Thực phẩm tươi sống)</option>
-                <option value="AMBIENT">AMBIENT (Đồ khô & Bách hóa tiêu dùng)</option>
-                <option value="FROZEN">FROZEN (Hàng đông lạnh & Thủy hải sản)</option>
-                <option value="UTILITIES">UTILITIES (Dịch vụ tiện ích / Điện nước)</option>
-                <option value="RENT">RENT (Thuê mặt bằng & Cơ sở vật chất)</option>
-                <option value="LOGISTICS">LOGISTICS (Vận tải & Giao nhận hàng hóa)</option>
-              </select>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%' }}>
+              <label style={labelStyle}>Trạng Thái</label>
+              <div style={fieldColStyle}>
+                <StatusToggle
+                  label=""
+                  checked={status === 'Active'}
+                  onChange={(next) => setStatus(next ? 'Active' : 'Inactive')}
+                  disabled={isSubmitting}
+                />
+              </div>
             </div>
 
-            {/* Row 4: Trạng thái hoạt động */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, width: '100%' }}>
-              <StatusToggle
-                checked={status === 'Active'}
-                onChange={(next) => setStatus(next ? 'Active' : 'Inactive')}
-                disabled={isSubmitting}
-              />
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, width: '100%' }}>
+              <label style={labelStyle}>Địa Chỉ Kho / Cửa Hàng</label>
+              <div style={fieldColStyle}>
+                <input
+                  type="text"
+                  placeholder="VD: 124 Đường 3/2, Phường 12, Quận 10, TP.HCM"
+                  value={address}
+                  onChange={(e) => {
+                    setAddress(e.target.value);
+                    if (fieldErrors.address) setFieldErrors((prev) => ({ ...prev, address: '' }));
+                  }}
+                  className="form-input"
+                  style={inputStyle}
+                />
+                {fieldErrors.address && <span style={errorStyle}>{fieldErrors.address}</span>}
+              </div>
             </div>
 
-            {/* Row 5: Địa chỉ kho / cửa hàng */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, width: '100%' }}>
-              <label style={{ fontSize: 13, fontWeight: 600, color: '#334155', display: 'block', minWidth: 'auto' }}>
-                Địa Chỉ Kho / Cửa Hàng
-              </label>
-              <input
-                type="text"
-                placeholder="VD: 124 Đường 3/2, Phường 12, Quận 10, TP.HCM"
-                value={address}
-                onChange={(e) => {
-                  setAddress(e.target.value);
-                  if (fieldErrors.address) setFieldErrors((prev) => ({ ...prev, address: '' }));
-                }}
-                className="form-input"
-                style={{ width: '100%', height: 38, fontSize: 13.5, boxSizing: 'border-box' }}
-              />
-              {fieldErrors.address && (
-                <span style={{ fontSize: 12, color: '#dc2626', marginTop: 3, display: 'block' }}>
-                  {fieldErrors.address}
-                </span>
-              )}
-            </div>
-
-            {/* Row 6: Ghi chú nhanh */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, width: '100%' }}>
-              <label style={{ fontSize: 13, fontWeight: 600, color: '#334155', display: 'block', minWidth: 'auto' }}>
-                Ghi Chú Nhanh
-              </label>
-              <input
-                type="text"
-                placeholder="Ghi chú nhanh về chính sách giao nhận, thời gian liên hệ (tùy chọn)..."
-                value={note}
-                onChange={(e) => {
-                  setNote(e.target.value);
-                  if (fieldErrors.note) setFieldErrors((prev) => ({ ...prev, note: '' }));
-                }}
-                className="form-input"
-                style={{ width: '100%', height: 38, fontSize: 13.5, boxSizing: 'border-box' }}
-              />
-              {fieldErrors.note && (
-                <span style={{ fontSize: 12, color: '#dc2626', marginTop: 3, display: 'block' }}>
-                  {fieldErrors.note}
-                </span>
-              )}
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, width: '100%' }}>
+              <label style={labelStyle}>Ghi Chú Nhanh</label>
+              <div style={fieldColStyle}>
+                <input
+                  type="text"
+                  placeholder="Ghi chú nhanh về chính sách giao nhận, thời gian liên hệ (tùy chọn)..."
+                  value={note}
+                  onChange={(e) => {
+                    setNote(e.target.value);
+                    if (fieldErrors.note) setFieldErrors((prev) => ({ ...prev, note: '' }));
+                  }}
+                  className="form-input"
+                  style={inputStyle}
+                />
+                {fieldErrors.note && <span style={errorStyle}>{fieldErrors.note}</span>}
+              </div>
             </div>
           </div>
 

@@ -12,7 +12,8 @@ import {
 } from '../types/expense.types';
 import { ExpenseStatusBadge } from './ExpenseStatusBadge';
 import { formatMoney } from '../../finance/utils/formatters';
-import { MoreHorizontal } from 'lucide-react';
+import { MoreHorizontal, ExternalLink } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 export interface ExpenseTableProps {
   data?: ServiceExpenseDto[];
@@ -20,6 +21,7 @@ export interface ExpenseTableProps {
   totalItems?: number;
   page?: number;
   pageSize?: number;
+  canManageExpenses?: boolean;
   onPageChange: (newPage: number) => void;
   onPageSizeChange?: (newPageSize: number) => void;
   onViewBill: (url: string, title: string) => void;
@@ -33,12 +35,14 @@ export const ExpenseTable: FC<ExpenseTableProps> = ({
   totalItems = 0,
   page = 1,
   pageSize = 10,
+  canManageExpenses = true,
   onPageChange,
   onPageSizeChange,
   onViewBill,
   onPay,
   onCancel,
 }) => {
+  const navigate = useNavigate();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
@@ -145,7 +149,7 @@ export const ExpenseTable: FC<ExpenseTableProps> = ({
                   <span className="mono-badge">{item.expenseId}</span>
                 </td>
                 <td>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                     <span className="expense-table-category">
                       {EXPENSE_CATEGORY_LABELS[item.category] || item.category}
                     </span>
@@ -155,6 +159,37 @@ export const ExpenseTable: FC<ExpenseTableProps> = ({
                         title={'Chi phí lặp lại định kỳ hàng tháng (ngày ' + (item.recurringDayOfMonth || 1) + ')'}
                       >
                         Định kỳ
+                      </span>
+                    )}
+                    {item.isTaxDeductible === false ? (
+                      <span
+                        style={{
+                          fontSize: '0.68rem',
+                          fontWeight: 700,
+                          color: '#B45309',
+                          background: '#FEF3C7',
+                          border: '1px solid #FDE68A',
+                          borderRadius: '9999px',
+                          padding: '1px 7px',
+                        }}
+                        title="Khoản chi nằm trong danh sách loại trừ thuế (Blacklist)"
+                      >
+                        Loại trừ thuế
+                      </span>
+                    ) : (
+                      <span
+                        style={{
+                          fontSize: '0.68rem',
+                          fontWeight: 600,
+                          color: '#0F766E',
+                          background: '#F0FDFA',
+                          border: '1px solid #CCFBF1',
+                          borderRadius: '9999px',
+                          padding: '1px 7px',
+                        }}
+                        title="Chi phí hợp lệ phục vụ sản xuất kinh doanh"
+                      >
+                        Hợp lệ thuế
                       </span>
                     )}
                   </div>
@@ -208,7 +243,7 @@ export const ExpenseTable: FC<ExpenseTableProps> = ({
                       </button>
                     )}
 
-                    {item.status === 'Pending' && (
+                    {item.status === 'Pending' && canManageExpenses && (
                       <button
                         type="button"
                         onClick={() => onPay(item)}
@@ -232,8 +267,33 @@ export const ExpenseTable: FC<ExpenseTableProps> = ({
                       </button>
                     )}
 
-                    {/* Poka-yoke: Danger action (Cancel) hidden in ⋯ menu */}
-                    {item.status === 'Pending' && (
+                    
+                    {item.status === 'Paid' && (
+                      <button
+                        type="button"
+                        onClick={() => navigate('/store-owner/cashbook?search=' + encodeURIComponent(item.expenseId))}
+                        title="Xem phiếu chi dòng tiền trong Sổ quỹ Cashbook"
+                        style={{
+                          background: '#F0FDFA',
+                          border: '1px solid #CCFBF1',
+                          color: '#0F766E',
+                          borderRadius: '8px',
+                          padding: '6px 12px',
+                          fontSize: '0.8rem',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '5px',
+                        }}
+                      >
+                        <ExternalLink size={12} />
+                        <span>Sổ quỹ</span>
+                      </button>
+                    )}
+
+                    {/* Poka-yoke: Danger action (Cancel) hidden in ⋯ menu, Owner/Manager only */}
+                    {item.status === 'Pending' && canManageExpenses && (
                       <div style={{ position: 'relative' }}>
                         <button
                           type="button"

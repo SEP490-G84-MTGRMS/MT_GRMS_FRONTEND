@@ -29,11 +29,54 @@ export interface BranchItemResponse {
   name: string;
   address: string;
   phone?: string;
+  email?: string;
   managerName?: string;
+  isHeadquarter?: boolean;
   status: 'Active' | 'Inactive' | string;
   pendingOrdersCount: number;
   lastOrderDate?: string;
   createdAt: string;
+}
+
+export interface BranchEmployeeSummaryItem {
+  id: string;
+  employeeCode: string;
+  fullName: string;
+  phone: string;
+  status: string;
+  startDate?: string;
+}
+
+export interface BranchProductSummaryItem {
+  productId: string;
+  sku: string;
+  barcode?: string;
+  productName: string;
+  unit: string;
+  sellingPrice: number;
+  status: string;
+}
+
+export interface BranchDetailResponse {
+  id: string;
+  code: string;
+  name: string;
+  address: string;
+  phone?: string;
+  email?: string;
+  managerName?: string;
+  isHeadquarter: boolean;
+  status: string;
+  createdAt: string;
+  totalProducts: number;
+  totalStock: number;
+  lowStockCount: number;
+  totalEmployees: number;
+  activeEmployees: number;
+  pendingOrdersCount: number;
+  lastOrderDate?: string;
+  recentEmployees: BranchEmployeeSummaryItem[];
+  recentProducts: BranchProductSummaryItem[];
 }
 
 export interface CreateBranchPayload {
@@ -41,6 +84,7 @@ export interface CreateBranchPayload {
   name: string;
   address: string;
   phone?: string;
+  email?: string;
   managerName?: string;
   isHeadquarter?: boolean;
 }
@@ -49,6 +93,7 @@ export interface UpdateBranchPayload {
   name: string;
   address: string;
   phone?: string;
+  email?: string;
   managerName?: string;
   isHeadquarter?: boolean;
 }
@@ -81,6 +126,11 @@ export const branchManagementApi = {
     return res.data;
   },
 
+  async getBranchDetail(id: string): Promise<ApiResponse<BranchDetailResponse>> {
+    const res = await httpClient.get<ApiResponse<BranchDetailResponse>>(`/branches/${id}/detail`);
+    return res.data;
+  },
+
   async createBranch(payload: CreateBranchPayload): Promise<ApiResponse<BranchItemResponse>> {
     const res = await httpClient.post<ApiResponse<BranchItemResponse>>('/branches', payload);
     return res.data;
@@ -93,6 +143,11 @@ export const branchManagementApi = {
 
   async toggleStatus(id: string, isActive: boolean): Promise<ApiResponse<BranchItemResponse>> {
     const res = await httpClient.patch<ApiResponse<BranchItemResponse>>(`/branches/${id}/status`, { isActive });
+    return res.data;
+  },
+
+  async deleteBranch(id: string): Promise<ApiResponse<boolean>> {
+    const res = await httpClient.delete<ApiResponse<boolean>>(`/branches/${id}`);
     return res.data;
   },
 };

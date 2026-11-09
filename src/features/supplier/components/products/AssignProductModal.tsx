@@ -32,7 +32,7 @@ interface AssignProductModalProps {
   onAssignBatch?: (input: BatchAssignProductInput) => Promise<any>;
 }
 
-type ProductTerms = Record<string, { price: string; moq: string }>;
+type ProductTerms = Record<string, { price: string; moq: string; shortage: string }>;
 
 const formatCurrency = (val: number): string =>
   new Intl.NumberFormat('vi-VN').format(Number.isFinite(val) ? val : 0);
@@ -42,9 +42,13 @@ const parseCurrency = (str: string): number => {
   return cleaned ? parseInt(cleaned, 10) : 0;
 };
 
-const defaultTerms = (masterPrice = 0, masterMoq = 1): { price: string; moq: string } => ({
+const defaultTerms = (
+  masterPrice = 0,
+  masterMoq = 1
+): { price: string; moq: string; shortage: string } => ({
   price: String(Math.max(0, Math.round(masterPrice || 0))),
   moq: String(Math.max(1, Math.round(masterMoq || 1))),
+  shortage: '0',
 });
 
 export const AssignProductModal: FC<AssignProductModalProps> = ({
@@ -181,7 +185,7 @@ export const AssignProductModal: FC<AssignProductModalProps> = ({
       }
       const seedMap: Record<string, SupplierAssignedProductInfo> = {};
       initialAssignedIds.forEach((id) => {
-        seedMap[id] = { productId: id, agreedPrice: 0, moq: 1 };
+        seedMap[id] = { productId: id, agreedPrice: 0, moq: 1, allowedShortageQty: 0 };
       });
       setAssignedMap(seedMap);
       void fetchSupplierAssignments(defaultId);
@@ -251,12 +255,12 @@ export const AssignProductModal: FC<AssignProductModalProps> = ({
     resetSelectionState();
   };
 
-  const termsFromMaster = (productId: string): { price: string; moq: string } => {
+  const termsFromMaster = (productId: string): { price: string; moq: string; shortage: string } => {
     const product = productCatalog.find((p) => p.id === productId);
     return defaultTerms(product?.defaultWholesalePrice ?? 0, product?.defaultMoq ?? 1);
   };
 
-  const ensureTerms = (productId: string): { price: string; moq: string } =>
+  const ensureTerms = (productId: string): { price: string; moq: string; shortage: string } =>
     productTerms[productId] ?? termsFromMaster(productId);
 
   const handleToggleProduct = (productId: string) => {
@@ -333,6 +337,20 @@ export const AssignProductModal: FC<AssignProductModalProps> = ({
     });
   };
 
+  const updateRowShortage = (productId: string, raw: string) => {
+    const digits = raw.replace(/[^\d]/g, '');
+    setProductTerms((prev) => ({
+      ...prev,
+      [productId]: { ...ensureTerms(productId), shortage: digits },
+    }));
+    setFieldErrors((prev) => {
+      const copy = { ...prev };
+      delete copy[`shortage_${productId}`];
+      delete copy.form;
+      return copy;
+    });
+  };
+
   const validateForm = (): boolean => {
     const errors: Record<string, string> = {};
 
@@ -360,6 +378,11 @@ export const AssignProductModal: FC<AssignProductModalProps> = ({
       if (!terms.moq || Number.isNaN(moq) || moq < 1) {
         errors[`moq_${id}`] = 'MOQ phải > 0.';
       }
+
+      const shortage = parseInt(terms.shortage || '0', 10);
+      if (Number.isNaN(shortage) || shortage < 0) {
+        errors[`shortage_${id}`] = 'Thiếu cho phép ≥ 0.';
+      }
     });
 
     setFieldErrors(errors);
@@ -378,6 +401,7 @@ export const AssignProductModal: FC<AssignProductModalProps> = ({
           productId: pid,
           agreedPrice: parseCurrency(terms.price),
           moq: parseInt(terms.moq, 10),
+          allowedShortageQty: parseInt(terms.shortage || '0', 10) || 0,
         };
       });
 
@@ -396,6 +420,7 @@ export const AssignProductModal: FC<AssignProductModalProps> = ({
             deliveryUoM: product?.baseUoM || 'Cái',
             agreedPrice: item.agreedPrice,
             moq: item.moq,
+            allowedShortageQty: item.allowedShortageQty,
             isPrimary: false,
           });
         }
@@ -436,7 +461,7 @@ export const AssignProductModal: FC<AssignProductModalProps> = ({
 
   if (!isOpen) return null;
 
-  const gridColumns = '40px 110px 1.4fr 70px 100px 120px 90px 90px';
+  const gridColumns = '40px 48px 100px 1.2fr 64px 88px 110px 80px 130px 80px';
 
   return (
     <div
@@ -458,7 +483,7 @@ export const AssignProductModal: FC<AssignProductModalProps> = ({
           backgroundColor: '#ffffff',
           borderRadius: 14,
           width: '100%',
-          maxWidth: 980,
+          maxWidth: 1280,
           boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
           border: '1px solid #e2e8f0',
           overflow: 'hidden',
@@ -845,10 +870,12 @@ export const AssignProductModal: FC<AssignProductModalProps> = ({
                   style={{
                     border: fieldErrors.products ? '1.5px solid #ef4444' : '1px solid #cbd5e1',
                     borderRadius: 8,
-                    overflow: 'hidden',
+                    overflow: 'auto',
                     backgroundColor: '#ffffff',
+                    minWidth: 0,
                   }}
                 >
+                  <div style={{ minWidth: 1080 }}>
                   <div
                     style={{
                       padding: '8px 12px',
@@ -960,12 +987,16 @@ export const AssignProductModal: FC<AssignProductModalProps> = ({
                         style={{ cursor: 'pointer', accentColor: '#0f766e' }}
                       />
                     </div>
+                    <div style={{ padding: '8px 4px', textAlign: 'center' }}>Ảnh</div>
                     <div style={{ padding: '8px 8px' }}>SKU</div>
                     <div style={{ padding: '8px 8px' }}>Tên sản phẩm</div>
                     <div style={{ padding: '8px 8px', textAlign: 'center' }}>ĐVT</div>
                     <div style={{ padding: '8px 8px', textAlign: 'center' }}>Trạng thái</div>
                     <div style={{ padding: '8px 8px', textAlign: 'right' }}>Giá nhập</div>
                     <div style={{ padding: '8px 8px', textAlign: 'right' }}>MOQ</div>
+                    <div style={{ padding: '8px 4px', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                      Thiếu cho phép
+                    </div>
                     <div style={{ padding: '8px 8px', textAlign: 'center' }}>Thao tác</div>
                   </div>
 
@@ -1006,6 +1037,7 @@ export const AssignProductModal: FC<AssignProductModalProps> = ({
                         const terms = ensureTerms(p.id);
                         const priceError = fieldErrors[`price_${p.id}`];
                         const moqError = fieldErrors[`moq_${p.id}`];
+                        const shortageError = fieldErrors[`shortage_${p.id}`];
 
                         return (
                           <div
@@ -1034,6 +1066,44 @@ export const AssignProductModal: FC<AssignProductModalProps> = ({
                                   accentColor: '#0f766e',
                                 }}
                               />
+                            </div>
+
+                            <div style={{ padding: '6px 4px', textAlign: 'center' }}>
+                              {p.imageUrl ? (
+                                <img
+                                  src={p.imageUrl}
+                                  alt={p.name}
+                                  style={{
+                                    width: 36,
+                                    height: 36,
+                                    objectFit: 'cover',
+                                    borderRadius: 6,
+                                    border: '1px solid #e2e8f0',
+                                    display: 'block',
+                                    margin: '0 auto',
+                                    opacity: isAssigned ? 0.55 : 1,
+                                    background: '#f8fafc',
+                                  }}
+                                />
+                              ) : (
+                                <div
+                                  style={{
+                                    width: 36,
+                                    height: 36,
+                                    borderRadius: 6,
+                                    border: '1px dashed #cbd5e1',
+                                    background: '#f8fafc',
+                                    margin: '0 auto',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    fontSize: 9,
+                                    color: '#94a3b8',
+                                  }}
+                                >
+                                  N/A
+                                </div>
+                              )}
                             </div>
 
                             <div
@@ -1185,6 +1255,61 @@ export const AssignProductModal: FC<AssignProductModalProps> = ({
                               )}
                             </div>
 
+                            <div style={{ padding: '6px 8px' }}>
+                              {isAssigned ? (
+                                <div
+                                  style={{
+                                    textAlign: 'right',
+                                    color: '#64748b',
+                                    fontWeight: 600,
+                                  }}
+                                >
+                                  {assigned.allowedShortageQty ?? 0} {p.baseUoM || 'Cái'}
+                                </div>
+                              ) : isSelected ? (
+                                <div>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                    <input
+                                      type="text"
+                                      inputMode="numeric"
+                                      value={terms.shortage}
+                                      onChange={(e) => updateRowShortage(p.id, e.target.value)}
+                                      disabled={isSubmitting}
+                                      style={{
+                                        width: '100%',
+                                        height: 30,
+                                        padding: '0 8px',
+                                        borderRadius: 6,
+                                        border: shortageError
+                                          ? '1.5px solid #ef4444'
+                                          : '1px solid #cbd5e1',
+                                        textAlign: 'right',
+                                        fontSize: '0.78rem',
+                                        boxSizing: 'border-box',
+                                      }}
+                                    />
+                                    <span
+                                      style={{
+                                        fontSize: '0.7rem',
+                                        color: '#64748b',
+                                        whiteSpace: 'nowrap',
+                                        minWidth: 28,
+                                      }}
+                                    >
+                                      {p.baseUoM || 'Cái'}
+                                    </span>
+                                  </div>
+                                  {shortageError && (
+                                    <div style={{ fontSize: '0.68rem', color: '#dc2626', marginTop: 2 }}>
+                                      {shortageError}
+                                    </div>
+                                  )}
+                                </div>
+                              ) : (
+                                <div style={{ textAlign: 'right', color: '#cbd5e1' }}>—</div>
+                              )}
+                            </div>
+
                             <div
                               style={{
                                 padding: '8px',
@@ -1200,6 +1325,7 @@ export const AssignProductModal: FC<AssignProductModalProps> = ({
                         );
                       })
                     )}
+                  </div>
                   </div>
                 </div>
               )}

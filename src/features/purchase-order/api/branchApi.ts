@@ -91,20 +91,51 @@ export const branchApi = {
     filter: BranchFilterParams
   ): Promise<{ items: BranchListItem[]; total: number }> {
     try {
+      const statusRaw = (filter.status || '').trim();
       const backendStatus =
-        filter.status === 'active'
-          ? 'Active'
-          : filter.status === 'inactive'
-          ? 'Inactive'
-          : undefined;
+        !statusRaw || statusRaw.toLowerCase() === 'all'
+          ? undefined
+          : statusRaw.toLowerCase() === 'active'
+            ? 'Active'
+            : statusRaw.toLowerCase() === 'inactive'
+              ? 'Inactive'
+              : statusRaw;
+
+      const branchCodes = (filter.branchCodes ?? []).map((x) => x.trim()).filter(Boolean);
+      const branchNames = (filter.branchNames ?? []).map((x) => x.trim()).filter(Boolean);
+      const addresses = (filter.addresses ?? []).map((x) => x.trim()).filter(Boolean);
+      const phones = (filter.phones ?? []).map((x) => x.trim()).filter(Boolean);
 
       const res = await httpClient.get<ApiResponse<PagedResult<BranchBackendDto>>>('/branches', {
         params: {
           Keyword: filter.keyword?.trim() || undefined,
-          BranchCode: filter.branchCode && filter.branchCode !== 'all' ? filter.branchCode : undefined,
+          BranchCode:
+            branchCodes.length === 0 && filter.branchCode && filter.branchCode !== 'all'
+              ? filter.branchCode
+              : undefined,
+          BranchCodes: branchCodes.length ? branchCodes : undefined,
+          BranchNames: branchNames.length ? branchNames : undefined,
+          Addresses: addresses.length ? addresses : undefined,
+          Phones: phones.length ? phones : undefined,
           Status: backendStatus,
           PageIndex: filter.pageIndex || 1,
           PageSize: filter.pageSize || 10,
+        },
+        paramsSerializer: (p) => {
+          const search = new URLSearchParams();
+          Object.entries(p).forEach(([key, value]) => {
+            if (value === undefined || value === null || value === '') return;
+            if (Array.isArray(value)) {
+              value.forEach((item) => {
+                if (item !== undefined && item !== null && String(item).trim() !== '') {
+                  search.append(key, String(item));
+                }
+              });
+              return;
+            }
+            search.append(key, String(value));
+          });
+          return search.toString();
         },
       });
 

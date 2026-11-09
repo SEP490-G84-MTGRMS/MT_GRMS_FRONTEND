@@ -40,7 +40,6 @@ const mockSuppliers: SupplierSummary[] = [
     code: 'SUP-001',
     name: 'Công Ty Sữa Vinamilk',
     supplierType: 'Goods',
-    category: 'FRESH',
     contactPerson: 'Nguyễn Văn A',
     phone: '0912345678',
     email: 'vinamilk@gmail.com',
@@ -58,7 +57,6 @@ const mockSuppliers: SupplierSummary[] = [
     code: 'SUP-002',
     name: 'Tập Đoàn Masan Consumer',
     supplierType: 'Goods',
-    category: 'AMBIENT',
     contactPerson: 'Trần Thị B',
     phone: '0987654321',
     email: 'masan@gmail.com',
@@ -134,7 +132,6 @@ describe('Master Supplier Management — SupplierListPage Component Tests', () =
       code: 'SUP-003',
       name: 'Nước Ngọt PepsiCo',
       supplierType: 'Goods',
-      category: 'AMBIENT',
       contactPerson: 'Lê Văn C',
       phone: '0933112233',
       status: 'Active',
@@ -191,6 +188,7 @@ describe('Master Supplier Management — SupplierListPage Component Tests', () =
         expect.objectContaining({
           storeName: expect.any(String),
           exportedBy: expect.any(String),
+          deliveryBySupplierId: expect.any(Object),
         })
       );
     });

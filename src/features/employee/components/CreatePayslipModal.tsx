@@ -1,103 +1,85 @@
-import React, { useState } from 'react';
-import { Settings, Sliders, CheckCircle2 } from 'lucide-react';
-import type { Branch, PayslipDetailedRecord } from '../types';
+import React, { useState, useEffect } from 'react';
+import { Settings, Sliders, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
+import type { Branch } from '../types';
 import { MOCK_BRANCHES } from '../services/mockData';
 import { AttendanceConfigModal } from './AttendanceConfigModal';
+import { payslipApi, extractErrorMessage } from '../api/payslipApi';
 
 interface CreatePayslipModalProps {
   isOpen: boolean;
   onClose: () => void;
   branches?: Branch[];
+  initialPeriodMonth?: string;
+  onCalculationSuccess?: (resultCount: number) => void;
   onCreateSuccess?: (periodMonth: string, branchName: string) => void;
-  onCreatePayslip?: (newSlip: PayslipDetailedRecord) => void;
 }
 
 export const CreatePayslipModal: React.FC<CreatePayslipModalProps> = ({
   isOpen,
   onClose,
   branches = MOCK_BRANCHES,
+  initialPeriodMonth,
+  onCalculationSuccess,
   onCreateSuccess,
-  onCreatePayslip,
 }) => {
-  const [periodMonth, setPeriodMonth] = useState('2026-11');
+  const [periodMonth, setPeriodMonth] = useState(initialPeriodMonth || '2026-11');
   const [branchId, setBranchId] = useState('ALL');
   const [salaryTypeFilter, setSalaryTypeFilter] = useState<'ALL' | 'MONTHLY' | 'SHIFT' | 'HOURLY'>('ALL');
-  const standardDays = 26; // Mặc định chuẩn 26 ngày công
-  const [standardDayHours, setStandardDayHours] = useState(8.0); // Chuẩn giờ/ngày công từ chính sách chi nhánh
+  const [standardDayHours, setStandardDayHours] = useState(8.0);
   const [isAttendanceConfigOpen, setIsAttendanceConfigOpen] = useState(false);
   const [policyFeedback, setPolicyFeedback] = useState<string | null>(null);
   const [batchNote, setBatchNote] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (initialPeriodMonth) {
+      setPeriodMonth(initialPeriodMonth);
+    }
+    setSubmitError(null);
+  }, [initialPeriodMonth, isOpen]);
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
+    setSubmitError(null);
 
-    setTimeout(() => {
-      setIsSubmitting(false);
+    try {
+      let typeFilterNum: number | undefined = undefined;
+      if (salaryTypeFilter === 'MONTHLY') typeFilterNum = 1;
+      else if (salaryTypeFilter === 'HOURLY') typeFilterNum = 2;
+      else if (salaryTypeFilter === 'SHIFT') typeFilterNum = 3;
+
+      const createdList = await payslipApi.generateMonthlyPayroll({
+        periodMonth,
+        branchId: branchId !== 'ALL' ? branchId : undefined,
+        salaryTypeFilter: typeFilterNum,
+        note: batchNote.trim() || undefined,
+      });
+
       const bName =
         branchId === 'ALL'
           ? 'Tất cả chi nhánh'
-          : branches.find((b) => b.id === branchId)?.name || 'Chi nhánh trung tâm';
+          : branches.find((b) => b.id === branchId)?.name || 'Chi nhánh đã chọn';
 
       if (onCreateSuccess) {
         onCreateSuccess(periodMonth, bName);
       }
 
-      if (onCreatePayslip) {
-        const sampleId = `PL${Math.floor(100000 + Math.random() * 900000)}`;
-        onCreatePayslip({
-          id: sampleId,
-          employeeId: 'EMP-NEW',
-          employeeCode: 'NV099',
-          employeeName: 'Nhân viên Mới',
-          branchName: bName,
-          periodMonth,
-          salaryType: salaryTypeFilter === 'ALL' ? 'MONTHLY' : salaryTypeFilter,
-          baseRate: 10000000,
-          standardDays,
-          standardDayHours,
-          workedDays: 24,
-          totalWorkHours: 192,
-          totalShifts: 24,
-          totalLateMinutes: 20,
-          totalEarlyLeaveMinutes: 0,
-          otHours: 4,
-          contractBaseSalary: 10000000,
-          baseSalaryEarned: 9230769,
-          overtimePay: 360577,
-          totalAllowance: 1230000,
-          allowances: [
-            { name: 'Phụ cấp ăn trưa', amount: 730000 },
-            { name: 'Phụ cấp trách nhiệm', amount: 500000 },
-          ],
-          allowancesDetailJson: JSON.stringify([
-            { name: 'Phụ cấp ăn trưa', amount: 730000 },
-            { name: 'Phụ cấp trách nhiệm', amount: 500000 },
-          ]),
-          lunchAllowance: 730000,
-          travelAllowance: 500000,
-          totalEarnings: 10821346,
-          advanceDeduction: 0,
-          remainingDebt: 0,
-          socialInsurance: 1050000,
-          bhxh: 800000,
-          bhyt: 150000,
-          bhtn: 100000,
-          totalDeductions: 1050000,
-          netSalary: 9771346,
-          status: 'UNPAID',
-          bankName: 'Techcombank',
-          bankAccountNumber: '1903456789012',
-          bankAccountName: 'NHAN VIEN MOI',
-          note: batchNote || `Bảng lương khởi tạo kỳ ${periodMonth} - ${bName}`,
-        });
+      if (onCalculationSuccess) {
+        onCalculationSuccess(createdList.length);
+      } else {
+        alert(`Đã tính toán và khởi tạo thành công ${createdList.length} phiếu lương cho kỳ ${periodMonth}!`);
+        onClose();
       }
-
-      onClose();
-    }, 700);
+    } catch (err: any) {
+      const msg = extractErrorMessage(err, 'Lỗi khi tính toán bảng lương.');
+      setSubmitError(msg);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -111,7 +93,7 @@ export const CreatePayslipModal: React.FC<CreatePayslipModalProps> = ({
               Áp dụng chính sách chấm công & cấu hình lương tự động cho nhân viên
             </div>
           </div>
-          <button type="button" className="emp-modal-close-btn" onClick={onClose}>
+          <button type="button" className="emp-modal-close-btn" onClick={onClose} disabled={isSubmitting}>
             &times;
           </button>
         </div>
@@ -119,6 +101,26 @@ export const CreatePayslipModal: React.FC<CreatePayslipModalProps> = ({
         {/* Body */}
         <form onSubmit={handleSubmit}>
           <div className="emp-modal-body">
+            {submitError && (
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  padding: '10px 14px',
+                  background: '#FEF2F2',
+                  border: '1px solid #FCA5A5',
+                  borderRadius: 8,
+                  color: '#991B1B',
+                  fontSize: 13,
+                  marginBottom: 14,
+                }}
+              >
+                <AlertCircle size={16} color="#DC2626" style={{ flexShrink: 0 }} />
+                <span>{submitError}</span>
+              </div>
+            )}
+
             {/* Hàng 1: Kỳ tháng & Chi nhánh */}
             <div className="emp-grid-2">
               <div className="emp-form-group">
@@ -260,15 +262,15 @@ export const CreatePayslipModal: React.FC<CreatePayslipModalProps> = ({
                 Quy tắc tính toán tự động
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 9, fontSize: 13 }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span>Tự động tổng hợp ngày công, tổng giờ và giờ OT từ bảng phân ca và chấm công thực tế</span>
                 </label>
 
-                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span>Tự động nạp danh sách phụ cấp định kỳ (ăn trưa, trách nhiệm...) từ hồ sơ nhân viên</span>
                 </label>
 
-                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span>Tự động cấn trừ các khoản tạm ứng lương đã chi trong kỳ và cập nhật công nợ còn lại</span>
                 </label>
               </div>
@@ -291,8 +293,14 @@ export const CreatePayslipModal: React.FC<CreatePayslipModalProps> = ({
             <button type="button" className="emp-btn emp-btn-secondary" onClick={onClose} disabled={isSubmitting}>
               Hủy
             </button>
-            <button type="submit" className="emp-btn emp-btn-primary" disabled={isSubmitting}>
-              {isSubmitting ? 'Đang khởi tạo...' : 'Tạo bảng lương tháng'}
+            <button
+              type="submit"
+              className="emp-btn emp-btn-primary"
+              disabled={isSubmitting}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+            >
+              {isSubmitting && <Loader2 size={16} className="animate-spin" />}
+              <span>{isSubmitting ? 'Đang tính toán...' : 'Bắt đầu tính toán'}</span>
             </button>
           </div>
         </form>

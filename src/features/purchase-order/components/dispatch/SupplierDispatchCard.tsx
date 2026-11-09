@@ -92,7 +92,13 @@ export const SupplierDispatchCard: FC<SupplierDispatchCardProps> = ({
           alignItems: 'center',
           justifyContent: 'space-between',
           gap: 14,
-          background: supplier.status === 'dispatched' ? '#f0fdf4' : supplier.urgency === 'critical' ? '#fffafb' : '#ffffff',
+          background: supplier.hasPendingChanges && supplier.status !== 'dispatched'
+            ? '#fff7ed'
+            : supplier.status === 'dispatched'
+              ? '#f0fdf4'
+              : supplier.urgency === 'critical'
+                ? '#fffafb'
+                : '#ffffff',
           cursor: 'pointer',
         }}
         onClick={onToggleExpand}
@@ -118,6 +124,22 @@ export const SupplierDispatchCard: FC<SupplierDispatchCardProps> = ({
             <span style={{ fontSize: 15, fontWeight: 800, color: '#0f172a' }}>
               {supplier.name}
             </span>
+
+            {supplier.hasPendingChanges && supplier.status !== 'dispatched' && (
+              <span
+                style={{
+                  fontSize: 11,
+                  fontWeight: 800,
+                  padding: '2px 8px',
+                  borderRadius: 12,
+                  background: '#ffedd5',
+                  color: '#c2410c',
+                  border: '1px solid #fdba74',
+                }}
+              >
+                Có thay đổi SL — cần cập nhật & gửi mail
+              </span>
+            )}
 
             {/* Urgency Badge */}
             <span
@@ -261,7 +283,7 @@ export const SupplierDispatchCard: FC<SupplierDispatchCardProps> = ({
               }}
             >
               <CheckCircle2 size={14} />
-              <span>ĐÃ GỬI PO ({supplier.poCode || 'PO-OK'})</span>
+              <span>ĐÃ KHÓA ({supplier.poCode || 'PO'} · qua cutoff)</span>
             </div>
           ) : (
             <button
@@ -278,9 +300,13 @@ export const SupplierDispatchCard: FC<SupplierDispatchCardProps> = ({
                 border: 'none',
                 background: !isMovMet
                   ? '#e0f2fe'
-                  : supplier.urgency === 'critical'
-                  ? '#dc2626'
-                  : '#0d9488',
+                  : supplier.hasPendingChanges
+                    ? '#ea580c'
+                    : supplier.canAmend || supplier.poCode
+                      ? '#0369a1'
+                      : supplier.urgency === 'critical'
+                        ? '#dc2626'
+                        : '#0d9488',
                 color: !isMovMet ? '#0369a1' : '#ffffff',
                 fontSize: 12,
                 fontWeight: 700,
@@ -290,11 +316,23 @@ export const SupplierDispatchCard: FC<SupplierDispatchCardProps> = ({
               title={
                 !isMovMet
                   ? `Đơn chưa đạt giá trị tối thiểu ${supplier.minOrderValue.toLocaleString('vi-VN')} đ`
-                  : 'Chốt đơn và phát hành Purchase Order'
+                  : supplier.hasPendingChanges
+                    ? `SL đã đổi — cập nhật PO ${supplier.poCode || ''} và gửi lại email NCC`
+                    : supplier.canAmend || supplier.poCode
+                      ? `Cập nhật PO ${supplier.poCode || ''} trước giờ cutoff`
+                      : 'Chốt đơn và phát hành Purchase Order'
               }
             >
               <Send size={13} />
-              <span>{!isMovMet ? 'Chốt đơn (Cảnh báo MOV)' : 'Chốt & Tạo PO'}</span>
+              <span>
+                {!isMovMet
+                  ? 'Chốt đơn (Cảnh báo MOV)'
+                  : supplier.hasPendingChanges
+                    ? 'Cập nhật & gửi mail'
+                    : supplier.canAmend || supplier.poCode
+                      ? 'Cập nhật PO'
+                      : 'Chốt & Tạo PO'}
+              </span>
             </button>
           )}
         </div>

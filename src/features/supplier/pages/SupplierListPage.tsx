@@ -16,7 +16,11 @@ import { EditSupplierModal } from '../components/EditSupplierModal';
 import { SupplierDetailPage } from './SupplierDetailPage';
 import { AdminToast, type ToastState } from '../../admin/components';
 import { supplierApi } from '../api/supplierApi';
-import { exportSuppliersToExcel } from '../lib/supplierExcelExporter';
+import {
+  exportSuppliersToExcel,
+  formatDeliveryDaysForExcel,
+  type SupplierExportDeliveryInfo,
+} from '../lib/supplierExcelExporter';
 import '../../purchase-order/purchase-order.css';
 import '../supplier.css';
 
@@ -31,7 +35,6 @@ const DEFAULT_FILTERS: SupplierFilterState = {
   contactPersons: [],
   phones: [],
   supplierType: '',
-  category: '',
   debtStatus: '',
   ratingFilter: '',
   status: '',
@@ -103,36 +106,27 @@ export const SupplierListPage: FC = () => {
   };
 
   const handleCreateSupplier = async (input: CreateSupplierInput) => {
-    try {
-      const created = await supplierApi.createSupplier(input);
-      showToast(`Đã thêm mới nhà cung cấp ${created.name} (${created.code}) thành công!`, 'success');
-      setIsCreateModalOpen(false);
-      await fetchSuppliers();
-    } catch (err: any) {
-      // Re-throw so modal error banner displays the message
-      throw err;
-    }
+    const created = await supplierApi.createSupplier(input);
+    showToast(`Đã thêm mới nhà cung cấp ${created.name} (${created.code}) thành công!`, 'success');
+    setIsCreateModalOpen(false);
+    await fetchSuppliers();
   };
 
   const handleEditSupplier = async (input: UpdateBasicSupplierInput) => {
-    try {
-      const updated = await supplierApi.updateBasicSupplier(input.id, input);
-      showToast(`Đã cập nhật thông tin nhà cung cấp ${updated.name} thành công!`, 'success');
-      setIsEditModalOpen(false);
-      setEditingSupplier(null);
-      await fetchSuppliers();
-      if (selectedSupplier && selectedSupplier.id === input.id) {
-        setSelectedSupplier((prev) =>
-          prev
-            ? {
-                ...prev,
-                ...updated,
-              }
-            : null
-        );
-      }
-    } catch (err: any) {
-      throw err;
+    const updated = await supplierApi.updateBasicSupplier(input.id, input);
+    showToast(`Đã cập nhật thông tin nhà cung cấp ${updated.name} thành công!`, 'success');
+    setIsEditModalOpen(false);
+    setEditingSupplier(null);
+    await fetchSuppliers();
+    if (selectedSupplier && selectedSupplier.id === input.id) {
+      setSelectedSupplier((prev) =>
+        prev
+          ? {
+              ...prev,
+              ...updated,
+            }
+          : null
+      );
     }
   };
 
@@ -177,9 +171,28 @@ export const SupplierListPage: FC = () => {
         return;
       }
 
+      const deliveryResults = await Promise.allSettled(
+        res.items.map((s) => supplierApi.getDeliveryConfig(s.id))
+      );
+      const deliveryBySupplierId: Record<string, SupplierExportDeliveryInfo> = {};
+      res.items.forEach((s, idx) => {
+        const result = deliveryResults[idx];
+        if (result.status !== 'fulfilled' || !result.value) return;
+        const cfg = result.value;
+        const deliveryDays: string[] = Array.isArray(cfg.deliveryDays) ? cfg.deliveryDays : [];
+        deliveryBySupplierId[s.id] = {
+          deliveryDays,
+          deliveryDaysDisplay: formatDeliveryDaysForExcel(deliveryDays),
+          cutoffDayOffset: typeof cfg.cutoffDayOffset === 'number' ? cfg.cutoffDayOffset : null,
+          cutoffTime: cfg.cutoffTime || cfg.orderCutoffTime || null,
+          minOrderQuantity: typeof cfg.minOrderQuantity === 'number' ? cfg.minOrderQuantity : null,
+        };
+      });
+
       exportSuppliersToExcel(res.items, {
         storeName: 'HỆ THỐNG QUẢN LÝ BÁN LẺ MT-GRMS',
         exportedBy: isStoreOwner ? 'Quản lý cửa hàng (Store Owner)' : 'Nhân viên chi nhánh',
+        deliveryBySupplierId,
       });
 
       showToast(`Đã xuất ${res.items.length} nhà cung cấp ra tệp Excel (.xlsx) chuẩn định dạng.`, 'success');
@@ -261,6 +274,14 @@ export const SupplierListPage: FC = () => {
           >
             <Package size={14} />
             <span>Sản phẩm theo NCC</span>
+          </Link>
+          <Link
+            to="/store-owner/stores/products"
+            className="po-btn po-btn-secondary"
+            title="Quản lý sản phẩm theo cửa hàng / chi nhánh"
+          >
+            <Store size={14} />
+            <span>Sản phẩm theo Cửa hàng</span>
           </Link>
           <Link
             to="/store-owner/suppliers/branches"

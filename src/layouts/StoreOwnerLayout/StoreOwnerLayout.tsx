@@ -7,7 +7,13 @@ export const StoreOwnerLayout: FC = () => {
   const { user, isAuthenticated } = useAuthStore();
 
   if (!isAuthenticated || !user) {
-    return <Navigate to="/auth/login" replace />;
+    const currentPath = location.pathname + location.search;
+    return <Navigate to={`/auth/login?redirect=${encodeURIComponent(currentPath)}`} replace />;
+  }
+
+  // Role Guard: Nhân viên (STAFF) không được phép truy cập cổng quản trị của Chủ cửa hàng
+  if (user.role === 'STAFF') {
+    return <Navigate to="/employee/schedule" replace />;
   }
 
   return (

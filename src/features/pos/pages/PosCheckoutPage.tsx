@@ -141,7 +141,7 @@ export const PosCheckoutPage: FC = () => {
   // Khởi tạo chi nhánh theo phân công vai trò
   const [activeBranch, setActiveBranch] = useState<{ id: string; name: string; address?: string; phone?: string }>(() => {
     if (isAnNhienStore) {
-      if (user?.role === 'EMPLOYEE' && (user?.phone === '0916667777' || user?.fullName?.includes('Cầu Giấy'))) {
+      if (user?.role === 'STAFF' && (user?.phone === '0916667777' || user?.fullName?.includes('Cầu Giấy'))) {
         return AN_NHIEN_BRANCHES[1] || AN_NHIEN_BRANCHES[0];
       }
       return AN_NHIEN_BRANCHES[0];

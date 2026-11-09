@@ -44,7 +44,45 @@ export const SupplierProductTableRow: FC<SupplierProductTableRowProps> = ({
         {index}
       </td>
 
-      {/* 2. SKU */}
+      {/* 2. Ảnh */}
+      <td style={{ padding: '8px 10px', textAlign: 'center', verticalAlign: 'middle' }}>
+        {item.imageUrl ? (
+          <img
+            src={item.imageUrl}
+            alt={item.name}
+            style={{
+              width: 36,
+              height: 36,
+              objectFit: 'cover',
+              borderRadius: 6,
+              border: '1px solid #e2e8f0',
+              display: 'block',
+              margin: '0 auto',
+              background: '#f8fafc',
+            }}
+          />
+        ) : (
+          <div
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: 6,
+              border: '1px dashed #cbd5e1',
+              background: '#f8fafc',
+              margin: '0 auto',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: 10,
+              color: '#94a3b8',
+            }}
+          >
+            N/A
+          </div>
+        )}
+      </td>
+
+      {/* 3. SKU */}
       <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>
         <span
           style={{
@@ -129,7 +167,20 @@ export const SupplierProductTableRow: FC<SupplierProductTableRowProps> = ({
         </span>
       </td>
 
-      {/* 11. Trạng Thái */}
+      {/* 11. Thiếu cho phép */}
+      <td style={{ padding: '10px 12px', textAlign: 'right', whiteSpace: 'nowrap' }}>
+        <span
+          style={{
+            fontFamily: 'var(--font-mono, monospace)',
+            fontSize: 12,
+            color: '#475569',
+          }}
+        >
+          {item.allowedShortageQty ?? 0} {item.baseUoM || item.deliveryUoM}
+        </span>
+      </td>
+
+      {/* 12. Trạng Thái */}
       <td style={{ textAlign: 'center' }}>
         <SupplierStatusBadge status={item.status} />
       </td>

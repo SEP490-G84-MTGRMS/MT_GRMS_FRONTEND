@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Type definitions for FE-10: Dashboard KPIs & Profit and Loss (P&L) Report.
  */
 
@@ -23,6 +23,19 @@ export interface BranchOption {
   code: string;
   name: string;
   isMain?: boolean;
+}
+
+export interface CogsValuationComparison {
+  weightedAverageCogs: number;
+  fefoSpecificCogs: number;
+  cogsVariance: number;
+  weightedAverageGrossProfit: number;
+  fefoSpecificGrossProfit: number;
+  weightedAverageGrossMarginPct: number;
+  fefoSpecificGrossMarginPct: number;
+  weightedAverageNetProfit: number;
+  fefoSpecificNetProfit: number;
+  appliedTaxMethod: string;
 }
 
 export interface KpiSummaryData {
@@ -53,6 +66,7 @@ export interface KpiSummaryData {
   cogsSource?: 'ACTUAL' | 'ESTIMATED_70_PCT' | 'MIXED';
   cogsEstimatedPercentage?: number;
   cogsWarningNotice?: string | null;
+  cogsComparison?: CogsValuationComparison;
 }
 
 export interface PnlLineItem {
@@ -90,6 +104,7 @@ export interface TopProductPerformance {
   productName: string;
   quantitySold: number;
   revenue: number;
+  cogs?: number;
   profit: number;
   marginPct: number;
 }

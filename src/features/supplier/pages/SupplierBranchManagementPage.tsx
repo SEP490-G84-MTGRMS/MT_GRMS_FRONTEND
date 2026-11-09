@@ -22,7 +22,7 @@ import { AdminToast, type ToastState } from '../../admin/components';
 import { supplierBranchApi } from '../api/supplierBranchApi';
 import { supplierApi } from '../api/supplierApi';
 import { branchApi } from '../../purchase-order/api/branchApi';
-import { Building2, Download, Plus, Store, Package, Loader2 } from 'lucide-react';
+import { Building2, Plus, Store, Package, Loader2 } from 'lucide-react';
 import '../../purchase-order/purchase-order.css';
 import '../supplier.css';
 
@@ -239,14 +239,14 @@ export const SupplierBranchManagementPage: FC = () => {
             <Package size={14} />
             <span>Sản phẩm theo NCC</span>
           </Link>
-          <button
-            type="button"
+          <Link
+            to="/store-owner/stores/products"
             className="po-btn po-btn-secondary"
-            onClick={() => showToast('Đang kết xuất danh sách phân bổ ra tệp Excel (.xlsx)...', 'info')}
+            title="Quản lý sản phẩm theo cửa hàng / chi nhánh"
           >
-            <Download size={14} />
-            <span>Xuất Excel</span>
-          </button>
+            <Store size={14} />
+            <span>Sản phẩm theo Cửa hàng</span>
+          </Link>
           <button
             type="button"
             id="btnOpenAssignBranchModal"

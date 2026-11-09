@@ -8,15 +8,6 @@ interface Props {
   onEdit?: () => void;
 }
 
-const CATEGORY_LABEL: Record<string, string> = {
-  FRESH: 'Nông sản',
-  AMBIENT: 'Hàng khô / Đồ khô',
-  FROZEN: 'Thực phẩm đông lạnh',
-  UTILITIES: 'Tiện ích / Điện nước',
-  RENT: 'Mặt bằng',
-  LOGISTICS: 'Vận chuyển',
-};
-
 const TYPE_LABEL: Record<string, string> = {
   Goods: 'Doanh nghiệp Hàng hóa',
   Service: 'Dịch vụ',
@@ -39,8 +30,6 @@ export const SupplierDetailHeader: FC<Props> = ({ supplier, onBack }) => {
               <span className="supplier-detail-code" data-testid="supplier-detail-code">{supplier.code}</span>
               <span className="supplier-detail-dot">·</span>
               <span>{TYPE_LABEL[supplier.supplierType] || supplier.supplierType}</span>
-              <span className="supplier-detail-dot">·</span>
-              <span>{CATEGORY_LABEL[supplier.category] || supplier.category}</span>
             </div>
           </div>
         </div>

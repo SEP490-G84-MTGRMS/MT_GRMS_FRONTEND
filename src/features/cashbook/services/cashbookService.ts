@@ -8,6 +8,11 @@ import type {
   CashReconciliationDTO,
   CashbookSummaryKPI,
   CashTransitItem,
+  DepositItem,
+  CreateDepositDTO,
+  RefundDepositDTO,
+  TriageItem,
+  ResolveTriageDTO,
 } from '../types/cashbook.types';
 import { financeHttpClient } from '../../../api/financeHttpClient';
 import { generateUuidV7 } from '../../../utils/uuid';
@@ -95,25 +100,13 @@ const INITIAL_ACCOUNTS: CashAccount[] = [
     id: '01a19664-6741-7f3d-9be7-cb4c7b876559',
     branchId: 'ALL',
     branchName: 'Toàn hệ thống',
-    accountName: 'Vietcombank - TK Thu Bán Hàng',
+    accountName: 'Vietcombank - TK Kinh doanh chính (VietQR)',
+    isDefault: true,
     accountType: 'BANK',
     bankName: 'Vietcombank (VCB)',
     accountNumber: '0071001234567',
     currentBalance: 145800000,
     initialBalance: 100000000,
-    isActive: true,
-    currency: 'VND',
-  },
-  {
-    id: '01a19664-6761-78c3-b60a-cc460c68c51c',
-    branchId: 'ALL',
-    branchName: 'Toàn hệ thống',
-    accountName: 'Techcombank - TK Chi Trả NCC',
-    accountType: 'BANK',
-    bankName: 'Techcombank (TCB)',
-    accountNumber: '19036789123011',
-    currentBalance: 32450000,
-    initialBalance: 50000000,
     isActive: true,
     currency: 'VND',
   },
@@ -235,13 +228,15 @@ const STORAGE_KEYS = {
   ACCOUNTS: 'mt_grms_cash_accounts_v2',
   TRANSACTIONS: 'mt_grms_cash_transactions_v2',
   TRANSITS: 'mt_grms_cash_transits_v2',
+  DEPOSITS: 'mt_grms_cash_deposits_v2',
+  TRIAGE: 'mt_grms_cash_triage_v2',
 };
 
 /**
  * Checks if mock mode should be used (Test runner or explicit env flag)
  */
 function isMockMode(): boolean {
-  return import.meta.env.MODE === 'test' || import.meta.env.VITE_USE_MOCK_DATA === 'true';
+  return import.meta.env.MODE === 'test';
 }
 
 function loadState<T>(key: string, defaultValue: T): T {
@@ -271,25 +266,40 @@ function mapBackendEntryToLedgerTransaction(
   accountNameLookup?: string
 ): LedgerTransaction {
   const isReceipt = entry.entryType.toUpperCase() === 'RECEIPT';
+  const isAdjustment = entry.sourceType === 'ADJUSTMENT';
+  const isCompensating = entry.sourceType === 'COMPENSATING';
+  const isExpense = entry.sourceType === 'EXPENSE' || entry.sourceType === 'EXPENSE_REVERSAL';
+  const isDebt =
+    entry.sourceType === 'DEBT' ||
+    entry.sourceType === 'DEBT_REPAYMENT' ||
+    Boolean(entry.description?.includes('Thu nợ'));
+  const isPos = entry.sourceType === 'POS' || entry.sourceType === 'POS_SALE';
+  const isInternalTransfer =
+    entry.sourceType === 'CASH_DROP' ||
+    entry.sourceType === 'BANK_DEPOSIT' ||
+    entry.sourceType === 'INTERNAL_TRANSFER';
+
   const defaultCategory =
-    entry.sourceType === 'POS'
+    isPos
       ? 'Doanh thu bán hàng POS'
-      : entry.sourceType === 'EXPENSE'
+      : isExpense
       ? 'Chi phí vận hành'
-      : entry.sourceType === 'DEBT'
+      : isDebt
       ? 'Thu nợ khách hàng'
       : entry.sourceType === 'CASH_DROP'
       ? 'Bàn giao tiền sang két sắt'
       : entry.sourceType === 'BANK_DEPOSIT'
       ? 'Nộp tiền vào ngân hàng'
-      : entry.sourceType === 'ADJUSTMENT'
+      : isAdjustment
       ? 'Kiểm kê chênh lệch két'
+      : isCompensating
+      ? 'Bút toán đảo hủy giao dịch'
       : 'Giao dịch thu chi';
 
   const counterpartyType =
-    entry.sourceType === 'POS'
+    isPos || isDebt
       ? 'CUSTOMER'
-      : entry.sourceType === 'EXPENSE'
+      : isExpense
       ? 'SUPPLIER'
       : 'INTERNAL';
 
@@ -301,28 +311,48 @@ function mapBackendEntryToLedgerTransaction(
       ? 'Két sắt chủ shop'
       : 'Tài khoản ngân hàng');
 
+  const sourceModuleName: LedgerTransaction['sourceModuleName'] = isPos
+    ? 'POS_RETAIL'
+    : isExpense
+    ? 'SERVICE_OPEX'
+    : isDebt
+    ? 'CRM_DEBT'
+    : isInternalTransfer
+    ? 'INTERNAL_TRANSFER'
+    : 'MANUAL';
+
+  const referenceDocType: LedgerTransaction['referenceDocType'] = isPos
+    ? 'POS_ORDER'
+    : isExpense
+    ? 'SERVICE_EXPENSE'
+    : isDebt
+    ? 'DEBT_PAYMENT'
+    : isInternalTransfer
+    ? 'INTERNAL_TRANSFER'
+    : isAdjustment
+    ? 'AUDIT'
+    : 'MANUAL';
+
   return {
     id: entry.id,
     transactionCode: entry.entryCode,
     accountId: entry.accountId,
     accountName: accountLabel,
     branchId: entry.branchId || 'ALL',
-    transactionType: isReceipt ? 'RECEIPT' : 'PAYMENT',
+    transactionType: isAdjustment ? 'ADJUSTMENT' : isReceipt ? 'RECEIPT' : 'PAYMENT',
     category: defaultCategory,
     amount: Number(entry.amount),
     balanceAfter: Number(entry.balanceAfter),
     counterpartyType: counterpartyType,
     counterpartyName: entry.referenceCode || entry.sourceType,
     description: entry.description || '',
-    referenceDocType:
-      entry.sourceType === 'POS'
-        ? 'POS_ORDER'
-        : entry.sourceType === 'EXPENSE'
-        ? 'SERVICE_EXPENSE'
-        : 'INTERNAL_TRANSFER',
-    referenceDocId: entry.sourceId || undefined,
-    sourceModuleName: (entry.sourceType as any) || 'MANUAL',
-    isAutomated: true,
+    referenceDocType,
+    referenceDocId: entry.referenceCode || entry.sourceId || undefined,
+    sourceModuleName,
+    isAutomated: entry.sourceType !== 'MANUAL',
+    isCompensating,
+    originalEntryId: isCompensating ? entry.sourceId || undefined : undefined,
+    linkedTransactionId: isCompensating || isInternalTransfer ? entry.sourceId || undefined : undefined,
     createdBy: 'Hệ thống',
     createdAt: entry.occurredAtUtc,
   };
@@ -335,43 +365,34 @@ export const cashbookService = {
   async getCashAccounts(branchId?: string): Promise<CashAccount[]> {
     if (isMockMode()) {
       const accounts = loadState<CashAccount[]>(STORAGE_KEYS.ACCOUNTS, INITIAL_ACCOUNTS);
-      if (!branchId || branchId === 'ALL') {
-        return accounts;
+      const filtered = accounts.filter((a) => a.id !== "01a19664-6761-78c3-b60a-cc460c68c51c");
+      if (!branchId || branchId === "ALL") {
+        return filtered;
       }
-      return accounts.filter((acc) => acc.branchId === branchId || acc.branchId === 'ALL');
+      return filtered.filter((acc) => acc.branchId === branchId || acc.branchId === "ALL");
     }
 
-    try {
-      const params = branchId && branchId !== 'ALL' ? { branchId } : {};
-      const res = await financeHttpClient.get<{ data: BackendCashAccountResponse[] }>('/cashbook/accounts', { params });
-      const backendAccounts = res.data?.data || [];
+    const params = branchId && branchId !== "ALL" ? { branchId } : {};
+    const res = await financeHttpClient.get<{ data: BackendCashAccountResponse[] }>("/cashbook/accounts", { params });
+    const backendAccounts = res.data?.data || [];
 
-      if (backendAccounts.length > 0) {
-        return backendAccounts.map((b) => ({
-          id: b.id,
-          branchId: b.branchId || 'ALL',
-          branchName: b.branchName,
-          accountName: b.accountName,
-          accountType: b.accountType,
-          bankName: b.bankName,
-          accountNumber: b.accountNumber,
-          currentBalance: Number(b.currentBalance),
-          initialBalance: Number(b.initialBalance),
-          isActive: b.isActive,
-          currency: b.currency || 'VND',
-          isSafeDeposit: b.isSafeDeposit,
-        }));
-      }
-
-      return loadState<CashAccount[]>(STORAGE_KEYS.ACCOUNTS, INITIAL_ACCOUNTS);
-    } catch (err) {
-      console.warn('Backend /cashbook/accounts unreachable, falling back to local storage:', err);
-      const accounts = loadState<CashAccount[]>(STORAGE_KEYS.ACCOUNTS, INITIAL_ACCOUNTS);
-      if (!branchId || branchId === 'ALL') {
-        return accounts;
-      }
-      return accounts.filter((acc) => acc.branchId === branchId || acc.branchId === 'ALL');
-    }
+    return backendAccounts
+      .filter((b) => b.isActive && b.id !== "01a19664-6761-78c3-b60a-cc460c68c51c")
+      .map((b) => ({
+        id: b.id,
+        branchId: b.branchId || "ALL",
+        branchName: b.branchName,
+        accountName: b.accountName,
+        accountType: b.accountType,
+        bankName: b.bankName,
+        accountNumber: b.accountNumber,
+        currentBalance: Number(b.currentBalance),
+        initialBalance: Number(b.initialBalance),
+        isActive: b.isActive,
+        currency: b.currency || "VND",
+        isSafeDeposit: b.isSafeDeposit,
+        isDefault: b.accountType === "BANK",
+      }));
   },
 
   /**
@@ -386,7 +407,7 @@ export const cashbookService = {
    * Retrieves Cash Transit transfers (Tiền đang chuyển về két sắt)
    */
   async getCashTransits(): Promise<CashTransitItem[]> {
-    return loadState<CashTransitItem[]>(STORAGE_KEYS.TRANSITS, INITIAL_TRANSITS);
+    return loadState<CashTransitItem[]>(STORAGE_KEYS.TRANSITS, isMockMode() ? INITIAL_TRANSITS : []);
   },
 
   /**
@@ -437,7 +458,7 @@ export const cashbookService = {
     page = 1,
     pageSize = 10
   ): { items: LedgerTransaction[]; totalItems: number } {
-    const all = loadState<LedgerTransaction[]>(STORAGE_KEYS.TRANSACTIONS, INITIAL_TRANSACTIONS);
+    const all = loadState<LedgerTransaction[]>(STORAGE_KEYS.TRANSACTIONS, isMockMode() ? INITIAL_TRANSACTIONS : []);
 
     let filtered = [...all];
 
@@ -460,7 +481,9 @@ export const cashbookService = {
           tx.transactionCode.toLowerCase().includes(q) ||
           tx.counterpartyName.toLowerCase().includes(q) ||
           tx.description.toLowerCase().includes(q) ||
-          tx.category.toLowerCase().includes(q)
+          tx.category.toLowerCase().includes(q) ||
+          (tx.referenceDocId && tx.referenceDocId.toLowerCase().includes(q)) ||
+          (tx.id && tx.id.toLowerCase().includes(q))
       );
     }
 
@@ -491,6 +514,10 @@ export const cashbookService = {
       if (params.branchId && params.branchId !== 'ALL') queryParams.branchId = params.branchId;
       if (params.startDate) queryParams.fromDate = params.startDate;
       if (params.endDate) queryParams.toDate = params.endDate;
+      const isGuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(params.searchQuery?.trim() || '');
+      if (params.searchQuery && params.searchQuery.trim() && !isGuid) {
+        queryParams.keyword = params.searchQuery.trim();
+      }
 
       const res = await financeHttpClient.get<{ data: BackendCashbookEntryResponse[] }>('/cashbook/entries', {
         params: queryParams,
@@ -524,7 +551,9 @@ export const cashbookService = {
             tx.transactionCode.toLowerCase().includes(q) ||
             tx.counterpartyName.toLowerCase().includes(q) ||
             tx.description.toLowerCase().includes(q) ||
-            tx.category.toLowerCase().includes(q)
+            tx.category.toLowerCase().includes(q) ||
+            (tx.referenceDocId && tx.referenceDocId.toLowerCase().includes(q)) ||
+            (tx.id && tx.id.toLowerCase().includes(q))
         );
       }
 
@@ -1107,5 +1136,225 @@ export const cashbookService = {
     });
 
     return '\uFEFF' + [headers.join(','), ...rows].join('\r\n');
+  },
+
+  // --- Phân hệ Cọc Vỏ (Deposit Tracking & Refund) ---
+  searchDeposits: async (keyword?: string, branchId?: string): Promise<DepositItem[]> => {
+    if (isMockMode()) {
+      const allDeposits = loadState<DepositItem[]>(STORAGE_KEYS.DEPOSITS, []);
+      let results = allDeposits.filter((d) => !d.isSettled);
+      if (keyword && keyword.trim()) {
+        const q = keyword.trim().toLowerCase();
+        results = results.filter(
+          (d) =>
+            d.customerName.toLowerCase().includes(q) ||
+            d.voucherCode.toLowerCase().includes(q) ||
+            (d.note && d.note.toLowerCase().includes(q))
+        );
+      }
+      return results;
+    }
+
+    try {
+      const params: Record<string, string> = {};
+      if (keyword) params.keyword = keyword;
+      if (branchId && branchId !== 'ALL') params.branchId = branchId;
+      const res = await financeHttpClient.get<{ data: DepositItem[] }>('/cashbook/deposits/search', { params });
+      return res.data?.data || [];
+    } catch (err) {
+      console.warn('Lỗi khi tra cứu cọc vỏ từ backend:', err);
+      return [];
+    }
+  },
+
+  createDeposit: async (data: CreateDepositDTO): Promise<any> => {
+    if (isMockMode()) {
+      if (data.amount <= 0) {
+        throw new Error('Số tiền cọc phải lớn hơn 0');
+      }
+      const accId = data.paymentSourceAccountId || data.accountId;
+      const accounts = loadState<CashAccount[]>(STORAGE_KEYS.ACCOUNTS, INITIAL_ACCOUNTS);
+      const acc = accounts.find((a) => a.id === accId);
+      if (!acc) throw new Error('Tài khoản thụ hưởng không tồn tại');
+
+      acc.currentBalance += data.amount;
+      saveState(STORAGE_KEYS.ACCOUNTS, accounts);
+
+      const id = `DEP-${Date.now()}`;
+      const voucherCode = `COC-${Date.now().toString().slice(-6)}`;
+      const newDeposit: DepositItem = {
+        id,
+        voucherCode,
+        customerName: data.customerName,
+        originalAmount: data.amount,
+        amount: data.amount,
+        refundedAmount: 0,
+        remainingAmount: data.amount,
+        remainingDeposit: data.amount,
+        isSettled: false,
+        note: data.note || '',
+        createdAt: new Date().toISOString(),
+      };
+
+      const allDeposits = loadState<DepositItem[]>(STORAGE_KEYS.DEPOSITS, []);
+      allDeposits.push(newDeposit);
+      saveState(STORAGE_KEYS.DEPOSITS, allDeposits);
+
+      return newDeposit;
+    }
+
+    const idempotencyKey =
+      typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `idemp-dep-${Date.now()}`;
+    const res = await financeHttpClient.post<{ data: any }>('/cashbook/deposits', data, {
+      headers: {
+        'Idempotency-Key': idempotencyKey,
+      },
+    });
+    return res.data?.data;
+  },
+
+  refundDeposit: async (depositId: string, data: RefundDepositDTO): Promise<any> => {
+    if (isMockMode()) {
+      const allDeposits = loadState<DepositItem[]>(STORAGE_KEYS.DEPOSITS, []);
+      const dep = allDeposits.find((d) => d.id === depositId);
+      if (!dep) throw new Error('Không tìm thấy phiếu cọc');
+      if (dep.isSettled) throw new Error('Khoản cọc này đã được hoàn tất toán');
+
+      const refundAmt = data.amount ?? data.refundAmount ?? 0;
+      const remaining = dep.remainingAmount ?? dep.remainingDeposit ?? 0;
+
+      if (refundAmt > remaining) {
+        throw new Error(`Số tiền hoàn (${refundAmt}) vượt quá số tiền cọc còn lại (${remaining})`);
+      }
+
+      const accId = data.paymentSourceAccountId || data.accountId;
+      const accounts = loadState<CashAccount[]>(STORAGE_KEYS.ACCOUNTS, INITIAL_ACCOUNTS);
+      const acc = accounts.find((a) => a.id === accId);
+      if (!acc) throw new Error('Tài khoản chi tiền không tồn tại');
+      if (acc.currentBalance < refundAmt) {
+        throw new Error(`Số tiền hoàn cọc vượt quá số dư két hiện có (${acc.currentBalance})`);
+      }
+
+      acc.currentBalance -= refundAmt;
+      saveState(STORAGE_KEYS.ACCOUNTS, accounts);
+
+      dep.refundedAmount += refundAmt;
+      const newRemaining = remaining - refundAmt;
+      dep.remainingAmount = newRemaining;
+      dep.remainingDeposit = newRemaining;
+      if (newRemaining <= 0) {
+        dep.isSettled = true;
+      }
+      saveState(STORAGE_KEYS.DEPOSITS, allDeposits);
+
+      return {
+        id: `REF-${Date.now()}`,
+        referenceCode: dep.voucherCode,
+        amount: refundAmt,
+        remainingAmount: newRemaining,
+        remainingDeposit: newRemaining,
+        isSettled: dep.isSettled,
+        note: data.note,
+      };
+    }
+
+    const idempotencyKey =
+      typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `idemp-ref-${Date.now()}`;
+    const res = await financeHttpClient.post<{ data: any }>(
+      `/cashbook/deposits/${depositId}/refund`,
+      data,
+      {
+        headers: {
+          'Idempotency-Key': idempotencyKey,
+        },
+      }
+    );
+    return res.data?.data;
+  },
+
+  // --- Phân hệ Triage Inbox & Xử lý mục không rõ ---
+  getPendingTriage: async (branchId?: string): Promise<TriageItem[]> => {
+    if (isMockMode()) {
+      const items = loadState<TriageItem[]>(STORAGE_KEYS.TRIAGE, [
+        {
+          id: 'TR-001',
+          voucherCode: 'PC-UNRESOLVED-01',
+          category: 'Chi phí vận hành',
+          beneficiaryName: 'Nhân viên',
+          description: 'Mua đá lạnh và băng keo ca trưa',
+          amount: 150000,
+          nature: 'Chưa phân loại (Unresolved)',
+          isTaxDeductible: false,
+          status: 'Unresolved',
+          createdBy: 'Nhân viên ca sáng',
+          expenseDate: new Date().toISOString(),
+        },
+      ]);
+      return items.filter((i) => i.status === 'Unresolved');
+    }
+
+    try {
+      const params: Record<string, string> = {};
+      if (branchId && branchId !== 'ALL') params.branchId = branchId;
+      const res = await financeHttpClient.get<{ data: TriageItem[] }>('/cashbook/triage/pending', { params });
+      return res.data?.data || [];
+    } catch (err) {
+      console.warn('Lỗi khi lấy Triage Inbox từ backend:', err);
+      return [];
+    }
+  },
+
+  resolveTriage: async (voucherId: string, data: ResolveTriageDTO): Promise<any> => {
+    if (isMockMode()) {
+      const items = loadState<TriageItem[]>(STORAGE_KEYS.TRIAGE, [
+        {
+          id: 'TR-001',
+          voucherCode: 'PC-UNRESOLVED-01',
+          category: 'Chi phí vận hành',
+          beneficiaryName: 'Nhân viên',
+          description: 'Mua đá lạnh và băng keo ca trưa',
+          amount: 150000,
+          nature: 'Chưa phân loại (Unresolved)',
+          isTaxDeductible: false,
+          status: 'Unresolved',
+          createdBy: 'Nhân viên ca sáng',
+          expenseDate: new Date().toISOString(),
+        },
+      ]);
+      const target = items.find((i) => i.id === voucherId);
+      if (target) {
+        target.status = 'PAID';
+        target.nature =
+          data.nature === 0 || data.nature === 1 ? 'Chi phí vận hành' : 'Rút vốn chủ';
+        target.isTaxDeductible = data.isTaxDeductible;
+        saveState(STORAGE_KEYS.TRIAGE, items);
+        return target;
+      }
+      return { id: voucherId, status: 'PAID' };
+    }
+
+    const normalizedPayload = {
+      ...data,
+      // Normalize legacy 0 -> 1 (FinancialNature.OperatingExpense) and 4 -> 5 (FinancialNature.OwnerDraw)
+      nature: data.nature === 0 ? 1 : data.nature === 4 ? 5 : data.nature,
+    };
+    const idempotencyKey =
+      typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `idemp-tri-${Date.now()}`;
+    const res = await financeHttpClient.post<{ data: any }>(
+      `/cashbook/triage/${voucherId}/resolve`,
+      normalizedPayload,
+      {
+        headers: {
+          'Idempotency-Key': idempotencyKey,
+        },
+      }
+    );
+    return res.data?.data;
   },
 };

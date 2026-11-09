@@ -8,6 +8,9 @@ import {
   AlertCircle,
   ArrowRight,
   Info,
+  Building2,
+  Calendar,
+  Store,
 } from 'lucide-react';
 import type { ExcelValidationResult } from '../../lib/matrixExcelService';
 
@@ -26,19 +29,23 @@ export const OrderMatrixImportPreviewModal: FC<OrderMatrixImportPreviewModalProp
 }) => {
   const [filterTab, setFilterTab] = useState<'all' | 'errors' | 'warnings' | 'valid'>('all');
 
+  // Filter items to display
+  const allNotices = useMemo(() => {
+    if (!result) return [];
+    return [...result.errors, ...result.warnings];
+  }, [result]);
+
+  const displayedItems = useMemo(() => {
+    if (!result) return [];
+    if (filterTab === 'errors') return result.errors;
+    if (filterTab === 'warnings') return result.warnings;
+    return allNotices;
+  }, [filterTab, result, allNotices]);
+
   if (!isOpen || !result) return null;
 
   const hasErrors = result.summary.errorCount > 0;
   const canApply = result.valid && result.summary.validCells > 0;
-
-  // Filter items to display
-  const allNotices = [...result.errors, ...result.warnings];
-
-  const displayedItems = useMemo(() => {
-    if (filterTab === 'errors') return result.errors;
-    if (filterTab === 'warnings') return result.warnings;
-    return allNotices;
-  }, [filterTab, result]);
 
   return (
     <div
@@ -60,30 +67,30 @@ export const OrderMatrixImportPreviewModal: FC<OrderMatrixImportPreviewModalProp
           borderRadius: 12,
           boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
           width: '100%',
-          maxWidth: 980,
-          maxHeight: '90vh',
+          maxWidth: 1080,
+          maxHeight: '92vh',
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
-          border: '1px solid #e2e8f0',
+          border: '1px solid #cbd5e1',
         }}
       >
         {/* Modal Header — Kiểu CISCA Clean & Professional */}
         <div
           style={{
             padding: '16px 20px',
-            backgroundColor: '#1e3a8a', // Xanh Navy đậm giống Header CISCA
+            backgroundColor: '#1e3a8a', // Deep Navy CISCA
             color: '#ffffff',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <div
               style={{
-                width: 34,
-                height: 34,
+                width: 36,
+                height: 36,
                 borderRadius: 8,
                 backgroundColor: 'rgba(255, 255, 255, 0.15)',
                 display: 'flex',
@@ -91,14 +98,14 @@ export const OrderMatrixImportPreviewModal: FC<OrderMatrixImportPreviewModalProp
                 justifyContent: 'center',
               }}
             >
-              <FileSpreadsheet size={19} color="#67e8f9" />
+              <FileSpreadsheet size={20} color="#67e8f9" />
             </div>
             <div>
               <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#ffffff', letterSpacing: '0.2px' }}>
-                Excel取込結果 — Kết quả kiểm tra file Excel
+                Excel取込結果 — Kiểm tra và nạp ma trận đặt hàng
               </h3>
               <div style={{ fontSize: 12, color: '#93c5fd', marginTop: 2 }}>
-                Tệp: <b style={{ color: '#ffffff' }}>{result.fileName}</b> ({Math.round(result.fileSize / 1024)} KB)
+                Tệp: <b style={{ color: '#ffffff' }}>{result.fileName}</b> ({Math.max(1, Math.round(result.fileSize / 1024))} KB)
               </div>
             </div>
           </div>
@@ -123,13 +130,13 @@ export const OrderMatrixImportPreviewModal: FC<OrderMatrixImportPreviewModalProp
           </button>
         </div>
 
-        {/* Summary Metric Cards */}
+        {/* 5.1. Summary Metric Cards */}
         <div
           style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(4, 1fr)',
             gap: 12,
-            padding: '14px 20px',
+            padding: '12px 20px',
             backgroundColor: '#f8fafc',
             borderBottom: '1px solid #e2e8f0',
           }}
@@ -270,7 +277,7 @@ export const OrderMatrixImportPreviewModal: FC<OrderMatrixImportPreviewModalProp
             </div>
             <div>
               <div style={{ fontSize: 11, color: '#64748b', fontWeight: 600, textTransform: 'uppercase' }}>
-                Ô trống / Khớp cũ
+                Ô bỏ qua / Trùng cũ
               </div>
               <div style={{ fontSize: 18, fontWeight: 800, color: '#475569' }}>
                 {result.summary.ignoredCells}
@@ -279,7 +286,99 @@ export const OrderMatrixImportPreviewModal: FC<OrderMatrixImportPreviewModalProp
           </div>
         </div>
 
-        {/* Filter Navigation Tabs */}
+        {/* 5.1. Scope Status Badges (Khớp chi nhánh? Khớp NCC? Khớp kỳ?) */}
+        {result.scopeStatus && (
+          <div
+            style={{
+              padding: '8px 20px',
+              backgroundColor: '#f1f5f9',
+              borderBottom: '1px solid #e2e8f0',
+              display: 'flex',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: 8,
+              fontSize: 12,
+            }}
+          >
+            <span style={{ fontWeight: 600, color: '#475569', marginRight: 4 }}>
+              Xác thực phạm vi:
+            </span>
+
+            {/* Chi nhánh badge */}
+            <div
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 5,
+                padding: '3px 10px',
+                borderRadius: 9999,
+                fontWeight: 600,
+                fontSize: 11.5,
+                backgroundColor: result.scopeStatus.branchMatched ? '#dcfce7' : '#fee2e2',
+                color: result.scopeStatus.branchMatched ? '#15803d' : '#b91c1c',
+                border: `1px solid ${result.scopeStatus.branchMatched ? '#bbf7d0' : '#fca5a5'}`,
+              }}
+            >
+              <Store size={13} />
+              <span>
+                Chi nhánh:{' '}
+                {result.scopeStatus.branchMatched
+                  ? `Khớp (${result.scopeStatus.branchExpected})`
+                  : `Sai! File: ${result.scopeStatus.branchActual || 'Khác'} ≠ UI: ${result.scopeStatus.branchExpected}`}
+              </span>
+            </div>
+
+            {/* NCC badge */}
+            <div
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 5,
+                padding: '3px 10px',
+                borderRadius: 9999,
+                fontWeight: 600,
+                fontSize: 11.5,
+                backgroundColor: result.scopeStatus.supplierMatched ? '#dcfce7' : '#fee2e2',
+                color: result.scopeStatus.supplierMatched ? '#15803d' : '#b91c1c',
+                border: `1px solid ${result.scopeStatus.supplierMatched ? '#bbf7d0' : '#fca5a5'}`,
+              }}
+            >
+              <Building2 size={13} />
+              <span>
+                NCC:{' '}
+                {result.scopeStatus.supplierMatched
+                  ? `Khớp (${result.scopeStatus.supplierExpected})`
+                  : `Sai! File: ${result.scopeStatus.supplierActual || 'Khác'} ≠ UI: ${result.scopeStatus.supplierExpected}`}
+              </span>
+            </div>
+
+            {/* Kỳ đặt hàng badge */}
+            <div
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 5,
+                padding: '3px 10px',
+                borderRadius: 9999,
+                fontWeight: 600,
+                fontSize: 11.5,
+                backgroundColor: result.scopeStatus.periodMatched ? '#dcfce7' : '#fee2e2',
+                color: result.scopeStatus.periodMatched ? '#15803d' : '#b91c1c',
+                border: `1px solid ${result.scopeStatus.periodMatched ? '#bbf7d0' : '#fca5a5'}`,
+              }}
+            >
+              <Calendar size={13} />
+              <span>
+                Kỳ ma trận:{' '}
+                {result.scopeStatus.periodMatched
+                  ? `Khớp (${result.scopeStatus.periodExpected})`
+                  : `Lệch kỳ! (${result.scopeStatus.periodExpected})`}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* 5.2. Filter Navigation Tabs */}
         <div
           style={{
             padding: '8px 20px',
@@ -294,7 +393,7 @@ export const OrderMatrixImportPreviewModal: FC<OrderMatrixImportPreviewModalProp
             type="button"
             onClick={() => setFilterTab('all')}
             style={{
-              padding: '5px 12px',
+              padding: '6px 14px',
               borderRadius: 6,
               border: 'none',
               fontSize: 12.5,
@@ -310,7 +409,7 @@ export const OrderMatrixImportPreviewModal: FC<OrderMatrixImportPreviewModalProp
             type="button"
             onClick={() => setFilterTab('errors')}
             style={{
-              padding: '5px 12px',
+              padding: '6px 14px',
               borderRadius: 6,
               border: 'none',
               fontSize: 12.5,
@@ -326,7 +425,7 @@ export const OrderMatrixImportPreviewModal: FC<OrderMatrixImportPreviewModalProp
             type="button"
             onClick={() => setFilterTab('warnings')}
             style={{
-              padding: '5px 12px',
+              padding: '6px 14px',
               borderRadius: 6,
               border: 'none',
               fontSize: 12.5,
@@ -338,65 +437,100 @@ export const OrderMatrixImportPreviewModal: FC<OrderMatrixImportPreviewModalProp
           >
             Chỉ xem cảnh báo ({result.summary.warningCount})
           </button>
-          {canApply && (
-            <button
-              type="button"
-              onClick={() => setFilterTab('valid')}
-              style={{
-                padding: '5px 12px',
-                borderRadius: 6,
-                border: 'none',
-                fontSize: 12.5,
-                fontWeight: 600,
-                cursor: 'pointer',
-                backgroundColor: filterTab === 'valid' ? '#16a34a' : '#f1f5f9',
-                color: filterTab === 'valid' ? '#ffffff' : '#475569',
-              }}
-            >
-              Ô hợp lệ sẽ nạp ({result.summary.validCells})
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={() => setFilterTab('valid')}
+            style={{
+              padding: '6px 14px',
+              borderRadius: 6,
+              border: 'none',
+              fontSize: 12.5,
+              fontWeight: 600,
+              cursor: 'pointer',
+              backgroundColor: filterTab === 'valid' ? '#16a34a' : '#f1f5f9',
+              color: filterTab === 'valid' ? '#ffffff' : '#475569',
+            }}
+          >
+            Ô sẽ nạp ({result.summary.validCells})
+          </button>
         </div>
 
-        {/* Modal Body: Error Details Table — Nền hồng nhạt kiểu CISCA */}
+        {/* Modal Body: Tables */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '12px 20px', minHeight: 280 }}>
           {filterTab === 'valid' ? (
-            /* Table of Valid Cells to Apply */
-            <table
-              style={{
-                width: '100%',
-                borderCollapse: 'collapse',
-                fontSize: 12.5,
-                border: '1px solid #bbf7d0',
-              }}
-            >
-              <thead>
-                <tr style={{ backgroundColor: '#f0fdf4', color: '#166534', borderBottom: '2px solid #bbf7d0' }}>
-                  <th style={{ padding: '8px 10px', textAlign: 'center', width: 60 }}>STT</th>
-                  <th style={{ padding: '8px 10px', textAlign: 'left', width: 120 }}>Mã sản phẩm</th>
-                  <th style={{ padding: '8px 10px', textAlign: 'left', width: 140 }}>Ngày giao hàng</th>
-                  <th style={{ padding: '8px 10px', textAlign: 'right', width: 120 }}>Số lượng nạp</th>
-                  <th style={{ padding: '8px 10px', textAlign: 'left' }}>Trạng thái áp dụng</th>
-                </tr>
-              </thead>
-              <tbody>
-                {result.cellsToApply.slice(0, 100).map((cell, idx) => (
-                  <tr key={`${cell.productId}_${cell.deliveryDate}_${idx}`} style={{ borderBottom: '1px solid #dcfce7' }}>
-                    <td style={{ padding: '7px 10px', textAlign: 'center', color: '#64748b' }}>{idx + 1}</td>
-                    <td style={{ padding: '7px 10px', fontFamily: 'monospace', fontWeight: 600, color: '#15803d' }}>
-                      {cell.productCode}
-                    </td>
-                    <td style={{ padding: '7px 10px', color: '#334155' }}>{cell.deliveryDate}</td>
-                    <td style={{ padding: '7px 10px', textAlign: 'right', fontWeight: 700, color: '#16a34a' }}>
-                      {cell.quantity}
-                    </td>
-                    <td style={{ padding: '7px 10px', color: '#166534' }}>
-                      ✅ Hợp lệ (Sẽ ghi vào bản thảo)
-                    </td>
+            /* 5.4. Bảng nội dung import hợp lệ (cellsToApply) */
+            result.cellsToApply.length === 0 ? (
+              <div
+                style={{
+                  padding: '40px 20px',
+                  textAlign: 'center',
+                  color: '#64748b',
+                  fontSize: 13,
+                }}
+              >
+                Không có ô số lượng hợp lệ nào để áp dụng.
+              </div>
+            ) : (
+              <table
+                style={{
+                  width: '100%',
+                  borderCollapse: 'collapse',
+                  fontSize: 12.5,
+                  border: '1px solid #bbf7d0',
+                }}
+              >
+                <thead>
+                  <tr style={{ backgroundColor: '#f0fdf4', color: '#166534', borderBottom: '2px solid #bbf7d0' }}>
+                    <th style={{ padding: '8px 10px', textAlign: 'center', width: 45 }}>#</th>
+                    <th style={{ padding: '8px 8px', textAlign: 'center', width: 80 }}>Dòng Excel</th>
+                    <th style={{ padding: '8px 10px', textAlign: 'left', width: 110 }}>Mã SP</th>
+                    <th style={{ padding: '8px 10px', textAlign: 'left', minWidth: 160 }}>Tên SP</th>
+                    <th style={{ padding: '8px 10px', textAlign: 'left', width: 130 }}>NCC</th>
+                    <th style={{ padding: '8px 10px', textAlign: 'center', width: 110 }}>Ngày giao</th>
+                    <th style={{ padding: '8px 10px', textAlign: 'right', width: 90 }}>SL hiện tại</th>
+                    <th style={{ padding: '8px 10px', textAlign: 'right', width: 95 }}>SL từ Excel</th>
+                    <th style={{ padding: '8px 12px', textAlign: 'left' }}>Ghi chú</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {result.cellsToApply.map((cell, idx) => (
+                    <tr
+                      key={`${cell.productId}_${cell.deliveryDate}_${idx}`}
+                      style={{
+                        backgroundColor: idx % 2 === 0 ? '#ffffff' : '#fcfdfd',
+                        borderBottom: '1px solid #e2e8f0',
+                      }}
+                    >
+                      <td style={{ padding: '7px 10px', textAlign: 'center', color: '#64748b' }}>{idx + 1}</td>
+                      <td style={{ padding: '7px 8px', textAlign: 'center', fontWeight: 600, color: '#64748b' }}>
+                        {cell.row > 0 ? cell.row : '-'}
+                      </td>
+                      <td style={{ padding: '7px 10px', fontFamily: 'monospace', fontWeight: 700, color: '#15803d' }}>
+                        {cell.productCode}
+                      </td>
+                      <td style={{ padding: '7px 10px', color: '#1e293b', fontWeight: 500 }}>
+                        {cell.productName}
+                      </td>
+                      <td style={{ padding: '7px 10px', color: '#475569', fontSize: 12 }}>
+                        {cell.supplierName || '-'}
+                      </td>
+                      <td style={{ padding: '7px 10px', textAlign: 'center', color: '#334155', fontSize: 12 }}>
+                        {cell.dateLabel || cell.deliveryDate}
+                      </td>
+                      <td style={{ padding: '7px 10px', textAlign: 'right', color: '#64748b', fontWeight: 500 }}>
+                        {cell.currentQty}
+                      </td>
+                      <td style={{ padding: '7px 10px', textAlign: 'right', fontWeight: 800, color: '#16a34a' }}>
+                        {cell.quantity}
+                      </td>
+                      <td style={{ padding: '7px 12px', color: cell.note?.includes('⚠️') ? '#b45309' : '#166534', fontSize: 12 }}>
+                        {cell.note || '✅ Sẵn sàng nạp'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )
           ) : displayedItems.length === 0 ? (
             <div
               style={{
@@ -432,7 +566,7 @@ export const OrderMatrixImportPreviewModal: FC<OrderMatrixImportPreviewModalProp
               </div>
             </div>
           ) : (
-            /* CISCA Error Details Table: Nền bảng màu hồng nhạt đặc trưng */
+            /* 5.3. Bảng chi tiết validate (errors / warnings) — 9 Cột */
             <table
               style={{
                 width: '100%',
@@ -450,13 +584,15 @@ export const OrderMatrixImportPreviewModal: FC<OrderMatrixImportPreviewModalProp
                     fontWeight: 700,
                   }}
                 >
-                  <th style={{ padding: '8px 10px', textAlign: 'center', width: 75 }}>種別 (Loại)</th>
-                  <th style={{ padding: '8px 8px', textAlign: 'center', width: 50 }}>行 (Dòng)</th>
-                  <th style={{ padding: '8px 10px', textAlign: 'left', width: 110 }}>MSコード (Mã SP)</th>
-                  <th style={{ padding: '8px 10px', textAlign: 'left', width: 170 }}>商品名 (Tên sản phẩm)</th>
+                  <th style={{ padding: '8px 8px', textAlign: 'center', width: 40 }}>#</th>
+                  <th style={{ padding: '8px 8px', textAlign: 'center', width: 75 }}>Dòng Excel</th>
+                  <th style={{ padding: '8px 10px', textAlign: 'left', width: 105 }}>Mã SP</th>
+                  <th style={{ padding: '8px 10px', textAlign: 'left', minWidth: 150 }}>Tên SP</th>
                   <th style={{ padding: '8px 10px', textAlign: 'center', width: 100 }}>Ngày giao</th>
-                  <th style={{ padding: '8px 10px', textAlign: 'center', width: 80 }}>入力値 (Giá trị)</th>
-                  <th style={{ padding: '8px 12px', textAlign: 'left' }}>内容 (Nội dung thông báo lỗi)</th>
+                  <th style={{ padding: '8px 10px', textAlign: 'center', width: 85 }}>Giá trị nhập</th>
+                  <th style={{ padding: '8px 10px', textAlign: 'center', width: 90 }}>Mức</th>
+                  <th style={{ padding: '8px 10px', textAlign: 'center', width: 140 }}>Mã lỗi</th>
+                  <th style={{ padding: '8px 12px', textAlign: 'left' }}>Thông báo</th>
                 </tr>
               </thead>
               <tbody>
@@ -466,31 +602,19 @@ export const OrderMatrixImportPreviewModal: FC<OrderMatrixImportPreviewModalProp
                     <tr
                       key={idx}
                       style={{
-                        backgroundColor: isErr ? '#fef2f2' : '#fffbeb', // Nền đỏ hồng nhạt cho ERROR như trong ảnh
+                        backgroundColor: isErr ? '#fef2f2' : '#fffbeb',
                         borderBottom: isErr ? '1px solid #fee2e2' : '1px solid #fef3c7',
                         color: isErr ? '#991b1b' : '#92400e',
                       }}
                     >
-                      {/* Loại */}
-                      <td style={{ padding: '7px 8px', textAlign: 'center' }}>
-                        <span
-                          style={{
-                            display: 'inline-block',
-                            padding: '2px 6px',
-                            borderRadius: 4,
-                            fontSize: 11,
-                            fontWeight: 700,
-                            backgroundColor: isErr ? '#dc2626' : '#d97706',
-                            color: '#ffffff',
-                          }}
-                        >
-                          {isErr ? 'エラー (Lỗi)' : '警告 (Cảnh báo)'}
-                        </span>
+                      {/* # */}
+                      <td style={{ padding: '7px 8px', textAlign: 'center', color: '#64748b' }}>
+                        {idx + 1}
                       </td>
 
-                      {/* Dòng */}
+                      {/* Dòng Excel */}
                       <td style={{ padding: '7px 8px', textAlign: 'center', fontWeight: 600, color: '#64748b' }}>
-                        {item.row || '-'}
+                        {item.row > 0 ? item.row : '-'}
                       </td>
 
                       {/* Mã SP */}
@@ -499,7 +623,7 @@ export const OrderMatrixImportPreviewModal: FC<OrderMatrixImportPreviewModalProp
                       </td>
 
                       {/* Tên SP */}
-                      <td style={{ padding: '7px 10px', maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <td style={{ padding: '7px 10px', maxWidth: 170, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {item.productName || '-'}
                       </td>
 
@@ -513,7 +637,29 @@ export const OrderMatrixImportPreviewModal: FC<OrderMatrixImportPreviewModalProp
                         {item.inputValue !== undefined ? String(item.inputValue) : '-'}
                       </td>
 
-                      {/* Chi tiết lỗi */}
+                      {/* Mức */}
+                      <td style={{ padding: '7px 8px', textAlign: 'center' }}>
+                        <span
+                          style={{
+                            display: 'inline-block',
+                            padding: '2px 8px',
+                            borderRadius: 4,
+                            fontSize: 11,
+                            fontWeight: 700,
+                            backgroundColor: isErr ? '#dc2626' : '#d97706',
+                            color: '#ffffff',
+                          }}
+                        >
+                          {isErr ? 'ERROR' : 'WARNING'}
+                        </span>
+                      </td>
+
+                      {/* Mã lỗi */}
+                      <td style={{ padding: '7px 10px', textAlign: 'center', fontFamily: 'monospace', fontSize: 11, fontWeight: 600 }}>
+                        {item.code}
+                      </td>
+
+                      {/* Thông báo */}
                       <td style={{ padding: '7px 12px', fontWeight: 500, lineHeight: 1.4 }}>
                         {item.message}
                       </td>
@@ -525,12 +671,12 @@ export const OrderMatrixImportPreviewModal: FC<OrderMatrixImportPreviewModalProp
           )}
         </div>
 
-        {/* Status Alert Banner — Dưới chân bảng như trong ảnh CISCA */}
+        {/* Status Alert Banner */}
         <div
           style={{
             padding: '10px 20px',
             borderTop: '1px solid #e2e8f0',
-            backgroundColor: hasErrors ? '#fffbeb' : '#f0fdf4',
+            backgroundColor: hasErrors ? '#fff1f2' : canApply ? '#f0fdf4' : '#f8fafc',
             display: 'flex',
             alignItems: 'center',
             gap: 12,
@@ -538,24 +684,29 @@ export const OrderMatrixImportPreviewModal: FC<OrderMatrixImportPreviewModalProp
         >
           {hasErrors ? (
             <>
-              <AlertTriangle size={18} color="#d97706" style={{ flexShrink: 0 }} />
-              <div style={{ fontSize: 13, color: '#b45309', fontWeight: 600 }}>
-                エラーがあるため、登録へ進められません。 (Tệp Excel có chứa lỗi dữ liệu. Bạn cần sửa các ô bị lỗi theo
-                danh sách trên trước khi có thể nạp vào hệ thống).
+              <AlertCircle size={18} color="#dc2626" style={{ flexShrink: 0 }} />
+              <div style={{ fontSize: 13, color: '#b91c1c', fontWeight: 600 }}>
+                Tệp Excel có chứa {result.summary.errorCount} lỗi. Bạn cần sửa các lỗi trong danh sách trên trước khi có thể áp dụng vào ma trận.
+              </div>
+            </>
+          ) : canApply ? (
+            <>
+              <CheckCircle2 size={18} color="#16a34a" style={{ flexShrink: 0 }} />
+              <div style={{ fontSize: 13, color: '#15803d', fontWeight: 600 }}>
+                Dữ liệu hợp lệ! Có tổng cộng <b>{result.summary.validCells}</b> ô số lượng sẵn sàng nạp vào bản thảo ma trận đặt hàng.
               </div>
             </>
           ) : (
             <>
-              <CheckCircle2 size={18} color="#16a34a" style={{ flexShrink: 0 }} />
-              <div style={{ fontSize: 13, color: '#15803d', fontWeight: 600 }}>
-                Dữ liệu hoàn toàn hợp lệ! Có tổng cộng <b>{result.summary.validCells}</b> ô số lượng hợp lệ sẵn sàng nạp
-                vào bản thảo ma trận đặt hàng.
+              <Info size={18} color="#64748b" style={{ flexShrink: 0 }} />
+              <div style={{ fontSize: 13, color: '#475569', fontWeight: 500 }}>
+                Không có ô số lượng thay đổi nào để nạp vào ma trận.
               </div>
             </>
           )}
         </div>
 
-        {/* Modal Footer Controls */}
+        {/* 5.5. Modal Footer Controls */}
         <div
           style={{
             padding: '12px 20px',
@@ -582,7 +733,7 @@ export const OrderMatrixImportPreviewModal: FC<OrderMatrixImportPreviewModalProp
               cursor: 'pointer',
             }}
           >
-            閉じる (Đóng)
+            Đóng / Hủy
           </button>
 
           <button
@@ -605,7 +756,7 @@ export const OrderMatrixImportPreviewModal: FC<OrderMatrixImportPreviewModalProp
               boxShadow: canApply ? '0 2px 6px rgba(22, 163, 74, 0.35)' : 'none',
             }}
           >
-            <span>取込実行 (Nạp dữ liệu vào Matrix)</span>
+            <span>Áp dụng vào ma trận</span>
             <ArrowRight size={15} />
           </button>
         </div>

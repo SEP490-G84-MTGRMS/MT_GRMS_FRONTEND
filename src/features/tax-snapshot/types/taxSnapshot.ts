@@ -77,6 +77,7 @@ export interface HouseholdTaxFilterDto {
   periodType: TaxPeriodType;
   periodNumber: number;
   branchId?: string;
+  bookType?: AccountingBookType;
   calculationMethod: TaxCalculationMethod;
   appliedPitMethod?: TaxCalculationMethod | null;
   tier2Method?: 'REVENUE_EXCESS' | 'PROFIT_15';
@@ -209,6 +210,19 @@ export interface AccountingBookEntryDto {
   bookCode: string;
   beneficiaryName?: string;
   invoiceNumber?: string;
+  unit?: string;
+  unitPrice?: number;
+  inQuantity?: number;
+  inAmount?: number;
+  outQuantity?: number;
+  outAmount?: number;
+  balanceQuantity?: number;
+  balanceAmount?: number;
+  sectionGroup?: string;
+  taxRate?: number;
+  taxAmount?: number;
+  note?: string;
+  isSummaryRow?: boolean;
 }
 
 /**

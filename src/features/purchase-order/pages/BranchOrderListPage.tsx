@@ -1,11 +1,10 @@
-import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import type { FC } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Building2, History, Download, Plus, Loader2 } from 'lucide-react';
 import type { BranchListItem, BranchFilterState } from '../types/po.types';
 import { BranchFilterBar } from '../components/branch/BranchFilterBar';
 import { BranchOrderTable } from '../components/branch/BranchOrderTable';
-import { BranchDetailModal } from '../components/branch/BranchDetailModal';
 import { AdminToast, type ToastState } from '../../admin/components';
 import { branchApi, countMatrixProductsForBranch } from '../api/branchApi';
 import '../purchase-order.css';
@@ -13,10 +12,12 @@ import '../../supplier/supplier.css';
 
 const DEFAULT_FILTERS: BranchFilterState = {
   keyword: '',
-  branchCode: 'all',
-  status: 'all',
-  dateFrom: '',
-  dateTo: '',
+  branchCode: '',
+  branchCodes: [],
+  branchNames: [],
+  addresses: [],
+  phones: [],
+  status: '',
   pageIndex: 1,
   pageSize: 10,
 };
@@ -29,9 +30,6 @@ export const BranchOrderListPage: FC = () => {
   const [totalCount, setTotalCount] = useState<number>(0);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [appliedFilters, setAppliedFilters] = useState<BranchFilterState>(DEFAULT_FILTERS);
-
-  const [selectedBranch, setSelectedBranch] = useState<BranchListItem | null>(null);
-  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
 
   const [toast, setToast] = useState<ToastState | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -49,15 +47,7 @@ export const BranchOrderListPage: FC = () => {
   const fetchBranches = useCallback(async () => {
     setIsLoading(true);
     try {
-      const res = await branchApi.getBranches({
-        keyword: appliedFilters.keyword,
-        branchCode: appliedFilters.branchCode,
-        status: appliedFilters.status,
-        dateFrom: appliedFilters.dateFrom,
-        dateTo: appliedFilters.dateTo,
-        pageIndex: appliedFilters.pageIndex,
-        pageSize: appliedFilters.pageSize,
-      });
+      const res = await branchApi.getBranches(appliedFilters);
       setBranches(res.items);
       setTotalCount(res.total);
     } catch (err: any) {
@@ -85,16 +75,6 @@ export const BranchOrderListPage: FC = () => {
     return () => window.removeEventListener('focus', refreshMatrixCounts);
   }, []);
 
-  // Branch code options for dropdown
-  const branchCodeOptions = useMemo(() => {
-    const defaultCodes = ['DC1', 'BR-01', 'BR-02', 'BR-03', 'BR-04', 'BR-05', 'DC-01'];
-    const set = new Set<string>(defaultCodes);
-    branches.forEach((b) => {
-      if (b.code) set.add(b.code);
-    });
-    return Array.from(set);
-  }, [branches]);
-
   const handleSearch = (newFilters: BranchFilterState) => {
     setAppliedFilters(newFilters);
   };
@@ -109,11 +89,6 @@ export const BranchOrderListPage: FC = () => {
 
   const handlePageSizeChange = (size: number) => {
     setAppliedFilters((prev) => ({ ...prev, pageSize: size, pageIndex: 1 }));
-  };
-
-  const handleViewDetail = (branch: BranchListItem) => {
-    setSelectedBranch(branch);
-    setIsDetailModalOpen(true);
   };
 
   const handleOrder = (branchId: string) => {
@@ -207,7 +182,6 @@ export const BranchOrderListPage: FC = () => {
       <div style={{ flexShrink: 0, marginBottom: 8 }}>
         <BranchFilterBar
           filters={appliedFilters}
-          branchCodeOptions={branchCodeOptions}
           onSearch={handleSearch}
           onReset={handleReset}
         />
@@ -221,19 +195,7 @@ export const BranchOrderListPage: FC = () => {
         pageSize={appliedFilters.pageSize}
         onPageChange={handlePageChange}
         onPageSizeChange={handlePageSizeChange}
-        onViewDetail={handleViewDetail}
         onOrder={handleOrder}
-      />
-
-      {/* Detail Modal */}
-      <BranchDetailModal
-        branch={selectedBranch}
-        isOpen={isDetailModalOpen}
-        onClose={() => setIsDetailModalOpen(false)}
-        onOrder={(id) => {
-          setIsDetailModalOpen(false);
-          handleOrder(id);
-        }}
       />
     </div>
   );

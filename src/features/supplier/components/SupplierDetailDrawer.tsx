@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { FC } from 'react';
 import type { SupplierSummary, APLedgerEntry } from '../types/supplier.types';
-import { SupplierTypeBadge, SupplierCategoryBadge, SupplierStatusBadge } from './SupplierStatusBadge';
+import { SupplierTypeBadge, SupplierStatusBadge } from './SupplierStatusBadge';
 import { X, Copy, Check, QrCode, FileSpreadsheet, UserCheck, ShieldAlert } from 'lucide-react';
 import '../supplier.css';
 
@@ -94,10 +94,9 @@ export const SupplierDetailDrawer: FC<Props> = ({
                 padding: '12px 16px', marginBottom: 20,
               }}>
                 <div>
-                  <div className="info-section-title" style={{ marginBottom: 6, border: 'none', padding: 0 }}>Phân Loại Ngành Hàng</div>
+                  <div className="info-section-title" style={{ marginBottom: 6, border: 'none', padding: 0 }}>Phân loại NCC</div>
                   <div style={{ display: 'flex', gap: 8 }}>
                     <SupplierTypeBadge type={supplier.supplierType} />
-                    <SupplierCategoryBadge category={supplier.category} />
                   </div>
                 </div>
                 <div style={{ textAlign: 'right', fontFamily: 'var(--font-mono)' }}>

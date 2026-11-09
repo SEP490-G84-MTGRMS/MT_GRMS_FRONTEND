@@ -1,7 +1,38 @@
 import { useState, useEffect } from 'react';
-import type { FC } from 'react';
+import type { CSSProperties, FC } from 'react';
 import type { SupplierSummary, SupplierDeliveryConfig } from '../../types/supplier.types';
 import { Clock, Truck, ShieldCheck, Package, CheckCircle2 } from 'lucide-react';
+
+const LABEL_WIDTH = 220;
+
+const labelRowStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'flex-start',
+  gap: 12,
+  width: '100%',
+};
+
+const labelStyle: CSSProperties = {
+  fontSize: 13,
+  fontWeight: 600,
+  color: '#334155',
+  width: LABEL_WIDTH,
+  minWidth: LABEL_WIDTH,
+  paddingTop: 10,
+  lineHeight: 1.35,
+  flexShrink: 0,
+  display: 'flex',
+  alignItems: 'center',
+  gap: 6,
+};
+
+const fieldColStyle: CSSProperties = {
+  flex: 1,
+  minWidth: 0,
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 4,
+};
 
 interface Props {
   supplier: SupplierSummary;
@@ -10,10 +41,9 @@ interface Props {
 }
 
 const DEFAULT_CONFIG: SupplierDeliveryConfig = {
-  leadTimeDays: 1,
-  leadTimeUnit: 'BUSINESS_DAYS',
   minOrderQuantity: 0,
   activeDeliveryDays: [1, 2, 3, 4, 5, 6],
+  cutoffDayOffset: 1,
   cutoffTime: '17:00',
   allowStoreEdit: true,
   editWindowType: 'BEFORE_CUTOFF',
@@ -33,12 +63,11 @@ const WEEKDAYS = [
 ];
 
 export const SupplierDeliveryConfigTab: FC<Props> = ({
-  supplier,
+  supplier: _supplier,
   initialConfig,
   onSaveConfig,
 }) => {
   const [config, setConfig] = useState<SupplierDeliveryConfig>(initialConfig || DEFAULT_CONFIG);
-  const [saveSuccessMsg, setSaveSuccessMsg] = useState(false);
   const [saveErrorMsg, setSaveErrorMsg] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -61,12 +90,13 @@ export const SupplierDeliveryConfigTab: FC<Props> = ({
       return 'Vui lòng chọn ít nhất một ngày giao hàng hoạt động trong tuần (Active Delivery Days).';
     }
 
-    if (config.leadTimeDays < 0 || config.leadTimeDays > 30) {
-      return 'Thời gian chuẩn bị (Lead Time) phải nằm trong khoảng từ 0 đến 30 ngày.';
-    }
-
     if (config.minOrderQuantity < 0) {
       return 'Số lượng đặt tối thiểu (MOQ) phải lớn hơn hoặc bằng 0.';
+    }
+
+    const offset = Number(config.cutoffDayOffset);
+    if (!Number.isFinite(offset) || offset < 0 || !Number.isInteger(offset)) {
+      return 'Số ngày trước ngày giao để chốt đơn phải là số nguyên ≥ 0.';
     }
 
     const cleanCutoff = (config.cutoffTime || '').trim();
@@ -108,8 +138,6 @@ export const SupplierDeliveryConfigTab: FC<Props> = ({
     setIsSaving(true);
     try {
       await onSaveConfig?.(config);
-      setSaveSuccessMsg(true);
-      setTimeout(() => setSaveSuccessMsg(false), 3000);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Không thể lưu cấu hình giao hàng.';
       setSaveErrorMsg(message);
@@ -120,20 +148,6 @@ export const SupplierDeliveryConfigTab: FC<Props> = ({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      {saveSuccessMsg && (
-        <div
-          data-testid="save-delivery-success-alert"
-          style={{
-            display: 'flex', alignItems: 'center', gap: 10,
-            background: '#e8f9ee', border: '1px solid #bbf7d0',
-            padding: '12px 18px', borderRadius: 'var(--radius-pill)',
-            color: '#065f46', fontWeight: 600, fontSize: '0.88rem',
-          }}
-        >
-          <CheckCircle2 size={18} color="#00c853" />
-          <span>Đã lưu cấu hình lịch giao hàng và thời gian Cutoff thành công cho {supplier.name}!</span>
-        </div>
-      )}
       {saveErrorMsg && (
         <div
           data-testid="save-delivery-error-alert"
@@ -162,102 +176,123 @@ export const SupplierDeliveryConfigTab: FC<Props> = ({
               Lịch Giao Hàng &amp; Thời Gian Cutoff
             </h2>
             <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-              Cấu hình thời gian chuẩn bị đơn (Lead time), ngày giao hàng hoạt động và giờ chốt đơn hằng ngày.
+              Cấu hình ngày giao hàng hoạt động và giờ chốt đơn hằng ngày.
             </div>
           </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16, marginBottom: 20 }}>
-          <div className="form-group">
-            <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <Clock size={14} color="var(--blue-primary)" />
-              <span>Thời gian chuẩn bị (Lead Time)</span>
-            </label>
-            <div style={{ display: 'flex', gap: 10 }}>
-              <input
-                type="number" min="0" max="30"
-                data-testid="input-lead-time"
-                value={config.leadTimeDays}
-                onChange={(e) => setConfig({ ...config, leadTimeDays: Math.max(0, parseInt(e.target.value) || 0) })}
-                className="admin-search-input"
-                style={{ width: 80, height: 40, textAlign: 'center', fontFamily: 'var(--font-mono)' }}
-              />
-              <select
-                data-testid="select-lead-time-unit"
-                value={config.leadTimeUnit}
-                onChange={(e) => setConfig({ ...config, leadTimeUnit: e.target.value as any })}
-                className="form-select"
-                style={{ height: 40, flex: 1 }}
-              >
-                <option value="BUSINESS_DAYS">Ngày làm việc (Business Days)</option>
-                <option value="CALENDAR_DAYS">Ngày dương lịch (Calendar Days)</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="form-group">
-            <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginBottom: 20 }}>
+          <div style={labelRowStyle}>
+            <label className="form-label" style={labelStyle} htmlFor="input-moq">
               <Package size={14} color="var(--blue-primary)" />
               <span>Số lượng đặt tối thiểu (MOQ)</span>
             </label>
-            <input
-              type="number"
-              min="0"
-              data-testid="input-moq"
-              value={config.minOrderQuantity}
-              onChange={(e) => setConfig({ ...config, minOrderQuantity: Math.max(0, parseInt(e.target.value) || 0) })}
-              className="admin-search-input"
-              style={{ width: '100%', height: 40, fontFamily: 'var(--font-mono)' }}
-            />
-            <div data-testid="moq-helper-text" style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 4 }}>
-              Đơn đặt hàng phải đạt tối thiểu <b>{config.minOrderQuantity}</b> đơn vị mới được gửi cho nhà cung cấp.
+            <div style={fieldColStyle}>
+              <input
+                id="input-moq"
+                type="number"
+                min="0"
+                data-testid="input-moq"
+                value={config.minOrderQuantity}
+                onChange={(e) => setConfig({ ...config, minOrderQuantity: Math.max(0, parseInt(e.target.value) || 0) })}
+                className="admin-search-input"
+                style={{ width: '100%', maxWidth: 280, height: 40, fontFamily: 'var(--font-mono)' }}
+              />
+              <div data-testid="moq-helper-text" style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                Đơn đặt hàng phải đạt tối thiểu <b>{config.minOrderQuantity}</b> đơn vị mới được gửi cho nhà cung cấp.
+              </div>
             </div>
           </div>
 
-          <div className="form-group">
-            <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div style={labelRowStyle}>
+            <label className="form-label" style={labelStyle} htmlFor="input-cutoff-day-offset">
               <Clock size={14} color="var(--orange-accent)" />
-              <span>Giờ chốt đơn hàng ngày (Order Cutoff Time)</span>
+              <span>Số ngày trước ngày giao để chốt đơn</span>
             </label>
-            <input
-              type="time"
-              data-testid="input-cutoff-time"
-              value={config.cutoffTime}
-              onChange={(e) => setConfig({ ...config, cutoffTime: e.target.value })}
-              className="admin-search-input"
-              style={{ width: '100%', height: 40, fontFamily: 'var(--font-mono)', fontSize: '0.95rem' }}
-            />
-            <div data-testid="cutoff-helper-text" style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 4 }}>
-              💡 Đơn PO đặt sau <b>{config.cutoffTime}</b> sẽ tự động tính chuyển sang chu kỳ giao hàng tiếp theo.
+            <div style={fieldColStyle}>
+              <input
+                id="input-cutoff-day-offset"
+                type="number"
+                min={0}
+                step={1}
+                data-testid="input-cutoff-day-offset"
+                value={config.cutoffDayOffset}
+                onChange={(e) =>
+                  setConfig({
+                    ...config,
+                    cutoffDayOffset: Math.max(0, parseInt(e.target.value, 10) || 0),
+                  })
+                }
+                className="admin-search-input"
+                style={{ width: '100%', maxWidth: 280, height: 40, fontFamily: 'var(--font-mono)' }}
+              />
+              <div data-testid="cutoff-day-offset-helper-text" style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                {config.cutoffDayOffset === 0 ? (
+                  <>
+                    Chốt đơn <b>cùng ngày giao</b> lúc <b>{config.cutoffTime || '—'}</b>.
+                  </>
+                ) : (
+                  <>
+                    Ví dụ ngày giao <b>09/11</b>, offset <b>{config.cutoffDayOffset}</b> → chốt lúc{' '}
+                    <b>{config.cutoffTime || '—'}</b> của ngày trước ngày giao {config.cutoffDayOffset} ngày
+                    {config.cutoffDayOffset === 1 ? ' (08/11)' : ''}.
+                  </>
+                )}
+              </div>
             </div>
           </div>
-        </div>
 
-        <div className="form-group" style={{ marginBottom: 20 }}>
-          <label className="form-label">Các ngày giao hàng trong tuần (Active Delivery Days)</label>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }} data-testid="delivery-weekdays-group">
-            {WEEKDAYS.map((day) => {
-              const isChecked = config.activeDeliveryDays.includes(day.val);
-              return (
-                <button
-                  key={day.val}
-                  type="button"
-                  data-testid={`btn-weekday-${day.val}`}
-                  aria-pressed={isChecked}
-                  onClick={() => handleToggleWeekday(day.val)}
-                  style={{
-                    padding: '8px 16px', borderRadius: 'var(--radius-pill)',
-                    fontSize: 13, fontWeight: 600, cursor: 'pointer',
-                    transition: 'all 0.15s ease',
-                    border: isChecked ? '1px solid var(--blue-primary)' : '1px solid var(--border-light)',
-                    background: isChecked ? 'var(--blue-light)' : '#ffffff',
-                    color: isChecked ? 'var(--blue-primary)' : 'var(--text-muted)',
-                  }}
-                >
-                  {isChecked ? '✓ ' : ''}{day.label}
-                </button>
-              );
-            })}
+          <div style={labelRowStyle}>
+            <label className="form-label" style={labelStyle} htmlFor="input-cutoff-time">
+              <Clock size={14} color="var(--orange-accent)" />
+              <span>Giờ chốt đơn hàng ngày (Cutoff)</span>
+            </label>
+            <div style={fieldColStyle}>
+              <input
+                id="input-cutoff-time"
+                type="time"
+                data-testid="input-cutoff-time"
+                value={config.cutoffTime}
+                onChange={(e) => setConfig({ ...config, cutoffTime: e.target.value })}
+                className="admin-search-input"
+                style={{ width: '100%', maxWidth: 280, height: 40, fontFamily: 'var(--font-mono)', fontSize: '0.95rem' }}
+              />
+              <div data-testid="cutoff-helper-text" style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                Kết hợp với số ngày trên: sau giờ <b>{config.cutoffTime}</b> của ngày chốt, cột ngày giao tương ứng bị khóa.
+              </div>
+            </div>
+          </div>
+
+          <div style={labelRowStyle}>
+            <div className="form-label" style={{ ...labelStyle, paddingTop: 8 }}>
+              Các ngày giao hàng trong tuần
+            </div>
+            <div style={fieldColStyle} data-testid="delivery-weekdays-group">
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {WEEKDAYS.map((day) => {
+                  const isChecked = config.activeDeliveryDays.includes(day.val);
+                  return (
+                    <button
+                      key={day.val}
+                      type="button"
+                      data-testid={`btn-weekday-${day.val}`}
+                      aria-pressed={isChecked}
+                      onClick={() => handleToggleWeekday(day.val)}
+                      style={{
+                        padding: '8px 16px', borderRadius: 'var(--radius-pill)',
+                        fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                        transition: 'all 0.15s ease',
+                        border: isChecked ? '1px solid var(--blue-primary)' : '1px solid var(--border-light)',
+                        background: isChecked ? 'var(--blue-light)' : '#ffffff',
+                        color: isChecked ? 'var(--blue-primary)' : 'var(--text-muted)',
+                      }}
+                    >
+                      {isChecked ? '✓ ' : ''}{day.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           </div>
         </div>
 

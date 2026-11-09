@@ -172,7 +172,7 @@ export const mapScheduleResponseToAssignment = (s: ScheduleResponse): ScheduleAs
 export const scheduleApi = {
   /**
    * Tra cứu danh sách lịch làm việc đầy đủ từ backend (bao gồm thông tin chấm công, check-in, check-out, đi muộn)
-   * Backend: GET /api/v1/schedules
+   * Backend: GET /api/schedules
    */
   async getRawSchedules(filter: ScheduleQueryFilter = {}): Promise<ScheduleResponse[]> {
     const params: Record<string, any> = {};
@@ -211,7 +211,7 @@ export const scheduleApi = {
 
   /**
    * Tra cứu danh sách lịch làm việc từ backend
-   * Backend: GET /api/v1/schedules
+   * Backend: GET /api/schedules
    */
   async getSchedules(filter: ScheduleQueryFilter = {}): Promise<ScheduleAssignment[]> {
     const params: Record<string, any> = {};
@@ -249,8 +249,34 @@ export const scheduleApi = {
   },
 
   /**
+   * Tra cứu lịch làm việc của cá nhân người đăng nhập
+   * Backend: GET /api/v1/schedules/my-schedule
+   */
+  async getMySchedules(fromDate?: string, toDate?: string): Promise<ScheduleAssignment[]> {
+    const params: Record<string, string> = {};
+    if (fromDate) params.fromDate = fromDate;
+    if (toDate) params.toDate = toDate;
+    const res = await httpClient.get<ApiResponse<ScheduleResponse[]>>('/schedules/my-schedule', { params });
+    if (res.data?.success && Array.isArray(res.data.data)) {
+      return res.data.data.map(mapScheduleResponseToAssignment);
+    }
+    return [];
+  },
+
+  async getRawMySchedules(fromDate?: string, toDate?: string): Promise<ScheduleResponse[]> {
+    const params: Record<string, string> = {};
+    if (fromDate) params.fromDate = fromDate;
+    if (toDate) params.toDate = toDate;
+    const res = await httpClient.get<ApiResponse<ScheduleResponse[]>>('/schedules/my-schedule', { params });
+    if (res.data?.success && Array.isArray(res.data.data)) {
+      return res.data.data;
+    }
+    return [];
+  },
+
+  /**
    * Tạo một ca làm việc đơn lẻ
-   * Backend: POST /api/v1/schedules
+   * Backend: POST /api/schedules
    */
   async createSchedule(payload: CreateScheduleItemPayload): Promise<ScheduleAssignment> {
     const res = await httpClient.post<ApiResponse<ScheduleResponse>>('/schedules', payload);
@@ -262,7 +288,7 @@ export const scheduleApi = {
 
   /**
    * Phân ca hàng loạt theo tuần/tháng
-   * Backend: POST /api/v1/schedules/batch
+   * Backend: POST /api/schedules/batch
    */
   async batchCreateSchedules(payload: BatchCreateSchedulePayload): Promise<ScheduleAssignment[]> {
     const res = await httpClient.post<ApiResponse<ScheduleResponse[]>>('/schedules/batch', payload);
@@ -274,7 +300,7 @@ export const scheduleApi = {
 
   /**
    * Khởi tạo ca làm việc lặp lại cho nhân viên (có ngày kết thúc -> tạo đến ngày chỉ định, không có ngày kết thúc -> tạo đến hết tháng sau)
-   * Backend: POST /api/v1/schedules/recurring
+   * Backend: POST /api/schedules/recurring
    */
   async createRecurringSchedule(payload: CreateRecurringSchedulePayload): Promise<ScheduleAssignment[]> {
     const res = await httpClient.post<ApiResponse<ScheduleResponse[]>>('/schedules/recurring', payload);
@@ -286,7 +312,7 @@ export const scheduleApi = {
 
   /**
    * Lấy chi tiết lịch làm việc theo ID
-   * Backend: GET /api/v1/schedules/{id}
+   * Backend: GET /api/schedules/{id}
    */
   async getScheduleById(id: string): Promise<ScheduleResponse> {
     const res = await httpClient.get<ApiResponse<ScheduleResponse>>(`/schedules/${id}`);
@@ -298,7 +324,7 @@ export const scheduleApi = {
 
   /**
    * Cập nhật thông tin ca làm việc
-   * Backend: PUT /api/v1/schedules/{id}
+   * Backend: PUT /api/schedules/{id}
    */
   async updateSchedule(id: string, payload: UpdateSchedulePayload): Promise<ScheduleAssignment> {
     const res = await httpClient.put<ApiResponse<ScheduleResponse>>(`/schedules/${id}`, payload);
@@ -310,7 +336,7 @@ export const scheduleApi = {
 
   /**
    * Xóa ca làm việc
-   * Backend: DELETE /api/v1/schedules/{id}
+   * Backend: DELETE /api/schedules/{id}
    */
   async deleteSchedule(id: string): Promise<boolean> {
     const res = await httpClient.delete<ApiResponse<object>>(`/schedules/${id}`);
@@ -319,7 +345,7 @@ export const scheduleApi = {
 
   /**
    * Ban hành lịch tuần
-   * Backend: POST /api/v1/schedules/publish
+   * Backend: POST /api/schedules/publish
    */
   async publishSchedules(payload: PublishSchedulesPayload): Promise<PublishSchedulesResponse> {
     const res = await httpClient.post<ApiResponse<PublishSchedulesResponse>>('/schedules/publish', payload);
@@ -331,7 +357,7 @@ export const scheduleApi = {
 
   /**
    * Chấm công thủ công (Đi làm, Nghỉ phép có lương, Nghỉ phép không lương)
-   * Backend: POST /api/v1/schedules/{id}/attendance
+   * Backend: POST /api/schedules/{id}/attendance
    */
   async recordManualAttendance(id: string, payload: ManualAttendancePayload): Promise<ScheduleResponse> {
     const res = await httpClient.post<ApiResponse<ScheduleResponse>>(`/schedules/${id}/attendance`, payload);
@@ -339,6 +365,54 @@ export const scheduleApi = {
       return res.data.data;
     }
     throw new Error(res.data?.message || 'Chấm công thủ công thất bại.');
+  },
+
+  /**
+   * Lấy danh sách vector khuôn mặt nhân viên trong ngày theo chi nhánh (phục vụ FaceMatcher tại POS)
+   * Backend: GET /api/v1/schedules/face-id/today-descriptors?branchId=...
+   */
+  async getTodayStaffDescriptors(branchId: string): Promise<any[]> {
+    const res = await httpClient.get<ApiResponse<any[]>>('/schedules/face-id/today-descriptors', {
+      params: { branchId },
+    });
+    if (res.data?.success && res.data.data) {
+      return res.data.data;
+    }
+    return [];
+  },
+
+  /**
+   * Điểm danh vào ca FaceID tại máy POS
+   * Backend: POST /api/v1/schedules/face-id/check-in
+   */
+  async checkInFaceId(payload: {
+    scheduleId: string;
+    employeeId: string;
+    faceMatchScore: number;
+    snapshotBase64?: string | null;
+  }): Promise<ScheduleResponse> {
+    const res = await httpClient.post<ApiResponse<ScheduleResponse>>('/schedules/face-id/check-in', payload);
+    if (res.data?.success && res.data.data) {
+      return res.data.data;
+    }
+    throw new Error(res.data?.message || 'Điểm danh vào ca FaceID thất bại.');
+  },
+
+  /**
+   * Điểm danh ra ca FaceID tại máy POS
+   * Backend: POST /api/v1/schedules/face-id/check-out
+   */
+  async checkOutFaceId(payload: {
+    scheduleId: string;
+    employeeId: string;
+    faceMatchScore: number;
+    snapshotBase64?: string | null;
+  }): Promise<ScheduleResponse> {
+    const res = await httpClient.post<ApiResponse<ScheduleResponse>>('/schedules/face-id/check-out', payload);
+    if (res.data?.success && res.data.data) {
+      return res.data.data;
+    }
+    throw new Error(res.data?.message || 'Điểm danh ra ca FaceID thất bại.');
   },
 };
 

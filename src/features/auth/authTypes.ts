@@ -1,8 +1,22 @@
+export const UserRoleEnum = {
+  ADMIN: 'ADMIN',
+  STORE_OWNER: 'STORE_OWNER',
+  STAFF: 'STAFF',
+} as const;
+
+// Alias tương thích ngược với SystemRoles
+export const SystemRoles = UserRoleEnum;
+
+export type UserRoleType = (typeof UserRoleEnum)[keyof typeof UserRoleEnum];
+export type SystemRole = UserRoleType;
+export type UserRole = UserRoleType | 'MANAGER' | 'CASHIER' | 'EMPLOYEE';
+
 export interface UserProfile {
   id: string;
   email: string;
   fullName: string;
-  role: 'ADMIN' | 'MANAGER' | 'CASHIER' | 'STORE_OWNER' | 'EMPLOYEE';
+  role: UserRole;
+  userRole?: UserRoleType;
   tenantId: string;
   tenantName?: string;
   branchId?: string;
@@ -28,7 +42,7 @@ export interface RegisterPayload {
 }
 
 export interface AuthResponse {
-  accessToken: string;
+  accessToken?: string;
   refreshToken?: string;
   expiresIn?: number;
   user: UserProfile;

@@ -120,6 +120,14 @@ export const storeApi = {
     return res.data;
   },
 
+  async activateTrial(): Promise<ApiResponse<PurchaseSubscriptionResult>> {
+    const res = await httpClient.post<ApiResponse<PurchaseSubscriptionResult>>(
+      '/tenant/subscriptions/trial',
+      {}
+    );
+    return res.data;
+  },
+
   async getSubscriptionHistory(): Promise<ApiResponse<SubscriptionOrderHistoryItem[]>> {
     const res = await httpClient.get<ApiResponse<SubscriptionOrderHistoryItem[]>>('/tenant/subscriptions/history');
     return res.data;
@@ -141,6 +149,7 @@ export interface PurchaseSubscriptionPayload {
   planCode: string;
   months?: number;
   extraBranches?: number;
+  hasStaffManagementAddon?: boolean;
   extraWarehouses?: number;
   paymentMethod?: 'Wallet' | 'VietQR';
 }

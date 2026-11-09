@@ -109,7 +109,7 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
     try {
       const trimmedUsername = username.trim().toLowerCase();
       const trimmedDisplayName = displayName.trim();
-      const defaultRole = 'employee';
+      const defaultRole = 'STAFF';
 
       if (employeeId && !deferSave) {
         let res: { userId: string; username: string; role: string };

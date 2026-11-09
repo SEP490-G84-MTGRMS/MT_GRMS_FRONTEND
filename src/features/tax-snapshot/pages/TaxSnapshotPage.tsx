@@ -26,6 +26,7 @@ import { TaxAnalyticsSection } from '../components/TaxAnalyticsSection';
 import { AccountingBooksView } from '../components/AccountingBooksView';
 import { ThresholdRuler } from '../../../components/common/ThresholdRuler';
 import { isUsingMockData, taxSnapshotApi } from '../api/taxSnapshotApi';
+import { useAuthStore } from '../../../stores/useAuthStore';
 import {
   TaxPeriodType,
   type CreateTaxSnapshotRequest,
@@ -37,6 +38,9 @@ type ActiveTaxTab = 'declaration' | 'books' | 'history' | 'analytics';
 
 export const TaxSnapshotPage: FC = () => {
   const [activeTab, setActiveTab] = useState<ActiveTaxTab>('declaration');
+  const { user } = useAuthStore();
+  const userRole = (user?.role || '').toUpperCase();
+  const isEmployee = userRole === 'EMPLOYEE' || userRole === 'CASHIER' || userRole === 'STAFF';
 
   const {
     summary,
@@ -191,11 +195,13 @@ export const TaxSnapshotPage: FC = () => {
                       gap: 4,
                     }}
                   >
-                    Nhóm 2: 1 – 3 tỷ (Sổ S2a)
+                    {summary?.householdGroupName
+                      ? `${summary.householdGroupName} (${summary.booksSummary?.primaryBookCode || 'S2a-HKD'})`
+                      : 'Nhóm 2: 1 – 3 tỷ (Sổ S2a)'}
                   </span>
                 </div>
                 <p className="tax-topbar-subtitle">
-                  Kiểm soát ngưỡng 1 tỷ, quản lý kê khai thuế và hệ thống 5 sổ kế toán HKD.
+                  Kiểm soát ngưỡng 1 tỷ, quản lý kê khai thuế và hệ thống 7 sổ kế toán HKD (Thông tư 152/2025/TT-BTC).
                 </p>
               </div>
             </div>
@@ -299,39 +305,41 @@ export const TaxSnapshotPage: FC = () => {
                 </select>
               </div>
 
-              {/* Tax Rate Config Button */}
-              <button
-                type="button"
-                onClick={() => setIsRateConfigOpen(true)}
-                className="btn-secondary-pill"
-                title="Cấu hình mức thuế suất GTGT, TNCN và chính sách giảm thuế"
-                style={{
-                  position: 'relative',
-                  ...(filterParams.customVatRate != null || filterParams.customPitRate != null
-                    ? {
-                        borderColor: '#0F766E',
-                        color: '#0F766E',
-                        background: '#F0FDFA',
-                        fontWeight: 700,
-                      }
-                    : {}),
-                }}
-              >
-                <SlidersHorizontal size={15} />
-                <span>Cấu hình thuế</span>
-                {(filterParams.customVatRate != null || filterParams.customPitRate != null) && (
-                  <span
-                    style={{
-                      width: 6,
-                      height: 6,
-                      borderRadius: '50%',
-                      background: '#0F766E',
-                      display: 'inline-block',
-                      marginLeft: 2,
-                    }}
-                  />
-                )}
-              </button>
+              {/* Tax Rate Config Button (Ẩn đối với Employee) */}
+              {!isEmployee && (
+                <button
+                  type="button"
+                  onClick={() => setIsRateConfigOpen(true)}
+                  className="btn-secondary-pill"
+                  title="Cấu hình mức thuế suất GTGT, TNCN và chính sách giảm thuế"
+                  style={{
+                    position: 'relative',
+                    ...(filterParams.customVatRate != null || filterParams.customPitRate != null
+                      ? {
+                          borderColor: '#0F766E',
+                          color: '#0F766E',
+                          background: '#F0FDFA',
+                          fontWeight: 700,
+                        }
+                      : {}),
+                  }}
+                >
+                  <SlidersHorizontal size={15} />
+                  <span>Cấu hình thuế</span>
+                  {(filterParams.customVatRate != null || filterParams.customPitRate != null) && (
+                    <span
+                      style={{
+                        width: 6,
+                        height: 6,
+                        borderRadius: '50%',
+                        background: '#0F766E',
+                        display: 'inline-block',
+                        marginLeft: 2,
+                      }}
+                    />
+                  )}
+                </button>
+              )}
 
               {/* Refresh Button */}
               <button
@@ -345,27 +353,31 @@ export const TaxSnapshotPage: FC = () => {
                 <span>Làm mới</span>
               </button>
 
-              {/* Export Excel Button */}
-              <button
-                type="button"
-                onClick={handleExportExcel}
-                disabled={isExportingExcel || isSummaryLoading}
-                className="btn-secondary-pill"
-                title="Xuất bảng tính Excel 4 sheet phẳng phục vụ đối chiếu"
-              >
-                <Download size={15} />
-                <span>{isExportingExcel ? 'Đang xuất...' : 'Xuất Excel'}</span>
-              </button>
+              {/* Export Excel Button (Ẩn đối với Employee) */}
+              {!isEmployee && (
+                <button
+                  type="button"
+                  onClick={handleExportExcel}
+                  disabled={isExportingExcel || isSummaryLoading}
+                  className="btn-secondary-pill"
+                  title="Xuất bảng tính Excel 4 sheet phẳng phục vụ đối chiếu"
+                >
+                  <Download size={15} />
+                  <span>{isExportingExcel ? 'Đang xuất...' : 'Xuất Excel'}</span>
+                </button>
+              )}
 
-              {/* Finalize Button */}
-              <button
-                type="button"
-                onClick={() => setIsCreateOpen(true)}
-                className="btn-primary-pill"
-              >
-                <Plus size={16} />
-                <span>Chốt số kỳ {periodLabel}</span>
-              </button>
+              {/* Finalize Button (Ẩn đối với Employee) */}
+              {!isEmployee && (
+                <button
+                  type="button"
+                  onClick={() => setIsCreateOpen(true)}
+                  className="btn-primary-pill"
+                >
+                  <Plus size={16} />
+                  <span>Chốt số kỳ {periodLabel}</span>
+                </button>
+              )}
             </div>
           </div>
         </div>

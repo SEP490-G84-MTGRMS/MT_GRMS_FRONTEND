@@ -83,6 +83,7 @@ interface BackendDispatchHub {
     note: string;
     status: string;
     poCode?: string;
+    canAmend?: boolean;
     dispatchedAt?: string;
     draftPoId?: string;
   }>;
@@ -130,6 +131,24 @@ export const dispatchHubApi = {
         urgency: string;
         expectedDelivery: string;
         status: string;
+        poCode?: string;
+        canAmend?: boolean;
+        hasPendingChanges?: boolean;
+        pendingChangeLineCount?: number;
+        pendingChanges?: Array<{
+          productId: string;
+          productName: string;
+          sku: string;
+          unit: string;
+          deliveryDate: string;
+          draftQty: number;
+          committedQty: number;
+          poCode?: string;
+          branchId?: string;
+          branchCode?: string;
+          branchName?: string;
+          updateStatus?: string;
+        }>;
         linkedBranchCount: number;
         branchesWithQty: number;
         skuCount: number;
@@ -143,6 +162,7 @@ export const dispatchHubApi = {
           totalQty: number;
           totalAmount: number;
           status: string;
+          hasPendingChanges?: boolean;
         }>;
       }>;
       counts: DispatchHubCounts;
@@ -184,6 +204,25 @@ export const dispatchHubApi = {
         items: [],
         note: '',
         status: s.status === 'dispatched' ? 'dispatched' : 'draft',
+        poCode: s.poCode,
+        canAmend: Boolean(s.canAmend || (s.poCode && s.status !== 'dispatched')),
+        hasPendingChanges: Boolean(s.hasPendingChanges),
+        pendingChangeLineCount: s.pendingChangeLineCount ?? 0,
+        pendingChanges: (s.pendingChanges || []).map((line) => ({
+          productId: line.productId,
+          productName: line.productName || '',
+          sku: line.sku || '',
+          unit: line.unit || '',
+          deliveryDate: toDateKey(line.deliveryDate),
+          draftQty: Number(line.draftQty) || 0,
+          committedQty: Number(line.committedQty) || 0,
+          poCode: line.poCode,
+          branchId: line.branchId,
+          branchCode: line.branchCode,
+          branchName: line.branchName,
+          updateStatus:
+            line.updateStatus === 'LOCKED_CUTOFF' ? ('LOCKED_CUTOFF' as const) : ('EDITABLE' as const),
+        })),
         linkedBranchCount: s.linkedBranchCount ?? 0,
         branchesWithQty: s.branchesWithQty ?? 0,
         skuCount: s.skuCount ?? 0,
@@ -197,6 +236,7 @@ export const dispatchHubApi = {
           totalQty: b.totalQty ?? 0,
           totalAmount: b.totalAmount ?? 0,
           status: b.status,
+          hasPendingChanges: Boolean(b.hasPendingChanges),
         })),
       })),
     };
@@ -230,6 +270,7 @@ export const dispatchHubApi = {
           unit: string;
           price: number;
           qty: number;
+          committedQty?: number;
           deliveryDate: string;
           cutoffSchedule: string;
           dayStatus: string;
@@ -269,7 +310,8 @@ export const dispatchHubApi = {
           sku: it.sku,
           unit: it.unit,
           price: it.price,
-          qty: it.qty,
+          qty: Number(it.qty) || 0,
+          committedQty: Number(it.committedQty) || 0,
           deliveryDate: toDateKey(it.deliveryDate),
           cutoffSchedule: it.cutoffSchedule,
           dayStatus: it.dayStatus,
@@ -311,25 +353,33 @@ export const dispatchHubApi = {
     note?: string,
     emailOptions?: DispatchEmailOptions
   ): Promise<SplitMatrixBatchResult> {
-    const res = await httpClient.post<ApiResponse<SplitMatrixBatchResult>>(
-      '/purchase-orders/matrix/split',
-      {
-        branchId: '00000000-0000-0000-0000-000000000000',
-        supplierId,
-        scope,
-        weekStartDate,
-        note,
-        emailSendMode: emailOptions?.emailSendMode ?? 'SEND_NOW',
-        scheduledSendAt: emailOptions?.scheduledSendAt,
-        ccEmails: emailOptions?.ccEmails ?? [],
+    try {
+      const res = await httpClient.post<ApiResponse<SplitMatrixBatchResult>>(
+        '/purchase-orders/matrix/split',
+        {
+          branchId: '00000000-0000-0000-0000-000000000000',
+          supplierId,
+          scope,
+          weekStartDate,
+          note,
+          emailSendMode: emailOptions?.emailSendMode ?? 'SEND_NOW',
+          scheduledSendAt: emailOptions?.scheduledSendAt,
+          ccEmails: emailOptions?.ccEmails ?? [],
+        }
+      );
+
+      if (!res.data?.success || !res.data.data) {
+        throw new Error(res.data?.message || 'Không thể chốt đơn mua hàng.');
       }
-    );
 
-    if (!res.data?.success || !res.data.data) {
-      throw new Error(res.data?.message || 'Không thể chốt đơn mua hàng.');
+      return res.data.data;
+    } catch (err: any) {
+      const apiMsg =
+        err?.response?.data?.message ||
+        err?.response?.data?.error ||
+        (typeof err?.response?.data === 'string' ? err.response.data : null);
+      throw new Error(apiMsg || err?.message || 'Không thể chốt đơn mua hàng.');
     }
-
-    return res.data.data;
   },
 
   async getDispatchPackage(packageId: string): Promise<SupplierDispatchPackage> {
@@ -441,6 +491,7 @@ export const dispatchHubApi = {
         note: s.note || '',
         status: s.status === 'dispatched' ? 'dispatched' : 'draft',
         poCode: s.poCode,
+        canAmend: Boolean(s.canAmend || (s.poCode && s.status !== 'dispatched')),
         dispatchedAt: s.dispatchedAt,
       })),
     };

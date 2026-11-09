@@ -190,7 +190,7 @@ export const TaxKPICards: React.FC<TaxKPICardsProps> = ({ summary, isLoading }) 
         </div>
       </div>
 
-      {/* KPI 5: Thuế đã phát sinh (Quý 1 – Quý 3) */}
+      {/* KPI 5: Thuế đã phát sinh */}
       <div className="tax-kpi-card" style={{ background: '#FFFBEB', borderColor: '#FDE68A' }}>
         <div className="tax-kpi-header">
           <span className="tax-kpi-title" style={{ color: '#B45309', fontWeight: 800 }}>
@@ -201,10 +201,10 @@ export const TaxKPICards: React.FC<TaxKPICardsProps> = ({ summary, isLoading }) 
           </div>
         </div>
         <div className="tax-kpi-value" style={{ color: '#B45309', fontWeight: 900 }}>
-          {formatMoney(summary.totalTaxAmount)}
+          {formatMoney((summary.priorDeclaredPitTax ?? 0) + summary.totalTaxAmount)}
         </div>
         <div className="tax-kpi-subtext" style={{ color: '#92400E' }}>
-          Q1+Q2 (0đ) + Q3 ({formatMoney(summary.totalTaxAmount)})
+          Kỳ trước ({formatMoney(summary.priorDeclaredPitTax ?? 0)}) + Kỳ này ({formatMoney(summary.totalTaxAmount)})
         </div>
       </div>
     </div>

@@ -472,6 +472,17 @@
   animation: modalFadeIn 0.2s ease-out;
 }
 
+.emp-modal-box {
+  background: #FFFFFF;
+  border-radius: var(--emp-radius-lg, 16px);
+  box-shadow: var(--emp-shadow-modal, 0 20px 48px rgba(15, 23, 42, 0.2));
+  border: 1px solid var(--emp-border, #E2E8F0);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: modalFadeIn 0.2s ease-out;
+}
+
 @keyframes modalFadeIn {
   from {
     opacity: 0;

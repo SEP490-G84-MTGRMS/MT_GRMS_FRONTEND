@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import type { FC } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import dayjs from 'dayjs';
 import type {
   DayColInfo,
   DayCutoffStatus,
@@ -37,7 +38,7 @@ const GUID_RE =
 
 const DEFAULT_DELIVERY: SupplierDeliveryConfig = {
   supplierId: '',
-  leadDays: 1,
+  leadDays: 0,
   cutoffHour: '15:00',
   lockHour: '16:00',
   activeDeliveryDays: [1, 2, 3, 4, 5, 6],
@@ -58,7 +59,7 @@ function suppliersFromMatrix(
       openAp: 0,
       config: {
         supplierId: sc.supplierId,
-        leadDays: sc.leadTimeDays,
+        leadDays: 0,
         cutoffHour: sc.cutoffTime,
         lockHour: sc.cutoffTime,
         activeDeliveryDays: sc.activeDeliveryDays,
@@ -109,7 +110,8 @@ const REASON_LABELS: Record<string, string> = {
   BRANCH_PRODUCT_INACTIVE: 'Chi nhánh không kinh doanh sản phẩm này',
   NOT_DELIVERY_DAY: 'Không phải ngày giao của NCC',
   HOLIDAY_BLACKOUT: 'Ngày nghỉ/blackout của NCC',
-  LEAD_TIME_VIOLATION: 'Chưa đủ LeadDays để giao ngày này',
+  LEAD_TIME_VIOLATION: 'Lead time tối thiểu 1 ngày — không đặt giao hôm nay',
+  PAST_DELIVERY_DATE: 'Ngày giao đã qua',
   CUTOFF_PASSED: 'Đã đến hoặc qua giờ chốt đơn',
   PO_ALREADY_COMMITTED: 'Ngày này đã chốt PO',
   PO_EXISTED_EDITABLE: 'Đã có PO — còn sửa trước cutoff',
@@ -163,8 +165,8 @@ function computeDayColumns(
   const list: DayColInfo[] = [];
   const isAll = supplierId === 'ALL';
   const supConfig = supplierConfigs?.find((sc) => sc.supplierId === supplierId);
-  const leadDays = supConfig?.leadTimeDays ?? (isAll ? 0 : DEFAULT_DELIVERY.leadDays);
-  const earliestAllowed = isAll ? today : fmtDateStr(addDaysToDate(parseDateStr(today), leadDays));
+  // Lead time ≥ 1 ngày: ngày giao sớm nhất = ngày mai
+  const earliestAllowed = fmtDateStr(addDaysToDate(parseDateStr(today), 1));
 
   for (let i = 0; i < durationDays; i++) {
     const d = addDaysToDate(viewFrom, i);
@@ -200,7 +202,7 @@ function computeDayColumns(
       primaryReasonCode = serverForSupplier.primaryReasonCode;
       poCode = serverForSupplier.poCode;
       isOff = cutoffStatus === 'SUPPLIER_OFF';
-      // PO_EXISTED_EDITABLE: có PoCode nhưng status OPEN/CUTOFF_DUE → vẫn sửa được
+      // PO_EXISTED_EDITABLE: có PoCode nhưng status OPEN/CUTOFF_DUE → vẫn sửa được đến cutoff
       isLocked = cutoffStatus === 'LOCKED' || cutoffStatus === 'PO_GENERATED';
       offReason =
         (primaryReasonCode && REASON_LABELS[primaryReasonCode]) ||
@@ -213,7 +215,13 @@ function computeDayColumns(
         }
       }
     } else if (isAll && serverStatuses.length > 0) {
-      poCode = serverStatuses.find((ds) => ds.poCode)?.poCode;
+      // Ưu tiên hiển thị PO còn amend được (OPEN/CUTOFF_DUE + poCode) thay vì khóa cả cột
+      const editableWithPo = serverStatuses.find(
+        (ds) =>
+          !!ds.poCode &&
+          (ds.deliveryDateStatus === 'OPEN' || ds.deliveryDateStatus === 'CUTOFF_DUE')
+      );
+      poCode = editableWithPo?.poCode || serverStatuses.find((ds) => ds.poCode)?.poCode;
       if (allFinalized) {
         cutoffStatus = 'PO_GENERATED';
         isLocked = true;
@@ -223,14 +231,17 @@ function computeDayColumns(
         cutoffStatus = finalized ? 'PO_GENERATED' : locked ? 'LOCKED' : 'SUPPLIER_OFF';
         isOff = cutoffStatus === 'SUPPLIER_OFF';
         isLocked = cutoffStatus === 'LOCKED' || cutoffStatus === 'PO_GENERATED';
-      } else if (serverStatuses.some((ds) => ds.deliveryDateStatus === 'CUTOFF_DUE')) {
+      } else if (serverStatuses.some((ds) => ds.deliveryDateStatus === 'CUTOFF_DUE') || editableWithPo) {
         cutoffStatus = 'CUTOFF_DUE';
+        isLocked = false;
       } else {
         cutoffStatus = 'OPEN';
+        isLocked = false;
       }
     } else {
       // Fallback local khi chưa có DayStatuses
-      const isLeadBlocked = isAll ? false : k < earliestAllowed;
+      // Áp dụng cả khi xem ALL (fallback): hôm nay luôn bị chặn lead time
+      const isLeadBlocked = k < earliestAllowed;
       let isDayOff = false;
       let isHoliday = false;
       let isSupplierInactive = false;
@@ -268,8 +279,15 @@ function computeDayColumns(
       if (isAlreadyPo) poCode = `PO-${k.replace(/-/g, '')}-GEN`;
     }
 
-    // lockedDates chỉ áp dụng khi BE đánh FINALIZED (sau cutoff) — không khóa PO còn amend được.
-    if (lockedDates.has(k) && !serverForSupplier && !(isAll && serverStatuses.length > 0)) {
+    // lockedDates (FINALIZED) chỉ dùng fallback khi chưa có DayStatuses từ BE.
+    // Có DayStatuses rồi thì tuyệt đối theo BE — PO trước cutoff vẫn OPEN/CUTOFF_DUE, không khóa.
+    if (
+      lockedDates.has(k) &&
+      !serverForSupplier &&
+      !(isAll && serverStatuses.length > 0) &&
+      cutoffStatus !== 'OPEN' &&
+      cutoffStatus !== 'CUTOFF_DUE'
+    ) {
       isLocked = true;
       cutoffStatus = 'PO_GENERATED';
     }
@@ -305,7 +323,7 @@ function buildEmptyCellMap(
 }
 
 export interface OrderMatrixPageProps {
-  forcedRole?: 'STORE_OWNER' | 'EMPLOYEE';
+  forcedRole?: 'STORE_OWNER' | 'STAFF' | 'EMPLOYEE';
 }
 
 export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
@@ -329,6 +347,7 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
   const [serverToday, setServerToday] = useState<string>(initialToday);
   const [branchIsActive, setBranchIsActive] = useState<boolean>(true);
   const [draftPoId, setDraftPoId] = useState<string | undefined>();
+  const [matrixRefreshKey, setMatrixRefreshKey] = useState(0);
 
   // State: Filter Scope
   const [branches, setBranches] = useState<BranchOption[]>([]);
@@ -345,7 +364,6 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
   );
 
   // State: Secondary Filters
-  const [categoryFilter, setCategoryFilter] = useState<string>('');
   const [keyword, setKeyword] = useState<string>('');
   const [moqOnly, setMoqOnly] = useState<boolean>(false);
   const [orderedOnly, setOrderedOnly] = useState<boolean>(false);
@@ -360,6 +378,19 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
   const isCellEditable = (d: DayColInfo, product?: OrderMatrixProduct) => {
     if (!branchIsActive) return false;
     if (product?.isRowDisabled) return false;
+
+    // View ALL: khóa theo đúng NCC của dòng SP (không dùng aggregate cột)
+    if (product && dayStatuses.length > 0) {
+      const ds = dayStatuses.find(
+        (x) => x.supplierId === product.supplierId && x.deliveryDate === d.dateKey
+      );
+      if (ds) {
+        const st = mapServerStatus(ds.deliveryDateStatus);
+        if (st === 'PO_GENERATED' || st === 'LOCKED' || st === 'SUPPLIER_OFF') return false;
+        return true; // OPEN / CUTOFF_DUE kể cả đã có PO (amend trước cutoff)
+      }
+    }
+
     if (d.isOff || d.isLocked) return false;
     if (d.cutoffStatus === 'PO_GENERATED' || d.cutoffStatus === 'LOCKED' || d.cutoffStatus === 'SUPPLIER_OFF') {
       return false;
@@ -380,16 +411,16 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
   // State: Toast
   const [toast, setToast] = useState<ToastState | null>(null);
 
-  // Role State: Xác định quyền thao tác Store Owner vs Employee
+  // Role State: Xác định quyền thao tác Store Owner vs Staff
   // Ưu tiên: 1. forcedRole từ Route, 2. param ?role=, 3. userRole trong AuthStore
   const roleParam = searchParams.get('role');
   const userRole = useAuthStore((s) => s.user?.role);
   const isStoreOwner = useMemo(() => {
     if (forcedRole === 'STORE_OWNER') return true;
-    if (forcedRole === 'EMPLOYEE') return false;
+    if (forcedRole === 'STAFF' || forcedRole === 'EMPLOYEE') return false;
     if (roleParam === 'employee' || roleParam === 'staff') return false;
     if (roleParam === 'owner' || roleParam === 'store_owner') return true;
-    return userRole !== 'EMPLOYEE' && userRole !== 'CASHIER';
+    return userRole === 'STORE_OWNER' || userRole === 'ADMIN';
   }, [forcedRole, roleParam, userRole]);
 
   const showToast = (message: string, type: ToastState['type'] = 'success') => {
@@ -516,7 +547,7 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
       isMounted = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedBranchId, viewFrom, durationDays]);
+  }, [selectedBranchId, viewFrom, durationDays, matrixRefreshKey]);
 
   // Date columns calculated dynamically with supplier configurations
   const dayColumns: DayColInfo[] = useMemo(() => {
@@ -543,19 +574,6 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
     });
     return { openDays, finalizedDays, lockedDays };
   }, [dayColumns]);
-
-  // Available Categories
-  const availableCategories = useMemo(() => {
-    const set = new Set<string>();
-    const prods =
-      selectedSupplierId === 'ALL'
-        ? matrixProducts
-        : matrixProducts.filter((p) => p.supplierId === selectedSupplierId);
-    prods.forEach((p) => {
-      if (p.category) set.add(p.category);
-    });
-    return Array.from(set);
-  }, [selectedSupplierId, matrixProducts]);
 
   // Handle cell quantity change by Store Owner or Employee
   const handleCellChange = (productId: string, dateKey: string, val: number) => {
@@ -671,7 +689,6 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
     const kw = keyword.trim().toLowerCase();
     return matrixProducts.filter((p) => {
       if (selectedSupplierId !== 'ALL' && p.supplierId !== selectedSupplierId) return false;
-      if (categoryFilter && p.category !== categoryFilter) return false;
       if (kw && !p.name.toLowerCase().includes(kw) && !p.sku.toLowerCase().includes(kw)) {
         return false;
       }
@@ -700,7 +717,6 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
   }, [
     matrixProducts,
     selectedSupplierId,
-    categoryFilter,
     keyword,
     moqOnly,
     orderedOnly,
@@ -936,11 +952,20 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
 
   // Excel Upload — 3 Giai đoạn: Validate -> Preview Modal -> Apply
   const handleExcelUpload = async (file: File) => {
+    const branch = branches.find((b) => b.id === selectedBranchId);
+    const supplier = suppliers.find((s) => s.id === selectedSupplierId);
+
     try {
       const validationResult = await validateMatrixExcelFile({
         file,
         currentBranchId: selectedBranchId,
+        currentBranchCode: branch?.code,
+        currentBranchName: branch?.name,
         currentSupplierId: selectedSupplierId,
+        currentSupplierCode: supplier?.code,
+        currentSupplierName: supplier?.name,
+        viewFrom,
+        viewTo: addDaysToDate(viewFrom, durationDays - 1),
         matrixProducts,
         dayColumns,
         cellMap,
@@ -951,13 +976,50 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
       setImportPreviewResult(validationResult);
       setIsImportModalOpen(true);
     } catch (err: any) {
-      showToast('Kiểm tra file Excel thất bại: ' + (err?.message || err), 'error');
+      // Đảm bảo luôn mở Preview Modal kể cả khi gặp lỗi đọc file sớm
+      const errResult: ExcelValidationResult = {
+        valid: false,
+        fileName: file?.name || 'unknown.xlsx',
+        fileSize: file?.size || 0,
+        scopeStatus: {
+          branchMatched: false,
+          branchExpected: branch?.name || selectedBranchId,
+          supplierMatched: false,
+          supplierExpected: supplier?.name || selectedSupplierId,
+          periodMatched: false,
+          periodExpected: `${dayjs(viewFrom).format('DD/MM/YYYY')} - ${dayjs(addDaysToDate(viewFrom, durationDays - 1)).format('DD/MM/YYYY')}`,
+        },
+        summary: {
+          totalCells: 0,
+          validCells: 0,
+          errorCount: 1,
+          warningCount: 0,
+          ignoredCells: 0,
+        },
+        errors: [
+          {
+            type: 'ERROR',
+            row: 0,
+            productCode: '-',
+            productName: '-',
+            deliveryDate: '-',
+            dateLabel: '-',
+            inputValue: '-',
+            code: 'FORMAT_INVALID',
+            message: `Không thể đọc nội dung file Excel: ${err?.message || 'File lỗi hoặc không đúng định dạng'}`,
+          },
+        ],
+        warnings: [],
+        cellsToApply: [],
+      };
+      setImportPreviewResult(errResult);
+      setIsImportModalOpen(true);
     }
   };
 
   // Xử lý nạp dữ liệu từ Modal Preview sau khi đã kiểm tra không có lỗi
   const handleConfirmApplyImport = () => {
-    if (!importPreviewResult || !importPreviewResult.valid) return;
+    if (!importPreviewResult || !importPreviewResult.valid || importPreviewResult.summary.validCells === 0) return;
 
     const newMap = applyMatrixExcelImport(
       importPreviewResult.cellsToApply,
@@ -1112,18 +1174,17 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
         draftPoId
       );
 
-      const newLocked = new Set(lockedDates);
-      generated.forEach((po) => {
-        if (po.deliveryDate) newLocked.add(po.deliveryDate);
-      });
-      selectedList.forEach((po) => newLocked.add(po.deliveryDate));
-      setLockedDates(newLocked);
-
+      // Không khóa ngày ngay sau chốt — chỉ FINALIZED (sau cutoff) mới khóa.
+      // Reload DayStatuses để hiện vàng = đã có PO còn amend được.
       setIsSplitModalOpen(false);
       setIsDirty(false);
+      setMatrixRefreshKey((k) => k + 1);
 
       const codes = generated.map((g) => g.orderCode).join(', ');
-      showToast(`Đã chốt thành công ${generated.length} PO (${codes}).`, 'success');
+      showToast(
+        `Đã chốt thành công ${generated.length} PO (${codes}). Có thể sửa SL và chốt lại trước giờ cutoff.`,
+        'success'
+      );
     } catch (err: any) {
       const msg =
         err?.response?.data?.message ||
@@ -1208,7 +1269,6 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
         onSelectBranch={(id) => {
           setSelectedBranchId(id);
           setSelectedSupplierId('ALL');
-          setCategoryFilter('');
           setKeyword('');
           setCellMap({});
           setIsDirty(false);
@@ -1225,9 +1285,6 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
         onApplyRange={handleApplyRange}
         durationDays={durationDays}
         onSelectDuration={handleSelectDuration}
-        categories={availableCategories}
-        categoryFilter={categoryFilter}
-        onCategoryChange={(cat) => setCategoryFilter(cat)}
         keyword={keyword}
         onKeywordChange={(kw) => setKeyword(kw)}
         moqOnly={moqOnly}
@@ -1241,7 +1298,6 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
         showSoh={showSoh}
         onShowSohChange={(checked) => setShowSoh(checked)}
         onResetFilters={() => {
-          setCategoryFilter('');
           setKeyword('');
           setMoqOnly(false);
           setOrderedOnly(false);
@@ -1268,6 +1324,7 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
           onCellChange={handleCellChange}
           onResetOverride={handleResetOverride}
           onDayCutoffClick={() => setIsSplitModalOpen(true)}
+          isCellEditable={isCellEditable}
           readOnly={isReadOnly}
           isStoreOwner={isStoreOwner}
         />

@@ -194,11 +194,11 @@ export const posOrderApi = {
   /**
    * Tạo đơn hàng bán lẻ POS, tự động trừ kho FEFO, tích điểm và xử lý công nợ
    */
-  createOrder: async (data: OrderCreateRequest): Promise<OrderResponse> => {
-    const idempotencyKey = generateUuidV7();
+  createOrder: async (data: OrderCreateRequest, idempotencyKey?: string): Promise<OrderResponse> => {
+    const key = idempotencyKey || generateUuidV7();
     const response = await httpClient.post<any>('/orders', data, {
       headers: {
-        'Idempotency-Key': idempotencyKey,
+        'Idempotency-Key': key,
       },
     });
     return response.data?.data ?? response.data;

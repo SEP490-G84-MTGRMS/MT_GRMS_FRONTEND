@@ -387,17 +387,24 @@ export const PoListTable: FC<PoListTableProps> = ({
                     style={{ cursor: 'pointer' }}
                   >
                     <td className="so-list-td so-list-td--wrap" style={cellWrap} title={order.poCode}>
-                      <span
-                        style={{
-                          fontFamily: 'monospace',
-                          fontSize: 12,
-                          fontWeight: 700,
-                          color: '#0284c7',
-                          ...cellWrap,
-                        }}
-                      >
-                        {order.poCode}
-                      </span>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
+                        <span
+                          style={{
+                            fontFamily: 'monospace',
+                            fontSize: 12,
+                            fontWeight: 700,
+                            color: '#0284c7',
+                            ...cellWrap,
+                          }}
+                        >
+                          {order.poCode}
+                        </span>
+                        {order.revisionNumber != null && order.revisionNumber > 1 && (
+                          <span style={{ fontSize: 11, fontWeight: 700, color: '#0369a1' }}>
+                            Rev {order.revisionNumber}
+                          </span>
+                        )}
+                      </div>
                     </td>
 
                     <td className="so-list-td so-list-td--wrap" style={cellWrap} title={branchCode}>
@@ -535,7 +542,10 @@ export const PoListTable: FC<PoListTableProps> = ({
                         {(order.status === 'SENT' || order.status === 'CONFIRMED') && onEditOrder && (
                           <button
                             type="button"
-                            onClick={() => onEditOrder(order)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onEditOrder(order);
+                            }}
                             style={{
                               display: 'inline-flex',
                               alignItems: 'center',
@@ -545,10 +555,10 @@ export const PoListTable: FC<PoListTableProps> = ({
                               borderRadius: 6,
                               backgroundColor: '#ffffff',
                               border: '1px solid #cbd5e1',
-                              color: '#64748b',
+                              color: '#0369a1',
                               cursor: 'pointer',
                             }}
-                            title="Chỉnh sửa đơn mua hàng"
+                            title="Sửa SL trên ma trận (còn trước cutoff) rồi chốt lại để cập nhật PO"
                           >
                             <Edit3 size={12} />
                           </button>

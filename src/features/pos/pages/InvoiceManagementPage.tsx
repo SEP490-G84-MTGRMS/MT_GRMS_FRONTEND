@@ -70,7 +70,7 @@ export const InvoiceManagementPage: FC = () => {
 
   // Quyền hạn tài khoản: Chỉ STORE_OWNER / ADMIN mới có quyền xem toàn chuỗi và hủy hóa đơn đã thanh toán
   const isStoreOwner = user?.role === 'STORE_OWNER' || user?.role === 'ADMIN';
-  const isStoreOwnerOrManager = isStoreOwner || user?.role === 'MANAGER';
+  const isStoreOwnerOrManager = isStoreOwner;
 
   // Danh sách chi nhánh thực tế từ backend
   const [dbBranches, setDbBranches] = useState<Array<{ id: string; name: string }>>([]);
