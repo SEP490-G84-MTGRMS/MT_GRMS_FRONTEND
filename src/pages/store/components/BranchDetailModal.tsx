@@ -44,7 +44,7 @@ export const BranchDetailModal: FC<BranchDetailModalProps> = ({
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [activeTab, setActiveTab] = useState<'products' | 'employees'>('products');
 
-  // Form input states (editable directly without separate popup)
+  // Form input states
   const [name, setName] = useState<string>(branch.name || '');
   const [address, setAddress] = useState<string>(branch.address || '');
   const [phone, setPhone] = useState<string>(branch.phone || '');
@@ -68,16 +68,33 @@ export const BranchDetailModal: FC<BranchDetailModalProps> = ({
         if (res.success && res.data && isMounted) {
           const d = res.data;
           setDetail(d);
-          // Sync input states from full detail
-          setName(d.name || '');
-          setAddress(d.address || '');
-          setPhone(d.phone || '');
-          setEmail(d.email || '');
-          setManagerName(d.managerName || '');
-          setIsHeadquarter(Boolean(d.isHeadquarter));
+          // Đồng bộ các trường input từ dữ liệu chi tiết
+          setName(d.name || branch.name);
+          setAddress(d.address || branch.address);
+          setPhone(d.phone || branch.phone || '');
+          setEmail(d.email || branch.email || '');
+          setManagerName(d.managerName || branch.managerName || '');
+          setIsHeadquarter(Boolean(d.isHeadquarter ?? branch.isHeadquarter));
+        } else if (isMounted) {
+          // Fallback an toàn nếu API detail trả dữ liệu khác
+          setName(branch.name);
+          setAddress(branch.address);
+          setPhone(branch.phone || '');
+          setEmail(branch.email || '');
+          setManagerName(branch.managerName || '');
+          setIsHeadquarter(Boolean(branch.isHeadquarter));
         }
       } catch (err) {
         console.error('Failed to load branch detail:', err);
+        // Fallback an toàn nếu gặp lỗi mạng
+        if (isMounted) {
+          setName(branch.name);
+          setAddress(branch.address);
+          setPhone(branch.phone || '');
+          setEmail(branch.email || '');
+          setManagerName(branch.managerName || '');
+          setIsHeadquarter(Boolean(branch.isHeadquarter));
+        }
       } finally {
         if (isMounted) setIsLoading(false);
       }
@@ -87,7 +104,7 @@ export const BranchDetailModal: FC<BranchDetailModalProps> = ({
     return () => {
       isMounted = false;
     };
-  }, [branch.id]);
+  }, [branch]);
 
   const handleSave = async (e?: FormEvent) => {
     if (e) e.preventDefault();
@@ -184,7 +201,7 @@ export const BranchDetailModal: FC<BranchDetailModalProps> = ({
         className="store-modal-card"
         style={{
           width: '100%',
-          maxWidth: '880px',
+          maxWidth: '890px',
           maxHeight: '94vh',
           backgroundColor: '#FFFFFF',
           borderRadius: '16px',
@@ -265,6 +282,7 @@ export const BranchDetailModal: FC<BranchDetailModalProps> = ({
                       fontWeight: 700,
                       backgroundColor: '#FEF3C7',
                       color: '#B45309',
+                      border: '1px solid #FDE68A',
                     }}
                   >
                     <ShieldCheck size={13} />
@@ -352,7 +370,7 @@ export const BranchDetailModal: FC<BranchDetailModalProps> = ({
             </div>
           ) : (
             <>
-              {/* PHẦN TRÊN: Thông tin cơ bản của chi nhánh (CÁC INPUT CHỈNH SỬA TRỰC TIẾP) */}
+              {/* PHẦN TRÊN: Thông tin cơ bản của chi nhánh (GRID 2 CỘT CHUẨN, KHÔNG BỊ LỆCH) */}
               <div
                 style={{
                   backgroundColor: '#F8FAFC',
@@ -407,16 +425,16 @@ export const BranchDetailModal: FC<BranchDetailModalProps> = ({
                   )}
                 </div>
 
-                {/* Form Inputs Grid */}
+                {/* Form Inputs: 2 Columns Disciplined Grid */}
                 <div
                   style={{
                     display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-                    gap: '14px 18px',
+                    gridTemplateColumns: '1fr 1fr',
+                    gap: '14px 20px',
                   }}
                 >
-                  {/* 1. Tên chi nhánh */}
-                  <div style={{ gridColumn: 'span 1' }}>
+                  {/* HÀNG 1, CỘT 1: Tên chi nhánh */}
+                  <div>
                     <label
                       style={{
                         display: 'block',
@@ -444,7 +462,8 @@ export const BranchDetailModal: FC<BranchDetailModalProps> = ({
                         placeholder="Nhập tên chi nhánh..."
                         style={{
                           width: '100%',
-                          padding: '9px 12px 9px 36px',
+                          height: '38px',
+                          padding: '0 12px 0 36px',
                           borderRadius: '8px',
                           border: '1px solid #CBD5E1',
                           backgroundColor: '#FFFFFF',
@@ -458,22 +477,38 @@ export const BranchDetailModal: FC<BranchDetailModalProps> = ({
                     </div>
                   </div>
 
-                  {/* 2. Mã chi nhánh (Khóa cố định do hệ thống cấp) */}
-                  <div style={{ gridColumn: 'span 1' }}>
-                    <label
+                  {/* HÀNG 1, CỘT 2: Mã chi nhánh (Khóa cố định) */}
+                  <div>
+                    <div
                       style={{
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'space-between',
-                        fontSize: 12.5,
-                        fontWeight: 600,
-                        color: '#334155',
                         marginBottom: 6,
                       }}
                     >
-                      <span>Mã chi nhánh</span>
-                      <span style={{ fontSize: 11, color: '#64748B', fontWeight: 400 }}>Mã hệ thống</span>
-                    </label>
+                      <label
+                        style={{
+                          fontSize: 12.5,
+                          fontWeight: 600,
+                          color: '#334155',
+                        }}
+                      >
+                        Mã chi nhánh
+                      </label>
+                      <span
+                        style={{
+                          fontSize: 11,
+                          fontWeight: 600,
+                          color: '#64748B',
+                          backgroundColor: '#E2E8F0',
+                          padding: '1px 6px',
+                          borderRadius: 4,
+                        }}
+                      >
+                        Mã hệ thống
+                      </span>
+                    </div>
                     <div style={{ position: 'relative' }}>
                       <Lock
                         size={15}
@@ -486,7 +521,8 @@ export const BranchDetailModal: FC<BranchDetailModalProps> = ({
                         disabled
                         style={{
                           width: '100%',
-                          padding: '9px 12px 9px 36px',
+                          height: '38px',
+                          padding: '0 12px 0 36px',
                           borderRadius: '8px',
                           border: '1px solid #E2E8F0',
                           backgroundColor: '#F1F5F9',
@@ -500,8 +536,8 @@ export const BranchDetailModal: FC<BranchDetailModalProps> = ({
                     </div>
                   </div>
 
-                  {/* 3. Địa chỉ hoạt động */}
-                  <div style={{ gridColumn: 'span 2' }}>
+                  {/* HÀNG 2: Địa chỉ hoạt động (Trải rộng 2 cột) */}
+                  <div style={{ gridColumn: '1 / -1' }}>
                     <label
                       style={{
                         display: 'block',
@@ -523,10 +559,11 @@ export const BranchDetailModal: FC<BranchDetailModalProps> = ({
                         type="text"
                         value={address}
                         onChange={(e) => setAddress(e.target.value)}
-                        placeholder="Số nhà, tên đường, phường/xã, quận/huyện..."
+                        placeholder="Số nhà, tên đường, phường/xã, quận/huyện, tỉnh/thành phố..."
                         style={{
                           width: '100%',
-                          padding: '9px 12px 9px 36px',
+                          height: '38px',
+                          padding: '0 12px 0 36px',
                           borderRadius: '8px',
                           border: '1px solid #CBD5E1',
                           backgroundColor: '#FFFFFF',
@@ -539,7 +576,7 @@ export const BranchDetailModal: FC<BranchDetailModalProps> = ({
                     </div>
                   </div>
 
-                  {/* 4. Hotline */}
+                  {/* HÀNG 3, CỘT 1: Hotline */}
                   <div>
                     <label
                       style={{
@@ -565,7 +602,8 @@ export const BranchDetailModal: FC<BranchDetailModalProps> = ({
                         placeholder="Ví dụ: 0369880798"
                         style={{
                           width: '100%',
-                          padding: '9px 12px 9px 36px',
+                          height: '38px',
+                          padding: '0 12px 0 36px',
                           borderRadius: '8px',
                           border: '1px solid #CBD5E1',
                           backgroundColor: '#FFFFFF',
@@ -578,7 +616,7 @@ export const BranchDetailModal: FC<BranchDetailModalProps> = ({
                     </div>
                   </div>
 
-                  {/* 5. Email liên hệ */}
+                  {/* HÀNG 3, CỘT 2: Email liên hệ */}
                   <div>
                     <label
                       style={{
@@ -604,7 +642,8 @@ export const BranchDetailModal: FC<BranchDetailModalProps> = ({
                         placeholder="chinhanh@cuahang.com"
                         style={{
                           width: '100%',
-                          padding: '9px 12px 9px 36px',
+                          height: '38px',
+                          padding: '0 12px 0 36px',
                           borderRadius: '8px',
                           border: '1px solid #CBD5E1',
                           backgroundColor: '#FFFFFF',
@@ -617,7 +656,7 @@ export const BranchDetailModal: FC<BranchDetailModalProps> = ({
                     </div>
                   </div>
 
-                  {/* 6. Quản lý phụ trách */}
+                  {/* HÀNG 4, CỘT 1: Quản lý phụ trách */}
                   <div>
                     <label
                       style={{
@@ -643,7 +682,8 @@ export const BranchDetailModal: FC<BranchDetailModalProps> = ({
                         placeholder="Họ và tên người quản lý..."
                         style={{
                           width: '100%',
-                          padding: '9px 12px 9px 36px',
+                          height: '38px',
+                          padding: '0 12px 0 36px',
                           borderRadius: '8px',
                           border: '1px solid #CBD5E1',
                           backgroundColor: '#FFFFFF',
@@ -656,20 +696,31 @@ export const BranchDetailModal: FC<BranchDetailModalProps> = ({
                     </div>
                   </div>
 
-                  {/* 7. Quy mô & Phân cấp (Checkbox Đặt làm Trụ sở chính) */}
-                  <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
+                  {/* HÀNG 4, CỘT 2: Phân cấp Trụ sở chính (Card gọn gàng, đồng đều chiều cao) */}
+                  <div>
+                    <label
+                      style={{
+                        display: 'block',
+                        fontSize: 12.5,
+                        fontWeight: 600,
+                        color: '#334155',
+                        marginBottom: 6,
+                      }}
+                    >
+                      Quy mô & Phân cấp
+                    </label>
                     <label
                       style={{
                         display: 'flex',
                         alignItems: 'center',
                         gap: 10,
-                        padding: '8px 12px',
+                        height: '38px',
+                        padding: '0 12px',
                         borderRadius: '8px',
                         border: `1px solid ${isHeadquarter ? '#FDE68A' : '#CBD5E1'}`,
                         backgroundColor: isHeadquarter ? '#FFFBEB' : '#FFFFFF',
                         cursor: 'pointer',
                         userSelect: 'none',
-                        minHeight: 40,
                         boxSizing: 'border-box',
                         transition: 'all 0.15s ease',
                       }}
@@ -678,35 +729,40 @@ export const BranchDetailModal: FC<BranchDetailModalProps> = ({
                         type="checkbox"
                         checked={isHeadquarter}
                         onChange={(e) => setIsHeadquarter(e.target.checked)}
-                        style={{ width: 16, height: 16, accentColor: '#0F766E', cursor: 'pointer' }}
+                        style={{ width: 16, height: 16, accentColor: '#0F766E', cursor: 'pointer', flexShrink: 0 }}
                       />
-                      <div>
-                        <div style={{ fontSize: 12.5, fontWeight: 700, color: isHeadquarter ? '#B45309' : '#0F172A' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, overflow: 'hidden' }}>
+                        <ShieldCheck size={15} color={isHeadquarter ? '#B45309' : '#64748B'} style={{ flexShrink: 0 }} />
+                        <span
+                          style={{
+                            fontSize: 13,
+                            fontWeight: 700,
+                            color: isHeadquarter ? '#B45309' : '#0F172A',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
                           Đặt làm Trụ sở chính (Cơ sở đầu não)
-                        </div>
-                        <div style={{ fontSize: 11, color: '#64748B' }}>
-                          Chi nhánh chính đại diện chuỗi, không thể xóa
-                        </div>
+                        </span>
                       </div>
                     </label>
                   </div>
-                </div>
 
-                {/* Dòng meta nhỏ ngày tạo */}
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 6,
-                    marginTop: 14,
-                    paddingTop: 10,
-                    borderTop: '1px dashed #E2E8F0',
-                    fontSize: 12,
-                    color: '#64748B',
-                  }}
-                >
-                  <Calendar size={13} color="#94A3B8" />
-                  <span>Ngày khởi tạo cơ sở: {formatDate(detail?.createdAt || branch.createdAt)}</span>
+                  {/* HÀNG 5: Ngày khởi tạo (Trải rộng 2 cột) */}
+                  <div
+                    style={{
+                      gridColumn: '1 / -1',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      paddingTop: 8,
+                      borderTop: '1px dashed #E2E8F0',
+                      fontSize: 12,
+                      color: '#64748B',
+                    }}
+                  >
+                    <Calendar size={13} color="#94A3B8" />
+                    <span>Ngày khởi tạo cơ sở: {formatDate(detail?.createdAt || branch.createdAt)}</span>
+                  </div>
                 </div>
               </div>
 

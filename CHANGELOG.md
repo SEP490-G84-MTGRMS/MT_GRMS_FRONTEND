@@ -4,6 +4,12 @@ Toàn bộ các thay đổi của repository Frontend React SPA được tổng 
 
 ---
 
+## [Unreleased] - 2026-11-09
+
+### Fixed
+- **Tái thiết kế lưới ô nhập liệu Modal Chi tiết chi nhánh (`BranchDetailModal.tsx`)**: Chuyển đổi từ bố cục auto-fit minmax sang hệ thống lưới 2 cột kỷ luật (`1fr 1fr`), chuẩn hóa chiều cao 38px cho tất cả các control, khắc phục triệt để hiện tượng xô lệch hàng, co ép tên chi nhánh và tràn chữ checkbox Trụ sở chính [FE-BRANCH] [worklog: docs/worklogs/2026-11-09_FE-BRANCH_AI_redesign-branch-detail-modal-inputs.md].
+- **Cải tiến cơ chế đồng bộ dữ liệu & phản hồi lưu thay đổi (`BranchDetailModal.tsx`)**: Bổ sung fallback giữ nguyên form khi API detail chậm hoặc gặp sự cố, đồng bộ tức thời huy hiệu Trụ sở chính trên header, hiển thị trạng thái loading spinner khi lưu và thông báo badge xanh "Đã lưu thành công!" [FE-BRANCH] [worklog: docs/worklogs/2026-11-09_FE-BRANCH_AI_redesign-branch-detail-modal-inputs.md].
+
 ## [Unreleased] - 2026-11-08
 ### Added
 - **Chuẩn hóa giao diện 2 Gói cước SaaS mới (Gói Thường 99k & Gói Pro 249k)**: Xóa bỏ gói miễn phí vĩnh viễn (0đ), cập nhật bảng giá đối xứng `SubscriptionPricingCards.tsx` và `storeData.ts` tập trung vào giá trị cốt lõi của siêu thị tạp hóa [FE-09] [worklog: docs/worklogs/2026-11-08_FE-09_AI_subscription-tier-quota-redesign.md].
