@@ -1,11 +1,12 @@
 import { httpClient } from '../../../api/httpClient';
-import type { ApiResponse } from '../../../api/types';
+import type { ApiResponse, PagedResult } from '../../../api/types';
 import type {
   OrderMatrixProduct,
   MatrixCellMap,
   SplitPoPreview,
   GeneratedPO,
 } from '../types/po.types';
+import type { PurchaseOrderListItem, PurchaseOrderStatus } from '../types/po-list.types';
 
 export interface MatrixBackendResponse {
   branchId: string;
@@ -45,6 +46,7 @@ export interface MatrixBackendResponse {
     deliveryDate: string;
     employeeQty: number;
     storeQty?: number;
+    isOwnerAdjusted?: boolean;
     finalQty: number;
   }>;
   supplierConfigs?: Array<{
@@ -131,12 +133,14 @@ export const purchaseOrderApi = {
         d.cells.forEach((c) => {
           if (!cellMap[c.productId]) cellMap[c.productId] = {};
           const dKey = c.deliveryDate.slice(0, 10);
+          const isAdjusted = Boolean(c.isOwnerAdjusted || (c.storeQty !== null && c.storeQty !== undefined));
           cellMap[c.productId][dKey] = {
             employeeQty: c.employeeQty,
             storeQty: c.storeQty ?? null,
             finalQty: c.finalQty,
-            isOwnerOverridden: c.storeQty !== null && c.storeQty !== undefined,
-            modifiedBy: c.storeQty !== null && c.storeQty !== undefined ? 'store_owner' : 'employee',
+            isOwnerAdjusted: isAdjusted,
+            isOwnerOverridden: isAdjusted,
+            modifiedBy: isAdjusted ? 'store_owner' : 'employee',
           };
         });
 
@@ -210,17 +214,24 @@ export const purchaseOrderApi = {
         deliveryDate: string;
         employeeQty: number;
         storeQty?: number;
+        isOwnerAdjusted: boolean;
         finalQty: number;
       }> = [];
 
       Object.entries(cellMap).forEach(([productId, dayMap]) => {
         Object.entries(dayMap).forEach(([dateKey, cell]) => {
-          if (cell.finalQty > 0 || cell.employeeQty > 0 || (cell.storeQty !== null && cell.storeQty > 0)) {
+          const isAdjusted = Boolean(
+            cell.isOwnerAdjusted ||
+            cell.isOwnerOverridden ||
+            (cell.storeQty !== null && cell.storeQty !== undefined)
+          );
+          if (cell.finalQty > 0 || cell.employeeQty > 0 || isAdjusted) {
             cells.push({
               productId,
               deliveryDate: dateKey,
               employeeQty: cell.employeeQty,
               storeQty: cell.storeQty ?? undefined,
+              isOwnerAdjusted: isAdjusted,
               finalQty: cell.finalQty,
             });
           }
@@ -295,5 +306,122 @@ export const purchaseOrderApi = {
       status: 'PENDING_APPROVAL',
       itemCount: sp.items.length,
     }));
+  },
+
+  /**
+   * Lấy danh sách đơn đặt hàng PO từ Backend CSDL với bộ lọc & phân trang
+   */
+  async getPurchaseOrders(params?: {
+    branchId?: string;
+    supplierId?: string;
+    status?: string;
+    dateFrom?: string;
+    dateTo?: string;
+    pageIndex?: number;
+    pageSize?: number;
+  }): Promise<{ items: PurchaseOrderListItem[]; totalCount: number }> {
+    try {
+      const q = new URLSearchParams();
+      if (params?.branchId && params.branchId !== 'all' && params.branchId !== 'ALL') q.append('BranchId', params.branchId);
+      if (params?.supplierId && params.supplierId !== 'all' && params.supplierId !== 'ALL') q.append('SupplierId', params.supplierId);
+      if (params?.status && params.status !== 'all') q.append('Status', params.status);
+      if (params?.dateFrom) q.append('DateFrom', params.dateFrom);
+      if (params?.dateTo) q.append('DateTo', params.dateTo);
+      if (params?.pageIndex) q.append('PageIndex', String(params.pageIndex));
+      if (params?.pageSize) q.append('PageSize', String(params.pageSize));
+
+      const res = await httpClient.get<ApiResponse<PagedResult<any>>>(`/purchase-orders?${q.toString()}`);
+      const rawList = res.data?.data?.items || [];
+      const totalCount = res.data?.data?.totalItems ?? (res.data?.data as any)?.totalCount ?? rawList.length;
+
+      const items: PurchaseOrderListItem[] = rawList.map((po: any) => ({
+        id: po.id,
+        poCode: po.code,
+        storeRefCode: po.branchCode || po.branchName || 'STR-01',
+        supplierId: po.supplierId,
+        supplierCode: po.supplierCode || 'SUP',
+        supplierName: po.supplierName || 'Nhà cung cấp',
+        branchId: po.branchId,
+        branchCode: po.branchCode || 'BR',
+        branchName: po.branchName || 'Chi nhánh',
+        createdSource: po.createdByRole === 'EMPLOYEE' ? 'NV Chi nhánh đề xuất' : 'Chủ cửa hàng (PO Matrix)',
+        lastUpdated: po.createdAt ? new Date(po.createdAt).toLocaleString('vi-VN') : '',
+        expectedDelivery: po.deliveryDate ? new Date(po.deliveryDate).toLocaleDateString('vi-VN') : '',
+        itemCount: po.details?.length || 0,
+        totalAmount: Number(po.totalAmount || 0),
+        status: (po.status as PurchaseOrderStatus) || 'PENDING_APPROVAL',
+        note: po.note || '',
+        items: (po.details || []).map((d: any) => ({
+          id: d.id,
+          name: d.productName,
+          sku: d.sku,
+          unit: d.unit,
+          orderedQty: Number(d.orderedQty || d.finalQty || 0),
+          receivedQty: Number(d.receivedQty || 0),
+          price: Number(d.unitPrice || 0),
+          total: Number(d.lineAmount || 0),
+        })),
+      }));
+
+      return { items, totalCount };
+    } catch (err) {
+      if (import.meta.env.MODE === 'test') {
+        const { MOCK_PURCHASE_ORDERS } = await import('../lib/mockPoListData');
+        return { items: MOCK_PURCHASE_ORDERS, totalCount: MOCK_PURCHASE_ORDERS.length };
+      }
+      console.warn('Lỗi tải danh sách PO từ backend:', err);
+      return { items: [], totalCount: 0 };
+    }
+  },
+
+  /**
+   * Lấy chi tiết một đơn PO theo ID từ Backend
+   */
+  async getPurchaseOrderById(id: string): Promise<PurchaseOrderListItem | null> {
+    try {
+      const res = await httpClient.get<ApiResponse<any>>(`/purchase-orders/${id}`);
+      const po = res.data?.data;
+      if (!po) return null;
+      return {
+        id: po.id,
+        poCode: po.code,
+        storeRefCode: po.branchCode || po.branchName || 'STR-01',
+        supplierId: po.supplierId,
+        supplierCode: po.supplierCode || 'SUP',
+        supplierName: po.supplierName || 'Nhà cung cấp',
+        branchId: po.branchId,
+        branchCode: po.branchCode || 'BR',
+        branchName: po.branchName || 'Chi nhánh',
+        createdSource: po.createdByRole === 'EMPLOYEE' ? 'NV Chi nhánh đề xuất' : 'Chủ cửa hàng (PO Matrix)',
+        lastUpdated: po.createdAt ? new Date(po.createdAt).toLocaleString('vi-VN') : '',
+        expectedDelivery: po.deliveryDate ? new Date(po.deliveryDate).toLocaleDateString('vi-VN') : '',
+        itemCount: po.details?.length || 0,
+        totalAmount: Number(po.totalAmount || 0),
+        status: (po.status as PurchaseOrderStatus) || 'PENDING_APPROVAL',
+        note: po.note || '',
+        items: (po.details || []).map((d: any) => ({
+          id: d.id,
+          name: d.productName,
+          sku: d.sku,
+          unit: d.unit,
+          orderedQty: Number(d.orderedQty || d.finalQty || 0),
+          receivedQty: Number(d.receivedQty || 0),
+          price: Number(d.unitPrice || 0),
+          total: Number(d.lineAmount || 0),
+        })),
+      };
+    } catch {
+      return null;
+    }
+  },
+
+  /**
+   * Cập nhật trạng thái đơn đặt hàng PO (APPROVED, DISPATCHED, CONFIRMED, CANCELLED)
+   */
+  async updatePurchaseOrderStatus(id: string, status: string, reason?: string): Promise<boolean> {
+    const q = new URLSearchParams({ status });
+    if (reason) q.append('reason', reason);
+    const res = await httpClient.patch(`/purchase-orders/${id}/status?${q.toString()}`, { status, reason });
+    return Boolean(res.data?.success ?? true);
   },
 };

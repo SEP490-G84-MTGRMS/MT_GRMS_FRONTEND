@@ -265,9 +265,18 @@ function mapBackendEntryToLedgerTransaction(
   accountNameLookup?: string
 ): LedgerTransaction {
   const isReceipt = entry.entryType.toUpperCase() === 'RECEIPT';
+  const isAdjustment = entry.sourceType === 'ADJUSTMENT';
+  const isCompensating = entry.sourceType === 'COMPENSATING';
   const isExpense = entry.sourceType === 'EXPENSE' || entry.sourceType === 'EXPENSE_REVERSAL';
-  const isDebt = entry.sourceType === 'DEBT' || entry.sourceType === 'DEBT_REPAYMENT' || entry.description?.includes('Thu nợ');
+  const isDebt =
+    entry.sourceType === 'DEBT' ||
+    entry.sourceType === 'DEBT_REPAYMENT' ||
+    Boolean(entry.description?.includes('Thu nợ'));
   const isPos = entry.sourceType === 'POS' || entry.sourceType === 'POS_SALE';
+  const isInternalTransfer =
+    entry.sourceType === 'CASH_DROP' ||
+    entry.sourceType === 'BANK_DEPOSIT' ||
+    entry.sourceType === 'INTERNAL_TRANSFER';
 
   const defaultCategory =
     isPos
@@ -280,8 +289,10 @@ function mapBackendEntryToLedgerTransaction(
       ? 'Bàn giao tiền sang két sắt'
       : entry.sourceType === 'BANK_DEPOSIT'
       ? 'Nộp tiền vào ngân hàng'
-      : entry.sourceType === 'ADJUSTMENT'
+      : isAdjustment
       ? 'Kiểm kê chênh lệch két'
+      : isCompensating
+      ? 'Bút toán đảo hủy giao dịch'
       : 'Giao dịch thu chi';
 
   const counterpartyType =
@@ -299,28 +310,48 @@ function mapBackendEntryToLedgerTransaction(
       ? 'Két sắt chủ shop'
       : 'Tài khoản ngân hàng');
 
+  const sourceModuleName: LedgerTransaction['sourceModuleName'] = isPos
+    ? 'POS_RETAIL'
+    : isExpense
+    ? 'SERVICE_OPEX'
+    : isDebt
+    ? 'CRM_DEBT'
+    : isInternalTransfer
+    ? 'INTERNAL_TRANSFER'
+    : 'MANUAL';
+
+  const referenceDocType: LedgerTransaction['referenceDocType'] = isPos
+    ? 'POS_ORDER'
+    : isExpense
+    ? 'SERVICE_EXPENSE'
+    : isDebt
+    ? 'DEBT_PAYMENT'
+    : isInternalTransfer
+    ? 'INTERNAL_TRANSFER'
+    : isAdjustment
+    ? 'AUDIT'
+    : 'MANUAL';
+
   return {
     id: entry.id,
     transactionCode: entry.entryCode,
     accountId: entry.accountId,
     accountName: accountLabel,
     branchId: entry.branchId || 'ALL',
-    transactionType: isReceipt ? 'RECEIPT' : 'PAYMENT',
+    transactionType: isAdjustment ? 'ADJUSTMENT' : isReceipt ? 'RECEIPT' : 'PAYMENT',
     category: defaultCategory,
     amount: Number(entry.amount),
     balanceAfter: Number(entry.balanceAfter),
     counterpartyType: counterpartyType,
     counterpartyName: entry.referenceCode || entry.sourceType,
     description: entry.description || '',
-    referenceDocType:
-      entry.sourceType === 'POS'
-        ? 'POS_ORDER'
-        : entry.sourceType === 'EXPENSE'
-        ? 'SERVICE_EXPENSE'
-        : 'INTERNAL_TRANSFER',
-    referenceDocId: entry.sourceId || undefined,
-    sourceModuleName: (entry.sourceType as any) || 'MANUAL',
-    isAutomated: true,
+    referenceDocType,
+    referenceDocId: entry.referenceCode || entry.sourceId || undefined,
+    sourceModuleName,
+    isAutomated: entry.sourceType !== 'MANUAL',
+    isCompensating,
+    originalEntryId: isCompensating ? entry.sourceId || undefined : undefined,
+    linkedTransactionId: isCompensating || isInternalTransfer ? entry.sourceId || undefined : undefined,
     createdBy: 'Hệ thống',
     createdAt: entry.occurredAtUtc,
   };
@@ -375,7 +406,7 @@ export const cashbookService = {
    * Retrieves Cash Transit transfers (Tiền đang chuyển về két sắt)
    */
   async getCashTransits(): Promise<CashTransitItem[]> {
-    return loadState<CashTransitItem[]>(STORAGE_KEYS.TRANSITS, INITIAL_TRANSITS);
+    return loadState<CashTransitItem[]>(STORAGE_KEYS.TRANSITS, isMockMode() ? INITIAL_TRANSITS : []);
   },
 
   /**
@@ -426,7 +457,7 @@ export const cashbookService = {
     page = 1,
     pageSize = 10
   ): { items: LedgerTransaction[]; totalItems: number } {
-    const all = loadState<LedgerTransaction[]>(STORAGE_KEYS.TRANSACTIONS, INITIAL_TRANSACTIONS);
+    const all = loadState<LedgerTransaction[]>(STORAGE_KEYS.TRANSACTIONS, isMockMode() ? INITIAL_TRANSACTIONS : []);
 
     let filtered = [...all];
 
@@ -1171,7 +1202,15 @@ export const cashbookService = {
       return newDeposit;
     }
 
-    const res = await financeHttpClient.post<{ data: any }>('/cashbook/deposits', data);
+    const idempotencyKey =
+      typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `idemp-dep-${Date.now()}`;
+    const res = await financeHttpClient.post<{ data: any }>('/cashbook/deposits', data, {
+      headers: {
+        'Idempotency-Key': idempotencyKey,
+      },
+    });
     return res.data?.data;
   },
 
@@ -1220,7 +1259,19 @@ export const cashbookService = {
       };
     }
 
-    const res = await financeHttpClient.post<{ data: any }>(`/cashbook/deposits/${depositId}/refund`, data);
+    const idempotencyKey =
+      typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `idemp-ref-${Date.now()}`;
+    const res = await financeHttpClient.post<{ data: any }>(
+      `/cashbook/deposits/${depositId}/refund`,
+      data,
+      {
+        headers: {
+          'Idempotency-Key': idempotencyKey,
+        },
+      }
+    );
     return res.data?.data;
   },
 
@@ -1276,7 +1327,8 @@ export const cashbookService = {
       const target = items.find((i) => i.id === voucherId);
       if (target) {
         target.status = 'PAID';
-        target.nature = data.nature === 0 ? 'Chi phí vận hành' : 'Rút vốn chủ';
+        target.nature =
+          data.nature === 0 || data.nature === 1 ? 'Chi phí vận hành' : 'Rút vốn chủ';
         target.isTaxDeductible = data.isTaxDeductible;
         saveState(STORAGE_KEYS.TRIAGE, items);
         return target;
@@ -1284,7 +1336,24 @@ export const cashbookService = {
       return { id: voucherId, status: 'PAID' };
     }
 
-    const res = await financeHttpClient.post<{ data: any }>(`/cashbook/triage/${voucherId}/resolve`, data);
+    const normalizedPayload = {
+      ...data,
+      // Normalize legacy 0 -> 1 (FinancialNature.OperatingExpense) and 4 -> 5 (FinancialNature.OwnerDraw)
+      nature: data.nature === 0 ? 1 : data.nature === 4 ? 5 : data.nature,
+    };
+    const idempotencyKey =
+      typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `idemp-tri-${Date.now()}`;
+    const res = await financeHttpClient.post<{ data: any }>(
+      `/cashbook/triage/${voucherId}/resolve`,
+      normalizedPayload,
+      {
+        headers: {
+          'Idempotency-Key': idempotencyKey,
+        },
+      }
+    );
     return res.data?.data;
   },
 };

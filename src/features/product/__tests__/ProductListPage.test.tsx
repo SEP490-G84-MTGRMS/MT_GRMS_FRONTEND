@@ -228,13 +228,13 @@ describe('ProductListPage - Task T6 BR-SEC-01 Phân quyền Giá vốn theo Vai 
       expect(screen.getByText('Nước ngọt Coca Cola 320ml')).toBeDefined();
     });
 
-    // Ban đầu hiển thị đơn vị cơ bản: "- chai" và giá bán 10,000 đ
-    expect(screen.getByText('- chai')).toBeDefined();
+    // Ban đầu hiển thị đơn vị cơ bản: "chai" và giá bán 10,000 đ
+    expect(screen.getByText('chai')).toBeDefined();
     expect(screen.getByText(/10[.,]000\s*đ/)).toBeDefined();
 
     // Click vào dropdown chọn đơn vị tính
-    const unitDropdownBtn = screen.getByTitle('Chọn đơn vị tính');
-    unitDropdownBtn.click();
+    const unitDropdownBtn = screen.getByTitle(/đơn vị tính/i);
+    fireEvent.click(unitDropdownBtn);
 
     // Menu mở ra hiển thị tùy chọn "thung"
     await waitFor(() => {
@@ -243,11 +243,11 @@ describe('ProductListPage - Task T6 BR-SEC-01 Phân quyền Giá vốn theo Vai 
 
     // Click chọn đơn vị "thung"
     const thungOption = screen.getByRole('button', { name: 'thung' });
-    thungOption.click();
+    fireEvent.click(thungOption);
 
-    // Dropdown chuyển sang hiển thị "- thung" và Giá bán cập nhật thành 220,000 đ
+    // Dropdown chuyển sang hiển thị "thung" và Giá bán cập nhật thành 220,000 đ
     await waitFor(() => {
-      expect(screen.getByText('- thung')).toBeDefined();
+      expect(screen.getByText('thung')).toBeDefined();
       expect(screen.getByText(/220[.,]000\s*đ/)).toBeDefined();
     });
   });
@@ -298,14 +298,14 @@ describe('ProductListPage - Task T6 BR-SEC-01 Phân quyền Giá vốn theo Vai 
 
     // Click vào dòng sản phẩm để mở ProductDetailModal
     const productRow = screen.getByText('Nước tăng lực Sting Dâu 330ml');
-    productRow.click();
+    fireEvent.click(productRow);
 
-    // Trong modal chi tiết, click nút "Chỉnh sửa"
+    // Trong modal chi tiết, click nút "Sửa hàng hóa"
     await waitFor(() => {
-      expect(screen.getByText('Chỉnh sửa')).toBeDefined();
+      expect(screen.getByRole('button', { name: /Sửa hàng hóa/i })).toBeDefined();
     });
-    const editBtn = screen.getByText('Chỉnh sửa');
-    editBtn.click();
+    const editBtn = screen.getByRole('button', { name: /Sửa hàng hóa/i });
+    fireEvent.click(editBtn);
 
     // Modal ProductFormModal mở ra, kiểm tra ô tên sản phẩm
     await waitFor(() => {

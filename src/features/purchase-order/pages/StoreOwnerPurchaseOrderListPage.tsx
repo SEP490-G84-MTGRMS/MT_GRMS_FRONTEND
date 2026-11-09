@@ -1,14 +1,16 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import type { FC } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Grid, Zap, Layers } from 'lucide-react';
-import { MOCK_PURCHASE_ORDERS } from '../lib/mockPoListData';
-import { MOCK_BRANCHES } from '../lib/mockData';
+import { Grid, Zap, Layers, RefreshCw, Loader2 } from 'lucide-react';
+import { purchaseOrderApi } from '../api/purchaseOrderApi';
 import type { PurchaseOrderListItem, PoListFilterState } from '../types/po-list.types';
+import type { BranchOption } from '../types/po.types';
 import { PoListFilterBar } from '../components/po-list/PoListFilterBar';
 import { PoListTable } from '../components/po-list/PoListTable';
 import { PoDetailDrawer } from '../components/po-list/PoDetailDrawer';
 import { AdminToast, type ToastState } from '../../admin/components';
+import { httpClient } from '../../../api/httpClient';
+import type { ApiResponse } from '../../../api/types';
 import '../purchase-order.css';
 
 const DEFAULT_FILTERS: PoListFilterState = {
@@ -49,7 +51,10 @@ export const StoreOwnerPurchaseOrderListPage: FC = () => {
   const navigate = useNavigate();
 
   // Master orders list
-  const [orders] = useState<PurchaseOrderListItem[]>(MOCK_PURCHASE_ORDERS);
+  const [orders, setOrders] = useState<PurchaseOrderListItem[]>([]);
+  const [branches, setBranches] = useState<BranchOption[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   // Filter input states
   const [filterInputs, setFilterInputs] = useState<PoListFilterState>(DEFAULT_FILTERS);
@@ -67,6 +72,105 @@ export const StoreOwnerPurchaseOrderListPage: FC = () => {
   const showToast = (message: string, type: ToastState['type'] = 'success') => {
     setToast({ id: Date.now().toString(), message, type });
     setTimeout(() => setToast(null), 3000);
+  };
+
+  // Load branches from Backend API
+  useEffect(() => {
+    const fetchBranches = async () => {
+      try {
+        const res = await httpClient.get<ApiResponse<any>>('/branches');
+        const rawData = res.data?.data;
+        const bList: any[] = Array.isArray(rawData)
+          ? rawData
+          : Array.isArray(rawData?.items)
+          ? rawData.items
+          : [];
+        if (bList.length > 0) {
+          setBranches(
+            bList.map((b) => ({
+              id: b.id,
+              code: b.branchCode || b.code || 'BR',
+              name: b.name || b.branchName || 'Chi nhánh',
+              address: b.address || '',
+            }))
+          );
+        }
+      } catch {
+        // keep empty
+      }
+    };
+    fetchBranches();
+  }, []);
+
+  // Load purchase orders from Backend API
+  const loadOrders = useCallback(async () => {
+    setIsLoading(true);
+    setLoadError(null);
+    try {
+      const data = await purchaseOrderApi.getPurchaseOrders({
+        branchId: appliedFilters.branchId,
+        supplierId: appliedFilters.supplierId,
+        status: appliedFilters.status,
+        dateFrom: appliedFilters.dateFrom,
+        dateTo: appliedFilters.dateTo,
+        pageSize: 100,
+      });
+      setOrders(data.items || []);
+    } catch (err: unknown) {
+      setLoadError(err instanceof Error ? err.message : 'Không thể tải danh sách đơn đặt hàng từ máy chủ.');
+      setOrders([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [appliedFilters]);
+
+  useEffect(() => {
+    loadOrders();
+  }, [loadOrders]);
+
+  // Approve PO via Backend API
+  const handleApproveOrder = async (order: PurchaseOrderListItem) => {
+    try {
+      await purchaseOrderApi.updatePurchaseOrderStatus(order.id, 'APPROVED');
+      setOrders((prev) =>
+        prev.map((o) => (o.id === order.id ? { ...o, status: 'APPROVED' } : o))
+      );
+      if (selectedOrder?.id === order.id) {
+        setSelectedOrder((prev) => (prev ? { ...prev, status: 'APPROVED' } : null));
+      }
+      showToast(`Đã duyệt đơn mua hàng ${order.poCode} thành công!`, 'success');
+    } catch {
+      showToast(`Lỗi khi duyệt đơn mua hàng ${order.poCode}.`, 'error');
+    }
+  };
+
+  // Cancel PO via Backend API
+  const handleCancelOrder = async (order: PurchaseOrderListItem) => {
+    try {
+      await purchaseOrderApi.updatePurchaseOrderStatus(
+        order.id,
+        'CANCELLED',
+        'Hủy từ danh sách đơn mua hàng PO'
+      );
+      setOrders((prev) =>
+        prev.map((o) => (o.id === order.id ? { ...o, status: 'CANCELLED' } : o))
+      );
+      if (selectedOrder?.id === order.id) {
+        setSelectedOrder((prev) => (prev ? { ...prev, status: 'CANCELLED' } : null));
+      }
+      showToast(`Đã hủy đơn mua hàng ${order.poCode}.`, 'info');
+    } catch {
+      showToast(`Lỗi khi hủy đơn mua hàng ${order.poCode}.`, 'error');
+    }
+  };
+
+  // Cross-module flow FE-8 -> FE-7: Receive Now (Nhập kho ngay)
+  const handleReceiveNow = (order: PurchaseOrderListItem) => {
+    const params = new URLSearchParams();
+    params.set('poId', order.id);
+    params.set('poCode', order.poCode);
+    if (order.branchId) params.set('branchId', order.branchId);
+    navigate(`/store-owner/goods-receipts/create?${params.toString()}`);
   };
 
   // Unique suppliers list derived from orders
@@ -195,6 +299,18 @@ export const StoreOwnerPurchaseOrderListPage: FC = () => {
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <button
             type="button"
+            onClick={loadOrders}
+            disabled={isLoading}
+            className="po-btn po-btn-outline"
+            style={{ height: 32, padding: '0 12px' }}
+            title="Tải lại danh sách từ máy chủ"
+          >
+            <RefreshCw size={13} className={isLoading ? 'animate-spin' : ''} />
+            <span>Làm mới</span>
+          </button>
+
+          <button
+            type="button"
             onClick={() => navigate('/store-owner/purchase-orders/dispatch-hub')}
             className="po-btn po-btn-outline"
             style={{ height: 32, padding: '0 14px' }}
@@ -217,6 +333,22 @@ export const StoreOwnerPurchaseOrderListPage: FC = () => {
         </div>
       </div>
 
+      {loadError && (
+        <div
+          style={{
+            padding: '10px 14px',
+            borderRadius: 8,
+            background: '#FEF2F2',
+            border: '1px solid #FECACA',
+            color: '#991B1B',
+            fontSize: '0.84rem',
+            marginBottom: 12,
+          }}
+        >
+          {loadError}
+        </div>
+      )}
+
       {/* ── UNIFIED FILTER BAR ── */}
       <PoListFilterBar
         filterInputs={filterInputs}
@@ -225,32 +357,67 @@ export const StoreOwnerPurchaseOrderListPage: FC = () => {
         }
         onSearch={handleSearch}
         onReset={handleReset}
-        branches={MOCK_BRANCHES}
+        branches={branches}
         suppliers={supplierOptions}
       />
 
       {/* ── MAIN DATA TABLE WITH PAGING ── */}
-      <PoListTable
-        orders={pagedOrders}
-        totalCount={filteredOrders.length}
-        pageIndex={pageIndex}
-        pageSize={pageSize}
-        onPageChange={(page) => setPageIndex(page)}
-        onPageSizeChange={(size) => {
-          setPageSize(size);
-          setPageIndex(1);
-        }}
-        onViewDetail={(order) => setSelectedOrder(order)}
-        onEditOrder={(order) => {
-          showToast(`Đang mở giao diện chỉnh sửa đơn ${order.poCode}`, 'info');
-        }}
-      />
+      {isLoading ? (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '48px 20px',
+            background: '#ffffff',
+            borderRadius: 8,
+            border: '1px solid #E2E8F0',
+            gap: 10,
+          }}
+        >
+          <Loader2 size={24} className="animate-spin" style={{ color: '#0F766E' }} />
+          <span style={{ fontSize: '0.88rem', color: '#64748B', fontWeight: 600 }}>
+            Đang tải danh sách đơn đặt hàng từ hệ thống...
+          </span>
+        </div>
+      ) : (
+        <PoListTable
+          orders={pagedOrders}
+          totalCount={filteredOrders.length}
+          pageIndex={pageIndex}
+          pageSize={pageSize}
+          onPageChange={(page) => setPageIndex(page)}
+          onPageSizeChange={(size) => {
+            setPageSize(size);
+            setPageIndex(1);
+          }}
+          onViewDetail={async (order) => {
+            setSelectedOrder(order);
+            const fullDetail = await purchaseOrderApi.getPurchaseOrderById(order.id);
+            if (fullDetail) {
+              setSelectedOrder(fullDetail);
+            }
+          }}
+          onEditOrder={(order) => {
+            const params = new URLSearchParams();
+            if (order.branchId) params.set('branchId', order.branchId);
+            if (order.supplierId) params.set('supplier', order.supplierId);
+            navigate(`/store-owner/purchase-orders/create-matrix?${params.toString()}`);
+          }}
+          onApproveOrder={handleApproveOrder}
+          onCancelOrder={handleCancelOrder}
+          onReceiveNow={handleReceiveNow}
+        />
+      )}
 
       {/* ── SLIDE-OVER DRAWER CHI TIẾT PO ── */}
       <PoDetailDrawer
         order={selectedOrder}
         isOpen={Boolean(selectedOrder)}
         onClose={() => setSelectedOrder(null)}
+        onApproveOrder={handleApproveOrder}
+        onCancelOrder={handleCancelOrder}
+        onReceiveNow={handleReceiveNow}
       />
     </div>
   );

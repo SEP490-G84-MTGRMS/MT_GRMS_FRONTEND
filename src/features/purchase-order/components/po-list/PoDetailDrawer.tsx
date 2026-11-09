@@ -7,6 +7,9 @@ import {
   Factory,
   MessageSquare,
   PackageOpen,
+  CheckCircle2,
+  XCircle,
+  PackageCheck,
 } from 'lucide-react';
 import type { PurchaseOrderListItem, PurchaseOrderStatus } from '../../types/po-list.types';
 
@@ -14,9 +17,19 @@ interface PoDetailDrawerProps {
   order: PurchaseOrderListItem | null;
   isOpen: boolean;
   onClose: () => void;
+  onApproveOrder?: (order: PurchaseOrderListItem) => void;
+  onCancelOrder?: (order: PurchaseOrderListItem) => void;
+  onReceiveNow?: (order: PurchaseOrderListItem) => void;
 }
 
-export const PoDetailDrawer: FC<PoDetailDrawerProps> = ({ order, isOpen, onClose }) => {
+export const PoDetailDrawer: FC<PoDetailDrawerProps> = ({
+  order,
+  isOpen,
+  onClose,
+  onApproveOrder,
+  onCancelOrder,
+  onReceiveNow,
+}) => {
   // Handle ESC key to close drawer
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -34,6 +47,39 @@ export const PoDetailDrawer: FC<PoDetailDrawerProps> = ({ order, isOpen, onClose
 
   const renderStatusBadge = (status: PurchaseOrderStatus) => {
     switch (status) {
+      case 'PENDING_APPROVAL':
+        return (
+          <span
+            style={{
+              padding: '2px 8px',
+              borderRadius: 4,
+              fontSize: 12,
+              fontWeight: 700,
+              backgroundColor: '#ffedd5',
+              color: '#c2410c',
+              border: '1px solid #fed7aa',
+            }}
+          >
+            🟠 Chờ duyệt
+          </span>
+        );
+      case 'APPROVED':
+        return (
+          <span
+            style={{
+              padding: '2px 8px',
+              borderRadius: 4,
+              fontSize: 12,
+              fontWeight: 700,
+              backgroundColor: '#dcfce7',
+              color: '#15803d',
+              border: '1px solid #86efac',
+            }}
+          >
+            🟢 Đã duyệt
+          </span>
+        );
+      case 'DISPATCHED':
       case 'SENT':
         return (
           <span
@@ -83,6 +129,7 @@ export const PoDetailDrawer: FC<PoDetailDrawerProps> = ({ order, isOpen, onClose
           </span>
         );
       case 'RECEIVED':
+      case 'COMPLETED':
         return (
           <span
             style={{
@@ -98,6 +145,7 @@ export const PoDetailDrawer: FC<PoDetailDrawerProps> = ({ order, isOpen, onClose
             🔵 Đã nhập kho
           </span>
         );
+      case 'REJECTED':
       case 'CANCELLED':
         return (
           <span
@@ -112,6 +160,22 @@ export const PoDetailDrawer: FC<PoDetailDrawerProps> = ({ order, isOpen, onClose
             }}
           >
             🔴 Đã hủy
+          </span>
+        );
+      default:
+        return (
+          <span
+            style={{
+              padding: '2px 8px',
+              borderRadius: 4,
+              fontSize: 12,
+              fontWeight: 700,
+              backgroundColor: '#f1f5f9',
+              color: '#475569',
+              border: '1px solid #cbd5e1',
+            }}
+          >
+            {status}
           </span>
         );
     }
@@ -540,35 +604,118 @@ export const PoDetailDrawer: FC<PoDetailDrawerProps> = ({ order, isOpen, onClose
             </div>
           )}
 
-          {/* Tổng kết tiền đơn hàng */}
+          {/* Tổng kết tiền đơn hàng & Nút Thao tác */}
           <div
             style={{
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
               gap: 14,
+              flexWrap: 'wrap',
             }}
           >
             <div>
               <span style={{ fontSize: 13, color: '#64748b' }}>
                 Tổng quy mô: <b>{order.itemCount} SKU</b> • <b>{totalOrderedItems} món</b>
               </span>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginTop: 2 }}>
+                <span style={{ fontSize: 12, fontWeight: 600, color: '#475569' }}>
+                  Tổng cộng PO:
+                </span>
+                <span
+                  style={{
+                    fontSize: 18,
+                    fontWeight: 800,
+                    color: '#059669',
+                    fontFamily: 'monospace',
+                  }}
+                >
+                  {order.totalAmount.toLocaleString('vi-VN')} đ
+                </span>
+              </div>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-              <span style={{ fontSize: 13, fontWeight: 600, color: '#475569' }}>
-                Tổng cộng PO:
-              </span>
-              <span
-                style={{
-                  fontSize: 20,
-                  fontWeight: 800,
-                  color: '#059669',
-                  fontFamily: 'monospace',
-                }}
-              >
-                {order.totalAmount.toLocaleString('vi-VN')} đ
-              </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              {(order.status === 'PENDING_APPROVAL' ||
+                order.status === 'APPROVED' ||
+                order.status === 'DISPATCHED' ||
+                order.status === 'SENT') &&
+                onCancelOrder && (
+                  <button
+                    type="button"
+                    onClick={() => onCancelOrder(order)}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      height: 36,
+                      padding: '0 14px',
+                      borderRadius: 8,
+                      fontSize: 13,
+                      fontWeight: 600,
+                      backgroundColor: '#fff1f2',
+                      border: '1px solid #fecdd3',
+                      color: '#e11d48',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <XCircle size={15} />
+                    <span>Hủy PO</span>
+                  </button>
+                )}
+
+              {order.status === 'PENDING_APPROVAL' && onApproveOrder && (
+                <button
+                  type="button"
+                  onClick={() => onApproveOrder(order)}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    height: 36,
+                    padding: '0 16px',
+                    borderRadius: 8,
+                    fontSize: 13,
+                    fontWeight: 700,
+                    backgroundColor: '#16a34a',
+                    border: 'none',
+                    color: '#ffffff',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <CheckCircle2 size={15} />
+                  <span>Duyệt PO</span>
+                </button>
+              )}
+
+              {(order.status === 'APPROVED' ||
+                order.status === 'DISPATCHED' ||
+                order.status === 'SENT' ||
+                order.status === 'CONFIRMED') &&
+                onReceiveNow && (
+                  <button
+                    type="button"
+                    onClick={() => onReceiveNow(order)}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      height: 36,
+                      padding: '0 18px',
+                      borderRadius: 8,
+                      fontSize: 13,
+                      fontWeight: 700,
+                      backgroundColor: '#0d9488',
+                      border: 'none',
+                      color: '#ffffff',
+                      cursor: 'pointer',
+                      boxShadow: '0 2px 6px rgba(13, 148, 136, 0.25)',
+                    }}
+                  >
+                    <PackageCheck size={16} />
+                    <span>Nhập kho ngay (FE-7)</span>
+                  </button>
+                )}
             </div>
           </div>
         </div>

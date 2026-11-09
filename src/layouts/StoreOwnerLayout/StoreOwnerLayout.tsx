@@ -1,13 +1,47 @@
 import type { FC } from 'react';
-import { Outlet, Navigate } from 'react-router-dom';
+import { Outlet, Navigate, useLocation } from 'react-router-dom';
 import { AppTopNav } from './AppTopNav';
 import { useAuthStore } from '../../stores/useAuthStore';
 
 export const StoreOwnerLayout: FC = () => {
   const { user, isAuthenticated } = useAuthStore();
+  const location = useLocation();
 
   if (!isAuthenticated || !user) {
     return <Navigate to="/auth/login" replace />;
+  }
+
+  const role = (user.role || '').toUpperCase();
+  const isEmployee = role === 'EMPLOYEE' || role === 'CASHIER' || role === 'STAFF';
+
+  // Route Guard: Nếu Employee cố tình truy cập vào các màn hình quản trị / tài chính / thuế của Chủ hộ -> Chuyển về POS
+  if (isEmployee) {
+    const restrictedPrefixes = [
+      '/store-owner/tax',
+      '/store-owner/accounting-books',
+      '/store-owner/tax-snapshots',
+      '/store-owner/reports/pnl',
+      '/store-owner/pnl',
+      '/store-owner/cashbook',
+      '/store-owner/finance',
+      '/store-owner/expenses',
+      '/store-owner/employees',
+      '/store-owner/subscriptions',
+      '/store-owner/settings',
+      '/store-owner/dashboard',
+      '/tax-snapshots',
+      '/cashbook',
+      '/expenses',
+      '/employees',
+    ];
+
+    const isRestricted = restrictedPrefixes.some(
+      (prefix) => location.pathname === prefix || location.pathname.startsWith(`${prefix}/`)
+    );
+
+    if (isRestricted || location.pathname === '/store-owner' || location.pathname === '/store-owner/') {
+      return <Navigate to="/employee/pos" replace />;
+    }
   }
 
   return (

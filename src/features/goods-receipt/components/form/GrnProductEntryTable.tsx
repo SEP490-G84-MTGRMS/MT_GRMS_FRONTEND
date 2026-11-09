@@ -15,7 +15,7 @@ import { REJECTION_REASON_LABELS } from '../../types/grn.types';
 interface GrnProductEntryTableProps {
   items: GrnItemDetail[];
   readOnly?: boolean;
-  onItemChange: (itemId: string, field: keyof GrnItemDetail, value: any) => void;
+  onItemChange: (itemId: string, field: keyof GrnItemDetail, value: unknown) => void;
   onAddNewRow?: () => void;
   onRemoveRow?: (itemId: string) => void;
   onBarcodeScan?: (code: string) => void;

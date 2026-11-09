@@ -13,6 +13,7 @@ export const CashAccountsCardSection: FC<CashAccountsCardSectionProps> = ({
   accounts,
   selectedAccountId,
   onSelectAccount,
+  onOpenReconcileModal,
 }) => {
   return (
     <div className="cash-accounts-grid">
@@ -128,7 +129,31 @@ export const CashAccountsCardSection: FC<CashAccountsCardSectionProps> = ({
                   />
                   <span>Thu ngân chi nhánh</span>
                 </span>
-                <span style={{ color: '#0284C7', fontWeight: 600 }}>Xem sổ quầy →</span>
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                  {onOpenReconcileModal && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onOpenReconcileModal(acc);
+                      }}
+                      style={{
+                        background: '#EFF6FF',
+                        border: '1px solid #BFDBFE',
+                        color: '#1D4ED8',
+                        borderRadius: '6px',
+                        padding: '2px 8px',
+                        fontSize: '10.5px',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                      }}
+                      title="Đối soát kiểm đếm tiền mặt thực tế tại két"
+                    >
+                      Kiểm kê két
+                    </button>
+                  )}
+                  <span style={{ color: '#0284C7', fontWeight: 600 }}>Xem sổ quầy →</span>
+                </div>
               </div>
             )}
             {isSafe && (

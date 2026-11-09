@@ -105,7 +105,11 @@ export const DepositRefundDrawer: FC<DepositRefundDrawerProps> = ({
     try {
       await cashbookService.refundDeposit(selectedDeposit.id, {
         amount: refundAmount,
-        paymentSourceType: account?.accountType === 'BANK' ? 'Bank' : 'Till',
+        paymentSourceType: account?.isSafeDeposit
+          ? 'Safe'
+          : account?.accountType === 'BANK'
+          ? 'Bank'
+          : 'Till',
         paymentSourceAccountId: refundAccountId,
         note: refundNote,
       });
@@ -138,7 +142,11 @@ export const DepositRefundDrawer: FC<DepositRefundDrawerProps> = ({
       await cashbookService.createDeposit({
         customerName: customerName.trim(),
         amount: depositAmount,
-        paymentSourceType: account?.accountType === 'BANK' ? 'Bank' : 'Till',
+        paymentSourceType: account?.isSafeDeposit
+          ? 'Safe'
+          : account?.accountType === 'BANK'
+          ? 'Bank'
+          : 'Till',
         paymentSourceAccountId: depositAccountId,
         note: depositNote.trim(),
       });

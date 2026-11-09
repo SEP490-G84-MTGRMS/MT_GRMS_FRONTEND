@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import type { FC } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
@@ -14,7 +14,7 @@ import type {
   GrnFilterTab,
   UserRole,
 } from '../types/grn.types';
-import { MOCK_GOODS_RECEIPTS } from '../lib/mockGrnData';
+import { goodsReceiptApi } from '../api/goodsReceiptApi';
 import { GrnFilterBar } from '../components/GrnFilterBar';
 import { GrnTable } from '../components/GrnTable';
 import { GrnDetailDrawer } from '../components/GrnDetailDrawer';
@@ -45,12 +45,45 @@ export const GoodsReceiptListPage: FC<{ defaultRole?: UserRole }> = ({
   const employeeBranchId = searchParams.get('branch') || 'BR-01';
 
   // Master State
-  const [receipts] = useState<GoodsReceiptListItem[]>(MOCK_GOODS_RECEIPTS);
   const [activeTab, setActiveTab] = useState<GrnFilterTab>('ALL');
   const [filterInputs, setFilterInputs] = useState<GrnFilterState>(DEFAULT_FILTERS);
   const [appliedFilters, setAppliedFilters] = useState<GrnFilterState>(DEFAULT_FILTERS);
   const [pageIndex, setPageIndex] = useState<number>(1);
   const [pageSize, setPageSize] = useState<number>(10);
+  const [receipts, setReceipts] = useState<GoodsReceiptListItem[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    setIsLoading(true);
+    setError(null);
+    goodsReceiptApi
+      .getGoodsReceipts({
+        ...appliedFilters,
+        tab: activeTab,
+        pageIndex,
+        pageSize: 100,
+      })
+      .then((data) => {
+        if (isMounted) {
+          setReceipts(data || []);
+        }
+      })
+      .catch((err) => {
+        console.warn('Lỗi tải phiếu nhập kho:', err);
+        if (isMounted) {
+          setError('Không thể kết nối đến máy chủ lấy danh sách phiếu nhập kho.');
+        }
+      })
+      .finally(() => {
+        if (isMounted) setIsLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [appliedFilters, activeTab, role]);
 
   // Drawer & Toast State
   const [selectedReceipt, setSelectedReceipt] = useState<GoodsReceiptListItem | null>(null);
@@ -87,7 +120,11 @@ export const GoodsReceiptListPage: FC<{ defaultRole?: UserRole }> = ({
   // Base list scoped by role
   const roleScopedReceipts = useMemo(() => {
     if (role === 'employee') {
-      return receipts.filter((r) => r.branchId === employeeBranchId);
+      return receipts.filter(
+        (r) =>
+          r.branchId === employeeBranchId ||
+          r.branchName.toLowerCase().includes(employeeBranchId.toLowerCase())
+      );
     }
     return receipts;
   }, [receipts, role, employeeBranchId]);
@@ -225,8 +262,8 @@ export const GoodsReceiptListPage: FC<{ defaultRole?: UserRole }> = ({
     } else if (action === 'EDIT_DRAFT') {
       const targetUrl =
         role === 'employee'
-          ? `/employee/goods-receipts/${receipt.id}?branch=${employeeBranchId}&role=employee`
-          : `/store-owner/goods-receipts/${receipt.id}`;
+          ? `/employee/goods-receipts/${receipt.id}/edit?branch=${employeeBranchId}&role=employee`
+          : `/store-owner/goods-receipts/${receipt.id}/edit`;
       navigate(targetUrl);
     } else if (action === 'RESOLVE_MISMATCH') {
       const targetUrl =
@@ -240,6 +277,7 @@ export const GoodsReceiptListPage: FC<{ defaultRole?: UserRole }> = ({
       showToast(`Xem danh sách lô hàng FEFO đã gán cho phiếu ${receipt.code}`, 'info');
     } else if (action === 'PRINT_RECEIPT') {
       showToast(`Đang kết nối máy in để in phiếu nhập kho ${receipt.code}...`, 'success');
+      window.print();
     }
   };
 
@@ -382,6 +420,16 @@ export const GoodsReceiptListPage: FC<{ defaultRole?: UserRole }> = ({
       />
 
       {/* ── MAIN DATA TABLE WITH PAGING (Matching PoListTable structure) ── */}
+      {error && (
+        <div style={{ padding: '8px 12px', marginBottom: 12, backgroundColor: '#fef2f2', color: '#b91c1c', borderRadius: 6, fontSize: 13 }}>
+          {error}
+        </div>
+      )}
+      {isLoading && (
+        <div style={{ padding: '8px 12px', marginBottom: 12, backgroundColor: '#f0fdf4', color: '#166534', borderRadius: 6, fontSize: 13 }}>
+          Đang tải dữ liệu từ máy chủ...
+        </div>
+      )}
       <GrnTable
         receipts={pagedReceipts}
         totalCount={filteredReceipts.length}

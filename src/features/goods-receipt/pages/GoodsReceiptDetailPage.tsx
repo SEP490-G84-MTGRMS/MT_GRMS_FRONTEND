@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import type { FC } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
@@ -17,9 +17,10 @@ import type {
   GrnPostSettings,
   GrnStatus,
   PoStatusPreview,
+  RejectionReason,
   UserRole,
 } from '../types/grn.types';
-import { MOCK_GOODS_RECEIPTS } from '../lib/mockGrnData';
+import { goodsReceiptApi, mapBackendStatusToUi } from '../api/goodsReceiptApi';
 import { GrnDetailHeaderCard } from '../components/detail/GrnDetailHeaderCard';
 import { GrnStockFefoTable } from '../components/detail/GrnStockFefoTable';
 import { GrnPoRemainingTable } from '../components/detail/GrnPoRemainingTable';
@@ -46,48 +47,113 @@ export const GoodsReceiptDetailPage: FC<{ defaultRole?: UserRole }> = ({
   const [role, setRole] = useState<UserRole>(roleParam || defaultRole);
   const employeeBranchId = searchParams.get('branch') || 'BR-01';
 
-  // Find receipt
-  const existingReceipt = useMemo(() => {
-    if (!id) return MOCK_GOODS_RECEIPTS[0];
-    return (
-      MOCK_GOODS_RECEIPTS.find((r) => r.id === id || r.code === id) ||
-      MOCK_GOODS_RECEIPTS[0]
-    );
-  }, [id]);
-
-  // Mode: confirmation vs view
-  const isModeConfirmParam = searchParams.get('mode') === 'confirm';
-  const [status, setStatus] = useState<GrnStatus>(existingReceipt.status);
-  const isConfirmationMode = isModeConfirmParam || status === 'DRAFT';
-
-  // Items with detail fields
-  const [items] = useState<GrnDetailItem[]>(() => {
-    return existingReceipt.items.map((it) => {
-      const isCatchWeight =
-        it.productCode === 'FR-THIT-01' ||
-        it.productName.toLowerCase().includes('xay') ||
-        it.productName.toLowerCase().includes('thịt');
-      const isGift =
-        it.productCode === 'BV-PEPSI-01' ||
-        it.unitPrice === 0 ||
-        it.productName.toLowerCase().includes('tặng');
-      const retail = it.unitPrice > 0 ? it.unitPrice * 1.35 : 10000;
-      return {
-        ...it,
-        retailPrice: retail,
-        isCatchWeight,
-        isGift,
-      };
-    });
-  });
+  // Loaded Receipt State from Backend
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [grnNo, setGrnNo] = useState<string>(id || '');
+  const [branchId, setBranchId] = useState<string>(employeeBranchId);
+  const [branchName, setBranchName] = useState<string>('');
+  const [supplierName, setSupplierName] = useState<string>('');
+  const [supplierCode, setSupplierCode] = useState<string>('');
+  const [poReference, setPoReference] = useState<string>('-');
+  const [receiverName, setReceiverName] = useState<string>('Thủ kho');
+  const [receiptTime, setReceiptTime] = useState<string>('');
+  const [invoiceNo, setInvoiceNo] = useState<string>('');
+  const [status, setStatus] = useState<GrnStatus>('DRAFT');
+  const [items, setItems] = useState<GrnDetailItem[]>([]);
 
   // Freight & Financials
-  const [landedCost] = useState<number>(50000);
-  const [discount] = useState<number>(0);
-  const [vatPercent] = useState<number>(0);
+  const [landedCost, setLandedCost] = useState<number>(0);
+  const [discount, setDiscount] = useState<number>(0);
+  const [vatPercent, setVatPercent] = useState<number>(0);
+
+  // Mode: confirmation vs view
+  const isModeConfirmParam =
+    searchParams.get('mode') === 'confirm' || window.location.pathname.endsWith('/confirm');
+  const isConfirmationMode = isModeConfirmParam || status === 'DRAFT';
+
+  // Fetch Receipt Details from Backend API
+  useEffect(() => {
+    if (!id) {
+      setIsLoading(false);
+      return;
+    }
+    let isMounted = true;
+    setIsLoading(true);
+
+    goodsReceiptApi
+      .getGoodsReceiptById(id)
+      .then((dto) => {
+        if (!isMounted || !dto) return;
+        setGrnNo(dto.code);
+        setBranchId(dto.branchId);
+        setBranchName(dto.branchName || dto.branchCode);
+        setSupplierName(dto.supplierName);
+        setSupplierCode(dto.supplierCode);
+        setPoReference(dto.purchaseOrderCode || '-');
+        setReceiverName(dto.receiverName || dto.receiverUserId || 'Thủ kho');
+        setReceiptTime(
+          dto.receivedAtUtc ? new Date(dto.receivedAtUtc).toLocaleString('vi-VN') : ''
+        );
+        setInvoiceNo(dto.invoiceNo || '');
+        setStatus(mapBackendStatusToUi(dto.status, dto.hasMismatch));
+        setLandedCost(dto.freightFee || 0);
+        setDiscount(dto.discountAmount || 0);
+        setVatPercent(dto.vatPercent || 0);
+
+        const mappedItems: GrnDetailItem[] = (dto.lines || []).map((l) => {
+          const isCatchWeight =
+            l.productCode === 'FR-THIT-01' ||
+            l.productName.toLowerCase().includes('xay') ||
+            l.productName.toLowerCase().includes('thịt');
+          const isGift =
+            l.productCode === 'BV-PEPSI-01' ||
+            l.unitPrice === 0 ||
+            l.productName.toLowerCase().includes('tặng');
+          const retail = l.unitPrice > 0 ? l.unitPrice * 1.35 : 10000;
+          return {
+            id: l.id,
+            productId: l.productId,
+            purchaseOrderDetailId: l.purchaseOrderDetailId,
+            productCode: l.productCode,
+            productName: l.productName,
+            unit: l.unit || 'Cái',
+            hasBatches: l.hasBatches,
+            orderedQty: l.orderedQty,
+            receivedQty: l.deliveredQty,
+            acceptedQty: l.acceptedQty,
+            rejectedQty: l.rejectedQty,
+            shortageQty: l.shortageQty,
+            differenceQty: l.differenceQty ?? (l.acceptedQty - l.orderedQty),
+            unitPrice: l.unitPrice,
+            lineTotal: l.lineAmount ?? (l.acceptedQty * l.unitPrice),
+            batchCode: l.batchCode,
+            manufactureDate: l.manufactureDate ? l.manufactureDate.slice(0, 10) : undefined,
+            expiryDate: l.expiryDate ? l.expiryDate.slice(0, 10) : undefined,
+            rejectionReason: l.rejectionReason as RejectionReason | undefined,
+            rejectionNote: l.rejectionNote,
+            note: l.note,
+            landedCostPerUnit: l.landedUnitCost,
+            retailPrice: retail,
+            isCatchWeight,
+            isGift,
+          };
+        });
+        setItems(mappedItems);
+      })
+      .finally(() => {
+        if (isMounted) setIsLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [id]);
 
   const goodsTotal = useMemo(() => {
-    return items.reduce((sum, it) => sum + (it.receivedQty * (it.unitPrice || 0)), 0);
+    return items.reduce(
+      (sum, it) => sum + ((it.acceptedQty ?? it.receivedQty) * (it.unitPrice || 0)),
+      0
+    );
   }, [items]);
 
   const grandTotal = useMemo(() => {
@@ -99,7 +165,7 @@ export const GoodsReceiptDetailPage: FC<{ defaultRole?: UserRole }> = ({
 
   // Total Labels count
   const totalLabels = useMemo(() => {
-    return items.reduce((sum, it) => sum + Math.ceil(it.receivedQty || 0), 0);
+    return items.reduce((sum, it) => sum + Math.ceil(it.acceptedQty ?? it.receivedQty ?? 0), 0);
   }, [items]);
 
   // PO status calculation: In V1, PO directly transitions to COMPLETED
@@ -109,7 +175,7 @@ export const GoodsReceiptDetailPage: FC<{ defaultRole?: UserRole }> = ({
   const [postSettings, setPostSettings] = useState<GrnPostSettings>({
     createApInvoice: true,
     printShelfLabels: true,
-    attachmentName: 'Bill_TuoiSach_2609.jpg',
+    attachmentName: 'Bill_GiaoNhan_GRN.jpg',
     attachmentSize: '1.2 MB',
   });
 
@@ -145,23 +211,37 @@ export const GoodsReceiptDetailPage: FC<{ defaultRole?: UserRole }> = ({
     setPostSettings((prev) => ({ ...prev, [key]: value }));
   };
 
-  // Confirm GRN Action
-  const handleConfirmGrn = () => {
+  // Confirm GRN Action connected 100% to Backend API (PUT /goods-receipts/{id}/confirm)
+  const handleConfirmGrn = async () => {
+    if (!id) return;
     setIsSubmitting(true);
-    setTimeout(() => {
-      setIsSubmitting(false);
-      setStatus('CONFIRMED');
+    try {
+      const updated = await goodsReceiptApi.completeGoodsReceipt(
+        id,
+        'Đã xác nhận hoàn tất phiếu nhập kho trên màn hình đối soát'
+      );
+      setStatus(mapBackendStatusToUi(updated?.status || 'COMPLETED', updated?.hasMismatch));
       setIsSuccessModalOpen(true);
-      showToast(`Đã duyệt hoàn tất phiếu ${existingReceipt.code}. Tồn kho và nợ AP đã được cập nhật!`, 'success');
-    }, 600);
+      showToast(
+        `Đã duyệt hoàn tất phiếu ${grnNo}. Tồn kho, lô FEFO, giá vốn MAC và nợ AP đã được cập nhật!`,
+        'success'
+      );
+    } catch (err: unknown) {
+      const errMsg =
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+        (err instanceof Error ? err.message : 'Không thể xác nhận hoàn tất phiếu nhập kho.');
+      showToast(`Lỗi xác nhận nhập kho: ${errMsg}`, 'error');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   // Navigations
   const handleBackToEdit = () => {
     const editUrl =
       role === 'employee'
-        ? `/employee/goods-receipts/create?poCode=${existingReceipt.poReference}&branch=${employeeBranchId}&role=employee`
-        : `/store-owner/goods-receipts/create?poCode=${existingReceipt.poReference}`;
+        ? `/employee/goods-receipts/${id}/edit?branch=${employeeBranchId}&role=employee`
+        : `/store-owner/goods-receipts/${id}/edit`;
     navigate(editUrl);
   };
 
@@ -190,6 +270,20 @@ export const GoodsReceiptDetailPage: FC<{ defaultRole?: UserRole }> = ({
     >
       {/* Toast Notification */}
       <AdminToast toast={toast} onClose={() => setToast(null)} />
+
+      {isLoading && (
+        <div
+          style={{
+            padding: '8px 12px',
+            backgroundColor: '#f0fdf4',
+            color: '#166534',
+            borderRadius: 6,
+            fontSize: 13,
+          }}
+        >
+          Đang tải chi tiết phiếu nhập kho từ máy chủ...
+        </div>
+      )}
 
       {/* ── Top Header Navigation Bar (Identical layout to GoodsReceiptFormPage) ── */}
       <div
@@ -239,7 +333,7 @@ export const GoodsReceiptDetailPage: FC<{ defaultRole?: UserRole }> = ({
               <span>
                 {isConfirmationMode
                   ? 'Xác nhận tổng quan phiếu nhập kho (Confirm GRN Summary)'
-                  : `Chi tiết phiếu nhập kho ${existingReceipt.code}`}
+                  : `Chi tiết phiếu nhập kho ${grnNo}`}
               </span>
             </h1>
             <p style={{ margin: '2px 0 0 0', fontSize: 12.5, color: '#64748b' }}>
@@ -312,13 +406,13 @@ export const GoodsReceiptDetailPage: FC<{ defaultRole?: UserRole }> = ({
 
       {/* ── Block 1: Header Info Card ── */}
       <GrnDetailHeaderCard
-        grnNo={existingReceipt.code}
-        branchName={existingReceipt.branchName}
-        branchCode={existingReceipt.branchId}
-        supplierName={existingReceipt.supplierName}
-        supplierCode={existingReceipt.supplierCode}
-        poReference={existingReceipt.poReference}
-        receiverName={existingReceipt.receiverName}
+        grnNo={grnNo}
+        branchName={branchName}
+        branchCode={branchId}
+        supplierName={supplierName}
+        supplierCode={supplierCode}
+        poReference={poReference}
+        receiverName={receiverName}
         status={status}
         goodsTotal={goodsTotal}
         landedCost={landedCost}
@@ -326,7 +420,8 @@ export const GoodsReceiptDetailPage: FC<{ defaultRole?: UserRole }> = ({
         vatPercent={vatPercent}
         grandTotal={grandTotal}
         paymentTerm="CREDIT_30"
-        receiptTime={existingReceipt.receiveDate}
+        receiptTime={receiptTime}
+        invoiceNo={invoiceNo || undefined}
         isConfirmationMode={isConfirmationMode}
       />
 
@@ -335,7 +430,7 @@ export const GoodsReceiptDetailPage: FC<{ defaultRole?: UserRole }> = ({
 
       {/* ── Block 3: PO Status Update & Remaining Handling Table ── */}
       <GrnPoRemainingTable
-        poReference={existingReceipt.poReference}
+        poReference={poReference}
         items={items}
         readOnly={!isConfirmationMode && status === 'CONFIRMED'}
       />
@@ -486,9 +581,9 @@ export const GoodsReceiptDetailPage: FC<{ defaultRole?: UserRole }> = ({
       {/* ── Modal Result Success ── */}
       <GrnDetailSuccessModal
         isOpen={isSuccessModalOpen}
-        grnNo={existingReceipt.code}
-        poReference={existingReceipt.poReference}
-        supplierName={existingReceipt.supplierName}
+        grnNo={grnNo}
+        poReference={poReference}
+        supplierName={supplierName}
         grandTotal={grandTotal}
         totalLabels={totalLabels}
         poStatusPreview={poStatusPreview}
@@ -504,7 +599,7 @@ export const GoodsReceiptDetailPage: FC<{ defaultRole?: UserRole }> = ({
       {/* ── Modal Print Preview Stickers ── */}
       <GrnPrintPreviewModal
         isOpen={isPrintLabelsModalOpen}
-        grnNo={existingReceipt.code}
+        grnNo={grnNo}
         items={items}
         onClose={() => setIsPrintLabelsModalOpen(false)}
         onPrint={() => {

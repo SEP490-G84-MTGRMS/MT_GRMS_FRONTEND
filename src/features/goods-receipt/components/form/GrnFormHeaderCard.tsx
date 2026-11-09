@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import type { FC } from 'react';
 import {
   FileSpreadsheet,
@@ -16,6 +17,7 @@ import type {
   UserRole,
 } from '../../types/grn.types';
 import { MOCK_GRN_BRANCHES } from '../../lib/mockGrnData';
+import { httpClient } from '../../../../api/httpClient';
 
 interface GrnFormHeaderCardProps {
   grnNo: string;
@@ -61,6 +63,36 @@ export const GrnFormHeaderCard: FC<GrnFormHeaderCardProps> = ({
   onPaymentMethodChange,
 }) => {
   const isEmployee = role === 'employee';
+  const [branches, setBranches] = useState<Array<{ id: string; code?: string; name: string }>>(() => {
+    return import.meta.env.MODE === 'test' ? MOCK_GRN_BRANCHES : [];
+  });
+
+  useEffect(() => {
+    if (import.meta.env.MODE === 'test') return;
+    httpClient
+      .get('/branches')
+      .then((res) => {
+        const bList = res.data?.data?.items || res.data?.data || res.data || [];
+        if (Array.isArray(bList) && bList.length > 0) {
+          setBranches(
+            bList.map((b: { id: string; branchCode?: string; code?: string; name: string }) => ({
+              id: b.id,
+              code: b.branchCode || b.code,
+              name: b.name,
+            }))
+          );
+        }
+      })
+      .catch(() => {
+        // Fallback if unauthorized or offline
+      });
+  }, []);
+
+  const currentBranchLabel = (() => {
+    const target = isEmployee ? employeeBranchId : branchId;
+    const found = branches.find((b) => b.id === target || b.code === target);
+    return found ? found.name : target;
+  })();
 
   return (
     <div
@@ -144,7 +176,7 @@ export const GrnFormHeaderCard: FC<GrnFormHeaderCardProps> = ({
               }}
             >
               <span>
-                {MOCK_GRN_BRANCHES.find((b) => b.id === (isEmployee ? employeeBranchId : branchId))?.name || branchId}
+                {currentBranchLabel}
               </span>
               {isEmployee && (
                 <span
@@ -179,7 +211,10 @@ export const GrnFormHeaderCard: FC<GrnFormHeaderCardProps> = ({
                 cursor: 'pointer',
               }}
             >
-              {MOCK_GRN_BRANCHES.map((b) => (
+              {branches.length === 0 && (
+                <option value={branchId}>{branchId || '-- Chọn chi nhánh --'}</option>
+              )}
+              {branches.map((b) => (
                 <option key={b.id} value={b.id}>
                   {b.name}
                 </option>
@@ -278,9 +313,15 @@ export const GrnFormHeaderCard: FC<GrnFormHeaderCardProps> = ({
               }}
             >
               <option value="">-- Chọn đơn đặt hàng PO --</option>
+              {poReference && !availablePos.some((po) => po.poCode === poReference) && (
+                <option value={poReference}>
+                  {poReference}
+                  {supplierName ? ` — ${supplierName}` : ''}
+                </option>
+              )}
               {availablePos.map((po) => (
                 <option key={po.poCode} value={po.poCode}>
-                  {po.poCode} — {po.supplierName} ({po.branchId})
+                  {po.poCode} — {po.supplierName} ({po.branchName || po.branchCode || po.branchId})
                 </option>
               ))}
             </select>

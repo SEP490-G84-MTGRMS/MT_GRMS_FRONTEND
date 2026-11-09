@@ -23,14 +23,13 @@ import {
   Building2,
 } from 'lucide-react';
 import { TablePagination } from '../../../components/common';
-import { mockInvoicesList, mockPreOrdersList } from '../mock/inventoryMockData';
 import type { InvoiceDTO, PreOrderDTO, DebtPaymentRecordDTO } from '../types/inventory.types';
 import { CollectDebtModal } from '../components/modals/CollectDebtModal';
 import { ReturnExchangeModal } from '../components/modals/ReturnExchangeModal';
 import { CreatePreOrderModal } from '../components/modals/CreatePreOrderModal';
 import { FulfillPreOrderModal } from '../components/modals/FulfillPreOrderModal';
-import { mockProducts, mockCustomers } from '../mock/posMockData';
 import { posOrderApi } from '../api/posOrderApi';
+import { customerApi } from '../../customer-crm/api/customerApi';
 import { useAuthStore } from '../../../stores/useAuthStore';
 import '../pos.css';
 
@@ -57,7 +56,6 @@ export const InvoiceManagementPage: FC = () => {
   // Danh sách hóa đơn có thể hủy / cập nhật trạng thái (Phân lập theo Cửa Hàng / Tenant)
   const { user } = useAuthStore();
   const currentTenantId = user?.tenantId || 'tenant_mt_mart_01';
-  const isDefaultDemoStore = currentTenantId === 'tenant_mt_mart_01';
 
   // Quyền hạn tài khoản: Chỉ STORE_OWNER (Chủ cửa hàng) mới có quyền xem toàn chuỗi và hủy hóa đơn đã thanh toán
   const isStoreOwner = user?.role === 'STORE_OWNER';
@@ -74,32 +72,43 @@ export const InvoiceManagementPage: FC = () => {
     }
   }, [isStoreOwner, activeBranchId]);
 
-  const [invoices, setInvoices] = useState<InvoiceDTO[]>(() => (isDefaultDemoStore ? mockInvoicesList : []));
-  const [preOrders, setPreOrders] = useState<PreOrderDTO[]>(() => (isDefaultDemoStore ? mockPreOrdersList : []));
+  const [invoices, setInvoices] = useState<InvoiceDTO[]>([]);
+  const [preOrders, setPreOrders] = useState<PreOrderDTO[]>([]);
+  const [isLoadingOrders, setIsLoadingOrders] = useState<boolean>(true);
+  const [ordersError, setOrdersError] = useState<string | null>(null);
+  const [availableProducts, setAvailableProducts] = useState<any[]>([]);
+  const [availableCustomers, setAvailableCustomers] = useState<any[]>([]);
 
-  // Khi chuyển tài khoản hoặc đăng nhập chủ cửa hàng khác -> Reset danh sách hóa đơn
-  useEffect(() => {
-    if (!isDefaultDemoStore) {
-      setInvoices([]);
-      setPreOrders([]);
-    } else {
-      setInvoices(mockInvoicesList);
-      setPreOrders(mockPreOrdersList);
-    }
-  }, [currentTenantId, isDefaultDemoStore]);
-
-  // Nạp dữ liệu thực tế từ Backend API theo Tenant
+  // Tải danh mục sản phẩm và khách hàng thực tế phục vụ đổi trả & đơn đặt trước
   useEffect(() => {
     let isMounted = true;
+    Promise.all([
+      posOrderApi.getAllProducts().catch(() => []),
+      posOrderApi.getAllCustomers().catch(() => []),
+    ]).then(([prods, custs]) => {
+      if (isMounted) {
+        setAvailableProducts(prods || []);
+        setAvailableCustomers(custs || []);
+      }
+    });
+    return () => {
+      isMounted = false;
+    };
+  }, [currentTenantId]);
+
+  // Nạp dữ liệu hóa đơn & đơn đặt trước thực tế 100% từ Backend API theo Tenant
+  useEffect(() => {
+    let isMounted = true;
+    setIsLoadingOrders(true);
+    setOrdersError(null);
+
     posOrderApi
       .getOrders()
       .then((res) => {
         if (!isMounted) return;
         if (!res || !res.items || res.items.length === 0) {
-          if (!isDefaultDemoStore) {
-            setInvoices([]);
-            setPreOrders([]);
-          }
+          setInvoices([]);
+          setPreOrders([]);
           return;
         }
 
@@ -142,65 +151,71 @@ export const InvoiceManagementPage: FC = () => {
             totalAmount: it.totalLineAmount || it.quantity * it.unitPrice,
           })),
         }));
-        if (mappedInvoices.length > 0) {
-          setInvoices(mappedInvoices);
-        }
+        setInvoices(mappedInvoices);
 
         // 2. Phân loại và nạp danh sách Đơn đặt trước giữ kho
         const preOrderItems = res.items.filter(
           (o: any) => o.status === 'PreOrder' || o.orderCode?.startsWith('PO-')
         );
-        if (preOrderItems.length > 0) {
-          const mappedPreOrders: PreOrderDTO[] = preOrderItems.map((o: any) => {
-            const totalOrderAmount = o.totalAmount || o.finalAmount;
-            const depositAmount = o.depositAmount || 0;
-            const remainingAmount = Math.max(0, totalOrderAmount - depositAmount);
-            return {
-              preOrderId: o.orderCode || o.id,
-              createdAt: o.orderDate ? new Date(o.orderDate).toLocaleString('vi-VN') : '',
-              branchId: o.branchId || '',
-              branchName: o.branchName || 'Chi nhánh Cầu Giấy (Trung tâm)',
-              pickupAppointment: o.note || '17:30 - Hôm nay',
-              customerName: o.customerName || 'Khách quen',
-              customerPhone: o.customerPhone || '0987654321',
-              totalOrderAmount,
-              depositAmount,
-              remainingAmount,
-              stockAllocated: true,
-              status:
-                o.status === 'Completed'
-                  ? 'COMPLETED'
-                  : o.status === 'Cancelled'
-                  ? 'CANCELLED'
-                  : 'RESERVED',
-              statusLabel:
-                o.status === 'Completed'
-                  ? 'Đã hoàn thành'
-                  : o.status === 'Cancelled'
-                  ? 'Đã hủy'
-                  : 'Đang giữ kho',
-              items: (o.items || []).map((it: any) => ({
-                itemId: it.id,
-                productId: it.productId,
-                productName: it.productName,
-                sku: it.barcode || '',
-                unitName: it.unitName || 'Cái',
-                quantity: it.quantity,
-                unitPrice: it.unitPrice,
-                discountAmount: it.discountAmount || 0,
-                totalAmount: it.totalLineAmount || it.quantity * it.unitPrice,
-              })),
-            };
-          });
-          setPreOrders(mappedPreOrders);
+        const mappedPreOrders: PreOrderDTO[] = preOrderItems.map((o: any) => {
+          const totalOrderAmount = o.totalAmount || o.finalAmount;
+          const depositAmount = o.depositAmount || 0;
+          const remainingAmount = Math.max(0, totalOrderAmount - depositAmount);
+          return {
+            preOrderId: o.orderCode || o.id,
+            createdAt: o.orderDate ? new Date(o.orderDate).toLocaleString('vi-VN') : '',
+            branchId: o.branchId || '',
+            branchName: o.branchName || 'Chi nhánh Cầu Giấy (Trung tâm)',
+            pickupAppointment: o.note || '17:30 - Hôm nay',
+            customerName: o.customerName || 'Khách quen',
+            customerPhone: o.customerPhone || '0987654321',
+            totalOrderAmount,
+            depositAmount,
+            remainingAmount,
+            stockAllocated: true,
+            status:
+              o.status === 'Completed'
+                ? 'COMPLETED'
+                : o.status === 'Cancelled'
+                ? 'CANCELLED'
+                : 'RESERVED',
+            statusLabel:
+              o.status === 'Completed'
+                ? 'Đã hoàn thành'
+                : o.status === 'Cancelled'
+                ? 'Đã hủy'
+                : 'Đang giữ kho',
+            items: (o.items || []).map((it: any) => ({
+              itemId: it.id,
+              productId: it.productId,
+              productName: it.productName,
+              sku: it.barcode || '',
+              unitName: it.unitName || 'Cái',
+              quantity: it.quantity,
+              unitPrice: it.unitPrice,
+              discountAmount: it.discountAmount || 0,
+              totalAmount: it.totalLineAmount || it.quantity * it.unitPrice,
+            })),
+          };
+        });
+        setPreOrders(mappedPreOrders);
+      })
+      .catch((err) => {
+        console.warn('Fetch orders error:', err);
+        if (isMounted) {
+          setOrdersError('Không thể kết nối đến máy chủ lấy danh sách hóa đơn.');
         }
       })
-      .catch((err) => console.warn('Fetch orders error:', err));
+      .finally(() => {
+        if (isMounted) {
+          setIsLoadingOrders(false);
+        }
+      });
 
     return () => {
       isMounted = false;
     };
-  }, [currentTenantId, isDefaultDemoStore]);
+  }, [currentTenantId]);
 
   // Danh sách các chi nhánh có trong hệ thống (Tự động hợp nhất từ CSDL & cấu hình chuỗi)
   const availableBranches = useMemo(() => {
@@ -424,11 +439,36 @@ export const InvoiceManagementPage: FC = () => {
     }
   };
 
-  // Thu tiền nợ hóa đơn
-  const handleCollectDebt = (
+  // Thu tiền nợ hóa đơn (đồng bộ trực tiếp với CustomerDebtService & Sổ quỹ)
+  const handleCollectDebt = async (
     invoiceId: string,
     payment: { amount: number; method: 'CASH' | 'VIETQR'; note: string; cashierName: string }
   ) => {
+    const targetInv = invoices.find((inv) => inv.invoiceId === invoiceId);
+    const resolvedCustomerId =
+      targetInv?.customerId ||
+      availableCustomers.find(
+        (c: any) =>
+          (targetInv?.customerPhone && c.phoneNumber === targetInv.customerPhone) ||
+          (targetInv?.customerName && c.fullName === targetInv.customerName)
+      )?.id;
+
+    if (
+      resolvedCustomerId &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(resolvedCustomerId)
+    ) {
+      try {
+        await customerApi.collectDebt({
+          customerId: resolvedCustomerId,
+          amount: payment.amount,
+          method: payment.method === 'VIETQR' ? 'VietQR' : 'Cash',
+          note: payment.note || `Thu nợ hóa đơn ${invoiceId}`,
+        });
+      } catch (err: any) {
+        console.warn('Đồng bộ thu nợ POS lên máy chủ:', err);
+      }
+    }
+
     setInvoices((prev) =>
       prev.map((inv) => {
         if (inv.invoiceId !== invoiceId) return inv;
@@ -830,7 +870,35 @@ export const InvoiceManagementPage: FC = () => {
                       <th style={{ textAlign: 'center', width: 170 }}>Thao tác</th>
                     </tr>
                   </thead>
-                  {paginatedInvoices.map((inv) => {
+                  {isLoadingOrders && (
+                    <tbody>
+                      <tr>
+                        <td colSpan={10} style={{ textAlign: 'center', padding: '48px 16px', color: '#0f766e', fontWeight: 600 }}>
+                          ⏳ Đang tải danh sách hóa đơn từ máy chủ...
+                        </td>
+                      </tr>
+                    </tbody>
+                  )}
+                  {!isLoadingOrders && ordersError && (
+                    <tbody>
+                      <tr>
+                        <td colSpan={10} style={{ textAlign: 'center', padding: '36px 16px', color: '#dc2626' }}>
+                          ⚠️ {ordersError}
+                        </td>
+                      </tr>
+                    </tbody>
+                  )}
+                  {!isLoadingOrders && !ordersError && paginatedInvoices.length === 0 && (
+                    <tbody>
+                      <tr>
+                        <td colSpan={10} style={{ textAlign: 'center', padding: '56px 16px', color: '#64748b' }}>
+                          <p style={{ margin: 0, fontSize: 15, fontWeight: 600, color: '#334155' }}>Chưa có hóa đơn bán lẻ nào</p>
+                          <p style={{ margin: '6px 0 0', fontSize: 13 }}>Tất cả các đơn bán lẻ tạo tại màn hình POS sẽ được lưu và hiển thị trực tiếp tại đây.</p>
+                        </td>
+                      </tr>
+                    </tbody>
+                  )}
+                  {!isLoadingOrders && !ordersError && paginatedInvoices.map((inv) => {
                     const isExpanded = expandedInvoiceId === inv.invoiceId;
                     const isCompleted = inv.status === 'COMPLETED';
                     const isDebt = inv.status === 'DEBT' || (inv.debtAmount !== undefined && inv.debtAmount > 0);
@@ -1672,7 +1740,7 @@ export const InvoiceManagementPage: FC = () => {
       <ReturnExchangeModal
         isOpen={Boolean(returnExchangeModalInvoice)}
         invoice={returnExchangeModalInvoice}
-        availableProducts={mockProducts}
+        availableProducts={availableProducts}
         onClose={() => setReturnExchangeModalInvoice(null)}
         onConfirm={handleConfirmReturnExchange}
       />
@@ -1681,8 +1749,8 @@ export const InvoiceManagementPage: FC = () => {
       <CreatePreOrderModal
         isOpen={isCreatePreOrderModalOpen}
         onClose={() => setIsCreatePreOrderModalOpen(false)}
-        availableProducts={mockProducts}
-        customers={mockCustomers}
+        availableProducts={availableProducts}
+        customers={availableCustomers}
         branchName={
           branchFilter !== 'ALL'
             ? availableBranches.find((b) => b.id === branchFilter)?.name || 'Chi nhánh Cầu Giấy (Trung tâm)'

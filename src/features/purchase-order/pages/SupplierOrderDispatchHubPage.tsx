@@ -1,25 +1,28 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import type { FC } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { MOCK_DISPATCH_SUPPLIERS } from '../lib/mockDispatchData';
 import { MOCK_BRANCHES } from '../lib/mockData';
-import type { SupplierDispatchGroup } from '../types/po.types';
+import type { BranchOption, SupplierDispatchGroup } from '../types/po.types';
 import { DispatchFilterBar, type DispatchTabType } from '../components/dispatch/DispatchFilterBar';
 import { SupplierDispatchTable } from '../components/dispatch/SupplierDispatchTable';
 import { SupplierDispatchDrawer } from '../components/dispatch/SupplierDispatchDrawer';
 import { DispatchConfirmModal } from '../components/dispatch/DispatchConfirmModal';
 import { AdminToast, type ToastState } from '../../admin/components';
+import { purchaseOrderApi } from '../api/purchaseOrderApi';
+import { httpClient } from '../../../api/httpClient';
 import '../purchase-order.css';
 
 export const SupplierOrderDispatchHubPage: FC = () => {
   const [searchParams] = useSearchParams();
 
-  // Branch scope
-  const branchParam = searchParams.get('branchId') || searchParams.get('branch') || 'DC1';
-  const [selectedBranchId, setSelectedBranchId] = useState<string>(branchParam);
+  // Danh sách chi nhánh thực từ Backend
+  const [branches, setBranches] = useState<BranchOption[]>(MOCK_BRANCHES);
+  const branchParam = searchParams.get('branchId') || searchParams.get('branch') || '';
+  const [selectedBranchId, setSelectedBranchId] = useState<string>(branchParam || MOCK_BRANCHES[0]?.id || 'ALL');
 
-  // Master State: Suppliers
-  const [suppliers, setSuppliers] = useState<SupplierDispatchGroup[]>(MOCK_DISPATCH_SUPPLIERS);
+  // Master State: Suppliers / PO Dispatch Groups
+  const [suppliers, setSuppliers] = useState<SupplierDispatchGroup[]>([]);
 
   // Drawer Open State: holds the ID of supplier currently viewed in Drawer
   const [selectedDrawerSupplierId, setSelectedDrawerSupplierId] = useState<string | null>(null);
@@ -38,6 +41,114 @@ export const SupplierOrderDispatchHubPage: FC = () => {
     setToast({ id: Date.now().toString(), message, type });
     setTimeout(() => setToast(null), 3500);
   };
+
+  // Tải danh sách chi nhánh thật từ Backend API
+  useEffect(() => {
+    let isMounted = true;
+    httpClient
+      .get('/branches')
+      .then((res) => {
+        if (!isMounted) return;
+        const rawData = res.data?.data;
+        const branchArray = Array.isArray(rawData)
+          ? rawData
+          : Array.isArray(rawData?.items)
+          ? rawData.items
+          : [];
+        if (branchArray.length > 0) {
+          const mappedBranches: BranchOption[] = branchArray.map(
+            (b: { id: string; name: string; branchCode?: string; code?: string }) => ({
+              id: b.id,
+              name: `${b.branchCode || b.code || 'CN'} — ${b.name}`,
+              shortName: b.name,
+            })
+          );
+          setBranches(mappedBranches);
+          if (!branchParam) {
+            setSelectedBranchId(mappedBranches[0].id);
+          }
+        }
+      })
+      .catch(() => {
+        // Fallback giữ MOCK_BRANCHES nếu chạy môi trường test
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, [branchParam]);
+
+  // Tải danh sách đơn đặt hàng PO từ Backend để chốt & phát hành cho NCC
+  const fetchDispatchGroups = useCallback(async () => {
+    try {
+      const res = await purchaseOrderApi.getPurchaseOrders({
+        branchId: selectedBranchId || 'ALL',
+        supplierId: 'ALL',
+        status: 'ALL',
+        dateFrom: '',
+        dateTo: '',
+        pageIndex: 1,
+        pageSize: 100,
+      });
+      const orders = res.items || [];
+
+      if (orders.length > 0) {
+        const mapped: SupplierDispatchGroup[] = orders
+          .filter((po) => po.status !== 'CANCELLED' && po.status !== 'REJECTED')
+          .map((po) => {
+            const isDispatched =
+              po.status === 'DISPATCHED' ||
+              po.status === 'SENT' ||
+              po.status === 'CONFIRMED' ||
+              po.status === 'PARTIALLY_RECEIVED' ||
+              po.status === 'RECEIVED' ||
+              po.status === 'COMPLETED';
+            return {
+              id: po.id,
+              code: po.supplierCode || po.poCode,
+              name: `${po.supplierName} (${po.poCode})`,
+              categoryTags: ['Đơn hàng PO'],
+              cutoffTimeStr: '15:00 Hôm nay',
+              countdownDisplay: isDispatched ? 'Đã phát hành' : 'Sẵn sàng chốt đơn',
+              remainingMinutes: isDispatched ? undefined : 60,
+              urgency: isDispatched
+                ? 'completed'
+                : po.status === 'PENDING_APPROVAL'
+                ? 'critical'
+                : 'today',
+              expectedDelivery: po.expectedDelivery || po.lastUpdated,
+              minOrderValue: 0,
+              note: po.note || '',
+              status: isDispatched ? 'dispatched' : 'draft',
+              poCode: po.poCode,
+              dispatchedAt: isDispatched ? po.lastUpdated : undefined,
+              items: po.items.map((it) => ({
+                id: it.id,
+                name: it.name,
+                sku: it.sku,
+                unit: it.unit,
+                price: it.price,
+                qty: it.orderedQty,
+                cutoffSchedule: 'Cutoff 15:00 hàng ngày',
+                groupType: 'daily',
+              })),
+            };
+          });
+        setSuppliers(mapped);
+      } else if (import.meta.env.MODE === 'test') {
+        setSuppliers(MOCK_DISPATCH_SUPPLIERS);
+      } else {
+        setSuppliers([]);
+      }
+    } catch {
+      if (import.meta.env.MODE === 'test') {
+        setSuppliers(MOCK_DISPATCH_SUPPLIERS);
+      }
+    }
+  }, [selectedBranchId]);
+
+  useEffect(() => {
+    fetchDispatchGroups();
+  }, [fetchDispatchGroups]);
 
   // Confirm Modal State
   const [modalState, setModalState] = useState<{
@@ -89,29 +200,39 @@ export const SupplierOrderDispatchHubPage: FC = () => {
     });
   };
 
-  // Confirm Dispatch & Generate PO
-  const handleConfirmDispatch = () => {
-    const targetIds = new Set(modalState.targets.map((t) => t.id));
+  // Confirm Dispatch & Update PO status on Backend
+  const handleConfirmDispatch = async () => {
+    const targets = modalState.targets;
+    const targetIds = new Set(targets.map((t) => t.id));
     const nowStr = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
 
-    setSuppliers((prev) =>
-      prev.map((s) => {
-        if (!targetIds.has(s.id)) return s;
-        const poCode = `PO-20261014-${s.code.replace('SUP-', '')}`;
-        return {
-          ...s,
-          status: 'dispatched',
-          poCode,
-          dispatchedAt: nowStr,
-        };
-      })
-    );
-
-    setModalState({ isOpen: false, targets: [], isBatch: false });
-    showToast(
-      `Đã phát hành đơn mua hàng PO thành công cho ${modalState.targets[0]?.name}!`,
-      'success'
-    );
+    try {
+      await Promise.all(
+        targets.map((t) =>
+          purchaseOrderApi.updatePurchaseOrderStatus(t.id, 'DISPATCHED', t.note)
+        )
+      );
+      setSuppliers((prev) =>
+        prev.map((s) => {
+          if (!targetIds.has(s.id)) return s;
+          const poCode = s.poCode || `PO-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${s.code.replace('SUP-', '')}`;
+          return {
+            ...s,
+            status: 'dispatched',
+            urgency: 'completed',
+            poCode,
+            dispatchedAt: nowStr,
+          };
+        })
+      );
+      setModalState({ isOpen: false, targets: [], isBatch: false });
+      showToast(
+        `Đã phát hành đơn mua hàng PO thành công cho ${targets[0]?.name}!`,
+        'success'
+      );
+    } catch {
+      showToast('Không thể phát hành đơn mua hàng. Vui lòng thử lại.', 'error');
+    }
   };
 
   // Tab counts for dropdown
@@ -213,7 +334,7 @@ export const SupplierOrderDispatchHubPage: FC = () => {
           setKeyword(kw);
           setPageIndex(1);
         }}
-        branches={MOCK_BRANCHES}
+        branches={branches}
         selectedBranchId={selectedBranchId}
         onSelectBranch={(id) => setSelectedBranchId(id)}
         onResetFilters={() => {

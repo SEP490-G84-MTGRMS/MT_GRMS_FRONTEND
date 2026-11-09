@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   calculateMarginPct,
+  toVietnamUtcIso,
+  buildPnlStatementTree,
   reportsPnlService,
   MOCK_BRANCHES,
 } from '../services/reportsPnlService';
@@ -310,6 +312,56 @@ describe('Reports P&L Financial Calculations Unit & Integration Tests', () => {
       expect(todayData.kpiSummary.grossSales).toBeLessThan(
         monthData.kpiSummary.grossSales
       );
+    });
+
+    it('should convert Vietnam local dates (+07:00) to exact UTC ISO boundaries matching S2c-HKD', () => {
+      const fromUtc = toVietnamUtcIso('2026-10-01', false);
+      const toUtc = toVietnamUtcIso('2026-10-31', true);
+
+      // 01/10/2026 00:00:00+07:00 == 2026-09-30T17:00:00.000Z
+      expect(fromUtc).toBe('2026-09-30T17:00:00.000Z');
+      // 31/10/2026 23:59:59+07:00 == 2026-10-31T16:59:59.000Z
+      expect(toUtc).toBe('2026-10-31T16:59:59.000Z');
+    });
+
+    it('should dynamically build P&L statement tree from real backend expense categories without hardcoded ratios', () => {
+      const kpi = {
+        grossSales: 100000000,
+        discounts: 5000000,
+        returns: 2000000,
+        netRevenue: 93000000,
+        cogs: 60000000,
+        grossProfit: 33000000,
+        grossMarginPct: 35.5,
+        operatingExpenses: 10000000,
+        shrinkageLoss: 1000000,
+        netProfit: 22000000,
+        netMarginPct: 23.7,
+        estimatedTaxAmount: 1395000,
+        netProfitAfterTax: 20605000,
+        netProfitAfterTaxMarginPct: 22.2,
+        totalOrders: 320,
+        averageOrderValue: 290625,
+        netRevenueGrowthPct: 0,
+        grossProfitGrowthPct: 0,
+        netProfitGrowthPct: 0,
+        expensesGrowthPct: 0,
+        ordersGrowthPct: 0,
+        aovGrowthPct: 0,
+      };
+
+      const tree = buildPnlStatementTree(kpi, [
+        { category: 'Tiền thuê kho lạnh', amount: 7000000 },
+        { category: 'Tiền điện 3 pha', amount: 3000000 },
+      ]);
+
+      const sec3 = tree.find((x) => x.id === 'sec-3');
+      const opexNode = sec3?.children?.find((x) => x.id === 'item-3-2');
+      expect(opexNode?.children).toHaveLength(2);
+      expect(opexNode?.children?.[0].title).toBe('Tiền thuê kho lạnh');
+      expect(opexNode?.children?.[0].amount).toBe(7000000);
+      expect(opexNode?.children?.[1].title).toBe('Tiền điện 3 pha');
+      expect(opexNode?.children?.[1].amount).toBe(3000000);
     });
   });
 });

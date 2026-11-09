@@ -194,20 +194,30 @@ export const customerApi = {
         return [];
       }
 
-      return res.data.data.map((entry) => ({
-        id: entry.id,
-        customerId: entry.customerId,
-        transactionType:
-          entry.entryType === 'DebtRepayment' || entry.entryType === 'GoodsReturnOffset'
-            ? 'DEBT_DECREASE'
-            : 'DEBT_INCREASE',
-        amount: entry.amount,
-        balanceAfter: entry.balanceAfter,
-        referenceDocId: entry.referenceCode,
-        cashTransactionCode: entry.entryCode,
-        note: entry.description,
-        createdAt: entry.occurredAtUtc,
-      }));
+      return res.data.data.map((entry) => {
+        const isDecrease =
+          entry.entryType === 'DebtRepayment' || entry.entryType === 'GoodsReturnOffset';
+        const isBankMethod =
+          Boolean(entry.description?.includes('Bank')) ||
+          Boolean(entry.description?.includes('VietQR'));
+
+        return {
+          id: entry.id,
+          customerId: entry.customerId,
+          transactionType: isDecrease ? 'DEBT_DECREASE' : 'DEBT_INCREASE',
+          amount: entry.amount,
+          balanceAfter: entry.balanceAfter,
+          referenceDocId: entry.referenceCode,
+          paymentMethod:
+            entry.entryType === 'DebtRepayment' ? (isBankMethod ? 'VietQR' : 'Cash') : undefined,
+          cashTransactionCode:
+            entry.entryType === 'DebtRepayment'
+              ? entry.referenceCode || entry.entryCode
+              : entry.entryCode,
+          note: entry.description,
+          createdAt: entry.occurredAtUtc,
+        };
+      });
     } catch {
       return [];
     }

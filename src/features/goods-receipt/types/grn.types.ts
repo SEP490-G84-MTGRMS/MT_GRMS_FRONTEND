@@ -33,6 +33,8 @@ export interface GrnBatchDetail {
 
 export interface GrnItemDetail {
   id: string;
+  productId?: string;
+  purchaseOrderDetailId?: string;
   productCode: string;
   productName: string;
   unit: string;
@@ -108,8 +110,10 @@ export type PaymentTerm =
 export type PaymentMethod = 'Credit' | 'Cash' | 'Bank';
 
 export interface PoLookupOption {
+  id?: string;
   poCode: string;
   branchId: string;
+  branchCode?: string;
   branchName: string;
   supplierId: string;
   supplierName: string;

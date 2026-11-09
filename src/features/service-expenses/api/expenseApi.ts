@@ -22,6 +22,29 @@ function isGuid(val?: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
 }
 
+const TAX_BLACKLIST_KEYWORDS = [
+  'phạt',
+  'vi phạm',
+  'cá nhân',
+  'từ thiện',
+  'phong bì',
+  'không hóa đơn',
+  'rút vốn',
+  'tiếp khách không chứng từ',
+];
+
+/**
+ * Checks whether an expense item matches the non-deductible tax blacklist
+ */
+export function isExpenseTaxBlacklisted(
+  category?: string,
+  vendorName?: string,
+  note?: string
+): boolean {
+  const combined = `${category || ''} ${vendorName || ''} ${note || ''}`.toLowerCase();
+  return TAX_BLACKLIST_KEYWORDS.some((kw) => combined.includes(kw));
+}
+
 /**
  * Maps Backend ExpenseVoucherResponse to Frontend ServiceExpenseDto
  */
@@ -33,6 +56,10 @@ function mapVoucherToExpenseDto(v: any): ServiceExpenseDto {
       : v.status === 'Cancelled' || v.status === 'Reversed'
       ? 'Cancelled'
       : 'Pending';
+
+  const blacklisted = isExpenseTaxBlacklisted(v.category, v.beneficiaryName, v.note);
+  const isTaxDeductible =
+    typeof v.isTaxDeductible === 'boolean' ? v.isTaxDeductible && !blacklisted : !blacklisted;
 
   return {
     expenseId: v.id || v.voucherCode,
@@ -47,6 +74,11 @@ function mapVoucherToExpenseDto(v: any): ServiceExpenseDto {
     cashBookId: v.paymentSourceAccountId || null,
     attachedBillUrl: v.evidenceAttachmentUrl || null,
     isRecurring: false,
+    isTaxDeductible,
+    invoiceNumber: v.invoiceNumber || null,
+    sellerTaxCode: v.sellerTaxCode || null,
+    isFlaggedAsSuspiciousSplit: Boolean(v.isFlaggedAsSuspiciousSplit),
+    suspiciousReason: v.suspiciousReason || null,
     note: v.note || null,
     createdAt: v.expenseDate || new Date().toISOString(),
   };
@@ -119,18 +151,22 @@ export const getExpenseSummary = async (
   if (fromDate) queryParams.fromDate = `${fromDate}T00:00:00Z`;
   if (toDate) queryParams.toDate = `${toDate}T23:59:59Z`;
 
-  const res = await financeHttpClient.get<ApiResponse<any>>('/expenses/summary', {
-    params: queryParams,
-  });
+  try {
+    const res = await financeHttpClient.get<ApiResponse<any>>('/expenses/summary', {
+      params: queryParams,
+    });
 
-  if (res.data?.data) {
-    const s = res.data.data;
-    return {
-      totalExpenseThisMonth: Number(s.totalAmount || 0),
-      totalPendingAmount: Number(s.pendingApprovalAmount || 0),
-      totalPaidAmount: Number(s.paidAmount || 0),
-      overdueCount: Number(s.suspiciousCount || 0),
-    };
+    if (res.data?.data) {
+      const s = res.data.data;
+      return {
+        totalExpenseThisMonth: Number(s.totalAmount || 0),
+        totalPendingAmount: Number(s.pendingApprovalAmount || 0),
+        totalPaidAmount: Number(s.paidAmount || 0),
+        overdueCount: Number(s.suspiciousCount || 0),
+      };
+    }
+  } catch {
+    // Fallback to zero summary if user role is restricted (e.g. Employee)
   }
 
   return {
@@ -150,16 +186,21 @@ export const createServiceExpense = async (
   data: CreateExpenseRequest
 ): Promise<ServiceExpenseDto> => {
   const idempotencyKey = generateUUID();
+  const categoryLabel = EXPENSE_CATEGORY_LABELS[data.category] || data.category;
+  const blacklisted = isExpenseTaxBlacklisted(categoryLabel, data.vendorName, data.note);
+  const isTaxDeductible =
+    typeof data.isTaxDeductible === 'boolean' ? data.isTaxDeductible && !blacklisted : !blacklisted;
+
   const payload = {
     branchId: isGuid(data.branchId) ? data.branchId : null,
     beneficiaryName: data.vendorName,
-    category: EXPENSE_CATEGORY_LABELS[data.category] || data.category,
+    category: categoryLabel,
     amount: data.amount,
-    paymentSourceType: 0, // Till
+    paymentSourceType: 1, // FinanceAccountType.Till = 1
     paymentSourceAccountId: null,
-    isTaxDeductible: true,
-    invoiceNumber: null,
-    sellerTaxCode: null,
+    isTaxDeductible,
+    invoiceNumber: data.invoiceNumber || null,
+    sellerTaxCode: data.sellerTaxCode || null,
     evidenceAttachmentUrl: data.attachedBillUrl || null,
     note: data.note || null,
   };
@@ -197,8 +238,8 @@ export const payServiceExpense = async (
     })
     .catch(() => null);
 
-  // Xác định PaymentSourceType dựa trên tài khoản được chọn
-  let paymentSourceType = data.paymentMethod === 'Cash' ? 0 : 2;
+  // Xác định PaymentSourceType chuẩn enum Backend FinanceAccountType (Till = 1, Safe = 2, Bank = 3)
+  let paymentSourceType = data.paymentMethod === 'Cash' ? 1 : 3;
   let paymentSourceAccountId = data.paidFromAccountId;
 
   if (paymentSourceAccountId) {
@@ -206,11 +247,11 @@ export const payServiceExpense = async (
     const matched = accounts.find((a) => a.id === paymentSourceAccountId);
     if (matched) {
       if (matched.isSafeDeposit) {
-        paymentSourceType = 1; // Safe
+        paymentSourceType = 2; // FinanceAccountType.Safe = 2
       } else if (matched.accountType === 'BANK') {
-        paymentSourceType = 2; // Bank
+        paymentSourceType = 3; // FinanceAccountType.Bank = 3
       } else {
-        paymentSourceType = 0; // Till
+        paymentSourceType = 1; // FinanceAccountType.Till = 1
       }
     }
   } else {
@@ -221,7 +262,7 @@ export const payServiceExpense = async (
     );
     if (fallback) {
       paymentSourceAccountId = fallback.id;
-      paymentSourceType = fallback.isSafeDeposit ? 1 : fallback.accountType === 'BANK' ? 2 : 0;
+      paymentSourceType = fallback.isSafeDeposit ? 2 : fallback.accountType === 'BANK' ? 3 : 1;
     }
   }
 

@@ -10,6 +10,7 @@ import type {
   CreateReceiptDTO,
   CreatePaymentDTO,
   FundTransferDTO,
+  CashReconciliationDTO,
   CashTransitItem,
 } from '../types/cashbook.types';
 import { cashbookService } from '../services/cashbookService';
@@ -19,14 +20,19 @@ import { CashbookLedgerTable } from '../components/CashbookLedgerTable';
 import { CreateReceiptModal } from '../components/CreateReceiptModal';
 import { CreatePaymentModal } from '../components/CreatePaymentModal';
 import { InternalTransferModal } from '../components/InternalTransferModal';
+import { CashReconciliationModal } from '../components/CashReconciliationModal';
 import { CashbookExportModal } from '../components/CashbookExportModal';
 import { DepositRefundDrawer } from '../components/DepositRefundDrawer';
 import { TriageInboxModal } from '../components/TriageInboxModal';
 import { AdminToast, type ToastState } from '../../admin/components/common/AdminToast';
 import { formatMoney } from '../../finance/utils/formatters';
 import '../cashbook.css';
+import { useAuthStore } from '../../../stores/useAuthStore';
 
 export const CashbookPage: FC = () => {
+  const { user } = useAuthStore();
+  const rawRole = (user?.role || '').toUpperCase();
+  const isEmployee = rawRole === 'EMPLOYEE' || rawRole === 'CASHIER' || rawRole === 'STAFF';
   const [searchParams] = useSearchParams();
   const urlSearch = searchParams.get('search') || searchParams.get('keyword') || '';
   const [accounts, setAccounts] = useState<CashAccount[]>([]);
@@ -76,6 +82,7 @@ export const CashbookPage: FC = () => {
   const [depositDrawerTab, setDepositDrawerTab] = useState<'refund' | 'create'>('refund');
   const [isTriageModalOpen, setIsTriageModalOpen] = useState(false);
   const [triagePendingCount, setTriagePendingCount] = useState(0);
+  const [reconcilingAccount, setReconcilingAccount] = useState<CashAccount | null>(null);
 
   // Ref and click outside listener for More Actions Menu
   const moreMenuRef = useRef<HTMLDivElement>(null);
@@ -126,10 +133,11 @@ export const CashbookPage: FC = () => {
   const loadData = useCallback(async () => {
     setIsLoading(true);
     try {
+      const branchParam = filters.branchId !== 'ALL' ? filters.branchId : undefined;
       const [accs, trns, kpis, txResult] = await Promise.all([
-        cashbookService.getCashAccounts(),
+        cashbookService.getCashAccounts(branchParam),
         cashbookService.getCashTransits(),
-        cashbookService.getSummaryKPI(),
+        cashbookService.getSummaryKPI(branchParam),
         cashbookService.getTransactions(filters, currentPage, pageSize),
       ]);
 
@@ -251,6 +259,41 @@ export const CashbookPage: FC = () => {
       void loadData();
     } catch (err: unknown) {
       showToast(err instanceof Error ? err.message : 'Lỗi khi hủy phiếu', 'error');
+    }
+  };
+
+  // Reconcile Cash Account Handler (Blind Count)
+  const handleReconcileAccount = async (data: {
+    accountId: string;
+    actualBalance: number;
+    difference: number;
+    reason: string;
+    countedBy: string;
+    denominations: Record<number, number>;
+  }) => {
+    try {
+      const dto: CashReconciliationDTO = {
+        accountId: data.accountId,
+        systemBalance: reconcilingAccount?.currentBalance ?? 0,
+        actualCountedBalance: data.actualBalance,
+        differenceAmount: data.difference,
+        reason: data.reason,
+        auditedBy: data.countedBy,
+        breakdown: data.denominations,
+      };
+      const adj = await cashbookService.reconcileCashAccount(dto);
+      if (adj) {
+        showToast(
+          `Đã hoàn tất kiểm kê két và tự động lập bút toán điều chỉnh [${adj.transactionCode}]!`,
+          'warning'
+        );
+      } else {
+        showToast('Đã xác nhận kiểm kê két: Tiền mặt thực tế khớp 100% với sổ sách!', 'success');
+      }
+      setReconcilingAccount(null);
+      void loadData();
+    } catch (err: unknown) {
+      showToast(err instanceof Error ? err.message : 'Lỗi khi đối soát két tiền mặt', 'error');
     }
   };
 
@@ -384,7 +427,7 @@ export const CashbookPage: FC = () => {
           </div>
 
           <div className="cashbook-header-actions flex items-center gap-2.5 flex-wrap" style={{ position: 'relative' }}>
-              {triagePendingCount > 0 && (
+              {!isEmployee && triagePendingCount > 0 && (
                 <button
                   type="button"
                   onClick={() => setIsTriageModalOpen(true)}
@@ -415,6 +458,8 @@ export const CashbookPage: FC = () => {
                 type="button"
                 className="cb-action-btn cb-action-btn-payment"
                 id="btn-create-payment"
+                disabled={isEmployee}
+                style={{ display: isEmployee ? 'none' : undefined }}
                 onClick={() => {
                   setPaymentInitialCategory(undefined);
                   setIsPaymentModalOpen(true);
@@ -434,7 +479,7 @@ export const CashbookPage: FC = () => {
                 >
                   <MoreHorizontal size={17} style={{ color: isMoreMenuOpen ? '#0F766E' : '#64748B' }} />
                   <span>Thao tác khác</span>
-                  {triagePendingCount > 0 && (
+                  {!isEmployee && triagePendingCount > 0 && (
                     <span
                       style={{
                         width: 8,
@@ -458,28 +503,32 @@ export const CashbookPage: FC = () => {
 
                 {isMoreMenuOpen && (
                   <div className="cb-more-dropdown-menu">
-                    <div className="cb-more-dropdown-header">
-                      <span>Thao tác mở rộng</span>
-                      <span style={{ fontSize: '10px', color: '#94A3B8', fontWeight: 500 }}>FE-17 Quản trị</span>
-                    </div>
+                    {!isEmployee && (
+                      <>
+                        <div className="cb-more-dropdown-header">
+                          <span>Thao tác mở rộng</span>
+                          <span style={{ fontSize: '10px', color: '#94A3B8', fontWeight: 500 }}>FE-17 Quản trị</span>
+                        </div>
 
-                    {/* 1. Internal Transfer */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsMoreMenuOpen(false);
-                        setIsTransferModalOpen(true);
-                      }}
-                      className="cb-more-dropdown-item"
-                    >
-                      <div className="cb-more-item-icon teal">
-                        <ArrowRightLeft size={16} />
-                      </div>
-                      <div className="cb-more-item-text">
-                        <div className="cb-more-item-title">Chuyển quỹ nội bộ</div>
-                        <div className="cb-more-item-sub">Két tiền mặt ↔ Ngân hàng</div>
-                      </div>
-                    </button>
+                        {/* 1. Internal Transfer */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsMoreMenuOpen(false);
+                            setIsTransferModalOpen(true);
+                          }}
+                          className="cb-more-dropdown-item"
+                        >
+                          <div className="cb-more-item-icon teal">
+                            <ArrowRightLeft size={16} />
+                          </div>
+                          <div className="cb-more-item-text">
+                            <div className="cb-more-item-title">Chuyển quỹ nội bộ</div>
+                            <div className="cb-more-item-sub">Két tiền mặt ↔ Ngân hàng</div>
+                          </div>
+                        </button>
+                      </>
+                    )}
 
                     {/* 2. Bottle Deposit Drawer */}
                     <button
@@ -501,113 +550,116 @@ export const CashbookPage: FC = () => {
                     </button>
 
                     {/* 3. Triage Inbox */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsMoreMenuOpen(false);
-                        setIsTriageModalOpen(true);
-                      }}
-                      className="cb-more-dropdown-item"
-                    >
-                      <div className="cb-more-item-icon indigo">
-                        <Inbox size={16} />
-                      </div>
-                      <div className="cb-more-item-text">
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                          <span className="cb-more-item-title">Hộp thư duyệt Triage</span>
-                          {triagePendingCount > 0 && (
-                            <span className="cb-more-badge">{triagePendingCount}</span>
-                          )}
+                    {!isEmployee && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsMoreMenuOpen(false);
+                          setIsTriageModalOpen(true);
+                        }}
+                        className="cb-more-dropdown-item"
+                      >
+                        <div className="cb-more-item-icon indigo">
+                          <Inbox size={16} />
                         </div>
-                        <div className="cb-more-item-sub">Duyệt giao dịch chuyển khoản treo</div>
-                      </div>
-                    </button>
+                        <div className="cb-more-item-text">
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <span className="cb-more-item-title">Hộp thư duyệt Triage</span>
+                            {triagePendingCount > 0 && (
+                              <span className="cb-more-badge">{triagePendingCount}</span>
+                            )}
+                          </div>
+                          <div className="cb-more-item-sub">Duyệt giao dịch chuyển khoản treo</div>
+                        </div>
+                      </button>
+                    )}
 
-                    {/* Divider */}
-                    <div className="cb-more-dropdown-divider" />
+                    {!isEmployee && (
+                      <>
+                        <div className="cb-more-dropdown-divider" />
+                        <div className="cb-more-dropdown-header">
+                          <span>Đặc quyền Chủ tiệm</span>
+                          <span style={{ fontSize: '10px', color: '#0F766E', fontWeight: 700 }}>Vốn & Thuế</span>
+                        </div>
 
-                    <div className="cb-more-dropdown-header">
-                      <span>Đặc quyền Chủ tiệm</span>
-                      <span style={{ fontSize: '10px', color: '#0F766E', fontWeight: 700 }}>Vốn & Thuế</span>
-                    </div>
+                        {/* Store Owner Quick Action 1: Nộp thuế */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsMoreMenuOpen(false);
+                            setPaymentInitialCategory('Nộp thuế nhà nước (Tax Payment)');
+                            setIsPaymentModalOpen(true);
+                          }}
+                          className="cb-more-dropdown-item"
+                        >
+                          <div className="cb-more-item-icon blue">
+                            <Landmark size={16} />
+                          </div>
+                          <div className="cb-more-item-text">
+                            <div className="cb-more-item-title">Nộp thuế nhà nước</div>
+                            <div className="cb-more-item-sub">Thuế GTGT, TNCN, môn bài</div>
+                          </div>
+                        </button>
 
-                    {/* Store Owner Quick Action 1: Nộp thuế */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsMoreMenuOpen(false);
-                        setPaymentInitialCategory('Nộp thuế nhà nước (Tax Payment)');
-                        setIsPaymentModalOpen(true);
-                      }}
-                      className="cb-more-dropdown-item"
-                    >
-                      <div className="cb-more-item-icon blue">
-                        <Landmark size={16} />
-                      </div>
-                      <div className="cb-more-item-text">
-                        <div className="cb-more-item-title">Nộp thuế nhà nước</div>
-                        <div className="cb-more-item-sub">Thuế GTGT, TNCN, môn bài</div>
-                      </div>
-                    </button>
+                        {/* Store Owner Quick Action 2: Rút vốn chủ */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsMoreMenuOpen(false);
+                            setPaymentInitialCategory('Rút vốn chủ (Owner Draw)');
+                            setIsPaymentModalOpen(true);
+                          }}
+                          className="cb-more-dropdown-item"
+                        >
+                          <div className="cb-more-item-icon purple">
+                            <Wallet size={16} />
+                          </div>
+                          <div className="cb-more-item-text">
+                            <div className="cb-more-item-title">Rút lợi nhuận / Vốn chủ</div>
+                            <div className="cb-more-item-sub">Owner Draw không tính thuế</div>
+                          </div>
+                        </button>
 
-                    {/* Store Owner Quick Action 2: Rút vốn chủ */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsMoreMenuOpen(false);
-                        setPaymentInitialCategory('Rút vốn chủ (Owner Draw)');
-                        setIsPaymentModalOpen(true);
-                      }}
-                      className="cb-more-dropdown-item"
-                    >
-                      <div className="cb-more-item-icon purple">
-                        <Wallet size={16} />
-                      </div>
-                      <div className="cb-more-item-text">
-                        <div className="cb-more-item-title">Rút lợi nhuận / Vốn chủ</div>
-                        <div className="cb-more-item-sub">Owner Draw không tính thuế</div>
-                      </div>
-                    </button>
+                        {/* Store Owner Quick Action 3: Nạp thêm vốn */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsMoreMenuOpen(false);
+                            setReceiptInitialCategory('Chủ nạp thêm vốn (Capital Contribution)');
+                            setIsReceiptModalOpen(true);
+                          }}
+                          className="cb-more-dropdown-item"
+                        >
+                          <div className="cb-more-item-icon emerald">
+                            <Plus size={16} />
+                          </div>
+                          <div className="cb-more-item-text">
+                            <div className="cb-more-item-title">Nạp thêm vốn kinh doanh</div>
+                            <div className="cb-more-item-sub">Bổ sung tiền vào quỹ</div>
+                          </div>
+                        </button>
 
-                    {/* Store Owner Quick Action 3: Nạp thêm vốn */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsMoreMenuOpen(false);
-                        setReceiptInitialCategory('Chủ nạp thêm vốn (Capital Contribution)');
-                        setIsReceiptModalOpen(true);
-                      }}
-                      className="cb-more-dropdown-item"
-                    >
-                      <div className="cb-more-item-icon emerald">
-                        <Plus size={16} />
-                      </div>
-                      <div className="cb-more-item-text">
-                        <div className="cb-more-item-title">Nạp thêm vốn kinh doanh</div>
-                        <div className="cb-more-item-sub">Bổ sung tiền vào quỹ</div>
-                      </div>
-                    </button>
+                        <div className="cb-more-dropdown-divider" />
 
-                    {/* Divider */}
-                    <div className="cb-more-dropdown-divider" />
-
-                    {/* 4. Export Excel */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsMoreMenuOpen(false);
-                        setIsExportModalOpen(true);
-                      }}
-                      className="cb-more-dropdown-item"
-                    >
-                      <div className="cb-more-item-icon emerald">
-                        <FileSpreadsheet size={16} />
-                      </div>
-                      <div className="cb-more-item-text">
-                        <div className="cb-more-item-title">Xuất sổ kế toán Excel</div>
-                        <div className="cb-more-item-sub">Tải file báo cáo thu chi & số dư</div>
-                      </div>
-                    </button>
+                        {/* 4. Export Excel */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsMoreMenuOpen(false);
+                            setIsExportModalOpen(true);
+                          }}
+                          className="cb-more-dropdown-item"
+                        >
+                          <div className="cb-more-item-icon emerald">
+                            <FileSpreadsheet size={16} />
+                          </div>
+                          <div className="cb-more-item-text">
+                            <div className="cb-more-item-title">Xuất sổ kế toán Excel</div>
+                            <div className="cb-more-item-sub">Tải file báo cáo thu chi & số dư</div>
+                          </div>
+                        </button>
+                      </>
+                    )}
                   </div>
                 )}
               </div>
@@ -659,6 +711,9 @@ export const CashbookPage: FC = () => {
             accounts={accounts}
             selectedAccountId={filters.accountId}
             onSelectAccount={handleSelectAccount}
+            onOpenReconcileModal={
+              isEmployee ? undefined : (acc) => setReconcilingAccount(acc)
+            }
           />
         </div>
 
@@ -692,7 +747,7 @@ export const CashbookPage: FC = () => {
               setPageSize(newSize);
               setCurrentPage(1);
             }}
-            onVoidTransaction={handleVoidTransaction}
+            onVoidTransaction={isEmployee ? undefined : handleVoidTransaction}
           />
         </div>
 
@@ -725,6 +780,13 @@ export const CashbookPage: FC = () => {
           onClose={() => setIsTransferModalOpen(false)}
           accounts={accounts}
           onSubmit={handleTransfer}
+        />
+
+        <CashReconciliationModal
+          isOpen={Boolean(reconcilingAccount)}
+          onClose={() => setReconcilingAccount(null)}
+          account={reconcilingAccount}
+          onSubmit={handleReconcileAccount}
         />
 
         <CashbookExportModal

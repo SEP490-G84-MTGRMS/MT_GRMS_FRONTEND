@@ -84,10 +84,15 @@ export const CreateTaxSnapshotModal: React.FC<CreateTaxSnapshotModalProps> = ({
         periodNumber: summary.periodNumber,
         branchId: summary.branchId,
         calculationMethod,
+        tier2Method: summary.tier2Method,
         applyVatReduction2026: applyVatReduction,
         customVatRate,
         customPitRate,
         vatReductionPercentage,
+        confirmEstimatedCogsResponsible: isConfirmed,
+        estimatedCogsConfirmationStatement: summary.isCogsEstimated
+          ? 'Chủ hộ xác nhận chịu trách nhiệm pháp lý đối với giá vốn ước tính tạm thời.'
+          : undefined,
         pin,
         notes: notes.trim() || undefined,
       });

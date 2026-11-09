@@ -22,8 +22,8 @@ export const TriageInboxModal: FC<TriageInboxModalProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [selectedItem, setSelectedItem] = useState<TriageItem | null>(null);
 
-  // Resolution form state
-  const [nature, setNature] = useState<number>(0); // 0 = OperatingExpense, 4 = OwnerDraw
+  // Resolution form state (Backend FinancialNature: 1 = OperatingExpense, 5 = OwnerDraw)
+  const [nature, setNature] = useState<number>(1);
   const [isTaxDeductible, setIsTaxDeductible] = useState<boolean>(false);
   const [category, setCategory] = useState<string>('');
   const [resolutionNote, setResolutionNote] = useState<string>('');
@@ -53,7 +53,7 @@ export const TriageInboxModal: FC<TriageInboxModalProps> = ({
   const handleSelectItem = (item: TriageItem) => {
     setSelectedItem(item);
     setCategory(item.category || 'Chi phí vận hành');
-    setNature(0); // Default OPEX
+    setNature(1); // Default FinancialNature.OperatingExpense = 1
     setIsTaxDeductible(false);
     setResolutionNote(`Chủ cửa hàng duyệt mục ${item.voucherCode}`);
     setError(null);
@@ -172,11 +172,11 @@ export const TriageInboxModal: FC<TriageInboxModalProps> = ({
                     <button
                       type="button"
                       onClick={() => {
-                        setNature(0);
+                        setNature(1);
                         setIsTaxDeductible(true);
                       }}
                       className={`p-2.5 rounded-xl border text-left font-medium transition-all ${
-                        nature === 0
+                        nature === 1
                           ? 'border-teal-600 bg-teal-50 text-teal-900 font-bold'
                           : 'border-gray-200 bg-white text-gray-700'
                       }`}
@@ -190,11 +190,11 @@ export const TriageInboxModal: FC<TriageInboxModalProps> = ({
                     <button
                       type="button"
                       onClick={() => {
-                        setNature(4);
+                        setNature(5);
                         setIsTaxDeductible(false);
                       }}
                       className={`p-2.5 rounded-xl border text-left font-medium transition-all ${
-                        nature === 4
+                        nature === 5
                           ? 'border-indigo-600 bg-indigo-50 text-indigo-900 font-bold'
                           : 'border-gray-200 bg-white text-gray-700'
                       }`}

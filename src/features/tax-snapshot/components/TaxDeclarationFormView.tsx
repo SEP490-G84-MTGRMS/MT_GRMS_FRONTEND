@@ -88,7 +88,7 @@ export const TaxDeclarationFormView: React.FC<TaxDeclarationFormViewProps> = ({
             </h2>
           </div>
           <p style={{ margin: '6px 0 0 0', fontSize: '0.82rem', opacity: 0.9 }}>
-            Kỳ tính thuế: <strong>{periodLabel}</strong> • Hộ kinh doanh: <strong>Tiệm Tạp Hóa Cô Ba</strong>
+            Kỳ tính thuế: <strong>{periodLabel}</strong> • Hộ kinh doanh: <strong>{summary.branchName || 'Điểm kinh doanh chính'}</strong>
           </p>
         </div>
 
@@ -125,7 +125,7 @@ export const TaxDeclarationFormView: React.FC<TaxDeclarationFormViewProps> = ({
                 Phương pháp tính thuế áp dụng
               </strong>
               <span style={{ fontSize: '0.8rem', color: '#64748B' }}>
-                Quy định theo nhóm doanh thu: <strong>Nhóm 2: Doanh thu 1 - 3 tỷ/năm (Chịu thuế phần vượt 1 tỷ)</strong>
+                Quy định theo nhóm doanh thu: <strong>{summary.householdGroupName || 'Nhóm 2: Doanh thu 1 - 3 tỷ/năm'}</strong>
               </span>
             </div>
 
@@ -280,7 +280,7 @@ export const TaxDeclarationFormView: React.FC<TaxDeclarationFormViewProps> = ({
                   <>
                     Doanh thu phát sinh kỳ này: <strong>{formatMoney(summary.taxableRevenueInPeriod)}</strong>.
                     Lũy kế năm {summary.year} đạt <strong>{formatMoney(summary.annualAccumulatedRevenue)}</strong> (đã vượt hạn mức 1 tỷ).{' '}
-                    Số thuế Quý 3 bao gồm thuế GTGT ({formatMoney(summary.vatAmount)}) và thuế TNCN tính trên phần vượt ({formatMoney(summary.pitAmount)}).
+                    Số thuế {periodLabel} bao gồm thuế GTGT ({formatMoney(summary.vatAmount)}) và thuế TNCN ({formatMoney(summary.pitAmount)}).
                   </>
                 )}
               </p>
@@ -307,33 +307,59 @@ export const TaxDeclarationFormView: React.FC<TaxDeclarationFormViewProps> = ({
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
                 <tbody>
                   <tr style={{ borderBottom: '1px solid #F1F5F9' }}>
-                    <td style={{ padding: '12px 16px', color: '#475569', fontWeight: 600 }}>Doanh thu phát sinh kỳ ({periodLabel}):</td>
+                    <td style={{ padding: '12px 16px', color: '#475569', fontWeight: 600 }}>1. Doanh thu thuần phát sinh kỳ ({periodLabel} - Sổ S2b/S2c):</td>
                     <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 800, color: '#0F172A' }}>
                       {formatMoney(summary.taxableRevenueInPeriod)}
                     </td>
                   </tr>
+                  {summary.cogsAmount != null && summary.cogsAmount > 0 && (
+                    <tr style={{ borderBottom: '1px solid #F1F5F9', background: '#FAFAFA' }}>
+                      <td style={{ padding: '10px 16px 10px 28px', color: '#64748B', fontSize: '0.8rem' }}>
+                        • Chi phí nguyên vật liệu, giá vốn hàng bán (Mục 2.a Sổ S2c-HKD){summary.isCogsEstimated ? ' [Ước tính]' : ''}:
+                      </td>
+                      <td style={{ padding: '10px 16px', textAlign: 'right', fontWeight: 600, color: '#475569', fontSize: '0.8rem' }}>
+                        - {formatMoney(summary.cogsAmount)}
+                      </td>
+                    </tr>
+                  )}
+                  {summary.opexAmount != null && summary.opexAmount > 0 && (
+                    <tr style={{ borderBottom: '1px solid #F1F5F9', background: '#FAFAFA' }}>
+                      <td style={{ padding: '10px 16px 10px 28px', color: '#64748B', fontSize: '0.8rem' }}>
+                        • Chi phí nhân công, điện nước, thuê mặt bằng, quản lý (Mục 2.b - 2.e Sổ S2c-HKD):
+                      </td>
+                      <td style={{ padding: '10px 16px', textAlign: 'right', fontWeight: 600, color: '#475569', fontSize: '0.8rem' }}>
+                        - {formatMoney(summary.opexAmount)}
+                      </td>
+                    </tr>
+                  )}
                   <tr style={{ borderBottom: '1px solid #F1F5F9' }}>
-                    <td style={{ padding: '12px 16px', color: '#475569', fontWeight: 600 }}>Chi phí hợp lý được trừ (S2c):</td>
+                    <td style={{ padding: '12px 16px', color: '#475569', fontWeight: 600 }}>2. Tổng chi phí hợp lý được trừ (S2c):</td>
                     <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 800, color: '#0F766E' }}>
                       - {formatMoney(summary.deductibleExpensesInPeriod)}
                     </td>
                   </tr>
                   <tr style={{ borderBottom: '1px solid #F1F5F9', background: '#F8FAFC' }}>
-                    <td style={{ padding: '12px 16px', color: '#0F172A', fontWeight: 700 }}>Thu nhập tính thuế TNCN (Lợi nhuận):</td>
+                    <td style={{ padding: '12px 16px', color: '#0F172A', fontWeight: 700 }}>3. Thu nhập tính thuế TNCN (Chênh lệch Thu - Chi mục 3 S2c):</td>
                     <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 800, color: '#B45309' }}>
                       {formatMoney(summary.taxableIncomeDeclaration)}
                     </td>
                   </tr>
                   <tr style={{ borderBottom: '1px solid #F1F5F9' }}>
-                    <td style={{ padding: '12px 16px', color: '#475569' }}>Thuế GTGT ({summary.vatRate}% doanh thu):</td>
+                    <td style={{ padding: '12px 16px', color: '#475569' }}>4. Thuế GTGT phải nộp (Sổ S2b-HKD - {summary.vatRate}% doanh thu):</td>
                     <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: '#0F766E' }}>
                       {formatMoney(summary.vatAmount)}
                     </td>
                   </tr>
-                  <tr>
-                    <td style={{ padding: '12px 16px', color: '#475569' }}>Thuế TNCN ({summary.pitRate}% thu nhập tính thuế):</td>
+                  <tr style={{ borderBottom: '1px solid #F1F5F9' }}>
+                    <td style={{ padding: '12px 16px', color: '#475569' }}>5. Thuế TNCN phải nộp (Mục 4 Sổ S2c-HKD - {summary.pitRate}% thu nhập tính thuế):</td>
                     <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: '#7C3AED' }}>
                       {formatMoney(summary.pitAmount)}
+                    </td>
+                  </tr>
+                  <tr style={{ background: '#F8FAFC' }}>
+                    <td style={{ padding: '14px 16px', fontWeight: 800, color: '#0F172A' }}>Tổng số thuế phải nộp ({periodLabel}):</td>
+                    <td style={{ padding: '14px 16px', textAlign: 'right', fontWeight: 900, color: '#0F766E', fontSize: '1.15rem' }}>
+                      {formatMoney(summary.totalTaxAmount)}
                     </td>
                   </tr>
                 </tbody>
@@ -477,7 +503,7 @@ export const TaxDeclarationFormView: React.FC<TaxDeclarationFormViewProps> = ({
 
               {/* COGS Notice for Declaration Method */}
               <div style={{ borderTop: '1px solid #E2E8F0', paddingTop: 10, fontSize: '0.76rem', color: '#64748B', lineHeight: 1.5 }}>
-                <strong>Lưu ý về Giá vốn hàng bán (COGS):</strong> Theo quy định, phương pháp Kê khai tính thuế trên Lợi nhuận = Doanh thu - Giá vốn hàng bán - Chi phí hợp lý. Cần máy chủ Backend hỗ trợ tính trừ Giá vốn hàng bán vào chi phí được trừ khi đồng bộ hóa dữ liệu kho.
+                <strong>Lưu ý về Giá vốn hàng bán (COGS):</strong> Theo Thông tư 152/2025/TT-BTC, phương pháp Kê khai tính thuế trên Chênh lệch Thu - Chi = Doanh thu thuần - Giá vốn hàng bán (Mục 2.a Sổ S2c-HKD kết chuyển từ Sổ S2d-HKD theo giá vốn thực tế khi xuất bán) - Chi phí vận hành hợp lý (Mục 2.b đến 2.e Sổ S2c-HKD).
               </div>
             </div>
           )}

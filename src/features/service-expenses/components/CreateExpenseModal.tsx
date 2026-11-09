@@ -111,6 +111,9 @@ export const CreateExpenseModal: FC<CreateExpenseModalProps> = ({
     vendorName: '',
     isRecurring: false,
     recurringDayOfMonth: 1,
+    isTaxDeductible: true,
+    invoiceNumber: '',
+    sellerTaxCode: '',
     attachedBillUrl: '',
     note: '',
   }));
@@ -219,6 +222,9 @@ export const CreateExpenseModal: FC<CreateExpenseModalProps> = ({
         expenseDate: formData.expenseDate,
         dueDate: formData.dueDate,
         vendorName: formData.vendorName.trim(),
+        isTaxDeductible: formData.isTaxDeductible,
+        invoiceNumber: formData.invoiceNumber.trim() || undefined,
+        sellerTaxCode: formData.sellerTaxCode.trim() || undefined,
         attachedBillUrl: formData.attachedBillUrl.trim() || undefined,
         note: formData.note.trim() || undefined,
       });
@@ -596,6 +602,67 @@ export const CreateExpenseModal: FC<CreateExpenseModalProps> = ({
                   />
                   {errors.vendorName && (
                     <p className="form-error">{errors.vendorName}</p>
+                  )}
+                </div>
+
+                {/* Tax Classification & Invoice Info (Một sổ hai góc nhìn - TT152) */}
+                <div
+                  style={{
+                    background: formData.isTaxDeductible ? '#F0FDFA' : '#FFFBEB',
+                    border: formData.isTaxDeductible ? '1px solid #CCFBF1' : '1px solid #FDE68A',
+                    borderRadius: '12px',
+                    padding: '12px 14px',
+                    marginBottom: '14px',
+                  }}
+                >
+                  <label
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      fontSize: '0.82rem',
+                      fontWeight: 700,
+                      color: formData.isTaxDeductible ? '#115E59' : '#92400E',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={formData.isTaxDeductible}
+                      onChange={(e) => handleChange('isTaxDeductible', e.target.checked)}
+                    />
+                    <span>
+                      {formData.isTaxDeductible
+                        ? 'Chi phí hợp lệ được trừ thuế (Có hóa đơn/chứng từ SXKD)'
+                        : 'Khoản chi nội bộ / Không hợp lệ trừ thuế (Blacklist)'}
+                    </span>
+                  </label>
+                  {formData.isTaxDeductible && (
+                    <div
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: '1fr 1fr',
+                        gap: '10px',
+                        marginTop: '10px',
+                      }}
+                    >
+                      <input
+                        type="text"
+                        placeholder="Số hóa đơn (VD: HD00123)"
+                        value={formData.invoiceNumber}
+                        onChange={(e) => handleChange('invoiceNumber', e.target.value)}
+                        className="form-input"
+                        style={{ height: '36px', fontSize: '0.78rem' }}
+                      />
+                      <input
+                        type="text"
+                        placeholder="MST người bán (VD: 0301234567)"
+                        value={formData.sellerTaxCode}
+                        onChange={(e) => handleChange('sellerTaxCode', e.target.value)}
+                        className="form-input"
+                        style={{ height: '36px', fontSize: '0.78rem' }}
+                      />
+                    </div>
                   )}
                 </div>
 

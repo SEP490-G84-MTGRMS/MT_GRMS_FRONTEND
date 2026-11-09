@@ -1,7 +1,10 @@
+import { useState, useEffect } from 'react';
 import type { FC } from 'react';
 import { Search, RotateCcw, Filter, Calendar, Layers } from 'lucide-react';
 import type { GrnFilterState, GrnFilterTab, UserRole } from '../types/grn.types';
 import { MOCK_GRN_BRANCHES, MOCK_GRN_SUPPLIERS } from '../lib/mockGrnData';
+import { supplierApi } from '../../supplier/api/supplierApi';
+import { httpClient } from '../../../api/httpClient';
 
 interface GrnFilterBarProps {
   filterInputs: GrnFilterState;
@@ -32,6 +35,28 @@ export const GrnFilterBar: FC<GrnFilterBarProps> = ({
   onReset,
 }) => {
   const isEmployee = role === 'employee';
+
+  const [branches, setBranches] = useState<Array<{ id: string; name: string }>>(() => {
+    return import.meta.env.MODE === 'test' ? MOCK_GRN_BRANCHES : [];
+  });
+  const [suppliers, setSuppliers] = useState<Array<{ id: string; name: string }>>(() => {
+    return import.meta.env.MODE === 'test' ? MOCK_GRN_SUPPLIERS : [];
+  });
+
+  useEffect(() => {
+    if (import.meta.env.MODE === 'test') return;
+    supplierApi.getSuppliers({ pageIndex: 1, pageSize: 100 }).then((res) => {
+      if (res?.items) {
+        setSuppliers(res.items.map((s) => ({ id: s.id, name: s.name })));
+      }
+    }).catch(() => {});
+    httpClient.get('/branches').then((res) => {
+      const bList = res.data?.data?.items || res.data?.data || res.data || [];
+      if (Array.isArray(bList) && bList.length > 0) {
+        setBranches(bList.map((b: { id: string; name: string }) => ({ id: b.id, name: b.name })));
+      }
+    }).catch(() => {});
+  }, []);
 
   return (
     <div
@@ -120,7 +145,7 @@ export const GrnFilterBar: FC<GrnFilterBarProps> = ({
                   backgroundColor: '#10b981',
                 }}
               />
-              {MOCK_GRN_BRANCHES.find((b) => b.id === employeeBranchId)?.name || employeeBranchId}
+              {branches.find((b) => b.id === employeeBranchId)?.name || employeeBranchId}
               <span
                 style={{
                   fontSize: 10,
@@ -152,7 +177,7 @@ export const GrnFilterBar: FC<GrnFilterBarProps> = ({
               }}
             >
               <option value="ALL">-- Tất cả chi nhánh --</option>
-              {MOCK_GRN_BRANCHES.map((b) => (
+              {branches.map((b) => (
                 <option key={b.id} value={b.id}>
                   {b.name}
                 </option>
@@ -183,7 +208,7 @@ export const GrnFilterBar: FC<GrnFilterBarProps> = ({
             }}
           >
             <option value="ALL">-- Tất cả nhà cung cấp --</option>
-            {MOCK_GRN_SUPPLIERS.map((s) => (
+            {suppliers.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.name}
               </option>

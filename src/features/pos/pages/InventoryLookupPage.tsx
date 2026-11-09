@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import type { FC } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
@@ -15,11 +15,11 @@ import {
   Store,
   Tag,
 } from 'lucide-react';
-import { mockProductsStockLookup } from '../mock/inventoryMockData';
 import type {
   ProductStockLookupDTO,
   FefoBatchDTO,
 } from '../types/inventory.types';
+import { posOrderApi } from '../api/posOrderApi';
 import '../pos.css';
 
 export const InventoryLookupPage: FC = () => {
@@ -37,15 +37,91 @@ export const InventoryLookupPage: FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
 
+  // Danh sách sản phẩm thực tế từ Backend
+  const [productsList, setProductsList] = useState<ProductStockLookupDTO[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+
   // Sản phẩm đang được chọn xem chi tiết
-  const [selectedProduct, setSelectedProduct] = useState<ProductStockLookupDTO>(
-    mockProductsStockLookup[0]
-  );
+  const [selectedProduct, setSelectedProduct] = useState<ProductStockLookupDTO | null>(null);
 
   // Danh sách Lô hàng của sản phẩm đang chọn
-  const [currentBatches, setCurrentBatches] = useState<FefoBatchDTO[]>(
-    mockProductsStockLookup[0].batches
-  );
+  const [currentBatches, setCurrentBatches] = useState<FefoBatchDTO[]>([]);
+
+  useEffect(() => {
+    let isMounted = true;
+    setIsLoading(true);
+    posOrderApi
+      .getAllProducts()
+      .then((rawProducts) => {
+        if (!isMounted) return;
+        const mapped: ProductStockLookupDTO[] = (rawProducts || []).map((p) => ({
+          productId: p.id,
+          sku: p.sku,
+          barcode: p.barcode,
+          name: p.name,
+          categoryCode: p.category,
+          categoryName: p.category,
+          baseUnit: p.baseUnit,
+          totalSystemStock: p.quantityOnHand || 0,
+          branchStocks: [
+            {
+              branchId: 'BR-01',
+              branchName: 'Chi nhánh chính (Quầy 01)',
+              address: 'Số 123 Đường Cầu Giấy, Hà Nội',
+              physicalStock: p.quantityOnHand || 0,
+              availableStock: p.quantityOnHand || 0,
+              onHoldStock: 0,
+              minSafetyThreshold: 10,
+              unitName: p.baseUnit,
+              isCurrentBranch: true,
+              status: (p.quantityOnHand || 0) > 10 ? 'sufficient' : 'low',
+            },
+          ],
+          prices: [
+            {
+              unitId: `unit-${p.id}`,
+              unitName: p.baseUnit,
+              conversionFactor: 1,
+              retailPrice: p.basePrice,
+              isBaseUnit: true,
+            },
+          ],
+          batches: [
+            {
+              batchId: `BATCH-${p.sku}`,
+              productId: p.id,
+              productName: p.name,
+              supplierName: 'Nhà cung cấp chính',
+              mfgDate: '01/01/2026',
+              expDate: '31/12/2026',
+              daysRemaining: 60,
+              availableQty: p.quantityOnHand || 0,
+              unitName: p.baseUnit,
+              fefoPriorityRank: 1,
+              expiryRiskLevel: 'safe',
+              isClearanceDiscountApplied: false,
+              clearanceDiscountPercent: 0,
+            },
+          ],
+        }));
+
+        setProductsList(mapped);
+        if (mapped.length > 0) {
+          setSelectedProduct(mapped[0]);
+          setCurrentBatches(mapped[0].batches);
+        }
+      })
+      .catch((err) => {
+        console.warn('Lỗi tải sản phẩm tồn kho:', err);
+      })
+      .finally(() => {
+        if (isMounted) setIsLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // Modals state
   const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
@@ -66,7 +142,7 @@ export const InventoryLookupPage: FC = () => {
 
   // Lọc danh sách gợi ý sản phẩm
   const filteredProducts = useMemo(() => {
-    return mockProductsStockLookup.filter((p) => {
+    return productsList.filter((p) => {
       const matchCat = selectedCategory === 'ALL' || p.categoryCode === selectedCategory;
       const matchQuery =
         !searchQuery.trim() ||
@@ -129,7 +205,7 @@ export const InventoryLookupPage: FC = () => {
   // Gửi yêu cầu chuyển kho
   const handleSubmitTransfer = () => {
     setIsTransferModalOpen(false);
-    showToast(`Đã lập yêu cầu chuyển ${transferQty} ${selectedProduct.baseUnit} từ ${transferFromBranch}!`);
+    showToast(`Đã lập yêu cầu chuyển ${transferQty} ${selectedProduct?.baseUnit || ''} từ ${transferFromBranch}!`);
     setTransferNotes('');
   };
 
@@ -175,7 +251,7 @@ export const InventoryLookupPage: FC = () => {
           <button
             type="button"
             className="pos-btn-primary-pill"
-            onClick={() => handleAddToCartPOS(selectedProduct)}
+            onClick={() => (selectedProduct ? handleAddToCartPOS(selectedProduct) : navigate(salesPath))}
             title="Đưa sản phẩm đang chọn về giỏ hàng POS"
           >
             <ShoppingCart size={14} />
@@ -272,8 +348,12 @@ export const InventoryLookupPage: FC = () => {
                   type="button"
                   className="pos-btn-secondary-pill"
                   onClick={() => {
-                    handleSelectProduct(mockProductsStockLookup[0]);
-                    showToast(`Quét Barcode 8934567890123: Khớp sản phẩm ${mockProductsStockLookup[0].name}`);
+                    if (productsList.length > 0) {
+                      handleSelectProduct(productsList[0]);
+                      showToast(`Quét mã: Khớp sản phẩm ${productsList[0].name}`);
+                    } else {
+                      showToast('Kho hàng hiện chưa có sản phẩm nào');
+                    }
                   }}
                   title="Mô phỏng quét mã vạch bằng máy quét"
                 >
@@ -306,7 +386,7 @@ export const InventoryLookupPage: FC = () => {
                   </thead>
                   <tbody>
                     {filteredProducts.map((p) => {
-                      const isSelected = selectedProduct.productId === p.productId;
+                      const isSelected = selectedProduct?.productId === p.productId;
                       const avail = p.branchStocks[0]?.availableStock || 0;
                       return (
                         <tr
@@ -370,14 +450,16 @@ export const InventoryLookupPage: FC = () => {
           </div>
 
           {/* CARD TÓM TẮT SẢN PHẨM ĐANG CHỌN */}
-          <div
-            className="pos-shift-card"
-            style={{
-              borderColor: '#99f6e4',
-              backgroundColor: '#f0fdfa',
-              borderLeft: '4px solid #0f766e',
-            }}
-          >
+          {selectedProduct ? (
+            <>
+              <div
+                className="pos-shift-card"
+                style={{
+                  borderColor: '#99f6e4',
+                  backgroundColor: '#f0fdfa',
+                  borderLeft: '4px solid #0f766e',
+                }}
+              >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -677,8 +759,19 @@ export const InventoryLookupPage: FC = () => {
               </table>
             </div>
           </div>
+        </>
+      ) : (
+        <div className="pos-shift-card" style={{ padding: '48px', textAlign: 'center', color: '#64748b' }}>
+          <p style={{ fontSize: 16, fontWeight: 700, color: '#334155', margin: 0 }}>
+            {isLoading ? '⏳ Đang tải dữ liệu tồn kho...' : 'Chưa có sản phẩm nào trong kho'}
+          </p>
+          <p style={{ fontSize: 13, margin: '8px 0 0' }}>
+            Vui lòng kiểm tra lại kết nối mạng hoặc thêm sản phẩm trong phân hệ Danh mục Hàng hóa.
+          </p>
         </div>
-      </main>
+      )}
+    </div>
+  </main>
 
       {/* MODAL 1: YÊU CẦU ĐIỀU CHUYỂN KHO NỘI BỘ - CHUẨN POS MODAL */}
       {isTransferModalOpen && (
@@ -708,7 +801,7 @@ export const InventoryLookupPage: FC = () => {
                 <input
                   type="text"
                   className="filter-select w-full"
-                  value={`${selectedProduct.sku} - ${selectedProduct.name}`}
+                  value={selectedProduct ? `${selectedProduct.sku} - ${selectedProduct.name}` : ''}
                   readOnly
                   style={{ backgroundColor: '#f8fafc', fontWeight: 600 }}
                 />
@@ -738,7 +831,7 @@ export const InventoryLookupPage: FC = () => {
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-slate-700 block mb-1">Số lượng yêu cầu ({selectedProduct.baseUnit}):</label>
+                <label className="text-xs font-semibold text-slate-700 block mb-1">Số lượng yêu cầu ({selectedProduct?.baseUnit || ''}):</label>
                 <input
                   type="number"
                   className="filter-select w-full font-mono font-bold"

@@ -4,9 +4,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { CheckCircle2 } from 'lucide-react';
 import type { OrderTab, CartItem, Product, Customer, ReceiptData } from '../types/pos.types';
 import {
-  mockProducts,
   initialCategories,
-  mockCustomers,
   createInitialCartItem,
 } from '../mock/posMockData';
 import { PosHeader } from '../components/PosHeader';
@@ -76,12 +74,13 @@ export const PosCheckoutPage: FC = () => {
   const location = useLocation();
   const { user } = useAuthStore();
   const currentTenantId = user?.tenantId || 'tenant_mt_mart_01';
-  const isDefaultDemoStore = currentTenantId === 'tenant_mt_mart_01';
 
   // Kho sản phẩm & danh sách khách hàng (Cách ly theo từng Cửa Hàng / Tenant)
-  // Chỉ cửa hàng mẫu MT-Mart mới nạp mock ban đầu; Chủ cửa hàng khác bắt đầu với dữ liệu trống
-  const [products, setProducts] = useState<Product[]>(() => (isDefaultDemoStore ? mockProducts : []));
-  const [customers, setCustomers] = useState<Customer[]>(() => (isDefaultDemoStore ? mockCustomers : []));
+  // Kho sản phẩm & danh sách khách hàng thực tế từ Backend CSDL (PostgreSQL)
+  const [products, setProducts] = useState<Product[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [isLoadingBackendData, setIsLoadingBackendData] = useState<boolean>(true);
+  const [backendLoadError, setBackendLoadError] = useState<string | null>(null);
 
   // Tab Đa đơn hàng (Multi-tab orders) được lưu trữ riêng biệt theo từng TenantId
   const [tabs, setTabs] = useState<OrderTab[]>(() => getInitialTabs(currentTenantId));
@@ -95,19 +94,12 @@ export const PosCheckoutPage: FC = () => {
     }, 4000);
   };
 
-  // Khi chuyển đổi tài khoản (TenantId thay đổi) -> reset và nạp dữ liệu riêng của Tenant đó
+  // Khi chuyển đổi tài khoản (TenantId thay đổi) -> reset tabs
   useEffect(() => {
     const freshTabs = getInitialTabs(currentTenantId);
     setTabs(freshTabs);
     setActiveTabId(getInitialActiveTabId(currentTenantId, freshTabs));
-    if (!isDefaultDemoStore) {
-      setProducts([]);
-      setCustomers([]);
-    } else {
-      setProducts(mockProducts);
-      setCustomers(mockCustomers);
-    }
-  }, [currentTenantId, isDefaultDemoStore]);
+  }, [currentTenantId]);
 
   // Tự động đồng bộ giỏ hàng và các hóa đơn vào localStorage theo TenantId
   useEffect(() => {
@@ -142,36 +134,32 @@ export const PosCheckoutPage: FC = () => {
   // Tab hiện tại
   const currentTab = tabs.find((t) => t.id === activeTabId) || tabs[0];
 
-  // Nạp dữ liệu thực tế từ Backend CSDL (PostgreSQL) theo Tenant hiện tại
+  // Nạp dữ liệu thực tế 100% từ Backend CSDL (PostgreSQL) theo Tenant hiện tại
   useEffect(() => {
     let isMounted = true;
     const fetchBackendData = async () => {
+      setIsLoadingBackendData(true);
+      setBackendLoadError(null);
       try {
         const [apiProducts, apiCustomers] = await Promise.all([
-          posOrderApi.getAllProducts().catch(() => null),
-          posOrderApi.getAllCustomers().catch(() => null),
+          posOrderApi.getAllProducts(),
+          posOrderApi.getAllCustomers(),
         ]);
 
         if (isMounted) {
-          if (apiProducts) {
-            if (isDefaultDemoStore) {
-              setProducts(apiProducts.length > 0 ? apiProducts : mockProducts);
-            } else {
-              // Cửa hàng khác: Tuyệt đối không hiển thị sản phẩm của MT-Mart
-              setProducts(apiProducts);
-            }
-          }
-          if (apiCustomers) {
-            if (isDefaultDemoStore) {
-              setCustomers(apiCustomers.length > 0 ? apiCustomers : mockCustomers);
-            } else {
-              // Cửa hàng khác: Tuyệt đối không hiển thị khách hàng của MT-Mart
-              setCustomers(apiCustomers);
-            }
-          }
+          setProducts(apiProducts || []);
+          setCustomers(apiCustomers || []);
         }
       } catch (err) {
-        console.warn('Backend load failed, fallback to local cache:', err);
+        console.warn('Backend load failed:', err);
+        if (isMounted) {
+          setBackendLoadError('Không thể kết nối đến máy chủ Backend để nạp danh mục hàng hóa.');
+          showToast('Không thể kết nối máy chủ để nạp hàng hóa POS', 'error');
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoadingBackendData(false);
+        }
       }
     };
 
@@ -179,7 +167,7 @@ export const PosCheckoutPage: FC = () => {
     return () => {
       isMounted = false;
     };
-  }, [currentTenantId, isDefaultDemoStore]);
+  }, [currentTenantId]);
 
   // Helper cập nhật Tab hiện tại
   const updateCurrentTab = (updater: Partial<OrderTab>) => {
@@ -604,8 +592,42 @@ export const PosCheckoutPage: FC = () => {
         }}
       />
 
-      {/* Thông báo độc lập dữ liệu cho cửa hàng mới (Tenant Isolation) */}
-      {!isDefaultDemoStore && products.length === 0 && (
+      {/* Trạng thái lỗi kết nối Backend */}
+      {backendLoadError && (
+        <div style={{
+          margin: '8px 16px 0 16px',
+          padding: '10px 16px',
+          backgroundColor: '#fef2f2',
+          border: '1px solid #fecaca',
+          borderRadius: 8,
+          fontSize: 13,
+          color: '#b91c1c',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between'
+        }}>
+          <span>⚠️ {backendLoadError}</span>
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            style={{
+              background: '#dc2626',
+              color: '#fff',
+              border: 'none',
+              padding: '4px 10px',
+              borderRadius: 4,
+              cursor: 'pointer',
+              fontWeight: 600,
+              fontSize: 12
+            }}
+          >
+            Tải lại
+          </button>
+        </div>
+      )}
+
+      {/* Trạng thái kho hàng rỗng (Empty state) */}
+      {!isLoadingBackendData && !backendLoadError && products.length === 0 && (
         <div style={{
           margin: '8px 16px 0 16px',
           padding: '8px 14px',
@@ -619,10 +641,10 @@ export const PosCheckoutPage: FC = () => {
           justifyContent: 'space-between'
         }}>
           <span>
-            🏪 <b>{user?.tenantName || 'Cửa hàng của bạn'}</b>: Dữ liệu phân lập an toàn (Multi-tenant). Kho hàng của tiệm này chưa có sản phẩm nào.
+            🏪 <b>{user?.tenantName || 'Cửa hàng của bạn'}</b>: Kho hàng thực tế từ hệ thống hiện chưa có sản phẩm nào. Vui lòng vào mục Quản lý Hàng hóa để nhập sản phẩm.
           </span>
           <span style={{ fontSize: 11.5, color: '#15803d', fontWeight: 600 }}>
-            🔒 Độc lập 100% &bull; Không chia sẻ dữ liệu với cửa hàng khác
+            🔒 Dữ liệu thực từ CSDL Backend
           </span>
         </div>
       )}

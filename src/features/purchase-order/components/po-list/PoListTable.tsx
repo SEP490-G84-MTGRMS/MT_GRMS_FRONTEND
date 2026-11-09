@@ -4,6 +4,9 @@ import {
   Truck,
   Eye,
   Edit3,
+  CheckCircle2,
+  XCircle,
+  PackageCheck,
   ArrowUpDown,
   ChevronLeft,
   ChevronRight,
@@ -20,6 +23,9 @@ interface PoListTableProps {
   onPageSizeChange?: (size: number) => void;
   onViewDetail: (order: PurchaseOrderListItem) => void;
   onEditOrder?: (order: PurchaseOrderListItem) => void;
+  onApproveOrder?: (order: PurchaseOrderListItem) => void;
+  onCancelOrder?: (order: PurchaseOrderListItem) => void;
+  onReceiveNow?: (order: PurchaseOrderListItem) => void;
 }
 
 type SortField = 'poCode' | 'supplier' | 'branch' | 'lastUpdated' | 'expectedDelivery' | 'itemCount' | 'totalAmount' | 'status';
@@ -34,6 +40,9 @@ export const PoListTable: FC<PoListTableProps> = ({
   onPageSizeChange,
   onViewDetail,
   onEditOrder,
+  onApproveOrder,
+  onCancelOrder,
+  onReceiveNow,
 }) => {
   const [sortField, setSortField] = useState<SortField | null>(null);
   const [sortDir, setSortDir] = useState<SortDirection>('asc');
@@ -107,6 +116,47 @@ export const PoListTable: FC<PoListTableProps> = ({
   // Render Status Badge
   const renderStatusBadge = (status: PurchaseOrderStatus) => {
     switch (status) {
+      case 'PENDING_APPROVAL':
+        return (
+          <span
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 4,
+              padding: '2px 8px',
+              borderRadius: 4,
+              fontSize: 11.5,
+              fontWeight: 700,
+              backgroundColor: '#ffedd5',
+              color: '#c2410c',
+              border: '1px solid #fed7aa',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            🟠 Chờ duyệt
+          </span>
+        );
+      case 'APPROVED':
+        return (
+          <span
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 4,
+              padding: '2px 8px',
+              borderRadius: 4,
+              fontSize: 11.5,
+              fontWeight: 700,
+              backgroundColor: '#dcfce7',
+              color: '#15803d',
+              border: '1px solid #86efac',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            🟢 Đã duyệt
+          </span>
+        );
+      case 'DISPATCHED':
       case 'SENT':
         return (
           <span
@@ -168,6 +218,7 @@ export const PoListTable: FC<PoListTableProps> = ({
           </span>
         );
       case 'RECEIVED':
+      case 'COMPLETED':
         return (
           <span
             style={{
@@ -187,6 +238,7 @@ export const PoListTable: FC<PoListTableProps> = ({
             🔵 Đã nhập kho
           </span>
         );
+      case 'REJECTED':
       case 'CANCELLED':
         return (
           <span
@@ -205,6 +257,26 @@ export const PoListTable: FC<PoListTableProps> = ({
             }}
           >
             🔴 Đã hủy
+          </span>
+        );
+      default:
+        return (
+          <span
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 4,
+              padding: '2px 8px',
+              borderRadius: 4,
+              fontSize: 11.5,
+              fontWeight: 700,
+              backgroundColor: '#f1f5f9',
+              color: '#475569',
+              border: '1px solid #cbd5e1',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {status}
           </span>
         );
     }
@@ -626,39 +698,117 @@ export const PoListTable: FC<PoListTableProps> = ({
                           <span>Chi tiết</span>
                         </button>
 
-                        {(order.status === 'SENT' || order.status === 'CONFIRMED') && onEditOrder && (
+                        {order.status === 'PENDING_APPROVAL' && onApproveOrder && (
                           <button
                             type="button"
-                            onClick={() => onEditOrder(order)}
+                            onClick={() => onApproveOrder(order)}
                             style={{
                               display: 'inline-flex',
                               alignItems: 'center',
-                              justifyContent: 'center',
-                              width: 28,
+                              gap: 4,
                               height: 28,
+                              padding: '0 8px',
                               borderRadius: 6,
                               fontSize: 12,
-                              backgroundColor: '#ffffff',
-                              border: '1px solid #cbd5e1',
-                              color: '#64748b',
+                              fontWeight: 600,
+                              backgroundColor: '#ecfdf5',
+                              border: '1px solid #6ee7b7',
+                              color: '#047857',
                               cursor: 'pointer',
-                              transition: 'all 0.15s ease',
+                              whiteSpace: 'nowrap',
                             }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.borderColor = '#0284c7';
-                              e.currentTarget.style.color = '#0284c7';
-                              e.currentTarget.style.backgroundColor = '#f0f9ff';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.borderColor = '#cbd5e1';
-                              e.currentTarget.style.color = '#64748b';
-                              e.currentTarget.style.backgroundColor = '#ffffff';
-                            }}
-                            title="Chỉnh sửa đơn mua hàng"
+                            title="Duyệt đơn đặt hàng PO"
                           >
-                            <Edit3 size={12} />
+                            <CheckCircle2 size={12} />
+                            <span>Duyệt</span>
                           </button>
                         )}
+
+                        {(order.status === 'APPROVED' ||
+                          order.status === 'DISPATCHED' ||
+                          order.status === 'SENT' ||
+                          order.status === 'CONFIRMED') &&
+                          onReceiveNow && (
+                            <button
+                              type="button"
+                              onClick={() => onReceiveNow(order)}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 4,
+                                height: 28,
+                                padding: '0 8px',
+                                borderRadius: 6,
+                                fontSize: 12,
+                                fontWeight: 700,
+                                backgroundColor: '#0d9488',
+                                border: 'none',
+                                color: '#ffffff',
+                                cursor: 'pointer',
+                                whiteSpace: 'nowrap',
+                              }}
+                              title="Tạo phiếu nhập kho ngay cho đơn PO này (FE-7)"
+                            >
+                              <PackageCheck size={12} />
+                              <span>Nhập kho ngay</span>
+                            </button>
+                          )}
+
+                        {(order.status === 'PENDING_APPROVAL' ||
+                          order.status === 'APPROVED' ||
+                          order.status === 'DISPATCHED' ||
+                          order.status === 'SENT' ||
+                          order.status === 'CONFIRMED') &&
+                          onEditOrder && (
+                            <button
+                              type="button"
+                              onClick={() => onEditOrder(order)}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                width: 28,
+                                height: 28,
+                                borderRadius: 6,
+                                fontSize: 12,
+                                backgroundColor: '#ffffff',
+                                border: '1px solid #cbd5e1',
+                                color: '#64748b',
+                                cursor: 'pointer',
+                                transition: 'all 0.15s ease',
+                              }}
+                              title="Mở bảng ma trận chỉnh sửa đơn PO"
+                            >
+                              <Edit3 size={12} />
+                            </button>
+                          )}
+
+                        {(order.status === 'PENDING_APPROVAL' ||
+                          order.status === 'APPROVED' ||
+                          order.status === 'DISPATCHED' ||
+                          order.status === 'SENT') &&
+                          onCancelOrder && (
+                            <button
+                              type="button"
+                              onClick={() => onCancelOrder(order)}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                width: 28,
+                                height: 28,
+                                borderRadius: 6,
+                                fontSize: 12,
+                                backgroundColor: '#fff1f2',
+                                border: '1px solid #fecdd3',
+                                color: '#e11d48',
+                                cursor: 'pointer',
+                              }}
+                              title="Hủy đơn mua hàng PO"
+                            >
+                              <XCircle size={12} />
+                            </button>
+                          )}
                       </div>
                     </td>
                   </tr>
