@@ -143,7 +143,7 @@ export const InvoiceManagementPage: FC = () => {
     const targetBranchId = branchFilter !== 'ALL' ? branchFilter : (assignedBranch.id.startsWith('BR-') ? 'cd5e8d1b-b08b-448d-beff-b85ea5873d52' : assignedBranch.id);
     posShiftApi.getCurrentShift(targetBranchId).then((s) => {
       if (s) setActiveShiftCash(s.expectedCash);
-    }).catch(() => {});
+    }).catch(() => { });
   }, [branchFilter, assignedBranch.id]);
 
   // Khi chuyển tài khoản hoặc đăng nhập chủ cửa hàng khác -> Reset danh sách hóa đơn
@@ -382,9 +382,10 @@ export const InvoiceManagementPage: FC = () => {
 
   // Xác nhận Đổi / Trả hàng chuẩn KiotViet
   const handleConfirmReturnExchange = async (data: {
-    returnedItems: Array<{ productId: string; quantity: number; unitPrice: number }>;
-    newItems: Array<{ productId: string; quantity: number; unitPrice: number; discountAmount?: number }>;
+    returnedItems: Array<{ productId: string; quantity: number; unitPrice: number; unitName?: string; condition?: 'Restock' | 'Damaged' }>;
+    newItems: Array<{ productId: string; quantity: number; unitPrice: number; unitName?: string; discountAmount?: number }>;
     settlementMethod: string;
+    reason?: string;
     note?: string;
   }) => {
     if (!returnExchangeModalInvoice) return;
@@ -437,6 +438,12 @@ export const InvoiceManagementPage: FC = () => {
           setInvoices(mapped);
         }
       });
+
+      // Tự động đồng bộ lại tiền mặt trong két quầy của ca hiện tại
+      const targetBranchId = branchFilter !== 'ALL' ? branchFilter : (assignedBranch.id.startsWith('BR-') ? 'cd5e8d1b-b08b-448d-beff-b85ea5873d52' : assignedBranch.id);
+      posShiftApi.getCurrentShift(targetBranchId).then((s) => {
+        if (s) setActiveShiftCash(s.expectedCash);
+      }).catch(() => { });
     } catch (e: any) {
       alert(`Lỗi khi xử lý đổi trả: ${e?.message || 'Không thể kết nối máy chủ'}`);
     }
