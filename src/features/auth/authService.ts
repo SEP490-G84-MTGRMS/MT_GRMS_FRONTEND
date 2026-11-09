@@ -1,11 +1,13 @@
 import { httpClient } from '../../api/httpClient';
-import { ApiError } from './authTypes';
+import { ApiError, UserRoleEnum } from './authTypes';
 import type {
   AuthResponse,
   LoginCredentials,
   RegisterPayload,
   ResetPasswordPayload,
   UserProfile,
+  UserRole,
+  UserRoleType,
 } from './authTypes';
 
 const SEED_TENANT_ID = 'tenant_mt_mart_01';
@@ -23,25 +25,24 @@ type BackendLoginUser = {
   isAdmin?: boolean;
 };
 
-function mapRole(roleName?: string): UserProfile['role'] {
-  const role = (roleName || '').toUpperCase();
-  if (role === 'CASHIER' || role === 'EMPLOYEE' || role === 'STAFF') return 'CASHIER';
-  if (role === 'MANAGER' || role === 'BRANCH_MANAGER') return 'MANAGER';
-  if (role === 'STORE_OWNER') return 'STORE_OWNER';
-  if (role === 'EMPLOYEE' || role === 'STAFF') return 'EMPLOYEE';
-  if (role === 'ADMIN') return 'ADMIN';
-  return 'STORE_OWNER';
+function mapRole(roleName?: string): UserRole {
+  const role = (roleName || '').trim().toUpperCase();
+  if (role === 'ADMIN' || role === 'SUPER_ADMIN') return UserRoleEnum.ADMIN;
+  if (role === 'STORE_OWNER' || role === 'TENANT_ADMIN' || role === 'OWNER') return UserRoleEnum.STORE_OWNER;
+  return UserRoleEnum.STAFF;
 }
 
 function mapLoginUser(user: BackendLoginUser): UserProfile {
   const isUserAdmin = Boolean(
     user.isAdmin ?? (user.role === 'ADMIN' || user.roleName === 'ADMIN')
   );
+  const resolvedRole = isUserAdmin ? UserRoleEnum.ADMIN : mapRole(user.roleName || user.role);
   return {
     id: user.id,
     email: user.email,
     fullName: user.fullName,
-    role: (isUserAdmin ? 'ADMIN' : mapRole(user.roleName || user.role)) as UserProfile['role'],
+    role: resolvedRole,
+    userRole: resolvedRole as UserRoleType,
     tenantId: user.tenantId || SEED_TENANT_ID,
     branchId: user.branchId || undefined,
     phone: user.phone,

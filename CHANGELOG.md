@@ -7,6 +7,7 @@ Toàn bộ các thay đổi của repository Frontend React SPA được tổng 
 ## [Unreleased] - 2026-11-09
 
 ### Added
+- Chuẩn hóa hệ thống phân quyền với enum `UserRoleEnum` ({ `ADMIN`, `STORE_OWNER`, `STAFF` }) tương thích tiêu chuẩn `erasableSyntaxOnly`; cập nhật `UserProfile.role` và `userRole`; đổi tên key `localStorage` trạng thái sidebar sang `ui_sidebar_open` để phân tách rạch ròi với quyền hạn admin [FE-AUTH] [worklog: docs/worklogs/2026-11-09_FE-AUTH_AI_user-role-enum-standardization.md].
 - Chuyển đổi toàn diện cơ chế xác thực sang HttpOnly Cookie: loại bỏ 100% việc lưu trữ token trong `localStorage` (miễn nhiễm XSS Token Theft), triển khai Silent Refresh với Axios Request Queue trong `httpClient.ts`, tự động đồng bộ phiên khi F5 qua `GET /api/auth/me`, và điều hướng thông minh khi phiên hết hạn kèm ghi nhớ `redirectUrl` [FE-AUTH] [worklog: docs/worklogs/2026-11-09_FE-AUTH_AI_httponly-cookie-and-session-expiry.md].
 
 ### Fixed

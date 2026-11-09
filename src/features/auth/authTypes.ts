@@ -1,8 +1,18 @@
+export const UserRoleEnum = {
+  ADMIN: 'ADMIN',
+  STORE_OWNER: 'STORE_OWNER',
+  STAFF: 'STAFF',
+} as const;
+
+export type UserRoleType = (typeof UserRoleEnum)[keyof typeof UserRoleEnum];
+export type UserRole = UserRoleType | 'MANAGER' | 'CASHIER' | 'EMPLOYEE';
+
 export interface UserProfile {
   id: string;
   email: string;
   fullName: string;
-  role: 'ADMIN' | 'MANAGER' | 'CASHIER' | 'STORE_OWNER' | 'EMPLOYEE';
+  role: UserRole;
+  userRole?: UserRoleType;
   tenantId: string;
   tenantName?: string;
   branchId?: string;
