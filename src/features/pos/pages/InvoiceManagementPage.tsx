@@ -34,7 +34,7 @@ import { CollectDebtModal } from '../components/modals/CollectDebtModal';
 import { ReturnExchangeModal } from '../components/modals/ReturnExchangeModal';
 import { CreatePreOrderModal } from '../components/modals/CreatePreOrderModal';
 import { FulfillPreOrderModal } from '../components/modals/FulfillPreOrderModal';
-import { mockProducts, mockCustomers, mockProductsAnNhien, mockCustomersAnNhien, AN_NHIEN_BRANCHES } from '../mock/posMockData';
+import { AN_NHIEN_BRANCHES } from '../mock/posMockData';
 import type { Product, Customer } from '../types/pos.types';
 import { posOrderApi } from '../api/posOrderApi';
 import { posShiftApi } from '../api/posShiftApi';
@@ -138,33 +138,51 @@ export const InvoiceManagementPage: FC = () => {
   const [invoices, setInvoices] = useState<InvoiceDTO[]>(getInitialInvoices);
   const [preOrders, setPreOrders] = useState<PreOrderDTO[]>(getInitialPreOrders);
   const [activeShiftCash, setActiveShiftCash] = useState<number | undefined>(undefined);
-  const [catalogProducts, setCatalogProducts] = useState<Product[]>(() =>
-    isAnNhienStore ? mockProductsAnNhien : mockProducts
-  );
-  const [catalogCustomers, setCatalogCustomers] = useState<Customer[]>(() =>
-    isAnNhienStore ? mockCustomersAnNhien : mockCustomers
-  );
+  const [catalogProducts, setCatalogProducts] = useState<Product[]>([]);
+  const [catalogCustomers, setCatalogCustomers] = useState<Customer[]>([]);
+  const [exchangeBranchProducts, setExchangeBranchProducts] = useState<Product[]>([]);
 
   useEffect(() => {
     let mounted = true;
+    if (branchFilter === 'ALL') {
+      setCatalogProducts([]);
+      posOrderApi.getAllCustomers().then((custs) => {
+        if (mounted && custs) setCatalogCustomers(custs);
+      }).catch(() => {});
+      return () => {
+        mounted = false;
+      };
+    }
+
     const targetBranchId =
-      branchFilter !== 'ALL' && !branchFilter.startsWith('BR-')
+      !branchFilter.startsWith('BR-')
         ? branchFilter
-        : !assignedBranch.id.startsWith('BR-')
-          ? assignedBranch.id
-          : dbBranches[0]?.id;
+        : (!assignedBranch.id.startsWith('BR-') ? assignedBranch.id : undefined);
+
+    if (!targetBranchId) {
+      setCatalogProducts([]);
+      return () => {
+        mounted = false;
+      };
+    }
+
     Promise.all([
-      posOrderApi.getAllProducts(targetBranchId).catch(() => null),
-      posOrderApi.getAllCustomers().catch(() => null),
+      posOrderApi.getAllProducts(targetBranchId),
+      posOrderApi.getAllCustomers().catch(() => []),
     ]).then(([prods, custs]) => {
       if (!mounted) return;
-      if (prods && prods.length > 0) setCatalogProducts(prods);
+      setCatalogProducts(prods || []);
       if (custs && custs.length > 0) setCatalogCustomers(custs);
+    }).catch((err) => {
+      if (!mounted) return;
+      setCatalogProducts([]);
+      console.error('Lỗi tải sản phẩm chi nhánh:', err);
     });
+
     return () => {
       mounted = false;
     };
-  }, [branchFilter, assignedBranch.id, currentTenantId, dbBranches]);
+  }, [branchFilter, assignedBranch.id, currentTenantId]);
 
   const mapBackendOrderToInvoice = (o: any): InvoiceDTO => {
     const isPreOrderFlag = Boolean(
@@ -382,6 +400,25 @@ export const InvoiceManagementPage: FC = () => {
   // Modal Đổi / Trả hàng chuẩn KiotViet
   const [returnExchangeModalInvoice, setReturnExchangeModalInvoice] = useState<InvoiceDTO | null>(null);
 
+  // Scoped danh mục cho modal Đổi/Trả hàng theo đúng chi nhánh của đơn gốc
+  useEffect(() => {
+    let mounted = true;
+    if (returnExchangeModalInvoice?.branchId && !returnExchangeModalInvoice.branchId.startsWith('BR-')) {
+      posOrderApi.getAllProducts(returnExchangeModalInvoice.branchId)
+        .then((prods) => {
+          if (mounted) setExchangeBranchProducts(prods || []);
+        })
+        .catch(() => {
+          if (mounted) setExchangeBranchProducts([]);
+        });
+    } else {
+      setExchangeBranchProducts(catalogProducts);
+    }
+    return () => {
+      mounted = false;
+    };
+  }, [returnExchangeModalInvoice?.branchId, catalogProducts]);
+
   // Modal Tạo đơn đặt trước giữ kho
   const [isCreatePreOrderModalOpen, setIsCreatePreOrderModalOpen] = useState(false);
   const [fulfillModalPreOrder, setFulfillModalPreOrder] = useState<PreOrderDTO | null>(null);
@@ -544,10 +581,14 @@ export const InvoiceManagementPage: FC = () => {
     appliedPromotionSummary?: string | null;
   }) => {
     const creatorCashier = user?.role === 'STORE_OWNER' ? `Chủ cửa hàng: ${user?.fullName || 'Admin'}` : (user?.fullName || 'Thu ngân POS');
-    const fallbackDbBranchId = dbBranches[0]?.id;
     const targetBranchId = branchFilter !== 'ALL'
       ? branchFilter
-      : (!assignedBranch.id.startsWith('BR-') ? assignedBranch.id : (fallbackDbBranchId || assignedBranch.id));
+      : (!assignedBranch.id.startsWith('BR-') ? assignedBranch.id : undefined);
+
+    if (!targetBranchId) {
+      alert('Vui lòng chọn một chi nhánh cụ thể từ bộ lọc trước khi tạo đơn đặt trước.');
+      return;
+    }
     try {
       let createdCode: string | null = null;
       let createdUuid: string | undefined;
@@ -1653,7 +1694,13 @@ export const InvoiceManagementPage: FC = () => {
                     type="button"
                     className="pos-btn-primary-pill"
                     style={{ height: 28, padding: '0 12px', fontSize: 11.5, backgroundColor: '#0f766e' }}
-                    onClick={() => setIsCreatePreOrderModalOpen(true)}
+                    onClick={() => {
+                      if (branchFilter === 'ALL' && (!assignedBranch.id || assignedBranch.id.startsWith('BR-'))) {
+                        alert('Vui lòng chọn một chi nhánh cụ thể từ bộ lọc trên thanh công cụ trước khi tạo đơn đặt trước.');
+                        return;
+                      }
+                      setIsCreatePreOrderModalOpen(true);
+                    }}
                   >
                     + Tạo đơn đặt trước
                   </button>
@@ -2152,7 +2199,7 @@ export const InvoiceManagementPage: FC = () => {
       <ReturnExchangeModal
         isOpen={Boolean(returnExchangeModalInvoice)}
         invoice={returnExchangeModalInvoice}
-        availableProducts={catalogProducts}
+        availableProducts={exchangeBranchProducts.length > 0 ? exchangeBranchProducts : catalogProducts}
         currentDrawerCash={activeShiftCash}
         onClose={() => setReturnExchangeModalInvoice(null)}
         onConfirm={handleConfirmReturnExchange}

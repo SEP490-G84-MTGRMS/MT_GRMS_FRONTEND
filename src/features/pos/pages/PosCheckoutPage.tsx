@@ -297,30 +297,49 @@ export const PosCheckoutPage: FC = () => {
           const summaries = await storeProductApi.getStoreSummaries();
           if (summaries && summaries.length > 0) {
             const matched = user?.branchId
-              ? summaries.find((s) => s.id === user.branchId) || summaries[0]
+              ? summaries.find((s) => s.id === user.branchId)
               : summaries[0];
-            currentBranchId = matched.id;
-            if (isMounted) {
-              setActiveBranch({
-                id: matched.id,
-                name: matched.name || matched.code,
-                address: matched.address,
-                phone: matched.phone,
-              });
+            if (matched) {
+              currentBranchId = matched.id;
+              if (isMounted) {
+                setActiveBranch({
+                  id: matched.id,
+                  name: matched.name || matched.code,
+                  address: matched.address,
+                  phone: matched.phone,
+                });
+              }
+            } else if (user?.branchId) {
+              currentBranchId = user.branchId;
+              if (isMounted) {
+                setActiveBranch({
+                  id: user.branchId,
+                  name: 'Chi nhánh hiện tại',
+                });
+              }
             }
           }
         } catch {
           // Fallback to default grocery branch
         }
 
-        const [apiProducts, apiCustomers] = await Promise.all([
-          posOrderApi.getAllProducts(currentBranchId).catch(() => null),
-          posOrderApi.getAllCustomers().catch(() => null),
-        ]);
+        let apiProducts: Product[] = [];
+        let apiCustomers: any[] = [];
+        try {
+          const [prods, custs] = await Promise.all([
+            posOrderApi.getAllProducts(currentBranchId),
+            posOrderApi.getAllCustomers().catch(() => []),
+          ]);
+          apiProducts = prods || [];
+          apiCustomers = custs || [];
+        } catch (err: any) {
+          console.error('Lỗi tải danh mục sản phẩm chi nhánh:', err);
+          showToast(err?.response?.data?.detail || err?.message || 'Không thể tải danh mục sản phẩm của chi nhánh', 'error');
+        }
 
         if (isMounted) {
-          if (apiProducts && apiProducts.length > 0) {
-            setProducts(apiProducts);
+          setProducts(apiProducts);
+          if (apiProducts.length > 0) {
             setTabs((prevTabs) =>
               prevTabs.map((tab) => ({
                 ...tab,
@@ -342,8 +361,6 @@ export const PosCheckoutPage: FC = () => {
                 }),
               }))
             );
-          } else {
-            setProducts(getInitialProducts());
           }
           if (apiCustomers && apiCustomers.length > 0) {
             setCustomers(apiCustomers);
@@ -352,7 +369,7 @@ export const PosCheckoutPage: FC = () => {
           }
         }
       } catch (err) {
-        console.warn('Backend load failed, fallback to local cache:', err);
+        console.warn('Backend load failed:', err);
       }
     };
 
