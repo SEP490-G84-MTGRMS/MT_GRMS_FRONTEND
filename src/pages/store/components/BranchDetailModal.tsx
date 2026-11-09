@@ -830,3 +830,4 @@ export const BranchDetailModal: FC<BranchDetailModalProps> = ({
     </div>
   );
 };
+
