@@ -8,3 +8,5 @@ import { OrderMatrixPage } from './OrderMatrixPage';
 export const EmployeeOrderMatrixPage: FC = () => {
   return <OrderMatrixPage forcedRole="EMPLOYEE" />;
 };
+
+export default EmployeeOrderMatrixPage;

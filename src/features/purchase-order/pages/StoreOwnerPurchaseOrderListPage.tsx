@@ -117,12 +117,13 @@ export const StoreOwnerPurchaseOrderListPage: FC = () => {
           branchCode,
           branchName: po.branchName,
           createdSource: 'Chủ cửa hàng (Dispatch Hub)',
-          lastUpdated: formatVnDateTime(po.createdAt),
+          lastUpdated: formatVnDateTime(po.lastAmendedAtUtc || po.createdAt),
           expectedDelivery: formatVnDate(po.deliveryDate),
           itemCount: po.details?.length ?? 0,
           totalAmount: po.totalAmount,
           status: mapBackendStatus(po.status),
           note: po.note,
+          revisionNumber: po.revisionNumber ?? 1,
           items: (po.details ?? []).map((d) => ({
             id: d.id,
             name: d.productName,
@@ -268,7 +269,15 @@ export const StoreOwnerPurchaseOrderListPage: FC = () => {
         }}
         onViewDetail={(order) => setSelectedOrder(order)}
         onEditOrder={(order) => {
-          showToast(`Đang mở giao diện chỉnh sửa đơn ${order.poCode}`, 'info');
+          // Sửa SL trên matrix trước cutoff → chốt lại ở dispatch-hub để amend PO
+          const params = new URLSearchParams();
+          if (order.branchId) params.set('branchId', order.branchId);
+          if (order.supplierId) params.set('supplier', order.supplierId);
+          showToast(
+            `Mở ma trận để sửa SL đơn ${order.poCode}${order.revisionNumber && order.revisionNumber > 1 ? ` (Rev ${order.revisionNumber})` : ''}. Chốt lại trước cutoff để cập nhật PO.`,
+            'info'
+          );
+          navigate(`/store-owner/purchase-orders/create-matrix?${params.toString()}`);
         }}
       />
 

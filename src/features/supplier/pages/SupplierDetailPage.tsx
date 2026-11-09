@@ -59,10 +59,16 @@ function mapJsDaysToNames(days: number[]): string[] {
 }
 
 function mapApiToDeliveryConfig(data: any, fallback: SupplierDeliveryConfig): SupplierDeliveryConfig {
+  const rawOffset = data.cutoffDayOffset;
+  const cutoffDayOffset =
+    typeof rawOffset === 'number' && rawOffset >= 0
+      ? rawOffset
+      : fallback.cutoffDayOffset ?? 1;
+
   return {
     ...fallback,
-    leadTimeDays: data.leadTimeDays ?? fallback.leadTimeDays,
     minOrderQuantity: data.minOrderQuantity ?? 0,
+    cutoffDayOffset,
     cutoffTime: data.orderCutoffTime || data.cutoffTime || fallback.cutoffTime,
     activeDeliveryDays: mapDeliveryDaysToJs(data.deliveryDays),
     holidays: Array.isArray(data.blackoutDates)
@@ -78,8 +84,7 @@ function mapApiToDeliveryConfig(data: any, fallback: SupplierDeliveryConfig): Su
 
 function mapDeliveryConfigToApi(cfg: SupplierDeliveryConfig) {
   return {
-    leadTimeHours: Math.max(0, cfg.leadTimeDays * 24),
-    leadTimeDays: cfg.leadTimeDays,
+    cutoffDayOffset: Math.max(0, Number(cfg.cutoffDayOffset) || 0),
     cutoffTime: cfg.cutoffTime,
     orderCutoffTime: cfg.cutoffTime,
     deliveryDays: mapJsDaysToNames(cfg.activeDeliveryDays),
@@ -137,10 +142,9 @@ export const SupplierDetailPage: FC<Props> = ({
 
   // Dynamic delivery config state
   const [deliveryConfig, setDeliveryConfig] = useState<SupplierDeliveryConfig>({
-    leadTimeDays: 1,
-    leadTimeUnit: 'BUSINESS_DAYS',
     minOrderQuantity: 0,
     activeDeliveryDays: [1, 2, 3, 4, 5, 6],
+    cutoffDayOffset: 1,
     cutoffTime: '17:00',
     allowStoreEdit: true,
     editWindowType: 'BEFORE_CUTOFF',
@@ -287,6 +291,10 @@ export const SupplierDetailPage: FC<Props> = ({
     }
     await supplierApi.updateDeliveryConfig(supplierId, mapDeliveryConfigToApi(newCfg));
     setDeliveryConfig(newCfg);
+    showToast(
+      `Đã lưu cấu hình lịch giao hàng và thời gian Cutoff thành công cho ${currentSupplier?.name || 'nhà cung cấp'}!`,
+      'success',
+    );
   };
 
   const handleLinkCustomer = (_supplierId: string, customerId: string) => {

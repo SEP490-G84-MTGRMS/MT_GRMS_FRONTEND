@@ -21,6 +21,8 @@ interface OrderMatrixTableProps {
   onCellChange?: (productId: string, dateKey: string, val: number) => void;
   onResetOverride?: (productId: string, dateKey: string) => void;
   onDayCutoffClick?: (day: DayColInfo) => void;
+  /** Gate sửa ô theo ngày + SP (ALL view: theo DayStatus từng NCC). */
+  isCellEditable?: (day: DayColInfo, product: OrderMatrixProduct) => boolean;
   readOnly?: boolean;
   isStoreOwner?: boolean;
 }
@@ -36,10 +38,22 @@ export const OrderMatrixTable: FC<OrderMatrixTableProps> = ({
   onCellChange,
   onResetOverride,
   onDayCutoffClick,
+  isCellEditable,
   readOnly = false,
   isStoreOwner = true,
 }) => {
   const fmt = (n: number) => new Intl.NumberFormat('vi-VN').format(n);
+
+  // Lead time ≥ 1 ngày: không cho nhập số lượng giao hôm nay / quá khứ
+  const earliestDeliveryDateKey = (() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() + 1);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  })();
 
   // Helper to extract cell data consistently
   const getCell = (productId: string, dateKey: string): MatrixCellData => {
@@ -352,7 +366,10 @@ export const OrderMatrixTable: FC<OrderMatrixTableProps> = ({
                           let isCellOff = false;
                           let cellOffReason = '';
 
-                          if (supConfig) {
+                          if (d.dateKey < earliestDeliveryDateKey) {
+                            isCellOff = true;
+                            cellOffReason = 'Lead time tối thiểu 1 ngày — không đặt giao hôm nay / ngày quá khứ';
+                          } else if (supConfig) {
                             if (!supConfig.isActive) {
                               isCellOff = true;
                               cellOffReason = supConfig.inactiveReason || 'Nhà cung cấp đang tạm dừng hoạt động';
@@ -406,15 +423,22 @@ export const OrderMatrixTable: FC<OrderMatrixTableProps> = ({
                             );
                           }
 
-                          if (d.isLocked || d.cutoffStatus === 'PO_GENERATED' || d.cutoffStatus === 'LOCKED') {
+                          const cellLockedByGate =
+                            typeof isCellEditable === 'function'
+                              ? !isCellEditable(d, p)
+                              : d.isLocked ||
+                                d.cutoffStatus === 'PO_GENERATED' ||
+                                d.cutoffStatus === 'LOCKED';
+
+                          if (cellLockedByGate) {
                             return (
                               <td
                                 key={d.dateKey}
                                 className="po-cell-locked po-cell-disabled"
                                 title={
-                                  d.cutoffStatus === 'PO_GENERATED'
-                                    ? `Đã chốt PO (${d.poCode || 'Đã tạo'}) — chỉ xem`
-                                    : 'Đã quá giờ khóa sửa đơn của ngày này'
+                                  d.cutoffStatus === 'PO_GENERATED' || d.poCode
+                                    ? `Đã khóa PO (${d.poCode || 'Đã tạo'}) — quá giờ cutoff`
+                                    : 'Ngày này không cho sửa số lượng'
                                 }
                               >
                                 <input

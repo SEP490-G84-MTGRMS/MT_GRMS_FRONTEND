@@ -61,8 +61,8 @@ export interface MatrixBackendResponse {
     isActive: boolean;
     isAssignedToBranch: boolean;
     inactiveReason?: string;
-    leadTimeDays: number;
     cutoffTime: string;
+    cutoffDayOffset?: number;
     activeDeliveryDays: number[];
     blackoutDates: string[];
   }>;
@@ -116,6 +116,8 @@ export interface PurchaseOrderListApiItem {
   supplierCode?: string;
   deliveryDate?: string;
   status: string;
+  revisionNumber?: number;
+  lastAmendedAtUtc?: string;
   totalQty: number;
   totalAmount: number;
   note?: string;
@@ -248,8 +250,11 @@ export const purchaseOrderApi = {
           isActive: sc.isActive,
           isAssignedToBranch: sc.isAssignedToBranch,
           inactiveReason: sc.inactiveReason,
-          leadTimeDays: sc.leadTimeDays || 1,
           cutoffTime: sc.cutoffTime || '15:00',
+          cutoffDayOffset:
+            typeof sc.cutoffDayOffset === 'number' && sc.cutoffDayOffset >= 0
+              ? sc.cutoffDayOffset
+              : 1,
           activeDeliveryDays: sc.activeDeliveryDays || [1, 2, 3, 4, 5, 6],
           blackoutDates: sc.blackoutDates || [],
         }));

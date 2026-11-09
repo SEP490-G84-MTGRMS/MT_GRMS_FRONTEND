@@ -22,7 +22,7 @@ interface SupplierDispatchTableProps {
   onDispatchSingle: (supplier: SupplierDispatchGroup) => void;
 }
 
-type SortField = 'code' | 'name' | 'cutoff' | 'branches' | 'amount';
+type SortField = 'code' | 'name' | 'pending' | 'cutoff' | 'branches' | 'sku' | 'amount';
 type SortDirection = 'asc' | 'desc';
 
 function cutoffSingleLine(supplier: SupplierDispatchGroup): {
@@ -111,6 +111,10 @@ export const SupplierDispatchTable: FC<SupplierDispatchTableProps> = ({
           valA = a.name.toLowerCase();
           valB = b.name.toLowerCase();
           break;
+        case 'pending':
+          valA = a.hasPendingChanges && a.status !== 'dispatched' ? 0 : 1;
+          valB = b.hasPendingChanges && b.status !== 'dispatched' ? 0 : 1;
+          break;
         case 'cutoff':
           valA = a.remainingMinutes ?? 9999;
           valB = b.remainingMinutes ?? 9999;
@@ -118,6 +122,10 @@ export const SupplierDispatchTable: FC<SupplierDispatchTableProps> = ({
         case 'branches':
           valA = a.branchesWithQty ?? 0;
           valB = b.branchesWithQty ?? 0;
+          break;
+        case 'sku':
+          valA = a.skuCount ?? 0;
+          valB = b.skuCount ?? 0;
           break;
         case 'amount':
           valA = a.totalAmount ?? 0;
@@ -165,7 +173,7 @@ export const SupplierDispatchTable: FC<SupplierDispatchTableProps> = ({
   return (
     <div className="so-list-table-card" style={{ position: 'relative', minHeight: 0, flex: 1 }}>
       <div className="so-list-table-body" style={{ width: '100%', overflowX: 'auto', minHeight: 280, flex: 1 }}>
-        <table style={{ width: '100%', minWidth: 980, borderCollapse: 'separate', borderSpacing: 0, fontSize: 13 }}>
+        <table style={{ width: '100%', minWidth: 1080, borderCollapse: 'separate', borderSpacing: 0, fontSize: 13 }}>
           <thead>
             <tr
               style={{
@@ -182,9 +190,11 @@ export const SupplierDispatchTable: FC<SupplierDispatchTableProps> = ({
             >
               {th('Mã NCC', 'code')}
               {th('Tên nhà cung cấp', 'name')}
+              {th('Thay đổi SL', 'pending')}
               {th('Giờ Cutoff đơn', 'cutoff')}
               {th('Cửa hàng', 'branches', 'right')}
-              {th('Quy mô', 'amount', 'right')}
+              {th('Quy mô', 'sku', 'right')}
+              {th('Giá trị', 'amount', 'right')}
               <th style={{ padding: '10px 18px 10px 12px', borderBottom: '1px solid #cbd5e1', background: '#f8fafc', textAlign: 'right' }}>
                 Thao tác
               </th>
@@ -193,7 +203,7 @@ export const SupplierDispatchTable: FC<SupplierDispatchTableProps> = ({
           <tbody>
             {sortedSuppliers.length === 0 ? (
               <tr>
-                <td colSpan={6} style={{ padding: '48px 16px', textAlign: 'center', color: '#64748b' }}>
+                <td colSpan={8} style={{ padding: '48px 16px', textAlign: 'center', color: '#64748b' }}>
                   Không tìm thấy nhà cung cấp nào phù hợp với bộ lọc.
                 </td>
               </tr>
@@ -201,6 +211,7 @@ export const SupplierDispatchTable: FC<SupplierDispatchTableProps> = ({
               sortedSuppliers.map((supplier) => {
                 const isCritical = supplier.urgency === 'critical' && supplier.status !== 'dispatched';
                 const isDispatched = supplier.status === 'dispatched';
+                const needsUpdate = Boolean(supplier.hasPendingChanges) && !isDispatched;
                 const cutoffTone = cutoffSingleLine(supplier);
                 const skuCount = supplier.skuCount ?? 0;
                 const branchWithQty = supplier.branchesWithQty ?? 0;
@@ -216,8 +227,16 @@ export const SupplierDispatchTable: FC<SupplierDispatchTableProps> = ({
                       height: 52,
                       cursor: 'pointer',
                       borderBottom: '1px solid #f1f5f9',
-                      backgroundColor: isCritical ? 'rgba(254, 242, 242, 0.45)' : '#ffffff',
-                      borderLeft: isCritical ? '4px solid #ef4444' : '4px solid transparent',
+                      backgroundColor: needsUpdate
+                        ? 'rgba(255, 247, 237, 0.7)'
+                        : isCritical
+                          ? 'rgba(254, 242, 242, 0.45)'
+                          : '#ffffff',
+                      borderLeft: needsUpdate
+                        ? '4px solid #ea580c'
+                        : isCritical
+                          ? '4px solid #ef4444'
+                          : '4px solid transparent',
                     }}
                   >
                     <td style={{ padding: '8px 12px', whiteSpace: 'nowrap', fontFamily: 'monospace', fontWeight: 700, color: '#475569' }}>
@@ -232,12 +251,37 @@ export const SupplierDispatchTable: FC<SupplierDispatchTableProps> = ({
                           overflow: 'hidden',
                           textOverflow: 'ellipsis',
                           display: 'block',
-                          maxWidth: 260,
+                          maxWidth: 240,
                         }}
                         title={supplier.name}
                       >
                         {supplier.name}
                       </span>
+                    </td>
+                    <td style={{ padding: '8px 12px', whiteSpace: 'nowrap' }}>
+                      {needsUpdate ? (
+                        <span
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            fontSize: 11.5,
+                            fontWeight: 800,
+                            color: '#c2410c',
+                            background: '#ffedd5',
+                            border: '1px solid #fdba74',
+                            padding: '3px 8px',
+                            borderRadius: 4,
+                          }}
+                          title="Số lượng trên ma trận khác PO đã chốt — nhấn Cập nhật & gửi mail để amend PO và gửi lại email NCC (trước giờ cutoff)."
+                        >
+                          Cần cập nhật
+                          {supplier.pendingChangeLineCount
+                            ? ` · ${supplier.pendingChangeLineCount} dòng`
+                            : ''}
+                        </span>
+                      ) : (
+                        <span style={{ fontSize: 12, color: '#94a3b8', fontWeight: 600 }}>—</span>
+                      )}
                     </td>
                     <td style={{ padding: '8px 12px' }}>
                       <span
@@ -262,11 +306,20 @@ export const SupplierDispatchTable: FC<SupplierDispatchTableProps> = ({
                         {branchWithQty}/{linked} CH có SL
                       </span>
                     </td>
-                    <td style={{ padding: '8px 12px', textAlign: 'right', whiteSpace: 'nowrap' }}>
-                      <div style={{ fontWeight: 700 }}>{skuCount} SKU</div>
-                      <div style={{ fontSize: 12, color: '#059669', fontFamily: 'monospace' }}>
-                        {totalAmount.toLocaleString('vi-VN')} đ
-                      </div>
+                    <td style={{ padding: '8px 12px', textAlign: 'right', whiteSpace: 'nowrap', fontWeight: 700 }}>
+                      {skuCount} SKU
+                    </td>
+                    <td
+                      style={{
+                        padding: '8px 12px',
+                        textAlign: 'right',
+                        whiteSpace: 'nowrap',
+                        fontWeight: 700,
+                        color: '#059669',
+                        fontFamily: 'monospace',
+                      }}
+                    >
+                      {totalAmount.toLocaleString('vi-VN')} đ
                     </td>
                     <td style={{ padding: '8px 18px 8px 12px', textAlign: 'right' }} onClick={(e) => e.stopPropagation()}>
                       <div style={{ display: 'inline-flex', gap: 6 }}>
@@ -295,7 +348,7 @@ export const SupplierDispatchTable: FC<SupplierDispatchTableProps> = ({
                             }}
                           >
                             <CheckCircle2 size={13} color="#10b981" />
-                            Đã chốt
+                            Đã khóa (qua cutoff)
                           </span>
                         ) : (
                           <button
@@ -313,12 +366,33 @@ export const SupplierDispatchTable: FC<SupplierDispatchTableProps> = ({
                               fontWeight: 700,
                               border: 'none',
                               color: '#fff',
-                              backgroundColor: !canDispatch ? '#94a3b8' : isCritical ? '#dc2626' : '#0d9488',
+                              backgroundColor: !canDispatch
+                                ? '#94a3b8'
+                                : needsUpdate
+                                  ? '#ea580c'
+                                  : supplier.canAmend || supplier.poCode
+                                    ? '#0369a1'
+                                    : isCritical
+                                      ? '#dc2626'
+                                      : '#0d9488',
                               cursor: canDispatch ? 'pointer' : 'not-allowed',
                             }}
+                            title={
+                              needsUpdate
+                                ? `SL đã đổi so với PO${supplier.poCode ? ` ${supplier.poCode}` : ''} — cập nhật và gửi lại email NCC`
+                                : supplier.canAmend || supplier.poCode
+                                  ? `Cập nhật PO đã tạo${supplier.poCode ? ` (${supplier.poCode})` : ''} trước giờ cutoff`
+                                  : 'Chốt đơn và phát hành Purchase Order'
+                            }
                           >
                             <Send size={13} />
-                            <span>Chốt đơn</span>
+                            <span>
+                              {needsUpdate
+                                ? 'Cập nhật & gửi mail'
+                                : supplier.canAmend || supplier.poCode
+                                  ? 'Cập nhật PO'
+                                  : 'Chốt đơn'}
+                            </span>
                           </button>
                         )}
                       </div>

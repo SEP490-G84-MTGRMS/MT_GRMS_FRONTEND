@@ -2,7 +2,6 @@ import { useState, useMemo, useRef, useEffect } from 'react';
 import type { FC } from 'react';
 import {
   Building2,
-  Eye,
   ShoppingCart,
   ChevronLeft,
   ChevronRight,
@@ -17,7 +16,6 @@ interface BranchOrderTableProps {
   pageSize: number;
   onPageChange: (page: number) => void;
   onPageSizeChange?: (size: number) => void;
-  onViewDetail: (branch: BranchListItem) => void;
   onOrder: (branchId: string) => void;
 }
 
@@ -38,7 +36,6 @@ export const BranchOrderTable: FC<BranchOrderTableProps> = ({
   pageSize,
   onPageChange,
   onPageSizeChange,
-  onViewDetail,
   onOrder,
 }) => {
   const [sortField, setSortField] = useState<SortField | null>(null);
@@ -555,43 +552,6 @@ export const BranchOrderTable: FC<BranchOrderTableProps> = ({
                       >
                         <ShoppingCart size={12} style={{ flexShrink: 0 }} />
                         <span>Đặt hàng</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => onViewDetail(b)}
-                        className="po-btn po-btn-secondary"
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: 4,
-                          height: 28,
-                          padding: '0 10px',
-                          borderRadius: 'var(--radius-pill)',
-                          fontSize: 11.5,
-                          fontWeight: 600,
-                          backgroundColor: '#ffffff',
-                          border: '1px solid #cbd5e1',
-                          color: '#334155',
-                          cursor: 'pointer',
-                          whiteSpace: 'nowrap',
-                          flexShrink: 0,
-                          transition: 'all 0.15s ease',
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.borderColor = '#0f766e';
-                          e.currentTarget.style.color = '#0f766e';
-                          e.currentTarget.style.backgroundColor = '#f0fdfa';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.borderColor = '#cbd5e1';
-                          e.currentTarget.style.color = '#334155';
-                          e.currentTarget.style.backgroundColor = '#ffffff';
-                        }}
-                        title="Xem chi tiết chi nhánh"
-                      >
-                        <Eye size={12} style={{ flexShrink: 0 }} />
-                        <span>Chi tiết</span>
                       </button>
                     </div>
                   </td>

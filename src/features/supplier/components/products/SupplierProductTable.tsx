@@ -24,6 +24,7 @@ type SortField =
   | 'supplierCode'
   | 'agreedPrice'
   | 'moq'
+  | 'allowedShortageQty'
   | 'status';
 type SortDirection = 'asc' | 'desc';
 
@@ -94,6 +95,10 @@ export const SupplierProductTable: FC<SupplierProductTableProps> = ({
           valA = a.moq;
           valB = b.moq;
           break;
+        case 'allowedShortageQty':
+          valA = a.allowedShortageQty ?? 0;
+          valB = b.allowedShortageQty ?? 0;
+          break;
         case 'status':
           valA = a.status;
           valB = b.status;
@@ -147,16 +152,18 @@ export const SupplierProductTable: FC<SupplierProductTableProps> = ({
   const tableColGroup = (
     <colgroup>
       <col style={{ width: '3%' }} />
-      <col style={{ width: '10%' }} />
-      <col style={{ width: '22%' }} />
-      <col style={{ width: '10%' }} />
-      <col style={{ width: '16%' }} />
-      <col style={{ width: '8%' }} />
       <col style={{ width: '5%' }} />
       <col style={{ width: '9%' }} />
-      <col style={{ width: '6%' }} />
+      <col style={{ width: '18%' }} />
       <col style={{ width: '8%' }} />
-      <col style={{ width: '10%' }} />
+      <col style={{ width: '14%' }} />
+      <col style={{ width: '8%' }} />
+      <col style={{ width: '5%' }} />
+      <col style={{ width: '8%' }} />
+      <col style={{ width: '6%' }} />
+      <col style={{ width: '7%' }} />
+      <col style={{ width: '7%' }} />
+      <col style={{ width: '8%' }} />
     </colgroup>
   );
 
@@ -184,6 +191,10 @@ export const SupplierProductTable: FC<SupplierProductTableProps> = ({
           <thead>
             <tr>
               <th style={{ ...thBaseStyle, textAlign: 'center' }}>#</th>
+
+              <th style={{ ...thBaseStyle, textAlign: 'center' }}>
+                <span>Ảnh</span>
+              </th>
 
               <th
                 onClick={() => handleSort('sku')}
@@ -244,6 +255,19 @@ export const SupplierProductTable: FC<SupplierProductTableProps> = ({
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4 }}>
                   <span>MOQ</span>
                   <ArrowUpDown size={12} color={sortField === 'moq' ? '#0f766e' : '#94a3b8'} />
+                </div>
+              </th>
+
+              <th
+                onClick={() => handleSort('allowedShortageQty')}
+                style={{ ...thBaseStyle, textAlign: 'right', cursor: 'pointer', userSelect: 'none' }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4 }}>
+                  <span>Thiếu cho phép</span>
+                  <ArrowUpDown
+                    size={12}
+                    color={sortField === 'allowedShortageQty' ? '#0f766e' : '#94a3b8'}
+                  />
                 </div>
               </th>
 

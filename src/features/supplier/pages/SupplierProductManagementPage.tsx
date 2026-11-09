@@ -294,6 +294,14 @@ export const SupplierProductManagementPage: FC = () => {
             <span>Danh sách NCC</span>
           </Link>
           <Link
+            to="/store-owner/stores/products"
+            className="po-btn po-btn-secondary"
+            title="Quản lý sản phẩm theo cửa hàng / chi nhánh"
+          >
+            <Store size={14} />
+            <span>Sản phẩm theo Cửa hàng</span>
+          </Link>
+          <Link
             to="/store-owner/suppliers/branches"
             className="po-btn po-btn-secondary"
             title="Gán nhà cung cấp phân bổ tới các cửa hàng / chi nhánh"

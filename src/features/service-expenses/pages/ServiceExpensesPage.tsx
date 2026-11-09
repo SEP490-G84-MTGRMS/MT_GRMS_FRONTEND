@@ -32,7 +32,10 @@ import '../service-expenses.css';
 export const ServiceExpensesPage: FC = () => {
   const [searchParams] = useSearchParams();
   const user = useAuthStore((state) => state.user);
-  const isEmployee = user?.role === 'EMPLOYEE' || user?.role === 'CASHIER';
+  const isEmployee =
+    user?.role === 'STAFF' ||
+    (user?.role as unknown as string) === 'EMPLOYEE' ||
+    (user?.role as unknown as string) === 'CASHIER';
   const urlSearch = searchParams.get('search') || searchParams.get('keyword') || '';
   const [periodLabel, setPeriodLabel] = useState('Tháng 10/2026');
   const [filters, setFilters] = useState<ExpenseFilterParams>(() => {
