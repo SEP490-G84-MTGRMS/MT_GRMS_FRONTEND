@@ -125,10 +125,6 @@ const NAV_GROUPS: NavGroup[] = [
             badge: "Mới",
             badgeType: "blue",
           },
-          {
-            label: "Thiết lập bảng giá",
-            to: "/store-owner/suppliers/products?view=pricing",
-          },
         ],
       },
       {
