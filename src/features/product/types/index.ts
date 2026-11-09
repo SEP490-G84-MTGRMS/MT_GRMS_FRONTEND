@@ -227,3 +227,22 @@ export interface ProductFilterState {
   page: number;
   pageSize: number;
 }
+
+export interface ProductPriceHistoryDto {
+  id: string;
+  productId: string;
+  branchId?: string | null;
+  branchName?: string | null;
+  priceScope: 'MASTER' | 'BRANCH' | string;
+  priceType: 'SELLING_PRICE' | 'COST_PRICE' | string;
+  oldPrice: number;
+  newPrice: number;
+  costPriceSnapshot?: number | null;
+  isBelowCost: boolean;
+  managerApprovedBy?: string | null;
+  managerApprovalReason?: string | null;
+  changedByUserId: string;
+  changedByUserName: string;
+  reason: string;
+  createdAt: string;
+}

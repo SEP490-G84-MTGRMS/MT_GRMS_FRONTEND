@@ -10,14 +10,17 @@ import {
   Check,
   Edit2,
   Trash2,
+  RotateCw,
 } from 'lucide-react';
 import type {
   VoucherBatchItem,
   VoucherBatchStatus,
   VoucherDiscountType,
   VoucherCodeStatus,
+  VoucherCodeItem,
 } from '../../types/promotion.types';
 import { TablePagination } from '../../../../components/common';
+import { promotionApi } from '../../api/promotionApi';
 
 interface VoucherBatchTableProps {
   batches: VoucherBatchItem[];
@@ -38,6 +41,32 @@ export const VoucherBatchTable: FC<VoucherBatchTableProps> = ({
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const [batchCodesMap, setBatchCodesMap] = useState<Record<string, VoucherCodeItem[]>>({});
+  const [loadingCodesMap, setLoadingCodesMap] = useState<Record<string, boolean>>({});
+
+  const fetchCodesForBatch = async (batchId: string) => {
+    setLoadingCodesMap((prev) => ({ ...prev, [batchId]: true }));
+    try {
+      const res = await promotionApi.getVoucherCodes(batchId, { pageSize: 500 });
+      if (res?.items) {
+        const mapped: VoucherCodeItem[] = res.items.map((dto) => ({
+          id: dto.id,
+          code: dto.code,
+          status: dto.status,
+          customerName: dto.customerName,
+          customerPhone: dto.customerPhone,
+          orderCode: dto.orderCode,
+          usedAt: dto.usedAt?.slice(0, 16).replace('T', ' '),
+          createdAt: dto.createdAt?.slice(0, 10),
+        }));
+        setBatchCodesMap((prev) => ({ ...prev, [batchId]: mapped }));
+      }
+    } catch (err) {
+      console.warn('Lỗi tải danh sách mã voucher từ CSDL:', err);
+    } finally {
+      setLoadingCodesMap((prev) => ({ ...prev, [batchId]: false }));
+    }
+  };
 
   const paginatedBatches = batches.slice(
     (currentPage - 1) * pageSize,
@@ -45,7 +74,13 @@ export const VoucherBatchTable: FC<VoucherBatchTableProps> = ({
   );
 
   const toggleExpand = (id: string) => {
-    setExpandedId((prev) => (prev === id ? null : id));
+    setExpandedId((prev) => {
+      const next = prev === id ? null : id;
+      if (next) {
+        fetchCodesForBatch(id);
+      }
+      return next;
+    });
   };
 
   const handleCopy = (code: string) => {
@@ -250,95 +285,121 @@ export const VoucherBatchTable: FC<VoucherBatchTableProps> = ({
                     </tr>
 
                     {/* Accordion Detail Row: Voucher Codes List */}
-                    {isExpanded && (
-                      <tr>
-                        <td colSpan={9} style={{ padding: 0 }}>
-                          <div className="accordion-wrapper">
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                              <div className="accordion-title" style={{ margin: 0 }}>
-                                <Ticket size={16} />
-                                <span>Danh sách mã code trong đợt ({batch.codes.length} mã đã tạo)</span>
-                              </div>
-                              <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
-                                Tiền tố mã (Prefix): <strong style={{ fontFamily: 'monospace', color: '#0F766E' }}>{batch.prefix}</strong>
-                              </span>
-                            </div>
+                    {isExpanded && (() => {
+                      const codes = batchCodesMap[batch.id] ?? batch.codes ?? [];
+                      const isLoadingCodes = loadingCodesMap[batch.id] ?? false;
 
-                            {batch.codes.length === 0 ? (
-                              <div style={{ padding: '24px', textAlign: 'center', color: '#64748b', fontSize: '0.85rem', background: '#ffffff', borderRadius: 12, border: '1px solid #e2e8f0' }}>
-                                Chưa có mã voucher nào được tạo. Bấm nút <strong>"Tạo thêm mã"</strong> phía trên để phát hành mã cho đợt này.
+                      return (
+                        <tr>
+                          <td colSpan={9} style={{ padding: 0 }}>
+                            <div className="accordion-wrapper">
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                                <div className="accordion-title" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+                                  <Ticket size={16} />
+                                  <span>Danh sách mã code trong đợt ({codes.length} mã đã tạo)</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => fetchCodesForBatch(batch.id)}
+                                    style={{
+                                      background: 'none',
+                                      border: 'none',
+                                      cursor: 'pointer',
+                                      color: '#0F766E',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      padding: 4,
+                                    }}
+                                    title="Tải lại danh sách mã từ CSDL"
+                                  >
+                                    <RotateCw size={13} className={isLoadingCodes ? 'animate-spin' : ''} />
+                                  </button>
+                                </div>
+                                <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                                  Tiền tố mã (Prefix): <strong style={{ fontFamily: 'monospace', color: '#0F766E' }}>{batch.prefix}</strong>
+                                </span>
                               </div>
-                            ) : (
-                              <div className="voucher-codes-table-container">
-                                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
-                                  <thead className="voucher-codes-sticky-header">
-                                    <tr>
-                                      <th style={{ textAlign: 'left' }}>Mã voucher (Code)</th>
-                                      <th style={{ textAlign: 'left' }}>Trạng thái</th>
-                                      <th style={{ textAlign: 'left' }}>Khách hàng sử dụng</th>
-                                      <th style={{ textAlign: 'left' }}>Hóa đơn áp dụng</th>
-                                      <th style={{ textAlign: 'left' }}>Thời điểm sử dụng</th>
-                                      <th style={{ textAlign: 'right' }}>Sao chép</th>
-                                    </tr>
-                                  </thead>
-                                <tbody>
-                                  {batch.codes.map((c) => (
-                                    <tr key={c.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                                      <td style={{ padding: '10px 14px' }}>
-                                        <div className="code-badge-box">
-                                          <span>{c.code}</span>
-                                        </div>
-                                      </td>
-                                      <td style={{ padding: '10px 14px' }}>{renderCodeStatus(c.status)}</td>
-                                      <td style={{ padding: '10px 14px' }}>
-                                        {c.customerName ? (
-                                          <div>
-                                            <div style={{ fontWeight: 600, color: '#0f172a' }}>{c.customerName}</div>
-                                            <div style={{ fontSize: '0.74rem', color: '#64748b' }}>{c.customerPhone}</div>
-                                          </div>
-                                        ) : (
-                                          <span style={{ color: '#94a3b8' }}>—</span>
-                                        )}
-                                      </td>
-                                      <td style={{ padding: '10px 14px' }}>
-                                        {c.orderCode ? (
-                                          <span style={{ fontFamily: 'monospace', color: '#0F766E', fontWeight: 600 }}>
-                                            {c.orderCode}
-                                          </span>
-                                        ) : (
-                                          <span style={{ color: '#94a3b8' }}>—</span>
-                                        )}
-                                      </td>
-                                      <td style={{ padding: '10px 14px', color: '#475569' }}>{c.usedAt || '—'}</td>
-                                      <td style={{ padding: '10px 14px', textAlign: 'right' }}>
-                                        <button
-                                          onClick={() => handleCopy(c.code)}
-                                          className="btn-copy-mini"
-                                          title="Sao chép mã"
-                                        >
-                                          {copiedCode === c.code ? (
-                                            <>
-                                              <Check size={13} color="#059669" />
-                                              <span style={{ color: '#059669' }}>Đã chép</span>
-                                            </>
-                                          ) : (
-                                            <>
-                                              <Copy size={13} />
-                                              <span>Chép</span>
-                                            </>
-                                          )}
-                                        </button>
-                                      </td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
+
+                              {isLoadingCodes ? (
+                                <div style={{ padding: '24px', textAlign: 'center', color: '#0F766E', fontSize: '0.85rem', background: '#ffffff', borderRadius: 12, border: '1px solid #e2e8f0' }}>
+                                  <RotateCw className="w-5 h-5 animate-spin" style={{ display: 'inline-block', marginRight: 8, verticalAlign: 'middle' }} />
+                                  Đang tải danh sách mã voucher từ CSDL...
+                                </div>
+                              ) : codes.length === 0 ? (
+                                <div style={{ padding: '24px', textAlign: 'center', color: '#64748b', fontSize: '0.85rem', background: '#ffffff', borderRadius: 12, border: '1px solid #e2e8f0' }}>
+                                  Chưa có mã voucher nào được tạo. Bấm nút <strong>"Tạo thêm mã"</strong> phía trên để phát hành mã cho đợt này.
+                                </div>
+                              ) : (
+                                <div className="voucher-codes-table-container">
+                                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
+                                    <thead className="voucher-codes-sticky-header">
+                                      <tr>
+                                        <th style={{ textAlign: 'left' }}>Mã voucher (Code)</th>
+                                        <th style={{ textAlign: 'left' }}>Trạng thái</th>
+                                        <th style={{ textAlign: 'left' }}>Khách hàng sử dụng</th>
+                                        <th style={{ textAlign: 'left' }}>Hóa đơn áp dụng</th>
+                                        <th style={{ textAlign: 'left' }}>Thời điểm sử dụng</th>
+                                        <th style={{ textAlign: 'right' }}>Sao chép</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {codes.map((c) => (
+                                        <tr key={c.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                          <td style={{ padding: '10px 14px' }}>
+                                            <div className="code-badge-box">
+                                              <span>{c.code}</span>
+                                            </div>
+                                          </td>
+                                          <td style={{ padding: '10px 14px' }}>{renderCodeStatus(c.status)}</td>
+                                          <td style={{ padding: '10px 14px' }}>
+                                            {c.customerName ? (
+                                              <div>
+                                                <div style={{ fontWeight: 600, color: '#0f172a' }}>{c.customerName}</div>
+                                                <div style={{ fontSize: '0.74rem', color: '#64748b' }}>{c.customerPhone}</div>
+                                              </div>
+                                            ) : (
+                                              <span style={{ color: '#94a3b8' }}>—</span>
+                                            )}
+                                          </td>
+                                          <td style={{ padding: '10px 14px' }}>
+                                            {c.orderCode ? (
+                                              <span style={{ fontFamily: 'monospace', color: '#0F766E', fontWeight: 600 }}>
+                                                {c.orderCode}
+                                              </span>
+                                            ) : (
+                                              <span style={{ color: '#94a3b8' }}>—</span>
+                                            )}
+                                          </td>
+                                          <td style={{ padding: '10px 14px', color: '#475569' }}>{c.usedAt || '—'}</td>
+                                          <td style={{ padding: '10px 14px', textAlign: 'right' }}>
+                                            <button
+                                              onClick={() => handleCopy(c.code)}
+                                              className="btn-copy-mini"
+                                              title="Sao chép mã"
+                                            >
+                                              {copiedCode === c.code ? (
+                                                <>
+                                                  <Check size={13} color="#059669" />
+                                                  <span style={{ color: '#059669' }}>Đã chép</span>
+                                                </>
+                                              ) : (
+                                                <>
+                                                  <Copy size={13} />
+                                                  <span>Chép</span>
+                                                </>
+                                              )}
+                                            </button>
+                                          </td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              )}
                             </div>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    )}
+                          </td>
+                        </tr>
+                      );
+                    })()}
                   </Fragment>
                 );
               })

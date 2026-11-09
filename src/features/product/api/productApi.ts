@@ -9,6 +9,7 @@ import type {
   ProductUnitUpdatePayload,
   ProductCreatePayload,
   ProductUpdatePayload,
+  ProductPriceHistoryDto,
 } from '../types';
 
 export const productApi = {
@@ -153,6 +154,24 @@ export const productApi = {
     if (!res.data?.success) {
       throw new Error(res.data?.message || 'Không thể xóa đơn vị tính.');
     }
+  },
+
+  /**
+   * Lấy lịch sử biến động giá bán sản phẩm (FE-03.2 Price Change History Tracking)
+   * Endpoint Backend: GET /api/products/{id}/price-history
+   */
+  async getPriceHistory(productId: string, branchId?: string): Promise<ProductPriceHistoryDto[]> {
+    const params: Record<string, any> = {};
+    if (branchId) {
+      params.branchId = branchId;
+    }
+    const res = await httpClient.get<ApiResponse<ProductPriceHistoryDto[]>>(`/products/${productId}/price-history`, {
+      params,
+    });
+    if (res.data?.success && res.data.data) {
+      return res.data.data;
+    }
+    return [];
   },
 };
 

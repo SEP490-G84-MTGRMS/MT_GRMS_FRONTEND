@@ -21,9 +21,13 @@ export class PromotionTierDTO {
   discountType: 'PERCENT' | 'FIXED_AMOUNT' = 'PERCENT'; // C#: string DiscountType
   discountValue: number = 0; // C#: decimal DiscountValue (% hoặc số tiền)
   maxDiscount?: number; // C#: decimal? MaxDiscount (Giảm tối đa nếu là %)
+  buyProductId?: string; // C#: Guid? ProductId của sản phẩm điều kiện mua X (rỗng = bất kỳ SP trong giỏ)
+  buyProductName?: string; // C#: string? BuyProductName
   requiredQty?: number; // C#: int? RequiredQty (Mua X)
+  giftProductId?: string; // C#: Guid? ProductId của quà tặng
   giftProductName?: string; // C#: string? GiftProductName (Tặng Y)
   giftProductSku?: string; // C#: string? GiftProductSku
+  giftUnit?: string; // Đơn vị tính quà tặng (Hộp, Chai, Vỉ, Cái...)
   giftQty?: number; // C#: int? GiftQty
 
   constructor(init?: Partial<PromotionTierDTO>) {

@@ -10,6 +10,7 @@ interface Props {
   onOpenAddCustomerModal: () => void;
   totalItemAmount: number;
   orderDiscountPercent: number;
+  orderDiscountAmount?: number;
   onOpenOrderDiscountModal: () => void;
   couponCode: string;
   onCouponCodeChange: (code: string) => void;
@@ -22,8 +23,9 @@ interface Props {
   pointsDeduction?: number;
   pointsToRedeem?: number;
   minPointsRequired?: number;
+  isPointsBlockedByPromo?: boolean;
   appliedPromotions?: string[];
-  giftItems?: { productName: string; quantity: number; reason?: string }[];
+  giftItems?: { productName: string; quantity: number; unitName?: string; equivalentValue?: number; reason?: string }[];
   paymentMethod: 'cash' | 'vietqr' | 'debt';
   onPaymentMethodChange: (method: 'cash' | 'vietqr' | 'debt') => void;
   cashTendered: number;
@@ -41,6 +43,7 @@ export const PosPaymentPanel: FC<Props> = ({
   onOpenAddCustomerModal,
   totalItemAmount,
   orderDiscountPercent,
+  orderDiscountAmount: externalOrderDiscount,
   onOpenOrderDiscountModal,
   couponCode,
   onCouponCodeChange,
@@ -53,6 +56,7 @@ export const PosPaymentPanel: FC<Props> = ({
   pointsDeduction: externalPointsDeduction,
   pointsToRedeem = 0,
   minPointsRequired = 20,
+  isPointsBlockedByPromo = false,
   appliedPromotions = [],
   giftItems = [],
   paymentMethod,
@@ -90,16 +94,20 @@ export const PosPaymentPanel: FC<Props> = ({
   }, []);
 
   // Tính toán các khoản giảm giá và thành tiền
-  const orderDiscountAmount = Math.round((totalItemAmount * orderDiscountPercent) / 100);
+  const orderDiscountAmount = externalOrderDiscount !== undefined
+    ? externalOrderDiscount
+    : Math.round((totalItemAmount * orderDiscountPercent) / 100);
   const couponDiscountAmount = externalCouponDiscount !== undefined
     ? externalCouponDiscount
     : (couponCode.trim().toUpperCase() === 'VIP10' ? 20000 : 0);
   const subTotalBeforePoints = Math.max(0, totalItemAmount - orderDiscountAmount - couponDiscountAmount);
 
   // Điểm tích lũy
-  const pointsDeduction = externalPointsDeduction !== undefined
-    ? externalPointsDeduction
-    : (usePoints && customer ? Math.min(customer.loyaltyPoints * 1000, subTotalBeforePoints) : 0);
+  const pointsDeduction = isPointsBlockedByPromo
+    ? 0
+    : (externalPointsDeduction !== undefined
+        ? externalPointsDeduction
+        : (usePoints && customer ? Math.min(customer.loyaltyPoints * 1000, subTotalBeforePoints) : 0));
 
   const finalAmount = Math.max(0, subTotalBeforePoints - pointsDeduction);
   const changeAmount = Math.max(0, cashTendered - finalAmount);
@@ -214,7 +222,7 @@ export const PosPaymentPanel: FC<Props> = ({
                       </span>
                     </div>
                     <div style={{ fontSize: 11.5, color: '#16a34a', display: 'flex', justifyContent: 'space-between', marginTop: 3 }}>
-                      <span>Mã: {cust.code} &bull; {cust.membershipTier}</span>
+                      <span>Mã: {cust.code}</span>
                       <span>Tích lũy: {cust.loyaltyPoints} điểm</span>
                     </div>
                   </div>
@@ -234,7 +242,7 @@ export const PosPaymentPanel: FC<Props> = ({
             <div>
               <b>{customer.name}</b> ({customer.code})<br />
               <span className="pos-loyalty-text">
-                Điểm: <b>{customer.loyaltyPoints} điểm</b> ({customer.membershipTier})
+                Điểm tích lũy: <b>{customer.loyaltyPoints} điểm</b>
               </span>
               <div style={{ marginTop: 4, fontSize: 11, color: '#334155', display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
                 <span>Đã nợ: <b style={{ color: '#0f766e' }}>{customer.debtCount || 0} lần</b></span>
@@ -289,7 +297,11 @@ export const PosPaymentPanel: FC<Props> = ({
                   onClick={onOpenOrderDiscountModal}
                   title="Nhấp để tùy chỉnh chiết khấu đơn"
                 >
-                  Giảm giá ({orderDiscountPercent}%) [KM]:
+                  {orderDiscountPercent > 0
+                    ? `Giảm giá (${orderDiscountPercent}%) [KM]:`
+                    : orderDiscountAmount > 0
+                    ? 'Giảm giá tự động [KM]:'
+                    : 'Giảm giá (0%) [KM]:'}
                 </span>
                 {appliedPromotions && appliedPromotions.length > 0 && (
                   <div style={{ fontSize: 11, color: '#0d9488', marginTop: 2 }}>
@@ -307,12 +319,16 @@ export const PosPaymentPanel: FC<Props> = ({
               <tr>
                 <td colSpan={2} style={{ background: '#f0fdf4', padding: '4px 8px', borderRadius: 4 }}>
                   <div style={{ fontSize: 11.5, color: '#15803d', fontWeight: 600 }}>
-                    Quà tặng khuyến mãi kèm theo:
+                    🎁 Quà tặng khuyến mãi xuất kho kèm đơn:
                   </div>
                   {giftItems.map((g, idx) => (
                     <div key={idx} style={{ fontSize: 11, color: '#166534', display: 'flex', justifyContent: 'space-between' }}>
-                      <span>✦ {g.productName} (x{g.quantity})</span>
-                      <span style={{ fontWeight: 600 }}>0 đ</span>
+                      <span>
+                        ✦ {g.productName} (x{g.quantity}{g.unitName ? ` ${g.unitName}` : ''})
+                      </span>
+                      <span style={{ fontWeight: 600 }}>
+                        0 đ{g.equivalentValue && g.equivalentValue > 0 ? ` (~${g.equivalentValue.toLocaleString('vi-VN')} đ)` : ''}
+                      </span>
                     </div>
                   ))}
                 </td>
@@ -362,19 +378,25 @@ export const PosPaymentPanel: FC<Props> = ({
             </tr>
             <tr>
               <td>
-                <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, cursor: isPointsBlockedByPromo ? 'not-allowed' : 'pointer' }}>
                   <input
                     type="checkbox"
-                    checked={usePoints}
-                    disabled={!customer || customer.loyaltyPoints < minPointsRequired}
+                    checked={usePoints && !isPointsBlockedByPromo}
+                    disabled={!customer || customer.loyaltyPoints < minPointsRequired || isPointsBlockedByPromo}
                     onChange={(e) => onToggleUsePoints(e.target.checked)}
                   />
                   <span>
                     Dùng điểm ({pointsToRedeem} điểm):
-                    {customer && customer.loyaltyPoints < minPointsRequired && (
-                      <span style={{ display: 'block', fontSize: 10.5, color: '#94a3b8' }}>
-                        (Tối thiểu {minPointsRequired} điểm)
+                    {isPointsBlockedByPromo ? (
+                      <span style={{ display: 'block', fontSize: 10.5, color: '#d97706' }}>
+                        (Không áp dụng cùng khuyến mãi)
                       </span>
+                    ) : (
+                      customer && customer.loyaltyPoints < minPointsRequired && (
+                        <span style={{ display: 'block', fontSize: 10.5, color: '#94a3b8' }}>
+                          (Tối thiểu {minPointsRequired} điểm)
+                        </span>
+                      )
                     )}
                   </span>
                 </label>

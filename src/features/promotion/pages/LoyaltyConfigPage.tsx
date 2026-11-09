@@ -46,7 +46,6 @@ export const LoyaltyConfigPage: FC = () => {
 
   // Active Tab from query param or default to 'config'
   const tabParam = searchParams.get('tab');
-  const viewParam = searchParams.get('view');
   const activeTab: 'config' | 'ledger' = tabParam === 'ledger' ? 'ledger' : 'config';
 
   const [toast, setToast] = useState<ToastState | null>(null);
@@ -76,16 +75,6 @@ export const LoyaltyConfigPage: FC = () => {
       nextState ? 'success' : 'info'
     );
   };
-
-  // Scroll to membership tiers if ?view=tiers
-  useEffect(() => {
-    if (viewParam === 'tiers') {
-      const el = document.getElementById('membership-tiers-section');
-      if (el) {
-        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }
-    }
-  }, [viewParam, activeTab]);
 
   const handleSaveConfig = async () => {
     try {
@@ -134,8 +123,8 @@ export const LoyaltyConfigPage: FC = () => {
             <Award className="w-6 h-6" />
           </div>
           <div className="promotion-topbar-text">
-            <h1>Thiết Lập Tích Điểm & Hạng Thẻ</h1>
-            <p>Cấu hình tỷ lệ tích / tiêu điểm, chính sách nâng hạng thẻ và quản lý sổ cái điểm thưởng</p>
+            <h1>Thiết Lập Tích Điểm & Đổi Thưởng</h1>
+            <p>Cấu hình tỷ lệ tích / tiêu điểm và quản lý sổ cái điểm thưởng cho toàn hệ thống</p>
           </div>
         </div>
       </div>
@@ -150,7 +139,7 @@ export const LoyaltyConfigPage: FC = () => {
               className={`loyalty-nav-tab-btn ${activeTab === 'config' ? 'active' : ''}`}
             >
               <Settings className="w-4 h-4" />
-              <span>Cấu hình tích điểm & Hạng thẻ</span>
+              <span>Cấu hình chính sách tích điểm</span>
             </button>
 
             <button

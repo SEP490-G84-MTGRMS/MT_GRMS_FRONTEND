@@ -1,9 +1,15 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import type { FC, FormEvent, KeyboardEvent } from 'react';
-import { Search, RotateCcw, X, Loader2, Filter } from 'lucide-react';
+import { Search, RotateCcw, X, Loader2, Filter, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import type { SupplierDispatchGroup } from '../../types/po.types';
 
-export type DispatchTabType = 'all' | 'critical' | 'today' | 'later' | 'completed';
+export type DispatchTabType =
+  | 'all'
+  | 'critical'
+  | 'today'
+  | 'later'
+  | 'completed'
+  | 'pending_changes';
 
 export interface DispatchFilterValues {
   codes: string[];
@@ -62,6 +68,11 @@ export interface DispatchFilterBarProps {
   keyword?: string;
   onKeywordChange?: (kw: string) => void;
   onResetFilters?: () => void;
+
+  /** Số NCC có SL ma trận khác PO — nút cam khi > 0, xanh khi = 0 */
+  pendingChangeCount?: number;
+  pendingChangeLineCount?: number;
+  onViewPendingChanges?: () => void;
 }
 
 function uniqueTokens(values: string[]): string[] {
@@ -127,6 +138,9 @@ export const DispatchFilterBar: FC<DispatchFilterBarProps> = ({
   activeTab,
   onTabChange,
   onResetFilters,
+  pendingChangeCount = 0,
+  pendingChangeLineCount = 0,
+  onViewPendingChanges,
 }) => {
   const effectiveUrgency = activeTab ?? filters.urgency ?? 'all';
 
@@ -163,6 +177,12 @@ export const DispatchFilterBar: FC<DispatchFilterBarProps> = ({
     setTokens(tokensFromFilters(filters));
     setQueries(EMPTY_QUERIES);
   }
+
+  useEffect(() => {
+    setDraftFilters((prev) =>
+      prev.urgency === effectiveUrgency ? prev : { ...prev, urgency: effectiveUrgency }
+    );
+  }, [effectiveUrgency]);
 
   // Click outside listener to close suggestions
   useEffect(() => {
@@ -449,14 +469,14 @@ export const DispatchFilterBar: FC<DispatchFilterBarProps> = ({
 
   const hasActiveFilters = Boolean(
     tokens.code.length ||
-    tokens.name.length ||
-    tokens.product.length ||
-    tokens.branch.length ||
-    queries.code.trim() ||
-    queries.name.trim() ||
-    queries.product.trim() ||
-    queries.branch.trim() ||
-    draftFilters.urgency !== 'all'
+      tokens.name.length ||
+      tokens.product.length ||
+      tokens.branch.length ||
+      queries.code.trim() ||
+      queries.name.trim() ||
+      queries.product.trim() ||
+      queries.branch.trim() ||
+      draftFilters.urgency !== 'all'
   );
 
   const safeCounts: Record<DispatchTabType, number> = {
@@ -765,12 +785,51 @@ export const DispatchFilterBar: FC<DispatchFilterBarProps> = ({
               title="Lọc theo mức độ ưu tiên hoặc trạng thái chốt PO"
             >
               <option value="all">Tất cả ({safeCounts.all})</option>
+              <option value="pending_changes">
+                🟠 Cần cập nhật SL ({safeCounts.pending_changes ?? 0})
+              </option>
               <option value="critical">🔴 Cần chốt gấp ({safeCounts.critical})</option>
               <option value="today">🟡 Hôm nay ({safeCounts.today})</option>
               <option value="later">🔵 Đợt tới ({safeCounts.later})</option>
               <option value="completed">🟢 Đã gửi PO ({safeCounts.completed})</option>
             </select>
           </div>
+
+          {onViewPendingChanges && (
+            <button
+              type="button"
+              onClick={onViewPendingChanges}
+              title={
+                pendingChangeCount > 0
+                  ? `Có ${pendingChangeCount} NCC cần cập nhật SL — xem chi tiết`
+                  : 'Không có NCC nào cần cập nhật số lượng'
+              }
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                height: 32,
+                padding: '0 12px',
+                borderRadius: 6,
+                border: pendingChangeCount > 0 ? '1px solid #ea580c' : '1px solid #16a34a',
+                background: pendingChangeCount > 0 ? '#ea580c' : '#16a34a',
+                color: '#fff',
+                fontSize: 12.5,
+                fontWeight: 700,
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {pendingChangeCount > 0 ? <AlertTriangle size={14} /> : <CheckCircle2 size={14} />}
+              <span>
+                {pendingChangeCount > 0
+                  ? `Cần cập nhật SL (${pendingChangeCount}${
+                      pendingChangeLineCount > 0 ? ` · ${pendingChangeLineCount} dòng` : ''
+                    })`
+                  : 'SL đã khớp PO'}
+              </span>
+            </button>
+          )}
 
           {/* Badge đang áp dụng bộ lọc */}
           {hasActiveFilters && (
