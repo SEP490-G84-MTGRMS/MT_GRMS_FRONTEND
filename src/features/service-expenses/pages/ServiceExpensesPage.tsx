@@ -1,4 +1,4 @@
-import { type FC, useState, useRef } from 'react';
+import { type FC, useState, useRef, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuthStore } from '../../../stores/useAuthStore';
 import {
@@ -37,7 +37,7 @@ export const ServiceExpensesPage: FC = () => {
     (user?.role as unknown as string) === 'EMPLOYEE' ||
     (user?.role as unknown as string) === 'CASHIER';
   const urlSearch = searchParams.get('search') || searchParams.get('keyword') || '';
-  const [periodLabel, setPeriodLabel] = useState('Tháng 10/2026');
+  const [periodLabel, setPeriodLabel] = useState(urlSearch ? 'Tất cả thời gian' : 'Tháng 10/2026');
   const [filters, setFilters] = useState<ExpenseFilterParams>(() => {
     const range = calculatePeriodRange('this-month');
     return {
@@ -47,10 +47,24 @@ export const ServiceExpensesPage: FC = () => {
       category: '',
       status: '',
       keyword: urlSearch,
-      fromDate: range.fromDate,
-      toDate: range.toDate,
+      fromDate: urlSearch ? undefined : range.fromDate,
+      toDate: urlSearch ? undefined : range.toDate,
     };
   });
+
+  // Keep filters in sync when navigation query parameters change
+  useEffect(() => {
+    if (urlSearch) {
+      setPeriodLabel('Tất cả thời gian');
+      setFilters((prev) => ({
+        ...prev,
+        keyword: urlSearch,
+        fromDate: undefined,
+        toDate: undefined,
+        page: 1,
+      }));
+    }
+  }, [urlSearch]);
 
   // Modals state
   const [isCreateOpen, setIsCreateOpen] = useState(false);

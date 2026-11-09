@@ -35,6 +35,7 @@ export const EXPENSE_CATEGORY_LABELS: Record<ExpenseCategory, string> = {
  */
 export interface ServiceExpenseDto {
   expenseId: string;
+  voucherCode?: string;
   branchId: string;
   branchName?: string;
   category: ExpenseCategory;

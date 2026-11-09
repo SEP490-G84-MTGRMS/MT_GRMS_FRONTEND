@@ -20,8 +20,13 @@ const isDeepLinkable = (tx: LedgerTransaction): boolean => {
   return (
     tx.sourceModuleName === 'SERVICE_OPEX' ||
     tx.referenceDocType === 'SERVICE_EXPENSE' ||
+    Boolean(tx.referenceDocId?.startsWith('EXP-')) ||
     Boolean(tx.description?.startsWith('Chi phí:')) ||
+    tx.sourceModuleName === 'POS_RETAIL' ||
+    tx.referenceDocType === 'POS_ORDER' ||
+    Boolean(tx.referenceDocId?.startsWith('ORD-')) ||
     tx.sourceModuleName === 'CRM_DEBT' ||
+    tx.referenceDocType === 'DEBT_PAYMENT' ||
     tx.counterpartyType === 'CUSTOMER' ||
     Boolean(tx.category?.includes('Thu nợ')) ||
     Boolean(tx.description?.includes('Thu nợ')) ||
@@ -35,10 +40,18 @@ const getDeepLinkLabel = (tx: LedgerTransaction): string => {
   if (
     tx.sourceModuleName === 'SERVICE_OPEX' ||
     tx.referenceDocType === 'SERVICE_EXPENSE' ||
+    tx.referenceDocId?.startsWith('EXP-') ||
     tx.description?.startsWith('Chi phí:') ||
     tx.category?.includes('Chi phí')
   ) {
-    return 'Xem hóa đơn FE-07';
+    return 'Xem phiếu chi FE-07';
+  }
+  if (
+    tx.sourceModuleName === 'POS_RETAIL' ||
+    tx.referenceDocType === 'POS_ORDER' ||
+    tx.referenceDocId?.startsWith('ORD-')
+  ) {
+    return 'Xem hóa đơn bán lẻ POS';
   }
   if (
     tx.sourceModuleName === 'CRM_DEBT' ||
@@ -56,24 +69,6 @@ const getDeepLinkLabel = (tx: LedgerTransaction): string => {
     return 'Xem sổ thuế TT 152';
   }
   return 'Chứng từ đối soát';
-};
-
-const getDeepLinkBg = (tx: LedgerTransaction): string => {
-  if (tx.counterpartyType === 'CUSTOMER' || tx.category?.includes('Thu nợ')) return '#EFF6FF';
-  if (tx.category?.includes('Nộp thuế') || tx.description?.includes('Nộp thuế')) return '#FEF3C7';
-  return '#F0FDFA';
-};
-
-const getDeepLinkBorder = (tx: LedgerTransaction): string => {
-  if (tx.counterpartyType === 'CUSTOMER' || tx.category?.includes('Thu nợ')) return '1px solid #DBEAFE';
-  if (tx.category?.includes('Nộp thuế') || tx.description?.includes('Nộp thuế')) return '1px solid #FDE68A';
-  return '1px solid #CCFBF1';
-};
-
-const getDeepLinkColor = (tx: LedgerTransaction): string => {
-  if (tx.counterpartyType === 'CUSTOMER' || tx.category?.includes('Thu nợ')) return '#1D4ED8';
-  if (tx.category?.includes('Nộp thuế') || tx.description?.includes('Nộp thuế')) return '#B45309';
-  return '#0F766E';
 };
 
 const renderSourceBadge = (source?: SourceModuleName, isAutomated?: boolean) => {
@@ -211,9 +206,11 @@ export const CashbookLedgerTable: FC<CashbookLedgerTableProps> = ({
   const navigate = useNavigate();
 
   const handleNavigateToDoc = (tx: LedgerTransaction) => {
+    // 1. Phai tra / Chi phi dich vu FE07
     if (
       tx.sourceModuleName === 'SERVICE_OPEX' ||
       tx.referenceDocType === 'SERVICE_EXPENSE' ||
+      tx.referenceDocId?.startsWith('EXP-') ||
       tx.description?.startsWith('Chi phí:') ||
       tx.category?.includes('Chi phí') ||
       tx.category?.includes('Tiền điện') ||
@@ -224,17 +221,35 @@ export const CashbookLedgerTable: FC<CashbookLedgerTableProps> = ({
       navigate('/store-owner/expenses?search=' + encodeURIComponent(searchTarget));
       return;
     }
+
+    // 2. Ban le POS / Hoa don don hang FE10
+    if (
+      tx.sourceModuleName === 'POS_RETAIL' ||
+      tx.referenceDocType === 'POS_ORDER' ||
+      tx.referenceDocId?.startsWith('ORD-') ||
+      tx.category?.includes('bán hàng') ||
+      tx.description?.includes('Hóa đơn')
+    ) {
+      const searchTarget = tx.referenceDocId || '';
+      navigate('/store-owner/invoices?search=' + encodeURIComponent(searchTarget));
+      return;
+    }
+
+    // 3. Khach no CRM / AR FE08
     if (
       tx.sourceModuleName === 'CRM_DEBT' ||
+      tx.referenceDocType === 'DEBT_PAYMENT' ||
       tx.counterpartyType === 'CUSTOMER' ||
       tx.category?.includes('Thu nợ') ||
       tx.description?.includes('Thu nợ')
     ) {
       const match = tx.description?.match(/Thu nợ khách hàng\s+([a-f0-9-]+)/i);
-      const searchTarget = match ? match[1] : (tx.counterpartyName || '');
+      const searchTarget = match ? match[1] : (tx.referenceDocId || tx.counterpartyName || '');
       navigate('/store-owner/customers?search=' + encodeURIComponent(searchTarget));
       return;
     }
+
+    // 4. Bao cao nop thue FE19
     if (
       tx.sourceModuleName === 'TAX_SNAPSHOT' ||
       tx.category?.includes('Nộp thuế') ||
@@ -264,7 +279,7 @@ export const CashbookLedgerTable: FC<CashbookLedgerTableProps> = ({
         <table className="cashbook-table">
           <thead>
             <tr>
-              <th>MÃ GIAO DỊCH</th>
+              <th>MÃ CHỨNG TỪ / QUỸ</th>
               <th>THỜI GIAN</th>
               <th>TÀI KHOẢN</th>
               <th>LOẠI BÚT TOÁN</th>
@@ -293,9 +308,49 @@ export const CashbookLedgerTable: FC<CashbookLedgerTableProps> = ({
                   }}
                 >
                   <td className="tx-code-cell">
-                    <div style={{ fontWeight: 700, textDecoration: isVoided ? 'line-through' : 'none' }}>
-                      {tx.transactionCode}
-                    </div>
+                    {tx.referenceDocId && tx.referenceDocId !== tx.transactionCode ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                        <button
+                          type="button"
+                          onClick={() => handleNavigateToDoc(tx)}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            background: 'none',
+                            border: 'none',
+                            padding: 0,
+                            color: '#0F766E',
+                            fontWeight: 700,
+                            fontSize: '0.84rem',
+                            cursor: isDeepLinkable(tx) ? 'pointer' : 'default',
+                            textDecoration: isVoided ? 'line-through' : 'none',
+                            textAlign: 'left',
+                            whiteSpace: 'nowrap',
+                          }}
+                          title={isDeepLinkable(tx) ? `Bấm để ${getDeepLinkLabel(tx)} (${tx.referenceDocId})` : undefined}
+                        >
+                          <span>{tx.referenceDocId}</span>
+                          {isDeepLinkable(tx) && <ExternalLink size={11} style={{ opacity: 0.75, flexShrink: 0 }} />}
+                        </button>
+                        <span
+                          style={{
+                            fontSize: '11px',
+                            color: '#64748B',
+                            fontFamily: 'var(--font-mono, monospace)',
+                            textDecoration: isVoided ? 'line-through' : 'none',
+                            whiteSpace: 'nowrap',
+                          }}
+                          title="Mã giao dịch phát sinh dòng tiền nội bộ trong Sổ quỹ"
+                        >
+                          Quỹ: {tx.transactionCode}
+                        </span>
+                      </div>
+                    ) : (
+                      <div style={{ fontWeight: 700, textDecoration: isVoided ? 'line-through' : 'none' }}>
+                        {tx.transactionCode}
+                      </div>
+                    )}
                     {tx.linkedTransactionId && (
                       <div
                         style={{
@@ -332,42 +387,23 @@ export const CashbookLedgerTable: FC<CashbookLedgerTableProps> = ({
                     {isAdj && <span className="tx-type-badge adjustment">Điều chỉnh</span>}
                   </td>
                   <td>
-                    {isDeepLinkable(tx) ? (
-                      <button
-                        type="button"
-                        onClick={() => handleNavigateToDoc(tx)}
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '5px',
-                          backgroundColor: getDeepLinkBg(tx),
-                          border: getDeepLinkBorder(tx),
-                          borderRadius: '6px',
-                          padding: '3px 8px',
-                          color: getDeepLinkColor(tx),
-                          fontSize: '12px',
-                          fontWeight: 700,
-                          cursor: 'pointer',
-                          transition: 'all 0.15s ease',
-                          textAlign: 'left',
-                          textDecoration: isVoided ? 'line-through' : 'none',
-                        }}
-                        title={`Bấm để truy vết đối soát chứng từ gốc: ${getDeepLinkLabel(tx)}`}
-                      >
-                        <span>{tx.counterpartyName}</span>
-                        <ExternalLink size={12} style={{ flexShrink: 0, opacity: 0.85 }} />
-                      </button>
-                    ) : (
-                      <div
-                        style={{
-                          fontWeight: 600,
-                          color: 'var(--text-main)',
-                          textDecoration: isVoided ? 'line-through' : 'none',
-                        }}
-                      >
-                        {tx.counterpartyName}
-                      </div>
-                    )}
+                    <div
+                      style={{
+                        fontWeight: 600,
+                        color: 'var(--text-main)',
+                        textDecoration: isVoided ? 'line-through' : 'none',
+                      }}
+                    >
+                      {tx.counterpartyName && tx.counterpartyName !== tx.referenceDocId
+                        ? tx.counterpartyName
+                        : tx.sourceModuleName === 'SERVICE_OPEX'
+                        ? 'Chi phí vận hành'
+                        : tx.sourceModuleName === 'POS_RETAIL'
+                        ? 'Khách mua lẻ'
+                        : tx.sourceModuleName === 'CRM_DEBT'
+                        ? 'Khách nợ'
+                        : (tx.counterpartyName || 'Nội bộ')}
+                    </div>
                     <div style={{ fontSize: '12px', color: 'var(--text-muted)', maxWidth: '280px', marginTop: '3px' }}>
                       {tx.description}
                     </div>
@@ -439,8 +475,8 @@ export const CashbookLedgerTable: FC<CashbookLedgerTableProps> = ({
                       )}
                     </div>
                   </td>
-                  <td style={{ textAlign: 'right' }}>
-                    {!isVoided && !isComp && onVoidTransaction && (
+                  <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                    {!isVoided && !isComp && onVoidTransaction ? (
                       <button
                         type="button"
                         onClick={() => onVoidTransaction(tx)}
@@ -461,6 +497,8 @@ export const CashbookLedgerTable: FC<CashbookLedgerTableProps> = ({
                         <Ban size={13} />
                         <span>Hủy phiếu</span>
                       </button>
+                    ) : (
+                      <span style={{ color: 'var(--text-faint)', fontSize: '0.75rem' }}>-</span>
                     )}
                   </td>
                 </tr>

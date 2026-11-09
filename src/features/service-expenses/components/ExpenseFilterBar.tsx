@@ -30,6 +30,11 @@ export const ExpenseFilterBar: FC<ExpenseFilterBarProps> = ({
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
 
+  // Synchronize search input when external filters (such as URL search param) change
+  useEffect(() => {
+    setSearchInput(filters.keyword || '');
+  }, [filters.keyword]);
+
   // Debounce search input by 300ms
   useEffect(() => {
     const handler = setTimeout(() => {

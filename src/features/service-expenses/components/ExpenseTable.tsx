@@ -146,7 +146,7 @@ export const ExpenseTable: FC<ExpenseTableProps> = ({
                   />
                 </td>
                 <td className="expense-table-id">
-                  <span className="mono-badge">{item.expenseId}</span>
+                  <span className="mono-badge">{item.voucherCode || item.expenseId}</span>
                 </td>
                 <td>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
@@ -272,7 +272,7 @@ export const ExpenseTable: FC<ExpenseTableProps> = ({
                       <button
                         type="button"
                         onClick={() => {
-                          const targetSearch = (item as any).voucherCode || item.invoiceNumber || item.expenseId;
+                          const targetSearch = item.voucherCode || item.invoiceNumber || item.expenseId;
                           navigate('/store-owner/cashbook?search=' + encodeURIComponent(targetSearch));
                         }}
                         title="Xem phiếu chi dòng tiền trong Sổ quỹ Cashbook"

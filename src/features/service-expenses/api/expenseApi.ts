@@ -57,6 +57,7 @@ function mapVoucherToExpenseDto(v: any): ServiceExpenseDto {
 
   return {
     expenseId: v.id || v.voucherCode,
+    voucherCode: v.voucherCode || v.id,
     branchId: v.branchId || 'BR-01',
     branchName: v.branchId ? `Chi nhánh ${String(v.branchId).substring(0, 8)}` : 'Toàn hệ thống',
     category: v.category || 'Other',
@@ -101,12 +102,14 @@ export const getServiceExpenses = async (
   if (res.data?.data && Array.isArray(res.data.data)) {
     let items = res.data.data.map(mapVoucherToExpenseDto);
     if (params?.keyword) {
-      const q = params.keyword.toLowerCase();
+      const q = params.keyword.trim().toLowerCase();
       items = items.filter(
         (i) =>
+          (i.voucherCode && i.voucherCode.toLowerCase().includes(q)) ||
+          (i.invoiceNumber && i.invoiceNumber.toLowerCase().includes(q)) ||
+          i.expenseId.toLowerCase().includes(q) ||
           i.vendorName.toLowerCase().includes(q) ||
-          (i.note && i.note.toLowerCase().includes(q)) ||
-          i.expenseId.toLowerCase().includes(q)
+          (i.note && i.note.toLowerCase().includes(q))
       );
     }
     if (params?.status) {
