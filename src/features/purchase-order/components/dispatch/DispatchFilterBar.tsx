@@ -3,7 +3,7 @@ import type { FC, FormEvent, KeyboardEvent } from 'react';
 import { Search, RotateCcw, X, Loader2, Filter } from 'lucide-react';
 import type { SupplierDispatchGroup } from '../../types/po.types';
 
-export type DispatchTabType = 'all' | 'critical' | 'today' | 'later' | 'completed';
+export type DispatchTabType = 'all' | 'critical' | 'today' | 'later' | 'completed' | 'pending_changes';
 
 export interface DispatchFilterValues {
   codes: string[];
@@ -62,6 +62,9 @@ export interface DispatchFilterBarProps {
   keyword?: string;
   onKeywordChange?: (kw: string) => void;
   onResetFilters?: () => void;
+  pendingChangeCount?: number;
+  pendingChangeLineCount?: number;
+  onViewPendingChanges?: () => void;
 }
 
 function uniqueTokens(values: string[]): string[] {
