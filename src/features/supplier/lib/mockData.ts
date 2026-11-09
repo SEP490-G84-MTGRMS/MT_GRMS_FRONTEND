@@ -264,6 +264,7 @@ export const DEFAULT_DELIVERY_CONFIGS: Record<string, SupplierDeliveryConfig> = 
   'supp-001': {
     minOrderQuantity: 0,
     activeDeliveryDays: [1, 2, 3, 4, 5, 6], // Mon - Sat (off Sun)
+    cutoffDayOffset: 1,
     cutoffTime: '16:00',
     allowStoreEdit: true,
     editWindowType: 'BEFORE_CUTOFF',
@@ -278,6 +279,7 @@ export const DEFAULT_DELIVERY_CONFIGS: Record<string, SupplierDeliveryConfig> = 
   'supp-002': {
     minOrderQuantity: 0,
     activeDeliveryDays: [1, 3, 5],
+    cutoffDayOffset: 1,
     cutoffTime: '14:00',
     allowStoreEdit: true,
     editWindowType: 'HOURS_BEFORE_DELIVERY',

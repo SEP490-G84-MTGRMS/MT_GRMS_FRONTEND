@@ -59,9 +59,16 @@ function mapJsDaysToNames(days: number[]): string[] {
 }
 
 function mapApiToDeliveryConfig(data: any, fallback: SupplierDeliveryConfig): SupplierDeliveryConfig {
+  const rawOffset = data.cutoffDayOffset;
+  const cutoffDayOffset =
+    typeof rawOffset === 'number' && rawOffset >= 0
+      ? rawOffset
+      : fallback.cutoffDayOffset ?? 1;
+
   return {
     ...fallback,
     minOrderQuantity: data.minOrderQuantity ?? 0,
+    cutoffDayOffset,
     cutoffTime: data.orderCutoffTime || data.cutoffTime || fallback.cutoffTime,
     activeDeliveryDays: mapDeliveryDaysToJs(data.deliveryDays),
     holidays: Array.isArray(data.blackoutDates)
@@ -77,6 +84,7 @@ function mapApiToDeliveryConfig(data: any, fallback: SupplierDeliveryConfig): Su
 
 function mapDeliveryConfigToApi(cfg: SupplierDeliveryConfig) {
   return {
+    cutoffDayOffset: Math.max(0, Number(cfg.cutoffDayOffset) || 0),
     cutoffTime: cfg.cutoffTime,
     orderCutoffTime: cfg.cutoffTime,
     deliveryDays: mapJsDaysToNames(cfg.activeDeliveryDays),
@@ -136,6 +144,7 @@ export const SupplierDetailPage: FC<Props> = ({
   const [deliveryConfig, setDeliveryConfig] = useState<SupplierDeliveryConfig>({
     minOrderQuantity: 0,
     activeDeliveryDays: [1, 2, 3, 4, 5, 6],
+    cutoffDayOffset: 1,
     cutoffTime: '17:00',
     allowStoreEdit: true,
     editWindowType: 'BEFORE_CUTOFF',

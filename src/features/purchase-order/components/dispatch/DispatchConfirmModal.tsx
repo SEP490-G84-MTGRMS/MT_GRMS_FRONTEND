@@ -9,8 +9,6 @@ import {
   ChevronRight,
   RotateCcw,
   Building2,
-  Calendar,
-  Zap,
   Package,
   Layers,
   Info,
@@ -66,25 +64,36 @@ function formatDateVN(dateStr?: string | Date): string {
   return `${dow}, ${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
 }
 
-function formatWeekRange(mondayStr?: string): string {
-  if (!mondayStr) return 'Tuần hiện tại';
-  const mon = new Date(mondayStr);
-  if (Number.isNaN(mon.getTime())) return mondayStr;
-  const sun = new Date(mon);
-  sun.setDate(mon.getDate() + 6);
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `Thứ Hai ${pad(mon.getDate())}/${pad(mon.getMonth() + 1)} — Chủ Nhật ${pad(sun.getDate())}/${pad(sun.getMonth() + 1)}/${sun.getFullYear()}`;
+const SCOPE_OPTIONS: Array<{
+  value: DispatchScope;
+  title: string;
+  days?: number;
+}> = [
+  { value: 'NEAREST', title: 'Ngày giao gần nhất' },
+  { value: 'DAYS_7', title: '1 tuần tới', days: 7 },
+  { value: 'DAYS_14', title: '2 tuần tới', days: 14 },
+  { value: 'DAYS_21', title: '3 tuần tới', days: 21 },
+  { value: 'DAYS_31', title: '1 tháng tới', days: 31 },
+];
+
+function resolveScopeIndex(scope: DispatchScope): number {
+  const idx = SCOPE_OPTIONS.findIndex((o) => o.value === scope);
+  return idx >= 0 ? idx : 0;
 }
 
-function shiftWeek(currentMondayStr?: string, deltaWeeks = 0): string {
-  const d = currentMondayStr ? new Date(currentMondayStr) : new Date();
-  if (Number.isNaN(d.getTime())) return '';
-  d.setDate(d.getDate() + deltaWeeks * 7);
-  const day = d.getDay();
-  const diff = (7 + (day - 1)) % 7;
-  d.setDate(d.getDate() - diff);
+function resolveScopeDays(scope: DispatchScope): number | null {
+  const opt = SCOPE_OPTIONS.find((o) => o.value === scope);
+  return opt?.days ?? (scope === 'ALL' ? 31 : scope === 'WEEK' ? 7 : null);
+}
+
+function formatRollingRange(days: number): string {
+  const from = new Date();
+  from.setHours(0, 0, 0, 0);
+  const to = new Date(from);
+  to.setDate(from.getDate() + days - 1);
   const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const fmt = (d: Date) => `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
+  return `${fmt(from)} → ${fmt(to)}`;
 }
 
 function isValidEmail(email: string): boolean {
@@ -105,8 +114,8 @@ export const DispatchConfirmModal: FC<DispatchConfirmModalProps> = ({
   supplierEmail,
   scope,
   onScopeChange,
-  weekStartDate,
-  onWeekChange,
+  weekStartDate: _weekStartDate,
+  onWeekChange: _onWeekChange,
   previewData = null,
   isLoadingPreview = false,
   previewError = null,
@@ -194,10 +203,9 @@ export const DispatchConfirmModal: FC<DispatchConfirmModalProps> = ({
 
 
 
-  // Phân loại các group từ Preview
+  // Chỉ lấy group đủ điều kiện (có qty từ matrix) để hiển thị / chốt
   const {
     eligibleGroups,
-    ineligibleGroups,
     uniqueBranchesCount,
     totalSkuCount,
     totalQuantity,
@@ -207,7 +215,6 @@ export const DispatchConfirmModal: FC<DispatchConfirmModalProps> = ({
     const results = previewData?.results || [];
 
     const eligible: SplitGroupResult[] = [];
-    const ineligible: SplitGroupResult[] = [];
 
     const branchSet = new Set<string>();
     let skuSum = 0;
@@ -225,14 +232,11 @@ export const DispatchConfirmModal: FC<DispatchConfirmModalProps> = ({
         if (r.hasMissingPrice || (r.lines && r.lines.some((l) => l.hasMissingPrice || l.unitPrice <= 0))) {
           missingPriceFound = true;
         }
-      } else {
-        ineligible.push(r);
       }
     }
 
     return {
       eligibleGroups: eligible,
-      ineligibleGroups: ineligible,
       uniqueBranchesCount: branchSet.size,
       totalSkuCount: skuSum,
       totalQuantity: qtySum,
@@ -241,71 +245,22 @@ export const DispatchConfirmModal: FC<DispatchConfirmModalProps> = ({
     };
   }, [previewData]);
 
-  // Phân nhóm các lý do bị bỏ qua / lỗi
-  const categorizedIneligible = useMemo(() => {
-    const map = new Map<string, { label: string; badgeColor: string; badgeBg: string; groups: SplitGroupResult[] }>();
-
-    for (const g of ineligibleGroups) {
-      let categoryKey = g.errorCode || g.status;
-      let label = g.errorMessage || 'Không đủ điều kiện';
-      let badgeColor = '#b91c1c';
-      let badgeBg = '#fef2f2';
-
-      if (g.status === 'ALREADY_FINALIZED') {
-        categoryKey = 'ALREADY_FINALIZED';
-        label = 'Đã khóa sau cutoff (không amend được)';
-        badgeColor = '#0369a1';
-        badgeBg = '#e0f2fe';
-      } else if (g.status === 'NO_CHANGES') {
-        categoryKey = 'NO_CHANGES';
-        label = 'Không có thay đổi so với PO hiện tại';
-        badgeColor = '#475569';
-        badgeBg = '#f1f5f9';
-      } else if (g.errorCode === 'CUTOFF_EXPIRED') {
-        categoryKey = 'CUTOFF_EXPIRED';
-        label = 'Đã quá thời hạn Cutoff ngày giao';
-        badgeColor = '#b45309';
-        badgeBg = '#fef3c7';
-      } else if (g.errorCode === 'EMPTY_LINES' || g.errorCode === 'NO_QTY') {
-        categoryKey = 'EMPTY_LINES';
-        label = 'Không có số lượng đặt (>0)';
-        badgeColor = '#64748b';
-        badgeBg = '#f1f5f9';
-      } else if (g.errorCode?.includes('MOQ')) {
-        categoryKey = 'MOQ_NOT_MET';
-        label = 'Không đạt số lượng tối thiểu (MOQ)';
-        badgeColor = '#b91c1c';
-        badgeBg = '#fef2f2';
-      } else if (g.errorCode?.includes('MULTIPLE')) {
-        categoryKey = 'ORDER_MULTIPLE_VIOLATION';
-        label = 'Vi phạm bội số đặt hàng';
-        badgeColor = '#b91c1c';
-        badgeBg = '#fef2f2';
-      } else if (g.errorCode?.includes('INACTIVE')) {
-        categoryKey = 'INACTIVE';
-        label = 'NCC hoặc chi nhánh tạm ngừng hoạt động';
-        badgeColor = '#b91c1c';
-        badgeBg = '#fef2f2';
-      }
-
-      if (!map.has(categoryKey)) {
-        map.set(categoryKey, { label, badgeColor, badgeBg, groups: [] });
-      }
-      map.get(categoryKey)!.groups.push(g);
-    }
-
-    return Array.from(map.entries());
-  }, [ineligibleGroups]);
-
   if (!isOpen || !supplier) return null;
 
   // ─────────────────────────────────────────────────────────────
   // RESULT VIEW: HIỂN THỊ KẾT QUẢ SAU KHI SUBMIT CHỐT ĐƠN
   // ─────────────────────────────────────────────────────────────
   if (batchResult) {
-    const isFullSuccess = batchResult.failedCount === 0 && batchResult.successCount > 0;
-    const isPartialSuccess = batchResult.successCount > 0 && batchResult.failedCount > 0;
-    
+    const createdCount = batchResult.successCount || 0;
+    const amendedCount = batchResult.amendedCount || 0;
+    const noChangesCount = batchResult.noChangesCount || 0;
+    const okCount = createdCount + amendedCount + noChangesCount;
+    const isFullSuccess = batchResult.failedCount === 0 && okCount > 0;
+    const isPartialSuccess = okCount > 0 && batchResult.failedCount > 0;
+    const isAmendOnly = amendedCount > 0 && createdCount === 0;
+    // Bỏ SKIPPED (NOT_DELIVERY_DAY…); giữ AMENDED / NO_CHANGES / SUCCESS / FAILED
+    const visibleResults = batchResult.results.filter((r) => r.status !== 'SKIPPED');
+
     return (
       <div className="po-modal-overlay" style={{
         position: 'fixed',
@@ -371,7 +326,11 @@ export const DispatchConfirmModal: FC<DispatchConfirmModalProps> = ({
               <div>
                 <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: '#0f172a' }}>
                   {isFullSuccess
-                    ? 'Chốt đơn Purchase Order thành công!'
+                    ? isAmendOnly
+                      ? 'Cập nhật Purchase Order thành công!'
+                      : amendedCount > 0
+                        ? 'Chốt / cập nhật Purchase Order thành công!'
+                        : 'Chốt đơn Purchase Order thành công!'
                     : isPartialSuccess
                     ? 'Chốt đơn thành công một phần (Partial Success)'
                     : 'Chốt đơn không thành công'}
@@ -411,9 +370,23 @@ export const DispatchConfirmModal: FC<DispatchConfirmModalProps> = ({
                   textAlign: 'center',
                 }}
               >
-                <div style={{ fontSize: 11.5, color: '#166534', fontWeight: 700 }}>PO TẠO THÀNH CÔNG</div>
+                <div style={{ fontSize: 11.5, color: '#166534', fontWeight: 700 }}>PO TẠO MỚI</div>
                 <div style={{ fontSize: 22, fontWeight: 800, color: '#15803d', marginTop: 2 }}>
-                  {batchResult.successCount}
+                  {createdCount}
+                </div>
+              </div>
+              <div
+                style={{
+                  background: '#eff6ff',
+                  border: '1px solid #bfdbfe',
+                  borderRadius: 8,
+                  padding: '12px 14px',
+                  textAlign: 'center',
+                }}
+              >
+                <div style={{ fontSize: 11.5, color: '#1d4ed8', fontWeight: 700 }}>PO CẬP NHẬT</div>
+                <div style={{ fontSize: 22, fontWeight: 800, color: '#1d4ed8', marginTop: 2 }}>
+                  {amendedCount}
                 </div>
               </div>
               <div
@@ -432,20 +405,6 @@ export const DispatchConfirmModal: FC<DispatchConfirmModalProps> = ({
               </div>
               <div
                 style={{
-                  background: '#fffbeb',
-                  border: '1px solid #fde68a',
-                  borderRadius: 8,
-                  padding: '12px 14px',
-                  textAlign: 'center',
-                }}
-              >
-                <div style={{ fontSize: 11.5, color: '#92400e', fontWeight: 700 }}>BỎ QUA (CUTOFF)</div>
-                <div style={{ fontSize: 22, fontWeight: 800, color: '#b45309', marginTop: 2 }}>
-                  {batchResult.skippedCount}
-                </div>
-              </div>
-              <div
-                style={{
                   background: '#f1f5f9',
                   border: '1px solid #cbd5e1',
                   borderRadius: 8,
@@ -453,9 +412,9 @@ export const DispatchConfirmModal: FC<DispatchConfirmModalProps> = ({
                   textAlign: 'center',
                 }}
               >
-                <div style={{ fontSize: 11.5, color: '#334155', fontWeight: 700 }}>ĐÃ CHỐT TRƯỚC ĐÓ</div>
+                <div style={{ fontSize: 11.5, color: '#334155', fontWeight: 700 }}>ĐÃ KHÓA / KHÔNG ĐỔI</div>
                 <div style={{ fontSize: 22, fontWeight: 800, color: '#475569', marginTop: 2 }}>
-                  {batchResult.alreadyFinalizedCount}
+                  {(batchResult.alreadyFinalizedCount || 0) + noChangesCount}
                 </div>
               </div>
             </div>
@@ -465,23 +424,33 @@ export const DispatchConfirmModal: FC<DispatchConfirmModalProps> = ({
               <div style={{ fontSize: 13, fontWeight: 700, color: '#334155', textTransform: 'uppercase' }}>
                 Chi tiết kết quả theo từng Purchase Order:
               </div>
-              {batchResult.results.map((r, idx) => {
-                                const isAlready = r.status === 'ALREADY_FINALIZED';
-                const isSkipped = r.status === 'SKIPPED';
+              {visibleResults.length === 0 && (
+                <div style={{ fontSize: 13, color: '#64748b', padding: '12px 0' }}>
+                  Không có PO nào được tạo trong phạm vi đã chọn.
+                </div>
+              )}
+              {visibleResults.map((r, idx) => {
+                const isAlready = r.status === 'ALREADY_FINALIZED';
                 const isFailed = r.status === 'FAILED';
+                const isAmended = r.status === 'AMENDED';
+                const isNoChanges = r.status === 'NO_CHANGES';
 
                 let badgeColor = '#15803d';
                 let badgeBg = '#dcfce7';
                 let statusText = 'TẠO PO THÀNH CÔNG';
 
-                if (isAlready) {
+                if (isAmended) {
+                  badgeColor = '#1d4ed8';
+                  badgeBg = '#dbeafe';
+                  statusText = 'ĐÃ CẬP NHẬT PO';
+                } else if (isNoChanges) {
                   badgeColor = '#0369a1';
                   badgeBg = '#e0f2fe';
-                  statusText = 'ĐÃ CHỐT TRƯỚC ĐÓ';
-                } else if (isSkipped) {
-                  badgeColor = '#b45309';
-                  badgeBg = '#fef3c7';
-                  statusText = 'BỎ QUA (QUÁ HẠN)';
+                  statusText = 'KHÔNG ĐỔI SL';
+                } else if (isAlready) {
+                  badgeColor = '#0369a1';
+                  badgeBg = '#e0f2fe';
+                  statusText = 'ĐÃ KHÓA (QUA CUTOFF)';
                 } else if (isFailed) {
                   badgeColor = '#b91c1c';
                   badgeBg = '#fee2e2';
@@ -735,9 +704,9 @@ export const DispatchConfirmModal: FC<DispatchConfirmModalProps> = ({
       <div
         className="po-modal-container"
         style={{
-          maxWidth: 940,
-          width: '95%',
-          maxHeight: '85vh',
+          maxWidth: 1080,
+          width: '96%',
+          maxHeight: '92vh',
           display: 'flex',
           flexDirection: 'column',
           background: '#ffffff',
@@ -807,144 +776,159 @@ export const DispatchConfirmModal: FC<DispatchConfirmModalProps> = ({
 
         {/* Scrollable Body */}
         <div style={{ padding: '20px 24px', overflowY: 'auto', flex: 1 }}>
-          {/* Scope Selector: Segmented Control */}
+          {/* Scope Selector: label + prev/text/next cùng một dòng */}
           <div
             style={{
               background: '#f8fafc',
               border: '1px solid #e2e8f0',
               borderRadius: 10,
-              padding: '14px 16px',
+              padding: '10px 14px',
               marginBottom: 16,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+              flexWrap: 'wrap',
             }}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
-              <div>
-                <label style={{ fontSize: 12.5, fontWeight: 700, color: '#334155', display: 'block', marginBottom: 6 }}>
-                  PHẠM VI CHỐT ĐƠN:
-                </label>
-                {/* Segmented Control Buttons */}
-                <div
+            <label
+              style={{
+                fontSize: 12.5,
+                fontWeight: 700,
+                color: '#334155',
+                whiteSpace: 'nowrap',
+                flexShrink: 0,
+                margin: 0,
+              }}
+            >
+              PHẠM VI CHỐT ĐƠN
+            </label>
+
+            <div
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 8,
+                minWidth: 0,
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => {
+                  const idx = resolveScopeIndex(scope);
+                  if (idx <= 0) return;
+                  onScopeChange(SCOPE_OPTIONS[idx - 1].value);
+                }}
+                disabled={isLoadingPreview || isSubmitting || resolveScopeIndex(scope) <= 0}
+                title="Phạm vi hẹp hơn"
+                style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: 8,
+                  border: '1px solid #cbd5e1',
+                  background: '#ffffff',
+                  color: '#334155',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor:
+                    isLoadingPreview || isSubmitting || resolveScopeIndex(scope) <= 0
+                      ? 'not-allowed'
+                      : 'pointer',
+                  opacity: resolveScopeIndex(scope) <= 0 ? 0.45 : 1,
+                  flexShrink: 0,
+                }}
+              >
+                <ChevronLeft size={18} />
+              </button>
+
+              <div
+                style={{
+                  width: 380,
+                  maxWidth: '100%',
+                  height: 40,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 6,
+                  textAlign: 'center',
+                  background: '#ffffff',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: 8,
+                  padding: '0 10px',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  boxSizing: 'border-box',
+                }}
+              >
+                <span
                   style={{
-                    display: 'inline-flex',
-                    background: '#e2e8f0',
-                    borderRadius: 8,
-                    padding: 3,
-                    gap: 3,
+                    fontSize: 13.5,
+                    fontWeight: 800,
+                    color: '#0f172a',
+                    letterSpacing: '-0.01em',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
                   }}
                 >
-                  <button
-                    type="button"
-                    onClick={() => onScopeChange('NEAREST')}
-                    disabled={isLoadingPreview || isSubmitting}
-                    style={{
-                      border: 'none',
-                      background: scope === 'NEAREST' ? '#ffffff' : 'transparent',
-                      color: scope === 'NEAREST' ? '#0f766e' : '#475569',
-                      boxShadow: scope === 'NEAREST' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-                      borderRadius: 6,
-                      padding: '6px 14px',
-                      fontSize: 13,
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 6,
-                      transition: 'all 0.15s ease',
-                    }}
-                  >
-                    <Zap size={14} color={scope === 'NEAREST' ? '#0d9488' : '#64748b'} />
-                    <span>Ngày giao gần nhất</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onScopeChange('WEEK')}
-                    disabled={isLoadingPreview || isSubmitting}
-                    style={{
-                      border: 'none',
-                      background: scope === 'WEEK' ? '#ffffff' : 'transparent',
-                      color: scope === 'WEEK' ? '#0369a1' : '#475569',
-                      boxShadow: scope === 'WEEK' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-                      borderRadius: 6,
-                      padding: '6px 14px',
-                      fontSize: 13,
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 6,
-                      transition: 'all 0.15s ease',
-                    }}
-                  >
-                    <Calendar size={14} color={scope === 'WEEK' ? '#0284c7' : '#64748b'} />
-                    <span>Cả tuần (T2–CN)</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Time Details Display */}
-              <div style={{ textAlign: 'right', minWidth: 260 }}>
+                  {SCOPE_OPTIONS[resolveScopeIndex(scope)].title}
+                </span>
                 {scope === 'NEAREST' ? (
-                  <div>
-                    <span style={{ fontSize: 11.5, color: '#64748b', fontWeight: 600 }}>NGÀY GIAO DỰ KIẾN:</span>
-                    <div style={{ fontSize: 13.5, fontWeight: 700, color: '#0f766e', marginTop: 2 }}>
-                      {eligibleGroups[0]
-                        ? formatDateVN(eligibleGroups[0].deliveryDate)
-                        : 'Chưa xác định ngày giao'}
-                    </div>
-                  </div>
-                ) : (
-                  <div>
-                    <span style={{ fontSize: 11.5, color: '#64748b', fontWeight: 600 }}>KHOẢNG THỜI GIAN TUẦN:</span>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4, justifyContent: 'flex-end' }}>
-                      <button
-                        type="button"
-                        onClick={() => onWeekChange(shiftWeek(weekStartDate, -1))}
-                        disabled={isLoadingPreview || isSubmitting}
-                        className="po-btn po-btn-secondary"
-                        style={{ padding: '2px 6px', height: 26 }}
-                        title="Tuần trước"
-                      >
-                        <ChevronLeft size={13} />
-                      </button>
-                      <span
-                        style={{
-                          fontSize: 12,
-                          fontWeight: 700,
-                          color: '#0369a1',
-                          background: '#f0f9ff',
-                          border: '1px solid #bae6fd',
-                          padding: '3px 8px',
-                          borderRadius: 4,
-                        }}
-                      >
-                        {formatWeekRange(weekStartDate)}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => onWeekChange(shiftWeek(undefined, 0))}
-                        disabled={isLoadingPreview || isSubmitting}
-                        className="po-btn po-btn-secondary"
-                        style={{ padding: '2px 8px', height: 26, fontSize: 11 }}
-                        title="Về tuần hiện tại"
-                      >
-                        Hiện tại
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => onWeekChange(shiftWeek(weekStartDate, 1))}
-                        disabled={isLoadingPreview || isSubmitting}
-                        className="po-btn po-btn-secondary"
-                        style={{ padding: '2px 6px', height: 26 }}
-                        title="Tuần kế tiếp"
-                      >
-                        <ChevronRight size={13} />
-                      </button>
-                    </div>
-                  </div>
-                )}
+                  <span
+                    style={{
+                      fontSize: 12.5,
+                      fontWeight: 700,
+                      color: '#0f766e',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                    }}
+                  >
+                    ·{' '}
+                    {eligibleGroups[0]
+                      ? formatDateVN(eligibleGroups[0].deliveryDate)
+                      : 'Chưa có ngày giao'}
+                  </span>
+                ) : resolveScopeDays(scope) != null ? (
+                  <span style={{ fontSize: 12.5, fontWeight: 700, color: '#0369a1' }}>
+                    · {formatRollingRange(resolveScopeDays(scope)!)}
+                  </span>
+                ) : null}
               </div>
-            </div>
 
+              <button
+                type="button"
+                onClick={() => {
+                  const idx = resolveScopeIndex(scope);
+                  if (idx >= SCOPE_OPTIONS.length - 1) return;
+                  onScopeChange(SCOPE_OPTIONS[idx + 1].value);
+                }}
+                disabled={
+                  isLoadingPreview || isSubmitting || resolveScopeIndex(scope) >= SCOPE_OPTIONS.length - 1
+                }
+                title="Phạm vi rộng hơn"
+                style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: 8,
+                  border: '1px solid #cbd5e1',
+                  background: '#ffffff',
+                  color: '#334155',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor:
+                    isLoadingPreview ||
+                    isSubmitting ||
+                    resolveScopeIndex(scope) >= SCOPE_OPTIONS.length - 1
+                      ? 'not-allowed'
+                      : 'pointer',
+                  opacity: resolveScopeIndex(scope) >= SCOPE_OPTIONS.length - 1 ? 0.45 : 1,
+                  flexShrink: 0,
+                }}
+              >
+                <ChevronRight size={18} />
+              </button>
+            </div>
           </div>
 
           {/* Loading Preview State */}
@@ -1223,109 +1207,11 @@ export const DispatchConfirmModal: FC<DispatchConfirmModalProps> = ({
                     <Info size={20} color="#94a3b8" style={{ margin: '0 auto 6px' }} />
                     <div>Không có Purchase Order nào đủ điều kiện tạo trong phạm vi này.</div>
                     <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 2 }}>
-                      Vui lòng kiểm tra lại số lượng đặt trên Ma trận đặt hàng hoặc chọn phạm vi tuần khác.
+                      Vui lòng kiểm tra lại số lượng đặt trên Ma trận đặt hàng hoặc chọn phạm vi rộng hơn.
                     </div>
                   </div>
                 )}
               </div>
-
-              {/* Skipped / ineligible — table */}
-              {categorizedIneligible.length > 0 && (
-                <div style={{ marginBottom: 18 }}>
-                  <div
-                    style={{
-                      fontSize: 13,
-                      fontWeight: 700,
-                      color: '#334155',
-                      marginBottom: 8,
-                      textTransform: 'uppercase',
-                    }}
-                  >
-                    Các trường hợp bị bỏ qua / không đủ điều kiện ({ineligibleGroups.length}):
-                  </div>
-                  <div
-                    style={{
-                      border: '1px solid #e2e8f0',
-                      borderRadius: 8,
-                      overflow: 'hidden',
-                      background: '#ffffff',
-                    }}
-                  >
-                    <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 12.5 }}>
-                      <thead>
-                        <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#475569' }}>
-                          <th style={{ padding: '10px 12px', fontWeight: 700 }}>Chi nhánh</th>
-                          <th style={{ padding: '10px 12px', fontWeight: 700 }}>Ngày giao</th>
-                          <th style={{ padding: '10px 12px', fontWeight: 700 }}>Lý do</th>
-                          <th style={{ padding: '10px 12px', fontWeight: 700 }}>Chi tiết</th>
-                          <th style={{ padding: '10px 12px', fontWeight: 700, textAlign: 'center' }}>Trạng thái</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {categorizedIneligible.flatMap(([catKey, cat]) =>
-                          cat.groups.map((item, iIdx) => (
-                            <tr
-                              key={`${catKey}-${item.branchId || ''}-${item.deliveryDate}-${iIdx}`}
-                              style={{ borderTop: '1px solid #f1f5f9' }}
-                            >
-                              <td style={{ padding: '10px 12px', fontWeight: 600, color: '#0f172a' }}>
-                                {item.branchName || 'Chi nhánh'}
-                              </td>
-                              <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>
-                                {formatDateVN(item.deliveryDate)}
-                              </td>
-                              <td style={{ padding: '10px 12px' }}>
-                                <span
-                                  style={{
-                                    fontSize: 11.5,
-                                    fontWeight: 700,
-                                    padding: '2px 8px',
-                                    borderRadius: 4,
-                                    background: cat.badgeBg,
-                                    color: cat.badgeColor,
-                                    whiteSpace: 'nowrap',
-                                  }}
-                                >
-                                  {cat.label}
-                                </span>
-                              </td>
-                              <td style={{ padding: '10px 12px', color: '#64748b', fontSize: 12 }}>
-                                {item.purchaseOrderCode ? (
-                                  <span style={{ fontFamily: 'monospace', color: '#0369a1', fontWeight: 700 }}>
-                                    {item.purchaseOrderCode}
-                                  </span>
-                                ) : (
-                                  item.errorMessage || item.errorCode || '—'
-                                )}
-                              </td>
-                              <td style={{ padding: '10px 12px', textAlign: 'center' }}>
-                                <span
-                                  style={{
-                                    fontSize: 11,
-                                    fontWeight: 700,
-                                    padding: '2px 8px',
-                                    borderRadius: 4,
-                                    background: item.status === 'ALREADY_FINALIZED' ? '#e0f2fe' : '#f1f5f9',
-                                    color: item.status === 'ALREADY_FINALIZED' ? '#0369a1' : '#64748b',
-                                  }}
-                                >
-                                  {item.status === 'ALREADY_FINALIZED'
-                                    ? 'Đã chốt'
-                                    : item.status === 'SKIPPED'
-                                      ? 'Bỏ qua'
-                                      : item.status === 'FAILED'
-                                        ? 'Lỗi'
-                                        : item.status}
-                                </span>
-                              </td>
-                            </tr>
-                          ))
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
 
               {/* Email send mode */}
               <div
@@ -1578,6 +1464,10 @@ export const DispatchConfirmModal: FC<DispatchConfirmModalProps> = ({
               display: 'inline-flex',
               alignItems: 'center',
               gap: 8,
+              background:
+                supplier?.hasPendingChanges && supplier.status !== 'dispatched' ? '#ea580c' : undefined,
+              borderColor:
+                supplier?.hasPendingChanges && supplier.status !== 'dispatched' ? '#ea580c' : undefined,
               opacity:
                 isSubmitting || isLoadingPreview || !hasEligibleGroups || !scheduleValid ? 0.6 : 1,
               cursor:
@@ -1589,13 +1479,21 @@ export const DispatchConfirmModal: FC<DispatchConfirmModalProps> = ({
             {isSubmitting ? (
               <>
                 <RotateCcw size={15} className="animate-spin" />
-                <span>Đang chốt đơn...</span>
+                <span>
+                  {supplier?.hasPendingChanges ? 'Đang cập nhật...' : 'Đang chốt đơn...'}
+                </span>
               </>
             ) : (
               <>
                 <Send size={15} />
                 <span>
-                  {emailSendMode === 'SCHEDULED_SEND' ? 'Chốt đơn và lên lịch gửi' : 'Chốt đơn và gửi email'}
+                  {supplier?.hasPendingChanges && supplier.status !== 'dispatched'
+                    ? emailSendMode === 'SCHEDULED_SEND'
+                      ? 'Cập nhật & lên lịch gửi'
+                      : 'Cập nhật & gửi mail'
+                    : emailSendMode === 'SCHEDULED_SEND'
+                      ? 'Chốt đơn và lên lịch gửi'
+                      : 'Chốt đơn và gửi email'}
                 </span>
               </>
             )}

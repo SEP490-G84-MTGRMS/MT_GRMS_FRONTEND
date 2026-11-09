@@ -42,6 +42,7 @@ const baseSupplier: SupplierSummary = {
 const baseDeliveryConfig: SupplierDeliveryConfig = {
   minOrderQuantity: 10,
   activeDeliveryDays: [1, 2, 3, 4, 5],
+  cutoffDayOffset: 1,
   cutoffTime: '17:00',
   allowStoreEdit: true,
   editWindowType: 'BEFORE_CUTOFF',

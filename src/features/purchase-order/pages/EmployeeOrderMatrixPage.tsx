@@ -13,6 +13,11 @@ import type {
 import { OrderMatrixHeader } from '../components/matrix/OrderMatrixHeader';
 import { OrderMatrixFilterBar } from '../components/matrix/OrderMatrixFilterBar';
 import { OrderMatrixTable } from '../components/matrix/OrderMatrixTable';
+import { OrderMatrixImportPreviewModal } from '../components/matrix/OrderMatrixImportPreviewModal';
+import {
+  validateMatrixExcelFile,
+  type ExcelValidationResult,
+} from '../lib/matrixExcelService';
 import { AdminToast, type ToastState } from '../../admin/components';
 import '../purchase-order.css';
 
@@ -144,6 +149,10 @@ export const EmployeeOrderMatrixPage: FC = () => {
   );
   const [isDirty, setIsDirty] = useState<boolean>(false);
   const [status, setStatus] = useState<string>('Draft');
+
+  // State: Import Preview Modal
+  const [importPreviewResult, setImportPreviewResult] = useState<ExcelValidationResult | null>(null);
+  const [isImportModalOpen, setIsImportModalOpen] = useState<boolean>(false);
 
   // State: Toast
   const [toast, setToast] = useState<ToastState | null>(null);
@@ -326,43 +335,92 @@ export const EmployeeOrderMatrixPage: FC = () => {
     showToast('Đã xuất file bảng ma trận đặt hàng (.csv) thành công!', 'success');
   };
 
-  // Excel Upload
-  const handleExcelUpload = (file: File) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const text = e.target?.result as string;
-      if (!text) return;
-      const lines = text.split('\n');
-      if (lines.length < 2) return;
+  // Excel Upload — 3 Giai đoạn: Validate -> Preview Modal -> Apply
+  const handleExcelUpload = async (file: File) => {
+    const supplier = MOCK_PO_SUPPLIERS.find((s) => s.id === selectedSupplierId);
 
-      const newMap = { ...qtyMap };
-      let updatedItems = 0;
-
-      lines.slice(1).forEach((line) => {
-        const cols = line.split(',');
-        if (cols.length >= 7) {
-          const sku = cols[3]?.trim();
-          const targetProd = MOCK_MATRIX_PRODUCTS.find((p) => p.sku === sku);
-          if (targetProd && (selectedSupplierId === 'ALL' || targetProd.supplierId === selectedSupplierId)) {
-            if (!newMap[targetProd.id]) newMap[targetProd.id] = {};
-            dayColumns.forEach((d, idx) => {
-              if (!d.isOff && !d.isLocked) {
-                const val = parseFloat(cols[7 + idx]);
-                if (!isNaN(val) && val >= 0) {
-                  newMap[targetProd.id][d.dateKey] = val;
-                  updatedItems++;
-                }
-              }
-            });
-          }
-        }
+    try {
+      const validationResult = await validateMatrixExcelFile({
+        file,
+        currentBranchId: employeeBranch.id,
+        currentBranchCode: employeeBranch.code,
+        currentBranchName: employeeBranch.name,
+        currentSupplierId: selectedSupplierId,
+        currentSupplierCode: supplier?.code,
+        currentSupplierName: supplier?.name,
+        viewFrom,
+        viewTo: addDaysToDate(viewFrom, viewMode - 1),
+        baseDate: BASE_TODAY,
+        matrixProducts: MOCK_MATRIX_PRODUCTS,
+        dayColumns,
+        qtyMap,
+        supplierConfigs: MOCK_PO_SUPPLIERS.map((s) => s.config),
+        isCellEditable: (d) => !d.isOff && !d.isLocked,
       });
 
-      setQtyMap(newMap);
-      setIsDirty(true);
-      showToast(`Đã nạp thành công dữ liệu từ file "${file.name}" (${updatedItems} ô số lượng)!`, 'success');
-    };
-    reader.readAsText(file);
+      setImportPreviewResult(validationResult);
+      setIsImportModalOpen(true);
+    } catch (err: any) {
+      // Đảm bảo luôn mở Preview Modal kể cả khi gặp lỗi đọc file sớm
+      const errResult: ExcelValidationResult = {
+        valid: false,
+        fileName: file?.name || 'unknown.xlsx',
+        fileSize: file?.size || 0,
+        scopeStatus: {
+          branchMatched: false,
+          branchExpected: `${employeeBranch.name} (${employeeBranch.code})`,
+          supplierMatched: false,
+          supplierExpected: supplier?.name || selectedSupplierId,
+          periodMatched: false,
+          periodExpected: `${fmtDateStr(viewFrom)} - ${fmtDateStr(addDaysToDate(viewFrom, viewMode - 1))}`,
+        },
+        summary: {
+          totalCells: 0,
+          validCells: 0,
+          errorCount: 1,
+          warningCount: 0,
+          ignoredCells: 0,
+        },
+        errors: [
+          {
+            type: 'ERROR',
+            row: 0,
+            productCode: '-',
+            productName: '-',
+            deliveryDate: '-',
+            dateLabel: '-',
+            inputValue: '-',
+            code: 'FORMAT_INVALID',
+            message: `Không thể đọc nội dung file Excel: ${err?.message || 'File lỗi hoặc không đúng định dạng'}`,
+          },
+        ],
+        warnings: [],
+        cellsToApply: [],
+      };
+      setImportPreviewResult(errResult);
+      setIsImportModalOpen(true);
+    }
+  };
+
+  // Nạp dữ liệu từ Preview Modal vào ma trận của Employee
+  const handleConfirmApplyImport = () => {
+    if (!importPreviewResult || !importPreviewResult.valid || importPreviewResult.summary.validCells === 0) return;
+
+    setQtyMap((prev) => {
+      const next = { ...prev };
+      importPreviewResult.cellsToApply.forEach((c) => {
+        if (!next[c.productId]) next[c.productId] = {};
+        next[c.productId][c.deliveryDate] = c.quantity;
+      });
+      return next;
+    });
+
+    setIsDirty(true);
+    setIsImportModalOpen(false);
+    showToast(
+      `Nạp thành công ${importPreviewResult.summary.validCells} ô số lượng từ file "${importPreviewResult.fileName}" vào Ma trận!`,
+      'success'
+    );
   };
 
   // Save Draft
@@ -439,6 +497,14 @@ export const EmployeeOrderMatrixPage: FC = () => {
           readOnly={isReadOnly}
         />
       </div>
+
+      {/* 4. Excel Import Preview Modal (CISCA Style) */}
+      <OrderMatrixImportPreviewModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        result={importPreviewResult}
+        onConfirmApply={handleConfirmApplyImport}
+      />
     </div>
   );
 };

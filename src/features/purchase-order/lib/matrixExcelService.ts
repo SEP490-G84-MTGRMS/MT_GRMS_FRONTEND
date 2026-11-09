@@ -5,6 +5,7 @@ import type {
   DayColInfo,
   MatrixCellMap,
   OrderMatrixSupplierDeliveryConfig,
+  SupplierDeliveryConfig,
   BranchOption,
   SupplierOption,
 } from '../types/po.types';
@@ -69,6 +70,30 @@ export interface ExcelValidationErrorItem {
   message: string;
 }
 
+export interface ExcelCellToApply {
+  row: number;
+  productId: string;
+  productCode: string;
+  productName: string;
+  supplierName?: string;
+  deliveryDate: string;
+  dateLabel: string;
+  currentQty: number;
+  quantity: number;
+  note?: string;
+}
+
+export interface ExcelScopeStatus {
+  branchMatched: boolean;
+  branchExpected: string;
+  branchActual?: string;
+  supplierMatched: boolean;
+  supplierExpected: string;
+  supplierActual?: string;
+  periodMatched: boolean;
+  periodExpected: string;
+}
+
 export interface ExcelValidationSummary {
   totalCells: number;
   validCells: number;
@@ -81,15 +106,11 @@ export interface ExcelValidationResult {
   valid: boolean;
   fileName: string;
   fileSize: number;
+  scopeStatus: ExcelScopeStatus;
   summary: ExcelValidationSummary;
   errors: ExcelValidationErrorItem[];
   warnings: ExcelValidationErrorItem[];
-  cellsToApply: Array<{
-    productId: string;
-    productCode: string;
-    deliveryDate: string;
-    quantity: number;
-  }>;
+  cellsToApply: ExcelCellToApply[];
 }
 
 export interface ExportMatrixExcelOptions {
@@ -541,24 +562,74 @@ export function exportMatrixToExcel(
 export interface ValidateMatrixExcelContext {
   file: File;
   currentBranchId: string;
+  currentBranchCode?: string;
+  currentBranchName?: string;
   currentSupplierId: string;
+  currentSupplierCode?: string;
+  currentSupplierName?: string;
+  viewFrom?: Date;
+  viewTo?: Date;
+  baseDate?: Date | string;
   matrixProducts: OrderMatrixProduct[];
   dayColumns: DayColInfo[];
-  cellMap: MatrixCellMap;
-  supplierConfigs?: OrderMatrixSupplierDeliveryConfig[];
+  cellMap?: MatrixCellMap;
+  qtyMap?: Record<string, Record<string, number>>;
+  supplierConfigs?: Array<OrderMatrixSupplierDeliveryConfig | SupplierDeliveryConfig>;
   isCellEditable: (d: DayColInfo, product?: OrderMatrixProduct) => boolean;
 }
 
 export async function validateMatrixExcelFile(
   context: ValidateMatrixExcelContext
 ): Promise<ExcelValidationResult> {
-  const { file, currentBranchId, currentSupplierId, matrixProducts, dayColumns, cellMap, isCellEditable } =
-    context;
+  const {
+    file,
+    currentBranchId,
+    currentBranchCode,
+    currentBranchName,
+    currentSupplierId,
+    currentSupplierCode,
+    currentSupplierName,
+    viewFrom,
+    viewTo,
+    baseDate,
+    matrixProducts,
+    dayColumns,
+    cellMap,
+    qtyMap,
+    supplierConfigs,
+    isCellEditable,
+  } = context;
+
+  const branchExpectStr = currentBranchName
+    ? `${currentBranchName} (${currentBranchCode || currentBranchId})`
+    : currentBranchCode || currentBranchId || '-';
+
+  const supplierExpectStr =
+    currentSupplierId === 'ALL'
+      ? 'Tất cả nhà cung cấp'
+      : currentSupplierName
+      ? `${currentSupplierName} (${currentSupplierCode || currentSupplierId})`
+      : currentSupplierCode || currentSupplierId || '-';
+
+  const periodExpectStr =
+    viewFrom && viewTo
+      ? `${dayjs(viewFrom).format('DD/MM/YYYY')} - ${dayjs(viewTo).format('DD/MM/YYYY')}`
+      : dayColumns.length > 0
+      ? `${dayColumns[0].dateShort} - ${dayColumns[dayColumns.length - 1].dateShort}`
+      : '-';
 
   const result: ExcelValidationResult = {
     valid: false,
-    fileName: file.name,
-    fileSize: file.size,
+    fileName: file?.name || 'unknown.xlsx',
+    fileSize: file?.size || 0,
+    scopeStatus: {
+      branchMatched: true,
+      branchExpected: branchExpectStr,
+      supplierMatched: true,
+      supplierExpected: supplierExpectStr,
+      periodMatched: true,
+      periodExpected: periodExpectStr,
+    },
     summary: {
       totalCells: 0,
       validCells: 0,
@@ -660,8 +731,24 @@ export async function validateMatrixExcelFile(
     return result;
   }
 
-  const firstSheetName = workbook.SheetNames[0];
-  const worksheet = workbook.Sheets[firstSheetName];
+  const sheetName = workbook.Sheets['PO_Matrix'] ? 'PO_Matrix' : workbook.SheetNames[0];
+  const worksheet = workbook.Sheets[sheetName];
+  if (!worksheet) {
+    result.errors.push({
+      type: 'ERROR',
+      row: 0,
+      productCode: '-',
+      productName: '-',
+      deliveryDate: '-',
+      dateLabel: '-',
+      inputValue: sheetName,
+      code: 'SHEET_NOT_FOUND',
+      message: `Không tìm thấy trang tính "${sheetName}" trong file Excel.`,
+    });
+    result.summary.errorCount++;
+    return result;
+  }
+
   const rows: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
 
   if (rows.length < 2) {
@@ -723,51 +810,74 @@ export async function validateMatrixExcelFile(
     return result;
   }
 
-  // Check metadata for Branch / Supplier in earlier rows
+  // Scope Validation: Check metadata for Branch & Supplier in banner rows
   for (let r = 0; r < headerRowIndex; r++) {
-    const rowStr = rows[r].join(' ');
-    const branchMatch = rowStr.match(/Mã CN:\s*([a-zA-Z0-9-]+)/i);
-    if (branchMatch && branchMatch[1] && currentBranchId && branchMatch[1] !== currentBranchId) {
-      result.errors.push({
-        type: 'ERROR',
-        row: r + 1,
-        productCode: '-',
-        productName: '-',
-        deliveryDate: '-',
-        dateLabel: '-',
-        inputValue: branchMatch[1],
-        code: 'BRANCH_MISMATCH',
-        message: `File Excel thuộc Chi nhánh khác (${branchMatch[1]}), không khớp với Chi nhánh hiện tại (${currentBranchId}).`,
-      });
-      result.summary.errorCount++;
+    const rowStr = rows[r].map((cell) => String(cell || '').trim()).join('   ');
+
+    // Branch match
+    const sysBranchMatch = rowStr.match(/Mã hệ thống:\s*([^\s|]+)/i);
+    const codeBranchMatch = rowStr.match(/Mã CN:\s*([^\s|]+)/i);
+    const extractedBranch = sysBranchMatch?.[1] || codeBranchMatch?.[1];
+
+    if (extractedBranch && currentBranchId) {
+      const isBranchMatched =
+        extractedBranch.toLowerCase() === currentBranchId.toLowerCase() ||
+        (Boolean(currentBranchCode) && extractedBranch.toLowerCase() === currentBranchCode?.toLowerCase());
+
+      if (!isBranchMatched) {
+        result.scopeStatus.branchMatched = false;
+        result.scopeStatus.branchActual = extractedBranch;
+        result.errors.push({
+          type: 'ERROR',
+          row: r + 1,
+          productCode: '-',
+          productName: '-',
+          deliveryDate: '-',
+          dateLabel: '-',
+          inputValue: extractedBranch,
+          code: 'BRANCH_MISMATCH',
+          message: `File Excel thuộc Chi nhánh "${extractedBranch}", không khớp với Chi nhánh đang mở trên màn hình (${branchExpectStr}).`,
+        });
+        result.summary.errorCount++;
+      } else {
+        result.scopeStatus.branchActual = extractedBranch;
+      }
     }
 
-    const supplierMatch = rowStr.match(/Mã NCC:\s*([a-zA-Z0-9-]+)/i);
-    if (
-      supplierMatch &&
-      supplierMatch[1] &&
-      currentSupplierId &&
-      currentSupplierId !== 'ALL' &&
-      supplierMatch[1] !== currentSupplierId
-    ) {
-      result.errors.push({
-        type: 'ERROR',
-        row: r + 1,
-        productCode: '-',
-        productName: '-',
-        deliveryDate: '-',
-        dateLabel: '-',
-        inputValue: supplierMatch[1],
-        code: 'SUPPLIER_MISMATCH',
-        message: `File Excel thuộc Nhà cung cấp khác (${supplierMatch[1]}), không khớp với Nhà cung cấp đang chọn (${currentSupplierId}).`,
-      });
-      result.summary.errorCount++;
+    // Supplier match
+    const supMatch = rowStr.match(/Mã NCC:\s*([^\s|]+)/i);
+    const extractedSupplier = supMatch?.[1];
+
+    if (extractedSupplier && currentSupplierId && currentSupplierId !== 'ALL') {
+      const isSupplierMatched =
+        extractedSupplier.toLowerCase() === currentSupplierId.toLowerCase() ||
+        (Boolean(currentSupplierCode) && extractedSupplier.toLowerCase() === currentSupplierCode?.toLowerCase());
+
+      if (!isSupplierMatched) {
+        result.scopeStatus.supplierMatched = false;
+        result.scopeStatus.supplierActual = extractedSupplier;
+        result.errors.push({
+          type: 'ERROR',
+          row: r + 1,
+          productCode: '-',
+          productName: '-',
+          deliveryDate: '-',
+          dateLabel: '-',
+          inputValue: extractedSupplier,
+          code: 'SUPPLIER_MISMATCH',
+          message: `File Excel thuộc Nhà cung cấp "${extractedSupplier}", không khớp với Nhà cung cấp đang chọn (${supplierExpectStr}).`,
+        });
+        result.summary.errorCount++;
+      } else {
+        result.scopeStatus.supplierActual = extractedSupplier;
+      }
     }
   }
 
   // 4. Identify Delivery Date Columns
   const headerRow = rows[headerRowIndex];
   const dateColMap: Array<{ colIdx: number; dayCol: DayColInfo; headerText: string }> = [];
+  const seenDateKeys = new Set<string>();
 
   for (let c = 0; c < headerRow.length; c++) {
     const rawHeader = String(headerRow[c] || '').trim();
@@ -776,14 +886,16 @@ export async function validateMatrixExcelFile(
     // Pattern 1: `[YYYY-MM-DD]` embedded in header
     const keyMatch = rawHeader.match(/\[(\d{4}-\d{2}-\d{2})\]/);
     let matchedDay: DayColInfo | undefined;
+    let parsedKey: string | null = null;
 
     if (keyMatch && keyMatch[1]) {
-      matchedDay = dayColumns.find((d) => d.dateKey === keyMatch[1]);
+      parsedKey = keyMatch[1];
+      matchedDay = dayColumns.find((d) => d.dateKey === parsedKey);
     } else {
       // Pattern 2: `YYYY/MM/DD` or `YYYY-MM-DD`
       const ymdMatch = rawHeader.match(/(\d{4})[/-](\d{1,2})[/-](\d{1,2})/);
       if (ymdMatch) {
-        const parsedKey = `${ymdMatch[1]}-${String(ymdMatch[2]).padStart(2, '0')}-${String(ymdMatch[3]).padStart(2, '0')}`;
+        parsedKey = `${ymdMatch[1]}-${String(ymdMatch[2]).padStart(2, '0')}-${String(ymdMatch[3]).padStart(2, '0')}`;
         matchedDay = dayColumns.find((d) => d.dateKey === parsedKey);
       } else {
         // Pattern 3: `DD/MM` or `MM/DD` matched with dateShort
@@ -792,16 +904,51 @@ export async function validateMatrixExcelFile(
           const short1 = `${String(mdMatch[1]).padStart(2, '0')}/${String(mdMatch[2]).padStart(2, '0')}`;
           const short2 = `${String(mdMatch[2]).padStart(2, '0')}/${String(mdMatch[1]).padStart(2, '0')}`;
           matchedDay = dayColumns.find((d) => d.dateShort === short1 || d.dateShort === short2);
+          if (matchedDay) parsedKey = matchedDay.dateKey;
         }
       }
     }
 
-    if (matchedDay) {
-      dateColMap.push({ colIdx: c, dayCol: matchedDay, headerText: rawHeader });
+    if (parsedKey || matchedDay) {
+      if (!matchedDay) {
+        // Date found in header, but not in dayColumns period!
+        result.scopeStatus.periodMatched = false;
+        result.errors.push({
+          type: 'ERROR',
+          row: headerRowIndex + 1,
+          productCode: '-',
+          productName: '-',
+          deliveryDate: parsedKey || rawHeader,
+          dateLabel: rawHeader,
+          inputValue: rawHeader,
+          code: 'DATE_OUT_OF_PERIOD',
+          message: `Cột ngày "${rawHeader}" nằm ngoài khoảng thời gian kỳ ma trận đang xem (${periodExpectStr}).`,
+        });
+        result.summary.errorCount++;
+      } else {
+        if (seenDateKeys.has(matchedDay.dateKey)) {
+          result.errors.push({
+            type: 'ERROR',
+            row: headerRowIndex + 1,
+            productCode: '-',
+            productName: '-',
+            deliveryDate: matchedDay.dateKey,
+            dateLabel: `${matchedDay.dowName} ${matchedDay.dateShort}`,
+            inputValue: rawHeader,
+            code: 'DUPLICATE_DATE',
+            message: `Cột ngày "${rawHeader}" (${matchedDay.dateKey}) bị trùng lặp trong tiêu đề file Excel.`,
+          });
+          result.summary.errorCount++;
+        } else {
+          seenDateKeys.add(matchedDay.dateKey);
+          dateColMap.push({ colIdx: c, dayCol: matchedDay, headerText: rawHeader });
+        }
+      }
     }
   }
 
   if (dateColMap.length === 0) {
+    result.scopeStatus.periodMatched = false;
     result.errors.push({
       type: 'ERROR',
       row: headerRowIndex + 1,
@@ -851,8 +998,8 @@ export async function validateMatrixExcelFile(
     }
     seenSkus.add(rawSku);
 
-    // Tier 4: Validate Product existence & Orderable status in current Matrix
-    const targetProduct = matrixProducts.find((p) => p.sku === rawSku);
+    // Validate Product existence & Orderable status in current Matrix
+    const targetProduct = matrixProducts.find((p) => p.sku === rawSku || p.id === rawSku);
 
     if (!targetProduct) {
       result.errors.push({
@@ -951,7 +1098,7 @@ export async function validateMatrixExcelFile(
       continue;
     }
 
-    // Tier 5 & 6: Validate each Delivery Date Cell
+    // Validate each Delivery Date Cell
     dateColMap.forEach(({ colIdx, dayCol }) => {
       result.summary.totalCells++;
       const rawCellVal = row[colIdx];
@@ -1036,10 +1183,11 @@ export async function validateMatrixExcelFile(
         return;
       }
 
-      // Check Matrix Cell State & Lock / Cutoff (Tier 6)
+      // Check Matrix Cell State & Lock / Cutoff
       const isEditable = isCellEditable(dayCol, targetProduct);
-      const currentCell = cellMap[targetProduct.id]?.[dayCol.dateKey];
-      const currentFinalQty = currentCell?.finalQty ?? 0;
+      const currentCell = cellMap?.[targetProduct.id]?.[dayCol.dateKey];
+      const currentFinalQty =
+        currentCell?.finalQty ?? qtyMap?.[targetProduct.id]?.[dayCol.dateKey] ?? 0;
 
       // NẾU Ô BỊ KHÓA / DISABLED:
       if (!isEditable) {
@@ -1081,22 +1229,63 @@ export async function validateMatrixExcelFile(
 
       // NẾU Ô ĐƯỢC PHÉP CHỈNH SỬA:
       if (numVal === 0) {
+        if (currentFinalQty === 0) {
+          result.summary.ignoredCells++;
+          return;
+        }
         // Người dùng muốn đặt 0 (xóa nhu cầu)
         result.cellsToApply.push({
+          row: rowNum,
           productId: targetProduct.id,
           productCode: targetProduct.sku,
+          productName: targetProduct.name,
+          supplierName: targetProduct.supplierName,
           deliveryDate: dayCol.dateKey,
+          dateLabel: `${dayCol.dowName} ${dayCol.dateShort}`,
+          currentQty: currentFinalQty,
           quantity: 0,
+          note: 'Hủy đặt (SL = 0)',
         });
         result.summary.validCells++;
         return;
       }
 
-      // Validate MOQ per Delivery Date (Tier 5)
-      const moq = targetProduct.moq || 1;
-      if (numVal < moq) {
+      // Lead time validation: minimum lead time >= 1 day (không cho giao hôm nay / quá khứ)
+      const base = baseDate ? dayjs(baseDate).startOf('day') : dayjs().startOf('day');
+      const cellDeliveryDate = dayjs(dayCol.dateKey).startOf('day');
+      const leadTimeDays = cellDeliveryDate.diff(base, 'day');
+      const supConfig = supplierConfigs?.find((sc) => sc.supplierId === targetProduct.supplierId);
+      const configuredLeadDays =
+        supConfig && 'leadDays' in supConfig ? Number(supConfig.leadDays) || 1 : 1;
+      const minLead = Math.max(1, configuredLeadDays);
+
+      if (leadTimeDays < minLead) {
         result.errors.push({
           type: 'ERROR',
+          row: rowNum,
+          productCode: targetProduct.sku,
+          productName: targetProduct.name,
+          deliveryDate: dayCol.dateKey,
+          dateLabel: `${dayCol.dowName} ${dayCol.dateShort}`,
+          inputValue: numVal,
+          code: 'LEAD_TIME_NOT_MET',
+          message:
+            leadTimeDays <= 0
+              ? `Ngày giao hàng ${dayCol.dateKey} là ngày hôm nay hoặc trong quá khứ. Quy định đặt hàng yêu cầu lead time tối thiểu 1 ngày.`
+              : `Ngày giao hàng ${dayCol.dateKey} chỉ cách ${leadTimeDays} ngày, không đủ lead time tối thiểu (${minLead} ngày) của nhà cung cấp.`,
+        });
+        result.summary.errorCount++;
+        return;
+      }
+
+      let cellNote = currentFinalQty > 0 ? `Cập nhật (${currentFinalQty} → ${numVal})` : 'Nạp mới';
+      let hasWarning = false;
+
+      // Validate MOQ per Delivery Date (WARNING)
+      const moq = targetProduct.moq || 1;
+      if (numVal < moq) {
+        result.warnings.push({
+          type: 'WARNING',
           row: rowNum,
           productCode: targetProduct.sku,
           productName: targetProduct.name,
@@ -1106,15 +1295,16 @@ export async function validateMatrixExcelFile(
           code: 'MOQ_NOT_MET',
           message: `Số lượng đặt (${numVal}) nhỏ hơn số lượng đặt tối thiểu MOQ = ${moq} của sản phẩm trong ngày này.`,
         });
-        result.summary.errorCount++;
-        return;
+        result.summary.warningCount++;
+        cellNote += ` • ⚠️ Dưới MOQ (${moq})`;
+        hasWarning = true;
       }
 
-      // Validate Order Multiple (nếu có cấu hình)
+      // Validate Order Multiple (WARNING)
       if (targetProduct.orderMultiple && targetProduct.orderMultiple > 1) {
         if (numVal % targetProduct.orderMultiple !== 0) {
-          result.errors.push({
-            type: 'ERROR',
+          result.warnings.push({
+            type: 'WARNING',
             row: rowNum,
             productCode: targetProduct.sku,
             productName: targetProduct.name,
@@ -1124,8 +1314,9 @@ export async function validateMatrixExcelFile(
             code: 'ORDER_MULTIPLE_INVALID',
             message: `Số lượng đặt (${numVal}) phải là bội số của ${targetProduct.orderMultiple} (ví dụ: quy cách đóng gói).`,
           });
-          result.summary.errorCount++;
-          return;
+          result.summary.warningCount++;
+          cellNote += ` • ⚠️ Sai bội số (${targetProduct.orderMultiple})`;
+          hasWarning = true;
         }
       }
 
@@ -1144,21 +1335,35 @@ export async function validateMatrixExcelFile(
           message: `Số lượng đặt (${numVal}) cao hơn gấp 15 lần mức tiêu thụ trung bình hàng ngày (${baselineSales}/ngày).`,
         });
         result.summary.warningCount++;
+        cellNote += ` • ⚠️ SL cao đột biến`;
+        hasWarning = true;
+      }
+
+      // Nếu số lượng bằng đúng số lượng hiện tại và không có warning mới -> coi như không đổi, bỏ qua
+      if (numVal === currentFinalQty && !hasWarning) {
+        result.summary.ignoredCells++;
+        return;
       }
 
       // Valid Cell -> Sẵn sàng áp dụng
       result.cellsToApply.push({
+        row: rowNum,
         productId: targetProduct.id,
         productCode: targetProduct.sku,
+        productName: targetProduct.name,
+        supplierName: targetProduct.supplierName,
         deliveryDate: dayCol.dateKey,
+        dateLabel: `${dayCol.dowName} ${dayCol.dateShort}`,
+        currentQty: currentFinalQty,
         quantity: numVal,
+        note: cellNote,
       });
       result.summary.validCells++;
     });
   }
 
   // 6. Final Verdict
-  result.valid = result.summary.errorCount === 0 && result.summary.validCells > 0;
+  result.valid = result.summary.errorCount === 0;
 
   return result;
 }

@@ -37,6 +37,8 @@ export interface OrderMatrixSupplierDeliveryConfig {
   isAssignedToBranch: boolean;
   inactiveReason?: string;
   cutoffTime: string;
+  /** Số ngày trước ngày giao để chốt đơn (0 = cùng ngày giao). */
+  cutoffDayOffset?: number;
   activeDeliveryDays: number[]; // 0: CN, 1: T2, ..., 6: T7
   blackoutDates: string[]; // YYYY-MM-DD
 }
@@ -236,6 +238,13 @@ export interface SupplierDispatchGroup {
   note: string;
   status: 'draft' | 'dispatched';
   poCode?: string;
+  /** Đã có PO nhưng còn trước cutoff — cho phép chốt lại (amend). */
+  canAmend?: boolean;
+  /** Draft SL khác PO đã chốt — cần cập nhật & gửi lại email. */
+  hasPendingChanges?: boolean;
+  pendingChangeLineCount?: number;
+  /** Chi tiết từng dòng SL khác PO (product × ngày × CH). */
+  pendingChanges?: DispatchPendingChangeLine[];
   dispatchedAt?: string;
   linkedBranchCount?: number;
   branchesWithQty?: number;
@@ -243,6 +252,28 @@ export interface SupplierDispatchGroup {
   totalQty?: number;
   totalAmount?: number;
   branches?: DispatchSupplierBranchSummary[];
+}
+
+export type DispatchPendingUpdateStatus = 'EDITABLE' | 'LOCKED_CUTOFF';
+
+export interface DispatchPendingChangeLine {
+  productId: string;
+  productName: string;
+  sku: string;
+  unit: string;
+  deliveryDate: string;
+  draftQty: number;
+  committedQty: number;
+  poCode?: string;
+  branchId?: string;
+  branchCode?: string;
+  branchName?: string;
+  /** EDITABLE = còn amend; LOCKED_CUTOFF = đã qua cutoff */
+  updateStatus?: DispatchPendingUpdateStatus;
+  /** Gắn từ FE khi flatten */
+  supplierId?: string;
+  supplierCode?: string;
+  supplierName?: string;
 }
 
 export interface DispatchSupplierBranchSummary {
@@ -253,6 +284,7 @@ export interface DispatchSupplierBranchSummary {
   totalQty: number;
   totalAmount: number;
   status: 'draft' | 'dispatched' | 'mixed' | string;
+  hasPendingChanges?: boolean;
 }
 
 export interface DispatchSupplierDetailLine {
@@ -262,7 +294,10 @@ export interface DispatchSupplierDetailLine {
   sku: string;
   unit: string;
   price: number;
+  /** SL trên ma trận */
   qty: number;
+  /** SL đã chốt trên PO */
+  committedQty: number;
   deliveryDate: string;
   cutoffSchedule: string;
   dayStatus: string;
@@ -292,7 +327,15 @@ export interface DispatchSupplierDetail {
   branches: DispatchSupplierDetailBranch[];
 }
 
-export type DispatchScope = 'NEAREST' | 'WEEK' | 'ALL';
+/** NEAREST = ngày giao gần nhất; DAYS_* = rolling từ hôm nay; WEEK/ALL giữ tương thích cũ. */
+export type DispatchScope =
+  | 'NEAREST'
+  | 'DAYS_7'
+  | 'DAYS_14'
+  | 'DAYS_21'
+  | 'DAYS_31'
+  | 'WEEK'
+  | 'ALL';
 export type EmailSendMode = 'SEND_NOW' | 'SCHEDULED_SEND';
 
 export interface SupplierDispatchPackage {
@@ -367,6 +410,8 @@ export interface SplitMatrixBatchResult {
   serverNow?: string;
   totalGroups: number;
   successCount: number;
+  amendedCount?: number;
+  noChangesCount?: number;
   failedCount: number;
   skippedCount: number;
   alreadyFinalizedCount: number;

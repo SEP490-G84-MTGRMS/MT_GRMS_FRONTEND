@@ -43,6 +43,7 @@ interface Props {
 const DEFAULT_CONFIG: SupplierDeliveryConfig = {
   minOrderQuantity: 0,
   activeDeliveryDays: [1, 2, 3, 4, 5, 6],
+  cutoffDayOffset: 1,
   cutoffTime: '17:00',
   allowStoreEdit: true,
   editWindowType: 'BEFORE_CUTOFF',
@@ -91,6 +92,11 @@ export const SupplierDeliveryConfigTab: FC<Props> = ({
 
     if (config.minOrderQuantity < 0) {
       return 'Số lượng đặt tối thiểu (MOQ) phải lớn hơn hoặc bằng 0.';
+    }
+
+    const offset = Number(config.cutoffDayOffset);
+    if (!Number.isFinite(offset) || offset < 0 || !Number.isInteger(offset)) {
+      return 'Số ngày trước ngày giao để chốt đơn phải là số nguyên ≥ 0.';
     }
 
     const cleanCutoff = (config.cutoffTime || '').trim();
@@ -199,6 +205,44 @@ export const SupplierDeliveryConfigTab: FC<Props> = ({
           </div>
 
           <div style={labelRowStyle}>
+            <label className="form-label" style={labelStyle} htmlFor="input-cutoff-day-offset">
+              <Clock size={14} color="var(--orange-accent)" />
+              <span>Số ngày trước ngày giao để chốt đơn</span>
+            </label>
+            <div style={fieldColStyle}>
+              <input
+                id="input-cutoff-day-offset"
+                type="number"
+                min={0}
+                step={1}
+                data-testid="input-cutoff-day-offset"
+                value={config.cutoffDayOffset}
+                onChange={(e) =>
+                  setConfig({
+                    ...config,
+                    cutoffDayOffset: Math.max(0, parseInt(e.target.value, 10) || 0),
+                  })
+                }
+                className="admin-search-input"
+                style={{ width: '100%', maxWidth: 280, height: 40, fontFamily: 'var(--font-mono)' }}
+              />
+              <div data-testid="cutoff-day-offset-helper-text" style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                {config.cutoffDayOffset === 0 ? (
+                  <>
+                    Chốt đơn <b>cùng ngày giao</b> lúc <b>{config.cutoffTime || '—'}</b>.
+                  </>
+                ) : (
+                  <>
+                    Ví dụ ngày giao <b>09/11</b>, offset <b>{config.cutoffDayOffset}</b> → chốt lúc{' '}
+                    <b>{config.cutoffTime || '—'}</b> của ngày trước ngày giao {config.cutoffDayOffset} ngày
+                    {config.cutoffDayOffset === 1 ? ' (08/11)' : ''}.
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div style={labelRowStyle}>
             <label className="form-label" style={labelStyle} htmlFor="input-cutoff-time">
               <Clock size={14} color="var(--orange-accent)" />
               <span>Giờ chốt đơn hàng ngày (Cutoff)</span>
@@ -214,7 +258,7 @@ export const SupplierDeliveryConfigTab: FC<Props> = ({
                 style={{ width: '100%', maxWidth: 280, height: 40, fontFamily: 'var(--font-mono)', fontSize: '0.95rem' }}
               />
               <div data-testid="cutoff-helper-text" style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                Đơn PO đặt sau <b>{config.cutoffTime}</b> sẽ tự động tính chuyển sang chu kỳ giao hàng tiếp theo.
+                Kết hợp với số ngày trên: sau giờ <b>{config.cutoffTime}</b> của ngày chốt, cột ngày giao tương ứng bị khóa.
               </div>
             </div>
           </div>

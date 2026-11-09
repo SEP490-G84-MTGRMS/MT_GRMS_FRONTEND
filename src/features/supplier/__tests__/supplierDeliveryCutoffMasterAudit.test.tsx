@@ -23,6 +23,7 @@ describe('MASTER AUDIT SUITE – Supplier Delivery & Cutoff Configuration', () =
   const initialValidConfig: SupplierDeliveryConfig = {
     minOrderQuantity: 10,
     activeDeliveryDays: [1, 2, 3, 4, 5], // T2 to T6
+    cutoffDayOffset: 1,
     cutoffTime: '17:00',
     allowStoreEdit: true,
     editWindowType: 'BEFORE_CUTOFF',

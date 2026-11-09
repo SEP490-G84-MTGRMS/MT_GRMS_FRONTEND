@@ -175,14 +175,27 @@ export const SupplierDispatchDetailPage: FC = () => {
         }
       );
       setModalState((prev) => ({ ...prev, batchResult: result }));
-      if (result.successCount > 0) {
-        showToast(`Đã chốt thành công ${result.successCount}/${result.totalGroups} group PO.`, 'success');
+      const created = result.successCount || 0;
+      const amended = result.amendedCount || 0;
+      const noChanges = result.noChangesCount || 0;
+      if (created > 0 && amended > 0) {
+        showToast(`Đã tạo ${created} PO mới và cập nhật ${amended} PO thành công.`, 'success');
+      } else if (amended > 0) {
+        showToast(`Đã cập nhật PO thành công (${amended} đơn).`, 'success');
+      } else if (created > 0) {
+        showToast(`Đã chốt thành công ${created}/${result.totalGroups} group PO.`, 'success');
+      } else if (noChanges > 0) {
+        showToast('PO không đổi số lượng — đã giữ nguyên và gửi lại email (nếu có).', 'success');
       } else {
-        showToast('Không có PO nào được tạo thành công.', 'warning');
+        showToast('Không có PO nào được tạo/cập nhật trong phạm vi đã chọn.', 'warning');
       }
       await loadDetail();
     } catch (err: any) {
-      showToast(err.message || 'Không thể chốt đơn mua hàng.', 'error');
+      const apiMsg =
+        err?.response?.data?.message ||
+        err?.response?.data?.error?.message ||
+        err?.message;
+      showToast(apiMsg || 'Không thể chốt đơn mua hàng.', 'error');
     } finally {
       setIsDispatching(false);
     }
@@ -299,7 +312,7 @@ export const SupplierDispatchDetailPage: FC = () => {
                   </div>
                 </div>
 
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 960 }}>
                   <thead>
                     <tr style={{ background: '#f8fafc', color: '#64748b', textAlign: 'left' }}>
                       <th style={{ padding: '10px 16px', fontWeight: 700 }}>Mã SP</th>
@@ -307,55 +320,104 @@ export const SupplierDispatchDetailPage: FC = () => {
                       <th style={{ padding: '10px 12px', fontWeight: 700 }}>Đơn vị</th>
                       <th style={{ padding: '10px 12px', fontWeight: 700 }}>Ngày giao</th>
                       <th style={{ padding: '10px 12px', fontWeight: 700 }}>Cutoff</th>
-                      <th style={{ padding: '10px 12px', fontWeight: 700, textAlign: 'right' }}>SL</th>
+                      <th style={{ padding: '10px 12px', fontWeight: 700, textAlign: 'right', whiteSpace: 'nowrap' }}>
+                        SL PO
+                      </th>
+                      <th style={{ padding: '10px 12px', fontWeight: 700, textAlign: 'right', whiteSpace: 'nowrap' }}>
+                        SL ma trận
+                      </th>
+                      <th style={{ padding: '10px 12px', fontWeight: 700, textAlign: 'right', whiteSpace: 'nowrap' }}>
+                        Chênh lệch
+                      </th>
                       <th style={{ padding: '10px 12px', fontWeight: 700, textAlign: 'right' }}>Đơn giá</th>
                       <th style={{ padding: '10px 16px', fontWeight: 700, textAlign: 'right' }}>Thành tiền</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {branch.items.map((it) => (
-                      <tr key={it.id} style={{ borderTop: '1px solid #f1f5f9' }}>
-                        <td
+                    {branch.items.map((it) => {
+                      const delta = it.qty - (it.committedQty ?? 0);
+                      const hasDiff = delta !== 0;
+                      const deltaColor = delta > 0 ? '#15803d' : delta < 0 ? '#b91c1c' : '#64748b';
+                      return (
+                        <tr
+                          key={it.id}
                           style={{
-                            padding: '10px 16px',
-                            fontFamily: 'monospace',
-                            color: '#64748b',
-                            whiteSpace: 'nowrap',
+                            borderTop: '1px solid #f1f5f9',
+                            background: hasDiff ? 'rgba(255, 247, 237, 0.65)' : undefined,
                           }}
                         >
-                          {it.sku}
-                        </td>
-                        <td style={{ padding: '10px 12px', fontWeight: 700, color: '#0f172a' }}>
-                          {it.name}
-                        </td>
-                        <td style={{ padding: '10px 12px', color: '#475569', whiteSpace: 'nowrap' }}>
-                          {it.unit}
-                        </td>
-                        <td style={{ padding: '10px 12px', whiteSpace: 'nowrap', fontWeight: 600 }}>
-                          {formatDateVi(it.deliveryDate)}
-                        </td>
-                        <td style={{ padding: '10px 12px', color: '#64748b', fontSize: 12.5 }}>
-                          {it.cutoffSchedule}
-                        </td>
-                        <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 800, fontFamily: 'monospace' }}>
-                          {it.qty}
-                        </td>
-                        <td style={{ padding: '10px 12px', textAlign: 'right', fontFamily: 'monospace', color: '#475569' }}>
-                          {it.price.toLocaleString('vi-VN')}
-                        </td>
-                        <td
-                          style={{
-                            padding: '10px 16px',
-                            textAlign: 'right',
-                            fontWeight: 800,
-                            fontFamily: 'monospace',
-                            color: '#059669',
-                          }}
-                        >
-                          {(it.qty * it.price).toLocaleString('vi-VN')} đ
-                        </td>
-                      </tr>
-                    ))}
+                          <td
+                            style={{
+                              padding: '10px 16px',
+                              fontFamily: 'monospace',
+                              color: '#64748b',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            {it.sku}
+                          </td>
+                          <td style={{ padding: '10px 12px', fontWeight: 700, color: '#0f172a' }}>
+                            {it.name}
+                          </td>
+                          <td style={{ padding: '10px 12px', color: '#475569', whiteSpace: 'nowrap' }}>
+                            {it.unit}
+                          </td>
+                          <td style={{ padding: '10px 12px', whiteSpace: 'nowrap', fontWeight: 600 }}>
+                            {formatDateVi(it.deliveryDate)}
+                          </td>
+                          <td style={{ padding: '10px 12px', color: '#64748b', fontSize: 12.5 }}>
+                            {it.cutoffSchedule}
+                          </td>
+                          <td
+                            style={{
+                              padding: '10px 12px',
+                              textAlign: 'right',
+                              fontWeight: 600,
+                              fontFamily: 'monospace',
+                            }}
+                          >
+                            {(it.committedQty ?? 0).toLocaleString('vi-VN')}
+                          </td>
+                          <td
+                            style={{
+                              padding: '10px 12px',
+                              textAlign: 'right',
+                              fontWeight: 800,
+                              fontFamily: 'monospace',
+                              color: hasDiff ? '#c2410c' : undefined,
+                            }}
+                          >
+                            {it.qty.toLocaleString('vi-VN')}
+                          </td>
+                          <td
+                            style={{
+                              padding: '10px 12px',
+                              textAlign: 'right',
+                              fontWeight: 800,
+                              fontFamily: 'monospace',
+                              color: deltaColor,
+                            }}
+                          >
+                            {delta > 0 ? '+' : ''}
+                            {delta.toLocaleString('vi-VN')}
+                          </td>
+                          <td style={{ padding: '10px 12px', textAlign: 'right', fontFamily: 'monospace', color: '#475569' }}>
+                            {it.price.toLocaleString('vi-VN')}
+                          </td>
+                          <td
+                            style={{
+                              padding: '10px 16px',
+                              textAlign: 'right',
+                              fontWeight: 800,
+                              fontFamily: 'monospace',
+                              color: '#059669',
+                            }}
+                          >
+                            {(it.qty * it.price).toLocaleString('vi-VN')} đ
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </section>

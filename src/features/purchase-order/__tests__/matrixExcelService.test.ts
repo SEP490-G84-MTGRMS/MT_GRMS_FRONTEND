@@ -115,6 +115,7 @@ describe('Purchase Order Matrix — Excel Export & Import Engine (CISCA Specific
   };
 
   const isCellEditable = (d: DayColInfo) => !d.isLocked && d.cutoffStatus === 'OPEN';
+  const testBaseDate = '2026-11-01'; // Reference date: 04/11 has 3 days lead time >= 1 day
 
   // Helper to generate a test File
   function createTestExcelFile(rows: any[][], fileName = 'test_matrix.xlsx'): File {
@@ -125,11 +126,10 @@ describe('Purchase Order Matrix — Excel Export & Import Engine (CISCA Specific
     return new File([u8], fileName, { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
   }
 
-  it('TC-EXCEL-001: Export matrix produces a valid workbook with metadata and headers', () => {
-    // We can call exportMatrixToExcel or simulate workbook creation
+  it('Scenario 1: File đúng chi nhánh A + data hợp lệ -> valid=true, cellsToApply đúng', async () => {
     const wsData = [
       ['HỆ THỐNG QUẢN LÝ BÁN LẺ MT-GRMS - ĐẶT HÀNG NHẬP KHO (PURCHASE ORDER MATRIX)'],
-      [`Chi nhánh: ${mockBranch.name} | Mã CN: ${mockBranch.id}`],
+      [`Chi nhánh: ${mockBranch.name} | Mã hệ thống: ${mockBranch.id}`],
       [`Nhà cung cấp: ${mockSupplier.name} | Mã NCC: ${mockSupplier.id}`],
       [],
       [
@@ -147,29 +147,52 @@ describe('Purchase Order Matrix — Excel Export & Import Engine (CISCA Specific
         'Tổng SL',
         'Thành tiền (VNĐ)',
       ],
-      [1, 'Sữa tươi', '893123456', 'SP001', 'Sữa tươi Vinamilk 1L', 'Hộp', 10, 1, 32000, 12, 20, 32, 1024000],
-    ];
-
-    const file = createTestExcelFile(wsData);
-    expect(file).toBeDefined();
-    expect(file.size).toBeGreaterThan(0);
-  });
-
-  it('TC-EXCEL-002: Validation detects MOQ_NOT_MET when ordered quantity is less than supplier MOQ', async () => {
-    const wsData = [
-      ['Header info'],
-      [`Mã CN: ${mockBranch.id}`],
-      [`Mã NCC: ${mockSupplier.id}`],
-      [],
-      ['STT', 'Ngành hàng', 'Mã vạch', 'Mã sản phẩm', 'Tên sản phẩm', 'ĐVT', 'MOQ', 'Bội số', 'Đơn giá', 'T4 04/11 [2026-11-04]', 'T5 05/11 [2026-11-05]'],
-      [1, 'Sữa tươi', '893123', 'SP001', 'Sữa tươi 1L', 'Hộp', 10, 1, 32000, 5, 20], // 5 < MOQ (10)
+      [1, 'Sữa tươi', '893123456', 'SP001', 'Sữa tươi Vinamilk 1L', 'Hộp', 10, 1, 32000, 15, 20, 35, 1120000],
     ];
 
     const file = createTestExcelFile(wsData);
     const result = await validateMatrixExcelFile({
       file,
       currentBranchId: mockBranch.id,
+      currentBranchCode: mockBranch.code,
       currentSupplierId: mockSupplier.id,
+      currentSupplierCode: mockSupplier.code,
+      baseDate: testBaseDate,
+      matrixProducts: mockProducts,
+      dayColumns: mockDays,
+      cellMap: mockCellMap,
+      isCellEditable,
+    });
+
+    expect(result.valid).toBe(true);
+    expect(result.summary.errorCount).toBe(0);
+    expect(result.summary.validCells).toBe(1); // 15 on 04/11 (05/11 is locked and unchanged at 20, ignored)
+    expect(result.cellsToApply[0].productCode).toBe('SP001');
+    expect(result.cellsToApply[0].quantity).toBe(15);
+    expect(result.cellsToApply[0].deliveryDate).toBe('2026-11-04');
+    expect(result.scopeStatus.branchMatched).toBe(true);
+    expect(result.scopeStatus.supplierMatched).toBe(true);
+    expect(result.scopeStatus.periodMatched).toBe(true);
+  });
+
+  it('Scenario 2: File chi nhánh B khi UI đang A -> BRANCH_MISMATCH, không Apply', async () => {
+    const foreignBranchId = '01a18874-9747-7999-b539-82c2174a9999';
+    const wsData = [
+      ['HỆ THỐNG QUẢN LÝ BÁN LẺ MT-GRMS'],
+      [`Chi nhánh: Chi nhánh Quận 7 | Mã hệ thống: ${foreignBranchId}`],
+      [`Nhà cung cấp: ${mockSupplier.name} | Mã NCC: ${mockSupplier.id}`],
+      [],
+      ['STT', 'Ngành hàng', 'Mã vạch', 'Mã sản phẩm', 'Tên sản phẩm', 'ĐVT', 'MOQ', 'Bội số', 'Đơn giá', 'T4 04/11 [2026-11-04]'],
+      [1, 'Sữa tươi', '893123', 'SP001', 'Sữa tươi 1L', 'Hộp', 10, 1, 32000, 15],
+    ];
+
+    const file = createTestExcelFile(wsData);
+    const result = await validateMatrixExcelFile({
+      file,
+      currentBranchId: mockBranch.id,
+      currentBranchCode: mockBranch.code,
+      currentSupplierId: mockSupplier.id,
+      baseDate: testBaseDate,
       matrixProducts: mockProducts,
       dayColumns: mockDays,
       cellMap: mockCellMap,
@@ -178,12 +201,70 @@ describe('Purchase Order Matrix — Excel Export & Import Engine (CISCA Specific
 
     expect(result.valid).toBe(false);
     expect(result.summary.errorCount).toBeGreaterThan(0);
-    const moqErr = result.errors.find((e) => e.code === 'MOQ_NOT_MET');
-    expect(moqErr).toBeDefined();
-    expect(moqErr?.inputValue).toBe(5);
+    const branchErr = result.errors.find((e) => e.code === 'BRANCH_MISMATCH');
+    expect(branchErr).toBeDefined();
+    expect(result.scopeStatus.branchMatched).toBe(false);
   });
 
-  it('TC-EXCEL-003: Validation detects BLOCKED_CELL_MODIFIED when locked/cutoff cell is changed', async () => {
+  it('Scenario 3: File NCC khác khi UI filter 1 NCC -> SUPPLIER_MISMATCH', async () => {
+    const foreignSupplierId = 'sup-th-true-milk';
+    const wsData = [
+      ['HỆ THỐNG QUẢN LÝ BÁN LẺ MT-GRMS'],
+      [`Chi nhánh: ${mockBranch.name} | Mã hệ thống: ${mockBranch.id}`],
+      [`Nhà cung cấp: TH True Milk | Mã NCC: ${foreignSupplierId}`],
+      [],
+      ['STT', 'Ngành hàng', 'Mã vạch', 'Mã sản phẩm', 'Tên sản phẩm', 'ĐVT', 'MOQ', 'Bội số', 'Đơn giá', 'T4 04/11 [2026-11-04]'],
+      [1, 'Sữa tươi', '893123', 'SP001', 'Sữa tươi 1L', 'Hộp', 10, 1, 32000, 15],
+    ];
+
+    const file = createTestExcelFile(wsData);
+    const result = await validateMatrixExcelFile({
+      file,
+      currentBranchId: mockBranch.id,
+      currentSupplierId: mockSupplier.id,
+      baseDate: testBaseDate,
+      matrixProducts: mockProducts,
+      dayColumns: mockDays,
+      cellMap: mockCellMap,
+      isCellEditable,
+    });
+
+    expect(result.valid).toBe(false);
+    expect(result.summary.errorCount).toBeGreaterThan(0);
+    const supErr = result.errors.find((e) => e.code === 'SUPPLIER_MISMATCH');
+    expect(supErr).toBeDefined();
+    expect(result.scopeStatus.supplierMatched).toBe(false);
+  });
+
+  it('Scenario 4: Ô ngày hôm nay / quá khứ -> LEAD_TIME_NOT_MET', async () => {
+    // If baseDate is 2026-11-04 (same day as delivery date), leadTimeDays = 0 < 1 day!
+    const wsData = [
+      ['Header info'],
+      [`Mã CN: ${mockBranch.id}`],
+      [`Mã NCC: ${mockSupplier.id}`],
+      [],
+      ['STT', 'Ngành hàng', 'Mã vạch', 'Mã sản phẩm', 'Tên sản phẩm', 'ĐVT', 'MOQ', 'Bội số', 'Đơn giá', 'T4 04/11 [2026-11-04]'],
+      [1, 'Sữa tươi', '893123', 'SP001', 'Sữa tươi 1L', 'Hộp', 10, 1, 32000, 15],
+    ];
+
+    const file = createTestExcelFile(wsData);
+    const result = await validateMatrixExcelFile({
+      file,
+      currentBranchId: mockBranch.id,
+      currentSupplierId: mockSupplier.id,
+      baseDate: '2026-11-04', // Today is the delivery date!
+      matrixProducts: mockProducts,
+      dayColumns: mockDays,
+      cellMap: mockCellMap,
+      isCellEditable,
+    });
+
+    expect(result.valid).toBe(false);
+    const leadErr = result.errors.find((e) => e.code === 'LEAD_TIME_NOT_MET');
+    expect(leadErr).toBeDefined();
+  });
+
+  it('Scenario 5: Ô LOCKED / PO_GENERATED mà đổi SL -> BLOCKED_CELL_MODIFIED / CUTOFF_PASSED', async () => {
     // 2026-11-05 is LOCKED, existing qty is 20. If Excel has 25 -> ERROR!
     const wsData = [
       ['Header info'],
@@ -199,6 +280,7 @@ describe('Purchase Order Matrix — Excel Export & Import Engine (CISCA Specific
       file,
       currentBranchId: mockBranch.id,
       currentSupplierId: mockSupplier.id,
+      baseDate: testBaseDate,
       matrixProducts: mockProducts,
       dayColumns: mockDays,
       cellMap: mockCellMap,
@@ -210,63 +292,7 @@ describe('Purchase Order Matrix — Excel Export & Import Engine (CISCA Specific
     expect(blockedErr).toBeDefined();
   });
 
-  it('TC-EXCEL-004: Locked cell with unchanged value is ignored and does NOT cause error', async () => {
-    // 2026-11-05 is LOCKED, existing qty is 20. Excel has 20 -> Ignored / No error!
-    const wsData = [
-      ['Header info'],
-      [`Mã CN: ${mockBranch.id}`],
-      [`Mã NCC: ${mockSupplier.id}`],
-      [],
-      ['STT', 'Ngành hàng', 'Mã vạch', 'Mã sản phẩm', 'Tên sản phẩm', 'ĐVT', 'MOQ', 'Bội số', 'Đơn giá', 'T4 04/11 [2026-11-04]', 'T5 05/11 [2026-11-05]'],
-      [1, 'Sữa tươi', '893123', 'SP001', 'Sữa tươi 1L', 'Hộp', 10, 1, 32000, 15, 20], // 15 valid on 04/11, 20 unchanged on 05/11
-    ];
-
-    const file = createTestExcelFile(wsData);
-    const result = await validateMatrixExcelFile({
-      file,
-      currentBranchId: mockBranch.id,
-      currentSupplierId: mockSupplier.id,
-      matrixProducts: mockProducts,
-      dayColumns: mockDays,
-      cellMap: mockCellMap,
-      isCellEditable,
-    });
-
-    expect(result.valid).toBe(true);
-    expect(result.summary.errorCount).toBe(0);
-    expect(result.summary.validCells).toBe(1);
-    expect(result.summary.ignoredCells).toBe(1);
-    expect(result.cellsToApply[0].quantity).toBe(15);
-  });
-
-  it('TC-EXCEL-005: Validation detects ORDER_MULTIPLE_INVALID when order multiple is violated', async () => {
-    // SP002 has MOQ=6, orderMultiple=4. If user orders 10 -> not multiple of 4!
-    const wsData = [
-      ['Header info'],
-      [`Mã CN: ${mockBranch.id}`],
-      [`Mã NCC: ${mockSupplier.id}`],
-      [],
-      ['STT', 'Ngành hàng', 'Mã vạch', 'Mã sản phẩm', 'Tên sản phẩm', 'ĐVT', 'MOQ', 'Bội số', 'Đơn giá', 'T4 04/11 [2026-11-04]'],
-      [1, 'Sữa chua', '893456', 'SP002', 'Sữa chua nha đam', 'Lốc', 6, 4, 28000, 10], // 10 % 4 !== 0
-    ];
-
-    const file = createTestExcelFile(wsData);
-    const result = await validateMatrixExcelFile({
-      file,
-      currentBranchId: mockBranch.id,
-      currentSupplierId: mockSupplier.id,
-      matrixProducts: mockProducts,
-      dayColumns: mockDays,
-      cellMap: mockCellMap,
-      isCellEditable,
-    });
-
-    expect(result.valid).toBe(false);
-    const mulErr = result.errors.find((e) => e.code === 'ORDER_MULTIPLE_INVALID');
-    expect(mulErr).toBeDefined();
-  });
-
-  it('TC-EXCEL-006: Validation detects PRODUCT_NOT_IN_MATRIX for foreign product SKU', async () => {
+  it('Scenario 6: SP không thuộc matrix chi nhánh -> PRODUCT_NOT_IN_MATRIX', async () => {
     const wsData = [
       ['Header info'],
       [`Mã CN: ${mockBranch.id}`],
@@ -281,6 +307,7 @@ describe('Purchase Order Matrix — Excel Export & Import Engine (CISCA Specific
       file,
       currentBranchId: mockBranch.id,
       currentSupplierId: mockSupplier.id,
+      baseDate: testBaseDate,
       matrixProducts: mockProducts,
       dayColumns: mockDays,
       cellMap: mockCellMap,
@@ -293,9 +320,109 @@ describe('Purchase Order Matrix — Excel Export & Import Engine (CISCA Specific
     expect(notFoundErr?.productCode).toBe('SP_FOREIGN_999');
   });
 
-  it('TC-EXCEL-007: Apply import correctly respects Store Owner and Employee role isolation', () => {
+  it('Scenario 7: SL âm hoặc không phải số -> ERROR (NEGATIVE_QUANTITY / INVALID_QUANTITY)', async () => {
+    const wsData = [
+      ['Header info'],
+      [`Mã CN: ${mockBranch.id}`],
+      [`Mã NCC: ${mockSupplier.id}`],
+      [],
+      ['STT', 'Ngành hàng', 'Mã vạch', 'Mã sản phẩm', 'Tên sản phẩm', 'ĐVT', 'MOQ', 'Bội số', 'Đơn giá', 'T4 04/11 [2026-11-04]'],
+      [1, 'Sữa tươi', '893123', 'SP001', 'Sữa tươi 1L', 'Hộp', 10, 1, 32000, -5], // Negative!
+    ];
+
+    const file = createTestExcelFile(wsData);
+    const result = await validateMatrixExcelFile({
+      file,
+      currentBranchId: mockBranch.id,
+      currentSupplierId: mockSupplier.id,
+      baseDate: testBaseDate,
+      matrixProducts: mockProducts,
+      dayColumns: mockDays,
+      cellMap: mockCellMap,
+      isCellEditable,
+    });
+
+    expect(result.valid).toBe(false);
+    const negErr = result.errors.find((e) => e.code === 'NEGATIVE_QUANTITY');
+    expect(negErr).toBeDefined();
+  });
+
+  it('Scenario 8: SL < MOQ -> WARNING; vẫn Apply được nếu không ERROR', async () => {
+    const wsData = [
+      ['Header info'],
+      [`Mã CN: ${mockBranch.id}`],
+      [`Mã NCC: ${mockSupplier.id}`],
+      [],
+      ['STT', 'Ngành hàng', 'Mã vạch', 'Mã sản phẩm', 'Tên sản phẩm', 'ĐVT', 'MOQ', 'Bội số', 'Đơn giá', 'T4 04/11 [2026-11-04]'],
+      [1, 'Sữa tươi', '893123', 'SP001', 'Sữa tươi 1L', 'Hộp', 10, 1, 32000, 5], // 5 < MOQ (10)
+    ];
+
+    const file = createTestExcelFile(wsData);
+    const result = await validateMatrixExcelFile({
+      file,
+      currentBranchId: mockBranch.id,
+      currentSupplierId: mockSupplier.id,
+      baseDate: testBaseDate,
+      matrixProducts: mockProducts,
+      dayColumns: mockDays,
+      cellMap: mockCellMap,
+      isCellEditable,
+    });
+
+    // Per user rules: MOQ is a WARNING, not an ERROR. Result is valid and can be applied!
+    expect(result.valid).toBe(true);
+    expect(result.summary.errorCount).toBe(0);
+    expect(result.summary.warningCount).toBe(1);
+    const moqWarn = result.warnings.find((w) => w.code === 'MOQ_NOT_MET');
+    expect(moqWarn).toBeDefined();
+    expect(moqWarn?.inputValue).toBe(5);
+    expect(result.summary.validCells).toBe(1);
+    expect(result.cellsToApply[0].quantity).toBe(5);
+  });
+
+  it('Scenario 9: Bội số đặt hàng không khớp -> WARNING (ORDER_MULTIPLE_INVALID)', async () => {
+    // SP002 has orderMultiple = 4. 10 is not multiple of 4.
+    const wsData = [
+      ['Header info'],
+      [`Mã CN: ${mockBranch.id}`],
+      [`Mã NCC: ${mockSupplier.id}`],
+      [],
+      ['STT', 'Ngành hàng', 'Mã vạch', 'Mã sản phẩm', 'Tên sản phẩm', 'ĐVT', 'MOQ', 'Bội số', 'Đơn giá', 'T4 04/11 [2026-11-04]'],
+      [1, 'Sữa chua', '893456', 'SP002', 'Sữa chua nha đam', 'Lốc', 6, 4, 28000, 10],
+    ];
+
+    const file = createTestExcelFile(wsData);
+    const result = await validateMatrixExcelFile({
+      file,
+      currentBranchId: mockBranch.id,
+      currentSupplierId: mockSupplier.id,
+      baseDate: testBaseDate,
+      matrixProducts: mockProducts,
+      dayColumns: mockDays,
+      cellMap: mockCellMap,
+      isCellEditable,
+    });
+
+    expect(result.valid).toBe(true);
+    expect(result.summary.errorCount).toBe(0);
+    const mulWarn = result.warnings.find((w) => w.code === 'ORDER_MULTIPLE_INVALID');
+    expect(mulWarn).toBeDefined();
+    expect(result.summary.validCells).toBe(1);
+  });
+
+  it('Scenario 10: Apply import correctly respects Store Owner and Employee role isolation', () => {
     const cellsToApply = [
-      { productId: 'prod-001', deliveryDate: '2026-11-04', quantity: 30 },
+      {
+        row: 6,
+        productId: 'prod-001',
+        productCode: 'SP001',
+        productName: 'Sữa tươi Vinamilk 1L',
+        deliveryDate: '2026-11-04',
+        dateLabel: 'T4 04/11',
+        currentQty: 12,
+        quantity: 30,
+        note: 'Nạp mới',
+      },
     ];
 
     // Store Owner apply

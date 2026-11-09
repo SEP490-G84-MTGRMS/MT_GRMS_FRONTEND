@@ -33,6 +33,7 @@ export interface PurchaseOrderListItem {
   totalAmount: number;         // Tổng tiền đơn hàng (VNĐ)
   status: PurchaseOrderStatus;
   note?: string;
+  revisionNumber?: number;
   items: PurchaseOrderItemDetail[];
 }
 

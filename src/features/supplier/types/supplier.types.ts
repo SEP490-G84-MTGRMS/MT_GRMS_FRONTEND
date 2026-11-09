@@ -144,6 +144,8 @@ export interface HolidayDateRange {
 export interface SupplierDeliveryConfig {
   minOrderQuantity: number;
   activeDeliveryDays: number[]; // 0 = Sun, 1 = Mon, ..., 6 = Sat
+  /** Số ngày trước ngày giao để chốt đơn (0 = cùng ngày giao). Mặc định 1. */
+  cutoffDayOffset: number;
   cutoffTime: string; // e.g. "14:00" or "16:00"
   allowStoreEdit: boolean;
   editWindowType: 'BEFORE_CUTOFF' | 'HOURS_BEFORE_DELIVERY' | 'HOURS_AFTER_ORDER';
