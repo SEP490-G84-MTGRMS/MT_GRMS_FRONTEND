@@ -4,7 +4,6 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import {
   ArrowLeft,
   Search,
-  ShoppingCart,
   QrCode,
   Banknote,
   PackageCheck,
@@ -193,6 +192,8 @@ export const InvoiceManagementPage: FC = () => {
           debtPaymentRecords: [],
           status: o.status === 'Cancelled' ? 'CANCELLED' : (o.paymentMethod === 'DEBT' || o.paymentMethod === 'CREDIT') ? 'DEBT' : 'COMPLETED',
           statusLabel: o.status === 'Cancelled' ? 'Đã hủy' : (o.paymentMethod === 'DEBT' || o.paymentMethod === 'CREDIT') ? 'Ghi nợ' : 'Hoàn thành',
+          isPreOrder: Boolean(o.orderCode?.startsWith('PO-') || o.orderCode?.startsWith('PRE-') || o.note?.toLowerCase().includes('đặt trước') || o.status === 'PreOrder'),
+          orderOrigin: (o.orderCode?.startsWith('PO-') || o.orderCode?.startsWith('PRE-') || o.note?.toLowerCase().includes('đặt trước') || o.status === 'PreOrder') ? 'PRE_ORDER' : 'RETAIL',
           items: (o.items || []).map((it: any) => ({
             itemId: it.id,
             productId: it.productId,
@@ -787,7 +788,7 @@ export const InvoiceManagementPage: FC = () => {
 
         {/* Khối phải: Bán hàng [F1] + Badge Thu ngân */}
         <div className="unified-header-right">
-          <button
+          {/* <button
             type="button"
             className="pos-btn-primary-pill"
             onClick={() => navigate(salesPath)}
@@ -795,7 +796,7 @@ export const InvoiceManagementPage: FC = () => {
           >
             <ShoppingCart size={14} />
             <span>Bán Hàng [F1]</span>
-          </button>
+          </button> */}
 
           <div className="pos-cashier-badge">
             {isStoreOwner ? (
