@@ -120,6 +120,7 @@ export interface PoLookupOption {
   id: string;
   poCode: string;
   branchId: string;
+  branchCode?: string;
   branchName: string;
   supplierId: string;
   supplierName: string;

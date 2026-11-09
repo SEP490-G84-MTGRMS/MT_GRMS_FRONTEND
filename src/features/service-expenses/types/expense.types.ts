@@ -48,6 +48,11 @@ export interface ServiceExpenseDto {
   isRecurring?: boolean;
   recurringCycle?: "Monthly" | "Quarterly" | "Yearly";
   recurringDayOfMonth?: number;
+  isTaxDeductible?: boolean;
+  invoiceNumber?: string | null;
+  sellerTaxCode?: string | null;
+  isFlaggedAsSuspiciousSplit?: boolean;
+  suspiciousReason?: string | null;
   note?: string | null;
   createdAt: string;
 }
@@ -133,6 +138,9 @@ export interface CreateExpenseRequest {
   isRecurring?: boolean;
   recurringCycle?: "Monthly" | "Quarterly" | "Yearly";
   recurringDayOfMonth?: number;
+  isTaxDeductible?: boolean;
+  invoiceNumber?: string;
+  sellerTaxCode?: string;
   note?: string;
 }
 

@@ -13,17 +13,11 @@ let localSnapshots = [...mockSnapshotsList];
 
 /**
  * Cấu hình chế độ Mock dữ liệu:
- * - Production: TUYỆT ĐỐI KHÔNG DÙNG MOCK (luôn trả về false).
- * - Vitest Unit Test / Explicit Flag: Cho phép mock để CI runner chạy độc lập mà không cần live database.
+ * - Runtime (Dev & Production): TUYỆT ĐỐI KHÔNG DÙNG MOCK, 100% dữ liệu thực từ Backend.
+ * - Vitest Unit Test: Chỉ bật khi MODE === 'test' để CI test độc lập.
  */
 export const isMockEnabled = (): boolean => {
-  if (import.meta.env.PROD || import.meta.env.MODE === 'production') {
-    return false;
-  }
-  return (
-    import.meta.env.VITE_USE_MOCK_DATA === 'true' ||
-    import.meta.env.MODE === 'test'
-  );
+  return import.meta.env.MODE === 'test';
 };
 
 // Theo dõi nguồn dữ liệu hiện tại (thật từ Backend hay Mock)
@@ -171,6 +165,9 @@ export const taxSnapshotApi = {
       if (res.data?.data && Array.isArray(res.data.data)) {
         return res.data.data;
       }
+      if (!isMockEnabled()) {
+        return [];
+      }
     } catch (err: unknown) {
       if (!isMockEnabled()) {
         throw new Error(extractErrorMessage(err, 'Không thể tải sổ kế toán từ máy chủ.'));
@@ -194,6 +191,9 @@ export const taxSnapshotApi = {
 
       if (res.data?.data && Array.isArray(res.data.data)) {
         return res.data.data;
+      }
+      if (!isMockEnabled()) {
+        return [];
       }
     } catch (err: unknown) {
       if (!isMockEnabled()) {
@@ -359,36 +359,55 @@ export const taxSnapshotApi = {
   },
 
   /**
-   * Kiểm tra tính toàn vẹn và chữ ký số bất biến của snapshot
+   * Xuất báo cáo thuế và sổ kế toán Thông tư 152/2025/TT-BTC (Excel .xlsx)
+   * Nếu truyền bookType thì chỉ xuất sổ đó, nếu không truyền sẽ xuất trọn bộ 7 sổ.
    */
-  /**
-   * Xuất báo cáo thuế 4 sheet phẳng (Excel .xlsx)
-   */
-  async exportTaxExcel(filter: HouseholdTaxFilterDto): Promise<Blob> {
+  async exportTaxExcel(filter: HouseholdTaxFilterDto, bookType?: AccountingBookType): Promise<Blob> {
+    const effectiveBookType = bookType ?? filter.bookType;
     const res = await financeHttpClient.get('/tax/household/export-excel', {
       params: {
         year: filter.year,
         periodType: filter.periodType,
         periodNumber: filter.periodNumber,
         branchId: filter.branchId,
+        bookType: effectiveBookType,
         method: filter.calculationMethod,
+        calculationMethod: filter.calculationMethod,
+        tier2Method: filter.tier2Method,
         applyVatReduction: filter.applyVatReduction2026,
+        vatReductionPercentage: filter.vatReductionPercentage,
       },
       responseType: 'blob',
     });
     return res.data;
   },
 
-  async verifyIntegrity(snapshotId: string): Promise<{ isIntegrityValid: boolean; message: string }> {
+  /**
+   * Kiểm tra tính toàn vẹn và chữ ký số bất biến HMAC-SHA256 của snapshot
+   */
+  async verifyIntegrity(snapshotId: string): Promise<{ isIntegrityValid: boolean; message: string; snapshotId?: string }> {
     try {
-      const res = await financeHttpClient.get<{ data: { isIntegrityValid: boolean }; message?: string }>(
-        `/tax/household/snapshots/${snapshotId}/verify-integrity`
-      );
+      const res = await financeHttpClient.get<{
+        data: { snapshotId?: string; isIntegrityValid: boolean };
+        message?: string;
+      }>(`/tax/household/snapshots/${snapshotId}/verify-integrity`);
       return {
+        snapshotId: res.data?.data?.snapshotId || snapshotId,
         isIntegrityValid: Boolean(res.data?.data?.isIntegrityValid),
-        message: res.data?.message || 'Kiểm tra chữ ký số hoàn tất.',
+        message: res.data?.message || 'Kiểm tra chữ ký số HMAC-SHA256 hoàn tất.',
       };
     } catch (err: unknown) {
+      if (isMockEnabled()) {
+        const snap = localSnapshots.find((s) => s.id === snapshotId);
+        const valid = snap?.isIntegrityValid !== false;
+        return {
+          snapshotId,
+          isIntegrityValid: valid,
+          message: valid
+            ? 'Chữ ký số toàn vẹn. Bản chốt thuế không bị can thiệp sau khi ký số.'
+            : 'CẢNH BÁO: Phát hiện sai lệch chữ ký số của bản chốt thuế!',
+        };
+      }
       throw new Error(extractErrorMessage(err, 'Không thể kiểm tra tính toàn vẹn của snapshot.'));
     }
   },

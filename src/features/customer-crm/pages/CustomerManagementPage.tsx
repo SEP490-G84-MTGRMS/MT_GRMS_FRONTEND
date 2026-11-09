@@ -1,4 +1,5 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import type { FC } from 'react';
 import { Users } from 'lucide-react';
 import { AdminToast, type ToastState } from '../../admin/components';
@@ -14,6 +15,8 @@ import type { CreateCustomerInput, UpdateCustomerInput } from '../types/customer
 import '../customer-crm.css';
 
 export const CustomerManagementPage: FC = () => {
+  const [searchParams] = useSearchParams();
+  const urlSearch = searchParams.get('search') || searchParams.get('keyword') || '';
   const {
     customers,
     kpiSummary,
@@ -50,6 +53,12 @@ export const CustomerManagementPage: FC = () => {
     updateMutation,
     collectDebtMutation,
   } = useCustomerCrm();
+
+  useEffect(() => {
+    if (urlSearch) {
+      setSearchTerm(urlSearch);
+    }
+  }, [urlSearch, setSearchTerm]);
 
   const [ledgerCustomer, setLedgerCustomer] = useState<any>(null);
   const [toast, setToast] = useState<ToastState | null>(null);

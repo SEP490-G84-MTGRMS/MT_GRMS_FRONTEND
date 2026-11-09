@@ -179,6 +179,81 @@ describe('customerApi Live Neon Integration Tests', () => {
         expect.anything()
       );
     });
+
+    it('TC-DEBT-BAD-01: should throw error when backend returns failure message during repayment', async () => {
+      vi.mocked(financeHttpClient.post).mockResolvedValueOnce({
+        data: {
+          success: false,
+          message: 'Khách hàng đang ở trạng thái Khóa (Inactive), không thể thu nợ.',
+        },
+      } as any);
+
+      await expect(
+        customerApi.collectDebt({
+          customerId: 'cust-inactive-id',
+          amount: 500000,
+          method: 'Cash',
+        })
+      ).rejects.toThrow('Khách hàng đang ở trạng thái Khóa (Inactive), không thể thu nợ.');
+    });
+
+    it('TC-DEBT-EDGE-01: should handle edge case of collecting exactly 1 VND', async () => {
+      vi.mocked(financeHttpClient.post).mockResolvedValueOnce({
+        data: { success: true },
+      } as any);
+
+      vi.mocked(financeHttpClient.get).mockResolvedValueOnce({
+        data: {
+          success: true,
+          data: { id: 'cust-1', currentDebtAR: 999999 },
+        },
+      } as any);
+
+      const res = await customerApi.collectDebt({
+        customerId: 'cust-1',
+        amount: 1,
+        method: 'Cash',
+        targetAccountId: 'till-acc-01',
+      });
+
+      expect(res.currentDebtAR).toBe(999999);
+      expect(financeHttpClient.post).toHaveBeenCalledWith(
+        '/customers/debt/repay',
+        expect.objectContaining({
+          amount: 1,
+          customerId: 'cust-1',
+        }),
+        expect.anything()
+      );
+    });
+
+    it('TC-DEBT-EDGE-02: should resolve dynamic account from cashbookService when targetAccountId is not provided', async () => {
+      vi.mocked(financeHttpClient.post).mockResolvedValueOnce({
+        data: { success: true },
+      } as any);
+
+      vi.mocked(financeHttpClient.get).mockResolvedValueOnce({
+        data: {
+          success: true,
+          data: { id: 'cust-1', currentDebtAR: 0 },
+        },
+      } as any);
+
+      await customerApi.collectDebt({
+        customerId: 'cust-1',
+        amount: 500000,
+        method: 'Cash',
+      });
+
+      expect(financeHttpClient.post).toHaveBeenCalledWith(
+        '/customers/debt/repay',
+        expect.objectContaining({
+          customerId: 'cust-1',
+          paymentSourceType: 1, // BranchTill
+        }),
+        expect.anything()
+      );
+    });
   });
 
   describe('getCustomerDebtLedger', () => {

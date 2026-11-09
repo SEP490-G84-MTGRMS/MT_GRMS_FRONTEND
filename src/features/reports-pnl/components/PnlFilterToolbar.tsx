@@ -31,6 +31,16 @@ const PRESET_OPTIONS: { id: PresetPeriod; label: string }[] = [
 ];
 
 /**
+ * Formats a local Date instance as YYYY-MM-DD without UTC day-shift bugs.
+ */
+export function formatLocalYmd(date: Date): string {
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  const dd = String(date.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+/**
  * Filter toolbar component for branch selection and period switching.
  */
 export const PnlFilterToolbar: React.FC<PnlFilterToolbarProps> = ({
@@ -50,30 +60,28 @@ export const PnlFilterToolbar: React.FC<PnlFilterToolbarProps> = ({
 
   const handlePresetChange = (preset: PresetPeriod) => {
     const today = new Date();
-    let startDate = today.toISOString().split('T')[0];
-    const endDate = today.toISOString().split('T')[0];
+    let startDate = formatLocalYmd(today);
+    const endDate = formatLocalYmd(today);
 
     if (preset === 'LAST_7_DAYS') {
-      const past = new Date();
-      past.setDate(past.getDate() - 6);
-      startDate = past.toISOString().split('T')[0];
+      const past = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 6);
+      startDate = formatLocalYmd(past);
     } else if (preset === 'THIS_MONTH') {
       const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
-      startDate = firstDay.toISOString().split('T')[0];
+      startDate = formatLocalYmd(firstDay);
     } else if (preset === 'LAST_MONTH') {
       const firstDay = new Date(today.getFullYear(), today.getMonth() - 1, 1);
       const lastDay = new Date(today.getFullYear(), today.getMonth(), 0);
-      startDate = firstDay.toISOString().split('T')[0];
       return onFilterChange({
         ...filter,
         presetPeriod: preset,
-        startDate,
-        endDate: lastDay.toISOString().split('T')[0],
+        startDate: formatLocalYmd(firstDay),
+        endDate: formatLocalYmd(lastDay),
       });
     } else if (preset === 'THIS_QUARTER') {
       const quarterMonth = Math.floor(today.getMonth() / 3) * 3;
       const firstDay = new Date(today.getFullYear(), quarterMonth, 1);
-      startDate = firstDay.toISOString().split('T')[0];
+      startDate = formatLocalYmd(firstDay);
     }
 
     onFilterChange({

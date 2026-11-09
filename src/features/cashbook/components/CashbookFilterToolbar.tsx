@@ -1,4 +1,13 @@
-import type { FC } from 'react';
+import { type FC, useState, useEffect } from 'react';
+import {
+  Search,
+  X,
+  ChevronDown,
+  RotateCcw,
+  Building2,
+  Calendar,
+  SlidersHorizontal,
+} from 'lucide-react';
 import type { CashbookFilterParams, TransactionType } from '../types/cashbook.types';
 
 interface CashbookFilterToolbarProps {
@@ -12,6 +21,29 @@ export const CashbookFilterToolbar: FC<CashbookFilterToolbarProps> = ({
   onChangeFilter,
   onResetFilter,
 }) => {
+  const [searchInput, setSearchInput] = useState(filters.searchQuery || '');
+  const [isCustomDate, setIsCustomDate] = useState(filters.datePeriod === 'custom');
+
+  // Debounce search query changes by 300ms
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      if (searchInput !== (filters.searchQuery || '')) {
+        onChangeFilter({ searchQuery: searchInput });
+      }
+    }, 300);
+
+    return () => clearTimeout(handler);
+  }, [searchInput, filters.searchQuery, onChangeFilter]);
+
+  // Sync internal search input if external filter changes (e.g. reset)
+  useEffect(() => {
+    setSearchInput(filters.searchQuery || '');
+  }, [filters.searchQuery]);
+
+  useEffect(() => {
+    setIsCustomDate(filters.datePeriod === 'custom');
+  }, [filters.datePeriod]);
+
   const branchOptions = [
     { id: 'ALL', label: 'Toàn hệ thống' },
     { id: 'BR-01', label: 'Chi nhánh Q1' },
@@ -20,9 +52,9 @@ export const CashbookFilterToolbar: FC<CashbookFilterToolbarProps> = ({
 
   const typeOptions: { id: TransactionType | 'ALL'; label: string }[] = [
     { id: 'ALL', label: 'Tất cả loại phiếu' },
-    { id: 'RECEIPT', label: '🟢 Phiếu Thu (+)' },
-    { id: 'PAYMENT', label: '🔴 Phiếu Chi (-)' },
-    { id: 'ADJUSTMENT', label: '🟠 Điều chỉnh kiểm kê' },
+    { id: 'RECEIPT', label: 'Phiếu Thu (+)' },
+    { id: 'PAYMENT', label: 'Phiếu Chi (-)' },
+    { id: 'ADJUSTMENT', label: 'Điều chỉnh kiểm kê' },
   ];
 
   const periodOptions: { id: CashbookFilterParams['datePeriod']; label: string }[] = [
@@ -30,86 +62,215 @@ export const CashbookFilterToolbar: FC<CashbookFilterToolbarProps> = ({
     { id: 'today', label: 'Hôm nay' },
     { id: 'last_7_days', label: '7 ngày qua' },
     { id: 'last_month', label: 'Tháng trước' },
+    { id: 'custom', label: 'Tùy chọn khoảng ngày...' },
   ];
 
-  return (
-    <div className="cashbook-toolbar-card">
-      <div className="toolbar-filter-row">
-        {/* Lọc loại giao dịch */}
-        <div className="toolbar-pills-group">
-          {typeOptions.map((opt) => (
-            <button
-              key={opt.id}
-              type="button"
-              className={`pill-filter-btn ${
-                (filters.transactionType || 'ALL') === opt.id ? 'active' : ''
-              }`}
-              onClick={() => onChangeFilter({ transactionType: opt.id })}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
+  const isFiltered =
+    (filters.branchId && filters.branchId !== 'ALL') ||
+    (filters.transactionType && filters.transactionType !== 'ALL') ||
+    (filters.datePeriod && filters.datePeriod !== 'this_month') ||
+    Boolean(filters.searchQuery) ||
+    Boolean(filters.startDate) ||
+    Boolean(filters.endDate);
 
-        {/* Ô tìm kiếm */}
-        <div className="toolbar-search-input">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <circle cx="11" cy="11" r="8" />
-            <line x1="21" y1="21" x2="16.65" y2="16.65" />
-          </svg>
+  const handlePeriodChange = (val: CashbookFilterParams['datePeriod']) => {
+    if (val === 'custom') {
+      setIsCustomDate(true);
+      onChangeFilter({ datePeriod: 'custom' });
+    } else {
+      setIsCustomDate(false);
+      onChangeFilter({
+        datePeriod: val,
+        startDate: undefined,
+        endDate: undefined,
+      });
+    }
+  };
+
+  const handleClearSearch = () => {
+    setSearchInput('');
+    onChangeFilter({ searchQuery: '' });
+  };
+
+  const handleQuickTypeSelect = (type: TransactionType | 'ALL') => {
+    onChangeFilter({ transactionType: type });
+  };
+
+  return (
+    <div className="cb-filter-panel">
+      {/* Top Filter Bar: Search + Filter Selects */}
+      <div className="cb-filter-row-top">
+        {/* Search Input with Debounce */}
+        <div className="cb-search-bar">
+          <Search size={18} style={{ color: '#94A3B8', flexShrink: 0 }} />
           <input
             type="text"
-            placeholder="Tìm theo mã GD, đối tượng, diễn giải..."
-            value={filters.searchQuery || ''}
-            onChange={(e) => onChangeFilter({ searchQuery: e.target.value })}
+            className="cb-search-input"
+            placeholder="Tìm theo mã phiếu, đối tượng (khách/NCC), diễn giải..."
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
           />
+          {searchInput && (
+            <button
+              type="button"
+              onClick={handleClearSearch}
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                color: '#94A3B8',
+                display: 'flex',
+                alignItems: 'center',
+                padding: '2px',
+              }}
+              title="Xóa tìm kiếm"
+            >
+              <X size={15} />
+            </button>
+          )}
+        </div>
+
+        {/* Dropdowns Row */}
+        <div className="cb-filter-select-group">
+          {/* Branch Select */}
+          <div className="cb-select-wrapper" style={{ minWidth: 160 }}>
+            <div className="cb-select-icon-left">
+              <Building2 size={16} />
+            </div>
+            <select
+              value={filters.branchId || 'ALL'}
+              onChange={(e) => onChangeFilter({ branchId: e.target.value })}
+              className="cb-native-select"
+              title="Lọc theo chi nhánh"
+            >
+              {branchOptions.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.label}
+                </option>
+              ))}
+            </select>
+            <div className="cb-select-icon-right">
+              <ChevronDown size={14} />
+            </div>
+          </div>
+
+          {/* Transaction Type Select */}
+          <div className="cb-select-wrapper" style={{ minWidth: 175 }}>
+            <div className="cb-select-icon-left">
+              <SlidersHorizontal size={16} />
+            </div>
+            <select
+              value={filters.transactionType || 'ALL'}
+              onChange={(e) =>
+                onChangeFilter({ transactionType: e.target.value as TransactionType | 'ALL' })
+              }
+              className="cb-native-select"
+              title="Lọc theo loại giao dịch"
+            >
+              {typeOptions.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.label}
+                </option>
+              ))}
+            </select>
+            <div className="cb-select-icon-right">
+              <ChevronDown size={14} />
+            </div>
+          </div>
+
+          {/* Period Select */}
+          <div className="cb-select-wrapper" style={{ minWidth: 155 }}>
+            <div className="cb-select-icon-left">
+              <Calendar size={16} />
+            </div>
+            <select
+              value={filters.datePeriod || 'this_month'}
+              onChange={(e) =>
+                handlePeriodChange(e.target.value as CashbookFilterParams['datePeriod'])
+              }
+              className="cb-native-select"
+              title="Lọc theo khoảng thời gian"
+            >
+              {periodOptions.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.label}
+                </option>
+              ))}
+            </select>
+            <div className="cb-select-icon-right">
+              <ChevronDown size={14} />
+            </div>
+          </div>
+
+          {/* Reset Button */}
+          {isFiltered && (
+            <button
+              type="button"
+              className="cb-reset-filter-btn"
+              onClick={onResetFilter}
+              title="Đặt lại tất cả bộ lọc về mặc định"
+            >
+              <RotateCcw size={14} />
+              <span>Đặt lại</span>
+            </button>
+          )}
         </div>
       </div>
 
-      <div className="toolbar-filter-row">
-        {/* Lọc chi nhánh & thời gian */}
-        <div className="toolbar-pills-group">
-          <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-muted)' }}>
-            Chi nhánh:
-          </span>
-          {branchOptions.map((b) => (
-            <button
-              key={b.id}
-              type="button"
-              className={`pill-filter-btn ${(filters.branchId || 'ALL') === b.id ? 'active' : ''}`}
-              onClick={() => onChangeFilter({ branchId: b.id })}
-            >
-              {b.label}
-            </button>
-          ))}
-        </div>
-
-        <div className="toolbar-pills-group">
-          <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-muted)' }}>
-            Thời gian:
-          </span>
-          {periodOptions.map((p) => (
-            <button
-              key={p.id}
-              type="button"
-              className={`pill-filter-btn ${
-                (filters.datePeriod || 'this_month') === p.id ? 'active' : ''
-              }`}
-              onClick={() => onChangeFilter({ datePeriod: p.id })}
-            >
-              {p.label}
-            </button>
-          ))}
-
+      {/* Sub-row: Quick Type Chips & Custom Date Range Pickers */}
+      <div className="cb-filter-row-bottom">
+        {/* Quick Type Selection Pills */}
+        <div className="cb-quick-chip-group">
+          <span className="cb-quick-chip-label">Phân loại nhanh:</span>
           <button
             type="button"
-            className="pill-filter-btn"
-            style={{ color: 'var(--text-faint)', borderColor: 'var(--border-light)' }}
-            onClick={onResetFilter}
+            onClick={() => handleQuickTypeSelect('ALL')}
+            className={`cb-quick-chip ${!filters.transactionType || filters.transactionType === 'ALL' ? 'active-all' : ''}`}
           >
-            🔄 Đặt lại
+            Tất cả
+          </button>
+          <button
+            type="button"
+            onClick={() => handleQuickTypeSelect('RECEIPT')}
+            className={`cb-quick-chip ${filters.transactionType === 'RECEIPT' ? 'active-receipt' : ''}`}
+          >
+            🟢 Phiếu Thu (+)
+          </button>
+          <button
+            type="button"
+            onClick={() => handleQuickTypeSelect('PAYMENT')}
+            className={`cb-quick-chip ${filters.transactionType === 'PAYMENT' ? 'active-payment' : ''}`}
+          >
+            🔴 Phiếu Chi (-)
+          </button>
+          <button
+            type="button"
+            onClick={() => handleQuickTypeSelect('ADJUSTMENT')}
+            className={`cb-quick-chip ${filters.transactionType === 'ADJUSTMENT' ? 'active-adjustment' : ''}`}
+          >
+            🟠 Kiểm kê
           </button>
         </div>
+
+        {/* Custom Date Pickers when 'custom' is active */}
+        {isCustomDate && (
+          <div className="cb-custom-date-box">
+            <span>Từ:</span>
+            <input
+              type="date"
+              value={filters.startDate || ''}
+              onChange={(e) => onChangeFilter({ startDate: e.target.value })}
+              className="cb-custom-date-input"
+            />
+            <span>Đến:</span>
+            <input
+              type="date"
+              value={filters.endDate || ''}
+              onChange={(e) => onChangeFilter({ endDate: e.target.value })}
+              className="cb-custom-date-input"
+            />
+          </div>
+        )}
       </div>
     </div>
   );

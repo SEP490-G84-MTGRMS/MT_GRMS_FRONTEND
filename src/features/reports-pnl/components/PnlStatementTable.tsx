@@ -6,12 +6,15 @@ import {
   Maximize2,
   Minimize2,
   HelpCircle,
+  Scale,
 } from 'lucide-react';
-import type { PnlLineItem } from '../types/reportsPnl.types';
+import type { CogsValuationComparison, PnlLineItem } from '../types/reportsPnl.types';
 
 interface PnlStatementTableProps {
   pnlTree: PnlLineItem[];
   isLoading: boolean;
+  estimatedTaxAmount?: number;
+  cogsComparison?: CogsValuationComparison;
 }
 
 function formatVnd(val: number): string {
@@ -126,11 +129,13 @@ const PnlTableRow: React.FC<{
 };
 
 /**
- * P&L Statement Table with collapsible tree view and formatting.
+ * P&L Statement Table with collapsible tree view, COGS valuation method comparison, and tax linkage.
  */
 export const PnlStatementTable: React.FC<PnlStatementTableProps> = ({
   pnlTree,
   isLoading,
+  estimatedTaxAmount = 0,
+  cogsComparison,
 }) => {
   const getAllParentIds = (items: PnlLineItem[]): string[] => {
     let ids: string[] = [];
@@ -188,7 +193,7 @@ export const PnlStatementTable: React.FC<PnlStatementTableProps> = ({
               Báo Cáo Kết Quả Hoạt Động Kinh Doanh (P&L Statement)
             </h3>
             <p style={{ fontSize: '0.74rem', color: 'var(--text-muted, #4b5563)', margin: '2px 0 0 0' }}>
-              Cân đối Doanh thu, Giá vốn xuất kho (FEFO), Chi phí vận hành & Lợi nhuận
+              Cân đối Doanh thu, Giá vốn xuất kho (Đối soát S2c-HKD), Chi phí vận hành & Lợi nhuận
             </p>
           </div>
         </div>
@@ -239,6 +244,90 @@ export const PnlStatementTable: React.FC<PnlStatementTableProps> = ({
         </table>
       </div>
 
+      {/* COGS Valuation Method Comparison Table (Weighted Average TT152 vs FEFO Specific) */}
+      {cogsComparison && (
+        <div
+          style={{
+            margin: '16px 20px 8px',
+            padding: '16px',
+            borderRadius: '14px',
+            background: '#F8FAFC',
+            border: '1px solid #E2E8F0',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Scale size={18} style={{ color: '#0F766E' }} />
+              <span style={{ fontSize: '0.86rem', fontWeight: 800, color: '#0F172A' }}>
+                Bảng So Sánh Phương Pháp Tính Giá Vốn Hàng Bán (COGS Valuation Comparison)
+              </span>
+            </div>
+            <span
+              style={{
+                fontSize: '0.72rem',
+                fontWeight: 700,
+                padding: '3px 10px',
+                borderRadius: '9999px',
+                background: '#CCFBF1',
+                color: '#0F766E',
+              }}
+            >
+              Chuẩn thuế TT 152/2025/TT-BTC: Bình quân gia quyền
+            </span>
+          </div>
+
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.78rem' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid #E2E8F0', color: '#475569', textAlign: 'left' }}>
+                  <th style={{ padding: '8px 10px' }}>Chỉ tiêu đối chiếu</th>
+                  <th style={{ padding: '8px 10px', textAlign: 'right' }}>Bình quân gia quyền (Sổ thuế TT152)</th>
+                  <th style={{ padding: '8px 10px', textAlign: 'right' }}>Thực tế đích danh по lô (FEFO POS)</th>
+                  <th style={{ padding: '8px 10px', textAlign: 'right' }}>Chênh lệch (FEFO - BQGQ)</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr style={{ borderBottom: '1px solid #F1F5F9' }}>
+                  <td style={{ padding: '8px 10px', fontWeight: 600 }}>Giá vốn hàng bán (COGS)</td>
+                  <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 700 }}>
+                    {formatVnd(cogsComparison.weightedAverageCogs)}
+                  </td>
+                  <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 700 }}>
+                    {formatVnd(cogsComparison.fefoSpecificCogs)}
+                  </td>
+                  <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 700, color: cogsComparison.cogsVariance === 0 ? '#64748B' : '#D97706' }}>
+                    {formatVnd(cogsComparison.cogsVariance)}
+                  </td>
+                </tr>
+                <tr style={{ borderBottom: '1px solid #F1F5F9' }}>
+                  <td style={{ padding: '8px 10px', fontWeight: 600 }}>Lợi nhuận gộp (Gross Profit)</td>
+                  <td style={{ padding: '8px 10px', textAlign: 'right' }}>
+                    {formatVnd(cogsComparison.weightedAverageGrossProfit)} ({cogsComparison.weightedAverageGrossMarginPct}%)
+                  </td>
+                  <td style={{ padding: '8px 10px', textAlign: 'right' }}>
+                    {formatVnd(cogsComparison.fefoSpecificGrossProfit)} ({cogsComparison.fefoSpecificGrossMarginPct}%)
+                  </td>
+                  <td style={{ padding: '8px 10px', textAlign: 'right' }}>
+                    {formatVnd(cogsComparison.fefoSpecificGrossProfit - cogsComparison.weightedAverageGrossProfit)}
+                  </td>
+                </tr>
+                <tr>
+                  <td style={{ padding: '8px 10px', fontWeight: 700, color: '#0F766E' }}>Lợi nhuận thuần trước thuế (Net Profit)</td>
+                  <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 800, color: '#0F766E' }}>
+                    {formatVnd(cogsComparison.weightedAverageNetProfit)}
+                  </td>
+                  <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 800, color: '#0F766E' }}>
+                    {formatVnd(cogsComparison.fefoSpecificNetProfit)}
+                  </td>
+                  <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 700 }}>
+                    {formatVnd(cogsComparison.fefoSpecificNetProfit - cogsComparison.weightedAverageNetProfit)}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* FE-19 Tax Reconciliation Linkage Callout */}
       <div
@@ -274,10 +363,10 @@ export const PnlStatementTable: React.FC<PnlStatementTableProps> = ({
           </div>
           <div>
             <div style={{ fontSize: '0.88rem', fontWeight: 800, color: '#92400E' }}>
-              Liên thông Đối soát Kê khai & Nộp thuế HKD
+              Liên thông Đối soát Kê khai & Nộp thuế HKD (Sổ S2c-HKD)
             </div>
             <p style={{ margin: '3px 0 0', fontSize: '0.78rem', color: '#B45309', lineHeight: 1.45 }}>
-              Nghĩa vụ thuế 1.5% (<strong>8.412.900 đ</strong>) được trích lập tự động từ Doanh thu bán lẻ. Sau khi xác nhận nộp thuế tại FE-19, hệ thống sẽ tự động hạch toán Phiếu Chi sang Sổ quỹ FE-17, bảo đảm đối soát ba bên tuyệt đối.
+              Nghĩa vụ thuế 1.5% (<strong>{formatVnd(estimatedTaxAmount)}</strong>) được trích lập tự động từ Doanh thu thuần bán lẻ. Sau khi xác nhận nộp thuế tại FE-19, hệ thống sẽ tự động hạch toán Phiếu Chi sang Sổ quỹ FE-17, bảo đảm đối soát ba bên tuyệt đối.
             </p>
           </div>
         </div>
@@ -309,7 +398,7 @@ export const PnlStatementTable: React.FC<PnlStatementTableProps> = ({
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           <HelpCircle size={14} style={{ color: 'var(--blue-primary, #0F766E)' }} />
           <span>
-            * Số liệu tính toán từ Doanh số bán POS, Giá vốn theo lô FEFO, và Chứng từ chi phí FE-07.
+            * Số liệu tính toán từ Doanh số bán POS, Giá vốn đối soát S2c-HKD, và Chứng từ chi phí hợp lý FE-07.
           </span>
         </div>
         <span style={{ fontWeight: 600 }}>Đơn vị tính: VNĐ</span>
