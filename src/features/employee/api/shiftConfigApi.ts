@@ -63,7 +63,7 @@ export interface UpdateShiftConfigPayload {
 export const shiftConfigApi = {
   /**
    * Lấy danh sách cấu hình ca làm việc có phân trang, tìm kiếm và lọc
-   * GET /api/v1/shift-configs
+   * GET /api/shift-configs
    */
   async getShiftConfigsPaged(filter?: ShiftConfigQueryFilter): Promise<PagedResult<ShiftConfigDto>> {
     const params: Record<string, any> = {};
@@ -88,7 +88,7 @@ export const shiftConfigApi = {
 
   /**
    * Lấy danh sách cấu hình ca làm việc theo chi nhánh (hoặc toàn bộ chi nhánh nếu không truyền branchId)
-   * GET /api/v1/shift-configs?branchId=...&isActive=...
+   * GET /api/shift-configs?branchId=...&isActive=...
    */
   async getShiftConfigsByBranch(branchId?: string, isActive?: boolean): Promise<ShiftConfigDto[]> {
     const params: Record<string, any> = { page: 1, pageSize: 1000 };
@@ -116,7 +116,7 @@ export const shiftConfigApi = {
 
   /**
    * Lấy chi tiết ca theo ID
-   * GET /api/v1/shift-configs/{id}
+   * GET /api/shift-configs/{id}
    */
   async getShiftConfigById(id: string): Promise<ShiftConfigDto> {
     const res = await httpClient.get<ApiResponse<ShiftConfigDto>>(`/shift-configs/${id}`);
@@ -128,7 +128,7 @@ export const shiftConfigApi = {
 
   /**
    * Tạo ca làm việc mới
-   * POST /api/v1/shift-configs
+   * POST /api/shift-configs
    */
   async createShiftConfig(payload: CreateShiftConfigPayload): Promise<ShiftConfigDto> {
     const res = await httpClient.post<ApiResponse<ShiftConfigDto>>('/shift-configs', payload);
@@ -140,7 +140,7 @@ export const shiftConfigApi = {
 
   /**
    * Cập nhật thông tin ca làm việc
-   * PUT /api/v1/shift-configs/{id}
+   * PUT /api/shift-configs/{id}
    */
   async updateShiftConfig(id: string, payload: UpdateShiftConfigPayload): Promise<ShiftConfigDto> {
     const res = await httpClient.put<ApiResponse<ShiftConfigDto>>(`/shift-configs/${id}`, payload);
@@ -152,7 +152,7 @@ export const shiftConfigApi = {
 
   /**
    * Cập nhật trạng thái bật/tắt (IsActive)
-   * PATCH /api/v1/shift-configs/{id}/status
+   * PATCH /api/shift-configs/{id}/status
    */
   async updateShiftConfigStatus(id: string, isActive: boolean): Promise<ShiftConfigDto> {
     const res = await httpClient.patch<ApiResponse<ShiftConfigDto>>(`/shift-configs/${id}/status`, {
@@ -166,7 +166,7 @@ export const shiftConfigApi = {
 
   /**
    * Xóa mềm ca làm việc
-   * DELETE /api/v1/shift-configs/{id}
+   * DELETE /api/shift-configs/{id}
    */
   async deleteShiftConfig(id: string): Promise<void> {
     await httpClient.delete(`/shift-configs/${id}`);

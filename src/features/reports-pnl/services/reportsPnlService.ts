@@ -303,7 +303,7 @@ export const reportsPnlService = {
    */
   async getBranches(): Promise<BranchOption[]> {
     try {
-      const res = await financeHttpClient.get<{ data?: { items?: Array<{ id: string; code?: string; name: string }> } }>('/v1/branches');
+      const res = await financeHttpClient.get<{ data?: { items?: Array<{ id: string; code?: string; name: string }> } }>('/branches');
       if (res.data?.data?.items && Array.isArray(res.data.data.items) && res.data.data.items.length > 0) {
         const liveBranches: BranchOption[] = res.data.data.items.map((b, idx) => ({
           id: b.id,

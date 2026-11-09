@@ -41,7 +41,7 @@ Mỗi khi AI Coding Agent hoặc Developer:
 
   ### 3. Chi Tiết UI/UX & API Integration
   - **Route & Đường Dẫn Màn Hình**: `/dashboard/...`
-  - **Endpoint Backend Được Gọi**: `[GET / POST] /api/v1/...`
+  - **Endpoint Backend Được Gọi**: `[GET / POST] /api/...`
   - **Breaking Changes / Side Effects**: [Có ảnh hưởng trang khác không]
 
   ### 4. Kiểm Thử & Xác Nhận (Verification)

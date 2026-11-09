@@ -16,7 +16,7 @@ export interface CategoryUpdatePayload {
 export const categoryApi = {
   /**
    * Lấy danh sách toàn bộ danh mục sản phẩm phẳng từ Backend
-   * Endpoint: GET /api/categories hoặc GET /api/v1/categories
+   * Endpoint: GET /api/categories
    */
   async getCategories(): Promise<CategoryDto[]> {
     try {
@@ -33,7 +33,7 @@ export const categoryApi = {
 
   /**
    * Tạo mới một nhóm hàng trên Backend
-   * Endpoint: POST /api/categories hoặc POST /api/v1/categories
+   * Endpoint: POST /api/categories
    */
   async createCategory(payload: CategoryCreatePayload): Promise<CategoryDto> {
     const res = await httpClient.post<ApiResponse<CategoryDto>>('/categories', payload);

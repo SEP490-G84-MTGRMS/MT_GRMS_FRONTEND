@@ -44,7 +44,7 @@ describe('Reports P&L Financial Calculations Unit & Integration Tests', () => {
       expect(branches[0].isMain).toBe(true);
     });
 
-    it('should parse live branches correctly when /v1/branches succeeds', async () => {
+    it('should parse live branches correctly when /branches succeeds', async () => {
       vi.spyOn(financeHttpClient, 'get').mockResolvedValueOnce({
         data: {
           data: {
@@ -177,7 +177,7 @@ describe('Reports P&L Financial Calculations Unit & Integration Tests', () => {
   });
 
   describe('3. Bad Test Cases (Kịch bản dữ liệu dị thường & Lỗi hệ thống)', () => {
-    it('should safely handle when /v1/branches rejects with network error and fallback to default', async () => {
+    it('should safely handle when /branches rejects with network error and fallback to default', async () => {
       vi.spyOn(financeHttpClient, 'get').mockRejectedValueOnce(
         new Error('Network error 500')
       );

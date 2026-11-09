@@ -59,7 +59,7 @@ export interface CopyAttendancePolicyResult {
 export const attendancePolicyApi = {
   /**
    * Lấy cấu hình chính sách chấm công theo BranchId
-   * GET /api/v1/attendance-policies/branch/{branchId}
+   * GET /api/attendance-policies/branch/{branchId}
    */
   async getByBranch(branchId: string): Promise<AttendancePolicyDto> {
     const res = await httpClient.get<ApiResponse<AttendancePolicyDto>>(
@@ -73,7 +73,7 @@ export const attendancePolicyApi = {
 
   /**
    * Cập nhật / tạo mới chính sách chấm công chi nhánh (Upsert)
-   * PUT /api/v1/attendance-policies/branch/{branchId}
+   * PUT /api/attendance-policies/branch/{branchId}
    */
   async upsertPolicy(
     branchId: string,
@@ -91,7 +91,7 @@ export const attendancePolicyApi = {
 
   /**
    * Sao chép chính sách sang các chi nhánh khác
-   * POST /api/v1/attendance-policies/copy
+   * POST /api/attendance-policies/copy
    */
   async copyPolicy(payload: CopyAttendancePolicyPayload): Promise<CopyAttendancePolicyResult> {
     const res = await httpClient.post<ApiResponse<CopyAttendancePolicyResult>>(
