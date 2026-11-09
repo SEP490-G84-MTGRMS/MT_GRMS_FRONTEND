@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   QrCode,
   Wallet,
@@ -14,11 +14,12 @@ import {
 import { DebtCollectionModal } from '../../customer-crm/components/DebtCollectionModal';
 import { CreateExpenseModal } from '../../service-expenses/components/CreateExpenseModal';
 import { CashReconciliationModal } from '../../cashbook/components/CashReconciliationModal';
-import { MOCK_CUSTOMERS } from '../../finance/data/mockFinanceData';
 import { formatMoney } from '../../finance/utils/formatters';
 import type { CustomerDto } from '../../customer-crm/types/customer.types';
 import type { CreateExpenseRequest } from '../../service-expenses/types/expense.types';
 import type { CashAccount } from '../../cashbook/types/cashbook.types';
+import { posOrderApi } from '../api/posOrderApi';
+import type { Customer } from '../types/pos.types';
 
 export const CashierShiftDashboardPage: React.FC = () => {
   // Modal states
@@ -27,6 +28,31 @@ export const CashierShiftDashboardPage: React.FC = () => {
   const [isReconcileModalOpen, setIsReconcileModalOpen] = useState(false);
   const [isSelectCustomerOpen, setIsSelectCustomerOpen] = useState(false);
   const [isDebtSubmitting, setIsDebtSubmitting] = useState(false);
+
+  // Real Customers from Backend
+  const [liveCustomers, setLiveCustomers] = useState<Customer[]>([]);
+  const [isLoadingCustomers, setIsLoadingCustomers] = useState<boolean>(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    setIsLoadingCustomers(true);
+    posOrderApi
+      .getAllCustomers()
+      .then((data) => {
+        if (isMounted) {
+          setLiveCustomers(data || []);
+        }
+      })
+      .catch((err) => {
+        console.warn('Lỗi tải danh sách khách hàng:', err);
+      })
+      .finally(() => {
+        if (isMounted) setIsLoadingCustomers(false);
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // Selected customer for debt collection
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerDto | null>(null);
@@ -87,19 +113,19 @@ export const CashierShiftDashboardPage: React.FC = () => {
     setIsSelectCustomerOpen(true);
   };
 
-  const handleSelectCustomerToCollect = (customer: (typeof MOCK_CUSTOMERS)[0]) => {
+  const handleSelectCustomerToCollect = (customer: Customer) => {
     const dto: CustomerDto = {
       id: customer.id,
       tenantId: 'TENANT-01',
       fullName: customer.name,
       phoneNumber: customer.phone,
-      currentDebtAR: customer.currentDebt,
-      debtLimit: customer.creditLimit,
-      loyaltyPoints: 0,
-      membershipTier: 'Standard',
-      totalSpending: 12000000,
+      currentDebtAR: customer.currentDebt || 0,
+      debtLimit: customer.debtLimit || 0,
+      loyaltyPoints: customer.loyaltyPoints || 0,
+      membershipTier: (customer.membershipTier as any) || 'Standard',
+      totalSpending: 0,
       status: 'Active',
-      createdAt: '2026-01-15',
+      createdAt: new Date().toISOString(),
     };
     setSelectedCustomer(dto);
     setIsSelectCustomerOpen(false);
@@ -168,12 +194,14 @@ export const CashierShiftDashboardPage: React.FC = () => {
     setIsReconcileModalOpen(false);
   };
 
-  // Filter customers with debt for selection
-  const customersWithDebt = MOCK_CUSTOMERS.filter((c) => c.currentDebt > 0).filter(
-    (c) =>
-      c.name.toLowerCase().includes(customerSearch.toLowerCase()) ||
-      c.phone.includes(customerSearch)
-  );
+  // Filter customers with debt for selection (Real data from Backend)
+  const customersWithDebt = liveCustomers
+    .filter((c) => (c.currentDebt || 0) > 0)
+    .filter(
+      (c) =>
+        c.name.toLowerCase().includes(customerSearch.toLowerCase()) ||
+        c.phone.includes(customerSearch)
+    );
 
   return (
     <div
@@ -594,7 +622,11 @@ export const CashierShiftDashboardPage: React.FC = () => {
             </div>
 
             <div style={{ maxHeight: '320px', overflowY: 'auto' }}>
-              {customersWithDebt.length === 0 ? (
+              {isLoadingCustomers ? (
+                <div style={{ textAlign: 'center', padding: '24px 0', color: '#0F766E', fontSize: '0.85rem' }}>
+                  Đang tải danh sách khách hàng từ máy chủ...
+                </div>
+              ) : customersWithDebt.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '24px 0', color: '#94A3B8', fontSize: '0.85rem' }}>
                   Không tìm thấy khách hàng nào có nợ phù hợp
                 </div>

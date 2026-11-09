@@ -390,7 +390,7 @@ export const ProductListPage: React.FC = () => {
   ) => {
     try {
       if (productToEdit) {
-        // Cập nhật sản phẩm qua PUT /api/v1/products/{id}
+        // Cập nhật sản phẩm qua PUT /api/products/{id}
         await productApi.updateProduct(productToEdit.id, {
           name: data.productName || productToEdit.productName,
           categoryId: data.categoryId || productToEdit.categoryId,
@@ -407,7 +407,7 @@ export const ProductListPage: React.FC = () => {
           hasBatches: data.hasBatches ?? productToEdit.hasBatches ?? false,
         });
 
-        // 1. Xóa các đơn vị quy đổi đã bị người dùng gỡ bỏ qua DELETE /api/v1/product-units/{id}
+        // 1. Xóa các đơn vị quy đổi đã bị người dùng gỡ bỏ qua DELETE /api/product-units/{id}
         if (deletedUnitIds && deletedUnitIds.length > 0) {
           for (const unitId of deletedUnitIds) {
             try {
@@ -435,7 +435,7 @@ export const ProductListPage: React.FC = () => {
                 console.warn('Lỗi khi thêm đơn vị quy đổi:', unitErr);
               }
             } else {
-              // Cập nhật đơn vị quy đổi hiện có qua PUT /api/v1/product-units/{id}
+              // Cập nhật đơn vị quy đổi hiện có qua PUT /api/product-units/{id}
               try {
                 await productApi.updateProductUnit(uom.id, {
                   unitName: uom.unitName,
@@ -463,7 +463,7 @@ export const ProductListPage: React.FC = () => {
           setSelectedProduct({ ...selectedProduct, ...data } as ProductItem);
         }
       } else {
-        // Tạo mới sản phẩm trên Backend qua POST /api/v1/products
+        // Tạo mới sản phẩm trên Backend qua POST /api/products
         const created = await productApi.createProduct({
           name: data.productName!,
           categoryId: data.categoryId!,
@@ -480,7 +480,7 @@ export const ProductListPage: React.FC = () => {
           hasBatches: data.hasBatches ?? false,
         });
 
-        // Thêm các đơn vị quy đổi cho sản phẩm vừa tạo qua POST /api/v1/products/{id}/units
+        // Thêm các đơn vị quy đổi cho sản phẩm vừa tạo qua POST /api/products/{id}/units
         if (data.uomConversions && data.uomConversions.length > 0) {
           const validUnits = data.uomConversions.filter((u) => u.unitName && u.unitName.trim() !== '');
           for (const uom of validUnits) {

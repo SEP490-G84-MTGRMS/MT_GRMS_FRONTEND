@@ -18,7 +18,7 @@
 - `src/stores/...`: [Cập nhật Zustand state nào]
 
 ### 3. Kết Nối API Backend
-- **Endpoint kết nối**: `[GET / POST / PUT / DELETE] /api/v1/...`
+- **Endpoint kết nối**: `[GET / POST / PUT / DELETE] /api/...`
 - **Xử lý trạng thái Loading & Error**: [Đã có Toast notification / Spinner]
 - **Dữ liệu hiển thị**: [Bảng, Form, Biểu đồ...]
 

@@ -172,7 +172,7 @@ export const mapScheduleResponseToAssignment = (s: ScheduleResponse): ScheduleAs
 export const scheduleApi = {
   /**
    * Tra cứu danh sách lịch làm việc đầy đủ từ backend (bao gồm thông tin chấm công, check-in, check-out, đi muộn)
-   * Backend: GET /api/v1/schedules
+   * Backend: GET /api/schedules
    */
   async getRawSchedules(filter: ScheduleQueryFilter = {}): Promise<ScheduleResponse[]> {
     const params: Record<string, any> = {};
@@ -211,7 +211,7 @@ export const scheduleApi = {
 
   /**
    * Tra cứu danh sách lịch làm việc từ backend
-   * Backend: GET /api/v1/schedules
+   * Backend: GET /api/schedules
    */
   async getSchedules(filter: ScheduleQueryFilter = {}): Promise<ScheduleAssignment[]> {
     const params: Record<string, any> = {};
@@ -276,7 +276,7 @@ export const scheduleApi = {
 
   /**
    * Tạo một ca làm việc đơn lẻ
-   * Backend: POST /api/v1/schedules
+   * Backend: POST /api/schedules
    */
   async createSchedule(payload: CreateScheduleItemPayload): Promise<ScheduleAssignment> {
     const res = await httpClient.post<ApiResponse<ScheduleResponse>>('/schedules', payload);
@@ -288,7 +288,7 @@ export const scheduleApi = {
 
   /**
    * Phân ca hàng loạt theo tuần/tháng
-   * Backend: POST /api/v1/schedules/batch
+   * Backend: POST /api/schedules/batch
    */
   async batchCreateSchedules(payload: BatchCreateSchedulePayload): Promise<ScheduleAssignment[]> {
     const res = await httpClient.post<ApiResponse<ScheduleResponse[]>>('/schedules/batch', payload);
@@ -300,7 +300,7 @@ export const scheduleApi = {
 
   /**
    * Khởi tạo ca làm việc lặp lại cho nhân viên (có ngày kết thúc -> tạo đến ngày chỉ định, không có ngày kết thúc -> tạo đến hết tháng sau)
-   * Backend: POST /api/v1/schedules/recurring
+   * Backend: POST /api/schedules/recurring
    */
   async createRecurringSchedule(payload: CreateRecurringSchedulePayload): Promise<ScheduleAssignment[]> {
     const res = await httpClient.post<ApiResponse<ScheduleResponse[]>>('/schedules/recurring', payload);
@@ -312,7 +312,7 @@ export const scheduleApi = {
 
   /**
    * Lấy chi tiết lịch làm việc theo ID
-   * Backend: GET /api/v1/schedules/{id}
+   * Backend: GET /api/schedules/{id}
    */
   async getScheduleById(id: string): Promise<ScheduleResponse> {
     const res = await httpClient.get<ApiResponse<ScheduleResponse>>(`/schedules/${id}`);
@@ -324,7 +324,7 @@ export const scheduleApi = {
 
   /**
    * Cập nhật thông tin ca làm việc
-   * Backend: PUT /api/v1/schedules/{id}
+   * Backend: PUT /api/schedules/{id}
    */
   async updateSchedule(id: string, payload: UpdateSchedulePayload): Promise<ScheduleAssignment> {
     const res = await httpClient.put<ApiResponse<ScheduleResponse>>(`/schedules/${id}`, payload);
@@ -336,7 +336,7 @@ export const scheduleApi = {
 
   /**
    * Xóa ca làm việc
-   * Backend: DELETE /api/v1/schedules/{id}
+   * Backend: DELETE /api/schedules/{id}
    */
   async deleteSchedule(id: string): Promise<boolean> {
     const res = await httpClient.delete<ApiResponse<object>>(`/schedules/${id}`);
@@ -345,7 +345,7 @@ export const scheduleApi = {
 
   /**
    * Ban hành lịch tuần
-   * Backend: POST /api/v1/schedules/publish
+   * Backend: POST /api/schedules/publish
    */
   async publishSchedules(payload: PublishSchedulesPayload): Promise<PublishSchedulesResponse> {
     const res = await httpClient.post<ApiResponse<PublishSchedulesResponse>>('/schedules/publish', payload);
@@ -357,7 +357,7 @@ export const scheduleApi = {
 
   /**
    * Chấm công thủ công (Đi làm, Nghỉ phép có lương, Nghỉ phép không lương)
-   * Backend: POST /api/v1/schedules/{id}/attendance
+   * Backend: POST /api/schedules/{id}/attendance
    */
   async recordManualAttendance(id: string, payload: ManualAttendancePayload): Promise<ScheduleResponse> {
     const res = await httpClient.post<ApiResponse<ScheduleResponse>>(`/schedules/${id}/attendance`, payload);

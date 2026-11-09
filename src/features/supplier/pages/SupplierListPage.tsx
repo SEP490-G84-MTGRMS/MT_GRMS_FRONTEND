@@ -103,36 +103,27 @@ export const SupplierListPage: FC = () => {
   };
 
   const handleCreateSupplier = async (input: CreateSupplierInput) => {
-    try {
-      const created = await supplierApi.createSupplier(input);
-      showToast(`Đã thêm mới nhà cung cấp ${created.name} (${created.code}) thành công!`, 'success');
-      setIsCreateModalOpen(false);
-      await fetchSuppliers();
-    } catch (err: any) {
-      // Re-throw so modal error banner displays the message
-      throw err;
-    }
+    const created = await supplierApi.createSupplier(input);
+    showToast(`Đã thêm mới nhà cung cấp ${created.name} (${created.code}) thành công!`, 'success');
+    setIsCreateModalOpen(false);
+    await fetchSuppliers();
   };
 
   const handleEditSupplier = async (input: UpdateBasicSupplierInput) => {
-    try {
-      const updated = await supplierApi.updateBasicSupplier(input.id, input);
-      showToast(`Đã cập nhật thông tin nhà cung cấp ${updated.name} thành công!`, 'success');
-      setIsEditModalOpen(false);
-      setEditingSupplier(null);
-      await fetchSuppliers();
-      if (selectedSupplier && selectedSupplier.id === input.id) {
-        setSelectedSupplier((prev) =>
-          prev
-            ? {
-                ...prev,
-                ...updated,
-              }
-            : null
-        );
-      }
-    } catch (err: any) {
-      throw err;
+    const updated = await supplierApi.updateBasicSupplier(input.id, input);
+    showToast(`Đã cập nhật thông tin nhà cung cấp ${updated.name} thành công!`, 'success');
+    setIsEditModalOpen(false);
+    setEditingSupplier(null);
+    await fetchSuppliers();
+    if (selectedSupplier && selectedSupplier.id === input.id) {
+      setSelectedSupplier((prev) =>
+        prev
+          ? {
+              ...prev,
+              ...updated,
+            }
+          : null
+      );
     }
   };
 

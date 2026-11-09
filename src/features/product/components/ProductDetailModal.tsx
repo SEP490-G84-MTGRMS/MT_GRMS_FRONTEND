@@ -106,7 +106,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   const conversionRate = isBaseUnit ? 1 : Math.max(1, currentUom?.conversionRate || 1);
 
   // Mã hàng & Mã vạch theo đơn vị
-  const displayCode = product.productCode;
+  const displayCode = (!isBaseUnit && currentUom?.productCode) ? currentUom.productCode : product.productCode;
   const displayBarcode = (!isBaseUnit && currentUom?.barcode) ? currentUom.barcode : (isBaseUnit ? product.barcode : '—');
 
   // Giá bán theo đơn vị (Price / SellingPrice)
@@ -116,6 +116,14 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   const displayCostPrice = product.costPrice != null
     ? (isBaseUnit ? Number(product.costPrice) : Number(product.costPrice) * conversionRate)
     : null;
+
+  // Tồn kho theo đơn vị
+  const onHand = product.onHand ?? 0;
+  const wholeUnits = !isBaseUnit ? Math.floor(onHand / conversionRate) : onHand;
+  const remainder = !isBaseUnit ? onHand % conversionRate : 0;
+  const displayStockText = isBaseUnit
+    ? `${onHand} ${product.baseUnit || 'Cái'}`
+    : `${wholeUnits} ${selectedUnitName}${remainder > 0 ? ` (Dư ${remainder} ${product.baseUnit || 'Cái'})` : ''}`;
 
   return (
     <div className="custom-modal-backdrop" style={{ zIndex: 1100 }}>
@@ -189,10 +197,59 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               <span style={{ fontSize: 16, fontWeight: 700, color: '#0F172A' }}>
                 {product.productName}
               </span>
+              {units.length > 0 && (
+                <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 6, flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedUnitName(product.baseUnit || 'Cái')}
+                    style={{
+                      padding: '3px 10px',
+                      borderRadius: 9999,
+                      fontSize: 12,
+                      fontWeight: isBaseUnit ? 700 : 500,
+                      backgroundColor: isBaseUnit ? '#0F766E' : '#F1F5F9',
+                      color: isBaseUnit ? '#FFFFFF' : '#475569',
+                      border: 'none',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {product.baseUnit || 'Cái'}
+                  </button>
+                  {units.map((u) => {
+                    const isSelected = selectedUnitName === u.unitName;
+                    return (
+                      <button
+                        key={u.id || u.unitName}
+                        type="button"
+                        onClick={() => setSelectedUnitName(u.unitName)}
+                        style={{
+                          padding: '3px 10px',
+                          borderRadius: 9999,
+                          fontSize: 12,
+                          fontWeight: isSelected ? 700 : 500,
+                          backgroundColor: isSelected ? '#0F766E' : '#F1F5F9',
+                          color: isSelected ? '#FFFFFF' : '#475569',
+                          border: 'none',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        {`${u.unitName} (x${u.conversionRate})`}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ fontSize: 11, color: '#64748B' }}>Tồn kho</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#0F172A' }}>
+                {displayStockText}
+              </div>
+            </div>
+
             <div style={{ textAlign: 'right' }}>
               <div style={{ fontSize: 11, color: '#64748B' }}>Giá bán</div>
               <div style={{ fontSize: 15, fontWeight: 700, color: '#0F172A' }}>
@@ -267,7 +324,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               gap: 6,
             }}
           >
-            <FileText size={15} /> Mô tả & Ghi chú
+            <FileText size={15} /> Mô tả, ghi chú
           </button>
         </div>
 
@@ -564,7 +621,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                       }}
                     >
                       <td style={{ padding: '8px 12px' }}>
-                        <b style={{ color: isBaseUnit ? '#0F766E' : '#1E293B' }}>{product.baseUnit}</b>{' '}
+                        <b style={{ color: isBaseUnit ? '#0F766E' : '#1E293B' }}>{product.baseUnit} (Đơn vị cơ bản)</b>{' '}
                         <span style={{ fontSize: 11, color: '#0F766E', background: '#CCFBF1', padding: '1px 6px', borderRadius: 4, fontWeight: 600 }}>
                           Cơ bản
                         </span>
@@ -791,7 +848,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               </button>
               <img
                 src={previewImageModalUrl}
-                alt="Product preview"
+                alt="Phóng to ảnh hàng hóa"
                 style={{
                   maxWidth: '85vw',
                   maxHeight: '80vh',

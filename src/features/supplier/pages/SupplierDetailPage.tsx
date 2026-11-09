@@ -229,75 +229,55 @@ export const SupplierDetailPage: FC<Props> = ({
   };
 
   const handleSaveGeneralInfo = async (input: UpdateBasicSupplierInput) => {
-    try {
-      const updated = await supplierApi.updateBasicSupplier(input.id, input);
-      setCurrentSupplier((prev) => (prev ? { ...prev, ...updated } : updated));
-      onSupplierUpdated?.(updated);
-      showToast(`Đã cập nhật thông tin chung nhà cung cấp ${updated.name} thành công!`, 'success');
-      setIsEditGeneralModalOpen(false);
-    } catch (err: any) {
-      throw err;
-    }
+    const updated = await supplierApi.updateBasicSupplier(input.id, input);
+    setCurrentSupplier((prev) => (prev ? { ...prev, ...updated } : updated));
+    onSupplierUpdated?.(updated);
+    showToast(`Đã cập nhật thông tin chung nhà cung cấp ${updated.name} thành công!`, 'success');
+    setIsEditGeneralModalOpen(false);
   };
 
   const handleSaveBank = async (input: UpdateSupplierBankInput) => {
     if (!currentSupplier) return;
-    try {
-      const updated = await supplierApi.updateSupplierBank(currentSupplier.id, input);
-      setCurrentSupplier((prev) => (prev ? { ...prev, ...updated } : updated));
-      onSupplierUpdated?.(updated);
-      showToast(`Đã lưu tài khoản ngân hàng ${updated.bankName || ''} thành công!`, 'success');
-      setIsBankModalOpen(false);
-    } catch (err: any) {
-      throw err;
-    }
+    const updated = await supplierApi.updateSupplierBank(currentSupplier.id, input);
+    setCurrentSupplier((prev) => (prev ? { ...prev, ...updated } : updated));
+    onSupplierUpdated?.(updated);
+    showToast(`Đã lưu tài khoản ngân hàng ${updated.bankName || ''} thành công!`, 'success');
+    setIsBankModalOpen(false);
   };
 
   const handleDeleteBank = async () => {
     if (!currentSupplier) return;
-    try {
-      const updated = await supplierApi.updateSupplierBank(currentSupplier.id, {
-        bankName: '',
-        bankAccount: '',
-        accountHolder: '',
-      });
-      setCurrentSupplier((prev) => (prev ? { ...prev, ...updated, bankName: undefined, bankAccount: undefined, accountHolder: undefined } : updated));
-      onSupplierUpdated?.(updated);
-      showToast('Đã xóa thông tin tài khoản ngân hàng thành công!', 'success');
-      setIsBankModalOpen(false);
-    } catch (err: any) {
-      throw err;
-    }
+    const updated = await supplierApi.updateSupplierBank(currentSupplier.id, {
+      bankName: '',
+      bankAccount: '',
+      accountHolder: '',
+    });
+    setCurrentSupplier((prev) => (prev ? { ...prev, ...updated, bankName: undefined, bankAccount: undefined, accountHolder: undefined } : updated));
+    onSupplierUpdated?.(updated);
+    showToast('Đã xóa thông tin tài khoản ngân hàng thành công!', 'success');
+    setIsBankModalOpen(false);
   };
 
   const handleSaveVat = async (input: UpdateSupplierVatInput) => {
     if (!currentSupplier) return;
-    try {
-      const updated = await supplierApi.updateSupplierVat(currentSupplier.id, input);
-      setCurrentSupplier((prev) => (prev ? { ...prev, ...updated } : updated));
-      onSupplierUpdated?.(updated);
-      showToast('Đã lưu thông tin hóa đơn VAT thành công!', 'success');
-      setIsVatModalOpen(false);
-    } catch (err: any) {
-      throw err;
-    }
+    const updated = await supplierApi.updateSupplierVat(currentSupplier.id, input);
+    setCurrentSupplier((prev) => (prev ? { ...prev, ...updated } : updated));
+    onSupplierUpdated?.(updated);
+    showToast('Đã lưu thông tin hóa đơn VAT thành công!', 'success');
+    setIsVatModalOpen(false);
   };
 
   const handleDeleteVat = async () => {
     if (!currentSupplier) return;
-    try {
-      const updated = await supplierApi.updateSupplierVat(currentSupplier.id, {
-        companyName: '',
-        taxCode: currentSupplier.taxCode,
-        invoiceAddress: '',
-      });
-      setCurrentSupplier((prev) => (prev ? { ...prev, ...updated, companyName: undefined, invoiceAddress: undefined } : updated));
-      onSupplierUpdated?.(updated);
-      showToast('Đã gỡ bỏ thông tin hóa đơn VAT thành công!', 'success');
-      setIsVatModalOpen(false);
-    } catch (err: any) {
-      throw err;
-    }
+    const updated = await supplierApi.updateSupplierVat(currentSupplier.id, {
+      companyName: '',
+      taxCode: currentSupplier.taxCode,
+      invoiceAddress: '',
+    });
+    setCurrentSupplier((prev) => (prev ? { ...prev, ...updated, companyName: undefined, invoiceAddress: undefined } : updated));
+    onSupplierUpdated?.(updated);
+    showToast('Đã gỡ bỏ thông tin hóa đơn VAT thành công!', 'success');
+    setIsVatModalOpen(false);
   };
 
   const handleSaveDeliveryConfig = async (newCfg: SupplierDeliveryConfig) => {

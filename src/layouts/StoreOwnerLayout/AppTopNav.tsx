@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback, Fragment } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo, Fragment } from "react";
 import type { FC } from "react";
 import { NavLink, Link, useLocation, useNavigate } from "react-router-dom";
 import {
@@ -844,6 +844,21 @@ export const AppTopNav: FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuthStore();
+  const userRole = (user?.role || "").toUpperCase();
+  const isEmployee =
+    userRole === "EMPLOYEE" ||
+    userRole === "CASHIER" ||
+    userRole === "STAFF";
+
+  const visibleNavGroups = useMemo(() => {
+    if (isEmployee) {
+      // Ẩn hoàn toàn menu Tài chính, Nhân sự và Cấu hình gói cước gian hàng đối với Employee
+      return NAV_GROUPS.filter(
+        (g) => g.id !== "finance" && g.id !== "employees" && g.id !== "store"
+      );
+    }
+    return NAV_GROUPS;
+  }, [isEmployee]);
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
@@ -1191,7 +1206,7 @@ export const AppTopNav: FC = () => {
               flex: 1,
             }}
           >
-            {NAV_GROUPS.map((group) => {
+            {visibleNavGroups.map((group) => {
               const active = isGroupActive(group);
               const isOpen = openMenu === group.id;
               const ref = getAnchorRef(group.id);
@@ -1925,39 +1940,41 @@ export const AppTopNav: FC = () => {
 
                     <div style={{ height: 1, backgroundColor: "#F1F5F9" }} />
 
-                    {/* Ví gian hàng & Hợp đồng */}
-                    <Link
-                      to="/store-owner/account?tab=wallet"
-                      onClick={() => setAccountMenuOpen(false)}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 12,
-                        padding: "11px 16px",
-                        textDecoration: "none",
-                        color: "#1E293B",
-                        backgroundColor: "transparent",
-                        transition: "background-color 0.15s ease",
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = "#F8FAFC";
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = "transparent";
-                      }}
-                    >
-                      <Wallet size={18} strokeWidth={1.9} color="#334155" />
-                      <span
+                    {/* Ví gian hàng & Hợp đồng (chỉ dành cho Chủ gian hàng & Admin) */}
+                    {!isEmployee && (
+                      <Link
+                        to="/store-owner/account?tab=wallet"
+                        onClick={() => setAccountMenuOpen(false)}
                         style={{
-                          flex: 1,
-                          fontSize: 13.5,
-                          fontWeight: 500,
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 12,
+                          padding: "11px 16px",
+                          textDecoration: "none",
                           color: "#1E293B",
+                          backgroundColor: "transparent",
+                          transition: "background-color 0.15s ease",
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = "#F8FAFC";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = "transparent";
                         }}
                       >
-                        Ví tiền
-                      </span>
-                    </Link>
+                        <Wallet size={18} strokeWidth={1.9} color="#334155" />
+                        <span
+                          style={{
+                            flex: 1,
+                            fontSize: 13.5,
+                            fontWeight: 500,
+                            color: "#1E293B",
+                          }}
+                        >
+                          Ví tiền
+                        </span>
+                      </Link>
+                    )}
 
                     <Link
                       to="/store-owner/account?tab=terms"
@@ -2118,7 +2135,7 @@ export const AppTopNav: FC = () => {
                 Quản lý Chuỗi Tạp Hóa
               </div>
             </div>
-            {NAV_GROUPS.map((group) => (
+            {visibleNavGroups.map((group) => (
               <div key={group.id} style={{ padding: "0 12px 4px" }}>
                 {group.to ? (
                   <NavLink

@@ -1,10 +1,11 @@
 import type { FC } from 'react';
-import { Outlet, Navigate } from 'react-router-dom';
+import { Outlet, Navigate, useLocation } from 'react-router-dom';
 import { AppTopNav } from './AppTopNav';
 import { useAuthStore } from '../../stores/useAuthStore';
 
 export const StoreOwnerLayout: FC = () => {
   const { user, isAuthenticated } = useAuthStore();
+  const location = useLocation();
 
   if (!isAuthenticated || !user) {
     return <Navigate to="/auth/login" replace />;

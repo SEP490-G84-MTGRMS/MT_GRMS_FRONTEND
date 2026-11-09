@@ -1,10 +1,12 @@
 ﻿import { useState } from 'react';
 import type { FC } from 'react';
-import { X, FileCheck, CheckCircle2, Download, Receipt, ArrowRight, Layers, Calendar, Hash } from 'lucide-react';
+import { X, FileCheck, CheckCircle2, Download, Receipt, ArrowRight, Layers, Calendar, Hash, ShieldCheck, ShieldAlert, Loader2 } from 'lucide-react';
 import { formatTaxPeriodLabel, type TaxSnapshot, type TaxSnapshotStatus } from '../types/taxSnapshot';
 import { TaxSnapshotStatusBadge } from './TaxSnapshotStatusBadge';
 // Mock pool removed - using real snapshot order count
 import { TablePagination } from '../../../components/common/TablePagination';
+import { useAuthStore } from '../../../stores/useAuthStore';
+import { taxSnapshotApi } from '../api/taxSnapshotApi';
 
 interface Props {
   snapshot: TaxSnapshot | null;
@@ -31,10 +33,34 @@ export const TaxSnapshotDetailDrawer: FC<Props> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'summary' | 'orders'>('summary');
   const [isUpdating, setIsUpdating] = useState<boolean>(false);
+  const [isVerifyingIntegrity, setIsVerifyingIntegrity] = useState<boolean>(false);
+  const [integrityCheckResult, setIntegrityCheckResult] = useState<{
+    isIntegrityValid: boolean;
+    message: string;
+  } | null>(null);
   const [orderPage, setOrderPage] = useState<number>(1);
   const [orderPageSize, setOrderPageSize] = useState<number>(5);
 
+  const { user } = useAuthStore();
+  const rawRole = (user?.role || '').toUpperCase();
+  const isEmployee = rawRole === 'EMPLOYEE' || rawRole === 'CASHIER' || rawRole === 'STAFF';
+
   if (!isOpen || !snapshot) return null;
+
+  const handleVerifySnapshotIntegrity = async () => {
+    try {
+      setIsVerifyingIntegrity(true);
+      const res = await taxSnapshotApi.verifyIntegrity(snapshot.id);
+      setIntegrityCheckResult(res);
+    } catch (err: unknown) {
+      setIntegrityCheckResult({
+        isIntegrityValid: false,
+        message: err instanceof Error ? err.message : 'Không thể kiểm tra tính toàn vẹn của bản chốt thuế.',
+      });
+    } finally {
+      setIsVerifyingIntegrity(false);
+    }
+  };
 
   const handleUpdate = onUpdateStatus || onStatusChange || (async () => {});
   const handleExport = onOpenExportModal || onExport || (() => {});
@@ -70,7 +96,7 @@ export const TaxSnapshotDetailDrawer: FC<Props> = ({
               <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0F172A', margin: 0, letterSpacing: '-0.02em' }}>
                 Kỳ tính thuế {periodTitle}
               </h2>
-              <TaxSnapshotStatusBadge status={snapshot.status || 'draft'} />
+              <TaxSnapshotStatusBadge status={snapshot.status || (snapshot.finalizedAtUtc ? 'Finalized' : 'draft')} />
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.78rem', color: '#64748B', marginTop: 4 }}>
               <Hash size={13} />
@@ -199,16 +225,68 @@ export const TaxSnapshotDetailDrawer: FC<Props> = ({
                   </div>
                 )}
 
-                {snapshot.auditSignatureHash && (
-                  <div className="tax-audit-row" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 4 }}>
+                <div className="tax-audit-row" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 6 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: 8, flexWrap: 'wrap' }}>
                     <span style={{ fontSize: '0.78rem', color: '#64748B' }}>
                       Mã kiểm tra toàn vẹn dữ liệu nội bộ (HMAC-SHA256):
                     </span>
+                    <button
+                      type="button"
+                      onClick={handleVerifySnapshotIntegrity}
+                      disabled={isVerifyingIntegrity}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 5,
+                        padding: '4px 10px',
+                        borderRadius: 6,
+                        fontSize: '0.75rem',
+                        fontWeight: 700,
+                        background: '#F0FDFA',
+                        border: '1px solid #99F6E4',
+                        color: '#0F766E',
+                        cursor: isVerifyingIntegrity ? 'not-allowed' : 'pointer',
+                      }}
+                    >
+                      {isVerifyingIntegrity ? (
+                        <Loader2 size={13} className="animate-spin" />
+                      ) : (
+                        <ShieldCheck size={13} />
+                      )}
+                      <span>{isVerifyingIntegrity ? 'Đang xác minh...' : 'Kiểm tra tính toàn vẹn'}</span>
+                    </button>
+                  </div>
+                  {snapshot.auditSignatureHash && (
                     <code style={{ fontSize: '0.72rem', background: '#F8FAFC', padding: '4px 8px', borderRadius: 6, wordBreak: 'break-all', color: '#0F766E', width: '100%', boxSizing: 'border-box' }}>
                       {snapshot.auditSignatureHash}
                     </code>
-                  </div>
-                )}
+                  )}
+                  {integrityCheckResult && (
+                    <div
+                      style={{
+                        width: '100%',
+                        boxSizing: 'border-box',
+                        padding: '8px 12px',
+                        borderRadius: 8,
+                        fontSize: '0.78rem',
+                        fontWeight: 700,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        background: integrityCheckResult.isIntegrityValid ? '#ECFDF5' : '#FEF2F2',
+                        border: integrityCheckResult.isIntegrityValid ? '1px solid #A7F3D0' : '1px solid #FECACA',
+                        color: integrityCheckResult.isIntegrityValid ? '#065F46' : '#991B1B',
+                      }}
+                    >
+                      {integrityCheckResult.isIntegrityValid ? (
+                        <ShieldCheck size={15} />
+                      ) : (
+                        <ShieldAlert size={15} />
+                      )}
+                      <span>{integrityCheckResult.message}</span>
+                    </div>
+                  )}
+                </div>
 
                 {(snapshot.note || snapshot.notes) && (
                   <div style={{ paddingTop: 8, borderTop: '1px solid #E2E8F0', marginTop: 2 }}>
@@ -280,52 +358,54 @@ export const TaxSnapshotDetailDrawer: FC<Props> = ({
           )}
         </div>
 
-        {/* Footer Actions */}
-        <div className="tax-drawer-footer">
-          <button
-            onClick={() => handleExport(snapshot)}
-            className="btn-secondary-pill"
-          >
-            <Download size={16} />
-            <span>Xuất tờ khai Form 01</span>
-          </button>
+        {/* Footer Actions (Chỉ dành cho StoreOwner & Admin) */}
+        {!isEmployee && (
+          <div className="tax-drawer-footer">
+            <button
+              onClick={() => handleExport(snapshot)}
+              className="btn-secondary-pill"
+            >
+              <Download size={16} />
+              <span>Xuất tờ khai Form 01</span>
+            </button>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            {snapshot.status === 'Draft' && (
-              <button
-                disabled={isUpdating}
-                onClick={() => handleStatusChangeInternal('Finalized')}
-                className="btn-primary-pill"
-              >
-                <FileCheck size={16} />
-                <span>Chốt số liệu</span>
-              </button>
-            )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              {snapshot.status === 'Draft' && (
+                <button
+                  disabled={isUpdating}
+                  onClick={() => handleStatusChangeInternal('Finalized')}
+                  className="btn-primary-pill"
+                >
+                  <FileCheck size={16} />
+                  <span>Chốt số liệu</span>
+                </button>
+              )}
 
-            {snapshot.status === 'Finalized' && (
-              <button
-                disabled={isUpdating}
-                onClick={() => handleStatusChangeInternal('Submitted')}
-                className="btn-primary-pill"
-              >
-                <span>Đánh dấu Đã nộp tờ khai</span>
-                <ArrowRight size={16} />
-              </button>
-            )}
+              {snapshot.status === 'Finalized' && (
+                <button
+                  disabled={isUpdating}
+                  onClick={() => handleStatusChangeInternal('Submitted')}
+                  className="btn-primary-pill"
+                >
+                  <span>Đánh dấu Đã nộp tờ khai</span>
+                  <ArrowRight size={16} />
+                </button>
+              )}
 
-            {snapshot.status === 'Submitted' && (
-              <button
-                disabled={isUpdating}
-                onClick={() => handleStatusChangeInternal('Paid')}
-                className="btn-primary-pill"
-                style={{ background: 'linear-gradient(135deg, #059669 0%, #047857 100%)' }}
-              >
-                <CheckCircle2 size={16} />
-                <span>Xác nhận Đã nộp thuế xong</span>
-              </button>
-            )}
+              {snapshot.status === 'Submitted' && (
+                <button
+                  disabled={isUpdating}
+                  onClick={() => handleStatusChangeInternal('Paid')}
+                  className="btn-primary-pill"
+                  style={{ background: 'linear-gradient(135deg, #059669 0%, #047857 100%)' }}
+                >
+                  <CheckCircle2 size={16} />
+                  <span>Xác nhận Đã nộp thuế xong</span>
+                </button>
+              )}
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

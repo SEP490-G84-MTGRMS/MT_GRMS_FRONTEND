@@ -346,8 +346,9 @@ describe('STORE PRODUCT MANAGEMENT – MASTER AUDIT SUITE', () => {
       expect(document.getElementById('summarySelectedCount')?.textContent).toBe('1 sản phẩm');
 
       // Switch to Store 2
-      const branchSelect = document.getElementById('assignStoreSelect') as HTMLSelectElement;
-      fireEvent.change(branchSelect, { target: { value: 'store-02' } });
+      const branchInput = document.getElementById('assignStoreSelect')!;
+      fireEvent.change(branchInput, { target: { value: 'Bình Thạnh' } });
+      fireEvent.click(screen.getByText(/Chi nhánh Bình Thạnh/i));
 
       // Verify selections are immediately cleared
       expect(document.getElementById('summarySelectedCount')?.textContent).toBe('0 sản phẩm');
@@ -724,7 +725,7 @@ describe('STORE PRODUCT MANAGEMENT – MASTER AUDIT SUITE', () => {
         // Assert payload targets Store 1 only
         expect(storeId).toBe('store-01');
         expect(productId).toBe('prod-01');
-        expect(input.minOrderQuantity).toBe(8);
+        expect(input.retailPrice).toBe(105000);
       });
 
       render(
@@ -737,9 +738,9 @@ describe('STORE PRODUCT MANAGEMENT – MASTER AUDIT SUITE', () => {
         />
       );
 
-      // Edit Store 1 MOQ to 8
-      const moqInput = screen.getByLabelText(/Số lượng đặt hàng tối thiểu/i);
-      fireEvent.change(moqInput, { target: { value: '8' } });
+      // Edit Store 1 price to 105,000
+      const priceInput = screen.getByLabelText(/Giá bán lẻ niêm yết/i);
+      fireEvent.change(priceInput, { target: { value: '105000' } });
       fireEvent.click(document.getElementById('btnSaveEditProduct')!);
 
       await waitFor(() => {

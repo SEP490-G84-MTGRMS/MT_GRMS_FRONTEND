@@ -15,7 +15,7 @@ import {
 export const employeeApi = {
   /**
    * Lấy danh sách nhân viên có phân trang, tìm kiếm và lọc theo chi nhánh/trạng thái
-   * Backend: GET /api/v1/employees
+   * Backend: GET /api/employees
    */
   async getEmployeesPaged(filter: EmployeeQueryFilterParams = {}): Promise<{
     items: Employee[];
@@ -67,7 +67,7 @@ export const employeeApi = {
 
   /**
    * Lấy thông tin chi tiết một nhân viên theo ID
-   * Backend: GET /api/v1/employees/{id}
+   * Backend: GET /api/employees/{id}
    */
   async getEmployeeById(id: string): Promise<Employee> {
     const res = await httpClient.get<ApiResponse<EmployeeBackendDetailDto>>(`/employees/${id}`);
@@ -79,7 +79,7 @@ export const employeeApi = {
 
   /**
    * Tạo mới hồ sơ nhân viên
-   * Backend: POST /api/v1/employees
+   * Backend: POST /api/employees
    */
   async createEmployee(payload: CreateEmployeePayload): Promise<Employee> {
     const res = await httpClient.post<ApiResponse<EmployeeBackendDetailDto>>('/employees', payload);
@@ -91,7 +91,7 @@ export const employeeApi = {
 
   /**
    * Cập nhật thông tin nhân viên và mức lương
-   * Backend: PUT /api/v1/employees/{id}
+   * Backend: PUT /api/employees/{id}
    */
   async updateEmployee(id: string, payload: UpdateEmployeePayload): Promise<Employee> {
     const res = await httpClient.put<ApiResponse<EmployeeBackendDetailDto>>(`/employees/${id}`, payload);
@@ -103,7 +103,7 @@ export const employeeApi = {
 
   /**
    * Cập nhật trạng thái hoạt động của nhân viên (active / inactive)
-   * Backend: PATCH /api/v1/employees/{id}/status
+   * Backend: PATCH /api/employees/{id}/status
    */
   async updateEmployeeStatus(id: string, status: 'active' | 'inactive'): Promise<boolean> {
     const res = await httpClient.patch<ApiResponse<object>>(`/employees/${id}/status`, { status });
@@ -112,7 +112,7 @@ export const employeeApi = {
 
   /**
    * Cấp tài khoản đăng nhập Identity cho nhân viên
-   * Backend: POST /api/v1/employees/{id}/identity-account
+   * Backend: POST /api/employees/{id}/identity-account
    */
   async createIdentityAccount(
     id: string,
@@ -130,7 +130,7 @@ export const employeeApi = {
 
   /**
    * Cập nhật tài khoản đăng nhập Identity cho nhân viên
-   * Backend: PUT /api/v1/employees/{id}/identity-account
+   * Backend: PUT /api/employees/{id}/identity-account
    */
   async updateIdentityAccount(
     id: string,
@@ -148,7 +148,7 @@ export const employeeApi = {
 
   /**
    * Xóa mềm nhân viên
-   * Backend: DELETE /api/v1/employees/{id}
+   * Backend: DELETE /api/employees/{id}
    */
   async deleteEmployee(id: string): Promise<boolean> {
     const res = await httpClient.delete<ApiResponse<object>>(`/employees/${id}`);
@@ -157,7 +157,7 @@ export const employeeApi = {
 
   /**
    * Lấy danh sách chi nhánh phục vụ chọn chi nhánh làm việc
-   * Backend: GET /api/v1/branches (fallback mock nếu lỗi)
+   * Backend: GET /api/branches (fallback mock nếu lỗi)
    */
   async getBranches(): Promise<Branch[]> {
     try {

@@ -807,7 +807,7 @@ const AttendanceDetailModalContent: React.FC<AttendanceDetailModalContentProps> 
     };
   }, [record.branchId, record.shiftConfigId, record.shiftCode, record.shiftName, record.checkInTime, record.checkOutTime]);
 
-  // 2. Fetch chi tiết lịch làm việc thực tế từ backend SchedulesController (GET /api/v1/schedules/{id})
+  // 2. Fetch chi tiết lịch làm việc thực tế từ backend SchedulesController (GET /api/schedules/{id})
   useEffect(() => {
     let isMounted = true;
     const fetchSchedule = async () => {
