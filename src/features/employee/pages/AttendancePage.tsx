@@ -14,6 +14,7 @@ import {
   History,
   LogIn,
   LogOut,
+  Camera,
 } from 'lucide-react';
 import type { AttendanceRecord, ApprovalRequest, Branch } from '../types';
 import { scheduleApi, getShiftColor, type ScheduleResponse } from '../api/scheduleApi';
@@ -23,6 +24,7 @@ import { AttendanceDetailModal } from '../components/AttendanceDetailModal';
 import { ApprovalRequestsModal } from '../components/ApprovalRequestsModal';
 import { CreateScheduleRequestModal } from '../components/CreateScheduleRequestModal';
 import { ScheduleRequestsHistoryModal } from '../components/ScheduleRequestsHistoryModal';
+import { FaceIdAttendanceModal } from '../components/FaceIdAttendanceModal';
 import { ScheduleRequestType } from '../types/scheduleApprovalTypes';
 import { useAuthStore } from '../../../stores/useAuthStore';
 import '../employee.css';
@@ -284,6 +286,7 @@ export const AttendancePage: React.FC = () => {
   const [historyModalScheduleId, setHistoryModalScheduleId] = useState<string | null>(null);
   const [historyModalTitle, setHistoryModalTitle] = useState<string>('');
   const [openMenuScheduleId, setOpenMenuScheduleId] = useState<string | null>(null);
+  const [isFaceIdModalOpen, setIsFaceIdModalOpen] = useState(false);
 
   useEffect(() => {
     const handleGlobalClick = () => setOpenMenuScheduleId(null);
@@ -496,6 +499,15 @@ export const AttendancePage: React.FC = () => {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <button
+            type="button"
+            className="emp-btn emp-btn-primary"
+            onClick={() => setIsFaceIdModalOpen(true)}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, backgroundColor: '#0F766E', borderColor: '#0F766E' }}
+          >
+            <Camera size={16} />
+            <span>Chấm công AI FaceID</span>
+          </button>
           <button
             type="button"
             className="emp-btn emp-btn-secondary"
@@ -1492,6 +1504,17 @@ export const AttendancePage: React.FC = () => {
           shiftTitle={historyModalTitle}
         />
       )}
+
+      {/* Modal Chấm công AI FaceID quầy POS */}
+      <FaceIdAttendanceModal
+        isOpen={isFaceIdModalOpen}
+        onClose={() => setIsFaceIdModalOpen(false)}
+        branchId={(selectedBranchIds.length > 0 ? selectedBranchIds[0] : branches[0]?.id) || ''}
+        branchName={branches.find((b) => b.id === (selectedBranchIds.length > 0 ? selectedBranchIds[0] : branches[0]?.id))?.name}
+        onSuccess={() => {
+          fetchAttendanceData();
+        }}
+      />
     </div>
   );
 };

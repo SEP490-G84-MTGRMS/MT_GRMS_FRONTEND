@@ -125,6 +125,9 @@ export interface Employee {
   // Status & Financial summary
   status: EmployeeStatus;
   debtAmount: number; // Nợ và tạm ứng (Dương = shop còn nợ NV; Âm = NV đang tạm ứng)
+  faceDescriptor?: string | null;
+  faceImageUrls?: string[] | string | null;
+  hasFaceId?: boolean;
 
   // Sub-modules
   salaryConfig?: SalaryConfig;

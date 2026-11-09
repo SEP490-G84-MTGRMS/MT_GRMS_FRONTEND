@@ -21,6 +21,7 @@ export interface EmployeeBackendSummaryDto {
   userId?: string;
   userName?: string;
   createdAt: string;
+  hasFaceId?: boolean;
 }
 
 export interface EmployeeBackendDetailDto {
@@ -33,6 +34,8 @@ export interface EmployeeBackendDetailDto {
   phone: string;
   email?: string;
   avatarUrl?: string;
+  faceDescriptor?: string | null;
+  faceImageUrls?: string | null;
   address?: string;
   startDate?: string;
   note?: string;
@@ -75,6 +78,8 @@ export interface CreateEmployeePayload {
   bankName?: string;
   bankAccountHolder?: string;
   avatarUrl?: string;
+  faceDescriptor?: string | null;
+  faceImageUrls?: string | null;
   userId?: string;
   userName?: string;
   password?: string;
@@ -136,6 +141,7 @@ export const mapBackendSummaryToEmployee = (dto: EmployeeBackendSummaryDto): Emp
     userName: dto.userName,
     status: dto.status?.toLowerCase() === 'inactive' ? 'inactive' : 'active',
     debtAmount: dto.debtAmount || 0,
+    hasFaceId: dto.hasFaceId ?? false,
     salaryConfig,
   };
 };
@@ -194,6 +200,9 @@ export const mapBackendDetailToEmployee = (dto: EmployeeBackendDetailDto): Emplo
     bankAccountNumber: dto.bankAccountNumber,
     bankName: dto.bankName,
     bankAccountHolder: dto.bankAccountHolder,
+    faceDescriptor: dto.faceDescriptor,
+    faceImageUrls: dto.faceImageUrls,
+    hasFaceId: !!dto.faceDescriptor,
     salaryConfig,
   };
 };
@@ -251,6 +260,8 @@ export const mapFormToCreatePayload = (
     bankName: emp.bankName?.trim() || undefined,
     bankAccountHolder: emp.bankAccountHolder?.trim() || undefined,
     avatarUrl: emp.avatarUrl?.trim() || undefined,
+    faceDescriptor: emp.faceDescriptor ?? undefined,
+    faceImageUrls: typeof emp.faceImageUrls === 'string' ? emp.faceImageUrls : Array.isArray(emp.faceImageUrls) ? JSON.stringify(emp.faceImageUrls) : undefined,
     userId: emp.userId?.trim() || undefined,
     userName: emp.userName?.trim() || undefined,
     password: emp.password?.trim() || undefined,

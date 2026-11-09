@@ -366,5 +366,53 @@ export const scheduleApi = {
     }
     throw new Error(res.data?.message || 'Chấm công thủ công thất bại.');
   },
+
+  /**
+   * Lấy danh sách vector khuôn mặt nhân viên trong ngày theo chi nhánh (phục vụ FaceMatcher tại POS)
+   * Backend: GET /api/v1/schedules/face-id/today-descriptors?branchId=...
+   */
+  async getTodayStaffDescriptors(branchId: string): Promise<any[]> {
+    const res = await httpClient.get<ApiResponse<any[]>>('/schedules/face-id/today-descriptors', {
+      params: { branchId },
+    });
+    if (res.data?.success && res.data.data) {
+      return res.data.data;
+    }
+    return [];
+  },
+
+  /**
+   * Điểm danh vào ca FaceID tại máy POS
+   * Backend: POST /api/v1/schedules/face-id/check-in
+   */
+  async checkInFaceId(payload: {
+    scheduleId: string;
+    employeeId: string;
+    faceMatchScore: number;
+    snapshotBase64?: string | null;
+  }): Promise<ScheduleResponse> {
+    const res = await httpClient.post<ApiResponse<ScheduleResponse>>('/schedules/face-id/check-in', payload);
+    if (res.data?.success && res.data.data) {
+      return res.data.data;
+    }
+    throw new Error(res.data?.message || 'Điểm danh vào ca FaceID thất bại.');
+  },
+
+  /**
+   * Điểm danh ra ca FaceID tại máy POS
+   * Backend: POST /api/v1/schedules/face-id/check-out
+   */
+  async checkOutFaceId(payload: {
+    scheduleId: string;
+    employeeId: string;
+    faceMatchScore: number;
+    snapshotBase64?: string | null;
+  }): Promise<ScheduleResponse> {
+    const res = await httpClient.post<ApiResponse<ScheduleResponse>>('/schedules/face-id/check-out', payload);
+    if (res.data?.success && res.data.data) {
+      return res.data.data;
+    }
+    throw new Error(res.data?.message || 'Điểm danh ra ca FaceID thất bại.');
+  },
 };
 

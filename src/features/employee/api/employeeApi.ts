@@ -191,5 +191,21 @@ export const employeeApi = {
       return null;
     }
   },
+
+  /**
+   * Đăng ký vector khuôn mặt FaceID cho nhân viên
+   * Backend: POST /api/v1/employees/{id}/face-descriptor
+   */
+  async registerFaceDescriptor(
+    employeeId: string,
+    faceDescriptor: string,
+    faceImageUrls?: string
+  ): Promise<boolean> {
+    const res = await httpClient.post<ApiResponse<boolean>>(`/employees/${employeeId}/face-descriptor`, {
+      faceDescriptor,
+      faceImageUrls,
+    });
+    return !!res.data?.success;
+  },
 };
 
