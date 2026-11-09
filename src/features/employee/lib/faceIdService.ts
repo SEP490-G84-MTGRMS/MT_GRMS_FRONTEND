@@ -1,6 +1,6 @@
 import * as faceapi from '@vladmandic/face-api';
 
-export const DISTANCE_THRESHOLD = 0.5;
+export const DISTANCE_THRESHOLD = 0.45;
 
 let modelsLoaded = false;
 let modelsLoadingPromise: Promise<void> | null = null;
@@ -133,11 +133,13 @@ export interface MatchResult {
 
 /**
  * 4. Nhận diện khuôn mặt từ video camera và vẽ bounding box lên canvas
+ * Hỗ trợ chế độ 1:1 Verification: đối chiếu với tài khoản cá nhân đang đăng nhập.
  */
 export async function detectAndDrawMatches(
   video: HTMLVideoElement,
   canvas: HTMLCanvasElement,
-  faceMatcher: faceapi.FaceMatcher | null
+  faceMatcher: faceapi.FaceMatcher | null,
+  _expectedStaff?: { fullName: string; employeeCode?: string; employeeId?: string }
 ): Promise<{ bestMatch: MatchResult | null; detectedCount: number }> {
   if (!video || !canvas || video.paused || video.ended || video.readyState < 2) {
     return { bestMatch: null, detectedCount: 0 };
@@ -185,15 +187,13 @@ export async function detectAndDrawMatches(
         empId = parts[2];
         label = `${fullName} (d: ${distance.toFixed(2)})`;
       } else {
-        label = match.label !== 'unknown'
-          ? `${match.label.split(':::')[1] || match.label} (d: ${distance.toFixed(2)})`
-          : `Không khớp (d: ${distance.toFixed(2)})`;
+        label = `Không khớp (d: ${distance.toFixed(2)})`;
       }
     }
 
     const drawBox = new faceapi.draw.DrawBox(box, {
       label,
-      boxColor: isMatched ? '#10B981' : '#F59E0B',
+      boxColor: isMatched ? '#10B981' : '#EF4444', // Xanh lá nếu trùng khớp chính chủ, Đỏ nếu người khác / không khớp
       lineWidth: 2,
     });
     drawBox.draw(canvas);
@@ -207,6 +207,17 @@ export async function detectAndDrawMatches(
         distance,
         matchScore,
         isMatched: true,
+        rawLabel: label,
+      };
+    } else if (!isMatched && (!bestMatch || distance < bestMatch.distance)) {
+      // Lưu lại thông tin mặt gần nhất nhưng không khớp để báo lỗi chính xác
+      bestMatch = {
+        employeeId: undefined,
+        employeeCode: undefined,
+        fullName: undefined,
+        distance,
+        matchScore,
+        isMatched: false,
         rawLabel: label,
       };
     }

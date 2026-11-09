@@ -102,11 +102,21 @@ const getWeekDates = (offsetWeeks: number) => {
 
 const formatTime = (isoOrTime?: string | null): string | undefined => {
   if (!isoOrTime) return undefined;
-  if (isoOrTime.includes('T')) {
-    const parts = isoOrTime.split('T')[1];
-    return parts ? parts.substring(0, 5) : undefined;
+  if (isoOrTime.includes('T') || isoOrTime.includes(' ')) {
+    const parts = isoOrTime.includes('T') ? isoOrTime.split('T')[1] : isoOrTime.split(' ')[1];
+    if (parts) {
+      const p = parts.split(':');
+      if (p.length >= 2) {
+        return `${p[0].padStart(2, '0')}:${p[1].padStart(2, '0')}`;
+      }
+      return parts.substring(0, 5);
+    }
   }
   if (isoOrTime.includes(':')) {
+    const parts = isoOrTime.trim().split(':');
+    if (parts.length >= 2) {
+      return `${parts[0].padStart(2, '0')}:${parts[1].padStart(2, '0')}`;
+    }
     return isoOrTime.substring(0, 5);
   }
   return isoOrTime;
@@ -502,7 +512,14 @@ export const AttendancePage: React.FC = () => {
           <button
             type="button"
             className="emp-btn emp-btn-primary"
-            onClick={() => setIsFaceIdModalOpen(true)}
+            onClick={() => {
+              if (!user) {
+                alert('Vui lòng đăng nhập tài khoản cá nhân để thực hiện chấm công FaceID.');
+                return;
+              }
+              setIsFaceIdModalOpen(true);
+            }}
+            title="Chấm công AI FaceID"
             style={{ display: 'inline-flex', alignItems: 'center', gap: 6, backgroundColor: '#0F766E', borderColor: '#0F766E' }}
           >
             <Camera size={16} />
@@ -1468,6 +1485,11 @@ export const AttendancePage: React.FC = () => {
         record={selectedRecord}
         onUpdateStatus={handleUpdateRecordStatus}
         onSaved={fetchAttendanceData}
+        isReadOnly={isEmployeeRole}
+        onRequestIncident={(rec, type) => {
+          setSelectedRecord(null);
+          handleOpenCreateRequest(rec, type);
+        }}
       />
 
       {/* Modal Duyệt chấm công */}

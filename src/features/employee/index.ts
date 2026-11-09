@@ -15,7 +15,6 @@ export * from './components/ShiftConfigModal';
 export * from './components/AddScheduleModal';
 export * from './components/ScheduleScopeConfirmModal';
 export * from './components/AttendanceDetailModal';
-export * from './components/GpsLocationsModal';
 export * from './components/CreatePayslipModal';
 export * from './components/PayslipDetailModal';
 export * from './components/PayslipPaymentModal';
