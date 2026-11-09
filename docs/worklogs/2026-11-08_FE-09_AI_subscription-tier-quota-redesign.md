@@ -100,4 +100,24 @@
 3. **Kiểm thử**:
    - Chạy `npx vite build` -> Thành công không có lỗi (built in 1.92s).
 
+---
+
+### Bổ sung (2026-11-09): Tích hợp Input chỉnh sửa trực tiếp và nút Lưu trong Modal Chi tiết Chi nhánh
+1. **Mục đích**:
+   - Chuyển đổi toàn bộ thông tin cơ bản ở phần trên thành các ô input nhập liệu trực tiếp (Tên chi nhánh, Địa chỉ hoạt động, Hotline, Email liên hệ, Quản lý phụ trách, Tùy chọn đặt làm Trụ sở chính, Mã chi nhánh khóa cố định).
+   - Bổ sung nút **"Lưu thay đổi"** ngay tại footer của modal, loại bỏ hoàn toàn việc phải mở popup chỉnh sửa riêng biệt, mang lại trải nghiệm chỉnh sửa liền mạch và tiện lợi cho người dùng.
+
+2. **Chi tiết tệp thay đổi**:
+   - `src/pages/store/components/BranchDetailModal.tsx`:
+     - Chuyển đổi static text thành các input fields có icon đại diện (`Store`, `MapPin`, `Phone`, `Mail`, `User`, `Lock`, `ShieldCheck`).
+     - Bổ sung state `isSaving`, `saveSuccess`, `errorMessage` và hàm `handleSave`.
+     - Footer: Thay thế nút mở popup chỉnh sửa cũ bằng nút primary *"Lưu thay đổi"* (Save icon, spinner loading state, visual feedback banner) và nút *"Đóng"*.
+   - `src/pages/store/components/BranchManagementTab.tsx`:
+     - Tích hợp nút Sửa (Edit2) trên danh sách chi nhánh mở trực tiếp modal chi tiết & chỉnh sửa này.
+     - Truyền callback `onSuccess={loadData}` để tự động đồng bộ lại danh sách và hạn mức sau khi lưu.
+
+3. **Kiểm thử**:
+   - Chạy `npx vite build` -> Thành công 0 Lỗi (built in 2.20s).
+
+
 

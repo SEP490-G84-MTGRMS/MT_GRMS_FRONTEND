@@ -425,7 +425,7 @@ export const BranchManagementTab: FC<BranchManagementTabProps> = ({
                           type="button"
                           onClick={() => {
                             setSelectedBranch(b);
-                            setActiveModal('edit');
+                            setActiveModal('detail');
                           }}
                           style={{
                             width: 32,
@@ -439,7 +439,7 @@ export const BranchManagementTab: FC<BranchManagementTabProps> = ({
                             justifyContent: 'center',
                             cursor: 'pointer',
                           }}
-                          title="Sửa thông tin chi nhánh"
+                          title="Chỉnh sửa thông tin chi nhánh"
                         >
                           <Edit2 size={15} />
                         </button>
@@ -527,7 +527,7 @@ export const BranchManagementTab: FC<BranchManagementTabProps> = ({
         />
       )}
 
-      {/* Modal Chi tiết chi nhánh */}
+      {/* Modal Chi tiết & Chỉnh sửa trực tiếp chi nhánh */}
       {activeModal === 'detail' && selectedBranch && (
         <BranchDetailModal
           branch={selectedBranch}
@@ -535,10 +535,7 @@ export const BranchManagementTab: FC<BranchManagementTabProps> = ({
             setActiveModal(null);
             setSelectedBranch(null);
           }}
-          onEdit={(branchToEdit) => {
-            setSelectedBranch(branchToEdit);
-            setActiveModal('edit');
-          }}
+          onSuccess={loadData}
         />
       )}
     </div>
