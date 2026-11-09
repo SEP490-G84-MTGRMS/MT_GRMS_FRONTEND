@@ -158,7 +158,7 @@ export const SubscriptionCheckoutModal: FC<SubscriptionCheckoutModalProps> = ({
         className="store-modal-dialog"
         onClick={(e) => e.stopPropagation()}
         style={{
-          maxWidth: 880,
+          maxWidth: 960,
           width: '95%',
           fontFamily: 'var(--font-sans)',
           borderRadius: 20,
@@ -289,10 +289,10 @@ export const SubscriptionCheckoutModal: FC<SubscriptionCheckoutModalProps> = ({
               style={{
                 backgroundColor: '#F8FAFC',
                 borderRight: '1px solid #E2E8F0',
-                padding: '24px 20px',
+                padding: '28px 24px',
                 display: 'flex',
                 flexDirection: 'column',
-                gap: 16,
+                gap: 18,
               }}
             >
               {/* Badge & Tên gói */}
@@ -302,23 +302,23 @@ export const SubscriptionCheckoutModal: FC<SubscriptionCheckoutModalProps> = ({
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: 6,
-                    padding: '3px 10px',
+                    padding: '4px 12px',
                     borderRadius: 20,
                     backgroundColor: isTrialPlan ? '#E2E8F0' : isPro ? '#EBF5FF' : '#ECFDF5',
                     color: isTrialPlan ? '#475569' : isPro ? 'var(--blue-primary)' : '#059669',
-                    fontSize: 11.5,
+                    fontSize: 12.5,
                     fontWeight: 700,
-                    marginBottom: 8,
+                    marginBottom: 10,
                   }}
                 >
-                  <Sparkles size={13} />
+                  <Sparkles size={14} />
                   {isTrialPlan ? 'Trải Nghiệm Miễn Phí' : isPro ? 'Chuỗi Cửa Hàng' : 'Cửa Hàng Độc Lập'}
                 </div>
 
                 <h4
                   style={{
-                    margin: '0 0 6px 0',
-                    fontSize: 17,
+                    margin: '0 0 8px 0',
+                    fontSize: 19,
                     fontWeight: 800,
                     color: '#0F172A',
                     letterSpacing: '-0.01em',
@@ -327,10 +327,10 @@ export const SubscriptionCheckoutModal: FC<SubscriptionCheckoutModalProps> = ({
                   {plan.name}
                 </h4>
 
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, marginBottom: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 10 }}>
                   <span
                     style={{
-                      fontSize: 22,
+                      fontSize: 26,
                       fontWeight: 900,
                       color: isPro ? 'var(--blue-primary)' : '#0F172A',
                       fontVariantNumeric: 'tabular-nums',
@@ -340,17 +340,17 @@ export const SubscriptionCheckoutModal: FC<SubscriptionCheckoutModalProps> = ({
                       ? 'Miễn phí'
                       : `${new Intl.NumberFormat('vi-VN').format(plan.monthlyPrice)} đ`}
                   </span>
-                  <span style={{ fontSize: 12.5, color: '#64748B' }}>
+                  <span style={{ fontSize: 14, color: '#64748B', fontWeight: 500 }}>
                     {isTrialPlan ? '/ 3 ngày' : '/ tháng'}
                   </span>
                 </div>
 
-                <p style={{ margin: 0, fontSize: 12.5, color: '#64748B', lineHeight: 1.5 }}>
+                <p style={{ margin: 0, fontSize: 13.5, color: '#475569', lineHeight: 1.6, fontWeight: 500 }}>
                   {plan.tagline || (isTrialPlan
                     ? 'Trải nghiệm toàn diện các tính năng cao cấp của MT-GRMS.'
                     : isPro
                     ? 'Dành cho chuỗi siêu thị bán lẻ, chuyên môn hóa quy trình kho chuỗi.'
-                    : 'Dành cho tiệm tạp hóa, siêu thị mini độc lập (1 điểm bán kiêm kho).')}
+                    : 'Dành cho tiệm tạp hóa, siêu thị mini độc lập (1 điểm bán kiêm kho tại chỗ).')}
                 </p>
               </div>
 
@@ -358,20 +358,20 @@ export const SubscriptionCheckoutModal: FC<SubscriptionCheckoutModalProps> = ({
               <div
                 style={{
                   backgroundColor: '#FFFFFF',
-                  borderRadius: 12,
+                  borderRadius: 14,
                   border: '1px solid #E2E8F0',
-                  padding: '12px 14px',
+                  padding: '14px 16px',
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: 8,
-                  fontSize: 12.5,
+                  gap: 10,
+                  fontSize: 13.5,
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#334155' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: '#334155' }}>
                   {isPro ? (
-                    <Building2 size={16} color="var(--blue-primary)" style={{ flexShrink: 0 }} />
+                    <Building2 size={18} color="var(--blue-primary)" style={{ flexShrink: 0 }} />
                   ) : (
-                    <Store size={16} color="#059669" style={{ flexShrink: 0 }} />
+                    <Store size={18} color="#059669" style={{ flexShrink: 0 }} />
                   )}
                   <span>
                     <strong>Quy mô:</strong>{' '}
@@ -382,8 +382,8 @@ export const SubscriptionCheckoutModal: FC<SubscriptionCheckoutModalProps> = ({
                       : '1 chi nhánh kiêm kho hàng'}
                   </span>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#334155' }}>
-                  <Clock size={16} color="#64748B" style={{ flexShrink: 0 }} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: '#334155' }}>
+                  <Clock size={18} color="#64748B" style={{ flexShrink: 0 }} />
                   <span>
                     <strong>Thời hạn:</strong>{' '}
                     {isTrialPlan ? '3 ngày trải nghiệm' : `${months} tháng${bonusMonths > 0 ? ' (+1 tháng)' : ''}`}
@@ -395,28 +395,28 @@ export const SubscriptionCheckoutModal: FC<SubscriptionCheckoutModalProps> = ({
               <div>
                 <div
                   style={{
-                    fontSize: 11.5,
+                    fontSize: 12.5,
                     fontWeight: 700,
-                    color: '#64748B',
+                    color: '#475569',
                     textTransform: 'uppercase',
                     letterSpacing: '0.04em',
-                    marginBottom: 10,
+                    marginBottom: 12,
                     display: 'flex',
                     alignItems: 'center',
                     gap: 6,
                   }}
                 >
-                  <CheckCircle2 size={14} color="#059669" />
+                  <CheckCircle2 size={15} color="#059669" />
                   <span>Tính năng bao gồm ({planFeatures.length})</span>
                 </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
                   {planFeatures.map((feat, idx) => (
-                    <div key={idx} style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                    <div key={idx} style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
                       <div
                         style={{
-                          width: 17,
-                          height: 17,
+                          width: 20,
+                          height: 20,
                           borderRadius: '50%',
                           backgroundColor: '#ECFDF5',
                           border: '1px solid #A7F3D0',
@@ -425,16 +425,16 @@ export const SubscriptionCheckoutModal: FC<SubscriptionCheckoutModalProps> = ({
                           justifyContent: 'center',
                           color: '#059669',
                           flexShrink: 0,
-                          marginTop: 2,
+                          marginTop: 1,
                         }}
                       >
-                        <Check size={11} strokeWidth={2.8} />
+                        <Check size={12} strokeWidth={3} />
                       </div>
                       <span
                         style={{
-                          fontSize: 12.5,
-                          color: '#334155',
-                          lineHeight: 1.45,
+                          fontSize: 13.5,
+                          color: '#1E293B',
+                          lineHeight: 1.5,
                           fontWeight: 500,
                         }}
                       >
@@ -449,17 +449,17 @@ export const SubscriptionCheckoutModal: FC<SubscriptionCheckoutModalProps> = ({
               <div
                 style={{
                   marginTop: 'auto',
-                  padding: '10px 12px',
+                  padding: '12px 14px',
                   backgroundColor: '#FFFFFF',
-                  borderRadius: 10,
+                  borderRadius: 12,
                   border: '1px solid #E2E8F0',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: 8,
+                  gap: 10,
                 }}
               >
-                <ShieldCheck size={16} color="#059669" style={{ flexShrink: 0 }} />
-                <span style={{ fontSize: 11.5, color: '#64748B', lineHeight: 1.4 }}>
+                <ShieldCheck size={18} color="#059669" style={{ flexShrink: 0 }} />
+                <span style={{ fontSize: 12.5, color: '#475569', lineHeight: 1.45, fontWeight: 500 }}>
                   Dữ liệu được sao lưu tự động & bảo mật đa tầng trên đám mây.
                 </span>
               </div>

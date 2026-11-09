@@ -57,6 +57,16 @@
   - Tiêu đề thẻ giờ đây chiếm trọn vẹn 100% chiều ngang của thẻ, áp dụng `whiteSpace: 'nowrap'` giúp chữ luôn nằm thẳng hàng trên 1 dòng duy nhất, không bao giờ bị cắt hoặc rớt dòng.
   - Chuyển lưới sang `gridTemplateColumns: 'repeat(4, minmax(0, 1fr))'` và mở rộng `maxWidth` modal lên 920px, đảm bảo cả 4 thẻ bằng phẳng, đồng đều và vuông vức.
 
+### 2.5. Phóng to kích thước & chữ mô tả cột bên trái Modal Thanh toán gói (`SubscriptionCheckoutModal.tsx`, `store-hub.css`)
+- **Tăng chiều rộng cột thông tin & mô tả**: Nâng chiều rộng cột trái từ `330px` lên `400px` trong `.checkout-modal-split` (`store-hub.css`) và mở rộng `maxWidth` modal từ `880px` lên `960px`.
+- **Nâng cấp độ lớn font chữ và tỷ lệ bố cục (Typography & Spacing)**:
+  - Tên gói: tăng từ `17px` lên `19px`, `fontWeight: 800`.
+  - Giá gói: tăng từ `22px` lên `26px`, `fontWeight: 900`.
+  - Mô tả ngắn / Tagline: tăng từ `12.5px` lên `13.5px`, `lineHeight: 1.6`, màu sắc tương phản rõ nét `#475569`.
+  - Khung Quy mô & Thời hạn: tăng cỡ chữ lên `13.5px`, icon phóng to lên `18px`.
+  - Danh sách tính năng bao gồm: tăng cỡ chữ từ `12.5px` lên `13.5px` (`#1E293B`, `fontWeight: 500`), vòng tròn tích xanh lớn hơn (`20x20px`), giãn cách giữa các dòng `gap: 11px`.
+  - Ghi chú bảo mật chân trang: tăng lên `12.5px` kèm icon lớn hơn.
+
 ---
 
 ## 3. Điểm Nhấn Kỹ Thuật (Technical Highlights)

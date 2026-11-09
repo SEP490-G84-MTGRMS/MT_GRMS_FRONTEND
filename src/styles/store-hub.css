@@ -448,7 +448,7 @@
 /* Split Layout for Subscription Checkout Modal */
 .checkout-modal-split {
   display: grid;
-  grid-template-columns: 330px 1fr;
+  grid-template-columns: 400px 1fr;
   flex: 1;
   overflow-y: auto;
 }
