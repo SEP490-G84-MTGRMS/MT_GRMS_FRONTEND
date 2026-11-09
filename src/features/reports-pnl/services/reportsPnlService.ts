@@ -24,7 +24,7 @@ export function calculateMarginPct(part: number, total: number): number {
 
 /**
  * Converts a local Vietnam date string (YYYY-MM-DD) into an ISO UTC boundary string
- * corresponding to +07:00 Vietnam Standard Time, ensuring 100% alignment with S2c-HKD (FE-19).
+ * corresponding to +07:00 Vietnam Standard Time, ensuring 100% alignment with S2c-HKD.
  * @param dateStr - Date in YYYY-MM-DD format.
  * @param isEndOfDay - True for 23:59:59+07:00, false for 00:00:00+07:00.
  */
