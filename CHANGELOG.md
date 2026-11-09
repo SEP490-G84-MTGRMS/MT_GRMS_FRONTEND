@@ -6,6 +6,9 @@ Toàn bộ các thay đổi của repository Frontend React SPA được tổng 
 
 ## [Unreleased] - 2026-11-09
 
+### Added
+- Chuyển đổi toàn diện cơ chế xác thực sang HttpOnly Cookie: loại bỏ 100% việc lưu trữ token trong `localStorage` (miễn nhiễm XSS Token Theft), triển khai Silent Refresh với Axios Request Queue trong `httpClient.ts`, tự động đồng bộ phiên khi F5 qua `GET /api/auth/me`, và điều hướng thông minh khi phiên hết hạn kèm ghi nhớ `redirectUrl` [FE-AUTH] [worklog: docs/worklogs/2026-11-09_FE-AUTH_AI_httponly-cookie-and-session-expiry.md].
+
 ### Fixed
 - **Phóng to kích thước & chữ mô tả cột bên trái Modal Thanh toán gói (`SubscriptionCheckoutModal.tsx`, `store-hub.css`)**: Tăng chiều rộng cột trái từ 330px lên 400px, nâng `maxWidth` modal lên 960px, phóng to font chữ tên gói (19px), giá (26px), mô tả ngắn (13.5px) và toàn bộ 7 tính năng kèm icon tích xanh lớn hơn, giúp dễ đọc và nổi bật giá trị gói cước [FE-BRANCH] [worklog: docs/worklogs/2026-11-09_FE-BRANCH_AI_redesign-branch-detail-modal-inputs.md].
 - **Sửa lỗi rớt dòng chữ tại 4 thẻ KPI chỉ số tổng quát (`BranchDetailModal.tsx`)**: Bố trí icon lên phía trên riêng biệt và cho tiêu đề trải rộng 100% chiều ngang thẻ với `whiteSpace: 'nowrap'`, loại bỏ triệt để hiện tượng rớt chữ ("doanh", "hàng", "dịch") xuống dòng 2, đồng đều chiều cao và cân đối 4 cột [FE-BRANCH] [worklog: docs/worklogs/2026-11-09_FE-BRANCH_AI_redesign-branch-detail-modal-inputs.md].
