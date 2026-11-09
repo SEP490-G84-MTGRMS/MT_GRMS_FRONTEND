@@ -319,9 +319,10 @@ export const posOrderApi = {
    * Đổi / Trả hàng chuẩn KiotViet: hoàn kho hàng trả, trừ kho FEFO hàng mới, bù trừ chênh lệch
    */
   returnExchangeOrder: async (orderId: string, data: {
-    returnedItems: Array<{ productId: string; quantity: number; unitPrice: number }>;
-    newItems: Array<{ productId: string; quantity: number; unitPrice: number; discountAmount?: number }>;
+    returnedItems: Array<{ productId: string; quantity: number; unitPrice: number; unitName?: string; condition?: 'Restock' | 'Damaged' }>;
+    newItems: Array<{ productId: string; quantity: number; unitPrice: number; unitName?: string; discountAmount?: number }>;
     settlementMethod: string;
+    reason?: string;
     note?: string;
   }): Promise<any> => {
     const res = await httpClient.post(`/orders/${orderId}/return-exchange`, data);
