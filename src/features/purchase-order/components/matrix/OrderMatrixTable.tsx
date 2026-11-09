@@ -470,6 +470,40 @@ export const OrderMatrixTable: FC<OrderMatrixTableProps> = ({
                             );
                           }
 
+                          // Employee: ô đã được Store Owner chốt → khóa không cho sửa
+                          if (!isStoreOwner && isOwnerAdjusted) {
+                            const lockedQty =
+                              cell.storeQty !== null && cell.storeQty !== undefined
+                                ? cell.storeQty
+                                : cell.finalQty;
+                            return (
+                              <td
+                                key={d.dateKey}
+                                className="po-td-employee-overridden po-cell-disabled"
+                                title={`Chủ cửa hàng đã chốt: ${lockedQty}. Đề xuất NV: ${cell.employeeQty}. Nhân viên không thể chỉnh sửa ô này.`}
+                              >
+                                <div className="po-cell-wrapper">
+                                  <div className="po-cell-input-row">
+                                    <input
+                                      type="text"
+                                      className="po-qty-input po-qty-input-disabled qty-employee-overridden"
+                                      value={lockedQty !== null && lockedQty !== undefined ? String(lockedQty) : ''}
+                                      placeholder="—"
+                                      disabled
+                                      readOnly
+                                    />
+                                  </div>
+                                  <div
+                                    className="po-cell-subtext po-cell-subtext--override"
+                                    title={`Số lượng Store Owner chốt: ${lockedQty}`}
+                                  >
+                                    Chốt: {lockedQty}
+                                  </div>
+                                </div>
+                              </td>
+                            );
+                          }
+
                           const isBad = q > 0 && q < p.moq;
                           const tooltipParts: string[] = [];
                           if (isBad) {

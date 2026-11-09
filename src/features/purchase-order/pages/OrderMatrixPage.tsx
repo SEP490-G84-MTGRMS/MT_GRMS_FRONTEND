@@ -589,6 +589,23 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
       return;
     }
 
+    if (!isStoreOwner) {
+      const existing = cellMap[productId]?.[dateKey];
+      const ownerLocked = Boolean(
+        existing &&
+          (existing.isOwnerAdjusted ||
+            existing.isOwnerOverridden ||
+            (existing.storeQty !== null && existing.storeQty !== undefined))
+      );
+      if (ownerLocked) {
+        showToast(
+          'Ô này đã được Chủ cửa hàng chốt — nhân viên không thể chỉnh sửa. Chỉ Chủ cửa hàng có thể đổi hoặc khôi phục.',
+          'warning'
+        );
+        return;
+      }
+    }
+
     setCellMap((prev) => {
       const prodMap = { ...(prev[productId] || {}) };
       const currentCell = prodMap[dateKey] || {
@@ -617,22 +634,10 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
           modifiedAt: new Date().toISOString(),
         };
       } else {
-        // Employee nhập số lượng đề xuất:
-        // 1. Lưu vào employeeQuantity = val.
-        // 2. Không cập nhật ownerQuantity.
-        // 3. Nếu Store Owner đã điều chỉnh: giữ nguyên ownerQuantity và finalQuantity.
-        // 4. Nếu Store Owner chưa điều chỉnh: finalQuantity = employeeQuantity (val).
-        const isAdjusted = Boolean(
-          currentCell.isOwnerAdjusted ||
-          currentCell.isOwnerOverridden ||
-          (currentCell.storeQty !== null && currentCell.storeQty !== undefined)
-        );
-        const finalQty = isAdjusted ? (currentCell.storeQty ?? val) : val;
-
         updatedCell = {
           ...currentCell,
           employeeQty: val,
-          finalQty,
+          finalQty: val,
           modifiedBy: 'employee',
           modifiedAt: new Date().toISOString(),
         };

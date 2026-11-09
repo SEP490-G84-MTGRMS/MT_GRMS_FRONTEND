@@ -1404,13 +1404,15 @@ export function applyMatrixExcelImport(
         modifiedAt: new Date().toISOString(),
       };
     } else {
-      // Employee import -> chỉ cập nhật employeeQty
-      // Nếu Store Owner đã từng ghi đè storeQty -> giữ nguyên storeQty, không cho Employee làm mất giá trị Store Owner
+      // Employee import: ô đã được Store Owner chốt thì bỏ qua — không cho ghi đè.
       const hasOwnerOverride = currentCell.storeQty !== null || currentCell.isOwnerAdjusted;
+      if (hasOwnerOverride) {
+        return;
+      }
       newMap[productId][deliveryDate] = {
         ...currentCell,
         employeeQty: quantity,
-        finalQty: hasOwnerOverride ? (currentCell.storeQty as number) : quantity,
+        finalQty: quantity,
         modifiedBy: 'employee',
         modifiedAt: new Date().toISOString(),
       };

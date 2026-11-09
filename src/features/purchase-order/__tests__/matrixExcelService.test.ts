@@ -432,10 +432,11 @@ describe('Purchase Order Matrix — Excel Export & Import Engine (CISCA Specific
     expect(soMap['prod-001']['2026-11-04'].isOwnerAdjusted).toBe(true);
     expect(soMap['prod-001']['2026-11-04'].modifiedBy).toBe('store_owner');
 
-    // Employee apply on existing cell where Store Owner had adjusted -> storeQty is preserved!
+    // Employee apply on owner-adjusted cell -> skipped entirely (không cho NV sửa ô đã chốt)
     const empMap = applyMatrixExcelImport(cellsToApply, soMap, false);
-    expect(empMap['prod-001']['2026-11-04'].employeeQty).toBe(30);
-    expect(empMap['prod-001']['2026-11-04'].storeQty).toBe(30); // Preserved!
+    expect(empMap['prod-001']['2026-11-04'].employeeQty).toBe(10); // giữ đề xuất cũ
+    expect(empMap['prod-001']['2026-11-04'].storeQty).toBe(30);
     expect(empMap['prod-001']['2026-11-04'].finalQty).toBe(30);
+    expect(empMap['prod-001']['2026-11-04'].isOwnerAdjusted).toBe(true);
   });
 });
