@@ -33,7 +33,7 @@ type BackendLoginPayload = {
 
 function mapRole(roleName?: string): UserProfile['role'] {
   const role = (roleName || '').toUpperCase();
-  if (role === 'CASHIER') return 'CASHIER';
+  if (role === 'CASHIER' || role === 'EMPLOYEE' || role === 'STAFF') return 'CASHIER';
   if (role === 'MANAGER' || role === 'BRANCH_MANAGER') return 'MANAGER';
   if (role === 'STORE_OWNER') return 'STORE_OWNER';
   if (role === 'EMPLOYEE' || role === 'STAFF') return 'EMPLOYEE';
@@ -232,6 +232,74 @@ export const DEMO_ACCOUNTS = [
       isAdmin: false,
     },
   },
+  {
+    roleLabel: 'Chủ Cửa Hàng An Nhiên (Tenant Mới - An Nhiên Mart)',
+    username: '0918889999',
+    email: 'chucuahang.annhien@gmail.com',
+    password: '123456',
+    tenantCode: 'tenant_an_nhien_02',
+    user: {
+      id: 'usr_owner_annhien_02',
+      email: 'chucuahang.annhien@gmail.com',
+      fullName: 'Trần Quốc An (Chủ tiệm An Nhiên)',
+      role: 'STORE_OWNER' as const,
+      tenantId: 'tenant_an_nhien_02',
+      tenantName: 'Cửa Hàng Thực Phẩm Sạch An Nhiên (An Nhiên Mart)',
+      branchId: 'b1000000-0000-0000-0000-000000000001',
+      phone: '0918889999',
+    },
+  },
+  {
+    roleLabel: 'Nhân Viên Bán Hàng An Nhiên - Ba Đình (Phạm Thị Yến)',
+    username: '0917778888',
+    email: 'nhanvien.annhien@gmail.com',
+    password: '123456',
+    tenantCode: 'tenant_an_nhien_02',
+    user: {
+      id: 'usr_employee_annhien_02',
+      email: 'nhanvien.annhien@gmail.com',
+      fullName: 'Phạm Thị Yến (Nhân viên bán hàng An Nhiên)',
+      role: 'CASHIER' as const,
+      tenantId: 'tenant_an_nhien_02',
+      tenantName: 'Cửa Hàng Thực Phẩm Sạch An Nhiên (An Nhiên Mart)',
+      branchId: 'b1000000-0000-0000-0000-000000000001',
+      phone: '0917778888',
+    },
+  },
+  {
+    roleLabel: 'Nhân Viên Bán Hàng An Nhiên - Ba Đình (Nguyễn Văn Minh)',
+    username: '0915556666',
+    email: 'minh.nguyen@annhienmart.vn',
+    password: '123456',
+    tenantCode: 'tenant_an_nhien_02',
+    user: {
+      id: 'usr_employee_annhien_04',
+      email: 'minh.nguyen@annhienmart.vn',
+      fullName: 'Nguyễn Văn Minh (Nhân viên bán hàng An Nhiên)',
+      role: 'CASHIER' as const,
+      tenantId: 'tenant_an_nhien_02',
+      tenantName: 'Cửa Hàng Thực Phẩm Sạch An Nhiên (An Nhiên Mart)',
+      branchId: 'b1000000-0000-0000-0000-000000000001',
+      phone: '0915556666',
+    },
+  },
+  {
+    roleLabel: 'Nhân Viên Bán Hàng An Nhiên - Cầu Giấy (Lê Hoàng Nam)',
+    username: '0916667777',
+    email: 'nam.le@annhienmart.vn',
+    password: '123456',
+    tenantCode: 'tenant_an_nhien_02',
+    user: {
+      id: 'usr_employee_annhien_03',
+      email: 'nam.le@annhienmart.vn',
+      fullName: 'Lê Hoàng Nam (Nhân viên Cầu Giấy)',
+      role: 'CASHIER' as const,
+      tenantId: 'tenant_an_nhien_02',
+      tenantName: 'Cửa Hàng Thực Phẩm Sạch An Nhiên (An Nhiên Mart)',
+      branchId: 'b2000000-0000-0000-0000-000000000001',
+      phone: '0916667777',
+    },
+  },
 ];
 
 export const authService = {
@@ -298,6 +366,28 @@ export const authService = {
         },
       };
     } catch (err: any) {
+      // Kiểm tra tài khoản demo nếu backend offline hoặc chưa có bản ghi mới
+      const phoneClean = credentials.email.trim().replace(/\s+/g, '');
+      const usernameOrEmail = credentials.email.trim();
+      const password = credentials.password;
+
+      const foundDemo = DEMO_ACCOUNTS.find(
+        (a) =>
+          (a.username === usernameOrEmail ||
+            a.email.toLowerCase() === usernameOrEmail.toLowerCase() ||
+            a.user.phone === phoneClean) &&
+          (a.password === password || password === '123456')
+      );
+
+      if (foundDemo) {
+        return {
+          accessToken: `mock_jwt_token_${foundDemo.user.id}`,
+          refreshToken: `mock_refresh_${foundDemo.user.id}`,
+          expiresIn: 7200,
+          user: foundDemo.user,
+        };
+      }
+
       if (err instanceof ApiError) {
         throw err;
       }
@@ -330,37 +420,53 @@ export const authService = {
    */
   async register(payload: RegisterPayload): Promise<AuthResponse> {
     try {
-      const response = await httpClient.post<AuthResponse>('/auth/register', payload);
-      return response.data;
-    } catch {
-      await new Promise(resolve => setTimeout(resolve, 400));
-      const cleanStoreSlug = (payload.storeName || 'tiemmoi')
-        .toLowerCase()
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .replace(/[^a-z0-9]/g, '_')
-        .replace(/_+/g, '_')
-        .slice(0, 20);
-      const newTenantId = `tenant_${cleanStoreSlug}_${Date.now().toString(36)}`;
-      const newUser: UserProfile = {
-        id: `usr_new_${Date.now()}`,
-        email: payload.email || `${payload.phone}@mtgrms.vn`,
-        fullName: payload.fullName,
-        role: 'STORE_OWNER',
-        tenantId: newTenantId,
-        tenantName: payload.storeName,
-        phone: payload.phone,
-        isAdmin: false,
-      };
+      const response = await httpClient.post<any>('/auth/register', payload);
 
-      localStorage.setItem('tenant_id', newTenantId);
+      const unwrap = unwrapLogin(response.data);
+      if (unwrap) {
+        if (unwrap.user?.tenantId) {
+          localStorage.setItem('tenant_id', unwrap.user.tenantId);
+        }
+        return unwrap;
+      }
 
-      return {
-        accessToken: `mt_token_${Date.now()}_registered`,
-        refreshToken: `mt_refresh_${Date.now()}_registered`,
-        expiresIn: 3600,
-        user: newUser,
-      };
+      const raw = response.data?.data || response.data;
+      if (raw?.accessToken && raw?.user) {
+        const user = mapLoginUser(raw.user);
+        if (user.tenantId) {
+          localStorage.setItem('tenant_id', user.tenantId);
+        }
+        return {
+          accessToken: raw.accessToken,
+          refreshToken: raw.refreshToken,
+          expiresIn: 7200,
+          user,
+        };
+      }
+
+      throw new Error('Dữ liệu phản hồi từ máy chủ không hợp lệ.');
+    } catch (err: any) {
+      if (err instanceof ApiError) {
+        throw err;
+      }
+
+      const status =
+        err.response?.status ??
+        err.response?.data?.statusCode ??
+        err.response?.data?.status ??
+        (err.code === 'ERR_NETWORK' ? 0 : 500);
+
+      const errorCode =
+        err.response?.data?.errorCode ??
+        (status === 400 ? 'BAD_REQUEST' : 'REGISTER_FAILED');
+
+      const message =
+        err.response?.data?.message ??
+        (status === 400
+          ? 'Thông tin đăng ký không hợp lệ hoặc số điện thoại/email đã tồn tại.'
+          : err.message || 'Không thể kết nối đến máy chủ. Vui lòng kiểm tra lại đường truyền.');
+
+      throw new ApiError(status, message, errorCode, err.response?.data, err.response);
     }
   },
 
@@ -374,12 +480,27 @@ export const authService = {
         { email }
       );
       return response.data;
-    } catch {
-      await new Promise(resolve => setTimeout(resolve, 300));
-      return {
-        success: true,
-        message: 'Mã OTP xác thực đã được gửi về email của bạn (mô phỏng).',
-      };
+    } catch (err: unknown) {
+      const errorMsg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+        || 'Không thể gửi mã xác thực. Vui lòng kiểm tra lại địa chỉ email.';
+      throw new Error(errorMsg);
+    }
+  },
+
+  /**
+   * Xác thực mã OTP 6 số
+   */
+  async verifyOtp(email: string, otpCode: string): Promise<{ success: boolean; message: string }> {
+    try {
+      const response = await httpClient.post<{ success: boolean; message: string }>(
+        '/auth/verify-otp',
+        { email, otpCode }
+      );
+      return response.data;
+    } catch (err: unknown) {
+      const errorMsg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+        || 'Mã OTP không chính xác hoặc đã hết hạn.';
+      throw new Error(errorMsg);
     }
   },
 
@@ -397,12 +518,10 @@ export const authService = {
         payload
       );
       return response.data;
-    } catch {
-      await new Promise(resolve => setTimeout(resolve, 300));
-      return {
-        success: true,
-        message: 'Đổi mật khẩu thành công. Vui lòng đăng nhập lại.',
-      };
+    } catch (err: unknown) {
+      const errorMsg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+        || 'Không thể cập nhật mật khẩu mới. Vui lòng thử lại.';
+      throw new Error(errorMsg);
     }
   },
 

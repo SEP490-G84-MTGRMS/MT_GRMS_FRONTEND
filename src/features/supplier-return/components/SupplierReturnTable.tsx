@@ -1,6 +1,16 @@
-import type { CSSProperties, FC } from 'react';
-import { Eye, CheckCircle2, Printer } from 'lucide-react';
+import { useState, useMemo, useRef } from 'react';
+import type { FC } from 'react';
+import {
+  Eye,
+  CheckCircle2,
+  Printer,
+  RotateCcw,
+  ChevronLeft,
+  ChevronRight,
+  ArrowUpDown,
+} from 'lucide-react';
 import type { SupplierReturnListItem, SupplierReturnStatus } from '../types/supplierReturn.types';
+import '../../../styles/so-list-page.css';
 
 interface Props {
   items: SupplierReturnListItem[];
@@ -14,25 +24,21 @@ interface Props {
   onPrint?: (item: SupplierReturnListItem) => void;
 }
 
+type SortField =
+  | 'code'
+  | 'goodsReceiptCode'
+  | 'supplierName'
+  | 'branchName'
+  | 'totalRequestedQty'
+  | 'totalApprovedQty'
+  | 'totalHandedOverQty'
+  | 'totalEstimatedAmount'
+  | 'status'
+  | 'createdAt';
+
+type SortDirection = 'asc' | 'desc';
+
 const fmt = (n: number) => new Intl.NumberFormat('vi-VN').format(n);
-
-const th: CSSProperties = {
-  padding: '8px 10px',
-  textAlign: 'left',
-  fontSize: 11,
-  fontWeight: 700,
-  color: '#475569',
-  background: '#f8fafc',
-  borderBottom: '1px solid #e2e8f0',
-  whiteSpace: 'nowrap',
-};
-
-const td: CSSProperties = {
-  padding: '8px 10px',
-  fontSize: 12.5,
-  borderBottom: '1px solid #f1f5f9',
-  color: '#1e293b',
-};
 
 export const returnStatusBadge = (status: SupplierReturnStatus) => {
   switch (status) {
@@ -64,152 +70,367 @@ export const SupplierReturnTable: FC<Props> = ({
   onQuickHandover,
   onPrint,
 }) => {
+  const [sortField, setSortField] = useState<SortField | null>(null);
+  const [sortDir, setSortDir] = useState<SortDirection>('asc');
+
+  const headRef = useRef<HTMLDivElement>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
+
+  const handleBodyScroll = () => {
+    if (bodyRef.current && headRef.current) {
+      headRef.current.scrollLeft = bodyRef.current.scrollLeft;
+    }
+  };
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      if (sortDir === 'asc') {
+        setSortDir('desc');
+      } else {
+        setSortField(null);
+        setSortDir('asc');
+      }
+    } else {
+      setSortField(field);
+      setSortDir('asc');
+    }
+  };
+
+  const sortedItems = useMemo(() => {
+    if (!sortField) return items;
+
+    return [...items].sort((a, b) => {
+      let valA: string | number = '';
+      let valB: string | number = '';
+
+      switch (sortField) {
+        case 'code':
+          valA = a.code.toLowerCase();
+          valB = b.code.toLowerCase();
+          break;
+        case 'goodsReceiptCode':
+          valA = a.goodsReceiptCode.toLowerCase();
+          valB = b.goodsReceiptCode.toLowerCase();
+          break;
+        case 'supplierName':
+          valA = a.supplierName.toLowerCase();
+          valB = b.supplierName.toLowerCase();
+          break;
+        case 'branchName':
+          valA = a.branchName.toLowerCase();
+          valB = b.branchName.toLowerCase();
+          break;
+        case 'totalRequestedQty':
+          valA = a.totalRequestedQty;
+          valB = b.totalRequestedQty;
+          break;
+        case 'totalApprovedQty':
+          valA = a.totalApprovedQty;
+          valB = b.totalApprovedQty;
+          break;
+        case 'totalHandedOverQty':
+          valA = a.totalHandedOverQty;
+          valB = b.totalHandedOverQty;
+          break;
+        case 'totalEstimatedAmount':
+          valA = a.totalEstimatedAmount;
+          valB = b.totalEstimatedAmount;
+          break;
+        case 'status':
+          valA = a.status;
+          valB = b.status;
+          break;
+        case 'createdAt':
+          valA = new Date(a.createdAt).getTime();
+          valB = new Date(b.createdAt).getTime();
+          break;
+      }
+
+      if (valA < valB) return sortDir === 'asc' ? -1 : 1;
+      if (valA > valB) return sortDir === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [items, sortField, sortDir]);
+
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
-  const start = totalCount === 0 ? 0 : (pageIndex - 1) * pageSize + 1;
-  const end = Math.min(pageIndex * pageSize, totalCount);
+  const startItem = totalCount === 0 ? 0 : (pageIndex - 1) * pageSize + 1;
+  const endItem = Math.min(pageIndex * pageSize, totalCount);
+
+  const colGroup = (
+    <colgroup>
+      <col style={{ width: '4%' }} />
+      <col style={{ width: '12%' }} />
+      <col style={{ width: '12%' }} />
+      <col style={{ width: '17%' }} />
+      <col style={{ width: '12%' }} />
+      <col style={{ width: '11%' }} />
+      <col style={{ width: '7%' }} />
+      <col style={{ width: '7%' }} />
+      <col style={{ width: '7%' }} />
+      <col style={{ width: '10%' }} />
+      <col style={{ width: '10%' }} />
+      <col style={{ width: '9%' }} />
+    </colgroup>
+  );
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
-      <div
-        style={{
-          overflow: 'auto',
-          flex: 1,
-          minHeight: 0,
-          border: '1px solid #e2e8f0',
-          borderRadius: 8,
-          background: '#fff',
-        }}
-      >
-        <table style={{ width: '100%', minWidth: 1200, borderCollapse: 'separate', borderSpacing: 0 }}>
+    <div className="so-list-table-card">
+      {/* ── Table Sticky Header ── */}
+      <div ref={headRef} className="so-list-table-head">
+        <table className="so-list-table" style={{ minWidth: 1280 }}>
+          {colGroup}
           <thead>
             <tr>
-              <th style={{ ...th, textAlign: 'center', width: 45 }}>#</th>
-              <th style={th}>Mã phiếu trả</th>
-              <th style={th}>Phiếu nhập gốc (GRN)</th>
-              <th style={th}>Nhà cung cấp</th>
-              <th style={th}>Chi nhánh</th>
-              <th style={th}>Lý do trả</th>
-              <th style={{ ...th, textAlign: 'right' }}>SL yêu cầu</th>
-              <th style={{ ...th, textAlign: 'right' }}>SL duyệt</th>
-              <th style={{ ...th, textAlign: 'right' }}>SL đã giao</th>
-              <th style={{ ...th, textAlign: 'right' }}>Giá trị ước tính</th>
-              <th style={{ ...th, textAlign: 'center' }}>Trạng thái</th>
-              <th style={{ ...th, textAlign: 'right' }}>Thao tác</th>
+              <th className="so-list-th" style={{ textAlign: 'center' }}>
+                #
+              </th>
+
+              <th
+                className="so-list-th"
+                onClick={() => handleSort('code')}
+                style={{ cursor: 'pointer', userSelect: 'none' }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span>Mã phiếu trả</span>
+                  <ArrowUpDown size={12} color={sortField === 'code' ? '#0f766e' : '#94a3b8'} />
+                </div>
+              </th>
+
+              <th
+                className="so-list-th"
+                onClick={() => handleSort('goodsReceiptCode')}
+                style={{ cursor: 'pointer', userSelect: 'none' }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span>Phiếu nhập (GRN)</span>
+                  <ArrowUpDown size={12} color={sortField === 'goodsReceiptCode' ? '#0f766e' : '#94a3b8'} />
+                </div>
+              </th>
+
+              <th
+                className="so-list-th"
+                onClick={() => handleSort('supplierName')}
+                style={{ cursor: 'pointer', userSelect: 'none' }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span>Nhà cung cấp</span>
+                  <ArrowUpDown size={12} color={sortField === 'supplierName' ? '#0f766e' : '#94a3b8'} />
+                </div>
+              </th>
+
+              <th
+                className="so-list-th"
+                onClick={() => handleSort('branchName')}
+                style={{ cursor: 'pointer', userSelect: 'none' }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span>Chi nhánh</span>
+                  <ArrowUpDown size={12} color={sortField === 'branchName' ? '#0f766e' : '#94a3b8'} />
+                </div>
+              </th>
+
+              <th className="so-list-th">Lý do trả</th>
+
+              <th
+                className="so-list-th"
+                onClick={() => handleSort('totalRequestedQty')}
+                style={{ textAlign: 'right', cursor: 'pointer', userSelect: 'none' }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4 }}>
+                  <span>SL Y/C</span>
+                  <ArrowUpDown size={12} color={sortField === 'totalRequestedQty' ? '#0f766e' : '#94a3b8'} />
+                </div>
+              </th>
+
+              <th
+                className="so-list-th"
+                onClick={() => handleSort('totalApprovedQty')}
+                style={{ textAlign: 'right', cursor: 'pointer', userSelect: 'none' }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4, color: '#15803d' }}>
+                  <span>SL Duyệt</span>
+                  <ArrowUpDown size={12} color={sortField === 'totalApprovedQty' ? '#0f766e' : '#94a3b8'} />
+                </div>
+              </th>
+
+              <th
+                className="so-list-th"
+                onClick={() => handleSort('totalHandedOverQty')}
+                style={{ textAlign: 'right', cursor: 'pointer', userSelect: 'none' }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4, color: '#0369a1' }}>
+                  <span>SL Đã giao</span>
+                  <ArrowUpDown size={12} color={sortField === 'totalHandedOverQty' ? '#0f766e' : '#94a3b8'} />
+                </div>
+              </th>
+
+              <th
+                className="so-list-th"
+                onClick={() => handleSort('totalEstimatedAmount')}
+                style={{ textAlign: 'right', cursor: 'pointer', userSelect: 'none' }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4 }}>
+                  <span>Giá trị trả</span>
+                  <ArrowUpDown size={12} color={sortField === 'totalEstimatedAmount' ? '#0f766e' : '#94a3b8'} />
+                </div>
+              </th>
+
+              <th
+                className="so-list-th"
+                onClick={() => handleSort('status')}
+                style={{ textAlign: 'center', cursor: 'pointer', userSelect: 'none' }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+                  <span>Trạng thái</span>
+                  <ArrowUpDown size={12} color={sortField === 'status' ? '#0f766e' : '#94a3b8'} />
+                </div>
+              </th>
+
+              <th className="so-list-th" style={{ textAlign: 'right' }}>
+                Hành động
+              </th>
             </tr>
           </thead>
+        </table>
+      </div>
+
+      {/* ── Table Scrollable Body ── */}
+      <div
+        ref={bodyRef}
+        className="so-list-table-body supplier-table-scroll-container"
+        onScroll={handleBodyScroll}
+      >
+        <table className="so-list-table" style={{ minWidth: 1280 }}>
+          {colGroup}
           <tbody>
-            {items.length === 0 ? (
-              <tr>
-                <td colSpan={12} style={{ ...td, textAlign: 'center', padding: 36, color: '#64748b' }}>
-                  Không có phiếu trả hàng nào phù hợp bộ lọc.
-                </td>
-              </tr>
-            ) : (
-              items.map((item, idx) => {
-                const badge = returnStatusBadge(item.status);
-                const rowNo = start + idx;
+            {sortedItems.length > 0 ? (
+              sortedItems.map((item, idx) => {
+                const st = returnStatusBadge(item.status);
+                const isApprovedWaitingHandover = item.status === 'APPROVED';
+
                 return (
-                  <tr key={item.id} style={{ transition: 'background-color 0.15s' }}>
-                    <td style={{ ...td, textAlign: 'center', color: '#64748b' }}>{rowNo}</td>
-                    <td style={td}>
-                      <span
+                  <tr key={item.id} className="so-list-row">
+                    {/* Index */}
+                    <td className="so-list-td" style={{ textAlign: 'center', color: '#64748b' }}>
+                      {(pageIndex - 1) * pageSize + idx + 1}
+                    </td>
+
+                    {/* Mã phiếu trả */}
+                    <td className="so-list-td">
+                      <button
+                        type="button"
                         onClick={() => onViewDetail(item)}
                         style={{
-                          fontFamily: 'var(--font-mono, monospace)',
-                          fontWeight: 700,
-                          color: '#0f766e',
+                          background: 'none',
+                          border: 'none',
+                          padding: 0,
                           cursor: 'pointer',
-                          textDecoration: 'underline',
+                          textAlign: 'left',
                         }}
                       >
-                        {item.code}
-                      </span>
+                        <span className="so-list-code" style={{ cursor: 'pointer' }}>
+                          {item.code}
+                        </span>
+                      </button>
                     </td>
-                    <td style={td}>
-                      <span style={{ fontFamily: 'var(--font-mono, monospace)', color: '#2563eb' }}>
+
+                    {/* Phiếu nhập gốc */}
+                    <td className="so-list-td">
+                      <span
+                        style={{
+                          fontFamily: 'var(--font-mono, monospace)',
+                          fontSize: 12,
+                          color: '#2563eb',
+                          fontWeight: 600,
+                        }}
+                      >
                         {item.goodsReceiptCode}
                       </span>
                     </td>
-                    <td style={{ ...td, fontWeight: 600 }}>{item.supplierName}</td>
-                    <td style={td}>{item.branchName}</td>
-                    <td style={{ ...td, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.reason}>
-                      {item.reason}
+
+                    {/* Nhà cung cấp */}
+                    <td className="so-list-td so-list-td--wrap">
+                      <div className="so-list-name" title={item.supplierName}>
+                        {item.supplierName}
+                      </div>
+                      <div style={{ fontSize: 11, color: '#64748b', fontFamily: 'var(--font-mono, monospace)' }}>
+                        {item.supplierCode}
+                      </div>
                     </td>
-                    <td style={{ ...td, textAlign: 'right', fontWeight: 600 }}>
+
+                    {/* Chi nhánh */}
+                    <td className="so-list-td">
+                      <span style={{ fontSize: 12, color: '#334155', fontWeight: 500 }}>
+                        {item.branchName}
+                      </span>
+                    </td>
+
+                    {/* Lý do trả */}
+                    <td className="so-list-td so-list-td--wrap" style={{ maxWidth: 180 }}>
+                      <span style={{ fontSize: 12, color: '#475569' }} title={item.reason}>
+                        {item.reason}
+                      </span>
+                    </td>
+
+                    {/* SL Y/C */}
+                    <td className="so-list-td" style={{ textAlign: 'right', fontWeight: 600 }}>
                       {fmt(item.totalRequestedQty)}
                     </td>
-                    <td style={{ ...td, textAlign: 'right', color: item.totalApprovedQty > 0 ? '#16a34a' : '#64748b', fontWeight: 600 }}>
-                      {item.status === 'DRAFT' || item.status === 'PENDING_SUPPLIER' ? '-' : fmt(item.totalApprovedQty)}
+
+                    {/* SL Duyệt */}
+                    <td className="so-list-td" style={{ textAlign: 'right', fontWeight: 700, color: '#15803d' }}>
+                      {fmt(item.totalApprovedQty)}
                     </td>
-                    <td style={{ ...td, textAlign: 'right', fontWeight: 700, color: item.totalHandedOverQty > 0 ? '#0284c7' : '#94a3b8' }}>
-                      {item.status === 'COMPLETED' ? fmt(item.totalHandedOverQty) : '-'}
+
+                    {/* SL Đã giao */}
+                    <td className="so-list-td" style={{ textAlign: 'right', fontWeight: 700, color: '#0369a1' }}>
+                      {fmt(item.totalHandedOverQty)}
                     </td>
-                    <td style={{ ...td, textAlign: 'right', fontWeight: 600, color: '#0f172a' }}>
+
+                    {/* Giá trị ước tính */}
+                    <td className="so-list-td" style={{ textAlign: 'right', fontWeight: 700, color: '#0f172a' }}>
                       {fmt(item.totalEstimatedAmount)} đ
                     </td>
-                    <td style={{ ...td, textAlign: 'center' }}>
+
+                    {/* Trạng thái */}
+                    <td className="so-list-td" style={{ textAlign: 'center' }}>
                       <span
                         style={{
                           display: 'inline-block',
-                          padding: '2px 8px',
-                          borderRadius: 12,
+                          padding: '3px 8px',
+                          borderRadius: 9999,
                           fontSize: 11,
                           fontWeight: 700,
-                          background: badge.bg,
-                          color: badge.color,
-                          border: `1px solid ${badge.border}`,
+                          backgroundColor: st.bg,
+                          color: st.color,
+                          border: `1px solid ${st.border}`,
                           whiteSpace: 'nowrap',
                         }}
                       >
-                        {badge.label}
+                        {st.label}
                       </span>
                     </td>
-                    <td style={{ ...td, textAlign: 'right', whiteSpace: 'nowrap' }}>
-                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+
+                    {/* Hành động */}
+                    <td className="so-list-td so-list-td--actions" style={{ textAlign: 'right' }}>
+                      <div className="so-list-actions">
                         <button
                           type="button"
+                          className="so-list-action-btn so-list-action-btn--icon"
                           onClick={() => onViewDetail(item)}
                           title="Xem chi tiết phiếu trả hàng"
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: 4,
-                            height: 28,
-                            padding: '0 8px',
-                            borderRadius: 6,
-                            fontSize: 12,
-                            fontWeight: 600,
-                            background: '#ffffff',
-                            border: '1px solid #cbd5e1',
-                            color: '#334155',
-                            cursor: 'pointer',
-                          }}
                         >
-                          <Eye size={12} />
-                          <span>Chi tiết</span>
+                          <Eye size={13} />
                         </button>
 
-                        {item.status === 'APPROVED' && onQuickHandover && (
+                        {isApprovedWaitingHandover && onQuickHandover && (
                           <button
                             type="button"
+                            className="so-list-action-btn so-list-action-btn--success"
                             onClick={() => onQuickHandover(item)}
-                            title="Xác nhận bàn giao thực tế"
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: 4,
-                              height: 28,
-                              padding: '0 8px',
-                              borderRadius: 6,
-                              fontSize: 12,
-                              fontWeight: 600,
-                              background: '#f0fdf4',
-                              border: '1px solid #86efac',
-                              color: '#15803d',
-                              cursor: 'pointer',
-                            }}
+                            title="Xác nhận bàn giao hàng thực tế cho NCC"
                           >
-                            <CheckCircle2 size={12} />
+                            <CheckCircle2 size={13} />
                             <span>Bàn giao</span>
                           </button>
                         )}
@@ -217,22 +438,11 @@ export const SupplierReturnTable: FC<Props> = ({
                         {onPrint && (
                           <button
                             type="button"
+                            className="so-list-action-btn so-list-action-btn--icon"
                             onClick={() => onPrint(item)}
-                            title="In biên bản trả hàng"
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              width: 28,
-                              height: 28,
-                              borderRadius: 6,
-                              background: '#ffffff',
-                              border: '1px solid #cbd5e1',
-                              color: '#475569',
-                              cursor: 'pointer',
-                            }}
+                            title="In biên bản trả hàng (A4)"
                           >
-                            <Printer size={12} />
+                            <Printer size={13} />
                           </button>
                         )}
                       </div>
@@ -240,57 +450,82 @@ export const SupplierReturnTable: FC<Props> = ({
                   </tr>
                 );
               })
+            ) : (
+              <tr>
+                <td
+                  colSpan={12}
+                  style={{
+                    textAlign: 'center',
+                    padding: '48px 16px',
+                    color: '#64748b',
+                    fontSize: 13,
+                    borderBottom: '1px solid #f1f5f9',
+                  }}
+                >
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+                    <RotateCcw size={36} color="#cbd5e1" />
+                    <span style={{ fontWeight: 600, color: '#475569' }}>
+                      Không tìm thấy phiếu trả hàng nào phù hợp
+                    </span>
+                    <span style={{ fontSize: 12, color: '#94a3b8' }}>
+                      Vui lòng thử thay đổi từ khóa tìm kiếm hoặc bấm &quot;Đặt lại&quot; bộ lọc.
+                    </span>
+                  </div>
+                </td>
+              </tr>
             )}
           </tbody>
         </table>
       </div>
 
-      {/* Pagination Footer */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 12,
-          padding: '8px 2px 0',
-          flexShrink: 0,
-          fontSize: 12,
-          color: '#475569',
-        }}
-      >
-        <div>
-          {totalCount === 0 ? 'Không có dữ liệu' : `Dòng ${start}–${end} / ${totalCount}`}
+      {/* ── Footer Phân trang (Paging) chuẩn so-list-pager ── */}
+      <div className="so-list-pager">
+        {/* Bên trái: Thông tin số lượng & Chọn số bản ghi / trang */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+          <div>
+            Hiển thị <b>{startItem}</b> - <b>{endItem}</b> trên <b>{totalCount}</b> phiếu trả hàng
+          </div>
+
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ color: '#64748b' }}>Bản ghi/trang:</span>
+            <select
+              className="so-list-pager-select"
+              value={pageSize}
+              onChange={(e) => onPageSizeChange(Number(e.target.value))}
+            >
+              <option value={10}>10</option>
+              <option value={15}>15</option>
+              <option value={24}>24</option>
+              <option value={36}>36</option>
+              <option value={50}>50</option>
+            </select>
+          </div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <select
-            value={pageSize}
-            onChange={(e) => onPageSizeChange(Number(e.target.value))}
-            style={{ height: 30, borderRadius: 6, border: '1px solid #cbd5e1', fontSize: 12 }}
-          >
-            <option value={10}>10 / trang</option>
-            <option value={20}>20 / trang</option>
-            <option value={50}>50 / trang</option>
-          </select>
+
+        {/* Bên phải: Nút Trước / Trang x / y / Sau */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <button
             type="button"
-            className="po-btn po-btn-secondary"
-            style={{ height: 30 }}
+            className="so-list-pager-btn"
             disabled={pageIndex <= 1}
             onClick={() => onPageChange(pageIndex - 1)}
           >
-            Trước
+            <ChevronLeft size={13} />
+            <span>Trước</span>
           </button>
-          <span style={{ fontWeight: 700 }}>
-            {pageIndex}/{totalPages}
+
+          <span style={{ padding: '0 8px', fontWeight: 600, color: '#0f172a' }}>
+            Trang {pageIndex} / {totalPages}
           </span>
+
           <button
             type="button"
-            className="po-btn po-btn-secondary"
-            style={{ height: 30 }}
+            className="so-list-pager-btn"
             disabled={pageIndex >= totalPages}
             onClick={() => onPageChange(pageIndex + 1)}
           >
-            Sau
+            <span>Sau</span>
+            <ChevronRight size={13} />
           </button>
         </div>
       </div>

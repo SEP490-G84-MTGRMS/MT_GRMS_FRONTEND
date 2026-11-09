@@ -1,5 +1,5 @@
 import type { FC } from 'react';
-import { Calculator, FileText, Truck, Percent, ReceiptText } from 'lucide-react';
+import { Calculator, FileText, Percent, ReceiptText } from 'lucide-react';
 import type { GrnCostSummary } from '../../types/grn.types';
 
 interface GrnCostSummaryCardProps {
@@ -7,7 +7,6 @@ interface GrnCostSummaryCardProps {
   costs: GrnCostSummary;
   readOnly?: boolean;
   onNotesChange: (val: string) => void;
-  onLandedCostChange: (val: number) => void;
   onDiscountChange: (val: number) => void;
   onVatPercentChange: (val: number) => void;
 }
@@ -21,7 +20,6 @@ export const GrnCostSummaryCard: FC<GrnCostSummaryCardProps> = ({
   costs,
   readOnly = false,
   onNotesChange,
-  onLandedCostChange,
   onDiscountChange,
   onVatPercentChange,
 }) => {
@@ -57,7 +55,7 @@ export const GrnCostSummaryCard: FC<GrnCostSummaryCardProps> = ({
             margin: 0,
           }}
         >
-          Tổng tiền & Chi phí kèm theo (Landed Cost)
+          Tổng tiền phiếu nhập kho
         </h2>
       </div>
 
@@ -137,49 +135,7 @@ export const GrnCostSummaryCard: FC<GrnCostSummaryCardProps> = ({
             </span>
           </div>
 
-          {/* 2. Chi phí vận chuyển (Landed Cost) */}
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              fontSize: 12.5,
-              color: '#475569',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <Truck size={13} color="#64748b" />
-              <span>Phí vận chuyển / bốc xếp (Landed Cost):</span>
-            </div>
-            {readOnly ? (
-              <span style={{ fontWeight: 600, fontFamily: 'monospace', color: '#0f172a' }}>
-                +{formatCurrency(costs.landedCost)} VNĐ
-              </span>
-            ) : (
-              <input
-                type="number"
-                min={0}
-                step={5000}
-                value={costs.landedCost}
-                onChange={(e) => onLandedCostChange(Math.max(0, parseFloat(e.target.value) || 0))}
-                style={{
-                  width: 120,
-                  height: 28,
-                  padding: '0 6px',
-                  textAlign: 'right',
-                  borderRadius: 5,
-                  border: '1px solid #cbd5e1',
-                  fontWeight: 600,
-                  fontSize: 12,
-                  color: '#0f172a',
-                  backgroundColor: '#ffffff',
-                  outline: 'none',
-                }}
-              />
-            )}
-          </div>
-
-          {/* 3. Chiết khấu NCC */}
+          {/* 2. Chiết khấu NCC */}
           <div
             style={{
               display: 'flex',
@@ -221,7 +177,7 @@ export const GrnCostSummaryCard: FC<GrnCostSummaryCardProps> = ({
             )}
           </div>
 
-          {/* 4. Thuế VAT */}
+          {/* 3. Thuế VAT */}
           <div
             style={{
               display: 'flex',
@@ -270,7 +226,7 @@ export const GrnCostSummaryCard: FC<GrnCostSummaryCardProps> = ({
           {/* Dòng phân cách Grand Total */}
           <div style={{ borderTop: '1px dashed #cbd5e1', margin: '4px 0' }} />
 
-          {/* 5. TỔNG GIÁ TRỊ PHIẾU NHẬP KHO */}
+          {/* 4. TỔNG GIÁ TRỊ PHIẾU NHẬP KHO */}
           <div
             style={{
               display: 'flex',

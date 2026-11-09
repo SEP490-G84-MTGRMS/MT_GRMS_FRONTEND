@@ -37,21 +37,28 @@ export const BranchManagementTab: FC<BranchManagementTabProps> = ({
   const [activeModal, setActiveModal] = useState<'create' | 'edit' | 'upgrade' | null>(null);
   const [selectedBranch, setSelectedBranch] = useState<BranchItemResponse | null>(null);
 
-  const loadData = async () => {
-    setIsLoading(true);
+  // 1. Tải hạn mức chi nhánh (Quota) - chỉ cần gọi 1 lần khi mount hoặc khi thêm/sửa chi nhánh
+  const fetchQuota = async () => {
     try {
-      const [quotaRes, branchRes] = await Promise.all([
-        branchManagementApi.getQuota(),
-        branchManagementApi.getBranches({
-          keyword: keyword.trim() || undefined,
-          status: statusFilter !== 'all' ? statusFilter : undefined,
-          pageSize: 50,
-        }),
-      ]);
-
+      const quotaRes = await branchManagementApi.getQuota();
       if (quotaRes.success && quotaRes.data) {
         setQuota(quotaRes.data);
       }
+    } catch (err) {
+      console.error('Failed to load branch quota:', err);
+    }
+  };
+
+  // 2. Tải danh sách chi nhánh (có hỗ trợ tìm kiếm & lọc)
+  const fetchBranches = async (searchKw: string, status: string) => {
+    setIsLoading(true);
+    try {
+      const branchRes = await branchManagementApi.getBranches({
+        keyword: searchKw.trim() || undefined,
+        status: status !== 'all' ? status : undefined,
+        pageSize: 50,
+      });
+
       if (branchRes.success && branchRes.data?.items) {
         setBranches(branchRes.data.items);
       }
@@ -62,9 +69,23 @@ export const BranchManagementTab: FC<BranchManagementTabProps> = ({
     }
   };
 
+  // Tải quota ban đầu khi vào màn hình
   useEffect(() => {
-    loadData();
+    fetchQuota();
+  }, []);
+
+  // Tải danh sách chi nhánh với Debounce 350ms khi gõ tìm kiếm hoặc đổi bộ lọc
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchBranches(keyword, statusFilter);
+    }, 350);
+
+    return () => clearTimeout(timer);
   }, [keyword, statusFilter]);
+
+  const loadData = async () => {
+    await Promise.all([fetchQuota(), fetchBranches(keyword, statusFilter)]);
+  };
 
   const handleToggleStatus = async (branch: BranchItemResponse) => {
     const isCurrentlyActive = branch.status.toLowerCase() === 'active';
@@ -72,7 +93,7 @@ export const BranchManagementTab: FC<BranchManagementTabProps> = ({
     try {
       const res = await branchManagementApi.toggleStatus(branch.id, nextActive);
       if (res.success) {
-        loadData();
+        await Promise.all([fetchQuota(), fetchBranches(keyword, statusFilter)]);
       }
     } catch (err) {
       console.error('Toggle status error:', err);

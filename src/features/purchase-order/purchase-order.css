@@ -567,6 +567,18 @@
   font-weight: 600;
 }
 
+/* Ngày đã chốt PO — xanh dương nhạt, không gắn chữ */
+.po-grid-table thead th.po-th-date.po-th-finalized {
+  background-color: #e0f2fe !important;
+  color: #0369a1 !important;
+  border-bottom: 2px solid #38bdf8;
+}
+.po-grid-table thead th.po-th-date.po-th-finalized .po-col-dow { color: #0284c7; }
+.po-grid-table thead th.po-th-date.po-th-finalized .po-col-short {
+  color: #0c4a6e;
+  font-weight: 700;
+}
+
 .po-grid-table thead th.po-th-date.po-th-cutoff-due {
   background-color: #fffbeb !important;
   color: #b45309 !important;
@@ -857,12 +869,16 @@
   cursor: not-allowed;
 }
 
-/* Disabled Row & Cell Rules for Inactive Products/Suppliers */
+/* Disabled row: tên SP / ĐVT / MOQ giữ màu bình thường — chỉ ô nhập số lượng xám */
 .po-row-disabled {
-  background-color: #fbfcfd;
+  background-color: transparent;
 }
 .po-row-disabled td {
-  color: #64748b;
+  color: inherit;
+}
+.po-row-disabled .po-cell-product,
+.po-row-disabled .po-cell-product b {
+  color: #0f172a !important;
 }
 .po-cell-disabled {
   background-color: #f1f5f9;
@@ -1205,6 +1221,22 @@
 .po-grid-table thead th.po-th-date.po-th-locked .po-col-short {
   color: #94a3b8;
   font-weight: 600;
+}
+
+/* Ngày đã chốt PO — xanh dương nhạt, không gắn chữ */
+.po-grid-table thead th.po-th-date.po-th-finalized {
+  background-color: #e0f2fe !important;
+  color: #0369a1 !important;
+  border-bottom: 2px solid #38bdf8;
+}
+
+.po-grid-table thead th.po-th-date.po-th-finalized .po-col-dow {
+  color: #0284c7;
+}
+
+.po-grid-table thead th.po-th-date.po-th-finalized .po-col-short {
+  color: #0c4a6e;
+  font-weight: 700;
 }
 
 .po-col-date-header {
@@ -1719,3 +1751,46 @@
   }
 }
 
+
+/* Purchase Order Modal Overlay & Container */
+.po-modal-overlay {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  z-index: 99999 !important;
+  background: rgba(15, 23, 42, 0.65) !important;
+  backdrop-filter: blur(3px);
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 24px 16px !important;
+  overflow-y: auto !important;
+}
+
+.po-modal-container {
+  position: relative !important;
+  max-width: 940px;
+  width: 100% !important;
+  max-height: 85vh !important;
+  display: flex !important;
+  flex-direction: column !important;
+  background: #ffffff !important;
+  border-radius: 12px !important;
+  box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.35) !important;
+  overflow: hidden !important;
+  margin: auto !important;
+  animation: poModalFadeIn 0.2s ease-out;
+}
+
+@keyframes poModalFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.97) translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}

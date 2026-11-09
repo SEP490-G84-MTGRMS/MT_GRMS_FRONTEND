@@ -119,7 +119,23 @@ export const storeApi = {
     );
     return res.data;
   },
+
+  async getSubscriptionHistory(): Promise<ApiResponse<SubscriptionOrderHistoryItem[]>> {
+    const res = await httpClient.get<ApiResponse<SubscriptionOrderHistoryItem[]>>('/tenant/subscriptions/history');
+    return res.data;
+  },
 };
+
+export interface SubscriptionOrderHistoryItem {
+  code: string;
+  planName: string;
+  startDate: string;
+  endDate: string;
+  totalAmount: number;
+  paymentMethod: string;
+  status: string;
+  createdAt: string;
+}
 
 export interface PurchaseSubscriptionPayload {
   planCode: string;

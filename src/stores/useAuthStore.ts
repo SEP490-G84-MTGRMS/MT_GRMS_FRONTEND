@@ -24,11 +24,13 @@ export const useAuthStore = create<AuthState>((set) => ({
   isAuthenticated: Boolean(localStorage.getItem('access_token')),
   setAuth: (user, token) => {
     localStorage.setItem('access_token', token);
-    localStorage.setItem('auth_user', JSON.stringify(user));
-    if (user.tenantId) {
-      localStorage.setItem('tenant_id', user.tenantId);
+    if (user) {
+      localStorage.setItem('auth_user', JSON.stringify(user));
+      if (user.tenantId) {
+        localStorage.setItem('tenant_id', user.tenantId);
+      }
     }
-    set({ user, token, isAuthenticated: true });
+    set({ user: user || null, token, isAuthenticated: Boolean(token) });
   },
   logout: () => {
     localStorage.removeItem('access_token');

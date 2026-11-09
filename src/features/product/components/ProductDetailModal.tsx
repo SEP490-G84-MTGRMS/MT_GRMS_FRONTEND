@@ -178,6 +178,21 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 >
                   {isDiscontinued ? 'Ngừng kinh doanh' : 'Đang bán'}
                 </span>
+                {product.hasBatches && (
+                  <span
+                    style={{
+                      background: '#EFF6FF',
+                      color: '#1D4ED8',
+                      fontSize: 11,
+                      fontWeight: 700,
+                      padding: '2px 8px',
+                      borderRadius: 9999,
+                      border: '1px solid #BFDBFE',
+                    }}
+                  >
+                    📦 Quản lý lô & HSD
+                  </span>
+                )}
               </div>
               <span style={{ fontSize: 16, fontWeight: 700, color: '#0F172A' }}>
                 {product.productName}
@@ -536,6 +551,13 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                     <div style={{ fontSize: 12, color: '#64748B', marginBottom: 2 }}>Trạng thái kinh doanh</div>
                     <div style={{ fontSize: 13, fontWeight: 700, color: isDiscontinued ? '#DC2626' : '#059669' }}>
                       {isDiscontinued ? '🔴 Ngừng kinh doanh' : '🟢 Đang bán'}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div style={{ fontSize: 12, color: '#64748B', marginBottom: 2 }}>Quản lý theo lô & HSD</div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: product.hasBatches ? '#1D4ED8' : '#64748B' }}>
+                      {product.hasBatches ? '📦 Có quản lý lô & HSD (FEFO)' : '⚪ Không'}
                     </div>
                   </div>
 

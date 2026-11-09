@@ -1,6 +1,7 @@
 import { EXPENSE_CATEGORY_LABELS } from '../types/expense.types';
 import { cashbookService } from '../../cashbook/services/cashbookService';
 import { financeHttpClient } from '../../../api/financeHttpClient';
+import { generateUuidV7 } from '../../../utils/uuid';
 import type { ApiResponse, PagedResult } from '../../../api/types';
 import type {
   CreateExpenseRequest,
@@ -9,13 +10,6 @@ import type {
   PayExpenseRequest,
   ServiceExpenseDto,
 } from '../types/expense.types';
-
-function generateUUID(): string {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-    return crypto.randomUUID();
-  }
-  return 'idemp-' + Date.now() + '-' + Math.random().toString(36).substring(2, 9);
-}
 
 function isGuid(val?: string): boolean {
   if (!val) return false;
@@ -185,7 +179,7 @@ export const getExpenseSummary = async (
 export const createServiceExpense = async (
   data: CreateExpenseRequest
 ): Promise<ServiceExpenseDto> => {
-  const idempotencyKey = generateUUID();
+  const idempotencyKey = typeof generateUuidV7 === 'function' ? generateUuidV7() : ('idemp-' + Date.now());
   const categoryLabel = EXPENSE_CATEGORY_LABELS[data.category] || data.category;
   const blacklisted = isExpenseTaxBlacklisted(categoryLabel, data.vendorName, data.note);
   const isTaxDeductible =
@@ -228,7 +222,7 @@ export const payServiceExpense = async (
   expenseId: string,
   data: PayExpenseRequest
 ): Promise<ServiceExpenseDto> => {
-  const idempotencyKey = generateUUID();
+  const idempotencyKey = typeof generateUuidV7 === 'function' ? generateUuidV7() : ('idemp-' + Date.now());
 
   // Tự động approve nếu đang chờ duyệt
   await financeHttpClient

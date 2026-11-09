@@ -1,388 +1,371 @@
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import type { FC } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { MOCK_DISPATCH_SUPPLIERS } from '../lib/mockDispatchData';
-import { MOCK_BRANCHES } from '../lib/mockData';
-import type { BranchOption, SupplierDispatchGroup } from '../types/po.types';
+import { Link, useNavigate } from 'react-router-dom';
+import { Grid3x3, ListOrdered, Loader2, Truck } from 'lucide-react';
+import type {
+  SupplierDispatchGroup,
+  DispatchScope,
+  SplitMatrixBatchResult,
+  EmailSendMode,
+} from '../types/po.types';
 import { DispatchFilterBar, type DispatchTabType } from '../components/dispatch/DispatchFilterBar';
 import { SupplierDispatchTable } from '../components/dispatch/SupplierDispatchTable';
-import { SupplierDispatchDrawer } from '../components/dispatch/SupplierDispatchDrawer';
 import { DispatchConfirmModal } from '../components/dispatch/DispatchConfirmModal';
 import { AdminToast, type ToastState } from '../../admin/components';
-import { purchaseOrderApi } from '../api/purchaseOrderApi';
-import { httpClient } from '../../../api/httpClient';
+import { dispatchHubApi } from '../api/dispatchHubApi';
 import '../purchase-order.css';
 
+const EMPTY_COUNTS: Record<DispatchTabType, number> = {
+  all: 0,
+  critical: 0,
+  today: 0,
+  later: 0,
+  completed: 0,
+};
+
+function getMondayOfThisWeek(): string {
+  const d = new Date();
+  const day = d.getDay();
+  const diff = (7 + (day - 1)) % 7;
+  d.setDate(d.getDate() - diff);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
 export const SupplierOrderDispatchHubPage: FC = () => {
-  const [searchParams] = useSearchParams();
-
-  // Danh sách chi nhánh thực từ Backend
-  const [branches, setBranches] = useState<BranchOption[]>(MOCK_BRANCHES);
-  const branchParam = searchParams.get('branchId') || searchParams.get('branch') || '';
-  const [selectedBranchId, setSelectedBranchId] = useState<string>(branchParam || MOCK_BRANCHES[0]?.id || 'ALL');
-
-  // Master State: Suppliers / PO Dispatch Groups
+  const navigate = useNavigate();
   const [suppliers, setSuppliers] = useState<SupplierDispatchGroup[]>([]);
+  const [tabCounts, setTabCounts] = useState(EMPTY_COUNTS);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isDispatching, setIsDispatching] = useState(false);
 
-  // Drawer Open State: holds the ID of supplier currently viewed in Drawer
-  const [selectedDrawerSupplierId, setSelectedDrawerSupplierId] = useState<string | null>(null);
-
-  // Filter States
   const [activeTab, setActiveTab] = useState<DispatchTabType>('all');
-  const [keyword, setKeyword] = useState<string>('');
+  const [keyword, setKeyword] = useState('');
+  const [pageIndex, setPageIndex] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
-  // Pagination States
-  const [pageIndex, setPageIndex] = useState<number>(1);
-  const [pageSize, setPageSize] = useState<number>(10);
-
-  // Toast
   const [toast, setToast] = useState<ToastState | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const showToast = (message: string, type: ToastState['type'] = 'success') => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     setToast({ id: Date.now().toString(), message, type });
-    setTimeout(() => setToast(null), 3500);
+    toastTimerRef.current = setTimeout(() => setToast(null), 4000);
   };
 
-  // Tải danh sách chi nhánh thật từ Backend API
-  useEffect(() => {
-    let isMounted = true;
-    httpClient
-      .get('/branches')
-      .then((res) => {
-        if (!isMounted) return;
-        const rawData = res.data?.data;
-        const branchArray = Array.isArray(rawData)
-          ? rawData
-          : Array.isArray(rawData?.items)
-          ? rawData.items
-          : [];
-        if (branchArray.length > 0) {
-          const mappedBranches: BranchOption[] = branchArray.map(
-            (b: { id: string; name: string; branchCode?: string; code?: string }) => ({
-              id: b.id,
-              name: `${b.branchCode || b.code || 'CN'} — ${b.name}`,
-              shortName: b.name,
-            })
-          );
-          setBranches(mappedBranches);
-          if (!branchParam) {
-            setSelectedBranchId(mappedBranches[0].id);
-          }
-        }
-      })
-      .catch(() => {
-        // Fallback giữ MOCK_BRANCHES nếu chạy môi trường test
-      });
-    return () => {
-      isMounted = false;
-    };
-  }, [branchParam]);
-
-  // Tải danh sách đơn đặt hàng PO từ Backend để chốt & phát hành cho NCC
-  const fetchDispatchGroups = useCallback(async () => {
-    try {
-      const res = await purchaseOrderApi.getPurchaseOrders({
-        branchId: selectedBranchId || 'ALL',
-        supplierId: 'ALL',
-        status: 'ALL',
-        dateFrom: '',
-        dateTo: '',
-        pageIndex: 1,
-        pageSize: 100,
-      });
-      const orders = res.items || [];
-
-      if (orders.length > 0) {
-        const mapped: SupplierDispatchGroup[] = orders
-          .filter((po) => po.status !== 'CANCELLED' && po.status !== 'REJECTED')
-          .map((po) => {
-            const isDispatched =
-              po.status === 'DISPATCHED' ||
-              po.status === 'SENT' ||
-              po.status === 'CONFIRMED' ||
-              po.status === 'PARTIALLY_RECEIVED' ||
-              po.status === 'RECEIVED' ||
-              po.status === 'COMPLETED';
-            return {
-              id: po.id,
-              code: po.supplierCode || po.poCode,
-              name: `${po.supplierName} (${po.poCode})`,
-              categoryTags: ['Đơn hàng PO'],
-              cutoffTimeStr: '15:00 Hôm nay',
-              countdownDisplay: isDispatched ? 'Đã phát hành' : 'Sẵn sàng chốt đơn',
-              remainingMinutes: isDispatched ? undefined : 60,
-              urgency: isDispatched
-                ? 'completed'
-                : po.status === 'PENDING_APPROVAL'
-                ? 'critical'
-                : 'today',
-              expectedDelivery: po.expectedDelivery || po.lastUpdated,
-              minOrderValue: 0,
-              note: po.note || '',
-              status: isDispatched ? 'dispatched' : 'draft',
-              poCode: po.poCode,
-              dispatchedAt: isDispatched ? po.lastUpdated : undefined,
-              items: po.items.map((it) => ({
-                id: it.id,
-                name: it.name,
-                sku: it.sku,
-                unit: it.unit,
-                price: it.price,
-                qty: it.orderedQty,
-                cutoffSchedule: 'Cutoff 15:00 hàng ngày',
-                groupType: 'daily',
-              })),
-            };
-          });
-        setSuppliers(mapped);
-      } else if (import.meta.env.MODE === 'test') {
-        setSuppliers(MOCK_DISPATCH_SUPPLIERS);
-      } else {
-        setSuppliers([]);
-      }
-    } catch {
-      if (import.meta.env.MODE === 'test') {
-        setSuppliers(MOCK_DISPATCH_SUPPLIERS);
-      }
-    }
-  }, [selectedBranchId]);
-
-  useEffect(() => {
-    fetchDispatchGroups();
-  }, [fetchDispatchGroups]);
-
-  // Confirm Modal State
   const [modalState, setModalState] = useState<{
     isOpen: boolean;
-    targets: SupplierDispatchGroup[];
-    isBatch: boolean;
+    supplier: SupplierDispatchGroup | null;
+    supplierEmail?: string;
+    scope: DispatchScope;
+    weekStartDate: string;
+    previewData: SplitMatrixBatchResult | null;
+    isLoadingPreview: boolean;
+    previewError: string | null;
+    batchResult: SplitMatrixBatchResult | null;
+    note: string;
+    emailSendMode: EmailSendMode;
+    scheduledSendAt: string;
+    ccEmails: string[];
   }>({
     isOpen: false,
-    targets: [],
-    isBatch: false,
+    supplier: null,
+    supplierEmail: undefined,
+    scope: 'NEAREST',
+    weekStartDate: getMondayOfThisWeek(),
+    previewData: null,
+    isLoadingPreview: false,
+    previewError: null,
+    batchResult: null,
+    note: '',
+    emailSendMode: 'SEND_NOW',
+    scheduledSendAt: '',
+    ccEmails: [],
   });
 
-  // Inline Quantity Edit in Drawer
-  const handleUpdateItemQty = (supplierId: string, itemId: string, newQty: number) => {
-    setSuppliers((prev) =>
-      prev.map((sup) => {
-        if (sup.id !== supplierId) return sup;
-        const updatedItems = sup.items.map((it) => (it.id === itemId ? { ...it, qty: newQty } : it));
-        return { ...sup, items: updatedItems };
-      })
-    );
-  };
+  const fetchHub = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const hub = await dispatchHubApi.getSupplierHub({
+        keyword: keyword.trim() || undefined,
+        urgency: activeTab,
+      });
+      setSuppliers(hub.suppliers);
+      setTabCounts({
+        all: hub.counts.all,
+        critical: hub.counts.critical,
+        today: hub.counts.today,
+        later: hub.counts.later,
+        completed: hub.counts.completed,
+      });
+    } catch (err: any) {
+      setSuppliers([]);
+      setTabCounts(EMPTY_COUNTS);
+      showToast(err.message || 'Không tải được hub chốt đơn.', 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [keyword, activeTab]);
 
-  // Delete Item from PO in Drawer
-  const handleDeleteItem = (supplierId: string, itemId: string) => {
-    setSuppliers((prev) =>
-      prev.map((sup) => {
-        if (sup.id !== supplierId) return sup;
-        const updatedItems = sup.items.filter((it) => it.id !== itemId);
-        return { ...sup, items: updatedItems };
-      })
-    );
-    showToast('Đã xóa mặt hàng khỏi đơn mua hàng.', 'info');
-  };
+  useEffect(() => {
+    const t = setTimeout(() => {
+      void fetchHub();
+    }, keyword ? 300 : 0);
+    return () => clearTimeout(t);
+  }, [fetchHub, keyword]);
 
-  // Update Note
-  const handleUpdateNote = (supplierId: string, note: string) => {
-    setSuppliers((prev) =>
-      prev.map((sup) => (sup.id === supplierId ? { ...sup, note } : sup))
-    );
-  };
+  const loadPreview = useCallback(
+    async (supplierId: string, targetScope: DispatchScope, weekMonday?: string) => {
+      setModalState((prev) => ({
+        ...prev,
+        isLoadingPreview: true,
+        previewError: null,
+      }));
 
-  // Open Dispatch Modal for single supplier
-  const handleOpenDispatchSingle = (sup: SupplierDispatchGroup) => {
+      try {
+        const preview = await dispatchHubApi.previewSupplierSplit(
+          supplierId,
+          targetScope,
+          targetScope === 'WEEK' ? weekMonday : undefined
+        );
+        setModalState((prev) =>
+          prev.isOpen && prev.supplier?.id === supplierId
+            ? { ...prev, previewData: preview, isLoadingPreview: false }
+            : prev
+        );
+      } catch (err: any) {
+        setModalState((prev) =>
+          prev.isOpen && prev.supplier?.id === supplierId
+            ? {
+                ...prev,
+                previewData: null,
+                previewError: err?.message || 'Không thể xem trước dữ liệu chốt PO từ máy chủ.',
+                isLoadingPreview: false,
+              }
+            : prev
+        );
+      }
+    },
+    []
+  );
+
+  const openConfirmForSupplier = async (sup: SupplierDispatchGroup, initialScope: DispatchScope = 'NEAREST') => {
+    const monday = getMondayOfThisWeek();
     setModalState({
       isOpen: true,
-      targets: [sup],
-      isBatch: false,
+      supplier: sup,
+      supplierEmail: undefined,
+      scope: initialScope,
+      weekStartDate: monday,
+      previewData: null,
+      isLoadingPreview: true,
+      previewError: null,
+      batchResult: null,
+      note: '',
+      emailSendMode: 'SEND_NOW',
+      scheduledSendAt: '',
+      ccEmails: [],
     });
+
+    void dispatchHubApi
+      .getSupplierDetail(sup.id)
+      .then((d) => setModalState((prev) => (prev.isOpen ? { ...prev, supplierEmail: d.email } : prev)))
+      .catch(() => undefined);
+
+    await loadPreview(sup.id, initialScope, monday);
   };
 
-  // Confirm Dispatch & Update PO status on Backend
-  const handleConfirmDispatch = async () => {
-    const targets = modalState.targets;
-    const targetIds = new Set(targets.map((t) => t.id));
-    const nowStr = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+  const handleScopeChange = async (newScope: DispatchScope) => {
+    const supplier = modalState.supplier;
+    if (!supplier) return;
+    setModalState((prev) => ({
+      ...prev,
+      scope: newScope,
+      previewData: null,
+      batchResult: null,
+    }));
+    await loadPreview(supplier.id, newScope, modalState.weekStartDate);
+  };
 
-    try {
-      await Promise.all(
-        targets.map((t) =>
-          purchaseOrderApi.updatePurchaseOrderStatus(t.id, 'DISPATCHED', t.note)
-        )
+  const handleWeekChange = async (newMonday: string) => {
+    const supplier = modalState.supplier;
+    if (!supplier) return;
+    setModalState((prev) => ({
+      ...prev,
+      weekStartDate: newMonday,
+      previewData: null,
+      batchResult: null,
+    }));
+    await loadPreview(supplier.id, 'WEEK', newMonday);
+  };
+
+  const handleRetryPreview = () => {
+    if (modalState.supplier) {
+      void loadPreview(
+        modalState.supplier.id,
+        modalState.scope,
+        modalState.scope === 'WEEK' ? modalState.weekStartDate : undefined
       );
-      setSuppliers((prev) =>
-        prev.map((s) => {
-          if (!targetIds.has(s.id)) return s;
-          const poCode = s.poCode || `PO-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${s.code.replace('SUP-', '')}`;
-          return {
-            ...s,
-            status: 'dispatched',
-            urgency: 'completed',
-            poCode,
-            dispatchedAt: nowStr,
-          };
-        })
-      );
-      setModalState({ isOpen: false, targets: [], isBatch: false });
-      showToast(
-        `Đã phát hành đơn mua hàng PO thành công cho ${targets[0]?.name}!`,
-        'success'
-      );
-    } catch {
-      showToast('Không thể phát hành đơn mua hàng. Vui lòng thử lại.', 'error');
     }
   };
 
-  // Tab counts for dropdown
-  const tabCounts = useMemo(() => {
-    return {
-      all: suppliers.length,
-      critical: suppliers.filter((s) => s.status !== 'dispatched' && s.urgency === 'critical').length,
-      today: suppliers.filter((s) => s.status !== 'dispatched' && (s.urgency === 'today' || s.urgency === 'critical')).length,
-      later: suppliers.filter((s) => s.status !== 'dispatched' && s.urgency === 'later').length,
-      completed: suppliers.filter((s) => s.status === 'dispatched').length,
-    };
-  }, [suppliers]);
-
-  // Filtered Suppliers
-  const filteredSuppliers = useMemo(() => {
-    const kw = keyword.trim().toLowerCase();
-
-    return suppliers.filter((s) => {
-      // Status dropdown filter
-      if (activeTab === 'critical' && (s.status === 'dispatched' || s.urgency !== 'critical')) return false;
-      if (activeTab === 'today' && (s.status === 'dispatched' || (s.urgency !== 'today' && s.urgency !== 'critical'))) return false;
-      if (activeTab === 'later' && (s.status === 'dispatched' || s.urgency !== 'later')) return false;
-      if (activeTab === 'completed' && s.status !== 'dispatched') return false;
-
-      // Keyword filter
-      if (kw) {
-        const matchName = s.name.toLowerCase().includes(kw);
-        const matchCode = s.code.toLowerCase().includes(kw);
-        const matchTag = s.categoryTags.some((t) => t.toLowerCase().includes(kw));
-        const matchItem = s.items.some((it) => it.name.toLowerCase().includes(kw) || it.sku.toLowerCase().includes(kw));
-        if (!matchName && !matchCode && !matchTag && !matchItem) return false;
+  const handleConfirmDispatch = async () => {
+    if (!modalState.supplier) return;
+    setIsDispatching(true);
+    try {
+      const result = await dispatchHubApi.dispatchSupplierByScope(
+        modalState.supplier.id,
+        modalState.scope,
+        modalState.scope === 'WEEK' ? modalState.weekStartDate : undefined,
+        modalState.note.trim() || undefined,
+        {
+          emailSendMode: modalState.emailSendMode,
+          scheduledSendAt: modalState.emailSendMode === 'SCHEDULED_SEND' ? modalState.scheduledSendAt : undefined,
+          ccEmails: modalState.ccEmails,
+        }
+      );
+      setModalState((prev) => ({ ...prev, batchResult: result }));
+      if (result.successCount > 0) {
+        showToast(`Đã chốt thành công ${result.successCount}/${result.totalGroups} group PO.`, 'success');
+      } else {
+        showToast('Không có PO nào được tạo thành công.', 'warning');
       }
+      await fetchHub();
+    } catch (err: any) {
+      showToast(err.message || 'Không thể chốt đơn mua hàng.', 'error');
+    } finally {
+      setIsDispatching(false);
+    }
+  };
 
-      return true;
-    });
-  }, [suppliers, activeTab, keyword]);
-
-  // Paginated Suppliers
   const pagedSuppliers = useMemo(() => {
     const start = (pageIndex - 1) * pageSize;
-    return filteredSuppliers.slice(start, start + pageSize);
-  }, [filteredSuppliers, pageIndex, pageSize]);
-
-  // Drawer Navigation helpers
-  const selectedDrawerSupplier = useMemo(() => {
-    if (!selectedDrawerSupplierId) return null;
-    return suppliers.find((s) => s.id === selectedDrawerSupplierId) || null;
-  }, [suppliers, selectedDrawerSupplierId]);
-
-  const currentDrawerIndex = useMemo(() => {
-    if (!selectedDrawerSupplierId) return -1;
-    return filteredSuppliers.findIndex((s) => s.id === selectedDrawerSupplierId);
-  }, [filteredSuppliers, selectedDrawerSupplierId]);
-
-  const hasPrevSupplier = currentDrawerIndex > 0;
-  const hasNextSupplier = currentDrawerIndex >= 0 && currentDrawerIndex < filteredSuppliers.length - 1;
-
-  const handlePrevSupplier = () => {
-    if (hasPrevSupplier) {
-      setSelectedDrawerSupplierId(filteredSuppliers[currentDrawerIndex - 1].id);
-    }
-  };
-
-  const handleNextSupplier = () => {
-    if (hasNextSupplier) {
-      setSelectedDrawerSupplierId(filteredSuppliers[currentDrawerIndex + 1].id);
-    }
-  };
+    return suppliers.slice(start, start + pageSize);
+  }, [suppliers, pageIndex, pageSize]);
 
   return (
-    <div className="po-matrix-container" style={{ width: '100%' }}>
-      {/* Toast Notification */}
+    <div
+      className="po-matrix-container"
+      style={{
+        width: '100%',
+        height: '100%',
+        maxHeight: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        minHeight: 0,
+        flex: 1,
+        overflow: 'hidden',
+      }}
+    >
       <AdminToast toast={toast} onClose={() => setToast(null)} />
 
-      {/* ── Tiêu đề trang đơn giản theo yêu cầu ── */}
-      <div style={{ marginBottom: 10 }}>
-        <h1
-          style={{
-            fontSize: 20,
-            fontWeight: 800,
-            color: 'var(--text-main)',
-            margin: 0,
-          }}
-        >
-          Chốt đơn với nhà cung cấp
-        </h1>
+      <div className="so-list-header">
+        <div>
+          <h1 className="so-list-title">
+            <Truck size={22} color="var(--blue-primary, #0f766e)" />
+            <span>Chốt đơn với nhà cung cấp</span>
+            {isLoading && (
+              <Loader2 size={16} className="animate-spin" style={{ color: 'var(--blue-primary, #0f766e)' }} />
+            )}
+          </h1>
+        </div>
+
+        <div className="so-list-header-actions">
+          <Link to="/store-owner/purchase-orders/create-matrix" className="po-btn po-btn-secondary">
+            <Grid3x3 size={14} />
+            <span>Ma trận đặt hàng</span>
+          </Link>
+          <Link to="/store-owner/purchase-orders" className="po-btn po-btn-secondary">
+            <ListOrdered size={14} />
+            <span>Danh sách PO</span>
+          </Link>
+        </div>
       </div>
 
-      {/* ── BỘ LỌC TÌM KIẾM & CHỌN TRẠNG THÁI / CHI NHÁNH ── */}
-      <DispatchFilterBar
-        activeTab={activeTab}
-        onTabChange={(tab) => {
-          setActiveTab(tab);
-          setPageIndex(1);
-        }}
-        counts={tabCounts}
-        keyword={keyword}
-        onKeywordChange={(kw) => {
-          setKeyword(kw);
-          setPageIndex(1);
-        }}
-        branches={branches}
-        selectedBranchId={selectedBranchId}
-        onSelectBranch={(id) => setSelectedBranchId(id)}
-        onResetFilters={() => {
-          setActiveTab('all');
-          setKeyword('');
-          setPageIndex(1);
-        }}
-      />
+      <div style={{ flexShrink: 0, marginBottom: 8 }}>
+        <DispatchFilterBar
+          activeTab={activeTab}
+          onTabChange={(tab) => {
+            setActiveTab(tab);
+            setPageIndex(1);
+          }}
+          counts={tabCounts}
+          keyword={keyword}
+          onKeywordChange={(kw) => {
+            setKeyword(kw);
+            setPageIndex(1);
+          }}
+          onResetFilters={() => {
+            setActiveTab('all');
+            setKeyword('');
+            setPageIndex(1);
+          }}
+        />
+      </div>
 
-      {/* ── BẢNG DỮ LIỆU CHÍNH CÓ PHÂN TRANG (MAIN DATA TABLE + PAGING) ── */}
       <SupplierDispatchTable
         suppliers={pagedSuppliers}
-        totalCount={filteredSuppliers.length}
+        totalCount={suppliers.length}
         pageIndex={pageIndex}
         pageSize={pageSize}
-        onPageChange={(page) => setPageIndex(page)}
+        onPageChange={setPageIndex}
         onPageSizeChange={(size) => {
           setPageSize(size);
           setPageIndex(1);
         }}
-        onOpenDrawer={(id) => setSelectedDrawerSupplierId(id)}
-        onDispatchSingle={handleOpenDispatchSingle}
+        onOpenDrawer={(supplierId) => {
+          navigate(`/store-owner/purchase-orders/dispatch-hub/${supplierId}`);
+        }}
+        onDispatchSingle={(sup) => {
+          void openConfirmForSupplier(sup, 'NEAREST');
+        }}
       />
 
-      {/* ── NGĂN KÉO CHI TIẾT (SLIDE-OVER DRAWER) ── */}
-      <SupplierDispatchDrawer
-        supplier={selectedDrawerSupplier}
-        isOpen={Boolean(selectedDrawerSupplierId)}
-        onClose={() => setSelectedDrawerSupplierId(null)}
-        onPrevSupplier={handlePrevSupplier}
-        onNextSupplier={handleNextSupplier}
-        hasPrev={hasPrevSupplier}
-        hasNext={hasNextSupplier}
-        currentIndex={currentDrawerIndex >= 0 ? currentDrawerIndex : undefined}
-        totalSuppliersCount={filteredSuppliers.length}
-        onUpdateItemQty={handleUpdateItemQty}
-        onDeleteItem={handleDeleteItem}
-        onUpdateNote={handleUpdateNote}
-        onDispatch={handleOpenDispatchSingle}
-      />
-
-      {/* ── MODAL XÁC NHẬN PHÁT HÀNH PO ── */}
       <DispatchConfirmModal
         isOpen={modalState.isOpen}
-        targetSuppliers={modalState.targets}
-        isBatch={modalState.isBatch}
-        onClose={() => setModalState({ isOpen: false, targets: [], isBatch: false })}
-        onConfirm={handleConfirmDispatch}
+        supplier={modalState.supplier}
+        supplierEmail={modalState.supplierEmail}
+        scope={modalState.scope}
+        onScopeChange={(s) => {
+          void handleScopeChange(s);
+        }}
+        weekStartDate={modalState.weekStartDate}
+        onWeekChange={(w) => {
+          void handleWeekChange(w);
+        }}
+        previewData={modalState.previewData}
+        isLoadingPreview={modalState.isLoadingPreview}
+        previewError={modalState.previewError}
+        onRetryPreview={handleRetryPreview}
+        batchResult={modalState.batchResult}
+        note={modalState.note}
+        onNoteChange={(n) => setModalState((prev) => ({ ...prev, note: n }))}
+        emailSendMode={modalState.emailSendMode}
+        onEmailSendModeChange={(m) => setModalState((prev) => ({ ...prev, emailSendMode: m }))}
+        scheduledSendAt={modalState.scheduledSendAt}
+        onScheduledSendAtChange={(v) => setModalState((prev) => ({ ...prev, scheduledSendAt: v }))}
+        ccEmails={modalState.ccEmails}
+        onCcEmailsChange={(emails) => setModalState((prev) => ({ ...prev, ccEmails: emails }))}
+        isSubmitting={isDispatching}
+        onClose={() =>
+          setModalState({
+            isOpen: false,
+            supplier: null,
+            supplierEmail: undefined,
+            scope: 'NEAREST',
+            weekStartDate: getMondayOfThisWeek(),
+            previewData: null,
+            isLoadingPreview: false,
+            previewError: null,
+            batchResult: null,
+            note: '',
+            emailSendMode: 'SEND_NOW',
+            scheduledSendAt: '',
+            ccEmails: [],
+          })
+        }
+        onConfirm={() => {
+          void handleConfirmDispatch();
+        }}
       />
     </div>
   );

@@ -14,11 +14,27 @@ interface Props {
     customerName: string;
     customerPhone: string;
     expectedPickupDate: string;
-    items: Array<{ productId: string; quantity: number; unitPrice: number; productName: string }>;
+    items: Array<{
+      productId: string;
+      quantity: number;
+      unitPrice: number;
+      productName: string;
+      unitId?: string;
+      unitName?: string;
+    }>;
     depositAmount: number;
     paymentMethod: string;
     note?: string;
   }) => Promise<void>;
+}
+
+export interface PreOrderCartItem {
+  product: Product;
+  quantity: number;
+  unitId?: string;
+  unitName: string;
+  unitPrice: number;
+  conversionRate: number;
 }
 
 export const CreatePreOrderModal: React.FC<Props> = ({
@@ -43,7 +59,7 @@ export const CreatePreOrderModal: React.FC<Props> = ({
     return d.toISOString().slice(0, 16);
   });
 
-  const [orderItems, setOrderItems] = useState<Array<{ product: Product; quantity: number }>>([]);
+  const [orderItems, setOrderItems] = useState<PreOrderCartItem[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isProductDropdownOpen, setIsProductDropdownOpen] = useState(false);
   const searchContainerRef = useRef<HTMLDivElement>(null);
@@ -55,7 +71,7 @@ export const CreatePreOrderModal: React.FC<Props> = ({
 
   // Tính tổng tiền đơn
   const totalAmount = orderItems.reduce(
-    (sum, item) => sum + (item.quantity > 0 ? item.quantity * item.product.basePrice : 0),
+    (sum, item) => sum + (item.quantity > 0 ? item.quantity * item.unitPrice : 0),
     0
   );
   const minDeposit = Math.round(totalAmount * 0.10);
@@ -113,42 +129,87 @@ export const CreatePreOrderModal: React.FC<Props> = ({
   };
 
   const handleSelectProduct = (prod: Product) => {
+    const defaultUnit = prod.unitPrices?.find((u) => u.isBaseUnit) || prod.unitPrices?.[0];
+    const unitName = defaultUnit?.unitName || prod.baseUnit || 'cái';
+    const unitPrice = defaultUnit?.price ?? prod.basePrice;
+    const conversionRate = defaultUnit?.conversionRate ?? 1;
+    const unitId = defaultUnit?.unitId;
+
     setOrderItems((prev) => {
-      const exist = prev.find((i) => i.product.id === prod.id);
-      if (exist) {
-        const nextQty = exist.quantity < prod.quantityOnHand ? exist.quantity + 1 : exist.quantity;
-        return prev.map((i) => (i.product.id === prod.id ? { ...i, quantity: nextQty } : i));
+      const existIdx = prev.findIndex((i) => i.product.id === prod.id && i.unitName === unitName);
+      if (existIdx >= 0) {
+        const exist = prev[existIdx];
+        const maxAvailable = Math.floor(prod.quantityOnHand / conversionRate);
+        const nextQty = exist.quantity < maxAvailable ? exist.quantity + 1 : exist.quantity;
+        return prev.map((item, idx) => (idx === existIdx ? { ...item, quantity: nextQty } : item));
       }
-      return [...prev, { product: prod, quantity: 1 }];
+      return [
+        ...prev,
+        {
+          product: prod,
+          quantity: 1,
+          unitId,
+          unitName,
+          unitPrice,
+          conversionRate,
+        },
+      ];
     });
     setSearchQuery('');
     setIsProductDropdownOpen(false);
   };
 
-  const handleRemoveItem = (id: string) => {
-    setOrderItems((prev) => prev.filter((i) => i.product.id !== id));
+  const handleChangeUnit = (index: number, newUnitKey: string) => {
+    setOrderItems((prev) =>
+      prev.map((item, idx) => {
+        if (idx !== index) return item;
+        const matched = item.product.unitPrices?.find(
+          (u) => (u.unitId && u.unitId === newUnitKey) || u.unitName === newUnitKey
+        );
+        if (!matched) return item;
+
+        const maxAvailable = Math.floor(item.product.quantityOnHand / matched.conversionRate);
+        const newQty = Math.min(item.quantity, Math.max(1, maxAvailable));
+
+        return {
+          ...item,
+          unitId: matched.unitId,
+          unitName: matched.unitName,
+          unitPrice: matched.price,
+          conversionRate: matched.conversionRate,
+          quantity: newQty,
+        };
+      })
+    );
+  };
+
+  const handleRemoveItem = (index: number) => {
+    setOrderItems((prev) => prev.filter((_, idx) => idx !== index));
   };
 
   // Cập nhật số lượng trực tiếp từ ô nhập
-  const handleUpdateQty = (id: string, qtyStr: string) => {
+  const handleUpdateQty = (index: number, qtyStr: string) => {
     const parsed = qtyStr === '' ? 0 : parseInt(qtyStr, 10);
     const qty = isNaN(parsed) ? 0 : parsed;
-    setOrderItems((prev) => prev.map((i) => (i.product.id === id ? { ...i, quantity: qty } : i)));
+    setOrderItems((prev) =>
+      prev.map((item, idx) => (idx === index ? { ...item, quantity: qty } : item))
+    );
   };
 
   // Tăng/giảm số lượng bằng nút bấm
-  const handleStepQty = (id: string, delta: number) => {
+  const handleStepQty = (index: number, delta: number) => {
     setOrderItems((prev) =>
-      prev.map((i) => {
-        if (i.product.id !== id) return i;
-        const target = i.quantity + delta;
-        if (delta > 0 && target > i.product.quantityOnHand) {
-          return i;
+      prev.map((item, idx) => {
+        if (idx !== index) return item;
+        const maxAvailable = Math.floor(item.product.quantityOnHand / item.conversionRate);
+        const target = item.quantity + delta;
+        if (delta > 0 && target > maxAvailable) {
+          return item;
         }
         if (delta < 0 && target < 1) {
-          return i;
+          return item;
         }
-        return { ...i, quantity: target };
+        return { ...item, quantity: target };
       })
     );
   };
@@ -159,15 +220,16 @@ export const CreatePreOrderModal: React.FC<Props> = ({
       return;
     }
 
-    // Kiểm tra số lượng từng mặt hàng
+    // Kiểm tra số lượng từng mặt hàng theo đơn vị tính
     for (const item of orderItems) {
+      const maxAvailable = Math.floor(item.product.quantityOnHand / item.conversionRate);
       if (item.quantity <= 0) {
-        alert(`Sản phẩm "${item.product.name}" có số lượng không hợp lệ (phải > 0). Vui lòng nhập lại số lượng!`);
+        alert(`Sản phẩm "${item.product.name}" (${item.unitName}) có số lượng không hợp lệ (phải > 0). Vui lòng nhập lại số lượng!`);
         return;
       }
-      if (item.quantity > item.product.quantityOnHand) {
+      if (item.quantity > maxAvailable) {
         alert(
-          `Sản phẩm "${item.product.name}" có số lượng (${item.quantity}) vượt quá tồn kho khả dụng (${item.product.quantityOnHand})! Vui lòng giảm số lượng.`
+          `Sản phẩm "${item.product.name}" (${item.unitName}) có số lượng (${item.quantity}) vượt quá tồn kho khả dụng (${maxAvailable} ${item.unitName})! Vui lòng giảm số lượng.`
         );
         return;
       }
@@ -200,7 +262,9 @@ export const CreatePreOrderModal: React.FC<Props> = ({
           productId: i.product.id,
           productName: i.product.name,
           quantity: i.quantity,
-          unitPrice: i.product.basePrice,
+          unitPrice: i.unitPrice,
+          unitId: i.unitId,
+          unitName: i.unitName,
         })),
         depositAmount,
         paymentMethod,
@@ -216,7 +280,7 @@ export const CreatePreOrderModal: React.FC<Props> = ({
 
   return (
     <div className="pos-modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="pos-modal-dialog" style={{ maxWidth: 740, width: '92%' }}>
+      <div className="pos-modal-dialog" style={{ maxWidth: 840, width: '94%' }}>
         <div className="pos-modal-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <b>+ Tạo Đơn Đặt Trước</b>
           <button type="button" className="pos-modal-close-btn" onClick={onClose}>✕</button>
@@ -474,41 +538,89 @@ export const CreatePreOrderModal: React.FC<Props> = ({
             )}
           </div>
 
-          {/* Bảng sản phẩm */}
+          {/* Bảng sản phẩm có cột chọn Đơn vị quy đổi */}
           <div style={{ border: '1px solid #e2e8f0', borderRadius: 6, overflow: 'hidden', marginBottom: 14 }}>
             <table style={{ width: '100%', fontSize: 12.5, borderCollapse: 'collapse', textAlign: 'left' }}>
               <thead style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
                 <tr>
                   <th style={{ padding: '8px 10px' }}>Sản phẩm</th>
-                  <th style={{ padding: '8px 10px', textAlign: 'right' }}>Đơn giá</th>
-                  <th style={{ padding: '8px 10px', textAlign: 'center', width: 140 }}>Số lượng</th>
-                  <th style={{ padding: '8px 10px', textAlign: 'right' }}>Thành tiền</th>
+                  <th style={{ padding: '8px 10px', width: 120 }}>Đơn vị</th>
+                  <th style={{ padding: '8px 10px', textAlign: 'right', width: 105 }}>Đơn giá</th>
+                  <th style={{ padding: '8px 10px', textAlign: 'center', width: 130 }}>Số lượng</th>
+                  <th style={{ padding: '8px 10px', textAlign: 'right', width: 110 }}>Thành tiền</th>
                   <th style={{ padding: '8px 10px', textAlign: 'center', width: 45 }}>Xóa</th>
                 </tr>
               </thead>
               <tbody>
                 {orderItems.length === 0 ? (
                   <tr>
-                    <td colSpan={5} style={{ padding: '24px 12px', textAlign: 'center', color: '#94a3b8' }}>
+                    <td colSpan={6} style={{ padding: '24px 12px', textAlign: 'center', color: '#94a3b8' }}>
                       Chưa có sản phẩm nào được chọn. Vui lòng tìm kiếm và chọn sản phẩm ở ô phía trên.
                     </td>
                   </tr>
                 ) : (
-                  orderItems.map((item) => {
+                  orderItems.map((item, idx) => {
+                    const maxAvailable = Math.floor(item.product.quantityOnHand / item.conversionRate);
                     const isNegativeOrZero = item.quantity <= 0;
-                    const isOverStock = item.quantity > item.product.quantityOnHand;
+                    const isOverStock = item.quantity > maxAvailable;
                     const hasQtyError = isNegativeOrZero || isOverStock;
+                    const hasMultipleUnits = item.product.unitPrices && item.product.unitPrices.length > 1;
 
                     return (
-                      <tr key={item.product.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                      <tr key={`${item.product.id}-${item.unitName}-${idx}`} style={{ borderBottom: '1px solid #f1f5f9' }}>
                         <td style={{ padding: '8px 10px' }}>
                           <div style={{ fontWeight: 600, color: '#0f172a' }}>{item.product.name}</div>
                           <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
                             Tồn kho: <b>{item.product.quantityOnHand}</b> {item.product.baseUnit || 'cái'}
+                            {item.conversionRate > 1 && (
+                              <span style={{ marginLeft: 6, color: '#0f766e', fontWeight: 600 }}>
+                                (Tối đa: {maxAvailable} {item.unitName})
+                              </span>
+                            )}
                           </div>
                         </td>
-                        <td style={{ padding: '8px 10px', textAlign: 'right' }}>
-                          {item.product.basePrice.toLocaleString('vi-VN')} đ
+                        <td style={{ padding: '8px 10px' }}>
+                          {hasMultipleUnits ? (
+                            <select
+                              value={item.unitId || item.unitName}
+                              onChange={(e) => handleChangeUnit(idx, e.target.value)}
+                              style={{
+                                padding: '4px 6px',
+                                borderRadius: 4,
+                                border: '1px solid #cbd5e1',
+                                fontSize: 12,
+                                fontWeight: 600,
+                                color: '#0f766e',
+                                backgroundColor: '#ffffff',
+                                cursor: 'pointer',
+                                outline: 'none',
+                                width: '100%',
+                              }}
+                            >
+                              {item.product.unitPrices!.map((u, uIdx) => (
+                                <option key={u.unitId || `${u.unitName}-${uIdx}`} value={u.unitId || u.unitName}>
+                                  {u.unitName} {u.conversionRate > 1 ? `(x${u.conversionRate})` : ''}
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            <span
+                              style={{
+                                display: 'inline-block',
+                                padding: '3px 8px',
+                                borderRadius: 4,
+                                background: '#f1f5f9',
+                                fontWeight: 600,
+                                fontSize: 12,
+                                color: '#475569',
+                              }}
+                            >
+                              {item.unitName}
+                            </span>
+                          )}
+                        </td>
+                        <td style={{ padding: '8px 10px', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                          {item.unitPrice.toLocaleString('vi-VN')} đ
                         </td>
                         <td style={{ padding: '8px 10px', textAlign: 'center' }}>
                           <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center' }}>
@@ -524,7 +636,7 @@ export const CreatePreOrderModal: React.FC<Props> = ({
                             >
                               <button
                                 type="button"
-                                onClick={() => handleStepQty(item.product.id, -1)}
+                                onClick={() => handleStepQty(idx, -1)}
                                 disabled={item.quantity <= 1}
                                 style={{
                                   border: 'none',
@@ -545,9 +657,9 @@ export const CreatePreOrderModal: React.FC<Props> = ({
                                 type="number"
                                 value={item.quantity === 0 ? '' : item.quantity}
                                 placeholder="0"
-                                onChange={(e) => handleUpdateQty(item.product.id, e.target.value)}
+                                onChange={(e) => handleUpdateQty(idx, e.target.value)}
                                 style={{
-                                  width: 52,
+                                  width: 48,
                                   textAlign: 'center',
                                   border: 'none',
                                   borderLeft: '1px solid #cbd5e1',
@@ -563,19 +675,19 @@ export const CreatePreOrderModal: React.FC<Props> = ({
 
                               <button
                                 type="button"
-                                onClick={() => handleStepQty(item.product.id, 1)}
-                                disabled={item.quantity >= item.product.quantityOnHand}
+                                onClick={() => handleStepQty(idx, 1)}
+                                disabled={item.quantity >= maxAvailable}
                                 style={{
                                   border: 'none',
-                                  background: item.quantity >= item.product.quantityOnHand ? '#f8fafc' : '#f1f5f9',
-                                  cursor: item.quantity >= item.product.quantityOnHand ? 'not-allowed' : 'pointer',
+                                  background: item.quantity >= maxAvailable ? '#f8fafc' : '#f1f5f9',
+                                  cursor: item.quantity >= maxAvailable ? 'not-allowed' : 'pointer',
                                   padding: '5px 8px',
-                                  color: item.quantity >= item.product.quantityOnHand ? '#cbd5e1' : '#475569',
+                                  color: item.quantity >= maxAvailable ? '#cbd5e1' : '#475569',
                                   display: 'flex',
                                   alignItems: 'center',
                                   justifyContent: 'center',
                                 }}
-                                title={item.quantity >= item.product.quantityOnHand ? 'Đã đạt tồn kho tối đa' : 'Tăng 1'}
+                                title={item.quantity >= maxAvailable ? 'Đã đạt tồn kho tối đa' : 'Tăng 1'}
                               >
                                 <Plus size={12} />
                               </button>
@@ -591,18 +703,18 @@ export const CreatePreOrderModal: React.FC<Props> = ({
                             {!isNegativeOrZero && isOverStock && (
                               <div style={{ color: '#dc2626', fontSize: 11, fontWeight: 600, marginTop: 3, display: 'flex', alignItems: 'center', gap: 3 }}>
                                 <AlertTriangle size={11} />
-                                <span>Quá tồn kho ({item.product.quantityOnHand})!</span>
+                                <span>Tối đa {maxAvailable} {item.unitName}!</span>
                               </div>
                             )}
                           </div>
                         </td>
-                        <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 700 }}>
-                          {(item.quantity > 0 ? item.quantity * item.product.basePrice : 0).toLocaleString('vi-VN')} đ
+                        <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 700, whiteSpace: 'nowrap' }}>
+                          {(item.quantity > 0 ? item.quantity * item.unitPrice : 0).toLocaleString('vi-VN')} đ
                         </td>
                         <td style={{ padding: '8px 10px', textAlign: 'center' }}>
                           <button
                             type="button"
-                            onClick={() => handleRemoveItem(item.product.id)}
+                            onClick={() => handleRemoveItem(idx)}
                             style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#94a3b8' }}
                             title="Xóa mặt hàng"
                           >

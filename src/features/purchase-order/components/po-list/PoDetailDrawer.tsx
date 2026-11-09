@@ -718,6 +718,7 @@ export const PoDetailDrawer: FC<PoDetailDrawerProps> = ({
                 )}
             </div>
           </div>
+
         </div>
       </div>
     </div>

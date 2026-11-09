@@ -17,6 +17,9 @@ export const MOCK_DISPATCH_SUPPLIERS: SupplierDispatchGroup[] = [
     items: [
       {
         id: 'IT-01',
+
+        productId: '00000000-0000-0000-0000-000000000001',
+        deliveryDate: '2026-10-15',
         name: 'Thịt ba chỉ bò Úc tươi',
         sku: 'BEEF-AUS-01',
         unit: 'Kg',
@@ -27,6 +30,9 @@ export const MOCK_DISPATCH_SUPPLIERS: SupplierDispatchGroup[] = [
       },
       {
         id: 'IT-02',
+
+        productId: '00000000-0000-0000-0000-000000000001',
+        deliveryDate: '2026-10-15',
         name: 'Sườn heo non sạch',
         sku: 'PORK-RIB-02',
         unit: 'Kg',
@@ -37,6 +43,9 @@ export const MOCK_DISPATCH_SUPPLIERS: SupplierDispatchGroup[] = [
       },
       {
         id: 'IT-03',
+
+        productId: '00000000-0000-0000-0000-000000000001',
+        deliveryDate: '2026-10-15',
         name: 'Nạc vai heo CP',
         sku: 'PORK-SHLD-03',
         unit: 'Kg',
@@ -47,6 +56,9 @@ export const MOCK_DISPATCH_SUPPLIERS: SupplierDispatchGroup[] = [
       },
       {
         id: 'IT-04',
+
+        productId: '00000000-0000-0000-0000-000000000001',
+        deliveryDate: '2026-10-15',
         name: 'Rau xà lách mỡ Đà Lạt',
         sku: 'VEG-LETT-04',
         unit: 'Kg',
@@ -57,6 +69,9 @@ export const MOCK_DISPATCH_SUPPLIERS: SupplierDispatchGroup[] = [
       },
       {
         id: 'IT-05',
+
+        productId: '00000000-0000-0000-0000-000000000001',
+        deliveryDate: '2026-10-15',
         name: 'Cà chua bi trái cây',
         sku: 'VEG-TOM-05',
         unit: 'Kg',
@@ -67,6 +82,9 @@ export const MOCK_DISPATCH_SUPPLIERS: SupplierDispatchGroup[] = [
       },
       {
         id: 'IT-06',
+
+        productId: '00000000-0000-0000-0000-000000000001',
+        deliveryDate: '2026-10-15',
         name: 'Hành hoa & ngò rí',
         sku: 'VEG-ONION-06',
         unit: 'Kg',
@@ -93,6 +111,9 @@ export const MOCK_DISPATCH_SUPPLIERS: SupplierDispatchGroup[] = [
     items: [
       {
         id: 'IT-07',
+
+        productId: '00000000-0000-0000-0000-000000000001',
+        deliveryDate: '2026-10-15',
         name: 'Cá hồi Na Uy nguyên con phile',
         sku: 'SEA-SALM-01',
         unit: 'Kg',
@@ -103,6 +124,9 @@ export const MOCK_DISPATCH_SUPPLIERS: SupplierDispatchGroup[] = [
       },
       {
         id: 'IT-08',
+
+        productId: '00000000-0000-0000-0000-000000000001',
+        deliveryDate: '2026-10-15',
         name: 'Tôm thẻ chân trắng size 30',
         sku: 'SEA-SHRM-02',
         unit: 'Kg',
@@ -113,6 +137,9 @@ export const MOCK_DISPATCH_SUPPLIERS: SupplierDispatchGroup[] = [
       },
       {
         id: 'IT-09',
+
+        productId: '00000000-0000-0000-0000-000000000001',
+        deliveryDate: '2026-10-15',
         name: 'Mực ống Phú Quốc tươi',
         sku: 'SEA-SQUID-03',
         unit: 'Kg',
@@ -123,6 +150,9 @@ export const MOCK_DISPATCH_SUPPLIERS: SupplierDispatchGroup[] = [
       },
       {
         id: 'IT-10',
+
+        productId: '00000000-0000-0000-0000-000000000001',
+        deliveryDate: '2026-10-15',
         name: 'Nghêu trắng sống size lớn',
         sku: 'SEA-CLAM-04',
         unit: 'Kg',
@@ -149,6 +179,9 @@ export const MOCK_DISPATCH_SUPPLIERS: SupplierDispatchGroup[] = [
     items: [
       {
         id: 'IT-11',
+
+        productId: '00000000-0000-0000-0000-000000000001',
+        deliveryDate: '2026-10-15',
         name: 'Bắp cải thảo VietGAP',
         sku: 'VEG-CABB-01',
         unit: 'Bắp',
@@ -159,6 +192,9 @@ export const MOCK_DISPATCH_SUPPLIERS: SupplierDispatchGroup[] = [
       },
       {
         id: 'IT-12',
+
+        productId: '00000000-0000-0000-0000-000000000001',
+        deliveryDate: '2026-10-15',
         name: 'Khoai tây Đà Lạt loại 1',
         sku: 'VEG-POTA-02',
         unit: 'Kg',
@@ -169,6 +205,9 @@ export const MOCK_DISPATCH_SUPPLIERS: SupplierDispatchGroup[] = [
       },
       {
         id: 'IT-13',
+
+        productId: '00000000-0000-0000-0000-000000000001',
+        deliveryDate: '2026-10-15',
         name: 'Nấm đùi gà tươi đóng gói',
         sku: 'VEG-MUSH-03',
         unit: 'Gói (200g)',
@@ -179,6 +218,9 @@ export const MOCK_DISPATCH_SUPPLIERS: SupplierDispatchGroup[] = [
       },
       {
         id: 'IT-14',
+
+        productId: '00000000-0000-0000-0000-000000000001',
+        deliveryDate: '2026-10-15',
         name: 'Cà rốt giống Nhật',
         sku: 'VEG-CARR-04',
         unit: 'Kg',
@@ -189,6 +231,9 @@ export const MOCK_DISPATCH_SUPPLIERS: SupplierDispatchGroup[] = [
       },
       {
         id: 'IT-15',
+
+        productId: '00000000-0000-0000-0000-000000000001',
+        deliveryDate: '2026-10-15',
         name: 'Đậu hũ trắng tươi Làng Mơ',
         sku: 'VEG-TOFU-05',
         unit: 'Khuôn',
@@ -215,6 +260,9 @@ export const MOCK_DISPATCH_SUPPLIERS: SupplierDispatchGroup[] = [
     items: [
       {
         id: 'IT-16',
+
+        productId: '00000000-0000-0000-0000-000000000001',
+        deliveryDate: '2026-10-15',
         name: 'Bia Heineken lon 330ml (Thùng 24)',
         sku: 'BEV-HEIN-01',
         unit: 'Thùng',
@@ -225,6 +273,9 @@ export const MOCK_DISPATCH_SUPPLIERS: SupplierDispatchGroup[] = [
       },
       {
         id: 'IT-17',
+
+        productId: '00000000-0000-0000-0000-000000000001',
+        deliveryDate: '2026-10-15',
         name: 'Nước ngọt Coca Cola 320ml (Thùng 24)',
         sku: 'BEV-COCA-02',
         unit: 'Thùng',
@@ -235,6 +286,9 @@ export const MOCK_DISPATCH_SUPPLIERS: SupplierDispatchGroup[] = [
       },
       {
         id: 'IT-18',
+
+        productId: '00000000-0000-0000-0000-000000000001',
+        deliveryDate: '2026-10-15',
         name: 'Nước suối Aquafina 500ml (Thùng 24)',
         sku: 'BEV-AQUA-03',
         unit: 'Thùng',
@@ -261,6 +315,9 @@ export const MOCK_DISPATCH_SUPPLIERS: SupplierDispatchGroup[] = [
     items: [
       {
         id: 'IT-19',
+
+        productId: '00000000-0000-0000-0000-000000000001',
+        deliveryDate: '2026-10-15',
         name: 'Bánh mì sandwich lúa mạch',
         sku: 'BAKE-SAND-01',
         unit: 'Gói',
@@ -271,6 +328,9 @@ export const MOCK_DISPATCH_SUPPLIERS: SupplierDispatchGroup[] = [
       },
       {
         id: 'IT-20',
+
+        productId: '00000000-0000-0000-0000-000000000001',
+        deliveryDate: '2026-10-15',
         name: 'Bánh mì que giòn Hải Phòng',
         sku: 'BAKE-STICK-02',
         unit: 'Cái',
@@ -281,6 +341,9 @@ export const MOCK_DISPATCH_SUPPLIERS: SupplierDispatchGroup[] = [
       },
       {
         id: 'IT-21',
+
+        productId: '00000000-0000-0000-0000-000000000001',
+        deliveryDate: '2026-10-15',
         name: 'Bánh bông lan cuộn kem dâu',
         sku: 'BAKE-CAKE-03',
         unit: 'Cái',
@@ -307,6 +370,9 @@ export const MOCK_DISPATCH_SUPPLIERS: SupplierDispatchGroup[] = [
     items: [
       {
         id: 'IT-22',
+
+        productId: '00000000-0000-0000-0000-000000000001',
+        deliveryDate: '2026-10-15',
         name: 'Dầu ăn Simply 5 Lít (Thùng 4 can)',
         sku: 'DRY-OIL-01',
         unit: 'Thùng',
@@ -317,6 +383,9 @@ export const MOCK_DISPATCH_SUPPLIERS: SupplierDispatchGroup[] = [
       },
       {
         id: 'IT-23',
+
+        productId: '00000000-0000-0000-0000-000000000001',
+        deliveryDate: '2026-10-15',
         name: 'Nước mắm Nam Ngư Đệ Nhị 900ml',
         sku: 'DRY-FSAUCE-02',
         unit: 'Thùng (15 chai)',
@@ -327,6 +396,9 @@ export const MOCK_DISPATCH_SUPPLIERS: SupplierDispatchGroup[] = [
       },
       {
         id: 'IT-24',
+
+        productId: '00000000-0000-0000-0000-000000000001',
+        deliveryDate: '2026-10-15',
         name: 'Hạt nêm Knorr thịt thăn 900g',
         sku: 'DRY-SEAS-03',
         unit: 'Gói',
@@ -337,6 +409,9 @@ export const MOCK_DISPATCH_SUPPLIERS: SupplierDispatchGroup[] = [
       },
       {
         id: 'IT-25',
+
+        productId: '00000000-0000-0000-0000-000000000001',
+        deliveryDate: '2026-10-15',
         name: 'Tương ớt Chinsu chai 250g (Thùng 24)',
         sku: 'DRY-CHILI-04',
         unit: 'Thùng',
@@ -363,6 +438,9 @@ export const MOCK_DISPATCH_SUPPLIERS: SupplierDispatchGroup[] = [
     items: [
       {
         id: 'IT-26',
+
+        productId: '00000000-0000-0000-0000-000000000001',
+        deliveryDate: '2026-10-15',
         name: 'Hộp cơm xốp 3 ngăn (Kiện 600 cái)',
         sku: 'PKG-BOX-01',
         unit: 'Kiện',
@@ -373,6 +451,9 @@ export const MOCK_DISPATCH_SUPPLIERS: SupplierDispatchGroup[] = [
       },
       {
         id: 'IT-27',
+
+        productId: '00000000-0000-0000-0000-000000000001',
+        deliveryDate: '2026-10-15',
         name: 'Túi nilong tự hủy sinh học 5kg',
         sku: 'PKG-BAG-02',
         unit: 'Cây (10kg)',
@@ -399,6 +480,9 @@ export const MOCK_DISPATCH_SUPPLIERS: SupplierDispatchGroup[] = [
     items: [
       {
         id: 'IT-28',
+
+        productId: '00000000-0000-0000-0000-000000000001',
+        deliveryDate: '2026-10-15',
         name: 'Sữa tươi thanh trùng không đường 1L',
         sku: 'MILK-PAST-01',
         unit: 'Thùng (12 hộp)',
@@ -409,6 +493,9 @@ export const MOCK_DISPATCH_SUPPLIERS: SupplierDispatchGroup[] = [
       },
       {
         id: 'IT-29',
+
+        productId: '00000000-0000-0000-0000-000000000001',
+        deliveryDate: '2026-10-15',
         name: 'Bơ lạt tự nhiên Anchor 250g',
         sku: 'MILK-BUTT-02',
         unit: 'Khối',
@@ -419,6 +506,9 @@ export const MOCK_DISPATCH_SUPPLIERS: SupplierDispatchGroup[] = [
       },
       {
         id: 'IT-30',
+
+        productId: '00000000-0000-0000-0000-000000000001',
+        deliveryDate: '2026-10-15',
         name: 'Phô mai Mozzarella bào sợi 1kg',
         sku: 'MILK-CHEES-03',
         unit: 'Gói',

@@ -7,7 +7,7 @@ import { BranchFilterBar } from '../components/branch/BranchFilterBar';
 import { BranchOrderTable } from '../components/branch/BranchOrderTable';
 import { BranchDetailModal } from '../components/branch/BranchDetailModal';
 import { AdminToast, type ToastState } from '../../admin/components';
-import { branchApi } from '../api/branchApi';
+import { branchApi, countMatrixProductsForBranch } from '../api/branchApi';
 import '../purchase-order.css';
 import '../../supplier/supplier.css';
 
@@ -70,6 +70,20 @@ export const BranchOrderListPage: FC = () => {
   useEffect(() => {
     fetchBranches();
   }, [fetchBranches]);
+
+  // Đồng bộ lại số SP trên Matrix khi quay lại tab (sau khi chỉnh Order Matrix)
+  useEffect(() => {
+    const refreshMatrixCounts = () => {
+      setBranches((prev) =>
+        prev.map((b) => ({
+          ...b,
+          matrixProductCount: countMatrixProductsForBranch(b.id),
+        }))
+      );
+    };
+    window.addEventListener('focus', refreshMatrixCounts);
+    return () => window.removeEventListener('focus', refreshMatrixCounts);
+  }, []);
 
   // Branch code options for dropdown
   const branchCodeOptions = useMemo(() => {

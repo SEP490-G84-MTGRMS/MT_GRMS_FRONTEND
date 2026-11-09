@@ -5,6 +5,7 @@ import { ArrowLeft, Save, Send, AlertCircle, FileText } from 'lucide-react';
 import { useAuthStore } from '../../../stores/useAuthStore';
 import type { EligibleGrnLookup, GrnReturnableLine } from '../types/supplierReturn.types';
 import { supplierReturnApi } from '../api/supplierReturnApi';
+import { branchApi } from '../../purchase-order/api/branchApi';
 import '../../purchase-order/purchase-order.css';
 
 const fmt = (n: number) => new Intl.NumberFormat('vi-VN').format(n);
@@ -24,8 +25,39 @@ export const SupplierReturnFormPage: FC = () => {
   const isStoreOwner = role === 'STORE_OWNER' || role === 'ADMIN' || !role;
   const lockedBranch = !isStoreOwner && userBranchId ? userBranchId : '';
 
-  const [branchId, setBranchId] = useState(lockedBranch || 'BR-01');
+  const [branches, setBranches] = useState<{ id: string; name: string }[]>([]);
+  const [branchId, setBranchId] = useState(lockedBranch || '');
   const [selectedGrnId, setSelectedGrnId] = useState('');
+
+  // Fetch branches
+  useEffect(() => {
+    let isMounted = true;
+    branchApi
+      .getBranches({ status: 'active', pageIndex: 1, pageSize: 100 })
+      .then((res) => {
+        if (!isMounted) return;
+        if (res.items?.length) {
+          const mapped = res.items.map((b) => ({ id: b.id, name: `${b.code || ''} — ${b.name}`.trim() }));
+          setBranches(mapped);
+          if (!branchId && !lockedBranch) {
+            setBranchId(mapped[0].id);
+          }
+        }
+      })
+      .catch(() => {
+        // Fallback
+        if (isMounted && branches.length === 0) {
+          setBranches([
+            { id: 'BR-01', name: 'BR-01 Main Store' },
+            { id: 'BR-02', name: 'BR-02 Thu Duc Hub' },
+          ]);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [branchId, lockedBranch]);
   const [reason, setReason] = useState(RETURN_REASONS[0]);
   const [reasonNotes, setReasonNotes] = useState('');
   const [eligibleGrns, setEligibleGrns] = useState<EligibleGrnLookup[]>([]);
@@ -304,8 +336,15 @@ export const SupplierReturnFormPage: FC = () => {
             onChange={(e) => setBranchId(e.target.value)}
             style={{ width: '100%', height: 34, borderRadius: 6, border: '1px solid #cbd5e1', padding: '0 10px', fontSize: 13 }}
           >
-            <option value="BR-01">BR-01 Main Store</option>
-            <option value="BR-02">BR-02 Thu Duc Hub</option>
+            {branches.length > 0 ? (
+              branches.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.name}
+                </option>
+              ))
+            ) : (
+              <option value="">-- Chọn chi nhánh --</option>
+            )}
           </select>
         </div>
 

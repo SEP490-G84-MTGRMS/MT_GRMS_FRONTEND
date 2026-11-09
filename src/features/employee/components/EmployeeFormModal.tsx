@@ -1,14 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Camera, Trash2, Search, ChevronDown, X, Check, Building2 } from 'lucide-react';
+import { Camera, Trash2, Search, ChevronDown, X, Check, Building2, AlertTriangle, RotateCw } from 'lucide-react';
 import type {
   Employee,
   Branch,
   AllowanceItem,
   SalaryType,
 } from '../types';
-import { MOCK_DEFAULT_ALLOWANCES } from '../services/mockData';
 import { CreateUserModal } from './CreateUserModal';
 import { CreateAllowanceModal } from './CreateAllowanceModal';
+import { employeeApi } from '../api/employeeApi';
+import { mapFormToCreatePayload } from '../lib/employeeMapper';
+import { uploadImageToCloudinary } from '../../../utils/cloudinary';
 
 interface EmployeeFormModalProps {
   isOpen: boolean;
@@ -17,6 +19,25 @@ interface EmployeeFormModalProps {
   onSave: (employee: Employee, isAddNew?: boolean) => void;
   branches: Branch[];
 }
+
+const PREDEFINED_BANKS = [
+  { value: 'Techcombank', label: 'Techcombank (TCB)' },
+  { value: 'Vietcombank', label: 'Vietcombank (VCB)' },
+  { value: 'MB Bank', label: 'MB Bank (MB)' },
+  { value: 'BIDV', label: 'BIDV' },
+  { value: 'VietinBank', label: 'VietinBank (CTG)' },
+  { value: 'Agribank', label: 'Agribank' },
+  { value: 'ACB', label: 'ACB' },
+  { value: 'VPBank', label: 'VPBank' },
+  { value: 'TPBank', label: 'TPBank' },
+  { value: 'Sacombank', label: 'Sacombank' },
+  { value: 'HDBank', label: 'HDBank' },
+  { value: 'VIB', label: 'VIB' },
+  { value: 'SHB', label: 'SHB' },
+  { value: 'MSB', label: 'MSB' },
+  { value: 'OCB', label: 'OCB' },
+  { value: 'SeABank', label: 'SeABank' },
+];
 
 export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
   isOpen,
@@ -30,48 +51,51 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
   // Sub-modals
   const [showCreateUser, setShowCreateUser] = useState(false);
   const [showCreateAllowance, setShowCreateAllowance] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
   // Form states - Tab 1: Thông tin
   const [fullName, setFullName] = useState('');
   const [employeeCode, setEmployeeCode] = useState('');
-  const [attendanceCode, setAttendanceCode] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [avatarUrl, setAvatarUrl] = useState('');
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
   const [gender, setGender] = useState<'male' | 'female'>('male');
   const [dateOfBirth, setDateOfBirth] = useState('');
   const [citizenId, setCitizenId] = useState('');
   const [address, setAddress] = useState('');
-  const [city, setCity] = useState('');
 
   // Work info
   const [startDate, setStartDate] = useState('');
-  const [workingBranchIds, setWorkingBranchIds] = useState<string[]>([]);
+  const [workingBranchId, setWorkingBranchId] = useState<string>('');
   const [userId, setUserId] = useState('');
   const [userName, setUserName] = useState('');
+  const [userPassword, setUserPassword] = useState('');
   const [note, setNote] = useState('');
 
   // Bank info
   const [bankAccountNumber, setBankAccountNumber] = useState('');
-  const [bankName, setBankName] = useState('Techcombank');
+  const [bankSelect, setBankSelect] = useState('Techcombank');
+  const [customBankName, setCustomBankName] = useState('');
   const [bankAccountHolder, setBankAccountHolder] = useState('');
 
   // Tab 2: Lương
   const [salaryType, setSalaryType] = useState<SalaryType>('monthly');
-  const [baseSalary, setBaseSalary] = useState<number>(7500000);
-  const [otWeekday, setOtWeekday] = useState('150%');
-  const [otSunday, setOtSunday] = useState('200%');
-  const [otDayOff, setOtDayOff] = useState('200%');
+  const [baseSalary, setBaseSalary] = useState<number | ''>('');
+  const [otWeekday, setOtWeekday] = useState('');
+  const [otSunday, setOtSunday] = useState('');
+  const [otDayOff, setOtDayOff] = useState('');
   const [otHoliday, setOtHoliday] = useState('300%');
-  const [enableAllowance, setEnableAllowance] = useState(true);
-  const [allowances, setAllowances] = useState<AllowanceItem[]>(MOCK_DEFAULT_ALLOWANCES);
+  const [enableAllowance, setEnableAllowance] = useState(false);
+  const [allowances, setAllowances] = useState<AllowanceItem[]>([]);
 
   // Sync when opening or editing
   useEffect(() => {
     if (employee) {
       setFullName(employee.fullName || '');
       setEmployeeCode(employee.employeeCode || '');
-      setAttendanceCode(employee.attendanceCode || '');
       setPhone(employee.phone || '');
       setEmail(employee.email || '');
       setAvatarUrl(employee.avatarUrl || '');
@@ -79,32 +103,46 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
       setDateOfBirth(employee.dateOfBirth || '');
       setCitizenId(employee.citizenId || '');
       setAddress(employee.address || '');
-      setCity(employee.city || '');
 
       setStartDate(employee.startDate || '');
-      setWorkingBranchIds(employee.workingBranchIds || [branches[0]?.id || '']);
+      const initBranchId =
+        employee.salaryBranchId ||
+        (employee.workingBranchIds && employee.workingBranchIds[0]) ||
+        (branches[0]?.id || '');
+      setWorkingBranchId(initBranchId);
       setUserId(employee.userId || '');
       setUserName(employee.userName || '');
       setNote(employee.note || '');
 
       setBankAccountNumber(employee.bankAccountNumber || '');
-      setBankName(employee.bankName || 'Techcombank');
+      const empBank = employee.bankName || '';
+      if (empBank && PREDEFINED_BANKS.some((b) => b.value === empBank)) {
+        setBankSelect(empBank);
+        setCustomBankName('');
+      } else if (empBank) {
+        setBankSelect('OTHER');
+        setCustomBankName(empBank);
+      } else {
+        setBankSelect('Techcombank');
+        setCustomBankName('');
+      }
       setBankAccountHolder(employee.bankAccountHolder || '');
 
       if (employee.salaryConfig) {
         setSalaryType(employee.salaryConfig.salaryType);
-        setBaseSalary(employee.salaryConfig.baseSalary);
-        setOtWeekday(employee.salaryConfig.otWeekday);
-        setOtSunday(employee.salaryConfig.otSunday);
-        setOtDayOff(employee.salaryConfig.otDayOff);
+        setBaseSalary(employee.salaryConfig.baseSalary ?? '');
+        setOtWeekday(employee.salaryConfig.otWeekday || '');
+        setOtSunday(employee.salaryConfig.otSunday || '');
+        setOtDayOff(employee.salaryConfig.otDayOff || '');
         setOtHoliday(employee.salaryConfig.otHoliday);
-        setAllowances(employee.salaryConfig.allowances || MOCK_DEFAULT_ALLOWANCES);
+        const empAllowances = employee.salaryConfig.allowances || [];
+        setAllowances(empAllowances);
+        setEnableAllowance(empAllowances.length > 0);
       }
     } else {
       // Default reset for creation
       setFullName('');
       setEmployeeCode('');
-      setAttendanceCode('');
       setPhone('');
       setEmail('');
       setAvatarUrl('');
@@ -112,22 +150,28 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
       setDateOfBirth('');
       setCitizenId('');
       setAddress('');
-      setCity('');
 
       setStartDate(new Date().toISOString().split('T')[0]);
-      setWorkingBranchIds([branches[0]?.id || '']);
+      setWorkingBranchId(branches[0]?.id || '');
       setUserId('');
       setUserName('');
       setNote('');
 
       setBankAccountNumber('');
-      setBankName('Techcombank');
+      setBankSelect('Techcombank');
+      setCustomBankName('');
       setBankAccountHolder('');
 
       setSalaryType('monthly');
-      setBaseSalary(7500000);
-      setAllowances(MOCK_DEFAULT_ALLOWANCES);
+      setBaseSalary('');
+      setOtWeekday('');
+      setOtSunday('');
+      setOtDayOff('');
+      setAllowances([]);
+      setEnableAllowance(false);
     }
+    setFormError(null);
+    setIsSubmitting(false);
   }, [employee, branches, isOpen]);
 
   const [isBranchDropdownOpen, setIsBranchDropdownOpen] = useState(false);
@@ -157,35 +201,48 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
     b.name.toLowerCase().includes(branchSearchKeyword.trim().toLowerCase())
   );
 
-  const handleWorkingBranchToggle = (branchId: string) => {
-    if (workingBranchIds.includes(branchId)) {
-      if (workingBranchIds.length === 1) {
-        alert('Nhân viên phải có ít nhất 1 chi nhánh làm việc!');
-        return;
-      }
-      setWorkingBranchIds(workingBranchIds.filter((id) => id !== branchId));
-    } else {
-      setWorkingBranchIds([...workingBranchIds, branchId]);
-    }
+  const handleSelectBranch = (branchId: string) => {
+    setWorkingBranchId(branchId);
+    setIsBranchDropdownOpen(false);
+    setBranchSearchKeyword('');
   };
 
-  const handleSelectAllBranches = () => {
-    setWorkingBranchIds(branches.map((b) => b.id));
-  };
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
 
-  const handleClearAllBranches = () => {
-    if (branches.length > 0) {
-      setWorkingBranchIds([branches[0].id]);
-    }
-  };
-
-  const handleRemoveBranchTag = (e: React.MouseEvent, branchId: string) => {
-    e.stopPropagation();
-    if (workingBranchIds.length <= 1) {
-      alert('Nhân viên phải có ít nhất 1 chi nhánh làm việc!');
+    if (file.size > 5 * 1024 * 1024) {
+      setFormError('Kích thước ảnh đại diện không được vượt quá 5MB.');
       return;
     }
-    setWorkingBranchIds(workingBranchIds.filter((id) => id !== branchId));
+
+    try {
+      setIsUploadingAvatar(true);
+      setFormError(null);
+      const secureUrl = await uploadImageToCloudinary(file, 'mtgrms/employees');
+      setAvatarUrl(secureUrl);
+    } catch (err: any) {
+      setFormError(err?.message || 'Không thể tải ảnh đại diện lên Cloudinary. Vui lòng thử lại.');
+    } finally {
+      setIsUploadingAvatar(false);
+      if (avatarInputRef.current) {
+        avatarInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handleRemoveAvatar = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setAvatarUrl('');
+    if (avatarInputRef.current) {
+      avatarInputRef.current.value = '';
+    }
+  };
+
+  const handleAllowanceNameChange = (id: string, name: string) => {
+    setAllowances(
+      allowances.map((item) => (item.id === id ? { ...item, name } : item))
+    );
   };
 
   const handleAllowanceAmountChange = (id: string, amount: number) => {
@@ -204,78 +261,155 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
     setAllowances(allowances.filter((item) => item.id !== id));
   };
 
+  const handleAddAllowanceRow = () => {
+    setEnableAllowance(true);
+    const newAl: AllowanceItem = {
+      id: `al_${Date.now()}`,
+      name: '',
+      type: 'monthly',
+      amount: 0,
+      enabled: true,
+    };
+    setAllowances((prev) => [...prev, newAl]);
+  };
+
+  const totalAllowances = enableAllowance
+    ? allowances
+      .filter((a) => a.enabled)
+      .reduce((sum, a) => sum + (Number(a.amount) || 0), 0)
+    : 0;
+
   const handleAddAllowanceSuccess = (newAl: AllowanceItem) => {
     setAllowances([...allowances, newAl]);
   };
 
-  const handleCreateUserSuccess = (user: { id: string; username: string }) => {
+  const handleCreateUserSuccess = (user: { id: string; username: string; password?: string }) => {
     setUserId(user.id);
     setUserName(user.username);
+    if (user.password) {
+      setUserPassword(user.password);
+    }
   };
 
-  const handleSave = (isAddNew: boolean = false) => {
+  const handleSave = async (isAddNew: boolean = false) => {
+    setFormError(null);
+    if (isUploadingAvatar) {
+      setFormError('Ảnh đại diện đang được tải lên Cloudinary, vui lòng chờ trong giây lát!');
+      return;
+    }
     if (!fullName.trim()) {
-      alert('Vui lòng nhập Tên nhân viên!');
+      setFormError('Vui lòng nhập Họ và tên nhân viên!');
       return;
     }
     if (!phone.trim()) {
-      alert('Vui lòng nhập Số điện thoại!');
+      setFormError('Vui lòng nhập Số điện thoại!');
       return;
     }
-    const wBranchNames = branches
-      .filter((b) => workingBranchIds.includes(b.id))
-      .map((b) => b.name);
+    if (!citizenId.trim()) {
+      setFormError('Vui lòng nhập Số CMND / CCCD (12 chữ số)!');
+      return;
+    }
+    if (!/^\d{12}$/.test(citizenId.trim())) {
+      setFormError('Số CMND / CCCD phải bao gồm đúng 12 chữ số!');
+      return;
+    }
 
-    const generatedCode =
-      employeeCode.trim() || `NV${String(Math.floor(Math.random() * 900000) + 100000)}`;
+    if (bankSelect === 'OTHER' && !customBankName.trim()) {
+      setFormError('Vui lòng nhập tên ngân hàng khác!');
+      return;
+    }
+    const effectiveBankName = bankSelect === 'OTHER' ? customBankName.trim() : bankSelect;
 
-    const savedEmployee: Employee = {
-      id: employee?.id || `emp-${Date.now()}`,
-      employeeCode: generatedCode,
-      attendanceCode: attendanceCode.trim() || `CC${generatedCode.replace(/\D/g, '')}`,
-      fullName: fullName.trim(),
-      phone: phone.trim(),
-      email: email.trim(),
-      avatarUrl,
-      gender,
-      dateOfBirth,
-      citizenId,
-      address,
-      city,
-      startDate,
-      workingBranchIds,
-      workingBranchNames: wBranchNames,
-      userId,
-      userName,
-      note,
-      status: employee?.status || 'active',
-      debtAmount: employee?.debtAmount ?? 0,
-      bankAccountNumber,
-      bankName,
-      bankAccountHolder: bankAccountHolder.toUpperCase(),
-      salaryConfig: {
+    const targetBranchId = workingBranchId || (branches[0] ? branches[0].id : '');
+    if (!targetBranchId) {
+      setFormError('Vui lòng chọn chi nhánh làm việc!');
+      return;
+    }
+
+    const payload = mapFormToCreatePayload(
+      {
+        fullName,
+        citizenId,
+        phone,
+        email,
+        address,
+        startDate,
+        note,
+        gender,
+        dateOfBirth,
+        bankAccountNumber,
+        bankName: effectiveBankName,
+        bankAccountHolder,
+        avatarUrl,
+        salaryBranchId: targetBranchId,
+        userId: userId && !userId.startsWith('temp_') ? userId : undefined,
+        userName: userName.trim() || undefined,
+        password: userPassword.trim() || undefined,
+        role: 'STAFF',
+      },
+      {
         salaryType,
-        baseSalary,
-        otWeekday,
-        otSunday,
-        otDayOff,
+        baseSalary: Number(baseSalary) || 0,
+        otWeekday: otWeekday || '150%',
+        otSunday: otSunday || '200%',
+        otDayOff: otDayOff || '200%',
         otHoliday,
         allowances: enableAllowance ? allowances : [],
       },
-      payslips: employee?.payslips || [],
-      workSchedule: employee?.workSchedule || [],
-      debtHistory: employee?.debtHistory || [],
-    };
+      targetBranchId
+    );
 
-    onSave(savedEmployee, isAddNew);
-    if (!isAddNew) {
-      onClose();
-    } else {
-      // Reset for next employee
-      setFullName('');
-      setEmployeeCode('');
-      setPhone('');
-      setEmail('');
+    setIsSubmitting(true);
+    try {
+      let savedEmp: Employee;
+      if (employee?.id) {
+        savedEmp = await employeeApi.updateEmployee(employee.id, payload);
+      } else {
+        savedEmp = await employeeApi.createEmployee(payload);
+        // Failsafe: nếu backend đang chạy phiên bản cũ chưa tự động tạo user trong createEmployee
+        if (savedEmp.id && userName && !savedEmp.userName) {
+          try {
+            const accRes = await employeeApi.createIdentityAccount(savedEmp.id, {
+              username: userName.trim(),
+              password: userPassword.trim() || 'Staff@123456',
+              role: 'STAFF',
+              displayName: fullName,
+            });
+            savedEmp = {
+              ...savedEmp,
+              userId: accRes.userId,
+              userName: accRes.username || userName,
+            };
+          } catch (accountErr) {
+            console.error('Lỗi khi tự động cấp tài khoản cho nhân viên mới:', accountErr);
+          }
+        }
+      }
+
+      onSave(savedEmp, isAddNew);
+      if (!isAddNew) {
+        onClose();
+      } else {
+        // Reset for next employee
+        setFullName('');
+        setEmployeeCode('');
+        setPhone('');
+        setEmail('');
+        setCitizenId('');
+        setDateOfBirth('');
+        setUserId('');
+        setUserName('');
+        setUserPassword('');
+        setFormError(null);
+      }
+    } catch (err: any) {
+      const msg =
+        err?.response?.data?.message ||
+        err?.message ||
+        'Lưu thông tin thất bại. Vui lòng kiểm tra lại.';
+      setFormError(msg);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -288,10 +422,35 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
           {/* Header */}
           <div className="emp-modal-header">
             <h3>{employee ? `Cập nhật nhân viên: ${employee.fullName}` : 'Thêm mới nhân viên'}</h3>
-            <button type="button" className="emp-modal-close-btn" onClick={onClose}>
+            <button
+              type="button"
+              className="emp-modal-close-btn"
+              onClick={onClose}
+              disabled={isSubmitting}
+            >
               &times;
             </button>
           </div>
+
+          {formError && (
+            <div
+              style={{
+                margin: '12px 24px 0',
+                padding: '10px 14px',
+                backgroundColor: '#FEE2E2',
+                border: '1px solid #FCA5A5',
+                color: '#B91C1C',
+                borderRadius: 6,
+                fontSize: 13,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+              }}
+            >
+              <AlertTriangle size={16} />
+              <span>{formError}</span>
+            </div>
+          )}
 
           {/* Tabs */}
           <div className="emp-modal-tabs">
@@ -375,9 +534,68 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
 
                     {/* Upload Avatar */}
                     <div style={{ width: 140, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                      <div className="emp-avatar-upload-box">
-                        {avatarUrl ? (
-                          <img src={avatarUrl} alt="Avatar" />
+                      <input
+                        ref={avatarInputRef}
+                        type="file"
+                        accept="image/png,image/jpeg,image/jpg,image/webp"
+                        style={{ display: 'none' }}
+                        onChange={handleAvatarUpload}
+                      />
+
+                      <div
+                        className="emp-avatar-upload-box"
+                        onClick={() => !isUploadingAvatar && avatarInputRef.current?.click()}
+                        title={avatarUrl ? 'Nhấn để thay đổi ảnh' : 'Nhấn để tải ảnh đại diện lên'}
+                      >
+                        {isUploadingAvatar ? (
+                          <div style={{ textAlign: 'center', padding: 8 }}>
+                            <RotateCw size={24} className="spin-icon" color="#0F766E" style={{ margin: '0 auto 6px' }} />
+                            <span style={{ fontSize: 11, color: '#0F766E', fontWeight: 600, display: 'block' }}>
+                              Đang tải lên...
+                            </span>
+                          </div>
+                        ) : avatarUrl ? (
+                          <>
+                            <img src={avatarUrl} alt="Avatar" />
+                            <button
+                              type="button"
+                              onClick={handleRemoveAvatar}
+                              style={{
+                                position: 'absolute',
+                                top: 6,
+                                right: 6,
+                                width: 22,
+                                height: 22,
+                                borderRadius: '50%',
+                                background: 'rgba(0, 0, 0, 0.65)',
+                                color: '#FFFFFF',
+                                border: 'none',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                cursor: 'pointer',
+                              }}
+                              title="Xóa ảnh đại diện"
+                            >
+                              <X size={13} />
+                            </button>
+                            <div
+                              style={{
+                                position: 'absolute',
+                                bottom: 0,
+                                left: 0,
+                                right: 0,
+                                background: 'rgba(15, 23, 42, 0.65)',
+                                color: '#FFFFFF',
+                                fontSize: 10,
+                                padding: '3px 0',
+                                textAlign: 'center',
+                                fontWeight: 600,
+                              }}
+                            >
+                              Đổi ảnh
+                            </div>
+                          </>
                         ) : (
                           <div style={{ textAlign: 'center', padding: 8 }}>
                             <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 4 }}>
@@ -388,7 +606,7 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
                         )}
                       </div>
                       <small style={{ fontSize: 11, color: '#94A3B8', marginTop: 6, textAlign: 'center' }}>
-                        Tối đa 2MB
+                        JPG, PNG, WEBP (Tối đa 5MB)
                       </small>
                     </div>
                   </div>
@@ -397,46 +615,28 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
                 {/* 2. THÔNG TIN CÔNG VIỆC */}
                 <div className="emp-section-card">
                   <div className="emp-section-title">Thông tin công việc</div>
-                  <div className="emp-grid-2">
-                    <div className="emp-form-group">
-                      <label className="emp-form-label">Ngày bắt đầu làm việc</label>
-                      <input
-                        type="date"
-                        className="emp-form-input"
-                        value={startDate}
-                        onChange={(e) => setStartDate(e.target.value)}
-                      />
-                    </div>
-
-                    <div className="emp-form-group">
-                      <label className="emp-form-label">Mã chấm công</label>
-                      <input
-                        type="text"
-                        className="emp-form-input"
-                        placeholder="Mã máy chấm công (nếu có)"
-                        value={attendanceCode}
-                        onChange={(e) => setAttendanceCode(e.target.value)}
-                      />
-                    </div>
+                  <div className="emp-form-group">
+                    <label className="emp-form-label">Ngày bắt đầu làm việc</label>
+                    <input
+                      type="date"
+                      className="emp-form-input"
+                      value={startDate}
+                      onChange={(e) => setStartDate(e.target.value)}
+                    />
                   </div>
 
-                  {/* Các chi nhánh làm việc - Searchable Multi-Select UI */}
+                  {/* Chi nhánh làm việc - Searchable Single-Select UI */}
                   <div className="emp-form-group" ref={branchDropdownRef} style={{ position: 'relative' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                      <label className="emp-form-label" style={{ marginBottom: 0 }}>
-                        Các chi nhánh làm việc <span className="required">*</span>
-                      </label>
-                      <span style={{ fontSize: 12, color: '#0F766E', fontWeight: 600 }}>
-                        Đã chọn {workingBranchIds.length}/{branches.length} chi nhánh
-                      </span>
-                    </div>
+                    <label className="emp-form-label">
+                      Chi nhánh làm việc <span className="required">*</span>
+                    </label>
 
                     {/* Selector Trigger Input */}
                     <div
                       onClick={() => setIsBranchDropdownOpen((prev) => !prev)}
                       style={{
-                        minHeight: 40,
-                        padding: '6px 12px',
+                        height: 40,
+                        padding: '0 12px',
                         border: `1px solid ${isBranchDropdownOpen ? '#0F766E' : '#CBD5E1'}`,
                         borderRadius: 8,
                         background: '#FFFFFF',
@@ -449,87 +649,49 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
                         boxShadow: isBranchDropdownOpen ? '0 0 0 3px rgba(15, 118, 110, 0.15)' : 'none',
                       }}
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', flex: 1 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, overflow: 'hidden', flex: 1 }}>
                         <Building2 size={16} color="#64748B" style={{ flexShrink: 0 }} />
 
-                        {workingBranchIds.length === 0 ? (
-                          <span style={{ color: '#94A3B8', fontSize: 13 }}>Chọn các chi nhánh làm việc...</span>
-                        ) : workingBranchIds.length === branches.length && branches.length > 2 ? (
-                          <span
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              padding: '2px 10px',
-                              borderRadius: 6,
-                              fontSize: 12,
-                              fontWeight: 600,
-                              background: '#F0FDFA',
-                              color: '#0F766E',
-                              border: '1px solid #99F6E4',
-                            }}
-                          >
-                            Tất cả chi nhánh ({branches.length})
-                          </span>
-                        ) : (
-                          <>
-                            {branches
-                              .filter((b) => workingBranchIds.includes(b.id))
-                              .slice(0, 3)
-                              .map((b) => (
-                                <span
-                                  key={b.id}
-                                  style={{
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    gap: 4,
-                                    padding: '2px 8px',
-                                    borderRadius: 6,
-                                    fontSize: 12,
-                                    fontWeight: 500,
-                                    background: '#F0FDFA',
-                                    color: '#0F766E',
-                                    border: '1px solid #99F6E4',
-                                  }}
-                                >
-                                  <span>{b.name}</span>
-                                  <span
-                                    onClick={(e) => handleRemoveBranchTag(e, b.id)}
-                                    title="Gỡ chi nhánh"
-                                    style={{
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      cursor: 'pointer',
-                                      borderRadius: '50%',
-                                      width: 14,
-                                      height: 14,
-                                      color: '#0F766E',
-                                      fontWeight: 700,
-                                    }}
-                                  >
-                                    <X size={11} />
-                                  </span>
-                                </span>
-                              ))}
-                            {workingBranchIds.length > 3 && (
+                        {(() => {
+                          const currentBranch = branches.find((b) => b.id === workingBranchId);
+                          if (!currentBranch) {
+                            return <span style={{ color: '#94A3B8', fontSize: 13 }}>Chọn chi nhánh làm việc...</span>;
+                          }
+                          return (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, overflow: 'hidden' }}>
                               <span
                                 style={{
-                                  padding: '2px 8px',
-                                  borderRadius: 6,
-                                  fontSize: 12,
-                                  fontWeight: 600,
-                                  background: '#F1F5F9',
-                                  color: '#475569',
+                                  fontSize: 13,
+                                  fontWeight: 500,
+                                  color: '#1E293B',
+                                  whiteSpace: 'nowrap',
+                                  textOverflow: 'ellipsis',
+                                  overflow: 'hidden',
                                 }}
                               >
-                                +{workingBranchIds.length - 3} chi nhánh khác
+                                {currentBranch.name}
                               </span>
-                            )}
-                          </>
-                        )}
+                              {currentBranch.isMain && (
+                                <span
+                                  style={{
+                                    fontSize: 10,
+                                    padding: '1px 6px',
+                                    borderRadius: 4,
+                                    background: '#E2E8F0',
+                                    color: '#475569',
+                                    fontWeight: 600,
+                                    flexShrink: 0,
+                                  }}
+                                >
+                                  Trụ sở
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </div>
 
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#64748B' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', color: '#64748B' }}>
                         <ChevronDown
                           size={16}
                           style={{
@@ -605,98 +767,39 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
                           </div>
                         </div>
 
-                        {/* Quick Selection Actions */}
-                        <div
-                          style={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center',
-                            padding: '6px 12px',
-                            background: '#F8FAFC',
-                            borderBottom: '1px solid #F1F5F9',
-                            fontSize: 12,
-                          }}
-                        >
-                          <span style={{ color: '#64748B' }}>
-                            Tìm thấy {filteredBranches.length} chi nhánh
-                          </span>
-                          <div style={{ display: 'flex', gap: 12 }}>
-                            <button
-                              type="button"
-                              onClick={handleSelectAllBranches}
-                              style={{
-                                border: 'none',
-                                background: 'transparent',
-                                color: '#0F766E',
-                                fontWeight: 600,
-                                cursor: 'pointer',
-                                padding: 0,
-                                fontSize: 12,
-                              }}
-                            >
-                              Chọn tất cả ({branches.length})
-                            </button>
-                            <span style={{ color: '#CBD5E1' }}>|</span>
-                            <button
-                              type="button"
-                              onClick={handleClearAllBranches}
-                              style={{
-                                border: 'none',
-                                background: 'transparent',
-                                color: '#64748B',
-                                fontWeight: 500,
-                                cursor: 'pointer',
-                                padding: 0,
-                                fontSize: 12,
-                              }}
-                            >
-                              Mặc định (1 CN)
-                            </button>
-                          </div>
-                        </div>
-
                         {/* Branches List */}
                         <div style={{ maxHeight: 210, overflowY: 'auto', padding: '4px 0' }}>
                           {filteredBranches.length ? (
                             filteredBranches.map((b) => {
-                              const isChecked = workingBranchIds.includes(b.id);
+                              const isSelected = workingBranchId === b.id;
                               return (
                                 <div
                                   key={b.id}
-                                  onClick={() => handleWorkingBranchToggle(b.id)}
+                                  onClick={() => handleSelectBranch(b.id)}
                                   style={{
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'space-between',
-                                    padding: '8px 12px',
+                                    padding: '9px 14px',
                                     cursor: 'pointer',
-                                    background: isChecked ? '#F0FDFA' : 'transparent',
+                                    background: isSelected ? '#F0FDFA' : 'transparent',
                                     transition: 'background 0.12s ease',
                                   }}
                                   onMouseEnter={(e) => {
-                                    if (!isChecked) e.currentTarget.style.background = '#F8FAFC';
+                                    if (!isSelected) e.currentTarget.style.background = '#F8FAFC';
                                   }}
                                   onMouseLeave={(e) => {
-                                    if (!isChecked) e.currentTarget.style.background = 'transparent';
+                                    if (!isSelected) e.currentTarget.style.background = 'transparent';
                                   }}
                                 >
-                                  <label
-                                    style={{
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      gap: 10,
-                                      cursor: 'pointer',
-                                      fontSize: 13,
-                                      width: '100%',
-                                    }}
-                                  >
-                                    <input
-                                      type="checkbox"
-                                      checked={isChecked}
-                                      onChange={() => {}} // Đã xử lý ở cấp row onClick
-                                      style={{ accentColor: '#0F766E', width: 16, height: 16 }}
-                                    />
-                                    <span style={{ fontWeight: isChecked ? 600 : 400, color: isChecked ? '#134E4A' : '#1E293B' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <span
+                                      style={{
+                                        fontSize: 13,
+                                        fontWeight: isSelected ? 600 : 400,
+                                        color: isSelected ? '#0F766E' : '#1E293B',
+                                      }}
+                                    >
                                       {b.name}
                                     </span>
                                     {b.isMain && (
@@ -713,9 +816,9 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
                                         Trụ sở
                                       </span>
                                     )}
-                                  </label>
+                                  </div>
 
-                                  {isChecked && <Check size={15} color="#0F766E" />}
+                                  {isSelected && <Check size={16} color="#0F766E" />}
                                 </div>
                               );
                             })
@@ -725,26 +828,6 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
                             </div>
                           )}
                         </div>
-
-                        {/* Footer */}
-                        <div
-                          style={{
-                            padding: '8px 12px',
-                            background: '#F8FAFC',
-                            borderTop: '1px solid #F1F5F9',
-                            display: 'flex',
-                            justifyContent: 'flex-end',
-                          }}
-                        >
-                          <button
-                            type="button"
-                            className="emp-btn emp-btn-primary"
-                            style={{ height: 28, padding: '0 14px', fontSize: 12 }}
-                            onClick={() => setIsBranchDropdownOpen(false)}
-                          >
-                            Xong ({workingBranchIds.length})
-                          </button>
-                        </div>
                       </div>
                     )}
                   </div>
@@ -753,20 +836,22 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
                     <div className="emp-form-group">
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <label className="emp-form-label">Tài khoản đăng nhập</label>
-                        <button
-                          type="button"
-                          style={{
-                            background: 'transparent',
-                            border: 'none',
-                            color: '#0F766E',
-                            fontWeight: 600,
-                            fontSize: 12,
-                            cursor: 'pointer',
-                          }}
-                          onClick={() => setShowCreateUser(true)}
-                        >
-                          + Tạo tài khoản
-                        </button>
+                        {!userName && (
+                          <button
+                            type="button"
+                            style={{
+                              background: 'transparent',
+                              border: 'none',
+                              color: '#0F766E',
+                              fontWeight: 600,
+                              fontSize: 12,
+                              cursor: 'pointer',
+                            }}
+                            onClick={() => setShowCreateUser(true)}
+                          >
+                            + Tạo tài khoản
+                          </button>
+                        )}
                       </div>
                       <input
                         type="text"
@@ -774,7 +859,12 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
                         placeholder="Chưa liên kết tài khoản"
                         value={userName || (userId ? `ID: ${userId}` : '')}
                         readOnly
-                        style={{ backgroundColor: '#F8FAFC' }}
+                        onClick={() => setShowCreateUser(true)}
+                        style={{
+                          backgroundColor: '#F8FAFC',
+                          cursor: 'pointer',
+                        }}
+                        title={userName ? 'Nhấn để cập nhật thông tin tài khoản' : 'Nhấn để tạo tài khoản'}
                       />
                     </div>
 
@@ -810,20 +900,36 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
                       <label className="emp-form-label">Ngân hàng</label>
                       <select
                         className="emp-form-select"
-                        value={bankName}
-                        onChange={(e) => setBankName(e.target.value)}
+                        value={bankSelect}
+                        onChange={(e) => setBankSelect(e.target.value)}
                       >
-                        <option value="Techcombank">Techcombank (TCB)</option>
-                        <option value="Vietcombank">Vietcombank (VCB)</option>
-                        <option value="MB Bank">MB Bank</option>
-                        <option value="BIDV">BIDV</option>
-                        <option value="ACB">ACB</option>
-                        <option value="VPBank">VPBank</option>
+                        {PREDEFINED_BANKS.map((b) => (
+                          <option key={b.value} value={b.value}>
+                            {b.label}
+                          </option>
+                        ))}
+                        <option value="OTHER">Ngân hàng khác...</option>
                       </select>
                     </div>
                   </div>
 
-                  <div className="emp-form-group">
+                  {bankSelect === 'OTHER' && (
+                    <div className="emp-form-group" style={{ marginTop: 12 }}>
+                      <label className="emp-form-label" style={{ color: '#0F766E', fontWeight: 600 }}>
+                        Tên ngân hàng khác <span style={{ color: '#EF4444' }}>*</span>
+                      </label>
+                      <input
+                        type="text"
+                        className="emp-form-input"
+                        placeholder="Nhập tên ngân hàng (VD: Shinhan Bank, Woori Bank...)"
+                        value={customBankName}
+                        onChange={(e) => setCustomBankName(e.target.value)}
+                        autoFocus
+                      />
+                    </div>
+                  )}
+
+                  <div className="emp-form-group" style={{ marginTop: 12 }}>
                     <label className="emp-form-label">Tên chủ tài khoản</label>
                     <input
                       type="text"
@@ -887,28 +993,15 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
                     </div>
                   </div>
 
-                  <div className="emp-grid-2">
-                    <div className="emp-form-group">
-                      <label className="emp-form-label">Địa chỉ</label>
-                      <input
-                        type="text"
-                        className="emp-form-input"
-                        placeholder="Số nhà, đường phố..."
-                        value={address}
-                        onChange={(e) => setAddress(e.target.value)}
-                      />
-                    </div>
-
-                    <div className="emp-form-group">
-                      <label className="emp-form-label">Tỉnh / Thành phố</label>
-                      <input
-                        type="text"
-                        className="emp-form-input"
-                        placeholder="VD: Hà Nội, TP. Hồ Chí Minh"
-                        value={city}
-                        onChange={(e) => setCity(e.target.value)}
-                      />
-                    </div>
+                  <div className="emp-form-group" style={{ marginTop: 12 }}>
+                    <label className="emp-form-label">Địa chỉ</label>
+                    <input
+                      type="text"
+                      className="emp-form-input"
+                      placeholder="Số nhà, đường phố, phường/xã, quận/huyện, tỉnh/thành..."
+                      value={address}
+                      onChange={(e) => setAddress(e.target.value)}
+                    />
                   </div>
                 </div>
               </div>
@@ -938,15 +1031,22 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
                         {salaryType === 'monthly'
                           ? 'Mức lương chính (VNĐ/tháng)'
                           : salaryType === 'hourly'
-                          ? 'Mức lương chính (VNĐ/giờ)'
-                          : 'Mức lương chính (VNĐ/ca)'}
+                            ? 'Mức lương chính (VNĐ/giờ)'
+                            : 'Mức lương chính (VNĐ/ca)'}
                       </label>
                       <input
                         type="number"
-                        step="500000"
+                        step="50000"
                         className="emp-form-input"
-                        value={baseSalary}
-                        onChange={(e) => setBaseSalary(Number(e.target.value))}
+                        placeholder={
+                          salaryType === 'monthly'
+                            ? 'VD: 7,500,000'
+                            : salaryType === 'hourly'
+                              ? 'VD: 30,000'
+                              : 'VD: 250,000'
+                        }
+                        value={baseSalary === '' ? '' : baseSalary}
+                        onChange={(e) => setBaseSalary(e.target.value === '' ? '' : Number(e.target.value))}
                       />
                     </div>
                   </div>
@@ -954,45 +1054,83 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
 
                 {/* OT Config */}
                 <div className="emp-section-card">
-                  <div className="emp-section-title">Hệ số làm thêm giờ (OT)</div>
-                  <div className="emp-grid-2">
-                    <div className="emp-form-group">
-                      <label className="emp-form-label">Tăng ca ngày thường</label>
-                      <input
-                        type="text"
-                        className="emp-form-input"
-                        value={otWeekday}
-                        onChange={(e) => setOtWeekday(e.target.value)}
-                      />
-                    </div>
-                    <div className="emp-form-group">
-                      <label className="emp-form-label">Tăng ca Chủ nhật / Ngày nghỉ</label>
-                      <input
-                        type="text"
-                        className="emp-form-input"
-                        value={otSunday}
-                        onChange={(e) => setOtSunday(e.target.value)}
-                      />
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                    <div>
+                      <div className="emp-section-title" style={{ marginBottom: 2 }}>Hệ số làm thêm giờ (OT)</div>
                     </div>
                   </div>
+
                   <div className="emp-grid-2">
+                    {/* Tăng ca ngày thường */}
                     <div className="emp-form-group">
-                      <label className="emp-form-label">Tăng ca ngày Lễ / Tết</label>
-                      <input
-                        type="text"
-                        className="emp-form-input"
-                        value={otHoliday}
-                        onChange={(e) => setOtHoliday(e.target.value)}
-                      />
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                        <label className="emp-form-label" style={{ marginBottom: 0 }}>Ngày thường</label>
+                        {otWeekday && (
+                          <span style={{ fontSize: 11, fontWeight: 600, color: '#0F766E' }}>
+                            x{((parseInt(otWeekday.replace('%', '')) || 0) / 100).toFixed(1)} lương/giờ
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                        <input
+                          type="number"
+                          min={100}
+                          max={500}
+                          step={10}
+                          className="emp-form-input"
+                          style={{ paddingRight: 36, fontWeight: 600 }}
+                          value={otWeekday ? otWeekday.replace('%', '') : ''}
+                          onChange={(e) => {
+                            const val = e.target.value.replace(/[^0-9]/g, '');
+                            setOtWeekday(val ? `${val}%` : '');
+                          }}
+                          placeholder="150"
+                        />
+                        <span style={{ position: 'absolute', right: 12, color: '#64748B', fontWeight: 600, pointerEvents: 'none' }}>
+                          %
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Tăng ca Chủ nhật / Ngày nghỉ */}
+                    <div className="emp-form-group">
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                        <label className="emp-form-label" style={{ marginBottom: 0 }}>Chủ nhật / Nghỉ tuần</label>
+                        {otSunday && (
+                          <span style={{ fontSize: 11, fontWeight: 600, color: '#0F766E' }}>
+                            x{((parseInt(otSunday.replace('%', '')) || 0) / 100).toFixed(1)} lương/giờ
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                        <input
+                          type="number"
+                          min={100}
+                          max={500}
+                          step={10}
+                          className="emp-form-input"
+                          style={{ paddingRight: 36, fontWeight: 600 }}
+                          value={otSunday ? otSunday.replace('%', '') : ''}
+                          onChange={(e) => {
+                            const val = e.target.value.replace(/[^0-9]/g, '');
+                            setOtSunday(val ? `${val}%` : '');
+                            setOtDayOff(val ? `${val}%` : '');
+                          }}
+                          placeholder="200"
+                        />
+                        <span style={{ position: 'absolute', right: 12, color: '#64748B', fontWeight: 600, pointerEvents: 'none' }}>
+                          %
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>
 
                 {/* Phụ cấp */}
                 <div className="emp-section-card">
-                  <div className="emp-section-title">
+                  <div className="emp-section-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <span>Phụ cấp hỗ trợ</span>
+                      <span>Phụ cấp lương</span>
                       <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 400 }}>
                         <input
                           type="checkbox"
@@ -1000,84 +1138,133 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
                           onChange={(e) => setEnableAllowance(e.target.checked)}
                           style={{ accentColor: '#0F766E' }}
                         />
-                        <span>Kích hoạt phụ cấp</span>
+                        <span>Áp dụng phụ cấp</span>
                       </label>
                     </div>
-                    {enableAllowance && (
-                      <button
-                        type="button"
-                        style={{
-                          background: 'transparent',
-                          border: 'none',
-                          color: '#0F766E',
-                          fontWeight: 600,
-                          fontSize: 13,
-                          cursor: 'pointer',
-                        }}
-                        onClick={() => setShowCreateAllowance(true)}
-                      >
-                        + Thêm loại phụ cấp
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      style={{
+                        background: '#F0FDFA',
+                        border: '1px solid #99F6E4',
+                        color: '#0F766E',
+                        borderRadius: 6,
+                        padding: '4px 12px',
+                        fontWeight: 600,
+                        fontSize: 13,
+                        cursor: 'pointer',
+                      }}
+                      onClick={handleAddAllowanceRow}
+                    >
+                      + Thêm khoản phụ cấp
+                    </button>
                   </div>
 
                   {enableAllowance && (
-                    <table className="emp-table" style={{ border: '1px solid #E2E8F0', borderRadius: 8 }}>
-                      <thead>
-                        <tr>
-                          <th style={{ width: 40 }}>Bật</th>
-                          <th>Tên phụ cấp</th>
-                          <th>Loại phụ cấp</th>
-                          <th style={{ width: 180 }}>Mức phụ cấp (VNĐ)</th>
-                          <th style={{ width: 40 }}></th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {allowances.map((al) => (
-                          <tr key={al.id}>
-                            <td>
-                              <input
-                                type="checkbox"
-                                checked={al.enabled}
-                                onChange={() => handleAllowanceToggle(al.id)}
-                                style={{ accentColor: '#0F766E' }}
-                              />
-                            </td>
-                            <td style={{ fontWeight: 600 }}>{al.name}</td>
-                            <td style={{ color: '#64748B' }}>{al.type}</td>
-                            <td>
-                              <input
-                                type="number"
-                                className="emp-form-input"
-                                style={{ height: 32 }}
-                                value={al.amount}
-                                onChange={(e) => handleAllowanceAmountChange(al.id, Number(e.target.value))}
-                                disabled={!al.enabled}
-                              />
-                            </td>
-                            <td>
-                              <button
-                                type="button"
-                                style={{
-                                  background: 'transparent',
-                                  border: 'none',
-                                  color: '#EF4444',
-                                  cursor: 'pointer',
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  padding: 4,
-                                }}
-                                onClick={() => handleDeleteAllowance(al.id)}
-                                title="Xóa phụ cấp"
-                              >
-                                <Trash2 size={16} />
-                              </button>
-                            </td>
+                    <>
+                      <table className="emp-table" style={{ border: '1px solid #E2E8F0', borderRadius: 8, marginTop: 8 }}>
+                        <thead>
+                          <tr>
+                            <th style={{ width: 44, textAlign: 'center' }}>Bật</th>
+                            <th>Tên khoản phụ cấp</th>
+                            <th style={{ width: 220 }}>Số tiền (VNĐ)</th>
+                            <th style={{ width: 44, textAlign: 'center' }}></th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                        </thead>
+                        <tbody>
+                          {allowances.length > 0 ? (
+                            allowances.map((al) => (
+                              <tr key={al.id}>
+                                <td style={{ textAlign: 'center' }}>
+                                  <input
+                                    type="checkbox"
+                                    checked={al.enabled}
+                                    onChange={() => handleAllowanceToggle(al.id)}
+                                    style={{ accentColor: '#0F766E' }}
+                                  />
+                                </td>
+                                <td>
+                                  <input
+                                    type="text"
+                                    className="emp-form-input"
+                                    style={{ height: 32 }}
+                                    placeholder="Tên khoản phụ cấp (VD: Ăn trưa, xăng xe, trách nhiệm...)"
+                                    value={al.name}
+                                    onChange={(e) => handleAllowanceNameChange(al.id, e.target.value)}
+                                    disabled={!al.enabled}
+                                  />
+                                </td>
+                                <td>
+                                  <input
+                                    type="number"
+                                    className="emp-form-input"
+                                    style={{ height: 32 }}
+                                    step="10000"
+                                    min="0"
+                                    placeholder="Số tiền (VD: 500,000)"
+                                    value={!al.amount ? '' : al.amount}
+                                    onChange={(e) =>
+                                      handleAllowanceAmountChange(
+                                        al.id,
+                                        e.target.value === '' ? 0 : Math.max(0, Number(e.target.value))
+                                      )
+                                    }
+                                    disabled={!al.enabled}
+                                  />
+                                </td>
+                                <td style={{ textAlign: 'center' }}>
+                                  <button
+                                    type="button"
+                                    style={{
+                                      background: 'transparent',
+                                      border: 'none',
+                                      color: '#EF4444',
+                                      cursor: 'pointer',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      padding: 4,
+                                    }}
+                                    onClick={() => handleDeleteAllowance(al.id)}
+                                    title="Xóa phụ cấp này"
+                                  >
+                                    <Trash2 size={16} />
+                                  </button>
+                                </td>
+                              </tr>
+                            ))
+                          ) : (
+                            <tr>
+                              <td colSpan={4} style={{ textAlign: 'center', color: '#94A3B8', padding: 20 }}>
+                                Chưa có khoản phụ cấp nào. Bấm "+ Thêm khoản phụ cấp" để tạo mới.
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+
+                      {/* Total Allowance Summary */}
+                      <div
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'flex-end',
+                          alignItems: 'center',
+                          gap: 12,
+                          marginTop: 10,
+                          padding: '8px 14px',
+                          background: '#F8FAFC',
+                          borderRadius: 6,
+                          border: '1px solid #E2E8F0',
+                          fontSize: 13,
+                          fontWeight: 600,
+                          color: '#334155',
+                        }}
+                      >
+                        <span>Tổng phụ cấp đang áp dụng:</span>
+                        <span style={{ color: '#0F766E', fontSize: 15, fontWeight: 700 }}>
+                          {totalAllowances.toLocaleString('vi-VN')} đ
+                        </span>
+                      </div>
+                    </>
                   )}
                 </div>
               </div>
@@ -1086,7 +1273,12 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
 
           {/* Footer */}
           <div className="emp-modal-footer">
-            <button type="button" className="emp-btn emp-btn-secondary" onClick={onClose}>
+            <button
+              type="button"
+              className="emp-btn emp-btn-secondary"
+              onClick={onClose}
+              disabled={isSubmitting || isUploadingAvatar}
+            >
               Bỏ qua
             </button>
             {!employee && (
@@ -1094,16 +1286,18 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
                 type="button"
                 className="emp-btn emp-btn-outline-teal"
                 onClick={() => handleSave(true)}
+                disabled={isSubmitting || isUploadingAvatar}
               >
-                Lưu & Thêm mới
+                {isSubmitting ? 'Đang lưu...' : 'Lưu & Thêm mới'}
               </button>
             )}
             <button
               type="button"
               className="emp-btn emp-btn-primary"
               onClick={() => handleSave(false)}
+              disabled={isSubmitting || isUploadingAvatar}
             >
-              Lưu thông tin
+              {isSubmitting ? 'Đang lưu...' : 'Lưu thông tin'}
             </button>
           </div>
         </div>
@@ -1113,6 +1307,13 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
       <CreateUserModal
         isOpen={showCreateUser}
         onClose={() => setShowCreateUser(false)}
+        employeeId={employee?.id}
+        employeeName={employee?.fullName || fullName}
+        employeeCode={employee?.employeeCode}
+        phone={phone}
+        initialUsername={userName}
+        branchName={branches.find((b) => b.id === workingBranchId)?.name}
+        deferSave={true}
         onSuccess={handleCreateUserSuccess}
       />
       <CreateAllowanceModal

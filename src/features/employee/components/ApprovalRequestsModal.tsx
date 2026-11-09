@@ -64,7 +64,7 @@ export const ApprovalRequestsModal: React.FC<ApprovalRequestsModalProps> = ({
 
   return (
     <div className="emp-modal-overlay">
-      <div className="emp-modal-card" style={{ maxWidth: 1050 }}>
+      <div className="emp-modal-card">
         {/* Header */}
         <div className="emp-modal-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>

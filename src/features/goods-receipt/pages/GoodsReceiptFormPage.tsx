@@ -1,11 +1,10 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import type { FC } from 'react';
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams, useLocation } from 'react-router-dom';
 import {
   PackageCheck,
   ArrowLeft,
-  ShieldCheck,
-  UserCheck,
+  Loader2,
 } from 'lucide-react';
 import type {
   GrnCostSummary,
@@ -14,11 +13,11 @@ import type {
   PaymentMethod,
   PaymentTerm,
   PoLookupOption,
-  RejectionReason,
   UserRole,
 } from '../types/grn.types';
 import { goodsReceiptApi, type BackendGoodsReceiptDto } from '../api/goodsReceiptApi';
-import { GrnFormHeaderCard } from '../components/form/GrnFormHeaderCard';
+import { branchApi } from '../../purchase-order/api/branchApi';
+import { GrnFormHeaderCard, type GrnBranchOption } from '../components/form/GrnFormHeaderCard';
 import { GrnProductEntryTable } from '../components/form/GrnProductEntryTable';
 import { GrnCostSummaryCard } from '../components/form/GrnCostSummaryCard';
 import { GrnFormActionBar } from '../components/form/GrnFormActionBar';
@@ -27,41 +26,107 @@ import { GrnPrintPreviewModal } from '../components/form/GrnPrintPreviewModal';
 import { AdminToast, type ToastState } from '../../admin/components';
 import '../../purchase-order/purchase-order.css';
 
+const mapPaymentMethod = (method: PaymentMethod): string => {
+  if (method === 'Cash') return 'CASH';
+  if (method === 'Bank') return 'BANK';
+  return 'AP';
+};
+
+const toDateInput = (value?: string | null): string => {
+  if (!value) return '';
+  const s = String(value);
+  return s.length >= 10 ? s.slice(0, 10) : s;
+};
+
+/** Tự sinh mã lô: BAT-{SKU}-{YYYYMMDD}[-n] */
+const generateBatchCode = (productCode: string, lotIndex = 1): string => {
+  const now = new Date();
+  const ymd = [
+    now.getFullYear(),
+    String(now.getMonth() + 1).padStart(2, '0'),
+    String(now.getDate()).padStart(2, '0'),
+  ].join('');
+  const sku = (productCode || 'SKU').replace(/\s+/g, '').slice(0, 12).toUpperCase() || 'SKU';
+  const base = `BAT-${sku}-${ymd}`;
+  return lotIndex > 1 ? `${base}-${lotIndex}` : base;
+};
+
+const mapDtoToItems = (dto: BackendGoodsReceiptDto): GrnItemDetail[] =>
+  (dto.lines ?? []).map((l) => {
+    const manageBatch = !!(
+      l.hasBatches ||
+      l.batchCode ||
+      l.manufactureDate ||
+      l.expiryDate
+    );
+    return {
+      id: l.id,
+      productId: l.productId,
+      purchaseOrderDetailId: l.purchaseOrderDetailId,
+      productCode: l.productCode,
+      productName: l.productName,
+      unit: l.unit,
+      orderedQty: l.orderedQty,
+      receivedQty: l.deliveredQty,
+      acceptedQty: l.deliveredQty,
+      rejectedQty: 0,
+      shortageQty: l.shortageQty,
+      differenceQty: l.differenceQty,
+      unitPrice: l.unitPrice,
+      lineTotal: l.lineAmount,
+      batchCode: l.batchCode || (manageBatch ? generateBatchCode(l.productCode) : ''),
+      manufactureDate: toDateInput(l.manufactureDate),
+      expiryDate: toDateInput(l.expiryDate),
+      hasBatches: l.hasBatches,
+      manageBatch,
+      isSplitLine: false,
+      rejectionReason: l.rejectionReason as any,
+      rejectionNote: l.rejectionNote,
+      note: l.note,
+    };
+  });
+
 export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
   defaultRole = 'store_owner',
 }) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { id } = useParams<{ id: string }>();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
 
-  // Role management
   const roleParam = searchParams.get('role') as UserRole | null;
-  const [role, setRole] = useState<UserRole>(roleParam || defaultRole);
-  const employeeBranchId = searchParams.get('branch') || 'BR-01';
+  const role: UserRole = roleParam || defaultRole;
+  const employeeBranchId = searchParams.get('branch') || '';
 
-  // Read mode vs Edit/Create mode
-  const isViewMode = Boolean(id && id !== 'create' && !window.location.pathname.endsWith('/edit'));
-  const [existingReceipt, setExistingReceipt] = useState<BackendGoodsReceiptDto | null>(null);
+  const isCreateMode = !id || id === 'create';
+  const isConfirmMode = location.pathname.endsWith('/confirm');
+  const isEditMode = location.pathname.includes('/edit');
+  const [receiptStatus, setReceiptStatus] = useState<string>('');
+
+  const listPath =
+    role === 'employee'
+      ? `/employee/goods-receipts?branch=${encodeURIComponent(employeeBranchId)}&role=employee`
+      : '/store-owner/goods-receipts';
+
   const [availablePos, setAvailablePos] = useState<PoLookupOption[]>([]);
-  const [isSaving, setIsSaving] = useState<boolean>(false);
-
-  // Master Form State
-  const [grnNo, setGrnNo] = useState<string>(
-    () => `GRN-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-NEW`
-  );
-  const [branchId, setBranchId] = useState<string>(
-    () => searchParams.get('branchId') || (role === 'employee' ? employeeBranchId : 'BR-01')
-  );
-  const [poReference, setPoReference] = useState<string>(
-    () => searchParams.get('poCode') || searchParams.get('po') || searchParams.get('poId') || ''
-  );
-  const [purchaseOrderId, setPurchaseOrderId] = useState<string>(
-    () => searchParams.get('poId') || ''
-  );
+  const [branches, setBranches] = useState<GrnBranchOption[]>([]);
+  const [selectedPoId, setSelectedPoId] = useState<string>('');
   const [supplierId, setSupplierId] = useState<string>('');
-  const [supplierName, setSupplierName] = useState<string>('');
-  const [supplierCode, setSupplierCode] = useState<string>('');
-  const [receiptTime, setReceiptTime] = useState<string>(() => {
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  /** Chỉ khóa khi phiếu đã COMPLETED/CANCELLED; create + DRAFT (confirm/edit) vẫn sửa được */
+  const isReadOnly =
+    isSaving || (!isCreateMode && !!receiptStatus && receiptStatus !== 'DRAFT');
+
+  const [grnNo, setGrnNo] = useState<string>('(Tự sinh khi lưu)');
+  const [branchId, setBranchId] = useState<string>(employeeBranchId || '');
+  const [poReference, setPoReference] = useState<string>(
+    () => searchParams.get('poCode') || searchParams.get('po') || ''
+  );
+  const [supplierName, setSupplierName] = useState('');
+  const [supplierCode, setSupplierCode] = useState('');
+  const [receiptTime] = useState<string>(() => {
     const now = new Date();
     const d = String(now.getDate()).padStart(2, '0');
     const m = String(now.getMonth() + 1).padStart(2, '0');
@@ -70,23 +135,17 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
     const mm = String(now.getMinutes()).padStart(2, '0');
     return `${d}/${m}/${y} ${hh}:${mm}`;
   });
-  const [invoiceNo, setInvoiceNo] = useState<string>('INV-998822');
-  const [createdBy, setCreatedBy] = useState<string>(
-    () => (role === 'employee' ? 'NV. Văn A (Thủ kho)' : 'Đức.DM (Quản lý kho)')
+  const [invoiceNo, setInvoiceNo] = useState('');
+  const [createdBy] = useState(
+    role === 'employee' ? 'NV. Thủ kho' : 'Quản lý kho'
   );
   const [paymentTerm, setPaymentTerm] = useState<PaymentTerm>('30');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('Credit');
-  const [notes, setNotes] = useState<string>(
-    'Nhập bổ sung đợt hàng cuối tuần theo đơn đặt hàng PO.'
-  );
+  const [notes, setNotes] = useState('');
   const [items, setItems] = useState<GrnItemDetail[]>([]);
+  const [discountAmount, setDiscountAmount] = useState(0);
+  const [vatPercent, setVatPercent] = useState(0);
 
-  // Cost calculation states
-  const [landedCost, setLandedCost] = useState<number>(30000);
-  const [discountAmount, setDiscountAmount] = useState<number>(0);
-  const [vatPercent, setVatPercent] = useState<number>(0);
-
-  // Modals & Toast State
   const [isMismatchModalOpen, setIsMismatchModalOpen] = useState(false);
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
   const [toast, setToast] = useState<ToastState | null>(null);
@@ -96,234 +155,288 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
     setTimeout(() => setToast(null), 3500);
   };
 
-  // Load existing receipt when editing or viewing
-  useEffect(() => {
+  const loadExisting = useCallback(async () => {
     if (!id || id === 'create') return;
-    let isMounted = true;
-    goodsReceiptApi
-      .getGoodsReceiptById(id)
-      .then((data) => {
-        if (!isMounted || !data) return;
-        setExistingReceipt(data);
-        setGrnNo(data.code);
-        setBranchId(data.branchId);
-        setPoReference(data.purchaseOrderCode || '');
-        setPurchaseOrderId(data.purchaseOrderId || '');
-        setSupplierId(data.supplierId);
-        setSupplierName(data.supplierName);
-        setSupplierCode(data.supplierCode);
-        if (data.receivedAtUtc) {
-          setReceiptTime(new Date(data.receivedAtUtc).toLocaleString('vi-VN'));
-        }
-        setInvoiceNo(data.invoiceNo || '');
-        setCreatedBy(data.receiverName || data.receiverUserId || 'Thủ kho');
-        setNotes(data.note || '');
-        setLandedCost(data.freightFee || 0);
-        setDiscountAmount(data.discountAmount || 0);
-        setVatPercent(data.vatPercent || 0);
-        if (data.paymentMethod === 'CASH') setPaymentMethod('Cash');
-        else if (data.paymentMethod === 'BANK') setPaymentMethod('Bank');
-        else setPaymentMethod('Credit');
-
-        setItems(
-          (data.lines || []).map((l) => ({
-            id: l.id,
-            productId: l.productId,
-            purchaseOrderDetailId: l.purchaseOrderDetailId,
-            productCode: l.productCode,
-            productName: l.productName,
-            unit: l.unit || 'Cái',
-            hasBatches: l.hasBatches,
-            orderedQty: l.orderedQty,
-            receivedQty: l.deliveredQty,
-            acceptedQty: l.acceptedQty,
-            rejectedQty: l.rejectedQty,
-            shortageQty: l.shortageQty,
-            differenceQty: l.differenceQty ?? (l.acceptedQty - l.orderedQty),
-            unitPrice: l.unitPrice,
-            lineTotal: l.lineAmount ?? (l.acceptedQty * l.unitPrice),
-            batchCode: l.batchCode,
-            manufactureDate: l.manufactureDate ? l.manufactureDate.slice(0, 10) : undefined,
-            expiryDate: l.expiryDate ? l.expiryDate.slice(0, 10) : undefined,
-            rejectionReason: l.rejectionReason as RejectionReason | undefined,
-            rejectionNote: l.rejectionNote,
-            note: l.note,
-          }))
+    setIsLoading(true);
+    try {
+      const dto = await goodsReceiptApi.getGoodsReceiptById(id);
+      if (!dto) {
+        showToast('Không tìm thấy phiếu nhập kho.', 'error');
+        navigate(listPath);
+        return;
+      }
+      setReceiptStatus(dto.status || '');
+      setGrnNo(dto.code);
+      setBranchId(dto.branchId);
+      setPoReference(dto.purchaseOrderCode || '');
+      setSelectedPoId(dto.purchaseOrderId || '');
+      setSupplierId(dto.supplierId);
+      setSupplierName(dto.supplierName);
+      setSupplierCode(dto.supplierCode);
+      setInvoiceNo(dto.invoiceNo || '');
+      setNotes(dto.note || '');
+      setDiscountAmount(dto.discountAmount || 0);
+      setVatPercent(dto.vatPercent || 0);
+      setItems(mapDtoToItems(dto));
+      if (dto.status && dto.status !== 'DRAFT' && (isConfirmMode || isEditMode)) {
+        showToast('Phiếu này không còn ở trạng thái nháp — chuyển sang xem chi tiết.', 'info');
+        navigate(
+          role === 'employee'
+            ? `/employee/goods-receipts/${id}?branch=${encodeURIComponent(employeeBranchId)}&role=employee`
+            : `/store-owner/goods-receipts/${id}`
         );
-      })
-      .catch((err) => {
-        console.warn('Không thể tải chi tiết phiếu nhập kho:', err);
-      });
-    return () => {
-      isMounted = false;
-    };
-  }, [id]);
-
-  // Fetch PO lookup options
-  useEffect(() => {
-    let isMounted = true;
-    goodsReceiptApi
-      .getPoLookup(branchId)
-      .then((pos) => {
-        if (isMounted) {
-          setAvailablePos(pos || []);
-        }
-      })
-      .catch(() => {
-        if (isMounted) setAvailablePos([]);
-      });
-    return () => {
-      isMounted = false;
-    };
-  }, [branchId]);
-
-  // When PO is chosen or loaded from URL parameter, bind items and supplier from Backend API
-  useEffect(() => {
-    if (!poReference || existingReceipt) return;
-    let isMounted = true;
-
-    const matchedPo = availablePos.find(
-      (p) => p.poCode === poReference || p.id === poReference
-    );
-    const paramPoId = searchParams.get('poId');
-    const lookupKey =
-      matchedPo?.id ||
-      (paramPoId && (!poReference || poReference === searchParams.get('poCode') || poReference === paramPoId)
-        ? paramPoId
-        : poReference);
-
-    goodsReceiptApi
-      .getPoReceiptDetails(lookupKey)
-      .then((details) => {
-        if (!isMounted) return;
-        if (details) {
-          setPurchaseOrderId(details.id);
-          if (details.code && details.code !== poReference) {
-            setPoReference(details.code);
-          }
-          setSupplierId(details.supplierId);
-          setSupplierName(details.supplierName || matchedPo?.supplierName || '');
-          setSupplierCode(details.supplierCode || matchedPo?.supplierCode || '');
-          if (role !== 'employee' && details.branchId) {
-            setBranchId(details.branchId);
-          }
-          if (details.items && details.items.length > 0) {
-            setItems(details.items.map((it) => ({ ...it })));
-          }
-        } else if (matchedPo) {
-          setPurchaseOrderId(matchedPo.id || '');
-          setSupplierId(matchedPo.supplierId);
-          setSupplierName(matchedPo.supplierName);
-          setSupplierCode(matchedPo.supplierCode);
-          if (role !== 'employee' && matchedPo.branchId) {
-            setBranchId(matchedPo.branchId);
-          }
-          if (matchedPo.items && matchedPo.items.length > 0) {
-            setItems(matchedPo.items.map((it) => ({ ...it })));
-          }
-        }
-      })
-      .catch(() => {
-        if (isMounted && matchedPo) {
-          setPurchaseOrderId(matchedPo.id || '');
-          setSupplierId(matchedPo.supplierId);
-          setSupplierName(matchedPo.supplierName);
-          setSupplierCode(matchedPo.supplierCode);
-          if (matchedPo.items && matchedPo.items.length > 0) {
-            setItems(matchedPo.items.map((it) => ({ ...it })));
-          }
-        }
-      });
-
-    return () => {
-      isMounted = false;
-    };
-  }, [poReference, existingReceipt, role, availablePos]);
-
-  // Initial load if query param has poCode or poId
-  useEffect(() => {
-    const paramPo = searchParams.get('poCode') || searchParams.get('po') || searchParams.get('poId');
-    if (paramPo && !poReference) {
-      setPoReference(paramPo);
+      }
+    } catch (err: any) {
+      showToast(err.message || 'Không thể tải phiếu nhập kho.', 'error');
+    } finally {
+      setIsLoading(false);
     }
-  }, [searchParams, poReference]);
+  }, [id, listPath, navigate, isConfirmMode, isEditMode, role, employeeBranchId]);
 
-  // Financial Calculations
+  const loadPoLookup = useCallback(async () => {
+    if (!isCreateMode) return;
+    try {
+      const branchFilter = role === 'employee' && employeeBranchId ? employeeBranchId : undefined;
+      const pos = await goodsReceiptApi.getPoLookup(branchFilter);
+      setAvailablePos(pos);
+
+      const paramPoCode = searchParams.get('poCode');
+      const paramPoIdRaw = searchParams.get('po');
+      // Chỉ nhận GUID đầy đủ — tránh JSON.stringify(order) / id cắt cụt từ link cũ
+      const paramPoId =
+        paramPoIdRaw &&
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(paramPoIdRaw)
+          ? paramPoIdRaw
+          : null;
+
+      const matched = pos.find(
+        (p) =>
+          (paramPoId && p.id.toLowerCase() === paramPoId.toLowerCase()) ||
+          (paramPoCode != null && paramPoCode !== '' && p.poCode === paramPoCode)
+      );
+
+      if (matched) {
+        setPoReference(matched.poCode);
+        setSelectedPoId(matched.id);
+        return;
+      }
+
+      // PO không còn trong lookup (đã có phiếu / sai trạng thái) — vẫn thử load theo id
+      // để API trả lỗi rõ, thay vì để bảng sản phẩm trống im lặng.
+      if (paramPoId) {
+        if (paramPoCode) setPoReference(paramPoCode);
+        setSelectedPoId(paramPoId);
+        return;
+      }
+
+      if (paramPoCode) {
+        setPoReference(paramPoCode);
+        showToast(
+          `Không tìm thấy PO ${paramPoCode} đủ điều kiện nhập kho (đã có phiếu DRAFT/COMPLETED hoặc trạng thái chưa cho phép).`,
+          'error'
+        );
+      }
+    } catch (err: any) {
+      showToast(err.message || 'Không thể tải danh sách PO.', 'error');
+    }
+  }, [isCreateMode, role, employeeBranchId, searchParams]);
+
+  useEffect(() => {
+    const loadBranches = async () => {
+      try {
+        const res = await branchApi.getBranches({ status: 'active', pageIndex: 1, pageSize: 100 });
+        const options = (res.items ?? []).map((b) => ({
+          id: b.id,
+          label: `${b.code || ''} — ${b.name}`.trim(),
+        }));
+        setBranches(options);
+        if (!branchId && options[0] && role !== 'employee') {
+          setBranchId(options[0].id);
+        }
+      } catch (err: any) {
+        showToast(err.message || 'Không thể tải danh sách chi nhánh.', 'error');
+      }
+    };
+    void loadBranches();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    void loadExisting();
+  }, [loadExisting]);
+
+  useEffect(() => {
+    void loadPoLookup();
+  }, [loadPoLookup]);
+
+  useEffect(() => {
+    // Phiếu đã tồn tại: không reload từ PO (sẽ lỗi PO_HAS_ACTIVE_RECEIPT)
+    if (!selectedPoId || !isCreateMode) return;
+    let cancelled = false;
+
+    const loadDetails = async () => {
+      try {
+        const details = await goodsReceiptApi.getPoReceiptDetails(selectedPoId);
+        if (!details || cancelled) return;
+
+        setSupplierId(details.supplierId);
+        setSupplierName(details.supplierName);
+        setSupplierCode(details.supplierCode);
+        // Chi nhánh nhận lấy từ PO; employee chỉ override khi URL có ?branch=
+        setBranchId(
+          role === 'employee' && employeeBranchId ? employeeBranchId : details.branchId
+        );
+        setItems(
+          details.items.map((it) => {
+            const manageBatch = !!it.hasBatches;
+            return {
+              id: it.purchaseOrderDetailId,
+              productId: it.productId,
+              purchaseOrderDetailId: it.purchaseOrderDetailId,
+              productCode: it.productCode,
+              productName: it.productName,
+              unit: it.unit,
+              hasBatches: it.hasBatches,
+              manageBatch,
+              isSplitLine: false,
+              orderedQty: it.orderedQty,
+              receivedQty: it.orderedQty,
+              acceptedQty: it.orderedQty,
+              rejectedQty: 0,
+              shortageQty: 0,
+              differenceQty: 0,
+              unitPrice: it.unitPrice,
+              lineTotal: it.orderedQty * it.unitPrice,
+              batchCode: manageBatch ? generateBatchCode(it.productCode) : '',
+              manufactureDate: '',
+              expiryDate: '',
+            };
+          })
+        );
+      } catch (err: any) {
+        showToast(err.response?.data?.message || err.message || 'Không thể tải chi tiết PO.', 'error');
+      }
+    };
+
+    void loadDetails();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedPoId, isCreateMode, role, employeeBranchId]);
+
   const costs: GrnCostSummary = useMemo(() => {
-    const goodsTotal = items.reduce((acc, it) => acc + (it.lineTotal || 0), 0);
-    const subtotalAfterDiscount = Math.max(0, goodsTotal - discountAmount + landedCost);
+    const goodsTotal = items.reduce((acc, it) => acc + it.lineTotal, 0);
+    const subtotalAfterDiscount = Math.max(0, goodsTotal - discountAmount);
     const vatAmount = Math.round(subtotalAfterDiscount * (vatPercent / 100));
     const grandTotal = subtotalAfterDiscount + vatAmount;
+    return { goodsTotal, landedCost: 0, discountAmount, vatPercent, vatAmount, grandTotal };
+  }, [items, discountAmount, vatPercent]);
 
-    return {
-      goodsTotal,
-      landedCost,
-      discountAmount,
-      vatPercent,
-      vatAmount,
-      grandTotal,
-    };
-  }, [items, landedCost, discountAmount, vatPercent]);
-
-  // Item field change handler
-  const handleItemChange = (itemId: string, field: keyof GrnItemDetail, value: unknown) => {
+  const handleItemChange = (itemId: string, field: keyof GrnItemDetail, value: any) => {
     setItems((prev) =>
       prev.map((it) => {
         if (it.id !== itemId) return it;
-
-        const updated = { ...it, [field]: value } as GrnItemDetail;
+        const updated = { ...it, [field]: value };
         if (field === 'receivedQty') {
-          const accepted = updated.acceptedQty !== undefined ? updated.acceptedQty : updated.receivedQty;
-          updated.differenceQty = accepted - updated.orderedQty;
-          updated.lineTotal = accepted * updated.unitPrice;
+          const received = Number(value) || 0;
+          updated.receivedQty = received;
+          updated.acceptedQty = received;
+          updated.rejectedQty = 0;
+          updated.shortageQty = Math.max(0, updated.orderedQty - received);
+          updated.differenceQty = received - updated.orderedQty;
+          updated.lineTotal = received * updated.unitPrice;
         }
         if (field === 'unitPrice') {
-          const accepted = updated.acceptedQty !== undefined ? updated.acceptedQty : updated.receivedQty;
-          updated.lineTotal = accepted * updated.unitPrice;
+          updated.lineTotal = (updated.receivedQty || 0) * Number(value);
+        }
+        if (field === 'manageBatch') {
+          if (value) {
+            if (!updated.batchCode?.trim()) {
+              const lotIndex =
+                prev.filter(
+                  (x) =>
+                    String(x.purchaseOrderDetailId || x.productId) ===
+                      String(updated.purchaseOrderDetailId || updated.productId) &&
+                    !!x.manageBatch
+                ).length + 1;
+              updated.batchCode = generateBatchCode(updated.productCode, lotIndex);
+            }
+          } else {
+            updated.batchCode = '';
+            updated.manufactureDate = '';
+            updated.expiryDate = '';
+          }
         }
         return updated;
       })
     );
   };
 
-  // Add a new custom item row
-  const handleAddNewRow = () => {
-    const newIdx = items.length + 1;
-    const firstProductId = items[0]?.productId || '00000000-0000-0000-0000-000000000000';
-    const newItem: GrnItemDetail = {
-      id: `item-custom-${Date.now()}`,
-      productId: firstProductId,
-      productCode: `SKU-0099${newIdx}`,
-      productName: `Sản phẩm nhập bổ sung ${newIdx}`,
-      unit: 'Gói',
-      orderedQty: 1,
-      receivedQty: 1,
-      acceptedQty: 1,
-      rejectedQty: 0,
-      differenceQty: 0,
-      unitPrice: 50000,
-      lineTotal: 50000,
-      batchCode: `BAT-BS-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}`,
-      expiryDate: '2027-12-31',
-    };
-    setItems((prev) => [...prev, newItem]);
-    showToast('Đã thêm 1 dòng hàng bổ sung vào phiếu nhập kho', 'info');
+  const handleSplitLot = (itemId: string) => {
+    setItems((prev) => {
+      const src = prev.find((it) => it.id === itemId);
+      if (!src) return prev;
+      const key = String(src.purchaseOrderDetailId || src.productId);
+      const lotIndex = prev.filter((it) => String(it.purchaseOrderDetailId || it.productId) === key).length + 1;
+      const newRow: GrnItemDetail = {
+        ...src,
+        id: `${src.purchaseOrderDetailId || src.productId}-split-${Date.now()}`,
+        isSplitLine: true,
+        manageBatch: true,
+        receivedQty: 0,
+        acceptedQty: 0,
+        rejectedQty: 0,
+        shortageQty: src.orderedQty,
+        differenceQty: -src.orderedQty,
+        lineTotal: 0,
+        batchCode: generateBatchCode(src.productCode, lotIndex),
+        manufactureDate: '',
+        expiryDate: '',
+        rejectionReason: undefined,
+      };
+      const idx = prev.findIndex((it) => it.id === itemId);
+      const next = [...prev];
+      next.splice(idx + 1, 0, newRow);
+      return next;
+    });
+    showToast('Đã thêm dòng lô cùng SKU. Điều chỉnh SL từng dòng (tổng ≤ SL đặt).', 'success');
   };
 
-  // Remove a row
   const handleRemoveRow = (itemId: string) => {
-    if (items.length <= 1) {
-      showToast('Phiếu nhập kho phải có ít nhất 1 mặt hàng!', 'error');
-      return;
-    }
-    setItems((prev) => prev.filter((it) => it.id !== itemId));
-    showToast('Đã xóa dòng hàng', 'info');
+    setItems((prev) => {
+      const target = prev.find((it) => it.id === itemId);
+      if (!target) return prev;
+      const key = String(target.purchaseOrderDetailId || target.productId || target.productCode);
+      const siblings = prev.filter(
+        (it) => String(it.purchaseOrderDetailId || it.productId || it.productCode) === key
+      );
+      if (siblings.length <= 1) {
+        showToast('Không thể xóa dòng gốc từ PO. Chỉ xóa được dòng tách lô.', 'error');
+        return prev;
+      }
+      return prev.filter((it) => it.id !== itemId);
+    });
   };
 
-  // Validate items before completing receipt
+  const handlePoChange = (poCode: string) => {
+    setPoReference(poCode);
+    const matched = availablePos.find((p) => p.poCode === poCode);
+    setSelectedPoId(matched?.id || '');
+    if (!matched) {
+      setItems([]);
+      setSupplierId('');
+      setSupplierName('');
+      setSupplierCode('');
+    }
+  };
+
   const validateForm = (): boolean => {
-    if (!poReference) {
+    if (!selectedPoId || !poReference) {
       showToast('Vui lòng chọn Đơn đặt hàng PO nguồn trước khi hoàn tất!', 'error');
+      return false;
+    }
+    if (!branchId) {
+      showToast('Thiếu chi nhánh nhận hàng.', 'error');
       return false;
     }
     if (items.length === 0) {
@@ -331,156 +444,167 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
       return false;
     }
 
-    const missingRejectionReason = items.some(
-      (it) => (it.rejectedQty || Math.max(0, it.receivedQty - (it.acceptedQty ?? it.receivedQty))) > 0 && !it.rejectionReason
-    );
-    if (missingRejectionReason) {
-      showToast('Dòng sản phẩm có hàng bị từ chối bắt buộc phải chọn lý do từ chối!', 'error');
-      return false;
+    const groups = new Map<string, typeof items>();
+    for (const it of items) {
+      const key = String(it.purchaseOrderDetailId || it.productId || it.productCode);
+      const list = groups.get(key) || [];
+      list.push(it);
+      groups.set(key, list);
     }
 
-    const missingBatch = items.some((it) => (it.acceptedQty ?? it.receivedQty) > 0 && !it.batchCode?.trim());
-    if (missingBatch) {
-      showToast('Tất cả mặt hàng có số lượng nhận phải được nhập Mã Lô (Batch No)!', 'error');
-      return false;
+    for (const [, rows] of groups) {
+      const ordered = rows[0].orderedQty;
+      const sumReceived = rows.reduce((s, r) => s + (r.receivedQty || 0), 0);
+      if (sumReceived > ordered) {
+        showToast(
+          `${rows[0].productCode}: tổng thực nhận các lô (${sumReceived}) vượt SL đặt (${ordered}).`,
+          'error'
+        );
+        return false;
+      }
+      if (sumReceived < ordered) {
+        const hasReason = rows.some((r) => !!r.rejectionReason);
+        if (!hasReason) {
+          showToast(
+            `${rows[0].productCode}: thực nhận (${sumReceived}) < SL đặt (${ordered}) — bắt buộc chọn lý do từ chối/thiếu.`,
+            'error'
+          );
+          return false;
+        }
+      }
     }
 
-    const missingExp = items.some((it) => (it.acceptedQty ?? it.receivedQty) > 0 && !it.expiryDate?.trim());
-    if (missingExp) {
-      showToast('Tất cả mặt hàng có số lượng nhận phải được chọn Hạn sử dụng (EXP Date)!', 'error');
-      return false;
+    for (const it of items) {
+      if (it.manageBatch && (it.receivedQty || 0) > 0) {
+        if (!it.manufactureDate?.trim()) {
+          showToast(`${it.productCode}: đang quản lý batch — bắt buộc Ngày SX (MFG).`, 'error');
+          return false;
+        }
+        if (!it.expiryDate?.trim()) {
+          showToast(`${it.productCode}: đang quản lý batch — bắt buộc Hạn SD (EXP).`, 'error');
+          return false;
+        }
+      }
     }
 
     return true;
   };
 
-  /**
-   * Gửi yêu cầu tạo phiếu nhập kho (Draft hoặc AutoComplete) lên Backend API
-   */
-  const submitGoodsReceiptToBackend = async (autoComplete: boolean, forcedStatus?: GrnStatus) => {
+  const buildCreateCommand = (autoComplete: boolean) => ({
+    purchaseOrderId: selectedPoId,
+    supplierId,
+    branchId,
+    invoiceNo: invoiceNo || undefined,
+    freightFee: 0,
+    discountAmount,
+    vatPercent,
+    paymentMethod: mapPaymentMethod(paymentMethod),
+    note: notes || undefined,
+    autoComplete,
+    lines: items.map((it) => {
+      const delivered = it.receivedQty || 0;
+      const key = String(it.purchaseOrderDetailId || it.productId || it.productCode);
+      const siblings = items.filter(
+        (x) => String(x.purchaseOrderDetailId || x.productId || x.productCode) === key
+      );
+      const ordered = siblings[0]?.orderedQty ?? it.orderedQty;
+      const sumReceived = siblings.reduce((s, r) => s + (r.receivedQty || 0), 0);
+      const isShort = sumReceived < ordered;
+      const groupReason =
+        siblings.find((r) => r.rejectionReason)?.rejectionReason || it.rejectionReason;
+      return {
+        productId: it.productId,
+        purchaseOrderDetailId: it.purchaseOrderDetailId,
+        orderedQty: it.orderedQty,
+        deliveredQty: delivered,
+        acceptedQty: delivered,
+        rejectedQty: 0,
+        unitPrice: it.unitPrice,
+        manageBatch: !!it.manageBatch,
+        batchCode: it.manageBatch ? it.batchCode || undefined : undefined,
+        manufactureDate: it.manageBatch ? it.manufactureDate || undefined : undefined,
+        expiryDate: it.manageBatch ? it.expiryDate || undefined : undefined,
+        rejectionReason: isShort ? groupReason || 'SHORT_DELIVERY' : undefined,
+        rejectionNote: it.rejectionNote,
+        note: it.note,
+      };
+    }),
+  });
+
+  const submitReceipt = async (autoComplete: boolean) => {
+    if (!validateForm()) return;
     setIsSaving(true);
     try {
-      const matchedPo = availablePos.find((p) => p.poCode === poReference || p.id === poReference);
-      const resolvedPoId = purchaseOrderId || matchedPo?.id || '';
-      const resolvedSupplierId = supplierId || matchedPo?.supplierId || '';
-      const resolvedBranchId = branchId || matchedPo?.branchId || '';
-
-      const dueDays = parseInt(paymentTerm, 10);
-      const dueDate = !isNaN(dueDays) && dueDays > 0
-        ? new Date(Date.now() + dueDays * 24 * 60 * 60 * 1000).toISOString()
-        : undefined;
-
-      const backendPaymentMethod =
-        paymentMethod === 'Cash' ? 'CASH' : paymentMethod === 'Bank' ? 'BANK' : 'AP';
-
-      const payload = {
-        purchaseOrderId: resolvedPoId,
-        supplierId: resolvedSupplierId,
-        branchId: resolvedBranchId,
-        invoiceNo: invoiceNo || undefined,
-        receivedAtUtc: new Date().toISOString(),
-        freightFee: landedCost,
-        discountAmount,
-        vatPercent,
-        paymentMethod: backendPaymentMethod,
-        paymentDueDate: dueDate,
-        note: notes,
-        autoComplete,
-        lines: items.map((it) => {
-          const accepted = it.acceptedQty !== undefined ? it.acceptedQty : Math.min(it.receivedQty, it.orderedQty);
-          const rejected = it.rejectedQty !== undefined ? it.rejectedQty : Math.max(0, it.receivedQty - accepted);
-          return {
-            productId: it.productId || it.id,
-            purchaseOrderDetailId: it.purchaseOrderDetailId,
-            orderedQty: it.orderedQty,
-            deliveredQty: it.receivedQty,
-            acceptedQty: accepted,
-            rejectedQty: rejected,
-            unitPrice: it.unitPrice,
-            batchCode: it.batchCode,
-            manufactureDate: it.manufactureDate ? new Date(it.manufactureDate).toISOString() : undefined,
-            expiryDate: it.expiryDate ? new Date(it.expiryDate).toISOString() : undefined,
-            qualityStatus: rejected > 0 ? 'PARTIAL_REJECT' : 'ACCEPTED',
-            rejectionReason: rejected > 0 ? (it.rejectionReason || 'OTHER') : undefined,
-            rejectionNote: it.rejectionNote,
-            note: it.note,
-          };
-        }),
-      };
-
-      const created = await goodsReceiptApi.createGoodsReceipt(payload);
-      const createdCode = created?.code || grnNo;
-      setGrnNo(createdCode);
-
-      if (!autoComplete) {
-        showToast(`Đã lưu nháp phiếu nhập kho ${createdCode} thành công (Draft)!`, 'success');
-      } else {
-        const hasMismatch = items.some((it) => it.differenceQty !== 0);
-        const finalStatus: GrnStatus = forcedStatus || (hasMismatch ? 'MISMATCH' : 'CONFIRMED');
-        showToast(
-          `Hoàn tất nhập kho thành công! Phiếu ${createdCode} đã chuyển sang ${finalStatus}. Tồn kho, lô FEFO, giá vốn MAC và công nợ AP đã được cập nhật.`,
-          'success'
+      // Phiếu DRAFT đã có: hủy rồi tạo lại để lưu đúng kiểm đếm (API chưa có update dòng)
+      if (!isCreateMode && id && receiptStatus === 'DRAFT') {
+        await goodsReceiptApi.cancelGoodsReceipt(
+          id,
+          autoComplete
+            ? 'Cập nhật kiểm đếm và hoàn tất nhập kho'
+            : 'Cập nhật kiểm đếm phiếu nháp'
         );
       }
 
-      const targetListUrl =
-        role === 'employee'
-          ? `/employee/goods-receipts?branch=${employeeBranchId}&role=employee`
-          : '/store-owner/goods-receipts';
-
-      setTimeout(() => {
-        navigate(targetListUrl);
-      }, 1200);
-    } catch (err: unknown) {
-      const errMsg =
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
-        (err instanceof Error ? err.message : 'Không thể lưu phiếu nhập kho lên máy chủ.');
-      showToast(`Lỗi lưu phiếu nhập kho: ${errMsg}`, 'error');
+      const created = await goodsReceiptApi.createGoodsReceipt(buildCreateCommand(autoComplete));
+      showToast(
+        autoComplete
+          ? `Hoàn tất nhập kho ${created.code}. Tồn kho đã được cập nhật.`
+          : `Đã lưu nháp phiếu ${created.code}.`,
+        'success'
+      );
+      setTimeout(() => navigate(listPath), 900);
+    } catch (err: any) {
+      showToast(err.response?.data?.message || err.message || 'Lưu phiếu nhập kho thất bại.', 'error');
     } finally {
       setIsSaving(false);
     }
   };
 
-  // Actions
   const handleSaveDraft = () => {
-    if (!poReference) {
-      showToast('Vui lòng chọn đơn đặt hàng PO trước khi lưu nháp!', 'error');
-      return;
-    }
-    if (items.length === 0) {
-      showToast('Danh sách hàng nhập không được để trống!', 'error');
-      return;
-    }
-    void submitGoodsReceiptToBackend(false);
+    void submitReceipt(false);
   };
 
-  const executeCompleteReceipt = (forcedStatus?: GrnStatus) => {
-    void submitGoodsReceiptToBackend(true, forcedStatus);
+  const executeCompleteReceipt = (_forcedStatus?: GrnStatus) => {
+    void submitReceipt(true);
+  };
+
+  const hasGroupMismatch = () => {
+    const groups = new Map<string, { ordered: number; accepted: number }>();
+    for (const it of items) {
+      const key = String(it.purchaseOrderDetailId || it.productId || it.productCode);
+      const cur = groups.get(key) || { ordered: it.orderedQty, accepted: 0 };
+      cur.accepted += (it.acceptedQty ?? it.receivedQty) || 0;
+      groups.set(key, cur);
+    }
+    return [...groups.values()].some((g) => g.accepted !== g.ordered);
   };
 
   const handleComplete = () => {
     if (!validateForm()) return;
-
-    const hasMismatch = items.some((it) => it.differenceQty !== 0);
-    if (hasMismatch) {
+    if (hasGroupMismatch()) {
       setIsMismatchModalOpen(true);
       return;
     }
-
     executeCompleteReceipt('CONFIRMED');
   };
 
   const handleCompleteAndPrint = () => {
     if (!validateForm()) return;
-
-    const hasMismatch = items.some((it) => it.differenceQty !== 0);
-    if (hasMismatch) {
+    if (hasGroupMismatch()) {
       setIsMismatchModalOpen(true);
       return;
     }
-
     setIsPrintModalOpen(true);
   };
+
+  if (isLoading) {
+    return (
+      <div style={{ padding: 48, display: 'flex', justifyContent: 'center', gap: 8, color: '#64748b' }}>
+        <Loader2 size={18} className="animate-spin" />
+        Đang tải phiếu nhập kho...
+      </div>
+    );
+  }
 
   return (
     <div
@@ -493,145 +617,65 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
         gap: 14,
       }}
     >
-      {/* Toast feedback */}
       <AdminToast toast={toast} onClose={() => setToast(null)} />
 
-      {/* ── Top Header Navigation Bar ── */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          flexWrap: 'wrap',
-          gap: 12,
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <button
-            type="button"
-            onClick={() => navigate('/store-owner/goods-receipts')}
-            style={{
-              width: 34,
-              height: 34,
-              borderRadius: 8,
-              border: '1px solid #cbd5e1',
-              backgroundColor: '#ffffff',
-              color: '#334155',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
-              boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-            }}
-            title="Quay lại danh sách phiếu nhập kho"
-          >
-            <ArrowLeft size={16} />
-          </button>
-
-          <div>
-            <h1
-              style={{
-                fontSize: 18,
-                fontWeight: 800,
-                color: '#0f172a',
-                margin: 0,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-              }}
-            >
-              <PackageCheck size={20} color="#0d9488" />
-              <span>
-                {isViewMode
-                  ? `Chi tiết phiếu nhập kho ${grnNo}`
-                  : 'Lập phiếu nhập kho từ đơn PO (Goods Receipt Note)'}
-              </span>
-            </h1>
-            <p style={{ margin: '2px 0 0 0', fontSize: 12.5, color: '#64748b' }}>
-              Đối soát số lượng thực nhận, kiểm tra hạn sử dụng FEFO và tính chi phí nhập kho
-            </p>
-          </div>
-        </div>
-
-        {/* Role Toggle Pill Switcher */}
-        <div
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <button
+          type="button"
+          onClick={() => navigate(listPath)}
           style={{
-            display: 'flex',
-            alignItems: 'center',
-            backgroundColor: '#f1f5f9',
-            padding: 2,
+            width: 34,
+            height: 34,
             borderRadius: 8,
             border: '1px solid #cbd5e1',
+            backgroundColor: '#ffffff',
+            color: '#334155',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
           }}
-          title="Chuyển đổi góc nhìn vai trò"
+          title="Quay lại danh sách phiếu nhập kho"
         >
-          <button
-            type="button"
-            onClick={() => {
-              setRole('store_owner');
-              const params = new URLSearchParams(searchParams);
-              params.set('role', 'store_owner');
-              params.delete('branch');
-              setSearchParams(params, { replace: true });
-            }}
-            style={{
-              height: 28,
-              padding: '0 10px',
-              fontSize: 12,
-              fontWeight: role === 'store_owner' ? 700 : 500,
-              backgroundColor: role === 'store_owner' ? '#ffffff' : 'transparent',
-              color: role === 'store_owner' ? '#0f766e' : '#475569',
-              borderRadius: 6,
-              border: 'none',
-              boxShadow: role === 'store_owner' ? '0 1px 2px rgba(0,0,0,0.08)' : 'none',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 5,
-            }}
-          >
-            <ShieldCheck size={14} />
-            <span>Chủ cửa hàng</span>
-          </button>
+          <ArrowLeft size={16} />
+        </button>
 
-          <button
-            type="button"
-            onClick={() => {
-              setRole('employee');
-              const params = new URLSearchParams(searchParams);
-              params.set('role', 'employee');
-              params.set('branch', employeeBranchId);
-              setSearchParams(params, { replace: true });
-              setBranchId(employeeBranchId);
-            }}
+        <div>
+          <h1
             style={{
-              height: 28,
-              padding: '0 10px',
-              fontSize: 12,
-              fontWeight: role === 'employee' ? 700 : 500,
-              backgroundColor: role === 'employee' ? '#ffffff' : 'transparent',
-              color: role === 'employee' ? '#059669' : '#475569',
-              borderRadius: 6,
-              border: 'none',
-              boxShadow: role === 'employee' ? '0 1px 2px rgba(0,0,0,0.08)' : 'none',
-              cursor: 'pointer',
+              fontSize: 18,
+              fontWeight: 800,
+              color: '#0f172a',
+              margin: 0,
               display: 'flex',
               alignItems: 'center',
-              gap: 5,
+              gap: 8,
             }}
           >
-            <UserCheck size={14} />
-            <span>Thủ kho ({employeeBranchId})</span>
-          </button>
+            <PackageCheck size={20} color="#0d9488" />
+            <span>
+              {isConfirmMode
+                ? `Xác nhận nhập kho — ${grnNo}`
+                : isEditMode
+                  ? `Sửa phiếu nhập kho ${grnNo}`
+                  : isCreateMode
+                    ? 'Lập phiếu nhập kho từ đơn PO (Goods Receipt Note)'
+                    : `Chi tiết phiếu nhập kho ${grnNo}`}
+            </span>
+            {isSaving && <Loader2 size={16} className="animate-spin" color="#0d9488" />}
+          </h1>
+          <p style={{ margin: '2px 0 0 0', fontSize: 12.5, color: '#64748b' }}>
+            Đối soát số lượng thực nhận, kiểm tra hạn sử dụng FEFO và tính chi phí nhập kho
+          </p>
         </div>
       </div>
 
-      {/* ── Block 1: Header Info Card ── */}
       <GrnFormHeaderCard
         grnNo={grnNo}
         branchId={branchId}
         poReference={poReference}
         availablePos={availablePos}
+        branches={branches}
         supplierName={supplierName}
         supplierCode={supplierCode}
         receiptTime={receiptTime}
@@ -641,48 +685,44 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
         paymentMethod={paymentMethod}
         role={role}
         employeeBranchId={employeeBranchId}
-        readOnly={isViewMode}
+        readOnly={isReadOnly || !isCreateMode}
         onBranchChange={setBranchId}
-        onPoChange={setPoReference}
+        onPoChange={handlePoChange}
         onInvoiceNoChange={setInvoiceNo}
         onPaymentTermChange={setPaymentTerm}
         onPaymentMethodChange={setPaymentMethod}
       />
 
-      {/* ── Block 2: Product Entry & FEFO Table ── */}
       <GrnProductEntryTable
         items={items}
-        readOnly={isViewMode}
+        readOnly={isReadOnly}
         onItemChange={handleItemChange}
-        onAddNewRow={handleAddNewRow}
         onRemoveRow={handleRemoveRow}
+        onSplitLot={handleSplitLot}
       />
 
-      {/* ── Block 3: Cost Summary & Notes ── */}
       <GrnCostSummaryCard
         notes={notes}
         costs={costs}
-        readOnly={isViewMode}
+        readOnly={isReadOnly}
         onNotesChange={setNotes}
-        onLandedCostChange={setLandedCost}
         onDiscountChange={setDiscountAmount}
         onVatPercentChange={setVatPercent}
       />
 
-      {/* ── Block 4: Fixed Bottom Action Bar ── */}
       <GrnFormActionBar
-        readOnly={isViewMode}
-        isSaving={isSaving}
-        onCancel={() => navigate('/store-owner/goods-receipts')}
+        readOnly={isReadOnly}
+        onCancel={() => navigate(listPath)}
         onSaveDraft={handleSaveDraft}
         onCompleteAndPrint={handleCompleteAndPrint}
         onComplete={handleComplete}
       />
 
-      {/* Mismatch Confirmation Modal */}
       <GrnMismatchConfirmModal
         isOpen={isMismatchModalOpen}
-        mismatchedItems={items.filter((it) => it.differenceQty !== 0)}
+        mismatchedItems={items.filter(
+          (it) => (it.receivedQty || 0) !== it.orderedQty
+        )}
         onClose={() => setIsMismatchModalOpen(false)}
         onConfirm={() => {
           setIsMismatchModalOpen(false);
@@ -690,7 +730,6 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
         }}
       />
 
-      {/* Print Preview Modal */}
       <GrnPrintPreviewModal
         isOpen={isPrintModalOpen}
         grnNo={grnNo}
@@ -708,4 +747,5 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
     </div>
   );
 };
+
 export default GoodsReceiptFormPage;

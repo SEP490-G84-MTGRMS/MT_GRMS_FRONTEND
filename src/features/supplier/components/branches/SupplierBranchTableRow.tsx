@@ -1,17 +1,14 @@
 import type { FC } from 'react';
 import type { SupplierBranchAssignmentItem } from '../../types/supplier.types';
 import { SupplierStatusBadge } from '../SupplierStatusBadge';
-import { PauseCircle, CheckCircle2 } from 'lucide-react';
+import { Pencil } from 'lucide-react';
 
 interface SupplierBranchTableRowProps {
   item: SupplierBranchAssignmentItem;
-  onToggleStatus: (item: SupplierBranchAssignmentItem) => void;
+  onEdit: (item: SupplierBranchAssignmentItem) => void;
 }
 
-export const SupplierBranchTableRow: FC<SupplierBranchTableRowProps> = ({
-  item,
-  onToggleStatus,
-}) => {
+export const SupplierBranchTableRow: FC<SupplierBranchTableRowProps> = ({ item, onEdit }) => {
   return (
     <tr
       className="so-list-row"
@@ -27,7 +24,6 @@ export const SupplierBranchTableRow: FC<SupplierBranchTableRowProps> = ({
         e.currentTarget.style.backgroundColor = '#ffffff';
       }}
     >
-      {/* 1. Mã Cửa Hàng */}
       <td style={{ padding: '8px 14px', borderBottom: '1px solid #f1f5f9', whiteSpace: 'nowrap' }}>
         <span
           style={{
@@ -46,7 +42,6 @@ export const SupplierBranchTableRow: FC<SupplierBranchTableRowProps> = ({
         </span>
       </td>
 
-      {/* 2. Tên Cửa Hàng / Chi Nhánh */}
       <td className="so-list-td--wrap">
         <div
           className="so-list-name"
@@ -56,7 +51,6 @@ export const SupplierBranchTableRow: FC<SupplierBranchTableRowProps> = ({
         </div>
       </td>
 
-      {/* 3. Mã NCC */}
       <td style={{ padding: '8px 14px', borderBottom: '1px solid #f1f5f9', whiteSpace: 'nowrap' }}>
         <span
           style={{
@@ -75,41 +69,43 @@ export const SupplierBranchTableRow: FC<SupplierBranchTableRowProps> = ({
         </span>
       </td>
 
-      {/* 4. Tên Nhà Cung Cấp */}
       <td className="so-list-td--wrap">
         <div className="so-list-name" title={item.supplierName}>
           {item.supplierName}
         </div>
       </td>
 
-      {/* 5. Trạng Thái (Chuẩn SupplierStatusBadge) */}
+      <td style={{ padding: '8px 14px', borderBottom: '1px solid #f1f5f9', whiteSpace: 'nowrap' }}>
+        <span
+          title={item.deliveryDaysDisplay || '—'}
+          style={{
+            border: '1px solid #e2e8f0',
+            background: '#f8fafc',
+            borderRadius: 6,
+            padding: '3px 8px',
+            fontSize: 12,
+            fontWeight: 600,
+            color: '#0f766e',
+            fontFamily: 'var(--font-mono, monospace)',
+          }}
+        >
+          {item.deliveryDaysDisplay || '—'}
+        </span>
+      </td>
+
       <td style={{ padding: '8px 14px', borderBottom: '1px solid #f1f5f9', whiteSpace: 'nowrap', textAlign: 'center' }}>
         <SupplierStatusBadge status={item.status} />
       </td>
 
-      {/* 6. Thao Tác */}
       <td style={{ padding: '8px 14px', borderBottom: '1px solid #f1f5f9', textAlign: 'right', whiteSpace: 'nowrap' }}>
         <button
           type="button"
-          className={`so-list-action-btn${item.status === 'Active' ? '' : ' so-list-action-btn--success'}`}
-          onClick={() => onToggleStatus(item)}
-          title={
-            item.status === 'Active'
-              ? `Tạm ngưng phân bổ ${item.supplierName} tại ${item.branchName}`
-              : `Kích hoạt phân bổ ${item.supplierName} tại ${item.branchName}`
-          }
+          className="so-list-action-btn"
+          onClick={() => onEdit(item)}
+          title={`Chỉnh sửa phân bổ ${item.supplierName} tại ${item.branchName}`}
         >
-          {item.status === 'Active' ? (
-            <>
-              <PauseCircle size={13} color="#64748b" />
-              <span>Tạm ngưng</span>
-            </>
-          ) : (
-            <>
-              <CheckCircle2 size={13} color="#0f766e" />
-              <span>Kích hoạt</span>
-            </>
-          )}
+          <Pencil size={13} color="#0f766e" />
+          <span>Chỉnh sửa</span>
         </button>
       </td>
     </tr>

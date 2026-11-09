@@ -237,6 +237,10 @@ export interface SupplierBranchAssignmentItem {
   assignedAt: string;
   status: 'Active' | 'Inactive';
   inactiveReason?: string;
+  /** Mon..Sun */
+  deliveryDays?: string[];
+  /** VD: T2, T4, T6 */
+  deliveryDaysDisplay?: string;
 }
 
 export interface SupplierBranchFilterState {
@@ -259,5 +263,12 @@ export interface AssignSupplierToBranchesInput {
 export interface AssignSuppliersToBranchInput {
   branchId: string;
   supplierIds: string[];
+  items?: Array<{
+    supplierId: string;
+    deliveryDays: string[];
+  }>;
+  /** Mặc định Active; Inactive cần inactiveReason */
+  status?: 'Active' | 'Inactive';
+  inactiveReason?: string;
 }
 

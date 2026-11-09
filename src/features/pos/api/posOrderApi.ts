@@ -1,4 +1,5 @@
 import { httpClient } from '../../../api/httpClient';
+import { generateUuidV7 } from '../../../utils/uuid';
 import type { Product, Customer } from '../types/pos.types';
 
 export interface OrderItemCreateDto {
@@ -7,6 +8,8 @@ export interface OrderItemCreateDto {
   unitPrice: number;
   discountAmount?: number;
   productName?: string;
+  unitId?: string;
+  unitName?: string;
 }
 
 export interface OrderCreateRequest {
@@ -19,6 +22,10 @@ export interface OrderCreateRequest {
   managerBypassCode?: string | null;
   note?: string | null;
   creatorRole?: string | null;
+  cashierName?: string | null;
+  shiftId?: string | null;
+  pointsRedeemed?: number | null;
+  voucherCode?: string | null;
 }
 
 export interface OrderItemResponse {
@@ -61,11 +68,64 @@ export interface PrintOrderResponse {
 
 export const posOrderApi = {
   /**
-   * Lấy danh sách toàn bộ sản phẩm thực tế từ Backend CSDL (PostgreSQL)
+   * Lấy danh sách sản phẩm kinh doanh tại chi nhánh từ Backend CSDL (PostgreSQL).
+   * Ưu tiên tải từ /branches/{branchId}/products (chứa RetailPrice, CurrentStock, UnitPrices từ BranchProducts)
+   * và tự động fallback về /products nếu chi nhánh chưa có danh mục riêng.
    */
-  getAllProducts: async (): Promise<Product[]> => {
+  getAllProducts: async (branchId?: string): Promise<Product[]> => {
+    if (branchId) {
+      try {
+        const res = await httpClient.get(`/branches/${branchId}/products`, {
+          params: { PageSize: 500, Status: 'Active' },
+        });
+        const paged = res.data?.data;
+        const items = Array.isArray(paged?.items)
+          ? paged.items
+          : Array.isArray(paged)
+          ? paged
+          : Array.isArray(res.data)
+          ? res.data
+          : [];
+
+        if (items.length > 0) {
+          return items.map((p: any) => ({
+            id: p.productId || p.id,
+            sku: p.sku || p.productCode || '',
+            barcode: p.barcode || '',
+            name: p.name || p.productName || '',
+            imageUrl: p.imageUrl,
+            spec: '',
+            shelfLocation: p.shelfLocation,
+            category: p.category || 'Bách hóa',
+            baseUnit: p.unit || p.baseUnit || 'Cái',
+            basePrice: p.retailPrice ?? p.basePrice ?? p.sellingPrice ?? 0,
+            costPrice: p.costPrice || 0,
+            quantityOnHand: p.currentStock ?? 100,
+            batchCode: 'LÔ-FEFO',
+            unitPrices: Array.isArray(p.unitPrices)
+              ? p.unitPrices.map((u: any) => ({
+                  unitId: u.unitId,
+                  unitName: u.unitName,
+                  conversionRate: Number(u.conversionRate ?? 1),
+                  price: Number(u.price ?? 0),
+                  isBaseUnit: Boolean(u.isBaseUnit),
+                }))
+              : undefined,
+          }));
+        }
+      } catch (err) {
+        console.warn('Backend branch products load failed, falling back to /products:', err);
+      }
+    }
+
     const res = await httpClient.get('/products');
-    const rawList = res.data?.data || res.data || [];
+    const rawList = Array.isArray(res.data?.data?.items)
+      ? res.data.data.items
+      : Array.isArray(res.data?.data)
+      ? res.data.data
+      : Array.isArray(res.data)
+      ? res.data
+      : [];
     return rawList.map((p: any) => ({
       id: p.id,
       sku: p.sku || p.productCode || '',
@@ -87,22 +147,28 @@ export const posOrderApi = {
    */
   getAllCustomers: async (): Promise<Customer[]> => {
     const res = await httpClient.get('/customers');
-    const rawList = res.data?.data || res.data || [];
+    const rawList = Array.isArray(res.data?.data?.items)
+      ? res.data.data.items
+      : Array.isArray(res.data?.data)
+      ? res.data.data
+      : Array.isArray(res.data)
+      ? res.data
+      : [];
     return rawList.map((c: any) => ({
       id: c.id,
-      code: c.code || c.customerCode || '',
-      name: c.name || '',
-      phone: c.phone || '',
+      code: c.customerCode || c.code || '',
+      name: c.fullName || c.name || '',
+      phone: c.phoneNumber || c.phone || '',
       email: c.email || '',
       address: c.address || '',
       area: 'Hà Nội',
       ward: '',
-      gender: 'Nam',
+      gender: c.gender || 'Nam',
       group: c.membershipTier || 'Khách hàng',
-      loyaltyPoints: c.loyaltyPoints || 0,
+      loyaltyPoints: c.loyaltyPoints ?? c.rewardPoints ?? 0,
       membershipTier: c.membershipTier || 'Standard',
       debtLimit: c.debtLimit || 0,
-      currentDebt: c.currentDebt || 0,
+      currentDebt: c.currentDebtAR ?? c.currentDebt ?? c.totalDebt ?? 0,
       allowDebt: Boolean(c.allowDebt),
       note: c.isBlockedForDebt ? 'Đang bị khóa nợ' : '',
     }));
@@ -112,9 +178,13 @@ export const posOrderApi = {
    * Tạo đơn hàng bán lẻ POS, tự động trừ kho FEFO, tích điểm và xử lý công nợ
    */
   createOrder: async (data: OrderCreateRequest, idempotencyKey?: string): Promise<OrderResponse> => {
-    const key = idempotencyKey || (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : 'idemp-' + Date.now() + '-' + Math.random().toString(36).substring(2, 9));
-    const response = await httpClient.post<OrderResponse>('/orders', data, { headers: { 'Idempotency-Key': key } });
-    return response.data;
+    const key = idempotencyKey || generateUuidV7();
+    const response = await httpClient.post<any>('/orders', data, {
+      headers: {
+        'Idempotency-Key': key,
+      },
+    });
+    return response.data?.data ?? response.data;
   },
 
   /**
@@ -150,8 +220,8 @@ export const posOrderApi = {
       subtotal: receiptData.totalItemAmount || 0,
       discountPercent: 0,
       discountAmount: (receiptData.orderDiscountAmount || 0) + (receiptData.pointsDiscountAmount || 0),
-      vatPercent: 1,
-      vatAmount: receiptData.vatAmount || 0,
+      vatPercent: 0,
+      vatAmount: 0,
       finalTotal: receiptData.finalAmount || 0,
       cashReceived: receiptData.cashTendered || receiptData.finalAmount || 0,
       cashChange: Math.max(0, (receiptData.cashTendered || 0) - (receiptData.finalAmount || 0)),
@@ -181,6 +251,7 @@ export const posOrderApi = {
         const backendRes = await httpClient.post<PrintOrderResponse>(`/orders/${receiptData.orderId}/print`, {
           printerName: 'POS-58',
           cashTendered: receiptData.cashTendered,
+          cashierName: receiptData.cashierName,
         });
         if (backendRes.data?.success) {
           return backendRes.data;
@@ -209,7 +280,7 @@ export const posOrderApi = {
    */
   getOrders: async (params?: any): Promise<{ items: any[]; totalCount: number }> => {
     const res = await httpClient.get('/orders', { params });
-    return res.data;
+    return res.data?.data || res.data || { items: [], totalCount: 0 };
   },
 
   /**
@@ -231,7 +302,7 @@ export const posOrderApi = {
   /**
    * Hoàn tất giao hàng đơn đặt trước
    */
-  fulfillPreOrder: async (orderId: string, data: { paymentMethod: string; amountPaid: number; note?: string }): Promise<any> => {
+  fulfillPreOrder: async (orderId: string, data: { paymentMethod: string; amountPaid: number; note?: string; cashierName?: string; shiftId?: string }): Promise<any> => {
     const res = await httpClient.put(`/orders/${orderId}/fulfill`, data);
     return res.data;
   },

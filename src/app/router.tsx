@@ -4,6 +4,7 @@ import { WebStoreLayout } from '../layouts/WebStoreLayout';
 import { AuthLayout } from '../layouts/AuthLayout';
 import { HomePage } from '../pages/HomePage';
 import { StoreOwnerLayout } from '../layouts/StoreOwnerLayout';
+import { EmployeeLayout } from '../layouts/EmployeeLayout';
 import { AdminLayout } from '../layouts/AdminLayout';
 import { AdminDashboardPage } from '../pages/admin/AdminDashboardPage';
 import { StoreOwnerDashboardPage } from '../features/store-owner-dashboard/pages/StoreOwnerDashboardPage';
@@ -22,6 +23,7 @@ import {
   BranchOrderListPage,
   EmployeeOrderMatrixPage,
   SupplierOrderDispatchHubPage,
+  SupplierDispatchDetailPage,
   StoreOwnerPurchaseOrderListPage,
 } from '../features/purchase-order';
 
@@ -66,6 +68,7 @@ import {
 import {
   EmployeeListPage,
   WorkSchedulePage,
+  ShiftConfigPage,
   AttendancePage,
   PayslipManagementPage,
 } from '../features/employee';
@@ -102,6 +105,8 @@ import { FinanceOverviewPage } from '../features/finance/pages/FinanceOverviewPa
 import { StoreSettingsHubPage } from '../pages/store/StoreSettingsHubPage';
 import { AccountManagementPage } from '../pages/store/AccountManagementPage';
 import { ProtectedRoute } from '../components/auth/ProtectedRoute';
+import { StorePaymentConfigPage } from '../features/pos/pages/StorePaymentConfigPage';
+import { StorePosCashControlPage } from '../features/pos/pages/StorePosCashControlPage';
 
 export const router = createBrowserRouter([
   {
@@ -320,6 +325,14 @@ export const router = createBrowserRouter([
         element: <StoreSettingsHubPage />,
       },
       {
+        path: 'payment-config',
+        element: <StorePaymentConfigPage />,
+      },
+      {
+        path: 'pos-cash-control',
+        element: <StorePosCashControlPage />,
+      },
+      {
         path: 'account',
         element: <AccountManagementPage />,
       },
@@ -388,6 +401,10 @@ export const router = createBrowserRouter([
         element: <SupplierOrderDispatchHubPage />,
       },
       {
+        path: 'purchase-orders/dispatch-hub/:supplierId',
+        element: <SupplierDispatchDetailPage />,
+      },
+      {
         path: 'purchase-orders/cutoff-hub',
         element: <SupplierOrderDispatchHubPage />,
       },
@@ -413,7 +430,7 @@ export const router = createBrowserRouter([
       },
       {
         path: 'goods-receipts/:id/confirm',
-        element: <GoodsReceiptDetailPage defaultRole="store_owner" />,
+        element: <GoodsReceiptFormPage defaultRole="store_owner" />,
       },
       {
         path: 'purchase-orders/receipts',
@@ -516,6 +533,10 @@ export const router = createBrowserRouter([
         ),
       },
       {
+        path: 'employees/shifts',
+        element: <ShiftConfigPage />,
+      },
+      {
         path: 'employees/attendance',
         element: (
           <ProtectedRoute allowedRoles={['STORE_OWNER', 'ADMIN', 'StoreOwner', 'Admin']}>
@@ -555,6 +576,18 @@ export const router = createBrowserRouter([
         path: 'invoices',
         element: <InvoiceManagementPage />,
       },
+          {
+            path: 'payment-config',
+            element: <StorePaymentConfigPage />,
+          },
+          {
+            path: 'pos-cash-control',
+            element: <StorePosCashControlPage />,
+          },
+          {
+            path: 'shifts',
+            element: <PosShiftPage />,
+          },
     ],
   },
 
@@ -642,6 +675,10 @@ export const router = createBrowserRouter([
       {
         path: 'employees/schedule',
         element: <WorkSchedulePage />,
+      },
+      {
+        path: 'employees/shifts',
+        element: <ShiftConfigPage />,
       },
       {
         path: 'employees/attendance',
@@ -733,12 +770,36 @@ export const router = createBrowserRouter([
         element: <WorkSchedulePage />,
       },
       {
+        path: 'shifts',
+        element: <ShiftConfigPage />,
+      },
+      {
         path: 'attendance',
         element: <AttendancePage />,
       },
       {
         path: 'payroll',
         element: <PayslipManagementPage />,
+      },
+    ],
+  },
+
+  // ─── EMPLOYEE PORTAL (/employee) ───
+  {
+    path: '/employee',
+    element: <EmployeeLayout />,
+    children: [
+      {
+        index: true,
+        element: <Navigate to="/employee/schedule" replace />,
+      },
+      {
+        path: 'schedule',
+        element: <WorkSchedulePage />,
+      },
+      {
+        path: 'attendance',
+        element: <AttendancePage />,
       },
     ],
   },
@@ -1037,7 +1098,7 @@ export const router = createBrowserRouter([
       },
       {
         path: 'goods-receipts/:id/confirm',
-        element: <GoodsReceiptDetailPage defaultRole="employee" />,
+        element: <GoodsReceiptFormPage defaultRole="employee" />,
       },
     ],
   },
@@ -1065,7 +1126,7 @@ export const router = createBrowserRouter([
       },
       {
         path: ':id/confirm',
-        element: <GoodsReceiptDetailPage defaultRole="store_owner" />,
+        element: <GoodsReceiptFormPage defaultRole="store_owner" />,
       },
     ],
   },
@@ -1091,7 +1152,7 @@ export const router = createBrowserRouter([
       },
       {
         path: ':id/confirm',
-        element: <GoodsReceiptDetailPage defaultRole="employee" />,
+        element: <GoodsReceiptFormPage defaultRole="employee" />,
       },
     ],
   },

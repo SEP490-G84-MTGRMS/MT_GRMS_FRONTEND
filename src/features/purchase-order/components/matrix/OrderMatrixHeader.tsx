@@ -1,8 +1,16 @@
 import type { FC } from 'react';
 import { Grid } from 'lucide-react';
 
+export interface MatrixDaySummary {
+  openDays: number;
+  finalizedDays: number;
+  lockedDays: number;
+}
+
 interface OrderMatrixHeaderProps {
-  status: string;
+  /** @deprecated Matrix không còn 1 status DRAFT toàn màn — dùng daySummary */
+  status?: string;
+  daySummary?: MatrixDaySummary;
   onBack: () => void;
   onSave?: () => void;
   onGoToCutoffHub?: () => void;
@@ -17,6 +25,7 @@ interface OrderMatrixHeaderProps {
 
 export const OrderMatrixHeader: FC<OrderMatrixHeaderProps> = ({
   status,
+  daySummary,
   onBack,
   onSave,
   onGoToCutoffHub,
@@ -28,6 +37,11 @@ export const OrderMatrixHeader: FC<OrderMatrixHeaderProps> = ({
   onSwitchScreen,
   switchScreenLabel,
 }) => {
+  const summaryLabel = daySummary
+    ? daySummary.finalizedDays > 0 || daySummary.lockedDays > 0
+      ? `${daySummary.openDays} ngày còn mở · ${daySummary.finalizedDays} đã chốt · ${daySummary.lockedDays} khóa`
+      : `${daySummary.openDays} ngày còn mở`
+    : null;
   return (
     <div
       style={{
@@ -167,19 +181,36 @@ export const OrderMatrixHeader: FC<OrderMatrixHeaderProps> = ({
           </span>
         )}
 
-        <span
-          style={{
-            fontSize: 12,
-            fontWeight: 700,
-            padding: '4px 12px',
-            borderRadius: 'var(--radius-pill)',
-            backgroundColor: status === 'APPROVED' ? 'var(--green-light)' : 'var(--bg-soft-blue)',
-            color: status === 'APPROVED' ? 'var(--green-money)' : 'var(--blue-primary)',
-            border: `1px solid ${status === 'APPROVED' ? 'var(--green-border)' : 'var(--blue-border)'}`,
-          }}
-        >
-          Trạng thái: <b>{status}</b>
-        </span>
+        {summaryLabel ? (
+          <span
+            style={{
+              fontSize: 12,
+              fontWeight: 700,
+              padding: '4px 12px',
+              borderRadius: 'var(--radius-pill)',
+              backgroundColor: daySummary && daySummary.finalizedDays > 0 ? '#ecfdf5' : 'var(--bg-soft-blue)',
+              color: daySummary && daySummary.finalizedDays > 0 ? '#047857' : 'var(--blue-primary)',
+              border: `1px solid ${daySummary && daySummary.finalizedDays > 0 ? '#a7f3d0' : 'var(--blue-border)'}`,
+            }}
+            title="Trạng thái theo từng ngày giao, không phải cả ma trận"
+          >
+            {summaryLabel}
+          </span>
+        ) : status && status.toUpperCase() !== 'DRAFT' ? (
+          <span
+            style={{
+              fontSize: 12,
+              fontWeight: 700,
+              padding: '4px 12px',
+              borderRadius: 'var(--radius-pill)',
+              backgroundColor: 'var(--bg-soft-blue)',
+              color: 'var(--blue-primary)',
+              border: '1px solid var(--blue-border)',
+            }}
+          >
+            {status}
+          </span>
+        ) : null}
 
         <button
           type="button"
