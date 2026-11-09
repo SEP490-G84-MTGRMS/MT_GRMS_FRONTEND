@@ -1,9 +1,10 @@
 import { httpClient } from '../../api/httpClient';
-import type { ApiResponse } from '../../api/types';
 import {
   ApiError,
   SystemRoles,
-  type SystemRole,
+  UserRoleEnum,
+  type UserRole,
+  type UserRoleType,
   type AuthResponse,
   type LoginCredentials,
   type RegisterPayload,
@@ -26,29 +27,24 @@ type BackendLoginUser = {
   isAdmin?: boolean;
 };
 
-type BackendLoginPayload = {
-  accessToken: string;
-  refreshToken?: string;
-  expiresAt?: string;
-  user: BackendLoginUser;
-};
-
-function mapRole(roleName?: string): SystemRole {
-  const role = (roleName || '').toUpperCase();
-  if (role === SystemRoles.ADMIN) return SystemRoles.ADMIN;
-  if (role === SystemRoles.STORE_OWNER) return SystemRoles.STORE_OWNER;
-  return SystemRoles.STAFF;
+function mapRole(roleName?: string): UserRole {
+  const role = (roleName || '').trim().toUpperCase();
+  if (role === 'ADMIN' || role === 'SUPER_ADMIN') return UserRoleEnum.ADMIN;
+  if (role === 'STORE_OWNER' || role === 'TENANT_ADMIN' || role === 'OWNER') return UserRoleEnum.STORE_OWNER;
+  return UserRoleEnum.STAFF;
 }
 
 function mapLoginUser(user: BackendLoginUser): UserProfile {
   const isUserAdmin = Boolean(
     user.isAdmin ?? (user.role === 'ADMIN' || user.roleName === 'ADMIN')
   );
+  const resolvedRole = isUserAdmin ? UserRoleEnum.ADMIN : mapRole(user.roleName || user.role);
   return {
     id: user.id,
     email: user.email,
     fullName: user.fullName,
-    role: isUserAdmin ? SystemRoles.ADMIN : mapRole(user.roleName || user.role),
+    role: resolvedRole,
+    userRole: resolvedRole as UserRoleType,
     tenantId: user.tenantId || SEED_TENANT_ID,
     branchId: user.branchId || undefined,
     phone: user.phone,
@@ -56,15 +52,16 @@ function mapLoginUser(user: BackendLoginUser): UserProfile {
   };
 }
 
-export function unwrapLogin(body: ApiResponse<BackendLoginPayload> | BackendLoginPayload | undefined): AuthResponse | null {
+export function unwrapLogin(body: any): AuthResponse | null {
   if (!body) return null;
-  const payload = 'data' in body && body.data ? body.data : (body as BackendLoginPayload);
-  if (!payload?.accessToken || !payload.user) return null;
+  const payload = 'data' in body && body.data ? body.data : body;
+  const rawUser = payload?.user || payload;
+  if (!rawUser?.id && !rawUser?.username && !rawUser?.email) return null;
   return {
-    accessToken: payload.accessToken,
-    refreshToken: payload.refreshToken,
-    expiresIn: 3600,
-    user: mapLoginUser(payload.user),
+    accessToken: payload?.accessToken || '',
+    refreshToken: payload?.refreshToken,
+    expiresIn: 7200,
+    user: mapLoginUser(rawUser),
   };
 }
 
@@ -338,34 +335,15 @@ export const authService = {
         tenantCode: credentials.tenantCode,
       });
 
-      const resData = response.data;
-      const loginData = resData?.data || resData;
-
-      if (!loginData?.accessToken) {
-        throw new Error('Dữ liệu phản hồi xác thực không hợp lệ.');
+      const unwrap = unwrapLogin(response.data);
+      if (unwrap) {
+        if (unwrap.user?.tenantId) {
+          localStorage.setItem('tenant_id', unwrap.user.tenantId);
+        }
+        return unwrap;
       }
 
-      const isUserAdmin = Boolean(
-        loginData.user?.isAdmin ?? (loginData.user?.role === 'ADMIN' || loginData.user?.roleName === 'ADMIN')
-      );
-
-      return {
-        accessToken: loginData.accessToken,
-        refreshToken: loginData.refreshToken,
-        expiresIn: 7200,
-        user: {
-          id: loginData.user?.id || 'usr_admin',
-          email: loginData.user?.email || 'admin@mtgrms.vn',
-          fullName: loginData.user?.fullName || 'Super Admin',
-          role: isUserAdmin
-            ? SystemRoles.ADMIN
-            : mapRole(loginData.user?.roleName || loginData.user?.role),
-          tenantId: loginData.user?.tenantId || 'DEFAULT',
-          branchId: loginData.user?.branchId,
-          phone: loginData.user?.phone || phoneClean,
-          isAdmin: isUserAdmin,
-        },
-      };
+      throw new Error('Dữ liệu phản hồi xác thực không hợp lệ.');
     } catch (err: any) {
       // Kiểm tra tài khoản demo nếu backend offline hoặc chưa có bản ghi mới
       const phoneClean = credentials.email.trim().replace(/\s+/g, '');
@@ -527,6 +505,28 @@ export const authService = {
   },
 
   /**
+   * Lấy thông tin tài khoản hiện tại từ HttpOnly Cookie
+   */
+  async getMe(): Promise<UserProfile> {
+    try {
+      const response = await httpClient.get<any>('/auth/me');
+      const unwrap = unwrapLogin(response.data);
+      if (!unwrap?.user) {
+        throw new Error('Chưa xác thực danh tính.');
+      }
+      if (unwrap.user.tenantId) {
+        localStorage.setItem('tenant_id', unwrap.user.tenantId);
+      }
+      return unwrap.user;
+    } catch (err: any) {
+      if (err instanceof ApiError) throw err;
+      const status = err.response?.status ?? 401;
+      const message = err.response?.data?.message || 'Chưa đăng nhập hoặc phiên đã hết hạn.';
+      throw new ApiError(status, message, 'UNAUTHORIZED', err.response?.data, err.response);
+    }
+  },
+
+  /**
    * Đăng xuất khỏi hệ thống
    */
   async logout(): Promise<void> {
@@ -534,6 +534,10 @@ export const authService = {
       await httpClient.post('/auth/logout');
     } catch {
       // Bỏ qua lỗi mạng khi logout trên môi trường test/dev
+    } finally {
+      localStorage.removeItem('auth_user');
+      localStorage.removeItem('tenant_id');
+      localStorage.removeItem('access_token');
     }
   },
 };

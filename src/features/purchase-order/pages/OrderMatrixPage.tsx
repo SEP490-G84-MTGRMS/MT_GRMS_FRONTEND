@@ -305,7 +305,7 @@ function buildEmptyCellMap(
 }
 
 export interface OrderMatrixPageProps {
-  forcedRole?: 'STORE_OWNER' | 'STAFF';
+  forcedRole?: 'STORE_OWNER' | 'STAFF' | 'EMPLOYEE';
 }
 
 export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
@@ -386,7 +386,7 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
   const userRole = useAuthStore((s) => s.user?.role);
   const isStoreOwner = useMemo(() => {
     if (forcedRole === 'STORE_OWNER') return true;
-    if (forcedRole === 'STAFF') return false;
+    if (forcedRole === 'STAFF' || forcedRole === 'EMPLOYEE') return false;
     if (roleParam === 'employee' || roleParam === 'staff') return false;
     if (roleParam === 'owner' || roleParam === 'store_owner') return true;
     return userRole === 'STORE_OWNER' || userRole === 'ADMIN';

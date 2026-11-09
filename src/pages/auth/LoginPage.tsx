@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { FC, FormEvent } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   ArrowLeft,
   Phone,
@@ -18,6 +18,8 @@ import { useAuthStore } from "../../stores/useAuthStore";
 
 export const LoginPage: FC = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const redirectUrl = searchParams.get("redirect");
   const setAuth = useAuthStore((state) => state.setAuth);
 
   const [phoneOrEmail, setPhoneOrEmail] = useState("admin@mtgrms.vn");
@@ -27,6 +29,9 @@ export const LoginPage: FC = () => {
 
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [sessionExpiredNotice] = useState<string | null>(
+    redirectUrl ? "Phiên làm việc đã hết hạn. Vui lòng đăng nhập lại để tiếp tục." : null
+  );
 
   const handleLoginSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -50,13 +55,21 @@ export const LoginPage: FC = () => {
         rememberMe,
       });
 
-      setAuth(res.user, res.accessToken);
+      setAuth(res.user);
+
+      // Nếu có redirectUrl, ưu tiên đưa người dùng về đúng màn hình đang làm dở
+      if (redirectUrl && !redirectUrl.startsWith("/auth") && redirectUrl !== "/login") {
+        navigate(redirectUrl, { replace: true });
+        return;
+      }
 
       // Điều hướng thông minh theo vai trò
       if (res.user.isAdmin || res.user.role === "ADMIN") {
         navigate("/admin/dashboard");
       } else if (res.user.role === "STAFF") {
         navigate("/employee/schedule");
+      } else if (res.user.role === "CASHIER" || res.user.role === "EMPLOYEE") {
+        navigate("/pos");
       } else {
         navigate("/store-owner/dashboard");
       }
@@ -180,6 +193,35 @@ export const LoginPage: FC = () => {
             Quên mật khẩu?
           </Link>
         </div>
+
+        {/* Thông báo phiên hết hạn màu vàng hổ phách nếu được chuyển hướng về */}
+        {sessionExpiredNotice && !errorMessage && (
+          <div
+            className="auth-alert auth-alert-warning"
+            role="status"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              padding: "10px 14px",
+              backgroundColor: "#FFFBEB",
+              border: "1px solid #FCD34D",
+              borderRadius: "10px",
+              color: "#D97706",
+              fontSize: "13.5px",
+              fontWeight: 600,
+              margin: "6px 0 8px 0",
+              lineHeight: 1.4,
+            }}
+          >
+            <AlertCircle
+              size={17}
+              strokeWidth={2.2}
+              style={{ flexShrink: 0, color: "#D97706" }}
+            />
+            <span style={{ color: "#D97706" }}>{sessionExpiredNotice}</span>
+          </div>
+        )}
 
         {/* Thông báo lỗi màu đỏ chuyển xuống bên dưới */}
         {errorMessage && (

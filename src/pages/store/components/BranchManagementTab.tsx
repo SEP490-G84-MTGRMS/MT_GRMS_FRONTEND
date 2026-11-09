@@ -3,7 +3,6 @@ import { useState, useEffect, type FC } from 'react';
 import {
   Search,
   Building2,
-  Edit2,
   Power,
   RefreshCw,
   MapPin,
@@ -11,6 +10,8 @@ import {
   User,
   CheckCircle2,
   XCircle,
+  Trash2,
+  Eye,
 } from 'lucide-react';
 import {
   branchManagementApi,
@@ -20,6 +21,7 @@ import {
 import { BranchQuotaBar } from './BranchQuotaBar';
 import { BranchFormModal } from './BranchFormModal';
 import { BranchUpgradeModal } from './BranchUpgradeModal';
+import { BranchDetailModal } from './BranchDetailModal';
 
 interface BranchManagementTabProps {
   onGoToSubscriptions: () => void;
@@ -34,7 +36,7 @@ export const BranchManagementTab: FC<BranchManagementTabProps> = ({
   const [keyword, setKeyword] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
-  const [activeModal, setActiveModal] = useState<'create' | 'edit' | 'upgrade' | null>(null);
+  const [activeModal, setActiveModal] = useState<'create' | 'edit' | 'upgrade' | 'detail' | null>(null);
   const [selectedBranch, setSelectedBranch] = useState<BranchItemResponse | null>(null);
 
   // 1. Tải hạn mức chi nhánh (Quota) - chỉ cần gọi 1 lần khi mount hoặc khi thêm/sửa chi nhánh
@@ -94,9 +96,40 @@ export const BranchManagementTab: FC<BranchManagementTabProps> = ({
       const res = await branchManagementApi.toggleStatus(branch.id, nextActive);
       if (res.success) {
         await Promise.all([fetchQuota(), fetchBranches(keyword, statusFilter)]);
+      } else {
+        alert(res.message || 'Không thể thay đổi trạng thái chi nhánh.');
       }
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('Toggle status error:', err);
+      const anyErr = err as { response?: { data?: { message?: string } }; message?: string };
+      const msg = anyErr?.response?.data?.message || anyErr?.message || 'Lỗi khi thay đổi trạng thái chi nhánh.';
+      alert(msg);
+    }
+  };
+
+  const handleDeleteBranch = async (branch: BranchItemResponse) => {
+    if (branch.isHeadquarter) {
+      alert('Không thể xóa chi nhánh chính (Trụ sở chính) của chuỗi cửa hàng.');
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Bạn có chắc chắn muốn xóa chi nhánh "${branch.name}" (${branch.code})?\n\nHành động này sẽ xóa chi nhánh và giải phóng hạn mức chi nhánh đang sử dụng của chuỗi cửa hàng.`
+    );
+    if (!confirmed) return;
+
+    try {
+      const res = await branchManagementApi.deleteBranch(branch.id);
+      if (res.success) {
+        await Promise.all([fetchQuota(), fetchBranches(keyword, statusFilter)]);
+      } else {
+        alert(res.message || 'Không thể xóa chi nhánh.');
+      }
+    } catch (err: unknown) {
+      console.error('Delete branch error:', err);
+      const anyErr = err as { response?: { data?: { message?: string } }; message?: string };
+      const msg = anyErr?.response?.data?.message || anyErr?.message || 'Lỗi khi xóa chi nhánh.';
+      alert(msg);
     }
   };
 
@@ -237,10 +270,18 @@ export const BranchManagementTab: FC<BranchManagementTabProps> = ({
                 return (
                   <tr
                     key={b.id}
+                    onClick={() => {
+                      setSelectedBranch(b);
+                      setActiveModal('detail');
+                    }}
                     style={{
                       borderBottom: '1px solid #F1F5F9',
                       transition: 'background-color 0.15s ease',
+                      cursor: 'pointer',
                     }}
+                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#F8FAFC')}
+                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                    title="Bấm vào hàng để xem chi tiết thông số chi nhánh"
                   >
                     {/* Mã */}
                     <td style={{ padding: '14px 20px' }}>
@@ -253,6 +294,8 @@ export const BranchManagementTab: FC<BranchManagementTabProps> = ({
                           borderRadius: 6,
                           background: '#EBF5FF',
                           color: '#0066FF',
+                          display: 'inline-block',
+                          boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
                         }}
                       >
                         {b.code}
@@ -261,8 +304,31 @@ export const BranchManagementTab: FC<BranchManagementTabProps> = ({
 
                     {/* Tên & Địa chỉ */}
                     <td style={{ padding: '14px 20px' }}>
-                      <div style={{ fontWeight: 700, color: '#0F172A', fontSize: 14 }}>
-                        {b.name}
+                      <div
+                        style={{
+                          fontWeight: 700,
+                          color: '#0F172A',
+                          fontSize: 14,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 6,
+                        }}
+                      >
+                        <span>{b.name}</span>
+                        {b.isHeadquarter && (
+                          <span
+                            style={{
+                              fontSize: 11,
+                              fontWeight: 700,
+                              color: '#B45309',
+                              backgroundColor: '#FEF3C7',
+                              padding: '1px 6px',
+                              borderRadius: 4,
+                            }}
+                          >
+                            Trụ sở chính
+                          </span>
+                        )}
                       </div>
                       <div
                         style={{
@@ -325,29 +391,32 @@ export const BranchManagementTab: FC<BranchManagementTabProps> = ({
 
                     {/* Thao tác */}
                     <td style={{ padding: '14px 20px', textAlign: 'center' }}>
-                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-                        {/* Sửa */}
+                      <div
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {/* Xem chi tiết */}
                         <button
                           type="button"
                           onClick={() => {
                             setSelectedBranch(b);
-                            setActiveModal('edit');
+                            setActiveModal('detail');
                           }}
                           style={{
                             width: 32,
                             height: 32,
                             borderRadius: 8,
                             border: '1px solid #CBD5E1',
-                            background: '#FFFFFF',
-                            color: '#334155',
+                            background: '#F0FDFA',
+                            color: '#0F766E',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
                             cursor: 'pointer',
                           }}
-                          title="Sửa thông tin chi nhánh"
+                          title="Xem chi tiết các thông số chi nhánh"
                         >
-                          <Edit2 size={15} />
+                          <Eye size={15} />
                         </button>
 
                         {/* Toggle Status */}
@@ -370,6 +439,29 @@ export const BranchManagementTab: FC<BranchManagementTabProps> = ({
                         >
                           <Power size={15} />
                         </button>
+
+                        {/* Xóa chi nhánh */}
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteBranch(b)}
+                          disabled={b.isHeadquarter}
+                          style={{
+                            width: 32,
+                            height: 32,
+                            borderRadius: 8,
+                            border: `1px solid ${b.isHeadquarter ? '#E2E8F0' : '#FECACA'}`,
+                            background: b.isHeadquarter ? '#F8FAFC' : '#FEF2F2',
+                            color: b.isHeadquarter ? '#CBD5E1' : '#EF4444',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            cursor: b.isHeadquarter ? 'not-allowed' : 'pointer',
+                            opacity: b.isHeadquarter ? 0.6 : 1,
+                          }}
+                          title={b.isHeadquarter ? 'Không thể xóa chi nhánh chính (Trụ sở chính)' : 'Xóa chi nhánh'}
+                        >
+                          <Trash2 size={15} />
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -384,6 +476,9 @@ export const BranchManagementTab: FC<BranchManagementTabProps> = ({
       {(activeModal === 'create' || activeModal === 'edit') && (
         <BranchFormModal
           branch={selectedBranch}
+          quota={quota}
+          existingBranches={branches}
+          onUpgrade={() => setActiveModal('upgrade')}
           onClose={() => {
             setActiveModal(null);
             setSelectedBranch(null);
@@ -404,6 +499,18 @@ export const BranchManagementTab: FC<BranchManagementTabProps> = ({
             setActiveModal(null);
             onGoToSubscriptions();
           }}
+        />
+      )}
+
+      {/* Modal Chi tiết & Chỉnh sửa trực tiếp chi nhánh */}
+      {activeModal === 'detail' && selectedBranch && (
+        <BranchDetailModal
+          branch={selectedBranch}
+          onClose={() => {
+            setActiveModal(null);
+            setSelectedBranch(null);
+          }}
+          onSuccess={loadData}
         />
       )}
     </div>

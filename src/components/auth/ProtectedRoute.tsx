@@ -12,7 +12,8 @@ export const ProtectedRoute: FC<ProtectedRouteProps> = ({ children, allowedRoles
   const location = useLocation();
 
   if (!isAuthenticated || !user) {
-    return <Navigate to="/auth/login" state={{ from: location }} replace />;
+    const currentPath = location.pathname + location.search;
+    return <Navigate to={`/auth/login?redirect=${encodeURIComponent(currentPath)}`} state={{ from: location }} replace />;
   }
 
   if (allowedRoles && allowedRoles.length > 0) {
