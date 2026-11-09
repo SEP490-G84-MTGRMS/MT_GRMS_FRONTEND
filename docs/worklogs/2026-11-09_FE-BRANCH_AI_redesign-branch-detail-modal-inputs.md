@@ -46,6 +46,10 @@
   - Bật / Tạm dừng hoạt động (icon Nguồn `Power`).
   - Xóa chi nhánh (icon Thùng rác `Trash2`).
 
+### 2.3. Tối giản hóa Modal Chi tiết chi nhánh (`BranchDetailModal.tsx`)
+- **Loại bỏ khu vực tabs và danh sách sản phẩm / nhân viên ở phía dưới**: Lược bỏ 2 tab "Sản phẩm kinh doanh" và "Đội ngũ nhân viên" cùng các bảng/khung empty state phía dưới. Giữ lại trọn vẹn 4 thẻ KPI chỉ số tổng quát (SKU, SOH, Cảnh báo tồn kho, Nhân sự, Đơn hàng).
+- Giúp modal gọn gàng, vừa vặn trọn vẹn màn hình, không bị cuộn dài và tập trung tối đa vào thông tin cơ bản & các chỉ số hoạt động cốt lõi.
+
 ---
 
 ## 3. Điểm Nhấn Kỹ Thuật (Technical Highlights)
