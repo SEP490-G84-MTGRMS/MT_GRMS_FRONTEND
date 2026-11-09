@@ -31,6 +31,7 @@ import { CashMovementModal } from '../components/modals/CashMovementModal';
 import { CloseShiftModal } from '../components/modals/CloseShiftModal';
 import { storeProductApi } from '../../product/api/storeProductApi';
 import { promotionApi, type LoyaltyConfigDto, type CartGiftItemDto } from '../../promotion/api/promotionApi';
+import { employeeApi } from '../../employee/api/employeeApi';
 import { useAuthStore } from '../../../stores/useAuthStore';
 import '../pos.css';
 
@@ -127,16 +128,32 @@ export const PosCheckoutPage: FC = () => {
   const [activeTabId, setActiveTabId] = useState<number>(() => getInitialActiveTabId(currentTenantId, tabs));
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'info' | 'error' } | null>(null);
   const [isInventoryLookupOpen, setIsInventoryLookupOpen] = useState(false);
+  const [dbBranches, setDbBranches] = useState<Array<{ id: string; name: string; address?: string; phone?: string }>>([]);
+
+  // Tải danh sách chi nhánh thực tế từ backend
+  useEffect(() => {
+    employeeApi.getBranches().then((list) => {
+      if (Array.isArray(list) && list.length > 0) {
+        setDbBranches(list.map((b) => ({
+          id: b.id,
+          name: b.name,
+          address: b.address,
+          phone: b.phone,
+        })));
+      }
+    }).catch(() => {});
+  }, []);
 
   // Danh sách các chi nhánh có sẵn theo cửa hàng
   const availableBranches = useMemo(() => {
+    if (dbBranches.length > 0) return dbBranches;
     if (isAnNhienStore) return AN_NHIEN_BRANCHES;
     return [
       { id: DEFAULT_GROCERY_BRANCH_ID, code: 'BR-01', name: 'Chi nhánh Cầu Giấy (Trung tâm)', address: 'Hà Nội', phone: '0901234567' },
       { id: 'BR-02', code: 'BR-02', name: 'Chi nhánh Ba Đình', address: 'Hà Nội', phone: '0907654321' },
       { id: 'BR-03', code: 'BR-03', name: 'Chi nhánh Đống Đa', address: 'Hà Nội', phone: '0908889999' },
     ];
-  }, [isAnNhienStore]);
+  }, [dbBranches, isAnNhienStore]);
 
   // Khởi tạo chi nhánh theo phân công vai trò
   const [activeBranch, setActiveBranch] = useState<{ id: string; name: string; address?: string; phone?: string }>(() => {
@@ -151,6 +168,19 @@ export const PosCheckoutPage: FC = () => {
       name: 'Chi nhánh Cầu Giấy (Trung tâm)',
     };
   });
+
+  // Tự động đồng bộ activeBranch sang chi nhánh thực tế khi dbBranches được tải
+  useEffect(() => {
+    if (dbBranches.length > 0) {
+      const userBranchId = (user as any)?.branchId;
+      const matched = userBranchId ? dbBranches.find((b) => b.id === userBranchId) : null;
+      if (matched) {
+        setActiveBranch(matched);
+      } else if (!dbBranches.some((b) => b.id === activeBranch.id)) {
+        setActiveBranch(dbBranches[0]);
+      }
+    }
+  }, [dbBranches, user]);
 
   const handleSelectBranch = (branchId: string) => {
     const target = availableBranches.find((b: { id: string; name: string }) => b.id === branchId);
@@ -647,6 +677,7 @@ export const PosCheckoutPage: FC = () => {
         productName: c.product.name,
         unitPrice: c.unitPrice,
         quantity: c.quantity,
+        conversionRate: c.conversionRate ?? 1,
       }));
 
       promotionApi

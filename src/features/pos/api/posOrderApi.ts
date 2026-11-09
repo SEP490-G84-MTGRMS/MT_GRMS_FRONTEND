@@ -117,11 +117,11 @@ export const posOrderApi = {
             baseUnit: p.unit || p.baseUnit || 'Cái',
             basePrice: p.retailPrice ?? p.basePrice ?? p.sellingPrice ?? 0,
             costPrice: p.costPrice || 0,
-            quantityOnHand: p.currentStock ?? 100,
+            quantityOnHand: p.currentStock ?? p.quantityOnHand ?? 0,
             batchCode: 'LÔ-FEFO',
             unitPrices: Array.isArray(p.unitPrices)
               ? p.unitPrices.map((u: any) => ({
-                  unitId: u.unitId,
+                  unitId: u.unitId || u.id,
                   unitName: u.unitName,
                   conversionRate: Number(u.conversionRate ?? 1),
                   price: Number(u.price ?? 0),
@@ -135,7 +135,7 @@ export const posOrderApi = {
       }
     }
 
-    const res = await httpClient.get('/products');
+    const res = await httpClient.get('/products?pageSize=100');
     const rawList = Array.isArray(res.data?.data?.items)
       ? res.data.data.items
       : Array.isArray(res.data?.data)
@@ -154,8 +154,17 @@ export const posOrderApi = {
       baseUnit: p.unitName || p.baseUnit || 'Cái',
       basePrice: p.basePrice || p.sellingPrice || 0,
       costPrice: p.costPrice || 0,
-      quantityOnHand: p.quantityOnHand ?? 100,
+      quantityOnHand: p.quantityOnHand ?? p.currentStock ?? 0,
       batchCode: 'LÔ-FEFO',
+      unitPrices: Array.isArray(p.unitPrices)
+        ? p.unitPrices.map((u: any) => ({
+            unitId: u.unitId || u.id,
+            unitName: u.unitName,
+            conversionRate: Number(u.conversionRate ?? 1),
+            price: Number(u.price ?? 0),
+            isBaseUnit: Boolean(u.isBaseUnit),
+          }))
+        : undefined,
     }));
   },
 

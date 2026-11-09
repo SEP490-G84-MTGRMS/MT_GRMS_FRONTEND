@@ -5,11 +5,13 @@ import { PromotionFilterBar } from '../components/promotions/PromotionFilterBar'
 import { PromotionTable } from '../components/promotions/PromotionTable';
 import { PromotionModal } from '../components/promotions/PromotionModal';
 import { promotionApi, type PromotionDto } from '../api/promotionApi';
-import type { PromotionItem, PromotionFilterState, PromotionType } from '../types/promotion.types';
+import { employeeApi } from '../../employee/api/employeeApi';
+import type { PromotionItem, PromotionFilterState, PromotionType, PromotionStatus } from '../types/promotion.types';
 import '../promotion.css';
 
 export const PromotionListPage: FC = () => {
   const [promotions, setPromotions] = useState<PromotionItem[]>([]);
+  const [dbBranches, setDbBranches] = useState<Array<{ id: string; name: string }>>([]);
   const [filter, setFilter] = useState<PromotionFilterState>({
     searchTerm: '',
     type: 'ALL',
@@ -18,6 +20,21 @@ export const PromotionListPage: FC = () => {
   });
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingPromo, setEditingPromo] = useState<PromotionItem | null>(null);
+
+  useEffect(() => {
+    employeeApi.getBranches().then((list) => {
+      if (Array.isArray(list)) {
+        setDbBranches(list.map((b) => ({ id: b.id, name: b.name })));
+      }
+    }).catch(() => {});
+  }, []);
+
+  const branchNames = useMemo(() => dbBranches.map((b) => b.name), [dbBranches]);
+  const branchMap = useMemo(() => {
+    const map = new Map<string, string>();
+    dbBranches.forEach((b) => map.set(b.id, b.name));
+    return map;
+  }, [dbBranches]);
 
   const mapDtoToItem = useCallback((dto: PromotionDto): PromotionItem => {
     let parsedTiers: any[] | null = null;
@@ -103,15 +120,36 @@ export const PromotionListPage: FC = () => {
           },
         ];
 
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const start = dto.startDate ? dto.startDate.slice(0, 10) : '';
+    const end = dto.endDate ? dto.endDate.slice(0, 10) : '';
+
+    let computedStatus: PromotionStatus = 'ACTIVE';
+    if (end && today > end) {
+      computedStatus = 'EXPIRED';
+    } else if (!dto.isActive) {
+      computedStatus = 'PAUSED';
+    } else if (start && today < start) {
+      computedStatus = 'UPCOMING';
+    } else {
+      computedStatus = 'ACTIVE';
+    }
+
+    const branches = dto.targetBranches
+      ? dto.targetBranches.split(',').map((b: string) => b.trim()).filter(Boolean)
+      : ['ALL'];
+
     return {
       id: dto.id,
       code: dto.promotionCode,
       name: dto.promotionName,
       type: (dto.type as PromotionType) || 'ORDER_DISCOUNT',
-      startDate: dto.startDate?.slice(0, 10) || '',
-      endDate: dto.endDate?.slice(0, 10) || '',
-      status: dto.isActive ? 'ACTIVE' : 'PAUSED',
-      branches: [dto.targetBranches || 'ALL'],
+      startDate: start,
+      endDate: end,
+      status: computedStatus,
+      isActive: Boolean(dto.isActive),
+      branches,
       tiers,
       usageCount: dto.usedCount,
       budgetLimit: dto.budgetLimit,
@@ -199,14 +237,26 @@ export const PromotionListPage: FC = () => {
     setPromotions((prev) =>
       prev.map((item) => {
         if (item.id === id) {
-          const nextStatus = item.status === 'ACTIVE' ? 'PAUSED' : 'ACTIVE';
+          const nextActive = !item.isActive;
+          const now = new Date();
+          const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+          let nextStatus: PromotionStatus = 'ACTIVE';
+          if (item.endDate && today > item.endDate) {
+            nextStatus = 'EXPIRED';
+          } else if (!nextActive) {
+            nextStatus = 'PAUSED';
+          } else if (item.startDate && today < item.startDate) {
+            nextStatus = 'UPCOMING';
+          } else {
+            nextStatus = 'ACTIVE';
+          }
           showToast(
-            nextStatus === 'ACTIVE'
+            nextActive
               ? `Đã kích hoạt chương trình "${item.name}"!`
               : `Đã tạm dừng chương trình "${item.name}"!`,
             'info'
           );
-          return { ...item, status: nextStatus };
+          return { ...item, isActive: nextActive, status: nextStatus };
         }
         return item;
       })
@@ -280,6 +330,12 @@ export const PromotionListPage: FC = () => {
       const cleanDesc = (savedPromo.description || '').replace(/\[TIERS_JSON\][\s\S]*?\[\/TIERS_JSON\]/g, '').trim();
       const descriptionWithTiers = cleanDesc ? `${cleanDesc}\n[TIERS_JSON]${tiersJson}[/TIERS_JSON]` : `[TIERS_JSON]${tiersJson}[/TIERS_JSON]`;
 
+      const isStillActive = editingPromo
+        ? (savedPromo.isActive ?? (savedPromo.status !== 'PAUSED'))
+        : (savedPromo.isActive ?? true);
+      const effectiveStartDate = savedPromo.startDate ? `${savedPromo.startDate}T00:00:00` : new Date().toISOString();
+      const effectiveEndDate = savedPromo.endDate ? `${savedPromo.endDate}T23:59:59` : new Date().toISOString();
+
       if (editingPromo) {
         await promotionApi.updatePromotion(savedPromo.id, {
           promotionName: savedPromo.name,
@@ -288,9 +344,9 @@ export const PromotionListPage: FC = () => {
           minOrderValue: minOrderVal,
           maxDiscountAmount: maxDiscount,
           usageLimit: undefined,
-          startDate: savedPromo.startDate || new Date().toISOString(),
-          endDate: savedPromo.endDate || new Date().toISOString(),
-          isActive: savedPromo.status === 'ACTIVE',
+          startDate: effectiveStartDate,
+          endDate: effectiveEndDate,
+          isActive: isStillActive,
           description: descriptionWithTiers,
           targetBranches: savedPromo.branches.join(','),
           budgetLimit: savedPromo.budgetLimit,
@@ -305,9 +361,9 @@ export const PromotionListPage: FC = () => {
           minOrderValue: minOrderVal,
           maxDiscountAmount: maxDiscount,
           usageLimit: undefined,
-          startDate: savedPromo.startDate || new Date().toISOString(),
-          endDate: savedPromo.endDate || new Date().toISOString(),
-          isActive: true,
+          startDate: effectiveStartDate,
+          endDate: effectiveEndDate,
+          isActive: isStillActive,
           description: descriptionWithTiers,
           targetBranches: savedPromo.branches.join(','),
           budgetLimit: savedPromo.budgetLimit,
@@ -315,19 +371,11 @@ export const PromotionListPage: FC = () => {
         });
       }
       await loadPromotions();
+      showToast(`Đã lưu chương trình "${savedPromo.name}" thành công!`);
     } catch (err: any) {
       console.error('Lỗi khi lưu chương trình khuyến mãi:', err);
-      setPromotions((prev) => {
-        const idx = prev.findIndex((p) => p.id === savedPromo.id);
-        if (idx >= 0) {
-          const next = [...prev];
-          next[idx] = savedPromo;
-          return next;
-        }
-        return [savedPromo, ...prev];
-      });
+      showToast(err?.response?.data?.message || err?.message || 'Lỗi khi lưu chương trình khuyến mãi!', 'error');
     }
-    showToast(`Đã lưu chương trình "${savedPromo.name}" thành công!`);
   };
 
   return (
@@ -367,6 +415,7 @@ export const PromotionListPage: FC = () => {
         filter={filter}
         onFilterChange={setFilter}
         onRefresh={loadPromotions}
+        branches={branchNames}
       />
 
       {/* Table */}
@@ -375,6 +424,7 @@ export const PromotionListPage: FC = () => {
         onEdit={handleOpenEdit}
         onToggleStatus={handleToggleStatus}
         onDelete={handleDelete}
+        branchMap={branchMap}
       />
 
       {/* Create / Edit Modal */}
@@ -383,6 +433,7 @@ export const PromotionListPage: FC = () => {
         onClose={() => setIsModalOpen(false)}
         onSave={handleSavePromo}
         editingPromo={editingPromo}
+        branches={branchNames}
       />
     </div>
   );

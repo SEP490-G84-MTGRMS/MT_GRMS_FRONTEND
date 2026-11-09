@@ -289,16 +289,27 @@ export const CreatePreOrderModal: React.FC<Props> = ({
       return;
     }
 
-    // Kiểm tra số lượng từng mặt hàng theo đơn vị tính
+    // Kiểm tra số lượng từng mặt hàng và tổng tồn kho quy đổi theo từng sản phẩm
+    const productBaseQtyMap = new Map<string, { totalBaseQty: number; name: string; quantityOnHand: number; baseUnit: string }>();
     for (const item of orderItems) {
-      const maxAvailable = Math.floor(item.product.quantityOnHand / item.conversionRate);
       if (item.quantity <= 0) {
         alert(`Sản phẩm "${item.product.name}" (${item.unitName}) có số lượng không hợp lệ (phải > 0). Vui lòng nhập lại số lượng!`);
         return;
       }
-      if (item.quantity > maxAvailable) {
+      const existing = productBaseQtyMap.get(item.product.id) || {
+        totalBaseQty: 0,
+        name: item.product.name,
+        quantityOnHand: item.product.quantityOnHand,
+        baseUnit: item.product.baseUnit || 'sản phẩm',
+      };
+      existing.totalBaseQty += item.quantity * (item.conversionRate || 1);
+      productBaseQtyMap.set(item.product.id, existing);
+    }
+
+    for (const [, info] of productBaseQtyMap) {
+      if (info.totalBaseQty > info.quantityOnHand) {
         alert(
-          `Sản phẩm "${item.product.name}" (${item.unitName}) có số lượng (${item.quantity}) vượt quá tồn kho khả dụng (${maxAvailable} ${item.unitName})! Vui lòng giảm số lượng.`
+          `Tổng số lượng quy đổi của sản phẩm "${info.name}" (${info.totalBaseQty} ${info.baseUnit}) vượt quá tồn kho khả dụng (${info.quantityOnHand} ${info.baseUnit})! Vui lòng giảm số lượng.`
         );
         return;
       }
@@ -329,6 +340,7 @@ export const CreatePreOrderModal: React.FC<Props> = ({
         unitPrice: i.unitPrice,
         unitId: i.unitId,
         unitName: i.unitName,
+        conversionRate: i.conversionRate || 1,
         isGift: false,
       }));
       const giftPayloadItems = giftItems
@@ -339,6 +351,7 @@ export const CreatePreOrderModal: React.FC<Props> = ({
           quantity: g.quantity,
           unitPrice: 0,
           unitName: g.unitName || 'Cái',
+          conversionRate: 1,
           isGift: true,
           promotionId: g.promotionId || appliedPromoId,
         }));

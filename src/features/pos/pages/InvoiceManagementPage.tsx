@@ -152,7 +152,7 @@ export const InvoiceManagementPage: FC = () => {
         ? branchFilter
         : !assignedBranch.id.startsWith('BR-')
           ? assignedBranch.id
-          : undefined;
+          : dbBranches[0]?.id;
     Promise.all([
       posOrderApi.getAllProducts(targetBranchId).catch(() => null),
       posOrderApi.getAllCustomers().catch(() => null),
@@ -164,7 +164,7 @@ export const InvoiceManagementPage: FC = () => {
     return () => {
       mounted = false;
     };
-  }, [branchFilter, assignedBranch.id, currentTenantId]);
+  }, [branchFilter, assignedBranch.id, currentTenantId, dbBranches]);
 
   const mapBackendOrderToInvoice = (o: any): InvoiceDTO => {
     const isPreOrderFlag = Boolean(
@@ -179,8 +179,8 @@ export const InvoiceManagementPage: FC = () => {
       orderUuid: o.id,
       invoiceId: o.orderCode || o.id,
       createdAt: o.orderDate ? new Date(o.orderDate).toLocaleString('vi-VN') : '',
-      branchId: o.branchId || 'cd5e8d1b-b08b-448d-beff-b85ea5873d52',
-      branchName: o.branchName || 'An Nhiên Mart - Chi nhánh Ba Đình',
+      branchId: o.branchId || dbBranches[0]?.id || assignedBranch.id,
+      branchName: o.branchName || dbBranches[0]?.name || 'Chi nhánh mặc định',
       cashierId: '',
       cashierName: o.cashierName || 'Thu ngân POS',
       customerId: o.customerId,
@@ -230,7 +230,7 @@ export const InvoiceManagementPage: FC = () => {
 
   // Nạp tiền mặt trong két ca làm việc đang mở của chi nhánh
   useEffect(() => {
-    const targetBranchId = branchFilter !== 'ALL' ? branchFilter : (assignedBranch.id.startsWith('BR-') ? 'cd5e8d1b-b08b-448d-beff-b85ea5873d52' : assignedBranch.id);
+    const targetBranchId = branchFilter !== 'ALL' ? branchFilter : (assignedBranch.id.startsWith('BR-') ? (dbBranches[0]?.id || assignedBranch.id) : assignedBranch.id);
     posShiftApi.getCurrentShift(targetBranchId).then((s) => {
       if (s) setActiveShiftCash(s.expectedCash);
     }).catch(() => { });
@@ -445,6 +445,31 @@ export const InvoiceManagementPage: FC = () => {
     setCancelNote('');
   };
 
+  // Hủy đơn đặt trước và hoàn lại tồn kho giữ
+  const handleCancelPreOrder = async (pre: PreOrderDTO) => {
+    if (!window.confirm(`Bạn có chắc chắn muốn hủy đơn đặt trước ${pre.preOrderId}? Tồn kho đã giữ sẽ được tự động hoàn lại vào kho hàng.`)) {
+      return;
+    }
+    try {
+      await posOrderApi.cancelOrder(pre.orderUuid || pre.preOrderId, {
+        reason: 'Khách hàng hủy đơn đặt trước',
+        note: 'Hủy đơn đặt trước từ màn hình Quản lý Đơn hàng',
+        userRole: user?.role || 'CASHIER',
+      });
+      setPreOrders((prev) =>
+        prev.map((p) =>
+          p.preOrderId === pre.preOrderId
+            ? { ...p, status: 'CANCELLED', statusLabel: 'Đã hủy' }
+            : p
+        )
+      );
+      showToast(`Đã hủy thành công đơn đặt trước ${pre.preOrderId}!`);
+    } catch (e: any) {
+      console.error('Cancel PreOrder failed:', e);
+      alert(`Lỗi khi hủy đơn đặt trước: ${e?.response?.data?.message || e?.message || 'Không thể kết nối máy chủ'}`);
+    }
+  };
+
   // Xác nhận Đổi / Trả hàng chuẩn KiotViet
   const handleConfirmReturnExchange = async (data: {
     returnedItems: Array<{
@@ -456,7 +481,15 @@ export const InvoiceManagementPage: FC = () => {
       orderDetailId?: string;
       isGift?: boolean;
     }>;
-    newItems: Array<{ productId: string; quantity: number; unitPrice: number; unitName?: string; discountAmount?: number }>;
+    newItems: Array<{
+      productId: string;
+      quantity: number;
+      unitPrice: number;
+      unitName?: string;
+      unitId?: string;
+      conversionRate?: number;
+      discountAmount?: number;
+    }>;
     settlementMethod: string;
     reason?: string;
     note?: string;
@@ -478,7 +511,7 @@ export const InvoiceManagementPage: FC = () => {
       });
 
       // Tự động đồng bộ lại tiền mặt trong két quầy của ca hiện tại
-      const targetBranchId = branchFilter !== 'ALL' ? branchFilter : (assignedBranch.id.startsWith('BR-') ? 'cd5e8d1b-b08b-448d-beff-b85ea5873d52' : assignedBranch.id);
+      const targetBranchId = branchFilter !== 'ALL' ? branchFilter : (assignedBranch.id.startsWith('BR-') ? (dbBranches[0]?.id || assignedBranch.id) : assignedBranch.id);
       posShiftApi.getCurrentShift(targetBranchId).then((s) => {
         if (s) setActiveShiftCash(s.expectedCash);
       }).catch(() => { });
@@ -511,7 +544,10 @@ export const InvoiceManagementPage: FC = () => {
     appliedPromotionSummary?: string | null;
   }) => {
     const creatorCashier = user?.role === 'STORE_OWNER' ? `Chủ cửa hàng: ${user?.fullName || 'Admin'}` : (user?.fullName || 'Thu ngân POS');
-    const targetBranchId = branchFilter !== 'ALL' ? branchFilter : (assignedBranch.id.startsWith('BR-') ? 'cd5e8d1b-b08b-448d-beff-b85ea5873d52' : assignedBranch.id);
+    const fallbackDbBranchId = dbBranches[0]?.id;
+    const targetBranchId = branchFilter !== 'ALL'
+      ? branchFilter
+      : (!assignedBranch.id.startsWith('BR-') ? assignedBranch.id : (fallbackDbBranchId || assignedBranch.id));
     try {
       let createdCode: string | null = null;
       let createdUuid: string | undefined;
@@ -528,6 +564,7 @@ export const InvoiceManagementPage: FC = () => {
             productName: i.productName,
             unitId: i.unitId,
             unitName: i.unitName,
+            conversionRate: (i as any).conversionRate ?? 1,
             isGift: Boolean(i.isGift),
             promotionId: i.promotionId || null,
           })),
@@ -542,8 +579,11 @@ export const InvoiceManagementPage: FC = () => {
         backendRes = res?.data || res;
         if (backendRes?.orderCode) createdCode = backendRes.orderCode;
         if (backendRes?.id) createdUuid = backendRes.id;
-      } catch (apiErr) {
-        console.warn('Backend createPreOrder API error (using fallback local pre-order):', apiErr);
+      } catch (apiErr: any) {
+        console.error('Backend createPreOrder API error:', apiErr);
+        const errMsg = apiErr?.response?.data?.message || apiErr?.message || 'Không thể tạo đơn đặt trước. Vui lòng kiểm tra lại tồn kho.';
+        alert(`Lỗi tạo đơn đặt trước: ${errMsg}`);
+        return;
       }
 
       const merchandiseAmt = data.items
@@ -606,7 +646,7 @@ export const InvoiceManagementPage: FC = () => {
     // Nếu thu bằng tiền mặt, tự động ghi nhận phiếu thu vào ca mở của thu ngân đang trực quầy
     if (payment.method === 'CASH') {
       try {
-        const targetBranchId = branchFilter !== 'ALL' ? branchFilter : (assignedBranch.id.startsWith('BR-') ? 'cd5e8d1b-b08b-448d-beff-b85ea5873d52' : assignedBranch.id);
+        const targetBranchId = branchFilter !== 'ALL' ? branchFilter : (assignedBranch.id.startsWith('BR-') ? (dbBranches[0]?.id || assignedBranch.id) : assignedBranch.id);
         const activeShift = await posShiftApi.getCurrentShift(targetBranchId);
         if (activeShift) {
           await posShiftApi.addCashMovement(activeShift.id, {
@@ -1659,6 +1699,13 @@ export const InvoiceManagementPage: FC = () => {
                               {pre.branchName || 'Chi nhánh Cầu Giấy (Trung tâm)'}
                             </span>
                           </div>
+                          {pre.items && pre.items.length > 0 && (
+                            <div style={{ color: '#475569', fontSize: 11, marginTop: 4 }}>
+                              {pre.items.map((it, idx) => (
+                                <div key={idx}>• {it.productName} (x{it.quantity} {it.unitName || 'Cái'})</div>
+                              ))}
+                            </div>
+                          )}
                         </td>
                         <td>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -1727,21 +1774,36 @@ export const InvoiceManagementPage: FC = () => {
                           </span>
                         </td>
                         <td style={{ textAlign: 'center' }}>
-                          {pre.status === 'COMPLETED' ? (
+                          {pre.status === 'CANCELLED' ? (
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 8px', borderRadius: 4, backgroundColor: '#fef2f2', color: '#b91c1c', fontSize: 11.5, fontWeight: 600 }}>
+                              <XCircle size={12} /> Đã hủy đơn
+                            </span>
+                          ) : pre.status === 'COMPLETED' ? (
                             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 8px', borderRadius: 4, backgroundColor: '#ecfdf5', color: '#047857', fontSize: 11.5, fontWeight: 600 }}>
                               <CheckCircle2 size={12} /> Đã bàn giao
                             </span>
                           ) : (
-                            <button
-                              type="button"
-                              className="pos-btn-primary-pill"
-                              style={{ height: 28, padding: '0 12px', fontSize: 11.5, backgroundColor: '#0f766e' }}
-                              onClick={() => setFulfillModalPreOrder(pre)}
-                              title="Thanh toán nốt số tiền còn lại và bàn giao hàng cho khách tại quầy"
-                            >
-                              <CreditCard size={13} />
-                              <span>Thanh toán &amp; Bàn giao ({pre.remainingAmount.toLocaleString('vi-VN')} đ)</span>
-                            </button>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                              <button
+                                type="button"
+                                className="pos-btn-primary-pill"
+                                style={{ height: 28, padding: '0 10px', fontSize: 11, backgroundColor: '#0f766e' }}
+                                onClick={() => setFulfillModalPreOrder(pre)}
+                                title="Thanh toán nốt số tiền còn lại và bàn giao hàng cho khách tại quầy"
+                              >
+                                <CreditCard size={12} />
+                                <span>Bàn giao ({pre.remainingAmount.toLocaleString('vi-VN')} đ)</span>
+                              </button>
+                              <button
+                                type="button"
+                                style={{ height: 28, padding: '0 8px', fontSize: 11, borderRadius: 6, display: 'inline-flex', alignItems: 'center', gap: 3, border: '1px solid #fecaca', backgroundColor: '#fef2f2', color: '#b91c1c', cursor: 'pointer', fontWeight: 500 }}
+                                onClick={() => handleCancelPreOrder(pre)}
+                                title="Hủy đơn đặt trước và hoàn lại tồn kho đã giữ"
+                              >
+                                <XCircle size={12} />
+                                <span>Hủy</span>
+                              </button>
+                            </div>
                           )}
                         </td>
                       </tr>

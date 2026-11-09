@@ -7,13 +7,16 @@ interface PromotionFilterBarProps {
   filter: PromotionFilterState;
   onFilterChange: (newFilter: PromotionFilterState) => void;
   onRefresh: () => void;
+  branches?: string[];
 }
 
 export const PromotionFilterBar: FC<PromotionFilterBarProps> = ({
   filter,
   onFilterChange,
   onRefresh,
+  branches,
 }) => {
+  const branchList = branches && branches.length > 0 ? branches : MOCK_BRANCHES;
   return (
     <div className="promotion-filter-bar">
       <div className="promotion-filter-left">
@@ -70,7 +73,7 @@ export const PromotionFilterBar: FC<PromotionFilterBarProps> = ({
           className="promotion-select"
         >
           <option value="ALL">Tất cả chi nhánh</option>
-          {MOCK_BRANCHES.map((b) => (
+          {branchList.map((b) => (
             <option key={b} value={b}>
               {b}
             </option>

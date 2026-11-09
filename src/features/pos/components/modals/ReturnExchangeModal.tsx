@@ -24,6 +24,8 @@ interface Props {
       quantity: number;
       unitPrice: number;
       unitName?: string;
+      unitId?: string;
+      conversionRate?: number;
       discountAmount?: number;
     }>;
     settlementMethod: string;
@@ -245,12 +247,18 @@ export const ReturnExchangeModal: React.FC<Props> = ({
       })
       .filter((x): x is NonNullable<typeof x> => x !== null);
 
-    const newItemsList = newItems.map((item) => ({
-      productId: item.product.id,
-      quantity: item.quantity,
-      unitPrice: item.unitPrice,
-      unitName: item.selectedUnitName,
-    }));
+    const newItemsList = newItems.map((item) => {
+      const units = getEffectiveUnitPrices(item.product);
+      const selectedUnit = units.find((u) => u.unitName === item.selectedUnitName);
+      return {
+        productId: item.product.id,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        unitName: item.selectedUnitName,
+        conversionRate: selectedUnit?.conversionRate ?? 1,
+        unitId: item.unitId || selectedUnit?.unitId,
+      };
+    });
 
     if (returnedItemsList.length === 0 && newItemsList.length === 0) {
       alert('Vui lòng chọn ít nhất 1 sản phẩm để trả hoặc 1 sản phẩm để đổi mới!');

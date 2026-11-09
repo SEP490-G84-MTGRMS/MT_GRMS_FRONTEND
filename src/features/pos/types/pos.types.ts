@@ -49,6 +49,7 @@ export class CartItemDTO {
   product: ProductDTO = new ProductDTO();
   unit: string = '';
   unitId?: string;
+  conversionRate?: number;
   quantity: number = 1;
   unitPrice: number = 0;
   discountPerItem: number = 0;

@@ -47,6 +47,7 @@ export class PromotionItemDTO {
   startDate: string = '';
   endDate: string = '';
   status: PromotionStatus = 'ACTIVE';
+  isActive?: boolean = true;
   branches: string[] = ['ALL'];
   tiers: PromotionTierDTO[] = [];
   usageCount: number = 0;

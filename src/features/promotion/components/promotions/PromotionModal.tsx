@@ -28,6 +28,7 @@ interface PromotionModalProps {
   onClose: () => void;
   onSave: (promo: PromotionItem) => void;
   editingPromo: PromotionItem | null;
+  branches?: string[];
 }
 
 export const PromotionModal: FC<PromotionModalProps> = ({
@@ -35,7 +36,9 @@ export const PromotionModal: FC<PromotionModalProps> = ({
   onClose,
   onSave,
   editingPromo,
+  branches,
 }) => {
+  const branchOptions = branches && branches.length > 0 ? branches : MOCK_BRANCHES;
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
   const [type, setType] = useState<PromotionType>("ORDER_DISCOUNT");
@@ -218,6 +221,7 @@ export const PromotionModal: FC<PromotionModalProps> = ({
       startDate,
       endDate,
       status: editingPromo ? editingPromo.status : "ACTIVE",
+      isActive: editingPromo?.isActive ?? true,
       branches: selectedBranches,
       description: description.trim(),
       budgetLimit,
@@ -352,7 +356,7 @@ export const PromotionModal: FC<PromotionModalProps> = ({
                   className="form-select-control"
                 >
                   <option value="ALL">Toàn hệ thống</option>
-                  {MOCK_BRANCHES.map((b) => (
+                  {branchOptions.map((b) => (
                     <option key={b} value={b}>
                       {b}
                     </option>

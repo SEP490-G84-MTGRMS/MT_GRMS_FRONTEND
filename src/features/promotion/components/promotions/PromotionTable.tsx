@@ -19,6 +19,7 @@ interface PromotionTableProps {
   onEdit: (item: PromotionItem) => void;
   onToggleStatus: (id: string) => void;
   onDelete: (id: string) => void;
+  branchMap?: Map<string, string>;
 }
 
 export const PromotionTable: FC<PromotionTableProps> = ({
@@ -26,6 +27,7 @@ export const PromotionTable: FC<PromotionTableProps> = ({
   onEdit,
   onToggleStatus,
   onDelete,
+  branchMap,
 }) => {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -143,26 +145,32 @@ export const PromotionTable: FC<PromotionTableProps> = ({
                         </div>
                       </td>
                       <td>
-                        <div
-                          className="promo-branch-cell"
-                          title={
-                            item.branches.includes('ALL') || item.branches.length === 0
-                              ? 'Áp dụng trên toàn bộ chuỗi cửa hàng'
-                              : item.branches.join(', ')
-                          }
-                        >
-                          <MapPin size={13} className="promo-branch-icon" />
-                          {item.branches.includes('ALL') || item.branches.length === 0 ? (
-                            <span className="promo-branch-all">Toàn hệ thống</span>
-                          ) : item.branches.length === 1 ? (
-                            <span className="promo-branch-single">{item.branches[0]}</span>
-                          ) : (
-                            <div className="promo-branch-multi">
-                              <span className="promo-branch-first">{item.branches[0]}</span>
-                              <span className="promo-branch-count">+{item.branches.length - 1}</span>
+                        {(() => {
+                          const displayBranches = item.branches.map((b) => branchMap?.get(b) || b);
+                          const isAll = item.branches.includes('ALL') || item.branches.length === 0;
+                          return (
+                            <div
+                              className="promo-branch-cell"
+                              title={
+                                isAll
+                                  ? 'Áp dụng trên toàn bộ chuỗi cửa hàng'
+                                  : displayBranches.join(', ')
+                              }
+                            >
+                              <MapPin size={13} className="promo-branch-icon" />
+                              {isAll ? (
+                                <span className="promo-branch-all">Toàn hệ thống</span>
+                              ) : displayBranches.length === 1 ? (
+                                <span className="promo-branch-single">{displayBranches[0]}</span>
+                              ) : (
+                                <div className="promo-branch-multi">
+                                  <span className="promo-branch-first">{displayBranches[0]}</span>
+                                  <span className="promo-branch-count">+{displayBranches.length - 1}</span>
+                                </div>
+                              )}
                             </div>
-                          )}
-                        </div>
+                          );
+                        })()}
                       </td>
                       <td>
                         <div className="promo-usage-cell">

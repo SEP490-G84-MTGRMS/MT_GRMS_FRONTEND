@@ -77,6 +77,7 @@ export interface CartItemDto {
   productName: string;
   unitPrice: number;
   quantity: number;
+  conversionRate?: number;
 }
 
 export interface CartGiftItemDto {
