@@ -200,7 +200,7 @@ export const BranchDetailModal: FC<BranchDetailModalProps> = ({
         className="store-modal-card"
         style={{
           width: '100%',
-          maxWidth: '890px',
+          maxWidth: '920px',
           maxHeight: '94vh',
           backgroundColor: '#FFFFFF',
           borderRadius: '16px',
@@ -786,7 +786,7 @@ export const BranchDetailModal: FC<BranchDetailModalProps> = ({
                 <div
                   style={{
                     display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+                    gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
                     gap: '14px',
                   }}
                 >
@@ -798,30 +798,59 @@ export const BranchDetailModal: FC<BranchDetailModalProps> = ({
                       borderRadius: '12px',
                       border: '1px solid #E2E8F0',
                       boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                      display: 'flex',
+                      flexDirection: 'column',
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                      <div
-                        style={{
-                          width: 32,
-                          height: 32,
-                          borderRadius: '8px',
-                          backgroundColor: '#F0FDF4',
-                          color: '#16A34A',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                        }}
-                      >
-                        <Package size={17} />
-                      </div>
-                      <span style={{ fontSize: 13, color: '#64748B', fontWeight: 600 }}>Sản phẩm kinh doanh</span>
+                    <div
+                      style={{
+                        width: 36,
+                        height: 36,
+                        borderRadius: '10px',
+                        backgroundColor: '#F0FDF4',
+                        color: '#16A34A',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        marginBottom: 10,
+                      }}
+                    >
+                      <Package size={18} />
                     </div>
-                    <div style={{ fontSize: 22, fontWeight: 800, color: '#0F172A' }}>
+                    <div
+                      style={{
+                        fontSize: 13,
+                        color: '#64748B',
+                        fontWeight: 600,
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                      }}
+                    >
+                      Sản phẩm kinh doanh
+                    </div>
+                    <div
+                      style={{
+                        fontSize: 22,
+                        fontWeight: 800,
+                        color: '#0F172A',
+                        margin: '4px 0 2px 0',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
                       {detail?.totalProducts ?? 0}{' '}
                       <span style={{ fontSize: 13, fontWeight: 500, color: '#64748B' }}>SKU</span>
                     </div>
-                    <div style={{ fontSize: 12, color: '#16A34A', marginTop: 4, fontWeight: 500 }}>
+                    <div
+                      style={{
+                        fontSize: 12,
+                        color: '#16A34A',
+                        fontWeight: 500,
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                      }}
+                    >
                       Tổng tồn kho: {(detail?.totalStock ?? 0).toLocaleString('vi-VN')} SOH
                     </div>
                   </div>
@@ -834,30 +863,44 @@ export const BranchDetailModal: FC<BranchDetailModalProps> = ({
                       borderRadius: '12px',
                       border: '1px solid #E2E8F0',
                       boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                      display: 'flex',
+                      flexDirection: 'column',
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                      <div
-                        style={{
-                          width: 32,
-                          height: 32,
-                          borderRadius: '8px',
-                          backgroundColor: '#FFF7ED',
-                          color: '#EA580C',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                        }}
-                      >
-                        <AlertTriangle size={17} />
-                      </div>
-                      <span style={{ fontSize: 13, color: '#64748B', fontWeight: 600 }}>Cảnh báo thiếu hàng</span>
+                    <div
+                      style={{
+                        width: 36,
+                        height: 36,
+                        borderRadius: '10px',
+                        backgroundColor: '#FFF7ED',
+                        color: '#EA580C',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        marginBottom: 10,
+                      }}
+                    >
+                      <AlertTriangle size={18} />
+                    </div>
+                    <div
+                      style={{
+                        fontSize: 13,
+                        color: '#64748B',
+                        fontWeight: 600,
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                      }}
+                    >
+                      Cảnh báo thiếu hàng
                     </div>
                     <div
                       style={{
                         fontSize: 22,
                         fontWeight: 800,
                         color: (detail?.lowStockCount ?? 0) > 0 ? '#EA580C' : '#0F172A',
+                        margin: '4px 0 2px 0',
+                        whiteSpace: 'nowrap',
                       }}
                     >
                       {detail?.lowStockCount ?? 0}{' '}
@@ -867,8 +910,10 @@ export const BranchDetailModal: FC<BranchDetailModalProps> = ({
                       style={{
                         fontSize: 12,
                         color: (detail?.lowStockCount ?? 0) > 0 ? '#EA580C' : '#64748B',
-                        marginTop: 4,
                         fontWeight: 500,
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
                       }}
                     >
                       {(detail?.lowStockCount ?? 0) > 0 ? 'Cần nhập hàng bổ sung' : 'Tồn kho ổn định'}
@@ -883,30 +928,59 @@ export const BranchDetailModal: FC<BranchDetailModalProps> = ({
                       borderRadius: '12px',
                       border: '1px solid #E2E8F0',
                       boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                      display: 'flex',
+                      flexDirection: 'column',
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                      <div
-                        style={{
-                          width: 32,
-                          height: 32,
-                          borderRadius: '8px',
-                          backgroundColor: '#EFF6FF',
-                          color: '#2563EB',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                        }}
-                      >
-                        <Users size={17} />
-                      </div>
-                      <span style={{ fontSize: 13, color: '#64748B', fontWeight: 600 }}>Nhân sự chi nhánh</span>
+                    <div
+                      style={{
+                        width: 36,
+                        height: 36,
+                        borderRadius: '10px',
+                        backgroundColor: '#EFF6FF',
+                        color: '#2563EB',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        marginBottom: 10,
+                      }}
+                    >
+                      <Users size={18} />
                     </div>
-                    <div style={{ fontSize: 22, fontWeight: 800, color: '#0F172A' }}>
+                    <div
+                      style={{
+                        fontSize: 13,
+                        color: '#64748B',
+                        fontWeight: 600,
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                      }}
+                    >
+                      Nhân sự chi nhánh
+                    </div>
+                    <div
+                      style={{
+                        fontSize: 22,
+                        fontWeight: 800,
+                        color: '#0F172A',
+                        margin: '4px 0 2px 0',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
                       {detail?.totalEmployees ?? 0}{' '}
                       <span style={{ fontSize: 13, fontWeight: 500, color: '#64748B' }}>nhân viên</span>
                     </div>
-                    <div style={{ fontSize: 12, color: '#2563EB', marginTop: 4, fontWeight: 500 }}>
+                    <div
+                      style={{
+                        fontSize: 12,
+                        color: '#2563EB',
+                        fontWeight: 500,
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                      }}
+                    >
                       {detail?.activeEmployees ?? 0} đang làm việc
                     </div>
                   </div>
@@ -919,30 +993,59 @@ export const BranchDetailModal: FC<BranchDetailModalProps> = ({
                       borderRadius: '12px',
                       border: '1px solid #E2E8F0',
                       boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                      display: 'flex',
+                      flexDirection: 'column',
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                      <div
-                        style={{
-                          width: 32,
-                          height: 32,
-                          borderRadius: '8px',
-                          backgroundColor: '#FAF5FF',
-                          color: '#9333EA',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                        }}
-                      >
-                        <Clock size={17} />
-                      </div>
-                      <span style={{ fontSize: 13, color: '#64748B', fontWeight: 600 }}>Đơn hàng & Giao dịch</span>
+                    <div
+                      style={{
+                        width: 36,
+                        height: 36,
+                        borderRadius: '10px',
+                        backgroundColor: '#FAF5FF',
+                        color: '#9333EA',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        marginBottom: 10,
+                      }}
+                    >
+                      <Clock size={18} />
                     </div>
-                    <div style={{ fontSize: 22, fontWeight: 800, color: '#0F172A' }}>
+                    <div
+                      style={{
+                        fontSize: 13,
+                        color: '#64748B',
+                        fontWeight: 600,
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                      }}
+                    >
+                      Đơn hàng & Giao dịch
+                    </div>
+                    <div
+                      style={{
+                        fontSize: 22,
+                        fontWeight: 800,
+                        color: '#0F172A',
+                        margin: '4px 0 2px 0',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
                       {detail?.pendingOrdersCount ?? branch.pendingOrdersCount ?? 0}{' '}
                       <span style={{ fontSize: 13, fontWeight: 500, color: '#64748B' }}>đơn chờ</span>
                     </div>
-                    <div style={{ fontSize: 12, color: '#64748B', marginTop: 4, fontWeight: 500 }}>
+                    <div
+                      style={{
+                        fontSize: 12,
+                        color: '#64748B',
+                        fontWeight: 500,
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                      }}
+                    >
                       Gần nhất: {formatDate(detail?.lastOrderDate || branch.lastOrderDate)}
                     </div>
                   </div>

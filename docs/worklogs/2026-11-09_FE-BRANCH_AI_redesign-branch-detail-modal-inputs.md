@@ -50,6 +50,13 @@
 - **Loại bỏ khu vực tabs và danh sách sản phẩm / nhân viên ở phía dưới**: Lược bỏ 2 tab "Sản phẩm kinh doanh" và "Đội ngũ nhân viên" cùng các bảng/khung empty state phía dưới. Giữ lại trọn vẹn 4 thẻ KPI chỉ số tổng quát (SKU, SOH, Cảnh báo tồn kho, Nhân sự, Đơn hàng).
 - Giúp modal gọn gàng, vừa vặn trọn vẹn màn hình, không bị cuộn dài và tập trung tối đa vào thông tin cơ bản & các chỉ số hoạt động cốt lõi.
 
+### 2.4. Khắc phục lỗi rớt dòng chữ tại 4 thẻ KPI tổng quát (`BranchDetailModal.tsx`)
+- **Nguyên nhân**: Do trước đó icon và tiêu đề được xếp chung một hàng ngang (flex row) trong không gian thẻ hẹp (~170px), khiến tiêu đề bị co ép và rớt từ cuối xuống dòng thứ 2 ("doanh", "hàng", "dịch") làm chiều cao các thẻ bị khấp khểnh, mất cân đối.
+- **Giải pháp**:
+  - Tách icon lên hàng riêng ở phía trên (`marginBottom: 10px`) với container bo góc màu sắc riêng biệt (Xanh lá, Cam, Xanh dương, Tím).
+  - Tiêu đề thẻ giờ đây chiếm trọn vẹn 100% chiều ngang của thẻ, áp dụng `whiteSpace: 'nowrap'` giúp chữ luôn nằm thẳng hàng trên 1 dòng duy nhất, không bao giờ bị cắt hoặc rớt dòng.
+  - Chuyển lưới sang `gridTemplateColumns: 'repeat(4, minmax(0, 1fr))'` và mở rộng `maxWidth` modal lên 920px, đảm bảo cả 4 thẻ bằng phẳng, đồng đều và vuông vức.
+
 ---
 
 ## 3. Điểm Nhấn Kỹ Thuật (Technical Highlights)
