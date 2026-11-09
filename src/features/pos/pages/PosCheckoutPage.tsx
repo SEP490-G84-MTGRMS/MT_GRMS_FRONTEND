@@ -246,8 +246,10 @@ export const PosCheckoutPage: FC = () => {
 
   // Khuyến mãi, Voucher & Tích điểm state
   const [loyaltyConfig, setLoyaltyConfig] = useState<LoyaltyConfigDto | null>(null);
+  const [appliedPromotionId, setAppliedPromotionId] = useState<string | undefined>(undefined);
   const [appliedPromotions, setAppliedPromotions] = useState<string[]>([]);
   const [giftItems, setGiftItems] = useState<CartGiftItemDto[]>([]);
+  const [autoPromoDiscount, setAutoPromoDiscount] = useState<number>(0);
   const [voucherDiscount, setVoucherDiscount] = useState<number>(0);
   const [couponStatusText, setCouponStatusText] = useState<string>('');
   const [isValidatingCoupon, setIsValidatingCoupon] = useState<boolean>(false);
@@ -590,31 +592,55 @@ export const PosCheckoutPage: FC = () => {
       .catch(() => {});
   }, []);
 
-  // Tổng hợp tiền & Chiết khấu
+  // Tổng hợp tiền & Chiết khấu (tự động trừ khuyến mãi chống conflict Best-Offer)
   const totalItemAmount = currentTab.cart.reduce((sum, item) => sum + item.totalAmount, 0);
-  const orderDiscountAmount = Math.round((totalItemAmount * currentTab.orderDiscountPercent) / 100);
-  const couponDiscountAmount = voucherDiscount;
+  const manualOrderDiscount = Math.round((totalItemAmount * currentTab.orderDiscountPercent) / 100);
+  const autoGiftEquivalentValue = giftItems.reduce((sum, g) => sum + (g.equivalentValue || 0), 0);
+  const isManualDiscountWinning =
+    manualOrderDiscount > 0 && manualOrderDiscount > Math.max(autoPromoDiscount, autoGiftEquivalentValue);
+  const effectiveGiftItems = isManualDiscountWinning ? [] : giftItems;
+  const effectivePromoLabels = isManualDiscountWinning
+    ? [`Chiết khấu tay (${currentTab.orderDiscountPercent}%)`]
+    : appliedPromotions;
+  const effectivePromoId = isManualDiscountWinning ? undefined : appliedPromotionId;
+  const orderDiscountAmount = Math.min(
+    totalItemAmount,
+    isManualDiscountWinning ? manualOrderDiscount : autoPromoDiscount
+  );
+  const couponDiscountAmount = Math.min(Math.max(0, totalItemAmount - orderDiscountAmount), voucherDiscount);
   const subTotalBeforePoints = Math.max(0, totalItemAmount - orderDiscountAmount - couponDiscountAmount);
 
-  // Tính điểm thưởng theo cấu hình hệ thống
+  // Tính điểm thưởng theo cấu hình hệ thống (tôn trọng cờ allowPointsWithPromotions)
   const redemptionRateAmount = loyaltyConfig?.redemptionRateAmount || 1000;
   const minPointsRequired = loyaltyConfig?.minRedemptionPoints || 20;
-  const maxPointsCanUse = currentTab.customer && currentTab.customer.loyaltyPoints >= minPointsRequired
-    ? Math.min(currentTab.customer.loyaltyPoints, Math.floor(subTotalBeforePoints / redemptionRateAmount))
-    : 0;
-  const pointsDeduction = currentTab.usePoints && currentTab.customer
-    ? maxPointsCanUse * redemptionRateAmount
-    : 0;
+  const isPointsBlockedByPromo =
+    loyaltyConfig?.allowPointsWithPromotions === false &&
+    (orderDiscountAmount > 0 || couponDiscountAmount > 0 || effectiveGiftItems.length > 0);
+  const maxPointsCanUse =
+    !isPointsBlockedByPromo && currentTab.customer && currentTab.customer.loyaltyPoints >= minPointsRequired
+      ? Math.min(currentTab.customer.loyaltyPoints, Math.floor(subTotalBeforePoints / redemptionRateAmount))
+      : 0;
+  const pointsDeduction =
+    !isPointsBlockedByPromo && currentTab.usePoints && currentTab.customer
+      ? maxPointsCanUse * redemptionRateAmount
+      : 0;
   const finalAmount = Math.max(0, subTotalBeforePoints - pointsDeduction);
 
-  // Thẩm định giỏ hàng tự động (Khuyến mãi % đơn, mua X tặng Y, chiết khấu sản phẩm)
+  // Thẩm định giỏ hàng tự động (Khuyến mãi bậc thang, Best-Offer không cộng dồn, mua X tặng Y, chiết khấu sản phẩm)
   useEffect(() => {
     if (!currentTab.cart || currentTab.cart.length === 0) {
+      setAppliedPromotionId(undefined);
       setAppliedPromotions([]);
       setGiftItems([]);
+      setAutoPromoDiscount(0);
+      if (!currentTab.couponCode?.trim()) {
+        setVoucherDiscount(0);
+        setCouponStatusText('');
+      }
       return;
     }
 
+    let cancelled = false;
     const timer = setTimeout(() => {
       const items = currentTab.cart.map((c) => ({
         productId: c.product.id || 'aaaaaaaa-1111-1111-1111-111111111111',
@@ -632,22 +658,36 @@ export const PosCheckoutPage: FC = () => {
           customerId: currentTab.customer?.id || undefined,
         })
         .then((res) => {
-          if (res) {
-            setAppliedPromotions(res.appliedPromotions || []);
-            setGiftItems(res.giftItems || []);
-            if (res.voucherResult) {
-              if (res.voucherResult.isValid) {
-                setVoucherDiscount(res.voucherResult.discountAmount);
-                setCouponStatusText(`✓ ${res.voucherResult.message || 'Mã hợp lệ'}`);
-              }
+          if (cancelled || !res) return;
+          setAppliedPromotionId(res.appliedPromotionId || undefined);
+          const promoLabels = (res.appliedPromotions || []).filter((p) => !p.startsWith('Voucher ['));
+          setAppliedPromotions(promoLabels);
+          setGiftItems(res.giftItems || []);
+
+          const effectiveVoucher = res.voucherResult?.isValid
+            ? Math.max(0, Math.round(res.voucherResult.discountAmount || 0))
+            : 0;
+          const autoDisc = Math.max(0, Math.round((res.totalDiscountAmount || 0) - effectiveVoucher));
+          setAutoPromoDiscount(autoDisc);
+
+          if (res.voucherResult) {
+            if (res.voucherResult.isValid) {
+              setVoucherDiscount(effectiveVoucher);
+              setCouponStatusText(`✓ ${res.voucherResult.message || 'Mã hợp lệ'}`);
+            } else {
+              setVoucherDiscount(0);
+              setCouponStatusText(res.voucherResult.message || '');
             }
           }
         })
         .catch(() => {});
     }, 350);
 
-    return () => clearTimeout(timer);
-  }, [currentTab.cart, currentTab.couponCode, currentTab.customer?.id, totalItemAmount, activeBranch.id]);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [activeTabId, currentTab.cart, currentTab.couponCode, currentTab.customer?.id, totalItemAmount, activeBranch.id]);
 
   // Handler thẩm định mã Voucher độc lập
   const handleValidateCoupon = async () => {
@@ -677,7 +717,10 @@ export const PosCheckoutPage: FC = () => {
   };
 
   // Tạo dữ liệu hóa đơn in POS-58 (Loại bỏ VAT, nạp động Tenant/Chi nhánh)
-  const buildReceiptData = (debtNote?: string): ReceiptData => {
+  const buildReceiptData = (
+    debtNote?: string,
+    backendOrder?: Awaited<ReturnType<typeof posOrderApi.createOrder>>
+  ): ReceiptData => {
     let paymentMethodText = 'Tiền mặt';
     if (currentTab.paymentMethod === 'vietqr') {
       paymentMethodText = 'Chuyển khoản VietQR';
@@ -694,12 +737,45 @@ export const PosCheckoutPage: FC = () => {
       ? `Chủ cửa hàng: ${user.fullName || 'Admin'}`
       : (user?.fullName || 'Thu ngân POS');
 
+    const receiptItems = backendOrder?.items?.length
+      ? backendOrder.items.map((it, i) => ({
+          stt: i + 1,
+          name: it.productName,
+          unitPrice: it.isGift ? 0 : it.actualPrice,
+          batchCode: it.batchCode || undefined,
+          quantity: it.quantity,
+          totalAmount: it.isGift ? 0 : it.totalLineAmount,
+          isGift: Boolean(it.isGift),
+        }))
+      : [
+          ...currentTab.cart.map((c, i) => ({
+            stt: i + 1,
+            name: c.product.name,
+            unitPrice: c.actualPrice,
+            batchCode: c.batchCode || c.product.batchCode || undefined,
+            quantity: c.quantity,
+            totalAmount: c.totalAmount,
+            isGift: false,
+          })),
+          ...effectiveGiftItems.map((g, gi) => ({
+            stt: currentTab.cart.length + gi + 1,
+            name: g.productName,
+            unitPrice: 0,
+            quantity: g.quantity,
+            totalAmount: 0,
+            isGift: true,
+          })),
+        ];
+
+    const effectiveVoucherCode =
+      couponDiscountAmount > 0 && currentTab.couponCode?.trim() ? currentTab.couponCode.trim().toUpperCase() : undefined;
+
     return {
       storeName: tenantOrStoreName,
       storeAddress,
       storePhone,
       hotline,
-      orderCode: `HD${Math.floor(100000 + Math.random() * 900000)}`,
+      orderCode: backendOrder?.orderCode || `HD${Math.floor(100000 + Math.random() * 900000)}`,
       createdAt: new Date().toLocaleString('vi-VN'),
       cashierName: cashierDisplayName,
       posMachine: 'POS#01',
@@ -712,25 +788,25 @@ export const PosCheckoutPage: FC = () => {
             loyaltyPoints: currentTab.customer.loyaltyPoints,
           }
         : null,
-      items: currentTab.cart.map((c, i) => ({
-        stt: i + 1,
-        name: c.product.name,
-        unitPrice: c.actualPrice,
-        batchCode: c.batchCode || c.product.batchCode || undefined,
-        quantity: c.quantity,
-        totalAmount: c.totalAmount,
-      })),
+      items: receiptItems,
       totalItemAmount,
       orderDiscountAmount,
+      voucherDiscountAmount: couponDiscountAmount,
+      appliedVoucherCode: backendOrder?.appliedVoucherCode || effectiveVoucherCode,
+      appliedPromotionSummary:
+        backendOrder?.appliedPromotionSummary ||
+        (effectivePromoLabels.length > 0 ? effectivePromoLabels.join('; ') : undefined),
       pointsDiscountAmount: pointsDeduction,
+      pointsRedeemed: pointsDeduction > 0 ? maxPointsCanUse : undefined,
       vatAmount: 0,
-      finalAmount,
+      finalAmount: backendOrder?.finalAmount ?? finalAmount,
       finalAmountInWords: '',
       paymentMethodText,
-      cashTendered: currentTab.cashTendered || finalAmount,
-      debtAmount: currentTab.paymentMethod === 'debt' ? finalAmount : undefined,
+      cashTendered: currentTab.cashTendered || (backendOrder?.finalAmount ?? finalAmount),
+      debtAmount: currentTab.paymentMethod === 'debt' ? (backendOrder?.finalAmount ?? finalAmount) : undefined,
       debtNote,
-      earnedPoints: Math.floor(finalAmount / 10000), // 10k = 1 điểm
+      earnedPoints: Math.floor((backendOrder?.finalAmount ?? finalAmount) / 10000), // 10k = 1 điểm
+      giftStockWarning: backendOrder?.giftStockWarning || undefined,
     };
   };
 
@@ -744,7 +820,7 @@ export const PosCheckoutPage: FC = () => {
       const paymentMethod = isDebt ? 'CREDIT' : isBank ? 'BANK' : 'CASH';
 
       const branchId = activeBranch.id || DEFAULT_GROCERY_BRANCH_ID;
-      const items = currentTab.cart.map((c) => ({
+      const paidItems = currentTab.cart.map((c) => ({
         productId: c.product.id || 'aaaaaaaa-1111-1111-1111-111111111111',
         productName: c.product.name,
         unitPrice: c.actualPrice,
@@ -752,7 +828,25 @@ export const PosCheckoutPage: FC = () => {
         discountAmount: Math.max(0, (c.unitPrice - c.actualPrice) * c.quantity),
         unitId: c.unitId,
         unitName: c.unit,
+        isGift: false,
       }));
+
+      const giftOrderItems = effectiveGiftItems
+        .filter((g) => g.productId && g.productId !== '00000000-0000-0000-0000-000000000000' && g.quantity > 0)
+        .map((g) => ({
+          productId: g.productId,
+          productName: g.productName,
+          unitPrice: 0,
+          quantity: g.quantity,
+          discountAmount: 0,
+          unitName: g.unitName || 'Cái',
+          isGift: true,
+          promotionId: g.promotionId || effectivePromoId || null,
+        }));
+
+      const items = [...paidItems, ...giftOrderItems];
+      const effectiveVoucherCode =
+        couponDiscountAmount > 0 && currentTab.couponCode?.trim() ? currentTab.couponCode.trim() : undefined;
 
       const backendOrder = await posOrderApi.createOrder({
         branchId,
@@ -766,8 +860,13 @@ export const PosCheckoutPage: FC = () => {
         creatorRole: user?.role,
         cashierName: user?.role === 'STORE_OWNER' ? `Chủ cửa hàng: ${user.fullName || 'Admin'}` : (user?.fullName || 'Thu ngân POS'),
         shiftId: currentShift?.id || undefined,
-        pointsRedeemed: currentTab.usePoints && currentTab.customer ? maxPointsCanUse : undefined,
-        voucherCode: currentTab.couponCode?.trim() || undefined,
+        pointsRedeemed: pointsDeduction > 0 && currentTab.usePoints && currentTab.customer ? maxPointsCanUse : undefined,
+        voucherCode: effectiveVoucherCode,
+        appliedPromotionId: effectivePromoId || null,
+        appliedPromotionSummary: effectivePromoLabels.length > 0 ? effectivePromoLabels.join('; ') : null,
+        promotionDiscountAmount: isManualDiscountWinning ? 0 : orderDiscountAmount,
+        voucherDiscountAmount: couponDiscountAmount,
+        pointsDiscountAmount: pointsDeduction,
       });
 
       createdOrderId = backendOrder.id;
@@ -782,7 +881,7 @@ export const PosCheckoutPage: FC = () => {
         updateCurrentTab({ customer: updatedCustomer });
       }
 
-      const receipt = buildReceiptData(debtNote);
+      const receipt = buildReceiptData(debtNote, backendOrder);
       if (createdOrderId) {
         receipt.orderId = createdOrderId;
       }
@@ -795,11 +894,17 @@ export const PosCheckoutPage: FC = () => {
       if (autoPrint) {
         posOrderApi.printDirect(receipt).then((res) => {
           if (res.success) {
-            showToast(`✅ Đã thanh toán đơn ${receipt.orderCode} & in trực tiếp ra máy in POS-58!`);
+            showToast(
+              backendOrder.giftStockWarning
+                ? `⚠️ Đã thanh toán & in đơn ${receipt.orderCode} (${backendOrder.giftStockWarning})`
+                : `✅ Đã thanh toán đơn ${receipt.orderCode} & in trực tiếp ra máy in POS-58!`
+            );
           } else {
             showToast(`⚠️ ${res.message}`, 'error');
           }
         });
+      } else if (backendOrder.giftStockWarning) {
+        showToast(`⚠️ Đã thanh toán đơn ${receipt.orderCode}. Lưu ý: ${backendOrder.giftStockWarning}`, 'info');
       } else {
         showToast(`✅ Đã thanh toán thành công đơn hàng ${receipt.orderCode}!`);
       }
@@ -1051,7 +1156,7 @@ export const PosCheckoutPage: FC = () => {
             onOpenCatalogModal={() => setIsCatalogModalOpen(true)}
             orderNote={currentTab.note}
             onOrderNoteChange={(note) => updateCurrentTab({ note })}
-            appliedPromotions={appliedPromotions}
+            appliedPromotions={effectivePromoLabels}
           />
         </div>
 
@@ -1063,6 +1168,7 @@ export const PosCheckoutPage: FC = () => {
             onOpenAddCustomerModal={() => setIsAddCustomerOpen(true)}
             totalItemAmount={totalItemAmount}
             orderDiscountPercent={currentTab.orderDiscountPercent}
+            orderDiscountAmount={orderDiscountAmount}
             onOpenOrderDiscountModal={() => setIsOrderDiscountOpen(true)}
             couponCode={currentTab.couponCode}
             onCouponCodeChange={(code) => {
@@ -1079,8 +1185,9 @@ export const PosCheckoutPage: FC = () => {
             pointsDeduction={pointsDeduction}
             pointsToRedeem={maxPointsCanUse}
             minPointsRequired={minPointsRequired}
-            appliedPromotions={appliedPromotions}
-            giftItems={giftItems}
+            isPointsBlockedByPromo={isPointsBlockedByPromo}
+            appliedPromotions={effectivePromoLabels}
+            giftItems={effectiveGiftItems}
             paymentMethod={currentTab.paymentMethod}
             onPaymentMethodChange={(pm) => updateCurrentTab({ paymentMethod: pm })}
             cashTendered={currentTab.cashTendered}
@@ -1153,6 +1260,7 @@ export const PosCheckoutPage: FC = () => {
         isOpen={isOrderDiscountOpen}
         totalItemAmount={totalItemAmount}
         currentDiscountPercent={currentTab.orderDiscountPercent}
+        autoPromoDiscount={autoPromoDiscount}
         onClose={() => setIsOrderDiscountOpen(false)}
         onApply={(percent) => updateCurrentTab({ orderDiscountPercent: percent })}
       />

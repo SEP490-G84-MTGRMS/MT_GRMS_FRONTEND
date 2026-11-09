@@ -20,6 +20,7 @@ import { posShiftApi } from '../api/posShiftApi';
 import type { ShiftCashMovementDto } from '../types/posShift.types';
 import { useAuthStore } from '../../../stores/useAuthStore';
 import { AN_NHIEN_BRANCHES } from '../mock/posMockData';
+import { branchManagementApi } from '../../../pages/store/api/branchManagementApi';
 
 export const StorePosCashControlPage: FC = () => {
   const { user } = useAuthStore();
@@ -45,7 +46,28 @@ export const StorePosCashControlPage: FC = () => {
   const [rejectionReason, setRejectionReason] = useState<string>('');
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
 
+  const [realBranches, setRealBranches] = useState<{ id: string; name: string }[]>([]);
+
+  useEffect(() => {
+    let isMounted = true;
+    branchManagementApi.getBranches({ pageSize: 100 })
+      .then((res) => {
+        if (isMounted && res.data?.items) {
+          setRealBranches(res.data.items.map((b) => ({ id: b.id, name: b.name })));
+        }
+      })
+      .catch((err) => {
+        console.warn('Không thể tải danh sách chi nhánh thực tế:', err);
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   const availableBranches = useMemo(() => {
+    if (realBranches.length > 0) {
+      return realBranches;
+    }
     if (isAnNhienStore) {
       return AN_NHIEN_BRANCHES;
     }
@@ -54,7 +76,7 @@ export const StorePosCashControlPage: FC = () => {
       { id: 'BR-02', name: 'Chi nhánh Thanh Xuân' },
       { id: 'BR-03', name: 'Chi nhánh Quận 1' },
     ];
-  }, [isAnNhienStore]);
+  }, [realBranches, isAnNhienStore]);
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
@@ -66,10 +88,8 @@ export const StorePosCashControlPage: FC = () => {
         setShiftTotalLimit(cfg.cashOutShiftTotalLimit ?? 0);
       }
 
-      // 2. Tải danh sách chờ duyệt theo chi nhánh
-      const branchParam = selectedBranchId === 'ALL'
-        ? (availableBranches[0]?.id || '')
-        : selectedBranchId;
+      // 2. Tải danh sách chờ duyệt theo chi nhánh (ALL => không truyền branchId để lấy toàn bộ tenant)
+      const branchParam = selectedBranchId === 'ALL' ? undefined : selectedBranchId;
 
       const summary = await posShiftApi.getPendingMovements(branchParam);
       if (summary?.movements) {
@@ -90,7 +110,7 @@ export const StorePosCashControlPage: FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedBranchId, availableBranches]);
+  }, [selectedBranchId]);
 
   useEffect(() => {
     loadData();

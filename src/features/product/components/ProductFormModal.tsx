@@ -13,10 +13,13 @@ import {
   Plus,
   Loader2,
   Tag,
+  AlertTriangle,
+  History,
 } from 'lucide-react';
 import type { ProductItem, Category, UomConversion } from '../types';
 import { uploadImageToCloudinary } from '../../../utils/cloudinary';
 import { productApi } from '../api/productApi';
+import { PriceHistoryModal } from './PriceHistoryModal';
 
 interface ProductFormModalProps {
   isOpen: boolean;
@@ -110,6 +113,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   const [costPrice, setCostPrice] = useState<number>(0);
   const [sellingPrice, setSellingPrice] = useState<number>(0);
   const [isFavorite, setIsFavorite] = useState<boolean>(false);
+  const [showPriceHistory, setShowPriceHistory] = useState<boolean>(false);
 
   // Trạng thái lưu (loading)
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
@@ -1235,17 +1239,39 @@ try {
 
               {/* (7) Giá bán */}
               <div>
-                <label
-                  style={{
-                    display: 'block',
-                    marginBottom: 6,
-                    fontSize: 13,
-                    fontWeight: 600,
-                    color: '#334155',
-                  }}
-                >
-                  Giá bán <span style={{ color: '#EF4444' }}>*</span>
-                </label>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                  <label
+                    style={{
+                      fontSize: 13,
+                      fontWeight: 600,
+                      color: '#334155',
+                    }}
+                  >
+                    Giá bán <span style={{ color: '#EF4444' }}>*</span>
+                  </label>
+                  {productToEdit?.id && (
+                    <button
+                      type="button"
+                      onClick={() => setShowPriceHistory(true)}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 4,
+                        fontSize: 12,
+                        color: '#2563EB',
+                        backgroundColor: '#EFF6FF',
+                        border: '1px solid #BFDBFE',
+                        borderRadius: 6,
+                        padding: '2px 8px',
+                        cursor: 'pointer',
+                        fontWeight: 500,
+                      }}
+                    >
+                      <History size={12} />
+                      Lịch sử giá
+                    </button>
+                  )}
+                </div>
                 <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
                   <input
                     type="number"
@@ -1271,6 +1297,27 @@ try {
                     đ
                   </span>
                 </div>
+                {costPrice > 0 && sellingPrice > 0 && sellingPrice < costPrice && (
+                  <div
+                    style={{
+                      marginTop: 8,
+                      padding: '8px 12px',
+                      backgroundColor: '#FEF3C7',
+                      border: '1px solid #F59E0B',
+                      borderRadius: 8,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      fontSize: 12,
+                      color: '#92400E',
+                    }}
+                  >
+                    <AlertTriangle size={15} color="#D97706" style={{ flexShrink: 0 }} />
+                    <span>
+                      <strong>Cảnh báo giá bán:</strong> Giá bán đang thấp hơn giá vốn ({costPrice.toLocaleString('vi-VN')} đ). Hệ thống sẽ tự động lưu vết audit log và cần sự đồng ý của Quản lý / Chủ cửa hàng.
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -2086,6 +2133,15 @@ try {
             </button>
           </div>
         </div>
+      )}
+
+      {showPriceHistory && productToEdit?.id && (
+        <PriceHistoryModal
+          isOpen={showPriceHistory}
+          onClose={() => setShowPriceHistory(false)}
+          productId={productToEdit.id}
+          productName={productName || productToEdit.productName || ''}
+        />
       )}
     </div>
   );

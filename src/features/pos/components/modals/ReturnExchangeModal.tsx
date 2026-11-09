@@ -16,6 +16,8 @@ interface Props {
       unitPrice: number;
       unitName?: string;
       condition?: 'Restock' | 'Damaged';
+      orderDetailId?: string;
+      isGift?: boolean;
     }>;
     newItems: Array<{
       productId: string;
@@ -110,10 +112,15 @@ export const ReturnExchangeModal: React.FC<Props> = ({
     invoice.invoiceId.startsWith('PRE-')
   );
 
-  // Tính tổng tiền hàng trả
-  const totalReturnAmount = (invoice.items || []).reduce((sum, item) => {
-    const qty = returnQtys[item.productId] || 0;
-    return sum + qty * item.unitPrice;
+  const getLineKey = (item: NonNullable<InvoiceDTO['items']>[number], idx: number) =>
+    item.itemId || `${item.productId}_${item.isGift ? 'gift' : 'paid'}_${idx}`;
+
+  // Tính tổng tiền hàng trả (dòng quà tặng khuyến mãi IsGift luôn hoàn 0 đ - REQ-ORD-BOGO-03)
+  const totalReturnAmount = (invoice.items || []).reduce((sum, item, idx) => {
+    const key = getLineKey(item, idx);
+    const qty = returnQtys[key] || 0;
+    const refundableUnit = item.isGift ? 0 : (item.actualPrice ?? item.unitPrice);
+    return sum + qty * refundableUnit;
   }, 0);
 
   // Tính tổng tiền hàng đổi mới
@@ -137,17 +144,17 @@ export const ReturnExchangeModal: React.FC<Props> = ({
     (newItems.length === 0 || netAmount < 0) &&
     returnReason !== 'DEFECTIVE';
 
-  const handleReturnQtyChange = (productId: string, maxQty: number, val: number) => {
+  const handleReturnQtyChange = (lineKey: string, maxQty: number, val: number) => {
     const validQty = Math.max(0, Math.min(maxQty, Math.floor(val || 0)));
     setReturnQtys((prev) => ({
       ...prev,
-      [productId]: validQty,
+      [lineKey]: validQty,
     }));
     // Mặc định tình trạng là Restock nếu chưa có
-    if (validQty > 0 && !returnConditions[productId]) {
+    if (validQty > 0 && !returnConditions[lineKey]) {
       setReturnConditions((prev) => ({
         ...prev,
-        [productId]: 'Restock',
+        [lineKey]: 'Restock',
       }));
     }
   };
@@ -220,18 +227,23 @@ export const ReturnExchangeModal: React.FC<Props> = ({
   };
 
   const handleSubmit = async () => {
-    const returnedItemsList = Object.entries(returnQtys)
-      .filter(([_, qty]) => qty > 0)
-      .map(([pId, qty]) => {
-        const originalItem = invoice.items?.find((i) => i.productId === pId);
+    const returnedItemsList = (invoice.items || [])
+      .map((originalItem, idx) => {
+        const key = getLineKey(originalItem, idx);
+        const qty = returnQtys[key] || 0;
+        if (qty <= 0) return null;
+        const refundableUnit = originalItem.isGift ? 0 : (originalItem.actualPrice ?? originalItem.unitPrice);
         return {
-          productId: pId,
+          productId: originalItem.productId,
           quantity: qty,
-          unitPrice: originalItem?.unitPrice || 0,
-          unitName: originalItem?.unitName,
-          condition: returnConditions[pId] || 'Restock',
+          unitPrice: refundableUnit,
+          unitName: originalItem.unitName,
+          condition: returnConditions[key] || ('Restock' as const),
+          orderDetailId: originalItem.itemId || undefined,
+          isGift: Boolean(originalItem.isGift),
         };
-      });
+      })
+      .filter((x): x is NonNullable<typeof x> => x !== null);
 
     const newItemsList = newItems.map((item) => ({
       productId: item.product.id,
@@ -378,16 +390,42 @@ export const ReturnExchangeModal: React.FC<Props> = ({
                   </tr>
                 </thead>
                 <tbody>
-                  {(invoice.items || []).map((item) => {
-                    const currentQty = returnQtys[item.productId] || 0;
-                    const condition = returnConditions[item.productId] || 'Restock';
+                  {(invoice.items || []).map((item, idx) => {
+                    const lineKey = getLineKey(item, idx);
+                    const currentQty = returnQtys[lineKey] || 0;
+                    const condition = returnConditions[lineKey] || 'Restock';
+                    const refundableUnit = item.isGift ? 0 : (item.actualPrice ?? item.unitPrice);
                     return (
-                      <tr key={item.productId} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                        <td style={{ padding: '8px 10px', fontWeight: 600 }}>{item.productName}</td>
+                      <tr key={lineKey} style={{ borderBottom: '1px solid #f1f5f9', backgroundColor: item.isGift ? '#f0fdf4' : undefined }}>
+                        <td style={{ padding: '8px 10px', fontWeight: 600 }}>
+                          {item.productName}
+                          {item.isGift && (
+                            <span
+                              style={{
+                                marginLeft: 6,
+                                padding: '1px 6px',
+                                borderRadius: 4,
+                                backgroundColor: '#dcfce7',
+                                color: '#15803d',
+                                border: '1px solid #86efac',
+                                fontSize: 10.5,
+                                fontWeight: 700,
+                              }}
+                            >
+                              🎁 Quà tặng KM (Hoàn 0 đ)
+                            </span>
+                          )}
+                        </td>
                         <td style={{ padding: '8px 10px', textAlign: 'center', color: '#0f766e', fontWeight: 600 }}>
                           {item.unitName || 'Cái'}
                         </td>
-                        <td style={{ padding: '8px 10px', textAlign: 'right' }}>{item.unitPrice.toLocaleString('vi-VN')} đ</td>
+                        <td style={{ padding: '8px 10px', textAlign: 'right' }}>
+                          {item.isGift ? (
+                            <span style={{ color: '#15803d', fontWeight: 600 }}>0 đ (Tặng)</span>
+                          ) : (
+                            `${refundableUnit.toLocaleString('vi-VN')} đ`
+                          )}
+                        </td>
                         <td style={{ padding: '8px 10px', textAlign: 'center', color: '#64748b' }}>{item.quantity}</td>
                         <td style={{ padding: '8px 10px', textAlign: 'center' }}>
                           <input
@@ -395,7 +433,7 @@ export const ReturnExchangeModal: React.FC<Props> = ({
                             min={0}
                             max={item.quantity}
                             value={currentQty}
-                            onChange={(e) => handleReturnQtyChange(item.productId, item.quantity, parseFloat(e.target.value))}
+                            onChange={(e) => handleReturnQtyChange(lineKey, item.quantity, parseFloat(e.target.value))}
                             style={{
                               width: 65,
                               textAlign: 'center',
@@ -414,7 +452,7 @@ export const ReturnExchangeModal: React.FC<Props> = ({
                             onChange={(e) =>
                               setReturnConditions((prev) => ({
                                 ...prev,
-                                [item.productId]: e.target.value as 'Restock' | 'Damaged',
+                                [lineKey]: e.target.value as 'Restock' | 'Damaged',
                               }))
                             }
                             style={{
@@ -434,8 +472,8 @@ export const ReturnExchangeModal: React.FC<Props> = ({
                             <option value="Damaged">⚠️ Hàng lỗi/hỏng (Chờ hủy/NCC)</option>
                           </select>
                         </td>
-                        <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 700, color: currentQty > 0 ? '#b91c1c' : '#94a3b8' }}>
-                          {(currentQty * item.unitPrice).toLocaleString('vi-VN')} đ
+                        <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 700, color: item.isGift ? '#15803d' : currentQty > 0 ? '#b91c1c' : '#94a3b8' }}>
+                          {item.isGift ? '0 đ' : `${(currentQty * refundableUnit).toLocaleString('vi-VN')} đ`}
                         </td>
                       </tr>
                     );

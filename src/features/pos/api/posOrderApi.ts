@@ -10,6 +10,8 @@ export interface OrderItemCreateDto {
   productName?: string;
   unitId?: string;
   unitName?: string;
+  isGift?: boolean;
+  promotionId?: string | null;
 }
 
 export interface OrderCreateRequest {
@@ -26,6 +28,11 @@ export interface OrderCreateRequest {
   shiftId?: string | null;
   pointsRedeemed?: number | null;
   voucherCode?: string | null;
+  appliedPromotionId?: string | null;
+  appliedPromotionSummary?: string | null;
+  promotionDiscountAmount?: number | null;
+  voucherDiscountAmount?: number | null;
+  pointsDiscountAmount?: number | null;
 }
 
 export interface OrderItemResponse {
@@ -40,6 +47,8 @@ export interface OrderItemResponse {
   actualPrice: number;
   totalLineAmount: number;
   batchCode?: string;
+  isGift?: boolean;
+  promotionId?: string | null;
 }
 
 export interface OrderResponse {
@@ -59,6 +68,14 @@ export interface OrderResponse {
   paymentStatus: string;
   status: string;
   items: OrderItemResponse[];
+  appliedPromotionId?: string | null;
+  appliedPromotionSummary?: string | null;
+  promotionDiscountAmount?: number;
+  appliedVoucherCode?: string | null;
+  voucherDiscountAmount?: number;
+  pointsRedeemed?: number;
+  pointsDiscountAmount?: number;
+  giftStockWarning?: string | null;
 }
 
 export interface PrintOrderResponse {
@@ -213,13 +230,16 @@ export const posOrderApi = {
       customer: receiptData.customer?.name || 'Khách lẻ',
       printTime: receiptData.createdAt || new Date().toLocaleString('vi-VN'),
       items: (receiptData.items || []).map((it: any) => ({
-        name: it.name,
+        name: it.isGift ? `[Quà KM] ${it.name}` : it.name,
         qty: it.quantity,
-        price: it.unitPrice,
+        price: it.isGift ? 0 : it.unitPrice,
       })),
       subtotal: receiptData.totalItemAmount || 0,
       discountPercent: 0,
-      discountAmount: (receiptData.orderDiscountAmount || 0) + (receiptData.pointsDiscountAmount || 0),
+      discountAmount:
+        (receiptData.orderDiscountAmount || 0) +
+        (receiptData.voucherDiscountAmount || 0) +
+        (receiptData.pointsDiscountAmount || 0),
       vatPercent: 0,
       vatAmount: 0,
       finalTotal: receiptData.finalAmount || 0,
@@ -319,7 +339,15 @@ export const posOrderApi = {
    * Đổi / Trả hàng chuẩn KiotViet: hoàn kho hàng trả, trừ kho FEFO hàng mới, bù trừ chênh lệch
    */
   returnExchangeOrder: async (orderId: string, data: {
-    returnedItems: Array<{ productId: string; quantity: number; unitPrice: number; unitName?: string; condition?: 'Restock' | 'Damaged' }>;
+    returnedItems: Array<{
+      productId: string;
+      quantity: number;
+      unitPrice: number;
+      unitName?: string;
+      condition?: 'Restock' | 'Damaged';
+      orderDetailId?: string;
+      isGift?: boolean;
+    }>;
     newItems: Array<{ productId: string; quantity: number; unitPrice: number; unitName?: string; discountAmount?: number }>;
     settlementMethod: string;
     reason?: string;
