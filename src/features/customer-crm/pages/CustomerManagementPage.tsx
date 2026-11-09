@@ -15,7 +15,7 @@ import type { CreateCustomerInput, UpdateCustomerInput } from '../types/customer
 import '../customer-crm.css';
 
 export const CustomerManagementPage: FC = () => {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const urlSearch = searchParams.get('search') || searchParams.get('keyword') || '';
   const {
     customers,
@@ -59,6 +59,24 @@ export const CustomerManagementPage: FC = () => {
       setSearchTerm(urlSearch);
     }
   }, [urlSearch, setSearchTerm]);
+
+  const handleSearchChange = (term: string) => {
+    setSearchTerm(term);
+    setCurrentPage(1);
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        if (term) {
+          next.set('search', term);
+        } else {
+          next.delete('search');
+          next.delete('keyword');
+        }
+        return next;
+      },
+      { replace: true }
+    );
+  };
 
   const [ledgerCustomer, setLedgerCustomer] = useState<any>(null);
   const [toast, setToast] = useState<ToastState | null>(null);
@@ -140,7 +158,7 @@ export const CustomerManagementPage: FC = () => {
       {/* 2. Filter & Action Bar */}
       <CustomerFilterBar
         searchTerm={searchTerm}
-        onSearchChange={setSearchTerm}
+        onSearchChange={handleSearchChange}
         selectedTier={selectedTier}
         onTierChange={setSelectedTier}
         selectedDebtStatus={selectedDebtStatus}

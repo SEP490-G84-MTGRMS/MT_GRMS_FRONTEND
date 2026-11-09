@@ -243,8 +243,16 @@ export const CashbookLedgerTable: FC<CashbookLedgerTableProps> = ({
       tx.category?.includes('Thu nợ') ||
       tx.description?.includes('Thu nợ')
     ) {
-      const match = tx.description?.match(/Thu nợ khách hàng\s+([a-f0-9-]+)/i);
-      const searchTarget = match ? match[1] : (tx.referenceDocId || tx.counterpartyName || '');
+      let searchTarget = '';
+      if (tx.description?.includes('Thu nợ khách hàng')) {
+        const cleaned = tx.description.replace(/^.*Thu nợ khách hàng\s*/i, '').trim();
+        if (cleaned && cleaned.toLowerCase() !== 'thủ công') {
+          searchTarget = cleaned;
+        }
+      }
+      if (!searchTarget) {
+        searchTarget = tx.referenceDocId || tx.counterpartyName || '';
+      }
       navigate('/store-owner/customers?search=' + encodeURIComponent(searchTarget));
       return;
     }

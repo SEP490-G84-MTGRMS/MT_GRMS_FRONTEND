@@ -30,7 +30,7 @@ import { calculatePeriodRange } from '../utils/datePeriodUtils';
 import '../service-expenses.css';
 
 export const ServiceExpensesPage: FC = () => {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const user = useAuthStore((state) => state.user);
   const isEmployee =
     user?.role === 'STAFF' ||
@@ -107,6 +107,21 @@ export const ServiceExpensesPage: FC = () => {
   const cancelExpenseMutation = useCancelExpense();
 
   const handleFilterChange = (updated: Partial<ExpenseFilterParams>) => {
+    if (updated.keyword !== undefined) {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          if (updated.keyword) {
+            next.set('search', updated.keyword);
+          } else {
+            next.delete('search');
+            next.delete('keyword');
+          }
+          return next;
+        },
+        { replace: true }
+      );
+    }
     setFilters((prev) => ({
       ...prev,
       ...updated,
@@ -115,6 +130,15 @@ export const ServiceExpensesPage: FC = () => {
   };
 
   const handleResetFilters = () => {
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete('search');
+        next.delete('keyword');
+        return next;
+      },
+      { replace: true }
+    );
     const range = calculatePeriodRange('this-month');
     setPeriodLabel(range.label);
     setFilters({

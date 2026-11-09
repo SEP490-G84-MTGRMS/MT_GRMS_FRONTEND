@@ -41,6 +41,7 @@ export const CustomerFilterBar: FC<CustomerFilterBarProps> = ({
           />
           {searchTerm && (
             <button
+              type="button"
               onClick={() => onSearchChange('')}
               className="customer-clear-btn"
               title="Xóa tìm kiếm"

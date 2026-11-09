@@ -33,7 +33,7 @@ export const CashbookPage: FC = () => {
   const { user } = useAuthStore();
   const rawRole = (user?.role || '').toUpperCase();
   const isEmployee = rawRole === 'EMPLOYEE' || rawRole === 'CASHIER' || rawRole === 'STAFF';
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const urlSearch = searchParams.get('search') || searchParams.get('keyword') || '';
   const [accounts, setAccounts] = useState<CashAccount[]>([]);
   const [transits, setTransits] = useState<CashTransitItem[]>([]);
@@ -62,6 +62,46 @@ export const CashbookPage: FC = () => {
       }));
     }
   }, [urlSearch]);
+
+  const handleFilterChange = (updated: Partial<CashbookFilterParams>) => {
+    if (updated.searchQuery !== undefined) {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          if (updated.searchQuery) {
+            next.set('search', updated.searchQuery);
+          } else {
+            next.delete('search');
+            next.delete('keyword');
+          }
+          return next;
+        },
+        { replace: true }
+      );
+    }
+    setFilters((prev) => ({ ...prev, ...updated }));
+  };
+
+  const handleResetFilters = () => {
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete('search');
+        next.delete('keyword');
+        return next;
+      },
+      { replace: true }
+    );
+    setFilters({
+      branchId: 'ALL',
+      accountId: 'ALL',
+      transactionType: 'ALL',
+      datePeriod: 'this_month',
+      searchQuery: '',
+      startDate: undefined,
+      endDate: undefined,
+    });
+  };
 
   const [summaryKPI, setSummaryKPI] = useState<CashbookSummaryKPI>({
     totalOpeningBalance: 345_050_000, // Standardized per Decision D2
@@ -724,18 +764,8 @@ export const CashbookPage: FC = () => {
         <div style={{ marginTop: 24 }}>
           <CashbookFilterToolbar
             filters={filters}
-            onChangeFilter={(updated) => setFilters((prev) => ({ ...prev, ...updated }))}
-            onResetFilter={() =>
-              setFilters({
-                branchId: 'ALL',
-                accountId: 'ALL',
-                transactionType: 'ALL',
-                datePeriod: 'this_month',
-                searchQuery: '',
-                startDate: undefined,
-                endDate: undefined,
-              })
-            }
+            onChangeFilter={handleFilterChange}
+            onResetFilter={handleResetFilters}
           />
         </div>
 
