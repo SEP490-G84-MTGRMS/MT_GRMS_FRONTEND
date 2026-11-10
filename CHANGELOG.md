@@ -6,6 +6,9 @@ Toàn bộ các thay đổi của repository Frontend React SPA được tổng 
 
 ## [Unreleased] - 2026-11-10
 
+### Changed
+- **Tái cấu trúc Modal "Chỉnh sửa sản phẩm tại chi nhánh" sang bố cục ngang 2 cột (`EditStoreProductModal.tsx`)**: Chuyển đổi toàn bộ form chỉnh sửa sản phẩm từ xếp dọc 1 cột (15 trường gây cuộn dọc dài) sang bố cục lưới 2 cột ngang (`grid-template-columns: repeat(2, 1fr)`), mở rộng `maxWidth: 860px`, sắp xếp logic các cặp trường thông tin (Chi nhánh, Sản phẩm, Nhà cung cấp, Giá vốn & Giá bán lẻ, MOQ & Trạng thái), loại bỏ hiện tượng cuộn dọc không hợp lý và tối ưu trải nghiệm người dùng [FE-PRODUCT] [worklog: docs/worklogs/2026-11-10_FE-PRODUCT_AI_filter-store-products-by-header-branch.md].
+
 ### Removed
 - **Lược bỏ cột "Mã NCC" và "Nhà Cung Cấp" trong bảng Sản phẩm theo Cửa hàng (`StoreProductTable.tsx`)**: Bỏ 2 cột `Mã NCC` và `Nhà Cung Cấp` khỏi bảng dữ liệu trên màn hình "Sản Phẩm Theo Cửa Hàng / Chi Nhánh" (`/store-owner/stores/products`), tái phân bổ lại tỷ lệ độ rộng cho 10 cột còn lại (Mã SKU, Tên SP, Giá vốn, Giá bán lẻ, Giá bán theo ĐVT, MOQ, ĐVT, Trạng thái, Thao tác) giúp giao diện thoáng đãng, dễ theo dõi [FE-PRODUCT] [worklog: docs/worklogs/2026-11-10_FE-PRODUCT_AI_filter-store-products-by-header-branch.md].
 - **Lược bỏ ô lọc & cột "Mã cửa hàng", "Cửa hàng" và đồng bộ lọc sản phẩm theo Header Branch Dropdown (`StoreProductManagementPage.tsx`, `StoreProductFilterBar.tsx`, `StoreProductTable.tsx`)**: Bỏ 2 ô lọc và 2 cột `Mã cửa hàng`, `Cửa hàng` trên màn hình "Sản Phẩm Theo Cửa Hàng / Chi Nhánh"; tự động lắng nghe dropdown Chi nhánh trên Header (`mtgrms:branch-changed`, `localStorage`) để lọc danh sách sản phẩm theo chi nhánh đang chọn [FE-PRODUCT] [worklog: docs/worklogs/2026-11-10_FE-PRODUCT_AI_filter-store-products-by-header-branch.md].
