@@ -48,6 +48,8 @@ export const returnStatusBadge = (status: SupplierReturnStatus) => {
       return { label: 'Chờ NCC duyệt', bg: '#fff7ed', color: '#c2410c', border: '#fed7aa' };
     case 'APPROVED':
       return { label: 'Đã duyệt (Chờ giao)', bg: '#f0fdf4', color: '#15803d', border: '#bbf7d0' };
+    case 'PARTIALLY_HANDED_OVER':
+      return { label: 'Đã giao một phần', bg: '#eff6ff', color: '#1d4ed8', border: '#bfdbfe' };
     case 'REJECTED':
       return { label: 'NCC từ chối', bg: '#fef2f2', color: '#b91c1c', border: '#fecaca' };
     case 'COMPLETED':
@@ -306,7 +308,8 @@ export const SupplierReturnTable: FC<Props> = ({
             {sortedItems.length > 0 ? (
               sortedItems.map((item, idx) => {
                 const st = returnStatusBadge(item.status);
-                const isApprovedWaitingHandover = item.status === 'APPROVED';
+                const isApprovedWaitingHandover =
+                  item.status === 'APPROVED' || item.status === 'PARTIALLY_HANDED_OVER';
 
                 return (
                   <tr key={item.id} className="so-list-row">
@@ -334,7 +337,7 @@ export const SupplierReturnTable: FC<Props> = ({
                       </button>
                     </td>
 
-                    {/* Phiếu nhập gốc */}
+                    {/* Phiếu nhập gốc & Phiếu kiểm kê */}
                     <td className="so-list-td">
                       <span
                         style={{
@@ -346,6 +349,19 @@ export const SupplierReturnTable: FC<Props> = ({
                       >
                         {item.goodsReceiptCode}
                       </span>
+                      {item.stocktakeCode && (
+                        <div
+                          style={{
+                            fontSize: 11,
+                            color: '#0f766e',
+                            fontFamily: 'var(--font-mono, monospace)',
+                            fontWeight: 600,
+                            marginTop: 2,
+                          }}
+                        >
+                          KK: {item.stocktakeCode}
+                        </div>
+                      )}
                     </td>
 
                     {/* Nhà cung cấp */}

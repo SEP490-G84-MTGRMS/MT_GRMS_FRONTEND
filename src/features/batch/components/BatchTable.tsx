@@ -9,6 +9,7 @@ import {
   Tag,
   Trash2,
   AlertTriangle,
+  ClipboardCheck,
 } from 'lucide-react';
 import type { BatchItem, BatchStatus } from '../types/batch.types';
 
@@ -17,6 +18,10 @@ interface BatchTableProps {
   totalCount: number;
   pageIndex: number;
   pageSize: number;
+  selectedIds?: string[];
+  onToggleSelect?: (batch: BatchItem) => void;
+  onToggleSelectAll?: (batches: BatchItem[]) => void;
+  onQuickStocktake?: (batch: BatchItem) => void;
   onPageChange: (newPage: number) => void;
   onPageSizeChange: (newSize: number) => void;
   onSelectBatch: (batch: BatchItem) => void;
@@ -56,6 +61,10 @@ export const BatchTable: FC<BatchTableProps> = ({
   totalCount,
   pageIndex,
   pageSize,
+  selectedIds = [],
+  onToggleSelect,
+  onToggleSelectAll,
+  onQuickStocktake,
   onPageChange,
   onPageSizeChange,
   onSelectBatch,
@@ -161,21 +170,25 @@ export const BatchTable: FC<BatchTableProps> = ({
   const startItem = totalCount === 0 ? 0 : (pageIndex - 1) * pageSize + 1;
   const endItem = Math.min(pageIndex * pageSize, totalCount);
 
+  const allCurrentSelected =
+    sortedBatches.length > 0 && sortedBatches.every((b) => selectedIds.includes(b.id));
+
   const tableColGroup = (
     <colgroup>
+      <col style={{ width: '3%' }} />
       <col style={{ width: '8%' }} />
       <col style={{ width: '13%' }} />
-      <col style={{ width: '9%' }} />
+      <col style={{ width: '8%' }} />
       <col style={{ width: '7%' }} />
       <col style={{ width: '6%' }} />
       <col style={{ width: '8%' }} />
-      <col style={{ width: '10%' }} />
+      <col style={{ width: '9%' }} />
       <col style={{ width: '6%' }} />
       <col style={{ width: '6%' }} />
       <col style={{ width: '5%' }} />
-      <col style={{ width: '4%' }} />
-      <col style={{ width: '4%' }} />
-      <col style={{ width: '7%' }} />
+      <col style={{ width: '5%' }} />
+      <col style={{ width: '3%' }} />
+      <col style={{ width: '6%' }} />
       <col style={{ width: '4%' }} />
       <col style={{ width: '3%' }} />
     </colgroup>
@@ -286,6 +299,17 @@ export const BatchTable: FC<BatchTableProps> = ({
           {tableColGroup}
           <thead>
             <tr>
+              <th style={{ ...thBaseStyle, textAlign: 'center', padding: '10px 6px' }}>
+                {onToggleSelectAll && (
+                  <input
+                    type="checkbox"
+                    checked={allCurrentSelected}
+                    onChange={() => onToggleSelectAll(sortedBatches)}
+                    title="Chọn tất cả lô trên trang để kiểm kê"
+                    style={{ cursor: 'pointer', width: 14, height: 14, accentColor: '#0f766e' }}
+                  />
+                )}
+              </th>
               <SortTh field="sku" label="Mã SKU" />
               <SortTh field="productName" label="Tên sản phẩm" />
               <SortTh field="batchCode" label="Mã lô" />
@@ -318,7 +342,7 @@ export const BatchTable: FC<BatchTableProps> = ({
             {sortedBatches.length === 0 ? (
               <tr>
                 <td
-                  colSpan={15}
+                  colSpan={16}
                   style={{
                     padding: '48px 16px',
                     textAlign: 'center',
@@ -354,8 +378,24 @@ export const BatchTable: FC<BatchTableProps> = ({
               </tr>
             ) : (
               sortedBatches.map((row) => {
+                const isSelected = selectedIds.includes(row.id);
                 return (
-                  <tr key={row.id} className="so-list-row">
+                  <tr
+                    key={row.id}
+                    className="so-list-row"
+                    style={isSelected ? { backgroundColor: '#f0fdfa' } : undefined}
+                  >
+                    <td style={{ textAlign: 'center', padding: '8px 6px' }}>
+                      {onToggleSelect && (
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => onToggleSelect(row)}
+                          title="Chọn lô này để kiểm kê"
+                          style={{ cursor: 'pointer', width: 14, height: 14, accentColor: '#0f766e' }}
+                        />
+                      )}
+                    </td>
                     <td style={{ fontFamily: 'var(--font-mono, monospace)', fontSize: 12, color: '#334155' }}>
                       {row.sku}
                     </td>
@@ -435,7 +475,14 @@ export const BatchTable: FC<BatchTableProps> = ({
                         color: '#0f172a',
                       }}
                     >
-                      {row.qtyCurrent}
+                      <div>{row.qtyCurrent}</div>
+                      {((row.qtyQuarantined ?? 0) > 0 || (row.qtyReserved ?? 0) > 0) && (
+                        <div style={{ fontSize: 10, fontWeight: 600, color: '#b45309', lineHeight: 1.2 }}>
+                          KD: {row.qtyAvailable ?? row.qtyCurrent}
+                          {(row.qtyQuarantined ?? 0) > 0 ? ` · CL:${row.qtyQuarantined}` : ''}
+                          {(row.qtyReserved ?? 0) > 0 ? ` · RTV:${row.qtyReserved}` : ''}
+                        </div>
+                      )}
                     </td>
 
                     <td style={{ textAlign: 'center', fontWeight: 600, color: '#475569' }}>
@@ -465,6 +512,18 @@ export const BatchTable: FC<BatchTableProps> = ({
                         >
                           <Eye size={14} />
                         </button>
+                        {onQuickStocktake && (
+                          <button
+                            type="button"
+                            className="so-list-action-btn so-list-action-btn--icon"
+                            onClick={() => onQuickStocktake(row)}
+                            title="Kiểm kê lô hàng này"
+                            aria-label="Kiểm kê lô hàng"
+                            style={{ color: '#0f766e', borderColor: '#99f6e4' }}
+                          >
+                            <ClipboardCheck size={14} />
+                          </button>
+                        )}
                         {(row.status === 'Warning' || row.status === 'Critical') && (
                           <button
                             type="button"

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { FC } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { RotateCcw, Truck, Plus, Loader2 } from 'lucide-react';
+import { RotateCcw, Truck, Plus, Loader2, ClipboardList } from 'lucide-react';
 import { useAuthStore } from '../../../stores/useAuthStore';
 import type {
   SupplierReturnListItem,
@@ -144,6 +144,14 @@ export const SupplierReturnListPage: FC = () => {
         </div>
 
         <div className="so-list-header-actions">
+          <Link
+            to="/store-owner/stocktakes"
+            className="po-btn po-btn-secondary"
+            title="Xem danh sách Phiếu kiểm kê hàng hóa"
+          >
+            <ClipboardList size={14} />
+            <span>Phiếu kiểm kê hàng hóa</span>
+          </Link>
           <Link
             to="/store-owner/goods-receipts"
             className="po-btn po-btn-secondary"

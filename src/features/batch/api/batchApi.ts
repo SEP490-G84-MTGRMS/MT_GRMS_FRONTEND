@@ -23,6 +23,9 @@ interface BatchListItemDto {
   daysLeft: number;
   qtyInitial: number;
   qtyCurrent: number;
+  qtyReserved?: number;
+  qtyQuarantined?: number;
+  qtyAvailable?: number;
   unit: string;
   costPrice: number;
   totalValuation: number;
@@ -30,6 +33,7 @@ interface BatchListItemDto {
   zoneArea?: string | null;
   shelfLocation?: string | null;
   originalGrnNo?: string | null;
+  originalGrnId?: string | null;
 }
 
 interface BatchPagedResultDto {
@@ -87,6 +91,17 @@ export const mapBatchDtoToItem = (dto: BatchListItemDto): BatchItem => ({
   daysLeft: dto.daysLeft,
   qtyInitial: Number(dto.qtyInitial) || 0,
   qtyCurrent: Number(dto.qtyCurrent) || 0,
+  qtyReserved: Number(dto.qtyReserved) || 0,
+  qtyQuarantined: Number(dto.qtyQuarantined) || 0,
+  qtyAvailable:
+    dto.qtyAvailable !== undefined
+      ? Number(dto.qtyAvailable) || 0
+      : Math.max(
+          0,
+          (Number(dto.qtyCurrent) || 0) -
+            (Number(dto.qtyReserved) || 0) -
+            (Number(dto.qtyQuarantined) || 0)
+        ),
   unit: dto.unit || 'Cái',
   costPrice: Number(dto.costPrice) || 0,
   totalValuation: Number(dto.totalValuation) || 0,
@@ -94,6 +109,7 @@ export const mapBatchDtoToItem = (dto: BatchListItemDto): BatchItem => ({
   zoneArea: dto.zoneArea || '—',
   shelfLocation: dto.shelfLocation || '—',
   originalGrnNo: dto.originalGrnNo || '',
+  originalGrnId: dto.originalGrnId || undefined,
   movements: [],
 });
 

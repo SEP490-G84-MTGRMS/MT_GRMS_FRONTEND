@@ -11,6 +11,7 @@ import {
   Store,
   FileText,
   FilePlus,
+  ClipboardCheck,
 } from 'lucide-react';
 import { useAuthStore } from '../../stores/useAuthStore';
 import { ApprovalRequestsModal } from '../../features/employee/components/ApprovalRequestsModal';
@@ -118,6 +119,10 @@ export const AppTopNav: FC = () => {
     location.pathname === '/employee/payroll' ||
     location.pathname === '/employees/payroll' ||
     location.pathname.startsWith('/employee/payroll');
+
+  const isStocktakeActive =
+    location.pathname.startsWith('/employee/stocktakes') ||
+    location.pathname.startsWith('/employee/batches');
 
   return (
     <>
@@ -310,6 +315,42 @@ export const AppTopNav: FC = () => {
             >
               <FileText size={17} color="currentColor" />
               <span>Phiếu lương của tôi</span>
+            </NavLink>
+
+            {/* 3b. Kiểm kê hàng hóa */}
+            <NavLink
+              to="/employee/stocktakes"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 8,
+                padding: '0 16px',
+                height: '100%',
+                textDecoration: 'none',
+                fontSize: 13.5,
+                fontWeight: isStocktakeActive ? 700 : 500,
+                color: '#ffffff',
+                backgroundColor: isStocktakeActive
+                  ? 'rgba(0, 0, 0, 0.2)'
+                  : 'transparent',
+                borderBottom: isStocktakeActive
+                  ? '3px solid #FCD34D'
+                  : '3px solid transparent',
+                transition: 'all 0.15s ease',
+                whiteSpace: 'nowrap',
+                boxSizing: 'border-box',
+              }}
+              onMouseEnter={(e) => {
+                if (!isStocktakeActive)
+                  e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.12)';
+              }}
+              onMouseLeave={(e) => {
+                if (!isStocktakeActive)
+                  e.currentTarget.style.backgroundColor = 'transparent';
+              }}
+            >
+              <ClipboardCheck size={17} color="currentColor" />
+              <span>Kiểm kê hàng hóa</span>
             </NavLink>
 
             {/* 4. Làm đơn (Xin nghỉ, Đổi ca, Sự cố FaceID, Làm thêm OT) */}

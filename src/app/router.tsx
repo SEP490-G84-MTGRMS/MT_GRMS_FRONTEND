@@ -46,6 +46,13 @@ import {
   SupplierReturnDetailPage,
 } from '../features/supplier-return';
 
+// 2f. Stocktake Feature (Phiếu kiểm kê hàng hóa)
+import {
+  StocktakeListPage,
+  StocktakeFormPage,
+  StocktakeDetailPage,
+} from '../features/stocktake';
+
 // 3. Service Expenses Feature (FE-07)
 import { ServiceExpensesPage } from '../features/service-expenses/pages/ServiceExpensesPage';
 
@@ -461,6 +468,22 @@ export const router = createBrowserRouter([
         element: <BatchListPage defaultRole="store_owner" />,
       },
       {
+        path: 'stocktakes',
+        element: <StocktakeListPage defaultRole="store_owner" />,
+      },
+      {
+        path: 'stocktakes/create',
+        element: <StocktakeFormPage defaultRole="store_owner" />,
+      },
+      {
+        path: 'stocktakes/:id',
+        element: <StocktakeDetailPage defaultRole="store_owner" />,
+      },
+      {
+        path: 'stocktakes/:id/edit',
+        element: <StocktakeFormPage defaultRole="store_owner" />,
+      },
+      {
         path: 'expenses',
         element: <ServiceExpensesPage />,
       },
@@ -789,6 +812,22 @@ export const router = createBrowserRouter([
         path: 'payroll',
         element: <PayslipManagementPage />,
       },
+      {
+        path: 'stocktakes',
+        element: <StocktakeListPage defaultRole="employee" />,
+      },
+      {
+        path: 'stocktakes/create',
+        element: <StocktakeFormPage defaultRole="employee" />,
+      },
+      {
+        path: 'stocktakes/:id',
+        element: <StocktakeDetailPage defaultRole="employee" />,
+      },
+      {
+        path: 'stocktakes/:id/edit',
+        element: <StocktakeFormPage defaultRole="employee" />,
+      },
     ],
   },
 
@@ -812,6 +851,22 @@ export const router = createBrowserRouter([
       {
         path: 'payroll',
         element: <PayslipManagementPage />,
+      },
+      {
+        path: 'stocktakes',
+        element: <StocktakeListPage defaultRole="employee" />,
+      },
+      {
+        path: 'stocktakes/create',
+        element: <StocktakeFormPage defaultRole="employee" />,
+      },
+      {
+        path: 'stocktakes/:id',
+        element: <StocktakeDetailPage defaultRole="employee" />,
+      },
+      {
+        path: 'stocktakes/:id/edit',
+        element: <StocktakeFormPage defaultRole="employee" />,
       },
     ],
   },
@@ -1197,6 +1252,28 @@ export const router = createBrowserRouter([
       {
         index: true,
         element: <BatchListPage defaultRole="employee" />,
+      },
+    ],
+  },
+  {
+    path: '/stocktakes',
+    element: <StoreOwnerLayout />,
+    children: [
+      {
+        index: true,
+        element: <StocktakeListPage defaultRole="store_owner" />,
+      },
+      {
+        path: 'create',
+        element: <StocktakeFormPage defaultRole="store_owner" />,
+      },
+      {
+        path: ':id',
+        element: <StocktakeDetailPage defaultRole="store_owner" />,
+      },
+      {
+        path: ':id/edit',
+        element: <StocktakeFormPage defaultRole="store_owner" />,
       },
     ],
   },

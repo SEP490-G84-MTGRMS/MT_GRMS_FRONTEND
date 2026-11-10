@@ -124,7 +124,7 @@ export const SupplierReturnDetailPage: FC = () => {
   const getStepIndex = (st: string) => {
     if (st === 'DRAFT') return 0;
     if (st === 'PENDING_SUPPLIER') return 1;
-    if (st === 'APPROVED') return 2;
+    if (st === 'APPROVED' || st === 'PARTIALLY_HANDED_OVER') return 2;
     if (st === 'COMPLETED') return 3;
     return -1;
   };
@@ -186,7 +186,31 @@ export const SupplierReturnDetailPage: FC = () => {
               </span>
             </div>
             <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
-              Phiếu nhập gốc: <strong>{detail.goodsReceiptCode}</strong> · Ngày lập: {new Date(detail.createdAt).toLocaleString('vi-VN')}
+              Phiếu nhập gốc: <strong>{detail.goodsReceiptCode}</strong>
+              {detail.stocktakeCode && (
+                <>
+                  {' · '}Phiếu kiểm kê gốc:{' '}
+                  <button
+                    type="button"
+                    onClick={() =>
+                      detail.stocktakeId &&
+                      navigate(`/store-owner/stocktakes/${detail.stocktakeId}`)
+                    }
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      padding: 0,
+                      color: '#0f766e',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      textDecoration: 'underline',
+                    }}
+                  >
+                    {detail.stocktakeCode}
+                  </button>
+                </>
+              )}
+              {' · '}Ngày lập: {new Date(detail.createdAt).toLocaleString('vi-VN')}
             </div>
           </div>
         </div>
@@ -230,8 +254,8 @@ export const SupplierReturnDetailPage: FC = () => {
             </button>
           )}
 
-          {/* APPROVED -> Handover */}
-          {detail.status === 'APPROVED' && (
+          {/* APPROVED or PARTIALLY_HANDED_OVER -> Handover */}
+          {(detail.status === 'APPROVED' || detail.status === 'PARTIALLY_HANDED_OVER') && (
             <button
               type="button"
               className="po-btn po-btn-primary"
@@ -239,7 +263,11 @@ export const SupplierReturnDetailPage: FC = () => {
               onClick={() => setIsHandoverModalOpen(true)}
             >
               <Truck size={14} />
-              <span>Xác nhận bàn giao thực tế</span>
+              <span>
+                {detail.status === 'PARTIALLY_HANDED_OVER'
+                  ? 'Bàn giao tiếp phần còn lại'
+                  : 'Xác nhận bàn giao thực tế'}
+              </span>
             </button>
           )}
 
@@ -523,7 +551,9 @@ export const SupplierReturnDetailPage: FC = () => {
                     {detail.status === 'DRAFT' || detail.status === 'PENDING_SUPPLIER' ? '—' : fmt(line.rejectedQty)}
                   </td>
                   <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 800, color: line.handedOverQty > 0 ? '#0284c7' : '#94a3b8' }}>
-                    {detail.status === 'COMPLETED' ? fmt(line.handedOverQty) : '—'}
+                    {detail.status === 'COMPLETED' || detail.status === 'PARTIALLY_HANDED_OVER'
+                      ? fmt(line.handedOverQty)
+                      : '—'}
                   </td>
                   <td style={{ padding: '8px 10px', textAlign: 'right', color: '#475569' }}>
                     {fmt(line.unitCost)}

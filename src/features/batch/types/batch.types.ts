@@ -30,6 +30,9 @@ export interface BatchItem {
   daysLeft: number; // Âm: Quá hạn, 0-3: Khẩn cấp, 4-30: Cảnh báo, >30: An toàn
   qtyInitial: number; // Số lượng nhập ban đầu
   qtyCurrent: number; // Số lượng tồn thực tế của lô
+  qtyReserved?: number; // Số lượng đang giữ chỗ trả NCC
+  qtyQuarantined?: number; // Số lượng đang cách ly chờ duyệt kiểm kê
+  qtyAvailable?: number; // Số lượng khả dụng (qtyCurrent - qtyReserved - qtyQuarantined)
   unit: string; // Hộp, Chai, Gói, Lon, Hũ, Kg
   costPrice: number; // Đơn giá vốn nhập kho (VNĐ)
   totalValuation: number; // qtyCurrent * costPrice
@@ -37,6 +40,7 @@ export interface BatchItem {
   zoneArea: string; // 'Cold Storage (Kho mát)' | 'Freezer Zone (Tủ đông)' | 'Fresh Display (Kệ rau tươi)' | 'Ambient (Kệ thường)'
   shelfLocation: string; // 'C-B-01', 'Z-F-01', 'F-A-02'...
   originalGrnNo: string; // Mã phiếu nhập gốc (vd: GRN-2026-0801, GRN-20261008-01)
+  originalGrnId?: string; // ID phiếu nhập gốc
   discountPercent?: number; // % giảm giá FEFO đã áp dụng
   movements: BatchMovement[];
 }
