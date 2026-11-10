@@ -52,7 +52,7 @@ const pad2 = (n: number) => String(n).padStart(2, '0');
 const formatViDate = (iso: string | null | undefined): string => {
   if (!iso) return '—';
   const d = new Date(iso);
-  if (Number.isNaN(d.getTime()) || d.getFullYear() <= 1) return '—';
+  if (Number.isNaN(d.getTime()) || d.getFullYear() <= 1 || d.getFullYear() >= 9999) return '—';
   return `${pad2(d.getDate())}/${pad2(d.getMonth() + 1)}/${d.getFullYear()}`;
 };
 

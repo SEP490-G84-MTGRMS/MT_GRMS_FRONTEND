@@ -163,20 +163,21 @@ export const BatchTable: FC<BatchTableProps> = ({
 
   const tableColGroup = (
     <colgroup>
+      <col style={{ width: '8%' }} />
+      <col style={{ width: '13%' }} />
       <col style={{ width: '9%' }} />
-      <col style={{ width: '14%' }} />
+      <col style={{ width: '7%' }} />
+      <col style={{ width: '6%' }} />
+      <col style={{ width: '8%' }} />
       <col style={{ width: '10%' }} />
-      <col style={{ width: '8%' }} />
-      <col style={{ width: '7%' }} />
-      <col style={{ width: '8%' }} />
-      <col style={{ width: '11%' }} />
-      <col style={{ width: '7%' }} />
+      <col style={{ width: '6%' }} />
       <col style={{ width: '6%' }} />
       <col style={{ width: '5%' }} />
       <col style={{ width: '4%' }} />
+      <col style={{ width: '4%' }} />
       <col style={{ width: '7%' }} />
-      <col style={{ width: '7%' }} />
-      <col style={{ width: '7%' }} />
+      <col style={{ width: '4%' }} />
+      <col style={{ width: '3%' }} />
     </colgroup>
   );
 
@@ -207,7 +208,12 @@ export const BatchTable: FC<BatchTableProps> = ({
     );
   };
 
-  const renderDaysLeft = (days: number) => {
+  const renderDaysLeft = (days: number, expiryDate?: string) => {
+    if (days >= 9999 || !expiryDate || expiryDate === '—') {
+      return (
+        <span style={{ color: '#94a3b8', fontWeight: 600, fontFamily: 'monospace' }}>—</span>
+      );
+    }
     if (days < 0) {
       return (
         <span
@@ -287,6 +293,7 @@ export const BatchTable: FC<BatchTableProps> = ({
               <th style={thBaseStyle}>Vị trí kệ</th>
               <th style={thBaseStyle}>Chi nhánh</th>
               <th style={thBaseStyle}>Nhà cung cấp</th>
+              <th style={{ ...thBaseStyle, textAlign: 'center' }}>Ngày SX</th>
               <SortTh field="expiryDate" label="Hạn dùng" align="center" />
               <SortTh field="daysLeft" label="Còn (ngày)" align="right" />
               <SortTh field="qtyCurrent" label="Tồn" align="right" />
@@ -311,7 +318,7 @@ export const BatchTable: FC<BatchTableProps> = ({
             {sortedBatches.length === 0 ? (
               <tr>
                 <td
-                  colSpan={14}
+                  colSpan={15}
                   style={{
                     padding: '48px 16px',
                     textAlign: 'center',
@@ -378,7 +385,7 @@ export const BatchTable: FC<BatchTableProps> = ({
                           fontFamily: 'var(--font-mono, monospace)',
                           fontSize: 12,
                           fontWeight: 700,
-                          color: '#0f172a',
+                          color: row.batchCode === '—' ? '#94a3b8' : '#0f172a',
                         }}
                       >
                         {row.batchCode}
@@ -410,11 +417,15 @@ export const BatchTable: FC<BatchTableProps> = ({
                       </div>
                     </td>
 
-                    <td style={{ textAlign: 'center', fontWeight: 600, color: '#1e293b' }}>
-                      {row.expiryDate}
+                    <td style={{ textAlign: 'center', fontWeight: 500, color: row.mfgDate === '—' ? '#94a3b8' : '#334155' }}>
+                      {row.mfgDate || '—'}
                     </td>
 
-                    <td style={{ textAlign: 'right' }}>{renderDaysLeft(row.daysLeft)}</td>
+                    <td style={{ textAlign: 'center', fontWeight: 600, color: row.expiryDate === '—' ? '#94a3b8' : '#1e293b' }}>
+                      {row.expiryDate || '—'}
+                    </td>
+
+                    <td style={{ textAlign: 'right' }}>{renderDaysLeft(row.daysLeft, row.expiryDate)}</td>
 
                     <td
                       style={{

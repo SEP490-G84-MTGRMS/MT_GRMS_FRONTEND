@@ -204,10 +204,17 @@ export const BatchDetailDrawer: FC<BatchDetailDrawerProps> = ({
                       fontWeight: 800,
                       fontFamily: 'monospace',
                       fontSize: 13,
-                      color: batch.daysLeft < 0 ? '#e11d48' : batch.daysLeft <= 3 ? '#d97706' : '#0d9488',
+                      color:
+                        batch.daysLeft >= 9999 || batch.expiryDate === '—'
+                          ? '#94a3b8'
+                          : batch.daysLeft < 0
+                          ? '#e11d48'
+                          : batch.daysLeft <= 3
+                          ? '#d97706'
+                          : '#0d9488',
                     }}
                   >
-                    {batch.daysLeft} ngày
+                    {batch.daysLeft >= 9999 || batch.expiryDate === '—' ? '—' : `${batch.daysLeft} ngày`}
                   </span>
                 </div>
                 {batch.discountPercent && (
