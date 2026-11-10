@@ -35,16 +35,22 @@
 - Tinh chỉnh lại độ rộng `<colgroup>` cho 10 cột còn lại (Ảnh: 5%, SKU: 12%, Tên SP: 26%, Giá vốn: 9%, Giá bán lẻ: 9%, Giá bán ĐVT: 15%, MOQ: 5%, ĐVT: 5%, Trạng thái: 7%, Thao tác: 7%) với tổng 100%.
 
 ### `src/features/product/components/EditStoreProductModal.tsx`
-- Tái cấu trúc layout form chỉnh sửa sản phẩm từ chiều dọc 1 cột sang **lưới 2 cột ngang (`grid-template-columns: repeat(2, 1fr)`)** với `maxWidth: 860px` thay cho `620px`.
+- Tái cấu trúc layout form chỉnh sửa sản phẩm từ chiều dọc 1 cột sang **lưới 2 cột ngang (`grid-template-columns: repeat(2, 1fr)`)** với `maxWidth: 920px` thay cho `620px`.
 - Bố trí các cặp trường thông tin ngang hàng logic:
   - `Mã chi nhánh` | `Tên chi nhánh`
   - `Địa chỉ chi nhánh` (trải rộng 2 cột)
   - `Mã SKU` | `Mã vạch`
-  - `Tên sản phẩm` | `Ngành hàng`
+  - `Sản phẩm` (trải rộng 2 cột full width, tránh bị cụt tên sản phẩm dài)
+  - `Ngành hàng` (trải rộng 2 cột full width)
   - `Đơn vị tính` | `Tồn kho`
   - `Mã NCC` | `Tên NCC`
   - `Giá vốn` | `Giá bán lẻ niêm yết` (kèm tính lãi gộp và thông báo lỗi trực quan)
-  - `Số lượng đặt hàng tối thiểu` (MOQ) | `Trạng thái kinh doanh` (Đang kinh doanh / Tạm ngừng bán)
+  - `Số lượng đặt hàng tối thiểu` (MOQ, `labelWidth={180}`) | `Trạng thái kinh doanh` (Đang kinh doanh / Tạm ngừng bán, `labelWidth={90}`)
+- **Khắc phục lỗi chữ dài bị ngắt dòng không mong muốn**:
+  - Thêm `whiteSpace: 'nowrap'` vào `labelStyle` và hỗ trợ linh hoạt `labelWidth` cho từng dòng.
+  - Gán `labelWidth={180}` cho "Số lượng đặt hàng tối thiểu" giúp label hiển thị trọn vẹn trên 1 dòng duy nhất.
+  - Thêm `whiteSpace: 'nowrap'` và `flexShrink: 0` cho các lựa chọn radio "Đang kinh doanh" và "Tạm ngừng bán" giúp không bị rớt chữ xuống dòng ("Đang kinh / doanh", "Tạm ngừng / bán").
+  - Cho phép trường `Sản phẩm` và `Ngành hàng` mở rộng 2 cột giúp tên hàng và danh mục dài không bị cắt cụt.
 - Loại bỏ hoàn toàn hiện tượng thanh cuộn dọc bị dài và bất hợp lý, toàn bộ modal vừa vặn trên màn hình.
 
 ### `src/features/product/pages/StoreProductManagementPage.tsx`

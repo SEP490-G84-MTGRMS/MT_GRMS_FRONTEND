@@ -32,13 +32,14 @@ const rowStyle: CSSProperties = {
 };
 
 const labelStyle: CSSProperties = {
-  width: 130,
+  width: 135,
   flexShrink: 0,
   fontSize: 12.5,
   fontWeight: 600,
   color: '#475569',
   textAlign: 'left',
   lineHeight: 1.3,
+  whiteSpace: 'nowrap',
 };
 
 const inputBase: CSSProperties = {
@@ -68,15 +69,23 @@ function FieldRow({
   children,
   htmlFor,
   style,
+  labelWidth,
 }: {
   label: string;
   children: ReactNode;
   htmlFor?: string;
   style?: CSSProperties;
+  labelWidth?: number;
 }) {
   return (
     <div style={{ ...rowStyle, ...style }}>
-      <label htmlFor={htmlFor} style={labelStyle}>
+      <label
+        htmlFor={htmlFor}
+        style={{
+          ...labelStyle,
+          ...(labelWidth ? { width: labelWidth } : {}),
+        }}
+      >
         {label}
       </label>
       {children}
@@ -266,7 +275,7 @@ export const EditStoreProductModal: FC<EditStoreProductModalProps> = ({
           id="modalEditStoreProductDialog"
           className="modal-box"
           style={{
-            maxWidth: 860,
+            maxWidth: 920,
             width: '95%',
             maxHeight: '90vh',
             display: 'flex',
@@ -447,7 +456,7 @@ export const EditStoreProductModal: FC<EditStoreProductModalProps> = ({
                 />
               </FieldRow>
 
-              <FieldRow label="Sản phẩm" htmlFor="inputProductName">
+              <FieldRow label="Sản phẩm" htmlFor="inputProductName" style={{ gridColumn: 'span 2' }}>
                 <input
                   id="inputProductName"
                   type="text"
@@ -458,7 +467,7 @@ export const EditStoreProductModal: FC<EditStoreProductModalProps> = ({
                 />
               </FieldRow>
 
-              <FieldRow label="Ngành hàng" htmlFor="inputProductCategory">
+              <FieldRow label="Ngành hàng" htmlFor="inputProductCategory" style={{ gridColumn: 'span 2' }}>
                 <input
                   id="inputProductCategory"
                   type="text"
@@ -593,7 +602,7 @@ export const EditStoreProductModal: FC<EditStoreProductModalProps> = ({
                 </div>
               )}
 
-              <FieldRow label="Số lượng đặt hàng tối thiểu" htmlFor="inputEditMoq">
+              <FieldRow label="Số lượng đặt hàng tối thiểu" htmlFor="inputEditMoq" labelWidth={180}>
                 <input
                   id="inputEditMoq"
                   type="number"
@@ -603,9 +612,9 @@ export const EditStoreProductModal: FC<EditStoreProductModalProps> = ({
                 />
               </FieldRow>
 
-              <FieldRow label="Trạng thái">
-                <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 16, height: 36 }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#15803d' }}>
+              <FieldRow label="Trạng thái" labelWidth={90}>
+                <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 16, height: 36, flexWrap: 'nowrap' }}>
+                  <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#15803d', whiteSpace: 'nowrap', flexShrink: 0 }}>
                     <input
                       type="radio"
                       id="statusActive"
@@ -617,7 +626,7 @@ export const EditStoreProductModal: FC<EditStoreProductModalProps> = ({
                     />
                     <span>Đang kinh doanh</span>
                   </label>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#64748b' }}>
+                  <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#64748b', whiteSpace: 'nowrap', flexShrink: 0 }}>
                     <input
                       type="radio"
                       id="statusInactive"
