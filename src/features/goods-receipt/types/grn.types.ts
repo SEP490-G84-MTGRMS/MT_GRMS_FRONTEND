@@ -13,14 +13,14 @@ export type RejectionReason =
   | 'OTHER';
 
 export const REJECTION_REASON_LABELS: Record<RejectionReason, string> = {
-  SHORT_DELIVERY: 'NCC giao thiếu so với PO',
-  DAMAGE: 'Hàng hư hỏng / móp méo',
-  EXPIRED: 'Hàng đã hết hạn sử dụng',
-  NEAR_EXPIRY: 'Hàng cận hạn không đạt chuẩn',
-  WRONG_SPEC: 'Sai quy cách đóng gói',
-  WRONG_ITEM: 'Giao sai sản phẩm',
-  QUALITY_ISSUE: 'Chất lượng không đạt',
-  OTHER: 'Lý do khác (ghi chú)',
+  DAMAGE: 'Hàng hư hỏng / móp méo (Trả về NCC)',
+  EXPIRED: 'Hàng đã hết hạn sử dụng (Trả về NCC)',
+  NEAR_EXPIRY: 'Hàng cận hạn không đạt chuẩn (Trả về NCC)',
+  WRONG_SPEC: 'Sai quy cách đóng gói (Trả về NCC)',
+  WRONG_ITEM: 'Giao sai sản phẩm (Trả về NCC)',
+  QUALITY_ISSUE: 'Chất lượng không đạt (Trả về NCC)',
+  SHORT_DELIVERY: 'NCC giao thiếu so với PO (Từ chối phần thiếu)',
+  OTHER: 'Lý do từ chối khác (Trả về NCC)',
 };
 
 export interface GrnBatchDetail {

@@ -67,9 +67,9 @@ const mapDtoToItems = (dto: BackendGoodsReceiptDto): GrnItemDetail[] =>
       productName: l.productName,
       unit: l.unit,
       orderedQty: l.orderedQty,
-      receivedQty: l.deliveredQty,
-      acceptedQty: l.deliveredQty,
-      rejectedQty: 0,
+      receivedQty: l.acceptedQty ?? l.deliveredQty,
+      acceptedQty: l.acceptedQty ?? l.deliveredQty,
+      rejectedQty: l.rejectedQty ?? 0,
       shortageQty: l.shortageQty,
       differenceQty: l.differenceQty,
       unitPrice: l.unitPrice,
@@ -578,6 +578,8 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
       const ordered = siblings[0]?.orderedQty ?? it.orderedQty;
       const sumReceived = siblings.reduce((s, r) => s + (r.receivedQty || 0), 0);
       const isShort = sumReceived < ordered;
+      const isFirstInGroup = siblings[0]?.id === it.id;
+      const rejected = isFirstInGroup && isShort ? ordered - sumReceived : 0;
       const groupReason =
         siblings.find((r) => r.rejectionReason)?.rejectionReason || it.rejectionReason;
       const isBatch = Boolean(it.hasBatches ?? it.manageBatch);
@@ -585,9 +587,9 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
         productId: it.productId,
         purchaseOrderDetailId: it.purchaseOrderDetailId,
         orderedQty: it.orderedQty,
-        deliveredQty: delivered,
+        deliveredQty: delivered + rejected,
         acceptedQty: delivered,
-        rejectedQty: 0,
+        rejectedQty: rejected,
         unitPrice: it.unitPrice,
         manageBatch: isBatch,
         batchCode: isBatch ? it.batchCode || undefined : undefined,
@@ -600,7 +602,7 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
     }),
   });
 
-  const submitReceipt = async (autoComplete: boolean) => {
+  const submitReceipt = async (autoComplete: boolean, redirectToReturn = false) => {
     if (!validateForm()) return;
     setIsSaving(true);
     try {
@@ -615,13 +617,24 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
       }
 
       const created = await goodsReceiptApi.createGoodsReceipt(buildCreateCommand(autoComplete));
+      const hasAutoReturn = autoComplete && !!created.createdReturnCode;
       showToast(
         autoComplete
-          ? `Hoàn tất nhập kho ${created.code}. Tồn kho đã được cập nhật.`
+          ? hasAutoReturn
+            ? `Hoàn tất nhập kho ${created.code} & Đã lập Phiếu trả hàng ${created.createdReturnCode} (Từ chối nhận hàng — Tài xế chở về ngay)!`
+            : `Hoàn tất nhập kho ${created.code}. Tồn kho đã được cập nhật.`
           : `Đã lưu nháp phiếu ${created.code}.`,
         'success'
       );
-      setTimeout(() => navigate(listPath), 900);
+      setTimeout(() => {
+        if (redirectToReturn && created.createdReturnId) {
+          navigate(`/store-owner/supplier-returns/${created.createdReturnId}`);
+        } else if (redirectToReturn) {
+          navigate('/store-owner/supplier-returns');
+        } else {
+          navigate(listPath);
+        }
+      }, 950);
     } catch (err: any) {
       showToast(err.response?.data?.message || err.message || 'Lưu phiếu nhập kho thất bại.', 'error');
     } finally {
@@ -633,8 +646,8 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
     void submitReceipt(false);
   };
 
-  const executeCompleteReceipt = (_forcedStatus?: GrnStatus) => {
-    void submitReceipt(true);
+  const executeCompleteReceipt = (_forcedStatus?: GrnStatus, redirectToReturn = false) => {
+    void submitReceipt(true, redirectToReturn);
   };
 
   const hasGroupMismatch = () => {
@@ -793,9 +806,9 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
           (it) => (it.receivedQty || 0) !== it.orderedQty
         )}
         onClose={() => setIsMismatchModalOpen(false)}
-        onConfirm={() => {
+        onConfirm={(redirectToReturn) => {
           setIsMismatchModalOpen(false);
-          executeCompleteReceipt('MISMATCH');
+          executeCompleteReceipt('MISMATCH', redirectToReturn);
         }}
       />
 

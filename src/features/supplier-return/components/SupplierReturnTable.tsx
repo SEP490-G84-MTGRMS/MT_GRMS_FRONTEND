@@ -367,9 +367,32 @@ export const SupplierReturnTable: FC<Props> = ({
 
                     {/* Lý do trả */}
                     <td className="so-list-td so-list-td--wrap" style={{ maxWidth: 180 }}>
-                      <span style={{ fontSize: 12, color: '#475569' }} title={item.reason}>
-                        {item.reason}
-                      </span>
+                      {item.reason === 'Từ chối nhận hàng' ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                          <span
+                            style={{
+                              display: 'inline-block',
+                              width: 'fit-content',
+                              padding: '2px 7px',
+                              borderRadius: 6,
+                              fontSize: 11,
+                              fontWeight: 700,
+                              backgroundColor: '#fff1f2',
+                              color: '#e11d48',
+                              border: '1px solid #fecdd3',
+                            }}
+                          >
+                            Từ chối nhận hàng
+                          </span>
+                          <span style={{ fontSize: 10.5, color: '#64748b' }}>
+                            Tài xế chở về ngay (GRN)
+                          </span>
+                        </div>
+                      ) : (
+                        <span style={{ fontSize: 12, color: '#475569' }} title={item.reason}>
+                          {item.reason}
+                        </span>
+                      )}
                     </td>
 
                     {/* SL Y/C */}

@@ -258,6 +258,34 @@ export const SupplierReturnDetailPage: FC = () => {
         </div>
       </div>
 
+      {/* Banner thông báo nếu là Phiếu trả hàng loại Từ chối nhận hàng ngay lúc GRN */}
+      {detail.reason === 'Từ chối nhận hàng' && (
+        <div
+          style={{
+            background: '#fff7ed',
+            border: '1px solid #fed7aa',
+            color: '#9a3412',
+            borderRadius: 8,
+            padding: '12px 16px',
+            marginBottom: 14,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+          }}
+        >
+          <Truck size={20} color="#ea580c" style={{ flexShrink: 0 }} />
+          <div>
+            <div style={{ fontWeight: 700, fontSize: 13 }}>
+              Phiếu trả hàng — Loại: Từ chối nhận hàng (Bàn giao tài xế chở về ngay lúc nhận GRN)
+            </div>
+            <div style={{ fontSize: 12, marginTop: 2, color: '#7c2d12' }}>
+              Chứng từ độc lập ghi nhận các sản phẩm bị từ chối trực tiếp khi kiểm nhận Phiếu nhập kho{' '}
+              <strong>{detail.goodsReceiptCode}</strong>. Hàng đã được bàn giao cho tài xế chở về ngay, không nhập vào tồn kho cửa hàng và dùng để đối soát công nợ với Nhà cung cấp.
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Status Progress Stepper */}
       {detail.status !== 'REJECTED' && detail.status !== 'CANCELLED' ? (
         <div
@@ -510,6 +538,42 @@ export const SupplierReturnDetailPage: FC = () => {
               ))}
             </tbody>
           </table>
+        </div>
+
+        {/* Khối chữ ký xác nhận chứng từ (In biên bản ký nhận với tài xế & đối soát NCC) */}
+        <div
+          style={{
+            borderTop: '1px dashed #cbd5e1',
+            padding: '18px 24px 24px',
+            backgroundColor: '#fafafa',
+            display: 'grid',
+            gridTemplateColumns: 'repeat(3, 1fr)',
+            gap: 16,
+            textAlign: 'center',
+            fontSize: 12.5,
+            color: '#334155',
+          }}
+        >
+          <div>
+            <div style={{ fontWeight: 700, color: '#0f172a' }}>ĐẠI DIỆN CỬA HÀNG / THỦ KHO</div>
+            <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>(Ký, ghi rõ họ tên)</div>
+            <div style={{ height: 56 }} />
+            <div style={{ fontWeight: 600, color: '#0f766e' }}>{detail.handedOverBy || '................................'}</div>
+          </div>
+          <div>
+            <div style={{ fontWeight: 700, color: '#0f172a' }}>TÀI XẾ GIAO HÀNG (NHẬN HÀNG TRẢ VỀ)</div>
+            <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
+              (Xác nhận đã nhận đủ hàng từ chối chở về)
+            </div>
+            <div style={{ height: 56 }} />
+            <div style={{ fontWeight: 600, color: '#475569' }}>................................</div>
+          </div>
+          <div>
+            <div style={{ fontWeight: 700, color: '#0f172a' }}>ĐẠI DIỆN NHÀ CUNG CẤP</div>
+            <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>(Xác nhận đối soát công nợ)</div>
+            <div style={{ height: 56 }} />
+            <div style={{ fontWeight: 600, color: '#475569' }}>{detail.supplierName}</div>
+          </div>
         </div>
       </div>
 

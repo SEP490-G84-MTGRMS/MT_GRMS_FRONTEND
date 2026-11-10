@@ -26,26 +26,34 @@ export const supplierReturnApi = {
     pageIndex: number;
     pageSize: number;
   }> {
-    try {
-      const params = new URLSearchParams();
-      if (filters.keyword) params.append('keyword', filters.keyword);
-      if (filters.branchId) params.append('branchId', filters.branchId);
-      if (filters.supplierId) params.append('supplierId', filters.supplierId);
-      if (filters.status) params.append('status', filters.status);
-      params.append('pageIndex', String(filters.pageIndex));
-      params.append('pageSize', String(filters.pageSize));
+    const params = new URLSearchParams();
+    if (filters.keyword) params.append('keyword', filters.keyword);
+    if (filters.branchId) params.append('branchId', filters.branchId);
+    if (filters.supplierId) params.append('supplierId', filters.supplierId);
+    if (filters.status) params.append('status', filters.status);
+    params.append('pageIndex', String(filters.pageIndex));
+    params.append('pageSize', String(filters.pageSize));
 
+    try {
       const res = await httpClient.get(`/supplier-returns?${params.toString()}`);
       if (res.data?.data) {
+        const paged = res.data.data;
+        const items = paged.items || [];
         return {
-          items: res.data.data.items || [],
-          totalCount: res.data.data.totalCount || 0,
-          pageIndex: res.data.data.pageIndex || filters.pageIndex,
-          pageSize: res.data.data.pageSize || filters.pageSize,
+          // Backend (PagedResult) trả `totalItems` & `page`
+          items,
+          totalCount: paged.totalItems ?? paged.totalCount ?? items.length,
+          pageIndex: paged.page ?? paged.pageIndex ?? filters.pageIndex,
+          pageSize: paged.pageSize || filters.pageSize,
         };
       }
-    } catch {
-      // Fallback to local
+    } catch (err: unknown) {
+      // Backend có phản hồi lỗi (4xx/5xx) → báo lỗi thật, KHÔNG rơi về dữ liệu mock
+      // (mock che mất phiếu thật như RTV tự sinh từ GRN). Chỉ dùng mock khi không kết nối được server.
+      const e = err as { response?: { data?: { message?: string } }; message?: string };
+      if (e.response) {
+        throw new Error(e.response.data?.message || e.message || 'Không thể tải danh sách phiếu trả hàng.');
+      }
     }
 
     let filtered = [...localReturns];
