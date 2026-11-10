@@ -145,8 +145,8 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
 
         setCostPrice(productToEdit.costPrice || 0);
         setSellingPrice(productToEdit.sellingPrice || 0);
-        setIsFavorite(productToEdit.isFavorite ?? false);
-        setHasBatches(productToEdit.hasBatches ?? false);
+        setIsFavorite(Boolean(productToEdit.isFavorite));
+        setHasBatches(Boolean(productToEdit.hasBatches));
         setIsSubmitting(false);
 
         setBaseUnit(productToEdit.baseUnit || '');
@@ -372,6 +372,7 @@ try {
         costPrice: userRole === 'StoreOwner' ? costPrice : productToEdit?.costPrice ?? 0,
         isFavorite,
         hasBatches,
+        eligibleForVatReduction,
         description: description.trim() || undefined,
         internalNote: internalNote.trim() || undefined,
         uomConversions,
@@ -1281,23 +1282,37 @@ try {
 
             {/* Thuộc tính nâng cao: Quản lý theo lô & Bán chạy */}
             <div style={{ display: 'flex', gap: 24, marginTop: 14, flexWrap: 'wrap' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, color: '#334155' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <input
+                  id="product-has-batches-checkbox"
                   type="checkbox"
+                  style={{ width: 18, height: 18, cursor: 'pointer', accentColor: '#0F766E', margin: 0 }}
                   checked={hasBatches}
                   onChange={(e) => setHasBatches(e.target.checked)}
                 />
-                <span style={{ fontWeight: 500 }}>Quản lý theo lô & hạn sử dụng (FEFO)</span>
-              </label>
+                <label
+                  htmlFor="product-has-batches-checkbox"
+                  style={{ cursor: 'pointer', fontSize: 13, color: '#334155', fontWeight: 500, userSelect: 'none', margin: 0 }}
+                >
+                  Quản lý theo lô & hạn sử dụng (FEFO)
+                </label>
+              </div>
 
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, color: '#334155' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <input
+                  id="product-is-favorite-checkbox"
                   type="checkbox"
+                  style={{ width: 18, height: 18, cursor: 'pointer', accentColor: '#0F766E', margin: 0 }}
                   checked={isFavorite}
                   onChange={(e) => setIsFavorite(e.target.checked)}
                 />
-                <span style={{ fontWeight: 500 }}>Đánh dấu hàng bán chạy / yêu thích (Ưu tiên POS)</span>
-              </label>
+                <label
+                  htmlFor="product-is-favorite-checkbox"
+                  style={{ cursor: 'pointer', fontSize: 13, color: '#334155', fontWeight: 500, userSelect: 'none', margin: 0 }}
+                >
+                  Đánh dấu hàng bán chạy / yêu thích (Ưu tiên POS)
+                </label>
+              </div>
             </div>
           </div>
 

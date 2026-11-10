@@ -39,17 +39,6 @@ export const GrnProductEntryTable: FC<GrnProductEntryTableProps> = ({
   const [barcodeQuery, setBarcodeQuery] = useState('');
   const [barcodeAlert, setBarcodeAlert] = useState<string | null>(null);
 
-  // Check if an expiration date is within 30 days (FEFO alert)
-  const isNearExpiry = (expDateStr?: string): boolean => {
-    if (!expDateStr) return false;
-    const exp = new Date(expDateStr);
-    if (isNaN(exp.getTime())) return false;
-    const now = new Date();
-    const diffTime = exp.getTime() - now.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays >= 0 && diffDays < 30;
-  };
-
   const handleBarcodeKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       e.preventDefault();
@@ -316,7 +305,6 @@ export const GrnProductEntryTable: FC<GrnProductEntryTableProps> = ({
                 const shortageQty = Math.max(0, -groupDiff);
                 const isShort = shortageQty > 0;
                 const isMismatch = groupDiff !== 0;
-                const isNearExp = isNearExpiry(row.expiryDate);
                 const hasExcessDelivery = gReceived > row.orderedQty;
                 const manageBatch = Boolean(row.hasBatches ?? row.manageBatch);
                 const siblingCount = items.filter((it) => groupKey(it) === groupKey(row)).length;
@@ -570,35 +558,28 @@ export const GrnProductEntryTable: FC<GrnProductEntryTableProps> = ({
                       {!manageBatch ? (
                         <span style={{ color: '#94a3b8', fontSize: 11 }}>—</span>
                       ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                          <input
-                            type="date"
-                            value={row.expiryDate || ''}
-                            disabled={readOnly}
-                            onChange={(e) => onItemChange(row.id, 'expiryDate', e.target.value)}
-                            style={{
-                              width: '100%',
-                              height: 28,
-                              padding: '0 4px',
-                              borderRadius: 4,
-                              border: readOnly
-                                ? '1px solid #cbd5e1'
-                                : !row.expiryDate || isNearExp
-                                ? '1.5px solid #f59e0b'
-                                : '1px solid #cbd5e1',
-                              fontSize: 11,
-                              color: readOnly ? '#475569' : '#0f172a',
-                              backgroundColor: readOnly ? '#f1f5f9' : '#ffffff',
-                              cursor: readOnly ? 'not-allowed' : 'text',
-                              boxSizing: 'border-box',
-                            }}
-                          />
-                          {isNearExp && (
-                            <span style={{ fontSize: 10, fontWeight: 700, color: '#b45309' }}>
-                              Cận HSD
-                            </span>
-                          )}
-                        </div>
+                        <input
+                          type="date"
+                          value={row.expiryDate || ''}
+                          disabled={readOnly}
+                          onChange={(e) => onItemChange(row.id, 'expiryDate', e.target.value)}
+                          style={{
+                            width: '100%',
+                            height: 28,
+                            padding: '0 4px',
+                            borderRadius: 4,
+                            border: readOnly
+                              ? '1px solid #cbd5e1'
+                              : !row.expiryDate
+                              ? '1.5px solid #f59e0b'
+                              : '1px solid #cbd5e1',
+                            fontSize: 11,
+                            color: readOnly ? '#475569' : '#0f172a',
+                            backgroundColor: readOnly ? '#f1f5f9' : '#ffffff',
+                            cursor: readOnly ? 'not-allowed' : 'text',
+                            boxSizing: 'border-box',
+                          }}
+                        />
                       )}
                     </td>
 
