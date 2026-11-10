@@ -27,6 +27,38 @@ export const PromotionListPage: FC = () => {
         setDbBranches(list.map((b) => ({ id: b.id, name: b.name })));
       }
     }).catch(() => {});
+
+    // Đồng bộ chi nhánh đang chọn từ TopNav (mtgrms_active_branch & event mtgrms:branch-changed)
+    const handleGlobalBranchChange = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      const branch = customEvent.detail;
+      if (branch) {
+        setFilter((prev) => ({
+          ...prev,
+          branch: branch.id === 'ALL' ? 'ALL' : (branch.name || branch.id),
+        }));
+      }
+    };
+
+    try {
+      const stored = localStorage.getItem('mtgrms_active_branch');
+      if (stored) {
+        const branch = JSON.parse(stored);
+        if (branch) {
+          setFilter((prev) => ({
+            ...prev,
+            branch: branch.id === 'ALL' ? 'ALL' : (branch.name || branch.id),
+          }));
+        }
+      }
+    } catch {
+      // fallback
+    }
+
+    window.addEventListener('mtgrms:branch-changed', handleGlobalBranchChange);
+    return () => {
+      window.removeEventListener('mtgrms:branch-changed', handleGlobalBranchChange);
+    };
   }, []);
 
   const branchNames = useMemo(() => dbBranches.map((b) => b.name), [dbBranches]);
@@ -210,8 +242,11 @@ export const PromotionListPage: FC = () => {
         return false;
       }
       // Branch
-      if (filter.branch !== 'ALL' && !item.branches.includes('ALL') && !item.branches.includes(filter.branch)) {
-        return false;
+      if (filter.branch !== 'ALL' && !item.branches.includes('ALL')) {
+        const matchesBranch = item.branches.some(
+          (b) => b.toLowerCase().includes(filter.branch.toLowerCase()) || filter.branch.toLowerCase().includes(b.toLowerCase())
+        );
+        if (!matchesBranch) return false;
       }
       return true;
     });

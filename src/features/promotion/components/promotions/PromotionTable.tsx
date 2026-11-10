@@ -93,7 +93,7 @@ export const PromotionTable: FC<PromotionTableProps> = ({
               <th style={{ width: 140 }}>Hình thức</th>
               <th style={{ width: 185 }}>Thời gian hiệu lực</th>
               <th style={{ width: 165 }}>Chi nhánh áp dụng</th>
-              <th style={{ width: 110 }}>Lượt áp dụng</th>
+              <th style={{ minWidth: 155, width: 165 }}>Lượt & Ngân sách</th>
               <th style={{ width: 140 }}>Trạng thái</th>
               <th style={{ width: 90, textAlign: 'right' }}>Thao tác</th>
             </tr>
@@ -173,12 +173,83 @@ export const PromotionTable: FC<PromotionTableProps> = ({
                         })()}
                       </td>
                       <td>
-                        <div className="promo-usage-cell">
-                          <span className="promo-usage-count">{item.usageCount} lượt</span>
-                          {item.totalDiscountGiven > 0 && (
-                            <span className="promo-usage-discount">
-                              (-{item.totalDiscountGiven.toLocaleString('vi-VN')} đ)
+                        <div className="promo-usage-cell" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
+                            <span className="promo-usage-count" style={{ fontWeight: 700, color: '#0f172a' }}>
+                              {item.usageCount} lượt
                             </span>
+                            {item.budgetLimit && item.budgetLimit > 0 ? (
+                              <span
+                                style={{
+                                  fontSize: 10.5,
+                                  fontWeight: 700,
+                                  padding: '1px 6px',
+                                  borderRadius: 4,
+                                  backgroundColor:
+                                    (item.totalDiscountGiven / item.budgetLimit) >= 1
+                                      ? '#fef2f2'
+                                      : (item.totalDiscountGiven / item.budgetLimit) >= 0.8
+                                      ? '#fffbeb'
+                                      : '#f0fdf4',
+                                  color:
+                                    (item.totalDiscountGiven / item.budgetLimit) >= 1
+                                      ? '#b91c1c'
+                                      : (item.totalDiscountGiven / item.budgetLimit) >= 0.8
+                                      ? '#b45309'
+                                      : '#15803d',
+                                }}
+                              >
+                                {Math.min(100, Math.round((item.totalDiscountGiven / item.budgetLimit) * 100))}%
+                              </span>
+                            ) : null}
+                          </div>
+
+                          {/* Chi tiết ngân sách */}
+                          {item.budgetLimit && item.budgetLimit > 0 ? (
+                            <div>
+                              <div style={{ fontSize: 11, color: '#475569', display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
+                                <span style={{ fontWeight: 700, color: '#0f766e' }}>
+                                  {item.totalDiscountGiven.toLocaleString('vi-VN')} đ
+                                </span>
+                                <span style={{ color: '#94a3b8' }}>/</span>
+                                <span style={{ color: '#64748b' }}>
+                                  {item.budgetLimit.toLocaleString('vi-VN')} đ
+                                </span>
+                              </div>
+                              {/* Thanh tiến độ */}
+                              <div
+                                style={{
+                                  width: '100%',
+                                  height: 5,
+                                  backgroundColor: '#e2e8f0',
+                                  borderRadius: 3,
+                                  marginTop: 3,
+                                  overflow: 'hidden',
+                                }}
+                                title={`Đã dùng ${item.totalDiscountGiven.toLocaleString('vi-VN')} đ trên tổng ${item.budgetLimit.toLocaleString('vi-VN')} đ`}
+                              >
+                                <div
+                                  style={{
+                                    height: '100%',
+                                    width: `${Math.min(100, Math.max(0, (item.totalDiscountGiven / item.budgetLimit) * 100))}%`,
+                                    backgroundColor:
+                                      (item.totalDiscountGiven / item.budgetLimit) >= 1
+                                        ? '#ef4444'
+                                        : (item.totalDiscountGiven / item.budgetLimit) >= 0.8
+                                        ? '#f59e0b'
+                                        : '#10b981',
+                                    borderRadius: 3,
+                                    transition: 'width 0.3s ease',
+                                  }}
+                                />
+                              </div>
+                            </div>
+                          ) : (
+                            <div style={{ fontSize: 11, color: '#64748b' }}>
+                              <span>Đã giảm: </span>
+                              <b style={{ color: '#0f766e' }}>{item.totalDiscountGiven.toLocaleString('vi-VN')} đ</b>
+                              <span style={{ fontSize: 10, color: '#94a3b8', display: 'block' }}>(Không giới hạn)</span>
+                            </div>
                           )}
                         </div>
                       </td>
@@ -259,7 +330,7 @@ export const PromotionTable: FC<PromotionTableProps> = ({
                                             <div>
                                               <span style={{ color: '#64748b' }}>Mua từ </span>
                                               <strong style={{ color: '#0f172a' }}>
-                                                {tier.requiredQty || 1} × {tier.buyProductName || 'sản phẩm bất kỳ'}
+                                                {tier.requiredQty || 1} {tier.buyUnit ? `${tier.buyUnit} ` : ''}× {tier.buyProductName || 'sản phẩm bất kỳ'}
                                               </strong>
                                             </div>
                                           ) : tier.minOrderValue !== undefined ? (
@@ -310,7 +381,7 @@ export const PromotionTable: FC<PromotionTableProps> = ({
                                         </td>
                                         <td style={{ padding: '10px 14px', color: '#475569' }}>
                                           {item.type === 'BUY_X_GET_Y'
-                                            ? `Mua đủ ${tier.requiredQty || 1} ${tier.buyProductName || 'sản phẩm bất kỳ'} tặng ngay ${tier.giftQty || 1} ${tier.giftUnit || ''} ${tier.giftProductName || 'quà tặng'} (0 đ)`
+                                            ? `Mua đủ ${tier.requiredQty || 1} ${tier.buyUnit ? `${tier.buyUnit} ` : ''}${tier.buyProductName || 'sản phẩm bất kỳ'} tặng ngay ${tier.giftQty || 1} ${tier.giftUnit || ''} ${tier.giftProductName || 'quà tặng'} (0 đ)`
                                             : tier.discountType === 'PERCENT'
                                             ? `Giảm ${tier.discountValue}% trên tổng tiền hàng${tier.maxDiscount ? ` (tối đa ${tier.maxDiscount.toLocaleString('vi-VN')} đ)` : ''}`
                                             : `Trừ trực tiếp ${tier.discountValue.toLocaleString('vi-VN')} đ vào hóa đơn`}

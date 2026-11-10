@@ -32,6 +32,7 @@ export const VoucherBatchModal: FC<VoucherBatchModalProps> = ({
     new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10)
   );
   const [description, setDescription] = useState('');
+  const [allowWithPromotions, setAllowWithPromotions] = useState(true);
 
   useEffect(() => {
     if (editingBatch) {
@@ -46,6 +47,7 @@ export const VoucherBatchModal: FC<VoucherBatchModalProps> = ({
       setStartDate(editingBatch.startDate);
       setEndDate(editingBatch.endDate);
       setDescription(editingBatch.description || '');
+      setAllowWithPromotions(editingBatch.allowWithPromotions !== false);
     } else {
       setName('');
       setBatchCode('');
@@ -58,6 +60,7 @@ export const VoucherBatchModal: FC<VoucherBatchModalProps> = ({
       setStartDate(new Date().toISOString().slice(0, 10));
       setEndDate(new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10));
       setDescription('');
+      setAllowWithPromotions(true);
     }
   }, [editingBatch, isOpen]);
 
@@ -82,6 +85,7 @@ export const VoucherBatchModal: FC<VoucherBatchModalProps> = ({
         startDate,
         endDate,
         description: description.trim(),
+        allowWithPromotions,
       };
       onSave(updatedBatch);
       onClose();
@@ -116,6 +120,7 @@ export const VoucherBatchModal: FC<VoucherBatchModalProps> = ({
       status: 'ACTIVE',
       prefix: prefix.toUpperCase().trim(),
       description: description.trim(),
+      allowWithPromotions,
       codes,
     };
 
@@ -264,6 +269,52 @@ export const VoucherBatchModal: FC<VoucherBatchModalProps> = ({
                   className="form-input"
                   required
                 />
+              </div>
+            </div>
+
+            <div className="form-group" style={{ backgroundColor: '#f8fafc', padding: '12px 16px', borderRadius: '8px', border: '1px solid #e2e8f0', marginTop: '4px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px' }}>
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: '14px', color: '#1e293b' }}>
+                    Áp dụng cùng khuyến mãi khác (Gộp KM)
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px', lineHeight: 1.4 }}>
+                    Khi bật, khách có thể nhập mã voucher này ngay cả khi đơn hàng đã hưởng chiết khấu tự động (voucher sẽ trừ trên số tiền còn lại sau khuyến mãi). Khi tắt, voucher sẽ bị từ chối nếu đơn có khuyến mãi.
+                  </div>
+                </div>
+                <label className="switch-container" style={{ margin: 0, cursor: 'pointer', flexShrink: 0 }}>
+                  <input
+                    type="checkbox"
+                    checked={allowWithPromotions}
+                    onChange={(e) => setAllowWithPromotions(e.target.checked)}
+                    style={{ display: 'none' }}
+                  />
+                  <span
+                    style={{
+                      display: 'inline-block',
+                      width: 44,
+                      height: 24,
+                      borderRadius: 12,
+                      backgroundColor: allowWithPromotions ? '#0F766E' : '#cbd5e1',
+                      position: 'relative',
+                      transition: 'background-color 0.2s',
+                    }}
+                  >
+                    <span
+                      style={{
+                        position: 'absolute',
+                        top: 2,
+                        left: allowWithPromotions ? 22 : 2,
+                        width: 20,
+                        height: 20,
+                        borderRadius: '50%',
+                        backgroundColor: '#ffffff',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                        transition: 'left 0.2s',
+                      }}
+                    />
+                  </span>
+                </label>
               </div>
             </div>
 

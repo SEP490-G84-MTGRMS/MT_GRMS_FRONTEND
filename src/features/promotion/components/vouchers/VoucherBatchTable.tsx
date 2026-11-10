@@ -178,6 +178,9 @@ export const VoucherBatchTable: FC<VoucherBatchTableProps> = ({
               paginatedBatches.map((batch) => {
                 const isExpanded = expandedId === batch.id;
                 const usagePercent = Math.round((batch.usedQuantity / batch.totalQuantity) * 100);
+                const cleanDescription = batch.description
+                  ? batch.description.replace(/\[CONFIG_JSON\][\s\S]*?\[\/CONFIG_JSON\]/g, '').trim()
+                  : '';
 
                 return (
                   <Fragment key={batch.id}>
@@ -200,9 +203,42 @@ export const VoucherBatchTable: FC<VoucherBatchTableProps> = ({
                       </td>
                       <td>
                         <div className="promo-title-box">
-                          <span className="promo-title-main">{batch.name}</span>
-                          {batch.description && (
-                            <span className="promo-title-sub">{batch.description}</span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                            <span className="promo-title-main">{batch.name}</span>
+                            {batch.allowWithPromotions !== false ? (
+                              <span
+                                style={{
+                                  fontSize: '11px',
+                                  fontWeight: 500,
+                                  padding: '1px 6px',
+                                  borderRadius: '4px',
+                                  backgroundColor: '#f0fdf4',
+                                  color: '#15803d',
+                                  border: '1px solid #bbf7d0',
+                                }}
+                                title="Cho phép kết hợp với chương trình khuyến mãi khác"
+                              >
+                                Gộp KM
+                              </span>
+                            ) : (
+                              <span
+                                style={{
+                                  fontSize: '11px',
+                                  fontWeight: 500,
+                                  padding: '1px 6px',
+                                  borderRadius: '4px',
+                                  backgroundColor: '#f8fafc',
+                                  color: '#64748b',
+                                  border: '1px solid #e2e8f0',
+                                }}
+                                title="Không áp dụng đồng thời với khuyến mãi khác"
+                              >
+                                Độc lập
+                              </span>
+                            )}
+                          </div>
+                          {cleanDescription && (
+                            <span className="promo-title-sub">{cleanDescription}</span>
                           )}
                         </div>
                       </td>

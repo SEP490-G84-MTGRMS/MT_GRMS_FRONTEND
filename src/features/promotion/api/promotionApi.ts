@@ -104,6 +104,7 @@ export interface ValidateVoucherResponse {
   promotionName?: string;
   discountType?: string;
   discountValue?: number;
+  allowWithPromotions?: boolean;
 }
 
 export interface EvaluateCartRequest {
@@ -141,6 +142,7 @@ export interface VoucherBatchDto {
   prefix: string;
   description?: string;
   createdAt: string;
+  allowWithPromotions?: boolean;
 }
 
 export interface VoucherBatchCreateRequest {
@@ -155,6 +157,7 @@ export interface VoucherBatchCreateRequest {
   endDate: string;
   prefix: string;
   description?: string;
+  allowWithPromotions?: boolean;
 }
 
 export interface VoucherCodeDto {
@@ -249,11 +252,12 @@ export const promotionApi = {
     return res.data?.data;
   },
 
-  async validateVoucher(code: string, cartTotal: number, customerId?: string) {
+  async validateVoucher(code: string, cartTotal: number, customerId?: string, hasOtherPromotions?: boolean) {
     const res = await httpClient.post<{ success: boolean; data: ValidateVoucherResponse }>('/vouchers/validate', {
       code,
       cartTotal,
       customerId,
+      hasOtherPromotions,
     });
     return res.data?.data;
   },

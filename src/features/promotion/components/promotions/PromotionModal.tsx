@@ -377,6 +377,37 @@ export const PromotionModal: FC<PromotionModalProps> = ({
                   placeholder="Không giới hạn"
                   className="form-input"
                 />
+                <span className="text-xs text-slate-500 mt-1 block">
+                  Tổng ngân sách chiết khấu toàn chiến dịch (để trống = không giới hạn kinh phí).
+                </span>
+                {editingPromo && (
+                  <div
+                    style={{
+                      marginTop: 8,
+                      padding: '8px 12px',
+                      backgroundColor: '#f8fafc',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: 6,
+                      fontSize: 12,
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
+                      <span>Đã giải ngân thực tế:</span>
+                      <strong style={{ color: '#0f766e' }}>
+                        {editingPromo.totalDiscountGiven.toLocaleString('vi-VN')} đ ({editingPromo.usageCount} lượt)
+                      </strong>
+                    </div>
+                    {budgetLimit && budgetLimit > 0 && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4, color: '#475569' }}>
+                        <span>Ngân sách còn lại:</span>
+                        <strong style={{ color: budgetLimit - editingPromo.totalDiscountGiven <= 0 ? '#dc2626' : '#16a34a' }}>
+                          {Math.max(0, budgetLimit - editingPromo.totalDiscountGiven).toLocaleString('vi-VN')} đ
+                          {budgetLimit - editingPromo.totalDiscountGiven <= 0 && ' (⚠️ Hết ngân sách)'}
+                        </strong>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -545,6 +576,7 @@ export const PromotionModal: FC<PromotionModalProps> = ({
                                 handleUpdateTier(idx, {
                                   buyProductId: prod.id,
                                   buyProductName: prod.name,
+                                  buyUnit: tier.buyUnit || prod.baseUnit || "Cái",
                                 });
                               } else {
                                 handleUpdateTier(idx, {
@@ -564,7 +596,7 @@ export const PromotionModal: FC<PromotionModalProps> = ({
                             ))}
                           </select>
                         </div>
-                        <div style={{ width: 80 }}>
+                        <div style={{ width: 75 }}>
                           <label
                             style={{
                               display: "block",
@@ -589,6 +621,36 @@ export const PromotionModal: FC<PromotionModalProps> = ({
                             className="form-input"
                             style={{ padding: "6px 8px", fontSize: "0.8rem" }}
                           />
+                        </div>
+                        <div style={{ width: 105 }}>
+                          <label
+                            style={{
+                              display: "block",
+                              color: "#64748b",
+                              fontSize: "0.74rem",
+                              marginBottom: 2,
+                            }}
+                          >
+                            Đơn vị mua (X)
+                          </label>
+                          <select
+                            value={tier.buyUnit || availableProducts.find((p) => p.id === tier.buyProductId)?.baseUnit || "Cái"}
+                            onChange={(e) =>
+                              handleUpdateTier(idx, "buyUnit", e.target.value)
+                            }
+                            className="form-select-control"
+                            style={{ padding: "6px 8px", fontSize: "0.8rem", width: "100%" }}
+                          >
+                            {Array.from(new Set([
+                              tier.buyUnit,
+                              availableProducts.find((p) => p.id === tier.buyProductId)?.baseUnit,
+                              ...COMMON_UNITS
+                            ].filter(Boolean))).map((u) => (
+                              <option key={u} value={u}>
+                                {u}
+                              </option>
+                            ))}
+                          </select>
                         </div>
                         <div style={{ flex: 2, minWidth: 200 }}>
                           <label
@@ -657,24 +719,26 @@ export const PromotionModal: FC<PromotionModalProps> = ({
                               marginBottom: 2,
                             }}
                           >
-                            Đơn vị tính
+                            Đơn vị tặng (Y)
                           </label>
-                          <input
-                            list={`units-list-${idx}`}
-                            type="text"
-                            value={tier.giftUnit || "Cái"}
+                          <select
+                            value={tier.giftUnit || availableProducts.find((p) => p.id === tier.giftProductId)?.baseUnit || "Cái"}
                             onChange={(e) =>
                               handleUpdateTier(idx, "giftUnit", e.target.value)
                             }
-                            placeholder="ĐVT..."
-                            className="form-input"
-                            style={{ padding: "6px 8px", fontSize: "0.8rem" }}
-                          />
-                          <datalist id={`units-list-${idx}`}>
-                            {COMMON_UNITS.map((u) => (
-                              <option key={u} value={u} />
+                            className="form-select-control"
+                            style={{ padding: "6px 8px", fontSize: "0.8rem", width: "100%" }}
+                          >
+                            {Array.from(new Set([
+                              tier.giftUnit,
+                              availableProducts.find((p) => p.id === tier.giftProductId)?.baseUnit,
+                              ...COMMON_UNITS
+                            ].filter(Boolean))).map((u) => (
+                              <option key={u} value={u}>
+                                {u}
+                              </option>
                             ))}
-                          </datalist>
+                          </select>
                         </div>
                         <div style={{ width: 75 }}>
                           <label
