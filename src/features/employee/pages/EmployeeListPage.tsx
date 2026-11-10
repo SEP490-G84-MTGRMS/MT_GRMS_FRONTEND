@@ -989,6 +989,7 @@ export const EmployeeListPage: React.FC = () => {
 
       {/* ─── FULL-WIDTH TABLE CONTAINER ─── */}
       <div className="emp-table-container" style={{ width: '100%' }}>
+        <div className="emp-table-scroll supplier-table-scroll-container">
           <table className="emp-table">
             <thead>
               <tr>
@@ -1130,6 +1131,7 @@ export const EmployeeListPage: React.FC = () => {
               )}
             </tbody>
           </table>
+        </div>
 
           {/* Enterprise Standard TablePagination */}
           <TablePagination

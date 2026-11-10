@@ -27,9 +27,11 @@ export const PlanFilterToolbar: FC<PlanFilterToolbarProps> = ({
     <div
       className="admin-toolbar-card"
       style={{
-        border: "1px solid #cbd5e1",
-        borderRadius: 10,
-        marginBottom: 16,
+        border: "1px solid #e2e8f0",
+        borderRadius: 8,
+        padding: "12px 16px",
+        marginBottom: 12,
+        flexShrink: 0,
       }}
     >
       <div

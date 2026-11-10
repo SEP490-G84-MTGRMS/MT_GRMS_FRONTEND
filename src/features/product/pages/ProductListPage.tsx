@@ -1447,7 +1447,7 @@ export const ProductListPage: React.FC = () => {
         </div>
 
         {/* Table */}
-        <div style={{ overflowX: 'auto' }}>
+        <div className="product-table-scroll supplier-table-scroll-container">
           <table className="product-main-table">
             <thead>
               <tr>
@@ -1548,17 +1548,18 @@ export const ProductListPage: React.FC = () => {
                             style={{
                               width: 28,
                               height: 28,
-                              borderRadius: 4,
-                              backgroundColor: '#f1f5f9',
+                              borderRadius: 6,
+                              border: '1px dashed #cbd5e1',
+                              backgroundColor: '#f8fafc',
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
-                              fontSize: 13,
+                              fontSize: 10,
                               color: '#94a3b8',
                               flexShrink: 0,
                             }}
                           >
-                            📦
+                            N/A
                           </div>
                         )}
                         <span className="product-code-link">
@@ -1737,12 +1738,17 @@ export const ProductListPage: React.FC = () => {
                     <td style={{ textAlign: 'center' }}>
                       <span
                         style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
                           fontSize: 11.5,
-                          fontWeight: 700,
-                          padding: '2px 8px',
+                          fontWeight: 600,
+                          padding: '3px 10px',
                           borderRadius: 9999,
-                          backgroundColor: p.status === 'Active' ? '#CCFBF1' : '#FEE2E2',
-                          color: p.status === 'Active' ? '#0F766E' : '#DC2626',
+                          backgroundColor: p.status === 'Active' ? '#f0fdf4' : '#f8fafc',
+                          color: p.status === 'Active' ? '#15803d' : '#64748b',
+                          border: p.status === 'Active' ? '1px solid #bbf7d0' : '1px solid #e2e8f0',
+                          whiteSpace: 'nowrap',
                         }}
                       >
                         {p.status === 'Active' ? 'Đang bán' : 'Ngừng kinh doanh'}

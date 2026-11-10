@@ -5,11 +5,10 @@ import {
   CheckCircle2,
   Printer,
   RotateCcw,
-  ChevronLeft,
-  ChevronRight,
   ArrowUpDown,
 } from 'lucide-react';
 import type { SupplierReturnListItem, SupplierReturnStatus } from '../types/supplierReturn.types';
+import { TablePagination } from '../../../components/common';
 import '../../../styles/so-list-page.css';
 
 interface Props {
@@ -151,10 +150,6 @@ export const SupplierReturnTable: FC<Props> = ({
       return 0;
     });
   }, [items, sortField, sortDir]);
-
-  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
-  const startItem = totalCount === 0 ? 0 : (pageIndex - 1) * pageSize + 1;
-  const endItem = Math.min(pageIndex * pageSize, totalCount);
 
   const colGroup = (
     <colgroup>
@@ -478,57 +473,16 @@ export const SupplierReturnTable: FC<Props> = ({
         </table>
       </div>
 
-      {/* ── Footer Phân trang (Paging) chuẩn so-list-pager ── */}
-      <div className="so-list-pager">
-        {/* Bên trái: Thông tin số lượng & Chọn số bản ghi / trang */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
-          <div>
-            Hiển thị <b>{startItem}</b> - <b>{endItem}</b> trên <b>{totalCount}</b> phiếu trả hàng
-          </div>
-
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ color: '#64748b' }}>Bản ghi/trang:</span>
-            <select
-              className="so-list-pager-select"
-              value={pageSize}
-              onChange={(e) => onPageSizeChange(Number(e.target.value))}
-            >
-              <option value={10}>10</option>
-              <option value={15}>15</option>
-              <option value={24}>24</option>
-              <option value={36}>36</option>
-              <option value={50}>50</option>
-            </select>
-          </div>
-        </div>
-
-        {/* Bên phải: Nút Trước / Trang x / y / Sau */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <button
-            type="button"
-            className="so-list-pager-btn"
-            disabled={pageIndex <= 1}
-            onClick={() => onPageChange(pageIndex - 1)}
-          >
-            <ChevronLeft size={13} />
-            <span>Trước</span>
-          </button>
-
-          <span style={{ padding: '0 8px', fontWeight: 600, color: '#0f172a' }}>
-            Trang {pageIndex} / {totalPages}
-          </span>
-
-          <button
-            type="button"
-            className="so-list-pager-btn"
-            disabled={pageIndex >= totalPages}
-            onClick={() => onPageChange(pageIndex + 1)}
-          >
-            <span>Sau</span>
-            <ChevronRight size={13} />
-          </button>
-        </div>
-      </div>
+      {/* ── Footer Phân trang chuẩn 1, 2, 3... ── */}
+      <TablePagination
+        currentPage={pageIndex}
+        pageSize={pageSize}
+        totalItems={totalCount}
+        pageSizeOptions={[10, 15, 24, 36, 50]}
+        onPageChange={onPageChange}
+        onPageSizeChange={onPageSizeChange}
+        itemLabel="phiếu trả hàng"
+      />
     </div>
   );
 };

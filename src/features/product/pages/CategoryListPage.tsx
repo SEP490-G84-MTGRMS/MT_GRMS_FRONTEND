@@ -382,7 +382,7 @@ export const CategoryListPage: React.FC = () => {
         </div>
 
         {/* Table */}
-        <div style={{ overflowX: 'auto' }}>
+        <div className="product-table-scroll supplier-table-scroll-container">
           <table className="product-main-table">
             <thead>
               <tr>

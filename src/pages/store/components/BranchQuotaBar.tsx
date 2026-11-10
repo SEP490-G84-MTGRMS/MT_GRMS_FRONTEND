@@ -53,10 +53,11 @@ export const BranchQuotaBar: FC<BranchQuotaBarProps> = ({
       style={{
         background: '#FFFFFF',
         borderRadius: 16,
-        padding: '22px 26px',
+        padding: '16px 20px',
         border: '1px solid #EDF2F9',
         boxShadow: '0 4px 16px rgba(0, 30, 90, 0.04)',
-        marginBottom: 24,
+        marginBottom: 14,
+        flexShrink: 0,
       }}
     >
       <div
