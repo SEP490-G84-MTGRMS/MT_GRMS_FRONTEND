@@ -7,6 +7,7 @@ Toàn bộ các thay đổi của repository Frontend React SPA được tổng 
 ## [Unreleased] - 2026-11-10
 
 ### Changed
+- **Chuẩn hóa giao diện bảng "Quản lý chi nhánh & Kho hàng" đồng bộ với bảng Sản phẩm theo Cửa hàng (`BranchManagementTab.tsx`)**: Áp dụng thiết kế chuẩn `.so-list-table-card` (`so-list-table-head`, `so-list-table-body`, `so-list-pager`), tách cột `Tên Chi Nhánh` và `Địa Chỉ` riêng biệt, bổ sung sắp xếp 2 chiều (`ArrowUpDown`) trên tiêu đề cột, định dạng mã chi nhánh monospace xanh cổ vịt (`#0f766e`), huy hiệu trạng thái `SupplierStatusBadge`, nút `Thao tác` (`.so-list-action-btn`) và thanh phân trang phía dưới [FE-BRANCH] [worklog: docs/worklogs/2026-11-10_FE-BRANCH_AI_standardize-branch-table-ui.md].
 - **Tái cấu trúc Modal "Chỉnh sửa sản phẩm tại chi nhánh" sang bố cục ngang 2 cột & Xử lý chữ dài không bị xuống dòng (`EditStoreProductModal.tsx`)**: Chuyển đổi toàn bộ form chỉnh sửa sản phẩm từ xếp dọc 1 cột sang bố cục lưới 2 cột ngang (`grid-template-columns: repeat(2, 1fr)`), mở rộng `maxWidth: 920px`, sắp xếp logic các cặp trường thông tin; gán `whiteSpace: 'nowrap'` cho các nhãn và radio options ("Số lượng đặt hàng tối thiểu", "Đang kinh doanh", "Tạm ngừng bán"), mở rộng `Sản phẩm` và `Ngành hàng` full width tránh cắt cụt văn bản [FE-PRODUCT] [worklog: docs/worklogs/2026-11-10_FE-PRODUCT_AI_filter-store-products-by-header-branch.md].
 
 ### Removed

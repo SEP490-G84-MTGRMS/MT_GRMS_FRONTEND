@@ -1,23 +1,21 @@
 // src/pages/store/components/BranchManagementTab.tsx
-import { useState, useEffect, type FC } from 'react';
+import { useState, useEffect, useMemo, useRef, type FC } from 'react';
 import {
   Search,
   Building2,
   Power,
   RefreshCw,
-  MapPin,
-  Phone,
-  User,
-  CheckCircle2,
-  XCircle,
   Trash2,
-  Eye,
+  ArrowUpDown,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import {
   branchManagementApi,
   type BranchItemResponse,
   type BranchQuotaResponse,
 } from '../api/branchManagementApi';
+import { SupplierStatusBadge } from '../../../features/supplier/components/SupplierStatusBadge';
 import { BranchQuotaBar } from './BranchQuotaBar';
 import { BranchFormModal } from './BranchFormModal';
 import { BranchUpgradeModal } from './BranchUpgradeModal';
@@ -26,6 +24,9 @@ import { BranchDetailModal } from './BranchDetailModal';
 interface BranchManagementTabProps {
   onGoToSubscriptions: () => void;
 }
+
+type SortField = 'code' | 'name' | 'address' | 'phone' | 'managerName' | 'status';
+type SortDirection = 'asc' | 'desc';
 
 export const BranchManagementTab: FC<BranchManagementTabProps> = ({
   onGoToSubscriptions,
@@ -38,6 +39,141 @@ export const BranchManagementTab: FC<BranchManagementTabProps> = ({
 
   const [activeModal, setActiveModal] = useState<'create' | 'edit' | 'upgrade' | 'detail' | null>(null);
   const [selectedBranch, setSelectedBranch] = useState<BranchItemResponse | null>(null);
+
+  const [sortField, setSortField] = useState<SortField | null>(null);
+  const [sortDir, setSortDir] = useState<SortDirection>('asc');
+  const [pageIndex, setPageIndex] = useState<number>(1);
+  const [pageSize, setPageSize] = useState<number>(15);
+
+  const headerRef = useRef<HTMLDivElement>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const [hasScrollY, setHasScrollY] = useState(false);
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      if (sortDir === 'asc') {
+        setSortDir('desc');
+      } else {
+        setSortField(null);
+        setSortDir('asc');
+      }
+    } else {
+      setSortField(field);
+      setSortDir('asc');
+    }
+  };
+
+  const sortedBranches = useMemo(() => {
+    if (!sortField) return branches;
+
+    return [...branches].sort((a, b) => {
+      let valA = '';
+      let valB = '';
+
+      switch (sortField) {
+        case 'code':
+          valA = (a.code || '').toLowerCase();
+          valB = (b.code || '').toLowerCase();
+          break;
+        case 'name':
+          valA = (a.name || '').toLowerCase();
+          valB = (b.name || '').toLowerCase();
+          break;
+        case 'address':
+          valA = (a.address || '').toLowerCase();
+          valB = (b.address || '').toLowerCase();
+          break;
+        case 'phone':
+          valA = (a.phone || '').toLowerCase();
+          valB = (b.phone || '').toLowerCase();
+          break;
+        case 'managerName':
+          valA = (a.managerName || '').toLowerCase();
+          valB = (b.managerName || '').toLowerCase();
+          break;
+        case 'status':
+          valA = (a.status || '').toLowerCase();
+          valB = (b.status || '').toLowerCase();
+          break;
+      }
+
+      if (valA < valB) return sortDir === 'asc' ? -1 : 1;
+      if (valA > valB) return sortDir === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [branches, sortField, sortDir]);
+
+  const totalCount = sortedBranches.length;
+  const totalPages = Math.ceil(totalCount / pageSize) || 1;
+  const startItem = totalCount === 0 ? 0 : (pageIndex - 1) * pageSize + 1;
+  const endItem = Math.min(pageIndex * pageSize, totalCount);
+
+  const pagedBranches = useMemo(() => {
+    const start = (pageIndex - 1) * pageSize;
+    return sortedBranches.slice(start, start + pageSize);
+  }, [sortedBranches, pageIndex, pageSize]);
+
+  useEffect(() => {
+    setPageIndex(1);
+  }, [keyword, statusFilter]);
+
+  useEffect(() => {
+    const updateScrollState = () => {
+      if (bodyRef.current) {
+        setHasScrollY(bodyRef.current.scrollHeight > bodyRef.current.clientHeight);
+      }
+    };
+
+    updateScrollState();
+
+    let observer: ResizeObserver | null = null;
+    if (bodyRef.current && typeof ResizeObserver !== 'undefined') {
+      observer = new ResizeObserver(() => {
+        updateScrollState();
+      });
+      observer.observe(bodyRef.current);
+    }
+
+    window.addEventListener('resize', updateScrollState);
+    return () => {
+      window.removeEventListener('resize', updateScrollState);
+      if (observer) observer.disconnect();
+    };
+  }, [pagedBranches, pageSize]);
+
+  const handleBodyScroll = () => {
+    if (headerRef.current && bodyRef.current) {
+      headerRef.current.scrollLeft = bodyRef.current.scrollLeft;
+    }
+  };
+
+  const tableColGroup = (
+    <colgroup>
+      <col style={{ width: '12%' }} />
+      <col style={{ width: '20%' }} />
+      <col style={{ width: '24%' }} />
+      <col style={{ width: '11%' }} />
+      <col style={{ width: '12%' }} />
+      <col style={{ width: '9%' }} />
+      <col style={{ width: '12%' }} />
+    </colgroup>
+  );
+
+  const thStyle: React.CSSProperties = {
+    backgroundColor: '#f8fafc',
+    padding: '8px 8px',
+    fontSize: 12,
+    fontWeight: 700,
+    color: '#334155',
+    textTransform: 'uppercase',
+    letterSpacing: '0.02em',
+    whiteSpace: 'normal',
+    wordBreak: 'break-word',
+    lineHeight: 1.25,
+    boxSizing: 'border-box',
+    borderBottom: '1px solid #cbd5e1',
+    userSelect: 'none',
+  };
 
   // 1. Tải hạn mức chi nhánh (Quota) - chỉ cần gọi 1 lần khi mount hoặc khi thêm/sửa chi nhánh
   const fetchQuota = async () => {
@@ -227,249 +363,277 @@ export const BranchManagementTab: FC<BranchManagementTabProps> = ({
       </div>
 
       {/* 3. Bảng danh sách chi nhánh */}
-      <div
-        style={{
-          background: '#FFFFFF',
-          borderRadius: 16,
-          border: '1px solid #EDF2F9',
-          boxShadow: '0 4px 16px rgba(0, 30, 90, 0.04)',
-          overflow: 'hidden',
-        }}
-      >
-        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 13.5 }}>
-          <thead>
-            <tr style={{ background: '#F8FAFC', borderBottom: '1px solid #EDF2F9', color: '#64748B', fontWeight: 700 }}>
-              <th style={{ padding: '14px 20px' }}>Mã chi nhánh</th>
-              <th style={{ padding: '14px 20px' }}>Tên & Địa chỉ chi nhánh</th>
-              <th style={{ padding: '14px 20px' }}>Hotline</th>
-              <th style={{ padding: '14px 20px' }}>Quản lý phụ trách</th>
-              <th style={{ padding: '14px 20px' }}>Trạng thái</th>
-              <th style={{ padding: '14px 20px', textAlign: 'center' }}>Thao tác</th>
-            </tr>
-          </thead>
-          <tbody>
-            {isLoading ? (
+      <div className="so-list-table-card">
+        <div
+          ref={headerRef}
+          className="so-list-table-head"
+          style={{
+            paddingRight: hasScrollY ? 6 : 0,
+            boxSizing: 'border-box',
+          }}
+        >
+          <table className="so-list-table" style={{ minWidth: 960, tableLayout: 'fixed' }}>
+            {tableColGroup}
+            <thead>
               <tr>
-                <td colSpan={6} style={{ padding: '40px 20px', textAlign: 'center', color: '#94A3B8' }}>
-                  Đang tải danh sách chi nhánh...
-                </td>
-              </tr>
-            ) : branches.length === 0 ? (
-              <tr>
-                <td colSpan={6} style={{ padding: '48px 20px', textAlign: 'center', color: '#64748B' }}>
-                  <Building2 size={36} color="#CBD5E1" style={{ margin: '0 auto 12px auto' }} />
-                  <div style={{ fontWeight: 600, fontSize: 15, color: '#334155' }}>Chưa có chi nhánh nào</div>
-                  <div style={{ fontSize: 13, color: '#94A3B8', marginTop: 4 }}>
-                    Hãy bấm nút "Thêm chi nhánh mới" để mở rộng chuỗi cửa hàng của bạn.
+                <th style={{ ...thStyle, cursor: 'pointer' }} onClick={() => handleSort('code')}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <span>Mã Chi Nhánh</span>
+                    <ArrowUpDown size={12} style={{ opacity: sortField === 'code' ? 1 : 0.4, color: sortField === 'code' ? '#0f766e' : 'inherit' }} />
                   </div>
-                </td>
+                </th>
+                <th style={{ ...thStyle, cursor: 'pointer' }} onClick={() => handleSort('name')}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <span>Tên Chi Nhánh</span>
+                    <ArrowUpDown size={12} style={{ opacity: sortField === 'name' ? 1 : 0.4, color: sortField === 'name' ? '#0f766e' : 'inherit' }} />
+                  </div>
+                </th>
+                <th style={{ ...thStyle, cursor: 'pointer' }} onClick={() => handleSort('address')}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <span>Địa Chỉ</span>
+                    <ArrowUpDown size={12} style={{ opacity: sortField === 'address' ? 1 : 0.4, color: sortField === 'address' ? '#0f766e' : 'inherit' }} />
+                  </div>
+                </th>
+                <th style={{ ...thStyle, cursor: 'pointer' }} onClick={() => handleSort('phone')}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <span>Hotline</span>
+                    <ArrowUpDown size={12} style={{ opacity: sortField === 'phone' ? 1 : 0.4, color: sortField === 'phone' ? '#0f766e' : 'inherit' }} />
+                  </div>
+                </th>
+                <th style={{ ...thStyle, cursor: 'pointer' }} onClick={() => handleSort('managerName')}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <span>Quản Lý Phụ Trách</span>
+                    <ArrowUpDown size={12} style={{ opacity: sortField === 'managerName' ? 1 : 0.4, color: sortField === 'managerName' ? '#0f766e' : 'inherit' }} />
+                  </div>
+                </th>
+                <th style={thStyle}>Trạng Thái</th>
+                <th style={{ ...thStyle, textAlign: 'right' }}>Thao Tác</th>
               </tr>
-            ) : (
-              branches.map((b) => {
-                const isActive = b.status.toLowerCase() === 'active';
-                return (
-                  <tr
-                    key={b.id}
-                    onClick={() => {
-                      setSelectedBranch(b);
-                      setActiveModal('detail');
-                    }}
-                    style={{
-                      borderBottom: '1px solid #F1F5F9',
-                      transition: 'background-color 0.15s ease',
-                      cursor: 'pointer',
-                    }}
-                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#F8FAFC')}
-                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-                    title="Bấm vào hàng để xem chi tiết thông số chi nhánh"
-                  >
-                    {/* Mã */}
-                    <td style={{ padding: '14px 20px' }}>
-                      <span
-                        style={{
-                          fontFamily: 'var(--font-mono)',
-                          fontWeight: 700,
-                          fontSize: 12.5,
-                          padding: '4px 8px',
-                          borderRadius: 6,
-                          background: '#EBF5FF',
-                          color: '#0066FF',
-                          display: 'inline-block',
-                          boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
-                        }}
-                      >
+            </thead>
+          </table>
+        </div>
+
+        <div
+          ref={bodyRef}
+          className="so-list-table-body supplier-table-scroll-container"
+          onScroll={handleBodyScroll}
+        >
+          <table className="so-list-table" style={{ minWidth: 960, tableLayout: 'fixed' }}>
+            {tableColGroup}
+            <tbody>
+              {isLoading ? (
+                <tr>
+                  <td colSpan={7} style={{ padding: '40px 20px', textAlign: 'center', color: '#94A3B8' }}>
+                    Đang tải danh sách chi nhánh...
+                  </td>
+                </tr>
+              ) : pagedBranches.length === 0 ? (
+                <tr>
+                  <td colSpan={7} style={{ padding: '48px 20px', textAlign: 'center', color: '#64748B' }}>
+                    <Building2 size={36} color="#CBD5E1" style={{ margin: '0 auto 12px auto' }} />
+                    <div style={{ fontWeight: 600, fontSize: 15, color: '#334155' }}>Chưa có chi nhánh nào</div>
+                    <div style={{ fontSize: 13, color: '#94A3B8', marginTop: 4 }}>
+                      Hãy bấm nút "Thêm chi nhánh mới" để mở rộng chuỗi cửa hàng của bạn.
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                pagedBranches.map((b) => {
+                  const isActive = b.status.toLowerCase() === 'active';
+                  return (
+                    <tr
+                      key={b.id}
+                      className="so-list-row"
+                      onClick={() => {
+                        setSelectedBranch(b);
+                        setActiveModal('detail');
+                      }}
+                      style={{ cursor: 'pointer' }}
+                      title="Bấm vào hàng để xem chi tiết thông số chi nhánh"
+                    >
+                      {/* Mã chi nhánh */}
+                      <td className="so-list-td--wrap" style={{ fontSize: 12, color: '#0f766e', fontWeight: 600, fontFamily: 'var(--font-mono)' }}>
                         {b.code}
-                      </span>
-                    </td>
+                      </td>
 
-                    {/* Tên & Địa chỉ */}
-                    <td style={{ padding: '14px 20px' }}>
-                      <div
-                        style={{
-                          fontWeight: 700,
-                          color: '#0F172A',
-                          fontSize: 14,
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 6,
-                        }}
-                      >
-                        <span>{b.name}</span>
-                        {b.isHeadquarter && (
-                          <span
-                            style={{
-                              fontSize: 11,
-                              fontWeight: 700,
-                              color: '#B45309',
-                              backgroundColor: '#FEF3C7',
-                              padding: '1px 6px',
-                              borderRadius: 4,
-                            }}
-                          >
-                            Trụ sở chính
+                      {/* Tên chi nhánh */}
+                      <td className="so-list-td--wrap">
+                        <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
+                          <span className="so-list-name" style={{ fontSize: 12.5 }}>
+                            {b.name}
                           </span>
-                        )}
-                      </div>
-                      <div
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 4,
-                          fontSize: 12.5,
-                          color: '#64748B',
-                          marginTop: 3,
-                        }}
-                      >
-                        <MapPin size={13} color="#94A3B8" />
-                        <span>{b.address || 'Chưa cập nhật địa chỉ'}</span>
-                      </div>
-                    </td>
-
-                    {/* Hotline */}
-                    <td style={{ padding: '14px 20px', color: '#334155' }}>
-                      {b.phone ? (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <Phone size={13} color="#94A3B8" />
-                          <span>{b.phone}</span>
+                          {b.isHeadquarter && (
+                            <span
+                              style={{
+                                fontSize: 10.5,
+                                fontWeight: 700,
+                                color: '#B45309',
+                                backgroundColor: '#FEF3C7',
+                                padding: '1px 6px',
+                                borderRadius: 4,
+                                whiteSpace: 'nowrap',
+                              }}
+                            >
+                              Trụ sở chính
+                            </span>
+                          )}
                         </div>
-                      ) : (
-                        <span style={{ color: '#94A3B8', fontStyle: 'italic' }}>—</span>
-                      )}
-                    </td>
+                      </td>
 
-                    {/* Quản lý */}
-                    <td style={{ padding: '14px 20px', color: '#334155' }}>
-                      {b.managerName ? (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <User size={14} color="#94A3B8" />
-                          <span>{b.managerName}</span>
+                      {/* Địa chỉ */}
+                      <td className="so-list-td--wrap" style={{ fontSize: 12, color: '#475569' }}>
+                        {b.address || '---'}
+                      </td>
+
+                      {/* Hotline */}
+                      <td className="so-list-td--wrap" style={{ fontSize: 12, color: '#334155', fontFamily: 'var(--font-mono)' }}>
+                        {b.phone || '---'}
+                      </td>
+
+                      {/* Quản lý phụ trách */}
+                      <td className="so-list-td--wrap" style={{ fontSize: 12, color: '#334155' }}>
+                        {b.managerName || '---'}
+                      </td>
+
+                      {/* Trạng thái */}
+                      <td className="so-list-td--wrap">
+                        <SupplierStatusBadge status={isActive ? 'Active' : 'Inactive'} />
+                      </td>
+
+                      {/* Thao tác */}
+                      <td style={{ textAlign: 'right' }}>
+                        <div
+                          style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-end', gap: 6 }}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <button
+                            type="button"
+                            className="so-list-action-btn"
+                            onClick={() => {
+                              setSelectedBranch(b);
+                              setActiveModal('detail');
+                            }}
+                            title="Xem chi tiết và chỉnh sửa thông số chi nhánh"
+                          >
+                            Thao tác
+                          </button>
+
+                          <button
+                            type="button"
+                            className="so-list-action-btn so-list-action-btn--icon"
+                            onClick={() => handleToggleStatus(b)}
+                            style={{
+                              color: isActive ? '#EA580C' : '#059669',
+                              borderColor: isActive ? '#FED7AA' : '#A7F3D0',
+                              background: isActive ? '#FFF7ED' : '#F0FDF4',
+                            }}
+                            title={isActive ? 'Tạm ngưng hoạt động' : 'Kích hoạt hoạt động'}
+                          >
+                            <Power size={13} />
+                          </button>
+
+                          <button
+                            type="button"
+                            className="so-list-action-btn so-list-action-btn--icon so-list-action-btn--danger"
+                            onClick={() => handleDeleteBranch(b)}
+                            disabled={b.isHeadquarter}
+                            style={{
+                              opacity: b.isHeadquarter ? 0.45 : 1,
+                              cursor: b.isHeadquarter ? 'not-allowed' : 'pointer',
+                            }}
+                            title={b.isHeadquarter ? 'Không thể xóa chi nhánh chính (Trụ sở chính)' : 'Xóa chi nhánh'}
+                          >
+                            <Trash2 size={13} />
+                          </button>
                         </div>
-                      ) : (
-                        <span style={{ color: '#94A3B8', fontStyle: 'italic' }}>Chưa phân công</span>
-                      )}
-                    </td>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
 
-                    {/* Trạng thái */}
-                    <td style={{ padding: '14px 20px' }}>
-                      <span
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: 6,
-                          padding: '3px 10px',
-                          borderRadius: 'var(--radius-pill)',
-                          fontSize: 12.5,
-                          fontWeight: 700,
-                          background: isActive ? '#ECFDF5' : '#F1F5F9',
-                          color: isActive ? '#059669' : '#64748B',
-                        }}
-                      >
-                        {isActive ? <CheckCircle2 size={13} /> : <XCircle size={13} />}
-                        <span>{isActive ? 'Đang hoạt động' : 'Tạm ngưng'}</span>
-                      </span>
-                    </td>
+        {/* Footer Pagination */}
+        <div className="so-list-pager">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            <span style={{ fontSize: 12, color: '#64748b' }}>
+              Hiển thị <strong style={{ color: '#0f172a' }}>{startItem} - {endItem}</strong> trên <strong style={{ color: '#0f172a' }}>{totalCount}</strong> chi nhánh
+            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#64748b' }}>
+              <span>Bản ghi/trang:</span>
+              <select
+                value={pageSize}
+                onChange={(e) => {
+                  setPageSize(Number(e.target.value));
+                  setPageIndex(1);
+                }}
+                style={{
+                  padding: '2px 8px',
+                  borderRadius: 'var(--radius-pill)',
+                  border: '1px solid #cbd5e1',
+                  fontSize: 12,
+                  color: '#0f172a',
+                  backgroundColor: '#fff',
+                  cursor: 'pointer',
+                  outline: 'none',
+                }}
+              >
+                <option value={15}>15</option>
+                <option value={24}>24</option>
+                <option value={36}>36</option>
+                <option value={48}>48</option>
+              </select>
+            </div>
+          </div>
 
-                    {/* Thao tác */}
-                    <td style={{ padding: '14px 20px', textAlign: 'center' }}>
-                      <div
-                        style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        {/* Xem chi tiết */}
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSelectedBranch(b);
-                            setActiveModal('detail');
-                          }}
-                          style={{
-                            width: 32,
-                            height: 32,
-                            borderRadius: 8,
-                            border: '1px solid #CBD5E1',
-                            background: '#F0FDFA',
-                            color: '#0F766E',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            cursor: 'pointer',
-                          }}
-                          title="Xem chi tiết các thông số chi nhánh"
-                        >
-                          <Eye size={15} />
-                        </button>
-
-                        {/* Toggle Status */}
-                        <button
-                          type="button"
-                          onClick={() => handleToggleStatus(b)}
-                          style={{
-                            width: 32,
-                            height: 32,
-                            borderRadius: 8,
-                            border: '1px solid #CBD5E1',
-                            background: isActive ? '#FFF7ED' : '#F0FDF4',
-                            color: isActive ? '#EA580C' : '#059669',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            cursor: 'pointer',
-                          }}
-                          title={isActive ? 'Tạm ngưng hoạt động' : 'Kích hoạt hoạt động'}
-                        >
-                          <Power size={15} />
-                        </button>
-
-                        {/* Xóa chi nhánh */}
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteBranch(b)}
-                          disabled={b.isHeadquarter}
-                          style={{
-                            width: 32,
-                            height: 32,
-                            borderRadius: 8,
-                            border: `1px solid ${b.isHeadquarter ? '#E2E8F0' : '#FECACA'}`,
-                            background: b.isHeadquarter ? '#F8FAFC' : '#FEF2F2',
-                            color: b.isHeadquarter ? '#CBD5E1' : '#EF4444',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            cursor: b.isHeadquarter ? 'not-allowed' : 'pointer',
-                            opacity: b.isHeadquarter ? 0.6 : 1,
-                          }}
-                          title={b.isHeadquarter ? 'Không thể xóa chi nhánh chính (Trụ sở chính)' : 'Xóa chi nhánh'}
-                        >
-                          <Trash2 size={15} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button
+              type="button"
+              disabled={pageIndex <= 1}
+              onClick={() => setPageIndex(pageIndex - 1)}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 4,
+                padding: '4px 10px',
+                borderRadius: 'var(--radius-pill)',
+                border: '1px solid #e2e8f0',
+                background: pageIndex <= 1 ? '#f8fafc' : '#fff',
+                color: pageIndex <= 1 ? '#cbd5e1' : '#334155',
+                fontSize: 12,
+                fontWeight: 500,
+                cursor: pageIndex <= 1 ? 'not-allowed' : 'pointer',
+              }}
+            >
+              <ChevronLeft size={13} /> Trước
+            </button>
+            <span style={{ fontSize: 12, color: '#475569', fontWeight: 500, padding: '0 4px' }}>
+              Trang {pageIndex} / {totalPages}
+            </span>
+            <button
+              type="button"
+              disabled={pageIndex >= totalPages}
+              onClick={() => setPageIndex(pageIndex + 1)}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 4,
+                padding: '4px 10px',
+                borderRadius: 'var(--radius-pill)',
+                border: '1px solid #e2e8f0',
+                background: pageIndex >= totalPages ? '#f8fafc' : '#fff',
+                color: pageIndex >= totalPages ? '#cbd5e1' : '#334155',
+                fontSize: 12,
+                fontWeight: 500,
+                cursor: pageIndex >= totalPages ? 'not-allowed' : 'pointer',
+              }}
+            >
+              Sau <ChevronRight size={13} />
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Modals */}
