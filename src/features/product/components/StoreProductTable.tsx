@@ -21,8 +21,6 @@ type SortField =
   | 'sku'
   | 'name'
   | 'unit'
-  | 'supplierCode'
-  | 'supplierName'
   | 'costPrice'
   | 'retailPrice'
   | 'minOrderQuantity'
@@ -105,14 +103,6 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
           valA = a.unit.toLowerCase();
           valB = b.unit.toLowerCase();
           break;
-        case 'supplierCode':
-          valA = (a.primarySupplierCode || '').toLowerCase();
-          valB = (b.primarySupplierCode || '').toLowerCase();
-          break;
-        case 'supplierName':
-          valA = (a.primarySupplierName || '').toLowerCase();
-          valB = (b.primarySupplierName || '').toLowerCase();
-          break;
         case 'costPrice':
           valA = a.costPrice;
           valB = b.costPrice;
@@ -179,17 +169,15 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
   const tableColGroup = (
     <colgroup>
       <col style={{ width: '5%' }} />
-      <col style={{ width: '10%' }} />
-      <col style={{ width: '16%' }} />
+      <col style={{ width: '12%' }} />
+      <col style={{ width: '26%' }} />
       <col style={{ width: '9%' }} />
-      <col style={{ width: '13%' }} />
+      <col style={{ width: '9%' }} />
+      <col style={{ width: '15%' }} />
+      <col style={{ width: '5%' }} />
+      <col style={{ width: '5%' }} />
       <col style={{ width: '7%' }} />
       <col style={{ width: '7%' }} />
-      <col style={{ width: '13%' }} />
-      <col style={{ width: '4%' }} />
-      <col style={{ width: '4%' }} />
-      <col style={{ width: '6%' }} />
-      <col style={{ width: '6%' }} />
     </colgroup>
   );
 
@@ -243,28 +231,6 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
                 <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                   <span>Tên Sản Phẩm</span>
                   <ArrowUpDown size={12} style={{ color: sortField === 'name' ? '#0f766e' : '#94a3b8', flexShrink: 0 }} />
-                </div>
-              </th>
-
-              <th
-                style={{ ...thStyle, cursor: 'pointer' }}
-                onClick={() => handleSort('supplierCode')}
-                title="Sắp xếp theo mã nhà cung cấp"
-              >
-                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                  <span>Mã NCC</span>
-                  <ArrowUpDown size={12} style={{ color: sortField === 'supplierCode' ? '#0f766e' : '#94a3b8', flexShrink: 0 }} />
-                </div>
-              </th>
-
-              <th
-                style={{ ...thStyle, cursor: 'pointer' }}
-                onClick={() => handleSort('supplierName')}
-                title="Sắp xếp theo nhà cung cấp"
-              >
-                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                  <span>Nhà Cung Cấp</span>
-                  <ArrowUpDown size={12} style={{ color: sortField === 'supplierName' ? '#0f766e' : '#94a3b8', flexShrink: 0 }} />
                 </div>
               </th>
 
@@ -336,7 +302,7 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
             {sortedProducts.length === 0 ? (
               <tr>
                 <td
-                  colSpan={12}
+                  colSpan={10}
                   style={{
                     textAlign: 'center',
                     padding: '48px 16px',
@@ -428,29 +394,7 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
                       <div className="so-list-name" title={p.name}>{p.name}</div>
                     </td>
 
-                    {/* 3. Mã Nhà Cung Cấp */}
-                    <td style={{ padding: '8px 8px', verticalAlign: 'middle', borderBottom: '1px solid #f1f5f9' }}>
-                      <span
-                        style={{
-                          fontFamily: 'var(--font-mono, monospace)',
-                          fontSize: 12,
-                          fontWeight: 600,
-                          color: '#334155',
-                          whiteSpace: 'nowrap',
-                          display: 'inline-block',
-                        }}
-                        title={p.primarySupplierCode}
-                      >
-                        {p.primarySupplierCode || '---'}
-                      </span>
-                    </td>
-
-                    {/* 6. Tên Nhà Cung Cấp */}
-                    <td className="so-list-td--wrap">
-                      <div className="so-list-name" title={p.primarySupplierName}>{p.primarySupplierName || '---'}</div>
-                    </td>
-
-                    {/* 8. Giá Vốn (đ) */}
+                    {/* Giá Vốn (đ) */}
                     <td style={{ padding: '8px 6px', textAlign: 'right', verticalAlign: 'middle', whiteSpace: 'nowrap', borderBottom: '1px solid #f1f5f9' }}>
                       <span style={{ fontFamily: 'var(--font-mono, monospace)', fontWeight: 600, fontSize: 12.5, color: '#64748b' }}>
                         {fmt(p.costPrice)} đ

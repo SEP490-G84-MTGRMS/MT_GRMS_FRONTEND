@@ -30,7 +30,8 @@
 
 ### `src/features/product/components/StoreProductTable.tsx`
 - Loại bỏ 2 cột `MÃ CỬA HÀNG` và `CỬA HÀNG` khỏi `<thead>`, `<tbody>`, `<colgroup>` và `SortField`.
-- Tinh chỉnh lại độ rộng `<colgroup>` cho 12 cột còn lại.
+- Tiếp tục lược bỏ 2 cột `MÃ NCC` và `NHÀ CUNG CẤP` khỏi `<thead>`, `<tbody>`, `<colgroup>`, `colSpan` và `SortField` theo yêu cầu người dùng, giúp bảng dữ liệu tập trung hoàn toàn vào thông tin hàng hóa, giá vốn, giá bán theo ĐVT, MOQ và trạng thái.
+- Tinh chỉnh lại độ rộng `<colgroup>` cho 10 cột còn lại (Ảnh: 5%, SKU: 12%, Tên SP: 26%, Giá vốn: 9%, Giá bán lẻ: 9%, Giá bán ĐVT: 15%, MOQ: 5%, ĐVT: 5%, Trạng thái: 7%, Thao tác: 7%) với tổng 100%.
 
 ### `src/features/product/pages/StoreProductManagementPage.tsx`
 - Thêm state `activeBranch` khởi tạo từ `getStoredActiveBranch()` và đồng bộ tức thời qua sự kiện `mtgrms:branch-changed` & `storage`.
@@ -57,3 +58,4 @@
   - `src/features/product/components/StoreProductFilterBar.tsx`
   - `src/features/product/components/StoreProductTable.tsx`
 - **Các bước hậu merge**: Không cần migrate DB.
+
