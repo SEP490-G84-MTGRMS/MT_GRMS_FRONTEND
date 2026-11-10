@@ -450,7 +450,7 @@ export const OwnerCashApprovalDrawer: FC<Props> = ({
                   step={10000}
                   value={threshold}
                   onChange={(e) => setThreshold(Number(e.target.value) || 0)}
-                  className="modal-input font-mono font-bold"
+                  className="modal-input tabular-nums font-bold"
                   style={{ fontSize: 14 }}
                   required
                 />
@@ -491,7 +491,7 @@ export const OwnerCashApprovalDrawer: FC<Props> = ({
                   step={100000}
                   value={shiftTotalLimit}
                   onChange={(e) => setShiftTotalLimit(Number(e.target.value) || 0)}
-                  className="modal-input font-mono"
+                  className="modal-input tabular-nums"
                   style={{ fontSize: 14 }}
                 />
               </div>

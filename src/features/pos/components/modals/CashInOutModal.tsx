@@ -84,7 +84,7 @@ export const CashInOutModal: FC<Props> = ({ isOpen, onClose, onSave }) => {
                 value={amount === 0 ? '' : amount}
                 onChange={(e) => setAmount(Number(e.target.value) || 0)}
                 placeholder="Nhập số tiền..."
-                className="modal-input font-mono tabular-nums font-semibold"
+                className="modal-input tabular-nums font-semibold"
                 autoFocus
                 required
               />
