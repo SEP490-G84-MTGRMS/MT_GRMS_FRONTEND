@@ -22,7 +22,7 @@ import { AdminToast, type ToastState } from '../../admin/components';
 import { supplierBranchApi } from '../api/supplierBranchApi';
 import { supplierApi } from '../api/supplierApi';
 import { branchApi } from '../../purchase-order/api/branchApi';
-import { Building2, Plus, Store, Package, Loader2 } from 'lucide-react';
+import { Building2, Plus, Store, Loader2 } from 'lucide-react';
 import '../../purchase-order/purchase-order.css';
 import '../supplier.css';
 
@@ -230,14 +230,6 @@ export const SupplierBranchManagementPage: FC = () => {
           >
             <Building2 size={14} />
             <span>Danh sách NCC</span>
-          </Link>
-          <Link
-            to="/store-owner/suppliers/products"
-            className="po-btn po-btn-secondary"
-            title="Quản lý danh mục sản phẩm theo NCC"
-          >
-            <Package size={14} />
-            <span>Sản phẩm theo NCC</span>
           </Link>
           <Link
             to="/store-owner/stores/products"

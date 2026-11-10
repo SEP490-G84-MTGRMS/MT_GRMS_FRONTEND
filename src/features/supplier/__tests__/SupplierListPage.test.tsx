@@ -94,10 +94,11 @@ describe('Master Supplier Management — SupplierListPage Component Tests', () =
     renderComponent();
 
     expect(screen.getByText('Quản lý Nhà Cung Cấp')).toBeDefined();
-    expect(screen.getByText('Sản phẩm theo NCC')).toBeDefined();
+    expect(screen.getByText('Sản phẩm theo Cửa hàng')).toBeDefined();
     expect(screen.getByText('Gán NCC với Cửa hàng')).toBeDefined();
     expect(screen.getByText('Xuất Excel')).toBeDefined();
     expect(screen.getByText('Thêm Nhà Cung Cấp')).toBeDefined();
+    expect(screen.queryByText('Sản phẩm theo NCC')).toBeNull();
 
     await waitFor(() => {
       expect(supplierApi.getSuppliers).toHaveBeenCalledTimes(1);

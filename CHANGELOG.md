@@ -6,6 +6,9 @@ Toàn bộ các thay đổi của repository Frontend React SPA được tổng 
 
 ## [Unreleased] - 2026-11-10
 
+### Removed
+- **Lược bỏ nút điều hướng và menu độc lập "Sản Phẩm Theo Nhà Cung Cấp" (`SupplierListPage.tsx`, `AppTopNav.tsx`, `router.tsx`)**: Bỏ nút "Sản phẩm theo NCC" trên thanh tác vụ của trang Quản lý Nhà Cung Cấp, trang Gán NCC với Cửa hàng và trang Sản phẩm theo Cửa hàng sau khi đã hợp nhất quản lý sản phẩm trực tiếp bên trong chi tiết từng NCC; tinh gọn menu Hàng hóa trên thanh điều hướng TopNav và điều hướng an toàn route cũ về `/store-owner/suppliers` [FE-SUPPLIER] [worklog: docs/worklogs/2026-11-10_FE-SUPPLIER_AI_remove-redundant-supplier-products-nav.md].
+
 ### Added
 - **Bổ sung Tab "Sản phẩm cung cấp" vào màn hình Chi tiết Nhà Cung Cấp (`SupplierDetailPage.tsx`, `SupplierProductsTab.tsx`)**: Thêm tab `Sản phẩm cung cấp` trên thanh điều hướng chi tiết NCC, tự động tải danh mục mặt hàng của NCC từ API (`GET /api/suppliers/{id}/products`), hỗ trợ tìm kiếm theo SKU/Tên SP, lọc theo Ngành hàng & Trạng thái, phân trang, gán sản phẩm mới (`AssignProductModal`) và sửa trực tiếp giá nhập sỉ, MOQ, hạn mức giao thiếu (`EditSupplierProductModal`) [FE-SUPPLIER] [worklog: docs/worklogs/2026-11-10_FE-SUPPLIER_AI_add-supplier-products-detail-tab.md].
 

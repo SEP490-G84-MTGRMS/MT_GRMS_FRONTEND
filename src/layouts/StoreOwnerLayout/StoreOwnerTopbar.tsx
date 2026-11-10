@@ -2,7 +2,6 @@ import type { FC } from 'react';
 import { NavLink, Link } from 'react-router-dom';
 import {
   TruckIcon,
-  PackageIcon,
   DashboardIcon,
   HomeIcon,
   BellIcon,
@@ -133,44 +132,6 @@ export const StoreOwnerTopbar: FC = () => {
                   }}
                 >
                   18 NCC
-                </span>
-              </>
-            )}
-          </NavLink>
-
-          <NavLink
-            to="/store-owner/suppliers/products"
-            style={({ isActive }) => ({
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 8,
-              padding: '8px 16px',
-              borderRadius: 'var(--radius-pill)',
-              textDecoration: 'none',
-              fontSize: '13.5px',
-              fontWeight: isActive ? 700 : 600,
-              backgroundColor: isActive ? 'var(--blue-primary)' : 'transparent',
-              color: isActive ? '#ffffff' : 'var(--text-muted)',
-              boxShadow: isActive ? '0 4px 14px rgba(0, 102, 255, 0.28)' : 'none',
-              transition: 'all 0.15s ease',
-            })}
-          >
-            {({ isActive }) => (
-              <>
-                <PackageIcon size={17} />
-                <span>Sản phẩm NCC</span>
-                <span
-                  style={{
-                    fontSize: 11,
-                    fontWeight: 700,
-                    padding: '1px 7px',
-                    borderRadius: 'var(--radius-pill)',
-                    backgroundColor: isActive ? 'rgba(255, 255, 255, 0.25)' : 'rgba(2, 132, 199, 0.12)',
-                    color: isActive ? '#ffffff' : '#0284c7',
-                    fontFamily: 'var(--font-mono)',
-                  }}
-                >
-                  Master
                 </span>
               </>
             )}

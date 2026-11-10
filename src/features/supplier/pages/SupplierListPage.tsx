@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import type { FC } from 'react';
 import { Link } from 'react-router-dom';
-import { Building2, Package, Store, Plus, Loader2, Download } from 'lucide-react';
+import { Building2, Store, Plus, Loader2, Download } from 'lucide-react';
 import { useAuthStore } from '../../../stores/useAuthStore';
 import type {
   SupplierSummary,
@@ -267,14 +267,6 @@ export const SupplierListPage: FC = () => {
         </div>
 
         <div className="so-list-header-actions">
-          <Link
-            to="/store-owner/suppliers/products"
-            className="po-btn po-btn-secondary"
-            title="Quản lý danh mục sản phẩm theo từng Nhà cung cấp"
-          >
-            <Package size={14} />
-            <span>Sản phẩm theo NCC</span>
-          </Link>
           <Link
             to="/store-owner/stores/products"
             className="po-btn po-btn-secondary"

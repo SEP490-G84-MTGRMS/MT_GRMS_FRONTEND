@@ -326,13 +326,6 @@ export const StoreProductManagementPage: FC = () => {
           >
             <span>Danh sách Cửa hàng</span>
           </Link>
-          <Link
-            to="/store-owner/suppliers/products"
-            className="po-btn po-btn-secondary"
-            title="Chuyển sang xem sản phẩm theo Nhà cung cấp"
-          >
-            <span>Sản phẩm theo NCC</span>
-          </Link>
           <button
             type="button"
             className="po-btn po-btn-secondary"
