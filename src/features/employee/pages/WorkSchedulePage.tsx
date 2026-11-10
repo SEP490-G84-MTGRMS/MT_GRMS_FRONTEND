@@ -233,11 +233,26 @@ export const WorkSchedulePage: React.FC = () => {
   };
 
   const [openMenuScheduleId, setOpenMenuScheduleId] = useState<string | null>(null);
+  const [menuPosition, setMenuPosition] = useState<{
+    top?: number;
+    bottom?: number;
+    left?: number;
+    right?: number;
+  } | null>(null);
 
   useEffect(() => {
-    const handleGlobalClick = () => setOpenMenuScheduleId(null);
-    window.addEventListener('click', handleGlobalClick);
-    return () => window.removeEventListener('click', handleGlobalClick);
+    const handleGlobalClose = () => {
+      setOpenMenuScheduleId(null);
+      setMenuPosition(null);
+    };
+    window.addEventListener('click', handleGlobalClose);
+    window.addEventListener('scroll', handleGlobalClose, true);
+    window.addEventListener('resize', handleGlobalClose);
+    return () => {
+      window.removeEventListener('click', handleGlobalClose);
+      window.removeEventListener('scroll', handleGlobalClose, true);
+      window.removeEventListener('resize', handleGlobalClose);
+    };
   }, []);
   const [editingAssignment, setEditingAssignment] = useState<ScheduleAssignment | null>(null);
   const [deletingAssignment, setDeletingAssignment] = useState<ScheduleAssignment | null>(null);
@@ -1250,7 +1265,7 @@ export const WorkSchedulePage: React.FC = () => {
                   </td>
                 </tr>
               ) : (
-                paginatedEmployees.map((emp) => {
+                paginatedEmployees.map((emp, empRowIndex) => {
                   const empAssignments = assignments.filter((a) => isEmployeeRole || a.employeeId === emp.id);
                   const shiftCount = empAssignments.length;
                   const estimatedWage = shiftCount * 250000;
@@ -1327,7 +1342,29 @@ export const WorkSchedulePage: React.FC = () => {
                                     <div
                                       onClick={(e) => {
                                         e.stopPropagation();
-                                        setOpenMenuScheduleId(isMenuOpen ? null : item.id);
+                                        if (isMenuOpen) {
+                                          setOpenMenuScheduleId(null);
+                                          setMenuPosition(null);
+                                        } else {
+                                          const rect = e.currentTarget.getBoundingClientRect();
+                                          const estimatedMenuHeight = isEmployeeRole ? 245 : 285;
+                                          const isLastRow =
+                                            paginatedEmployees.length > 1 &&
+                                            empRowIndex === paginatedEmployees.length - 1;
+                                          const openUpward =
+                                            (isLastRow ||
+                                              window.innerHeight - rect.bottom < estimatedMenuHeight + 16) &&
+                                            rect.top > estimatedMenuHeight;
+                                          setMenuPosition({
+                                            top: openUpward ? undefined : rect.bottom + 4,
+                                            bottom: openUpward ? window.innerHeight - rect.top + 4 : undefined,
+                                            left: isRightAligned ? undefined : Math.max(8, rect.left),
+                                            right: isRightAligned
+                                              ? Math.max(8, window.innerWidth - rect.right)
+                                              : undefined,
+                                          });
+                                          setOpenMenuScheduleId(item.id);
+                                        }
                                       }}
                                       style={{
                                         background: isOnLeave ? '#F3E8FF' : `${item.shiftColor}18`,
@@ -1370,14 +1407,15 @@ export const WorkSchedulePage: React.FC = () => {
                                       )}
                                     </div>
 
-                                    {isMenuOpen && (
+                                    {isMenuOpen && menuPosition && (
                                       <div
                                         style={{
-                                          position: 'absolute',
-                                          top: 'calc(100% + 4px)',
-                                          left: isRightAligned ? 'auto' : 0,
-                                          right: isRightAligned ? 0 : 'auto',
-                                          zIndex: 500,
+                                          position: 'fixed',
+                                          top: menuPosition.top,
+                                          bottom: menuPosition.bottom,
+                                          left: menuPosition.left,
+                                          right: menuPosition.right,
+                                          zIndex: 9999,
                                           background: '#FFFFFF',
                                           boxShadow: '0 10px 25px -5px rgba(15, 23, 42, 0.15), 0 8px 10px -6px rgba(15, 23, 42, 0.1)',
                                           borderRadius: 8,
@@ -1694,7 +1732,7 @@ export const WorkSchedulePage: React.FC = () => {
                   </td>
                 </tr>
               ) : (
-                paginatedShifts.map((sh) => (
+                paginatedShifts.map((sh, shiftRowIndex) => (
                   <tr key={sh.id} style={{ height: 80 }}>
                     <td style={{ textAlign: 'left', verticalAlign: 'middle', padding: '12px 16px' }}>
                       <div style={{ fontWeight: 700, color: '#0F172A', fontSize: 14 }}>
@@ -1736,7 +1774,29 @@ export const WorkSchedulePage: React.FC = () => {
                                   <div
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      setOpenMenuScheduleId(isMenuOpen ? null : ('shift_' + item.id));
+                                      if (isMenuOpen) {
+                                        setOpenMenuScheduleId(null);
+                                        setMenuPosition(null);
+                                      } else {
+                                        const rect = e.currentTarget.getBoundingClientRect();
+                                        const estimatedMenuHeight = isEmployeeRole ? 245 : 285;
+                                        const isLastRow =
+                                          paginatedShifts.length > 1 &&
+                                          shiftRowIndex === paginatedShifts.length - 1;
+                                        const openUpward =
+                                          (isLastRow ||
+                                            window.innerHeight - rect.bottom < estimatedMenuHeight + 16) &&
+                                          rect.top > estimatedMenuHeight;
+                                        setMenuPosition({
+                                          top: openUpward ? undefined : rect.bottom + 4,
+                                          bottom: openUpward ? window.innerHeight - rect.top + 4 : undefined,
+                                          left: isRightAligned ? undefined : Math.max(8, rect.left),
+                                          right: isRightAligned
+                                            ? Math.max(8, window.innerWidth - rect.right)
+                                            : undefined,
+                                        });
+                                        setOpenMenuScheduleId('shift_' + item.id);
+                                      }
                                     }}
                                     style={{
                                       background: isOnLeave ? '#F3E8FF' : '#F0FDFA',
@@ -1785,14 +1845,15 @@ export const WorkSchedulePage: React.FC = () => {
                                     )}
                                   </div>
 
-                                  {isMenuOpen && (
+                                  {isMenuOpen && menuPosition && (
                                     <div
                                       style={{
-                                        position: 'absolute',
-                                        top: 'calc(100% + 4px)',
-                                        left: isRightAligned ? 'auto' : 0,
-                                        right: isRightAligned ? 0 : 'auto',
-                                        zIndex: 500,
+                                        position: 'fixed',
+                                        top: menuPosition.top,
+                                        bottom: menuPosition.bottom,
+                                        left: menuPosition.left,
+                                        right: menuPosition.right,
+                                        zIndex: 9999,
                                         background: '#FFFFFF',
                                         boxShadow: '0 10px 25px -5px rgba(15, 23, 42, 0.15), 0 8px 10px -6px rgba(15, 23, 42, 0.1)',
                                         borderRadius: 8,

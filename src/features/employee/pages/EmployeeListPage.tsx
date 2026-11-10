@@ -192,6 +192,19 @@ export const EmployeeListPage: React.FC = () => {
   const [showApprovalModal, setShowApprovalModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [showActionDropdown, setShowActionDropdown] = useState(false);
+  const actionDropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (actionDropdownRef.current && !actionDropdownRef.current.contains(event.target as Node)) {
+        setShowActionDropdown(false);
+      }
+    };
+    if (showActionDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showActionDropdown]);
 
   // Selection
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -837,7 +850,7 @@ export const EmployeeListPage: React.FC = () => {
           </button>
 
           {/* Dropdown Action Menu */}
-          <div style={{ position: 'relative' }}>
+          <div ref={actionDropdownRef} style={{ position: 'relative' }}>
             <button
               type="button"
               className="emp-btn emp-btn-secondary"
@@ -858,7 +871,7 @@ export const EmployeeListPage: React.FC = () => {
                   boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
                   border: '1px solid #E2E8F0',
                   minWidth: 180,
-                  zIndex: 200,
+                  zIndex: 1000,
                   overflow: 'hidden',
                 }}
               >
