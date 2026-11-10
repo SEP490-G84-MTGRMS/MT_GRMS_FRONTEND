@@ -68,14 +68,37 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
             const isChecked = selectedCategoryIds.includes(cat.id);
             return (
               <div key={cat.id} className="category-item-row">
-                <label className="category-item-left">
+                <label className="category-item-left" style={{ minWidth: 0 }} title={cat.name}>
                   <input
                     type="checkbox"
                     checked={isChecked}
                     onChange={() => onToggleCategory(cat.id)}
+                    style={{ flexShrink: 0 }}
                   />
-                  <span style={{ fontSize: 12.5, fontWeight: isChecked ? 600 : 400, color: isChecked ? "#0F766E" : "#334155" }}>
-                    {cat.name} <span style={{ color: "#94A3B8", fontSize: 11.5, fontWeight: 400 }}>({cat.productCount})</span>
+                  <span
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 4,
+                      minWidth: 0,
+                      flex: 1,
+                      fontSize: 12.5,
+                      fontWeight: isChecked ? 600 : 400,
+                      color: isChecked ? '#0F766E' : '#334155',
+                    }}
+                  >
+                    <span
+                      style={{
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {cat.name.length > 25 ? `${cat.name.slice(0, 25)}...` : cat.name}
+                    </span>
+                    <span style={{ color: '#94A3B8', fontSize: 11.5, fontWeight: 400, flexShrink: 0 }}>
+                      ({cat.productCount})
+                    </span>
                   </span>
                 </label>
                 <button
@@ -83,6 +106,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                   className="category-edit-btn"
                   title="Sửa / Xóa nhóm hàng"
                   onClick={() => onOpenEditModal(cat)}
+                  style={{ flexShrink: 0 }}
                 >
                   <Edit2 size={13} />
                 </button>

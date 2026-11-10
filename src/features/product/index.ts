@@ -7,5 +7,6 @@ export * from './components/ProductFormModal';
 export * from './components/ProductDetailModal';
 export * from './components/ProductDeleteConfirmModal';
 export * from './pages/ProductListPage';
+export * from './pages/CategoryListPage';
 export * from './pages/StoreProductManagementPage';
 

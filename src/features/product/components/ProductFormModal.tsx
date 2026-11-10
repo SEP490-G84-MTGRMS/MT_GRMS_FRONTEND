@@ -134,6 +134,17 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   // Alerts & Validation Popup
   const [warningMsg, setWarningMsg] = useState('');
   const [validationPopupMsg, setValidationPopupMsg] = useState<string>('');
+  const [touched, setTouched] = useState<{
+    productCode?: boolean;
+    barcode?: boolean;
+    productName?: boolean;
+    categoryId?: boolean;
+    costPrice?: boolean;
+    sellingPrice?: boolean;
+    baseUnit?: boolean;
+    description?: boolean;
+    internalNote?: boolean;
+  }>({});
 
   const isEditing = Boolean(productToEdit);
   const hasTransactions = productToEdit?.hasTransactions || false;
@@ -203,6 +214,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
 
         setWarningMsg('');
         setValidationPopupMsg('');
+        setTouched({});
       } else {
         setProductCode('');
         setBarcode('');
@@ -228,6 +240,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
 
         setWarningMsg('');
         setValidationPopupMsg('');
+        setTouched({});
         setPreviewImageModalUrl(null);
       }
     }
@@ -266,6 +279,104 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
 
   const triggerValidationError = (msg: string) => {
     setValidationPopupMsg(msg);
+  };
+
+  // Real-time / Inline Validation Errors
+  const trimmedProductCode = productCode.trim();
+  const productCodeError =
+    !isEditing && productCode !== ''
+      ? trimmedProductCode.length > 50
+        ? 'Mã hàng không được vượt quá 50 ký tự.'
+        : /\s/.test(productCode) || !/^[A-Za-z0-9_-]+$/.test(trimmedProductCode)
+        ? 'Mã hàng chỉ gồm chữ cái không dấu, số, gạch ngang (-) hoặc gạch dưới (_).'
+        : ''
+      : '';
+
+  const trimmedBarcode = barcode.trim();
+  const isMainBarcodeDuplicateWithUom =
+    trimmedBarcode !== '' &&
+    uomConversions.some((u) => (u.barcode || '').trim().toLowerCase() === trimmedBarcode.toLowerCase());
+  const barcodeError =
+    barcode !== ''
+      ? trimmedBarcode.length > 50 || /\s/.test(barcode)
+        ? 'Mã vạch không được chứa khoảng trắng và tối đa 50 ký tự.'
+        : isMainBarcodeDuplicateWithUom
+        ? 'Mã vạch đang trùng với mã vạch của đơn vị quy đổi.'
+        : ''
+      : '';
+
+  const trimmedProductName = productName.trim();
+  const productNameError =
+    touched.productName && !trimmedProductName
+      ? 'Vui lòng nhập tên sản phẩm (Bắt buộc).'
+      : trimmedProductName.length > 200
+      ? 'Tên sản phẩm không được vượt quá 200 ký tự.'
+      : '';
+
+  const categoryError =
+    touched.categoryId && !categoryId ? 'Vui lòng chọn nhóm hàng (Bắt buộc).' : '';
+
+  const costPriceError =
+    costPrice < 0 || costPrice > 1_000_000_000
+      ? 'Giá vốn không được nhỏ hơn 0 hoặc vượt quá 1.000.000.000 đ.'
+      : '';
+
+  const sellingPriceError =
+    sellingPrice < 0 || sellingPrice > 1_000_000_000
+      ? 'Giá bán không được nhỏ hơn 0 hoặc vượt quá 1.000.000.000 đ.'
+      : '';
+
+  const trimmedBaseUnit = baseUnit.trim();
+  const baseUnitError =
+    (touched.baseUnit || uomConversions.length > 0) && !trimmedBaseUnit
+      ? 'Vui lòng nhập tên đơn vị cơ bản (Bắt buộc).'
+      : trimmedBaseUnit.length > 30
+      ? 'Tên đơn vị cơ bản tối đa 30 ký tự.'
+      : '';
+
+  const descriptionError =
+    description.trim().length > 1000 ? 'Mô tả chi tiết không được vượt quá 1000 ký tự.' : '';
+
+  const internalNoteError =
+    internalNote.trim().length > 500 ? 'Ghi chú nội bộ không được vượt quá 500 ký tự.' : '';
+
+  const getUomRowErrors = (uom: UomConversion) => {
+    const uName = (uom.unitName || '').trim();
+    const lowerName = uName.toLowerCase();
+    const isDuplicateNameWithBase = trimmedBaseUnit !== '' && lowerName === trimmedBaseUnit.toLowerCase();
+    const isDuplicateNameWithOtherUom =
+      uName !== '' &&
+      uomConversions.some((other) => other.id !== uom.id && (other.unitName || '').trim().toLowerCase() === lowerName);
+
+    const unitNameError = !uName
+      ? 'Vui lòng nhập tên đơn vị.'
+      : uName.length > 30
+      ? 'Tối đa 30 ký tự.'
+      : isDuplicateNameWithBase || isDuplicateNameWithOtherUom
+      ? 'Trùng tên đơn vị tính.'
+      : '';
+
+    const conversionRateError =
+      !uom.conversionRate || uom.conversionRate <= 0 ? 'Tỷ lệ phải > 0.' : '';
+
+    const priceError =
+      uom.price < 0 || uom.price > 1_000_000_000 ? 'Giá bán tối đa 1.000.000.000 đ.' : '';
+
+    const uBarcode = (uom.barcode || '').trim();
+    const lowerBarcode = uBarcode.toLowerCase();
+    const isDuplicateBarcodeWithMain = trimmedBarcode !== '' && lowerBarcode === trimmedBarcode.toLowerCase();
+    const isDuplicateBarcodeWithOtherUom =
+      uBarcode !== '' &&
+      uomConversions.some((other) => other.id !== uom.id && (other.barcode || '').trim().toLowerCase() === lowerBarcode);
+
+    const barcodeError =
+      uom.barcode && (/\s/.test(uom.barcode) || uBarcode.length > 50)
+        ? 'Không chứa khoảng trắng (tối đa 50 ký tự).'
+        : uBarcode && (isDuplicateBarcodeWithMain || isDuplicateBarcodeWithOtherUom)
+        ? 'Trùng mã vạch.'
+        : '';
+
+    return { unitNameError, conversionRateError, priceError, barcodeError };
   };
 
   // Add UOM conversion row
@@ -381,6 +492,18 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
 
   // Submit Handler
   const handleSubmit = async (saveAndAddNew: boolean = false) => {
+    setTouched({
+      productCode: true,
+      barcode: true,
+      productName: true,
+      categoryId: true,
+      costPrice: true,
+      sellingPrice: true,
+      baseUnit: true,
+      description: true,
+      internalNote: true,
+    });
+
     if (isUploadingImage) {
       triggerValidationError('Đang tải ảnh lên Cloudinary, vui lòng chờ hoàn tất trước khi lưu.');
       return;
@@ -550,6 +673,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         setHasBatches(false);
         setWarningMsg('');
         setValidationPopupMsg('');
+        setTouched({});
         setPreviewImageModalUrl(null);
       }
     } catch (err: any) {
@@ -652,76 +776,100 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
                   {/* (1) Mã hàng */}
                   <div>
-                    <label
-                      style={{
-                        display: 'block',
-                        marginBottom: 6,
-                        fontSize: 13,
-                        fontWeight: 600,
-                        color: '#334155',
-                      }}
-                    >
-                      Mã hàng
-                    </label>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                      <label style={{ fontSize: 13, fontWeight: 600, color: '#334155' }}>
+                        Mã hàng
+                      </label>
+                      {!isEditing && (
+                        <span style={{ fontSize: 11, color: productCode.length > 50 ? '#DC2626' : '#94A3B8' }}>
+                          {productCode.length}/50
+                        </span>
+                      )}
+                    </div>
                     <input
                       type="text"
                       className="filter-input"
                       placeholder="Mã tự động sinh"
-                      maxLength={50}
                       value={productCode}
-                      onChange={(e) => setProductCode(e.target.value)}
+                      onChange={(e) => {
+                        setProductCode(e.target.value);
+                        setTouched((prev) => ({ ...prev, productCode: true }));
+                      }}
+                      onBlur={() => setTouched((prev) => ({ ...prev, productCode: true }))}
                       disabled={isEditing}
-                      style={isEditing ? { backgroundColor: '#F1F5F9', cursor: 'not-allowed', color: '#64748B' } : undefined}
+                      style={{
+                        ...(isEditing ? { backgroundColor: '#F1F5F9', cursor: 'not-allowed', color: '#64748B' } : {}),
+                        ...(productCodeError ? { borderColor: '#EF4444', boxShadow: '0 0 0 2px rgba(239, 68, 68, 0.12)' } : {}),
+                      }}
                       title={isEditing ? 'Mã hàng không thể thay đổi sau khi tạo' : undefined}
                     />
+                    {productCodeError && (
+                      <div style={{ color: '#DC2626', fontSize: 11.5, marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <AlertCircle size={13} style={{ flexShrink: 0 }} />
+                        <span>{productCodeError}</span>
+                      </div>
+                    )}
                   </div>
 
                   {/* (2) Mã vạch */}
                   <div>
-                    <label
-                      style={{
-                        display: 'block',
-                        marginBottom: 6,
-                        fontSize: 13,
-                        fontWeight: 600,
-                        color: '#334155',
-                      }}
-                    >
-                      Mã vạch
-                    </label>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                      <label style={{ fontSize: 13, fontWeight: 600, color: '#334155' }}>
+                        Mã vạch
+                      </label>
+                      <span style={{ fontSize: 11, color: barcode.length > 50 ? '#DC2626' : '#94A3B8' }}>
+                        {barcode.length}/50
+                      </span>
+                    </div>
                     <input
                       type="text"
                       className="filter-input"
                       placeholder="Nhập mã vạch (Barcode)"
-                      maxLength={50}
                       value={barcode}
-                      onChange={(e) => setBarcode(e.target.value)}
+                      onChange={(e) => {
+                        setBarcode(e.target.value);
+                        setTouched((prev) => ({ ...prev, barcode: true }));
+                      }}
+                      onBlur={() => setTouched((prev) => ({ ...prev, barcode: true }))}
+                      style={barcodeError ? { borderColor: '#EF4444', boxShadow: '0 0 0 2px rgba(239, 68, 68, 0.12)' } : undefined}
                     />
+                    {barcodeError && (
+                      <div style={{ color: '#DC2626', fontSize: 11.5, marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <AlertCircle size={13} style={{ flexShrink: 0 }} />
+                        <span>{barcodeError}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
 
                 {/* (3) Tên hàng */}
                 <div>
-                  <label
-                    style={{
-                      display: 'block',
-                      marginBottom: 6,
-                      fontSize: 13,
-                      fontWeight: 600,
-                      color: '#334155',
-                    }}
-                  >
-                    Tên hàng <span style={{ color: '#EF4444' }}>*</span>
-                  </label>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                    <label style={{ fontSize: 13, fontWeight: 600, color: '#334155' }}>
+                      Tên hàng <span style={{ color: '#EF4444' }}>*</span>
+                    </label>
+                    <span style={{ fontSize: 11, color: productName.length > 200 ? '#DC2626' : '#94A3B8' }}>
+                      {productName.length}/200
+                    </span>
+                  </div>
                   <input
                     type="text"
                     className="filter-input"
                     placeholder="Nhập tên sản phẩm (Bắt buộc)"
-                    maxLength={200}
                     value={productName}
-                    onChange={(e) => setProductName(e.target.value)}
-                    required
+                    onChange={(e) => {
+                      setProductName(e.target.value);
+                      setTouched((prev) => ({ ...prev, productName: true }));
+                    }}
+                    onBlur={() => setTouched((prev) => ({ ...prev, productName: true }))}
+                    style={productNameError ? { borderColor: '#EF4444', boxShadow: '0 0 0 2px rgba(239, 68, 68, 0.12)' } : undefined}
                   />
+                  {productNameError && (
+                    <div style={{ color: '#DC2626', fontSize: 11.5, marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <AlertCircle size={13} style={{ flexShrink: 0 }} />
+                      <span>{productNameError}</span>
+                    </div>
+                  )}
                 </div>
 
                 {/* (4) Nhóm hàng & (17) Tạo mới - Searchable Dropdown */}
@@ -756,7 +904,10 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
 
                   {/* Trigger Box */}
                   <div
-                    onClick={() => setIsCategoryDropdownOpen(!isCategoryDropdownOpen)}
+                    onClick={() => {
+                      setIsCategoryDropdownOpen(!isCategoryDropdownOpen);
+                      setTouched((prev) => ({ ...prev, categoryId: true }));
+                    }}
                     style={{
                       display: 'flex',
                       alignItems: 'center',
@@ -764,11 +915,19 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                       minHeight: 38,
                       padding: '6px 12px',
                       background: '#FFFFFF',
-                      border: isCategoryDropdownOpen ? '1.5px solid #0D9488' : '1px solid #CBD5E1',
+                      border: categoryError
+                        ? '1.5px solid #EF4444'
+                        : isCategoryDropdownOpen
+                        ? '1.5px solid #0D9488'
+                        : '1px solid #CBD5E1',
                       borderRadius: 8,
                       cursor: 'pointer',
                       transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
-                      boxShadow: isCategoryDropdownOpen ? '0 0 0 3px rgba(13, 148, 136, 0.12)' : 'none',
+                      boxShadow: categoryError
+                        ? '0 0 0 2px rgba(239, 68, 68, 0.12)'
+                        : isCategoryDropdownOpen
+                        ? '0 0 0 3px rgba(13, 148, 136, 0.12)'
+                        : 'none',
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
@@ -815,6 +974,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                           onClick={(e) => {
                             e.stopPropagation();
                             setCategoryId('');
+                            setTouched((prev) => ({ ...prev, categoryId: true }));
                           }}
                           title="Bỏ chọn"
                           style={{
@@ -845,6 +1005,12 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                       />
                     </div>
                   </div>
+                  {categoryError && (
+                    <div style={{ color: '#DC2626', fontSize: 11.5, marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <AlertCircle size={13} style={{ flexShrink: 0 }} />
+                      <span>{categoryError}</span>
+                    </div>
+                  )}
 
                   {/* Dropdown Menu Panel */}
                   {isCategoryDropdownOpen && (
@@ -1357,10 +1523,16 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                       type="text"
                       inputMode="numeric"
                       className="filter-input"
-                      style={{ paddingRight: 32 }}
+                      style={{
+                        paddingRight: 32,
+                        ...(costPriceError ? { borderColor: '#EF4444', boxShadow: '0 0 0 2px rgba(239, 68, 68, 0.12)' } : {}),
+                      }}
                       placeholder="0"
                       value={formatCurrencyInput(costPrice)}
-                      onChange={(e) => setCostPrice(parseCurrencyInput(e.target.value))}
+                      onChange={(e) => {
+                        setCostPrice(parseCurrencyInput(e.target.value));
+                        setTouched((prev) => ({ ...prev, costPrice: true }));
+                      }}
                       onFocus={(e) => e.target.select()}
                     />
                     <span
@@ -1376,6 +1548,12 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                       đ
                     </span>
                   </div>
+                  {costPriceError && (
+                    <div style={{ color: '#DC2626', fontSize: 11.5, marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <AlertCircle size={13} style={{ flexShrink: 0 }} />
+                      <span>{costPriceError}</span>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1419,10 +1597,16 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                     type="text"
                     inputMode="numeric"
                     className="filter-input"
-                    style={{ paddingRight: 32 }}
+                    style={{
+                      paddingRight: 32,
+                      ...(sellingPriceError ? { borderColor: '#EF4444', boxShadow: '0 0 0 2px rgba(239, 68, 68, 0.12)' } : {}),
+                    }}
                     placeholder="0"
                     value={formatCurrencyInput(sellingPrice)}
-                    onChange={(e) => handleSellingPriceChange(parseCurrencyInput(e.target.value))}
+                    onChange={(e) => {
+                      handleSellingPriceChange(parseCurrencyInput(e.target.value));
+                      setTouched((prev) => ({ ...prev, sellingPrice: true }));
+                    }}
                     onFocus={(e) => e.target.select()}
                     required
                   />
@@ -1439,6 +1623,12 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                     đ
                   </span>
                 </div>
+                {sellingPriceError && (
+                  <div style={{ color: '#DC2626', fontSize: 11.5, marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <AlertCircle size={13} style={{ flexShrink: 0 }} />
+                    <span>{sellingPriceError}</span>
+                  </div>
+                )}
                 {costPrice > 0 && sellingPrice > 0 && sellingPrice < costPrice && (
                   <div
                     style={{
@@ -1545,28 +1735,35 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                 </div>
 
                 {/* Dòng đơn vị cơ bản: (8) Tên đơn vị cơ bản & (7) Giá bán */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16 }}>
                   <div style={{ width: 220 }}>
-                    <label
-                      style={{
-                        display: 'block',
-                        marginBottom: 4,
-                        fontSize: 12,
-                        fontWeight: 600,
-                        color: '#475569',
-                      }}
-                    >
-                      Tên đơn vị cơ bản
-                    </label>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                      <label style={{ fontSize: 12, fontWeight: 600, color: '#475569' }}>
+                        Tên đơn vị cơ bản <span style={{ color: '#EF4444' }}>*</span>
+                      </label>
+                      <span style={{ fontSize: 11, color: baseUnit.length > 30 ? '#DC2626' : '#94A3B8' }}>
+                        {baseUnit.length}/30
+                      </span>
+                    </div>
                     <input
                       type="text"
                       className="filter-input"
                       placeholder="VD: Chai, Lon, Gói, Hộp..."
-                      maxLength={30}
                       value={baseUnit}
                       disabled={hasTransactions}
-                      onChange={(e) => setBaseUnit(e.target.value)}
+                      onChange={(e) => {
+                        setBaseUnit(e.target.value);
+                        setTouched((prev) => ({ ...prev, baseUnit: true }));
+                      }}
+                      onBlur={() => setTouched((prev) => ({ ...prev, baseUnit: true }))}
+                      style={baseUnitError ? { borderColor: '#EF4444', boxShadow: '0 0 0 2px rgba(239, 68, 68, 0.12)' } : undefined}
                     />
+                    {baseUnitError && (
+                      <div style={{ color: '#DC2626', fontSize: 11.5, marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <AlertCircle size={12} style={{ flexShrink: 0 }} />
+                        <span>{baseUnitError}</span>
+                      </div>
+                    )}
                   </div>
 
                   <div style={{ width: 180 }}>
@@ -1589,10 +1786,11 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                       value={formatCurrencyInput(baseUnitPrice)}
                       onChange={(e) => handleSellingPriceChange(parseCurrencyInput(e.target.value))}
                       onFocus={(e) => e.target.select()}
+                      style={sellingPriceError ? { borderColor: '#EF4444', boxShadow: '0 0 0 2px rgba(239, 68, 68, 0.12)' } : undefined}
                     />
                   </div>
 
-                  <div style={{ paddingTop: 20 }}>
+                  <div style={{ paddingTop: 22 }}>
                     <label
                       style={{
                         display: 'inline-flex',
@@ -1628,119 +1826,141 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                 </div>
 
                 {/* Danh sách đơn vị quy đổi (9) */}
-                {uomConversions.map((uom) => (
-                  <div
-                    key={uom.id}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 12,
-                      padding: '8px 0',
-                    }}
-                  >
-                    {/* Tên đơn vị */}
-                    <div style={{ width: 220 }}>
-                      <input
-                        type="text"
-                        className="filter-input"
-                        placeholder="thùng, lốc..."
-                        maxLength={30}
-                        value={uom.unitName}
-                        onChange={(e) => handleUpdateUom(uom.id, 'unitName', e.target.value)}
-                      />
-                    </div>
-
-                    <span style={{ fontSize: 16, fontWeight: 700, color: '#475569' }}>=</span>
-
-                    {/* Giá trị quy đổi */}
-                    <div style={{ width: 100 }}>
-                      <input
-                        type="number"
-                        className="filter-input"
-                        placeholder="1"
-                        value={uom.conversionRate === 0 ? '' : uom.conversionRate}
-                        onChange={(e) =>
-                          handleUpdateUom(uom.id, 'conversionRate', e.target.value === '' ? 0 : Number(e.target.value))
-                        }
-                        onFocus={(e) => e.target.select()}
-                        min={1}
-                      />
-                    </div>
-
-                    {/* Text tên đơn vị cơ bản */}
-                    <span style={{ fontSize: 13, fontWeight: 600, color: '#334155', minWidth: 40 }}>
-                      {baseUnit || 'đơn vị'}
-                    </span>
-
-                    {/* Giá bán đơn vị quy đổi */}
-                    <div style={{ width: 180 }}>
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        className="filter-input"
-                        placeholder="Giá bán"
-                        value={formatCurrencyInput(uom.price)}
-                        onChange={(e) =>
-                          handleUpdateUom(uom.id, 'price', parseCurrencyInput(e.target.value))
-                        }
-                        onFocus={(e) => e.target.select()}
-                      />
-                    </div>
-
-                    {/* Đánh dấu Đơn vị nhập hàng */}
-                    <label
+                {uomConversions.map((uom) => {
+                  const rowErr = getUomRowErrors(uom);
+                  return (
+                    <div
+                      key={uom.id}
                       style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: 6,
-                        cursor: 'pointer',
-                        fontSize: 12.5,
-                        fontWeight: 600,
-                        color: uom.isPurchaseUnit ? '#0F766E' : '#475569',
-                        padding: '6px 10px',
-                        borderRadius: 6,
-                        backgroundColor: uom.isPurchaseUnit ? '#F0FDFA' : '#F8FAFC',
-                        border: `1px solid ${uom.isPurchaseUnit ? '#99F6E4' : '#E2E8F0'}`,
-                        userSelect: 'none',
-                        whiteSpace: 'nowrap',
-                      }}
-                      title="Đánh dấu đơn vị quy đổi này là đơn vị dùng để nhập hàng"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={Boolean(uom.isPurchaseUnit)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            handleSelectUomAsPurchaseUnit(uom.id);
-                          } else {
-                            handleUpdateUom(uom.id, 'isPurchaseUnit', false);
-                            setIsBaseUnitPurchaseUnit(true);
-                          }
-                        }}
-                        style={{ accentColor: '#0F766E', cursor: 'pointer', width: 15, height: 15 }}
-                      />
-                      <span>Đơn vị nhập hàng</span>
-                    </label>
-
-                    {/* Nút xóa */}
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveUom(uom.id)}
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        cursor: 'pointer',
-                        color: '#64748B',
-                        padding: 6,
                         display: 'flex',
-                        alignItems: 'center',
+                        alignItems: 'flex-start',
+                        gap: 12,
+                        padding: '8px 0',
                       }}
-                      title="Xóa đơn vị"
                     >
-                      <Trash2 size={18} />
-                    </button>
-                  </div>
-                ))}
+                      {/* Tên đơn vị */}
+                      <div style={{ width: 220 }}>
+                        <input
+                          type="text"
+                          className="filter-input"
+                          placeholder="thùng, lốc..."
+                          value={uom.unitName}
+                          onChange={(e) => handleUpdateUom(uom.id, 'unitName', e.target.value)}
+                          style={rowErr.unitNameError ? { borderColor: '#EF4444', boxShadow: '0 0 0 2px rgba(239, 68, 68, 0.12)' } : undefined}
+                        />
+                        {rowErr.unitNameError && (
+                          <div style={{ color: '#DC2626', fontSize: 11, marginTop: 3 }}>
+                            {rowErr.unitNameError}
+                          </div>
+                        )}
+                      </div>
+
+                      <span style={{ fontSize: 16, fontWeight: 700, color: '#475569', paddingTop: 7 }}>=</span>
+
+                      {/* Giá trị quy đổi */}
+                      <div style={{ width: 100 }}>
+                        <input
+                          type="number"
+                          className="filter-input"
+                          placeholder="1"
+                          value={uom.conversionRate === 0 ? '' : uom.conversionRate}
+                          onChange={(e) =>
+                            handleUpdateUom(uom.id, 'conversionRate', e.target.value === '' ? 0 : Number(e.target.value))
+                          }
+                          onFocus={(e) => e.target.select()}
+                          min={1}
+                          style={rowErr.conversionRateError ? { borderColor: '#EF4444', boxShadow: '0 0 0 2px rgba(239, 68, 68, 0.12)' } : undefined}
+                        />
+                        {rowErr.conversionRateError && (
+                          <div style={{ color: '#DC2626', fontSize: 11, marginTop: 3 }}>
+                            {rowErr.conversionRateError}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Text tên đơn vị cơ bản */}
+                      <span style={{ fontSize: 13, fontWeight: 600, color: '#334155', minWidth: 40, paddingTop: 9 }}>
+                        {baseUnit || 'đơn vị'}
+                      </span>
+
+                      {/* Giá bán đơn vị quy đổi */}
+                      <div style={{ width: 180 }}>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          className="filter-input"
+                          placeholder="Giá bán"
+                          value={formatCurrencyInput(uom.price)}
+                          onChange={(e) =>
+                            handleUpdateUom(uom.id, 'price', parseCurrencyInput(e.target.value))
+                          }
+                          onFocus={(e) => e.target.select()}
+                          style={rowErr.priceError ? { borderColor: '#EF4444', boxShadow: '0 0 0 2px rgba(239, 68, 68, 0.12)' } : undefined}
+                        />
+                        {rowErr.priceError && (
+                          <div style={{ color: '#DC2626', fontSize: 11, marginTop: 3 }}>
+                            {rowErr.priceError}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Đánh dấu Đơn vị nhập hàng */}
+                      <label
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 6,
+                          cursor: 'pointer',
+                          fontSize: 12.5,
+                          fontWeight: 600,
+                          color: uom.isPurchaseUnit ? '#0F766E' : '#475569',
+                          padding: '6px 10px',
+                          borderRadius: 6,
+                          backgroundColor: uom.isPurchaseUnit ? '#F0FDFA' : '#F8FAFC',
+                          border: `1px solid ${uom.isPurchaseUnit ? '#99F6E4' : '#E2E8F0'}`,
+                          userSelect: 'none',
+                          whiteSpace: 'nowrap',
+                          marginTop: 2,
+                        }}
+                        title="Đánh dấu đơn vị quy đổi này là đơn vị dùng để nhập hàng"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={Boolean(uom.isPurchaseUnit)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              handleSelectUomAsPurchaseUnit(uom.id);
+                            } else {
+                              handleUpdateUom(uom.id, 'isPurchaseUnit', false);
+                              setIsBaseUnitPurchaseUnit(true);
+                            }
+                          }}
+                          style={{ accentColor: '#0F766E', cursor: 'pointer', width: 15, height: 15 }}
+                        />
+                        <span>Đơn vị nhập hàng</span>
+                      </label>
+
+                      {/* Nút xóa */}
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveUom(uom.id)}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          cursor: 'pointer',
+                          color: '#64748B',
+                          padding: 6,
+                          display: 'flex',
+                          alignItems: 'center',
+                          marginTop: 2,
+                        }}
+                        title="Xóa đơn vị"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    </div>
+                  );
+                })}
 
                 {/* (18) + Thêm đơn vị */}
                 <div>
@@ -1944,11 +2164,17 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                           {/* Dòng 2 trở đi: Các đơn vị quy đổi */}
                           {uomConversions.map((uom) => {
                             const convertedCost = costPrice > 0 ? costPrice * (uom.conversionRate || 1) : 0;
+                            const rowErr = getUomRowErrors(uom);
                             
                             return (
-                              <tr key={uom.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                                <td style={{ padding: '8px 12px', color: '#1E293B', fontWeight: 500 }}>
-                                  {uom.unitName || '(Chưa đặt tên)'}
+                              <tr key={uom.id} style={{ borderBottom: '1px solid #f1f5f9', verticalAlign: 'top' }}>
+                                <td style={{ padding: '12px 12px 8px', color: rowErr.unitNameError ? '#DC2626' : '#1E293B', fontWeight: 500 }}>
+                                  <div>{uom.unitName || '(Chưa đặt tên)'}</div>
+                                  {rowErr.unitNameError && (
+                                    <div style={{ color: '#DC2626', fontSize: 11, fontWeight: 400, marginTop: 2 }}>
+                                      {rowErr.unitNameError}
+                                    </div>
+                                  )}
                                 </td>
                                 <td style={{ padding: '8px', textAlign: 'center' }}>
                                   <input
@@ -1964,11 +2190,16 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                                       width: '100%',
                                       padding: '6px 8px',
                                       borderRadius: 6,
-                                      border: '1px solid #E2E8F0',
+                                      border: rowErr.conversionRateError ? '1px solid #EF4444' : '1px solid #E2E8F0',
                                       textAlign: 'center',
                                       fontSize: 13,
                                     }}
                                   />
+                                  {rowErr.conversionRateError && (
+                                    <div style={{ color: '#DC2626', fontSize: 10.5, marginTop: 2 }}>
+                                      {rowErr.conversionRateError}
+                                    </div>
+                                  )}
                                 </td>
                                 <td style={{ padding: '8px' }}>
                                   <input
@@ -1993,17 +2224,21 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                                   <input
                                     type="text"
                                     placeholder=""
-                                    maxLength={50}
                                     value={uom.barcode || ''}
                                     onChange={(e) => handleUpdateUom(uom.id, 'barcode', e.target.value)}
                                     style={{
                                       width: '100%',
                                       padding: '6px 8px',
                                       borderRadius: 6,
-                                      border: '1px solid #E2E8F0',
+                                      border: rowErr.barcodeError ? '1px solid #EF4444' : '1px solid #E2E8F0',
                                       fontSize: 13,
                                     }}
                                   />
+                                  {rowErr.barcodeError && (
+                                    <div style={{ color: '#DC2626', fontSize: 10.5, marginTop: 2 }}>
+                                      {rowErr.barcodeError}
+                                    </div>
+                                  )}
                                 </td>
                                 <td style={{ padding: '8px' }}>
                                   <input
@@ -2036,13 +2271,18 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                                       width: '100%',
                                       padding: '6px 8px',
                                       borderRadius: 6,
-                                      border: '1px solid #E2E8F0',
+                                      border: rowErr.priceError ? '1px solid #EF4444' : '1px solid #E2E8F0',
                                       textAlign: 'right',
                                       fontSize: 13,
                                     }}
                                   />
+                                  {rowErr.priceError && (
+                                    <div style={{ color: '#DC2626', fontSize: 10.5, marginTop: 2 }}>
+                                      {rowErr.priceError}
+                                    </div>
+                                  )}
                                 </td>
-                                <td style={{ padding: '8px', textAlign: 'center' }}>
+                                <td style={{ padding: '12px 8px 8px', textAlign: 'center' }}>
                                   <input
                                     type="checkbox"
                                     checked={Boolean(uom.isPurchaseUnit)}
@@ -2058,7 +2298,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                                     style={{ accentColor: '#0F766E', cursor: 'pointer', width: 16, height: 16 }}
                                   />
                                 </td>
-                                <td style={{ padding: '8px 12px', textAlign: 'center' }}>
+                                <td style={{ padding: '10px 12px 8px', textAlign: 'center' }}>
                                   <button
                                     type="button"
                                     onClick={() => handleRemoveUom(uom.id)}
@@ -2117,48 +2357,60 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               {/* (12) Mô tả chi tiết */}
               <div>
-                <label
-                  style={{
-                    display: 'block',
-                    marginBottom: 6,
-                    fontSize: 13,
-                    fontWeight: 600,
-                    color: '#334155',
-                  }}
-                >
-                  Mô tả chi tiết
-                </label>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                  <label style={{ fontSize: 13, fontWeight: 600, color: '#334155' }}>
+                    Mô tả chi tiết
+                  </label>
+                  <span style={{ fontSize: 11, color: description.length > 1000 ? '#DC2626' : '#94A3B8' }}>
+                    {description.length}/1000
+                  </span>
+                </div>
                 <textarea
                   className="filter-input"
                   rows={3}
                   placeholder="Nhập thông tin giới thiệu, thành phần, hướng dẫn sử dụng sản phẩm..."
-                  maxLength={1000}
                   value={description}
-                  onChange={(e) => setDescription(e.target.value)}
+                  onChange={(e) => {
+                    setDescription(e.target.value);
+                    setTouched((prev) => ({ ...prev, description: true }));
+                  }}
+                  style={descriptionError ? { borderColor: '#EF4444', boxShadow: '0 0 0 2px rgba(239, 68, 68, 0.12)' } : undefined}
                 />
+                {descriptionError && (
+                  <div style={{ color: '#DC2626', fontSize: 11.5, marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <AlertCircle size={13} style={{ flexShrink: 0 }} />
+                    <span>{descriptionError}</span>
+                  </div>
+                )}
               </div>
 
               {/* (13) Ghi chú nội bộ */}
               <div>
-                <label
-                  style={{
-                    display: 'block',
-                    marginBottom: 6,
-                    fontSize: 13,
-                    fontWeight: 600,
-                    color: '#334155',
-                  }}
-                >
-                  Ghi chú nội bộ
-                </label>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                  <label style={{ fontSize: 13, fontWeight: 600, color: '#334155' }}>
+                    Ghi chú nội bộ
+                  </label>
+                  <span style={{ fontSize: 11, color: internalNote.length > 500 ? '#DC2626' : '#94A3B8' }}>
+                    {internalNote.length}/500
+                  </span>
+                </div>
                 <input
                   type="text"
                   className="filter-input"
                   placeholder="Ghi chú dành cho thu ngân, thủ kho kiểm hàng..."
-                  maxLength={500}
                   value={internalNote}
-                  onChange={(e) => setInternalNote(e.target.value)}
+                  onChange={(e) => {
+                    setInternalNote(e.target.value);
+                    setTouched((prev) => ({ ...prev, internalNote: true }));
+                  }}
+                  style={internalNoteError ? { borderColor: '#EF4444', boxShadow: '0 0 0 2px rgba(239, 68, 68, 0.12)' } : undefined}
                 />
+                {internalNoteError && (
+                  <div style={{ color: '#DC2626', fontSize: 11.5, marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <AlertCircle size={13} style={{ flexShrink: 0 }} />
+                    <span>{internalNoteError}</span>
+                  </div>
+                )}
               </div>
             </div>
           </div>

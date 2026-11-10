@@ -848,6 +848,7 @@ export const ProductListPage: React.FC = () => {
                       return (
                         <span
                           key={firstCat.id}
+                          title={firstCat.name}
                           style={{
                             display: 'inline-flex',
                             alignItems: 'center',
@@ -860,7 +861,7 @@ export const ProductListPage: React.FC = () => {
                             color: '#0F766E',
                             border: '1px solid #99F6E4',
                             whiteSpace: 'nowrap',
-                            maxWidth: selectedCategoryIds.length > 1 ? 140 : 200,
+                            maxWidth: selectedCategoryIds.length > 1 ? 140 : 180,
                           }}
                         >
                           <span
@@ -870,7 +871,7 @@ export const ProductListPage: React.FC = () => {
                               whiteSpace: 'nowrap',
                             }}
                           >
-                            {firstCat.name}
+                            {firstCat.name.length > 22 ? `${firstCat.name.slice(0, 22)}...` : firstCat.name}
                           </span>
                           <span
                             onClick={(e) => handleRemoveCategoryTag(e, firstCat.id)}
@@ -1092,25 +1093,35 @@ export const ProductListPage: React.FC = () => {
                           }}
                         >
                           <label
+                            title={c.name}
                             style={{
                               display: 'flex',
                               alignItems: 'center',
                               gap: 10,
                               cursor: 'pointer',
                               fontSize: 13,
-                              width: '100%',
+                              flex: 1,
+                              minWidth: 0,
+                              marginRight: 8,
                             }}
                           >
                             <input
                               type="checkbox"
                               checked={isChecked}
                               onChange={() => { }} // Handled at row click
-                              style={{ accentColor: '#0F766E', width: 16, height: 16 }}
+                              style={{ accentColor: '#0F766E', width: 16, height: 16, flexShrink: 0 }}
                             />
-                            <span style={{ fontWeight: isChecked ? 600 : 400, color: isChecked ? '#134E4A' : '#1E293B' }}>
-                              {c.name}
+                            <span
+                              style={{
+                                fontWeight: isChecked ? 600 : 400,
+                                color: isChecked ? '#134E4A' : '#1E293B',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
+                              }}
+                            >
+                              {c.name.length > 26 ? `${c.name.slice(0, 26)}...` : c.name}
                             </span>
-
                           </label>
                           {c.productCount !== undefined && (
                             <span style={{ fontSize: 11, color: '#64748B', fontWeight: 600, flexShrink: 0 }}>
