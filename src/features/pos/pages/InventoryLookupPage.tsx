@@ -16,6 +16,7 @@ import {
   X,
   Store,
   Tag,
+  ShieldCheck,
 } from 'lucide-react';
 import { mockProductsStockLookup } from '../mock/inventoryMockData';
 import type {
@@ -252,8 +253,8 @@ export const InventoryLookupPage: FC = () => {
             }}
           >
             {isStoreOwner ? (
-              <span style={{ color: '#047857', fontWeight: 700 }}>
-                👑 {user?.fullName || 'Trần Quốc An'} (Chủ Chuỗi)
+              <span style={{ color: '#047857', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                <ShieldCheck size={14} color="#047857" /> {user?.fullName || 'Trần Quốc An'} (Chủ Chuỗi)
               </span>
             ) : (
               <span style={{ color: '#334155' }}>

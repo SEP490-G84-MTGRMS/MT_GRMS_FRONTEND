@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import type { InvoiceDTO } from '../../types/inventory.types';
 import type { Product } from '../../types/pos.types';
-import { ArrowLeftRight, RotateCcw, Plus, Trash2, AlertTriangle, AlertCircle, PackageCheck } from 'lucide-react';
+import { ArrowLeftRight, RotateCcw, Plus, Trash2, AlertTriangle, AlertCircle, PackageCheck, Gift } from 'lucide-react';
 
 interface Props {
   isOpen: boolean;
@@ -273,7 +273,7 @@ export const ReturnExchangeModal: React.FC<Props> = ({
     // Ràng buộc đơn đặt trước
     if (isPreOrderExchangeOnlyBlocked) {
       alert(
-        '⛔ Đơn đặt trước đã bàn giao chỉ hỗ trợ ĐỔI SẢN PHẨM KHÁC (Exchange), không áp dụng trả hàng lấy lại tiền mặt trừ khi có lỗi từ Nhà Sản Xuất!\n' +
+        'Đơn đặt trước đã bàn giao chỉ hỗ trợ ĐỔI SẢN PHẨM KHÁC (Exchange), không áp dụng trả hàng lấy lại tiền mặt trừ khi có lỗi từ Nhà Sản Xuất!\n' +
         'Vui lòng chọn sản phẩm đổi mới tương đương hoặc chọn lý do "Lỗi do Nhà Sản Xuất".'
       );
       return;
@@ -283,7 +283,7 @@ export const ReturnExchangeModal: React.FC<Props> = ({
     if (netAmount < 0) {
       if (isDrawerCashInsufficient) {
         alert(
-          `⚠️ Tiền mặt trong két quầy hiện tại (${currentDrawerCash?.toLocaleString('vi-VN')} đ) KHÔNG ĐỦ để hoàn trả ${refundAmount.toLocaleString('vi-VN')} đ cho khách!\n` +
+          `Tiền mặt trong két quầy hiện tại (${currentDrawerCash?.toLocaleString('vi-VN')} đ) KHÔNG ĐỦ để hoàn trả ${refundAmount.toLocaleString('vi-VN')} đ cho khách!\n` +
           `Vui lòng lập phiếu thu nạp thêm tiền vào két ca trước khi tiếp tục hoàn tiền.`
         );
         return;
@@ -411,6 +411,9 @@ export const ReturnExchangeModal: React.FC<Props> = ({
                             <span
                               style={{
                                 marginLeft: 6,
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 3,
                                 padding: '1px 6px',
                                 borderRadius: 4,
                                 backgroundColor: '#dcfce7',
@@ -420,7 +423,7 @@ export const ReturnExchangeModal: React.FC<Props> = ({
                                 fontWeight: 700,
                               }}
                             >
-                              🎁 Quà tặng KM (Hoàn 0 đ)
+                              <Gift size={10} color="#15803d" /> Quà tặng KM (Hoàn 0 đ)
                             </span>
                           )}
                         </td>
@@ -476,8 +479,8 @@ export const ReturnExchangeModal: React.FC<Props> = ({
                               opacity: currentQty > 0 ? 1 : 0.5,
                             }}
                           >
-                            <option value="Restock">✨ Nguyên vẹn (Nhập kho bán)</option>
-                            <option value="Damaged">⚠️ Hàng lỗi/hỏng (Chờ hủy/NCC)</option>
+                            <option value="Restock">Nguyên vẹn (Nhập kho bán)</option>
+                            <option value="Damaged">Hàng lỗi/hỏng (Chờ hủy/NCC)</option>
                           </select>
                         </td>
                         <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 700, color: item.isGift ? '#15803d' : currentQty > 0 ? '#b91c1c' : '#94a3b8' }}>

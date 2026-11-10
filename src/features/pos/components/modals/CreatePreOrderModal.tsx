@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import type { Product, Customer } from '../../types/pos.types';
-import { Plus, Minus, Trash2, Search, Package, Phone, User, AlertTriangle } from 'lucide-react';
+import { Plus, Minus, Trash2, Search, Package, Phone, User, AlertTriangle, Gift } from 'lucide-react';
 import { mockCustomers } from '../../mock/posMockData';
 import { promotionApi, type CartGiftItemDto } from '../../../promotion/api/promotionApi';
 
@@ -838,7 +838,9 @@ export const CreatePreOrderModal: React.FC<Props> = ({
             {(effectivePromoDiscount > 0 || appliedPromoLabels.length > 0) && (
               <div style={{ marginBottom: 6, padding: '6px 8px', backgroundColor: '#f0fdfa', border: '1px solid #ccfbf1', borderRadius: 4 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5, color: '#0f766e', fontWeight: 600 }}>
-                  <span>🎁 Khuyến mãi cửa hàng (Tự động):</span>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                    <Gift size={13} color="#0f766e" /> Khuyến mãi cửa hàng (Tự động):
+                  </span>
                   <span style={{ color: '#dc2626' }}>-{effectivePromoDiscount.toLocaleString('vi-VN')} đ</span>
                 </div>
                 {appliedPromoLabels.map((lbl, i) => (
@@ -851,8 +853,8 @@ export const CreatePreOrderModal: React.FC<Props> = ({
 
             {giftItems.length > 0 && (
               <div style={{ marginBottom: 8, padding: '6px 8px', backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 4 }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: '#15803d', marginBottom: 2 }}>
-                  🎁 Quà tặng giữ kho kèm đơn (0 đ):
+                <div style={{ fontSize: 12, fontWeight: 700, color: '#15803d', marginBottom: 2, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                  <Gift size={13} color="#15803d" /> Quà tặng giữ kho kèm đơn (0 đ):
                 </div>
                 {giftItems.map((g, idx) => (
                   <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, color: '#166534' }}>
