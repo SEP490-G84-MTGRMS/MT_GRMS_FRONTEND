@@ -319,13 +319,6 @@ export const StoreProductManagementPage: FC = () => {
             <Building2 size={14} />
             <span>Danh sách NCC</span>
           </Link>
-          <Link
-            to="/store-owner/suppliers/branches"
-            className="po-btn po-btn-secondary"
-            title="Xem danh sách các cửa hàng chi nhánh"
-          >
-            <span>Danh sách Cửa hàng</span>
-          </Link>
           <button
             type="button"
             className="po-btn po-btn-secondary"

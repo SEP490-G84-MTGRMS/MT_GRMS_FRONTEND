@@ -169,10 +169,6 @@ const NAV_GROUPS: NavGroup[] = [
         items: [
           { label: "Danh sách nhà cung cấp", to: "/store-owner/suppliers" },
           {
-            label: "Cửa Hàng với nhà cung cấp",
-            to: "/store-owner/suppliers/branches",
-          },
-          {
             label: "Hóa đơn đầu vào",
             to: "/store-owner/suppliers?view=invoices",
             badge: "Mới",

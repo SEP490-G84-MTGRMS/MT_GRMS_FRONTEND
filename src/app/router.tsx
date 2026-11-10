@@ -13,7 +13,6 @@ import { TenantManagementPage } from '../pages/admin/TenantManagementPage';
 import {
   SupplierListPage,
   SupplierDetailPage,
-  SupplierBranchManagementPage,
 } from '../features/supplier';
 
 // 2. Purchase Orders Feature
@@ -354,7 +353,7 @@ export const router = createBrowserRouter([
       },
       {
         path: 'suppliers/branches',
-        element: <SupplierBranchManagementPage />,
+        element: <Navigate to="/store-owner/suppliers" replace />,
       },
       {
         path: 'suppliers/:id',
@@ -366,7 +365,7 @@ export const router = createBrowserRouter([
       },
       {
         path: 'suppliers/:id/branches',
-        element: <SupplierBranchManagementPage />,
+        element: <Navigate to="/store-owner/suppliers" replace />,
       },
       {
         path: 'stores/products',
@@ -638,7 +637,7 @@ export const router = createBrowserRouter([
       },
       {
         path: 'suppliers/branches',
-        element: <SupplierBranchManagementPage />,
+        element: <Navigate to="/store-owner/suppliers" replace />,
       },
       {
         path: 'suppliers/:id',
@@ -650,7 +649,7 @@ export const router = createBrowserRouter([
       },
       {
         path: 'suppliers/:id/branches',
-        element: <SupplierBranchManagementPage />,
+        element: <Navigate to="/store-owner/suppliers" replace />,
       },
       {
         path: 'purchase-orders',
@@ -843,7 +842,7 @@ export const router = createBrowserRouter([
       },
       {
         path: 'branches',
-        element: <SupplierBranchManagementPage />,
+        element: <Navigate to="/store-owner/suppliers" replace />,
       },
       {
         path: ':id',
@@ -855,7 +854,7 @@ export const router = createBrowserRouter([
       },
       {
         path: ':id/branches',
-        element: <SupplierBranchManagementPage />,
+        element: <Navigate to="/store-owner/suppliers" replace />,
       },
     ],
   },

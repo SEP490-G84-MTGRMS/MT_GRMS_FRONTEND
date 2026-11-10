@@ -275,14 +275,6 @@ export const SupplierListPage: FC = () => {
             <Store size={14} />
             <span>Sản phẩm theo Cửa hàng</span>
           </Link>
-          <Link
-            to="/store-owner/suppliers/branches"
-            className="po-btn po-btn-secondary"
-            title="Gán nhà cung cấp phân bổ tới các cửa hàng / chi nhánh"
-          >
-            <Store size={14} />
-            <span>Gán NCC với Cửa hàng</span>
-          </Link>
           <button
             type="button"
             className="po-btn po-btn-secondary"

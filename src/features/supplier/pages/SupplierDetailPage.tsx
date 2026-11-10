@@ -421,6 +421,7 @@ export const SupplierDetailPage: FC<Props> = ({
               supplier={currentSupplier}
               initialConfig={deliveryConfig}
               onSaveConfig={handleSaveDeliveryConfig}
+              onNotify={showToast}
             />
           )}
 
