@@ -39,7 +39,9 @@
 - Lắng nghe `mtgrms:branch-changed` và `storage` event để đồng bộ `activeBranch` với Header Dropdown.
 - Tích hợp `supplierBranchApi.getBranchAssignments`, `assignSuppliersToBranch`, `updateAssignmentDeliveryDays`, `updateAssignmentStatus`.
 - Bổ sung khối UI **Trạng thái tại chi nhánh** (`StatusToggle` + lý do tạm ngưng) khi đang chọn một chi nhánh trên Header.
-- Hỗ trợ lưu tách biệt theo từng chi nhánh (`CURRENT_ONLY`) hoặc đồng bộ toàn chuỗi (`ALL_BRANCHES` từ chi nhánh tổng/chi nhánh chính).
+- **Cô lập tuyệt đối nút "Lưu Cấu Hình Giao Hàng & Cutoff" (`CURRENT_ONLY`) với "Lưu thay đổi trên các chi nhánh khác" (`ALL_BRANCHES`)**:
+  - Khi bấm **"Lưu Cấu Hình Giao Hàng & Cutoff"** (`CURRENT_ONLY`) ở Chi nhánh tổng (`Toàn hệ thống`) hoặc Chi nhánh chính: hệ thống tự động khóa (snapshot) cấu hình hiện tại (bao gồm `activeDeliveryDays`, `minOrderQuantity`, `cutoffDayOffset`, `cutoffTime`, chính sách sửa PO) của tất cả các chi nhánh khác vào `byBranchId` và bảo toàn `deliveryDays` của từng chi nhánh con trên Backend, đảm bảo các chi nhánh khác giữ nguyên 100% không bị ảnh hưởng.
+  - Chỉ khi bấm **"Lưu thay đổi trên các chi nhánh khác"** (`ALL_BRANCHES`) hệ thống mới đồng bộ cấu hình mới sang toàn bộ các chi nhánh.
 
 ### `src/layouts/StoreOwnerLayout/AppTopNav.tsx`, `src/features/supplier/pages/SupplierListPage.tsx`, `src/features/product/pages/StoreProductManagementPage.tsx`, `src/app/router.tsx`
 - Gỡ bỏ hoàn toàn các liên kết điều hướng tới màn hình `/store-owner/suppliers/branches` cũ và redirect an toàn về `/store-owner/suppliers`.

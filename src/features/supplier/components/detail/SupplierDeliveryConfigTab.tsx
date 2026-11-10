@@ -242,23 +242,19 @@ export const SupplierDeliveryConfigTab: FC<Props> = ({
       // On "Toàn hệ thống", always reflect the authoritative initialConfig from API/props
       setConfig(baseCfg);
     } else if (record?.byBranchId?.[branchKey]) {
-      const savedBranchCfg = record.byBranchId[branchKey];
+      // Chi nhánh đã từng được chỉnh sửa hoặc bảo toàn cấu hình riêng -> ưu tiên 100%
       setConfig({
         ...baseCfg,
-        ...savedBranchCfg,
-        activeDeliveryDays: currentBranchAssignment?.deliveryDays?.length
-          ? mapDeliveryDaysToJs(currentBranchAssignment.deliveryDays)
-          : savedBranchCfg.activeDeliveryDays,
+        ...record.byBranchId[branchKey],
       });
     } else if (record?.defaultConfig) {
+      // Kế thừa cấu hình mặc định đã được bảo toàn trước khi chi nhánh chính/tổng thay đổi
       setConfig({
         ...baseCfg,
         ...record.defaultConfig,
-        activeDeliveryDays: currentBranchAssignment?.deliveryDays?.length
-          ? mapDeliveryDaysToJs(currentBranchAssignment.deliveryDays)
-          : record.defaultConfig.activeDeliveryDays,
       });
     } else {
+      // Chưa có cấu hình riêng tại localStorage: ưu tiên ngày giao của chi nhánh từ API (nếu có)
       setConfig({
         ...baseCfg,
         activeDeliveryDays: currentBranchAssignment?.deliveryDays?.length
@@ -454,14 +450,34 @@ export const SupplierDeliveryConfigTab: FC<Props> = ({
         setBranchDeliveryMap((prev) => {
           const existing = prev[supplier.id];
           const preservedDefault = existing?.defaultConfig ?? baseCfg;
+          const nextByBranch: Record<string, SupplierDeliveryConfig> = {
+            ...(existing?.byBranchId || {}),
+          };
+
+          // Trước khi lưu cho chi nhánh chính/tổng, khóa lại cấu hình hiện tại của tất cả các chi nhánh khác
+          if (branchAssignments.length > 0) {
+            branchAssignments.forEach((assignment) => {
+              if (
+                assignment.branchId !== branchKey &&
+                !nextByBranch[assignment.branchId]
+              ) {
+                nextByBranch[assignment.branchId] = {
+                  ...preservedDefault,
+                  activeDeliveryDays: assignment.deliveryDays?.length
+                    ? mapDeliveryDaysToJs(assignment.deliveryDays)
+                    : preservedDefault.activeDeliveryDays,
+                };
+              }
+            });
+          }
+
+          nextByBranch[branchKey] = config;
+
           const next: Record<string, BranchDeliveryRecord> = {
             ...prev,
             [supplier.id]: {
               defaultConfig: preservedDefault,
-              byBranchId: {
-                ...(existing?.byBranchId || {}),
-                [branchKey]: config,
-              },
+              byBranchId: nextByBranch,
             },
           };
           try {
@@ -509,17 +525,31 @@ export const SupplierDeliveryConfigTab: FC<Props> = ({
           // non-blocking if backend endpoint not reachable in unit test
         }
 
-        if (isMainOrTotalBranch) {
-          await onSaveConfig?.(config);
-        } else {
-          onNotify?.(
-            `Đã lưu cấu hình Giao hàng & Cutoff riêng cho chi nhánh "${activeBranch.name}"!`,
-            'success',
-          );
-        }
+        // Lưu riêng tại chi nhánh đang chọn (kể cả Chi nhánh chính) -> KHÔNG gọi onSaveConfig toàn chuỗi
+        onNotify?.(
+          isMainOrTotalBranch
+            ? `Đã lưu cấu hình Giao hàng & Cutoff chỉ trên thông tin chi nhánh chính "${activeBranch.name}" (giữ nguyên các chi nhánh khác)!`
+            : `Đã lưu cấu hình Giao hàng & Cutoff riêng cho chi nhánh "${activeBranch.name}"!`,
+          'success',
+        );
         await fetchSupplierBranchAssignments();
       } else {
-        // Toàn hệ thống (chỉ lưu trên chi nhánh chính/tổng)
+        // Đang ở "Toàn hệ thống" (ALL) và bấm "Lưu Cấu Hình Giao Hàng & Cutoff" (CURRENT_ONLY)
+        // Bảo toàn ngày giao hiện tại của các chi nhánh con trên Backend để không bị ghi đè
+        if (branchAssignments.length > 0) {
+          await Promise.allSettled(
+            branchAssignments.map((assignment) => {
+              const existingDays = assignment.deliveryDays?.length
+                ? assignment.deliveryDays
+                : mapJsDaysToNames(baseCfg.activeDeliveryDays);
+              return supplierBranchApi.updateAssignmentDeliveryDays(
+                supplier.id,
+                assignment.branchId,
+                existingDays,
+              );
+            }),
+          );
+        }
         await onSaveConfig?.(config);
       }
     } catch (err: unknown) {
