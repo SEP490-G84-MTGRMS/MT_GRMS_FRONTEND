@@ -15,7 +15,7 @@ export interface StoreProductFilterBarProps {
   onReset: () => void;
 }
 
-type FieldKey = 'sku' | 'name' | 'storeCode' | 'storeName' | 'supplierCode' | 'supplierName';
+type FieldKey = 'sku' | 'name' | 'supplierCode' | 'supplierName';
 type TokenMap = Record<FieldKey, string[]>;
 type QueryMap = Record<FieldKey, string>;
 
@@ -35,8 +35,6 @@ interface FieldConfig {
 const FIELDS: FieldConfig[] = [
   { key: 'sku', label: 'Mã SKU', placeholder: 'Nhập SKU, Enter để thêm...', minWidth: 200 },
   { key: 'name', label: 'Tên sản phẩm', placeholder: 'Nhập tên, Enter để thêm...', minWidth: 240 },
-  { key: 'storeCode', label: 'Mã cửa hàng', placeholder: 'Nhập mã CH, Enter để thêm...', minWidth: 200 },
-  { key: 'storeName', label: 'Cửa hàng', placeholder: 'Nhập tên CH, Enter để thêm...', minWidth: 220 },
   { key: 'supplierCode', label: 'Mã NCC', placeholder: 'Nhập mã NCC, Enter để thêm...', minWidth: 200 },
   { key: 'supplierName', label: 'Nhà cung cấp', placeholder: 'Nhập tên NCC, Enter để thêm...', minWidth: 240 },
 ];
@@ -44,8 +42,6 @@ const FIELDS: FieldConfig[] = [
 const EMPTY_TOKENS: TokenMap = {
   sku: [],
   name: [],
-  storeCode: [],
-  storeName: [],
   supplierCode: [],
   supplierName: [],
 };
@@ -53,8 +49,6 @@ const EMPTY_TOKENS: TokenMap = {
 const EMPTY_QUERIES: QueryMap = {
   sku: '',
   name: '',
-  storeCode: '',
-  storeName: '',
   supplierCode: '',
   supplierName: '',
 };
@@ -77,8 +71,6 @@ function tokensFromFilters(filters: StoreProductFilterValues): TokenMap {
   return {
     sku: uniqueTokens(filters.skus?.length ? filters.skus : []),
     name: uniqueTokens(filters.names?.length ? filters.names : []),
-    storeCode: uniqueTokens(filters.storeCodes?.length ? filters.storeCodes : []),
-    storeName: uniqueTokens(filters.storeNames?.length ? filters.storeNames : []),
     supplierCode: uniqueTokens(filters.supplierCodes?.length ? filters.supplierCodes : []),
     supplierName: uniqueTokens(filters.supplierNames?.length ? filters.supplierNames : []),
   };
@@ -130,8 +122,6 @@ export const StoreProductFilterBar: FC<StoreProductFilterBarProps> = ({
   const inputRefs = useRef<Record<FieldKey, HTMLInputElement | null>>({
     sku: null,
     name: null,
-    storeCode: null,
-    storeName: null,
     supplierCode: null,
     supplierName: null,
   });
@@ -160,8 +150,8 @@ export const StoreProductFilterBar: FC<StoreProductFilterBarProps> = ({
     onSearch({
       skus: updatedTokens.sku,
       names: updatedTokens.name,
-      storeCodes: updatedTokens.storeCode,
-      storeNames: updatedTokens.storeName,
+      storeCodes: [],
+      storeNames: [],
       supplierCodes: updatedTokens.supplierCode,
       supplierNames: updatedTokens.supplierName,
       storeId: initialValues.storeId || 'ALL',
@@ -228,60 +218,6 @@ export const StoreProductFilterBar: FC<StoreProductFilterBarProps> = ({
           seen.add(key);
           mapped.push({
             id: `name-${item.id}-${val}`,
-            value: val,
-            primary: val,
-          });
-          if (mapped.length >= 8) break;
-        }
-      } else if (field === 'storeCode') {
-        for (const item of stores) {
-          const val = item.code;
-          if (!val?.trim()) continue;
-          const key = val.toLowerCase();
-          if (selectedSet.has(key) || seen.has(key) || !key.includes(trimmed)) continue;
-          seen.add(key);
-          mapped.push({
-            id: `storecode-${item.id}-${val}`,
-            value: val,
-            primary: `${val} (${item.name})`,
-          });
-          if (mapped.length >= 8) break;
-        }
-        for (const item of products) {
-          const val = item.storeCode;
-          if (!val?.trim()) continue;
-          const key = val.toLowerCase();
-          if (selectedSet.has(key) || seen.has(key) || !key.includes(trimmed)) continue;
-          seen.add(key);
-          mapped.push({
-            id: `prod-sc-${item.id}-${val}`,
-            value: val,
-            primary: `${val} (${item.storeName})`,
-          });
-          if (mapped.length >= 8) break;
-        }
-      } else if (field === 'storeName') {
-        for (const item of stores) {
-          const val = item.name;
-          if (!val?.trim()) continue;
-          const key = val.toLowerCase();
-          if (selectedSet.has(key) || seen.has(key) || !key.includes(trimmed)) continue;
-          seen.add(key);
-          mapped.push({
-            id: `store-${item.id}-${val}`,
-            value: val,
-            primary: val,
-          });
-          if (mapped.length >= 8) break;
-        }
-        for (const item of products) {
-          const val = item.storeName;
-          if (!val?.trim()) continue;
-          const key = val.toLowerCase();
-          if (selectedSet.has(key) || seen.has(key) || !key.includes(trimmed)) continue;
-          seen.add(key);
-          mapped.push({
-            id: `prod-sn-${item.id}-${val}`,
             value: val,
             primary: val,
           });
@@ -425,8 +361,6 @@ export const StoreProductFilterBar: FC<StoreProductFilterBarProps> = ({
     const effectiveTokens: TokenMap = {
       sku: [...tokens.sku],
       name: [...tokens.name],
-      storeCode: [...tokens.storeCode],
-      storeName: [...tokens.storeName],
       supplierCode: [...tokens.supplierCode],
       supplierName: [...tokens.supplierName],
     };
@@ -441,8 +375,8 @@ export const StoreProductFilterBar: FC<StoreProductFilterBarProps> = ({
     return {
       skus: effectiveTokens.sku,
       names: effectiveTokens.name,
-      storeCodes: effectiveTokens.storeCode,
-      storeNames: effectiveTokens.storeName,
+      storeCodes: [],
+      storeNames: [],
       supplierCodes: effectiveTokens.supplierCode,
       supplierNames: effectiveTokens.supplierName,
       storeId: initialValues.storeId || 'ALL',
@@ -472,8 +406,6 @@ export const StoreProductFilterBar: FC<StoreProductFilterBarProps> = ({
   const totalActiveTokens =
     tokens.sku.length +
     tokens.name.length +
-    tokens.storeCode.length +
-    tokens.storeName.length +
     tokens.supplierCode.length +
     tokens.supplierName.length;
 
@@ -696,7 +628,7 @@ export const StoreProductFilterBar: FC<StoreProductFilterBarProps> = ({
 
   return (
     <div ref={containerRef} className="so-list-filter">
-      {/* ── ROW 1: 4 ô sản phẩm & chi nhánh (Mã SKU, Tên SP, Mã Cửa hàng, Cửa hàng) ── */}
+      {/* ── ROW 1: 4 ô lọc sản phẩm & nhà cung cấp (Mã SKU, Tên SP, Mã NCC, Nhà cung cấp) ── */}
       <div
         style={{
           display: 'grid',
@@ -705,28 +637,23 @@ export const StoreProductFilterBar: FC<StoreProductFilterBarProps> = ({
           marginBottom: 10,
         }}
       >
-        {FIELDS.slice(0, 4).map(renderField)}
+        {FIELDS.map(renderField)}
       </div>
 
-      {/* ── ROW 2: 4 cột cùng chuẩn width (Cột 1: Mã NCC, Cột 2: Nhà cung cấp, Cột 3: Trạng thái, Cột 4: Nút thao tác) ── */}
+      {/* ── ROW 2: Trạng thái & Nút thao tác ── */}
       <div
         style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(4, 1fr)',
-          gap: '10px 14px',
+          display: 'flex',
+          justifyContent: 'space-between',
           alignItems: 'center',
+          gap: '10px 14px',
           paddingTop: 8,
           borderTop: '1px dashed #f1f5f9',
+          flexWrap: 'wrap',
         }}
       >
-        {/* Cột 1: Mã NCC - chuẩn width bằng Mã SKU */}
-        {renderField(FIELDS[4])}
-
-        {/* Cột 2: Nhà cung cấp - chuẩn width bằng Mã SKU */}
-        {renderField(FIELDS[5])}
-
-        {/* Cột 3: Trạng thái & Badge */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+        {/* Trạng thái & Badge */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 260 }}>
           <span style={{ fontSize: 12, fontWeight: 700, color: '#475569', whiteSpace: 'nowrap' }}>Trạng thái:</span>
           <select
             value={status}
@@ -747,7 +674,7 @@ export const StoreProductFilterBar: FC<StoreProductFilterBarProps> = ({
               color: '#1e293b',
               backgroundColor: '#ffffff',
               cursor: 'pointer',
-              minWidth: 0,
+              minWidth: 180,
             }}
           >
             <option value="ALL">-- Tất cả trạng thái --</option>
@@ -772,8 +699,8 @@ export const StoreProductFilterBar: FC<StoreProductFilterBarProps> = ({
           )}
         </div>
 
-        {/* Cột 4: Nút Tìm kiếm & Đặt lại */}
-        <div className="so-list-filter-actions" style={{ justifyContent: 'flex-end', width: '100%' }}>
+        {/* Nút Tìm kiếm & Đặt lại */}
+        <div className="so-list-filter-actions" style={{ justifyContent: 'flex-end' }}>
           <button
             type="button"
             className="so-list-filter-search"

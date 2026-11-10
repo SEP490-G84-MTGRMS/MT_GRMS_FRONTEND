@@ -21,8 +21,6 @@ type SortField =
   | 'sku'
   | 'name'
   | 'unit'
-  | 'storeCode'
-  | 'storeName'
   | 'supplierCode'
   | 'supplierName'
   | 'costPrice'
@@ -107,14 +105,6 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
           valA = a.unit.toLowerCase();
           valB = b.unit.toLowerCase();
           break;
-        case 'storeCode':
-          valA = (a.storeCode || '').toLowerCase();
-          valB = (b.storeCode || '').toLowerCase();
-          break;
-        case 'storeName':
-          valA = a.storeName.toLowerCase();
-          valB = b.storeName.toLowerCase();
-          break;
         case 'supplierCode':
           valA = (a.primarySupplierCode || '').toLowerCase();
           valB = (b.primarySupplierCode || '').toLowerCase();
@@ -188,19 +178,17 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
 
   const tableColGroup = (
     <colgroup>
-      <col style={{ width: '4%' }} />
-      <col style={{ width: '8%' }} />
-      <col style={{ width: '12%' }} />
-      <col style={{ width: '6%' }} />
+      <col style={{ width: '5%' }} />
+      <col style={{ width: '10%' }} />
+      <col style={{ width: '16%' }} />
       <col style={{ width: '9%' }} />
+      <col style={{ width: '13%' }} />
       <col style={{ width: '7%' }} />
-      <col style={{ width: '9%' }} />
-      <col style={{ width: '6%' }} />
-      <col style={{ width: '6%' }} />
-      <col style={{ width: '12%' }} />
+      <col style={{ width: '7%' }} />
+      <col style={{ width: '13%' }} />
       <col style={{ width: '4%' }} />
       <col style={{ width: '4%' }} />
-      <col style={{ width: '7%' }} />
+      <col style={{ width: '6%' }} />
       <col style={{ width: '6%' }} />
     </colgroup>
   );
@@ -228,7 +216,7 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
         className="so-list-table-head"
         style={{ paddingRight: hasScrollY ? 6 : 0 }}
       >
-        <table className="so-list-table" style={{ minWidth: 1520, tableLayout: 'fixed' }}>
+        <table className="so-list-table" style={{ minWidth: 1200, tableLayout: 'fixed' }}>
           {tableColGroup}
           <thead>
             <tr>
@@ -255,28 +243,6 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
                 <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                   <span>Tên Sản Phẩm</span>
                   <ArrowUpDown size={12} style={{ color: sortField === 'name' ? '#0f766e' : '#94a3b8', flexShrink: 0 }} />
-                </div>
-              </th>
-
-              <th
-                style={{ ...thStyle, cursor: 'pointer' }}
-                onClick={() => handleSort('storeCode')}
-                title="Sắp xếp theo mã cửa hàng"
-              >
-                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                  <span>Mã Cửa Hàng</span>
-                  <ArrowUpDown size={12} style={{ color: sortField === 'storeCode' ? '#0f766e' : '#94a3b8', flexShrink: 0 }} />
-                </div>
-              </th>
-
-              <th
-                style={{ ...thStyle, cursor: 'pointer' }}
-                onClick={() => handleSort('storeName')}
-                title="Sắp xếp theo Cửa hàng"
-              >
-                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                  <span>Cửa Hàng</span>
-                  <ArrowUpDown size={12} style={{ color: sortField === 'storeName' ? '#0f766e' : '#94a3b8', flexShrink: 0 }} />
                 </div>
               </th>
 
@@ -364,13 +330,13 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
         className="so-list-table-body supplier-table-scroll-container"
         onScroll={handleBodyScroll}
       >
-        <table className="so-list-table" style={{ minWidth: 1520, tableLayout: 'fixed' }}>
+        <table className="so-list-table" style={{ minWidth: 1200, tableLayout: 'fixed' }}>
           {tableColGroup}
           <tbody>
             {sortedProducts.length === 0 ? (
               <tr>
                 <td
-                  colSpan={14}
+                  colSpan={12}
                   style={{
                     textAlign: 'center',
                     padding: '48px 16px',
@@ -462,29 +428,7 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
                       <div className="so-list-name" title={p.name}>{p.name}</div>
                     </td>
 
-                    {/* 3. Mã Cửa Hàng */}
-                    <td style={{ padding: '8px 8px', verticalAlign: 'middle', borderBottom: '1px solid #f1f5f9' }}>
-                      <span
-                        style={{
-                          fontFamily: 'var(--font-mono, monospace)',
-                          fontSize: 12,
-                          fontWeight: 600,
-                          color: '#334155',
-                          whiteSpace: 'nowrap',
-                          display: 'inline-block',
-                        }}
-                        title={p.storeCode}
-                      >
-                        {p.storeCode || '---'}
-                      </span>
-                    </td>
-
-                    {/* 4. Cửa Hàng (xuống dòng tối đa 2 dòng khi dài) */}
-                    <td className="so-list-td--wrap">
-                      <div className="so-list-name" title={p.storeName}>{p.storeName}</div>
-                    </td>
-
-                    {/* 5. Mã Nhà Cung Cấp */}
+                    {/* 3. Mã Nhà Cung Cấp */}
                     <td style={{ padding: '8px 8px', verticalAlign: 'middle', borderBottom: '1px solid #f1f5f9' }}>
                       <span
                         style={{

@@ -9,7 +9,6 @@ import type {
   EditStoreProductInput,
 } from '../types/storeProduct.types';
 import type { SupplierSummary } from '../../supplier/types/supplier.types';
-import { StoreProductContextCard } from '../components/StoreProductContextCard';
 import { StoreProductFilterBar } from '../components/StoreProductFilterBar';
 import { StoreProductTable } from '../components/StoreProductTable';
 import { AssignStoreProductModal } from '../components/AssignStoreProductModal';
@@ -17,9 +16,32 @@ import { EditStoreProductModal } from '../components/EditStoreProductModal';
 import { AdminToast, type ToastState } from '../../admin/components';
 import { storeProductApi } from '../api/storeProductApi';
 import { supplierApi } from '../../supplier/api/supplierApi';
-import { Building2, Loader2, Package } from 'lucide-react';
+import { Building2, Loader2, Package, Store } from 'lucide-react';
 import '../../purchase-order/purchase-order.css';
 import '../../supplier/supplier.css';
+
+export interface ActiveBranchInfo {
+  id: string; // 'ALL' or Guid
+  code?: string;
+  name?: string;
+  address?: string;
+  isHeadquarter?: boolean;
+}
+
+const STORAGE_KEY = 'mtgrms_active_branch';
+
+const getStoredActiveBranch = (): ActiveBranchInfo => {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed?.id) return parsed;
+    }
+  } catch {
+    // fallback
+  }
+  return { id: 'ALL', name: 'Toàn hệ thống', code: 'ALL' };
+};
 
 export interface StoreProductFilterState extends StoreProductFilterValues {
   pageIndex: number;
@@ -44,6 +66,14 @@ export const StoreProductManagementPage: FC = () => {
   const [searchParams] = useSearchParams();
   const queryStoreId = searchParams.get('storeId');
 
+  // Active branch from Header Dropdown
+  const [activeBranch, setActiveBranch] = useState<ActiveBranchInfo>(() => {
+    if (queryStoreId) {
+      return { id: queryStoreId, name: 'Chi nhánh' };
+    }
+    return getStoredActiveBranch();
+  });
+
   // Stores, Suppliers & Products state
   const [stores, setStores] = useState<StoreSummary[]>([]);
   const [suppliers, setSuppliers] = useState<SupplierSummary[]>([]);
@@ -54,7 +84,7 @@ export const StoreProductManagementPage: FC = () => {
   // Applied filter criteria state
   const [appliedFilters, setAppliedFilters] = useState<StoreProductFilterState>(() => ({
     ...DEFAULT_FILTERS,
-    storeId: queryStoreId || 'ALL',
+    storeId: queryStoreId || getStoredActiveBranch().id || 'ALL',
   }));
 
   // Modals state
@@ -91,6 +121,66 @@ export const StoreProductManagementPage: FC = () => {
     loadInitialData();
   }, []);
 
+  // Subscribe to Header Dropdown (BranchSelectorDropdown) changes
+  useEffect(() => {
+    const syncBranch = (branch: ActiveBranchInfo) => {
+      setActiveBranch(branch);
+      setAppliedFilters((prev) => ({
+        ...prev,
+        storeId: branch.id || 'ALL',
+        storeCodes: [],
+        storeNames: [],
+        pageIndex: 1,
+      }));
+    };
+
+    const handleBranchChange = (e: Event) => {
+      const customEvent = e as CustomEvent<ActiveBranchInfo>;
+      if (customEvent.detail) {
+        syncBranch(customEvent.detail);
+      } else {
+        syncBranch(getStoredActiveBranch());
+      }
+    };
+
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === STORAGE_KEY) {
+        syncBranch(getStoredActiveBranch());
+      }
+    };
+
+    window.addEventListener('mtgrms:branch-changed', handleBranchChange);
+    window.addEventListener('storage', handleStorageChange);
+    return () => {
+      window.removeEventListener('mtgrms:branch-changed', handleBranchChange);
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, []);
+
+  const handleSwitchToAllBranches = () => {
+    const allOption: ActiveBranchInfo = {
+      id: 'ALL',
+      name: 'Toàn hệ thống',
+      code: 'ALL',
+    };
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(allOption));
+      window.dispatchEvent(
+        new CustomEvent('mtgrms:branch-changed', { detail: allOption }),
+      );
+    } catch {
+      // ignore
+    }
+    setActiveBranch(allOption);
+    setAppliedFilters((prev) => ({
+      ...prev,
+      storeId: 'ALL',
+      storeCodes: [],
+      storeNames: [],
+      pageIndex: 1,
+    }));
+  };
+
   // Fetch products based on applied filters & pagination
   const fetchProducts = useCallback(async () => {
     setIsLoading(true);
@@ -126,12 +216,18 @@ export const StoreProductManagementPage: FC = () => {
     setAppliedFilters((prev) => ({
       ...prev,
       ...newValues,
+      storeId: activeBranch.id || 'ALL',
+      storeCodes: [],
+      storeNames: [],
       pageIndex: 1,
     }));
   };
 
   const handleResetFilters = () => {
-    setAppliedFilters(DEFAULT_FILTERS);
+    setAppliedFilters({
+      ...DEFAULT_FILTERS,
+      storeId: activeBranch.id || 'ALL',
+    });
   };
 
   const handlePageChange = (pageIndex: number) => {
@@ -302,12 +398,70 @@ export const StoreProductManagementPage: FC = () => {
       <AdminToast toast={toast} onClose={() => setToast(null)} />
 
       <div className="so-list-header">
-        <div>
-          <h1 className="so-list-title">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <h1 className="so-list-title" style={{ margin: 0 }}>
             <Package size={22} color="var(--blue-primary, #0f766e)" />
             <span>Sản Phẩm Theo Cửa Hàng / Chi Nhánh</span>
             {isLoading && <Loader2 size={16} className="animate-spin" style={{ color: 'var(--blue-primary, #0f766e)' }} />}
           </h1>
+
+          {/* Active Branch Pill from Header Dropdown */}
+          {activeBranch.id && activeBranch.id !== 'ALL' ? (
+            <span
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 5,
+                padding: '3px 10px',
+                borderRadius: 999,
+                backgroundColor: '#ecfdf5',
+                color: '#065f46',
+                fontSize: 12,
+                fontWeight: 600,
+                border: '1px solid #a7f3d0',
+              }}
+              title="Đang lọc danh sách sản phẩm theo chi nhánh được chọn trên thanh Header"
+            >
+              <Store size={13} color="#059669" />
+              <span>Chi nhánh: {currentStore?.name || activeBranch.name}</span>
+              <button
+                type="button"
+                onClick={handleSwitchToAllBranches}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  padding: 0,
+                  marginLeft: 4,
+                  color: '#047857',
+                  textDecoration: 'underline',
+                  cursor: 'pointer',
+                  fontSize: 11,
+                  fontWeight: 600,
+                }}
+              >
+                (Xem toàn hệ thống)
+              </button>
+            </span>
+          ) : (
+            <span
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 5,
+                padding: '3px 10px',
+                borderRadius: 999,
+                backgroundColor: '#f1f5f9',
+                color: '#475569',
+                fontSize: 12,
+                fontWeight: 600,
+                border: '1px solid #e2e8f0',
+              }}
+              title="Đang hiển thị sản phẩm gộp của toàn hệ thống"
+            >
+              <Store size={13} color="#64748b" />
+              <span>Toàn hệ thống</span>
+            </span>
+          )}
         </div>
 
         <div className="so-list-header-actions">
@@ -340,21 +494,7 @@ export const StoreProductManagementPage: FC = () => {
         </div>
       </div>
 
-      {/* ── Context Card: Hiển thị khi lọc theo 1 Cửa hàng cụ thể ── */}
-      {appliedFilters.storeId !== 'ALL' && currentStore && (
-        <div style={{ flexShrink: 0, marginBottom: 8 }}>
-          <StoreProductContextCard
-            store={currentStore}
-            stores={stores}
-            onSelectStore={(newId) =>
-              setAppliedFilters((prev) => ({ ...prev, storeId: newId, pageIndex: 1 }))
-            }
-            productCount={totalCount}
-          />
-        </div>
-      )}
-
-      {/* ── Bộ Lọc Filter Bar 2 dòng rộng rãi ── */}
+      {/* ── Bộ Lọc Filter Bar ── */}
       <div style={{ flexShrink: 0, marginBottom: 8 }}>
         <StoreProductFilterBar
           initialValues={appliedFilters}
