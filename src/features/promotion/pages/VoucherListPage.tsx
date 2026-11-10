@@ -44,6 +44,12 @@ export const VoucherListPage: FC = () => {
     status: dto.status,
     prefix: dto.prefix,
     description: dto.description || '',
+    allowWithPromotions:
+      dto.allowWithPromotions !== undefined
+        ? dto.allowWithPromotions
+        : dto.description
+        ? !dto.description.includes('"allowWithPromotions":false')
+        : true,
     codes: [],
   }), []);
 
@@ -153,6 +159,7 @@ export const VoucherListPage: FC = () => {
           endDate: savedBatch.endDate || new Date().toISOString(),
           prefix: savedBatch.prefix,
           description: savedBatch.description,
+          allowWithPromotions: savedBatch.allowWithPromotions,
         });
       }
       await loadBatches();
