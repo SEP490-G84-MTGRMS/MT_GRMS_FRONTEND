@@ -6,6 +6,9 @@ Toàn bộ các thay đổi của repository Frontend React SPA được tổng 
 
 ## [Unreleased] - 2026-11-10
 
+### Added
+- **Bổ sung Tab "Sản phẩm cung cấp" vào màn hình Chi tiết Nhà Cung Cấp (`SupplierDetailPage.tsx`, `SupplierProductsTab.tsx`)**: Thêm tab `Sản phẩm cung cấp` trên thanh điều hướng chi tiết NCC, tự động tải danh mục mặt hàng của NCC từ API (`GET /api/suppliers/{id}/products`), hỗ trợ tìm kiếm theo SKU/Tên SP, lọc theo Ngành hàng & Trạng thái, phân trang, gán sản phẩm mới (`AssignProductModal`) và sửa trực tiếp giá nhập sỉ, MOQ, hạn mức giao thiếu (`EditSupplierProductModal`) [FE-SUPPLIER] [worklog: docs/worklogs/2026-11-10_FE-SUPPLIER_AI_add-supplier-products-detail-tab.md].
+
 ### Fixed
 - **Sửa lỗi xác thực mật khẩu màn Đăng ký (`RegisterPage.tsx`)**: Điều chỉnh điều kiện độ dài tối thiểu từ 8 ký tự về 6 ký tự đồng bộ với Backend, nâng cấp thanh đo độ mạnh mật khẩu `passwordStrength` giúp các mật khẩu trung bình (từ 6 ký tự trở lên kết hợp chữ và số hoặc độ dài >= 8) được phép tạo tài khoản thành công mà không bị chặn, cập nhật thông báo lỗi chuẩn xác và điều hướng trực tiếp vào Cổng quản trị cửa hàng (`/store-owner/dashboard`) [FE-AUTH] [worklog: docs/worklogs/2026-11-10_FE-AUTH_AI_register-password-strength-fix.md].
 

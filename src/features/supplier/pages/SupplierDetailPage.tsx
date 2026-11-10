@@ -13,6 +13,7 @@ import type {
 } from '../types/supplier.types';
 import { SupplierDetailHeader } from '../components/detail/SupplierDetailHeader';
 import { SupplierGeneralProfileTab } from '../components/detail/SupplierGeneralProfileTab';
+import { SupplierProductsTab } from '../components/detail/SupplierProductsTab';
 import { SupplierDeliveryConfigTab } from '../components/detail/SupplierDeliveryConfigTab';
 import { SupplierHolidaysTab } from '../components/detail/SupplierHolidaysTab';
 import { SupplierPayablesTab } from '../components/detail/SupplierPayablesTab';
@@ -35,10 +36,11 @@ interface Props {
   onSupplierUpdated?: (supplier: SupplierSummary) => void;
 }
 
-type TabKey = 'profile' | 'delivery' | 'holidays' | 'payables' | 'history';
+type TabKey = 'profile' | 'products' | 'delivery' | 'holidays' | 'payables' | 'history';
 
 const ALL_TABS: { key: TabKey; label: string }[] = [
   { key: 'profile', label: 'Hồ sơ chung' },
+  { key: 'products', label: 'Sản phẩm cung cấp' },
   { key: 'delivery', label: 'Giao hàng & Cutoff' },
   { key: 'holidays', label: 'Ngày nghỉ lễ' },
   { key: 'payables', label: 'Công nợ & thanh toán' },
@@ -403,6 +405,14 @@ export const SupplierDetailPage: FC<Props> = ({
                 }
               }}
               onEditBank={() => setIsBankModalOpen(true)}
+            />
+          )}
+
+          {activeTab === 'products' && (
+            <SupplierProductsTab
+              supplier={currentSupplier}
+              canEdit={isStoreOwner}
+              onNotify={showToast}
             />
           )}
 
