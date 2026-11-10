@@ -13,6 +13,13 @@
   color: var(--text-muted, #64748b);
 }
 
+.table-pagination-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
 .table-pagination-info {
   display: flex;
   align-items: center;

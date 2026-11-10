@@ -13,6 +13,7 @@ vi.mock('../api/supplierApi', () => ({
     getSupplierById: vi.fn(),
     getSupplierTransactions: vi.fn().mockResolvedValue([]),
     getDeliveryConfig: vi.fn().mockResolvedValue(null),
+    getAPLedger: vi.fn().mockResolvedValue({ items: [], totalItems: 0 }),
     createSupplier: vi.fn(),
     updateBasicSupplier: vi.fn(),
     updateSupplierStatus: vi.fn(),

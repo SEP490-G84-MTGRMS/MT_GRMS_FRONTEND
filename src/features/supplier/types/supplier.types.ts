@@ -41,6 +41,8 @@ export interface APLedgerEntry {
   balanceAfter: number;
   createdByName: string;
   idempotencyKey?: string;
+  branchId?: string;
+  branchName?: string;
 }
 
 export interface SupplierStats {
@@ -220,6 +222,7 @@ export interface PurchaseOrderItem {
   code: string;
   orderDate: string;
   deliveryDate?: string;
+  branchId?: string;
   branchName: string;
   totalAmount: number;
   status: 'PENDING' | 'CONFIRMED' | 'PARTIALLY_RECEIVED' | 'COMPLETED' | 'CANCELLED';

@@ -15,7 +15,7 @@ export interface StoreProductFilterBarProps {
   onReset: () => void;
 }
 
-type FieldKey = 'sku' | 'name' | 'supplierCode' | 'supplierName';
+type FieldKey = 'sku' | 'name';
 type TokenMap = Record<FieldKey, string[]>;
 type QueryMap = Record<FieldKey, string>;
 
@@ -35,22 +35,16 @@ interface FieldConfig {
 const FIELDS: FieldConfig[] = [
   { key: 'sku', label: 'Mã SKU', placeholder: 'Nhập SKU, Enter để thêm...', minWidth: 200 },
   { key: 'name', label: 'Tên sản phẩm', placeholder: 'Nhập tên, Enter để thêm...', minWidth: 240 },
-  { key: 'supplierCode', label: 'Mã NCC', placeholder: 'Nhập mã NCC, Enter để thêm...', minWidth: 200 },
-  { key: 'supplierName', label: 'Nhà cung cấp', placeholder: 'Nhập tên NCC, Enter để thêm...', minWidth: 240 },
 ];
 
 const EMPTY_TOKENS: TokenMap = {
   sku: [],
   name: [],
-  supplierCode: [],
-  supplierName: [],
 };
 
 const EMPTY_QUERIES: QueryMap = {
   sku: '',
   name: '',
-  supplierCode: '',
-  supplierName: '',
 };
 
 function uniqueTokens(values: string[]): string[] {
@@ -71,8 +65,6 @@ function tokensFromFilters(filters: StoreProductFilterValues): TokenMap {
   return {
     sku: uniqueTokens(filters.skus?.length ? filters.skus : []),
     name: uniqueTokens(filters.names?.length ? filters.names : []),
-    supplierCode: uniqueTokens(filters.supplierCodes?.length ? filters.supplierCodes : []),
-    supplierName: uniqueTokens(filters.supplierNames?.length ? filters.supplierNames : []),
   };
 }
 
@@ -102,8 +94,6 @@ function highlightMatch(text: string, query: string) {
 
 export const StoreProductFilterBar: FC<StoreProductFilterBarProps> = ({
   initialValues,
-  stores,
-  suppliers,
   products,
   onSearch,
   onReset,
@@ -122,8 +112,6 @@ export const StoreProductFilterBar: FC<StoreProductFilterBarProps> = ({
   const inputRefs = useRef<Record<FieldKey, HTMLInputElement | null>>({
     sku: null,
     name: null,
-    supplierCode: null,
-    supplierName: null,
   });
 
   useEffect(() => {
@@ -152,8 +140,8 @@ export const StoreProductFilterBar: FC<StoreProductFilterBarProps> = ({
       names: updatedTokens.name,
       storeCodes: [],
       storeNames: [],
-      supplierCodes: updatedTokens.supplierCode,
-      supplierNames: updatedTokens.supplierName,
+      supplierCodes: [],
+      supplierNames: [],
       storeId: initialValues.storeId || 'ALL',
       statusFilter: currentStatus,
       searchTerm: '',
@@ -223,71 +211,13 @@ export const StoreProductFilterBar: FC<StoreProductFilterBarProps> = ({
           });
           if (mapped.length >= 8) break;
         }
-      } else if (field === 'supplierCode') {
-        if (suppliers?.length) {
-          for (const item of suppliers) {
-            const val = item.code;
-            if (!val?.trim()) continue;
-            const key = val.toLowerCase();
-            if (selectedSet.has(key) || seen.has(key) || !key.includes(trimmed)) continue;
-            seen.add(key);
-            mapped.push({
-              id: `suppcode-${item.id}-${val}`,
-              value: val,
-              primary: `${val} (${item.name})`,
-            });
-            if (mapped.length >= 8) break;
-          }
-        }
-        for (const item of products) {
-          const val = item.primarySupplierCode;
-          if (!val?.trim()) continue;
-          const key = val.toLowerCase();
-          if (selectedSet.has(key) || seen.has(key) || !key.includes(trimmed)) continue;
-          seen.add(key);
-          mapped.push({
-            id: `prod-sc-${item.id}-${val}`,
-            value: val,
-            primary: `${val} (${item.primarySupplierName})`,
-          });
-          if (mapped.length >= 8) break;
-        }
-      } else if (field === 'supplierName') {
-        if (suppliers?.length) {
-          for (const item of suppliers) {
-            const val = item.name;
-            if (!val?.trim()) continue;
-            const key = val.toLowerCase();
-            if (selectedSet.has(key) || seen.has(key) || !key.includes(trimmed)) continue;
-            seen.add(key);
-            mapped.push({
-              id: `suppname-${item.id}-${val}`,
-              value: val,
-              primary: val,
-            });
-            if (mapped.length >= 8) break;
-          }
-        }
-        for (const item of products) {
-          const val = item.primarySupplierName;
-          if (!val?.trim()) continue;
-          const key = val.toLowerCase();
-          if (selectedSet.has(key) || seen.has(key) || !key.includes(trimmed)) continue;
-          seen.add(key);
-          mapped.push({
-            id: `prod-sn-${item.id}-${val}`,
-            value: val,
-            primary: val,
-          });
-          if (mapped.length >= 8) break;
-        }
       }
 
       setSuggestions(mapped);
       setOpenField(mapped.length > 0 ? field : null);
       setFocusedIndex(mapped.length > 0 ? 0 : -1);
     },
-    [products, stores, suppliers]
+    [products]
   );
 
   const handleFieldChange = (field: FieldKey, rawValue: string) => {
@@ -361,8 +291,6 @@ export const StoreProductFilterBar: FC<StoreProductFilterBarProps> = ({
     const effectiveTokens: TokenMap = {
       sku: [...tokens.sku],
       name: [...tokens.name],
-      supplierCode: [...tokens.supplierCode],
-      supplierName: [...tokens.supplierName],
     };
 
     (Object.keys(queries) as FieldKey[]).forEach((k) => {
@@ -377,8 +305,8 @@ export const StoreProductFilterBar: FC<StoreProductFilterBarProps> = ({
       names: effectiveTokens.name,
       storeCodes: [],
       storeNames: [],
-      supplierCodes: effectiveTokens.supplierCode,
-      supplierNames: effectiveTokens.supplierName,
+      supplierCodes: [],
+      supplierNames: [],
       storeId: initialValues.storeId || 'ALL',
       statusFilter: status,
       searchTerm: '',
@@ -403,11 +331,7 @@ export const StoreProductFilterBar: FC<StoreProductFilterBarProps> = ({
     onReset();
   };
 
-  const totalActiveTokens =
-    tokens.sku.length +
-    tokens.name.length +
-    tokens.supplierCode.length +
-    tokens.supplierName.length;
+  const totalActiveTokens = tokens.sku.length + tokens.name.length;
 
   const isFiltered = totalActiveTokens > 0 || status !== 'ALL';
 
@@ -425,13 +349,12 @@ export const StoreProductFilterBar: FC<StoreProductFilterBarProps> = ({
           alignItems: 'center',
           gap: 8,
           position: 'relative',
-          minWidth: 0,
-          flex: 1,
+          minWidth: 200,
+          flex: '1 1 220px',
         }}
       >
         <label
           style={{
-            width: 84,
             fontSize: 12,
             fontWeight: 700,
             color: '#475569',
@@ -628,32 +551,19 @@ export const StoreProductFilterBar: FC<StoreProductFilterBarProps> = ({
 
   return (
     <div ref={containerRef} className="so-list-filter">
-      {/* ── ROW 1: 4 ô lọc sản phẩm & nhà cung cấp (Mã SKU, Tên SP, Mã NCC, Nhà cung cấp) ── */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(4, 1fr)',
-          gap: '10px 14px',
-          marginBottom: 10,
-        }}
-      >
-        {FIELDS.map(renderField)}
-      </div>
-
-      {/* ── ROW 2: Trạng thái & Nút thao tác ── */}
+      {/* ── SINGLE ROW: Mã SKU, Tên SP, Trạng thái & Nút thao tác ── */}
       <div
         style={{
           display: 'flex',
-          justifyContent: 'space-between',
           alignItems: 'center',
           gap: '10px 14px',
-          paddingTop: 8,
-          borderTop: '1px dashed #f1f5f9',
           flexWrap: 'wrap',
         }}
       >
+        {FIELDS.map(renderField)}
+
         {/* Trạng thái & Badge */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 260 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
           <span style={{ fontSize: 12, fontWeight: 700, color: '#475569', whiteSpace: 'nowrap' }}>Trạng thái:</span>
           <select
             value={status}
@@ -665,7 +575,6 @@ export const StoreProductFilterBar: FC<StoreProductFilterBarProps> = ({
             }}
             style={{
               height: 32,
-              flex: 1,
               padding: '0 8px',
               borderRadius: 6,
               border: '1px solid #cbd5e1',
@@ -674,7 +583,7 @@ export const StoreProductFilterBar: FC<StoreProductFilterBarProps> = ({
               color: '#1e293b',
               backgroundColor: '#ffffff',
               cursor: 'pointer',
-              minWidth: 180,
+              minWidth: 165,
             }}
           >
             <option value="ALL">-- Tất cả trạng thái --</option>
@@ -700,7 +609,7 @@ export const StoreProductFilterBar: FC<StoreProductFilterBarProps> = ({
         </div>
 
         {/* Nút Tìm kiếm & Đặt lại */}
-        <div className="so-list-filter-actions" style={{ justifyContent: 'flex-end' }}>
+        <div className="so-list-filter-actions" style={{ justifyContent: 'flex-end', flexShrink: 0 }}>
           <button
             type="button"
             className="so-list-filter-search"

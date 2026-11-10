@@ -89,7 +89,7 @@ describe('ProductListPage - Task T3 Server-side Table & Pagination Integration',
       expect(productApi.getProductsPaged).toHaveBeenCalledWith(
         expect.objectContaining({
           pageIndex: 1,
-          pageSize: 20,
+          pageSize: 15,
         })
       );
     });

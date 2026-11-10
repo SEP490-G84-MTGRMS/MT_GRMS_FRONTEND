@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { AssignStoreProductModal } from '../components/AssignStoreProductModal';
 import { EditStoreProductModal } from '../components/EditStoreProductModal';
+import { StoreProductFilterBar } from '../components/StoreProductFilterBar';
 import { storeProductApi } from '../api/storeProductApi';
 import type { StoreSummary, StoreProductItem, EditStoreProductInput } from '../types/storeProduct.types';
 
@@ -751,6 +752,42 @@ describe('STORE PRODUCT MANAGEMENT – MASTER AUDIT SUITE', () => {
       expect(itemStore2.minOrderQuantity).toBe(10);
       expect(itemStore2.retailPrice).toBe(110000);
       expect(itemStore2.storeId).toBe('store-02');
+    });
+  });
+
+  // =========================================================================
+  // 10. StoreProductFilterBar – Filter Fields Verification
+  // =========================================================================
+  describe('10. StoreProductFilterBar – Filter Fields Verification', () => {
+    it('TC-FILTER-001: Renders only SKU, Product Name, and Status filters without Supplier Code or Supplier Name', () => {
+      const onSearch = vi.fn();
+      const onReset = vi.fn();
+
+      render(
+        <StoreProductFilterBar
+          initialValues={{
+            skus: [],
+            names: [],
+            storeCodes: [],
+            storeNames: [],
+            supplierCodes: [],
+            supplierNames: [],
+            storeId: 'ALL',
+            statusFilter: 'ALL',
+            searchTerm: '',
+          }}
+          stores={mockStores}
+          products={[mockItemStore1]}
+          onSearch={onSearch}
+          onReset={onReset}
+        />
+      );
+
+      expect(screen.getByText('Mã SKU:')).toBeInTheDocument();
+      expect(screen.getByText('Tên sản phẩm:')).toBeInTheDocument();
+      expect(screen.getByText('Trạng thái:')).toBeInTheDocument();
+      expect(screen.queryByText('Mã NCC:')).not.toBeInTheDocument();
+      expect(screen.queryByText('Nhà cung cấp:')).not.toBeInTheDocument();
     });
   });
 });

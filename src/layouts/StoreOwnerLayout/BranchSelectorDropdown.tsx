@@ -235,7 +235,7 @@ export const BranchSelectorDropdown: FC = () => {
     };
   }, [fetchBranches]);
 
-  // 3. Lắng nghe thay đổi chi nhánh từ tab khác qua localStorage
+  // 3. Lắng nghe thay đổi chi nhánh từ tab khác qua localStorage hoặc sự kiện nội bộ
   useEffect(() => {
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === STORAGE_KEY && e.newValue) {
@@ -247,9 +247,22 @@ export const BranchSelectorDropdown: FC = () => {
         }
       }
     };
+
+    const handleBranchChange = (e: Event) => {
+      const customEvent = e as CustomEvent<BranchOption>;
+      if (customEvent.detail) {
+        setSelectedBranch((current) => {
+          if (current.id === customEvent.detail.id) return current;
+          return customEvent.detail;
+        });
+      }
+    };
+
     window.addEventListener("storage", handleStorageChange);
+    window.addEventListener("mtgrms:branch-changed", handleBranchChange);
     return () => {
       window.removeEventListener("storage", handleStorageChange);
+      window.removeEventListener("mtgrms:branch-changed", handleBranchChange);
     };
   }, []);
 

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { SupplierGeneralProfileTab } from '../components/detail/SupplierGeneralProfileTab';
 import { EditSupplierModal } from '../components/EditSupplierModal';
 import { SupplierBankModal, normalizeAccountHolderName } from '../components/detail/SupplierBankModal';
@@ -63,14 +63,30 @@ const baseApLedgers: APLedgerEntry[] = [
   {
     id: 'ledger-01',
     supplierId: 'sup-guid-001',
+    branchId: '01a181dc-5902-7b21-b424-1c9ea18e917d',
+    branchName: 'MT-Mart Chi Nhánh Quận 1',
     transactionDate: '2026-10-20',
     docType: 'PurchaseInvoice',
     docNo: 'PINV-202610-001',
-    description: 'Nhập lô hàng nông sản tươi',
+    description: 'Nhập lô hàng nông sản tươi Quận 1',
     amount: 12500000,
     direction: 1,
     balanceAfter: 12500000,
     createdByName: 'Kế toán trưởng',
+  },
+  {
+    id: 'ledger-02',
+    supplierId: 'sup-guid-001',
+    branchId: '01a181dc-5902-71fe-ba6d-aeb9700b4743',
+    branchName: 'MT-Mart Chi Nhánh Cầu Giấy',
+    transactionDate: '2026-10-22',
+    docType: 'PurchaseInvoice',
+    docNo: 'PINV-202610-002',
+    description: 'Nhập lô hàng nông sản Cầu Giấy',
+    amount: 5000000,
+    direction: 1,
+    balanceAfter: 17500000,
+    createdByName: 'Kế toán kho',
   },
 ];
 
@@ -79,11 +95,22 @@ const basePurchaseOrders: PurchaseOrderItem[] = [
   {
     id: 'po-01',
     code: 'PO-20261020-0001',
-    branchName: 'Chi nhánh Quận 10',
+    branchId: '01a181dc-5902-7b21-b424-1c9ea18e917d',
+    branchName: 'MT-Mart Chi Nhánh Quận 1',
     orderDate: '2026-10-20',
     deliveryDate: '2026-10-22',
     totalAmount: 12500000,
     status: 'COMPLETED',
+  },
+  {
+    id: 'po-02',
+    code: 'PO-20261025-0002',
+    branchId: '01a181dc-5902-71fe-ba6d-aeb9700b4743',
+    branchName: 'MT-Mart Chi Nhánh Cầu Giấy',
+    orderDate: '2026-10-25',
+    deliveryDate: '2026-10-27',
+    totalAmount: 5000000,
+    status: 'CONFIRMED',
   },
 ];
 
@@ -723,7 +750,7 @@ describe('MASTER AUDIT SUITE – Supplier Detail Management', () => {
       expect(screen.getByText(/30\/04\/2026/i)).toBeDefined();
     });
 
-    it('Tab 4: Debt & Payment Tab renders aging buckets and financial ledgers', () => {
+    it('Tab 4: Debt & Payment Tab renders aging buckets and financial ledgers with branch filter support', async () => {
       render(
         <SupplierPayablesTab
           supplier={baseSupplier}
@@ -731,11 +758,41 @@ describe('MASTER AUDIT SUITE – Supplier Detail Management', () => {
         />
       );
 
+      // Default: Toàn hệ thống
       expect(screen.getByText(/Phân Tích Tuổi Nợ/i)).toBeDefined();
       expect(screen.getByText('PINV-202610-001')).toBeDefined();
+      expect(screen.getByText('PINV-202610-002')).toBeDefined();
+      expect(screen.getByText('Toàn hệ thống')).toBeDefined();
+
+      // Change branch to Chi nhánh Quận 1 via header event
+      await act(async () => {
+        window.dispatchEvent(
+          new CustomEvent('mtgrms:branch-changed', {
+            detail: {
+              id: '01a181dc-5902-7b21-b424-1c9ea18e917d',
+              code: 'BR-HCM-01',
+              name: 'MT-Mart Chi Nhánh Quận 1',
+            },
+          })
+        );
+      });
+
+      // Shows Quận 1 record, hides Cầu Giấy record
+      expect(screen.getByText('PINV-202610-001')).toBeDefined();
+      expect(screen.queryByText('PINV-202610-002')).toBeNull();
+      expect(screen.getByText(/Chi nhánh: MT-Mart Chi Nhánh Quận 1/i)).toBeDefined();
+
+      // Reset to all branches
+      const resetBtn = screen.getByText('(Xem toàn hệ thống)');
+      await act(async () => {
+        fireEvent.click(resetBtn);
+      });
+
+      expect(screen.getByText('PINV-202610-001')).toBeDefined();
+      expect(screen.getByText('PINV-202610-002')).toBeDefined();
     });
 
-    it('Tab 5: Transaction History Tab renders purchase orders with status badges', () => {
+    it('Tab 5: Transaction History Tab renders purchase orders with status badges and branch filter', async () => {
       render(
         <SupplierHistoryTab
           supplier={baseSupplier}
@@ -743,8 +800,40 @@ describe('MASTER AUDIT SUITE – Supplier Detail Management', () => {
         />
       );
 
+      // Default: Toàn hệ thống showing both POs
       expect(screen.getByText('PO-20261020-0001')).toBeDefined();
+      expect(screen.getByText('PO-20261025-0002')).toBeDefined();
       expect(screen.getByText('Hoàn tất')).toBeDefined();
+      expect(screen.getByText('Đã xác nhận')).toBeDefined();
+      expect(screen.getByText('Toàn hệ thống')).toBeDefined();
+
+      // Change branch to Chi nhánh Cầu Giấy via header event
+      await act(async () => {
+        window.dispatchEvent(
+          new CustomEvent('mtgrms:branch-changed', {
+            detail: {
+              id: '01a181dc-5902-71fe-ba6d-aeb9700b4743',
+              code: 'BR-HN-01',
+              name: 'MT-Mart Chi Nhánh Cầu Giấy',
+            },
+          })
+        );
+      });
+
+      // Shows Cầu Giấy PO only, Quận 1 is filtered out
+      expect(screen.getByText('PO-20261025-0002')).toBeDefined();
+      expect(screen.queryByText('PO-20261020-0001')).toBeNull();
+      expect(screen.getByText(/Lịch Sử Giao Dịch & Đơn Mua Hàng \(1\)/i)).toBeDefined();
+
+      // Reset to all branches
+      const resetBtn = screen.getByText('(Xem toàn hệ thống)');
+      await act(async () => {
+        fireEvent.click(resetBtn);
+      });
+
+      expect(screen.getByText('PO-20261020-0001')).toBeDefined();
+      expect(screen.getByText('PO-20261025-0002')).toBeDefined();
+      expect(screen.getByText(/Lịch Sử Giao Dịch & Đơn Mua Hàng \(2\)/i)).toBeDefined();
     });
   });
 

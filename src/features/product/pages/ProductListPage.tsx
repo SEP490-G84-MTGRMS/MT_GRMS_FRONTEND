@@ -24,6 +24,7 @@ import { TablePagination, NotificationModal } from '../../../components/common';
 import { useAuthStore } from '../../../stores/useAuthStore';
 import { AdminToast, type ToastState } from '../../admin/components';
 import '../product.css';
+import '../../supplier/supplier.css';
 
 // Hàm chuẩn hóa tiếng Việt loại bỏ dấu thanh & ký tự đặc biệt phục vụ tìm kiếm thông minh
 const removeVietnameseTones = (str?: string | null): string => {
@@ -42,7 +43,7 @@ export const ProductListPage: React.FC = () => {
   const [products, setProducts] = useState<ProductItem[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [pageIndex, setPageIndex] = useState<number>(1);
-  const [pageSize, setPageSize] = useState<number>(20);
+  const [pageSize, setPageSize] = useState<number>(15);
   const [totalCount, setTotalCount] = useState<number>(0);
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
@@ -730,11 +731,91 @@ export const ProductListPage: React.FC = () => {
     showToast('Đang kết nối máy in tem mã vạch Barcode...');
   };
 
+  // Synchronize horizontal scrolling between header and body & detect vertical scroll
+  const headerRef = useRef<HTMLDivElement>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const [hasScrollY, setHasScrollY] = useState(false);
+
+  useEffect(() => {
+    const updateScrollState = () => {
+      if (bodyRef.current) {
+        setHasScrollY(bodyRef.current.scrollHeight > bodyRef.current.clientHeight);
+      }
+    };
+
+    updateScrollState();
+
+    let observer: ResizeObserver | null = null;
+    if (bodyRef.current && typeof ResizeObserver !== 'undefined') {
+      observer = new ResizeObserver(() => {
+        updateScrollState();
+      });
+      observer.observe(bodyRef.current);
+    }
+
+    window.addEventListener('resize', updateScrollState);
+    return () => {
+      window.removeEventListener('resize', updateScrollState);
+      if (observer) observer.disconnect();
+    };
+  }, [filteredProducts, pageSize]);
+
+  const handleBodyScroll = () => {
+    if (headerRef.current && bodyRef.current) {
+      headerRef.current.scrollLeft = bodyRef.current.scrollLeft;
+    }
+  };
+
+  const tableColGroup = (
+    <colgroup>
+      <col style={{ width: '3.5%' }} />
+      <col style={{ width: '3.5%' }} />
+      <col style={{ width: '5%' }} />
+      <col style={{ width: '13%' }} />
+      <col style={{ width: userRole === 'StoreOwner' ? '25%' : '34%' }} />
+      <col style={{ width: '8%' }} />
+      <col style={{ width: '9%' }} />
+      {userRole === 'StoreOwner' && <col style={{ width: '9%' }} />}
+      <col style={{ width: '11%' }} />
+      <col style={{ width: '6%' }} />
+      <col style={{ width: '6%' }} />
+    </colgroup>
+  );
+
+  const thStyle: React.CSSProperties = {
+    backgroundColor: '#f8fafc',
+    padding: '8px 6px',
+    fontSize: 12,
+    fontWeight: 700,
+    color: '#334155',
+    textTransform: 'uppercase',
+    letterSpacing: '0.02em',
+    whiteSpace: 'normal',
+    wordBreak: 'break-word',
+    lineHeight: 1.25,
+    boxSizing: 'border-box',
+    borderBottom: '1px solid #cbd5e1',
+    userSelect: 'none',
+  };
+
   return (
-    <div className="product-management-container">
+    <div
+      className="product-management-container po-matrix-container"
+      style={{
+        width: '100%',
+        height: '100%',
+        maxHeight: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        minHeight: 0,
+        flex: 1,
+        overflow: 'hidden',
+        gap: 10,
+      }}
+    >
       {/* Toast */}
       {toast && <AdminToast toast={toast} onClose={() => setToast(null)} />}
-      <div className="product-title-area">
+      <div className="product-title-area" style={{ flexShrink: 0 }}>
         <Package size={28} color="#0F766E" />
         <h1>Hàng hóa</h1>
         <span
@@ -751,7 +832,7 @@ export const ProductListPage: React.FC = () => {
         </span>
       </div>
       {/* 1. Header Toolbar */}
-      <div className="product-header-toolbar">
+      <div className="product-header-toolbar" style={{ flexShrink: 0 }}>
 
 
         {/* Bộ lọc: Tìm kiếm + Nhóm hàng + Thời gian tạo */}
@@ -1341,76 +1422,85 @@ export const ProductListPage: React.FC = () => {
         </div>
       </div>
 
-      {/* 2. Main Body: Full-width Table */}
-      <div className="product-table-wrapper" style={{ width: '100%' }}>
-        {/* Summary bar */}
-        <div className="product-table-summary-bar">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div>
-              Đang hiển thị <b>{filteredProducts.length}</b> mặt hàng
-            </div>
-            {selectedProductIds.length > 0 && (
-              <div
+      {/* 2. Main Body: Full-width Table Card */}
+      <div
+        className="so-list-table-card"
+        style={{
+          flex: '1 1 auto',
+          minHeight: 0,
+          maxHeight: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+        }}
+      >
+        {/* Bulk delete bar if items selected */}
+        {selectedProductIds.length > 0 && (
+          <div
+            style={{
+              padding: '8px 16px',
+              backgroundColor: '#FEF2F2',
+              borderBottom: '1px solid #FECACA',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexShrink: 0,
+            }}
+          >
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 12 }}>
+              <span style={{ fontSize: 12.5, fontWeight: 600, color: '#991B1B' }}>
+                Đã chọn {selectedProductIds.length} hàng hóa
+              </span>
+              <button
+                type="button"
+                onClick={() => setIsBulkDeleteOpen(true)}
                 style={{
+                  padding: '2px 8px',
+                  fontSize: 12,
+                  borderRadius: 4,
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: 8,
-                  padding: '3px 10px',
-                  backgroundColor: '#FEF2F2',
-                  border: '1px solid #FECACA',
-                  borderRadius: 6,
+                  gap: 4,
+                  backgroundColor: '#EF4444',
+                  color: '#FFFFFF',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontWeight: 600,
                 }}
               >
-                <span style={{ fontSize: 12.5, fontWeight: 600, color: '#991B1B' }}>
-                  Đã chọn {selectedProductIds.length} hàng hóa
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setIsBulkDeleteOpen(true)}
-                  style={{
-                    padding: '2px 8px',
-                    fontSize: 12,
-                    borderRadius: 4,
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 4,
-                    backgroundColor: '#EF4444',
-                    color: '#FFFFFF',
-                    border: 'none',
-                    cursor: 'pointer',
-                    fontWeight: 600,
-                  }}
-                >
-                  <Trash2 size={13} />
-                  Xóa đã chọn
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSelectedProductIds([])}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    color: '#64748B',
-                    fontSize: 12,
-                    cursor: 'pointer',
-                    textDecoration: 'underline',
-                    padding: '0 4px',
-                  }}
-                >
-                  Bỏ chọn
-                </button>
-              </div>
-            )}
+                <Trash2 size={13} />
+                Xóa đã chọn
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedProductIds([])}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#64748B',
+                  fontSize: 12,
+                  cursor: 'pointer',
+                  textDecoration: 'underline',
+                  padding: '0 4px',
+                }}
+              >
+                Bỏ chọn
+              </button>
+            </div>
           </div>
+        )}
 
-        </div>
-
-        {/* Table */}
-        <div style={{ overflowX: 'auto' }}>
-          <table className="product-main-table">
+        {/* ── Fixed Header Table ── */}
+        <div
+          ref={headerRef}
+          className="so-list-table-head"
+          style={{ paddingRight: hasScrollY ? 6 : 0, flexShrink: 0 }}
+        >
+          <table className="so-list-table" style={{ minWidth: 1200, tableLayout: 'fixed' }}>
+            {tableColGroup}
             <thead>
               <tr>
-                <th style={{ width: 36, textAlign: 'center' }}>
+                <th style={{ ...thStyle, textAlign: 'center' }}>
                   <input
                     type="checkbox"
                     checked={
@@ -1426,18 +1516,32 @@ export const ProductListPage: React.FC = () => {
                     }}
                   />
                 </th>
-                <th style={{ width: 36, textAlign: 'center' }}>★</th>
-                <th style={{ width: 180, minWidth: 150 }}>Mã hàng</th>
-                <th>Tên hàng hóa</th>
-                <th style={{ width: 110 }}>Đơn vị tính</th>
-                <th style={{ textAlign: 'right', width: 120 }}>Giá bán</th>
+                <th style={{ ...thStyle, textAlign: 'center' }}>★</th>
+                <th style={{ ...thStyle, textAlign: 'center' }}>Ảnh</th>
+                <th style={{ ...thStyle }}>Mã hàng</th>
+                <th style={{ ...thStyle }}>Tên hàng hóa</th>
+                <th style={{ ...thStyle, textAlign: 'center' }}>ĐVT</th>
+                <th style={{ ...thStyle, textAlign: 'right' }}>Giá bán</th>
                 {userRole === 'StoreOwner' && (
-                  <th style={{ textAlign: 'right', width: 120 }}>Giá vốn</th>
+                  <th style={{ ...thStyle, textAlign: 'right' }}>Giá vốn</th>
                 )}
-                <th style={{ textAlign: 'center', width: 130 }}>Trạng thái</th>
-                <th style={{ width: 130 }}>Thời gian tạo</th>
+                <th style={{ ...thStyle, textAlign: 'center' }}>Trạng thái</th>
+                <th style={{ ...thStyle }}>Ngày tạo</th>
+                <th style={{ ...thStyle, textAlign: 'right', paddingRight: 14 }}>Thao tác</th>
               </tr>
             </thead>
+          </table>
+        </div>
+
+        {/* ── Scrollable Body Table ── */}
+        <div
+          ref={bodyRef}
+          className="so-list-table-body supplier-table-scroll-container"
+          onScroll={handleBodyScroll}
+          style={{ flex: '1 1 auto', minHeight: 0, overflowY: 'auto' }}
+        >
+          <table className="so-list-table" style={{ minWidth: 1200, tableLayout: 'fixed' }}>
+            {tableColGroup}
             <tbody>
               {filteredProducts.map((p) => {
                 const isChecked = selectedProductIds.includes(p.id);
@@ -1457,6 +1561,7 @@ export const ProductListPage: React.FC = () => {
                 return (
                   <tr
                     key={p.id}
+                    className="so-list-row"
                     onClick={() => {
                       setSelectedProduct(p);
                       setIsDetailModalOpen(true);
@@ -1467,11 +1572,18 @@ export const ProductListPage: React.FC = () => {
                         ? '#f0fdfa'
                         : p.status === 'Discontinued'
                           ? '#f8fafc'
-                          : undefined,
+                          : '#ffffff',
                       opacity: p.status === 'Discontinued' ? 0.75 : 1,
+                      borderBottom: '1px solid #f1f5f9',
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!isSelected) e.currentTarget.style.backgroundColor = '#f8fafc';
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isSelected) e.currentTarget.style.backgroundColor = p.status === 'Discontinued' ? '#f8fafc' : '#ffffff';
                     }}
                   >
-                    <td style={{ textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
+                    <td style={{ textAlign: 'center', padding: '6px 4px', verticalAlign: 'middle' }} onClick={(e) => e.stopPropagation()}>
                       <input
                         type="checkbox"
                         checked={isChecked}
@@ -1484,7 +1596,7 @@ export const ProductListPage: React.FC = () => {
                         }}
                       />
                     </td>
-                    <td style={{ textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
+                    <td style={{ textAlign: 'center', padding: '6px 4px', verticalAlign: 'middle' }} onClick={(e) => e.stopPropagation()}>
                       <button
                         type="button"
                         className={`favorite-star-btn ${p.isFavorite ? 'active' : ''}`}
@@ -1494,41 +1606,44 @@ export const ProductListPage: React.FC = () => {
                         {p.isFavorite ? '★' : '☆'}
                       </button>
                     </td>
-                    <td style={{ minWidth: 180, width: 220 }}>
-                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
-                        {p.imageUrl ? (
-                          <img
-                            src={p.imageUrl}
-                            alt=""
-                            style={{ width: 28, height: 28, borderRadius: 4, objectFit: 'cover', border: '1px solid #e2e8f0', flexShrink: 0 }}
-                          />
-                        ) : (
-                          <div
-                            style={{
-                              width: 28,
-                              height: 28,
-                              borderRadius: 4,
-                              backgroundColor: '#f1f5f9',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              fontSize: 13,
-                              color: '#94a3b8',
-                              flexShrink: 0,
-                            }}
-                          >
-                            📦
-                          </div>
-                        )}
-                        <span className="product-code-link">
-                          {displayCode}
+                    {/* Ảnh */}
+                    <td style={{ textAlign: 'center', padding: '6px 4px', verticalAlign: 'middle' }}>
+                      {p.imageUrl ? (
+                        <img
+                          src={p.imageUrl}
+                          alt={p.productName}
+                          style={{ width: 36, height: 36, borderRadius: 6, objectFit: 'cover', border: '1px solid #e2e8f0', display: 'inline-block' }}
+                        />
+                      ) : (
+                        <span
+                          style={{
+                            width: 36,
+                            height: 36,
+                            borderRadius: 6,
+                            background: '#f1f5f9',
+                            border: '1px solid #e2e8f0',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                        >
+                          <Package size={16} color="#94a3b8" />
                         </span>
-                      </div>
+                      )}
+                    </td>
+                    {/* Mã hàng */}
+                    <td style={{ padding: '8px 8px', verticalAlign: 'middle' }}>
+                      <span
+                        title={displayCode}
+                        style={{ fontFamily: 'var(--font-mono, monospace)', fontSize: 12, fontWeight: 600, color: '#0f766e', whiteSpace: 'nowrap' }}
+                      >
+                        {displayCode}
+                      </span>
                     </td>
                     {/* Tên hàng hóa */}
-                    <td>
+                    <td className="so-list-td--wrap" style={{ verticalAlign: 'middle' }}>
                       <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                        <span style={{ fontWeight: 600, color: '#1e293b' }}>
+                        <span className="so-list-name" title={p.productName}>
                           {p.productName}
                         </span>
                         {p.hasBatches && (
@@ -1547,24 +1662,10 @@ export const ProductListPage: React.FC = () => {
                           </span>
                         )}
                         {p.isCombo && <span className="badge-combo">Combo</span>}
-                        {p.status === 'Discontinued' && (
-                          <span
-                            style={{
-                              marginLeft: 6,
-                              fontSize: 11,
-                              color: '#dc2626',
-                              background: '#fee2e2',
-                              padding: '2px 6px',
-                              borderRadius: 4,
-                            }}
-                          >
-                            Ngừng kinh doanh
-                          </span>
-                        )}
                       </div>
                     </td>
                     {/* Đơn vị tính (chứa option chuyển đổi ĐVT) */}
-                    <td>
+                    <td style={{ textAlign: 'center', padding: '8px 4px', verticalAlign: 'middle', overflow: 'visible' }}>
                       {p.uomConversions && p.uomConversions.length > 0 ? (
                         <div className="unit-dropdown-container" style={{ position: 'relative', display: 'inline-block' }}>
                           <button
@@ -1578,9 +1679,9 @@ export const ProductListPage: React.FC = () => {
                               border: '1px solid #CCFBF1',
                               color: '#0F766E',
                               fontWeight: 700,
-                              fontSize: 13,
+                              fontSize: 12,
                               cursor: 'pointer',
-                              padding: '3px 8px',
+                              padding: '2px 7px',
                               borderRadius: 6,
                               display: 'inline-flex',
                               alignItems: 'center',
@@ -1591,7 +1692,7 @@ export const ProductListPage: React.FC = () => {
                           >
                             <span>{currentUnitName}</span>
                             <ChevronDown
-                              size={13}
+                              size={12}
                               style={{
                                 transform: activeUnitDropdownId === p.id ? 'rotate(180deg)' : 'none',
                                 transition: 'transform 0.15s ease',
@@ -1663,34 +1764,65 @@ export const ProductListPage: React.FC = () => {
                           )}
                         </div>
                       ) : (
-                        <span style={{ fontWeight: 600, color: '#0F766E' }}>
+                        <span style={{ fontWeight: 600, color: '#334155', fontSize: 12.5 }}>
                           {p.baseUnit || 'Cái'}
                         </span>
                       )}
                     </td>
-                    <td style={{ textAlign: 'right', fontWeight: 600 }}>
-                      {(displayPrice ?? 0).toLocaleString('vi-VN')} đ
+                    <td style={{ textAlign: 'right', padding: '8px 6px', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
+                      <span style={{ fontFamily: 'var(--font-mono, monospace)', fontWeight: 700, fontSize: 13, color: '#0f766e' }}>
+                        {(displayPrice ?? 0).toLocaleString('vi-VN')} đ
+                      </span>
                     </td>
                     {userRole === 'StoreOwner' && (
-                      <td style={{ textAlign: 'right', color: '#64748b' }}>
-                        {p.costPrice != null ? `${Number(p.costPrice).toLocaleString('vi-VN')} đ` : '—'}
+                      <td style={{ textAlign: 'right', padding: '8px 6px', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
+                        <span style={{ fontFamily: 'var(--font-mono, monospace)', fontWeight: 600, fontSize: 12.5, color: '#64748b' }}>
+                          {p.costPrice != null ? `${Number(p.costPrice).toLocaleString('vi-VN')} đ` : '—'}
+                        </span>
                       </td>
                     )}
-                    <td style={{ textAlign: 'center' }}>
+                    <td style={{ textAlign: 'center', padding: '8px 4px', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
                       <span
                         style={{
-                          fontSize: 11.5,
-                          fontWeight: 700,
-                          padding: '2px 8px',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 6,
+                          fontSize: 12,
+                          fontWeight: 500,
+                          padding: '3px 10px',
                           borderRadius: 9999,
-                          backgroundColor: p.status === 'Active' ? '#CCFBF1' : '#FEE2E2',
-                          color: p.status === 'Active' ? '#0F766E' : '#DC2626',
+                          whiteSpace: 'nowrap',
+                          backgroundColor: p.status === 'Active' ? '#E8F9EE' : '#F1F5F9',
+                          color: p.status === 'Active' ? '#047857' : '#64748b',
                         }}
                       >
+                        <span
+                          style={{
+                            width: 6,
+                            height: 6,
+                            borderRadius: '50%',
+                            backgroundColor: p.status === 'Active' ? '#00C853' : '#94a3b8',
+                          }}
+                        />
                         {p.status === 'Active' ? 'Đang bán' : 'Ngừng kinh doanh'}
                       </span>
                     </td>
-                    <td style={{ fontSize: 12.5, color: '#64748b' }}>{p.createdAt}</td>
+                    <td style={{ padding: '8px 6px', verticalAlign: 'middle', color: '#64748b', fontSize: 12, whiteSpace: 'nowrap' }}>
+                      {p.createdAt}
+                    </td>
+                    <td style={{ textAlign: 'right', padding: '8px 14px 8px 4px', verticalAlign: 'middle', whiteSpace: 'nowrap' }} onClick={(e) => e.stopPropagation()}>
+                      <button
+                        type="button"
+                        className="so-list-action-btn"
+                        onClick={() => {
+                          setSelectedProduct(p);
+                          setIsDetailModalOpen(true);
+                        }}
+                        title="Mở chi tiết sản phẩm"
+                      >
+                        Thao tác
+                      </button>
+                    </td>
                   </tr>
                 );
               })}
@@ -1698,12 +1830,12 @@ export const ProductListPage: React.FC = () => {
               {filteredProducts.length === 0 && (
                 <tr>
                   <td
-                    colSpan={userRole === 'StoreOwner' ? 9 : 8}
-                    style={{ padding: '40px 20px', textAlign: 'center', color: '#94a3b8' }}
+                    colSpan={userRole === 'StoreOwner' ? 11 : 10}
+                    style={{ padding: '48px 16px', textAlign: 'center', color: '#94a3b8' }}
                   >
                     <Package size={40} style={{ margin: '0 auto 10px auto', opacity: 0.5 }} />
-                    <div style={{ fontSize: 15, fontWeight: 600 }}>Không tìm thấy sản phẩm nào</div>
-                    <div style={{ fontSize: 13, marginTop: 4 }}>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: '#64748b' }}>Không tìm thấy sản phẩm nào</div>
+                    <div style={{ fontSize: 12.5, marginTop: 4, color: '#94a3b8' }}>
                       Vui lòng thử tìm với từ khóa khác hoặc đặt lại bộ lọc.
                     </div>
                   </td>
@@ -1713,20 +1845,22 @@ export const ProductListPage: React.FC = () => {
           </table>
         </div>
 
-        {/* Enterprise Standard TablePagination */}
-        <TablePagination
-          currentPage={pageIndex}
-          pageSize={pageSize}
-          totalItems={totalCount}
-          pageSizeOptions={[10, 20, 50]}
-          onPageChange={(page) => setPageIndex(page)}
-          onPageSizeChange={(newSize) => {
-            setPageSize(newSize);
-            setPageIndex(1);
-          }}
-          itemLabel="hàng hóa"
-          isLoading={isLoading}
-        />
+        {/* ── Enterprise Standard TablePagination ── */}
+        <div style={{ flexShrink: 0 }}>
+          <TablePagination
+            currentPage={pageIndex}
+            pageSize={pageSize}
+            totalItems={totalCount}
+            pageSizeOptions={[15, 24, 36, 48]}
+            onPageChange={(page) => setPageIndex(page)}
+            onPageSizeChange={(newSize) => {
+              setPageSize(newSize);
+              setPageIndex(1);
+            }}
+            itemLabel="hàng hóa"
+            isLoading={isLoading}
+          />
+        </div>
       </div>
 
       {/* 3. Product Form Modal (Add / Edit Standard Product) */}

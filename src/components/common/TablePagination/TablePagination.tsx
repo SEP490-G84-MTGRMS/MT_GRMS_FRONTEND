@@ -53,14 +53,13 @@ export const TablePagination: FC<TablePaginationProps> = ({
 
   return (
     <div className={`table-pagination-container ${className}`.trim()}>
-      {/* 1. Records summary */}
-      <div className="table-pagination-info">
-        Hiển thị <strong>{fromItem} - {toItem}</strong> trên tổng số{' '}
-        <strong>{totalItems.toLocaleString('vi-VN')}</strong> {itemLabel}
-      </div>
+      {/* 1. Records summary & Page size selector (Left side) */}
+      <div className="table-pagination-left">
+        <div className="table-pagination-info">
+          Hiển thị <strong>{fromItem} - {toItem}</strong> trên tổng số{' '}
+          <strong>{totalItems.toLocaleString('vi-VN')}</strong> {itemLabel}
+        </div>
 
-      {/* 2. Controls */}
-      <div className="table-pagination-controls">
         {/* Page Size Selector */}
         {onPageSizeChange && (
           <div className="table-pagination-size-wrapper">
@@ -79,7 +78,10 @@ export const TablePagination: FC<TablePaginationProps> = ({
             </select>
           </div>
         )}
+      </div>
 
+      {/* 2. Controls & Navigation buttons (Right side) */}
+      <div className="table-pagination-controls">
         {/* Navigation buttons */}
         <div className="table-pagination-pages">
           {/* Previous Page */}

@@ -216,6 +216,8 @@ export const INITIAL_AP_LEDGERS: Record<string, APLedgerEntry[]> = {
     {
       id: 'ledg-001',
       supplierId: 'supp-001',
+      branchId: '01a181dc-5902-7b21-b424-1c9ea18e917d',
+      branchName: 'MT-Mart Chi Nhánh Quận 1',
       transactionDate: '2026-10-08T09:30:00Z',
       docType: 'PurchaseInvoice',
       docNo: 'GRN-20261008-001',
@@ -225,12 +227,29 @@ export const INITIAL_AP_LEDGERS: Record<string, APLedgerEntry[]> = {
       balanceAfter: 2180000,
       createdByName: 'Đức (Quản lý kho)',
       idempotencyKey: 'GRN-20261008-001-KEY'
+    },
+    {
+      id: 'ledg-003',
+      supplierId: 'supp-001',
+      branchId: '01a181dc-5902-71fe-ba6d-aeb9700b4743',
+      branchName: 'MT-Mart Chi Nhánh Cầu Giấy',
+      transactionDate: '2026-09-15T11:00:00Z',
+      docType: 'PurchaseInvoice',
+      docNo: 'GRN-20260915-002',
+      description: 'Nhập nông sản đợt 2 theo Đơn hàng PO-002',
+      amount: 3200000,
+      direction: 1,
+      balanceAfter: 3200000,
+      createdByName: 'Lan (Kho Cầu Giấy)',
+      idempotencyKey: 'GRN-20260915-002-KEY'
     }
   ],
   'supp-005': [
     {
       id: 'ledg-002',
       supplierId: 'supp-005',
+      branchId: '01a181dc-5902-7b21-b424-1c9ea18e917d',
+      branchName: 'MT-Mart Chi Nhánh Quận 1',
       transactionDate: '2026-09-25T10:00:00Z',
       docType: 'ServiceInvoice',
       docNo: 'EVN-202609-088',
@@ -241,6 +260,68 @@ export const INITIAL_AP_LEDGERS: Record<string, APLedgerEntry[]> = {
       createdByName: 'Thành (Kế toán)',
       idempotencyKey: 'EVN-202609-088-KEY'
     }
+  ],
+  'SUP-UNILEVER': [
+    {
+      id: 'ledg-uni-01',
+      supplierId: 'SUP-UNILEVER',
+      branchId: '01a181dc-5902-7b21-b424-1c9ea18e917d',
+      branchName: 'MT-Mart Chi Nhánh Quận 1',
+      transactionDate: '2026-10-12T10:00:00Z',
+      docType: 'PurchaseInvoice',
+      docNo: 'GRN-20261012-001',
+      description: 'Nhập dầu gội Sunsilk & Clear theo đơn PO-011',
+      amount: 3500000,
+      direction: 1,
+      balanceAfter: 3500000,
+      createdByName: 'Đức (Quản lý kho)',
+      idempotencyKey: 'GRN-20261012-001-KEY',
+    },
+    {
+      id: 'ledg-uni-02',
+      supplierId: 'SUP-UNILEVER',
+      branchId: '01a181dc-5902-7b21-b424-1c9ea18e917d',
+      branchName: 'MT-Mart Chi Nhánh Quận 1',
+      transactionDate: '2026-10-15T14:30:00Z',
+      docType: 'PaymentVoucher',
+      docNo: 'PAY-20261015-003',
+      description: 'Thanh toán tiền hàng đợt 1 Unilever Quận 1',
+      amount: 2000000,
+      direction: -1,
+      balanceAfter: 1500000,
+      createdByName: 'Thành (Kế toán)',
+      idempotencyKey: 'PAY-20261015-003-KEY',
+    },
+    {
+      id: 'ledg-uni-03',
+      supplierId: 'SUP-UNILEVER',
+      branchId: '01a181dc-5902-71fe-ba6d-aeb9700b4743',
+      branchName: 'MT-Mart Chi Nhánh Cầu Giấy',
+      transactionDate: '2026-10-18T09:15:00Z',
+      docType: 'PurchaseInvoice',
+      docNo: 'GRN-20261018-002',
+      description: 'Nhập bột giặt OMO & Comfort theo đơn PO-019',
+      amount: 4800000,
+      direction: 1,
+      balanceAfter: 4800000,
+      createdByName: 'Lan (Kho Cầu Giấy)',
+      idempotencyKey: 'GRN-20261018-002-KEY',
+    },
+    {
+      id: 'ledg-uni-04',
+      supplierId: 'SUP-UNILEVER',
+      branchId: '01a181dc-5902-71fe-ba6d-aeb9700b4743',
+      branchName: 'MT-Mart Chi Nhánh Cầu Giấy',
+      transactionDate: '2026-10-20T16:00:00Z',
+      docType: 'PaymentVoucher',
+      docNo: 'PAY-20261020-004',
+      description: 'Thanh toán tiền hàng OMO đợt 1 Cầu Giấy',
+      amount: 3000000,
+      direction: -1,
+      balanceAfter: 1800000,
+      createdByName: 'Thành (Kế toán)',
+      idempotencyKey: 'PAY-20261020-004-KEY',
+    },
   ]
 };
 
@@ -536,11 +617,15 @@ export const MOCK_SUPPLIER_PRODUCTS: Record<string, SupplierProductItem[]> = {
 
 export const MOCK_PURCHASE_ORDERS: Record<string, PurchaseOrderItem[]> = {
   'supp-001': [
-    { id: 'po-101', code: 'PO-20261008-012', orderDate: '2026-10-08', deliveryDate: '2026-10-09', branchName: 'Siêu thị Mini Minh Đức (CN1)', totalAmount: 2180000, status: 'COMPLETED' },
-    { id: 'po-102', code: 'PO-20260928-005', orderDate: '2026-09-28', deliveryDate: '2026-09-29', branchName: 'Siêu thị Mini Minh Đức (CN1)', totalAmount: 1850000, status: 'COMPLETED' },
-    { id: 'po-103', code: 'PO-20260915-002', orderDate: '2026-09-15', deliveryDate: '2026-09-16', branchName: 'Siêu thị Mini Minh Đức (CN2)', totalAmount: 3200000, status: 'COMPLETED' },
+    { id: 'po-101', code: 'PO-20261008-012', orderDate: '2026-10-08', deliveryDate: '2026-10-09', branchId: '01a181dc-5902-7b21-b424-1c9ea18e917d', branchName: 'MT-Mart Chi Nhánh Quận 1', totalAmount: 2180000, status: 'COMPLETED' },
+    { id: 'po-102', code: 'PO-20260928-005', orderDate: '2026-09-28', deliveryDate: '2026-09-29', branchId: '01a181dc-5902-7b21-b424-1c9ea18e917d', branchName: 'MT-Mart Chi Nhánh Quận 1', totalAmount: 1850000, status: 'COMPLETED' },
+    { id: 'po-103', code: 'PO-20260915-002', orderDate: '2026-09-15', deliveryDate: '2026-09-16', branchId: '01a181dc-5902-71fe-ba6d-aeb9700b4743', branchName: 'MT-Mart Chi Nhánh Cầu Giấy', totalAmount: 3200000, status: 'COMPLETED' },
   ],
   'supp-002': [
-    { id: 'po-201', code: 'PO-20261002-008', orderDate: '2026-10-02', deliveryDate: '2026-10-04', branchName: 'Siêu thị Mini Minh Đức (CN1)', totalAmount: 4500000, status: 'PARTIALLY_RECEIVED' },
+    { id: 'po-201', code: 'PO-20261002-008', orderDate: '2026-10-02', deliveryDate: '2026-10-04', branchId: '01a181dc-5902-7b21-b424-1c9ea18e917d', branchName: 'MT-Mart Chi Nhánh Quận 1', totalAmount: 4500000, status: 'PARTIALLY_RECEIVED' },
+  ],
+  'SUP-UNILEVER': [
+    { id: 'po-uni-01', code: 'PO-20261010-011', orderDate: '2026-10-10', deliveryDate: '2026-10-12', branchId: '01a181dc-5902-7b21-b424-1c9ea18e917d', branchName: 'MT-Mart Chi Nhánh Quận 1', totalAmount: 3500000, status: 'COMPLETED' },
+    { id: 'po-uni-02', code: 'PO-20261016-019', orderDate: '2026-10-16', deliveryDate: '2026-10-18', branchId: '01a181dc-5902-71fe-ba6d-aeb9700b4743', branchName: 'MT-Mart Chi Nhánh Cầu Giấy', totalAmount: 4800000, status: 'CONFIRMED' },
   ],
 };
