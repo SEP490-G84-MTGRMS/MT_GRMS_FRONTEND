@@ -115,9 +115,11 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  /** Chỉ khóa khi phiếu đã COMPLETED/CANCELLED; create + DRAFT (confirm/edit) vẫn sửa được */
+  /** Khóa khi lưu, khi xem chi tiết (:id mà không phải confirm/edit), hoặc khi phiếu đã COMPLETED/CANCELLED */
   const isReadOnly =
-    isSaving || (!isCreateMode && !!receiptStatus && receiptStatus !== 'DRAFT');
+    isSaving ||
+    (!isCreateMode && !isConfirmMode && !isEditMode) ||
+    (!isCreateMode && !!receiptStatus && receiptStatus !== 'DRAFT');
 
   const [grnNo, setGrnNo] = useState<string>('(Tự sinh khi lưu)');
   const [branchId, setBranchId] = useState<string>(employeeBranchId || '');
@@ -126,7 +128,7 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
   );
   const [supplierName, setSupplierName] = useState('');
   const [supplierCode, setSupplierCode] = useState('');
-  const [receiptTime] = useState<string>(() => {
+  const [receiptTime, setReceiptTime] = useState<string>(() => {
     const now = new Date();
     const d = String(now.getDate()).padStart(2, '0');
     const m = String(now.getMonth() + 1).padStart(2, '0');
@@ -136,7 +138,7 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
     return `${d}/${m}/${y} ${hh}:${mm}`;
   });
   const [invoiceNo, setInvoiceNo] = useState('');
-  const [createdBy] = useState(
+  const [createdBy, setCreatedBy] = useState<string>(
     role === 'employee' ? 'NV. Thủ kho' : 'Quản lý kho'
   );
   const [paymentTerm, setPaymentTerm] = useState<PaymentTerm>('30');
@@ -177,6 +179,21 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
       setNotes(dto.note || '');
       setDiscountAmount(dto.discountAmount || 0);
       setVatPercent(dto.vatPercent || 0);
+      if (dto.receivedAtUtc) {
+        const d = new Date(dto.receivedAtUtc);
+        const day = String(d.getDate()).padStart(2, '0');
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const year = d.getFullYear();
+        const hh = String(d.getHours()).padStart(2, '0');
+        const mm = String(d.getMinutes()).padStart(2, '0');
+        setReceiptTime(`${day}/${month}/${year} ${hh}:${mm}`);
+      }
+      if (dto.receiverName || dto.receiverUserId) {
+        setCreatedBy(dto.receiverName || dto.receiverUserId);
+      }
+      if (dto.paymentMethod) {
+        setPaymentMethod(dto.paymentMethod as PaymentMethod);
+      }
       setItems(mapDtoToItems(dto));
       if (dto.status && dto.status !== 'DRAFT' && (isConfirmMode || isEditMode)) {
         showToast('Phiếu này không còn ở trạng thái nháp — chuyển sang xem chi tiết.', 'info');
@@ -426,18 +443,20 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
       if (!src) return prev;
       const key = String(src.purchaseOrderDetailId || src.productId);
       const lotIndex = prev.filter((it) => String(it.purchaseOrderDetailId || it.productId) === key).length + 1;
+      const isManaged = Boolean(src.hasBatches ?? src.manageBatch);
       const newRow: GrnItemDetail = {
         ...src,
         id: `${src.purchaseOrderDetailId || src.productId}-split-${Date.now()}`,
         isSplitLine: true,
-        manageBatch: true,
+        hasBatches: isManaged,
+        manageBatch: isManaged,
         receivedQty: 0,
         acceptedQty: 0,
         rejectedQty: 0,
         shortageQty: src.orderedQty,
         differenceQty: -src.orderedQty,
         lineTotal: 0,
-        batchCode: generateBatchCode(src.productCode, lotIndex),
+        batchCode: isManaged ? generateBatchCode(src.productCode, lotIndex) : '',
         manufactureDate: '',
         expiryDate: '',
         rejectionReason: undefined,
@@ -523,7 +542,8 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
     }
 
     for (const it of items) {
-      if (it.manageBatch && (it.receivedQty || 0) > 0) {
+      const isBatch = Boolean(it.hasBatches ?? it.manageBatch);
+      if (isBatch && (it.receivedQty || 0) > 0) {
         if (!it.manufactureDate?.trim()) {
           showToast(`${it.productCode}: đang quản lý batch — bắt buộc Ngày SX (MFG).`, 'error');
           return false;
@@ -560,6 +580,7 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
       const isShort = sumReceived < ordered;
       const groupReason =
         siblings.find((r) => r.rejectionReason)?.rejectionReason || it.rejectionReason;
+      const isBatch = Boolean(it.hasBatches ?? it.manageBatch);
       return {
         productId: it.productId,
         purchaseOrderDetailId: it.purchaseOrderDetailId,
@@ -568,10 +589,10 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
         acceptedQty: delivered,
         rejectedQty: 0,
         unitPrice: it.unitPrice,
-        manageBatch: !!it.manageBatch,
-        batchCode: it.manageBatch ? it.batchCode || undefined : undefined,
-        manufactureDate: it.manageBatch ? it.manufactureDate || undefined : undefined,
-        expiryDate: it.manageBatch ? it.expiryDate || undefined : undefined,
+        manageBatch: isBatch,
+        batchCode: isBatch ? it.batchCode || undefined : undefined,
+        manufactureDate: isBatch ? it.manufactureDate || undefined : undefined,
+        expiryDate: isBatch ? it.expiryDate || undefined : undefined,
         rejectionReason: isShort ? groupReason || 'SHORT_DELIVERY' : undefined,
         rejectionNote: it.rejectionNote,
         note: it.note,

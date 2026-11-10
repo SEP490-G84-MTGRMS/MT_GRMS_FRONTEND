@@ -25,15 +25,23 @@ interface PoListTableProps {
 
 const canShowReceiveAction = (order: PurchaseOrderListItem): boolean => {
   const grn = (order.activeGoodsReceiptStatus || '').toUpperCase();
-  if (grn === 'DRAFT' || grn === 'COMPLETED') return true;
-  if (order.status === 'CANCELLED' || order.status === 'REJECTED') return false;
+  // Khi đã nhập rồi (COMPLETED / RECEIVED) thì bỏ icon nhập hàng đi, chỉ để lại nút chi tiết
+  if (grn === 'COMPLETED') return false;
+  if (grn === 'DRAFT') return true;
+  if (
+    order.status === 'CANCELLED' ||
+    order.status === 'REJECTED' ||
+    order.status === 'RECEIVED' ||
+    order.status === 'COMPLETED'
+  ) {
+    return false;
+  }
   return (
     order.status === 'SENT' ||
     order.status === 'CONFIRMED' ||
     order.status === 'APPROVED' ||
     order.status === 'DISPATCHED' ||
-    order.status === 'PARTIALLY_RECEIVED' ||
-    order.status === 'RECEIVED'
+    order.status === 'PARTIALLY_RECEIVED'
   );
 };
 

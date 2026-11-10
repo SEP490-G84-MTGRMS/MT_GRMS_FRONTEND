@@ -149,32 +149,28 @@ export const GrnCostSummaryCard: FC<GrnCostSummaryCardProps> = ({
               <Percent size={13} color="#64748b" />
               <span>Chiết khấu từ NCC:</span>
             </div>
-            {readOnly ? (
-              <span style={{ fontWeight: 600, fontFamily: 'monospace', color: '#dc2626' }}>
-                -{formatCurrency(costs.discountAmount)} VNĐ
-              </span>
-            ) : (
-              <input
-                type="number"
-                min={0}
-                step={5000}
-                value={costs.discountAmount}
-                onChange={(e) => onDiscountChange(Math.max(0, parseFloat(e.target.value) || 0))}
-                style={{
-                  width: 120,
-                  height: 28,
-                  padding: '0 6px',
-                  textAlign: 'right',
-                  borderRadius: 5,
-                  border: '1px solid #cbd5e1',
-                  fontWeight: 600,
-                  fontSize: 12,
-                  color: '#dc2626',
-                  backgroundColor: '#ffffff',
-                  outline: 'none',
-                }}
-              />
-            )}
+            <input
+              type="number"
+              min={0}
+              step={5000}
+              disabled={readOnly}
+              value={costs.discountAmount}
+              onChange={(e) => onDiscountChange(Math.max(0, parseFloat(e.target.value) || 0))}
+              style={{
+                width: 120,
+                height: 28,
+                padding: '0 6px',
+                textAlign: 'right',
+                borderRadius: 5,
+                border: '1px solid #cbd5e1',
+                fontWeight: 600,
+                fontSize: 12,
+                color: readOnly ? '#64748b' : '#dc2626',
+                backgroundColor: readOnly ? '#f1f5f9' : '#ffffff',
+                cursor: readOnly ? 'not-allowed' : 'text',
+                outline: 'none',
+              }}
+            />
           </div>
 
           {/* 3. Thuế VAT */}
@@ -192,31 +188,28 @@ export const GrnCostSummaryCard: FC<GrnCostSummaryCardProps> = ({
               <span>Thuế VAT:</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              {readOnly ? (
-                <span style={{ fontSize: 12, color: '#475569' }}>({costs.vatPercent}%)</span>
-              ) : (
-                <select
-                  value={costs.vatPercent}
-                  onChange={(e) => onVatPercentChange(parseFloat(e.target.value) || 0)}
-                  style={{
-                    height: 28,
-                    padding: '0 6px',
-                    borderRadius: 5,
-                    border: '1px solid #cbd5e1',
-                    fontSize: 12,
-                    fontWeight: 600,
-                    color: '#334155',
-                    backgroundColor: '#ffffff',
-                    outline: 'none',
-                    cursor: 'pointer',
-                  }}
-                >
-                  <option value={0}>0% VAT</option>
-                  <option value={5}>5% VAT</option>
-                  <option value={8}>8% VAT</option>
-                  <option value={10}>10% VAT</option>
-                </select>
-              )}
+              <select
+                value={costs.vatPercent}
+                disabled={readOnly}
+                onChange={(e) => onVatPercentChange(parseFloat(e.target.value) || 0)}
+                style={{
+                  height: 28,
+                  padding: '0 6px',
+                  borderRadius: 5,
+                  border: '1px solid #cbd5e1',
+                  fontSize: 12,
+                  fontWeight: 600,
+                  color: readOnly ? '#64748b' : '#334155',
+                  backgroundColor: readOnly ? '#f1f5f9' : '#ffffff',
+                  outline: 'none',
+                  cursor: readOnly ? 'not-allowed' : 'pointer',
+                }}
+              >
+                <option value={0}>0% VAT</option>
+                <option value={5}>5% VAT</option>
+                <option value={8}>8% VAT</option>
+                <option value={10}>10% VAT</option>
+              </select>
               <span style={{ fontWeight: 600, fontFamily: 'monospace', color: '#0f172a' }}>
                 +{formatCurrency(costs.vatAmount)} VNĐ
               </span>

@@ -31,7 +31,6 @@ import {
 import {
   GoodsReceiptListPage,
   GoodsReceiptFormPage,
-  GoodsReceiptDetailPage,
 } from '../features/goods-receipt';
 
 // 2c. Batch & Expiry Feature (FE-02 / UI-02-01)
@@ -427,7 +426,7 @@ export const router = createBrowserRouter([
       },
       {
         path: 'goods-receipts/:id',
-        element: <GoodsReceiptDetailPage defaultRole="store_owner" />,
+        element: <GoodsReceiptFormPage defaultRole="store_owner" />,
       },
       {
         path: 'goods-receipts/:id/confirm',
@@ -1107,7 +1106,7 @@ export const router = createBrowserRouter([
       },
       {
         path: 'goods-receipts/:id',
-        element: <GoodsReceiptDetailPage defaultRole="employee" />,
+        element: <GoodsReceiptFormPage defaultRole="employee" />,
       },
       {
         path: 'goods-receipts/:id/confirm',
@@ -1135,7 +1134,7 @@ export const router = createBrowserRouter([
       },
       {
         path: ':id',
-        element: <GoodsReceiptDetailPage defaultRole="store_owner" />,
+        element: <GoodsReceiptFormPage defaultRole="store_owner" />,
       },
       {
         path: ':id/confirm',
@@ -1161,7 +1160,7 @@ export const router = createBrowserRouter([
       },
       {
         path: ':id',
-        element: <GoodsReceiptDetailPage defaultRole="employee" />,
+        element: <GoodsReceiptFormPage defaultRole="employee" />,
       },
       {
         path: ':id/confirm',
