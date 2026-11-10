@@ -123,13 +123,13 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   const [isUomExpanded, setIsUomExpanded] = useState<boolean>(true);
   const [baseUnit, setBaseUnit] = useState('');
   const [baseUnitPrice, setBaseUnitPrice] = useState<number>(0);
+  const [isBaseUnitPurchaseUnit, setIsBaseUnitPurchaseUnit] = useState<boolean>(true);
   const [uomConversions, setUomConversions] = useState<UomConversion[]>([]);
   const [deletedUnitIds, setDeletedUnitIds] = useState<string[]>([]);
 
   // 5. Mô tả & Ghi chú sản phẩm
   const [description, setDescription] = useState('');
   const [internalNote, setInternalNote] = useState('');
-  const [eligibleForVatReduction, setEligibleForVatReduction] = useState<boolean>(false);
 
   // Alerts & Validation Popup
   const [warningMsg, setWarningMsg] = useState('');
@@ -158,14 +158,26 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         setDeletedUnitIds([]);
 
         if (productToEdit.uomConversions && productToEdit.uomConversions.length > 0) {
+          const hasNonBasePurchaseUnit = productToEdit.uomConversions.some((u) => Boolean(u.isPurchaseUnit));
+          setIsBaseUnitPurchaseUnit(
+            productToEdit.isBaseUnitPurchaseUnit !== undefined
+              ? productToEdit.isBaseUnitPurchaseUnit
+              : !hasNonBasePurchaseUnit
+          );
           setUomConversions(productToEdit.uomConversions);
         } else {
+          setIsBaseUnitPurchaseUnit(productToEdit.isBaseUnitPurchaseUnit ?? true);
           // Tự động nạp đơn vị tính từ API nếu chưa có sẵn
           productApi
             .getProductUnits(productToEdit.id)
             .then((units) => {
               if (units && units.length > 0) {
+                const baseUnitRow = units.find((u) => u.isBaseUnit);
                 const nonBaseUnits = units.filter((u) => !u.isBaseUnit);
+                const hasNonBasePurchase = nonBaseUnits.some((u) => Boolean(u.isPurchaseUnit));
+                setIsBaseUnitPurchaseUnit(
+                  hasNonBasePurchase ? false : (baseUnitRow?.isPurchaseUnit ?? true)
+                );
                 setUomConversions(
                   nonBaseUnits.map((u) => ({
                     id: u.id,
@@ -174,6 +186,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                     barcode: u.barcode || '',
                     price: u.price,
                     productCode: '',
+                    isPurchaseUnit: Boolean(u.isPurchaseUnit),
                   }))
                 );
               } else {
@@ -187,7 +200,6 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
 
         setDescription(productToEdit.description || '');
         setInternalNote(productToEdit.internalNote || '');
-        setEligibleForVatReduction(productToEdit.eligibleForVatReduction ?? false);
 
         setWarningMsg('');
         setValidationPopupMsg('');
@@ -207,12 +219,12 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
 
         setBaseUnit('');
         setBaseUnitPrice(0);
+        setIsBaseUnitPurchaseUnit(true);
         setUomConversions([]);
         setDeletedUnitIds([]);
 
         setDescription('');
         setInternalNote('');
-        setEligibleForVatReduction(false);
 
         setWarningMsg('');
         setValidationPopupMsg('');
@@ -239,6 +251,17 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     setBaseUnitPrice(val);
   };
 
+  // Định dạng hiển thị số tiền có dấu chấm phân cách hàng nghìn (VD: 1.000.000)
+  const formatCurrencyInput = (val: number): string => {
+    if (!val || val <= 0) return '';
+    return val.toLocaleString('vi-VN');
+  };
+
+  const parseCurrencyInput = (raw: string): number => {
+    const digitsOnly = raw.replace(/\D/g, '');
+    return digitsOnly === '' ? 0 : Math.max(0, Number(digitsOnly));
+  };
+
   if (!isOpen) return null;
 
   const triggerValidationError = (msg: string) => {
@@ -259,8 +282,24 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       barcode: '',
       price: sellingPrice || 0,
       productCode: productCode.trim() || 'Mã tự động',
+      isPurchaseUnit: false,
     };
     setUomConversions([...uomConversions, newUom]);
+  };
+
+  const handleSelectBaseUnitAsPurchaseUnit = () => {
+    setIsBaseUnitPurchaseUnit(true);
+    setUomConversions((prev) => prev.map((u) => ({ ...u, isPurchaseUnit: false })));
+  };
+
+  const handleSelectUomAsPurchaseUnit = (id: string) => {
+    setIsBaseUnitPurchaseUnit(false);
+    setUomConversions((prev) =>
+      prev.map((u) => ({
+        ...u,
+        isPurchaseUnit: u.id === id,
+      }))
+    );
   };
 
   const handleUpdateUom = (id: string, field: keyof UomConversion, value: any) => {
@@ -286,8 +325,12 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   };
 
   const handleRemoveUom = (id: string) => {
+    const removed = uomConversions.find((u) => u.id === id);
     if (!id.startsWith('uom-')) {
       setDeletedUnitIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
+    }
+    if (removed?.isPurchaseUnit) {
+      setIsBaseUnitPurchaseUnit(true);
     }
     setUomConversions(uomConversions.filter((u) => u.id !== id));
   };
@@ -338,30 +381,132 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
 
   // Submit Handler
   const handleSubmit = async (saveAndAddNew: boolean = false) => {
-    if (!productName.trim()) {
+    if (isUploadingImage) {
+      triggerValidationError('Đang tải ảnh lên Cloudinary, vui lòng chờ hoàn tất trước khi lưu.');
+      return;
+    }
+
+    const trimmedName = productName.trim();
+    if (!trimmedName) {
       triggerValidationError('Vui lòng nhập tên sản phẩm (Bắt buộc).');
       return;
     }
+    if (trimmedName.length > 200) {
+      triggerValidationError('Tên sản phẩm không được vượt quá 200 ký tự.');
+      return;
+    }
+
+    const trimmedCode = productCode.trim();
+    if (!isEditing && trimmedCode) {
+      if (trimmedCode.length > 50 || !/^[A-Za-z0-9_-]+$/.test(trimmedCode)) {
+        triggerValidationError('Mã hàng không được vượt quá 50 ký tự và chỉ gồm chữ cái không dấu, số, gạch ngang/dưới.');
+        return;
+      }
+    }
+
+    const trimmedBarcode = barcode.trim();
+    if (trimmedBarcode) {
+      if (trimmedBarcode.length > 50 || /\s/.test(trimmedBarcode)) {
+        triggerValidationError('Mã vạch không hợp lệ (tối đa 50 ký tự, không chứa khoảng trắng).');
+        return;
+      }
+    }
+
     if (!categoryId) {
       triggerValidationError('Vui lòng chọn nhóm hàng (Bắt buộc).');
       return;
     }
-    if (!baseUnit.trim()) {
+
+    const trimmedBaseUnit = baseUnit.trim();
+    if (!trimmedBaseUnit) {
       triggerValidationError('Vui lòng nhập tên đơn vị cơ bản (Bắt buộc).');
       return;
     }
-    
+    if (trimmedBaseUnit.length > 30) {
+      triggerValidationError('Tên đơn vị cơ bản không được vượt quá 30 ký tự.');
+      return;
+    }
+
+    if (sellingPrice < 0 || sellingPrice > 1_000_000_000) {
+      triggerValidationError('Giá bán không được nhỏ hơn 0 hoặc vượt quá 1.000.000.000 đ.');
+      return;
+    }
+    if (costPrice < 0 || costPrice > 1_000_000_000) {
+      triggerValidationError('Giá vốn không được nhỏ hơn 0 hoặc vượt quá 1.000.000.000 đ.');
+      return;
+    }
+
+    if (description.trim().length > 1000) {
+      triggerValidationError('Mô tả sản phẩm không được vượt quá 1000 ký tự.');
+      return;
+    }
+    if (internalNote.trim().length > 500) {
+      triggerValidationError('Ghi chú nội bộ không được vượt quá 500 ký tự.');
+      return;
+    }
+
+    // Validate danh sách đơn vị quy đổi (ProductUnit)
+    if (uomConversions.length > 0) {
+      const seenUnitNames = new Set<string>([trimmedBaseUnit.toLowerCase()]);
+      const seenBarcodes = new Set<string>();
+      if (trimmedBarcode) {
+        seenBarcodes.add(trimmedBarcode.toLowerCase());
+      }
+
+      for (const uom of uomConversions) {
+        const uName = (uom.unitName || '').trim();
+        if (!uName) {
+          triggerValidationError('Vui lòng nhập tên cho tất cả các đơn vị quy đổi.');
+          return;
+        }
+        if (uName.length > 30) {
+          triggerValidationError(`Tên đơn vị quy đổi "${uName}" không được vượt quá 30 ký tự.`);
+          return;
+        }
+        const lowerName = uName.toLowerCase();
+        if (seenUnitNames.has(lowerName)) {
+          triggerValidationError(`Tên đơn vị quy đổi "${uName}" không được trùng với đơn vị cơ bản hoặc trùng lặp nhau.`);
+          return;
+        }
+        seenUnitNames.add(lowerName);
+
+        if (!uom.conversionRate || uom.conversionRate <= 0) {
+          triggerValidationError(`Tỷ lệ quy đổi của đơn vị "${uName}" phải lớn hơn 0.`);
+          return;
+        }
+        if (uom.price < 0 || uom.price > 1_000_000_000) {
+          triggerValidationError(`Giá bán của đơn vị "${uName}" không hợp lệ (0 - 1.000.000.000 đ).`);
+          return;
+        }
+
+        const uBarcode = (uom.barcode || '').trim();
+        if (uBarcode) {
+          if (uBarcode.length > 50 || /\s/.test(uBarcode)) {
+            triggerValidationError(`Mã vạch của đơn vị "${uName}" không hợp lệ (tối đa 50 ký tự, không chứa khoảng trắng).`);
+            return;
+          }
+          const lowerBarcode = uBarcode.toLowerCase();
+          if (seenBarcodes.has(lowerBarcode)) {
+            triggerValidationError(`Mã vạch "${uBarcode}" của đơn vị "${uName}" bị trùng lặp với mã vạch sản phẩm hoặc đơn vị khác.`);
+            return;
+          }
+          seenBarcodes.add(lowerBarcode);
+        }
+      }
+    }
+
     if (sellingPrice < costPrice && costPrice > 0 && !warningMsg) {
       setWarningMsg('Cảnh báo: Giá bán đang thấp hơn giá vốn! Nhấn Lưu lần nữa để xác nhận.');
       return;
     }
 
-try {
+    try {
       setIsSubmitting(true);
       setWarningMsg('');
       setValidationPopupMsg('');
 
       const selectedCategory = categories.find((c) => c.id === categoryId);
+      const purchaseUnitObj = uomConversions.find((u) => Boolean(u.isPurchaseUnit));
 
       const payload: Partial<ProductItem> = {
         productCode: productCode.trim() || undefined,
@@ -378,6 +523,8 @@ try {
         hasBatches,
         description: description.trim() || undefined,
         internalNote: internalNote.trim() || undefined,
+        isBaseUnitPurchaseUnit: !purchaseUnitObj && isBaseUnitPurchaseUnit,
+        purchaseUnit: purchaseUnitObj?.unitName?.trim() || baseUnit.trim(),
         uomConversions,
       };
 
@@ -394,6 +541,7 @@ try {
         setCostPrice(0);
         setBaseUnit('');
         setBaseUnitPrice(0);
+        setIsBaseUnitPurchaseUnit(true);
         setUomConversions([]);
         setDeletedUnitIds([]);
         setDescription('');
@@ -519,6 +667,7 @@ try {
                       type="text"
                       className="filter-input"
                       placeholder="Mã tự động sinh"
+                      maxLength={50}
                       value={productCode}
                       onChange={(e) => setProductCode(e.target.value)}
                       disabled={isEditing}
@@ -544,6 +693,7 @@ try {
                       type="text"
                       className="filter-input"
                       placeholder="Nhập mã vạch (Barcode)"
+                      maxLength={50}
                       value={barcode}
                       onChange={(e) => setBarcode(e.target.value)}
                     />
@@ -567,6 +717,7 @@ try {
                     type="text"
                     className="filter-input"
                     placeholder="Nhập tên sản phẩm (Bắt buộc)"
+                    maxLength={200}
                     value={productName}
                     onChange={(e) => setProductName(e.target.value)}
                     required
@@ -999,20 +1150,6 @@ try {
                             borderRadius: 6,
                             boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
                           }}
-                          onClick={() => setPreviewImageModalUrl(images[0])}
-                        >
-                          <Search size={12} style={{ marginRight: 4 }} /> Xem to
-                        </button>
-                        <button
-                          type="button"
-                          className="btn-secondary-white"
-                          style={{
-                            padding: '3px 8px',
-                            fontSize: 11,
-                            fontWeight: 600,
-                            borderRadius: 6,
-                            boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-                          }}
                           disabled={isSubmitting}
                           onClick={() => fileInputRef.current?.click()}
                         >
@@ -1217,14 +1354,14 @@ try {
                   </label>
                   <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
                     <input
-                      type="number"
+                      type="text"
+                      inputMode="numeric"
                       className="filter-input"
                       style={{ paddingRight: 32 }}
                       placeholder="0"
-                      value={costPrice === 0 ? '' : costPrice}
-                      onChange={(e) => setCostPrice(e.target.value === '' ? 0 : Math.max(0, Number(e.target.value)))}
+                      value={formatCurrencyInput(costPrice)}
+                      onChange={(e) => setCostPrice(parseCurrencyInput(e.target.value))}
                       onFocus={(e) => e.target.select()}
-                      min={0}
                     />
                     <span
                       style={{
@@ -1279,14 +1416,14 @@ try {
                 </div>
                 <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
                   <input
-                    type="number"
+                    type="text"
+                    inputMode="numeric"
                     className="filter-input"
                     style={{ paddingRight: 32 }}
                     placeholder="0"
-                    value={sellingPrice === 0 ? '' : sellingPrice}
-                    onChange={(e) => handleSellingPriceChange(e.target.value === '' ? 0 : Math.max(0, Number(e.target.value)))}
+                    value={formatCurrencyInput(sellingPrice)}
+                    onChange={(e) => handleSellingPriceChange(parseCurrencyInput(e.target.value))}
                     onFocus={(e) => e.target.select()}
-                    min={0}
                     required
                   />
                   <span
@@ -1425,6 +1562,7 @@ try {
                       type="text"
                       className="filter-input"
                       placeholder="VD: Chai, Lon, Gói, Hộp..."
+                      maxLength={30}
                       value={baseUnit}
                       disabled={hasTransactions}
                       onChange={(e) => setBaseUnit(e.target.value)}
@@ -1444,14 +1582,48 @@ try {
                       Giá bán
                     </label>
                     <input
-                      type="number"
+                      type="text"
+                      inputMode="numeric"
                       className="filter-input"
                       placeholder="0"
-                      value={baseUnitPrice === 0 ? '' : baseUnitPrice}
-                      onChange={(e) => setBaseUnitPrice(e.target.value === '' ? 0 : Math.max(0, Number(e.target.value)))}
+                      value={formatCurrencyInput(baseUnitPrice)}
+                      onChange={(e) => handleSellingPriceChange(parseCurrencyInput(e.target.value))}
                       onFocus={(e) => e.target.select()}
-                      min={0}
                     />
+                  </div>
+
+                  <div style={{ paddingTop: 20 }}>
+                    <label
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        cursor: 'pointer',
+                        fontSize: 12.5,
+                        fontWeight: 600,
+                        color: isBaseUnitPurchaseUnit ? '#0F766E' : '#475569',
+                        padding: '6px 10px',
+                        borderRadius: 6,
+                        backgroundColor: isBaseUnitPurchaseUnit ? '#F0FDFA' : '#F8FAFC',
+                        border: `1px solid ${isBaseUnitPurchaseUnit ? '#99F6E4' : '#E2E8F0'}`,
+                        userSelect: 'none',
+                      }}
+                      title="Đánh dấu đơn vị cơ bản là đơn vị dùng để nhập hàng"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isBaseUnitPurchaseUnit}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            handleSelectBaseUnitAsPurchaseUnit();
+                          } else {
+                            setIsBaseUnitPurchaseUnit(false);
+                          }
+                        }}
+                        style={{ accentColor: '#0F766E', cursor: 'pointer', width: 15, height: 15 }}
+                      />
+                      <span>Đơn vị nhập hàng</span>
+                    </label>
                   </div>
                 </div>
 
@@ -1472,6 +1644,7 @@ try {
                         type="text"
                         className="filter-input"
                         placeholder="thùng, lốc..."
+                        maxLength={30}
                         value={uom.unitName}
                         onChange={(e) => handleUpdateUom(uom.id, 'unitName', e.target.value)}
                       />
@@ -1502,17 +1675,52 @@ try {
                     {/* Giá bán đơn vị quy đổi */}
                     <div style={{ width: 180 }}>
                       <input
-                        type="number"
+                        type="text"
+                        inputMode="numeric"
                         className="filter-input"
                         placeholder="Giá bán"
-                        value={uom.price === 0 ? '' : uom.price}
+                        value={formatCurrencyInput(uom.price)}
                         onChange={(e) =>
-                          handleUpdateUom(uom.id, 'price', e.target.value === '' ? 0 : Math.max(0, Number(e.target.value)))
+                          handleUpdateUom(uom.id, 'price', parseCurrencyInput(e.target.value))
                         }
                         onFocus={(e) => e.target.select()}
-                        min={0}
                       />
                     </div>
+
+                    {/* Đánh dấu Đơn vị nhập hàng */}
+                    <label
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        cursor: 'pointer',
+                        fontSize: 12.5,
+                        fontWeight: 600,
+                        color: uom.isPurchaseUnit ? '#0F766E' : '#475569',
+                        padding: '6px 10px',
+                        borderRadius: 6,
+                        backgroundColor: uom.isPurchaseUnit ? '#F0FDFA' : '#F8FAFC',
+                        border: `1px solid ${uom.isPurchaseUnit ? '#99F6E4' : '#E2E8F0'}`,
+                        userSelect: 'none',
+                        whiteSpace: 'nowrap',
+                      }}
+                      title="Đánh dấu đơn vị quy đổi này là đơn vị dùng để nhập hàng"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={Boolean(uom.isPurchaseUnit)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            handleSelectUomAsPurchaseUnit(uom.id);
+                          } else {
+                            handleUpdateUom(uom.id, 'isPurchaseUnit', false);
+                            setIsBaseUnitPurchaseUnit(true);
+                          }
+                        }}
+                        style={{ accentColor: '#0F766E', cursor: 'pointer', width: 15, height: 15 }}
+                      />
+                      <span>Đơn vị nhập hàng</span>
+                    </label>
 
                     {/* Nút xóa */}
                     <button
@@ -1607,7 +1815,8 @@ try {
                             <th style={{ padding: '10px 8px', textAlign: 'left', minWidth: 130 }}>Mã vạch</th>
                             <th style={{ padding: '10px 8px', textAlign: 'right', minWidth: 110 }}>Giá vốn</th>
                             <th style={{ padding: '10px 8px', textAlign: 'right', minWidth: 110 }}>Giá bán</th>
-                                                        <th style={{ padding: '10px 12px', textAlign: 'center', width: 44 }}></th>
+                            <th style={{ padding: '10px 8px', textAlign: 'center', minWidth: 110 }}>Đơn vị nhập</th>
+                            <th style={{ padding: '10px 12px', textAlign: 'center', width: 44 }}></th>
                           </tr>
                         </thead>
                         <tbody>
@@ -1665,10 +1874,11 @@ try {
                             </td>
                             <td style={{ padding: '8px' }}>
                               <input
-                                type="number"
+                                type="text"
+                                inputMode="numeric"
                                 placeholder="0"
-                                value={costPrice === 0 ? '' : costPrice}
-                                onChange={(e) => setCostPrice(e.target.value === '' ? 0 : Math.max(0, Number(e.target.value)))}
+                                value={formatCurrencyInput(costPrice)}
+                                onChange={(e) => setCostPrice(parseCurrencyInput(e.target.value))}
                                 onFocus={(e) => e.target.select()}
                                 style={{
                                   width: '100%',
@@ -1682,10 +1892,11 @@ try {
                             </td>
                             <td style={{ padding: '8px' }}>
                               <input
-                                type="number"
+                                type="text"
+                                inputMode="numeric"
                                 placeholder="0"
-                                value={sellingPrice === 0 ? '' : sellingPrice}
-                                onChange={(e) => handleSellingPriceChange(e.target.value === '' ? 0 : Math.max(0, Number(e.target.value)))}
+                                value={formatCurrencyInput(sellingPrice)}
+                                onChange={(e) => handleSellingPriceChange(parseCurrencyInput(e.target.value))}
                                 onFocus={(e) => e.target.select()}
                                 style={{
                                   width: '100%',
@@ -1697,7 +1908,21 @@ try {
                                 }}
                               />
                             </td>
-                            
+                            <td style={{ padding: '8px', textAlign: 'center' }}>
+                              <input
+                                type="checkbox"
+                                checked={isBaseUnitPurchaseUnit}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    handleSelectBaseUnitAsPurchaseUnit();
+                                  } else {
+                                    setIsBaseUnitPurchaseUnit(false);
+                                  }
+                                }}
+                                title="Đánh dấu là đơn vị nhập hàng"
+                                style={{ accentColor: '#0F766E', cursor: 'pointer', width: 16, height: 16 }}
+                              />
+                            </td>
                             <td style={{ padding: '8px 12px', textAlign: 'center' }}>
                               <button
                                 type="button"
@@ -1768,6 +1993,7 @@ try {
                                   <input
                                     type="text"
                                     placeholder=""
+                                    maxLength={50}
                                     value={uom.barcode || ''}
                                     onChange={(e) => handleUpdateUom(uom.id, 'barcode', e.target.value)}
                                     style={{
@@ -1798,11 +2024,12 @@ try {
                                 </td>
                                 <td style={{ padding: '8px' }}>
                                   <input
-                                    type="number"
+                                    type="text"
+                                    inputMode="numeric"
                                     placeholder="0"
-                                    value={uom.price === 0 ? '' : uom.price}
+                                    value={formatCurrencyInput(uom.price)}
                                     onChange={(e) =>
-                                      handleUpdateUom(uom.id, 'price', e.target.value === '' ? 0 : Math.max(0, Number(e.target.value)))
+                                      handleUpdateUom(uom.id, 'price', parseCurrencyInput(e.target.value))
                                     }
                                     onFocus={(e) => e.target.select()}
                                     style={{
@@ -1815,7 +2042,22 @@ try {
                                     }}
                                   />
                                 </td>
-                                
+                                <td style={{ padding: '8px', textAlign: 'center' }}>
+                                  <input
+                                    type="checkbox"
+                                    checked={Boolean(uom.isPurchaseUnit)}
+                                    onChange={(e) => {
+                                      if (e.target.checked) {
+                                        handleSelectUomAsPurchaseUnit(uom.id);
+                                      } else {
+                                        handleUpdateUom(uom.id, 'isPurchaseUnit', false);
+                                        setIsBaseUnitPurchaseUnit(true);
+                                      }
+                                    }}
+                                    title="Đánh dấu là đơn vị nhập hàng"
+                                    style={{ accentColor: '#0F766E', cursor: 'pointer', width: 16, height: 16 }}
+                                  />
+                                </td>
                                 <td style={{ padding: '8px 12px', textAlign: 'center' }}>
                                   <button
                                     type="button"
@@ -1890,6 +2132,7 @@ try {
                   className="filter-input"
                   rows={3}
                   placeholder="Nhập thông tin giới thiệu, thành phần, hướng dẫn sử dụng sản phẩm..."
+                  maxLength={1000}
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                 />
@@ -1912,35 +2155,10 @@ try {
                   type="text"
                   className="filter-input"
                   placeholder="Ghi chú dành cho thu ngân, thủ kho kiểm hàng..."
+                  maxLength={500}
                   value={internalNote}
                   onChange={(e) => setInternalNote(e.target.value)}
                 />
-              </div>
-
-              {/* (13b) Chính sách thuế GTGT */}
-              <div
-                style={{
-                  marginTop: 14,
-                  padding: '12px 16px',
-                  background: '#F0FDFA',
-                  borderRadius: 8,
-                  border: '1px solid #CCFBF1',
-                }}
-              >
-                <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', margin: 0 }}>
-                  <input
-                    type="checkbox"
-                    checked={eligibleForVatReduction}
-                    onChange={(e) => setEligibleForVatReduction(e.target.checked)}
-                    style={{ width: 16, height: 16, cursor: 'pointer' }}
-                  />
-                  <span style={{ fontSize: 13, fontWeight: 700, color: '#0F766E' }}>
-                    Đủ điều kiện giảm 20% thuế GTGT (Nghị quyết 204/2025/QH15)
-                  </span>
-                </label>
-                <p style={{ margin: '4px 0 0 26px', fontSize: 12, color: '#64748B' }}>
-                  Mặc định không áp dụng (áp thuế GTGT trực tiếp 1%). Tích chọn nếu mặt hàng thuộc nhóm hàng hóa áp dụng mức giảm 20% tỷ lệ GTGT (còn 0.8%) đến hết ngày 31/12/2026.
-                </p>
               </div>
             </div>
           </div>

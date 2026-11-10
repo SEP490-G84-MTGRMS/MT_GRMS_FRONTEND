@@ -26,6 +26,8 @@ export interface ProductResponse {
   internalNote?: string | null;
   hasBatches: boolean;
   isFavorite: boolean;
+  isBaseUnitPurchaseUnit?: boolean;
+  purchaseUnit?: string | null;
   createdAt: string;
   rawCreatedAt?: string;
   updatedAt?: string | null;
@@ -81,6 +83,7 @@ export interface UomConversion {
   barcode?: string;
   price: number;
   productCode?: string; // Mặc định hiển thị theo mã hàng của sản phẩm
+  isPurchaseUnit?: boolean;
 }
 
 export interface ProductUnitResponse {
@@ -91,6 +94,7 @@ export interface ProductUnitResponse {
   price: number;
   barcode?: string | null;
   isBaseUnit: boolean;
+  isPurchaseUnit?: boolean;
   createdAt: string;
   rawCreatedAt?: string;
   updatedAt?: string | null;
@@ -102,6 +106,7 @@ export interface ProductUnitCreatePayload {
   price: number;
   barcode?: string | null;
   isBaseUnit?: boolean;
+  isPurchaseUnit?: boolean;
 }
 
 export interface ProductUnitUpdatePayload {
@@ -110,6 +115,7 @@ export interface ProductUnitUpdatePayload {
   price: number;
   barcode?: string | null;
   isBaseUnit?: boolean;
+  isPurchaseUnit?: boolean;
 }
 
 export interface ProductCreatePayload {
@@ -131,6 +137,7 @@ export interface ProductCreatePayload {
   internalNote?: string | null;
   hasBatches?: boolean;
   isFavorite?: boolean;
+  isBaseUnitPurchaseUnit?: boolean;
 }
 
 export interface ProductUpdatePayload {
@@ -151,6 +158,7 @@ export interface ProductUpdatePayload {
   hasBatches?: boolean;
   isFavorite?: boolean;
   eligibleForVatReduction?: boolean;
+  isBaseUnitPurchaseUnit?: boolean;
 }
 
 export interface ComboComponent {
@@ -210,6 +218,8 @@ export interface ProductItem {
   description?: string;
   internalNote?: string;
   hasTransactions?: boolean;
+  isBaseUnitPurchaseUnit?: boolean;
+  purchaseUnit?: string;
   uomConversions?: UomConversion[];
   comboComponents?: ComboComponent[];
   stockLedger?: StockLedgerEntry[];

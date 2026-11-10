@@ -46,8 +46,27 @@ export const CategoryModal: React.FC<CategoryModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) {
+    const trimmedName = name.trim();
+    if (!trimmedName) {
       setErrorMsg('Vui lòng nhập tên nhóm hàng.');
+      return;
+    }
+    if (trimmedName.length > 100) {
+      setErrorMsg('Tên nhóm hàng không được vượt quá 100 ký tự.');
+      return;
+    }
+
+    const trimmedCode = code.trim().toUpperCase();
+    if (!categoryToEdit && trimmedCode) {
+      if (trimmedCode.length > 30 || !/^[A-Z0-9_-]+$/.test(trimmedCode)) {
+        setErrorMsg('Mã nhóm hàng chỉ gồm chữ cái không dấu, số, gạch ngang/dưới và tối đa 30 ký tự.');
+        return;
+      }
+    }
+
+    const trimmedDesc = description.trim();
+    if (trimmedDesc.length > 500) {
+      setErrorMsg('Mô tả nhóm hàng không được vượt quá 500 ký tự.');
       return;
     }
 
@@ -55,10 +74,10 @@ export const CategoryModal: React.FC<CategoryModalProps> = ({
       setIsSubmitting(true);
       setErrorMsg('');
       await onSave(
-        name.trim(),
+        trimmedName,
         categoryToEdit?.id,
-        code.trim() || undefined,
-        description.trim() || undefined
+        trimmedCode || undefined,
+        trimmedDesc || undefined
       );
       onClose();
     } catch (err: any) {
@@ -147,6 +166,7 @@ export const CategoryModal: React.FC<CategoryModalProps> = ({
                     className="filter-input"
                     style={{ padding: '8px 12px', fontSize: 13.5 }}
                     placeholder="Ví dụ: Rau Củ Sạch, Đồ Uống Pha Chế..."
+                    maxLength={100}
                     value={name}
                     onChange={(e) => {
                       setName(e.target.value);
@@ -167,6 +187,7 @@ export const CategoryModal: React.FC<CategoryModalProps> = ({
                     className="filter-input"
                     style={{ padding: '8px 12px', fontSize: 13.5, textTransform: 'uppercase' }}
                     placeholder="Ví dụ: FRESH, BEV, DRY..."
+                    maxLength={30}
                     value={code}
                     onChange={(e) => setCode(e.target.value.toUpperCase())}
                     disabled={Boolean(categoryToEdit)}
@@ -183,6 +204,7 @@ export const CategoryModal: React.FC<CategoryModalProps> = ({
                     className="filter-input"
                     style={{ padding: '8px 12px', fontSize: 13, resize: 'vertical' }}
                     placeholder="Ghi chú ngắn về nhóm sản phẩm này..."
+                    maxLength={500}
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
                   />
