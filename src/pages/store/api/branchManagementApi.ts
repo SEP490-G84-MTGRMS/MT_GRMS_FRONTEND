@@ -110,6 +110,21 @@ export interface BranchQueryParams {
   pageSize?: number;
 }
 
+export const BRANCHES_UPDATED_EVENT = 'mtgrms:branches-updated';
+
+export interface BranchesUpdatedEventDetail {
+  action: 'create' | 'update' | 'status' | 'delete';
+  branch?: BranchItemResponse;
+  branchId?: string;
+  selectCreated?: boolean;
+}
+
+export const emitBranchesUpdated = (detail: BranchesUpdatedEventDetail): void => {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent(BRANCHES_UPDATED_EVENT, { detail }));
+  }
+};
+
 export const branchManagementApi = {
   async getQuota(): Promise<ApiResponse<BranchQuotaResponse>> {
     const res = await httpClient.get<ApiResponse<BranchQuotaResponse>>('/branches/quota');
@@ -133,21 +148,48 @@ export const branchManagementApi = {
 
   async createBranch(payload: CreateBranchPayload): Promise<ApiResponse<BranchItemResponse>> {
     const res = await httpClient.post<ApiResponse<BranchItemResponse>>('/branches', payload);
+    if (res.data?.success && res.data.data) {
+      emitBranchesUpdated({
+        action: 'create',
+        branch: res.data.data,
+        selectCreated: true,
+      });
+    }
     return res.data;
   },
 
   async updateBranch(id: string, payload: UpdateBranchPayload): Promise<ApiResponse<BranchItemResponse>> {
     const res = await httpClient.put<ApiResponse<BranchItemResponse>>(`/branches/${id}`, payload);
+    if (res.data?.success && res.data.data) {
+      emitBranchesUpdated({
+        action: 'update',
+        branch: res.data.data,
+        branchId: id,
+      });
+    }
     return res.data;
   },
 
   async toggleStatus(id: string, isActive: boolean): Promise<ApiResponse<BranchItemResponse>> {
     const res = await httpClient.patch<ApiResponse<BranchItemResponse>>(`/branches/${id}/status`, { isActive });
+    if (res.data?.success) {
+      emitBranchesUpdated({
+        action: 'status',
+        branch: res.data.data,
+        branchId: id,
+      });
+    }
     return res.data;
   },
 
   async deleteBranch(id: string): Promise<ApiResponse<boolean>> {
     const res = await httpClient.delete<ApiResponse<boolean>>(`/branches/${id}`);
+    if (res.data?.success) {
+      emitBranchesUpdated({
+        action: 'delete',
+        branchId: id,
+      });
+    }
     return res.data;
   },
 };
