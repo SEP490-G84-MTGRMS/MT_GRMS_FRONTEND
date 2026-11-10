@@ -1,19 +1,22 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import type { FC, FormEvent } from 'react';
+import { useState, useEffect, useCallback, useMemo } from "react";
+import type { FC, FormEvent } from "react";
 import type {
   SupplierSummary,
   SupplierProductItem,
   AssignProductInput,
   EditSupplierProductInput,
-} from '../../types/supplier.types';
+} from "../../types/supplier.types";
 import {
   supplierProductApi,
   type BatchAssignProductInput,
-} from '../../api/supplierProductApi';
-import { storeProductApi } from '../../../product/api/storeProductApi';
-import { SupplierStatusBadge } from '../SupplierStatusBadge';
-import { AssignProductModal } from '../products/AssignProductModal';
-import { EditSupplierProductModal } from '../products/EditSupplierProductModal';
+} from "../../api/supplierProductApi";
+import { storeProductApi } from "../../../product/api/storeProductApi";
+import { SupplierStatusBadge } from "../SupplierStatusBadge";
+import { AssignProductModal } from "../products/AssignProductModal";
+import {
+  EditSupplierProductModal,
+  type SaveSupplierProductScope,
+} from "../products/EditSupplierProductModal";
 import {
   Package,
   Plus,
@@ -24,15 +27,17 @@ import {
   ChevronLeft,
   ChevronRight,
   Store,
-  CheckCircle2,
   AlertCircle,
-} from 'lucide-react';
+} from "lucide-react";
 
 interface Props {
   supplier?: SupplierSummary;
   products?: SupplierProductItem[];
   canEdit?: boolean;
-  onNotify?: (message: string, type?: 'success' | 'error' | 'info' | 'warning') => void;
+  onNotify?: (
+    message: string,
+    type?: "success" | "error" | "info" | "warning",
+  ) => void;
 }
 
 export interface ActiveBranchInfo {
@@ -43,7 +48,33 @@ export interface ActiveBranchInfo {
   isHeadquarter?: boolean;
 }
 
-const STORAGE_KEY = 'mtgrms_active_branch';
+const STORAGE_KEY = "mtgrms_active_branch";
+const BRANCH_TERMS_STORAGE_KEY = "mtgrms_supplier_product_branch_terms_v1";
+
+interface SupplierProductTermsValue {
+  agreedPrice: number;
+  moq: number;
+  allowedShortageQty: number;
+  status: "Active" | "Inactive";
+}
+
+interface ProductBranchTermsRecord {
+  defaultTerms?: SupplierProductTermsValue;
+  byBranchId: Record<string, SupplierProductTermsValue>;
+}
+
+const getStoredBranchTermsMap = (): Record<string, ProductBranchTermsRecord> => {
+  try {
+    const raw = localStorage.getItem(BRANCH_TERMS_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === "object") return parsed;
+    }
+  } catch {
+    // fallback
+  }
+  return {};
+};
 
 const getStoredActiveBranch = (): ActiveBranchInfo => {
   try {
@@ -55,7 +86,7 @@ const getStoredActiveBranch = (): ActiveBranchInfo => {
   } catch {
     // fallback
   }
-  return { id: 'ALL', name: 'Toàn hệ thống', code: 'ALL' };
+  return { id: "ALL", name: "Toàn hệ thống", code: "ALL" };
 };
 
 export const SupplierProductsTab: FC<Props> = ({
@@ -65,42 +96,115 @@ export const SupplierProductsTab: FC<Props> = ({
   onNotify,
 }) => {
   // Products from supplier API
-  const [products, setProducts] = useState<SupplierProductItem[]>(initialProducts || []);
-  const [totalCount, setTotalCount] = useState<number>(initialProducts?.length || 0);
+  const [products, setProducts] = useState<SupplierProductItem[]>(
+    initialProducts || [],
+  );
+  const [totalCount, setTotalCount] = useState<number>(
+    initialProducts?.length || 0,
+  );
   const [masterProducts, setMasterProducts] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(!initialProducts && !!supplier?.id);
+  const [isLoading, setIsLoading] = useState<boolean>(
+    !initialProducts && !!supplier?.id,
+  );
 
   // Active branch from header dropdown (BranchSelectorDropdown)
-  const [activeBranch, setActiveBranch] = useState<ActiveBranchInfo>(getStoredActiveBranch);
-  const [branchProductMap, setBranchProductMap] = useState<Map<string, any>>(new Map());
+  const [activeBranch, setActiveBranch] = useState<ActiveBranchInfo>(
+    getStoredActiveBranch,
+  );
+  const [branchProductMap, setBranchProductMap] = useState<Map<string, any>>(
+    new Map(),
+  );
   const [isLoadingBranchProducts, setIsLoadingBranchProducts] = useState(false);
+  const [branchTermsMap, setBranchTermsMap] = useState<
+    Record<string, ProductBranchTermsRecord>
+  >(getStoredBranchTermsMap);
+
+  const getProductTermsKey = useCallback(
+    (item: { supplierId: string; productId: string }) =>
+      `${item.supplierId}__${item.productId}`,
+    [],
+  );
+
+  const getEffectiveTerms = useCallback(
+    (
+      item: SupplierProductItem,
+      targetBranchId?: string,
+    ): SupplierProductTermsValue => {
+      const bId = targetBranchId ?? (activeBranch.id || "ALL");
+      const key = getProductTermsKey(item);
+      const record = branchTermsMap[key];
+
+      const basePrice =
+        item.effectivePrice ?? item.agreedPrice ?? item.importPrice ?? 0;
+      const baseTerms: SupplierProductTermsValue = {
+        agreedPrice: basePrice,
+        moq: item.moq,
+        allowedShortageQty: item.allowedShortageQty ?? 0,
+        status: item.status || "Active",
+      };
+
+      if (record?.byBranchId?.[bId]) {
+        return record.byBranchId[bId];
+      }
+
+      if (record?.defaultTerms) {
+        if (bId !== "ALL") {
+          const branchInfo = branchProductMap.get(item.productId);
+          return {
+            ...record.defaultTerms,
+            status: branchInfo?.status || record.defaultTerms.status,
+          };
+        }
+        return record.defaultTerms;
+      }
+
+      if (bId !== "ALL") {
+        const branchInfo = branchProductMap.get(item.productId);
+        if (branchInfo?.status) {
+          return {
+            ...baseTerms,
+            status: branchInfo.status,
+          };
+        }
+      }
+
+      return baseTerms;
+    },
+    [activeBranch.id, branchTermsMap, branchProductMap, getProductTermsKey],
+  );
 
   // Filter inputs (draft state)
-  const [searchInput, setSearchInput] = useState('');
-  const [categoryInput, setCategoryInput] = useState('ALL');
-  const [statusInput, setStatusInput] = useState('ALL');
+  const [searchInput, setSearchInput] = useState("");
+  const [categoryInput, setCategoryInput] = useState("ALL");
+  const [statusInput, setStatusInput] = useState("ALL");
 
   // Applied filters for API query
   const [appliedFilters, setAppliedFilters] = useState({
-    searchTerm: '',
-    categoryFilter: 'ALL',
-    statusFilter: 'ALL',
+    searchTerm: "",
+    categoryFilter: "ALL",
+    statusFilter: "ALL",
     pageIndex: 1,
     pageSize: 10,
   });
 
   // Modals
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
-  const [editingItem, setEditingItem] = useState<SupplierProductItem | null>(null);
+  const [editingItem, setEditingItem] = useState<SupplierProductItem | null>(
+    null,
+  );
 
   const fmtCurrency = (val: number) =>
-    new Intl.NumberFormat('vi-VN').format(Number.isFinite(val) ? val : 0) + ' đ';
+    new Intl.NumberFormat("vi-VN").format(Number.isFinite(val) ? val : 0) +
+    " đ";
 
   const notify = useCallback(
-    (msg: string, type: 'success' | 'error' | 'info' | 'warning' = 'success') => {
+    (
+      msg: string,
+      type: "success" | "error" | "info" | "warning" = "success",
+    ) => {
       onNotify?.(msg, type);
     },
-    [onNotify]
+    [onNotify],
   );
 
   // 1. Subscribe to Header Dropdown (BranchSelectorDropdown) changes
@@ -120,11 +224,11 @@ export const SupplierProductsTab: FC<Props> = ({
       }
     };
 
-    window.addEventListener('mtgrms:branch-changed', handleBranchChange);
-    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener("mtgrms:branch-changed", handleBranchChange);
+    window.addEventListener("storage", handleStorageChange);
     return () => {
-      window.removeEventListener('mtgrms:branch-changed', handleBranchChange);
-      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener("mtgrms:branch-changed", handleBranchChange);
+      window.removeEventListener("storage", handleStorageChange);
     };
   }, []);
 
@@ -168,7 +272,10 @@ export const SupplierProductsTab: FC<Props> = ({
       setProducts(res.items);
       setTotalCount(res.total);
     } catch (err: any) {
-      notify(err.message || 'Không thể tải danh sách sản phẩm của nhà cung cấp.', 'error');
+      notify(
+        err.message || "Không thể tải danh sách sản phẩm của nhà cung cấp.",
+        "error",
+      );
     } finally {
       setIsLoading(false);
     }
@@ -180,7 +287,7 @@ export const SupplierProductsTab: FC<Props> = ({
 
   // 4. Fetch branch-assigned products when a specific branch is selected in Header Dropdown
   const fetchBranchProducts = useCallback(async () => {
-    if (!activeBranch.id || activeBranch.id === 'ALL') {
+    if (!activeBranch.id || activeBranch.id === "ALL") {
       setBranchProductMap(new Map());
       return;
     }
@@ -191,15 +298,15 @@ export const SupplierProductsTab: FC<Props> = ({
         storeId: activeBranch.id,
         pageIndex: 1,
         pageSize: 500,
-        searchTerm: '',
+        searchTerm: "",
         skus: [],
         names: [],
         storeCodes: [],
         storeNames: [],
         supplierCodes: supplier?.code ? [supplier.code] : [],
         supplierNames: supplier?.name ? [supplier.name] : [],
-        statusFilter: 'ALL',
-        stockAlertFilter: 'ALL',
+        statusFilter: "ALL",
+        stockAlertFilter: "ALL",
       });
 
       const map = new Map<string, any>();
@@ -208,7 +315,7 @@ export const SupplierProductsTab: FC<Props> = ({
       });
       setBranchProductMap(map);
     } catch (err) {
-      console.warn('Không thể tải danh mục sản phẩm của chi nhánh:', err);
+      console.warn("Không thể tải danh mục sản phẩm của chi nhánh:", err);
       setBranchProductMap(new Map());
     } finally {
       setIsLoadingBranchProducts(false);
@@ -236,7 +343,7 @@ export const SupplierProductsTab: FC<Props> = ({
     let list = products;
 
     // A. Filter by Active Branch (from Header Dropdown)
-    if (activeBranch.id && activeBranch.id !== 'ALL') {
+    if (activeBranch.id && activeBranch.id !== "ALL") {
       list = list.filter((p) => branchProductMap.has(p.productId));
     }
 
@@ -244,26 +351,49 @@ export const SupplierProductsTab: FC<Props> = ({
     if (appliedFilters.searchTerm) {
       const q = appliedFilters.searchTerm.toLowerCase();
       list = list.filter(
-        (p) => p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q)
+        (p) =>
+          p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q),
       );
     }
-    if (appliedFilters.categoryFilter !== 'ALL') {
-      list = list.filter((p) => p.categoryName === appliedFilters.categoryFilter);
+    if (appliedFilters.categoryFilter !== "ALL") {
+      list = list.filter(
+        (p) => p.categoryName === appliedFilters.categoryFilter,
+      );
     }
-    if (appliedFilters.statusFilter !== 'ALL') {
-      list = list.filter((p) => p.status === appliedFilters.statusFilter);
+    if (appliedFilters.statusFilter !== "ALL") {
+      list = list.filter(
+        (p) => getEffectiveTerms(p).status === appliedFilters.statusFilter,
+      );
     }
 
     return list;
-  }, [products, activeBranch.id, branchProductMap, appliedFilters]);
+  }, [
+    products,
+    activeBranch.id,
+    branchProductMap,
+    appliedFilters,
+    getEffectiveTerms,
+  ]);
 
   // Pagination for displayed products
-  const isBranchFiltered = Boolean(activeBranch.id && activeBranch.id !== 'ALL');
-  const effectiveTotal = isBranchFiltered ? displayedProducts.length : displayedProducts.length;
-  const totalPages = Math.max(1, Math.ceil(effectiveTotal / appliedFilters.pageSize));
+  const isBranchFiltered = Boolean(
+    activeBranch.id && activeBranch.id !== "ALL",
+  );
+  const effectiveTotal = isBranchFiltered
+    ? displayedProducts.length
+    : displayedProducts.length;
+  const totalPages = Math.max(
+    1,
+    Math.ceil(effectiveTotal / appliedFilters.pageSize),
+  );
   const startItem =
-    effectiveTotal === 0 ? 0 : (appliedFilters.pageIndex - 1) * appliedFilters.pageSize + 1;
-  const endItem = Math.min(appliedFilters.pageIndex * appliedFilters.pageSize, effectiveTotal);
+    effectiveTotal === 0
+      ? 0
+      : (appliedFilters.pageIndex - 1) * appliedFilters.pageSize + 1;
+  const endItem = Math.min(
+    appliedFilters.pageIndex * appliedFilters.pageSize,
+    effectiveTotal,
+  );
 
   const paginatedItems = useMemo(() => {
     const start = (appliedFilters.pageIndex - 1) * appliedFilters.pageSize;
@@ -282,23 +412,29 @@ export const SupplierProductsTab: FC<Props> = ({
   };
 
   const handleResetFilters = () => {
-    setSearchInput('');
-    setCategoryInput('ALL');
-    setStatusInput('ALL');
+    setSearchInput("");
+    setCategoryInput("ALL");
+    setStatusInput("ALL");
     setAppliedFilters({
-      searchTerm: '',
-      categoryFilter: 'ALL',
-      statusFilter: 'ALL',
+      searchTerm: "",
+      categoryFilter: "ALL",
+      statusFilter: "ALL",
       pageIndex: 1,
       pageSize: appliedFilters.pageSize,
     });
   };
 
   const handleSwitchToAllBranches = () => {
-    const allOption: ActiveBranchInfo = { id: 'ALL', name: 'Toàn hệ thống', code: 'ALL' };
+    const allOption: ActiveBranchInfo = {
+      id: "ALL",
+      name: "Toàn hệ thống",
+      code: "ALL",
+    };
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(allOption));
-      window.dispatchEvent(new CustomEvent('mtgrms:branch-changed', { detail: allOption }));
+      window.dispatchEvent(
+        new CustomEvent("mtgrms:branch-changed", { detail: allOption }),
+      );
     } catch {
       // ignore
     }
@@ -312,17 +448,17 @@ export const SupplierProductsTab: FC<Props> = ({
       if (syncedCount > 0) {
         notify(
           `Đã gán sản phẩm thành công. Hệ thống đã tự động phân bổ sản phẩm đến ${syncedCount} chi nhánh.`,
-          'success'
+          "success",
         );
       } else {
-        notify('Đã gán sản phẩm cho nhà cung cấp thành công!', 'success');
+        notify("Đã gán sản phẩm cho nhà cung cấp thành công!", "success");
       }
       setIsAssignModalOpen(false);
       await fetchSupplierProducts();
       await fetchBranchProducts();
       return res;
     } catch (err: any) {
-      notify(err.message || 'Thao tác gán sản phẩm không thành công.', 'error');
+      notify(err.message || "Thao tác gán sản phẩm không thành công.", "error");
       throw err;
     }
   };
@@ -334,13 +470,13 @@ export const SupplierProductsTab: FC<Props> = ({
       const syncedCount = res?.syncedBranchesCount ?? 0;
       if (syncedCount > 0) {
         notify(
-          `Đã gán thành công ${assignedCount} sản phẩm cho NCC ${supplier?.name || ''}. Tự động phân bổ đến ${syncedCount} chi nhánh.`,
-          'success'
+          `Đã gán thành công ${assignedCount} sản phẩm cho NCC ${supplier?.name || ""}. Tự động phân bổ đến ${syncedCount} chi nhánh.`,
+          "success",
         );
       } else {
         notify(
-          `Đã gán thành công ${assignedCount} sản phẩm cho NCC ${supplier?.name || ''}!`,
-          'success'
+          `Đã gán thành công ${assignedCount} sản phẩm cho NCC ${supplier?.name || ""}!`,
+          "success",
         );
       }
       setIsAssignModalOpen(false);
@@ -348,108 +484,246 @@ export const SupplierProductsTab: FC<Props> = ({
       await fetchBranchProducts();
       return res;
     } catch (err: any) {
-      notify(err.message || 'Thao tác gán sản phẩm không thành công.', 'error');
+      notify(err.message || "Thao tác gán sản phẩm không thành công.", "error");
       throw err;
     }
   };
 
-  const handleSaveEdit = async (input: EditSupplierProductInput) => {
+  const handleSaveEdit = async (
+    input: EditSupplierProductInput,
+    scope: SaveSupplierProductScope = "CURRENT_ONLY",
+  ) => {
     if (!editingItem) return;
+
+    const currentBranchKey = activeBranch.id || "ALL";
+    const isMainOrTotal =
+      currentBranchKey === "ALL" ||
+      Boolean(activeBranch.isHeadquarter) ||
+      Boolean(activeBranch.name?.toLowerCase().includes("chi nhánh chính"));
+
+    const key = getProductTermsKey(editingItem);
+    const basePrice =
+      editingItem.effectivePrice ??
+      editingItem.agreedPrice ??
+      editingItem.importPrice ??
+      0;
+    const baseTerms: SupplierProductTermsValue = {
+      agreedPrice: basePrice,
+      moq: editingItem.moq,
+      allowedShortageQty: editingItem.allowedShortageQty ?? 0,
+      status: editingItem.status || "Active",
+    };
+
+    const newTerms: SupplierProductTermsValue = {
+      agreedPrice: input.agreedPrice,
+      moq: input.moq,
+      allowedShortageQty: input.allowedShortageQty,
+      status: input.status,
+    };
+
     try {
-      await supplierProductApi.updateProduct(
-        editingItem.supplierId,
-        editingItem.productId,
-        input
-      );
-      if (input.status !== editingItem.status) {
-        await supplierProductApi.toggleStatus(
+      if (scope === "ALL_BRANCHES") {
+        // 1. Update supplier product on backend
+        await supplierProductApi.updateProduct(
           editingItem.supplierId,
           editingItem.productId,
-          input.status
+          input,
         );
+        if (input.status !== editingItem.status) {
+          await supplierProductApi.toggleStatus(
+            editingItem.supplierId,
+            editingItem.productId,
+            input.status,
+          );
+        }
+
+        // 2. Sync status across all branches on backend (best-effort)
+        try {
+          const stores = await storeProductApi.getStoreSummaries();
+          await Promise.allSettled(
+            (stores || []).map((st) =>
+              storeProductApi.toggleStatus(
+                st.id,
+                editingItem.productId,
+                input.status,
+              ),
+            ),
+          );
+        } catch {
+          // non-blocking
+        }
+
+        // 3. Apply newTerms as default across all branches & clear per-branch overrides
+        setBranchTermsMap((prev) => {
+          const next: Record<string, ProductBranchTermsRecord> = {
+            ...prev,
+            [key]: {
+              defaultTerms: newTerms,
+              byBranchId: {
+                ALL: newTerms,
+              },
+            },
+          };
+          try {
+            localStorage.setItem(BRANCH_TERMS_STORAGE_KEY, JSON.stringify(next));
+          } catch {
+            // ignore
+          }
+          return next;
+        });
+
+        notify(
+          "Đã lưu thay đổi và đồng bộ điều khoản cung ứng trên tất cả các chi nhánh!",
+          "success",
+        );
+        setEditingItem(null);
+        await fetchSupplierProducts();
+        await fetchBranchProducts();
+        return;
       }
-      notify('Đã cập nhật điều khoản cung ứng toàn hệ thống thành công!', 'success');
-      setEditingItem(null);
-      await fetchSupplierProducts();
-      await fetchBranchProducts();
-    } catch (err: any) {
-      notify(err.message || 'Không thể cập nhật sản phẩm.', 'error');
-      throw err;
-    }
-  };
 
-  const handleSaveBranchProduct = async (
-    branchId: string,
-    productId: string,
-    input: { retailPrice: number; status: 'Active' | 'Inactive' }
-  ) => {
-    try {
-      await storeProductApi.updateProduct(branchId, productId, {
-        retailPrice: input.retailPrice,
-        status: input.status,
+      // scope === "CURRENT_ONLY"
+      // Snapshot baseline into defaultTerms first so other branches retain their old values
+      setBranchTermsMap((prev) => {
+        const existingRecord = prev[key];
+        const preservedDefault = existingRecord?.defaultTerms ?? baseTerms;
+        const nextByBranch: Record<string, SupplierProductTermsValue> = {
+          ...(existingRecord?.byBranchId || {}),
+          [currentBranchKey]: newTerms,
+        };
+
+        const next: Record<string, ProductBranchTermsRecord> = {
+          ...prev,
+          [key]: {
+            defaultTerms: preservedDefault,
+            byBranchId: nextByBranch,
+          },
+        };
+        try {
+          localStorage.setItem(BRANCH_TERMS_STORAGE_KEY, JSON.stringify(next));
+        } catch {
+          // ignore
+        }
+        return next;
       });
-      await storeProductApi.toggleStatus(branchId, productId, input.status);
 
-      notify(
-        `Đã cập nhật trạng thái & giá bán tại chi nhánh "${activeBranch.name}" thành công!`,
-        'success'
-      );
-      setEditingItem(null);
-      await fetchBranchProducts();
+      if (isMainOrTotal) {
+        await supplierProductApi.updateProduct(
+          editingItem.supplierId,
+          editingItem.productId,
+          input,
+        );
+        if (input.status !== editingItem.status) {
+          await supplierProductApi.toggleStatus(
+            editingItem.supplierId,
+            editingItem.productId,
+            input.status,
+          );
+        }
+        if (currentBranchKey !== "ALL") {
+          try {
+            await storeProductApi.toggleStatus(
+              currentBranchKey,
+              editingItem.productId,
+              input.status,
+            );
+          } catch {
+            // non-blocking
+          }
+        }
+        notify(
+          "Đã lưu thay đổi chỉ trên thông tin chi nhánh chính (giữ nguyên các chi nhánh khác)!",
+          "success",
+        );
+        setEditingItem(null);
+        await fetchSupplierProducts();
+        await fetchBranchProducts();
+      } else {
+        // Sub-branch only
+        await storeProductApi.toggleStatus(
+          currentBranchKey,
+          editingItem.productId,
+          input.status,
+        );
+        notify(
+          `Đã lưu thay đổi điều khoản cung ứng riêng cho chi nhánh "${activeBranch.name}"!`,
+          "success",
+        );
+        setEditingItem(null);
+        await fetchBranchProducts();
+      }
     } catch (err: any) {
-      notify(err.message || 'Không thể cập nhật sản phẩm tại chi nhánh.', 'error');
+      notify(err.message || "Không thể cập nhật sản phẩm.", "error");
       throw err;
     }
   };
 
   const assignedProductIds = useMemo(
     () => products.map((p) => p.productId),
-    [products]
+    [products],
   );
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
       <div className="supplier-detail-card">
         {/* Header Bar */}
         <div
           style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
             marginBottom: 16,
-            flexWrap: 'wrap',
+            flexWrap: "wrap",
             gap: 12,
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <div
               style={{
                 width: 36,
                 height: 36,
-                borderRadius: 'var(--radius-sm, 8px)',
-                background: 'var(--blue-light, #f0fdfa)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: 'var(--blue-primary, #0f766e)',
+                borderRadius: "var(--radius-sm, 8px)",
+                background: "var(--blue-light, #f0fdfa)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                color: "var(--blue-primary, #0f766e)",
               }}
             >
               <Package size={20} />
             </div>
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  flexWrap: "wrap",
+                }}
+              >
                 <h2
                   className="supplier-detail-card-title"
-                  style={{ margin: 0, border: 'none', padding: 0, display: 'flex', alignItems: 'center', gap: 8 }}
+                  style={{
+                    margin: 0,
+                    border: "none",
+                    padding: 0,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                  }}
                 >
                   <span>
-                    Danh Mục Sản Phẩm Cung Ứng ({isBranchFiltered ? `${effectiveTotal} / ${totalCount}` : totalCount})
+                    Danh Mục Sản Phẩm Cung Ứng (
+                    {isBranchFiltered
+                      ? `${effectiveTotal} / ${totalCount}`
+                      : totalCount}
+                    )
                   </span>
                   {(isLoading || isLoadingBranchProducts) && (
                     <Loader2
                       size={16}
                       className="animate-spin"
-                      style={{ color: 'var(--blue-primary, #0f766e)' }}
+                      style={{ color: "var(--blue-primary, #0f766e)" }}
                     />
                   )}
                 </h2>
@@ -458,16 +732,16 @@ export const SupplierProductsTab: FC<Props> = ({
                 {isBranchFiltered ? (
                   <span
                     style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
+                      display: "inline-flex",
+                      alignItems: "center",
                       gap: 5,
-                      padding: '3px 10px',
+                      padding: "3px 10px",
                       borderRadius: 999,
-                      backgroundColor: '#ecfdf5',
-                      color: '#065f46',
+                      backgroundColor: "#ecfdf5",
+                      color: "#065f46",
                       fontSize: 12,
                       fontWeight: 600,
-                      border: '1px solid #a7f3d0',
+                      border: "1px solid #a7f3d0",
                     }}
                     title="Đang lọc danh mục mặt hàng theo chi nhánh được chọn từ dropdown trên thanh Header"
                   >
@@ -478,13 +752,13 @@ export const SupplierProductsTab: FC<Props> = ({
                       onClick={handleSwitchToAllBranches}
                       title="Bấm để xem gộp toàn hệ thống"
                       style={{
-                        background: 'none',
-                        border: 'none',
+                        background: "none",
+                        border: "none",
                         padding: 0,
                         marginLeft: 4,
-                        color: '#047857',
-                        textDecoration: 'underline',
-                        cursor: 'pointer',
+                        color: "#047857",
+                        textDecoration: "underline",
+                        cursor: "pointer",
                         fontSize: 11,
                         fontWeight: 600,
                       }}
@@ -495,16 +769,16 @@ export const SupplierProductsTab: FC<Props> = ({
                 ) : (
                   <span
                     style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
+                      display: "inline-flex",
+                      alignItems: "center",
                       gap: 5,
-                      padding: '3px 10px',
+                      padding: "3px 10px",
                       borderRadius: 999,
-                      backgroundColor: '#f1f5f9',
-                      color: '#475569',
+                      backgroundColor: "#f1f5f9",
+                      color: "#475569",
                       fontSize: 12,
                       fontWeight: 600,
-                      border: '1px solid #e2e8f0',
+                      border: "1px solid #e2e8f0",
                     }}
                     title="Dữ liệu gộp toàn chuỗi từ dropdown trên thanh Header"
                   >
@@ -514,14 +788,25 @@ export const SupplierProductsTab: FC<Props> = ({
                 )}
               </div>
 
-              <div style={{ fontSize: '0.78rem', color: 'var(--text-muted, #64748b)', marginTop: 2 }}>
+              <div
+                style={{
+                  fontSize: "0.78rem",
+                  color: "var(--text-muted, #64748b)",
+                  marginTop: 2,
+                }}
+              >
                 {isBranchFiltered ? (
                   <span>
-                    Đang hiển thị các mặt hàng của {supplier?.name ? <b>{supplier.name}</b> : 'nhà cung cấp'} phân bổ tại chi nhánh <b>{activeBranch.name}</b> (tự động đồng bộ theo dropdown Chi nhánh trên Header).
+                    Đang hiển thị các mặt hàng của{" "}
+                    {supplier?.name ? <b>{supplier.name}</b> : "nhà cung cấp"}{" "}
+                    phân bổ tại chi nhánh <b>{activeBranch.name}</b> .
                   </span>
                 ) : (
                   <span>
-                    Bảng giá nhập sỉ hiện tại, số lượng đặt hàng tối thiểu (MOQ) và hạn mức giao thiếu của {supplier?.name ? <b>{supplier.name}</b> : 'nhà cung cấp'} trên toàn chuỗi cửa hàng.
+                    Bảng giá nhập sỉ hiện tại, số lượng đặt hàng tối thiểu (MOQ)
+                    và hạn mức giao thiếu của{" "}
+                    {supplier?.name ? <b>{supplier.name}</b> : "nhà cung cấp"}{" "}
+                    trên toàn chuỗi cửa hàng.
                   </span>
                 )}
               </div>
@@ -545,18 +830,18 @@ export const SupplierProductsTab: FC<Props> = ({
         <form
           onSubmit={handleSearchSubmit}
           style={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            alignItems: 'center',
+            display: "flex",
+            flexWrap: "wrap",
+            alignItems: "center",
             gap: 10,
             marginBottom: 16,
-            padding: '12px 14px',
-            backgroundColor: '#f8fafc',
+            padding: "12px 14px",
+            backgroundColor: "#f8fafc",
             borderRadius: 10,
-            border: '1px solid #e2e8f0',
+            border: "1px solid #e2e8f0",
           }}
         >
-          <div style={{ flex: '1 1 240px', minWidth: 200 }}>
+          <div style={{ flex: "1 1 240px", minWidth: 200 }}>
             <input
               type="text"
               placeholder="Tìm theo mã SKU hoặc tên sản phẩm..."
@@ -564,19 +849,26 @@ export const SupplierProductsTab: FC<Props> = ({
               onChange={(e) => setSearchInput(e.target.value)}
               className="admin-search-input"
               style={{
-                width: '100%',
+                width: "100%",
                 height: 36,
-                padding: '0 12px',
+                padding: "0 12px",
                 borderRadius: 6,
-                border: '1px solid #cbd5e1',
+                border: "1px solid #cbd5e1",
                 fontSize: 13,
-                backgroundColor: '#ffffff',
+                backgroundColor: "#ffffff",
               }}
             />
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ fontSize: 12.5, fontWeight: 600, color: '#475569', whiteSpace: 'nowrap' }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span
+              style={{
+                fontSize: 12.5,
+                fontWeight: 600,
+                color: "#475569",
+                whiteSpace: "nowrap",
+              }}
+            >
               Ngành hàng:
             </span>
             <select
@@ -584,15 +876,17 @@ export const SupplierProductsTab: FC<Props> = ({
               onChange={(e) => setCategoryInput(e.target.value)}
               style={{
                 height: 36,
-                padding: '0 10px',
+                padding: "0 10px",
                 borderRadius: 6,
-                border: '1px solid #cbd5e1',
+                border: "1px solid #cbd5e1",
                 fontSize: 13,
-                backgroundColor: '#ffffff',
-                color: '#1e293b',
+                backgroundColor: "#ffffff",
+                color: "#1e293b",
               }}
             >
-              <option value="ALL">-- Tất cả ngành hàng ({availableCategories.length}) --</option>
+              <option value="ALL">
+                -- Tất cả ngành hàng ({availableCategories.length}) --
+              </option>
               {availableCategories.map((cat) => (
                 <option key={cat} value={cat}>
                   {cat}
@@ -601,8 +895,15 @@ export const SupplierProductsTab: FC<Props> = ({
             </select>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ fontSize: 12.5, fontWeight: 600, color: '#475569', whiteSpace: 'nowrap' }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span
+              style={{
+                fontSize: 12.5,
+                fontWeight: 600,
+                color: "#475569",
+                whiteSpace: "nowrap",
+              }}
+            >
               Trạng thái:
             </span>
             <select
@@ -610,12 +911,12 @@ export const SupplierProductsTab: FC<Props> = ({
               onChange={(e) => setStatusInput(e.target.value)}
               style={{
                 height: 36,
-                padding: '0 10px',
+                padding: "0 10px",
                 borderRadius: 6,
-                border: '1px solid #cbd5e1',
+                border: "1px solid #cbd5e1",
                 fontSize: 13,
-                backgroundColor: '#ffffff',
-                color: '#1e293b',
+                backgroundColor: "#ffffff",
+                color: "#1e293b",
               }}
             >
               <option value="ALL">-- Tất cả trạng thái --</option>
@@ -624,8 +925,19 @@ export const SupplierProductsTab: FC<Props> = ({
             </select>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 'auto' }}>
-            <button type="submit" className="po-btn po-btn-primary" style={{ height: 36 }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              marginLeft: "auto",
+            }}
+          >
+            <button
+              type="submit"
+              className="po-btn po-btn-primary"
+              style={{ height: 36 }}
+            >
               <Search size={14} />
               <span>Tìm kiếm</span>
             </button>
@@ -646,45 +958,129 @@ export const SupplierProductsTab: FC<Props> = ({
           className="admin-table-card"
           style={{
             borderRadius: 12,
-            border: '1px solid #e2e8f0',
-            overflowX: 'auto',
+            border: "1px solid #e2e8f0",
+            overflowX: "auto",
           }}
         >
-          <table className="admin-data-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <table
+            className="admin-data-table"
+            style={{ width: "100%", borderCollapse: "collapse" }}
+          >
             <thead>
-              <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
-                <th style={{ width: 44, textAlign: 'center', padding: '10px 8px', fontSize: 11.5 }}>
+              <tr
+                style={{
+                  backgroundColor: "#f8fafc",
+                  borderBottom: "1px solid #e2e8f0",
+                }}
+              >
+                <th
+                  style={{
+                    width: 44,
+                    textAlign: "center",
+                    padding: "10px 8px",
+                    fontSize: 11.5,
+                  }}
+                >
                   #
                 </th>
-                <th style={{ width: 56, textAlign: 'center', padding: '10px 8px', fontSize: 11.5 }}>
+                <th
+                  style={{
+                    width: 56,
+                    textAlign: "center",
+                    padding: "10px 8px",
+                    fontSize: 11.5,
+                  }}
+                >
                   ẢNH
                 </th>
-                <th style={{ width: 140, textAlign: 'left', padding: '10px 12px', fontSize: 11.5 }}>
+                <th
+                  style={{
+                    width: 140,
+                    textAlign: "left",
+                    padding: "10px 12px",
+                    fontSize: 11.5,
+                  }}
+                >
                   MÃ SKU
                 </th>
-                <th style={{ textAlign: 'left', padding: '10px 12px', fontSize: 11.5 }}>
+                <th
+                  style={{
+                    textAlign: "left",
+                    padding: "10px 12px",
+                    fontSize: 11.5,
+                  }}
+                >
                   TÊN SẢN PHẨM
                 </th>
-                <th style={{ width: 140, textAlign: 'left', padding: '10px 12px', fontSize: 11.5 }}>
+                <th
+                  style={{
+                    width: 140,
+                    textAlign: "left",
+                    padding: "10px 12px",
+                    fontSize: 11.5,
+                  }}
+                >
                   NGÀNH HÀNG
                 </th>
-                <th style={{ width: 80, textAlign: 'center', padding: '10px 12px', fontSize: 11.5 }}>
+                <th
+                  style={{
+                    width: 80,
+                    textAlign: "center",
+                    padding: "10px 12px",
+                    fontSize: 11.5,
+                  }}
+                >
                   ĐVT
                 </th>
-                <th style={{ width: 140, textAlign: 'right', padding: '10px 12px', fontSize: 11.5 }}>
-                  {isBranchFiltered ? 'GIÁ BÁN (CN) / SỈ' : 'GIÁ NHẬP SỈ'}
+                <th
+                  style={{
+                    width: 140,
+                    textAlign: "right",
+                    padding: "10px 12px",
+                    fontSize: 11.5,
+                  }}
+                >
+                  GIÁ NHẬP SỈ
                 </th>
-                <th style={{ width: 100, textAlign: 'right', padding: '10px 12px', fontSize: 11.5 }}>
+                <th
+                  style={{
+                    width: 100,
+                    textAlign: "right",
+                    padding: "10px 12px",
+                    fontSize: 11.5,
+                  }}
+                >
                   MOQ
                 </th>
-                <th style={{ width: 125, textAlign: 'right', padding: '10px 12px', fontSize: 11.5 }}>
+                <th
+                  style={{
+                    width: 125,
+                    textAlign: "right",
+                    padding: "10px 12px",
+                    fontSize: 11.5,
+                  }}
+                >
                   THIẾU CHO PHÉP
                 </th>
-                <th style={{ width: 130, textAlign: 'center', padding: '10px 12px', fontSize: 11.5 }}>
-                  {isBranchFiltered ? 'TRẠNG THÁI / TỒN KHO' : 'TRẠNG THÁI'}
+                <th
+                  style={{
+                    width: 130,
+                    textAlign: "center",
+                    padding: "10px 12px",
+                    fontSize: 11.5,
+                  }}
+                >
+                  TRẠNG THÁI
                 </th>
                 {canEdit && (
-                  <th style={{ width: 95, textAlign: 'right', padding: '10px 12px', fontSize: 11.5 }}>
+                  <th
+                    style={{
+                      width: 95,
+                      textAlign: "right",
+                      padding: "10px 12px",
+                      fontSize: 11.5,
+                    }}
+                  >
                     THAO TÁC
                   </th>
                 )}
@@ -695,12 +1091,16 @@ export const SupplierProductsTab: FC<Props> = ({
                 <tr>
                   <td
                     colSpan={canEdit ? 11 : 10}
-                    style={{ textAlign: 'center', padding: '36px 16px', color: '#64748b' }}
+                    style={{
+                      textAlign: "center",
+                      padding: "36px 16px",
+                      color: "#64748b",
+                    }}
                   >
                     <div
                       style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
+                        display: "inline-flex",
+                        alignItems: "center",
                         gap: 8,
                         fontSize: 13,
                       }}
@@ -709,7 +1109,7 @@ export const SupplierProductsTab: FC<Props> = ({
                       <span>
                         {isLoadingBranchProducts
                           ? `Đang lọc danh mục sản phẩm theo chi nhánh "${activeBranch.name}"...`
-                          : 'Đang tải danh mục sản phẩm cung ứng...'}
+                          : "Đang tải danh mục sản phẩm cung ứng..."}
                       </span>
                     </div>
                   </td>
@@ -717,33 +1117,41 @@ export const SupplierProductsTab: FC<Props> = ({
               ) : paginatedItems.length > 0 ? (
                 paginatedItems.map((item, idx) => {
                   const rowIndex =
-                    (appliedFilters.pageIndex - 1) * appliedFilters.pageSize + idx + 1;
-                  const uom = item.baseUoM || item.deliveryUoM || item.unit || 'Cái';
-                  const price = item.effectivePrice ?? item.agreedPrice ?? item.importPrice ?? 0;
-                  const branchInfo = branchProductMap.get(item.productId);
+                    (appliedFilters.pageIndex - 1) * appliedFilters.pageSize +
+                    idx +
+                    1;
+                  const uom =
+                    item.baseUoM || item.deliveryUoM || item.unit || "Cái";
+                  const effective = getEffectiveTerms(item);
 
                   return (
                     <tr
                       key={item.id}
                       style={{
-                        borderBottom: '1px solid #f1f5f9',
-                        opacity: item.status === 'Inactive' ? 0.65 : 1,
+                        borderBottom: "1px solid #f1f5f9",
+                        opacity: effective.status === "Inactive" ? 0.65 : 1,
                       }}
                     >
                       {/* 1. STT */}
                       <td
                         style={{
-                          padding: '10px 8px',
-                          textAlign: 'center',
+                          padding: "10px 8px",
+                          textAlign: "center",
                           fontSize: 12,
-                          color: '#94a3b8',
+                          color: "#94a3b8",
                         }}
                       >
                         {rowIndex}
                       </td>
 
                       {/* 2. Ảnh */}
-                      <td style={{ padding: '8px', textAlign: 'center', verticalAlign: 'middle' }}>
+                      <td
+                        style={{
+                          padding: "8px",
+                          textAlign: "center",
+                          verticalAlign: "middle",
+                        }}
+                      >
                         {item.imageUrl ? (
                           <img
                             src={item.imageUrl}
@@ -751,12 +1159,12 @@ export const SupplierProductsTab: FC<Props> = ({
                             style={{
                               width: 36,
                               height: 36,
-                              objectFit: 'cover',
+                              objectFit: "cover",
                               borderRadius: 6,
-                              border: '1px solid #e2e8f0',
-                              display: 'block',
-                              margin: '0 auto',
-                              background: '#f8fafc',
+                              border: "1px solid #e2e8f0",
+                              display: "block",
+                              margin: "0 auto",
+                              background: "#f8fafc",
                             }}
                           />
                         ) : (
@@ -765,14 +1173,14 @@ export const SupplierProductsTab: FC<Props> = ({
                               width: 36,
                               height: 36,
                               borderRadius: 6,
-                              border: '1px dashed #cbd5e1',
-                              background: '#f8fafc',
-                              margin: '0 auto',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
+                              border: "1px dashed #cbd5e1",
+                              background: "#f8fafc",
+                              margin: "0 auto",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
                               fontSize: 10,
-                              color: '#94a3b8',
+                              color: "#94a3b8",
                             }}
                           >
                             N/A
@@ -781,13 +1189,15 @@ export const SupplierProductsTab: FC<Props> = ({
                       </td>
 
                       {/* 3. Mã SKU */}
-                      <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>
+                      <td
+                        style={{ padding: "10px 12px", whiteSpace: "nowrap" }}
+                      >
                         <span
                           style={{
-                            fontFamily: 'var(--font-mono, monospace)',
+                            fontFamily: "var(--font-mono, monospace)",
                             fontSize: 12,
                             fontWeight: 600,
-                            color: '#0f766e',
+                            color: "#0f766e",
                           }}
                         >
                           {item.sku}
@@ -795,116 +1205,124 @@ export const SupplierProductsTab: FC<Props> = ({
                       </td>
 
                       {/* 4. Tên sản phẩm */}
-                      <td style={{ padding: '10px 12px' }}>
-                        <div style={{ fontWeight: 600, color: '#0f172a', fontSize: 13 }}>
+                      <td style={{ padding: "10px 12px" }}>
+                        <div
+                          style={{
+                            fontWeight: 600,
+                            color: "#0f172a",
+                            fontSize: 13,
+                          }}
+                        >
                           {item.name}
                         </div>
                       </td>
 
                       {/* 5. Ngành hàng */}
-                      <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>
-                        <span style={{ fontSize: 12, color: '#475569', fontWeight: 500 }}>
-                          {item.categoryName || 'Chung'}
+                      <td
+                        style={{ padding: "10px 12px", whiteSpace: "nowrap" }}
+                      >
+                        <span
+                          style={{
+                            fontSize: 12,
+                            color: "#475569",
+                            fontWeight: 500,
+                          }}
+                        >
+                          {item.categoryName || "Chung"}
                         </span>
                       </td>
 
                       {/* 6. ĐVT */}
-                      <td style={{ padding: '10px 12px', textAlign: 'center', whiteSpace: 'nowrap' }}>
-                        <span style={{ fontSize: 12, fontWeight: 600, color: '#1e293b' }}>
+                      <td
+                        style={{
+                          padding: "10px 12px",
+                          textAlign: "center",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        <span
+                          style={{
+                            fontSize: 12,
+                            fontWeight: 600,
+                            color: "#1e293b",
+                          }}
+                        >
                           {uom}
                         </span>
                       </td>
 
                       {/* 7. Giá */}
-                      <td style={{ padding: '10px 12px', textAlign: 'right', whiteSpace: 'nowrap' }}>
-                        {isBranchFiltered && branchInfo?.retailPrice !== undefined ? (
-                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
-                            <span
-                              style={{
-                                fontFamily: 'var(--font-mono, monospace)',
-                                fontSize: 12.5,
-                                fontWeight: 700,
-                                color: '#0f766e',
-                              }}
-                              title={`Giá bán lẻ niêm yết tại ${activeBranch.name}`}
-                            >
-                              {fmtCurrency(branchInfo.retailPrice)}
-                            </span>
-                            <span style={{ fontSize: 10.5, color: '#64748b' }} title="Giá nhập sỉ từ NCC (toàn chuỗi)">
-                              Sỉ: {fmtCurrency(price)}
-                            </span>
-                          </div>
-                        ) : (
-                          <span
-                            style={{
-                              fontFamily: 'var(--font-mono, monospace)',
-                              fontSize: 12.5,
-                              fontWeight: 700,
-                              color: '#0f766e',
-                            }}
-                          >
-                            {fmtCurrency(price)}
-                          </span>
-                        )}
+                      <td
+                        style={{
+                          padding: "10px 12px",
+                          textAlign: "right",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        <span
+                          style={{
+                            fontFamily: "var(--font-mono, monospace)",
+                            fontSize: 12.5,
+                            fontWeight: 700,
+                            color: "#0f766e",
+                          }}
+                        >
+                          {fmtCurrency(effective.agreedPrice)}
+                        </span>
                       </td>
 
                       {/* 8. MOQ */}
-                      <td style={{ padding: '10px 12px', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                      <td
+                        style={{
+                          padding: "10px 12px",
+                          textAlign: "right",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
                         <span
                           style={{
-                            fontFamily: 'var(--font-mono, monospace)',
+                            fontFamily: "var(--font-mono, monospace)",
                             fontSize: 12,
-                            color: '#475569',
+                            color: "#475569",
                           }}
                         >
-                          {item.moq} {uom}
+                          {effective.moq} {uom}
                         </span>
                       </td>
 
                       {/* 9. Thiếu cho phép */}
-                      <td style={{ padding: '10px 12px', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                      <td
+                        style={{
+                          padding: "10px 12px",
+                          textAlign: "right",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
                         <span
                           style={{
-                            fontFamily: 'var(--font-mono, monospace)',
+                            fontFamily: "var(--font-mono, monospace)",
                             fontSize: 12,
-                            color: '#475569',
+                            color: "#475569",
                           }}
                         >
-                          {item.allowedShortageQty ?? 0} {uom}
+                          {effective.allowedShortageQty} {uom}
                         </span>
                       </td>
 
-                      {/* 10. Trạng thái & Tồn kho chi nhánh */}
-                      <td style={{ padding: '10px 12px', textAlign: 'center' }}>
-                        <SupplierStatusBadge
-                          status={isBranchFiltered ? (branchInfo?.status || 'Active') : (item.status || 'Active')}
-                        />
-                        {isBranchFiltered && (
-                          <div
-                            style={{
-                              marginTop: 4,
-                              fontSize: 11,
-                              color: '#0369a1',
-                              fontWeight: 600,
-                              backgroundColor: '#f0f9ff',
-                              padding: '2px 6px',
-                              borderRadius: 4,
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: 3,
-                            }}
-                            title={`Tồn kho thực tế tại ${activeBranch.name}`}
-                          >
-                            <CheckCircle2 size={11} color="#0284c7" />
-                            <span>Kho: {branchInfo?.currentStock ?? 0} {uom}</span>
-                          </div>
-                        )}
+                      {/* 10. Trạng thái */}
+                      <td style={{ padding: "10px 12px", textAlign: "center" }}>
+                        <SupplierStatusBadge status={effective.status} />
                       </td>
 
                       {/* 11. Thao tác */}
                       {canEdit && (
-                        <td style={{ padding: '10px 12px', textAlign: 'right' }}>
-                          <div className="so-list-actions" style={{ justifyContent: 'flex-end' }}>
+                        <td
+                          style={{ padding: "10px 12px", textAlign: "right" }}
+                        >
+                          <div
+                            className="so-list-actions"
+                            style={{ justifyContent: "flex-end" }}
+                          >
                             <button
                               type="button"
                               className="so-list-action-btn"
@@ -923,19 +1341,39 @@ export const SupplierProductsTab: FC<Props> = ({
                 <tr>
                   <td
                     colSpan={canEdit ? 11 : 10}
-                    style={{ textAlign: 'center', padding: '36px 16px', color: '#64748b' }}
+                    style={{
+                      textAlign: "center",
+                      padding: "36px 16px",
+                      color: "#64748b",
+                    }}
                   >
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        gap: 10,
+                      }}
+                    >
                       <AlertCircle size={28} color="#94a3b8" />
                       {isBranchFiltered ? (
                         <>
-                          <span style={{ fontWeight: 600, color: '#334155' }}>
-                            Không tìm thấy sản phẩm nào của nhà cung cấp tại chi nhánh "{activeBranch.name}".
+                          <span style={{ fontWeight: 600, color: "#334155" }}>
+                            Không tìm thấy sản phẩm nào của nhà cung cấp tại chi
+                            nhánh "{activeBranch.name}".
                           </span>
-                          <span style={{ fontSize: 12.5, color: '#64748b' }}>
-                            Sản phẩm của nhà cung cấp này chưa được phân bổ tới chi nhánh đang chọn.
+                          <span style={{ fontSize: 12.5, color: "#64748b" }}>
+                            Sản phẩm của nhà cung cấp này chưa được phân bổ tới
+                            chi nhánh đang chọn.
                           </span>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 4 }}>
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 10,
+                              marginTop: 4,
+                            }}
+                          >
                             <button
                               type="button"
                               onClick={handleSwitchToAllBranches}
@@ -958,7 +1396,10 @@ export const SupplierProductsTab: FC<Props> = ({
                         </>
                       ) : (
                         <>
-                          <span>Không có sản phẩm nào phù hợp hoặc nhà cung cấp chưa được gán mặt hàng.</span>
+                          <span>
+                            Không có sản phẩm nào phù hợp hoặc nhà cung cấp chưa
+                            được gán mặt hàng.
+                          </span>
                           {canEdit && supplier && (
                             <button
                               type="button"
@@ -982,28 +1423,35 @@ export const SupplierProductsTab: FC<Props> = ({
           {effectiveTotal > 0 && (
             <div
               style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                padding: '10px 16px',
-                borderTop: '1px solid #e2e8f0',
-                backgroundColor: '#f8fafc',
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                padding: "10px 16px",
+                borderTop: "1px solid #e2e8f0",
+                backgroundColor: "#f8fafc",
                 fontSize: 12.5,
-                color: '#475569',
-                flexWrap: 'wrap',
+                color: "#475569",
+                flexWrap: "wrap",
                 gap: 12,
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                 <span>
-                  Hiển thị <b>{startItem}</b> – <b>{endItem}</b> trên <b>{effectiveTotal}</b> mặt hàng
+                  Hiển thị <b>{startItem}</b> – <b>{endItem}</b> trên{" "}
+                  <b>{effectiveTotal}</b> mặt hàng
                   {isBranchFiltered && (
-                    <span style={{ marginLeft: 6, color: '#0369a1', fontWeight: 600 }}>
+                    <span
+                      style={{
+                        marginLeft: 6,
+                        color: "#0369a1",
+                        fontWeight: 600,
+                      }}
+                    >
                       (tại {activeBranch.name} • Tổng chuỗi: {totalCount})
                     </span>
                   )}
                 </span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                   <span>Bản ghi/trang:</span>
                   <select
                     value={appliedFilters.pageSize}
@@ -1015,11 +1463,11 @@ export const SupplierProductsTab: FC<Props> = ({
                       }))
                     }
                     style={{
-                      padding: '2px 6px',
+                      padding: "2px 6px",
                       borderRadius: 4,
-                      border: '1px solid #cbd5e1',
+                      border: "1px solid #cbd5e1",
                       fontSize: 12,
-                      backgroundColor: '#ffffff',
+                      backgroundColor: "#ffffff",
                     }}
                   >
                     <option value={10}>10</option>
@@ -1029,7 +1477,7 @@ export const SupplierProductsTab: FC<Props> = ({
                 </div>
               </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <button
                   type="button"
                   disabled={appliedFilters.pageIndex <= 1}
@@ -1040,7 +1488,7 @@ export const SupplierProductsTab: FC<Props> = ({
                     }))
                   }
                   className="po-btn po-btn-secondary"
-                  style={{ height: 28, padding: '0 8px', fontSize: 12 }}
+                  style={{ height: 28, padding: "0 8px", fontSize: 12 }}
                 >
                   <ChevronLeft size={14} /> Trước
                 </button>
@@ -1057,7 +1505,7 @@ export const SupplierProductsTab: FC<Props> = ({
                     }))
                   }
                   className="po-btn po-btn-secondary"
-                  style={{ height: 28, padding: '0 8px', fontSize: 12 }}
+                  style={{ height: 28, padding: "0 8px", fontSize: 12 }}
                 >
                   Sau <ChevronRight size={14} />
                 </button>
@@ -1086,19 +1534,29 @@ export const SupplierProductsTab: FC<Props> = ({
         <EditSupplierProductModal
           isOpen={!!editingItem}
           onClose={() => setEditingItem(null)}
-          item={editingItem}
-          supplierName={supplier?.name || editingItem?.supplierName || ''}
-          branchContext={
-            isBranchFiltered
+          item={
+            editingItem
               ? {
-                  branchId: activeBranch.id,
-                  branchName: activeBranch.name || 'Chi nhánh',
-                  branchInfo: editingItem ? branchProductMap.get(editingItem.productId) : undefined,
+                  ...editingItem,
+                  agreedPrice: getEffectiveTerms(editingItem).agreedPrice,
+                  effectivePrice: getEffectiveTerms(editingItem).agreedPrice,
+                  moq: getEffectiveTerms(editingItem).moq,
+                  allowedShortageQty:
+                    getEffectiveTerms(editingItem).allowedShortageQty,
+                  status: getEffectiveTerms(editingItem).status,
                 }
               : null
           }
+          supplierName={supplier?.name || editingItem?.supplierName || ""}
+          branchContext={{
+            branchId: activeBranch.id || "ALL",
+            branchName: activeBranch.name || "Toàn hệ thống",
+            isHeadquarter: activeBranch.isHeadquarter,
+            branchInfo: editingItem
+              ? branchProductMap.get(editingItem.productId)
+              : undefined,
+          }}
           onSave={handleSaveEdit}
-          onSaveBranchProduct={handleSaveBranchProduct}
         />
       )}
     </div>

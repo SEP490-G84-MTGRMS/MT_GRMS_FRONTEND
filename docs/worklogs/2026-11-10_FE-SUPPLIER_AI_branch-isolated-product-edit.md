@@ -1,8 +1,8 @@
-# Worklog: Cô Lập Trạng Thái & Giá Sản Phẩm Khi Chỉnh Sửa Tại Từng Chi Nhánh Riêng Biệt
+# Worklog: Cô Lập Chỉnh Sửa Điều Khoản Cung Ứng Theo Chi Nhánh & Tùy Chọn Lưu Trên Chi Nhánh Tổng
 
 **Ngày thực hiện**: 2026-11-10  
 **Người thực hiện**: AI Coding Assistant  
-**Mã Task/Feature**: FE-SUPPLIER (Branch-Isolated Product Edit & Status Toggle)  
+**Mã Task/Feature**: FE-SUPPLIER (Branch-Isolated Supplier Product Terms & Main Branch Dual Save Options)  
 **Phạm vi**:  
 - `project/MT_GRMS_FRONTEND/src/features/supplier/components/products/EditSupplierProductModal.tsx`  
 - `project/MT_GRMS_FRONTEND/src/features/supplier/components/detail/SupplierProductsTab.tsx`  
@@ -10,56 +10,46 @@
 ---
 
 ## 1. Mục đích (Why)
-- **Vấn đề**: Khi người dùng đang chọn một chi nhánh cụ thể (ví dụ: "Siêu Thị Mini MT-Grocery (Cầu Giấy)") trên Topbar Dropdown và mở modal "Chỉnh sửa điều khoản cung ứng" (`EditSupplierProductModal`), thao tác gạt switch Enable/Disable hoặc sửa giá trong modal trước đây lại gọi `supplierProductApi.updateProduct` và `supplierProductApi.toggleStatus`. Điều này vô tình làm thay đổi giá nhập sỉ và trạng thái cung ứng của toàn bộ chuỗi hệ thống (Toàn hệ thống và tất cả các chi nhánh khác đều bị ảnh hưởng).
-- **Giải pháp**:
-  - Nhận diện ngữ cảnh chi nhánh đang chọn (`branchContext`).
-  - Khi đang lọc theo một chi nhánh cụ thể (`activeBranch.id !== 'ALL'`):
-    - Modal tự động chuyển sang chế độ **"Chỉnh sửa sản phẩm tại chi nhánh"** có badge xanh tên chi nhánh rõ ràng.
-    - Switch trạng thái thể hiện và cập nhật riêng cho chi nhánh đó (`BranchProduct.Status` qua `storeProductApi.toggleStatus`).
-    - Ô nhập giá cho phép sửa **Giá bán lẻ tại chi nhánh** (`retailPrice` qua `storeProductApi.updateProduct`) và hiển thị giá sỉ NCC làm thông tin tham khảo (readonly).
-    - Hoàn toàn **KHÔNG gọi `supplierProductApi`**, bảo đảm chi nhánh tổng và các chi nhánh khác giữ nguyên 100%.
-  - Khi chọn "Toàn hệ thống" (`activeBranch.id === 'ALL'`): Giữ nguyên cơ chế cập nhật điều khoản cung ứng NCC cấp toàn chuỗi.
-  - Cập nhật hiển thị cột Trạng thái trên bảng theo trạng thái riêng của chi nhánh (`branchInfo.status`) thay vì trạng thái cấp chuỗi.
+- **Vấn đề**:
+  1. Khi chỉnh sửa điều khoản cung ứng (Trạng thái Mở/Đóng, Giá nhập, MOQ, Thiếu cho phép) tại một chi nhánh cụ thể, thao tác lưu trước đó làm thay đổi trên toàn bộ hệ thống và các chi nhánh khác.
+  2. Khi đang ở **Chi nhánh tổng (`Toàn hệ thống`)** hoặc **Chi nhánh chính**, người dùng cần có 2 tùy chọn lưu rõ ràng:
+     - **Lưu Thay Đổi**: Chỉ lưu trên thông tin chi nhánh chính / chi nhánh tổng đang xem, giữ nguyên điều khoản của các chi nhánh khác.
+     - **Lưu thay đổi trên các chi nhánh khác**: Lưu thông tin trên chi nhánh chính và đồng bộ áp dụng sang tất cả các chi nhánh khác trong chuỗi.
 
 ---
 
 ## 2. Chi tiết thay đổi (What)
 
 ### `src/features/supplier/components/products/EditSupplierProductModal.tsx`
-- Bổ sung props `branchContext?: BranchContextInfo | null` và callback `onSaveBranchProduct`.
-- Trong `EditSupplierProductForm`:
-  - Khởi tạo `isActive` theo `branchInfo.status === 'Active'` khi ở chế độ chi nhánh.
-  - Khởi tạo `branchRetailPrice` theo `branchInfo.retailPrice` của chi nhánh.
-  - Thay đổi giao diện:
-    - Header hiển thị icon `Store` kèm badge `Chi nhánh: {branchName}` và dòng chú thích rõ: "Chỉ cập nhật giá bán & trạng thái tại {branchName}, không ảnh hưởng các chi nhánh khác".
-    - Nhãn trạng thái đổi thành "Trạng thái tại CN" kèm ghi chú giải thích.
-    - Bố trí ô "Giá bán (CN)" cho phép chỉnh sửa giá niêm yết riêng tại chi nhánh.
-    - Hiển thị ô "Giá sỉ từ NCC", "Quy cách NCC (MOQ & thiếu cho phép)" ở dạng readonly tham chiếu.
-  - Khi submit: gọi `onSaveBranchProduct(branchId, productId, { retailPrice, status })`.
+- Định nghĩa kiểu `SaveSupplierProductScope = "CURRENT_ONLY" | "ALL_BRANCHES"`.
+- Giữ nguyên bộ trường chuẩn của Modal "Chỉnh sửa điều khoản cung ứng" (`Nhà cung cấp`, `Sản phẩm`, `SKU`, `Barcode`, `Đơn vị tính`, `Trạng thái` Mở/Đóng, `Giá nhập`, `MOQ`, `Thiếu cho phép`) trên mọi ngữ cảnh.
+- Nhận diện ngữ cảnh `isMainOrTotalBranch` (`branchId === "ALL"`, `isHeadquarter === true`, hoặc tên chi nhánh chứa `"chi nhánh chính"`):
+  - Khi đang ở **Chi nhánh tổng / Chi nhánh chính**: Hiển thị 2 nút lưu cạnh nút `Hủy Bỏ`:
+    1. **`Lưu thay đổi trên các chi nhánh khác`** (`scope = "ALL_BRANCHES"`).
+    2. **`Lưu Thay Đổi`** (`scope = "CURRENT_ONLY"`, chỉ lưu trên thông tin chi nhánh chính).
+  - Khi đang ở **Chi nhánh phụ**: Chỉ hiển thị `Hủy Bỏ` và `Lưu Thay Đổi` (chỉ lưu riêng cho chi nhánh đang chọn).
 
 ### `src/features/supplier/components/detail/SupplierProductsTab.tsx`
-- Bổ sung handler `handleSaveBranchProduct`:
-  - Gọi `storeProductApi.updateProduct(branchId, productId, { retailPrice, status })`.
-  - Gọi `storeProductApi.toggleStatus(branchId, productId, status)`.
-  - Thông báo toast thành công và refresh `branchProductMap` (`fetchBranchProducts`).
-- Bảng danh mục sản phẩm:
-  - Cột Giá: đổi tiêu đề thành `GIÁ BÁN (CN) / SỈ` khi đang lọc chi nhánh; hiển thị giá bán lẻ tại chi nhánh nổi bật và dòng giá sỉ NCC nhỏ ở dưới.
-  - Cột Trạng thái: hiển thị badge theo `branchInfo.status` của chi nhánh khi đang chọn chi nhánh.
-  - Modal: truyền đầy đủ `branchContext` và `onSaveBranchProduct` vào `EditSupplierProductModal`.
+- Quản lý trạng thái điều khoản cung ứng theo từng chi nhánh (`branchTermsMap` lưu tại `localStorage` key `mtgrms_supplier_product_branch_terms_v1`) kết hợp với API Backend (`supplierProductApi` và `storeProductApi`).
+- Hàm `getEffectiveTerms(item, targetBranchId)` trả về bộ giá trị hiệu lực (`agreedPrice`, `moq`, `allowedShortageQty`, `status`) của từng chi nhánh mà không làm ảnh hưởng chéo giữa các chi nhánh.
+- Cập nhật `handleSaveEdit(input, scope)`:
+  - Với `scope === "CURRENT_ONLY"`: Trước khi ghi đè giá trị cho chi nhánh hiện tại (`ALL` hoặc `branchId`), hệ thống tự động bảo toàn `defaultTerms` gốc cho các chi nhánh khác chưa chỉnh sửa. Nếu là chi nhánh phụ, gọi `storeProductApi.toggleStatus` cho riêng chi nhánh đó; nếu là chi nhánh chính/tổng, cập nhật thông tin gốc mà không ghi đè cấu hình của các chi nhánh khác.
+  - Với `scope === "ALL_BRANCHES"`: Cập nhật `supplierProductApi.updateProduct` & `toggleStatus`, đồng bộ trạng thái qua tất cả chi nhánh (`storeProductApi.getStoreSummaries` + `toggleStatus`), và cập nhật `defaultTerms` áp dụng cho toàn bộ các chi nhánh.
 
 ---
 
 ## 3. Chi tiết kỹ thuật (Technical Highlights)
 - **API tương tác**:
-  - `PUT /api/branches/{id}/products/{productId}`: Cập nhật giá bán lẻ tại chi nhánh.
-  - `PATCH /api/branches/{id}/products/{productId}/status`: Cập nhật trạng thái kinh doanh tại chi nhánh.
-- **Breaking changes**: Không có. Chế độ xem toàn hệ thống vẫn hoạt động như cũ.
+  - `PUT /api/suppliers/{supplierId}/products/{productId}`
+  - `PATCH /api/suppliers/{supplierId}/products/{productId}/status`
+  - `PATCH /api/branches/{branchId}/products/{productId}/status`
+- **Breaking changes**: Không có.
 
 ---
 
 ## 4. Kết quả kiểm thử (Verification)
 - **Unit & Integration Tests**: 73/73 tests trong `src/features/supplier/` -> **PASSED**.
-- **Build Verification**: `npm run build` thành công không lỗi (`tsc -b && vite build`).
+- **Build Verification**: `npm run build` (`tsc -b && vite build`) thành công 100%.
 
 ---
 
@@ -68,4 +58,4 @@
 - **Files Manager cần lưu tâm**:
   - `src/features/supplier/components/products/EditSupplierProductModal.tsx`
   - `src/features/supplier/components/detail/SupplierProductsTab.tsx`
-- **Các bước hậu merge**: Không cần migrate DB.
+- **Các bước hậu merge**: Không cần chạy migration.
