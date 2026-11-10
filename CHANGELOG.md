@@ -4,6 +4,11 @@ Toàn bộ các thay đổi của repository Frontend React SPA được tổng 
 
 ---
 
+## [Unreleased] - 2026-11-10
+
+### Fixed
+- **Sửa lỗi xác thực mật khẩu màn Đăng ký (`RegisterPage.tsx`)**: Điều chỉnh điều kiện độ dài tối thiểu từ 8 ký tự về 6 ký tự đồng bộ với Backend, nâng cấp thanh đo độ mạnh mật khẩu `passwordStrength` giúp các mật khẩu trung bình (từ 6 ký tự trở lên kết hợp chữ và số hoặc độ dài >= 8) được phép tạo tài khoản thành công mà không bị chặn, cập nhật thông báo lỗi chuẩn xác và điều hướng trực tiếp vào Cổng quản trị cửa hàng (`/store-owner/dashboard`) [FE-AUTH] [worklog: docs/worklogs/2026-11-10_FE-AUTH_AI_register-password-strength-fix.md].
+
 ## [Unreleased] - 2026-11-09
 
 ### Added
@@ -11,6 +16,7 @@ Toàn bộ các thay đổi của repository Frontend React SPA được tổng 
 - Chuyển đổi toàn diện cơ chế xác thực sang HttpOnly Cookie: loại bỏ 100% việc lưu trữ token trong `localStorage` (miễn nhiễm XSS Token Theft), triển khai Silent Refresh với Axios Request Queue trong `httpClient.ts`, tự động đồng bộ phiên khi F5 qua `GET /api/auth/me`, và điều hướng thông minh khi phiên hết hạn kèm ghi nhớ `redirectUrl` [FE-AUTH] [worklog: docs/worklogs/2026-11-09_FE-AUTH_AI_httponly-cookie-and-session-expiry.md].
 
 ### Fixed
+- Đồng bộ `withCredentials: true` trong `financeHttpClient.ts` để tự động gửi HttpOnly Cookie khi gọi các API phân hệ Tài chính - Sổ quỹ - Thuế, khắc phục lỗi `401 Unauthorized` trên Console [FE-AUTH] [worklog: docs/worklogs/2026-11-09_FE-AUTH_AI_user-role-enum-standardization.md].
 - **Phóng to kích thước & chữ mô tả cột bên trái Modal Thanh toán gói (`SubscriptionCheckoutModal.tsx`, `store-hub.css`)**: Tăng chiều rộng cột trái từ 330px lên 400px, nâng `maxWidth` modal lên 960px, phóng to font chữ tên gói (19px), giá (26px), mô tả ngắn (13.5px) và toàn bộ 7 tính năng kèm icon tích xanh lớn hơn, giúp dễ đọc và nổi bật giá trị gói cước [FE-BRANCH] [worklog: docs/worklogs/2026-11-09_FE-BRANCH_AI_redesign-branch-detail-modal-inputs.md].
 - **Sửa lỗi rớt dòng chữ tại 4 thẻ KPI chỉ số tổng quát (`BranchDetailModal.tsx`)**: Bố trí icon lên phía trên riêng biệt và cho tiêu đề trải rộng 100% chiều ngang thẻ với `whiteSpace: 'nowrap'`, loại bỏ triệt để hiện tượng rớt chữ ("doanh", "hàng", "dịch") xuống dòng 2, đồng đều chiều cao và cân đối 4 cột [FE-BRANCH] [worklog: docs/worklogs/2026-11-09_FE-BRANCH_AI_redesign-branch-detail-modal-inputs.md].
 - **Tối giản hóa Modal Chi tiết chi nhánh (`BranchDetailModal.tsx`)**: Lược bỏ 2 tab danh sách và bảng chi tiết sản phẩm / nhân viên ở phía dưới, giữ nguyên 4 thẻ KPI chỉ số tổng quát (SKU, SOH, Thiếu hàng, Nhân sự) giúp modal vừa vặn màn hình và tải nhanh hơn [FE-BRANCH] [worklog: docs/worklogs/2026-11-09_FE-BRANCH_AI_redesign-branch-detail-modal-inputs.md].

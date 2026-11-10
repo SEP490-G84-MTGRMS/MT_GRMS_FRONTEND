@@ -54,7 +54,7 @@ import { ServiceExpensesPage } from '../features/service-expenses/pages/ServiceE
 import { CustomerManagementPage } from '../features/customer-crm';
 
 // 5. Product Management Feature (FE-01)
-import { ProductListPage, StoreProductManagementPage } from '../features/product';
+import { ProductListPage, CategoryListPage, StoreProductManagementPage } from '../features/product';
 
 // 6. Transfer Feature (FE-15)
 import {
@@ -292,6 +292,10 @@ export const router = createBrowserRouter([
       {
         path: 'products',
         element: <ProductListPage />,
+      },
+      {
+        path: 'categories',
+        element: <CategoryListPage />,
       },
       {
         path: 'transfers',
@@ -610,6 +614,10 @@ export const router = createBrowserRouter([
         element: <ProductListPage />,
       },
       {
+        path: 'categories',
+        element: <CategoryListPage />,
+      },
+      {
         path: 'transfers',
         element: <TransferListPage />,
       },
@@ -737,6 +745,20 @@ export const router = createBrowserRouter([
       {
         index: true,
         element: <ProductListPage />,
+      },
+      {
+        path: 'categories',
+        element: <CategoryListPage />,
+      },
+    ],
+  },
+  {
+    path: '/categories',
+    element: <StoreOwnerLayout />,
+    children: [
+      {
+        index: true,
+        element: <CategoryListPage />,
       },
     ],
   },

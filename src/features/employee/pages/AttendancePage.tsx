@@ -301,12 +301,27 @@ export const AttendancePage: React.FC = () => {
   const [historyModalScheduleId, setHistoryModalScheduleId] = useState<string | null>(null);
   const [historyModalTitle, setHistoryModalTitle] = useState<string>('');
   const [openMenuScheduleId, setOpenMenuScheduleId] = useState<string | null>(null);
+  const [menuPosition, setMenuPosition] = useState<{
+    top?: number;
+    bottom?: number;
+    left?: number;
+    right?: number;
+  } | null>(null);
   const [isFaceIdModalOpen, setIsFaceIdModalOpen] = useState(false);
 
   useEffect(() => {
-    const handleGlobalClick = () => setOpenMenuScheduleId(null);
-    window.addEventListener('click', handleGlobalClick);
-    return () => window.removeEventListener('click', handleGlobalClick);
+    const handleGlobalClose = () => {
+      setOpenMenuScheduleId(null);
+      setMenuPosition(null);
+    };
+    window.addEventListener('click', handleGlobalClose);
+    window.addEventListener('scroll', handleGlobalClose, true);
+    window.addEventListener('resize', handleGlobalClose);
+    return () => {
+      window.removeEventListener('click', handleGlobalClose);
+      window.removeEventListener('scroll', handleGlobalClose, true);
+      window.removeEventListener('resize', handleGlobalClose);
+    };
   }, []);
 
   const handleOpenCreateRequest = (
@@ -1224,7 +1239,7 @@ export const AttendancePage: React.FC = () => {
               </tr>
             </thead>
             <tbody>
-              {shifts.map((sh) => (
+              {shifts.map((sh, shiftIndex) => (
                 <tr key={sh.id} style={{ minHeight: 90 }}>
                   {/* Cột thông tin Ca */}
                   <td style={{ verticalAlign: 'top', padding: 12 }}>
@@ -1264,7 +1279,24 @@ export const AttendancePage: React.FC = () => {
                                 <div
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    setOpenMenuScheduleId(isMenuOpen ? null : att.id);
+                                    if (isMenuOpen) {
+                                      setOpenMenuScheduleId(null);
+                                      setMenuPosition(null);
+                                    } else {
+                                      const rect = e.currentTarget.getBoundingClientRect();
+                                      const estimatedMenuHeight = 230;
+                                      const isLastRow = shifts.length > 1 && shiftIndex === shifts.length - 1;
+                                      const openUpward =
+                                        (isLastRow || window.innerHeight - rect.bottom < estimatedMenuHeight + 16) &&
+                                        rect.top > estimatedMenuHeight;
+                                      setMenuPosition({
+                                        top: openUpward ? undefined : rect.bottom + 4,
+                                        bottom: openUpward ? window.innerHeight - rect.top + 4 : undefined,
+                                        left: isRightAligned ? undefined : Math.max(8, rect.left),
+                                        right: isRightAligned ? Math.max(8, window.innerWidth - rect.right) : undefined,
+                                      });
+                                      setOpenMenuScheduleId(att.id);
+                                    }
                                   }}
                                   style={{
                                     background: '#FFFFFF',
@@ -1327,14 +1359,15 @@ export const AttendancePage: React.FC = () => {
                                   </div>
                                 </div>
 
-                                {isMenuOpen && (
+                                {isMenuOpen && menuPosition && (
                                   <div
                                     style={{
-                                      position: 'absolute',
-                                      top: 'calc(100% + 4px)',
-                                      left: isRightAligned ? 'auto' : 0,
-                                      right: isRightAligned ? 0 : 'auto',
-                                      zIndex: 500,
+                                      position: 'fixed',
+                                      top: menuPosition.top,
+                                      bottom: menuPosition.bottom,
+                                      left: menuPosition.left,
+                                      right: menuPosition.right,
+                                      zIndex: 9999,
                                       background: '#FFFFFF',
                                       boxShadow: '0 10px 25px -5px rgba(15, 23, 42, 0.15), 0 8px 10px -6px rgba(15, 23, 42, 0.1)',
                                       borderRadius: 8,

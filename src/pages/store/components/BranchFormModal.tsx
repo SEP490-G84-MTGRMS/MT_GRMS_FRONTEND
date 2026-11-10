@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import {
   branchManagementApi,
+  emitBranchesUpdated,
   type BranchItemResponse,
   type BranchQuotaResponse,
   type CreateBranchPayload,
@@ -131,6 +132,13 @@ export const BranchFormModal: FC<BranchFormModalProps> = ({
         };
         const res = await branchManagementApi.updateBranch(branch.id, payload);
         if (res.success) {
+          if (res.data) {
+            emitBranchesUpdated({
+              action: 'update',
+              branch: res.data,
+              branchId: branch.id,
+            });
+          }
           onSuccess();
         } else {
           setErrorMessage(res.message || 'Cập nhật chi nhánh thất bại.');
@@ -147,6 +155,13 @@ export const BranchFormModal: FC<BranchFormModalProps> = ({
         };
         const res = await branchManagementApi.createBranch(payload);
         if (res.success) {
+          if (res.data) {
+            emitBranchesUpdated({
+              action: 'create',
+              branch: res.data,
+              selectCreated: true,
+            });
+          }
           onSuccess();
         } else {
           setErrorMessage(res.message || 'Tạo chi nhánh thất bại.');

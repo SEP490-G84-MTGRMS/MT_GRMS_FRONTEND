@@ -14,16 +14,12 @@ export const financeHttpClient = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  withCredentials: true,
   timeout: 15000, // 15s cho các thao tác kế toán, đối soát
 });
 
 financeHttpClient.interceptors.request.use((config) => {
-  const token = localStorage.getItem('access_token');
-  if (token && config.headers) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-
-  let tenantId = 'tenant-grocery-001';
+  let tenantId = localStorage.getItem('tenant_id') || 'tenant_mt_mart_01';
   try {
     const raw = localStorage.getItem('auth_user');
     if (raw) {
@@ -56,14 +52,6 @@ financeHttpClient.interceptors.response.use(
     const vietnameseMessage = mapProblemDetailsToVietnamese(error);
     const enhancedError: EnhancedAxiosError = error;
     enhancedError.vietnameseMessage = vietnameseMessage;
-
-    // 2. Xử lý token hết hạn 401
-    if (error.response?.status === 401) {
-      localStorage.removeItem('access_token');
-      if (window.location.pathname !== '/login') {
-        window.location.href = '/login';
-      }
-    }
 
     return Promise.reject(enhancedError);
   }

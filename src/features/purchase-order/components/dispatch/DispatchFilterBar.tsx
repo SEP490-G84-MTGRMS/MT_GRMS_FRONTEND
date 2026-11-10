@@ -68,7 +68,6 @@ export interface DispatchFilterBarProps {
   keyword?: string;
   onKeywordChange?: (kw: string) => void;
   onResetFilters?: () => void;
-
   /** Số NCC có SL ma trận khác PO — nút cam khi > 0, xanh khi = 0 */
   pendingChangeCount?: number;
   pendingChangeLineCount?: number;
