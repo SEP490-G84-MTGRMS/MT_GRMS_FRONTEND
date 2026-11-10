@@ -164,6 +164,38 @@ export const supplierProductApi = {
   },
 
   /**
+   * Đồng bộ tự động nhà cung cấp và danh mục sản phẩm đang hoạt động xuống toàn bộ các chi nhánh con
+   */
+  async syncSupplierToAllBranches(supplierId: string): Promise<number> {
+    try {
+      const branchesRes = await httpClient.get<ApiResponse<PagedResult<any> | any[]>>('/branches', {
+        params: { pageSize: 100 },
+      });
+      const rawBranches = branchesRes.data?.data;
+      const branchList = Array.isArray(rawBranches)
+        ? rawBranches
+        : Array.isArray((rawBranches as any)?.items)
+          ? (rawBranches as any).items
+          : [];
+      const branchIds = branchList
+        .filter((b: any) => b?.id && b.isActive !== false)
+        .map((b: any) => String(b.id));
+
+      if (branchIds.length === 0) {
+        return 0;
+      }
+
+      await httpClient.post('/suppliers/branch-assignments', {
+        supplierId,
+        branchIds,
+      });
+      return branchIds.length;
+    } catch {
+      return 0;
+    }
+  },
+
+  /**
    * Gán sản phẩm mới cho Nhà cung cấp (REQ-SP01)
    */
   async assignProduct(input: AssignProductInput): Promise<any> {
@@ -181,6 +213,7 @@ export const supplierProductApi = {
         }
       );
       if (res.data?.success) {
+        await this.syncSupplierToAllBranches(input.supplierId);
         return res.data.data;
       }
     } catch (err: any) {
@@ -216,7 +249,14 @@ export const supplierProductApi = {
         }
       );
       if (res.data?.success && res.data.data) {
-        return res.data.data;
+        const data = res.data.data;
+        if (!data.syncedBranchesCount || data.syncedBranchesCount === 0) {
+          const syncedCount = await this.syncSupplierToAllBranches(input.supplierId);
+          if (syncedCount > 0) {
+            return { ...data, syncedBranchesCount: syncedCount };
+          }
+        }
+        return data;
       }
       throw new Error(res.data?.message || 'Không thể gán sản phẩm.');
     } catch (err: any) {

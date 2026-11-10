@@ -294,20 +294,29 @@ export const SupplierProductsTab: FC<Props> = ({
 
     setIsLoadingBranchProducts(true);
     try {
-      const res = await storeProductApi.getStoreProducts({
+      const queryParams = {
         storeId: activeBranch.id,
         pageIndex: 1,
         pageSize: 500,
         searchTerm: "",
-        skus: [],
-        names: [],
-        storeCodes: [],
-        storeNames: [],
+        skus: [] as string[],
+        names: [] as string[],
+        storeCodes: [] as string[],
+        storeNames: [] as string[],
         supplierCodes: supplier?.code ? [supplier.code] : [],
         supplierNames: supplier?.name ? [supplier.name] : [],
-        statusFilter: "ALL",
-        stockAlertFilter: "ALL",
-      });
+        statusFilter: "ALL" as const,
+        stockAlertFilter: "ALL" as const,
+      };
+
+      let res = await storeProductApi.getStoreProducts(queryParams);
+
+      if ((res.items || []).length === 0 && products.length > 0 && supplier?.id) {
+        const syncedCount = await supplierProductApi.syncSupplierToAllBranches(supplier.id);
+        if (syncedCount > 0) {
+          res = await storeProductApi.getStoreProducts(queryParams);
+        }
+      }
 
       const map = new Map<string, any>();
       (res.items || []).forEach((item) => {
@@ -320,7 +329,7 @@ export const SupplierProductsTab: FC<Props> = ({
     } finally {
       setIsLoadingBranchProducts(false);
     }
-  }, [activeBranch.id, supplier?.code, supplier?.name]);
+  }, [activeBranch.id, supplier?.id, supplier?.code, supplier?.name, products.length]);
 
   useEffect(() => {
     void fetchBranchProducts();

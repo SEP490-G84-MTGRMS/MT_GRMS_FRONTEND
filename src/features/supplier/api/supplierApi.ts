@@ -215,7 +215,30 @@ export const supplierApi = {
 
     const res = await httpClient.post<ApiResponse<any>>('/suppliers', payload);
     if (res.data?.success && res.data.data) {
-      return mapBackendSupplierToFrontend(res.data.data);
+      const created = mapBackendSupplierToFrontend(res.data.data);
+      try {
+        const branchesRes = await httpClient.get<ApiResponse<PagedResult<any> | any[]>>('/branches', {
+          params: { pageSize: 100 },
+        });
+        const rawBranches = branchesRes.data?.data;
+        const branchList = Array.isArray(rawBranches)
+          ? rawBranches
+          : Array.isArray((rawBranches as any)?.items)
+            ? (rawBranches as any).items
+            : [];
+        const branchIds = branchList
+          .filter((b: any) => b?.id && b.isActive !== false)
+          .map((b: any) => String(b.id));
+        if (branchIds.length > 0) {
+          await httpClient.post('/suppliers/branch-assignments', {
+            supplierId: created.id,
+            branchIds,
+          });
+        }
+      } catch {
+        // Ignore branch auto-assignment fallback error on supplier creation
+      }
+      return created;
     }
     throw new Error(res.data?.message || 'Không thể tạo mới nhà cung cấp.');
   },
