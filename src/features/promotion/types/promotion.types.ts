@@ -23,6 +23,7 @@ export class PromotionTierDTO {
   maxDiscount?: number; // C#: decimal? MaxDiscount (Giảm tối đa nếu là %)
   buyProductId?: string; // C#: Guid? ProductId của sản phẩm điều kiện mua X (rỗng = bất kỳ SP trong giỏ)
   buyProductName?: string; // C#: string? BuyProductName
+  buyUnit?: string; // Đơn vị tính của sản phẩm mua X (Thùng, Lon, Chai, Hộp...)
   requiredQty?: number; // C#: int? RequiredQty (Mua X)
   giftProductId?: string; // C#: Guid? ProductId của quà tặng
   giftProductName?: string; // C#: string? GiftProductName (Tặng Y)
@@ -47,6 +48,7 @@ export class PromotionItemDTO {
   startDate: string = '';
   endDate: string = '';
   status: PromotionStatus = 'ACTIVE';
+  isActive?: boolean = true;
   branches: string[] = ['ALL'];
   tiers: PromotionTierDTO[] = [];
   usageCount: number = 0;
@@ -99,6 +101,7 @@ export class VoucherBatchItemDTO {
   prefix: string = '';
   codes: VoucherCodeItemDTO[] = [];
   description?: string;
+  allowWithPromotions?: boolean = true;
 
   constructor(init?: Partial<VoucherBatchItemDTO>) {
     Object.assign(this, init);

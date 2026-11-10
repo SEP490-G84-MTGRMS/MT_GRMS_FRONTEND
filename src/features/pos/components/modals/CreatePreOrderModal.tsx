@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import type { Product, Customer } from '../../types/pos.types';
-import { Plus, Minus, Trash2, Search, Package, Phone, User, AlertTriangle } from 'lucide-react';
+import { Plus, Minus, Trash2, Search, Package, Phone, User, AlertTriangle, Gift } from 'lucide-react';
 import { mockCustomers } from '../../mock/posMockData';
 import { promotionApi, type CartGiftItemDto } from '../../../promotion/api/promotionApi';
 
@@ -289,16 +289,27 @@ export const CreatePreOrderModal: React.FC<Props> = ({
       return;
     }
 
-    // Kiểm tra số lượng từng mặt hàng theo đơn vị tính
+    // Kiểm tra số lượng từng mặt hàng và tổng tồn kho quy đổi theo từng sản phẩm
+    const productBaseQtyMap = new Map<string, { totalBaseQty: number; name: string; quantityOnHand: number; baseUnit: string }>();
     for (const item of orderItems) {
-      const maxAvailable = Math.floor(item.product.quantityOnHand / item.conversionRate);
       if (item.quantity <= 0) {
         alert(`Sản phẩm "${item.product.name}" (${item.unitName}) có số lượng không hợp lệ (phải > 0). Vui lòng nhập lại số lượng!`);
         return;
       }
-      if (item.quantity > maxAvailable) {
+      const existing = productBaseQtyMap.get(item.product.id) || {
+        totalBaseQty: 0,
+        name: item.product.name,
+        quantityOnHand: item.product.quantityOnHand,
+        baseUnit: item.product.baseUnit || 'sản phẩm',
+      };
+      existing.totalBaseQty += item.quantity * (item.conversionRate || 1);
+      productBaseQtyMap.set(item.product.id, existing);
+    }
+
+    for (const [, info] of productBaseQtyMap) {
+      if (info.totalBaseQty > info.quantityOnHand) {
         alert(
-          `Sản phẩm "${item.product.name}" (${item.unitName}) có số lượng (${item.quantity}) vượt quá tồn kho khả dụng (${maxAvailable} ${item.unitName})! Vui lòng giảm số lượng.`
+          `Tổng số lượng quy đổi của sản phẩm "${info.name}" (${info.totalBaseQty} ${info.baseUnit}) vượt quá tồn kho khả dụng (${info.quantityOnHand} ${info.baseUnit})! Vui lòng giảm số lượng.`
         );
         return;
       }
@@ -329,6 +340,7 @@ export const CreatePreOrderModal: React.FC<Props> = ({
         unitPrice: i.unitPrice,
         unitId: i.unitId,
         unitName: i.unitName,
+        conversionRate: i.conversionRate || 1,
         isGift: false,
       }));
       const giftPayloadItems = giftItems
@@ -339,6 +351,7 @@ export const CreatePreOrderModal: React.FC<Props> = ({
           quantity: g.quantity,
           unitPrice: 0,
           unitName: g.unitName || 'Cái',
+          conversionRate: 1,
           isGift: true,
           promotionId: g.promotionId || appliedPromoId,
         }));
@@ -825,7 +838,9 @@ export const CreatePreOrderModal: React.FC<Props> = ({
             {(effectivePromoDiscount > 0 || appliedPromoLabels.length > 0) && (
               <div style={{ marginBottom: 6, padding: '6px 8px', backgroundColor: '#f0fdfa', border: '1px solid #ccfbf1', borderRadius: 4 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5, color: '#0f766e', fontWeight: 600 }}>
-                  <span>🎁 Khuyến mãi cửa hàng (Tự động):</span>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                    <Gift size={13} color="#0f766e" /> Khuyến mãi cửa hàng (Tự động):
+                  </span>
                   <span style={{ color: '#dc2626' }}>-{effectivePromoDiscount.toLocaleString('vi-VN')} đ</span>
                 </div>
                 {appliedPromoLabels.map((lbl, i) => (
@@ -838,8 +853,8 @@ export const CreatePreOrderModal: React.FC<Props> = ({
 
             {giftItems.length > 0 && (
               <div style={{ marginBottom: 8, padding: '6px 8px', backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 4 }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: '#15803d', marginBottom: 2 }}>
-                  🎁 Quà tặng giữ kho kèm đơn (0 đ):
+                <div style={{ fontSize: 12, fontWeight: 700, color: '#15803d', marginBottom: 2, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                  <Gift size={13} color="#15803d" /> Quà tặng giữ kho kèm đơn (0 đ):
                 </div>
                 {giftItems.map((g, idx) => (
                   <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, color: '#166534' }}>

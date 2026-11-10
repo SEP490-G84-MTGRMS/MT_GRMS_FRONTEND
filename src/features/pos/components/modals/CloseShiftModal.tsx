@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import type { FC } from 'react';
-import { Lock, AlertCircle, CheckCircle, X, CreditCard, Banknote, TrendingUp, Sparkles } from 'lucide-react';
+import { Lock, AlertCircle, CheckCircle, X, CreditCard, Banknote, TrendingUp, Sparkles, BarChart3, AlertTriangle } from 'lucide-react';
 import { posShiftApi } from '../../api/posShiftApi';
 import type { ShiftDetailResponse, ShiftCashMovementDto } from '../../types/posShift.types';
 
@@ -189,7 +189,7 @@ export const CloseShiftModal: FC<Props> = ({
     try {
       const updated = await posShiftApi.startClosingShift(shift.id, { notes: notes.trim() || undefined });
       setCurrentShiftData(updated);
-      alert('🔒 Đã chuyển sang trạng thái kiểm đếm chốt ca (Closing). Toàn bộ quầy POS thuộc chi nhánh đã tạm thời khóa bán hàng để bảo toàn tiền két.');
+      alert('Đã chuyển sang trạng thái kiểm đếm chốt ca (Closing). Toàn bộ quầy POS thuộc chi nhánh đã tạm thời khóa bán hàng để bảo toàn tiền két.');
     } catch (err: any) {
       setErrorMsg(err.response?.data?.message || err.message || 'Lỗi khi bắt đầu chốt ca');
     } finally {
@@ -204,7 +204,7 @@ export const CloseShiftModal: FC<Props> = ({
     try {
       const updated = await posShiftApi.cancelClosingShift(shift.id, { reason: notes.trim() || 'Thu ngân mở lại quầy' });
       setCurrentShiftData(updated);
-      alert('✅ Đã hủy chốt ca. Quầy POS của chi nhánh đã được mở lại để tiếp tục bán hàng.');
+      alert('Đã hủy chốt ca. Quầy POS của chi nhánh đã được mở lại để tiếp tục bán hàng.');
     } catch (err: any) {
       setErrorMsg(err.response?.data?.message || err.message || 'Lỗi khi hủy chốt ca');
     } finally {
@@ -424,8 +424,8 @@ export const CloseShiftModal: FC<Props> = ({
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>
-                  📊 Tổng hợp doanh thu &amp; phương thức thanh toán trong ca
+                <span style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <BarChart3 size={15} color="#0f766e" /> Tổng hợp doanh thu &amp; phương thức thanh toán trong ca
                 </span>
                 <span style={{ fontSize: 12, color: '#64748b' }}>
                   Đã hoàn thành: <b style={{ color: '#0f766e' }}>{ordersCount} đơn hàng</b>
@@ -474,8 +474,8 @@ export const CloseShiftModal: FC<Props> = ({
             {/* 2. KHỐI KẾT TOÁN TIỀN MẶT TRONG KÉT */}
             <div style={{ border: '1px solid #cbd5e1', borderRadius: 10, padding: '12px 14px', backgroundColor: '#ffffff' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                <div style={{ fontWeight: 700, fontSize: 13, color: '#0f172a' }}>
-                  💵 Kiểm đếm tiền mặt thực tế trong két (H)
+                <div style={{ fontWeight: 700, fontSize: 13, color: '#0f172a', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <Banknote size={15} color="#0f766e" /> Kiểm đếm tiền mặt thực tế trong két (H)
                 </div>
 
                 {/* Tabs chuyển đổi giữa Nhập nhanh tổng tiền mặt và Đếm chi tiết 9 mệnh giá */}
@@ -712,7 +712,7 @@ export const CloseShiftModal: FC<Props> = ({
                     step={1000}
                     value={retainedFloat}
                     onChange={(e) => setRetainedFloat(Number(e.target.value) || 0)}
-                    className="modal-input font-mono font-bold"
+                    className="modal-input tabular-nums font-bold"
                   />
                 </div>
 
@@ -724,14 +724,15 @@ export const CloseShiftModal: FC<Props> = ({
                     step={1000}
                     value={droppedToSafe}
                     onChange={(e) => setDroppedToSafe(Number(e.target.value) || 0)}
-                    className="modal-input font-mono font-bold"
+                    className="modal-input tabular-nums font-bold"
                   />
                 </div>
               </div>
 
               {!isAllocationValid && (
-                <div style={{ marginTop: 8, fontSize: 12, color: '#dc2626', fontWeight: 600 }}>
-                  ⚠️ Tổng phân bổ ({allocatedSum.toLocaleString('vi-VN')} đ) lệch so với thực đếm ({actualCashCounted.toLocaleString('vi-VN')} đ) {Math.abs(allocatedSum - actualCashCounted).toLocaleString('vi-VN')} đ!
+                <div style={{ marginTop: 8, fontSize: 12, color: '#dc2626', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <AlertTriangle size={14} color="#dc2626" style={{ flexShrink: 0 }} />
+                  <span>Tổng phân bổ ({allocatedSum.toLocaleString('vi-VN')} đ) lệch so với thực đếm ({actualCashCounted.toLocaleString('vi-VN')} đ) {Math.abs(allocatedSum - actualCashCounted).toLocaleString('vi-VN')} đ!</span>
                 </div>
               )}
             </div>

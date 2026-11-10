@@ -382,6 +382,21 @@ export const scheduleApi = {
   },
 
   /**
+   * Nhân viên tự chấm công vào ca trực của chính mình (khi chưa đăng ký FaceID)
+   * Backend: POST /api/schedules/{id}/self-check-in
+   */
+  async selfCheckIn(scheduleId: string, note?: string | null): Promise<ScheduleResponse> {
+    const res = await httpClient.post<ApiResponse<ScheduleResponse>>(
+      `/schedules/${scheduleId}/self-check-in`,
+      { note: note ?? null }
+    );
+    if (res.data?.success && res.data.data) {
+      return res.data.data;
+    }
+    throw new Error(res.data?.message || 'Chấm công vào ca thất bại.');
+  },
+
+  /**
    * Điểm danh vào ca FaceID tại máy POS
    * Backend: POST /api/v1/schedules/face-id/check-in
    */

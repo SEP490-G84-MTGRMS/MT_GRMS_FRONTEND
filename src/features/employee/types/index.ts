@@ -16,6 +16,8 @@ export interface Branch {
   id: string;
   name: string;
   isMain?: boolean;
+  address?: string;
+  phone?: string;
 }
 
 export interface AllowanceItem {
