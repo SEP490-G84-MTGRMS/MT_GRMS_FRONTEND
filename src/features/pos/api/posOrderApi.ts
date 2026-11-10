@@ -89,10 +89,11 @@ export const posOrderApi = {
    * Yêu cầu nạp từ /branches/{branchId}/products (Status=Active, chứa RetailPrice, CurrentStock, UnitPrices từ BranchProducts).
    * Không fallback về danh mục chung /products khi đã truyền branchId (REQ-BRANCH-SCOPE-01).
    */
-  getAllProducts: async (branchId?: string): Promise<Product[]> => {
+  getAllProducts: async (branchId?: string, signal?: AbortSignal): Promise<Product[]> => {
     if (branchId) {
       const res = await httpClient.get(`/branches/${branchId}/products`, {
         params: { PageSize: 500, Status: 'Active' },
+        signal,
       });
       const paged = res.data?.data;
       const items = Array.isArray(paged?.items)
@@ -129,26 +130,36 @@ export const posOrderApi = {
       }));
     }
 
-    const res = await httpClient.get('/products?pageSize=100');
-    const rawList = Array.isArray(res.data?.data?.items)
-      ? res.data.data.items
-      : Array.isArray(res.data?.data)
-      ? res.data.data
+    return [];
+  },
+
+  searchBranchProducts: async (branchId: string, searchTerm: string): Promise<Product[]> => {
+    if (!branchId || !searchTerm.trim()) return [];
+    const res = await httpClient.get(`/branches/${branchId}/products`, {
+      params: { SearchTerm: searchTerm.trim(), Status: 'Active', PageSize: 20 },
+    });
+    const paged = res.data?.data;
+    const items = Array.isArray(paged?.items)
+      ? paged.items
+      : Array.isArray(paged)
+      ? paged
       : Array.isArray(res.data)
       ? res.data
       : [];
-    return rawList.map((p: any) => ({
-      id: p.id,
+
+    return items.map((p: any) => ({
+      id: p.productId || p.id,
       sku: p.sku || p.productCode || '',
       barcode: p.barcode || '',
-      name: p.productName || p.name || '',
+      name: p.name || p.productName || '',
       imageUrl: p.imageUrl,
-      spec: p.taxCategory === 'STANDARD_1PCT' ? 'VAT 1%' : '',
-      category: p.categoryName || 'Bách hóa',
-      baseUnit: p.unitName || p.baseUnit || 'Cái',
-      basePrice: p.basePrice || p.sellingPrice || 0,
+      spec: '',
+      shelfLocation: p.shelfLocation,
+      category: p.category || 'Bách hóa',
+      baseUnit: p.unit || p.baseUnit || 'Cái',
+      basePrice: p.retailPrice ?? p.basePrice ?? p.sellingPrice ?? 0,
       costPrice: p.costPrice || 0,
-      quantityOnHand: p.quantityOnHand ?? p.currentStock ?? 0,
+      quantityOnHand: p.currentStock ?? p.quantityOnHand ?? 0,
       batchCode: 'LÔ-FEFO',
       unitPrices: Array.isArray(p.unitPrices)
         ? p.unitPrices.map((u: any) => ({

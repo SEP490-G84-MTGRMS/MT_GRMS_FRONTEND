@@ -183,6 +183,7 @@ export class ReceiptDataDTO {
   customer: ReceiptCustomerDTO | null = null;
   items: ReceiptItemDTO[] = [];
   totalItemAmount: number = 0;
+  itemDiscountAmount?: number = 0;
   orderDiscountAmount: number = 0;
   voucherDiscountAmount?: number;
   appliedVoucherCode?: string;
