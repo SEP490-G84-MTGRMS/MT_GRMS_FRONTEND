@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { FC } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   ClipboardList,
   Plus,
@@ -13,6 +13,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Loader2,
+  Truck,
 } from 'lucide-react';
 import { useAuthStore } from '../../../stores/useAuthStore';
 import { AdminToast, type ToastState } from '../../admin/components';
@@ -46,10 +47,20 @@ export const stocktakeStatusBadge = (status: StocktakeStatus | string) => {
   }
 };
 
+const STATUS_TABS: { value: '' | StocktakeStatus; label: string }[] = [
+  { value: '', label: 'Tất cả phiếu' },
+  { value: 'PENDING_APPROVAL', label: 'Chờ Store Owner duyệt' },
+  { value: 'APPROVED', label: 'Đã duyệt kiểm kê' },
+  { value: 'DRAFT', label: 'Bản nháp' },
+  { value: 'NEEDS_RECOUNT', label: 'Yêu cầu kiểm kê lại' },
+  { value: 'REJECTED', label: 'Đã từ chối' },
+];
+
 export const StocktakeListPage: FC<{ defaultRole?: 'store_owner' | 'employee' }> = ({
   defaultRole = 'store_owner',
 }) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const userRole = useAuthStore((s) => s.user?.role);
   const userBranchId = useAuthStore((s) => s.user?.branchId);
   const isStoreOwner =
@@ -80,6 +91,7 @@ export const StocktakeListPage: FC<{ defaultRole?: 'store_owner' | 'employee' }>
   const [isLoading, setIsLoading] = useState(false);
   const [loadError, setLoadError] = useState('');
   const [toast, setToast] = useState<ToastState | null>(null);
+  const [highlightId, setHighlightId] = useState<string | null>(null);
   const [branches, setBranches] = useState<{ id: string; name: string }[]>([]);
 
   const showToast = useCallback(
@@ -89,6 +101,16 @@ export const StocktakeListPage: FC<{ defaultRole?: 'store_owner' | 'employee' }>
     },
     []
   );
+
+  useEffect(() => {
+    const state = location.state as { toastMessage?: string; highlightId?: string } | null;
+    if (state?.toastMessage) {
+      showToast(state.toastMessage, 'success');
+    }
+    if (state?.highlightId) {
+      setHighlightId(state.highlightId);
+    }
+  }, [location.state, showToast]);
 
   useEffect(() => {
     let mounted = true;
@@ -105,7 +127,7 @@ export const StocktakeListPage: FC<{ defaultRole?: 'store_owner' | 'employee' }>
           );
         }
       })
-      .catch(() => {});
+      .catch(() => { });
     return () => {
       mounted = false;
     };
@@ -127,12 +149,8 @@ export const StocktakeListPage: FC<{ defaultRole?: 'store_owner' | 'employee' }>
       };
       const rawMsg =
         e.response?.data?.message || e.message || 'Không thể tải danh sách phiếu kiểm kê.';
-      const msg =
-        e.response?.status === 404
-          ? `Không tìm thấy API /api/stocktakes (404) — vui lòng khởi động lại Backend (${rawMsg}).`
-          : rawMsg;
-      setLoadError(msg);
-      showToast(msg, 'error');
+      setLoadError(rawMsg);
+      showToast(rawMsg, 'error');
     } finally {
       setIsLoading(false);
     }
@@ -141,6 +159,11 @@ export const StocktakeListPage: FC<{ defaultRole?: 'store_owner' | 'employee' }>
   useEffect(() => {
     void loadData();
   }, [loadData]);
+
+  const handleSelectTab = (status: '' | StocktakeStatus) => {
+    setDraft((prev) => ({ ...prev, status, pageIndex: 1 }));
+    setApplied((prev) => ({ ...prev, status, pageIndex: 1 }));
+  };
 
   const totalPages = Math.max(1, Math.ceil(totalCount / applied.pageSize));
   const startItem = totalCount === 0 ? 0 : (applied.pageIndex - 1) * applied.pageSize + 1;
@@ -166,13 +189,13 @@ export const StocktakeListPage: FC<{ defaultRole?: 'store_owner' | 'employee' }>
         <div>
           <h1 className="so-list-title">
             <ClipboardList size={22} color="var(--blue-primary, #0f766e)" />
-            <span>Quản lý Phiếu Kiểm Kê Hàng Hóa</span>
+            <span>Danh sách Phiếu Kiểm Kê Hàng Hóa</span>
             {isLoading && (
               <Loader2 size={16} className="animate-spin" style={{ color: '#0f766e' }} />
             )}
           </h1>
           <div style={{ fontSize: 12.5, color: '#64748b', marginTop: 2 }}>
-            Kiểm đếm thực tế tại chi nhánh, phân loại hàng tốt / lỗi NCC / hỏng / cận hạn / hết hạn trước khi điều chỉnh tồn hoặc tạo yêu cầu trả NCC
+            Theo dõi toàn bộ các đợt kiểm kê tại chi nhánh, phê duyệt chênh lệch/xuất hủy và lập phiếu trả hàng NCC
           </div>
         </div>
 
@@ -207,7 +230,7 @@ export const StocktakeListPage: FC<{ defaultRole?: 'store_owner' | 'employee' }>
         </div>
       </div>
 
-      {/* Filter Bar */}
+      {/* Status Tabs + Filter Bar */}
       <div
         style={{
           flexShrink: 0,
@@ -217,106 +240,123 @@ export const StocktakeListPage: FC<{ defaultRole?: 'store_owner' | 'employee' }>
           borderRadius: 8,
           padding: '10px 14px',
           display: 'flex',
-          alignItems: 'center',
+          flexDirection: 'column',
           gap: 10,
-          flexWrap: 'wrap',
         }}
       >
-        <div style={{ position: 'relative', flex: '1 1 240px', maxWidth: 340 }}>
-          <Search
-            size={14}
-            color="#64748b"
-            style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)' }}
-          />
-          <input
-            type="text"
-            placeholder="Tìm theo mã phiếu kiểm kê (KK-...), người tạo..."
-            value={draft.keyword}
-            onChange={(e) => setDraft((prev) => ({ ...prev, keyword: e.target.value }))}
-            onKeyDown={(e) => e.key === 'Enter' && setApplied({ ...draft, pageIndex: 1 })}
+        {/* Quick Status Tabs */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            flexWrap: 'wrap',
+            borderBottom: '1px solid #f1f5f9',
+            paddingBottom: 8,
+          }}
+        >
+          {STATUS_TABS.map((tab) => {
+            const active = applied.status === tab.value;
+            return (
+              <button
+                key={tab.value || 'ALL'}
+                type="button"
+                onClick={() => handleSelectTab(tab.value)}
+                style={{
+                  height: 30,
+                  padding: '0 12px',
+                  borderRadius: 9999,
+                  fontSize: 12,
+                  fontWeight: active ? 700 : 600,
+                  cursor: 'pointer',
+                  border: active ? '1px solid #0f766e' : '1px solid #e2e8f0',
+                  backgroundColor: active ? '#f0fdfa' : '#ffffff',
+                  color: active ? '#0f766e' : '#475569',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Search & Branch Filter */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <div style={{ position: 'relative', flex: '1 1 240px', maxWidth: 340 }}>
+            <Search
+              size={14}
+              color="#64748b"
+              style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)' }}
+            />
+            <input
+              type="text"
+              placeholder="Tìm theo mã phiếu kiểm kê (KK-...), người tạo..."
+              value={draft.keyword}
+              onChange={(e) => setDraft((prev) => ({ ...prev, keyword: e.target.value }))}
+              onKeyDown={(e) => e.key === 'Enter' && setApplied({ ...draft, pageIndex: 1 })}
+              style={{
+                width: '100%',
+                height: 34,
+                padding: '0 10px 0 32px',
+                borderRadius: 6,
+                border: '1px solid #cbd5e1',
+                fontSize: 13,
+                boxSizing: 'border-box',
+              }}
+            />
+          </div>
+
+          <select
+            value={draft.branchId}
+            disabled={Boolean(lockedBranch)}
+            onChange={(e) => setDraft((prev) => ({ ...prev, branchId: e.target.value }))}
             style={{
-              width: '100%',
               height: 34,
-              padding: '0 10px 0 32px',
+              padding: '0 10px',
               borderRadius: 6,
               border: '1px solid #cbd5e1',
               fontSize: 13,
-              boxSizing: 'border-box',
+              backgroundColor: lockedBranch ? '#f1f5f9' : '#ffffff',
             }}
-          />
+          >
+            <option value="">Tất cả chi nhánh</option>
+            {branches.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.name}
+              </option>
+            ))}
+          </select>
+
+          <button
+            type="button"
+            className="po-btn po-btn-primary"
+            style={{ height: 34, backgroundColor: '#0f766e' }}
+            onClick={() => setApplied({ ...draft, pageIndex: 1 })}
+          >
+            <Search size={14} />
+            <span>Tìm kiếm</span>
+          </button>
+
+          <button
+            type="button"
+            className="po-btn po-btn-secondary"
+            style={{ height: 34 }}
+            onClick={() => {
+              const reset: StocktakeFilterState = {
+                keyword: '',
+                branchId: lockedBranch,
+                status: '',
+                pageIndex: 1,
+                pageSize: 15,
+              };
+              setDraft(reset);
+              setApplied(reset);
+            }}
+          >
+            Đặt lại
+          </button>
         </div>
-
-        <select
-          value={draft.branchId}
-          disabled={Boolean(lockedBranch)}
-          onChange={(e) => setDraft((prev) => ({ ...prev, branchId: e.target.value }))}
-          style={{
-            height: 34,
-            padding: '0 10px',
-            borderRadius: 6,
-            border: '1px solid #cbd5e1',
-            fontSize: 13,
-            backgroundColor: lockedBranch ? '#f1f5f9' : '#ffffff',
-          }}
-        >
-          <option value="">Tất cả chi nhánh</option>
-          {branches.map((b) => (
-            <option key={b.id} value={b.id}>
-              {b.name}
-            </option>
-          ))}
-        </select>
-
-        <select
-          value={draft.status}
-          onChange={(e) =>
-            setDraft((prev) => ({ ...prev, status: e.target.value as '' | StocktakeStatus }))
-          }
-          style={{
-            height: 34,
-            padding: '0 10px',
-            borderRadius: 6,
-            border: '1px solid #cbd5e1',
-            fontSize: 13,
-            backgroundColor: '#ffffff',
-          }}
-        >
-          <option value="">Tất cả trạng thái</option>
-          <option value="DRAFT">Bản nháp (DRAFT)</option>
-          <option value="PENDING_APPROVAL">Chờ duyệt (PENDING_APPROVAL)</option>
-          <option value="APPROVED">Đã duyệt (APPROVED)</option>
-          <option value="NEEDS_RECOUNT">Yêu cầu kiểm kê lại (NEEDS_RECOUNT)</option>
-          <option value="REJECTED">Đã từ chối (REJECTED)</option>
-        </select>
-
-        <button
-          type="button"
-          className="po-btn po-btn-primary"
-          style={{ height: 34, backgroundColor: '#0f766e' }}
-          onClick={() => setApplied({ ...draft, pageIndex: 1 })}
-        >
-          <Search size={14} />
-          <span>Tìm kiếm</span>
-        </button>
-
-        <button
-          type="button"
-          className="po-btn po-btn-secondary"
-          style={{ height: 34 }}
-          onClick={() => {
-            const reset: StocktakeFilterState = {
-              keyword: '',
-              branchId: lockedBranch,
-              status: '',
-              pageIndex: 1,
-              pageSize: 15,
-            };
-            setDraft(reset);
-            setApplied(reset);
-          }}
-        >
-          Đặt lại
-        </button>
       </div>
 
       {loadError && (
@@ -391,7 +431,7 @@ export const StocktakeListPage: FC<{ defaultRole?: 'store_owner' | 'employee' }>
                     >
                       <ClipboardList size={36} color="#cbd5e1" />
                       <span style={{ fontWeight: 600, color: '#475569' }}>
-                        Chưa có phiếu kiểm kê hàng hóa nào
+                        Chưa có phiếu kiểm kê hàng hóa nào khớp bộ lọc
                       </span>
                       <span style={{ fontSize: 12, color: '#94a3b8' }}>
                         Nhân viên chi nhánh hoặc chủ cửa hàng có thể bấm &quot;+ Tạo Phiếu Kiểm Kê&quot; hoặc chọn lô trên màn hình FEFO để kiểm kê.
@@ -406,9 +446,16 @@ export const StocktakeListPage: FC<{ defaultRole?: 'store_owner' | 'employee' }>
                     item.status === 'DRAFT' || item.status === 'NEEDS_RECOUNT';
                   const canApprove =
                     isStoreOwner && item.status === 'PENDING_APPROVAL';
+                  const canCreateReturn =
+                    isStoreOwner && item.status === 'APPROVED' && item.totalDefectiveQty > 0;
+                  const isHighlighted = highlightId === item.id;
 
                   return (
-                    <tr key={item.id} className="so-list-row">
+                    <tr
+                      key={item.id}
+                      className="so-list-row"
+                      style={isHighlighted ? { backgroundColor: '#f0fdfa' } : undefined}
+                    >
                       <td className="so-list-td" style={{ textAlign: 'center', color: '#64748b' }}>
                         {(applied.pageIndex - 1) * applied.pageSize + idx + 1}
                       </td>
@@ -519,10 +566,27 @@ export const StocktakeListPage: FC<{ defaultRole?: 'store_owner' | 'employee' }>
                               type="button"
                               className="so-list-action-btn so-list-action-btn--success"
                               onClick={() => navigate(`${basePath}/${item.id}`)}
-                              title="Duyệt phiếu kiểm kê"
+                              title="Xem và duyệt phiếu kiểm kê"
                             >
                               <CheckCircle2 size={13} />
                               <span>Duyệt</span>
+                            </button>
+                          )}
+                          {canCreateReturn && (
+                            <button
+                              type="button"
+                              className="so-list-action-btn"
+                              style={{
+                                color: '#ea580c',
+                                borderColor: '#fed7aa',
+                                backgroundColor: '#fff7ed',
+                                fontWeight: 700,
+                              }}
+                              onClick={() => navigate(`${basePath}/${item.id}`)}
+                              title="Tạo phiếu trả hàng NCC từ phiếu kiểm kê này"
+                            >
+                              <Truck size={13} />
+                              <span>Trả NCC</span>
                             </button>
                           )}
                         </div>
@@ -574,4 +638,3 @@ export const StocktakeListPage: FC<{ defaultRole?: 'store_owner' | 'employee' }>
 };
 
 export default StocktakeListPage;
-

@@ -8,6 +8,7 @@ import {
   RefreshCw,
   Trash2,
   ClipboardCheck,
+  ClipboardList,
   AlertTriangle,
   Plus,
 } from 'lucide-react';
@@ -352,11 +353,12 @@ export const StocktakeFormPage: FC<{ defaultRole?: 'store_owner' | 'employee' }>
           : 'Đã lưu nháp phiếu kiểm kê thành công!',
         'success'
       );
-      navigate(`${basePath}/${saved.id}`, {
+      navigate(basePath, {
         state: {
           toastMessage: submitImmediately
-            ? `Đã gửi phiếu kiểm kê ${saved.code} chờ Store Owner phê duyệt!`
-            : `Đã lưu nháp phiếu kiểm kê ${saved.code}!`,
+            ? `Đã gửi phiếu kiểm kê ${saved.code} lên Store Owner chờ phê duyệt!`
+            : `Đã lưu nháp phiếu kiểm kê ${saved.code} vào danh sách!`,
+          highlightId: saved.id,
         },
       });
     } catch (err: unknown) {
@@ -426,6 +428,14 @@ export const StocktakeFormPage: FC<{ defaultRole?: 'store_owner' | 'employee' }>
         </div>
 
         <div className="so-list-header-actions">
+          <button
+            type="button"
+            className="po-btn po-btn-secondary"
+            onClick={() => navigate(basePath)}
+          >
+            <ClipboardList size={14} />
+            <span>Danh sách phiếu kiểm kê</span>
+          </button>
           <button
             type="button"
             className="po-btn po-btn-secondary"
