@@ -43,13 +43,34 @@ export const productApi = {
 
     if (res.data?.success && res.data.data) {
       const data = res.data.data;
-      const totalCount = data.totalCount ?? (data as any).totalItems ?? (data.items ? data.items.length : 0);
+      let items = data.items ?? [];
+      let totalCount = data.totalCount ?? (data as any).totalItems ?? (items ? items.length : 0);
       const pageSize = data.pageSize ?? filter.pageSize ?? 20;
       const pageIndex = data.pageIndex ?? (data as any).page ?? filter.pageIndex ?? 1;
-      const totalPages = data.totalPages ?? Math.max(1, Math.ceil(totalCount / pageSize));
+
+      if (items.length > 0 && items.length < pageSize && totalCount > pageIndex * pageSize) {
+        const missingCount = pageSize - items.length;
+        try {
+          const refillRes = await httpClient.get<ApiResponse<PagedResult<ProductResponse>>>('/products', {
+            params: {
+              ...params,
+              PageIndex: pageIndex,
+              PageSize: pageSize + missingCount,
+            },
+          });
+          if (refillRes.data?.success && refillRes.data.data?.items?.length) {
+            items = refillRes.data.data.items.slice(0, pageSize);
+            totalCount = Math.max(items.length, totalCount - missingCount);
+          }
+        } catch {
+          // Giữ nguyên danh sách nếu gọi bổ sung thất bại
+        }
+      }
+
+      const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
 
       return {
-        items: data.items ?? [],
+        items,
         pageIndex,
         pageSize,
         totalCount,

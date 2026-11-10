@@ -9,6 +9,7 @@ import {
   ArrowUpDown,
   ChevronLeft,
   ChevronRight,
+  Eye,
 } from 'lucide-react';
 import {
   branchManagementApi,
@@ -39,6 +40,14 @@ export const BranchManagementTab: FC<BranchManagementTabProps> = ({
 
   const [activeModal, setActiveModal] = useState<'create' | 'edit' | 'upgrade' | 'detail' | null>(null);
   const [selectedBranch, setSelectedBranch] = useState<BranchItemResponse | null>(null);
+  const [openActionId, setOpenActionId] = useState<string | null>(null);
+
+  // Đóng dropdown thao tác khi click ra ngoài
+  useEffect(() => {
+    const handleOutsideClick = () => setOpenActionId(null);
+    window.addEventListener('click', handleOutsideClick);
+    return () => window.removeEventListener('click', handleOutsideClick);
+  }, []);
 
   const [sortField, setSortField] = useState<SortField | null>(null);
   const [sortDir, setSortDir] = useState<SortDirection>('asc');
@@ -149,13 +158,13 @@ export const BranchManagementTab: FC<BranchManagementTabProps> = ({
 
   const tableColGroup = (
     <colgroup>
+      <col style={{ width: '13%' }} />
+      <col style={{ width: '22%' }} />
+      <col style={{ width: '25%' }} />
       <col style={{ width: '12%' }} />
-      <col style={{ width: '20%' }} />
-      <col style={{ width: '24%' }} />
-      <col style={{ width: '11%' }} />
-      <col style={{ width: '12%' }} />
-      <col style={{ width: '9%' }} />
-      <col style={{ width: '12%' }} />
+      <col style={{ width: '14%' }} />
+      <col style={{ width: '7%' }} />
+      <col style={{ width: '7%' }} />
     </colgroup>
   );
 
@@ -362,7 +371,7 @@ export const BranchManagementTab: FC<BranchManagementTabProps> = ({
         </button>
       </div>
 
-      {/* 3. Bảng danh sách chi nhánh */}
+      {/* 3. Bảng danh sách chi nhánh (Chuẩn giao diện như http://localhost:5173/store-owner/stores/products) */}
       <div className="so-list-table-card">
         <div
           ref={headerRef}
@@ -372,53 +381,89 @@ export const BranchManagementTab: FC<BranchManagementTabProps> = ({
             boxSizing: 'border-box',
           }}
         >
-          <table className="so-list-table" style={{ minWidth: 960, tableLayout: 'fixed' }}>
+          <table className="so-list-table" style={{ minWidth: 1000, tableLayout: 'fixed' }}>
             {tableColGroup}
             <thead>
               <tr>
-                <th style={{ ...thStyle, cursor: 'pointer' }} onClick={() => handleSort('code')}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <th
+                  style={{ ...thStyle, cursor: 'pointer' }}
+                  onClick={() => handleSort('code')}
+                  title="Sắp xếp theo mã chi nhánh"
+                >
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                     <span>Mã Chi Nhánh</span>
-                    <ArrowUpDown size={12} style={{ opacity: sortField === 'code' ? 1 : 0.4, color: sortField === 'code' ? '#0f766e' : 'inherit' }} />
+                    <ArrowUpDown size={12} style={{ color: sortField === 'code' ? '#0f766e' : '#94a3b8', flexShrink: 0 }} />
                   </div>
                 </th>
-                <th style={{ ...thStyle, cursor: 'pointer' }} onClick={() => handleSort('name')}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+
+                <th
+                  style={{ ...thStyle, cursor: 'pointer' }}
+                  onClick={() => handleSort('name')}
+                  title="Sắp xếp theo tên chi nhánh"
+                >
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                     <span>Tên Chi Nhánh</span>
-                    <ArrowUpDown size={12} style={{ opacity: sortField === 'name' ? 1 : 0.4, color: sortField === 'name' ? '#0f766e' : 'inherit' }} />
+                    <ArrowUpDown size={12} style={{ color: sortField === 'name' ? '#0f766e' : '#94a3b8', flexShrink: 0 }} />
                   </div>
                 </th>
-                <th style={{ ...thStyle, cursor: 'pointer' }} onClick={() => handleSort('address')}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+
+                <th
+                  style={{ ...thStyle, cursor: 'pointer' }}
+                  onClick={() => handleSort('address')}
+                  title="Sắp xếp theo địa chỉ"
+                >
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                     <span>Địa Chỉ</span>
-                    <ArrowUpDown size={12} style={{ opacity: sortField === 'address' ? 1 : 0.4, color: sortField === 'address' ? '#0f766e' : 'inherit' }} />
+                    <ArrowUpDown size={12} style={{ color: sortField === 'address' ? '#0f766e' : '#94a3b8', flexShrink: 0 }} />
                   </div>
                 </th>
-                <th style={{ ...thStyle, cursor: 'pointer' }} onClick={() => handleSort('phone')}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+
+                <th
+                  style={{ ...thStyle, cursor: 'pointer' }}
+                  onClick={() => handleSort('phone')}
+                  title="Sắp xếp theo hotline"
+                >
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                     <span>Hotline</span>
-                    <ArrowUpDown size={12} style={{ opacity: sortField === 'phone' ? 1 : 0.4, color: sortField === 'phone' ? '#0f766e' : 'inherit' }} />
+                    <ArrowUpDown size={12} style={{ color: sortField === 'phone' ? '#0f766e' : '#94a3b8', flexShrink: 0 }} />
                   </div>
                 </th>
-                <th style={{ ...thStyle, cursor: 'pointer' }} onClick={() => handleSort('managerName')}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+
+                <th
+                  style={{ ...thStyle, cursor: 'pointer' }}
+                  onClick={() => handleSort('managerName')}
+                  title="Sắp xếp theo quản lý phụ trách"
+                >
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                     <span>Quản Lý Phụ Trách</span>
-                    <ArrowUpDown size={12} style={{ opacity: sortField === 'managerName' ? 1 : 0.4, color: sortField === 'managerName' ? '#0f766e' : 'inherit' }} />
+                    <ArrowUpDown size={12} style={{ color: sortField === 'managerName' ? '#0f766e' : '#94a3b8', flexShrink: 0 }} />
                   </div>
                 </th>
-                <th style={thStyle}>Trạng Thái</th>
-                <th style={{ ...thStyle, textAlign: 'right' }}>Thao Tác</th>
+
+                <th style={{ ...thStyle, textAlign: 'right', paddingRight: 8 }}>
+                  Trạng Thái
+                </th>
+
+                <th style={{ ...thStyle, textAlign: 'right', paddingRight: 14 }}>
+                  Thao Tác
+                </th>
               </tr>
             </thead>
           </table>
         </div>
 
+        {/* ── Scrollable Table Body: cuộn trong table khi danh sách dài, header và pager cố định ── */}
         <div
           ref={bodyRef}
           className="so-list-table-body supplier-table-scroll-container"
           onScroll={handleBodyScroll}
+          style={{
+            maxHeight: 'calc(100vh - 380px)',
+            minHeight: 220,
+            overflowY: 'auto',
+          }}
         >
-          <table className="so-list-table" style={{ minWidth: 960, tableLayout: 'fixed' }}>
+          <table className="so-list-table" style={{ minWidth: 1000, tableLayout: 'fixed' }}>
             {tableColGroup}
             <tbody>
               {isLoading ? (
@@ -444,22 +489,44 @@ export const BranchManagementTab: FC<BranchManagementTabProps> = ({
                     <tr
                       key={b.id}
                       className="so-list-row"
+                      style={{
+                        borderBottom: '1px solid #f1f5f9',
+                        backgroundColor: '#ffffff',
+                        cursor: 'pointer',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = '#f8fafc';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = '#ffffff';
+                      }}
                       onClick={() => {
                         setSelectedBranch(b);
                         setActiveModal('detail');
                       }}
-                      style={{ cursor: 'pointer' }}
                       title="Bấm vào hàng để xem chi tiết thông số chi nhánh"
                     >
                       {/* Mã chi nhánh */}
-                      <td className="so-list-td--wrap" style={{ fontSize: 12, color: '#0f766e', fontWeight: 600, fontFamily: 'var(--font-mono)' }}>
-                        {b.code}
+                      <td style={{ padding: '8px 8px', verticalAlign: 'middle', borderBottom: '1px solid #f1f5f9' }}>
+                        <span
+                          style={{
+                            fontFamily: 'var(--font-mono, monospace)',
+                            fontSize: 12,
+                            fontWeight: 600,
+                            color: '#0f766e',
+                            whiteSpace: 'nowrap',
+                            display: 'inline-block',
+                          }}
+                          title={b.code}
+                        >
+                          {b.code}
+                        </span>
                       </td>
 
                       {/* Tên chi nhánh */}
-                      <td className="so-list-td--wrap">
-                        <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
-                          <span className="so-list-name" style={{ fontSize: 12.5 }}>
+                      <td className="so-list-td--wrap" style={{ padding: '8px 8px', verticalAlign: 'middle', borderBottom: '1px solid #f1f5f9' }}>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                          <span className="so-list-name" title={b.name} style={{ fontWeight: 600, color: '#0f172a' }}>
                             {b.name}
                           </span>
                           {b.isHeadquarter && (
@@ -481,70 +548,186 @@ export const BranchManagementTab: FC<BranchManagementTabProps> = ({
                       </td>
 
                       {/* Địa chỉ */}
-                      <td className="so-list-td--wrap" style={{ fontSize: 12, color: '#475569' }}>
-                        {b.address || '---'}
+                      <td className="so-list-td--wrap" style={{ padding: '8px 8px', verticalAlign: 'middle', borderBottom: '1px solid #f1f5f9', color: '#475569', fontSize: 12.5 }}>
+                        <span title={b.address || ''}>{b.address || '---'}</span>
                       </td>
 
                       {/* Hotline */}
-                      <td className="so-list-td--wrap" style={{ fontSize: 12, color: '#334155', fontFamily: 'var(--font-mono)' }}>
-                        {b.phone || '---'}
+                      <td style={{ padding: '8px 8px', verticalAlign: 'middle', borderBottom: '1px solid #f1f5f9', whiteSpace: 'nowrap' }}>
+                        <span style={{ fontFamily: 'var(--font-mono, monospace)', fontSize: 12.5, color: '#334155' }}>
+                          {b.phone || '---'}
+                        </span>
                       </td>
 
                       {/* Quản lý phụ trách */}
-                      <td className="so-list-td--wrap" style={{ fontSize: 12, color: '#334155' }}>
-                        {b.managerName || '---'}
+                      <td className="so-list-td--wrap" style={{ padding: '8px 8px', verticalAlign: 'middle', borderBottom: '1px solid #f1f5f9', color: '#334155', fontSize: 12.5 }}>
+                        <span>{b.managerName || 'Chưa phân công'}</span>
                       </td>
 
-                      {/* Trạng thái */}
-                      <td className="so-list-td--wrap">
+                      {/* Trạng thái (Pill monochrome + dot xanh/xám, chuẩn KiotViet không emoji) */}
+                      <td
+                        style={{
+                          textAlign: 'right',
+                          verticalAlign: 'middle',
+                          padding: '8px 8px 8px 4px',
+                          borderBottom: '1px solid #f1f5f9',
+                          overflow: 'visible',
+                          textOverflow: 'clip',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
                         <SupplierStatusBadge status={isActive ? 'Active' : 'Inactive'} />
                       </td>
 
-                      {/* Thao tác */}
-                      <td style={{ textAlign: 'right' }}>
-                        <div
-                          style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-end', gap: 6 }}
-                          onClick={(e) => e.stopPropagation()}
-                        >
+                      {/* Thao tác (Chuẩn 1 nút Thao tác pill như StoreProductTable) */}
+                      <td
+                        style={{
+                          padding: '8px 14px 8px 4px',
+                          textAlign: 'right',
+                          whiteSpace: 'nowrap',
+                          verticalAlign: 'middle',
+                          borderBottom: '1px solid #f1f5f9',
+                          position: 'relative',
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <div style={{ position: 'relative', display: 'inline-block' }}>
                           <button
                             type="button"
                             className="so-list-action-btn"
-                            onClick={() => {
-                              setSelectedBranch(b);
-                              setActiveModal('detail');
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setOpenActionId(openActionId === b.id ? null : b.id);
                             }}
-                            title="Xem chi tiết và chỉnh sửa thông số chi nhánh"
+                            title="Mở menu thao tác chi nhánh"
                           >
                             Thao tác
                           </button>
 
-                          <button
-                            type="button"
-                            className="so-list-action-btn so-list-action-btn--icon"
-                            onClick={() => handleToggleStatus(b)}
-                            style={{
-                              color: isActive ? '#EA580C' : '#059669',
-                              borderColor: isActive ? '#FED7AA' : '#A7F3D0',
-                              background: isActive ? '#FFF7ED' : '#F0FDF4',
-                            }}
-                            title={isActive ? 'Tạm ngưng hoạt động' : 'Kích hoạt hoạt động'}
-                          >
-                            <Power size={13} />
-                          </button>
+                          {/* Menu thao tác nổi thanh lịch */}
+                          {openActionId === b.id && (
+                            <div
+                              style={{
+                                position: 'absolute',
+                                right: 0,
+                                top: '100%',
+                                marginTop: 4,
+                                backgroundColor: '#FFFFFF',
+                                borderRadius: 8,
+                                border: '1px solid #E2E8F0',
+                                boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.12), 0 8px 10px -6px rgba(0, 0, 0, 0.08)',
+                                zIndex: 60,
+                                minWidth: 180,
+                                padding: 4,
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: 2,
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <button
+                                type="button"
+                                style={{
+                                  width: '100%',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: 8,
+                                  padding: '8px 10px',
+                                  border: 'none',
+                                  background: 'none',
+                                  fontSize: 12.5,
+                                  color: '#334155',
+                                  borderRadius: 6,
+                                  cursor: 'pointer',
+                                  textAlign: 'left',
+                                  fontWeight: 500,
+                                  transition: 'background-color 0.12s ease',
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.backgroundColor = '#F1F5F9';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.backgroundColor = 'transparent';
+                                }}
+                                onClick={() => {
+                                  setOpenActionId(null);
+                                  setSelectedBranch(b);
+                                  setActiveModal('detail');
+                                }}
+                              >
+                                <Eye size={14} color="#0F766E" />
+                                <span>Chi tiết & Chỉnh sửa</span>
+                              </button>
 
-                          <button
-                            type="button"
-                            className="so-list-action-btn so-list-action-btn--icon so-list-action-btn--danger"
-                            onClick={() => handleDeleteBranch(b)}
-                            disabled={b.isHeadquarter}
-                            style={{
-                              opacity: b.isHeadquarter ? 0.45 : 1,
-                              cursor: b.isHeadquarter ? 'not-allowed' : 'pointer',
-                            }}
-                            title={b.isHeadquarter ? 'Không thể xóa chi nhánh chính (Trụ sở chính)' : 'Xóa chi nhánh'}
-                          >
-                            <Trash2 size={13} />
-                          </button>
+                              <button
+                                type="button"
+                                style={{
+                                  width: '100%',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: 8,
+                                  padding: '8px 10px',
+                                  border: 'none',
+                                  background: 'none',
+                                  fontSize: 12.5,
+                                  color: isActive ? '#D97706' : '#059669',
+                                  borderRadius: 6,
+                                  cursor: 'pointer',
+                                  textAlign: 'left',
+                                  fontWeight: 500,
+                                  transition: 'background-color 0.12s ease',
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.backgroundColor = '#F1F5F9';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.backgroundColor = 'transparent';
+                                }}
+                                onClick={() => {
+                                  setOpenActionId(null);
+                                  handleToggleStatus(b);
+                                }}
+                              >
+                                <Power size={14} />
+                                <span>{isActive ? 'Tạm ngưng hoạt động' : 'Kích hoạt chi nhánh'}</span>
+                              </button>
+
+                              {!b.isHeadquarter && (
+                                <button
+                                  type="button"
+                                  style={{
+                                    width: '100%',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 8,
+                                    padding: '8px 10px',
+                                    border: 'none',
+                                    background: 'none',
+                                    fontSize: 12.5,
+                                    color: '#DC2626',
+                                    borderRadius: 6,
+                                    cursor: 'pointer',
+                                    textAlign: 'left',
+                                    fontWeight: 500,
+                                    transition: 'background-color 0.12s ease',
+                                  }}
+                                  onMouseEnter={(e) => {
+                                    e.currentTarget.style.backgroundColor = '#FEF2F2';
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    e.currentTarget.style.backgroundColor = 'transparent';
+                                  }}
+                                  onClick={() => {
+                                    setOpenActionId(null);
+                                    handleDeleteBranch(b);
+                                  }}
+                                >
+                                  <Trash2 size={14} />
+                                  <span>Xóa chi nhánh</span>
+                                </button>
+                              )}
+                            </div>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -555,29 +738,22 @@ export const BranchManagementTab: FC<BranchManagementTabProps> = ({
           </table>
         </div>
 
-        {/* Footer Pagination */}
+        {/* ── Footer Phân trang (Paging) tích hợp đồng bộ theo chuẩn http://localhost:5173/store-owner/stores/products ── */}
         <div className="so-list-pager">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-            <span style={{ fontSize: 12, color: '#64748b' }}>
-              Hiển thị <strong style={{ color: '#0f172a' }}>{startItem} - {endItem}</strong> trên <strong style={{ color: '#0f172a' }}>{totalCount}</strong> chi nhánh
-            </span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#64748b' }}>
-              <span>Bản ghi/trang:</span>
+          {/* Bên trái: Thông tin số lượng & Chọn số bản ghi / trang */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+            <div>
+              Hiển thị <b>{startItem}</b> - <b>{endItem}</b> trên <b>{totalCount}</b> chi nhánh
+            </div>
+
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ color: '#64748b' }}>Bản ghi/trang:</span>
               <select
+                className="so-list-pager-select"
                 value={pageSize}
                 onChange={(e) => {
                   setPageSize(Number(e.target.value));
                   setPageIndex(1);
-                }}
-                style={{
-                  padding: '2px 8px',
-                  borderRadius: 'var(--radius-pill)',
-                  border: '1px solid #cbd5e1',
-                  fontSize: 12,
-                  color: '#0f172a',
-                  backgroundColor: '#fff',
-                  cursor: 'pointer',
-                  outline: 'none',
                 }}
               >
                 <option value={15}>15</option>
@@ -588,49 +764,30 @@ export const BranchManagementTab: FC<BranchManagementTabProps> = ({
             </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {/* Bên phải: Nút Trước / Trang x / y / Sau */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <button
               type="button"
+              className="so-list-pager-btn"
               disabled={pageIndex <= 1}
               onClick={() => setPageIndex(pageIndex - 1)}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 4,
-                padding: '4px 10px',
-                borderRadius: 'var(--radius-pill)',
-                border: '1px solid #e2e8f0',
-                background: pageIndex <= 1 ? '#f8fafc' : '#fff',
-                color: pageIndex <= 1 ? '#cbd5e1' : '#334155',
-                fontSize: 12,
-                fontWeight: 500,
-                cursor: pageIndex <= 1 ? 'not-allowed' : 'pointer',
-              }}
             >
-              <ChevronLeft size={13} /> Trước
+              <ChevronLeft size={13} />
+              <span>Trước</span>
             </button>
-            <span style={{ fontSize: 12, color: '#475569', fontWeight: 500, padding: '0 4px' }}>
+
+            <span style={{ padding: '0 8px', fontWeight: 600, color: '#0f172a' }}>
               Trang {pageIndex} / {totalPages}
             </span>
+
             <button
               type="button"
+              className="so-list-pager-btn"
               disabled={pageIndex >= totalPages}
               onClick={() => setPageIndex(pageIndex + 1)}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 4,
-                padding: '4px 10px',
-                borderRadius: 'var(--radius-pill)',
-                border: '1px solid #e2e8f0',
-                background: pageIndex >= totalPages ? '#f8fafc' : '#fff',
-                color: pageIndex >= totalPages ? '#cbd5e1' : '#334155',
-                fontSize: 12,
-                fontWeight: 500,
-                cursor: pageIndex >= totalPages ? 'not-allowed' : 'pointer',
-              }}
             >
-              Sau <ChevronRight size={13} />
+              <span>Sau</span>
+              <ChevronRight size={13} />
             </button>
           </div>
         </div>

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import type { FC, FormEvent } from "react";
 import type {
   SupplierSummary,
@@ -663,18 +663,109 @@ export const SupplierProductsTab: FC<Props> = ({
     [products],
   );
 
+  // Synchronize horizontal scrolling between header and body & detect vertical scroll
+  const headerRef = useRef<HTMLDivElement>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const [hasScrollY, setHasScrollY] = useState(false);
+
+  useEffect(() => {
+    const updateScrollState = () => {
+      if (bodyRef.current) {
+        setHasScrollY(
+          bodyRef.current.scrollHeight > bodyRef.current.clientHeight,
+        );
+      }
+    };
+
+    updateScrollState();
+
+    let observer: ResizeObserver | null = null;
+    if (bodyRef.current && typeof ResizeObserver !== "undefined") {
+      observer = new ResizeObserver(() => {
+        updateScrollState();
+      });
+      observer.observe(bodyRef.current);
+    }
+
+    window.addEventListener("resize", updateScrollState);
+    return () => {
+      window.removeEventListener("resize", updateScrollState);
+      if (observer) observer.disconnect();
+    };
+  }, [paginatedItems, appliedFilters.pageSize]);
+
+  const handleBodyScroll = () => {
+    if (headerRef.current && bodyRef.current) {
+      headerRef.current.scrollLeft = bodyRef.current.scrollLeft;
+    }
+  };
+
+  const tableColGroup = (
+    <colgroup>
+      <col style={{ width: "3.5%" }} />
+      <col style={{ width: "4.5%" }} />
+      <col style={{ width: "12%" }} />
+      <col style={{ width: canEdit ? "21%" : "27%" }} />
+      <col style={{ width: "13%" }} />
+      <col style={{ width: "6%" }} />
+      <col style={{ width: "10%" }} />
+      <col style={{ width: "7%" }} />
+      <col style={{ width: "8%" }} />
+      <col style={{ width: "9%" }} />
+      {canEdit && <col style={{ width: "6%" }} />}
+    </colgroup>
+  );
+
+  const thStyle: React.CSSProperties = {
+    backgroundColor: "#f8fafc",
+    padding: "8px 10px",
+    fontSize: 11.5,
+    fontWeight: 700,
+    color: "#334155",
+    textTransform: "uppercase",
+    letterSpacing: "0.02em",
+    whiteSpace: "normal",
+    wordBreak: "break-word",
+    lineHeight: 1.25,
+    boxSizing: "border-box",
+    borderBottom: "1px solid #cbd5e1",
+    userSelect: "none",
+  };
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-      <div className="supplier-detail-card">
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        flex: "1 1 auto",
+        minHeight: 0,
+        height: "100%",
+        maxHeight: "100%",
+        overflow: "hidden",
+      }}
+    >
+      <div
+        className="supplier-detail-card so-list-table-card"
+        style={{
+          flex: "1 1 auto",
+          minHeight: 0,
+          maxHeight: "100%",
+          display: "flex",
+          flexDirection: "column",
+          overflow: "hidden",
+          padding: 0,
+        }}
+      >
         {/* Header Bar */}
         <div
           style={{
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
-            marginBottom: 16,
+            padding: "16px 20px 10px 20px",
             flexWrap: "wrap",
             gap: 12,
+            flexShrink: 0,
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -834,11 +925,12 @@ export const SupplierProductsTab: FC<Props> = ({
             flexWrap: "wrap",
             alignItems: "center",
             gap: 10,
-            marginBottom: 16,
-            padding: "12px 14px",
+            margin: "0 20px 10px 20px",
+            padding: "10px 14px",
             backgroundColor: "#f8fafc",
             borderRadius: 10,
             border: "1px solid #e2e8f0",
+            flexShrink: 0,
           }}
         >
           <div style={{ flex: "1 1 240px", minWidth: 200 }}>
@@ -953,132 +1045,35 @@ export const SupplierProductsTab: FC<Props> = ({
           </div>
         </form>
 
-        {/* Data Table */}
+        {/* ── Fixed Header Table ── */}
         <div
-          className="admin-table-card"
-          style={{
-            borderRadius: 12,
-            border: "1px solid #e2e8f0",
-            overflowX: "auto",
-          }}
+          ref={headerRef}
+          className="so-list-table-head"
+          style={{ paddingRight: hasScrollY ? 6 : 0, flexShrink: 0 }}
         >
           <table
-            className="admin-data-table"
-            style={{ width: "100%", borderCollapse: "collapse" }}
+            className="so-list-table"
+            style={{ minWidth: 1200, tableLayout: "fixed" }}
           >
+            {tableColGroup}
             <thead>
-              <tr
-                style={{
-                  backgroundColor: "#f8fafc",
-                  borderBottom: "1px solid #e2e8f0",
-                }}
-              >
-                <th
-                  style={{
-                    width: 44,
-                    textAlign: "center",
-                    padding: "10px 8px",
-                    fontSize: 11.5,
-                  }}
-                >
-                  #
-                </th>
-                <th
-                  style={{
-                    width: 56,
-                    textAlign: "center",
-                    padding: "10px 8px",
-                    fontSize: 11.5,
-                  }}
-                >
-                  ẢNH
-                </th>
-                <th
-                  style={{
-                    width: 140,
-                    textAlign: "left",
-                    padding: "10px 12px",
-                    fontSize: 11.5,
-                  }}
-                >
-                  MÃ SKU
-                </th>
-                <th
-                  style={{
-                    textAlign: "left",
-                    padding: "10px 12px",
-                    fontSize: 11.5,
-                  }}
-                >
-                  TÊN SẢN PHẨM
-                </th>
-                <th
-                  style={{
-                    width: 140,
-                    textAlign: "left",
-                    padding: "10px 12px",
-                    fontSize: 11.5,
-                  }}
-                >
-                  NGÀNH HÀNG
-                </th>
-                <th
-                  style={{
-                    width: 80,
-                    textAlign: "center",
-                    padding: "10px 12px",
-                    fontSize: 11.5,
-                  }}
-                >
-                  ĐVT
-                </th>
-                <th
-                  style={{
-                    width: 140,
-                    textAlign: "right",
-                    padding: "10px 12px",
-                    fontSize: 11.5,
-                  }}
-                >
-                  GIÁ NHẬP SỈ
-                </th>
-                <th
-                  style={{
-                    width: 100,
-                    textAlign: "right",
-                    padding: "10px 12px",
-                    fontSize: 11.5,
-                  }}
-                >
-                  MOQ
-                </th>
-                <th
-                  style={{
-                    width: 125,
-                    textAlign: "right",
-                    padding: "10px 12px",
-                    fontSize: 11.5,
-                  }}
-                >
-                  THIẾU CHO PHÉP
-                </th>
-                <th
-                  style={{
-                    width: 130,
-                    textAlign: "center",
-                    padding: "10px 12px",
-                    fontSize: 11.5,
-                  }}
-                >
-                  TRẠNG THÁI
-                </th>
+              <tr>
+                <th style={{ ...thStyle, textAlign: "center" }}>#</th>
+                <th style={{ ...thStyle, textAlign: "center" }}>ẢNH</th>
+                <th style={{ ...thStyle }}>MÃ SKU</th>
+                <th style={{ ...thStyle }}>TÊN SẢN PHẨM</th>
+                <th style={{ ...thStyle }}>NGÀNH HÀNG</th>
+                <th style={{ ...thStyle, textAlign: "center" }}>ĐVT</th>
+                <th style={{ ...thStyle, textAlign: "right" }}>GIÁ NHẬP SỈ</th>
+                <th style={{ ...thStyle, textAlign: "right" }}>MOQ</th>
+                <th style={{ ...thStyle, textAlign: "right" }}>THIẾU CHO PHÉP</th>
+                <th style={{ ...thStyle, textAlign: "center" }}>TRẠNG THÁI</th>
                 {canEdit && (
                   <th
                     style={{
-                      width: 95,
+                      ...thStyle,
                       textAlign: "right",
-                      padding: "10px 12px",
-                      fontSize: 11.5,
+                      paddingRight: 14,
                     }}
                   >
                     THAO TÁC
@@ -1086,6 +1081,21 @@ export const SupplierProductsTab: FC<Props> = ({
                 )}
               </tr>
             </thead>
+          </table>
+        </div>
+
+        {/* ── Scrollable Body Table ── */}
+        <div
+          ref={bodyRef}
+          className="so-list-table-body supplier-table-scroll-container"
+          onScroll={handleBodyScroll}
+          style={{ flex: "1 1 auto", minHeight: 0, overflowY: "auto" }}
+        >
+          <table
+            className="so-list-table"
+            style={{ minWidth: 1200, tableLayout: "fixed" }}
+          >
+            {tableColGroup}
             <tbody>
               {isLoading || isLoadingBranchProducts ? (
                 <tr>
@@ -1127,18 +1137,27 @@ export const SupplierProductsTab: FC<Props> = ({
                   return (
                     <tr
                       key={item.id}
+                      className="so-list-row"
                       style={{
                         borderBottom: "1px solid #f1f5f9",
                         opacity: effective.status === "Inactive" ? 0.65 : 1,
+                        backgroundColor: "#ffffff",
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = "#f8fafc";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = "#ffffff";
                       }}
                     >
                       {/* 1. STT */}
                       <td
                         style={{
-                          padding: "10px 8px",
+                          padding: "8px 6px",
                           textAlign: "center",
                           fontSize: 12,
                           color: "#94a3b8",
+                          verticalAlign: "middle",
                         }}
                       >
                         {rowIndex}
@@ -1147,7 +1166,7 @@ export const SupplierProductsTab: FC<Props> = ({
                       {/* 2. Ảnh */}
                       <td
                         style={{
-                          padding: "8px",
+                          padding: "6px 4px",
                           textAlign: "center",
                           verticalAlign: "middle",
                         }}
@@ -1190,7 +1209,11 @@ export const SupplierProductsTab: FC<Props> = ({
 
                       {/* 3. Mã SKU */}
                       <td
-                        style={{ padding: "10px 12px", whiteSpace: "nowrap" }}
+                        style={{
+                          padding: "8px 10px",
+                          whiteSpace: "nowrap",
+                          verticalAlign: "middle",
+                        }}
                       >
                         <span
                           style={{
@@ -1205,13 +1228,13 @@ export const SupplierProductsTab: FC<Props> = ({
                       </td>
 
                       {/* 4. Tên sản phẩm */}
-                      <td style={{ padding: "10px 12px" }}>
+                      <td
+                        className="so-list-td--wrap"
+                        style={{ padding: "8px 10px", verticalAlign: "middle" }}
+                      >
                         <div
-                          style={{
-                            fontWeight: 600,
-                            color: "#0f172a",
-                            fontSize: 13,
-                          }}
+                          className="so-list-name"
+                          title={item.name}
                         >
                           {item.name}
                         </div>
@@ -1219,7 +1242,11 @@ export const SupplierProductsTab: FC<Props> = ({
 
                       {/* 5. Ngành hàng */}
                       <td
-                        style={{ padding: "10px 12px", whiteSpace: "nowrap" }}
+                        style={{
+                          padding: "8px 10px",
+                          whiteSpace: "nowrap",
+                          verticalAlign: "middle",
+                        }}
                       >
                         <span
                           style={{
@@ -1235,9 +1262,10 @@ export const SupplierProductsTab: FC<Props> = ({
                       {/* 6. ĐVT */}
                       <td
                         style={{
-                          padding: "10px 12px",
+                          padding: "8px 6px",
                           textAlign: "center",
                           whiteSpace: "nowrap",
+                          verticalAlign: "middle",
                         }}
                       >
                         <span
@@ -1254,9 +1282,10 @@ export const SupplierProductsTab: FC<Props> = ({
                       {/* 7. Giá */}
                       <td
                         style={{
-                          padding: "10px 12px",
+                          padding: "8px 10px",
                           textAlign: "right",
                           whiteSpace: "nowrap",
+                          verticalAlign: "middle",
                         }}
                       >
                         <span
@@ -1274,9 +1303,10 @@ export const SupplierProductsTab: FC<Props> = ({
                       {/* 8. MOQ */}
                       <td
                         style={{
-                          padding: "10px 12px",
+                          padding: "8px 10px",
                           textAlign: "right",
                           whiteSpace: "nowrap",
+                          verticalAlign: "middle",
                         }}
                       >
                         <span
@@ -1293,9 +1323,10 @@ export const SupplierProductsTab: FC<Props> = ({
                       {/* 9. Thiếu cho phép */}
                       <td
                         style={{
-                          padding: "10px 12px",
+                          padding: "8px 10px",
                           textAlign: "right",
                           whiteSpace: "nowrap",
+                          verticalAlign: "middle",
                         }}
                       >
                         <span
@@ -1310,14 +1341,26 @@ export const SupplierProductsTab: FC<Props> = ({
                       </td>
 
                       {/* 10. Trạng thái */}
-                      <td style={{ padding: "10px 12px", textAlign: "center" }}>
+                      <td
+                        style={{
+                          padding: "8px 8px",
+                          textAlign: "center",
+                          verticalAlign: "middle",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
                         <SupplierStatusBadge status={effective.status} />
                       </td>
 
                       {/* 11. Thao tác */}
                       {canEdit && (
                         <td
-                          style={{ padding: "10px 12px", textAlign: "right" }}
+                          style={{
+                            padding: "8px 14px 8px 4px",
+                            textAlign: "right",
+                            verticalAlign: "middle",
+                            whiteSpace: "nowrap",
+                          }}
                         >
                           <div
                             className="so-list-actions"
@@ -1418,101 +1461,115 @@ export const SupplierProductsTab: FC<Props> = ({
               )}
             </tbody>
           </table>
+        </div>
 
-          {/* Pagination Footer */}
-          {effectiveTotal > 0 && (
+        {/* Pagination Footer */}
+        {effectiveTotal > 0 && (
+          <div
+            className="so-list-pager"
+            style={{
+              padding: "10px 16px",
+              borderTop: "1px solid #e2e8f0",
+              backgroundColor: "#ffffff",
+              fontSize: 12.5,
+              color: "#475569",
+              flexShrink: 0,
+            }}
+          >
             <div
               style={{
                 display: "flex",
-                justifyContent: "space-between",
                 alignItems: "center",
-                padding: "10px 16px",
-                borderTop: "1px solid #e2e8f0",
-                backgroundColor: "#f8fafc",
-                fontSize: 12.5,
-                color: "#475569",
+                gap: 14,
                 flexWrap: "wrap",
-                gap: 12,
               }}
             >
-              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <span>
-                  Hiển thị <b>{startItem}</b> – <b>{endItem}</b> trên{" "}
-                  <b>{effectiveTotal}</b> mặt hàng
-                  {isBranchFiltered && (
-                    <span
-                      style={{
-                        marginLeft: 6,
-                        color: "#0369a1",
-                        fontWeight: 600,
-                      }}
-                    >
-                      (tại {activeBranch.name} • Tổng chuỗi: {totalCount})
-                    </span>
-                  )}
-                </span>
-                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <span>Bản ghi/trang:</span>
-                  <select
-                    value={appliedFilters.pageSize}
-                    onChange={(e) =>
-                      setAppliedFilters((prev) => ({
-                        ...prev,
-                        pageSize: Number(e.target.value),
-                        pageIndex: 1,
-                      }))
-                    }
+              <span>
+                Hiển thị <b>{startItem}</b> – <b>{endItem}</b> trên{" "}
+                <b>{effectiveTotal}</b> mặt hàng
+                {isBranchFiltered && (
+                  <span
                     style={{
-                      padding: "2px 6px",
-                      borderRadius: 4,
-                      border: "1px solid #cbd5e1",
-                      fontSize: 12,
-                      backgroundColor: "#ffffff",
+                      marginLeft: 6,
+                      color: "#0369a1",
+                      fontWeight: 600,
                     }}
                   >
-                    <option value={10}>10</option>
-                    <option value={20}>20</option>
-                    <option value={50}>50</option>
-                  </select>
-                </div>
-              </div>
+                    (tại {activeBranch.name} • Tổng chuỗi: {totalCount})
+                  </span>
+                )}
+              </span>
 
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <button
-                  type="button"
-                  disabled={appliedFilters.pageIndex <= 1}
-                  onClick={() =>
+              <div
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                }}
+              >
+                <span style={{ color: "#64748b" }}>Bản ghi/trang:</span>
+                <select
+                  className="so-list-pager-select"
+                  value={appliedFilters.pageSize}
+                  onChange={(e) =>
                     setAppliedFilters((prev) => ({
                       ...prev,
-                      pageIndex: Math.max(1, prev.pageIndex - 1),
+                      pageSize: Number(e.target.value),
+                      pageIndex: 1,
                     }))
                   }
-                  className="po-btn po-btn-secondary"
-                  style={{ height: 28, padding: "0 8px", fontSize: 12 }}
                 >
-                  <ChevronLeft size={14} /> Trước
-                </button>
-                <span>
-                  Trang <b>{appliedFilters.pageIndex}</b> / <b>{totalPages}</b>
-                </span>
-                <button
-                  type="button"
-                  disabled={appliedFilters.pageIndex >= totalPages}
-                  onClick={() =>
-                    setAppliedFilters((prev) => ({
-                      ...prev,
-                      pageIndex: Math.min(totalPages, prev.pageIndex + 1),
-                    }))
-                  }
-                  className="po-btn po-btn-secondary"
-                  style={{ height: 28, padding: "0 8px", fontSize: 12 }}
-                >
-                  Sau <ChevronRight size={14} />
-                </button>
+                  <option value={10}>10</option>
+                  <option value={15}>15</option>
+                  <option value={20}>20</option>
+                  <option value={50}>50</option>
+                </select>
               </div>
             </div>
-          )}
-        </div>
+
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <button
+                type="button"
+                className="so-list-pager-btn"
+                disabled={appliedFilters.pageIndex <= 1}
+                onClick={() =>
+                  setAppliedFilters((prev) => ({
+                    ...prev,
+                    pageIndex: Math.max(1, prev.pageIndex - 1),
+                  }))
+                }
+              >
+                <ChevronLeft size={13} />
+                <span>Trước</span>
+              </button>
+
+              <span
+                style={{
+                  padding: "0 8px",
+                  fontWeight: 600,
+                  color: "#0f172a",
+                }}
+              >
+                Trang <b>{appliedFilters.pageIndex}</b> / <b>{totalPages}</b>
+              </span>
+
+              <button
+                type="button"
+                className="so-list-pager-btn"
+                disabled={appliedFilters.pageIndex >= totalPages}
+                onClick={() =>
+                  setAppliedFilters((prev) => ({
+                    ...prev,
+                    pageIndex: Math.min(totalPages, prev.pageIndex + 1),
+                  }))
+                }
+              >
+                <span>Sau</span>
+                <ChevronRight size={13} />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Modal 1: Assign New Product */}

@@ -1,4 +1,11 @@
-import { useState, useRef, useEffect, useCallback, useMemo, Fragment } from "react";
+import {
+  useState,
+  useRef,
+  useEffect,
+  useCallback,
+  useMemo,
+  Fragment,
+} from "react";
 import type { FC } from "react";
 import { NavLink, Link, useLocation, useNavigate } from "react-router-dom";
 import {
@@ -114,10 +121,9 @@ const NAV_GROUPS: NavGroup[] = [
             badge: "",
           },
           {
-            label: "Sản phẩm theo Cửa hàng",
+            label: "Thiết lập giá bán",
             to: "/store-owner/stores/products",
-            badge: "Mới",
-            badgeType: "blue",
+            badge: "",
           },
         ],
       },
@@ -168,12 +174,6 @@ const NAV_GROUPS: NavGroup[] = [
         title: "Nhà cung cấp",
         items: [
           { label: "Danh sách nhà cung cấp", to: "/store-owner/suppliers" },
-          {
-            label: "Hóa đơn đầu vào",
-            to: "/store-owner/suppliers?view=invoices",
-            badge: "Mới",
-            badgeType: "red",
-          },
         ],
       },
       {
@@ -233,9 +233,7 @@ const NAV_GROUPS: NavGroup[] = [
       },
       {
         title: "Công nợ & Khách hàng",
-        items: [
-          { label: "Khách nợ", to: "/store-owner/customers" },
-        ],
+        items: [{ label: "Khách nợ", to: "/store-owner/customers" }],
       },
       {
         title: "Báo cáo & Thuế",
@@ -253,28 +251,26 @@ const NAV_GROUPS: NavGroup[] = [
     sections: [
       {
         title: "Nhân sự & Hồ sơ",
-        items: [
-          { label: "Danh sách nhân viên", to: "/store-owner/employees" }
-        ],
+        items: [{ label: "Danh sách nhân viên", to: "/store-owner/employees" }],
       },
       {
         title: "Lịch & Chấm công",
         items: [
           {
             label: "Lịch làm việc chi nhánh",
-            to: "/store-owner/employees/schedule"
+            to: "/store-owner/employees/schedule",
           },
           {
             label: "Bảng chấm công",
-            to: "/store-owner/employees/attendance"
+            to: "/store-owner/employees/attendance",
           },
           {
             label: "Duyệt đơn yêu cầu",
-            to: "/store-owner/employees/approval-requests"
+            to: "/store-owner/employees/approval-requests",
           },
           {
             label: "Cấu hình ca làm việc",
-            to: "/store-owner/employees/shifts"
+            to: "/store-owner/employees/shifts",
           },
         ],
       },
@@ -284,7 +280,7 @@ const NAV_GROUPS: NavGroup[] = [
           {
             label: "Bảng tính lương tháng",
             to: "/store-owner/employees/payroll",
-          }
+          },
         ],
       },
     ],
@@ -820,15 +816,13 @@ export const AppTopNav: FC = () => {
   const { user, logout } = useAuthStore();
   const userRole = (user?.role || "").toUpperCase();
   const isEmployee =
-    userRole === "EMPLOYEE" ||
-    userRole === "CASHIER" ||
-    userRole === "STAFF";
+    userRole === "EMPLOYEE" || userRole === "CASHIER" || userRole === "STAFF";
 
   const visibleNavGroups = useMemo(() => {
     if (isEmployee) {
       // Ẩn hoàn toàn menu Tài chính, Nhân sự và Cấu hình gói cước gian hàng đối với Employee
       return NAV_GROUPS.filter(
-        (g) => g.id !== "finance" && g.id !== "employees" && g.id !== "store"
+        (g) => g.id !== "finance" && g.id !== "employees" && g.id !== "store",
       );
     }
     return NAV_GROUPS;
@@ -841,16 +835,21 @@ export const AppTopNav: FC = () => {
   const [settingsMenuOpen, setSettingsMenuOpen] = useState(false);
   const settingsMenuRef = useRef<HTMLDivElement | null>(null);
   const settingsTimerRef = useRef<number | null>(null);
-  const [pendingCashApprovalCount, setPendingCashApprovalCount] = useState<number>(0);
+  const [pendingCashApprovalCount, setPendingCashApprovalCount] =
+    useState<number>(0);
 
   useEffect(() => {
-    if (user?.role === 'STORE_OWNER') {
+    if (user?.role === "STORE_OWNER") {
       const fetchPending = async () => {
         try {
-          const res = await posShiftApi.getPendingMovements('');
+          const res = await posShiftApi.getPendingMovements("");
           if (res?.movements) {
             const count = res.movements.filter(
-              (m) => m.status === 'PendingApproval' || m.status === 2 || ((m.category === 'CASH_DRAW' || m.category === 2) && !m.isConfirmedByOwner)
+              (m) =>
+                m.status === "PendingApproval" ||
+                m.status === 2 ||
+                ((m.category === "CASH_DRAW" || m.category === 2) &&
+                  !m.isConfirmedByOwner),
             ).length;
             setPendingCashApprovalCount(count);
           }
@@ -925,7 +924,12 @@ export const AppTopNav: FC = () => {
       clearAccountTimer();
       clearSettingsTimer();
     };
-  }, [location.pathname, clearCloseTimer, clearAccountTimer, clearSettingsTimer]);
+  }, [
+    location.pathname,
+    clearCloseTimer,
+    clearAccountTimer,
+    clearSettingsTimer,
+  ]);
 
   // Close settings menu on click outside or Escape
   useEffect(() => {
@@ -1188,7 +1192,7 @@ export const AppTopNav: FC = () => {
               if (group.to) {
                 const targetTo =
                   group.id === "overview" &&
-                    location.pathname.startsWith("/store-owner")
+                  location.pathname.startsWith("/store-owner")
                     ? "/store-owner/dashboard"
                     : group.to;
                 // Direct link (no dropdown)
@@ -1703,7 +1707,8 @@ export const AppTopNav: FC = () => {
                               marginTop: 2,
                             }}
                           >
-                            Thiết lập hạn mức, phê duyệt chi két & xác nhận tiền rút két
+                            Thiết lập hạn mức, phê duyệt chi két & xác nhận tiền
+                            rút két
                           </div>
                         </div>
                       </Link>
@@ -2151,171 +2156,171 @@ export const AppTopNav: FC = () => {
                     </div>
                     {group.sections
                       ? group.sections.map((sec) => (
-                        <div key={sec.title} style={{ marginBottom: 6 }}>
-                          <div
-                            style={{
-                              fontSize: 11,
-                              fontWeight: 700,
-                              color: "#64748b",
-                              padding: "4px 14px 2px 24px",
-                            }}
-                          >
-                            {sec.title}
-                          </div>
-                          {sec.items.map((child) => {
-                            const isActive = (() => {
-                              const [toPath, toQuery] = child.to.split("?");
-                              const currPath = location.pathname;
-                              const currQuery = location.search;
-                              if (toQuery) {
+                          <div key={sec.title} style={{ marginBottom: 6 }}>
+                            <div
+                              style={{
+                                fontSize: 11,
+                                fontWeight: 700,
+                                color: "#64748b",
+                                padding: "4px 14px 2px 24px",
+                              }}
+                            >
+                              {sec.title}
+                            </div>
+                            {sec.items.map((child) => {
+                              const isActive = (() => {
+                                const [toPath, toQuery] = child.to.split("?");
+                                const currPath = location.pathname;
+                                const currQuery = location.search;
+                                if (toQuery) {
+                                  return (
+                                    currPath === toPath &&
+                                    currQuery.includes(toQuery)
+                                  );
+                                }
+                                if (toPath === "/store-owner/suppliers") {
+                                  const hasOtherView =
+                                    currQuery.includes("view=");
+                                  return (
+                                    (currPath === toPath ||
+                                      currPath.startsWith(toPath + "/")) &&
+                                    !currPath.includes("/products") &&
+                                    !currPath.includes("/branches") &&
+                                    !hasOtherView
+                                  );
+                                }
+                                if (
+                                  toPath === "/store-owner/suppliers/products"
+                                ) {
+                                  const hasOtherView =
+                                    currQuery.includes("view=");
+                                  return (
+                                    (currPath === toPath ||
+                                      currPath.startsWith(toPath + "/")) &&
+                                    !hasOtherView
+                                  );
+                                }
+                                if (toPath === "/store-owner/expenses") {
+                                  const hasOtherView =
+                                    currQuery.includes("view=") ||
+                                    currQuery.includes("tab=");
+                                  return (
+                                    (currPath === toPath ||
+                                      currPath.startsWith(toPath + "/")) &&
+                                    !hasOtherView
+                                  );
+                                }
                                 return (
-                                  currPath === toPath &&
-                                  currQuery.includes(toQuery)
+                                  currPath === toPath ||
+                                  currPath.startsWith(toPath + "/")
                                 );
-                              }
-                              if (toPath === "/store-owner/suppliers") {
-                                const hasOtherView =
-                                  currQuery.includes("view=");
-                                return (
-                                  (currPath === toPath ||
-                                    currPath.startsWith(toPath + "/")) &&
-                                  !currPath.includes("/products") &&
-                                  !currPath.includes("/branches") &&
-                                  !hasOtherView
-                                );
-                              }
-                              if (
-                                toPath === "/store-owner/suppliers/products"
-                              ) {
-                                const hasOtherView =
-                                  currQuery.includes("view=");
-                                return (
-                                  (currPath === toPath ||
-                                    currPath.startsWith(toPath + "/")) &&
-                                  !hasOtherView
-                                );
-                              }
-                              if (toPath === "/store-owner/expenses") {
-                                const hasOtherView =
-                                  currQuery.includes("view=") ||
-                                  currQuery.includes("tab=");
-                                return (
-                                  (currPath === toPath ||
-                                    currPath.startsWith(toPath + "/")) &&
-                                  !hasOtherView
-                                );
-                              }
+                              })();
                               return (
-                                currPath === toPath ||
-                                currPath.startsWith(toPath + "/")
+                                <NavLink
+                                  key={child.label + child.to}
+                                  to={child.to}
+                                  onClick={() => setMobileOpen(false)}
+                                  style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 10,
+                                    padding: "7px 14px 7px 32px",
+                                    borderRadius: "var(--radius-pill)",
+                                    textDecoration: "none",
+                                    fontSize: 13,
+                                    fontWeight: isActive ? 700 : 500,
+                                    color: isActive
+                                      ? "var(--blue-primary)"
+                                      : "var(--text-muted)",
+                                    backgroundColor: isActive
+                                      ? "var(--blue-light)"
+                                      : "transparent",
+                                  }}
+                                >
+                                  <span style={{ flex: 1 }}>{child.label}</span>
+                                  {child.badge && (
+                                    <span
+                                      style={{
+                                        fontSize: 9.5,
+                                        fontWeight: 700,
+                                        padding: "1px 6px",
+                                        borderRadius: "var(--radius-pill)",
+                                        backgroundColor:
+                                          child.badgeType === "red"
+                                            ? "#FF3B30"
+                                            : "#e0f2fe",
+                                        color:
+                                          child.badgeType === "red"
+                                            ? "#ffffff"
+                                            : "#0284c7",
+                                      }}
+                                    >
+                                      {child.badge}
+                                    </span>
+                                  )}
+                                </NavLink>
                               );
-                            })();
-                            return (
-                              <NavLink
-                                key={child.label + child.to}
-                                to={child.to}
-                                onClick={() => setMobileOpen(false)}
-                                style={{
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: 10,
-                                  padding: "7px 14px 7px 32px",
-                                  borderRadius: "var(--radius-pill)",
-                                  textDecoration: "none",
-                                  fontSize: 13,
-                                  fontWeight: isActive ? 700 : 500,
-                                  color: isActive
-                                    ? "var(--blue-primary)"
-                                    : "var(--text-muted)",
-                                  backgroundColor: isActive
-                                    ? "var(--blue-light)"
-                                    : "transparent",
-                                }}
-                              >
-                                <span style={{ flex: 1 }}>{child.label}</span>
-                                {child.badge && (
-                                  <span
-                                    style={{
-                                      fontSize: 9.5,
-                                      fontWeight: 700,
-                                      padding: "1px 6px",
-                                      borderRadius: "var(--radius-pill)",
-                                      backgroundColor:
-                                        child.badgeType === "red"
-                                          ? "#FF3B30"
-                                          : "#e0f2fe",
-                                      color:
-                                        child.badgeType === "red"
-                                          ? "#ffffff"
-                                          : "#0284c7",
-                                    }}
-                                  >
-                                    {child.badge}
-                                  </span>
-                                )}
-                              </NavLink>
-                            );
-                          })}
-                        </div>
-                      ))
+                            })}
+                          </div>
+                        ))
                       : group.children?.map((child) => {
-                        const isActive = (() => {
-                          if (child.to === "/store-owner/suppliers") {
+                          const isActive = (() => {
+                            if (child.to === "/store-owner/suppliers") {
+                              return (
+                                (location.pathname === child.to ||
+                                  location.pathname.startsWith(
+                                    child.to + "/",
+                                  )) &&
+                                !location.pathname.includes("/products") &&
+                                !location.pathname.includes("/branches")
+                              );
+                            }
                             return (
-                              (location.pathname === child.to ||
-                                location.pathname.startsWith(
-                                  child.to + "/",
-                                )) &&
-                              !location.pathname.includes("/products") &&
-                              !location.pathname.includes("/branches")
+                              location.pathname === child.to ||
+                              location.pathname.startsWith(child.to + "/")
                             );
-                          }
+                          })();
                           return (
-                            location.pathname === child.to ||
-                            location.pathname.startsWith(child.to + "/")
+                            <NavLink
+                              key={child.to}
+                              to={child.to}
+                              onClick={() => setMobileOpen(false)}
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 10,
+                                padding: "9px 14px 9px 28px",
+                                borderRadius: "var(--radius-pill)",
+                                textDecoration: "none",
+                                fontSize: 13.5,
+                                fontWeight: isActive ? 700 : 500,
+                                color: isActive
+                                  ? "var(--blue-primary)"
+                                  : "var(--text-muted)",
+                                backgroundColor: isActive
+                                  ? "var(--blue-light)"
+                                  : "transparent",
+                              }}
+                            >
+                              <ChevronRightIcon size={13} />
+                              {child.label}
+                              {child.badge && (
+                                <span
+                                  style={{
+                                    fontSize: 10,
+                                    fontWeight: 700,
+                                    padding: "1px 6px",
+                                    borderRadius: "var(--radius-pill)",
+                                    backgroundColor: "#e0f2fe",
+                                    color: "#0284c7",
+                                  }}
+                                >
+                                  {child.badge}
+                                </span>
+                              )}
+                            </NavLink>
                           );
-                        })();
-                        return (
-                          <NavLink
-                            key={child.to}
-                            to={child.to}
-                            onClick={() => setMobileOpen(false)}
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 10,
-                              padding: "9px 14px 9px 28px",
-                              borderRadius: "var(--radius-pill)",
-                              textDecoration: "none",
-                              fontSize: 13.5,
-                              fontWeight: isActive ? 700 : 500,
-                              color: isActive
-                                ? "var(--blue-primary)"
-                                : "var(--text-muted)",
-                              backgroundColor: isActive
-                                ? "var(--blue-light)"
-                                : "transparent",
-                            }}
-                          >
-                            <ChevronRightIcon size={13} />
-                            {child.label}
-                            {child.badge && (
-                              <span
-                                style={{
-                                  fontSize: 10,
-                                  fontWeight: 700,
-                                  padding: "1px 6px",
-                                  borderRadius: "var(--radius-pill)",
-                                  backgroundColor: "#e0f2fe",
-                                  color: "#0284c7",
-                                }}
-                              >
-                                {child.badge}
-                              </span>
-                            )}
-                          </NavLink>
-                        );
-                      })}
+                        })}
                   </>
                 )}
               </div>

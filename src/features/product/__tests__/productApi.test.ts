@@ -152,6 +152,64 @@ describe('productApi.getProductsPaged', () => {
     expect(result.totalCount).toBe(0);
     expect(result.totalPages).toBe(0);
   });
+
+  it('tự động lấy bù đủ 15 sản phẩm khi trang 1 trả về 10 sản phẩm do lệch danh mục tenant', async () => {
+    const tenItems = Array.from({ length: 10 }, (_, idx) => ({
+      id: `prod-${idx + 1}`,
+      productCode: `SP00${idx + 1}`,
+      name: `Sản phẩm ${idx + 1}`,
+      categoryId: 'cat-01',
+      baseUnit: 'Cái',
+      sellingPrice: 10000,
+      status: 'Active' as const,
+      hasBatches: false,
+      isFavorite: false,
+      createdAt: '2026-11-10T10:00:00Z',
+    }));
+
+    const fifteenItems = Array.from({ length: 15 }, (_, idx) => ({
+      id: `prod-${idx + 1}`,
+      productCode: `SP00${idx + 1}`,
+      name: `Sản phẩm ${idx + 1}`,
+      categoryId: 'cat-01',
+      baseUnit: 'Cái',
+      sellingPrice: 10000,
+      status: 'Active' as const,
+      hasBatches: false,
+      isFavorite: false,
+      createdAt: '2026-11-10T10:00:00Z',
+    }));
+
+    (httpClient.get as any)
+      .mockResolvedValueOnce({
+        data: {
+          success: true,
+          data: {
+            items: tenItems,
+            page: 1,
+            pageSize: 15,
+            totalItems: 139,
+          },
+        },
+      })
+      .mockResolvedValueOnce({
+        data: {
+          success: true,
+          data: {
+            items: fifteenItems,
+            page: 1,
+            pageSize: 20,
+            totalItems: 139,
+          },
+        },
+      });
+
+    const result = await productApi.getProductsPaged({ pageIndex: 1, pageSize: 15 });
+
+    expect(result.items).toHaveLength(15);
+    expect(result.pageSize).toBe(15);
+    expect(result.totalCount).toBe(134);
+  });
 });
 
 describe('productApi.createProduct & createProductUnit', () => {

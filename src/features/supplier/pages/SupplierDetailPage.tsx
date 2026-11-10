@@ -453,24 +453,50 @@ export const SupplierDetailPage: FC<Props> = ({
   }
 
   return (
-    <div className="supplier-detail-page">
+    <div
+      className="supplier-detail-page po-matrix-container"
+      style={{
+        width: "100%",
+        height: "100%",
+        maxHeight: "100%",
+        display: "flex",
+        flexDirection: "column",
+        minHeight: 0,
+        flex: 1,
+        overflow: "hidden",
+      }}
+    >
       {/* Toast Notification */}
       <AdminToast toast={toast} onClose={() => setToast(null)} />
 
-      <div className="supplier-detail-container">
+      <div
+        className="supplier-detail-container"
+        style={{
+          width: "100%",
+          height: "100%",
+          maxHeight: "100%",
+          display: "flex",
+          flexDirection: "column",
+          minHeight: 0,
+          flex: 1,
+          overflow: "hidden",
+        }}
+      >
         {/* Header with back button, avatar, name (R2 & R3: Status badge & Edit button removed from shared header) */}
-        <SupplierDetailHeader
-          supplier={currentSupplier}
-          onBack={handleBack}
-        />
+        <div style={{ flexShrink: 0 }}>
+          <SupplierDetailHeader
+            supplier={currentSupplier}
+            onBack={handleBack}
+          />
+        </div>
 
         {/* Section Header */}
-        <div className="supplier-detail-section-label">
+        <div className="supplier-detail-section-label" style={{ flexShrink: 0, margin: '2px 0 6px 0' }}>
           THÔNG TIN NHÀ CUNG CẤP
         </div>
 
         {/* Tab Navigation Pill Bar */}
-        <div className="supplier-detail-tabs-bar">
+        <div className="supplier-detail-tabs-bar" style={{ flexShrink: 0, marginBottom: 10 }}>
           {tabs.map((tab) => (
             <button
               key={tab.key}
@@ -485,7 +511,16 @@ export const SupplierDetailPage: FC<Props> = ({
         </div>
 
         {/* Tab Contents */}
-        <div className="supplier-detail-tab-content">
+        <div
+          className="supplier-detail-tab-content"
+          style={{
+            flex: "1 1 auto",
+            minHeight: 0,
+            display: "flex",
+            flexDirection: "column",
+            overflow: activeTab === 'products' ? 'hidden' : 'auto',
+          }}
+        >
           {activeTab === 'profile' && (
             <SupplierGeneralProfileTab
               supplier={currentSupplier}
