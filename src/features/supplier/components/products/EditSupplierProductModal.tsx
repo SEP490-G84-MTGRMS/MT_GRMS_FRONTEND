@@ -1,21 +1,39 @@
 import { useState } from 'react';
 import type { CSSProperties, FC, FormEvent, ReactNode } from 'react';
 import type { SupplierProductItem, EditSupplierProductInput } from '../../types/supplier.types';
-import { X, Save, Loader2, AlertCircle } from 'lucide-react';
+import { X, Save, Loader2, AlertCircle, Store } from 'lucide-react';
 import '../../supplier.css';
 
-interface EditSupplierProductModalProps {
+export interface BranchContextInfo {
+  branchId: string;
+  branchName: string;
+  branchInfo?: any;
+}
+
+export interface EditSupplierProductModalProps {
   isOpen: boolean;
   onClose: () => void;
   item: SupplierProductItem | null;
   supplierName: string;
+  branchContext?: BranchContextInfo | null;
   onSave: (input: EditSupplierProductInput) => void | Promise<void>;
+  onSaveBranchProduct?: (
+    branchId: string,
+    productId: string,
+    input: { retailPrice: number; status: 'Active' | 'Inactive' }
+  ) => void | Promise<void>;
 }
 
 interface EditSupplierProductFormProps {
   item: SupplierProductItem;
   supplierName: string;
+  branchContext?: BranchContextInfo | null;
   onSave: (input: EditSupplierProductInput) => void | Promise<void>;
+  onSaveBranchProduct?: (
+    branchId: string,
+    productId: string,
+    input: { retailPrice: number; status: 'Active' | 'Inactive' }
+  ) => void | Promise<void>;
   onClose: () => void;
 }
 
@@ -108,23 +126,65 @@ const StatusToggle: FC<{
 const EditSupplierProductForm: FC<EditSupplierProductFormProps> = ({
   item,
   supplierName,
+  branchContext,
   onSave,
+  onSaveBranchProduct,
   onClose,
 }) => {
+  const isBranchMode = !!branchContext && branchContext.branchId !== 'ALL';
+  const branchInfo = branchContext?.branchInfo;
+
   const masterCost = item.costPrice ?? 0;
-  const initialPrice = item.agreedPrice > 0 ? item.agreedPrice : masterCost;
-  const [purchasePrice, setPurchasePrice] = useState<number>(initialPrice);
+  const initialWholesalePrice = item.agreedPrice > 0 ? item.agreedPrice : masterCost;
+  const [purchasePrice, setPurchasePrice] = useState<number>(initialWholesalePrice);
   const [moq, setMoq] = useState<number>(item.moq);
   const [allowedShortageQty, setAllowedShortageQty] = useState<number>(item.allowedShortageQty ?? 0);
-  const [isActive, setIsActive] = useState<boolean>(item.status === 'Active');
+
+  // Branch-specific retail price & status
+  const initialBranchPrice =
+    branchInfo?.retailPrice ?? (item.costPrice ?? initialWholesalePrice);
+  const [branchRetailPrice, setBranchRetailPrice] = useState<number>(initialBranchPrice);
+
+  const initialIsActive = isBranchMode
+    ? (branchInfo?.status ? branchInfo.status === 'Active' : item.status === 'Active')
+    : item.status === 'Active';
+  const [isActive, setIsActive] = useState<boolean>(initialIsActive);
+
   const [errorMsg, setErrorMsg] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const unitLabel = item.baseUoM || item.deliveryUoM || 'Cái';
+
+  const fmtCurrency = (n: number) =>
+    new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(n);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
 
+    if (isBranchMode) {
+      if (isNaN(branchRetailPrice) || branchRetailPrice < 0) {
+        setErrorMsg('Giá bán tại chi nhánh không được âm.');
+        return;
+      }
+
+      setIsSaving(true);
+      try {
+        if (onSaveBranchProduct && branchContext) {
+          await onSaveBranchProduct(branchContext.branchId, item.productId, {
+            retailPrice: branchRetailPrice,
+            status: isActive ? 'Active' : 'Inactive',
+          });
+        }
+        onClose();
+      } catch {
+        // Parent shows toast; keep modal open
+      } finally {
+        setIsSaving(false);
+      }
+      return;
+    }
+
+    // Whole-system mode
     if (isNaN(purchasePrice) || purchasePrice < 0) {
       setErrorMsg('Giá nhập không được âm.');
       return;
@@ -179,19 +239,47 @@ const EditSupplierProductForm: FC<EditSupplierProductFormProps> = ({
               width: 36,
               height: 36,
               borderRadius: 8,
-              backgroundColor: '#f0fdfa',
-              color: '#0f766e',
-              border: '1px solid #ccfbf1',
+              backgroundColor: isBranchMode ? '#ecfdf5' : '#f0fdfa',
+              color: isBranchMode ? '#059669' : '#0f766e',
+              border: `1px solid ${isBranchMode ? '#a7f3d0' : '#ccfbf1'}`,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
             }}
           >
-            <Save size={18} />
+            {isBranchMode ? <Store size={18} /> : <Save size={18} />}
           </div>
-          <h2 className="modal-title" style={{ fontSize: '1rem', fontWeight: 700, margin: 0, color: '#0f172a' }}>
-            Chỉnh sửa điều khoản cung ứng
-          </h2>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <h2 className="modal-title" style={{ fontSize: '1rem', fontWeight: 700, margin: 0, color: '#0f172a' }}>
+                {isBranchMode ? 'Chỉnh sửa sản phẩm tại chi nhánh' : 'Chỉnh sửa điều khoản cung ứng'}
+              </h2>
+              {isBranchMode && (
+                <span
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 4,
+                    padding: '2px 8px',
+                    borderRadius: 999,
+                    backgroundColor: '#ecfdf5',
+                    color: '#065f46',
+                    fontSize: 11.5,
+                    fontWeight: 600,
+                    border: '1px solid #a7f3d0',
+                  }}
+                >
+                  <Store size={11} color="#059669" />
+                  <span>{branchContext?.branchName}</span>
+                </span>
+              )}
+            </div>
+            <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: 2 }}>
+              {isBranchMode
+                ? `Chỉ cập nhật giá bán & trạng thái tại "${branchContext?.branchName}", không ảnh hưởng các chi nhánh khác.`
+                : 'Cập nhật giá sỉ và trạng thái cung ứng của NCC cho toàn bộ chuỗi.'}
+            </div>
+          </div>
         </div>
         <button
           type="button"
@@ -278,52 +366,104 @@ const EditSupplierProductForm: FC<EditSupplierProductFormProps> = ({
             <input type="text" value={unitLabel} readOnly className="form-input" style={readonlyInputStyle} />
           </FieldRow>
 
-          <FieldRow label="Trạng thái">
+          <FieldRow label={isBranchMode ? 'Trạng thái tại CN' : 'Trạng thái'}>
             <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 12, height: 38 }}>
               <StatusToggle checked={isActive} onChange={setIsActive} />
               <span style={{ fontSize: 13.5, color: isActive ? '#15803d' : '#64748b', fontWeight: 600 }}>
-                {isActive ? 'Enable' : 'Disable'}
+                {isActive ? 'Enable (Đang kinh doanh)' : 'Disable (Tạm ngưng)'}
               </span>
+              {isBranchMode && (
+                <span style={{ fontSize: 11.5, color: '#64748b', fontStyle: 'italic' }}>
+                  (Chỉ áp dụng tại {branchContext?.branchName})
+                </span>
+              )}
             </div>
           </FieldRow>
 
-          <FieldRow label="Giá nhập" htmlFor="inputSupplierPurchasePrice">
-            <input
-              id="inputSupplierPurchasePrice"
-              type="number"
-              min={0}
-              step={1000}
-              value={Number.isFinite(purchasePrice) ? purchasePrice : 0}
-              onChange={(e) => setPurchasePrice(parseFloat(e.target.value) || 0)}
-              className="form-input"
-              style={editableInputStyle}
-            />
-          </FieldRow>
+          {isBranchMode ? (
+            <>
+              {/* Giá bán lẻ tại chi nhánh */}
+              <FieldRow label="Giá bán (CN)" htmlFor="inputBranchRetailPrice">
+                <input
+                  id="inputBranchRetailPrice"
+                  type="number"
+                  min={0}
+                  step={1000}
+                  value={Number.isFinite(branchRetailPrice) ? branchRetailPrice : 0}
+                  onChange={(e) => setBranchRetailPrice(parseFloat(e.target.value) || 0)}
+                  className="form-input"
+                  style={editableInputStyle}
+                />
+              </FieldRow>
 
-          <FieldRow label="MOQ" htmlFor="inputSupplierMoq">
-            <input
-              id="inputSupplierMoq"
-              type="number"
-              min={1}
-              value={moq || ''}
-              onChange={(e) => setMoq(parseInt(e.target.value, 10) || 1)}
-              className="form-input"
-              style={editableInputStyle}
-            />
-          </FieldRow>
+              {/* Giá nhập sỉ NCC (Readonly) */}
+              <FieldRow label="Giá sỉ từ NCC">
+                <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <input
+                    type="text"
+                    value={fmtCurrency(item.effectivePrice ?? item.agreedPrice ?? purchasePrice)}
+                    readOnly
+                    className="form-input"
+                    style={{ ...readonlyInputStyle, color: '#0f766e', fontWeight: 700 }}
+                  />
+                  <span style={{ fontSize: 11.5, color: '#64748b', whiteSpace: 'nowrap' }}>
+                    (Hợp đồng NCC chuỗi)
+                  </span>
+                </div>
+              </FieldRow>
 
-          <FieldRow label="Thiếu cho phép" htmlFor="inputAllowedShortageQty">
-            <input
-              id="inputAllowedShortageQty"
-              type="number"
-              min={0}
-              value={Number.isFinite(allowedShortageQty) ? allowedShortageQty : 0}
-              onChange={(e) => setAllowedShortageQty(Math.max(0, parseInt(e.target.value, 10) || 0))}
-              className="form-input"
-              style={editableInputStyle}
-              title="Số lượng thiếu hàng cho phép"
-            />
-          </FieldRow>
+              {/* Quy cách NCC (Readonly) */}
+              <FieldRow label="Quy cách NCC">
+                <input
+                  type="text"
+                  value={`MOQ: ${moq} ${unitLabel} • Cho thiếu: ${allowedShortageQty} ${unitLabel}`}
+                  readOnly
+                  className="form-input"
+                  style={readonlyInputStyle}
+                />
+              </FieldRow>
+            </>
+          ) : (
+            <>
+              <FieldRow label="Giá nhập" htmlFor="inputSupplierPurchasePrice">
+                <input
+                  id="inputSupplierPurchasePrice"
+                  type="number"
+                  min={0}
+                  step={1000}
+                  value={Number.isFinite(purchasePrice) ? purchasePrice : 0}
+                  onChange={(e) => setPurchasePrice(parseFloat(e.target.value) || 0)}
+                  className="form-input"
+                  style={editableInputStyle}
+                />
+              </FieldRow>
+
+              <FieldRow label="MOQ" htmlFor="inputSupplierMoq">
+                <input
+                  id="inputSupplierMoq"
+                  type="number"
+                  min={1}
+                  value={moq || ''}
+                  onChange={(e) => setMoq(parseInt(e.target.value, 10) || 1)}
+                  className="form-input"
+                  style={editableInputStyle}
+                />
+              </FieldRow>
+
+              <FieldRow label="Thiếu cho phép" htmlFor="inputAllowedShortageQty">
+                <input
+                  id="inputAllowedShortageQty"
+                  type="number"
+                  min={0}
+                  value={Number.isFinite(allowedShortageQty) ? allowedShortageQty : 0}
+                  onChange={(e) => setAllowedShortageQty(Math.max(0, parseInt(e.target.value, 10) || 0))}
+                  className="form-input"
+                  style={editableInputStyle}
+                  title="Số lượng thiếu hàng cho phép"
+                />
+              </FieldRow>
+            </>
+          )}
         </div>
 
         <div
@@ -383,7 +523,9 @@ export const EditSupplierProductModal: FC<EditSupplierProductModalProps> = ({
   onClose,
   item,
   supplierName,
+  branchContext,
   onSave,
+  onSaveBranchProduct,
 }) => {
   if (!isOpen || !item) return null;
 
@@ -404,10 +546,12 @@ export const EditSupplierProductModal: FC<EditSupplierProductModalProps> = ({
         onClick={(e) => e.stopPropagation()}
       >
         <EditSupplierProductForm
-          key={item.id}
+          key={`${item.id}-${branchContext?.branchId || 'ALL'}`}
           item={item}
           supplierName={supplierName}
+          branchContext={branchContext}
           onSave={onSave}
+          onSaveBranchProduct={onSaveBranchProduct}
           onClose={onClose}
         />
       </div>

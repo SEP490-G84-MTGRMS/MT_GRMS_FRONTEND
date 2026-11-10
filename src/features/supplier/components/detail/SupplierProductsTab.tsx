@@ -368,12 +368,36 @@ export const SupplierProductsTab: FC<Props> = ({
           input.status
         );
       }
-      notify('Đã cập nhật điều khoản cung ứng sản phẩm thành công!', 'success');
+      notify('Đã cập nhật điều khoản cung ứng toàn hệ thống thành công!', 'success');
       setEditingItem(null);
       await fetchSupplierProducts();
       await fetchBranchProducts();
     } catch (err: any) {
       notify(err.message || 'Không thể cập nhật sản phẩm.', 'error');
+      throw err;
+    }
+  };
+
+  const handleSaveBranchProduct = async (
+    branchId: string,
+    productId: string,
+    input: { retailPrice: number; status: 'Active' | 'Inactive' }
+  ) => {
+    try {
+      await storeProductApi.updateProduct(branchId, productId, {
+        retailPrice: input.retailPrice,
+        status: input.status,
+      });
+      await storeProductApi.toggleStatus(branchId, productId, input.status);
+
+      notify(
+        `Đã cập nhật trạng thái & giá bán tại chi nhánh "${activeBranch.name}" thành công!`,
+        'success'
+      );
+      setEditingItem(null);
+      await fetchBranchProducts();
+    } catch (err: any) {
+      notify(err.message || 'Không thể cập nhật sản phẩm tại chi nhánh.', 'error');
       throw err;
     }
   };
@@ -647,8 +671,8 @@ export const SupplierProductsTab: FC<Props> = ({
                 <th style={{ width: 80, textAlign: 'center', padding: '10px 12px', fontSize: 11.5 }}>
                   ĐVT
                 </th>
-                <th style={{ width: 130, textAlign: 'right', padding: '10px 12px', fontSize: 11.5 }}>
-                  GIÁ NHẬP SỈ
+                <th style={{ width: 140, textAlign: 'right', padding: '10px 12px', fontSize: 11.5 }}>
+                  {isBranchFiltered ? 'GIÁ BÁN (CN) / SỈ' : 'GIÁ NHẬP SỈ'}
                 </th>
                 <th style={{ width: 100, textAlign: 'right', padding: '10px 12px', fontSize: 11.5 }}>
                   MOQ
@@ -791,18 +815,37 @@ export const SupplierProductsTab: FC<Props> = ({
                         </span>
                       </td>
 
-                      {/* 7. Giá nhập sỉ */}
+                      {/* 7. Giá */}
                       <td style={{ padding: '10px 12px', textAlign: 'right', whiteSpace: 'nowrap' }}>
-                        <span
-                          style={{
-                            fontFamily: 'var(--font-mono, monospace)',
-                            fontSize: 12.5,
-                            fontWeight: 700,
-                            color: '#0f766e',
-                          }}
-                        >
-                          {fmtCurrency(price)}
-                        </span>
+                        {isBranchFiltered && branchInfo?.retailPrice !== undefined ? (
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
+                            <span
+                              style={{
+                                fontFamily: 'var(--font-mono, monospace)',
+                                fontSize: 12.5,
+                                fontWeight: 700,
+                                color: '#0f766e',
+                              }}
+                              title={`Giá bán lẻ niêm yết tại ${activeBranch.name}`}
+                            >
+                              {fmtCurrency(branchInfo.retailPrice)}
+                            </span>
+                            <span style={{ fontSize: 10.5, color: '#64748b' }} title="Giá nhập sỉ từ NCC (toàn chuỗi)">
+                              Sỉ: {fmtCurrency(price)}
+                            </span>
+                          </div>
+                        ) : (
+                          <span
+                            style={{
+                              fontFamily: 'var(--font-mono, monospace)',
+                              fontSize: 12.5,
+                              fontWeight: 700,
+                              color: '#0f766e',
+                            }}
+                          >
+                            {fmtCurrency(price)}
+                          </span>
+                        )}
                       </td>
 
                       {/* 8. MOQ */}
@@ -833,8 +876,10 @@ export const SupplierProductsTab: FC<Props> = ({
 
                       {/* 10. Trạng thái & Tồn kho chi nhánh */}
                       <td style={{ padding: '10px 12px', textAlign: 'center' }}>
-                        <SupplierStatusBadge status={item.status || 'Active'} />
-                        {isBranchFiltered && branchInfo && (
+                        <SupplierStatusBadge
+                          status={isBranchFiltered ? (branchInfo?.status || 'Active') : (item.status || 'Active')}
+                        />
+                        {isBranchFiltered && (
                           <div
                             style={{
                               marginTop: 4,
@@ -851,7 +896,7 @@ export const SupplierProductsTab: FC<Props> = ({
                             title={`Tồn kho thực tế tại ${activeBranch.name}`}
                           >
                             <CheckCircle2 size={11} color="#0284c7" />
-                            <span>Kho: {branchInfo.currentStock ?? 0} {uom}</span>
+                            <span>Kho: {branchInfo?.currentStock ?? 0} {uom}</span>
                           </div>
                         )}
                       </td>
@@ -1043,7 +1088,17 @@ export const SupplierProductsTab: FC<Props> = ({
           onClose={() => setEditingItem(null)}
           item={editingItem}
           supplierName={supplier?.name || editingItem?.supplierName || ''}
+          branchContext={
+            isBranchFiltered
+              ? {
+                  branchId: activeBranch.id,
+                  branchName: activeBranch.name || 'Chi nhánh',
+                  branchInfo: editingItem ? branchProductMap.get(editingItem.productId) : undefined,
+                }
+              : null
+          }
           onSave={handleSaveEdit}
+          onSaveBranchProduct={handleSaveBranchProduct}
         />
       )}
     </div>
