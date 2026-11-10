@@ -315,8 +315,9 @@ function buildEmptyCellMap(
 ): MatrixCellMap {
   const map: MatrixCellMap = { ...(existing || {}) };
   prodList.forEach((p) => {
-    if (!map[p.id]) {
-      map[p.id] = {};
+    const key = `${p.id}__${p.supplierId || 'none'}`;
+    if (!map[key]) {
+      map[key] = {};
     }
   });
   return map;
@@ -575,14 +576,17 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
     return { openDays, finalizedDays, lockedDays };
   }, [dayColumns]);
 
-  // Handle cell quantity change by Store Owner or Employee
-  const handleCellChange = (productId: string, dateKey: string, val: number) => {
+  const findProductByRowKey = (rowKey: string) =>
+    matrixProducts.find((p) => `${p.id}__${p.supplierId || 'none'}` === rowKey);
+
+  // Handle cell quantity change by Store Owner or Employee (rowKey = productId__supplierId)
+  const handleCellChange = (rowKey: string, dateKey: string, val: number) => {
     if (!branchIsActive) {
       showToast('Chi nhánh đang ngừng hoạt động — không thể nhập số lượng.', 'warning');
       return;
     }
     if (val < 0) return;
-    const product = matrixProducts.find((p) => p.id === productId);
+    const product = findProductByRowKey(rowKey);
     const day = dayColumns.find((d) => d.dateKey === dateKey);
     if (product?.isRowDisabled || (day && !isCellEditable(day, product))) {
       showToast('Ô này không còn chỉnh sửa được.', 'warning');
@@ -590,7 +594,7 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
     }
 
     if (!isStoreOwner) {
-      const existing = cellMap[productId]?.[dateKey];
+      const existing = cellMap[rowKey]?.[dateKey];
       const ownerLocked = Boolean(
         existing &&
           (existing.isOwnerAdjusted ||
@@ -607,7 +611,7 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
     }
 
     setCellMap((prev) => {
-      const prodMap = { ...(prev[productId] || {}) };
+      const prodMap = { ...(prev[rowKey] || {}) };
       const currentCell = prodMap[dateKey] || {
         employeeQty: 0,
         storeQty: null,
@@ -644,15 +648,15 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
       }
 
       prodMap[dateKey] = updatedCell;
-      return { ...prev, [productId]: prodMap };
+      return { ...prev, [rowKey]: prodMap };
     });
     setIsDirty(true);
   };
 
   // Handle revert Store Owner override back to Employee proposed qty
-  const handleResetOverride = (productId: string, dateKey: string) => {
+  const handleResetOverride = (rowKey: string, dateKey: string) => {
     setCellMap((prev) => {
-      const prodMap = { ...(prev[productId] || {}) };
+      const prodMap = { ...(prev[rowKey] || {}) };
       const currentCell = prodMap[dateKey];
       if (!currentCell) return prev;
 
@@ -670,7 +674,7 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
       };
 
       prodMap[dateKey] = updatedCell;
-      return { ...prev, [productId]: prodMap };
+      return { ...prev, [rowKey]: prodMap };
     });
     setIsDirty(true);
     showToast('Đã khôi phục số lượng theo đề xuất ban đầu của Nhân viên!', 'info');
@@ -699,20 +703,20 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
       }
       if (moqOnly) {
         const hasMoqFail = dayColumns.some((d) => {
-          const q = cellMap[p.id]?.[d.dateKey]?.finalQty || 0;
+          const q = cellMap[`${p.id}__${p.supplierId || 'none'}`]?.[d.dateKey]?.finalQty || 0;
           return q > 0 && q < p.moq;
         });
         if (!hasMoqFail) return false;
       }
       if (orderedOnly) {
         const hasQty = dayColumns.some(
-          (d) => (cellMap[p.id]?.[d.dateKey]?.finalQty || 0) > 0
+          (d) => (cellMap[`${p.id}__${p.supplierId || 'none'}`]?.[d.dateKey]?.finalQty || 0) > 0
         );
         if (!hasQty) return false;
       }
       if (ownerModifiedOnly) {
         const hasOwnerMod = dayColumns.some((d) => {
-          const cell = cellMap[p.id]?.[d.dateKey];
+          const cell = cellMap[`${p.id}__${p.supplierId || 'none'}`]?.[d.dateKey];
           return cell && cell.storeQty !== null && cell.storeQty !== cell.employeeQty;
         });
         if (!hasOwnerMod) return false;
@@ -740,7 +744,7 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
 
     activeProducts.forEach((p) => {
       dayColumns.forEach((d) => {
-        const q = cellMap[p.id]?.[d.dateKey]?.finalQty || 0;
+        const q = cellMap[`${p.id}__${p.supplierId || 'none'}`]?.[d.dateKey]?.finalQty || 0;
         if (q > 0 && q < p.moq) {
           fails.push(`${p.name} (${d.dateShort}): SL ${q} < MOQ ${p.moq}`);
         }
@@ -803,10 +807,11 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
 
     filteredProducts.forEach((p) => {
       if (p.isRowDisabled) return;
-      if (!newMap[p.id]) newMap[p.id] = {};
+      const rk = `${p.id}__${p.supplierId || 'none'}`;
+      if (!newMap[rk]) newMap[rk] = {};
       dayColumns.forEach((d) => {
         if (!isCellEditable(d, p)) return;
-        const currentCell = newMap[p.id][d.dateKey] || {
+        const currentCell = newMap[rk][d.dateKey] || {
           employeeQty: 0,
           storeQty: null,
           finalQty: 0,
@@ -827,7 +832,7 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
         let finalSuggested = Math.max(p.moq || 0, Math.ceil(rawSuggested / multiple) * multiple);
 
         if (isStoreOwner) {
-          newMap[p.id][d.dateKey] = {
+          newMap[rk][d.dateKey] = {
             ...currentCell,
             storeQty: finalSuggested,
             isOwnerAdjusted: true,
@@ -838,7 +843,7 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
             modifiedAt: new Date().toISOString(),
           };
         } else {
-          newMap[p.id][d.dateKey] = {
+          newMap[rk][d.dateKey] = {
             ...currentCell,
             employeeQty: finalSuggested,
             storeQty: null,
@@ -877,17 +882,18 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
 
     relevantProducts.forEach((p) => {
       if (p.isRowDisabled) return;
-      if (!newMap[p.id]) newMap[p.id] = {};
+      const rk = `${p.id}__${p.supplierId || 'none'}`;
+      if (!newMap[rk]) newMap[rk] = {};
       dayColumns.forEach((d) => {
         if (!isCellEditable(d, p)) {
           skipped++;
           return;
         }
         const prevKey = fmtDateStr(addDaysToDate(d.date, -7));
-        const prevCell = cellMap[p.id]?.[prevKey];
+        const prevCell = cellMap[rk]?.[prevKey];
         if (!prevCell || prevCell.finalQty <= 0) return;
 
-        const currentCell = newMap[p.id][d.dateKey] || {
+        const currentCell = newMap[rk][d.dateKey] || {
           employeeQty: 0,
           storeQty: null,
           finalQty: 0,
@@ -896,7 +902,7 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
 
         if (isStoreOwner) {
           const qty = prevCell.storeQty ?? prevCell.finalQty;
-          newMap[p.id][d.dateKey] = {
+          newMap[rk][d.dateKey] = {
             ...currentCell,
             storeQty: qty,
             isOwnerAdjusted: true,
@@ -910,7 +916,7 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
             skipped++;
             return;
           }
-          newMap[p.id][d.dateKey] = {
+          newMap[rk][d.dateKey] = {
             ...currentCell,
             employeeQty: prevCell.employeeQty || prevCell.finalQty,
             storeQty: null,
@@ -1081,7 +1087,7 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
 
         supProducts.forEach((p) => {
           if (p.isRowDisabled) return;
-          const cell = cellMap[p.id]?.[d.dateKey];
+          const cell = cellMap[`${p.id}__${p.supplierId || 'none'}`]?.[d.dateKey];
           const finalQty = cell?.finalQty || 0;
           if (finalQty > 0) {
             const lineTotal = finalQty * p.price;
@@ -1326,6 +1332,7 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
           cellMap={cellMap}
           supplierConfigs={supplierConfigs}
           showSoh={showSoh}
+          flatByPrice={false}
           onCellChange={handleCellChange}
           onResetOverride={handleResetOverride}
           onDayCutoffClick={() => setIsSplitModalOpen(true)}

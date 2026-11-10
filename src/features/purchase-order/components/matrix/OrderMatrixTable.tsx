@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import type { FC, KeyboardEvent, ChangeEvent } from 'react';
 import type {
   OrderMatrixProduct,
@@ -8,7 +8,8 @@ import type {
   MatrixCellData,
   OrderMatrixSupplierDeliveryConfig,
 } from '../../types/po.types';
-import { RotateCcw } from 'lucide-react';
+import { ArrowUpDown, RotateCcw } from 'lucide-react';
+import { productRowKey } from '../../lib/matrixRowKey';
 
 interface OrderMatrixTableProps {
   products: OrderMatrixProduct[];
@@ -17,6 +18,8 @@ interface OrderMatrixTableProps {
   cellMap?: MatrixCellMap;
   supplierConfigs?: OrderMatrixSupplierDeliveryConfig[];
   showSoh: boolean;
+  /** ALL / nhiều NCC: flat + cột NCC/giá, sort giá. */
+  flatByPrice?: boolean;
   onQtyChange?: (productId: string, dateKey: string, val: number) => void;
   onCellChange?: (productId: string, dateKey: string, val: number) => void;
   onResetOverride?: (productId: string, dateKey: string) => void;
@@ -34,6 +37,7 @@ export const OrderMatrixTable: FC<OrderMatrixTableProps> = ({
   cellMap,
   supplierConfigs,
   showSoh,
+  flatByPrice = false,
   onQtyChange,
   onCellChange,
   onResetOverride,
@@ -43,6 +47,7 @@ export const OrderMatrixTable: FC<OrderMatrixTableProps> = ({
   isStoreOwner = true,
 }) => {
   const fmt = (n: number) => new Intl.NumberFormat('vi-VN').format(n);
+  const [priceSortDir, setPriceSortDir] = useState<'asc' | 'desc'>('asc');
 
   // Lead time ≥ 1 ngày: không cho nhập số lượng giao hôm nay / quá khứ
   const earliestDeliveryDateKey = (() => {
@@ -55,12 +60,17 @@ export const OrderMatrixTable: FC<OrderMatrixTableProps> = ({
     return `${y}-${m}-${day}`;
   })();
 
-  // Helper to extract cell data consistently
-  const getCell = (productId: string, dateKey: string): MatrixCellData => {
-    if (cellMap && cellMap[productId]?.[dateKey]) {
-      return cellMap[productId][dateKey];
+  // Helper to extract cell data consistently (key = productId__supplierId)
+  const getCell = (p: OrderMatrixProduct, dateKey: string): MatrixCellData => {
+    const key = productRowKey(p);
+    if (cellMap && cellMap[key]?.[dateKey]) {
+      return cellMap[key][dateKey];
     }
-    const val = qtyMap?.[productId]?.[dateKey] || 0;
+    // Backward-compat: bản nháp cũ chỉ key theo productId
+    if (cellMap && cellMap[p.id]?.[dateKey]) {
+      return cellMap[p.id][dateKey];
+    }
+    const val = qtyMap?.[key]?.[dateKey] || qtyMap?.[p.id]?.[dateKey] || 0;
     return {
       employeeQty: val,
       storeQty: null,
@@ -68,51 +78,75 @@ export const OrderMatrixTable: FC<OrderMatrixTableProps> = ({
     };
   };
 
-  // Group products by Supplier
+  const sortedProducts = useMemo(() => {
+    const list = [...products];
+    if (!flatByPrice) return list;
+    list.sort((a, b) => {
+      const pa = a.price > 0 ? a.price : Number.MAX_SAFE_INTEGER;
+      const pb = b.price > 0 ? b.price : Number.MAX_SAFE_INTEGER;
+      if (pa !== pb) return priceSortDir === 'asc' ? pa - pb : pb - pa;
+      return (a.name || '').localeCompare(b.name || '', 'vi');
+    });
+    return list;
+  }, [products, flatByPrice, priceSortDir]);
+
+  // Group products by Supplier (khi không flat theo giá)
   const supplierOrder = ['TươiSạch', 'SnackVN', 'Vissan', 'CPFoods'];
   const groupedProducts: { supplierId: string; supplierName: string; items: OrderMatrixProduct[] }[] = [];
 
-  const supplierMap = new Map<string, { supplierId: string; supplierName: string; items: OrderMatrixProduct[] }>();
-  products.forEach((p) => {
-    const sId = p.supplierId;
-    const sName = p.supplierName || sId;
-    if (!supplierMap.has(sId)) {
-      supplierMap.set(sId, { supplierId: sId, supplierName: sName, items: [] });
-    }
-    supplierMap.get(sId)!.items.push(p);
-  });
+  if (!flatByPrice) {
+    const supplierMap = new Map<string, { supplierId: string; supplierName: string; items: OrderMatrixProduct[] }>();
+    products.forEach((p) => {
+      const sId = p.supplierId;
+      const sName = p.supplierName || sId;
+      if (!supplierMap.has(sId)) {
+        supplierMap.set(sId, { supplierId: sId, supplierName: sName, items: [] });
+      }
+      supplierMap.get(sId)!.items.push(p);
+    });
 
-  supplierOrder.forEach((sId) => {
-    const group = supplierMap.get(sId);
-    if (group && group.items.length > 0) {
-      groupedProducts.push(group);
-    }
-  });
+    const sortItemsByPrice = (items: OrderMatrixProduct[]) =>
+      [...items].sort((a, b) => {
+        const pa = a.price > 0 ? a.price : Number.MAX_SAFE_INTEGER;
+        const pb = b.price > 0 ? b.price : Number.MAX_SAFE_INTEGER;
+        if (pa !== pb) return pa - pb;
+        return (a.name || '').localeCompare(b.name || '', 'vi');
+      });
 
-  // Catch any remaining suppliers
-  supplierMap.forEach((group, sId) => {
-    if (!supplierOrder.includes(sId) && group.items.length > 0) {
-      groupedProducts.push(group);
-    }
-  });
+    supplierOrder.forEach((sId) => {
+      const group = supplierMap.get(sId);
+      if (group && group.items.length > 0) {
+        groupedProducts.push({ ...group, items: sortItemsByPrice(group.items) });
+      }
+    });
+
+    supplierMap.forEach((group, sId) => {
+      if (!supplierOrder.includes(sId) && group.items.length > 0) {
+        groupedProducts.push({ ...group, items: sortItemsByPrice(group.items) });
+      }
+    });
+  }
+
+  const displayProducts = flatByPrice ? sortedProducts : products;
 
   // Calculate daily totals across all products based on finalQty
   const dailyTotalQty = days.map((d) => {
-    return products.reduce((acc, p) => {
-      const cell = getCell(p.id, d.dateKey);
+    return displayProducts.reduce((acc, p) => {
+      const cell = getCell(p, d.dateKey);
       return acc + (cell.finalQty || 0);
     }, 0);
   });
 
   const grandTotalQty = dailyTotalQty.reduce((a, b) => a + b, 0);
 
-  const grandTotalAmt = products.reduce((acc, p) => {
-    const rowQty = days.reduce((sum, d) => sum + (getCell(p.id, d.dateKey).finalQty || 0), 0);
+  const grandTotalAmt = displayProducts.reduce((acc, p) => {
+    const rowQty = days.reduce((sum, d) => sum + (getCell(p, d.dateKey).finalQty || 0), 0);
     return acc + rowQty * p.price;
   }, 0);
 
-  // Number of fixed metadata columns
-  const fixedColCount = 3 + (showSoh ? 2 : 0);
+  // Number of fixed metadata columns: Tên SP + (NCC nếu flat) + ĐVT + MOQ + Giá nhập + (SOH)
+  const metaExtra = flatByPrice ? 1 : 0; // cột NCC khi flat
+  const fixedColCount = 4 + metaExtra + (showSoh ? 2 : 0);
   const totalColSpan = fixedColCount + days.length + 2;
 
   // Handle cell navigation with keyboard
@@ -179,9 +213,11 @@ export const OrderMatrixTable: FC<OrderMatrixTableProps> = ({
 
   const renderColGroup = () => (
     <colgroup>
-      <col style={{ width: 190 }} />
+      <col style={{ width: flatByPrice ? 170 : 190 }} />
+      {flatByPrice && <col style={{ width: 120 }} />}
       <col style={{ width: 68 }} />
       <col style={{ width: 45 }} />
+      <col style={{ width: 88 }} />
       {showSoh && (
         <>
           <col style={{ width: 66 }} />
@@ -205,8 +241,28 @@ export const OrderMatrixTable: FC<OrderMatrixTableProps> = ({
           <thead>
             <tr>
               <th className="po-th-left po-th-product">Tên Sản Phẩm</th>
+              {flatByPrice && <th className="po-th-left">Nhà Cung Cấp</th>}
               <th>ĐVT</th>
               <th>MOQ</th>
+              <th
+                style={{ cursor: flatByPrice ? 'pointer' : undefined, userSelect: 'none' }}
+                title="Giá nhập theo NCC"
+                onClick={
+                  flatByPrice
+                    ? () => setPriceSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+                    : undefined
+                }
+              >
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, justifyContent: 'center' }}>
+                  Giá nhập
+                  {flatByPrice ? (
+                    <>
+                      <ArrowUpDown size={12} style={{ color: '#0f766e' }} />
+                      <span style={{ fontSize: 10, color: '#64748b' }}>{priceSortDir === 'asc' ? '↑' : '↓'}</span>
+                    </>
+                  ) : null}
+                </span>
+              </th>
               {showSoh && (
                 <>
                   <th style={{ backgroundColor: '#fef9c3', color: '#854d0e' }}>Tồn (SOH)</th>
@@ -278,24 +334,160 @@ export const OrderMatrixTable: FC<OrderMatrixTableProps> = ({
         <table className="po-grid-table">
           {renderColGroup()}
           <tbody>
-          {groupedProducts.length === 0 ? (
+          {displayProducts.length === 0 ? (
             <tr>
               <td colSpan={totalColSpan} style={{ textAlign: 'center', padding: '40px 16px', color: 'var(--text-muted)' }}>
                 Không có sản phẩm nào phù hợp với điều kiện tìm kiếm và lọc.
               </td>
             </tr>
+          ) : flatByPrice ? (
+            <>
+              {sortedProducts.map((p) => {
+                let rowQty = 0;
+                const rowKey = productRowKey(p);
+                const isRowDisabled = p.isRowDisabled ?? (
+                  p.isProductActive === false ||
+                  p.isSupplierActive === false ||
+                  p.isSupplierProductActive === false ||
+                  p.isSupplierBranchActive === false ||
+                  p.isBranchProductActive === false
+                );
+
+                return (
+                  <tr key={rowKey} className={isRowDisabled ? 'po-row-disabled' : ''}>
+                    <td className="po-cell-product">
+                      <div
+                        style={{ whiteSpace: 'normal', wordBreak: 'break-word', overflowWrap: 'break-word', lineHeight: 1.35 }}
+                        title={
+                          isRowDisabled
+                            ? p.rowDisabledReason || 'Sản phẩm đang tạm ngưng / chưa mở bán'
+                            : p.sku
+                              ? `Mã SKU: ${p.sku}`
+                              : undefined
+                        }
+                      >
+                        <b style={{ color: '#0f172a' }}>{p.name}</b>
+                        {p.sku ? (
+                          <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>{p.sku}</div>
+                        ) : null}
+                      </div>
+                    </td>
+                    <td className="po-cell-product">
+                      <div style={{ fontSize: 12, fontWeight: 600, color: '#334155' }}>{p.supplierName || '—'}</div>
+                    </td>
+                    <td style={{ textAlign: 'center' }}>{p.unit}</td>
+                    <td style={{ textAlign: 'center', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{p.moq}</td>
+                    <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', fontWeight: 700, color: '#0f766e', whiteSpace: 'nowrap' }}>
+                      {fmt(p.price)} đ
+                    </td>
+
+                    {showSoh && (
+                      <>
+                        <td style={{ textAlign: 'center', fontFamily: 'var(--font-mono)', backgroundColor: '#fffbeb' }}>
+                          {p.soh}
+                        </td>
+                        <td style={{ textAlign: 'center', fontFamily: 'var(--font-mono)', backgroundColor: '#fffbeb' }}>
+                          {p.sales}
+                        </td>
+                      </>
+                    )}
+
+                    {days.map((d, colIdx) => {
+                      const cell = getCell(p, d.dateKey);
+                      const q = cell.finalQty || 0;
+                      rowQty += q;
+                      const isOwnerAdjusted = Boolean(
+                        cell.isOwnerAdjusted ||
+                        cell.isOwnerOverridden ||
+                        (cell.storeQty !== null && cell.storeQty !== undefined)
+                      );
+                      const supConfig = supplierConfigs?.find((sc) => sc.supplierId === p.supplierId);
+                      let isCellOff = false;
+                      let cellOffReason = '';
+                      if (d.dateKey < earliestDeliveryDateKey) {
+                        isCellOff = true;
+                        cellOffReason = 'Lead time tối thiểu 1 ngày — không đặt giao hôm nay / ngày quá khứ';
+                      } else if (supConfig) {
+                        if (!supConfig.isActive) {
+                          isCellOff = true;
+                          cellOffReason = supConfig.inactiveReason || 'Nhà cung cấp đang tạm dừng hoạt động';
+                        } else if (!supConfig.isAssignedToBranch) {
+                          isCellOff = true;
+                          cellOffReason = 'Nhà cung cấp chưa được phân bổ tới chi nhánh này';
+                        } else if (supConfig.activeDeliveryDays && !supConfig.activeDeliveryDays.includes(d.date.getDay())) {
+                          isCellOff = true;
+                          cellOffReason = 'Không phải ngày giao của NCC';
+                        } else if (supConfig.blackoutDates?.includes(d.dateKey)) {
+                          isCellOff = true;
+                          cellOffReason = 'Ngày nghỉ/blackout của NCC';
+                        }
+                      }
+                      const editable = !isRowDisabled && !isCellOff && (isCellEditable ? isCellEditable(d, p) : !d.isLocked && !d.isOff);
+                      const handler = onCellChange || onQtyChange;
+
+                      if (isCellOff || !editable || readOnly) {
+                        return (
+                          <td
+                            key={d.dateKey}
+                            style={{ textAlign: 'center', backgroundColor: isCellOff ? '#f1f5f9' : undefined }}
+                            title={cellOffReason || (isRowDisabled ? p.rowDisabledReason : undefined)}
+                          >
+                            {q > 0 ? q : '—'}
+                          </td>
+                        );
+                      }
+
+                      return (
+                        <td key={d.dateKey} style={{ textAlign: 'center', position: 'relative' }}>
+                          <input
+                            className={`po-qty-input ${isOwnerAdjusted ? 'po-qty-owner' : ''}`}
+                            type="text"
+                            inputMode="decimal"
+                            value={q > 0 ? String(q) : ''}
+                            data-row={rowKey}
+                            data-col={colIdx}
+                            onChange={(e) => {
+                              const rawVal = e.target.value.replace(/[^\d.]/g, '');
+                              let n = parseFloat(rawVal);
+                              if (isNaN(n) || n < 0) n = 0;
+                              handler?.(rowKey, d.dateKey, n);
+                            }}
+                            onKeyDown={handleKeyDown}
+                          />
+                          {isStoreOwner && isOwnerAdjusted && onResetOverride ? (
+                            <button
+                              type="button"
+                              className="po-reset-btn"
+                              title="Khôi phục số lượng NV"
+                              onClick={() => onResetOverride(rowKey, d.dateKey)}
+                            >
+                              <RotateCcw size={11} />
+                            </button>
+                          ) : null}
+                        </td>
+                      );
+                    })}
+
+                    <td style={{ textAlign: 'center', fontFamily: 'var(--font-mono)', fontWeight: 700 }}>{rowQty || '—'}</td>
+                    <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', fontWeight: 700 }}>
+                      {rowQty > 0 ? `${fmt(rowQty * p.price)} đ` : '—'}
+                    </td>
+                  </tr>
+                );
+              })}
+            </>
           ) : (
             groupedProducts.map((group) => {
               // Subtotals for this supplier group
               const subDayQty = days.map((d) => {
                 return group.items.reduce((sum, item) => {
-                  const cell = getCell(item.id, d.dateKey);
+                  const cell = getCell(item, d.dateKey);
                   return sum + (cell.finalQty || 0);
                 }, 0);
               });
               const subTotalQty = subDayQty.reduce((a, b) => a + b, 0);
               const subTotalAmt = group.items.reduce((sum, item) => {
-                const rowQty = days.reduce((rSum, d) => rSum + (getCell(item.id, d.dateKey).finalQty || 0), 0);
+                const rowQty = days.reduce((rSum, d) => rSum + (getCell(item, d.dateKey).finalQty || 0), 0);
                 return sum + rowQty * item.price;
               }, 0);
 
@@ -311,6 +503,7 @@ export const OrderMatrixTable: FC<OrderMatrixTableProps> = ({
                   {/* Product Rows */}
                   {group.items.map((p) => {
                     let rowQty = 0;
+                    const rowKey = productRowKey(p);
                     const isRowDisabled = p.isRowDisabled ?? (
                       p.isProductActive === false ||
                       p.isSupplierActive === false ||
@@ -320,7 +513,7 @@ export const OrderMatrixTable: FC<OrderMatrixTableProps> = ({
                     );
 
                     return (
-                      <tr key={p.id} className={isRowDisabled ? 'po-row-disabled' : ''}>
+                      <tr key={rowKey} className={isRowDisabled ? 'po-row-disabled' : ''}>
                         <td className="po-cell-product">
                           <div
                             style={{ whiteSpace: 'normal', wordBreak: 'break-word', overflowWrap: 'break-word', lineHeight: 1.35 }}
@@ -337,6 +530,18 @@ export const OrderMatrixTable: FC<OrderMatrixTableProps> = ({
                         </td>
                         <td style={{ textAlign: 'center' }}>{p.unit}</td>
                         <td style={{ textAlign: 'center', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{p.moq}</td>
+                        <td
+                          style={{
+                            textAlign: 'right',
+                            fontFamily: 'var(--font-mono)',
+                            fontWeight: 700,
+                            color: '#0f766e',
+                            whiteSpace: 'nowrap',
+                          }}
+                          title={`Giá nhập từ ${p.supplierName || 'NCC'}`}
+                        >
+                          {fmt(p.price)} đ
+                        </td>
 
                         {showSoh && (
                           <>
@@ -351,7 +556,7 @@ export const OrderMatrixTable: FC<OrderMatrixTableProps> = ({
 
                         {/* Quantity Cells */}
                         {days.map((d, colIdx) => {
-                          const cell = getCell(p.id, d.dateKey);
+                          const cell = getCell(p, d.dateKey);
                           const q = cell.finalQty || 0;
                           rowQty += q;
 
@@ -561,11 +766,11 @@ export const OrderMatrixTable: FC<OrderMatrixTableProps> = ({
                                     className={inputClassName}
                                     value={displayVal}
                                     placeholder={!isStoreOwner ? '' : (cell.employeeQty > 0 ? String(cell.employeeQty) : '')}
-                                    data-pid={p.id}
+                                    data-pid={rowKey}
                                     data-day={d.dateKey}
                                     data-col={colIdx}
                                     title={tooltip}
-                                    onChange={(e) => handleInputChange(p.id, d.dateKey, e)}
+                                    onChange={(e) => handleInputChange(rowKey, d.dateKey, e)}
                                     onKeyDown={handleKeyDown}
                                   />
 
@@ -575,7 +780,7 @@ export const OrderMatrixTable: FC<OrderMatrixTableProps> = ({
                                       type="button"
                                       className="po-cell-revert-btn"
                                       title={`Khôi phục số lượng đề xuất của Nhân viên (${cell.employeeQty})`}
-                                      onClick={() => onResetOverride(p.id, d.dateKey)}
+                                      onClick={() => onResetOverride(rowKey, d.dateKey)}
                                     >
                                       <RotateCcw size={9} />
                                     </button>

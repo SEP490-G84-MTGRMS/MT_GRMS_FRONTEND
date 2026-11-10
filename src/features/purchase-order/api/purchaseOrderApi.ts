@@ -48,6 +48,7 @@ export interface MatrixBackendResponse {
   }>;
   cells: Array<{
     productId: string;
+    supplierId?: string;
     deliveryDate: string;
     employeeQty: number;
     storeQty?: number | null;
@@ -233,10 +234,13 @@ export const purchaseOrderApi = {
 
         const cellMap: MatrixCellMap = {};
         d.cells.forEach((c) => {
-          if (!cellMap[c.productId]) cellMap[c.productId] = {};
+          const rowKey = c.supplierId
+            ? `${c.productId}__${c.supplierId}`
+            : c.productId;
+          if (!cellMap[rowKey]) cellMap[rowKey] = {};
           const dKey = toDateKey(c.deliveryDate);
           const isOwnerAdjusted = Boolean(c.isOwnerAdjusted || (c.storeQty !== null && c.storeQty !== undefined));
-          cellMap[c.productId][dKey] = {
+          cellMap[rowKey][dKey] = {
             employeeQty: c.employeeQty,
             storeQty: c.storeQty ?? null,
             finalQty: c.finalQty,
@@ -339,6 +343,7 @@ export const purchaseOrderApi = {
     try {
       const cells: Array<{
         productId: string;
+        supplierId?: string;
         deliveryDate: string;
         employeeQty: number;
         storeQty?: number | null;
@@ -346,7 +351,10 @@ export const purchaseOrderApi = {
         finalQty: number;
       }> = [];
 
-      Object.entries(cellMap).forEach(([productId, dayMap]) => {
+      Object.entries(cellMap).forEach(([rowKey, dayMap]) => {
+        const sep = rowKey.indexOf('__');
+        const productId = sep >= 0 ? rowKey.slice(0, sep) : rowKey;
+        const supplierId = sep >= 0 ? rowKey.slice(sep + 2) : undefined;
         Object.entries(dayMap).forEach(([dateKey, cell]) => {
           const isOwnerAdjusted = Boolean(
             cell.isOwnerAdjusted || cell.isOwnerOverridden || (cell.storeQty !== null && cell.storeQty !== undefined)
@@ -360,6 +368,7 @@ export const purchaseOrderApi = {
           ) {
             cells.push({
               productId,
+              supplierId: supplierId && supplierId !== 'none' ? supplierId : undefined,
               deliveryDate: dateKey,
               employeeQty: cell.employeeQty ?? 0,
               storeQty: cell.storeQty ?? null,
