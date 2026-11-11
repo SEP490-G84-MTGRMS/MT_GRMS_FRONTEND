@@ -23,7 +23,7 @@ import {
   type UpdateShiftConfigPayload,
 } from '../api/shiftConfigApi';
 import { ConfirmModal, NotificationModal, TablePagination } from '../../../components/common';
-import { AttendanceConfigModal } from '../components/AttendanceConfigModal';
+import { AttendanceConfigModal } from '../components/shift-config/AttendanceConfigModal';
 import { normalizeVietnameseComparison } from '../lib/vietnamTime';
 import '../employee.css';
 
@@ -50,6 +50,8 @@ const calculateHoursText = (start: string, end: string): { hours: number; text: 
   }
 };
 
+const ACTIVE_BRANCH_STORAGE_KEY = 'mtgrms_active_branch';
+
 export const ShiftConfigPage: React.FC = () => {
   // State danh sách
   const [shifts, setShifts] = useState<ShiftConfigDto[]>([]);
@@ -60,12 +62,47 @@ export const ShiftConfigPage: React.FC = () => {
   // Bộ lọc
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive'>('all');
-  const [selectedBranchIds, setSelectedBranchIds] = useState<string[]>([]);
+  const [activeBranch, setActiveBranch] = useState<{ id: string; name: string } | null>(() => {
+    try {
+      const stored = localStorage.getItem(ACTIVE_BRANCH_STORAGE_KEY);
+      if (stored) {
+        return JSON.parse(stored);
+      }
+    } catch {
+      // ignore
+    }
+    return null;
+  });
 
-  // Branch multi-select dropdown states trong filter bar
-  const [isFilterBranchDropdownOpen, setIsFilterBranchDropdownOpen] = useState(false);
-  const [filterBranchSearch, setFilterBranchSearch] = useState('');
-  const filterBranchDropdownRef = useRef<HTMLDivElement>(null);
+  // Lắng nghe thay đổi chi nhánh từ StoreOwnerLayout (BranchSelectorDropdown)
+  useEffect(() => {
+    const handleBranchChanged = (e: Event) => {
+      const customEvent = e as CustomEvent<any>;
+      if (customEvent.detail) {
+        setActiveBranch(customEvent.detail);
+        setCurrentPage(1);
+      }
+    };
+
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === ACTIVE_BRANCH_STORAGE_KEY && e.newValue) {
+        try {
+          const parsed = JSON.parse(e.newValue);
+          setActiveBranch(parsed);
+          setCurrentPage(1);
+        } catch {
+          // ignore
+        }
+      }
+    };
+
+    window.addEventListener('mtgrms:branch-changed', handleBranchChanged);
+    window.addEventListener('storage', handleStorageChange);
+    return () => {
+      window.removeEventListener('mtgrms:branch-changed', handleBranchChanged);
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, []);
 
   // Phân trang
   const [currentPage, setCurrentPage] = useState<number>(1);
@@ -120,15 +157,9 @@ export const ShiftConfigPage: React.FC = () => {
       });
   }, []);
 
-  // Đóng dropdown bộ lọc chi nhánh khi click ra ngoài
+  // Đóng dropdown chọn chi nhánh trong modal khi click ra ngoài
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (
-        filterBranchDropdownRef.current &&
-        !filterBranchDropdownRef.current.contains(event.target as Node)
-      ) {
-        setIsFilterBranchDropdownOpen(false);
-      }
       if (
         modalBranchDropdownRef.current &&
         !modalBranchDropdownRef.current.contains(event.target as Node)
@@ -159,11 +190,11 @@ export const ShiftConfigPage: React.FC = () => {
 
       const statusParam =
         filterStatus === 'active' ? true : filterStatus === 'inactive' ? false : undefined;
+      const branchIdParam = activeBranch && activeBranch.id !== 'ALL' ? activeBranch.id : undefined;
 
       const pagedResult = await shiftConfigApi.getShiftConfigsPaged({
         keyword: debouncedSearchTerm.trim() || undefined,
-        branchId: selectedBranchIds.length === 1 ? selectedBranchIds[0] : undefined,
-        branchIds: selectedBranchIds.length > 0 ? selectedBranchIds : undefined,
+        branchId: branchIdParam,
         isActive: statusParam,
         page: currentPage,
         pageSize,
@@ -179,7 +210,7 @@ export const ShiftConfigPage: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [debouncedSearchTerm, selectedBranchIds, filterStatus, currentPage, pageSize]);
+  }, [debouncedSearchTerm, activeBranch, filterStatus, currentPage, pageSize]);
 
   useEffect(() => {
     fetchShifts();
@@ -198,8 +229,8 @@ export const ShiftConfigPage: React.FC = () => {
     setFormCheckInEnd('00:00');
     setFormIsActive(true);
 
-    if (selectedBranchIds.length > 0) {
-      setFormBranchIds([...selectedBranchIds]);
+    if (activeBranch && activeBranch.id !== 'ALL') {
+      setFormBranchIds([activeBranch.id]);
     } else if (branches.length > 0) {
       setFormBranchIds([branches[0].id]);
     } else {
@@ -492,148 +523,30 @@ export const ShiftConfigPage: React.FC = () => {
             )}
           </div>
 
-          {/* 2. Lọc Chi nhánh làm việc */}
-          <div ref={filterBranchDropdownRef} style={{ position: 'relative', minWidth: 230, maxWidth: 360 }}>
-            <div
-              onClick={() => setIsFilterBranchDropdownOpen((prev) => !prev)}
-              style={{
-                height: 40,
-                padding: '4px 10px',
-                border: `1px solid ${isFilterBranchDropdownOpen ? 'var(--blue-primary, #0F766E)' : '#CBD5E1'}`,
-                borderRadius: 8,
-                background: '#FFFFFF',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                gap: 8,
-                transition: 'all 0.15s ease',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, overflow: 'hidden', flex: 1 }}>
-                <Building2 size={16} color="#64748B" style={{ flexShrink: 0 }} />
-                {selectedBranchIds.length === 0 ? (
-                  <span style={{ color: '#475569', fontSize: 13, whiteSpace: 'nowrap' }}>
-                    Tất cả chi nhánh ({branches.length})
-                  </span>
-                ) : (
-                  <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--blue-primary, #0F766E)' }}>
-                    Đã chọn {selectedBranchIds.length} chi nhánh
-                  </span>
-                )}
-              </div>
-              <ChevronDown size={16} color="#64748B" />
-            </div>
-
-            {isFilterBranchDropdownOpen && (
-              <div
-                style={{
-                  position: 'absolute',
-                  top: '100%',
-                  left: 0,
-                  marginTop: 6,
-                  width: 300,
-                  background: '#FFFFFF',
-                  border: '1px solid #E2E8F0',
-                  borderRadius: 10,
-                  boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.12)',
-                  zIndex: 1000,
-                  overflow: 'hidden',
-                }}
-              >
-                <div style={{ padding: '8px 10px', borderBottom: '1px solid #F1F5F9' }}>
-                  <input
-                    type="text"
-                    value={filterBranchSearch}
-                    onChange={(e) => setFilterBranchSearch(e.target.value)}
-                    placeholder="Tìm tên chi nhánh..."
-                    style={{
-                      width: '100%',
-                      padding: '5px 8px',
-                      border: '1px solid #E2E8F0',
-                      borderRadius: 6,
-                      fontSize: 12,
-                      outline: 'none',
-                    }}
-                    autoFocus
-                  />
-                </div>
-                <div style={{ maxHeight: 180, overflowY: 'auto' }}>
-                  {branches
-                    .filter((b) => b.name.toLowerCase().includes(filterBranchSearch.toLowerCase().trim()))
-                    .map((b) => {
-                      const isChecked = selectedBranchIds.includes(b.id);
-                      return (
-                        <div
-                          key={b.id}
-                          onClick={() => {
-                            setSelectedBranchIds((prev) =>
-                              prev.includes(b.id) ? prev.filter((id) => id !== b.id) : [...prev, b.id]
-                            );
-                            setCurrentPage(1);
-                          }}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            padding: '8px 12px',
-                            cursor: 'pointer',
-                            background: isChecked ? 'var(--blue-light, #F0FDFA)' : 'transparent',
-                            fontSize: 13,
-                          }}
-                        >
-                          <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-                            <input
-                              type="checkbox"
-                              checked={isChecked}
-                              onChange={() => { }}
-                              style={{ accentColor: 'var(--blue-primary, #0F766E)', width: 15, height: 15 }}
-                            />
-                            <span>{b.name}</span>
-                          </label>
-                          {isChecked && <Check size={14} color="var(--blue-primary, #0F766E)" />}
-                        </div>
-                      );
-                    })}
-                </div>
-                <div
-                  style={{
-                    padding: '6px 12px',
-                    background: '#F8FAFC',
-                    borderTop: '1px solid #F1F5F9',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    fontSize: 12,
-                  }}
-                >
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedBranchIds([]);
-                      setCurrentPage(1);
-                    }}
-                    style={{ border: 'none', background: 'transparent', color: '#64748B', cursor: 'pointer' }}
-                  >
-                    Bỏ chọn
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setIsFilterBranchDropdownOpen(false)}
-                    style={{
-                      border: 'none',
-                      background: 'var(--blue-primary, #0F766E)',
-                      color: '#FFF',
-                      padding: '3px 10px',
-                      borderRadius: 4,
-                      cursor: 'pointer',
-                      fontWeight: 600,
-                    }}
-                  >
-                    Đóng
-                  </button>
-                </div>
-              </div>
-            )}
+          {/* 2. Hiển thị Chi nhánh đang áp dụng từ StoreOwnerLayout */}
+          <div
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 8,
+              height: 40,
+              padding: '0 14px',
+              borderRadius: 8,
+              background: '#F0FDFA',
+              border: '1px solid #99F6E4',
+              color: '#0F766E',
+              fontSize: 13,
+              fontWeight: 500,
+            }}
+            title="Chi nhánh được đồng bộ trực tiếp từ bộ chọn chi nhánh của hệ thống ở thanh điều hướng trên cùng"
+          >
+            <Building2 size={16} color="#0F766E" />
+            <span>
+              Chi nhánh:{' '}
+              <strong style={{ fontWeight: 600 }}>
+                {activeBranch?.name || 'Tất cả chi nhánh'}
+              </strong>
+            </span>
           </div>
 
           {/* 3. Lọc trạng thái */}
@@ -654,13 +567,12 @@ export const ShiftConfigPage: React.FC = () => {
           </div>
 
           {/* 4. Nút Đặt lại bộ lọc */}
-          {(searchTerm || selectedBranchIds.length > 0 || filterStatus !== 'all') && (
+          {(searchTerm || filterStatus !== 'all') && (
             <button
               type="button"
               onClick={() => {
                 setSearchTerm('');
                 setFilterStatus('all');
-                setSelectedBranchIds([]);
                 setCurrentPage(1);
               }}
               style={{
@@ -1065,7 +977,7 @@ export const ShiftConfigPage: React.FC = () => {
                   </div>
 
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <div style={{ position: 'relative', width: 110 }}>
+                    <div style={{ position: 'relative', width: 140 }}>
                       <input
                         type="time"
                         value={formStartTime}
@@ -1073,10 +985,10 @@ export const ShiftConfigPage: React.FC = () => {
                         style={{
                           width: '100%',
                           height: 38,
-                          padding: '0 10px',
+                          padding: '0 12px',
                           borderRadius: 8,
                           border: '1px solid #CBD5E1',
-                          fontSize: 13,
+                          fontSize: 14,
                           fontWeight: 500,
                           color: '#1E293B',
                           background: '#FFFFFF',
@@ -1087,7 +999,7 @@ export const ShiftConfigPage: React.FC = () => {
 
                     <span style={{ fontSize: 13, color: '#475569', fontWeight: 500 }}>Đến</span>
 
-                    <div style={{ position: 'relative', width: 110 }}>
+                    <div style={{ position: 'relative', width: 140 }}>
                       <input
                         type="time"
                         value={formEndTime}
@@ -1095,10 +1007,10 @@ export const ShiftConfigPage: React.FC = () => {
                         style={{
                           width: '100%',
                           height: 38,
-                          padding: '0 10px',
+                          padding: '0 12px',
                           borderRadius: 8,
                           border: '1px solid #CBD5E1',
-                          fontSize: 13,
+                          fontSize: 14,
                           fontWeight: 500,
                           color: '#1E293B',
                           background: '#FFFFFF',
@@ -1132,7 +1044,7 @@ export const ShiftConfigPage: React.FC = () => {
                   </div>
 
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <div style={{ position: 'relative', width: 110 }}>
+                    <div style={{ position: 'relative', width: 140 }}>
                       <input
                         type="time"
                         value={formCheckInStart}
@@ -1140,10 +1052,10 @@ export const ShiftConfigPage: React.FC = () => {
                         style={{
                           width: '100%',
                           height: 38,
-                          padding: '0 10px',
+                          padding: '0 12px',
                           borderRadius: 8,
                           border: '1px solid #CBD5E1',
-                          fontSize: 13,
+                          fontSize: 14,
                           fontWeight: 500,
                           color: '#1E293B',
                           background: '#FFFFFF',
@@ -1154,7 +1066,7 @@ export const ShiftConfigPage: React.FC = () => {
 
                     <span style={{ fontSize: 13, color: '#475569', fontWeight: 500 }}>Đến</span>
 
-                    <div style={{ position: 'relative', width: 110 }}>
+                    <div style={{ position: 'relative', width: 140 }}>
                       <input
                         type="time"
                         value={formCheckInEnd}
@@ -1162,10 +1074,10 @@ export const ShiftConfigPage: React.FC = () => {
                         style={{
                           width: '100%',
                           height: 38,
-                          padding: '0 10px',
+                          padding: '0 12px',
                           borderRadius: 8,
                           border: '1px solid #CBD5E1',
-                          fontSize: 13,
+                          fontSize: 14,
                           fontWeight: 500,
                           color: '#1E293B',
                           background: '#FFFFFF',
@@ -1486,7 +1398,7 @@ export const ShiftConfigPage: React.FC = () => {
         isOpen={showAttendanceConfigModal}
         onClose={() => setShowAttendanceConfigModal(false)}
         branches={branches}
-        initialBranchId={selectedBranchIds[0] || branches[0]?.id}
+        initialBranchId={activeBranch && activeBranch.id !== 'ALL' ? activeBranch.id : branches[0]?.id}
         onSaveSuccess={(branchId) => {
           const bName = branches.find((b) => b.id === branchId)?.name || 'Chi nhánh';
           setNotification({

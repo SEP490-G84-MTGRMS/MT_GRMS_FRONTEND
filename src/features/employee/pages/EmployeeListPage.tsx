@@ -22,10 +22,10 @@ import type {
   DebtTransaction,
 } from '../types';
 import { employeeApi } from '../api/employeeApi';
-import { EmployeeFormModal } from '../components/EmployeeFormModal';
-import { EmployeeDetailModal } from '../components/EmployeeDetailModal';
-import { ApprovalRequestsModal } from '../components/ApprovalRequestsModal';
-import { ImportEmployeeModal } from '../components/ImportEmployeeModal';
+import { EmployeeFormModal } from '../components/employee-list/EmployeeFormModal';
+import { EmployeeDetailModal } from '../components/employee-list/EmployeeDetailModal';
+import { ApprovalRequestsModal } from '../components/approval-requests/ApprovalRequestsModal';
+import { ImportEmployeeModal } from '../components/employee-list/ImportEmployeeModal';
 import { TablePagination, NotificationModal, ConfirmModal } from '../../../components/common';
 import '../employee.css';
 

@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { Settings, Sliders, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
-import type { Branch } from '../types';
-import { MOCK_BRANCHES } from '../services/mockData';
-import { AttendanceConfigModal } from './AttendanceConfigModal';
-import { payslipApi, extractErrorMessage } from '../api/payslipApi';
+import type { Branch } from '../../types';
+import { MOCK_BRANCHES } from '../../services/mockData';
+import { AttendanceConfigModal } from '../shift-config/AttendanceConfigModal';
+import { payslipApi, extractErrorMessage } from '../../api/payslipApi';
 
 interface CreatePayslipModalProps {
   isOpen: boolean;

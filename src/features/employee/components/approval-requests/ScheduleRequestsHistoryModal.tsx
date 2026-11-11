@@ -1,11 +1,11 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import { X, Loader2, CheckCircle2, XCircle, Clock, Paperclip } from 'lucide-react';
 import {
   ScheduleApprovalStatus,
   ScheduleRequestTypeLabels,
   type ScheduleApprovalRequestDto,
-} from '../types/scheduleApprovalTypes';
-import { scheduleApprovalApi } from '../api/scheduleApprovalApi';
+} from '../../types/scheduleApprovalTypes';
+import { scheduleApprovalApi } from '../../api/scheduleApprovalApi';
 
 export interface ScheduleRequestsHistoryModalProps {
   isOpen: boolean;

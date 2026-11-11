@@ -1,12 +1,12 @@
-import React, { useState, useEffect, useCallback } from 'react';
+﻿import React, { useState, useEffect, useCallback } from 'react';
 import { X, Check, AlertCircle, Loader2 } from 'lucide-react';
 import {
   ScheduleRequestType,
   ScheduleRequestTypeLabels,
   type ScheduleApprovalRequestDto,
   type ReviewScheduleApprovalRequestDto,
-} from '../types/scheduleApprovalTypes';
-import { scheduleApprovalApi } from '../api/scheduleApprovalApi';
+} from '../../types/scheduleApprovalTypes';
+import { scheduleApprovalApi } from '../../api/scheduleApprovalApi';
 
 export interface ApprovalRequestsModalProps {
   isOpen: boolean;

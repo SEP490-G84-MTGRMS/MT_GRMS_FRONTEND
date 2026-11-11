@@ -1,7 +1,7 @@
-import React, { useState, useMemo } from 'react';
+﻿import React, { useState, useMemo } from 'react';
 import { Pencil, Download, Banknote, Loader2 } from 'lucide-react';
-import type { Employee, DebtTransaction } from '../types';
-import { employeeApi } from '../api/employeeApi';
+import type { Employee, DebtTransaction } from '../../types';
+import { employeeApi } from '../../api/employeeApi';
 import { CreateUserModal } from './CreateUserModal';
 
 interface EmployeeDetailModalProps {

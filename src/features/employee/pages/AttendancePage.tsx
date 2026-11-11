@@ -20,11 +20,11 @@ import type { AttendanceRecord, ApprovalRequest, Branch } from '../types';
 import { scheduleApi, getShiftColor, type ScheduleResponse } from '../api/scheduleApi';
 import { shiftConfigApi, type ShiftConfigDto } from '../api/shiftConfigApi';
 import { employeeApi } from '../api/employeeApi';
-import { AttendanceDetailModal } from '../components/AttendanceDetailModal';
-import { ApprovalRequestsModal } from '../components/ApprovalRequestsModal';
-import { CreateScheduleRequestModal } from '../components/CreateScheduleRequestModal';
-import { ScheduleRequestsHistoryModal } from '../components/ScheduleRequestsHistoryModal';
-import { FaceIdAttendanceModal } from '../components/FaceIdAttendanceModal';
+import { AttendanceDetailModal } from '../components/attendance/AttendanceDetailModal';
+import { ApprovalRequestsModal } from '../components/approval-requests/ApprovalRequestsModal';
+import { CreateScheduleRequestModal } from '../components/approval-requests/CreateScheduleRequestModal';
+import { ScheduleRequestsHistoryModal } from '../components/approval-requests/ScheduleRequestsHistoryModal';
+import { FaceIdAttendanceModal } from '../components/attendance/FaceIdAttendanceModal';
 import { ScheduleRequestType } from '../types/scheduleApprovalTypes';
 import { getVietnamToday } from '../lib/vietnamTime';
 import { useAuthStore } from '../../../stores/useAuthStore';
@@ -200,12 +200,16 @@ export const AttendancePage: React.FC = () => {
   const { user } = useAuthStore();
   const location = useLocation();
   const roleUpper = (user?.role || '').toUpperCase();
+  const isEmployeePortal = location.pathname.startsWith('/employee/') || location.pathname === '/employee';
+  const isStoreOwnerOrAdmin =
+    Boolean(user?.isAdmin) ||
+    roleUpper === 'STORE_OWNER' ||
+    roleUpper === 'STOREOWNER' ||
+    roleUpper === 'ADMIN';
+
   const isEmployeeRole =
-    location.pathname.startsWith('/employee') ||
-    roleUpper === 'STAFF' ||
-    roleUpper === 'EMPLOYEE' ||
-    roleUpper === 'CASHIER' ||
-    (!user?.isAdmin && roleUpper !== 'STORE_OWNER' && roleUpper !== 'ADMIN');
+    isEmployeePortal ||
+    (!isStoreOwnerOrAdmin && (roleUpper === 'STAFF' || roleUpper === 'EMPLOYEE' || roleUpper === 'CASHIER'));
 
   // Backend data states
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
@@ -1518,7 +1522,7 @@ export const AttendancePage: React.FC = () => {
         onUpdateStatus={handleUpdateRecordStatus}
         onSaved={fetchAttendanceData}
         isReadOnly={isEmployeeRole}
-        onRequestIncident={(rec, type) => {
+        onRequestIncident={(rec: any, type: any) => {
           setSelectedRecord(null);
           handleOpenCreateRequest(rec, type);
         }}

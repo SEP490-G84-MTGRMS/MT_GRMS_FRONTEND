@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Search,
@@ -6,9 +6,6 @@ import {
   User,
   RefreshCw,
   Building2,
-  ChevronDown,
-  Check,
-  X,
   CalendarX,
   ArrowLeftRight,
   Clock,
@@ -25,17 +22,17 @@ import type {
   DebtTransaction,
   Branch,
 } from '../types';
-import { AddScheduleModal } from '../components/AddScheduleModal';
-import { EmployeeDetailModal } from '../components/EmployeeDetailModal';
-import { ShiftConfigModal } from '../components/ShiftConfigModal';
+import { AddScheduleModal } from '../components/work-schedule/AddScheduleModal';
+import { EmployeeDetailModal } from '../components/employee-list/EmployeeDetailModal';
+import { ShiftConfigModal } from '../components/shift-config/ShiftConfigModal';
 import {
   ScheduleScopeConfirmModal,
   type ScheduleScopeType,
   type ScheduleScopeDateRange,
-} from '../components/ScheduleScopeConfirmModal';
+} from '../components/work-schedule/ScheduleScopeConfirmModal';
 import { TablePagination, NotificationModal } from '../../../components/common';
-import { CreateScheduleRequestModal } from '../components/CreateScheduleRequestModal';
-import { ScheduleRequestsHistoryModal } from '../components/ScheduleRequestsHistoryModal';
+import { CreateScheduleRequestModal } from '../components/approval-requests/CreateScheduleRequestModal';
+import { ScheduleRequestsHistoryModal } from '../components/approval-requests/ScheduleRequestsHistoryModal';
 import { ScheduleRequestType } from '../types/scheduleApprovalTypes';
 import { employeeApi } from '../api/employeeApi';
 import { shiftConfigApi, type ShiftConfigDto } from '../api/shiftConfigApi';
@@ -104,68 +101,67 @@ const getWeekDates = (offsetWeeks: number) => {
   return { label, days, monday, sunday, fromDateIso, toDateIso };
 };
 
+const ACTIVE_BRANCH_STORAGE_KEY = 'mtgrms_active_branch';
+
 export const WorkSchedulePage: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuthStore();
   const location = useLocation();
   const roleUpper = (user?.role || '').toUpperCase();
+  const isEmployeePortal = location.pathname.startsWith('/employee/') || location.pathname === '/employee';
+  const isStoreOwnerOrAdmin =
+    Boolean(user?.isAdmin) ||
+    roleUpper === 'STORE_OWNER' ||
+    roleUpper === 'STOREOWNER' ||
+    roleUpper === 'ADMIN';
+
   const isEmployeeRole =
-    location.pathname.startsWith('/employee') ||
-    roleUpper === 'STAFF' ||
-    (!user?.isAdmin && roleUpper !== 'STORE_OWNER' && roleUpper !== 'ADMIN');
+    isEmployeePortal ||
+    (!isStoreOwnerOrAdmin && (roleUpper === 'STAFF' || roleUpper === 'EMPLOYEE' || roleUpper === 'CASHIER'));
 
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [shifts, setShifts] = useState<WorkShiftDefinition[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
-  // Branch multi-select dropdown states (giống EmployeeListPage)
-  const [selectedBranchIds, setSelectedBranchIds] = useState<string[]>([]);
-  const [isBranchDropdownOpen, setIsBranchDropdownOpen] = useState(false);
-  const [branchSearchKeyword, setBranchSearchKeyword] = useState('');
-  const branchDropdownRef = useRef<HTMLDivElement>(null);
 
-  // Click outside to close branch dropdown
+  // Lắng nghe thay đổi chi nhánh từ StoreOwnerLayout (BranchSelectorDropdown)
+  const [activeBranch, setActiveBranch] = useState<{ id: string; name: string } | null>(() => {
+    try {
+      const stored = localStorage.getItem(ACTIVE_BRANCH_STORAGE_KEY);
+      if (stored) {
+        return JSON.parse(stored);
+      }
+    } catch {
+      // ignore
+    }
+    return null;
+  });
+
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        branchDropdownRef.current &&
-        !branchDropdownRef.current.contains(event.target as Node)
-      ) {
-        setIsBranchDropdownOpen(false);
+    const handleBranchChanged = (e: Event) => {
+      const customEvent = e as CustomEvent<any>;
+      if (customEvent.detail) {
+        setActiveBranch(customEvent.detail);
       }
     };
 
-    if (isBranchDropdownOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === ACTIVE_BRANCH_STORAGE_KEY && e.newValue) {
+        try {
+          const parsed = JSON.parse(e.newValue);
+          setActiveBranch(parsed);
+        } catch {
+          // ignore
+        }
+      }
     };
-  }, [isBranchDropdownOpen]);
 
-  const filteredBranches = useMemo(() => {
-    return branches.filter((b) =>
-      b.name.toLowerCase().includes(branchSearchKeyword.toLowerCase())
-    );
-  }, [branches, branchSearchKeyword]);
-
-  const handleBranchToggle = (branchId: string) => {
-    setSelectedBranchIds((prev) =>
-      prev.includes(branchId) ? prev.filter((id) => id !== branchId) : [...prev, branchId]
-    );
-  };
-
-  const handleRemoveBranchTag = (e: React.MouseEvent, branchId: string) => {
-    e.stopPropagation();
-    setSelectedBranchIds((prev) => prev.filter((id) => id !== branchId));
-  };
-
-  const handleSelectAllBranches = () => {
-    setSelectedBranchIds(branches.map((b) => b.id));
-  };
-
-  const handleClearAllBranches = () => {
-    setSelectedBranchIds([]);
-  };
+    window.addEventListener('mtgrms:branch-changed', handleBranchChanged);
+    window.addEventListener('storage', handleStorageChange);
+    return () => {
+      window.removeEventListener('mtgrms:branch-changed', handleBranchChanged);
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, []);
   const [assignments, setAssignments] = useState<ScheduleAssignment[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
@@ -300,21 +296,17 @@ export const WorkSchedulePage: React.FC = () => {
   const fetchEmployeesAndShifts = useCallback(async () => {
     try {
       const branchParam =
-        selectedBranchIds.length === 1 ? selectedBranchIds[0] : undefined;
-      const branchIdsParam =
-        selectedBranchIds.length > 0 ? selectedBranchIds : undefined;
+        activeBranch && activeBranch.id !== 'ALL' ? activeBranch.id : undefined;
 
       const [empResult, shiftResult] = await Promise.allSettled([
         isEmployeeRole
           ? Promise.resolve({ items: [] })
           : employeeApi.getEmployeesPaged({
             branchId: branchParam,
-            branchIds: branchIdsParam,
             pageSize: 200,
           }),
         shiftConfigApi.getShiftConfigsPaged({
           branchId: branchParam,
-          branchIds: branchIdsParam,
           pageSize: 100,
           isActive: true,
         }),
@@ -374,7 +366,7 @@ export const WorkSchedulePage: React.FC = () => {
       setEmployees([]);
       setShifts([]);
     }
-  }, [selectedBranchIds, isEmployeeRole, user]);
+  }, [activeBranch, isEmployeeRole, user]);
 
   useEffect(() => {
     fetchEmployeesAndShifts();
@@ -385,7 +377,7 @@ export const WorkSchedulePage: React.FC = () => {
     setIsLoading(true);
     try {
       const branchParam =
-        selectedBranchIds.length === 1 ? selectedBranchIds[0] : undefined;
+        activeBranch && activeBranch.id !== 'ALL' ? activeBranch.id : undefined;
 
       let data: ScheduleAssignment[] = [];
       if (isEmployeeRole) {
@@ -452,9 +444,9 @@ export const WorkSchedulePage: React.FC = () => {
       }
 
       const filteredData =
-        !isEmployeeRole && selectedBranchIds.length > 1
+        !isEmployeeRole && activeBranch && activeBranch.id !== 'ALL'
           ? data.filter(
-            (item) => item.branchId && selectedBranchIds.includes(item.branchId)
+            (item) => item.branchId === activeBranch.id
           )
           : data;
 
@@ -465,7 +457,7 @@ export const WorkSchedulePage: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [weekData.fromDateIso, weekData.toDateIso, selectedBranchIds, isEmployeeRole]);
+  }, [weekData.fromDateIso, weekData.toDateIso, activeBranch, isEmployeeRole]);
 
   useEffect(() => {
     fetchSchedules();
@@ -488,16 +480,16 @@ export const WorkSchedulePage: React.FC = () => {
       if (!matchesKeyword) return false;
 
       // 2. Lọc theo chi nhánh được chọn từ dropdown (chỉ áp dụng cho Owner)
-      if (!isEmployeeRole && selectedBranchIds.length > 0) {
+      if (!isEmployeeRole && activeBranch && activeBranch.id !== 'ALL') {
         const matchesSalaryBranch =
-          e.salaryBranchId && selectedBranchIds.includes(e.salaryBranchId);
+          e.salaryBranchId && e.salaryBranchId === activeBranch.id;
         const matchesWorkingBranch =
           Array.isArray(e.workingBranchIds) &&
-          e.workingBranchIds.some((bId) => selectedBranchIds.includes(bId));
+          e.workingBranchIds.includes(activeBranch.id);
         const hasAssignment = assignments.some(
           (a) =>
             a.employeeId === e.id &&
-            (!a.branchId || selectedBranchIds.includes(a.branchId))
+            (!a.branchId || a.branchId === activeBranch.id)
         );
 
         return matchesSalaryBranch || matchesWorkingBranch || hasAssignment;
@@ -505,7 +497,7 @@ export const WorkSchedulePage: React.FC = () => {
 
       return true;
     });
-  }, [employees, searchEmployee, selectedBranchIds, assignments, isEmployeeRole]);
+  }, [employees, searchEmployee, activeBranch, assignments, isEmployeeRole]);
 
   const paginatedEmployees = useMemo(() => {
     const start = (currentPage - 1) * pageSize;
@@ -514,7 +506,7 @@ export const WorkSchedulePage: React.FC = () => {
 
   const filteredShifts = useMemo(() => {
     let list = shifts;
-    if (!isEmployeeRole && selectedBranchIds.length > 0) {
+    if (!isEmployeeRole && activeBranch && activeBranch.id !== 'ALL') {
       list = list.filter((s) => {
         if (s.id === 'custom') return true;
         if (!s.branchId && (!s.branchIds || s.branchIds.length === 0)) return true;
@@ -524,7 +516,7 @@ export const WorkSchedulePage: React.FC = () => {
             : s.branchId
               ? [s.branchId]
               : [];
-        return selectedBranchIds.some((bId) => shiftBranchIds.includes(bId));
+        return shiftBranchIds.includes(activeBranch.id);
       });
     }
     if (searchEmployee.trim()) {
@@ -536,7 +528,7 @@ export const WorkSchedulePage: React.FC = () => {
       );
     }
     return list;
-  }, [shifts, selectedBranchIds, isEmployeeRole, searchEmployee]);
+  }, [shifts, activeBranch, isEmployeeRole, searchEmployee]);
 
   const paginatedShifts = useMemo(() => {
     const start = (shiftCurrentPage - 1) * shiftPageSize;
@@ -547,7 +539,7 @@ export const WorkSchedulePage: React.FC = () => {
   useEffect(() => {
     setCurrentPage(1);
     setShiftCurrentPage(1);
-  }, [searchEmployee, selectedBranchIds, weekOffset]);
+  }, [searchEmployee, activeBranch, weekOffset]);
 
   const handleOpenCell = (empId: string, day: 'T2' | 'T3' | 'T4' | 'T5' | 'T6' | 'T7' | 'CN') => {
     if (isEmployeeRole) return;
@@ -801,332 +793,29 @@ export const WorkSchedulePage: React.FC = () => {
 
           {/* Lọc Chi nhánh làm việc (Chỉ dành cho Quản lý / StoreOwner) */}
           {!isEmployeeRole && (
-            <div ref={branchDropdownRef} style={{ position: 'relative', minWidth: 240, maxWidth: 360 }}>
-              <div
-                onClick={() => setIsBranchDropdownOpen((prev) => !prev)}
-                style={{
-                  height: 40,
-                  padding: '4px 10px',
-                  border: `1px solid ${isBranchDropdownOpen ? '#0F766E' : '#CBD5E1'}`,
-                  borderRadius: 8,
-                  background: '#FFFFFF',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: 8,
-                  transition: 'all 0.15s ease',
-                  boxShadow: isBranchDropdownOpen ? '0 0 0 3px rgba(15, 118, 110, 0.15)' : 'none',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'nowrap', overflow: 'hidden', flex: 1 }}>
-                  <Building2 size={16} color="#64748B" style={{ flexShrink: 0 }} />
-
-                  {selectedBranchIds.length === 0 ? (
-                    <span style={{ color: '#475569', fontSize: 13, whiteSpace: 'nowrap' }}>
-                      Tất cả chi nhánh ({branches.length})
-                    </span>
-                  ) : selectedBranchIds.length === branches.length && branches.length > 1 ? (
-                    <span
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        padding: '2px 8px',
-                        borderRadius: 6,
-                        fontSize: 12,
-                        fontWeight: 600,
-                        background: '#F0FDFA',
-                        color: '#0F766E',
-                        border: '1px solid #99F6E4',
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      Tất cả chi nhánh ({branches.length})
-                    </span>
-                  ) : (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, overflow: 'hidden' }}>
-                      {branches
-                        .filter((b) => selectedBranchIds.includes(b.id))
-                        .slice(0, 1)
-                        .map((b) => (
-                          <span
-                            key={b.id}
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: 4,
-                              padding: '2px 8px',
-                              borderRadius: 6,
-                              fontSize: 12,
-                              fontWeight: 500,
-                              background: '#F0FDFA',
-                              color: '#0F766E',
-                              border: '1px solid #99F6E4',
-                              whiteSpace: 'nowrap',
-                              maxWidth: 150,
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                            }}
-                          >
-                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{b.name}</span>
-                            <span
-                              onClick={(e) => handleRemoveBranchTag(e, b.id)}
-                              title="Gỡ chi nhánh"
-                              style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                cursor: 'pointer',
-                                borderRadius: '50%',
-                                width: 14,
-                                height: 14,
-                                color: '#0F766E',
-                                fontWeight: 700,
-                                flexShrink: 0,
-                              }}
-                            >
-                              <X size={11} />
-                            </span>
-                          </span>
-                        ))}
-                      {selectedBranchIds.length > 1 && (
-                        <span
-                          style={{
-                            padding: '2px 6px',
-                            borderRadius: 6,
-                            fontSize: 11,
-                            fontWeight: 600,
-                            background: '#F1F5F9',
-                            color: '#475569',
-                            whiteSpace: 'nowrap',
-                            flexShrink: 0,
-                          }}
-                        >
-                          +{selectedBranchIds.length - 1} khác
-                        </span>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#64748B', flexShrink: 0 }}>
-                  <ChevronDown
-                    size={16}
-                    style={{
-                      transform: isBranchDropdownOpen ? 'rotate(180deg)' : 'none',
-                      transition: 'transform 0.2s ease',
-                    }}
-                  />
-                </div>
-              </div>
-
-              {/* Dropdown Panel */}
-              {isBranchDropdownOpen && (
-                <div
-                  style={{
-                    position: 'absolute',
-                    top: '100%',
-                    left: 0,
-                    marginTop: 6,
-                    width: 320,
-                    background: '#FFFFFF',
-                    border: '1px solid #E2E8F0',
-                    borderRadius: 10,
-                    boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
-                    zIndex: 1000,
-                    overflow: 'hidden',
-                  }}
-                >
-                  {/* Search Input Bar */}
-                  <div style={{ padding: '8px 10px', borderBottom: '1px solid #F1F5F9' }}>
-                    <div
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 8,
-                        background: '#F8FAFC',
-                        border: '1px solid #E2E8F0',
-                        borderRadius: 6,
-                        padding: '5px 10px',
-                      }}
-                    >
-                      <Search size={14} color="#94A3B8" />
-                      <input
-                        type="text"
-                        value={branchSearchKeyword}
-                        onChange={(e) => setBranchSearchKeyword(e.target.value)}
-                        placeholder="Tìm kiếm chi nhánh theo tên..."
-                        style={{
-                          border: 'none',
-                          background: 'transparent',
-                          outline: 'none',
-                          width: '100%',
-                          fontSize: 13,
-                          color: '#1E293B',
-                        }}
-                        autoFocus
-                      />
-                      {branchSearchKeyword && (
-                        <button
-                          type="button"
-                          onClick={() => setBranchSearchKeyword('')}
-                          style={{
-                            border: 'none',
-                            background: 'transparent',
-                            cursor: 'pointer',
-                            color: '#94A3B8',
-                            padding: 0,
-                            display: 'flex',
-                          }}
-                        >
-                          <X size={14} />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Quick Selection Actions */}
-                  <div
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      padding: '6px 12px',
-                      background: '#F8FAFC',
-                      borderBottom: '1px solid #F1F5F9',
-                      fontSize: 12,
-                    }}
-                  >
-                    <span style={{ color: '#64748B' }}>
-                      Tìm thấy {filteredBranches.length} chi nhánh
-                    </span>
-                    <div style={{ display: 'flex', gap: 12 }}>
-                      <button
-                        type="button"
-                        onClick={handleSelectAllBranches}
-                        style={{
-                          border: 'none',
-                          background: 'transparent',
-                          color: '#0F766E',
-                          fontWeight: 600,
-                          cursor: 'pointer',
-                          padding: 0,
-                          fontSize: 12,
-                        }}
-                      >
-                        Chọn tất cả ({branches.length})
-                      </button>
-                      <span style={{ color: '#CBD5E1' }}>|</span>
-                      <button
-                        type="button"
-                        onClick={handleClearAllBranches}
-                        style={{
-                          border: 'none',
-                          background: 'transparent',
-                          color: '#64748B',
-                          fontWeight: 500,
-                          cursor: 'pointer',
-                          padding: 0,
-                          fontSize: 12,
-                        }}
-                      >
-                        Bỏ chọn tất cả
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Branches List */}
-                  <div style={{ maxHeight: 210, overflowY: 'auto', padding: '4px 0' }}>
-                    {filteredBranches.length ? (
-                      filteredBranches.map((b) => {
-                        const isChecked = selectedBranchIds.includes(b.id);
-                        return (
-                          <div
-                            key={b.id}
-                            onClick={() => handleBranchToggle(b.id)}
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'space-between',
-                              padding: '8px 12px',
-                              cursor: 'pointer',
-                              background: isChecked ? '#F0FDFA' : 'transparent',
-                              transition: 'background 0.12s ease',
-                            }}
-                            onMouseEnter={(e) => {
-                              if (!isChecked) e.currentTarget.style.background = '#F8FAFC';
-                            }}
-                            onMouseLeave={(e) => {
-                              if (!isChecked) e.currentTarget.style.background = 'transparent';
-                            }}
-                          >
-                            <label
-                              style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: 10,
-                                cursor: 'pointer',
-                                fontSize: 13,
-                                width: '100%',
-                              }}
-                            >
-                              <input
-                                type="checkbox"
-                                checked={isChecked}
-                                onChange={() => { }}
-                                style={{ accentColor: '#0F766E', width: 16, height: 16 }}
-                              />
-                              <span style={{ fontWeight: isChecked ? 600 : 400, color: isChecked ? '#134E4A' : '#1E293B' }}>
-                                {b.name}
-                              </span>
-                              {b.isMain && (
-                                <span
-                                  style={{
-                                    fontSize: 10,
-                                    padding: '1px 6px',
-                                    borderRadius: 4,
-                                    background: '#E2E8F0',
-                                    color: '#475569',
-                                    fontWeight: 600,
-                                  }}
-                                >
-                                  Trụ sở
-                                </span>
-                              )}
-                            </label>
-
-                            {isChecked && <Check size={15} color="#0F766E" />}
-                          </div>
-                        );
-                      })
-                    ) : (
-                      <div style={{ padding: '16px 12px', textAlign: 'center', color: '#94A3B8', fontSize: 13 }}>
-                        Không tìm thấy chi nhánh nào phù hợp
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Footer */}
-                  <div
-                    style={{
-                      padding: '8px 12px',
-                      background: '#F8FAFC',
-                      borderTop: '1px solid #F1F5F9',
-                      display: 'flex',
-                      justifyContent: 'flex-end',
-                    }}
-                  >
-                    <button
-                      type="button"
-                      className="emp-btn emp-btn-primary"
-                      style={{ height: 28, padding: '0 14px', fontSize: 12 }}
-                      onClick={() => setIsBranchDropdownOpen(false)}
-                    >
-                      Xong ({selectedBranchIds.length})
-                    </button>
-                  </div>
-                </div>
-              )}
+            <div
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 8,
+                height: 40,
+                padding: '0 14px',
+                borderRadius: 8,
+                background: '#F0FDFA',
+                border: '1px solid #99F6E4',
+                color: '#0F766E',
+                fontSize: 13,
+                fontWeight: 500,
+              }}
+              title="Chi nhánh được đồng bộ trực tiếp từ bộ chọn chi nhánh của hệ thống ở thanh điều hướng trên cùng"
+            >
+              <Building2 size={16} color="#0F766E" />
+              <span>
+                Chi nhánh:{' '}
+                <strong style={{ fontWeight: 600 }}>
+                  {activeBranch?.name || 'Tất cả chi nhánh'}
+                </strong>
+              </span>
             </div>
           )}
 
@@ -1206,7 +895,7 @@ export const WorkSchedulePage: React.FC = () => {
                 transition: 'all 0.15s ease',
               }}
               onClick={() => {
-                const branchParam = selectedBranchIds.length === 1 ? selectedBranchIds[0] : (selectedBranchIds[0] || '');
+                const branchParam = activeBranch && activeBranch.id !== 'ALL' ? activeBranch.id : (branches[0]?.id || '');
                 navigate(branchParam ? `/store-owner/shifts?branchId=${branchParam}` : '/store-owner/shifts');
               }}
               title="Xem nhật ký lịch sử ca bán hàng và bàn giao quầy thu ngân"
@@ -1343,6 +1032,10 @@ export const WorkSchedulePage: React.FC = () => {
                                     <div
                                       onClick={(e) => {
                                         e.stopPropagation();
+                                        if (!isEmployeeRole) {
+                                          handleEditAssignment(item);
+                                          return;
+                                        }
                                         if (isMenuOpen) {
                                           setOpenMenuScheduleId(null);
                                           setMenuPosition(null);
@@ -1383,7 +1076,7 @@ export const WorkSchedulePage: React.FC = () => {
                                         cursor: 'pointer',
                                         transition: 'all 0.15s ease',
                                       }}
-                                      title="Bấm để gửi yêu cầu hoặc thao tác ca làm"
+                                      title={!isEmployeeRole ? "Bấm để xem chi tiết và chỉnh sửa ca làm việc" : "Bấm để gửi yêu cầu hoặc thao tác ca làm"}
                                     >
                                       <span>{isOnLeave ? `[Nghỉ] ${item.shiftName}` : item.shiftName}</span>
                                       {!isEmployeeRole && (
@@ -1775,6 +1468,10 @@ export const WorkSchedulePage: React.FC = () => {
                                   <div
                                     onClick={(e) => {
                                       e.stopPropagation();
+                                      if (!isEmployeeRole) {
+                                        handleEditAssignment(item);
+                                        return;
+                                      }
                                       if (isMenuOpen) {
                                         setOpenMenuScheduleId(null);
                                         setMenuPosition(null);
@@ -1810,6 +1507,7 @@ export const WorkSchedulePage: React.FC = () => {
                                       transition: 'all 0.15s ease',
                                       boxShadow: '0 1px 2px rgba(15, 118, 110, 0.05)',
                                     }}
+                                    title={!isEmployeeRole ? "Bấm để xem chi tiết và chỉnh sửa ca làm việc" : "Bấm để gửi yêu cầu hoặc thao tác ca làm"}
                                   >
                                     <div
                                       style={{
@@ -2173,7 +1871,9 @@ export const WorkSchedulePage: React.FC = () => {
             isOpen: true,
             type: 'success',
             title: 'Thành công',
-            message: 'Đã khởi tạo ca làm việc thành công vào hệ thống.',
+            message: editingAssignment
+              ? 'Đã cập nhật ca làm việc thành công.'
+              : 'Đã khởi tạo ca làm việc thành công vào hệ thống.',
           });
         }}
         onUpdate={handleUpdateAssignment}
@@ -2199,10 +1899,10 @@ export const WorkSchedulePage: React.FC = () => {
           fetchSchedules();
           fetchEmployeesAndShifts();
         }}
-        branchId={selectedBranchIds.length > 0 ? selectedBranchIds[0] : branches[0]?.id || 'b1'}
+        branchId={activeBranch && activeBranch.id !== 'ALL' ? activeBranch.id : branches[0]?.id || 'b1'}
         branchName={
-          selectedBranchIds.length > 0
-            ? branches.find((b) => b.id === selectedBranchIds[0])?.name || 'Chi nhánh mặc định'
+          activeBranch && activeBranch.id !== 'ALL'
+            ? activeBranch.name
             : branches[0]?.name || 'Chi nhánh mặc định'
         }
       />

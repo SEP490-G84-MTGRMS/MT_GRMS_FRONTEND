@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { X, Loader2 } from 'lucide-react';
-import { scheduleApi } from '../api/scheduleApi';
-import { getVietnamToday } from '../lib/vietnamTime';
+import { scheduleApi } from '../../api/scheduleApi';
+import { getVietnamToday } from '../../lib/vietnamTime';
 
 export type ScopeActionType = 'update' | 'delete';
 export type ScheduleScopeType = 'single' | 'following' | 'all';

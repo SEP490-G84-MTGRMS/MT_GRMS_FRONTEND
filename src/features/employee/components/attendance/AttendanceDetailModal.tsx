@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import {
   Clock,
   Building2,
@@ -14,15 +14,15 @@ import {
   UserCheck,
   Maximize2,
 } from 'lucide-react';
-import type { AttendanceRecord } from '../types';
-import { shiftConfigApi, type ShiftConfigDto } from '../api/shiftConfigApi';
+import type { AttendanceRecord } from '../../types';
+import { shiftConfigApi, type ShiftConfigDto } from '../../api/shiftConfigApi';
 import {
   scheduleApi,
   type ScheduleResponse,
   type UpdateSchedulePayload,
   type ManualAttendancePayload,
-} from '../api/scheduleApi';
-import { ScheduleRequestType } from '../types/scheduleApprovalTypes';
+} from '../../api/scheduleApi';
+import { ScheduleRequestType } from '../../types/scheduleApprovalTypes';
 
 export interface AttendanceDetailModalProps {
   isOpen: boolean;

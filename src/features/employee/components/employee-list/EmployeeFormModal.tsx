@@ -5,18 +5,18 @@ import type {
   Branch,
   AllowanceItem,
   SalaryType,
-} from '../types';
+} from '../../types';
 import { CreateUserModal } from './CreateUserModal';
 import { CreateAllowanceModal } from './CreateAllowanceModal';
-import { employeeApi } from '../api/employeeApi';
-import { mapFormToCreatePayload } from '../lib/employeeMapper';
-import { extractDescriptorFromImage } from '../lib/faceIdService';
+import { employeeApi } from '../../api/employeeApi';
+import { mapFormToCreatePayload } from '../../lib/employeeMapper';
+import { extractDescriptorFromImage } from '../../lib/faceIdService';
 import {
   getVietnamToday,
   getVietnamTodayIso,
   normalizeVietnameseComparison,
-} from '../lib/vietnamTime';
-import { uploadImageToCloudinary } from '../../../utils/cloudinary';
+} from '../../lib/vietnamTime';
+import { uploadImageToCloudinary } from '../../../../utils/cloudinary';
 
 interface EmployeeFormModalProps {
   isOpen: boolean;

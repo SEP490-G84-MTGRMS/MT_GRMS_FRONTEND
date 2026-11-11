@@ -5,11 +5,11 @@ import type {
   WorkShiftDefinition,
   Branch,
   ScheduleAssignment,
-} from '../types';
-import { shiftConfigApi, type ShiftConfigDto } from '../api/shiftConfigApi';
-import { scheduleApi, type CreateRecurringSchedulePayload } from '../api/scheduleApi';
+} from '../../types';
+import { shiftConfigApi, type ShiftConfigDto } from '../../api/shiftConfigApi';
+import { scheduleApi, type CreateRecurringSchedulePayload } from '../../api/scheduleApi';
 import { ScheduleScopeConfirmModal } from './ScheduleScopeConfirmModal';
-import { getVietnamToday, getVietnamTodayIso } from '../lib/vietnamTime';
+import { getVietnamToday, getVietnamTodayIso } from '../../lib/vietnamTime';
 
 interface AddScheduleModalProps {
   isOpen: boolean;
@@ -370,8 +370,17 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
 
     if (editingAssignment) {
       setEmployeeId(editingAssignment.employeeId);
-      setSelectedShiftId(editingAssignment.shiftId);
-      if (editingAssignment.shiftId === 'custom' && editingAssignment.shiftTime) {
+      const matchedShift = activeShifts.find(
+        (s) =>
+          s.id === editingAssignment.shiftId ||
+          (editingAssignment.shiftName && s.name.toLowerCase().trim() === editingAssignment.shiftName.toLowerCase().trim())
+      );
+      if (matchedShift) {
+        setSelectedShiftId(matchedShift.id);
+      } else {
+        setSelectedShiftId(editingAssignment.shiftId || 'custom');
+      }
+      if ((editingAssignment.shiftId === 'custom' || !matchedShift) && editingAssignment.shiftTime) {
         const parts = editingAssignment.shiftTime.split('-').map((s) => s.trim());
         if (parts[0]) setCustomStartTime(parts[0]);
         if (parts[1]) setCustomEndTime(parts[1]);

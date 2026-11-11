@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { Copy, Check, CreditCard, Banknote, Loader2, AlertCircle, Users } from 'lucide-react';
-import type { PayslipDetailedRecord } from '../types';
-import { payslipApi, extractErrorMessage } from '../api/payslipApi';
+import type { PayslipDetailedRecord } from '../../types';
+import { payslipApi, extractErrorMessage } from '../../api/payslipApi';
 
 interface PayslipPaymentModalProps {
   isOpen: boolean;
