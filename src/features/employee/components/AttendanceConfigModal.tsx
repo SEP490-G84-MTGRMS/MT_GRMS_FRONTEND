@@ -178,9 +178,50 @@ export const AttendanceConfigModal: React.FC<AttendanceConfigModalProps> = ({
     setShowCopyModal(true);
   };
 
+  const validatePolicyConfig = (): string | null => {
+    if (!currentConfig.standardDayHours || currentConfig.standardDayHours <= 0 || currentConfig.standardDayHours > 24) {
+      return 'Số giờ chuẩn của 1 ngày công phải lớn hơn 0 và không vượt quá 24 giờ.';
+    }
+    if (currentConfig.lateThresholdMinutes < 0 || currentConfig.lateThresholdMinutes > 240) {
+      return 'Số phút tính đi muộn phải nằm trong khoảng từ 0 đến 240 phút.';
+    }
+    if (currentConfig.earlyLeaveThresholdMinutes < 0 || currentConfig.earlyLeaveThresholdMinutes > 240) {
+      return 'Số phút tính về sớm phải nằm trong khoảng từ 0 đến 240 phút.';
+    }
+    if (currentConfig.isConvertHoursToDays) {
+      for (const r of rules) {
+        const fromH = r.fromHours ?? 0;
+        const fromM = r.fromMinutes ?? 0;
+        if (fromH < 0 || fromH > 24 || fromM < 0 || fromM > 59) {
+          return 'Mốc giờ/phút bắt đầu trong quy tắc quy đổi công không hợp lệ.';
+        }
+        if (r.workUnits <= 0 || r.workUnits > 5) {
+          return 'Số công quy đổi phải lớn hơn 0 và không vượt quá 5 công.';
+        }
+        if (r.type === 'range') {
+          const toH = r.toHours ?? 0;
+          const toM = r.toMinutes ?? 0;
+          if (toH < 0 || toH > 24 || toM < 0 || toM > 59) {
+            return 'Mốc giờ/phút kết thúc trong quy tắc quy đổi công không hợp lệ.';
+          }
+          if (toH * 60 + toM <= fromH * 60 + fromM) {
+            return 'Mốc thời gian "đến dưới" phải lớn hơn mốc thời gian "Làm từ" trong quy tắc quy đổi công.';
+          }
+        }
+      }
+    }
+    return null;
+  };
+
   // Xác nhận sao chép sang các chi nhánh được chọn
   const handleConfirmCopy = async () => {
     if (!selectedBranchId || targetBranchIds.length === 0) return;
+
+    const validationErr = validatePolicyConfig();
+    if (validationErr) {
+      setCopyFeedback(validationErr);
+      return;
+    }
 
     try {
       setIsCopying(true);
@@ -221,6 +262,12 @@ export const AttendanceConfigModal: React.FC<AttendanceConfigModalProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedBranchId) return;
+
+    const validationErr = validatePolicyConfig();
+    if (validationErr) {
+      setErrorMessage(validationErr);
+      return;
+    }
 
     try {
       setIsSubmitting(true);
@@ -787,7 +834,7 @@ export const AttendanceConfigModal: React.FC<AttendanceConfigModalProps> = ({
                   <input
                     type="number"
                     min={0}
-                    max={120}
+                    max={240}
                     value={currentConfig.lateThresholdMinutes}
                     disabled={!currentConfig.enableLateThreshold}
                     onChange={(e) =>
@@ -854,7 +901,7 @@ export const AttendanceConfigModal: React.FC<AttendanceConfigModalProps> = ({
                   <input
                     type="number"
                     min={0}
-                    max={120}
+                    max={240}
                     value={currentConfig.earlyLeaveThresholdMinutes}
                     disabled={!currentConfig.enableEarlyLeaveThreshold}
                     onChange={(e) =>

@@ -24,6 +24,7 @@ import {
 } from '../api/shiftConfigApi';
 import { ConfirmModal, NotificationModal, TablePagination } from '../../../components/common';
 import { AttendanceConfigModal } from '../components/AttendanceConfigModal';
+import { normalizeVietnameseComparison } from '../lib/vietnamTime';
 import '../employee.css';
 
 // Helper format HH:mm:ss -> HH:mm
@@ -281,12 +282,36 @@ export const ShiftConfigPage: React.FC = () => {
       return;
     }
 
+    if (formShiftName.trim().length > 100) {
+      setFormError('Tên ca làm việc không được vượt quá 100 ký tự.');
+      return;
+    }
+
+    const normalizedShiftName = normalizeVietnameseComparison(formShiftName);
+    const duplicateShift = shifts.find((s) => {
+      if (editingShift && s.id === editingShift.id) return false;
+      if (normalizeVietnameseComparison(s.shiftName) !== normalizedShiftName) return false;
+      const sBranches = s.branchIds && s.branchIds.length > 0 ? s.branchIds : s.branchId ? [s.branchId] : [];
+      if (sBranches.length === 0 || formBranchIds.length === 0) return true;
+      return sBranches.some((bId) => formBranchIds.includes(bId));
+    });
+    if (duplicateShift) {
+      setFormError(
+        `Tên ca làm việc "${formShiftName.trim()}" bị trùng với ca "${duplicateShift.shiftName}" đã tồn tại trong chi nhánh (so sánh không phân biệt dấu tiếng Việt và chữ HOA/thường).`
+      );
+      return;
+    }
+
     if (formBranchIds.length === 0) {
       setFormError('Vui lòng chọn ít nhất một chi nhánh trong phạm vi áp dụng.');
       return;
     }
 
     const durationInfo = calculateHoursText(formStartTime, formEndTime);
+    if (formStartTime === formEndTime || durationInfo.hours <= 0 || durationInfo.hours < 0.5) {
+      setFormError('Giờ bắt đầu và giờ kết thúc không hợp lệ (thời lượng ca phải từ 0.5 đến 24 giờ).');
+      return;
+    }
     const isNextDay = isNextDayCheckIn(formCheckInStart, formCheckInEnd, formStartTime);
 
     try {

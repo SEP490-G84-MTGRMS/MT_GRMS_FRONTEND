@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Loader2 } from 'lucide-react';
 import { scheduleApi } from '../api/scheduleApi';
+import { getVietnamToday } from '../lib/vietnamTime';
 
 export type ScopeActionType = 'update' | 'delete';
 export type ScheduleScopeType = 'single' | 'following' | 'all';
@@ -29,7 +30,7 @@ interface ScheduleScopeConfirmModalProps {
 }
 
 const parseDate = (str?: string): Date => {
-  if (!str) return new Date();
+  if (!str) return getVietnamToday();
   if (str.includes('T')) {
     const d = new Date(str);
     if (!isNaN(d.getTime())) return d;
@@ -44,10 +45,10 @@ const parseDate = (str?: string): Date => {
     const parts = str.split('/');
     const d = parseInt(parts[0], 10);
     const m = parseInt(parts[1], 10) - 1;
-    const y = parts.length >= 3 ? parseInt(parts[2], 10) : new Date().getFullYear();
+    const y = parts.length >= 3 ? parseInt(parts[2], 10) : getVietnamToday().getFullYear();
     return new Date(y, m, d);
   }
-  return new Date();
+  return getVietnamToday();
 };
 
 const formatDateStr = (d: Date): string => {

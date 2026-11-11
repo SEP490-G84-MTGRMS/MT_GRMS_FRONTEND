@@ -70,6 +70,19 @@ export const ApprovalRequestsModal: React.FC<ApprovalRequestsModalProps> = ({
     e.preventDefault();
     if (!selectedRequest) return;
 
+    if (!isApproveAction && !reviewNote.trim()) {
+      alert('Vui lòng nhập lý do từ chối yêu cầu.');
+      return;
+    }
+    if (reviewNote.trim().length > 500) {
+      alert('Ghi chú phản hồi không được vượt quá 500 ký tự.');
+      return;
+    }
+    if (isApproveAction && selectedRequest.requestType === ScheduleRequestType.Overtime && (approvedMinutes < 0 || approvedMinutes > 480)) {
+      alert('Số phút OT phê duyệt phải từ 0 đến 480 phút.');
+      return;
+    }
+
     try {
       setSubmitting(true);
       const payload: ReviewScheduleApprovalRequestDto = {

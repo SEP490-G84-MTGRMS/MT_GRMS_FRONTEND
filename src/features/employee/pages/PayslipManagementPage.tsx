@@ -30,6 +30,7 @@ import { PayslipDetailModal } from '../components/PayslipDetailModal';
 import { PayslipPaymentModal } from '../components/PayslipPaymentModal';
 import { useLocation } from 'react-router-dom';
 import { ConfirmModal, NotificationModal } from '../../../components/common';
+import { getVietnamCurrentMonthIso } from '../lib/vietnamTime';
 import { useAuthStore } from '../../../stores/useAuthStore';
 import '../employee.css';
 
@@ -231,12 +232,9 @@ export const PayslipManagementPage: React.FC = () => {
     return cleanDate;
   };
 
-  // Month navigation
+  // Month navigation (múi giờ Việt Nam UTC+7)
   const currentMonthIso = useMemo(() => {
-    const now = new Date();
-    const yyyy = now.getFullYear();
-    const mm = String(now.getMonth() + 1).padStart(2, '0');
-    return `${yyyy}-${mm}`;
+    return getVietnamCurrentMonthIso();
   }, []);
 
   const handleCurrentMonth = () => {

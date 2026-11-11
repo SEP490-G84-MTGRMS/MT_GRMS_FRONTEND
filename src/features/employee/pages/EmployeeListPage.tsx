@@ -306,28 +306,73 @@ export const EmployeeListPage: React.FC = () => {
     setIsDeleting(true);
     const target = employeeToDelete;
     try {
-      await employeeApi.deleteEmployee(target.id);
-      setEmployees((prev) => prev.filter((e) => e.id !== target.id));
-      setTotalItems((prev) => Math.max(0, prev - 1));
-      setSelectedIds((prev) => prev.filter((id) => id !== target.id));
-      if (selectedDetailEmployee?.id === target.id) {
-        setSelectedDetailEmployee(null);
-      }
+      const result = await employeeApi.deleteEmployee(target.id);
       setEmployeeToDelete(null);
-      setNotification({
-        isOpen: true,
-        type: 'success',
-        title: 'Xóa nhân viên thành công',
-        message: `Đã xóa nhân viên "${target.fullName}" khỏi hệ thống thành công.`,
-        itemCode: target.employeeCode,
-      });
+
+      if (result.action === 'deactivated') {
+        // Nhân viên đã có lịch làm việc hoặc phiếu lương -> giữ lại trong danh sách với trạng thái "Đã nghỉ" (inactive)
+        setEmployees((prev) =>
+          prev.map((e) => (e.id === target.id ? { ...e, status: 'inactive' } : e))
+        );
+        if (selectedDetailEmployee?.id === target.id) {
+          setSelectedDetailEmployee({ ...selectedDetailEmployee, status: 'inactive' });
+        }
+        await fetchEmployees();
+        setNotification({
+          isOpen: true,
+          type: 'warning',
+          title: 'Đã chuyển sang trạng thái Đã nghỉ',
+          message:
+            result.message ||
+            `Nhân viên "${target.fullName}" đã có dữ liệu lịch làm việc hoặc phiếu lương nên hệ thống không xóa cứng, mà đã chuyển sang trạng thái "Đã nghỉ" (Ngừng làm việc).`,
+          itemCode: target.employeeCode,
+        });
+      } else {
+        // Nhân viên chưa có lịch làm việc / phiếu lương -> xóa khỏi danh sách
+        setEmployees((prev) => prev.filter((e) => e.id !== target.id));
+        setTotalItems((prev) => Math.max(0, prev - 1));
+        setSelectedIds((prev) => prev.filter((id) => id !== target.id));
+        if (selectedDetailEmployee?.id === target.id) {
+          setSelectedDetailEmployee(null);
+        }
+        await fetchEmployees();
+        setNotification({
+          isOpen: true,
+          type: 'success',
+          title: 'Xóa nhân viên thành công',
+          message: `Đã xóa nhân viên "${target.fullName}" khỏi hệ thống thành công.`,
+          itemCode: target.employeeCode,
+        });
+      }
     } catch (err: any) {
-      setNotification({
-        isOpen: true,
-        type: 'error',
-        title: 'Xóa nhân viên thất bại',
-        message: err?.response?.data?.message || err?.message || 'Có lỗi xảy ra khi xóa nhân viên.',
-      });
+      const errCode = err?.response?.data?.errorCode;
+      if (errCode === 'EMPLOYEE_HAS_WORK_HISTORY') {
+        // Fallback nếu backend trả về mã EMPLOYEE_HAS_WORK_HISTORY
+        setEmployeeToDelete(null);
+        setEmployees((prev) =>
+          prev.map((e) => (e.id === target.id ? { ...e, status: 'inactive' } : e))
+        );
+        if (selectedDetailEmployee?.id === target.id) {
+          setSelectedDetailEmployee({ ...selectedDetailEmployee, status: 'inactive' });
+        }
+        await fetchEmployees();
+        setNotification({
+          isOpen: true,
+          type: 'warning',
+          title: 'Đã chuyển sang trạng thái Đã nghỉ',
+          message:
+            err?.response?.data?.message ||
+            `Nhân viên "${target.fullName}" đã có dữ liệu lịch làm việc hoặc phiếu lương nên đã được chuyển sang trạng thái "Đã nghỉ".`,
+          itemCode: target.employeeCode,
+        });
+      } else {
+        setNotification({
+          isOpen: true,
+          type: 'error',
+          title: 'Xóa nhân viên thất bại',
+          message: err?.response?.data?.message || err?.message || 'Có lỗi xảy ra khi xóa nhân viên.',
+        });
+      }
     } finally {
       setIsDeleting(false);
     }
@@ -1158,6 +1203,7 @@ export const EmployeeListPage: React.FC = () => {
         employee={editingEmployee}
         onSave={handleSaveEmployee}
         branches={branches}
+        existingEmployees={employees}
       />
 
       {/* 2. Modal Chi tiết nhân viên 360 */}
@@ -1209,7 +1255,7 @@ export const EmployeeListPage: React.FC = () => {
               Bạn có chắc chắn muốn xóa nhân viên <b>"{employeeToDelete?.fullName}"</b> khỏi hệ thống? Thao tác này sẽ ẩn nhân viên khỏi danh sách làm việc.
             </p>
             <p style={{ margin: '10px 0 0', fontSize: 12.5, color: '#B45309', backgroundColor: '#FEF3C7', padding: '8px 12px', borderRadius: 6, lineHeight: 1.5 }}>
-              ⚠️ <b>Lưu ý:</b> Chỉ nhân viên chưa phát sinh lịch làm việc / ca làm việc và phiếu lương mới có thể xóa khỏi hệ thống. Nhân viên đã có dữ liệu làm việc vui lòng chuyển sang "Ngừng làm việc".
+              ⚠️ <b>Lưu ý:</b> Nếu nhân viên đã phát sinh lịch làm việc hoặc phiếu lương, hệ thống sẽ <b>không xóa cứng</b> mà tự động chuyển trạng thái nhân viên sang <b>"Đã nghỉ" (Ngừng làm việc)</b> để bảo toàn lịch sử dữ liệu.
             </p>
           </>
         }

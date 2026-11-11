@@ -399,13 +399,19 @@ export const PayslipPaymentModal: React.FC<PayslipPaymentModalProps> = ({
 
             {/* Ghi chú chi tiền */}
             <div style={{ marginTop: 8 }}>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#475569', marginBottom: 6 }}>
-                Ghi chú thanh toán (Tùy chọn)
-              </label>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                <label style={{ fontSize: 12, fontWeight: 600, color: '#475569', margin: 0 }}>
+                  Ghi chú thanh toán (Tùy chọn)
+                </label>
+                <span style={{ fontSize: 11, color: notes.length > 500 ? '#EF4444' : '#94A3B8' }}>
+                  {notes.length}/500
+                </span>
+              </div>
               <input
                 type="text"
                 className="emp-form-input"
-                style={{ width: '100%', boxSizing: 'border-box' }}
+                maxLength={500}
+                style={{ width: '100%', boxSizing: 'border-box', borderColor: notes.length > 500 ? '#EF4444' : undefined }}
                 placeholder={isBatchMode ? 'Ví dụ: Đã chi trả lương hàng loạt kỳ này' : `Ví dụ: Đã chi trả lương kỳ ${payslip?.periodMonth}`}
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}

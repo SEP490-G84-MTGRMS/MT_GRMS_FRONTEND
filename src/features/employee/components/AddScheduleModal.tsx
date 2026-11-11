@@ -9,6 +9,7 @@ import type {
 import { shiftConfigApi, type ShiftConfigDto } from '../api/shiftConfigApi';
 import { scheduleApi, type CreateRecurringSchedulePayload } from '../api/scheduleApi';
 import { ScheduleScopeConfirmModal } from './ScheduleScopeConfirmModal';
+import { getVietnamToday, getVietnamTodayIso } from '../lib/vietnamTime';
 
 interface AddScheduleModalProps {
   isOpen: boolean;
@@ -94,7 +95,7 @@ const getScheduleDayOfWeek = (s: ScheduleAssignment): 'T2' | 'T3' | 'T4' | 'T5' 
     if (parts.length >= 2) {
       const dd = parseInt(parts[0], 10);
       const mm = parseInt(parts[1], 10) - 1;
-      const yyyy = parts.length >= 3 ? parseInt(parts[2], 10) : new Date().getFullYear();
+      const yyyy = parts.length >= 3 ? parseInt(parts[2], 10) : getVietnamToday().getFullYear();
       const d = new Date(yyyy, mm, dd);
       if (!isNaN(d.getTime())) return DAY_OF_WEEK_MAP[d.getDay()] || 'T2';
     }
@@ -342,11 +343,7 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
     if (dayObj && dayObj.dateIso) {
       return dayObj.dateIso;
     }
-    const now = new Date();
-    const yyyy = now.getFullYear();
-    const mm = String(now.getMonth() + 1).padStart(2, '0');
-    const dd = String(now.getDate()).padStart(2, '0');
-    return `${yyyy}-${mm}-${dd}`;
+    return getVietnamTodayIso();
   }, [defaultStartDate, selectedDays, defaultDayOfWeek, activeDaysList]);
 
   // Ngày cuối cùng của tháng sau (hiển thị khi không chọn ngày kết thúc)
@@ -433,7 +430,7 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
     if (!editingAssignment?.dateStr) return '16/10/2026';
     const str = editingAssignment.dateStr;
     if (str.split('/').length === 3) return str;
-    return `${str}/${new Date().getFullYear()}`;
+    return `${str}/${getVietnamToday().getFullYear()}`;
   }, [editingAssignment]);
 
   // Tên ngày hiện tại hiển thị ở subtitle
@@ -520,6 +517,16 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentEmp) return;
+
+    if (currentEmp.startDate) {
+      const empStartStr = currentEmp.startDate.slice(0, 10);
+      if (calculatedStartDate && calculatedStartDate < empStartStr) {
+        setSubmitError(
+          `Không thể phân ca cho nhân viên "${currentEmp.fullName}" vào ngày ${calculatedStartDate} trước ngày bắt đầu làm việc (${empStartStr}).`
+        );
+        return;
+      }
+    }
 
     // Xác định thông tin ca
     let shiftName = '';

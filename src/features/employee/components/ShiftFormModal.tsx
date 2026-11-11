@@ -64,6 +64,15 @@ export const ShiftFormModal: React.FC<ShiftFormModalProps> = ({
       alert('Vui lòng nhập tên ca làm việc!');
       return;
     }
+    if (name.trim().length > 100) {
+      alert('Tên ca làm việc không được vượt quá 100 ký tự!');
+      return;
+    }
+    const totalHours = calculateHours();
+    if (startTime === endTime || totalHours <= 0 || totalHours < 0.5) {
+      alert('Giờ bắt đầu và giờ kết thúc không được trùng nhau (thời lượng ca tối thiểu 30 phút)!');
+      return;
+    }
 
     const savedShift: WorkShiftDefinition = {
       id: shift?.id || `s_${Date.now()}`,

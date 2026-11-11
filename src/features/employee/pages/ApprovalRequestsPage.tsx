@@ -210,6 +210,34 @@ export const ApprovalRequestsPage: React.FC = () => {
     e.preventDefault();
     if (!selectedRequest) return;
 
+    if (!isApproveAction && !reviewNote.trim()) {
+      setNotification({
+        isOpen: true,
+        type: 'error',
+        title: 'Thiếu lý do từ chối',
+        message: 'Vui lòng cung cấp lý do từ chối yêu cầu.',
+      });
+      return;
+    }
+    if (reviewNote.trim().length > 500) {
+      setNotification({
+        isOpen: true,
+        type: 'error',
+        title: 'Quá giới hạn ký tự',
+        message: 'Ghi chú phản hồi không được vượt quá 500 ký tự.',
+      });
+      return;
+    }
+    if (isApproveAction && selectedRequest.requestType === ScheduleRequestType.Overtime && (approvedMinutes < 0 || approvedMinutes > 480)) {
+      setNotification({
+        isOpen: true,
+        type: 'error',
+        title: 'Số phút OT không hợp lệ',
+        message: 'Số phút làm thêm giờ phê duyệt phải từ 0 đến 480 phút.',
+      });
+      return;
+    }
+
     try {
       setIsSubmitting(true);
       const payload: ReviewScheduleApprovalRequestDto = {

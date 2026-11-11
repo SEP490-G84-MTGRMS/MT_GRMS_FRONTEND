@@ -40,12 +40,13 @@ import { ScheduleRequestType } from '../types/scheduleApprovalTypes';
 import { employeeApi } from '../api/employeeApi';
 import { shiftConfigApi, type ShiftConfigDto } from '../api/shiftConfigApi';
 import { scheduleApi, getShiftColor } from '../api/scheduleApi';
+import { getVietnamToday } from '../lib/vietnamTime';
 import { useAuthStore } from '../../../stores/useAuthStore';
 import '../employee.css';
 
 const getWeekDates = (offsetWeeks: number) => {
-  // Mốc mặc định: Thứ Hai của tuần hiện tại
-  const now = new Date();
+  // Mốc mặc định: Thứ Hai của tuần hiện tại theo múi giờ Việt Nam (UTC+7)
+  const now = getVietnamToday();
   const currentDay = now.getDay();
   const distanceToMonday = (currentDay + 6) % 7;
   const baseMonday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - distanceToMonday);

@@ -43,6 +43,14 @@ export const CreatePayslipModal: React.FC<CreatePayslipModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!periodMonth || !/^\d{4}-(0[1-9]|1[0-2])$/.test(periodMonth.trim())) {
+      setSubmitError('Kỳ tính lương phải có định dạng yyyy-MM (Ví dụ: 2026-11).');
+      return;
+    }
+    if (batchNote.length > 500) {
+      setSubmitError('Ghi chú không được vượt quá 500 ký tự.');
+      return;
+    }
     setIsSubmitting(true);
     setSubmitError(null);
 
@@ -278,13 +286,20 @@ export const CreatePayslipModal: React.FC<CreatePayslipModalProps> = ({
 
             {/* Ghi chú chung đợt tính lương */}
             <div className="emp-form-group" style={{ marginTop: 8 }}>
-              <label className="emp-form-label">Ghi chú đợt khởi tạo bảng lương</label>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                <label className="emp-form-label" style={{ marginBottom: 0 }}>Ghi chú đợt khởi tạo bảng lương</label>
+                <span style={{ fontSize: 11, color: batchNote.length > 500 ? '#EF4444' : '#94A3B8' }}>
+                  {batchNote.length}/500
+                </span>
+              </div>
               <input
                 type="text"
                 className="emp-form-input"
+                maxLength={500}
                 placeholder="Ví dụ: Bảng lương tháng 11/2026 - Quyết toán kỳ chuẩn"
                 value={batchNote}
                 onChange={(e) => setBatchNote(e.target.value)}
+                style={{ borderColor: batchNote.length > 500 ? '#EF4444' : undefined }}
               />
             </div>
           </div>

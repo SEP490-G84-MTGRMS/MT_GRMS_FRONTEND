@@ -26,6 +26,7 @@ import { CreateScheduleRequestModal } from '../components/CreateScheduleRequestM
 import { ScheduleRequestsHistoryModal } from '../components/ScheduleRequestsHistoryModal';
 import { FaceIdAttendanceModal } from '../components/FaceIdAttendanceModal';
 import { ScheduleRequestType } from '../types/scheduleApprovalTypes';
+import { getVietnamToday } from '../lib/vietnamTime';
 import { useAuthStore } from '../../../stores/useAuthStore';
 import '../employee.css';
 
@@ -43,7 +44,7 @@ const DAY_KEYS: Array<'CN' | 'T2' | 'T3' | 'T4' | 'T5' | 'T6' | 'T7'> = [
 ];
 
 const getWeekDates = (offsetWeeks: number) => {
-  const now = new Date();
+  const now = getVietnamToday();
   const currentDay = now.getDay();
   const distanceToMonday = (currentDay + 6) % 7;
   const baseMonday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - distanceToMonday);
@@ -137,8 +138,7 @@ const mapScheduleToAttendanceRecord = (s: ScheduleResponse): AttendanceRecord =>
   if (s.status === 'Cancelled') {
     status = 'absent';
   } else if (s.checkInTime && !s.checkOutTime) {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const today = getVietnamToday();
     const scheduleDate = new Date(s.workDate);
     scheduleDate.setHours(0, 0, 0, 0);
     if (scheduleDate < today) {
@@ -155,8 +155,7 @@ const mapScheduleToAttendanceRecord = (s: ScheduleResponse): AttendanceRecord =>
   } else if (s.checkInTime) {
     status = 'ontime';
   } else {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const today = getVietnamToday();
     const scheduleDate = new Date(s.workDate);
     scheduleDate.setHours(0, 0, 0, 0);
     if (scheduleDate < today) {

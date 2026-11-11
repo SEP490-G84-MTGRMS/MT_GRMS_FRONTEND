@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { X, Eye, EyeOff, User, AlertCircle, CheckCircle2, Loader2, Info } from 'lucide-react';
 import { employeeApi } from '../api/employeeApi';
 
@@ -36,8 +36,14 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const [hasSubmitted, setHasSubmitted] = useState(false);
 
   const isUpdateMode = Boolean(initialUsername && initialUsername.trim());
+
+  const markTouched = (field: string) => {
+    setTouched((prev) => ({ ...prev, [field]: true }));
+  };
 
   // Khởi tạo form khi mở modal
   useEffect(() => {
@@ -61,39 +67,69 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
     setErrorMessage(null);
     setSuccessMessage(null);
     setIsSubmitting(false);
+    setTouched({});
+    setHasSubmitted(false);
   }, [isOpen, employeeName, phone, initialUsername]);
+
+  // Realtime Inline Validation
+  const displayNameError = useMemo(() => {
+    const trimmed = displayName.trim();
+    if (!trimmed) return 'Tên hiển thị không được để trống.';
+    if (trimmed.length < 2) return 'Tên hiển thị phải từ 2 đến 100 ký tự.';
+    if (displayName.length > 100) return 'Tên hiển thị không vượt quá 100 ký tự.';
+    if (!/^[\p{L}\s'.\-]+$/u.test(trimmed)) {
+      return 'Tên hiển thị không được chứa chữ số hoặc ký tự đặc biệt.';
+    }
+    return null;
+  }, [displayName]);
+
+  const usernameError = useMemo(() => {
+    const trimmed = username.trim();
+    if (!trimmed) return 'Tên đăng nhập không được để trống.';
+    if (trimmed.length < 3) return 'Tên đăng nhập phải từ 3 đến 50 ký tự.';
+    if (trimmed.length > 50) return 'Tên đăng nhập không vượt quá 50 ký tự.';
+    if (/\s/.test(trimmed)) return 'Tên đăng nhập không được chứa khoảng trắng.';
+    if (/[^\x00-\x7F]/.test(trimmed)) {
+      return 'Tên đăng nhập chỉ được nhập chữ cái tiếng Việt không dấu (a-z) và chữ số (0-9).';
+    }
+    if (!/^[a-z0-9._-]+$/i.test(trimmed)) {
+      return 'Tên đăng nhập chỉ gồm chữ cái không dấu (a-z), chữ số (0-9), dấu chấm, gạch dưới (_) hoặc gạch ngang (-).';
+    }
+    return null;
+  }, [username]);
+
+  const passwordError = useMemo(() => {
+    if (!isUpdateMode && !password) return 'Mật khẩu khởi tạo không được để trống.';
+    if (password && password.length < 6) return 'Mật khẩu phải bao gồm tối thiểu 6 ký tự.';
+    if (password.length > 50) return 'Mật khẩu không vượt quá 50 ký tự.';
+    return null;
+  }, [password, isUpdateMode]);
+
+  const confirmPasswordError = useMemo(() => {
+    if (!isUpdateMode && !confirmPassword) return 'Vui lòng nhập xác nhận mật khẩu.';
+    if ((password || confirmPassword) && password !== confirmPassword) {
+      return 'Xác nhận mật khẩu không trùng khớp với mật khẩu đã nhập.';
+    }
+    return null;
+  }, [password, confirmPassword, isUpdateMode]);
 
   if (!isOpen) return null;
 
   const validate = (): boolean => {
-    const trimmedDisplayName = displayName.trim();
-    if (!trimmedDisplayName) {
-      setErrorMessage('Vui lòng nhập Tên hiển thị!');
+    if (displayNameError) {
+      setErrorMessage(displayNameError);
       return false;
     }
-    const trimmedUser = username.trim();
-    if (!trimmedUser) {
-      setErrorMessage('Vui lòng nhập Tên đăng nhập!');
+    if (usernameError) {
+      setErrorMessage(usernameError);
       return false;
     }
-    if (trimmedUser.length < 3 || trimmedUser.length > 50) {
-      setErrorMessage('Tên đăng nhập phải từ 3 đến 50 ký tự!');
+    if (passwordError) {
+      setErrorMessage(passwordError);
       return false;
     }
-    if (/\s/.test(trimmedUser)) {
-      setErrorMessage('Tên đăng nhập không được chứa khoảng trắng!');
-      return false;
-    }
-    if (!isUpdateMode && !password) {
-      setErrorMessage('Vui lòng nhập Mật khẩu khởi tạo!');
-      return false;
-    }
-    if (password && password.length < 6) {
-      setErrorMessage('Mật khẩu phải bao gồm tối thiểu 6 ký tự!');
-      return false;
-    }
-    if (password && password !== confirmPassword) {
-      setErrorMessage('Xác nhận mật khẩu không trùng khớp!');
+    if (confirmPasswordError) {
+      setErrorMessage(confirmPasswordError);
       return false;
     }
     return true;
@@ -101,6 +137,7 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setHasSubmitted(true);
     if (!validate()) return;
 
     setErrorMessage(null);
@@ -379,17 +416,28 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
 
             {/* Tên hiển thị */}
             <div>
-              <label style={{ display: 'block', fontSize: 12.5, fontWeight: 600, color: '#334155', marginBottom: 5 }}>
-                Tên hiển thị <span style={{ color: '#EF4444' }}>*</span>
-              </label>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
+                <label style={{ fontSize: 12.5, fontWeight: 600, color: '#334155', margin: 0 }}>
+                  Tên hiển thị <span style={{ color: '#EF4444' }}>*</span>
+                </label>
+                <span style={{ fontSize: 11, color: displayName.length > 100 ? '#EF4444' : '#94A3B8' }}>
+                  {displayName.length}/100
+                </span>
+              </div>
               <div style={{ position: 'relative' }}>
                 <input
                   type="text"
                   placeholder="VD: Nguyễn Văn A"
                   value={displayName}
+                  maxLength={100}
                   onChange={(e) => {
                     setDisplayName(e.target.value);
+                    if (!touched.displayName) markTouched('displayName');
                     if (errorMessage) setErrorMessage(null);
+                  }}
+                  onBlur={() => {
+                    setDisplayName((prev) => prev.replace(/\s+/g, ' ').trim());
+                    markTouched('displayName');
                   }}
                   disabled={isSubmitting}
                   required
@@ -397,7 +445,7 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
                     width: '100%',
                     padding: '8.5px 12px',
                     borderRadius: 6,
-                    border: '1px solid #CBD5E1',
+                    border: `1px solid ${(touched.displayName || hasSubmitted) && displayNameError ? '#EF4444' : '#CBD5E1'}`,
                     fontSize: 13,
                     color: '#0F172A',
                     boxSizing: 'border-box',
@@ -405,29 +453,42 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
                   }}
                 />
               </div>
+              {(touched.displayName || hasSubmitted) && displayNameError && (
+                <div style={{ fontSize: 12, color: '#DC2626', marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span>•</span> {displayNameError}
+                </div>
+              )}
             </div>
 
             {/* Tên đăng nhập */}
             <div>
-              <label style={{ display: 'block', fontSize: 12.5, fontWeight: 600, color: '#334155', marginBottom: 5 }}>
-                Tên đăng nhập <span style={{ color: '#EF4444' }}>*</span>
-              </label>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
+                <label style={{ fontSize: 12.5, fontWeight: 600, color: '#334155', margin: 0 }}>
+                  Tên đăng nhập <span style={{ color: '#EF4444' }}>*</span>
+                </label>
+                <span style={{ fontSize: 11, color: username.length > 50 ? '#EF4444' : '#94A3B8' }}>
+                  {username.length}/50
+                </span>
+              </div>
               <div style={{ position: 'relative' }}>
                 <input
                   type="text"
                   placeholder="VD: cashier_lan hoặc nv001"
                   value={username}
+                  maxLength={50}
                   onChange={(e) => {
                     setUsername(e.target.value.toLowerCase());
+                    if (!touched.username) markTouched('username');
                     if (errorMessage) setErrorMessage(null);
                   }}
+                  onBlur={() => markTouched('username')}
                   disabled={isSubmitting}
                   required
                   style={{
                     width: '100%',
                     padding: '8.5px 12px',
                     borderRadius: 6,
-                    border: '1px solid #CBD5E1',
+                    border: `1px solid ${(touched.username || hasSubmitted) && usernameError ? '#EF4444' : '#CBD5E1'}`,
                     fontSize: 13,
                     color: '#0F172A',
                     boxSizing: 'border-box',
@@ -435,37 +496,51 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
                   }}
                 />
               </div>
-              <span style={{ fontSize: 11, color: '#64748B', marginTop: 4, display: 'block' }}>
-                Từ 3 - 50 ký tự, viết liền không dấu, không chứa khoảng trắng.
-              </span>
+              {(touched.username || hasSubmitted) && usernameError ? (
+                <div style={{ fontSize: 12, color: '#DC2626', marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span>•</span> {usernameError}
+                </div>
+              ) : (
+                <span style={{ fontSize: 11, color: '#64748B', marginTop: 4, display: 'block' }}>
+                  Từ 3 - 50 ký tự, chỉ gồm chữ cái không dấu (a-z), chữ số (0-9), dấu chấm, gạch dưới/ngang.
+                </span>
+              )}
             </div>
 
             {/* Mật khẩu */}
             <div>
-              <label style={{ display: 'block', fontSize: 12.5, fontWeight: 600, color: '#334155', marginBottom: 5 }}>
-                {isUpdateMode ? 'Mật khẩu mới' : 'Mật khẩu khởi tạo'}{' '}
-                {!isUpdateMode ? (
-                  <span style={{ color: '#EF4444' }}>*</span>
-                ) : (
-                  <span style={{ fontSize: 11, fontWeight: 400, color: '#64748B' }}>(Để trống nếu không đổi)</span>
-                )}
-              </label>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
+                <label style={{ fontSize: 12.5, fontWeight: 600, color: '#334155', margin: 0 }}>
+                  {isUpdateMode ? 'Mật khẩu mới' : 'Mật khẩu khởi tạo'}{' '}
+                  {!isUpdateMode ? (
+                    <span style={{ color: '#EF4444' }}>*</span>
+                  ) : (
+                    <span style={{ fontSize: 11, fontWeight: 400, color: '#64748B' }}>(Để trống nếu không đổi)</span>
+                  )}
+                </label>
+                <span style={{ fontSize: 11, color: password.length > 50 ? '#EF4444' : '#94A3B8' }}>
+                  {password.length}/50
+                </span>
+              </div>
               <div style={{ position: 'relative' }}>
                 <input
                   type={showPassword ? 'text' : 'password'}
                   placeholder={isUpdateMode ? 'Nhập mật khẩu mới nếu muốn thay đổi' : 'Tối thiểu 6 ký tự'}
                   value={password}
+                  maxLength={50}
                   onChange={(e) => {
                     setPassword(e.target.value);
+                    if (!touched.password) markTouched('password');
                     if (errorMessage) setErrorMessage(null);
                   }}
+                  onBlur={() => markTouched('password')}
                   disabled={isSubmitting}
                   required={!isUpdateMode}
                   style={{
                     width: '100%',
                     padding: '8.5px 36px 8.5px 12px',
                     borderRadius: 6,
-                    border: '1px solid #CBD5E1',
+                    border: `1px solid ${(touched.password || hasSubmitted) && passwordError ? '#EF4444' : '#CBD5E1'}`,
                     fontSize: 13,
                     color: '#0F172A',
                     boxSizing: 'border-box',
@@ -491,30 +566,43 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
                   {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
+              {(touched.password || hasSubmitted) && passwordError && (
+                <div style={{ fontSize: 12, color: '#DC2626', marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span>•</span> {passwordError}
+                </div>
+              )}
             </div>
 
             {/* Xác nhận mật khẩu */}
             <div>
-              <label style={{ display: 'block', fontSize: 12.5, fontWeight: 600, color: '#334155', marginBottom: 5 }}>
-                {isUpdateMode ? 'Xác nhận mật khẩu mới' : 'Xác nhận mật khẩu'}{' '}
-                {!isUpdateMode && <span style={{ color: '#EF4444' }}>*</span>}
-              </label>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
+                <label style={{ fontSize: 12.5, fontWeight: 600, color: '#334155', margin: 0 }}>
+                  {isUpdateMode ? 'Xác nhận mật khẩu mới' : 'Xác nhận mật khẩu'}{' '}
+                  {!isUpdateMode && <span style={{ color: '#EF4444' }}>*</span>}
+                </label>
+                <span style={{ fontSize: 11, color: confirmPassword.length > 50 ? '#EF4444' : '#94A3B8' }}>
+                  {confirmPassword.length}/50
+                </span>
+              </div>
               <div style={{ position: 'relative' }}>
                 <input
                   type={showConfirmPassword ? 'text' : 'password'}
                   placeholder={isUpdateMode ? 'Nhập lại mật khẩu mới nếu thay đổi' : 'Nhập lại mật khẩu khởi tạo'}
                   value={confirmPassword}
+                  maxLength={50}
                   onChange={(e) => {
                     setConfirmPassword(e.target.value);
+                    if (!touched.confirmPassword) markTouched('confirmPassword');
                     if (errorMessage) setErrorMessage(null);
                   }}
+                  onBlur={() => markTouched('confirmPassword')}
                   disabled={isSubmitting}
                   required={!isUpdateMode}
                   style={{
                     width: '100%',
                     padding: '8.5px 36px 8.5px 12px',
                     borderRadius: 6,
-                    border: '1px solid #CBD5E1',
+                    border: `1px solid ${(touched.confirmPassword || hasSubmitted) && confirmPasswordError ? '#EF4444' : '#CBD5E1'}`,
                     fontSize: 13,
                     color: '#0F172A',
                     boxSizing: 'border-box',
@@ -540,6 +628,11 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
                   {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
+              {(touched.confirmPassword || hasSubmitted) && confirmPasswordError && (
+                <div style={{ fontSize: 12, color: '#DC2626', marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span>•</span> {confirmPasswordError}
+                </div>
+              )}
             </div>
           </div>
 

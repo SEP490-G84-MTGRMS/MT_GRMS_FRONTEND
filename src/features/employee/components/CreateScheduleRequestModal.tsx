@@ -23,6 +23,7 @@ import {
 import { scheduleApprovalApi } from '../api/scheduleApprovalApi';
 import { employeeApi } from '../api/employeeApi';
 import { scheduleApi } from '../api/scheduleApi';
+import { formatLocalDateIso, getVietnamToday } from '../lib/vietnamTime';
 import { uploadImageToCloudinary } from '../../../utils/cloudinary';
 import type { Employee } from '../types';
 
@@ -95,6 +96,20 @@ export const CreateScheduleRequestModal: React.FC<CreateScheduleRequestModalProp
   const [loadingColleagues, setLoadingColleagues] = useState<boolean>(false);
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [reasonTouched, setReasonTouched] = useState<boolean>(false);
+
+  const reasonError = !reason.trim()
+    ? 'Vui lòng nhập lý do giải trình.'
+    : reason.trim().length < 5
+      ? 'Lý do giải trình tối thiểu 5 ký tự.'
+      : reason.length > 500
+        ? 'Lý do giải trình không vượt quá 500 ký tự.'
+        : null;
+
+  const overtimeError =
+    requestType === ScheduleRequestType.Overtime && (overtimeMinutes < 15 || overtimeMinutes > 480)
+      ? 'Số phút làm thêm giờ (OT) phải từ 15 đến 480 phút.'
+      : null;
 
   // Khởi tạo form khi mở modal
   useEffect(() => {
@@ -107,6 +122,7 @@ export const CreateScheduleRequestModal: React.FC<CreateScheduleRequestModalProp
     setTargetEmployeeId('');
     setOvertimeMinutes(60);
     setReason('');
+    setReasonTouched(false);
     setEvidenceImageUrls([]);
     setUploadingImage(false);
     setUploadError(null);
@@ -117,11 +133,11 @@ export const CreateScheduleRequestModal: React.FC<CreateScheduleRequestModalProp
       setCheckInTime(safeFormatTime(schedule.plannedStartTime, '08:00'));
       setCheckOutTime(safeFormatTime(schedule.plannedEndTime, '17:00'));
     } else {
-      // Mở từ thanh điều hướng (chưa chọn ca) -> tải danh sách ca của nhân viên
+      // Mở từ thanh điều hướng (chưa chọn ca) -> tải danh sách ca của nhân viên theo chuẩn múi giờ UTC+7
       setLoadingSchedules(true);
-      const now = new Date();
-      const fromDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7).toISOString().slice(0, 10);
-      const toDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 14).toISOString().slice(0, 10);
+      const vnToday = getVietnamToday();
+      const fromDate = formatLocalDateIso(new Date(vnToday.getFullYear(), vnToday.getMonth(), vnToday.getDate() - 7));
+      const toDate = formatLocalDateIso(new Date(vnToday.getFullYear(), vnToday.getMonth(), vnToday.getDate() + 14));
 
       scheduleApi
         .getRawMySchedules(fromDate, toDate)
@@ -236,13 +252,24 @@ export const CreateScheduleRequestModal: React.FC<CreateScheduleRequestModalProp
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setReasonTouched(true);
     if (!selectedSchedule) {
       setErrorMessage('Vui lòng chọn ca làm việc.');
       return;
     }
 
-    if (!reason.trim()) {
-      setErrorMessage('Vui lòng nhập lý do gửi yêu cầu.');
+    if (uploadingImage) {
+      setErrorMessage('Ảnh minh chứng đang được tải lên, vui lòng chờ giây lát.');
+      return;
+    }
+
+    if (overtimeError) {
+      setErrorMessage(overtimeError);
+      return;
+    }
+
+    if (reasonError) {
+      setErrorMessage(reasonError);
       return;
     }
 
@@ -913,7 +940,13 @@ export const CreateScheduleRequestModal: React.FC<CreateScheduleRequestModalProp
                     className="emp-form-input"
                     value={overtimeMinutes}
                     onChange={(e) => setOvertimeMinutes(parseInt(e.target.value, 10) || 0)}
-                    style={{ width: 110, height: 38, fontSize: 13, background: '#FFFFFF' }}
+                    style={{
+                      width: 110,
+                      height: 38,
+                      fontSize: 13,
+                      background: '#FFFFFF',
+                      borderColor: overtimeError ? '#EF4444' : undefined,
+                    }}
                     required
                   />
                   <span style={{ fontSize: 13, color: '#64748B' }}>phút</span>
@@ -940,37 +973,57 @@ export const CreateScheduleRequestModal: React.FC<CreateScheduleRequestModalProp
                     ))}
                   </div>
                 </div>
+                {overtimeError && (
+                  <div style={{ fontSize: 12, color: '#DC2626', marginTop: 4 }}>
+                    • {overtimeError}
+                  </div>
+                )}
               </div>
             )}
 
             {/* Lý do */}
             <div>
-              <label
-                style={{
-                  fontSize: 13,
-                  fontWeight: 600,
-                  color: '#334155',
-                  display: 'block',
-                  marginBottom: 6,
-                }}
-              >
-                Lý do giải trình <span style={{ color: '#EF4444' }}>*</span>
-              </label>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                <label
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: '#334155',
+                    margin: 0,
+                  }}
+                >
+                  Lý do giải trình <span style={{ color: '#EF4444' }}>*</span>
+                </label>
+                <span style={{ fontSize: 11, color: reason.length > 500 ? '#EF4444' : '#94A3B8' }}>
+                  {reason.length}/500
+                </span>
+              </div>
               <textarea
                 className="emp-form-textarea"
                 rows={3}
+                maxLength={500}
                 value={reason}
-                onChange={(e) => setReason(e.target.value)}
-                placeholder="Nhập lý do gửi yêu cầu..."
+                onChange={(e) => {
+                  setReason(e.target.value);
+                  if (!reasonTouched) setReasonTouched(true);
+                }}
+                onBlur={() => setReasonTouched(true)}
+                placeholder="Nhập lý do gửi yêu cầu (tối thiểu 5 ký tự)..."
                 style={{
                   width: '100%',
                   fontSize: 13,
                   minHeight: 80,
                   lineHeight: 1.5,
                   resize: 'vertical',
+                  borderColor: reasonTouched && reasonError ? '#EF4444' : undefined,
                 }}
                 required
               />
+              {reasonTouched && reasonError && (
+                <div style={{ fontSize: 12, color: '#DC2626', marginTop: 4 }}>
+                  • {reasonError}
+                </div>
+              )}
             </div>
 
             {/* Tệp đính kèm (Nhiều ảnh) */}

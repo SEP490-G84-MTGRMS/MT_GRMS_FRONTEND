@@ -181,8 +181,18 @@ export const ShiftConfigModal: React.FC<ShiftConfigModalProps> = ({
       return;
     }
 
+    if (shiftName.trim().length > 100) {
+      setErrorMessage('Tên ca làm việc không được vượt quá 100 ký tự.');
+      return;
+    }
+
     if (selectedBranchIds.length === 0) {
       setErrorMessage('Vui lòng chọn ít nhất một chi nhánh trong phạm vi áp dụng.');
+      return;
+    }
+
+    if (startTime === endTime || durationInfo.hours <= 0 || durationInfo.hours < 0.5) {
+      setErrorMessage('Giờ bắt đầu và giờ kết thúc không hợp lệ (thời lượng ca phải từ 0.5 đến 24 giờ).');
       return;
     }
 
