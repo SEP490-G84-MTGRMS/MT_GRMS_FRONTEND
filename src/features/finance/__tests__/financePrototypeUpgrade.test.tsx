@@ -66,7 +66,7 @@ const MOCK_PNL_REPORT: PnlReportResponse = {
     startDate: '2026-11-01',
     endDate: '2026-11-10',
   },
-  kpiSummary: {
+  kpiSummary: ({
     grossSales: 350000000,
     discounts: 10000000,
     returns: 5000000,
@@ -83,7 +83,7 @@ const MOCK_PNL_REPORT: PnlReportResponse = {
     netProfitAfterTaxMarginPct: 24.1,
     totalOrders: 1240,
     averageOrderValue: 270161,
-  },
+  } as any),
   pnlTree: [
     {
       id: 'sec-1',

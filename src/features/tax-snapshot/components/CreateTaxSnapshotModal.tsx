@@ -8,7 +8,6 @@ import {
   Check,
   Copy,
   Loader2,
-  Calendar,
 } from 'lucide-react';
 import {
   TaxCalculationMethod,

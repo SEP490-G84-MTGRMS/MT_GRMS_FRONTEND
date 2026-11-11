@@ -4,7 +4,6 @@ import {
   Scale,
   Building2,
   FileSpreadsheet,
-  CheckCircle,
   AlertCircle,
   ChevronDown,
   ChevronUp,
@@ -38,7 +37,7 @@ export const TaxDeclarationFormView: React.FC<TaxDeclarationFormViewProps> = ({
   applyVatReduction,
   onToggleVatReduction,
   customVatRate,
-  customPitRate,
+  customPitRate: _customPitRate,
   vatReductionPercentage,
   onOpenRateConfig,
   isLoading,
@@ -54,7 +53,6 @@ export const TaxDeclarationFormView: React.FC<TaxDeclarationFormViewProps> = ({
   }
 
   const isDeclaration = calculationMethod === TaxCalculationMethod.DeclarationBased;
-  const isExempt = summary.isTaxExempt;
 
   const reductionPct: number =
     summary.vatReductionPercentage != null && summary.vatReductionPercentage > 0

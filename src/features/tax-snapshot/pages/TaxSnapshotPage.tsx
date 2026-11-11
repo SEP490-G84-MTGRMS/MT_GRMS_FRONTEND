@@ -16,7 +16,6 @@ import {
 import { AdminToast, type ToastState } from '../../admin/components';
 import { useTaxSnapshots } from '../hooks/useTaxSnapshots';
 import { TaxKPICards } from '../components/TaxKPICards';
-import { TaxSnapshotTable } from '../components/TaxSnapshotTable';
 import { TaxSnapshotsHistoryView } from '../components/TaxSnapshotsHistoryView';
 import { CreateTaxSnapshotModal } from '../components/CreateTaxSnapshotModal';
 import { TaxRateConfigModal } from '../components/TaxRateConfigModal';

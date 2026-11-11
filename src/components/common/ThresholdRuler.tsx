@@ -1,5 +1,5 @@
 import React from 'react';
-import { AlertTriangle, CheckCircle2, Info } from 'lucide-react';
+import { AlertTriangle, Info } from 'lucide-react';
 import { formatMoney } from '../../features/finance/utils/formatters';
 import { HouseholdTaxGroup } from '../../features/tax-snapshot/types/taxSnapshot';
 

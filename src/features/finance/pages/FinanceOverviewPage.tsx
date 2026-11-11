@@ -565,7 +565,7 @@ function useFinanceOverviewController() {
         next
           ? 'Đã bật Chế độ Kế toán (hiện đối chiếu dồn tích & thực thu chi).'
           : 'Đã ẩn thuật ngữ kế toán để xem đơn giản.',
-        'teal'
+        'info'
       );
       return next;
     });

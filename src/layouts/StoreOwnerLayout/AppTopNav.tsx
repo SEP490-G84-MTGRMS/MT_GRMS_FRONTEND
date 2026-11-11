@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useMemo, Fragment } from "react";
-import type { FC } from "react";
+import type { FC, RefObject } from "react";
 import { NavLink, Link, useLocation, useNavigate } from "react-router-dom";
 import {
   DashboardIcon,
@@ -494,7 +494,7 @@ interface DropdownProps {
   items?: NavSubItem[];
   sections?: NavSection[];
   isOpen: boolean;
-  anchorRef: React.RefObject<HTMLDivElement | null>;
+  anchorRef: RefObject<HTMLDivElement | null>;
   onClose: () => void;
   onMouseEnter?: () => void;
   onMouseLeave?: () => void;
@@ -1015,7 +1015,7 @@ export const AppTopNav: FC = () => {
     }, 220);
   }, [clearSettingsTimer]);
   const anchorRefs = useRef<
-    Map<string, React.RefObject<HTMLDivElement | null>>
+    Map<string, RefObject<HTMLDivElement | null>>
   >(new Map());
   const closeTimerRef = useRef<number | null>(null);
 
@@ -1110,7 +1110,7 @@ export const AppTopNav: FC = () => {
   }, [accountMenuOpen]);
 
   const getAnchorRef = useCallback(
-    (id: string): React.RefObject<HTMLDivElement | null> => {
+    (id: string): RefObject<HTMLDivElement | null> => {
       if (!anchorRefs.current.has(id)) {
         anchorRefs.current.set(id, { current: null });
       }

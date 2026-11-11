@@ -5,7 +5,6 @@ import {
   ShieldAlert,
   Eye,
   FileSpreadsheet,
-  Lock,
   Copy,
   Check,
   X,

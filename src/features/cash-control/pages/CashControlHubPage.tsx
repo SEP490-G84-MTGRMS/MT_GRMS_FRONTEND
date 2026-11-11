@@ -10,7 +10,6 @@ import {
   ArrowUpCircle,
   Wallet,
   Clock,
-  User,
   Check,
   X,
   Sliders,
