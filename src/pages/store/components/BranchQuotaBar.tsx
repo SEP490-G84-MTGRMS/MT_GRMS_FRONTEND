@@ -77,11 +77,11 @@ export const BranchQuotaBar: FC<BranchQuotaBarProps> = ({
               width: 44,
               height: 44,
               borderRadius: 14,
-              background: canAddMore ? '#ECFDF5' : '#FFFBEB',
+              background: '#ECFDF5',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              color: quotaAccent,
+              color: '#0F766E',
             }}
           >
             <Building2 size={24} strokeWidth={2} />

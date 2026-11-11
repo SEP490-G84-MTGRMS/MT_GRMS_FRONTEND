@@ -1,48 +1,49 @@
 // src/pages/store/StoreSettingsHubPage.tsx
-import { useState, useEffect, type FC } from 'react';
-import { useSearchParams, useNavigate, Navigate } from 'react-router-dom';
+import { useState, useEffect, type FC } from "react";
+import { useSearchParams, useNavigate, Navigate } from "react-router-dom";
 import {
   INITIAL_STORE_INFO,
   type StoreInfo,
   type SubscriptionPlanItem,
-} from './storeData';
-import { StoreSidebarNav, type StoreHubTabKey } from './components/StoreSidebarNav';
-import { StoreTopStatusBar } from './components/StoreTopStatusBar';
-import { SubscriptionPricingCards } from './components/SubscriptionPricingCards';
-import { SubscriptionCheckoutModal } from './components/SubscriptionCheckoutModal';
-import { StoreWalletTopupModal } from './components/StoreWalletTopupModal';
-import { StoreInfoTab } from './components/StoreInfoTab';
-import { OrderHistoryTab } from './components/OrderHistoryTab';
-import { TermsOfServiceTab } from './components/TermsOfServiceTab';
-import { WalletLedgerTab } from './components/WalletLedgerTab';
-import { BranchManagementTab } from './components/BranchManagementTab';
-import { storeApi, mapBackendStoreToFrontend } from './api/storeApi';
+} from "./storeData";
+import {
+  StoreSidebarNav,
+  type StoreHubTabKey,
+} from "./components/StoreSidebarNav";
+import { StoreTopStatusBar } from "./components/StoreTopStatusBar";
+import { SubscriptionPricingCards } from "./components/SubscriptionPricingCards";
+import { SubscriptionCheckoutModal } from "./components/SubscriptionCheckoutModal";
+import { StoreWalletTopupModal } from "./components/StoreWalletTopupModal";
+import { StoreInfoTab } from "./components/StoreInfoTab";
+import { OrderHistoryTab } from "./components/OrderHistoryTab";
+import { TermsOfServiceTab } from "./components/TermsOfServiceTab";
+import { WalletLedgerTab } from "./components/WalletLedgerTab";
+import { BranchManagementTab } from "./components/BranchManagementTab";
+import { storeApi, mapBackendStoreToFrontend } from "./api/storeApi";
 
 const VALID_TABS: StoreHubTabKey[] = [
-  'store-info',
-  'branches',
-  'subscriptions',
-  'order-history',
-  'terms',
-  'wallet',
+  "store-info",
+  "branches",
+  "subscriptions",
+  "order-history",
+  "terms",
+  "wallet",
 ];
 
 export const StoreSettingsHubPage: FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const rawTab = searchParams.get('tab');
+  const rawTab = searchParams.get("tab");
 
   // Nếu người dùng truy cập tab tài khoản cá nhân, chuyển hướng sang trang Profile riêng
-  if (rawTab === 'account-profile') {
+  if (rawTab === "account-profile") {
     return <Navigate to="/store-owner/account?tab=account-profile" replace />;
   }
 
   const tabParam = rawTab as StoreHubTabKey | null;
 
   const [activeTab, setActiveTab] = useState<StoreHubTabKey>(
-    tabParam && VALID_TABS.includes(tabParam)
-      ? tabParam
-      : 'store-info'
+    tabParam && VALID_TABS.includes(tabParam) ? tabParam : "store-info",
   );
 
   const [storeInfo, setStoreInfo] = useState<StoreInfo>(INITIAL_STORE_INFO);
@@ -58,7 +59,9 @@ export const StoreSettingsHubPage: FC = () => {
       try {
         const res = await storeApi.getStoreInfo();
         if (res.success && res.data) {
-          setStoreInfo((prev) => mapBackendStoreToFrontend(res.data, prev.walletBalance));
+          setStoreInfo((prev) =>
+            mapBackendStoreToFrontend(res.data, prev.walletBalance),
+          );
         }
       } catch {
         // Giữ mock fallback nếu mạng lỗi
@@ -81,7 +84,8 @@ export const StoreSettingsHubPage: FC = () => {
 
   // Nạp tiền ví
   const handleTopupSuccess = (amount: number, newBalance?: number) => {
-    const newBal = newBalance !== undefined ? newBalance : storeInfo.walletBalance + amount;
+    const newBal =
+      newBalance !== undefined ? newBalance : storeInfo.walletBalance + amount;
 
     setStoreInfo((prev) => ({
       ...prev,
@@ -96,12 +100,12 @@ export const StoreSettingsHubPage: FC = () => {
     planName: string;
     months: number;
     totalAmount: number;
-    paymentMethod: 'Wallet' | 'VietQR';
+    paymentMethod: "Wallet" | "VietQR";
     subscriptionExpiresAt?: string;
     daysRemaining?: number;
   }) => {
     let newBal = storeInfo.walletBalance;
-    if (result.paymentMethod === 'Wallet') {
+    if (result.paymentMethod === "Wallet") {
       newBal = Math.max(0, storeInfo.walletBalance - result.totalAmount);
     }
 
@@ -112,11 +116,11 @@ export const StoreSettingsHubPage: FC = () => {
         : storeInfo.daysRemaining + result.months * 30;
 
     const newExpStr = result.subscriptionExpiresAt
-      ? result.subscriptionExpiresAt.split('T')[0]
+      ? result.subscriptionExpiresAt.split("T")[0]
       : (() => {
           const expDate = new Date();
           expDate.setDate(expDate.getDate() + newDaysRemaining);
-          return expDate.toISOString().split('T')[0];
+          return expDate.toISOString().split("T")[0];
         })();
 
     setStoreInfo((prev) => ({
@@ -131,7 +135,9 @@ export const StoreSettingsHubPage: FC = () => {
   };
 
   // Cập nhật thông tin store
-  const handleUpdateStoreInfo = async (updated: Partial<StoreInfo>): Promise<boolean> => {
+  const handleUpdateStoreInfo = async (
+    updated: Partial<StoreInfo>,
+  ): Promise<boolean> => {
     try {
       const res = await storeApi.updateStoreInfo({
         name: updated.name || storeInfo.name,
@@ -141,12 +147,14 @@ export const StoreSettingsHubPage: FC = () => {
         city: updated.city,
       });
       if (res.success && res.data) {
-        setStoreInfo((prev) => mapBackendStoreToFrontend(res.data, prev.walletBalance));
+        setStoreInfo((prev) =>
+          mapBackendStoreToFrontend(res.data, prev.walletBalance),
+        );
         return true;
       }
       return false;
     } catch (error) {
-      console.error('Update store info error:', error);
+      console.error("Update store info error:", error);
       return false;
     }
   };
@@ -154,28 +162,35 @@ export const StoreSettingsHubPage: FC = () => {
   return (
     <div className="store-hub-container">
       {/* 1. Sidebar bên trái chuẩn phong cách KiotViet */}
-      <StoreSidebarNav
-        activeTab={activeTab}
-        onSelectTab={handleSelectTab}
-      />
+      <StoreSidebarNav activeTab={activeTab} onSelectTab={handleSelectTab} />
 
       {/* 2. Không gian làm việc chính bên phải */}
       <div className="store-hub-main">
         {/* Top Status Bar */}
         <StoreTopStatusBar
           storeInfo={storeInfo}
-          onNavigateBranches={() => handleSelectTab('branches')}
+          onNavigateBranches={() => handleSelectTab("branches")}
         />
 
         {/* Tab 1: Gói dịch vụ */}
-        {activeTab === 'subscriptions' && (
-          <div style={{ width: '100%' }}>
+        {activeTab === "subscriptions" && (
+          <div style={{ width: "100%" }}>
             <div style={{ marginBottom: 18 }}>
-              <h1 style={{ fontSize: 22, fontWeight: 800, color: '#0F172A', margin: 0 }}>
+              <h1
+                style={{
+                  fontSize: 22,
+                  fontWeight: 800,
+                  color: "#0F172A",
+                  margin: 0,
+                }}
+              >
                 Gói dịch vụ MT-GRMS
               </h1>
-              <p style={{ fontSize: 13, color: '#64748B', margin: '4px 0 0 0' }}>
-                Lựa chọn gói thuê bao phù hợp với quy mô chuỗi cửa hàng, quản lý đa chi nhánh và tự động hóa bán lẻ.
+              <p
+                style={{ fontSize: 13, color: "#64748B", margin: "4px 0 0 0" }}
+              >
+                Lựa chọn gói thuê bao phù hợp với quy mô chuỗi cửa hàng, quản lý
+                đa chi nhánh và tự động hóa bán lẻ.
               </p>
             </div>
             <SubscriptionPricingCards
@@ -185,46 +200,43 @@ export const StoreSettingsHubPage: FC = () => {
           </div>
         )}
 
-        {/* Tab 2: Thông tin gian hàng */}
-        {activeTab === 'store-info' && (
-          <StoreInfoTab
-            storeInfo={storeInfo}
-            onUpdateStoreInfo={handleUpdateStoreInfo}
-          />
-        )}
-
         {/* Tab: Chi nhánh & Kho hàng */}
-        {activeTab === 'branches' && (
-          <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
-            <div style={{ marginBottom: 14, flexShrink: 0 }}>
-              <h1 style={{ fontSize: 22, fontWeight: 800, color: '#0F172A', margin: 0 }}>
-                Quản lý chi nhánh & Kho hàng
-              </h1>
-              <p style={{ fontSize: 13, color: '#64748B', margin: '4px 0 0 0' }}>
-                Danh sách chi nhánh thuộc chuỗi, kiểm soát hạn mức quota và phân công quản lý.
-              </p>
-            </div>
+        {activeTab === "branches" && (
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              flex: 1,
+              minHeight: 0,
+            }}
+          >
             <BranchManagementTab
-              onGoToSubscriptions={() => handleSelectTab('subscriptions')}
+              onGoToSubscriptions={() => handleSelectTab("subscriptions")}
             />
           </div>
         )}
 
         {/* Tab 3: Lịch sử mua hàng */}
-        {activeTab === 'order-history' && (
-          <OrderHistoryTab />
-        )}
+        {activeTab === "order-history" && <OrderHistoryTab />}
 
         {/* Tab 4: Điều khoản sử dụng */}
-        {activeTab === 'terms' && (
+        {activeTab === "terms" && (
           <div style={{ marginTop: 8 }}>
             <TermsOfServiceTab />
           </div>
         )}
 
         {/* Tab 5: Thanh toán & Ví gian hàng */}
-        {activeTab === 'wallet' && (
-          <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, marginTop: 4 }}>
+        {activeTab === "wallet" && (
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              flex: 1,
+              minHeight: 0,
+              marginTop: 4,
+            }}
+          >
             <WalletLedgerTab
               refreshKey={walletRefreshKey}
               onOpenTopupModal={() => setShowTopupModal(true)}
