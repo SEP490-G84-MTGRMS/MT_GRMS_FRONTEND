@@ -127,7 +127,7 @@ export const StocktakeListPage: FC<{ defaultRole?: 'store_owner' | 'employee' }>
           );
         }
       })
-      .catch(() => { });
+      .catch(() => {});
     return () => {
       mounted = false;
     };
