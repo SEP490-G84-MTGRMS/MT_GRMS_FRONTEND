@@ -166,7 +166,6 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
     if (currentEmpBranchIds.length === 0) return base;
 
     return base.filter((s) => {
-      if (s.id === 'custom') return true;
       // Ca không gắn chi nhánh nào (áp dụng toàn hệ thống)
       if (!s.branchId && (!s.branchIds || s.branchIds.length === 0)) return true;
 
@@ -183,12 +182,10 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
     });
   }, [shiftsData, shifts, currentEmpBranchIds]);
 
-  // Ca làm việc: id của shift hoặc 'custom'
+  // Ca làm việc: id của shift
   const [selectedShiftId, setSelectedShiftId] = useState<string>(
-    editingAssignment?.shiftId || activeShifts[0]?.id || 'custom'
+    editingAssignment?.shiftId || activeShifts[0]?.id || ''
   );
-  const [customStartTime, setCustomStartTime] = useState('00:00');
-  const [customEndTime, setCustomEndTime] = useState('00:00');
   const [isShiftDropdownOpen, setIsShiftDropdownOpen] = useState(false);
   const [shiftSearchKeyword, setShiftSearchKeyword] = useState('');
   const shiftDropdownRef = useRef<HTMLDivElement>(null);
@@ -232,7 +229,6 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
         } else {
           // Lọc từ props shifts theo branchIds của Employee nếu API trả rỗng
           const fallback = (shifts || []).filter((s) => {
-            if (s.id === 'custom') return true;
             if (!s.branchId && (!s.branchIds || s.branchIds.length === 0)) return true;
             if (currentEmpBranchIds.length === 0) return true;
             const shiftBranchIds =
@@ -248,7 +244,6 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
       } catch (err) {
         console.warn('Lỗi khi fetch ca làm việc từ ShiftConfigsController, dùng shifts dự phòng:', err);
         const fallback = (shifts || []).filter((s) => {
-          if (s.id === 'custom') return true;
           if (!s.branchId && (!s.branchIds || s.branchIds.length === 0)) return true;
           if (currentEmpBranchIds.length === 0) return true;
           const shiftBranchIds =
@@ -278,7 +273,7 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
   useEffect(() => {
     if (!editingAssignment && activeShifts.length > 0) {
       const exists = activeShifts.some((s) => s.id === selectedShiftId);
-      if (!exists && selectedShiftId !== 'custom') {
+      if (!exists) {
         setSelectedShiftId(activeShifts[0].id);
       }
     }
@@ -378,12 +373,7 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
       if (matchedShift) {
         setSelectedShiftId(matchedShift.id);
       } else {
-        setSelectedShiftId(editingAssignment.shiftId || 'custom');
-      }
-      if ((editingAssignment.shiftId === 'custom' || !matchedShift) && editingAssignment.shiftTime) {
-        const parts = editingAssignment.shiftTime.split('-').map((s) => s.trim());
-        if (parts[0]) setCustomStartTime(parts[0]);
-        if (parts[1]) setCustomEndTime(parts[1]);
+        setSelectedShiftId(editingAssignment.shiftId || activeShifts[0]?.id || '');
       }
       setSelectedDays([editingAssignment.dayOfWeek]);
       setApplyToOthers(false);
@@ -397,7 +387,7 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
       if (defaultDayOfWeek) {
         setSelectedDays([defaultDayOfWeek]);
       }
-      setSelectedShiftId(activeShifts[0]?.id || 'custom');
+      setSelectedShiftId(activeShifts[0]?.id || '');
       setApplyToOthers(false);
       setSelectedOtherEmpIds([]);
     }
@@ -405,13 +395,11 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
 
   // Thông tin ca hiện tại đang chọn
   const currentSelectedShift = useMemo(() => {
-    if (selectedShiftId === 'custom') return null;
     return activeShifts.find((s) => s.id === selectedShiftId);
   }, [activeShifts, selectedShiftId]);
 
   const filteredShiftsList = useMemo(() => {
     return activeShifts
-      .filter((s) => s.id !== 'custom')
       .filter(
         (s) =>
           s.name.toLowerCase().includes(shiftSearchKeyword.toLowerCase()) ||
@@ -419,12 +407,6 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
           s.endTime.includes(shiftSearchKeyword)
       );
   }, [activeShifts, shiftSearchKeyword]);
-
-  const showCustomOption =
-    !shiftSearchKeyword.trim() ||
-    'ca tùy chọn thời gian'.includes(shiftSearchKeyword.toLowerCase()) ||
-    'tùy chọn'.includes(shiftSearchKeyword.toLowerCase()) ||
-    'custom'.includes(shiftSearchKeyword.toLowerCase());
 
   // Ngày hiển thị trong popup xác nhận
   const displayDateFormatted = useMemo(() => {
@@ -538,27 +520,18 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
     }
 
     // Xác định thông tin ca
-    let shiftName = '';
-    let shiftTime = '';
-    let shiftColor = '#0F766E';
-    let shiftIdFinal = selectedShiftId;
-
-    if (selectedShiftId === 'custom') {
-      shiftName = 'Ca tùy chọn thời gian';
-      shiftTime = `${customStartTime} - ${customEndTime}`;
-      shiftColor = '#0F766E';
-    } else {
-      const sh = activeShifts.find((s) => s.id === selectedShiftId);
-      if (sh) {
-        shiftName = sh.name;
-        shiftTime = `${sh.startTime} - ${sh.endTime}`;
-        shiftColor = sh.color || '#0F766E';
-      }
+    const currentShift = currentSelectedShift || activeShifts.find((s) => s.id === selectedShiftId);
+    if (!currentShift) {
+      setSubmitError('Vui lòng chọn một ca làm việc.');
+      return;
     }
 
-    const parts = (shiftTime || '').split('-').map((s) => s.trim());
-    const rawStartTime = parts[0] || (selectedShiftId === 'custom' ? customStartTime : currentSelectedShift?.startTime) || '08:00';
-    const rawEndTime = parts[1] || (selectedShiftId === 'custom' ? customEndTime : currentSelectedShift?.endTime) || '17:00';
+    const shiftName = currentShift.name;
+    const shiftTime = `${currentShift.startTime} - ${currentShift.endTime}`;
+    const shiftColor = currentShift.color || '#0F766E';
+    const shiftIdFinal = currentShift.id;
+    const rawStartTime = currentShift.startTime || '08:00';
+    const rawEndTime = currentShift.endTime || '17:00';
 
     const branchNameFinal =
       currentEmp?.workingBranchNames?.[0] ||
@@ -631,14 +604,14 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
             if (matchingOtherSchedules.length > 0) {
               const formattedStart = rawStartTime ? (rawStartTime.length === 5 ? `${rawStartTime}:00` : rawStartTime) : undefined;
               const formattedEnd = rawEndTime ? (rawEndTime.length === 5 ? `${rawEndTime}:00` : rawEndTime) : undefined;
-              const shiftConfigIdVal = shiftIdFinal !== 'custom' ? shiftIdFinal : undefined;
+              const shiftConfigIdVal = shiftIdFinal;
 
               await Promise.all(
                 matchingOtherSchedules.map((s) =>
                   scheduleApi.updateSchedule(s.id, {
                     shiftName,
                     shiftConfigId: shiftConfigIdVal,
-                    shiftCode: currentSelectedShift?.code || (shiftIdFinal !== 'custom' ? undefined : 'CUSTOM'),
+                    shiftCode: currentSelectedShift?.code,
                     plannedStartTime: formattedStart,
                     plannedEndTime: formattedEnd,
                   }).catch((err) => {
@@ -694,21 +667,24 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
       setIsSubmitting(true);
       setSubmitError(null);
 
-      // Gọi API khởi tạo ca làm việc từ Backend (có ngày kết thúc -> tạo đến ngày chỉ định, không có ngày kết thúc -> tạo đến hết tháng sau)
+      const isSingleShift = !isRepeating;
+      const targetRepeatDays = isSingleShift ? [selectedDays[0] || defaultDayOfWeek || 'T2'] : selectedDays;
+
+      // Gọi API khởi tạo ca làm việc từ Backend (khi tắt lặp lại -> hasEndDate=true và endDate=startDate để chỉ tạo đúng 1 ca)
       const payload: CreateRecurringSchedulePayload = {
         employeeId: currentEmp.id,
         branchId: currentEmpBranchId || branches[0]?.id || '',
         startDate: calculatedStartDate,
-        hasEndDate: hasEndDate && !!endDate,
-        endDate: hasEndDate && endDate ? endDate : null,
-        repeatDays: isRepeating ? selectedDays : [selectedDays[0] || 'T2'],
+        hasEndDate: isSingleShift ? true : (hasEndDate && !!endDate),
+        endDate: isSingleShift ? calculatedStartDate : (hasEndDate && endDate ? endDate : null),
+        repeatDays: targetRepeatDays,
         additionalEmployeeIds: applyToOthers && selectedOtherEmpIds.length > 0 ? selectedOtherEmpIds : [],
-        shiftConfigId: shiftIdFinal !== 'custom' ? shiftIdFinal : undefined,
-        shiftCode: currentSelectedShift?.code || (shiftIdFinal !== 'custom' ? undefined : 'CUSTOM'),
+        shiftConfigId: shiftIdFinal,
+        shiftCode: currentShift.code,
         shiftName: shiftName,
         plannedStartTime: rawStartTime ? (rawStartTime.length === 5 ? `${rawStartTime}:00` : rawStartTime) : undefined,
         plannedEndTime: rawEndTime ? (rawEndTime.length === 5 ? `${rawEndTime}:00` : rawEndTime) : undefined,
-        durationHours: currentSelectedShift?.totalHours,
+        durationHours: currentShift.totalHours,
         isCheckInNextDay: rawEndTime <= rawStartTime,
       };
 
@@ -844,29 +820,7 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, overflow: 'hidden', flex: 1 }}>
                     <Clock size={16} color="#64748B" style={{ flexShrink: 0 }} />
 
-                    {selectedShiftId === 'custom' ? (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, overflow: 'hidden' }}>
-                        <span
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            padding: '2px 8px',
-                            borderRadius: 6,
-                            fontSize: 12,
-                            fontWeight: 600,
-                            background: '#F0FDFA',
-                            color: '#0F766E',
-                            border: '1px solid #99F6E4',
-                            whiteSpace: 'nowrap',
-                          }}
-                        >
-                          Ca tùy chọn
-                        </span>
-                        <span style={{ fontSize: 13, color: '#334155', fontWeight: 500 }}>
-                          {customStartTime} - {customEndTime}
-                        </span>
-                      </div>
-                    ) : currentSelectedShift ? (
+                    {currentSelectedShift ? (
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, overflow: 'hidden' }}>
                         <span style={{ fontSize: 13, fontWeight: 600, color: '#0F172A' }}>
                           {currentSelectedShift.name}
@@ -970,7 +924,7 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
                       }}
                     >
                       <span>
-                        Tìm thấy {filteredShiftsList.length + (showCustomOption ? 1 : 0)} ca làm việc
+                        Tìm thấy {filteredShiftsList.length} ca làm việc
                       </span>
                       {isLoadingShifts && (
                         <span style={{ fontSize: 11, color: '#0F766E', fontWeight: 500 }}>
@@ -1062,44 +1016,7 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
                         );
                       })}
 
-                      {/* Option Ca tùy chọn */}
-                      {showCustomOption && (
-                        <div
-                          onClick={() => {
-                            setSelectedShiftId('custom');
-                            setIsShiftDropdownOpen(false);
-                          }}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            padding: '10px 14px',
-                            cursor: 'pointer',
-                            borderTop: '1px dashed #E2E8F0',
-                            background: selectedShiftId === 'custom' ? '#F0FDFA' : 'transparent',
-                            transition: 'background 0.12s ease',
-                          }}
-                          onMouseEnter={(e) => {
-                            if (selectedShiftId !== 'custom') e.currentTarget.style.background = '#F8FAFC';
-                          }}
-                          onMouseLeave={(e) => {
-                            if (selectedShiftId !== 'custom') e.currentTarget.style.background = 'transparent';
-                          }}
-                        >
-                          <div>
-                            <div style={{ fontSize: 13, fontWeight: selectedShiftId === 'custom' ? 700 : 600, color: selectedShiftId === 'custom' ? '#0F766E' : '#1E293B' }}>
-                              Ca tùy chọn
-                            </div>
-                            <div style={{ fontSize: 11, color: '#64748B', marginTop: 1 }}>
-                              Tự do thiết lập giờ bắt đầu và kết thúc
-                            </div>
-                          </div>
-
-                          {selectedShiftId === 'custom' && <Check size={16} color="#0F766E" />}
-                        </div>
-                      )}
-
-                      {!filteredShiftsList.length && !showCustomOption && (
+                      {!filteredShiftsList.length && (
                         <div style={{ padding: '16px 12px', textAlign: 'center', color: '#94A3B8', fontSize: 13 }}>
                           Không tìm thấy ca làm việc nào phù hợp
                         </div>
@@ -1108,43 +1025,6 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
                   </div>
                 )}
               </div>
-
-              {/* Khung nhập giờ bắt đầu - kết thúc khi chọn Ca tùy chọn */}
-              {selectedShiftId === 'custom' && (
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 16,
-                    marginTop: 10,
-                    padding: '12px 16px',
-                    background: '#F0FDFA',
-                    border: '1px solid #99F6E4',
-                    borderRadius: 8,
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: 13, fontWeight: 600, color: '#0F766E' }}>Giờ bắt đầu:</span>
-                    <input
-                      type="time"
-                      value={customStartTime}
-                      onChange={(e) => setCustomStartTime(e.target.value)}
-                      className="emp-form-input"
-                      style={{ width: 110, height: 34, padding: '2px 8px', fontSize: 13 }}
-                    />
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: 13, fontWeight: 600, color: '#0F766E' }}>Giờ kết thúc:</span>
-                    <input
-                      type="time"
-                      value={customEndTime}
-                      onChange={(e) => setCustomEndTime(e.target.value)}
-                      className="emp-form-input"
-                      style={{ width: 110, height: 34, padding: '2px 8px', fontSize: 13 }}
-                    />
-                  </div>
-                </div>
-              )}
             </div>
 
             {/* ─── SECTION 2: LẶP LẠI HÀNG TUẦN ─── */}
@@ -1158,7 +1038,15 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
                   <input
                     type="checkbox"
                     checked={isRepeating}
-                    onChange={(e) => setIsRepeating(e.target.checked)}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setIsRepeating(checked);
+                      if (!checked) {
+                        setSelectedDays([selectedDays[0] || defaultDayOfWeek || 'T2']);
+                        setHasEndDate(false);
+                        setEndDate('');
+                      }
+                    }}
                     style={{ opacity: 0, width: 0, height: 0 }}
                   />
                   <span
@@ -1187,8 +1075,10 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
                   />
                 </label>
               </div>
-              <div style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>
-                Lịch làm việc sẽ được tự động lặp lại vào các ngày trong tuần
+              <div style={{ fontSize: 12, color: isRepeating ? '#64748B' : '#0F766E', marginTop: 2, fontWeight: isRepeating ? 400 : 600 }}>
+                {isRepeating
+                  ? 'Lịch làm việc sẽ được tự động lặp lại vào các ngày trong tuần'
+                  : '✓ Chế độ chỉ tạo 1 ca duy nhất vào ngày được chọn'}
               </div>
 
               {isRepeating && (
@@ -1654,7 +1544,7 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
                 const rawEnd = parts[1] || '17:00';
                 const formattedStart = rawStart.length === 5 ? `${rawStart}:00` : rawStart;
                 const formattedEnd = rawEnd.length === 5 ? `${rawEnd}:00` : rawEnd;
-                const shiftConfigIdVal = pendingUpdatedItem.shiftId !== 'custom' ? pendingUpdatedItem.shiftId : undefined;
+                const shiftConfigIdVal = pendingUpdatedItem.shiftId;
 
                 const schedulesInRange = await scheduleApi.getSchedules({
                   employeeId: currentEmp?.id || pendingUpdatedItem.employeeId,
@@ -1675,7 +1565,7 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
                       scheduleApi.updateSchedule(s.id, {
                         shiftName: pendingUpdatedItem.shiftName,
                         shiftConfigId: shiftConfigIdVal,
-                        shiftCode: currentSelectedShift?.code || (pendingUpdatedItem.shiftId !== 'custom' ? undefined : 'CUSTOM'),
+                        shiftCode: currentSelectedShift?.code,
                         plannedStartTime: formattedStart,
                         plannedEndTime: formattedEnd,
                       }).catch((err) => {
