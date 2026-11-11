@@ -104,8 +104,8 @@ export const CashInOutModal: FC<Props> = ({ isOpen, onClose, onSave }) => {
                   Mua vật tư cuộn giấy in K80, văn phòng phẩm
                 </option>
                 <option value="Đổi tiền lẻ phục vụ ca">Đổi tiền lẻ phục vụ ca</option>
-                <option value="Thu tiền cọc hoặc thanh toán bổ sung">
-                  Thu tiền cọc hoặc thanh toán bổ sung
+                <option value="Thu tiền đặt cọc đơn hàng hoặc thanh toán bổ sung">
+                  Thu tiền đặt cọc đơn hàng hoặc thanh toán bổ sung
                 </option>
                 <option value="Khác">Khác (Chi tiết trong ghi chú)</option>
               </select>

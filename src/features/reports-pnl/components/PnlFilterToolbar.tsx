@@ -19,6 +19,7 @@ interface PnlFilterToolbarProps {
   onFilterChange: (newFilter: PnlFilterParams) => void;
   onOpenExportModal: () => void;
   onRefresh: () => void;
+  hideRefresh?: boolean;
 }
 
 const PRESET_OPTIONS: { id: PresetPeriod; label: string }[] = [
@@ -40,6 +41,152 @@ export function formatLocalYmd(date: Date): string {
   return `${yyyy}-${mm}-${dd}`;
 }
 
+function createCurrentLocalDate(): Date {
+  return new Date();
+}
+
+function computePresetDateRange(
+  preset: PresetPeriod,
+  today: Date
+): { startDate: string; endDate: string } {
+  const endDate = formatLocalYmd(today);
+
+  if (preset === 'LAST_7_DAYS') {
+    const past = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 6);
+    return { startDate: formatLocalYmd(past), endDate };
+  }
+  if (preset === 'THIS_MONTH') {
+    const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+    return { startDate: formatLocalYmd(firstDay), endDate };
+  }
+  if (preset === 'LAST_MONTH') {
+    const firstDay = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+    const lastDay = new Date(today.getFullYear(), today.getMonth(), 0);
+    return { startDate: formatLocalYmd(firstDay), endDate: formatLocalYmd(lastDay) };
+  }
+  if (preset === 'THIS_QUARTER') {
+    const quarterMonth = Math.floor(today.getMonth() / 3) * 3;
+    const firstDay = new Date(today.getFullYear(), quarterMonth, 1);
+    return { startDate: formatLocalYmd(firstDay), endDate };
+  }
+
+  return { startDate: endDate, endDate };
+}
+
+const BranchSelectField: React.FC<{
+  branches: BranchOption[];
+  value: string;
+  isLoading: boolean;
+  onChange: (branchId: string) => void;
+}> = ({ branches, value, isLoading, onChange }) => (
+  <div className="pnl-branch-select-wrapper">
+    <div className="pnl-branch-icon-left">
+      <Building2 size={18} />
+    </div>
+    <select
+      aria-label="Chọn chi nhánh"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      disabled={isLoading}
+      className="pnl-branch-select"
+    >
+      {branches.map((b) => (
+        <option key={b.id} value={b.id}>
+          {b.name}
+        </option>
+      ))}
+    </select>
+    <div className="pnl-branch-icon-right">
+      <ChevronDown size={15} />
+    </div>
+  </div>
+);
+
+const PresetPeriodGroup: React.FC<{
+  activePreset: PresetPeriod;
+  isLoading: boolean;
+  onSelect: (preset: PresetPeriod) => void;
+}> = ({ activePreset, isLoading, onSelect }) => (
+  <div className="pnl-preset-group">
+    {PRESET_OPTIONS.map((item) => {
+      const active = activePreset === item.id;
+      return (
+        <button
+          key={item.id}
+          type="button"
+          onClick={() => onSelect(item.id)}
+          disabled={isLoading}
+          className={`pnl-preset-btn ${active ? 'active' : ''}`}
+        >
+          {item.label}
+        </button>
+      );
+    })}
+  </div>
+);
+
+const CustomDateRangeFields: React.FC<{
+  startDate: string;
+  endDate: string;
+  isLoading: boolean;
+  onChange: (field: 'startDate' | 'endDate', value: string) => void;
+}> = ({ startDate, endDate, isLoading, onChange }) => (
+  <div className="pnl-custom-date-box">
+    <Calendar size={14} style={{ color: 'var(--blue-primary, #0F766E)', flexShrink: 0 }} />
+    <span>Từ:</span>
+    <input
+      type="date"
+      aria-label="Từ ngày"
+      value={startDate}
+      max={endDate}
+      disabled={isLoading}
+      onChange={(e) => onChange('startDate', e.target.value)}
+      className="pnl-custom-date-input"
+    />
+    <span>Đến:</span>
+    <input
+      type="date"
+      aria-label="Đến ngày"
+      value={endDate}
+      min={startDate}
+      disabled={isLoading}
+      onChange={(e) => onChange('endDate', e.target.value)}
+      className="pnl-custom-date-input"
+    />
+  </div>
+);
+
+const FilterToolbarActions: React.FC<{
+  isLoading: boolean;
+  hideRefresh: boolean;
+  onRefresh: () => void;
+  onOpenExportModal: () => void;
+}> = ({ isLoading, hideRefresh, onRefresh, onOpenExportModal }) => (
+  <div className="pnl-filter-right">
+    {!hideRefresh && (
+      <button
+        type="button"
+        onClick={onRefresh}
+        disabled={isLoading}
+        className="btn-secondary-pill"
+        title="Làm mới số liệu"
+      >
+        <RotateCw size={15} className={isLoading ? 'animate-spin' : ''} />
+        <span>Làm mới</span>
+      </button>
+    )}
+
+    <button
+      type="button"
+      onClick={onOpenExportModal}
+      className="btn-primary-pill"
+    >
+      <Printer size={16} />
+      <span>In &amp; Xuất Báo Cáo</span>
+    </button>
+  </div>
+);
+
 /**
  * Filter toolbar component for branch selection and period switching.
  */
@@ -50,147 +197,77 @@ export const PnlFilterToolbar: React.FC<PnlFilterToolbarProps> = ({
   onFilterChange,
   onOpenExportModal,
   onRefresh,
+  hideRefresh = false,
 }) => {
-  const handleBranchChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    onFilterChange({
-      ...filter,
-      branchId: e.target.value,
-    });
+  const handleBranchChange = (branchId: string) => {
+    onFilterChange({ ...filter, branchId });
   };
 
   const handlePresetChange = (preset: PresetPeriod) => {
-    const today = new Date();
-    let startDate = formatLocalYmd(today);
-    const endDate = formatLocalYmd(today);
-
-    if (preset === 'LAST_7_DAYS') {
-      const past = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 6);
-      startDate = formatLocalYmd(past);
-    } else if (preset === 'THIS_MONTH') {
-      const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
-      startDate = formatLocalYmd(firstDay);
-    } else if (preset === 'LAST_MONTH') {
-      const firstDay = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-      const lastDay = new Date(today.getFullYear(), today.getMonth(), 0);
-      return onFilterChange({
+    const today = createCurrentLocalDate();
+    if (preset === 'CUSTOM') {
+      const fallback = formatLocalYmd(today);
+      onFilterChange({
         ...filter,
-        presetPeriod: preset,
-        startDate: formatLocalYmd(firstDay),
-        endDate: formatLocalYmd(lastDay),
+        presetPeriod: 'CUSTOM',
+        startDate: filter.startDate || fallback,
+        endDate: filter.endDate || fallback,
       });
-    } else if (preset === 'THIS_QUARTER') {
-      const quarterMonth = Math.floor(today.getMonth() / 3) * 3;
-      const firstDay = new Date(today.getFullYear(), quarterMonth, 1);
-      startDate = formatLocalYmd(firstDay);
+      return;
     }
 
-    onFilterChange({
-      ...filter,
-      presetPeriod: preset,
-      startDate,
-      endDate,
-    });
+    const { startDate, endDate } = computePresetDateRange(preset, today);
+    onFilterChange({ ...filter, presetPeriod: preset, startDate, endDate });
   };
 
-  const handleCustomDateChange = (
-    field: 'startDate' | 'endDate',
-    value: string
-  ) => {
+  const handleCustomDateChange = (field: 'startDate' | 'endDate', value: string) => {
+    if (!value) {
+      return;
+    }
+
+    const nextStart = field === 'startDate' ? value : filter.startDate;
+    const nextEnd = field === 'endDate' ? value : filter.endDate;
+    const clampedStart = field === 'endDate' && nextEnd < nextStart ? nextEnd : nextStart;
+    const clampedEnd = field === 'startDate' && nextStart > nextEnd ? nextStart : nextEnd;
+
     onFilterChange({
       ...filter,
       presetPeriod: 'CUSTOM',
-      [field]: value,
+      startDate: clampedStart,
+      endDate: clampedEnd,
     });
   };
 
   return (
     <div className="pnl-filter-bar">
-      {/* Left Controls: Branch Selector & Preset Period Tabs */}
       <div className="pnl-filter-left">
-        {/* Branch Selector Dropdown */}
-        <div className="pnl-branch-select-wrapper">
-          <div className="pnl-branch-icon-left">
-            <Building2 size={18} />
-          </div>
-          <select
-            value={filter.branchId || 'ALL'}
-            onChange={handleBranchChange}
-            disabled={isLoading}
-            className="pnl-branch-select"
-          >
-            {branches.map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.name}
-              </option>
-            ))}
-          </select>
-          <div className="pnl-branch-icon-right">
-            <ChevronDown size={15} />
-          </div>
-        </div>
-
-        {/* Quick Period Presets */}
-        <div className="pnl-preset-group">
-          {PRESET_OPTIONS.map((item) => {
-            const active = filter.presetPeriod === item.id;
-            return (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => handlePresetChange(item.id)}
-                disabled={isLoading}
-                className={`pnl-preset-btn ${active ? 'active' : ''}`}
-              >
-                {item.label}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Custom Date Pickers */}
+        <BranchSelectField
+          branches={branches}
+          value={filter.branchId || 'ALL'}
+          isLoading={isLoading}
+          onChange={handleBranchChange}
+        />
+        <PresetPeriodGroup
+          activePreset={filter.presetPeriod}
+          isLoading={isLoading}
+          onSelect={handlePresetChange}
+        />
         {filter.presetPeriod === 'CUSTOM' && (
-          <div className="pnl-custom-date-box">
-            <Calendar size={14} style={{ color: 'var(--blue-primary, #0F766E)' }} />
-            <span>Từ:</span>
-            <input
-              type="date"
-              value={filter.startDate}
-              onChange={(e) => handleCustomDateChange('startDate', e.target.value)}
-              className="pnl-custom-date-input"
-            />
-            <span>Đến:</span>
-            <input
-              type="date"
-              value={filter.endDate}
-              onChange={(e) => handleCustomDateChange('endDate', e.target.value)}
-              className="pnl-custom-date-input"
-            />
-          </div>
+          <CustomDateRangeFields
+            startDate={filter.startDate}
+            endDate={filter.endDate}
+            isLoading={isLoading}
+            onChange={handleCustomDateChange}
+          />
         )}
       </div>
 
-      {/* Right Controls: Refresh & Print Buttons */}
-      <div className="pnl-filter-right">
-        <button
-          type="button"
-          onClick={onRefresh}
-          disabled={isLoading}
-          className="btn-secondary-pill"
-          title="Làm mới số liệu"
-        >
-          <RotateCw size={15} className={isLoading ? 'animate-spin' : ''} />
-          <span>Làm mới</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={onOpenExportModal}
-          className="btn-primary-pill"
-        >
-          <Printer size={16} />
-          <span>In & Xuất Báo Cáo</span>
-        </button>
-      </div>
+      <FilterToolbarActions
+        isLoading={isLoading}
+        hideRefresh={hideRefresh}
+        onRefresh={onRefresh}
+        onOpenExportModal={onOpenExportModal}
+      />
     </div>
   );
 };

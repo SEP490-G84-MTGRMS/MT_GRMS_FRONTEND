@@ -338,12 +338,13 @@ export const PnlStatementTable: React.FC<PnlStatementTableProps> = ({
           background: 'linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%)',
           border: '1px solid #FDE68A',
           display: 'flex',
+          flexWrap: 'wrap',
           alignItems: 'center',
           justifyContent: 'space-between',
-          gap: '16px',
+          gap: '12px',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: '1 1 260px', minWidth: 0 }}>
           <div
             style={{
               width: '40px',
@@ -394,9 +395,22 @@ export const PnlStatementTable: React.FC<PnlStatementTableProps> = ({
       </div>
 
       {/* Table Footer Notes */}
-      <div style={{ padding: '12px 20px', background: '#F8FAFC', borderTop: '1px solid var(--border-subtle, #e5edf8)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.72rem', color: 'var(--text-muted, #4b5563)' }}>
+      <div
+        style={{
+          padding: '12px 20px',
+          background: '#F8FAFC',
+          borderTop: '1px solid var(--border-subtle, #e5edf8)',
+          display: 'flex',
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '12px',
+          fontSize: '0.72rem',
+          color: 'var(--text-muted, #4b5563)',
+        }}
+      >
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <HelpCircle size={14} style={{ color: 'var(--blue-primary, #0F766E)' }} />
+          <HelpCircle size={14} style={{ color: 'var(--blue-primary, #0F766E)', flexShrink: 0 }} />
           <span>
             * Số liệu tính toán từ Doanh số bán POS, Giá vốn đối soát S2c-HKD, và Chứng từ chi phí hợp lý FE-07.
           </span>

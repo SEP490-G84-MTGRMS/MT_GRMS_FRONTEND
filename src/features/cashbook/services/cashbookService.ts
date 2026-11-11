@@ -8,9 +8,6 @@ import type {
   CashReconciliationDTO,
   CashbookSummaryKPI,
   CashTransitItem,
-  DepositItem,
-  CreateDepositDTO,
-  RefundDepositDTO,
   TriageItem,
   ResolveTriageDTO,
 } from '../types/cashbook.types';
@@ -228,7 +225,6 @@ const STORAGE_KEYS = {
   ACCOUNTS: 'mt_grms_cash_accounts_v2',
   TRANSACTIONS: 'mt_grms_cash_transactions_v2',
   TRANSITS: 'mt_grms_cash_transits_v2',
-  DEPOSITS: 'mt_grms_cash_deposits_v2',
   TRIAGE: 'mt_grms_cash_triage_v2',
 };
 
@@ -1138,144 +1134,6 @@ export const cashbookService = {
     });
 
     return '\uFEFF' + [headers.join(','), ...rows].join('\r\n');
-  },
-
-  // --- Phân hệ Cọc Vỏ (Deposit Tracking & Refund) ---
-  searchDeposits: async (keyword?: string, branchId?: string): Promise<DepositItem[]> => {
-    if (isMockMode()) {
-      const allDeposits = loadState<DepositItem[]>(STORAGE_KEYS.DEPOSITS, []);
-      let results = allDeposits.filter((d) => !d.isSettled);
-      if (keyword && keyword.trim()) {
-        const q = keyword.trim().toLowerCase();
-        results = results.filter(
-          (d) =>
-            d.customerName.toLowerCase().includes(q) ||
-            d.voucherCode.toLowerCase().includes(q) ||
-            (d.note && d.note.toLowerCase().includes(q))
-        );
-      }
-      return results;
-    }
-
-    try {
-      const params: Record<string, string> = {};
-      if (keyword) params.keyword = keyword;
-      if (branchId && branchId !== 'ALL') params.branchId = branchId;
-      const res = await financeHttpClient.get<{ data: DepositItem[] }>('/cashbook/deposits/search', { params });
-      return res.data?.data || [];
-    } catch (err) {
-      console.warn('Lỗi khi tra cứu cọc vỏ từ backend:', err);
-      return [];
-    }
-  },
-
-  createDeposit: async (data: CreateDepositDTO): Promise<any> => {
-    if (isMockMode()) {
-      if (data.amount <= 0) {
-        throw new Error('Số tiền cọc phải lớn hơn 0');
-      }
-      const accId = data.paymentSourceAccountId || data.accountId;
-      const accounts = loadState<CashAccount[]>(STORAGE_KEYS.ACCOUNTS, INITIAL_ACCOUNTS);
-      const acc = accounts.find((a) => a.id === accId);
-      if (!acc) throw new Error('Tài khoản thụ hưởng không tồn tại');
-
-      acc.currentBalance += data.amount;
-      saveState(STORAGE_KEYS.ACCOUNTS, accounts);
-
-      const id = `DEP-${Date.now()}`;
-      const voucherCode = `COC-${Date.now().toString().slice(-6)}`;
-      const newDeposit: DepositItem = {
-        id,
-        voucherCode,
-        customerName: data.customerName,
-        originalAmount: data.amount,
-        amount: data.amount,
-        refundedAmount: 0,
-        remainingAmount: data.amount,
-        remainingDeposit: data.amount,
-        isSettled: false,
-        note: data.note || '',
-        createdAt: new Date().toISOString(),
-      };
-
-      const allDeposits = loadState<DepositItem[]>(STORAGE_KEYS.DEPOSITS, []);
-      allDeposits.push(newDeposit);
-      saveState(STORAGE_KEYS.DEPOSITS, allDeposits);
-
-      return newDeposit;
-    }
-
-    const idempotencyKey =
-      typeof crypto !== 'undefined' && crypto.randomUUID
-        ? crypto.randomUUID()
-        : `idemp-dep-${Date.now()}`;
-    const res = await financeHttpClient.post<{ data: any }>('/cashbook/deposits', data, {
-      headers: {
-        'Idempotency-Key': idempotencyKey,
-      },
-    });
-    return res.data?.data;
-  },
-
-  refundDeposit: async (depositId: string, data: RefundDepositDTO): Promise<any> => {
-    if (isMockMode()) {
-      const allDeposits = loadState<DepositItem[]>(STORAGE_KEYS.DEPOSITS, []);
-      const dep = allDeposits.find((d) => d.id === depositId);
-      if (!dep) throw new Error('Không tìm thấy phiếu cọc');
-      if (dep.isSettled) throw new Error('Khoản cọc này đã được hoàn tất toán');
-
-      const refundAmt = data.amount ?? data.refundAmount ?? 0;
-      const remaining = dep.remainingAmount ?? dep.remainingDeposit ?? 0;
-
-      if (refundAmt > remaining) {
-        throw new Error(`Số tiền hoàn (${refundAmt}) vượt quá số tiền cọc còn lại (${remaining})`);
-      }
-
-      const accId = data.paymentSourceAccountId || data.accountId;
-      const accounts = loadState<CashAccount[]>(STORAGE_KEYS.ACCOUNTS, INITIAL_ACCOUNTS);
-      const acc = accounts.find((a) => a.id === accId);
-      if (!acc) throw new Error('Tài khoản chi tiền không tồn tại');
-      if (acc.currentBalance < refundAmt) {
-        throw new Error(`Số tiền hoàn cọc vượt quá số dư két hiện có (${acc.currentBalance})`);
-      }
-
-      acc.currentBalance -= refundAmt;
-      saveState(STORAGE_KEYS.ACCOUNTS, accounts);
-
-      dep.refundedAmount += refundAmt;
-      const newRemaining = remaining - refundAmt;
-      dep.remainingAmount = newRemaining;
-      dep.remainingDeposit = newRemaining;
-      if (newRemaining <= 0) {
-        dep.isSettled = true;
-      }
-      saveState(STORAGE_KEYS.DEPOSITS, allDeposits);
-
-      return {
-        id: `REF-${Date.now()}`,
-        referenceCode: dep.voucherCode,
-        amount: refundAmt,
-        remainingAmount: newRemaining,
-        remainingDeposit: newRemaining,
-        isSettled: dep.isSettled,
-        note: data.note,
-      };
-    }
-
-    const idempotencyKey =
-      typeof crypto !== 'undefined' && crypto.randomUUID
-        ? crypto.randomUUID()
-        : `idemp-ref-${Date.now()}`;
-    const res = await financeHttpClient.post<{ data: any }>(
-      `/cashbook/deposits/${depositId}/refund`,
-      data,
-      {
-        headers: {
-          'Idempotency-Key': idempotencyKey,
-        },
-      }
-    );
-    return res.data?.data;
   },
 
   // --- Phân hệ Triage Inbox & Xử lý mục không rõ ---

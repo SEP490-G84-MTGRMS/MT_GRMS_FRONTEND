@@ -6,15 +6,17 @@
   min-height: 100vh;
   background-color: #F8FAFC;
   font-family: var(--font-family-finance, 'Be Vietnam Pro', system-ui, sans-serif);
+  box-sizing: border-box;
 }
 
 .finance-overview-main {
-  max-width: 1280px;
+  max-width: 1320px;
   margin: 0 auto;
   padding: 24px 20px 48px;
   display: flex;
   flex-direction: column;
   gap: 24px;
+  box-sizing: border-box;
 }
 
 /* Header */
@@ -24,6 +26,99 @@
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 16px;
+}
+
+.finance-overview-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+/* Scoped Secondary Pill Button & Header Action Alignment */
+.finance-btn-secondary {
+  height: 40px;
+  padding: 0 16px;
+  border-radius: 9999px;
+  background: #FFFFFF;
+  color: #334155;
+  border: 1px solid #CBD5E1;
+  font-size: 0.85rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+  box-sizing: border-box;
+}
+
+.finance-btn-secondary:hover:not(:disabled) {
+  background: #F0FDFA;
+  border-color: #0F766E;
+  color: #0F766E;
+}
+
+.finance-btn-secondary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.finance-overview-actions .btn-primary-teal {
+  height: 40px;
+  min-height: 40px;
+  padding: 0 18px;
+  border-radius: 9999px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  box-sizing: border-box;
+}
+
+@keyframes finance-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.finance-overview-container .animate-spin {
+  animation: finance-spin 1s linear infinite;
+}
+
+/* Error Notification Banner */
+.finance-error-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 12px 16px;
+  background-color: #FEF2F2;
+  border: 1px solid #FCA5A5;
+  border-radius: 12px;
+  color: #991B1B;
+}
+
+.finance-error-banner-content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.finance-error-retry-btn {
+  background: #DC2626;
+  color: #FFFFFF;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
 }
 
 .finance-overview-title h1 {
@@ -47,6 +142,7 @@
   padding: 28px 32px;
   border: 1px solid #E2E8F0;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  box-sizing: border-box;
 }
 
 .finance-hero-header {
@@ -137,6 +233,7 @@
   padding: 24px 28px;
   border: 1px solid #E2E8F0;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  box-sizing: border-box;
 }
 
 .finance-todo-header {
@@ -275,6 +372,38 @@
   opacity: 0.9;
 }
 
+/* Compact To-Do Empty Banner */
+.finance-todo-empty-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 18px;
+  border-radius: 14px;
+  background-color: #F0FDF4;
+  border: 1px solid #BBF7D0;
+  color: #166534;
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+
+.finance-todo-empty-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.finance-todo-empty-badge {
+  background-color: #DCFCE7;
+  color: #15803D;
+  font-size: 0.74rem;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 9999px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
 /* 4 Summary Cards Grid */
 .finance-summary-grid {
   display: grid;
@@ -293,12 +422,38 @@
   display: flex;
   flex-direction: column;
   justify-content: space-between;
+  box-sizing: border-box;
 }
 
 .finance-summary-card:hover {
   border-color: #0F766E;
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(15, 118, 110, 0.08);
+}
+
+.finance-summary-card:focus-visible {
+  outline: 2px solid #0F766E;
+  outline-offset: 2px;
+}
+
+.finance-summary-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.finance-summary-period-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  background-color: #F0FDFA;
+  border: 1px solid #CCFBF1;
+  color: #0F766E;
+  font-size: 0.7rem;
+  font-weight: 700;
+  white-space: nowrap;
 }
 
 .finance-summary-title {
@@ -322,6 +477,39 @@
   font-size: 0.78rem;
 }
 
+/* Zone Divider between Zone A (Real-time) and Zone B (Period P&L) */
+.finance-zone-divider {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 8px 0 4px;
+}
+
+.finance-zone-divider-line {
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, #CBD5E1 0%, #E2E8F0 100%);
+}
+
+.finance-zone-divider-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: 9999px;
+  background-color: #F0FDFA;
+  border: 1px solid #99F6E4;
+  color: #0F766E;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.finance-pnl-zone {
+  width: 100%;
+}
+
 /* Modal Backdrop & Dialog */
 .finance-modal-backdrop {
   position: fixed;
@@ -343,8 +531,26 @@
   box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
 }
 
+.finance-modal-icon-box {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: #CCFBF1;
+  color: #0F766E;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
 /* Responsive Breakpoints */
 @media (max-width: 1024px) {
+  .finance-overview-main {
+    padding: 20px 16px 40px;
+  }
+  .finance-overview-header {
+    align-items: flex-start;
+  }
   .finance-summary-grid {
     grid-template-columns: repeat(2, 1fr);
   }
@@ -357,6 +563,9 @@
   .finance-overview-main {
     padding: 16px 12px 32px;
     gap: 16px;
+  }
+  .finance-overview-actions {
+    width: 100%;
   }
   .finance-hero-card {
     padding: 20px 16px;
@@ -376,5 +585,16 @@
   }
   .finance-todo-btn {
     align-self: flex-end;
+  }
+  .finance-todo-empty-strip {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 12px 14px;
+  }
+  .finance-zone-divider-label {
+    font-size: 0.74rem;
+    padding: 5px 12px;
+    white-space: normal;
+    text-align: center;
   }
 }

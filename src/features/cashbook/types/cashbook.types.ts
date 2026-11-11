@@ -158,39 +158,6 @@ export interface CashbookSummaryKPI {
   totalSafeDepositBalance?: number;
 }
 
-export interface DepositItem {
-  id: string;
-  voucherCode: string;
-  customerName: string;
-  originalAmount: number;
-  amount?: number;
-  refundedAmount: number;
-  remainingAmount: number;
-  remainingDeposit?: number;
-  isSettled: boolean;
-  createdAt: string;
-  note?: string;
-}
-
-export interface CreateDepositDTO {
-  branchId?: string;
-  customerName: string;
-  amount: number;
-  paymentSourceType?: string;
-  paymentSourceAccountId?: string;
-  accountId?: string;
-  note?: string;
-}
-
-export interface RefundDepositDTO {
-  amount?: number;
-  refundAmount?: number;
-  paymentSourceType?: string;
-  paymentSourceAccountId?: string;
-  accountId?: string;
-  note?: string;
-}
-
 export interface TriageItem {
   id: string;
   voucherCode: string;

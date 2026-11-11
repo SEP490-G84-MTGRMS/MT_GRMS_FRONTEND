@@ -1,7 +1,7 @@
 import { useSearchParams } from 'react-router-dom';
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { FC } from 'react';
-import { Truck, CheckCircle, Plus, MoreHorizontal, FileSpreadsheet, ArrowRightLeft, AlertTriangle, RotateCcw, Inbox, ChevronDown, Landmark, Wallet } from 'lucide-react';
+import { Truck, CheckCircle, Plus, MoreHorizontal, FileSpreadsheet, ArrowRightLeft, AlertTriangle, Inbox, ChevronDown, Landmark, Wallet } from 'lucide-react';
 import type {
   CashAccount,
   LedgerTransaction,
@@ -22,7 +22,6 @@ import { CreatePaymentModal } from '../components/CreatePaymentModal';
 import { InternalTransferModal } from '../components/InternalTransferModal';
 import { CashReconciliationModal } from '../components/CashReconciliationModal';
 import { CashbookExportModal } from '../components/CashbookExportModal';
-import { DepositRefundDrawer } from '../components/DepositRefundDrawer';
 import { TriageInboxModal } from '../components/TriageInboxModal';
 import { AdminToast, type ToastState } from '../../admin/components/common/AdminToast';
 import { formatMoney } from '../../finance/utils/formatters';
@@ -121,8 +120,6 @@ export const CashbookPage: FC = () => {
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
   const [paymentInitialCategory, setPaymentInitialCategory] = useState<string | undefined>(undefined);
   const [receiptInitialCategory, setReceiptInitialCategory] = useState<string | undefined>(undefined);
-  const [isDepositDrawerOpen, setIsDepositDrawerOpen] = useState(false);
-  const [depositDrawerTab, setDepositDrawerTab] = useState<'refund' | 'create'>('refund');
   const [isTriageModalOpen, setIsTriageModalOpen] = useState(false);
   const [triagePendingCount, setTriagePendingCount] = useState(0);
   const [reconcilingAccount, setReconcilingAccount] = useState<CashAccount | null>(null);
@@ -573,25 +570,6 @@ export const CashbookPage: FC = () => {
                       </>
                     )}
 
-                    {/* 2. Bottle Deposit Drawer */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsMoreMenuOpen(false);
-                        setDepositDrawerTab('refund');
-                        setIsDepositDrawerOpen(true);
-                      }}
-                      className="cb-more-dropdown-item"
-                    >
-                      <div className="cb-more-item-icon amber">
-                        <RotateCcw size={16} />
-                      </div>
-                      <div className="cb-more-item-text">
-                        <div className="cb-more-item-title">Quản lý cọc vỏ</div>
-                        <div className="cb-more-item-sub">Thu cọc / Hoàn trả cọc két</div>
-                      </div>
-                    </button>
-
                     {/* 3. Triage Inbox */}
                     {!isEmployee && (
                       <button
@@ -830,17 +808,6 @@ export const CashbookPage: FC = () => {
           transactions={transactions}
           selectedAccount={selectedAccountObj}
           onShowToast={showToast}
-        />
-
-        <DepositRefundDrawer
-          isOpen={isDepositDrawerOpen}
-          initialTab={depositDrawerTab}
-          onClose={() => setIsDepositDrawerOpen(false)}
-          accounts={accounts}
-          onSuccess={(msg) => {
-            showToast(msg, 'success');
-            void loadData();
-          }}
         />
 
         <TriageInboxModal
