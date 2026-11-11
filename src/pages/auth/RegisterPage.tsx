@@ -6,6 +6,7 @@ import {
   User,
   Store,
   Phone,
+  Mail,
   Lock,
   Eye,
   EyeOff,
@@ -26,6 +27,7 @@ export const RegisterPage: FC = () => {
   const [fullName, setFullName] = useState("");
   const [storeName, setStoreName] = useState("");
   const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [agreeTerms, setAgreeTerms] = useState(true);
@@ -37,16 +39,15 @@ export const RegisterPage: FC = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSuccess, setIsSuccess] = useState(false);
 
-  // State cho bước xác thực SMS OTP qua TextBee Android SMS Gateway
+  // State cho bước xác thực Email OTP kích hoạt cửa hàng
   const [isOtpModalOpen, setIsOtpModalOpen] = useState(false);
-  const [maskedPhone, setMaskedPhone] = useState("");
-  const [isRealSmsSent, setIsRealSmsSent] = useState(false);
+  const [maskedEmail, setMaskedEmail] = useState("");
+  const [isRealEmailSent, setIsRealEmailSent] = useState(false);
   const [devOtpCode, setDevOtpCode] = useState<string | null>(null);
   const [otpErrorMessage, setOtpErrorMessage] = useState<string | null>(null);
   const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
   const [isResendingOtp, setIsResendingOtp] = useState(false);
 
-  // Tính toán độ mạnh mật khẩu (Weak / Medium / Strong)
   const passwordStrength = useMemo(() => {
     if (!password)
       return { score: 0, text: "", color: "transparent", width: "0%" };
@@ -104,8 +105,18 @@ export const RegisterPage: FC = () => {
       setErrorMessage("Vui lòng nhập tên chuỗi hoặc cửa hàng bán lẻ.");
       return;
     }
-    if (!phone.trim()) {
+    const cleanPhone = phone.trim().replace(/\D/g, "");
+    if (!cleanPhone) {
       setErrorMessage("Vui lòng nhập số điện thoại liên hệ.");
+      return;
+    }
+    if (!/^(0[3|5|7|8|9])[0-9]{8}$/.test(cleanPhone)) {
+      setErrorMessage("Số điện thoại không hợp lệ. Vui lòng nhập số điện thoại Việt Nam gồm 10 chữ số (bắt đầu bằng 03, 05, 07, 08, 09).");
+      return;
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!email.trim() || !emailRegex.test(email.trim())) {
+      setErrorMessage("Vui lòng nhập địa chỉ email hợp lệ (VD: chucuahang@gmail.com).");
       return;
     }
     if (password.length < 6) {
@@ -126,15 +137,15 @@ export const RegisterPage: FC = () => {
     try {
       setIsLoading(true);
 
-      // 1. Kiểm tra trùng số điện thoại và gửi SMS OTP qua TextBee Gateway trên Backend
       const otpRes = await authService.sendRegistrationOtp({
         phone: phone.trim(),
+        email: email.trim(),
         storeName: storeName.trim(),
         fullName: fullName.trim(),
       });
 
-      setMaskedPhone(otpRes.maskedPhone);
-      setIsRealSmsSent(otpRes.isRealSmsSent);
+      setMaskedEmail(otpRes.maskedEmail);
+      setIsRealEmailSent(otpRes.isRealEmailSent);
       setDevOtpCode(otpRes.devOtpCode ?? null);
       setOtpErrorMessage(null);
       setIsOtpModalOpen(true);
@@ -142,7 +153,7 @@ export const RegisterPage: FC = () => {
       const msg =
         err instanceof Error
           ? err.message
-          : "Không thể gửi mã xác thực SMS. Vui lòng thử lại.";
+          : "Không thể gửi mã xác thực Email OTP. Vui lòng thử lại.";
       setErrorMessage(msg);
     } finally {
       setIsLoading(false);
@@ -158,13 +169,14 @@ export const RegisterPage: FC = () => {
         fullName: fullName.trim(),
         storeName: storeName.trim(),
         phone: phone.trim(),
+        email: email.trim(),
         password,
         agreeTerms,
         otpCode,
       });
 
       setIsOtpModalOpen(false);
-      setAuth(res.user, res.accessToken);
+      setAuth(res.user);
       setIsSuccess(true);
     } catch (err: unknown) {
       const msg =
@@ -183,17 +195,18 @@ export const RegisterPage: FC = () => {
       setIsResendingOtp(true);
       const otpRes = await authService.sendRegistrationOtp({
         phone: phone.trim(),
+        email: email.trim(),
         storeName: storeName.trim(),
         fullName: fullName.trim(),
       });
-      setMaskedPhone(otpRes.maskedPhone);
-      setIsRealSmsSent(otpRes.isRealSmsSent);
+      setMaskedEmail(otpRes.maskedEmail);
+      setIsRealEmailSent(otpRes.isRealEmailSent);
       setDevOtpCode(otpRes.devOtpCode ?? null);
     } catch (err: unknown) {
       const msg =
         err instanceof Error
           ? err.message
-          : "Không thể gửi lại mã SMS OTP. Vui lòng thử lại.";
+          : "Không thể gửi lại mã Email OTP. Vui lòng thử lại.";
       setOtpErrorMessage(msg);
     } finally {
       setIsResendingOtp(false);
@@ -256,7 +269,6 @@ export const RegisterPage: FC = () => {
 
   return (
     <div className="auth-card">
-      {/* Thanh trên cùng */}
       <div className="auth-card-topbar">
         <Link to="/" className="auth-back-home-link">
           <ArrowLeft size={14} strokeWidth={2.2} />
@@ -282,7 +294,6 @@ export const RegisterPage: FC = () => {
       )}
 
       <form onSubmit={handleSubmit} className="auth-form-fields">
-        {/* Tên người đại diện */}
         <div className="auth-field-block">
           <label
             htmlFor="reg-fullname"
@@ -308,7 +319,6 @@ export const RegisterPage: FC = () => {
           </div>
         </div>
 
-        {/* Tên cửa hàng */}
         <div className="auth-field-block">
           <label
             htmlFor="reg-storename"
@@ -334,7 +344,6 @@ export const RegisterPage: FC = () => {
           </div>
         </div>
 
-        {/* Số điện thoại */}
         <div className="auth-field-block">
           <label
             htmlFor="reg-phone"
@@ -350,17 +359,69 @@ export const RegisterPage: FC = () => {
             <input
               id="reg-phone"
               type="tel"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              maxLength={11}
               className="auth-styled-input font-mono-input"
-              placeholder="Số điện thoại"
+              placeholder="09xx xxx xxx"
               value={phone}
-              onChange={(e) => setPhone(e.target.value)}
+              onChange={(e) => {
+                // Tự động loại bỏ toàn bộ ký tự không phải chữ số (chống nhập chữ như asddda)
+                const numericOnly = e.target.value.replace(/\D/g, "").slice(0, 11);
+                setPhone(numericOnly);
+                if (errorMessage) setErrorMessage(null);
+              }}
+              onKeyDown={(e) => {
+                // Chặn gõ phím chữ, chỉ cho phép số, phím xóa và điều hướng
+                const allowedControlKeys = [
+                  "Backspace",
+                  "Delete",
+                  "ArrowLeft",
+                  "ArrowRight",
+                  "Tab",
+                  "Enter",
+                ];
+                if (
+                  allowedControlKeys.includes(e.key) ||
+                  (e.ctrlKey || e.metaKey) // Ctrl+C, Ctrl+V, Ctrl+A
+                ) {
+                  return;
+                }
+                if (!/^\d$/.test(e.key)) {
+                  e.preventDefault();
+                }
+              }}
               disabled={isLoading}
               required
             />
           </div>
         </div>
 
-        {/* Mật khẩu */}
+        <div className="auth-field-block">
+          <label
+            htmlFor="reg-email"
+            className="auth-field-label"
+            style={{ marginBottom: "5px" }}
+          >
+            Email nhận mã OTP kích hoạt
+          </label>
+          <div className="auth-input-container">
+            <span className="auth-input-prefix-icon">
+              <Mail size={18} strokeWidth={1.8} />
+            </span>
+            <input
+              id="reg-email"
+              type="email"
+              className="auth-styled-input"
+              placeholder="chucuahang@gmail.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              disabled={isLoading}
+              required
+            />
+          </div>
+        </div>
+
         <div className="auth-field-block">
           <label
             htmlFor="reg-password"
@@ -425,7 +486,6 @@ export const RegisterPage: FC = () => {
           </div>
         )}
 
-        {/* Xác nhận lại mật khẩu */}
         <div className="auth-field-block">
           <label
             htmlFor="reg-confirm-password"
@@ -464,7 +524,6 @@ export const RegisterPage: FC = () => {
           </div>
         </div>
 
-        {/* Đồng ý điều khoản */}
         <div className="auth-remember-row" style={{ alignItems: "flex-start" }}>
           <label
             className="auth-checkbox-wrap"
@@ -486,7 +545,6 @@ export const RegisterPage: FC = () => {
           </label>
         </div>
 
-        {/* Nút Submit */}
         <button
           type="submit"
           className="auth-cta-primary-btn"
@@ -495,7 +553,7 @@ export const RegisterPage: FC = () => {
           {isLoading ? (
             <>
               <Loader2 size={18} className="animate-spin" />
-              <span>Đang gửi mã xác thực SMS...</span>
+              <span>Đang gửi mã OTP qua Email...</span>
             </>
           ) : (
             <>
@@ -508,10 +566,10 @@ export const RegisterPage: FC = () => {
 
       <RegistrationOtpModal
         isOpen={isOtpModalOpen}
-        phone={phone.trim()}
-        maskedPhone={maskedPhone}
+        email={email.trim()}
+        maskedEmail={maskedEmail}
         storeName={storeName.trim()}
-        isRealSmsSent={isRealSmsSent}
+        isRealEmailSent={isRealEmailSent}
         devOtpCode={devOtpCode}
         isSubmitting={isVerifyingOtp}
         isResending={isResendingOtp}

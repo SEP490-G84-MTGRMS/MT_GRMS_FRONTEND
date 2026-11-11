@@ -2,20 +2,19 @@ import { useState, useEffect, useRef } from "react";
 import type { FC, FormEvent, KeyboardEvent, ClipboardEvent } from "react";
 import {
   ShieldCheck,
-  Smartphone,
+  Mail,
   RotateCcw,
   X,
   AlertCircle,
   Loader2,
-  CheckCircle2,
 } from "lucide-react";
 
 export interface RegistrationOtpModalProps {
   isOpen: boolean;
-  phone: string;
-  maskedPhone: string;
+  email: string;
+  maskedEmail: string;
   storeName: string;
-  isRealSmsSent: boolean;
+  isRealEmailSent: boolean;
   devOtpCode?: string | null;
   isSubmitting: boolean;
   isResending: boolean;
@@ -29,10 +28,10 @@ const OTP_LENGTH = 6;
 
 export const RegistrationOtpModal: FC<RegistrationOtpModalProps> = ({
   isOpen,
-  phone,
-  maskedPhone,
+  email,
+  maskedEmail,
   storeName,
-  isRealSmsSent,
+  isRealEmailSent,
   devOtpCode,
   isSubmitting,
   isResending,
@@ -153,7 +152,7 @@ export const RegistrationOtpModal: FC<RegistrationOtpModalProps> = ({
     <div
       role="dialog"
       aria-modal="true"
-      aria-labelledby="sms-otp-modal-title"
+      aria-labelledby="email-otp-modal-title"
       style={{
         position: "fixed",
         inset: 0,
@@ -179,7 +178,6 @@ export const RegistrationOtpModal: FC<RegistrationOtpModalProps> = ({
           fontFamily: "var(--font-sans, 'Be Vietnam Pro', sans-serif)",
         }}
       >
-        {/* Nút đóng */}
         <button
           type="button"
           onClick={onClose}
@@ -205,25 +203,24 @@ export const RegistrationOtpModal: FC<RegistrationOtpModalProps> = ({
           <X size={16} strokeWidth={2} />
         </button>
 
-        {/* Icon Header */}
         <div
           style={{
             width: "48px",
             height: "48px",
             borderRadius: "9999px",
             backgroundColor: "#F1F5F9",
-            color: "var(--blue-primary, #0f766e)",
+            color: "var(--blue-primary, #0066FF)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             margin: "0 auto 14px auto",
           }}
         >
-          <Smartphone size={22} strokeWidth={1.9} />
+          <Mail size={22} strokeWidth={1.9} />
         </div>
 
         <h2
-          id="sms-otp-modal-title"
+          id="email-otp-modal-title"
           style={{
             fontSize: "1.25rem",
             fontWeight: 800,
@@ -233,7 +230,7 @@ export const RegistrationOtpModal: FC<RegistrationOtpModalProps> = ({
             letterSpacing: "-0.02em",
           }}
         >
-          Xác thực số điện thoại SMS
+          Xác thực địa chỉ Email (OTP)
         </h2>
 
         <p
@@ -245,7 +242,7 @@ export const RegistrationOtpModal: FC<RegistrationOtpModalProps> = ({
             lineHeight: 1.5,
           }}
         >
-          Mã xác thực 6 chữ số đã được gửi qua <strong>SMS Gateway</strong> tới số{" "}
+          Mã xác thực 6 chữ số đã được gửi tới email{" "}
           <span
             style={{
               fontFamily: "var(--font-mono, 'JetBrains Mono', monospace)",
@@ -253,13 +250,12 @@ export const RegistrationOtpModal: FC<RegistrationOtpModalProps> = ({
               color: "var(--text-main, #0F172A)",
             }}
           >
-            {phone || maskedPhone}
+            {email || maskedEmail}
           </span>{" "}
           để kích hoạt cửa hàng <strong>{storeName}</strong>.
         </p>
 
-        {/* Chế độ Dev / TextBee Fallback gợi ý nhanh nếu chưa bật TextBee SMS Gateway */}
-        {!isRealSmsSent && devOtpCode && (
+        {!isRealEmailSent && devOtpCode && (
           <div
             style={{
               backgroundColor: "#F8FAFC",
@@ -275,13 +271,13 @@ export const RegistrationOtpModal: FC<RegistrationOtpModalProps> = ({
           >
             <div style={{ fontSize: "12px", color: "#475569", lineHeight: 1.4 }}>
               <span style={{ fontWeight: 600, color: "#0F172A" }}>
-                Mã OTP (Dev / Chưa bật TextBee Gateway):
+                Mã Email OTP (Dev / Chưa cấu hình SMTP):
               </span>{" "}
               <strong
                 style={{
                   fontFamily: "var(--font-mono, 'JetBrains Mono', monospace)",
                   fontSize: "14px",
-                  color: "var(--blue-primary, #0f766e)",
+                  color: "var(--blue-primary, #0066FF)",
                   letterSpacing: "1px",
                 }}
               >
@@ -308,53 +304,29 @@ export const RegistrationOtpModal: FC<RegistrationOtpModalProps> = ({
           </div>
         )}
 
-        {isRealSmsSent && (
-          <div
-            style={{
-              backgroundColor: "#E8F9EE",
-              border: "1px solid #BBF7D0",
-              borderRadius: "12px",
-              padding: "8px 12px",
-              marginBottom: "16px",
-              display: "flex",
-              alignItems: "center",
-              gap: "8px",
-              fontSize: "12px",
-              color: "#166534",
-            }}
-          >
-            <CheckCircle2 size={15} strokeWidth={2} style={{ flexShrink: 0 }} />
-            <span>Đã gửi tin nhắn SMS thật đến điện thoại của bạn.</span>
-          </div>
-        )}
-
         {activeError && (
           <div
             role="alert"
             style={{
-              backgroundColor: "#FFF0F0",
-              border: "1px solid #FFD6D6",
-              borderRadius: "12px",
-              padding: "10px 12px",
-              marginBottom: "14px",
               display: "flex",
               alignItems: "flex-start",
               gap: "8px",
-              fontSize: "12.5px",
-              color: "#DC2626",
+              padding: "10px 12px",
+              borderRadius: "12px",
+              backgroundColor: "#FEF2F2",
+              border: "1px solid #FECACA",
+              color: "#B91C1C",
+              fontSize: "0.82rem",
+              marginBottom: "16px",
+              lineHeight: 1.45,
             }}
           >
-            <AlertCircle
-              size={15}
-              strokeWidth={2}
-              style={{ flexShrink: 0, marginTop: "1px" }}
-            />
+            <AlertCircle size={16} strokeWidth={2} style={{ flexShrink: 0, marginTop: "1px" }} />
             <span>{activeError}</span>
           </div>
         )}
 
         <form onSubmit={handleSubmit}>
-          {/* 6 Ô nhập mã OTP */}
           <div
             style={{
               display: "grid",
@@ -371,49 +343,42 @@ export const RegistrationOtpModal: FC<RegistrationOtpModalProps> = ({
                 }}
                 type="text"
                 inputMode="numeric"
-                autoComplete="one-time-code"
                 maxLength={1}
                 value={digit}
+                disabled={isSubmitting}
                 onChange={(e) => handleDigitChange(idx, e.target.value)}
                 onKeyDown={(e) => handleKeyDown(idx, e)}
                 onPaste={handlePaste}
-                disabled={isSubmitting}
                 aria-label={`Chữ số OTP thứ ${idx + 1}`}
                 style={{
                   width: "100%",
-                  height: "50px",
-                  textAlign: "center",
-                  fontFamily: "var(--font-mono, 'JetBrains Mono', monospace)",
-                  fontSize: "1.25rem",
-                  fontWeight: 700,
-                  color: "var(--text-main, #0F172A)",
-                  backgroundColor: digit ? "#FFFFFF" : "#F8FAFC",
-                  border: digit
-                    ? "1.5px solid var(--blue-primary, #0f766e)"
-                    : "1.5px solid #E2E8F0",
+                  height: "52px",
                   borderRadius: "14px",
+                  border: digit
+                    ? "1.5px solid var(--blue-primary, #0066FF)"
+                    : "1.5px solid #CBD5E1",
+                  backgroundColor: digit ? "#F8FAFC" : "#FFFFFF",
+                  textAlign: "center",
+                  fontSize: "1.35rem",
+                  fontWeight: 800,
+                  fontFamily: "var(--font-mono, 'JetBrains Mono', monospace)",
+                  color: "var(--text-main, #0F172A)",
                   outline: "none",
-                  boxSizing: "border-box",
                   transition: "border-color 0.15s ease, background-color 0.15s ease",
                 }}
               />
             ))}
           </div>
 
-          {/* Nút xác nhận Full Pill */}
           <button
             type="submit"
             disabled={isSubmitting || otpString.length < OTP_LENGTH}
             className="auth-cta-primary-btn"
             style={{
               width: "100%",
-              height: "44px",
               borderRadius: "9999px",
+              marginBottom: "14px",
               opacity: isSubmitting || otpString.length < OTP_LENGTH ? 0.65 : 1,
-              cursor:
-                isSubmitting || otpString.length < OTP_LENGTH
-                  ? "not-allowed"
-                  : "pointer",
             }}
           >
             {isSubmitting ? (
@@ -430,18 +395,17 @@ export const RegistrationOtpModal: FC<RegistrationOtpModalProps> = ({
           </button>
         </form>
 
-        {/* Bộ đếm ngược & Gửi lại mã */}
         <div
           style={{
-            marginTop: "16px",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            fontSize: "12.5px",
+            fontSize: "0.82rem",
             color: "var(--text-muted, #64748B)",
+            paddingTop: "4px",
           }}
         >
-          <span>Không nhận được mã SMS?</span>
+          <span>Chưa nhận được email?</span>
           <button
             type="button"
             onClick={handleResendClick}
@@ -450,39 +414,33 @@ export const RegistrationOtpModal: FC<RegistrationOtpModalProps> = ({
               display: "inline-flex",
               alignItems: "center",
               gap: "5px",
+              background: "none",
               border: "none",
-              background: "transparent",
-              padding: "4px 10px",
-              borderRadius: "9999px",
-              fontFamily: "var(--font-sans, 'Be Vietnam Pro', sans-serif)",
-              fontSize: "12.5px",
-              fontWeight: 600,
+              padding: 0,
+              fontSize: "0.82rem",
+              fontWeight: 700,
               color:
-                countdown > 0
+                countdown > 0 || isResending
                   ? "#94A3B8"
-                  : "var(--blue-primary, #0f766e)",
+                  : "var(--blue-primary, #0066FF)",
               cursor:
                 countdown > 0 || isResending || isSubmitting
                   ? "not-allowed"
                   : "pointer",
             }}
           >
-            <RotateCcw size={13} strokeWidth={2} />
+            <RotateCcw size={13} strokeWidth={2.2} />
             {isResending ? (
               <span>Đang gửi lại...</span>
             ) : countdown > 0 ? (
               <span>
                 Gửi lại mã sau{" "}
-                <strong
-                  style={{
-                    fontFamily: "var(--font-mono, 'JetBrains Mono', monospace)",
-                  }}
-                >
+                <strong style={{ fontFamily: "var(--font-mono, monospace)" }}>
                   {countdown}s
                 </strong>
               </span>
             ) : (
-              <span>Gửi lại mã SMS</span>
+              <span>Gửi lại mã OTP qua Email</span>
             )}
           </button>
         </div>
@@ -490,4 +448,3 @@ export const RegistrationOtpModal: FC<RegistrationOtpModalProps> = ({
     </div>
   );
 };
-

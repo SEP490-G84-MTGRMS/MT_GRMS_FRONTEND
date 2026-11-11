@@ -3,7 +3,7 @@ import type { FC, FormEvent } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   ArrowLeft,
-  Phone,
+  Mail,
   KeyRound,
   Eye,
   EyeOff,
@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { authService } from "../../features/auth/authService";
 import { ApiError } from "../../features/auth/authTypes";
+import { LoginOtpModal } from "../../features/auth/components/LoginOtpModal";
 import { useAuthStore } from "../../stores/useAuthStore";
 
 export const LoginPage: FC = () => {
@@ -33,12 +34,40 @@ export const LoginPage: FC = () => {
     redirectUrl ? "Phiên làm việc đã hết hạn. Vui lòng đăng nhập lại để tiếp tục." : null
   );
 
+  // State cho bước xác thực 2FA Email OTP khi đăng nhập
+  const [isOtpModalOpen, setIsOtpModalOpen] = useState(false);
+  const [tempToken, setTempToken] = useState("");
+  const [maskedEmail, setMaskedEmail] = useState("");
+  const [targetEmail, setTargetEmail] = useState("");
+  const [isRealEmailSent, setIsRealEmailSent] = useState(false);
+  const [devOtpCode, setDevOtpCode] = useState<string | null>(null);
+  const [otpErrorMessage, setOtpErrorMessage] = useState<string | null>(null);
+  const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
+  const [isResendingOtp, setIsResendingOtp] = useState(false);
+
+  const navigateByRole = (user: { isAdmin?: boolean; role: string }) => {
+    if (redirectUrl && !redirectUrl.startsWith("/auth") && redirectUrl !== "/login") {
+      navigate(redirectUrl, { replace: true });
+      return;
+    }
+
+    if (user.isAdmin || user.role === "ADMIN") {
+      navigate("/admin/dashboard");
+    } else if (user.role === "STAFF") {
+      navigate("/employee/schedule");
+    } else if (user.role === "CASHIER" || user.role === "EMPLOYEE") {
+      navigate("/pos");
+    } else {
+      navigate("/store-owner/dashboard");
+    }
+  };
+
   const handleLoginSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
 
     if (!phoneOrEmail.trim()) {
-      setErrorMessage("Vui lòng nhập số điện thoại hoặc email đăng nhập.");
+      setErrorMessage("Vui lòng nhập email hoặc tài khoản đăng nhập.");
       return;
     }
 
@@ -49,30 +78,19 @@ export const LoginPage: FC = () => {
 
     try {
       setIsLoading(true);
-      const res = await authService.login({
+      const otpInitRes = await authService.sendLoginOtp({
         email: phoneOrEmail.trim(),
         password,
         rememberMe,
       });
 
-      setAuth(res.user);
-
-      // Nếu có redirectUrl, ưu tiên đưa người dùng về đúng màn hình đang làm dở
-      if (redirectUrl && !redirectUrl.startsWith("/auth") && redirectUrl !== "/login") {
-        navigate(redirectUrl, { replace: true });
-        return;
-      }
-
-      // Điều hướng thông minh theo vai trò
-      if (res.user.isAdmin || res.user.role === "ADMIN") {
-        navigate("/admin/dashboard");
-      } else if (res.user.role === "STAFF") {
-        navigate("/employee/schedule");
-      } else if (res.user.role === "CASHIER" || res.user.role === "EMPLOYEE") {
-        navigate("/pos");
-      } else {
-        navigate("/store-owner/dashboard");
-      }
+      setTempToken(otpInitRes.tempToken);
+      setMaskedEmail(otpInitRes.maskedEmail);
+      setTargetEmail(otpInitRes.targetEmail);
+      setIsRealEmailSent(otpInitRes.isRealEmailSent);
+      setDevOtpCode(otpInitRes.devOtpCode ?? null);
+      setOtpErrorMessage(null);
+      setIsOtpModalOpen(true);
     } catch (err: unknown) {
       let msg = "Đăng nhập không thành công. Vui lòng kiểm tra lại tài khoản.";
       let status: number | undefined;
@@ -89,16 +107,64 @@ export const LoginPage: FC = () => {
         msg = anyErr.message || anyErr.response?.data?.message || msg;
       }
 
-      console.warn(`[Login Failed] API Status: ${status}, ErrorCode: ${errorCode}, Message: ${msg}`);
+      console.warn(`[Login OTP Send Failed] API Status: ${status}, ErrorCode: ${errorCode}, Message: ${msg}`);
       setErrorMessage(msg);
     } finally {
       setIsLoading(false);
     }
   };
 
+  const handleVerifyLoginOtp = async (otpCode: string) => {
+    setOtpErrorMessage(null);
+    try {
+      setIsVerifyingOtp(true);
+      const res = await authService.verifyLoginOtp({
+        tempToken,
+        otpCode,
+      });
+
+      setIsOtpModalOpen(false);
+      setAuth(res.user);
+      navigateByRole(res.user);
+    } catch (err: unknown) {
+      const msg =
+        err instanceof Error
+          ? err.message
+          : "Mã xác thực Email OTP không chính xác hoặc đã hết hạn.";
+      setOtpErrorMessage(msg);
+    } finally {
+      setIsVerifyingOtp(false);
+    }
+  };
+
+  const handleResendLoginOtp = async () => {
+    setOtpErrorMessage(null);
+    try {
+      setIsResendingOtp(true);
+      const otpInitRes = await authService.sendLoginOtp({
+        email: phoneOrEmail.trim(),
+        password,
+        rememberMe,
+      });
+      setTempToken(otpInitRes.tempToken);
+      setMaskedEmail(otpInitRes.maskedEmail);
+      setTargetEmail(otpInitRes.targetEmail);
+      setIsRealEmailSent(otpInitRes.isRealEmailSent);
+      setDevOtpCode(otpInitRes.devOtpCode ?? null);
+    } catch (err: unknown) {
+      const msg =
+        err instanceof Error
+          ? err.message
+          : "Không thể gửi lại mã Email OTP. Vui lòng thử lại.";
+      setOtpErrorMessage(msg);
+    } finally {
+      setIsResendingOtp(false);
+    }
+  };
+
   return (
     <div className="auth-card">
-      {/* Thanh trên cùng: Quay lại trang chủ & Huy hiệu Bảo mật SSL */}
+      {/* Thanh trên cùng: Quay lại trang chủ */}
       <div className="auth-card-topbar">
         <Link to="/" className="auth-back-home-link">
           <ArrowLeft size={14} strokeWidth={2.2} />
@@ -111,24 +177,24 @@ export const LoginPage: FC = () => {
 
       {/* FORM ĐĂNG NHẬP */}
       <form onSubmit={handleLoginSubmit} className="auth-form-fields">
-        {/* 1. Tên đăng nhập / Số điện thoại */}
+        {/* 1. Email / Tài khoản */}
         <div className="auth-field-block">
           <label
             htmlFor="username-input"
             className="auth-field-label"
             style={{ marginBottom: "6px" }}
           >
-            Số điện thoại
+            Email hoặc Tài khoản
           </label>
           <div className="auth-input-container">
             <span className="auth-input-prefix-icon">
-              <Phone size={18} strokeWidth={1.8} />
+              <Mail size={18} strokeWidth={1.8} />
             </span>
             <input
               id="username-input"
               type="text"
               className="auth-styled-input"
-              placeholder="09xx xxx xxx"
+              placeholder="admin@mtgrms.vn hoặc số điện thoại"
               value={phoneOrEmail}
               onChange={(e) => setPhoneOrEmail(e.target.value)}
               autoComplete="username"
@@ -223,7 +289,7 @@ export const LoginPage: FC = () => {
           </div>
         )}
 
-        {/* Thông báo lỗi màu đỏ chuyển xuống bên dưới */}
+        {/* Thông báo lỗi màu đỏ */}
         {errorMessage && (
           <div
             className="auth-alert auth-alert-error"
@@ -261,7 +327,7 @@ export const LoginPage: FC = () => {
           {isLoading ? (
             <>
               <Loader2 size={18} className="animate-spin" />
-              <span>ĐANG XÁC THỰC BẢO MẬT...</span>
+              <span>ĐANG GỬI MÃ EMAIL OTP...</span>
             </>
           ) : (
             <>
@@ -281,6 +347,20 @@ export const LoginPage: FC = () => {
           <span>Vào Nhanh Quầy POS Thu Ngân</span>
         </button>
       </form>
+
+      <LoginOtpModal
+        isOpen={isOtpModalOpen}
+        emailDisplay={targetEmail || phoneOrEmail.trim()}
+        maskedEmail={maskedEmail}
+        isRealEmailSent={isRealEmailSent}
+        devOtpCode={devOtpCode}
+        isSubmitting={isVerifyingOtp}
+        isResending={isResendingOtp}
+        errorMessage={otpErrorMessage}
+        onClose={() => setIsOtpModalOpen(false)}
+        onVerify={handleVerifyLoginOtp}
+        onResend={handleResendLoginOtp}
+      />
 
       {/* Hàng chuyển sang Đăng ký mở tiệm */}
       <div className="auth-bottom-switch-link">

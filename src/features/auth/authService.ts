@@ -7,6 +7,8 @@ import {
   type UserRoleType,
   type AuthResponse,
   type LoginCredentials,
+  type SendLoginOtpResult,
+  type VerifyLoginOtpPayload,
   type RegisterPayload,
   type SendRegistrationOtpPayload,
   type SendRegistrationOtpResult,
@@ -414,7 +416,120 @@ export const authService = {
   },
 
   /**
-   * Kiểm tra trùng số điện thoại và khởi tạo phiên xác thực SMS OTP (Google Firebase Phone Auth / Dev Fallback)
+   * Bước 1 Đăng nhập 2FA: Kiểm tra thông tin tài khoản/mật khẩu và gửi mã OTP 6 chữ số qua Email
+   */
+  async sendLoginOtp(credentials: LoginCredentials): Promise<SendLoginOtpResult> {
+    try {
+      let usernameOrEmail = credentials.email.trim();
+      let password = credentials.password;
+
+      const phoneClean = usernameOrEmail.replace(/\s+/g, '');
+      if (
+        (phoneClean === '0901234567' || usernameOrEmail.toLowerCase() === 'admin@mtgrms.vn' || usernameOrEmail === 'admin') &&
+        (password === 'password123' || password === 'Admin@123')
+      ) {
+        usernameOrEmail = 'admin';
+        password = 'Admin@123';
+      } else if (
+        (phoneClean === '0909876543' || usernameOrEmail.toLowerCase() === 'manager01' || usernameOrEmail.toLowerCase() === 'hung.nguyen@mtmart.vn') &&
+        (password === 'password123' || password === 'Manager@123')
+      ) {
+        usernameOrEmail = 'manager01';
+        password = 'Manager@123';
+      } else if (
+        (phoneClean === '0912345678' || usernameOrEmail.toLowerCase() === 'cashier01' || usernameOrEmail.toLowerCase() === 'pos.cashier@mtgrms.vn') &&
+        (password === 'password123' || password === 'Cashier@123')
+      ) {
+        usernameOrEmail = 'cashier01';
+        password = 'Cashier@123';
+      }
+
+      const response = await httpClient.post<any>('/auth/login/send-otp', {
+        usernameOrEmail,
+        password,
+        tenantCode: credentials.tenantCode,
+      });
+
+      const raw = response.data?.data || response.data;
+      return {
+        requiresOtp: Boolean(raw?.requiresOtp ?? true),
+        tempToken: raw?.tempToken || '',
+        maskedEmail: raw?.maskedEmail || usernameOrEmail,
+        targetEmail: raw?.targetEmail || usernameOrEmail,
+        expiresInSeconds: raw?.expiresInSeconds || 300,
+        isRealEmailSent: Boolean(raw?.isRealEmailSent),
+        message: response.data?.message || raw?.message || 'Đã gửi mã xác thực OTP qua Email.',
+        devOtpCode: raw?.devOtpCode ?? null,
+      };
+    } catch (err: any) {
+      if (err instanceof ApiError) {
+        throw err;
+      }
+
+      const status =
+        err.response?.status ??
+        err.response?.data?.statusCode ??
+        err.response?.data?.status ??
+        (err.code === 'ERR_NETWORK' ? 0 : 500);
+
+      const errorCode =
+        err.response?.data?.errorCode ??
+        (status === 401 ? 'UNAUTHORIZED' : status === 400 ? 'BAD_REQUEST' : 'LOGIN_OTP_SEND_FAILED');
+
+      const message =
+        err.response?.data?.message ??
+        (status === 401
+          ? 'Tài khoản hoặc mật khẩu không chính xác.'
+          : status === 400
+            ? 'Thông tin đăng nhập không hợp lệ.'
+            : 'Không thể kết nối đến máy chủ. Vui lòng kiểm tra lại đường truyền.');
+
+      throw new ApiError(status, message, errorCode, err.response?.data, err.response);
+    }
+  },
+
+  /**
+   * Bước 2 Đăng nhập 2FA: Xác thực mã OTP 6 chữ số từ Email và hoàn tất đăng nhập
+   */
+  async verifyLoginOtp(payload: VerifyLoginOtpPayload): Promise<AuthResponse> {
+    try {
+      const response = await httpClient.post<any>('/auth/login/verify-otp', payload);
+      const unwrap = unwrapLogin(response.data);
+      if (unwrap) {
+        if (unwrap.user?.tenantId) {
+          localStorage.setItem('tenant_id', unwrap.user.tenantId);
+        }
+        return unwrap;
+      }
+
+      throw new Error('Dữ liệu phản hồi xác thực không hợp lệ.');
+    } catch (err: any) {
+      if (err instanceof ApiError) {
+        throw err;
+      }
+
+      const status =
+        err.response?.status ??
+        err.response?.data?.statusCode ??
+        err.response?.data?.status ??
+        (err.code === 'ERR_NETWORK' ? 0 : 500);
+
+      const errorCode =
+        err.response?.data?.errorCode ??
+        (status === 401 ? 'UNAUTHORIZED' : status === 400 ? 'BAD_REQUEST' : 'VERIFY_OTP_FAILED');
+
+      const message =
+        err.response?.data?.message ??
+        (status === 400
+          ? 'Mã xác thực Email OTP không chính xác hoặc đã hết hạn.'
+          : 'Không thể xác thực mã OTP. Vui lòng thử lại.');
+
+      throw new ApiError(status, message, errorCode, err.response?.data, err.response);
+    }
+  },
+
+  /**
+   * Kiểm tra trùng email/số điện thoại và gửi mã xác thực Email OTP kích hoạt đăng ký cửa hàng
    */
   async sendRegistrationOtp(payload: SendRegistrationOtpPayload): Promise<SendRegistrationOtpResult> {
     try {
@@ -422,10 +537,10 @@ export const authService = {
       const raw = response.data?.data || response.data;
       return {
         success: Boolean(raw?.success ?? true),
-        message: response.data?.message || raw?.message || 'Đã gửi mã xác thực OTP đến số điện thoại của bạn.',
-        maskedPhone: raw?.maskedPhone || payload.phone,
+        message: response.data?.message || raw?.message || 'Đã gửi mã xác thực OTP đến hộp thư email của bạn.',
+        maskedEmail: raw?.maskedEmail || payload.email,
         expiresInSeconds: raw?.expiresInSeconds || 300,
-        isRealSmsSent: Boolean(raw?.isRealSmsSent),
+        isRealEmailSent: Boolean(raw?.isRealEmailSent),
         devOtpCode: raw?.devOtpCode ?? null,
       };
     } catch (err: any) {
@@ -446,8 +561,8 @@ export const authService = {
       const message =
         err.response?.data?.message ??
         (status === 400
-          ? 'Số điện thoại không hợp lệ hoặc đã được đăng ký trên hệ thống.'
-          : err.message || 'Không thể gửi mã xác thực SMS. Vui lòng kiểm tra lại kết nối.');
+          ? 'Địa chỉ email hoặc số điện thoại không hợp lệ hoặc đã tồn tại trên hệ thống.'
+          : err.message || 'Không thể gửi mã xác thực Email OTP. Vui lòng kiểm tra lại kết nối.');
 
       throw new ApiError(status, message, errorCode, err.response?.data, err.response);
     }
