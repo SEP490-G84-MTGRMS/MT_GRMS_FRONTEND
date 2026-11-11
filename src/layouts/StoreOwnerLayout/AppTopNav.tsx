@@ -428,11 +428,15 @@ const NAV_PATH_EXCLUSIONS: Record<
 function matchesQueryParams(currQuery: string, toQuery: string): boolean {
   const currParams = new URLSearchParams(currQuery);
   const toParams = new URLSearchParams(toQuery);
-  const entries = Array.from(toParams.entries());
-  return (
-    entries.length > 0 &&
-    entries.every(([key, value]) => currParams.get(key) === value)
-  );
+  let count = 0;
+  let match = true;
+  toParams.forEach((value, key) => {
+    count += 1;
+    if (currParams.get(key) !== value) {
+      match = false;
+    }
+  });
+  return count > 0 && match;
 }
 
 function isQueryNavItemActive(
