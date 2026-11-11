@@ -84,6 +84,12 @@ export const LoginPage: FC = () => {
         rememberMe,
       });
 
+      if (!otpInitRes.requiresOtp && otpInitRes.user) {
+        setAuth(otpInitRes.user);
+        navigateByRole(otpInitRes.user);
+        return;
+      }
+
       setTempToken(otpInitRes.tempToken);
       setMaskedEmail(otpInitRes.maskedEmail);
       setTargetEmail(otpInitRes.targetEmail);

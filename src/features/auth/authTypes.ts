@@ -34,6 +34,7 @@ export interface LoginCredentials {
 
 export interface SendLoginOtpResult {
   requiresOtp: boolean;
+  user?: UserProfile;
   tempToken: string;
   maskedEmail: string;
   targetEmail: string;

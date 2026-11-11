@@ -448,6 +448,49 @@
   border-bottom-right-radius: 24px;
 }
 
+.store-btn-primary,
+.store-btn-secondary {
+  min-height: 38px;
+  padding: 9px 18px;
+  border-radius: 9999px;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.store-btn-primary {
+  color: #FFFFFF;
+  background: var(--blue-primary, #0F766E);
+  border: 1px solid var(--blue-primary, #0F766E);
+  box-shadow: 0 3px 8px rgba(15, 118, 110, 0.22);
+}
+
+.store-btn-primary:hover:not(:disabled) {
+  background: var(--blue-dark, #134E4A);
+  border-color: var(--blue-dark, #134E4A);
+}
+
+.store-btn-secondary {
+  color: #334155;
+  background: #FFFFFF;
+  border: 1px solid #CBD5E1;
+}
+
+.store-btn-secondary:hover:not(:disabled) {
+  background: #F1F5F9;
+  border-color: #94A3B8;
+}
+
+.store-btn-primary:disabled,
+.store-btn-secondary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
 /* Split Layout for Subscription Checkout Modal */
 .checkout-modal-split {
   display: grid;

@@ -453,6 +453,7 @@ export const authService = {
       const raw = response.data?.data || response.data;
       return {
         requiresOtp: Boolean(raw?.requiresOtp ?? true),
+        user: raw?.user,
         tempToken: raw?.tempToken || '',
         maskedEmail: raw?.maskedEmail || usernameOrEmail,
         targetEmail: raw?.targetEmail || usernameOrEmail,
@@ -526,6 +527,21 @@ export const authService = {
 
       throw new ApiError(status, message, errorCode, err.response?.data, err.response);
     }
+  },
+
+  async getTwoFactorStatus(): Promise<{ enabled: boolean; maskedEmail: string; isEmailVerified: boolean }> {
+    const response = await httpClient.get<any>('/auth/me/2fa');
+    return response.data?.data || response.data;
+  },
+
+  async requestTwoFactorChallenge(enabled: boolean, currentPassword: string) {
+    const response = await httpClient.post<any>('/auth/me/2fa/challenge', { enabled, currentPassword });
+    return response.data?.data || response.data;
+  },
+
+  async confirmTwoFactorChallenge(challengeToken: string, otpCode: string) {
+    const response = await httpClient.post<any>('/auth/me/2fa/confirm', { challengeToken, otpCode });
+    return response.data?.data || response.data;
   },
 
   /**

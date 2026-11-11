@@ -39,6 +39,7 @@ export const BranchQuotaBar: FC<BranchQuotaBarProps> = ({
   const { usedBranches, maxBranches, canAddMore, currentPlanName } = quota;
   const percentage = Math.min(100, Math.round((usedBranches / maxBranches) * 100));
   const isNearLimit = percentage >= 80;
+  const quotaAccent = canAddMore ? '#0F766E' : '#B45309';
 
   const handleAddClick = () => {
     if (canAddMore) {
@@ -52,10 +53,10 @@ export const BranchQuotaBar: FC<BranchQuotaBarProps> = ({
     <div
       style={{
         background: '#FFFFFF',
-        borderRadius: 16,
+        borderRadius: 20,
         padding: '16px 20px',
-        border: '1px solid #EDF2F9',
-        boxShadow: '0 4px 16px rgba(0, 30, 90, 0.04)',
+        border: '1px solid #E2E8F0',
+        boxShadow: 'none',
         marginBottom: 14,
         flexShrink: 0,
       }}
@@ -75,12 +76,12 @@ export const BranchQuotaBar: FC<BranchQuotaBarProps> = ({
             style={{
               width: 44,
               height: 44,
-              borderRadius: 12,
-              background: canAddMore ? '#EBF5FF' : '#FFF7ED',
+              borderRadius: 14,
+              background: canAddMore ? '#ECFDF5' : '#FFFBEB',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              color: canAddMore ? '#0066FF' : '#EA580C',
+              color: quotaAccent,
             }}
           >
             <Building2 size={24} strokeWidth={2} />
@@ -107,10 +108,10 @@ export const BranchQuotaBar: FC<BranchQuotaBarProps> = ({
               {canAddMore ? (
                 <span>
                   Đã sử dụng <strong>{usedBranches}</strong> / <strong>{maxBranches}</strong> chi nhánh (còn trống{' '}
-                  <strong style={{ color: '#0066FF' }}>{maxBranches - usedBranches}</strong> slot)
+                  <strong style={{ color: quotaAccent }}>{maxBranches - usedBranches}</strong> slot)
                 </span>
               ) : (
-                <span style={{ color: '#DC2626', fontWeight: 600 }}>
+                <span style={{ color: '#92400E', fontWeight: 600 }}>
                   {usedBranches > maxBranches
                     ? `Đã sử dụng ${usedBranches}/${maxBranches} chi nhánh (Vượt quá hạn mức ${usedBranches - maxBranches} chi nhánh)`
                     : `Đã đạt giới hạn tối đa ${maxBranches}/${maxBranches} chi nhánh của gói hiện tại`}
@@ -131,9 +132,9 @@ export const BranchQuotaBar: FC<BranchQuotaBarProps> = ({
                 gap: 6,
                 padding: '9px 18px',
                 borderRadius: 'var(--radius-pill)',
-                border: '1px solid #0066FF',
-                background: '#F8FAFC',
-                color: '#0066FF',
+                border: '1px solid #0F766E',
+                background: '#FFFFFF',
+                color: '#0F766E',
                 fontSize: 13.5,
                 fontWeight: 700,
                 cursor: 'pointer',
@@ -153,16 +154,13 @@ export const BranchQuotaBar: FC<BranchQuotaBarProps> = ({
               gap: 8,
               padding: '9px 20px',
               borderRadius: 'var(--radius-pill)',
-              background: canAddMore ? 'var(--blue-primary)' : '#EA580C',
+              background: '#0F766E',
               color: '#FFFFFF',
               border: 'none',
               fontSize: 13.5,
               fontWeight: 700,
               cursor: 'pointer',
-              boxShadow: canAddMore
-                ? '0 4px 14px rgba(0, 102, 255, 0.28)'
-                : '0 4px 14px rgba(234, 88, 12, 0.28)',
-              transition: 'background-color 0.15s ease',
+              boxShadow: 'none',
             }}
           >
             <Plus size={16} strokeWidth={2.4} />
@@ -187,10 +185,7 @@ export const BranchQuotaBar: FC<BranchQuotaBarProps> = ({
             width: `${percentage}%`,
             height: '100%',
             borderRadius: 4,
-            background: isNearLimit
-              ? 'linear-gradient(90deg, #F59E0B, #DC2626)'
-              : 'linear-gradient(90deg, #0066FF, #00C853)',
-            transition: 'width 0.4s ease',
+            background: isNearLimit ? '#D97706' : '#0F766E',
           }}
         />
       </div>
