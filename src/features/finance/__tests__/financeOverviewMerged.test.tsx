@@ -5,6 +5,7 @@ import { MemoryRouter, useLocation } from 'react-router-dom';
 import { FinanceOverviewPage } from '../pages/FinanceOverviewPage';
 import { financeHttpClient } from '../../../api/financeHttpClient';
 import { cashbookService } from '../../cashbook/services/cashbookService';
+import { posShiftApi } from '../../pos/api/posShiftApi';
 import { reportsPnlService } from '../../reports-pnl';
 import type { BranchOption, PnlReportResponse } from '../../reports-pnl';
 import type { CashAccount } from '../../cashbook/types/cashbook.types';
@@ -271,6 +272,12 @@ describe('FinanceOverviewPage — Unified Zone A + Zone B (P&L) Integration Suit
     pnlReportSpy = vi
       .spyOn(reportsPnlService, 'getPnlReportData')
       .mockResolvedValue(MOCK_PNL_REPORT);
+
+    vi.spyOn(posShiftApi, 'getPendingMovements').mockResolvedValue({
+      pendingApprovalsCount: 0,
+      unconfirmedDropsCount: 0,
+      movements: [],
+    });
   };
 
   /**
@@ -499,5 +506,108 @@ describe('FinanceOverviewPage — Unified Zone A + Zone B (P&L) Integration Suit
     expect(screen.getByText(/Tiền hiện có hôm nay/i)).toBeDefined();
     expect(container.querySelector('#pnl-section')).not.toBeNull();
     expect(screen.getByText('85.811.580đ')).toBeDefined();
+  });
+
+  it('8. calculates cashInTransit from unconfirmed CASH_DRAW movements and reflects in total assets', async () => {
+    vi.restoreAllMocks();
+    setupDefaultMocks();
+
+    vi.spyOn(posShiftApi, 'getPendingMovements').mockResolvedValue({
+      pendingApprovalsCount: 1,
+      unconfirmedDropsCount: 1,
+      movements: [
+        {
+          id: 'mov-1',
+          shiftId: 'shift-1',
+          movementType: 'OUT',
+          category: 'CASH_DRAW',
+          amount: 5000000,
+          reason: 'Rút két nộp két sắt',
+          occurredAtUtc: new Date().toISOString(),
+          status: 'Recorded',
+          isConfirmedByOwner: false,
+        },
+        {
+          id: 'mov-2',
+          shiftId: 'shift-1',
+          movementType: 'OUT',
+          category: 'CASH_DRAW',
+          amount: 2000000,
+          reason: 'Đã xác nhận',
+          occurredAtUtc: new Date().toISOString(),
+          status: 'Recorded',
+          isConfirmedByOwner: true,
+        },
+      ],
+    });
+
+    renderPage();
+
+    // 348.950.000 + 5.000.000 (cashInTransit) = 353.950.000đ
+    await waitFor(() => {
+      expect(screen.getByText('353.950.000đ')).toBeDefined();
+    });
+  });
+
+  it('9. Card #2 reads pending amount from totalPendingAmount or totalAmount - paidAmount when overdueAmount is missing', async () => {
+    vi.restoreAllMocks();
+    setupDefaultMocks();
+
+    httpGetSpy.mockImplementation(async (url: string) => {
+      if (url === '/cashbook/summary') {
+        return {
+          data: {
+            data: {
+              totalOpeningBalance: 334700000,
+              totalReceipts: 42500000,
+              totalPayments: 28250000,
+              totalClosingBalance: 348950000,
+              totalCashInDrawers: 12500000,
+              totalBankDeposits: 186450000,
+              totalSafeDepositBalance: 150000000,
+            },
+          },
+        } as never;
+      }
+      if (url === '/customers/debts/summary') {
+        return {
+          data: {
+            data: { totalDebtAR: 0, overLimitCount: 0, totalCustomers: 0 },
+          },
+        } as never;
+      }
+      if (url === '/expenses/summary') {
+        return {
+          data: {
+            data: {
+              totalAmount: 15000000,
+              paidAmount: 10000000,
+              totalPendingAmount: 5000000,
+              pendingApprovalCount: 2,
+            },
+          },
+        } as never;
+      }
+      if (url === '/tax/household/summary') {
+        return {
+          data: {
+            success: true,
+            data: { taxDueYtd: 0, totalTaxAmount: 0 },
+          },
+        } as never;
+      }
+      throw new Error(`Unexpected financeHttpClient.get call: ${url}`);
+    });
+
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByText('5.000.000đ')).toBeDefined();
+    });
+
+    const card2Title = screen.getByText('Phải trả dịch vụ');
+    const card2Element = card2Title.closest('.finance-summary-card') as HTMLElement;
+    expect(card2Element.textContent).toContain('5.000.000đ');
+    expect(card2Element.textContent).toContain('2 khoản quá hạn');
   });
 });

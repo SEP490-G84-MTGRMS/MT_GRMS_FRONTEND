@@ -1,4 +1,4 @@
-import { type FC, useState } from 'react';
+import { type FC, useState, useEffect } from 'react';
 import {
   Zap,
   Droplets,
@@ -10,6 +10,7 @@ import {
   Wrench,
 } from 'lucide-react';
 import { PlusIcon, CloseIcon, UploadIcon } from '../../admin/components';
+import { employeeApi } from '../../employee/api/employeeApi';
 import {
   EXPENSE_CATEGORY_LABELS,
   type CreateExpenseRequest,
@@ -24,6 +25,8 @@ interface CreateExpenseModalProps {
   onClose: () => void;
   onSubmit: (data: CreateExpenseRequest) => Promise<void>;
   isSubmitting?: boolean;
+  branches?: { id: string; name: string }[];
+  defaultBranchId?: string;
 }
 
 interface QuickOption {
@@ -38,58 +41,58 @@ interface QuickOption {
 
 const QUICK_OPTIONS: QuickOption[] = [
   {
-    category: 'Maintenance',
-    vendorName: 'Nhà cung cấp Phụ tùng xe máy',
-    label: 'Tiền phụ tùng',
-    sub: 'Nhông sên, dầu nhớt, lốp',
-    icon: Wrench,
-    color: '#0F766E',
-    bg: '#CCFBF1',
-  },
-  {
-    category: 'Rent',
-    vendorName: 'Chủ nhà cho thuê mặt bằng',
-    label: 'Mặt bằng',
-    sub: 'Tiền thuê cửa hàng định kỳ',
-    icon: Home,
-    color: '#7C3AED',
-    bg: '#EDE9FE',
-  },
-  {
     category: 'Electricity',
     vendorName: 'Điện lực EVN',
-    label: 'Tiền điện',
-    sub: 'Hóa đơn điện lực sinh hoạt/KD',
+    label: 'Tiền điện kho lạnh',
+    sub: 'Điện kho lạnh bảo quản thực phẩm & chiếu sáng',
     icon: Zap,
     color: '#D97706',
     bg: '#FEF3C7',
   },
   {
+    category: 'Rent',
+    vendorName: 'Chủ nhà cho thuê mặt bằng',
+    label: 'Tiền thuê mặt bằng cửa hàng',
+    sub: 'Tiền thuê mặt bằng cửa hàng định kỳ',
+    icon: Home,
+    color: '#7C3AED',
+    bg: '#EDE9FE',
+  },
+  {
+    category: 'Maintenance',
+    vendorName: 'Đơn vị cơ điện lạnh',
+    label: 'Bảo trì tủ đông mát',
+    sub: 'Bảo trì tủ đông mát, điều hòa quầy kệ',
+    icon: Wrench,
+    color: '#0F766E',
+    bg: '#CCFBF1',
+  },
+  {
+    category: 'Other',
+    vendorName: 'Nhà cung cấp bao bì & ấn phẩm',
+    label: 'Bao bì & Cuộn in bill',
+    sub: 'Mua bao bì túi ni lông & cuộn in bill',
+    icon: Package,
+    color: '#475569',
+    bg: '#F1F5F9',
+  },
+  {
     category: 'Water',
     vendorName: 'Công ty Cấp nước Sawaco',
     label: 'Tiền nước',
-    sub: 'Nước rửa xe, sinh hoạt',
+    sub: 'Nước sơ chế thực phẩm & vệ sinh quầy kệ',
     icon: Droplets,
     color: '#0284C7',
     bg: '#E0F2FE',
   },
   {
     category: 'Internet',
-    vendorName: 'Nhân viên & Thợ sửa xe',
-    label: 'Lương & Phụ cấp',
-    sub: 'Ứng lương, phụ cấp ca',
+    vendorName: 'Nhà mạng Viettel / VNPT',
+    label: 'Internet & Phần mềm',
+    sub: 'Cáp quang POS & phần mềm bán lẻ',
     icon: Users,
     color: '#15803D',
     bg: '#DCFCE7',
-  },
-  {
-    category: 'Other',
-    vendorName: 'Nhà cung cấp lẻ',
-    label: 'Chi phí khác',
-    sub: 'Vệ sinh, rác, lặt vặt',
-    icon: Package,
-    color: '#475569',
-    bg: '#F1F5F9',
   },
 ];
 
@@ -98,12 +101,32 @@ export const CreateExpenseModal: FC<CreateExpenseModalProps> = ({
   onClose,
   onSubmit,
   isSubmitting = false,
+  branches,
+  defaultBranchId,
 }) => {
   const [activeTab, setActiveTab] = useState<'quick' | 'detail'>('quick');
+  const [internalBranches, setInternalBranches] = useState<{ id: string; name: string }[]>([]);
+
+  // Tự động tải danh sách chi nhánh nếu component cha không truyền xuống
+  useEffect(() => {
+    if (!branches || branches.length === 0) {
+      let isMounted = true;
+      employeeApi.getBranches().then((list) => {
+        if (isMounted && list && list.length > 0) {
+          setInternalBranches(list);
+        }
+      });
+      return () => {
+        isMounted = false;
+      };
+    }
+  }, [branches]);
+
+  const activeBranches = branches && branches.length > 0 ? branches : internalBranches;
 
   // Poka-yoke: Do NOT pre-select category. User must explicitly choose one.
   const [formData, setFormData] = useState(() => ({
-    branchId: 'BR-01',
+    branchId: defaultBranchId || '',
     category: '' as unknown as ExpenseCategory,
     amount: '',
     expenseDate: new Date().toISOString().split('T')[0],
@@ -117,6 +140,16 @@ export const CreateExpenseModal: FC<CreateExpenseModalProps> = ({
     attachedBillUrl: '',
     note: '',
   }));
+
+  // Cập nhật branchId nếu defaultBranchId hoặc danh sách chi nhánh sẵn sàng
+  useEffect(() => {
+    if (!formData.branchId && (defaultBranchId || activeBranches[0]?.id)) {
+      setFormData((prev) => ({
+        ...prev,
+        branchId: defaultBranchId || activeBranches[0]?.id || '',
+      }));
+    }
+  }, [defaultBranchId, activeBranches, formData.branchId]);
 
   const [attachMode, setAttachMode] = useState<'upload' | 'url'>('upload');
   const [uploadedFile, setUploadedFile] = useState<{ name: string; size: string } | null>(null);
@@ -515,9 +548,14 @@ export const CreateExpenseModal: FC<CreateExpenseModalProps> = ({
                       onChange={(e) => handleChange('branchId', e.target.value)}
                       className={`form-select ${errors.branchId ? 'error' : ''}`}
                     >
-                      <option value="BR-01">Quận 1 (Trụ sở chính)</option>
-                      <option value="BR-02">Bình Thạnh</option>
-                      <option value="BR-03">Thủ Đức</option>
+                      {activeBranches.length === 0 && (
+                        <option value="">-- Đang tải chi nhánh... --</option>
+                      )}
+                      {activeBranches.map((b) => (
+                        <option key={b.id} value={b.id}>
+                          {b.name}
+                        </option>
+                      ))}
                     </select>
                     {errors.branchId && <p className="form-error">{errors.branchId}</p>}
                   </div>

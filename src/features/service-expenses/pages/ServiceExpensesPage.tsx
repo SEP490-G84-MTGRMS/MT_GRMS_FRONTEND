@@ -1,6 +1,7 @@
 import { type FC, useState, useRef, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuthStore } from '../../../stores/useAuthStore';
+import { employeeApi } from '../../employee/api/employeeApi';
 import {
   AdminToast,
   type ToastState,
@@ -29,6 +30,24 @@ import type {
 import { calculatePeriodRange } from '../utils/datePeriodUtils';
 import '../service-expenses.css';
 
+/**
+ * Trích xuất branchId ban đầu từ authStore hoặc localStorage mtgrms_active_branch
+ */
+const getInitialActiveBranchId = (userBranchId?: string): string => {
+  try {
+    const raw = localStorage.getItem('mtgrms_active_branch');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && parsed.id && parsed.id !== 'ALL') {
+        return parsed.id;
+      }
+    }
+  } catch {
+    // fallback
+  }
+  return userBranchId || '';
+};
+
 export const ServiceExpensesPage: FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const user = useAuthStore((state) => state.user);
@@ -37,20 +56,55 @@ export const ServiceExpensesPage: FC = () => {
     (user?.role as unknown as string) === 'EMPLOYEE' ||
     (user?.role as unknown as string) === 'CASHIER';
   const urlSearch = searchParams.get('search') || searchParams.get('keyword') || '';
-  const [periodLabel, setPeriodLabel] = useState(urlSearch ? 'Tất cả thời gian' : 'Tháng 10/2026');
+  const initialRange = calculatePeriodRange('this-month');
+  const [periodLabel, setPeriodLabel] = useState(urlSearch ? 'Tất cả thời gian' : initialRange.label);
+  const [branches, setBranches] = useState<{ id: string; name: string }[]>([]);
   const [filters, setFilters] = useState<ExpenseFilterParams>(() => {
-    const range = calculatePeriodRange('this-month');
     return {
       page: 1,
       pageSize: 10,
-      branchId: '',
+      branchId: getInitialActiveBranchId(user?.branchId),
       category: '',
       status: '',
       keyword: urlSearch,
-      fromDate: urlSearch ? undefined : range.fromDate,
-      toDate: urlSearch ? undefined : range.toDate,
+      fromDate: urlSearch ? undefined : initialRange.fromDate,
+      toDate: urlSearch ? undefined : initialRange.toDate,
     };
   });
+
+  // Tải danh sách chi nhánh hoạt động thực tế từ Backend
+  useEffect(() => {
+    let isMounted = true;
+    employeeApi.getBranches().then((list) => {
+      if (isMounted && list && list.length > 0) {
+        setBranches(list);
+      }
+    });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Đồng bộ chi nhánh đang chọn từ TopNav (mtgrms_active_branch & event mtgrms:branch-changed)
+  useEffect(() => {
+    const handleGlobalBranchChange = (e: Event) => {
+      const customEvent = e as CustomEvent<{ id?: string }>;
+      const branch = customEvent.detail;
+      if (branch) {
+        const nextBranchId = branch.id === 'ALL' ? '' : (branch.id || '');
+        setFilters((prev) => ({
+          ...prev,
+          branchId: nextBranchId,
+          page: 1,
+        }));
+      }
+    };
+
+    window.addEventListener('mtgrms:branch-changed', handleGlobalBranchChange);
+    return () => {
+      window.removeEventListener('mtgrms:branch-changed', handleGlobalBranchChange);
+    };
+  }, []);
 
   // Keep filters in sync when navigation query parameters change
   useEffect(() => {
@@ -144,7 +198,7 @@ export const ServiceExpensesPage: FC = () => {
     setFilters({
       page: 1,
       pageSize: 10,
-      branchId: '',
+      branchId: getInitialActiveBranchId(user?.branchId),
       category: '',
       status: '',
       keyword: '',
@@ -203,7 +257,7 @@ export const ServiceExpensesPage: FC = () => {
             Phải trả
           </h1>
           <p style={{ margin: '4px 0 0', fontSize: '0.84rem', color: '#64748B' }}>
-            Theo dõi tiền phụ tùng, mặt bằng, điện nước cần thanh toán
+            Theo dõi tiền điện kho lạnh bảo quản thực phẩm, tiền thuê mặt bằng cửa hàng, mua bao bì túi ni lông &amp; cuộn in bill, bảo trì tủ đông mát...
           </p>
         </div>
 
@@ -238,7 +292,7 @@ export const ServiceExpensesPage: FC = () => {
             }}
           >
             <PlusIcon size={16} color="#ffffff" />
-            <span>+ Ghi nhận chi phí</span>
+            <span>Ghi nhận chi phí</span>
           </button>
         </div>
       </div>
@@ -256,6 +310,7 @@ export const ServiceExpensesPage: FC = () => {
         onFilterChange={handleFilterChange}
         onReset={handleResetFilters}
         onPeriodLabelChange={setPeriodLabel}
+        branches={branches}
       />
 
       {/* Main Expense Table */}
@@ -283,6 +338,8 @@ export const ServiceExpensesPage: FC = () => {
         onClose={() => setIsCreateOpen(false)}
         onSubmit={handleCreateSubmit}
         isSubmitting={createExpenseMutation.isPending}
+        branches={branches}
+        defaultBranchId={filters.branchId || branches[0]?.id || ''}
       />
 
       {/* Pay Modal */}

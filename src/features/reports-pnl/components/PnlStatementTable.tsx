@@ -29,6 +29,23 @@ function formatVnd(val: number): string {
 }
 
 /**
+ * Sanitizes P&L line item titles to ensure no internal dev tags or numbering discrepancies reach the UI.
+ */
+function cleanPnlTitle(title: string): string {
+  if (!title) return '';
+  return title
+    .replace(/\s*\(\s*FE-13\s*\)/gi, '')
+    .replace(/\s*\(\s*FE-06\s*\/\s*FE-08\s*\)/gi, '')
+    .replace(/\s*\(\s*FE-07\s*\)/gi, '')
+    .replace(/\s*FE-13/gi, '')
+    .replace(/\s*FE-06\s*\/\s*FE-08/gi, '')
+    .replace(/\s*FE-07/gi, '')
+    .replace(/III\.\s*CHI PHÍ/gi, 'IV. CHI PHÍ')
+    .replace(/III\.\s*LỢI NHUẬN VẬN HÀNH/gi, 'V. LỢI NHUẬN THUẦN')
+    .replace(/по/g, 'theo');
+}
+
+/**
  * Recursive Row component for P&L tree hierarchy.
  */
 const PnlTableRow: React.FC<{
@@ -82,7 +99,7 @@ const PnlTableRow: React.FC<{
               <span style={{ width: '20px', display: 'inline-block' }} />
             )}
             <span style={{ fontWeight: item.isHeader || item.isTotal ? 800 : 500 }}>
-              {item.title}
+              {cleanPnlTitle(item.title)}
             </span>
           </div>
         </td>
@@ -282,7 +299,7 @@ export const PnlStatementTable: React.FC<PnlStatementTableProps> = ({
                 <tr style={{ borderBottom: '1px solid #E2E8F0', color: '#475569', textAlign: 'left' }}>
                   <th style={{ padding: '8px 10px' }}>Chỉ tiêu đối chiếu</th>
                   <th style={{ padding: '8px 10px', textAlign: 'right' }}>Bình quân gia quyền (Sổ thuế TT152)</th>
-                  <th style={{ padding: '8px 10px', textAlign: 'right' }}>Thực tế đích danh по lô (FEFO POS)</th>
+                  <th style={{ padding: '8px 10px', textAlign: 'right' }}>Thực tế đích danh theo lô (FEFO POS)</th>
                   <th style={{ padding: '8px 10px', textAlign: 'right' }}>Chênh lệch (FEFO - BQGQ)</th>
                 </tr>
               </thead>
@@ -367,7 +384,7 @@ export const PnlStatementTable: React.FC<PnlStatementTableProps> = ({
               Liên thông Đối soát Kê khai & Nộp thuế HKD (Sổ S2c-HKD)
             </div>
             <p style={{ margin: '3px 0 0', fontSize: '0.78rem', color: '#B45309', lineHeight: 1.45 }}>
-              Nghĩa vụ thuế 1.5% (<strong>{formatVnd(estimatedTaxAmount)}</strong>) được trích lập tự động từ Doanh thu thuần bán lẻ. Sau khi xác nhận nộp thuế tại FE-19, hệ thống sẽ tự động hạch toán Phiếu Chi sang Sổ quỹ FE-17, bảo đảm đối soát ba bên tuyệt đối.
+              Nghĩa vụ thuế 1.5% (<strong>{formatVnd(estimatedTaxAmount)}</strong>) được trích lập tự động từ Doanh thu thuần bán lẻ. Sau khi xác nhận nộp thuế, hệ thống sẽ tự động hạch toán Phiếu Chi sang Sổ quỹ, bảo đảm đối soát ba bên tuyệt đối.
             </p>
           </div>
         </div>
@@ -389,7 +406,7 @@ export const PnlStatementTable: React.FC<PnlStatementTableProps> = ({
             boxShadow: '0 2px 8px rgba(217, 119, 6, 0.25)',
           }}
         >
-          <span>Xem tờ khai FE-19</span>
+          <span>Xem tờ khai thuế</span>
           <span>➔</span>
         </a>
       </div>
@@ -412,7 +429,7 @@ export const PnlStatementTable: React.FC<PnlStatementTableProps> = ({
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           <HelpCircle size={14} style={{ color: 'var(--blue-primary, #0F766E)', flexShrink: 0 }} />
           <span>
-            * Số liệu tính toán từ Doanh số bán POS, Giá vốn đối soát S2c-HKD, và Chứng từ chi phí hợp lý FE-07.
+            * Số liệu tính toán từ Doanh số bán POS, Giá vốn đối soát S2c-HKD, và Chứng từ chi phí hợp lý.
           </span>
         </div>
         <span style={{ fontWeight: 600 }}>Đơn vị tính: VNĐ</span>

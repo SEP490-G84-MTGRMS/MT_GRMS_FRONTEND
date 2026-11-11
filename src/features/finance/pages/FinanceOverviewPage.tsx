@@ -17,6 +17,8 @@ import {
 } from '../../cashbook/services/cashbookService';
 import type { CashAccount } from '../../cashbook/types/cashbook.types';
 import { financeHttpClient } from '../../../api/financeHttpClient';
+import { posShiftApi } from '../../pos/api/posShiftApi';
+import type { PendingMovementsSummaryResponse } from '../../pos/types/posShift.types';
 import { taxSnapshotApi } from '../../tax-snapshot/api/taxSnapshotApi';
 import {
   TaxCalculationMethod,
@@ -42,6 +44,13 @@ interface DebtsSummaryResponse {
 }
 
 interface ExpensesSummaryResponse {
+  totalAmount?: number;
+  totalCount?: number;
+  paidAmount?: number;
+  paidCount?: number;
+  pendingApprovalAmount?: number;
+  pendingApprovalCount?: number;
+  totalPendingAmount?: number;
   overdueAmount?: number;
   totalOverdueAmount?: number;
   overdueCount?: number;
@@ -87,6 +96,7 @@ interface ZoneAQueriesResult {
   debtsSummaryQuery: UseQueryResult<DebtsSummaryResponse | null, Error>;
   expensesSummaryQuery: UseQueryResult<ExpensesSummaryResponse | null, Error>;
   taxSummaryQuery: UseQueryResult<HouseholdTaxSummaryDto, Error>;
+  pendingMovementsQuery: UseQueryResult<PendingMovementsSummaryResponse, Error>;
 }
 
 const PRESET_PERIOD_LABELS: Record<PnlFilterParams['presetPeriod'], string> = {
@@ -143,7 +153,8 @@ async function fetchOptionalSummary<T>(
  */
 function computeCashMetrics(
   accounts: CashAccount[],
-  cashSummary: BackendCashbookSummaryResponse | undefined
+  cashSummary: BackendCashbookSummaryResponse | undefined,
+  cashInTransit: number = 0
 ): CashMetrics {
   const cashAtRegisters =
     cashSummary?.totalCashInDrawers ??
@@ -163,7 +174,6 @@ function computeCashMetrics(
       .filter((a) => a.accountType === 'BANK')
       .reduce((sum, a) => sum + (a.currentBalance || 0), 0);
 
-  const cashInTransit = 0;
   const totalAssets =
     (cashSummary?.totalClosingBalance ?? cashAtRegisters + safeDeposit + bankBalances) +
     cashInTransit;
@@ -196,12 +206,22 @@ function buildPillarsSummary(
   const expenses = zoneA.expensesSummaryQuery.data;
   const tax = zoneA.taxSummaryQuery.data;
 
+  const overduePayablesAmount =
+    expenses?.totalPendingAmount ??
+    (expenses?.pendingApprovalAmount ?? ((expenses?.totalAmount ?? 0) - (expenses?.paidAmount ?? 0)));
+  const overduePayablesCount =
+    expenses?.overdueCount ??
+    expenses?.pendingApprovalCount ??
+    ((expenses?.totalCount !== undefined && expenses?.paidCount !== undefined)
+      ? Math.max(0, expenses.totalCount - expenses.paidCount)
+      : (overduePayablesAmount > 0 ? 1 : 0));
+
   return {
     totalCustomerDebt: debts?.totalDebtAR || 0,
     overLimitCustomersCount: debts?.overLimitCount || 0,
     totalDebtorsCount: debts?.totalCustomers || 0,
-    overduePayablesAmount: expenses?.overdueAmount ?? expenses?.totalOverdueAmount ?? 0,
-    overduePayablesCount: expenses?.overdueCount || 0,
+    overduePayablesAmount,
+    overduePayablesCount,
     netProfitMonth: Number(pnlReportData?.kpiSummary?.netProfit ?? 0),
     netMarginPct: Number(pnlReportData?.kpiSummary?.netMarginPct ?? 0),
     activePeriodLabel: PRESET_PERIOD_LABELS[presetPeriod] ?? 'Tháng này',
@@ -320,12 +340,25 @@ function useZoneAQueries(currentYear: number): ZoneAQueriesResult {
       }),
   });
 
+  const pendingMovementsQuery = useQuery({
+    queryKey: ['finance-overview-pending-movements'],
+    queryFn: async () => {
+      try {
+        return await posShiftApi.getPendingMovements();
+      } catch (err) {
+        console.error('Failed to fetch pending movements for cash-in-transit:', err);
+        return { pendingApprovalsCount: 0, unconfirmedDropsCount: 0, movements: [] };
+      }
+    },
+  });
+
   return {
     cashAccountsQuery,
     cashSummaryQuery,
     debtsSummaryQuery,
     expensesSummaryQuery,
     taxSummaryQuery,
+    pendingMovementsQuery,
   };
 }
 
@@ -368,6 +401,7 @@ function useOverviewRefresh(
   const refetchDebtsSummary = zoneA.debtsSummaryQuery.refetch;
   const refetchExpensesSummary = zoneA.expensesSummaryQuery.refetch;
   const refetchTaxSummary = zoneA.taxSummaryQuery.refetch;
+  const refetchPendingMovements = zoneA.pendingMovementsQuery.refetch;
   const refetchPnlReport = pnlReportQuery.refetch;
 
   const handleRefreshAll = useCallback(async () => {
@@ -377,6 +411,7 @@ function useOverviewRefresh(
         refetchCashSummary(),
         refetchDebtsSummary(),
         refetchExpensesSummary(),
+        refetchPendingMovements(),
         refetchPnlReport(),
         refetchTaxSummary(),
       ]);
@@ -391,7 +426,7 @@ function useOverviewRefresh(
     }
   }, [
     refetchCashAccounts, refetchCashSummary, refetchDebtsSummary,
-    refetchExpensesSummary, refetchPnlReport, refetchTaxSummary, showToast,
+    refetchExpensesSummary, refetchPendingMovements, refetchPnlReport, refetchTaxSummary, showToast,
   ]);
 
   const isRefreshing =
@@ -400,6 +435,7 @@ function useOverviewRefresh(
     zoneA.debtsSummaryQuery.isFetching ||
     zoneA.expensesSummaryQuery.isFetching ||
     zoneA.taxSummaryQuery.isFetching ||
+    zoneA.pendingMovementsQuery.isFetching ||
     pnlReportQuery.isFetching;
 
   return { handleRefreshAll, isRefreshing };
@@ -918,9 +954,19 @@ function useFinanceOverviewController() {
   const isLoading = zoneA.cashAccountsQuery.isLoading || zoneA.cashSummaryQuery.isLoading;
   usePnlDeepLinkScroll(!isLoading);
 
+  const pendingMovements = zoneA.pendingMovementsQuery.data?.movements || [];
+  const cashInTransit = pendingMovements
+    .filter(
+      (m) =>
+        (m.category === 'CASH_DRAW' || (m.category as unknown) === 2) &&
+        !m.isConfirmedByOwner
+    )
+    .reduce((sum, m) => sum + (Number(m.amount) || 0), 0);
+
   const cashMetrics = computeCashMetrics(
     zoneA.cashAccountsQuery.data || [],
-    zoneA.cashSummaryQuery.data
+    zoneA.cashSummaryQuery.data,
+    cashInTransit
   );
   const pillars = buildPillarsSummary(
     zoneA,

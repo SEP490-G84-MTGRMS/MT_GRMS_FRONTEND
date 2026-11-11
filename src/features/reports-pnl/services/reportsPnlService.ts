@@ -120,7 +120,7 @@ export function buildPnlStatementTree(
             {
               id: 'item-1-2-2',
               code: '1.2.b',
-              title: 'Hàng bán bị trả lại & Hoàn tiền (FE-13)',
+              title: 'Hàng bán bị trả lại & Hoàn tiền',
               level: 3,
               amount: kpi.returns,
               percentageOfNetRevenue: calculateMarginPct(kpi.returns, rev),
@@ -161,8 +161,8 @@ export function buildPnlStatementTree(
     },
     {
       id: 'total-gross-profit',
-      code: 'GP',
-      title: 'LỢI NHUẬN GỘP VỀ BÁN HÀNG (DOANH THU THUẦN - COGS)',
+      code: 'III',
+      title: 'III. LỢI NHUẬN GỘP VỀ BÁN HÀNG (DOANH THU THUẦN - COGS)',
       level: 1,
       amount: kpi.grossProfit,
       percentageOfNetRevenue: kpi.grossMarginPct,
@@ -170,8 +170,8 @@ export function buildPnlStatementTree(
     },
     {
       id: 'sec-3',
-      code: 'III',
-      title: 'III. CHI PHÍ VẬN HÀNH & HAO HỤT',
+      code: 'IV',
+      title: 'IV. CHI PHÍ HOẠT ĐỘNG & HAO HỤT',
       level: 1,
       amount: kpi.operatingExpenses + kpi.shrinkageLoss,
       percentageOfNetRevenue: calculateMarginPct(kpi.operatingExpenses + kpi.shrinkageLoss, rev),
@@ -180,7 +180,7 @@ export function buildPnlStatementTree(
         {
           id: 'item-3-1',
           code: '3.1',
-          title: 'Tổn thất xóa nợ xấu / Hao hụt kho (FE-06 / FE-08)',
+          title: 'Tổn thất xóa nợ xấu / Hao hụt kho',
           level: 2,
           amount: kpi.shrinkageLoss,
           percentageOfNetRevenue: calculateMarginPct(kpi.shrinkageLoss, rev),
@@ -189,7 +189,7 @@ export function buildPnlStatementTree(
         {
           id: 'item-3-2',
           code: '3.2',
-          title: 'Chi phí dịch vụ vận hành ngoài (FE-07)',
+          title: 'Chi phí dịch vụ vận hành ngoài',
           level: 2,
           amount: kpi.operatingExpenses,
           percentageOfNetRevenue: calculateMarginPct(kpi.operatingExpenses, rev),
@@ -200,8 +200,8 @@ export function buildPnlStatementTree(
     },
     {
       id: 'total-net-profit',
-      code: 'EBT',
-      title: 'III. LỢI NHUẬN VẬN HÀNH TRƯỚC THUẾ (LÃI GỘP - CHI PHÍ VẬN HÀNH)',
+      code: 'V',
+      title: 'V. LỢI NHUẬN THUẦN TRƯỚC THUẾ (LÃI GỘP - CHI PHÍ HOẠT ĐỘNG)',
       level: 1,
       amount: kpi.netProfit,
       percentageOfNetRevenue: kpi.netMarginPct,
@@ -209,8 +209,8 @@ export function buildPnlStatementTree(
     },
     {
       id: 'sec-4-tax',
-      code: 'IV',
-      title: 'IV. NGHĨA VỤ THUẾ HỘ KINH DOANH (THÔNG TƯ 40 & TT 152/2025/TT-BTC)',
+      code: 'VI',
+      title: 'VI. NGHĨA VỤ THUẾ HỘ KINH DOANH (THÔNG TƯ 40 & TT 152/2025/TT-BTC)',
       level: 1,
       amount: kpi.estimatedTaxAmount,
       percentageOfNetRevenue: rev > 0 ? 1.5 : 0,
@@ -238,8 +238,8 @@ export function buildPnlStatementTree(
     },
     {
       id: 'total-final-net-profit',
-      code: 'NP-AT',
-      title: 'V. LỢI NHUẬN RÒNG SAU THUẾ THỰC NHẬN CỦA CHỦ TIỆM',
+      code: 'VII',
+      title: 'VII. LỢI NHUẬN RÒNG SAU THUẾ THỰC NHẬN CỦA CHỦ TIỆM',
       level: 1,
       amount: kpi.netProfitAfterTax,
       percentageOfNetRevenue: kpi.netProfitAfterTaxMarginPct,

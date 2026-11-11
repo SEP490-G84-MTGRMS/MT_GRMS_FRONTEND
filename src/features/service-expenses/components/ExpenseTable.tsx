@@ -106,7 +106,7 @@ export const ExpenseTable: FC<ExpenseTableProps> = ({
           Không có khoản phải trả nào
         </h4>
         <p style={{ fontSize: '0.82rem', color: '#64748b', margin: 0 }}>
-          Bấm "+ Ghi nhận chi phí" để thêm hóa đơn phụ tùng hoặc chi phí mới.
+          Bấm "+ Ghi nhận chi phí" để thêm hóa đơn chi phí vận hành mới.
         </p>
       </div>
     );

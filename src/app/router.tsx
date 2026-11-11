@@ -85,7 +85,6 @@ import {
 import {
   PosCheckoutPage,
   PosShiftPage,
-  CashierShiftDashboardPage,
   InventoryLookupPage,
   InvoiceManagementPage,
 } from '../features/pos';
@@ -106,7 +105,7 @@ import { StoreSettingsHubPage } from '../pages/store/StoreSettingsHubPage';
 import { AccountManagementPage } from '../pages/store/AccountManagementPage';
 import { ProtectedRoute } from '../components/auth/ProtectedRoute';
 import { StorePaymentConfigPage } from '../features/pos/pages/StorePaymentConfigPage';
-import { StorePosCashControlPage } from '../features/pos/pages/StorePosCashControlPage';
+import { CashControlHubPage } from '../features/cash-control';
 
 /**
  * Application client-side router configuration across public, store-owner, POS, and admin portals.
@@ -340,8 +339,20 @@ export const router = createBrowserRouter([
         element: <StorePaymentConfigPage />,
       },
       {
+        path: 'cash-control',
+        element: (
+          <ProtectedRoute allowedRoles={['STORE_OWNER', 'ADMIN', 'StoreOwner', 'Admin']}>
+            <CashControlHubPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'cash-control/*',
+        element: <Navigate to="/store-owner/cash-control" replace />,
+      },
+      {
         path: 'pos-cash-control',
-        element: <StorePosCashControlPage />,
+        element: <Navigate to="/store-owner/cash-control" replace />,
       },
       {
         path: 'account',
@@ -508,6 +519,18 @@ export const router = createBrowserRouter([
         ),
       },
       {
+        path: 'cash-control',
+        element: (
+          <ProtectedRoute allowedRoles={['STORE_OWNER', 'ADMIN', 'StoreOwner', 'Admin']}>
+            <CashControlHubPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'cash-control/*',
+        element: <Navigate to="/store-owner/cash-control" replace />,
+      },
+      {
         path: 'tax-snapshots',
         element: (
           <ProtectedRoute allowedRoles={['STORE_OWNER', 'ADMIN', 'StoreOwner', 'Admin']}>
@@ -593,11 +616,11 @@ export const router = createBrowserRouter([
           },
           {
             path: 'pos-cash-control',
-            element: <StorePosCashControlPage />,
+            element: <Navigate to="/store-owner/cash-control" replace />,
           },
           {
             path: 'shifts',
-            element: <PosShiftPage />,
+            element: <Navigate to="/store-owner/cash-control?tab=history" replace />,
           },
     ],
   },
@@ -927,6 +950,20 @@ export const router = createBrowserRouter([
     element: <Navigate to="/store-owner/cashbook" replace />,
   },
 
+  // Cash Control Shortcut - Drawers, Approvals & Shifts
+  {
+    path: '/cash-control',
+    element: <Navigate to="/store-owner/cash-control" replace />,
+  },
+  {
+    path: '/cash-control/*',
+    element: <Navigate to="/store-owner/cash-control" replace />,
+  },
+  {
+    path: '/pos-cash-control',
+    element: <Navigate to="/store-owner/cash-control" replace />,
+  },
+
   // Promotions
   {
     path: '/promotions',
@@ -962,7 +999,7 @@ export const router = createBrowserRouter([
       },
       {
         path: 'cashier-shift',
-        element: <CashierShiftDashboardPage />,
+        element: <Navigate to="/pos/shift" replace />,
       },
       {
         path: 'inventory-lookup',
@@ -997,12 +1034,12 @@ export const router = createBrowserRouter([
           },
           {
             path: 'shift',
-        element: <PosShiftPage />,
-      },
-      {
-        path: 'cashier-shift',
-        element: <CashierShiftDashboardPage />,
-      },
+            element: <PosShiftPage />,
+          },
+          {
+            path: 'cashier-shift',
+            element: <Navigate to="/employee/pos/shift" replace />,
+          },
           {
             path: 'inventory-lookup',
             element: <InventoryLookupPage />,
