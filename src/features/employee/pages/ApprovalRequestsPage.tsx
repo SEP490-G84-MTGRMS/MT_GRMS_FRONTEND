@@ -433,29 +433,30 @@ export const ApprovalRequestsPage: React.FC = () => {
           </div>
 
           {/* 5. Nút Đặt lại bộ lọc */}
-          {hasActiveFilters && (
-            <button
-              type="button"
-              onClick={handleResetFilters}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 6,
-                padding: '6px 12px',
-                fontSize: 12,
-                fontWeight: 500,
-                color: '#EF4444',
-                background: '#FEE2E2',
-                border: '1px solid #FECACA',
-                borderRadius: 6,
-                cursor: 'pointer',
-              }}
-              title="Xóa toàn bộ bộ lọc và từ khóa"
-            >
-              <RotateCw size={12} />
-              <span>Đặt lại bộ lọc</span>
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={handleResetFilters}
+            disabled={!hasActiveFilters}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              height: 40,
+              padding: '0 14px',
+              fontSize: 13,
+              fontWeight: 500,
+              color: hasActiveFilters ? '#EF4444' : '#94A3B8',
+              background: hasActiveFilters ? '#FEE2E2' : '#F8FAFC',
+              border: `1px solid ${hasActiveFilters ? '#FECACA' : '#E2E8F0'}`,
+              borderRadius: 8,
+              cursor: hasActiveFilters ? 'pointer' : 'not-allowed',
+              transition: 'all 0.15s ease',
+            }}
+            title="Xóa toàn bộ bộ lọc và từ khóa"
+          >
+            <RotateCw size={13} />
+            <span>Đặt lại bộ lọc</span>
+          </button>
         </div>
       </div>
 

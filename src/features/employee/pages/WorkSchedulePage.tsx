@@ -5,6 +5,7 @@ import {
   Plus,
   User,
   RefreshCw,
+  RotateCw,
   Building2,
   CalendarX,
   ArrowLeftRight,
@@ -930,6 +931,43 @@ export const WorkSchedulePage: React.FC = () => {
           >
             Tuần này
           </button>
+
+          {/* Nút Đặt lại bộ lọc */}
+          {(() => {
+            const hasActiveFilters =
+              (!isEmployeeRole && Boolean(searchEmployee.trim())) || weekOffset !== 0;
+            return (
+              <button
+                type="button"
+                disabled={!hasActiveFilters}
+                onClick={() => {
+                  setSearchEmployee('');
+                  setWeekOffset(0);
+                  setCurrentPage(1);
+                  setShiftCurrentPage(1);
+                }}
+                title="Xóa toàn bộ bộ lọc và từ khóa"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  height: 36,
+                  padding: '0 12px',
+                  fontSize: 13,
+                  fontWeight: 500,
+                  color: hasActiveFilters ? '#EF4444' : '#94A3B8',
+                  background: hasActiveFilters ? '#FEE2E2' : '#F8FAFC',
+                  border: `1px solid ${hasActiveFilters ? '#FECACA' : '#E2E8F0'}`,
+                  borderRadius: 8,
+                  cursor: hasActiveFilters ? 'pointer' : 'not-allowed',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                <RotateCw size={13} />
+                <span>Đặt lại bộ lọc</span>
+              </button>
+            );
+          })()}
         </div>
 
         <div className="emp-header-actions">
