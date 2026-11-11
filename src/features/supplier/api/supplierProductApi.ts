@@ -117,7 +117,7 @@ export const supplierProductApi = {
         categoryName: item.categoryName || 'Chung',
         deliveryUoM: item.baseUoM || item.deliveryUoM || 'Cái',
         baseUoM: item.baseUoM || item.deliveryUoM || 'Cái',
-        agreedPrice: item.agreedWholesalePrice ?? item.agreedPrice ?? 0,
+        agreedPrice: Number(item.agreedWholesalePrice ?? item.agreedPrice ?? 0) || 0,
         costPrice: item.costPrice,
         effectivePrice: item.effectivePurchasePrice ?? item.effectivePrice,
         moq: item.minimumOrderQuantity ?? item.moq ?? 1,

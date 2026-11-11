@@ -151,6 +151,22 @@ export const SupplierProductTableRow: FC<SupplierProductTableRowProps> = ({
           }}
         >
           {fmtCurrency(item.effectivePrice ?? item.agreedPrice)}
+          {!(item.agreedPrice > 0) && (item.effectivePrice ?? 0) > 0 ? (
+            <span
+              style={{
+                marginLeft: 6,
+                fontSize: 10,
+                fontWeight: 700,
+                color: '#64748b',
+                background: '#f1f5f9',
+                borderRadius: 4,
+                padding: '1px 5px',
+              }}
+              title="Chưa thỏa thuận — đang dùng giá Master"
+            >
+              Master
+            </span>
+          ) : null}
         </span>
       </td>
 

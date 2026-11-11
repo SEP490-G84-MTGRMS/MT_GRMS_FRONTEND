@@ -112,7 +112,8 @@ const EditSupplierProductForm: FC<EditSupplierProductFormProps> = ({
   onClose,
 }) => {
   const masterCost = item.costPrice ?? 0;
-  const initialPrice = item.agreedPrice > 0 ? item.agreedPrice : masterCost;
+  // 0 / chưa thỏa thuận → giữ 0 (không copy Master vào field), BE lưu NULL
+  const initialPrice = item.agreedPrice > 0 ? item.agreedPrice : 0;
   const [purchasePrice, setPurchasePrice] = useState<number>(initialPrice);
   const [moq, setMoq] = useState<number>(item.moq);
   const [allowedShortageQty, setAllowedShortageQty] = useState<number>(item.allowedShortageQty ?? 0);
@@ -288,16 +289,24 @@ const EditSupplierProductForm: FC<EditSupplierProductFormProps> = ({
           </FieldRow>
 
           <FieldRow label="Giá nhập" htmlFor="inputSupplierPurchasePrice">
-            <input
-              id="inputSupplierPurchasePrice"
-              type="number"
-              min={0}
-              step={1000}
-              value={Number.isFinite(purchasePrice) ? purchasePrice : 0}
-              onChange={(e) => setPurchasePrice(parseFloat(e.target.value) || 0)}
-              className="form-input"
-              style={editableInputStyle}
-            />
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <input
+                id="inputSupplierPurchasePrice"
+                type="number"
+                min={0}
+                step={1000}
+                value={Number.isFinite(purchasePrice) ? purchasePrice : 0}
+                onChange={(e) => setPurchasePrice(parseFloat(e.target.value) || 0)}
+                className="form-input"
+                style={editableInputStyle}
+                title="0 = chưa thỏa thuận (dùng giá Master khi đặt hàng)"
+              />
+              {masterCost > 0 && (
+                <span style={{ fontSize: 12, color: '#64748b' }}>
+                  Master: {new Intl.NumberFormat('vi-VN').format(masterCost)} · 0 = chưa thỏa thuận
+                </span>
+              )}
+            </div>
           </FieldRow>
 
           <FieldRow label="MOQ" htmlFor="inputSupplierMoq">

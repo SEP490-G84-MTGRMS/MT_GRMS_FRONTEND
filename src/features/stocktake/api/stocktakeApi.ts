@@ -591,6 +591,7 @@ export const stocktakeApi = {
     const command = {
       decision: payload.action,
       reviewNote: payload.note || null,
+      confirmSurplusFound: !!payload.confirmSurplusFound,
     };
     try {
       const res = await httpClient.post(`/stocktakes/${id}/review`, command);
