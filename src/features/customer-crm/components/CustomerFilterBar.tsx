@@ -1,5 +1,5 @@
 import type { FC } from 'react';
-import { Search, UserPlus, RotateCw, X } from 'lucide-react';
+import { RotateCw, X } from 'lucide-react';
 import type { DebtFilterStatus } from '../types/customer.types';
 
 interface CustomerFilterBarProps {
@@ -9,7 +9,7 @@ interface CustomerFilterBarProps {
   onTierChange: (val: string) => void;
   selectedDebtStatus: DebtFilterStatus;
   onDebtStatusChange: (val: DebtFilterStatus) => void;
-  onOpenCreate: () => void;
+  onOpenCreate?: () => void;
   onRefresh: () => void;
   isRefreshing?: boolean;
 }
@@ -21,86 +21,98 @@ export const CustomerFilterBar: FC<CustomerFilterBarProps> = ({
   onTierChange,
   selectedDebtStatus,
   onDebtStatusChange,
-  onOpenCreate,
   onRefresh,
   isRefreshing,
 }) => {
   return (
-    <div className="customer-filter-bar">
-      {/* Search & Select filters */}
-      <div className="customer-filter-left">
-        {/* Search Input */}
-        <div className="customer-search-box">
-          <Search className="w-4 h-4 customer-search-icon" />
-          <input
-            type="text"
-            value={searchTerm}
-            onChange={(e) => onSearchChange(e.target.value)}
-            placeholder="Tìm theo SĐT, Họ tên, Tên đại lý..."
-            className="customer-search-input"
-          />
-          {searchTerm && (
-            <button
-              type="button"
-              onClick={() => onSearchChange('')}
-              className="customer-clear-btn"
-              title="Xóa tìm kiếm"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          )}
-        </div>
+    <div className="filter-bar">
+      {/* Search box chuẩn prototype: 🔍 Tìm tên, SĐT, mã KH, mã số thuế... */}
+      <div className="search-box">
+        <span className="search-icon">🔍</span>
+        <input
+          id="crm-cust-search"
+          type="text"
+          className="input"
+          placeholder="Tìm tên, SĐT, mã KH, mã số thuế..."
+          value={searchTerm}
+          onChange={(e) => onSearchChange(e.target.value)}
+        />
+        {searchTerm && (
+          <button
+            type="button"
+            onClick={() => onSearchChange('')}
+            className="customer-clear-btn"
+            title="Xóa tìm kiếm"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        )}
+      </div>
 
-        {/* Membership Tier Filter */}
+      {/* 3 Quick Chips lọc nhanh chuẩn prototype */}
+      <div className="flex-gap">
+        <button
+          type="button"
+          className={`pill-btn ${selectedDebtStatus === 'ALL' ? 'active' : ''}`}
+          onClick={() => onDebtStatusChange('ALL')}
+        >
+          Tất cả
+        </button>
+        <button
+          type="button"
+          className={`pill-btn ${selectedDebtStatus === 'DEBT' ? 'active' : ''}`}
+          onClick={() => onDebtStatusChange('DEBT')}
+        >
+          Đang nợ
+        </button>
+        <button
+          type="button"
+          className={`pill-btn ${selectedDebtStatus === 'OVER_LIMIT' ? 'active' : ''}`}
+          onClick={() => onDebtStatusChange('OVER_LIMIT')}
+        >
+          Vượt hạn mức
+        </button>
+
+        {/* Bộ lọc nhóm / hạng thẻ thành viên */}
         <select
           value={selectedTier}
           onChange={(e) => onTierChange(e.target.value)}
-          className="customer-select"
+          className="select"
+          style={{
+            height: '32px',
+            padding: '0 12px',
+            fontSize: '12.5px',
+            borderRadius: '9999px',
+            border: '1px solid var(--border, #e2e8f0)',
+            background: 'var(--bg-card, #ffffff)',
+            color: 'var(--text-main, #0f172a)',
+            cursor: 'pointer',
+          }}
+          title="Lọc theo nhóm / hạng thẻ thành viên"
         >
-          <option value="ALL">Tất cả hạng thẻ</option>
-          <option value="Standard">Standard (Chuẩn)</option>
-          <option value="Silver">Silver (Bạc)</option>
-          <option value="Gold">Gold (Vàng)</option>
-          <option value="VIP">VIP</option>
+          <option value="ALL">Tất cả nhóm khách</option>
+          <option value="Standard">Thành viên (Standard)</option>
+          <option value="Silver">Thân thiết (Silver)</option>
+          <option value="Gold">Bán buôn nhỏ (Gold)</option>
+          <option value="VIP">Khách sỉ / VIP</option>
         </select>
 
-        {/* Debt Status Filter */}
-        <select
-          value={selectedDebtStatus}
-          onChange={(e) => onDebtStatusChange(e.target.value as DebtFilterStatus)}
-          className="customer-select"
-        >
-          <option value="ALL">Tất cả trạng thái nợ</option>
-          <option value="NO_DEBT">Không nợ (0 đ)</option>
-          <option value="IN_LIMIT">Còn nợ trong hạn mức</option>
-          <option value="OVER_LIMIT">Cảnh báo: Vượt hạn mức</option>
-        </select>
-      </div>
-
-      {/* Action Buttons */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        {/* Nút tải lại */}
         <button
+          type="button"
           onClick={onRefresh}
           disabled={isRefreshing}
           title="Tải lại danh sách"
-          className="action-icon-btn"
-          style={{ width: '38px', height: '38px' }}
+          className="pill-btn"
+          style={{ padding: '0 10px' }}
         >
           <RotateCw
-            className="w-4 h-4"
+            className="w-3.5 h-3.5"
             style={{
               animation: isRefreshing ? 'spin 1s linear infinite' : 'none',
-              color: isRefreshing ? 'var(--blue-primary)' : 'inherit',
+              color: isRefreshing ? 'var(--teal-primary, #0f766e)' : 'inherit',
             }}
           />
-        </button>
-
-        <button
-          onClick={onOpenCreate}
-          className="btn-primary-pill"
-        >
-          <UserPlus className="w-4 h-4" />
-          <span>Thêm khách hàng</span>
         </button>
       </div>
     </div>

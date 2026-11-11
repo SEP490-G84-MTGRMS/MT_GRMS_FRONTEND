@@ -1,160 +1,88 @@
 import type { FC } from 'react';
-import { AlertTriangle, Users } from 'lucide-react';
-import type { CustomerKpiSummary } from '../types/customer.types';
+import type { CustomerDto, CustomerKpiSummary } from '../types/customer.types';
 import { formatMoney } from '../../finance/utils/formatters';
 
 interface CustomerKpiCardsProps {
   summary?: CustomerKpiSummary;
+  customers?: CustomerDto[];
   isLoading?: boolean;
   onFilterOverLimit?: () => void;
+  onFilterDebt?: () => void;
 }
 
 export const CustomerKpiCards: FC<CustomerKpiCardsProps> = ({
   summary,
+  customers = [],
   isLoading,
   onFilterOverLimit,
+  onFilterDebt,
 }) => {
   if (isLoading) {
     return (
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px', marginBottom: '20px' }}>
-        <div style={{ background: '#ffffff', borderRadius: '16px', padding: '24px', border: '1px solid #E2E8F0', height: '96px', opacity: 0.6 }} />
-        <div style={{ background: '#ffffff', borderRadius: '16px', padding: '24px', border: '1px solid #E2E8F0', height: '96px', opacity: 0.6 }} />
+      <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(3, minmax(0, 1fr))' }}>
+        <div className="kpi-card" style={{ height: '96px', opacity: 0.6 }} />
+        <div className="kpi-card" style={{ height: '96px', opacity: 0.6 }} />
+        <div className="kpi-card" style={{ height: '96px', opacity: 0.6 }} />
       </div>
     );
   }
 
-  const totalDebt = summary?.totalDebtAR || 82_700_000;
-  const overdueCount = summary?.overLimitCount || 2;
+  const debtorsCount = customers.filter((c) => (c.currentDebtAR || 0) > 0).length;
+  const overLimitCustomers = customers.filter(
+    (c) => (c.debtLimit || 0) > 0 && (c.currentDebtAR || 0) > (c.debtLimit || 0)
+  );
+  const overLimitCount = summary?.overLimitCount ?? overLimitCustomers.length;
+  const totalDebt =
+    summary?.totalDebtAR ??
+    customers.reduce((sum, c) => sum + (c.currentDebtAR || 0), 0);
+
+  const overLimitSubtitle =
+    overLimitCustomers.length > 0
+      ? overLimitCustomers[0].fullName
+      : 'Tất cả trong hạn mức';
 
   return (
-    <div
-      className="customer-kpi-summary-strip"
-      style={{
-        display: 'flex',
-        flexWrap: 'wrap',
-        gap: '16px',
-        marginBottom: '20px',
-      }}
-    >
-      {/* Khối Trái (Tỷ lệ 7): Tổng nợ khách hàng */}
-      <div
-        style={{
-          flex: '7 1 360px',
-          background: '#ffffff',
-          borderRadius: '16px',
-          padding: '20px 24px',
-          border: '1px solid #E2E8F0',
-          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: '16px',
-        }}
-      >
-        <div>
-          <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#64748B', display: 'block', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-            Khách đang nợ mình
-          </span>
-          <div
-            style={{
-              fontSize: 'clamp(1.75rem, 2.5vw, 2.25rem)',
-              fontWeight: 800,
-              color: '#0F172A',
-              letterSpacing: '-0.02em',
-              margin: '6px 0 4px 0',
-              fontVariantNumeric: 'tabular-nums',
-            }}
-          >
-            {formatMoney(totalDebt)}
-          </div>
-          <span style={{ fontSize: '0.82rem', color: '#64748B', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <Users size={14} color="#0D9488" />
-            Tổng cộng <strong>5 khách</strong> đang có nợ mua chịu
-          </span>
+    <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(3, minmax(0, 1fr))' }}>
+      {/* Thẻ 1: Khách nợ mình (Tổng công nợ) */}
+      <div className="kpi-card">
+        <div className="kpi-label">
+          <span>Khách nợ mình (Tổng công nợ)</span>
+          <span className="kpi-icon">💳</span>
         </div>
-
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' }}>
-          <span
-            style={{
-              display: 'inline-block',
-              padding: '6px 12px',
-              borderRadius: '9999px',
-              fontSize: '0.78rem',
-              fontWeight: 700,
-              background: '#F0FDFA',
-              color: '#0F766E',
-              border: '1px solid #99F6E4',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            Hạn mức tín dụng
-          </span>
-        </div>
+        <div className="kpi-value">{formatMoney(totalDebt)}</div>
+        <div className="kpi-sub">Số liệu thật đồng bộ Hóa đơn &amp; Sổ quỹ</div>
       </div>
 
-      {/* Khối Phải (Tỷ lệ 5): Cảnh báo khách vượt hạn mức */}
+      {/* Thẻ 2: Số khách đang nợ */}
       <div
-        style={{
-          flex: '5 1 300px',
-          background: '#FEF2F2',
-          borderRadius: '16px',
-          padding: '20px 24px',
-          border: '1px solid #FECACA',
-          boxShadow: '0 2px 8px rgba(220, 38, 38, 0.06)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: '16px',
-        }}
+        className="kpi-card"
+        onClick={onFilterDebt}
+        style={{ cursor: onFilterDebt ? "pointer" : "default" }}
+        title={onFilterDebt ? "Bấm để lọc danh sách khách đang nợ" : undefined}
       >
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px' }}>
-          <div
-            style={{
-              width: '42px',
-              height: '42px',
-              borderRadius: '50%',
-              background: '#DC2626',
-              color: '#ffffff',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0,
-              boxShadow: '0 2px 6px rgba(220, 38, 38, 0.3)',
-            }}
-          >
-            <AlertTriangle size={22} />
-          </div>
-          <div>
-            <span style={{ fontSize: '1rem', fontWeight: 800, color: '#991B1B', display: 'block' }}>
-              {overdueCount} khách vượt hạn mức nợ
-            </span>
-            <span style={{ fontSize: '0.82rem', color: '#B91C1C', marginTop: '4px', display: 'block', lineHeight: 1.4 }}>
-              Đang chặn bán nợ thêm cho tới khi thanh toán
-            </span>
-          </div>
+        <div className="kpi-label">
+          <span>Số khách đang nợ</span>
+          <span className="kpi-icon">👥</span>
         </div>
+        <div className="kpi-value">{debtorsCount} khách</div>
+        <div className="kpi-sub">Tổng số khách hàng ghi nợ</div>
+      </div>
 
-        {onFilterOverLimit && (
-          <button
-            type="button"
-            onClick={onFilterOverLimit}
-            style={{
-              padding: '8px 16px',
-              background: '#DC2626',
-              color: '#ffffff',
-              fontSize: '0.82rem',
-              fontWeight: 700,
-              borderRadius: '8px',
-              border: 'none',
-              cursor: 'pointer',
-              whiteSpace: 'nowrap',
-              flexShrink: 0,
-              boxShadow: '0 2px 4px rgba(220, 38, 38, 0.2)',
-            }}
-          >
-            Lọc danh sách
-          </button>
-        )}
+      {/* Thẻ 3: Khách vượt hạn mức */}
+      <div
+        className="kpi-card"
+        onClick={onFilterOverLimit}
+        style={{ cursor: onFilterOverLimit ? 'pointer' : 'default' }}
+        title={onFilterOverLimit ? 'Bấm để lọc danh sách khách vượt hạn mức' : undefined}
+      >
+        <div className="kpi-label">
+          <span>Khách vượt hạn mức</span>
+          <span className="kpi-icon">🚨</span>
+        </div>
+        <div className={`kpi-value ${overLimitCount > 0 ? 'text-red' : ''}`}>
+          {overLimitCount} khách
+        </div>
+        <div className="kpi-sub">{overLimitSubtitle}</div>
       </div>
     </div>
   );

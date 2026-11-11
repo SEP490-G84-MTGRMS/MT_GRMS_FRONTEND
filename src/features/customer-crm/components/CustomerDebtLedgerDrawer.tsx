@@ -192,10 +192,32 @@ export const CustomerDebtLedgerDrawer: FC<CustomerDebtLedgerDrawerProps> = ({
                 -{formatCurrency(totalDecreased)}
               </div>
               <div style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: '2px' }}>
-                Tiền mặt & VietQR
+                Tiền mặt &amp; VietQR
               </div>
             </div>
           </div>
+
+          {/* FIFO Unpaid Invoices Badges */}
+          {customer.invoices && customer.invoices.filter((inv) => inv.status !== 'Paid').length > 0 && (
+            <div style={{ marginTop: '12px', padding: '10px 12px', background: '#F0FDFA', borderRadius: '10px', border: '1px solid #99F6E4' }}>
+              <div style={{ fontSize: '0.74rem', fontWeight: 700, color: '#0F766E', marginBottom: '6px' }}>
+                HÓA ĐƠN NỢ THEO THỨ TỰ FIFO (CẦN THU TRƯỚC):
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                {customer.invoices
+                  .filter((inv) => inv.status !== 'Paid')
+                  .map((inv, idx) => (
+                    <span
+                      key={inv.id}
+                      className="badge badge-teal"
+                      style={{ fontSize: '0.74rem', padding: '3px 8px' }}
+                    >
+                      #{idx + 1} {inv.id}: {formatCurrency(inv.amount)} ({inv.status === 'Partial' ? 'Nợ một phần' : 'Chưa trả'})
+                    </span>
+                  ))}
+              </div>
+            </div>
+          )}
 
           {/* Filter Segmented Control */}
           <div style={{ display: 'flex', gap: '8px', marginTop: '14px' }}>

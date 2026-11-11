@@ -266,6 +266,12 @@ const NAV_GROUPS: NavGroup[] = [
         desc: "Tờ khai 01/CNKD & 7 sổ TT152 theo ngưỡng 1 tỷ",
         icon: "🏛️",
       },
+      {
+        label: "Khách nợ & Thu công nợ",
+        to: "/store-owner/customers",
+        desc: "Sổ nợ, hạn mức tín dụng & thu nợ VietQR",
+        icon: "👥",
+      },
     ],
   },
   {
@@ -475,7 +481,11 @@ function isNavItemActive(
     return isQueryNavItemActive(toPath, toQuery, currPath, normalizedQuery);
   }
 
-  const pathMatches = currPath === toPath || currPath.startsWith(toPath + "/");
+  const pathMatches =
+    currPath === toPath ||
+    currPath.startsWith(toPath + "/") ||
+    (toPath === "/store-owner/customers" &&
+      (currPath === "/customers" || currPath.startsWith("/customers/")));
   if (!pathMatches) {
     return false;
   }
@@ -1197,7 +1207,11 @@ export const AppTopNav: FC = () => {
         location.pathname === "/store-owner/expenses" ||
         location.pathname.startsWith("/store-owner/expenses/") ||
         location.pathname === "/admin/expenses" ||
-        location.pathname.startsWith("/admin/expenses/")
+        location.pathname.startsWith("/admin/expenses/") ||
+        location.pathname === "/store-owner/customers" ||
+        location.pathname.startsWith("/store-owner/customers/") ||
+        location.pathname === "/customers" ||
+        location.pathname.startsWith("/customers/")
       );
     }
     if (group.id === "store") {

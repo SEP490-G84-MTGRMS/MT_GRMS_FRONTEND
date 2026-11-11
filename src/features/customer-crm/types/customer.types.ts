@@ -6,7 +6,7 @@ export type MembershipTier = 'Standard' | 'Silver' | 'Gold' | 'VIP';
 /**
  * Filter status for accounts receivable
  */
-export type DebtFilterStatus = 'ALL' | 'NO_DEBT' | 'IN_LIMIT' | 'OVER_LIMIT';
+export type DebtFilterStatus = 'ALL' | 'NO_DEBT' | 'IN_LIMIT' | 'OVER_LIMIT' | 'DEBT';
 
 /**
  * Summary of an invoice linked to a customer
@@ -36,6 +36,7 @@ export interface CustomerDebtPaymentSummary {
 export interface CustomerDto {
   id: string;
   tenantId: string;
+  customerCode?: string;
   phoneNumber: string;
   fullName: string;
   email?: string;
