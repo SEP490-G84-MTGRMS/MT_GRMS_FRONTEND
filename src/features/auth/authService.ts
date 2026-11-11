@@ -8,6 +8,8 @@ import {
   type AuthResponse,
   type LoginCredentials,
   type RegisterPayload,
+  type SendRegistrationOtpPayload,
+  type SendRegistrationOtpResult,
   type ResetPasswordPayload,
   type UserProfile,
 } from './authTypes';
@@ -406,6 +408,46 @@ export const authService = {
           : status === 400
             ? 'Thông tin đăng nhập không hợp lệ.'
             : 'Không thể kết nối đến máy chủ. Vui lòng kiểm tra lại đường truyền.');
+
+      throw new ApiError(status, message, errorCode, err.response?.data, err.response);
+    }
+  },
+
+  /**
+   * Kiểm tra trùng số điện thoại và khởi tạo phiên xác thực SMS OTP (Google Firebase Phone Auth / Dev Fallback)
+   */
+  async sendRegistrationOtp(payload: SendRegistrationOtpPayload): Promise<SendRegistrationOtpResult> {
+    try {
+      const response = await httpClient.post<any>('/auth/register/send-otp', payload);
+      const raw = response.data?.data || response.data;
+      return {
+        success: Boolean(raw?.success ?? true),
+        message: response.data?.message || raw?.message || 'Đã gửi mã xác thực OTP đến số điện thoại của bạn.',
+        maskedPhone: raw?.maskedPhone || payload.phone,
+        expiresInSeconds: raw?.expiresInSeconds || 300,
+        isRealSmsSent: Boolean(raw?.isRealSmsSent),
+        devOtpCode: raw?.devOtpCode ?? null,
+      };
+    } catch (err: any) {
+      if (err instanceof ApiError) {
+        throw err;
+      }
+
+      const status =
+        err.response?.status ??
+        err.response?.data?.statusCode ??
+        err.response?.data?.status ??
+        (err.code === 'ERR_NETWORK' ? 0 : 500);
+
+      const errorCode =
+        err.response?.data?.errorCode ??
+        (status === 400 ? 'BAD_REQUEST' : 'SEND_OTP_FAILED');
+
+      const message =
+        err.response?.data?.message ??
+        (status === 400
+          ? 'Số điện thoại không hợp lệ hoặc đã được đăng ký trên hệ thống.'
+          : err.message || 'Không thể gửi mã xác thực SMS. Vui lòng kiểm tra lại kết nối.');
 
       throw new ApiError(status, message, errorCode, err.response?.data, err.response);
     }

@@ -39,6 +39,23 @@ export interface RegisterPayload {
   email?: string;
   password: string;
   agreeTerms: boolean;
+  otpCode?: string;
+}
+
+export interface SendRegistrationOtpPayload {
+  phone: string;
+  storeName?: string;
+  fullName?: string;
+  email?: string;
+}
+
+export interface SendRegistrationOtpResult {
+  success: boolean;
+  message: string;
+  maskedPhone: string;
+  expiresInSeconds: number;
+  isRealSmsSent: boolean;
+  devOtpCode?: string | null;
 }
 
 export interface AuthResponse {
