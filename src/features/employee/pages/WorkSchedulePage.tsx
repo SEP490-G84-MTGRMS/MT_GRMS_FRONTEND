@@ -13,6 +13,7 @@ import {
   Edit3,
   LogIn,
   LogOut,
+  X,
 } from 'lucide-react';
 import type {
   Employee,
@@ -613,35 +614,84 @@ export const WorkSchedulePage: React.FC = () => {
     }
   };
 
-  // 5. Xác nhận xóa ca trên Backend theo phạm vi
-  const handleConfirmDelete = async (scope?: ScheduleScopeType, dateRange?: ScheduleScopeDateRange) => {
-    if (!deletingAssignment) return;
+  // 5. Hàm thực thi xóa ca làm việc trên Backend theo phạm vi
+  const executeDeleteSchedule = async (
+    target: ScheduleAssignment,
+    scope?: ScheduleScopeType,
+    dateRange?: ScheduleScopeDateRange
+  ) => {
     try {
       setIsLoading(true);
 
+      // TRƯỜNG HỢP 4: scope === 'entire' -> Xóa toàn bộ ca của nhân viên (trừ ca đã chấm công / có dữ liệu)
+      if (scope === 'entire') {
+        try {
+          const rawList = await scheduleApi.getRawSchedules({
+            employeeId: target.employeeId,
+            pageSize: 1000,
+          });
+
+          // Lọc ra các ca chưa có dữ liệu chấm công và chưa hoàn thành
+          const deletable = rawList.filter((s) => {
+            if (s.checkInTime || s.checkOutTime) return false;
+            if (s.status === 'Completed' || s.status === 'completed') return false;
+            return true;
+          });
+
+          if (deletable.length > 0) {
+            await Promise.allSettled(
+              deletable.map((s) =>
+                scheduleApi.deleteSchedule(s.id).catch((err) => {
+                  console.warn(`Lỗi xóa ca ${s.id}:`, err);
+                })
+              )
+            );
+          }
+
+          await fetchSchedules();
+          setNotificationModal({
+            isOpen: true,
+            type: 'success',
+            title: 'Thành công',
+            message: `Đã xóa toàn bộ ${deletable.length} ca làm việc chưa chấm công của nhân viên. Các ca đã có dữ liệu chấm công được giữ nguyên.`,
+          });
+          return true;
+        } catch (entireErr: any) {
+          console.error('Lỗi khi xóa toàn bộ ca:', entireErr);
+          setNotificationModal({
+            isOpen: true,
+            type: 'error',
+            title: 'Lỗi xóa ca',
+            message: entireErr?.response?.data?.message || entireErr?.message || 'Không thể xóa toàn bộ ca làm việc.',
+          });
+          return false;
+        }
+      }
+
+      // CÁC TRƯỜNG HỢP CÒN LẠI (single, following, all):
       // Luôn xóa ca hiện tại được bấm
-      await scheduleApi.deleteSchedule(deletingAssignment.id);
+      await scheduleApi.deleteSchedule(target.id);
 
       // Nếu người dùng chọn Option 2 (following) hoặc Option 3 (all), fetch và xóa các ca cùng phạm vi
       if ((scope === 'following' || scope === 'all') && dateRange?.fromDate && dateRange?.toDate) {
         try {
           const schedulesInRange = await scheduleApi.getSchedules({
-            employeeId: deletingAssignment.employeeId,
+            employeeId: target.employeeId,
             fromDate: dateRange.fromDate,
             toDate: dateRange.toDate,
             pageSize: 1000,
           });
 
-          const targetDow = deletingAssignment.dayOfWeek;
-          const targetShiftId = deletingAssignment.shiftId;
-          const targetShiftName = deletingAssignment.shiftName?.toLowerCase().trim();
+          const targetDow = target.dayOfWeek;
+          const targetShiftId = target.shiftId;
+          const targetShiftName = target.shiftName?.toLowerCase().trim();
 
           const DAY_MAP: Record<number, string> = {
             0: 'CN', 1: 'T2', 2: 'T3', 3: 'T4', 4: 'T5', 5: 'T6', 6: 'T7'
           };
 
           const otherMatching = schedulesInRange.filter((s) => {
-            if (s.id === deletingAssignment.id) return false;
+            if (s.id === target.id) return false;
             const dow = s.dayOfWeek || (s.workDate ? DAY_MAP[new Date(s.workDate).getDay()] : undefined);
             const matchesDow = !targetDow || dow === targetDow;
             const matchesShift = !targetShiftId || s.shiftId === targetShiftId || (s.shiftName && s.shiftName.toLowerCase().trim() === targetShiftName);
@@ -649,7 +699,7 @@ export const WorkSchedulePage: React.FC = () => {
           });
 
           if (otherMatching.length > 0) {
-            await Promise.all(
+            await Promise.allSettled(
               otherMatching.map((s) =>
                 scheduleApi.deleteSchedule(s.id).catch((err) => {
                   console.warn(`Lỗi xóa ca ${s.id}:`, err);
@@ -662,13 +712,14 @@ export const WorkSchedulePage: React.FC = () => {
         }
       }
 
+      await fetchSchedules();
       setNotificationModal({
         isOpen: true,
         type: 'success',
         title: 'Thành công',
         message: 'Đã xóa ca làm việc thành công.',
       });
-      await fetchSchedules();
+      return true;
     } catch (err: any) {
       setNotificationModal({
         isOpen: true,
@@ -676,9 +727,27 @@ export const WorkSchedulePage: React.FC = () => {
         title: 'Lỗi xóa ca',
         message: err?.response?.data?.message || err?.message || 'Không thể xóa ca làm việc.',
       });
+      return false;
     } finally {
       setIsLoading(false);
-      setDeletingAssignment(null);
+    }
+  };
+
+  const handleConfirmDelete = async (scope?: ScheduleScopeType, dateRange?: ScheduleScopeDateRange) => {
+    if (!deletingAssignment) return;
+    const target = deletingAssignment;
+    setDeletingAssignment(null);
+    await executeDeleteSchedule(target, scope, dateRange);
+  };
+
+  const handleDeleteFromModal = async (
+    assignmentId: string,
+    scope?: ScheduleScopeType,
+    dateRange?: ScheduleScopeDateRange
+  ) => {
+    const target = editingAssignment || assignments.find((a) => a.id === assignmentId);
+    if (target) {
+      await executeDeleteSchedule(target, scope, dateRange);
     }
   };
 
@@ -956,8 +1025,33 @@ export const WorkSchedulePage: React.FC = () => {
                 </tr>
               ) : (
                 paginatedEmployees.map((emp, empRowIndex) => {
-                  const empAssignments = assignments.filter((a) => isEmployeeRole || a.employeeId === emp.id);
+                  const empAssignments = assignments.filter(
+                    (a) => (isEmployeeRole || a.employeeId === emp.id) && a.status?.toLowerCase() !== 'cancelled'
+                  );
                   const shiftCount = empAssignments.length;
+                  const totalWeekHours = empAssignments.reduce((sum, a) => {
+                    if (typeof a.durationHours === 'number' && a.durationHours > 0) {
+                      return sum + a.durationHours;
+                    }
+                    const matchedShift = shifts.find(
+                      (s) => s.id === a.shiftId || (a.shiftName && s.name.toLowerCase().trim() === a.shiftName.toLowerCase().trim())
+                    );
+                    if (matchedShift && matchedShift.totalHours > 0) {
+                      return sum + matchedShift.totalHours;
+                    }
+                    if (a.shiftTime && a.shiftTime.includes('-')) {
+                      const [st, et] = a.shiftTime.split('-').map((x) => x.trim());
+                      const [sh, sm] = (st || '00:00').split(':').map(Number);
+                      const [eh, em] = (et || '00:00').split(':').map(Number);
+                      if (!isNaN(sh) && !isNaN(sm) && !isNaN(eh) && !isNaN(em)) {
+                        let diff = eh * 60 + em - (sh * 60 + sm);
+                        if (diff <= 0) diff += 24 * 60;
+                        return sum + Math.round((diff / 60) * 100) / 100;
+                      }
+                    }
+                    return sum + 8;
+                  }, 0);
+                  const roundedWeekHours = Math.round(totalWeekHours * 10) / 10;
                   const estimatedWage = shiftCount * 250000;
 
                   return (
@@ -1087,8 +1181,21 @@ export const WorkSchedulePage: React.FC = () => {
                                             border: 'none',
                                             color: isOnLeave ? '#7E22CE' : item.shiftColor,
                                             cursor: 'pointer',
-                                            fontSize: 12,
-                                            padding: 0,
+                                            padding: 2,
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            width: 22,
+                                            height: 22,
+                                            borderRadius: 4,
+                                            transition: 'all 0.15s ease',
+                                            flexShrink: 0,
+                                          }}
+                                          onMouseEnter={(e) => {
+                                            e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.08)';
+                                          }}
+                                          onMouseLeave={(e) => {
+                                            e.currentTarget.style.backgroundColor = 'transparent';
                                           }}
                                           onClick={(e) => {
                                             e.stopPropagation();
@@ -1096,7 +1203,7 @@ export const WorkSchedulePage: React.FC = () => {
                                           }}
                                           title="Hủy ca"
                                         >
-                                          &times;
+                                          <X size={15} strokeWidth={2.5} />
                                         </button>
                                       )}
                                     </div>
@@ -1371,7 +1478,9 @@ export const WorkSchedulePage: React.FC = () => {
                       {/* Lương dự kiến */}
                       <td style={{ textAlign: 'right', verticalAlign: 'middle' }}>
                         <div style={{ fontWeight: 700, color: '#0F766E' }}>{formatVND(estimatedWage)}</div>
-                        <div style={{ fontSize: 11, color: '#64748B' }}>{shiftCount} ca</div>
+                        <div style={{ fontSize: 11, color: '#64748B' }}>
+                          {shiftCount} ca ({roundedWeekHours}h)
+                        </div>
                       </td>
                     </tr>
                   );
@@ -1863,21 +1972,24 @@ export const WorkSchedulePage: React.FC = () => {
         defaultEmployeeId={selectedEmpId}
         defaultDayOfWeek={selectedDay}
         weekDays={weekData.days}
+        weekAssignments={assignments}
         editingAssignment={editingAssignment}
         onSave={handleSaveAssignments}
-        onSuccess={async () => {
+        onSuccess={async (actionType) => {
           await fetchSchedules();
-          setNotificationModal({
-            isOpen: true,
-            type: 'success',
-            title: 'Thành công',
-            message: editingAssignment
-              ? 'Đã cập nhật ca làm việc thành công.'
-              : 'Đã khởi tạo ca làm việc thành công vào hệ thống.',
-          });
+          if (actionType !== 'delete') {
+            setNotificationModal({
+              isOpen: true,
+              type: 'success',
+              title: 'Thành công',
+              message: editingAssignment
+                ? 'Đã cập nhật ca làm việc thành công.'
+                : 'Đã khởi tạo ca làm việc thành công vào hệ thống.',
+            });
+          }
         }}
         onUpdate={handleUpdateAssignment}
-        onDelete={handleDeleteAssignment}
+        onDelete={handleDeleteFromModal}
       />
 
       {/* Modal Chi Tiết Lịch Làm Việc Của Nhân Viên (360 độ - tab Lịch làm việc) */}

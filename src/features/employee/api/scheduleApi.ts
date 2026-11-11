@@ -161,11 +161,13 @@ export const mapScheduleResponseToAssignment = (s: ScheduleResponse): ScheduleAs
     shiftName: s.shiftName || 'Ca làm việc',
     shiftTime: `${startFormatted} - ${endFormatted}`,
     shiftColor: getShiftColor(s.shiftName || s.shiftCode),
+    durationHours: s.durationHours,
     dayOfWeek,
     dateStr,
     workDate: s.workDate,
     branchId: s.branchId,
     branchName: s.branchName || 'Chi nhánh',
+    status: s.status,
   };
 };
 

@@ -8,7 +8,7 @@ import type {
 } from '../../types';
 import { shiftConfigApi, type ShiftConfigDto } from '../../api/shiftConfigApi';
 import { scheduleApi, type CreateRecurringSchedulePayload } from '../../api/scheduleApi';
-import { ScheduleScopeConfirmModal } from './ScheduleScopeConfirmModal';
+import { ScheduleScopeConfirmModal, type ScheduleScopeType, type ScheduleScopeDateRange } from './ScheduleScopeConfirmModal';
 import { getVietnamToday, getVietnamTodayIso } from '../../lib/vietnamTime';
 
 interface AddScheduleModalProps {
@@ -30,11 +30,16 @@ interface AddScheduleModalProps {
     fullDate?: any;
     isToday?: boolean;
   }>;
+  weekAssignments?: ScheduleAssignment[];
   editingAssignment?: ScheduleAssignment | null;
   onSave?: (assignments: ScheduleAssignment[]) => void;
   onUpdate?: (updatedAssignment: ScheduleAssignment) => void;
-  onDelete?: (assignmentId: string) => void;
-  onSuccess?: () => void;
+  onDelete?: (
+    assignmentId: string,
+    scope?: ScheduleScopeType,
+    dateRange?: ScheduleScopeDateRange
+  ) => Promise<void> | void;
+  onSuccess?: (actionType?: 'create' | 'update' | 'delete') => Promise<void> | void;
 }
 
 const SHIFT_COLORS: Record<string, string> = {
@@ -103,6 +108,91 @@ const getScheduleDayOfWeek = (s: ScheduleAssignment): 'T2' | 'T3' | 'T4' | 'T5' 
   return 'T2';
 };
 
+const parseTimeToMinutes = (timeStr?: string): number => {
+  if (!timeStr) return 0;
+  const parts = timeStr.trim().split(':');
+  const h = parseInt(parts[0], 10) || 0;
+  const m = parseInt(parts[1], 10) || 0;
+  return h * 60 + m;
+};
+
+const getShiftIntervalMinutes = (startStr: string, endStr: string): [number, number] => {
+  const startMin = parseTimeToMinutes(startStr);
+  let endMin = parseTimeToMinutes(endStr);
+  if (endMin <= startMin) {
+    endMin += 24 * 60;
+  }
+  return [startMin, endMin];
+};
+
+const getAssignmentDurationHours = (a: ScheduleAssignment, shiftsList: WorkShiftDefinition[]): number => {
+  if (typeof a.durationHours === 'number' && a.durationHours > 0) {
+    return a.durationHours;
+  }
+  const matchedShift = shiftsList.find(
+    (s) => s.id === a.shiftId || (a.shiftName && s.name.toLowerCase().trim() === a.shiftName.toLowerCase().trim())
+  );
+  if (matchedShift && matchedShift.totalHours > 0) {
+    return matchedShift.totalHours;
+  }
+  if (a.shiftTime && a.shiftTime.includes('-')) {
+    const [st, et] = a.shiftTime.split('-').map((x) => x.trim());
+    const [sMin, eMin] = getShiftIntervalMinutes(st, et);
+    return Math.round(((eMin - sMin) / 60) * 100) / 100;
+  }
+  return 8;
+};
+
+// Hàm kiểm tra xem ca làm việc có phải là ca lặp lại tuần sau hay không
+const checkIsRepeatingSchedule = async (assignment: ScheduleAssignment): Promise<boolean> => {
+  try {
+    let baseDate: Date | null = null;
+    if (assignment.workDate) {
+      const d = new Date(assignment.workDate);
+      if (!isNaN(d.getTime())) baseDate = d;
+    }
+    if (!baseDate && assignment.dateStr) {
+      const parts = assignment.dateStr.split('/');
+      if (parts.length >= 2) {
+        const dd = parseInt(parts[0], 10);
+        const mm = parseInt(parts[1], 10) - 1;
+        const yyyy = parts.length >= 3 ? parseInt(parts[2], 10) : getVietnamToday().getFullYear();
+        const d = new Date(yyyy, mm, dd);
+        if (!isNaN(d.getTime())) baseDate = d;
+      }
+    }
+
+    if (!baseDate) return false;
+
+    // Ngày cùng thứ tuần sau (+7 ngày)
+    const nextWeekDate = new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate() + 7);
+    const dd = String(nextWeekDate.getDate()).padStart(2, '0');
+    const mm = String(nextWeekDate.getMonth() + 1).padStart(2, '0');
+    const yyyy = nextWeekDate.getFullYear();
+    const nextWeekDateIso = `${yyyy}-${mm}-${dd}`;
+
+    const nextWeekSchedules = await scheduleApi.getSchedules({
+      employeeId: assignment.employeeId,
+      fromDate: nextWeekDateIso,
+      toDate: nextWeekDateIso,
+      pageSize: 10,
+    });
+
+    const targetShiftId = assignment.shiftId;
+    const targetShiftName = assignment.shiftName?.toLowerCase().trim();
+
+    return nextWeekSchedules.some((s) => {
+      const matchesShift =
+        (targetShiftId && s.shiftId === targetShiftId) ||
+        (targetShiftName && s.shiftName && s.shiftName.toLowerCase().trim() === targetShiftName);
+      return matchesShift;
+    });
+  } catch (err) {
+    console.warn('Lỗi kiểm tra ca tuần sau:', err);
+    return false;
+  }
+};
+
 export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
   isOpen,
   onClose,
@@ -113,6 +203,7 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
   defaultDayOfWeek,
   defaultStartDate,
   weekDays,
+  weekAssignments,
   editingAssignment,
   onSave,
   onUpdate,
@@ -121,10 +212,9 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
 }) => {
   const isEditMode = !!editingAssignment;
 
-  // Popup xác nhận phạm vi áp dụng (khi update hoặc delete)
+  // Popup xác nhận phạm vi áp dụng (khi xóa ca)
   const [showScopeModal, setShowScopeModal] = useState(false);
-  const [scopeAction, setScopeAction] = useState<'update' | 'delete'>('update');
-  const [pendingUpdatedItem, setPendingUpdatedItem] = useState<ScheduleAssignment | null>(null);
+  const [scopeAction, setScopeAction] = useState<'update' | 'delete'>('delete');
 
   // Nhân viên chính
   const [employeeId, setEmployeeId] = useState(
@@ -269,9 +359,20 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
     };
   }, [isOpen, currentEmp?.id, currentEmpBranchId, currentEmpBranchIds]);
 
-  // Tự động gán ca hợp lệ theo BranchId mới khi đổi nhân viên
+  // Tự động gán ca hợp lệ theo BranchId mới khi đổi nhân viên hoặc khi danh sách ca cập nhật
   useEffect(() => {
-    if (!editingAssignment && activeShifts.length > 0) {
+    if (activeShifts.length === 0) return;
+    if (editingAssignment) {
+      const matchedShift = activeShifts.find(
+        (s) =>
+          s.id === editingAssignment.shiftId ||
+          (editingAssignment.shiftName &&
+            s.name.toLowerCase().trim() === editingAssignment.shiftName.toLowerCase().trim())
+      );
+      if (matchedShift && !activeShifts.some((s) => s.id === selectedShiftId)) {
+        setSelectedShiftId(matchedShift.id);
+      }
+    } else {
       const exists = activeShifts.some((s) => s.id === selectedShiftId);
       if (!exists) {
         setSelectedShiftId(activeShifts[0].id);
@@ -332,6 +433,9 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
 
   // Ngày bắt đầu tính toán (ISO YYYY-MM-DD)
   const calculatedStartDate: string = useMemo(() => {
+    if (editingAssignment?.workDate) {
+      return editingAssignment.workDate.slice(0, 10);
+    }
     if (defaultStartDate) return defaultStartDate;
     const activeKey = selectedDays[0] || defaultDayOfWeek || 'T2';
     const dayObj = activeDaysList.find((d) => d.key === activeKey);
@@ -339,7 +443,7 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
       return dayObj.dateIso;
     }
     return getVietnamTodayIso();
-  }, [defaultStartDate, selectedDays, defaultDayOfWeek, activeDaysList]);
+  }, [editingAssignment, defaultStartDate, selectedDays, defaultDayOfWeek, activeDaysList]);
 
   // Ngày cuối cùng của tháng sau (hiển thị khi không chọn ngày kết thúc)
   const endOfNextMonthDisplay = useMemo(() => {
@@ -375,9 +479,58 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
       } else {
         setSelectedShiftId(editingAssignment.shiftId || activeShifts[0]?.id || '');
       }
+
+      // Tìm tất cả các thứ trong tuần đã được giao ca này của nhân viên
+      const empId = editingAssignment.employeeId;
+      const targetShiftId = editingAssignment.shiftId;
+      const targetShiftName = editingAssignment.shiftName?.toLowerCase().trim();
+
+      const matchingAssignments = (weekAssignments || []).filter((a) => {
+        if (a.employeeId !== empId) return false;
+        const matchesShift =
+          (targetShiftId && a.shiftId === targetShiftId) ||
+          (targetShiftName && a.shiftName && a.shiftName.toLowerCase().trim() === targetShiftName);
+        return matchesShift;
+      });
+
+      const assignedDays = Array.from(
+        new Set(matchingAssignments.map((a) => a.dayOfWeek))
+      ).filter((d): d is 'T2' | 'T3' | 'T4' | 'T5' | 'T6' | 'T7' | 'CN' =>
+        ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'].includes(d as any)
+      );
+
+      // Đảm bảo luôn bao gồm thứ của ca hiện tại
+      if (editingAssignment.dayOfWeek && !assignedDays.includes(editingAssignment.dayOfWeek)) {
+        assignedDays.push(editingAssignment.dayOfWeek);
+      }
+
+      const DAY_ORDER: Record<string, number> = {
+        T2: 1, T3: 2, T4: 3, T5: 4, T6: 5, T7: 6, CN: 7,
+      };
+      assignedDays.sort((a, b) => (DAY_ORDER[a] || 0) - (DAY_ORDER[b] || 0));
+
+      // Khởi tạo tạm thời là không lặp lại và chỉ chọn ngày của ca hiện tại
       setSelectedDays([editingAssignment.dayOfWeek]);
+      setIsRepeating(false);
       setApplyToOthers(false);
       setSelectedOtherEmpIds([]);
+
+      // Kiểm tra xem ca làm việc này có phải là ca lặp lại tuần sau hay không
+      let isSubscribed = true;
+      checkIsRepeatingSchedule(editingAssignment).then((isRepeat) => {
+        if (!isSubscribed) return;
+        if (isRepeat) {
+          setIsRepeating(true);
+          setSelectedDays(assignedDays.length > 0 ? assignedDays : [editingAssignment.dayOfWeek]);
+        } else {
+          setIsRepeating(false);
+          setSelectedDays([editingAssignment.dayOfWeek]);
+        }
+      });
+
+      return () => {
+        isSubscribed = false;
+      };
     } else {
       if (defaultEmployeeId) {
         setEmployeeId(defaultEmployeeId);
@@ -386,12 +539,17 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
       }
       if (defaultDayOfWeek) {
         setSelectedDays([defaultDayOfWeek]);
+      } else {
+        setSelectedDays(['T2']);
       }
+      setIsRepeating(true);
       setSelectedShiftId(activeShifts[0]?.id || '');
       setApplyToOthers(false);
       setSelectedOtherEmpIds([]);
     }
-  }, [isOpen, editingAssignment, defaultEmployeeId, defaultDayOfWeek, employees, activeShifts]);
+    // Chỉ khởi tạo lại form khi mở modal hoặc chuyển đổi ca cần chỉnh sửa / mặc định
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, editingAssignment, defaultEmployeeId, defaultDayOfWeek]);
 
   // Thông tin ca hiện tại đang chọn
   const currentSelectedShift = useMemo(() => {
@@ -426,10 +584,18 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
 
   // Tên ngày hiện tại hiển thị ở subtitle
   const currentDayInfo = useMemo(() => {
-    const activeKey = selectedDays[0] || 'T3';
-    const dayItem = DAYS.find((d) => d.key === activeKey);
-    return dayItem ? `${dayItem.label}, ${dayItem.date}/2026` : 'Thứ 3, 29/09/2026';
-  }, [selectedDays]);
+    const activeKey = selectedDays[0] || defaultDayOfWeek || 'T2';
+    const dayItem = activeDaysList.find((d) => d.key === activeKey);
+    if (dayItem) {
+      const datePart = dayItem.date.includes('/') && dayItem.date.split('/').length === 3
+        ? dayItem.date
+        : dayItem.dateIso
+          ? dayItem.dateIso.split('-').reverse().join('/')
+          : `${dayItem.date}/${getVietnamToday().getFullYear()}`;
+      return `${dayItem.label}, ${datePart}`;
+    }
+    return 'Thứ 2';
+  }, [selectedDays, defaultDayOfWeek, activeDaysList]);
 
   // Toggle ngày trong tuần
   const handleToggleDay = (day: 'T2' | 'T3' | 'T4' | 'T5' | 'T6' | 'T7' | 'CN') => {
@@ -555,6 +721,59 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
       const activeDay = selectedDays[0] || editingAssignment.dayOfWeek;
       const dayObj = activeDaysList.find((item) => item.key === activeDay);
 
+      // Kiểm tra trùng ca / trùng giờ / vượt 12h mỗi ngày trên tuần hiện tại trước khi cập nhật
+      const daysToCheckEdit = isRepeating
+        ? (selectedDays.length > 0 ? selectedDays : [activeDay])
+        : [activeDay];
+      const [newStartMin, newEndMin] = getShiftIntervalMinutes(rawStartTime, rawEndTime);
+      const newShiftHours = currentShift.totalHours || Math.round(((newEndMin - newStartMin) / 60) * 100) / 100;
+
+      for (const dow of daysToCheckEdit) {
+        const existingOnDay = (weekAssignments || []).filter(
+          (a) =>
+            a.employeeId === currentEmp.id &&
+            a.id !== editingAssignment.id &&
+            a.status?.toLowerCase() !== 'cancelled' &&
+            getScheduleDayOfWeek(a) === dow &&
+            !(isRepeating && (a.shiftId === editingAssignment.shiftId || a.shiftName.toLowerCase().trim() === editingAssignment.shiftName.toLowerCase().trim()))
+        );
+
+        let totalHoursOnDay = newShiftHours;
+        const dayLabel = activeDaysList.find((d) => d.key === dow)?.label || dow;
+
+        for (const ex of existingOnDay) {
+          const isSameShift =
+            ex.shiftId === shiftIdFinal ||
+            ex.shiftName.toLowerCase().trim() === shiftName.toLowerCase().trim();
+          if (isSameShift) {
+            setSubmitError(
+              `Nhân viên "${currentEmp.fullName}" đã được phân ca "${ex.shiftName}" vào ${dayLabel}, không thể cập nhật trùng cùng một ca.`
+            );
+            return;
+          }
+
+          if (ex.shiftTime && ex.shiftTime.includes('-')) {
+            const [exSt, exEt] = ex.shiftTime.split('-').map((x) => x.trim());
+            const [exStartMin, exEndMin] = getShiftIntervalMinutes(exSt, exEt);
+            if (newStartMin < exEndMin && newEndMin > exStartMin) {
+              setSubmitError(
+                `Nhân viên "${currentEmp.fullName}" bị trùng khung giờ làm việc vào ${dayLabel} giữa ca "${shiftName} (${shiftTime})" và ca "${ex.shiftName} (${ex.shiftTime})".`
+              );
+              return;
+            }
+          }
+
+          totalHoursOnDay += getAssignmentDurationHours(ex, activeShifts);
+        }
+
+        if (totalHoursOnDay > 12) {
+          setSubmitError(
+            `Tổng thời gian làm việc các ca trong ${dayLabel} của nhân viên "${currentEmp.fullName}" là ${totalHoursOnDay}h, vượt quá giới hạn tối đa 12h/ngày.`
+          );
+          return;
+        }
+      }
+
       const updatedItem: ScheduleAssignment = {
         ...editingAssignment,
         employeeId: currentEmp.id,
@@ -570,52 +789,72 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
         branchName: branchNameFinal,
       };
 
-      // Nếu có ngày kết thúc: trực tiếp update đến ngày kết thúc và KHÔNG hiện popup ScheduleScopeConfirmModal
-      if (hasEndDate && endDate) {
-        try {
-          setIsSubmitting(true);
-          setSubmitError(null);
+      // CẬP NHẬT TRỰC TIẾP, KHÔNG HIỂN THỊ ScheduleScopeConfirmModal NỮA
+      try {
+        setIsSubmitting(true);
+        setSubmitError(null);
 
-          // Cập nhật ca hiện tại
-          if (onUpdate) {
-            await onUpdate(updatedItem);
-          } else if (onSave) {
-            onSave([updatedItem]);
+        // 1. Cập nhật ca hiện tại
+        if (onUpdate) {
+          await onUpdate(updatedItem);
+        } else if (onSave) {
+          onSave([updatedItem]);
+        }
+
+        // 2. Nếu bật "Lặp lại hàng tuần", cập nhật tiếp các ca khác của nhân viên trong dải ngày
+        if (isRepeating) {
+          const daysToUpdate = selectedDays.length > 0 ? selectedDays : [updatedItem.dayOfWeek];
+
+          // Xác định ngày kết thúc dải ngày:
+          // Nếu có endDate cụ thể thì dùng endDate, ngược lại mặc định đến hết tháng sau
+          let toDateFinal = endDate;
+          if (!hasEndDate || !toDateFinal) {
+            const d = new Date(calculatedStartDate);
+            if (!isNaN(d.getTime())) {
+              const nextMonthLastDay = new Date(d.getFullYear(), d.getMonth() + 2, 0);
+              const dd = String(nextMonthLastDay.getDate()).padStart(2, '0');
+              const mm = String(nextMonthLastDay.getMonth() + 1).padStart(2, '0');
+              toDateFinal = `${nextMonthLastDay.getFullYear()}-${mm}-${dd}`;
+            } else {
+              toDateFinal = calculatedStartDate;
+            }
           }
 
-          // Cập nhật tất cả các ca khác của nhân viên trong khoảng [calculatedStartDate, endDate]
-          // CHỈ UPDATE NHỮNG THỨ ĐƯỢC CHỌN (selectedDays)
-          const daysToUpdate = isRepeating ? selectedDays : [selectedDays[0] || updatedItem.dayOfWeek];
           try {
             const schedulesInRange = await scheduleApi.getSchedules({
               employeeId: currentEmp.id,
               branchId: currentEmpBranchId || undefined,
               fromDate: calculatedStartDate,
-              toDate: endDate,
-              pageSize: 500,
+              toDate: toDateFinal,
+              pageSize: 1000,
             });
+
+            const targetShiftId = editingAssignment.shiftId;
+            const targetShiftName = editingAssignment.shiftName?.toLowerCase().trim();
 
             const matchingOtherSchedules = schedulesInRange.filter((s) => {
               if (s.id === editingAssignment.id) return false;
               const dow = getScheduleDayOfWeek(s);
-              return daysToUpdate.includes(dow);
+              const matchesDow = daysToUpdate.includes(dow);
+              const matchesShift =
+                !targetShiftId ||
+                s.shiftId === targetShiftId ||
+                (s.shiftName && s.shiftName.toLowerCase().trim() === targetShiftName);
+              return matchesDow && matchesShift;
             });
 
             if (matchingOtherSchedules.length > 0) {
               const formattedStart = rawStartTime ? (rawStartTime.length === 5 ? `${rawStartTime}:00` : rawStartTime) : undefined;
               const formattedEnd = rawEndTime ? (rawEndTime.length === 5 ? `${rawEndTime}:00` : rawEndTime) : undefined;
-              const shiftConfigIdVal = shiftIdFinal;
 
-              await Promise.all(
+              await Promise.allSettled(
                 matchingOtherSchedules.map((s) =>
                   scheduleApi.updateSchedule(s.id, {
                     shiftName,
-                    shiftConfigId: shiftConfigIdVal,
+                    shiftConfigId: shiftIdFinal,
                     shiftCode: currentSelectedShift?.code,
                     plannedStartTime: formattedStart,
                     plannedEndTime: formattedEnd,
-                  }).catch((err) => {
-                    console.warn(`Lỗi khi cập nhật ca ${s.id}:`, err);
                   })
                 )
               );
@@ -623,25 +862,19 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
           } catch (rangeErr) {
             console.warn('Lỗi khi cập nhật các ca cùng dải ngày kết thúc:', rangeErr);
           }
-
-          if (onSuccess) {
-            await onSuccess();
-          }
-
-          onClose();
-        } catch (err: any) {
-          console.error('Lỗi khi cập nhật ca làm việc:', err);
-          setSubmitError(err?.response?.data?.message || err?.message || 'Cập nhật ca làm việc thất bại.');
-        } finally {
-          setIsSubmitting(false);
         }
-        return;
-      }
 
-      // Không có ngày kết thúc -> mở popup ScheduleScopeConfirmModal để chọn phạm vi
-      setPendingUpdatedItem(updatedItem);
-      setScopeAction('update');
-      setShowScopeModal(true);
+        if (onSuccess) {
+          await onSuccess('update');
+        }
+
+        onClose();
+      } catch (err: any) {
+        console.error('Lỗi khi cập nhật ca làm việc:', err);
+        setSubmitError(err?.response?.data?.message || err?.message || 'Cập nhật ca làm việc thất bại.');
+      } finally {
+        setIsSubmitting(false);
+      }
       return;
     }
 
@@ -669,6 +902,61 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
 
       const isSingleShift = !isRepeating;
       const targetRepeatDays = isSingleShift ? [selectedDays[0] || defaultDayOfWeek || 'T2'] : selectedDays;
+
+      // Kiểm tra trùng ca, trùng khung giờ và tổng thời gian trong ngày (tối đa 12h/ngày) cho tất cả nhân viên được chọn
+      const [newStartMin, newEndMin] = getShiftIntervalMinutes(rawStartTime, rawEndTime);
+      const newShiftHours = currentShift.totalHours || Math.round(((newEndMin - newStartMin) / 60) * 100) / 100;
+
+      for (const empIdToCheck of targetEmpIds) {
+        const empObj = employees.find((e) => e.id === empIdToCheck) || currentEmp;
+        for (const dow of targetRepeatDays) {
+          const existingOnDay = (weekAssignments || []).filter(
+            (a) =>
+              a.employeeId === empIdToCheck &&
+              a.status?.toLowerCase() !== 'cancelled' &&
+              getScheduleDayOfWeek(a) === dow
+          );
+
+          let totalHoursOnDay = newShiftHours;
+          const dayInfoObj = activeDaysList.find((d) => d.key === dow);
+          const dayLabel = dayInfoObj ? `${dayInfoObj.label} (${dayInfoObj.date})` : dow;
+
+          for (const ex of existingOnDay) {
+            const isSameShift =
+              ex.shiftId === shiftIdFinal ||
+              ex.shiftName.toLowerCase().trim() === shiftName.toLowerCase().trim();
+            if (isSameShift) {
+              setSubmitError(
+                `Nhân viên "${empObj.fullName}" đã có ca "${ex.shiftName}" vào ${dayLabel}, không thể thêm trùng cùng một ca.`
+              );
+              setIsSubmitting(false);
+              return;
+            }
+
+            if (ex.shiftTime && ex.shiftTime.includes('-')) {
+              const [exSt, exEt] = ex.shiftTime.split('-').map((x) => x.trim());
+              const [exStartMin, exEndMin] = getShiftIntervalMinutes(exSt, exEt);
+              if (newStartMin < exEndMin && newEndMin > exStartMin) {
+                setSubmitError(
+                  `Nhân viên "${empObj.fullName}" bị trùng khung giờ làm việc vào ${dayLabel} giữa ca "${shiftName} (${shiftTime})" và ca "${ex.shiftName} (${ex.shiftTime})".`
+                );
+                setIsSubmitting(false);
+                return;
+              }
+            }
+
+            totalHoursOnDay += getAssignmentDurationHours(ex, activeShifts);
+          }
+
+          if (totalHoursOnDay > 12) {
+            setSubmitError(
+              `Tổng thời gian các ca trong ngày ${dayLabel} của nhân viên "${empObj.fullName}" là ${totalHoursOnDay}h, vượt quá giới hạn tối đa 12h/ngày.`
+            );
+            setIsSubmitting(false);
+            return;
+          }
+        }
+      }
 
       // Gọi API khởi tạo ca làm việc từ Backend (khi tắt lặp lại -> hasEndDate=true và endDate=startDate để chỉ tạo đúng 1 ca)
       const payload: CreateRecurringSchedulePayload = {
@@ -749,10 +1037,13 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
               )}
             </div>
             <div style={{ fontSize: 13, color: '#64748B', marginTop: 4, display: 'flex', alignItems: 'center', flexWrap: 'wrap' }}>
-              {!defaultEmployeeId ? (
+              {!isEditMode ? (
                 <select
                   value={employeeId}
-                  onChange={(e) => setEmployeeId(e.target.value)}
+                  onChange={(e) => {
+                    setEmployeeId(e.target.value);
+                    setSubmitError(null);
+                  }}
                   style={{
                     fontWeight: 600,
                     color: '#0F766E',
@@ -1077,8 +1368,12 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
               </div>
               <div style={{ fontSize: 12, color: isRepeating ? '#64748B' : '#0F766E', marginTop: 2, fontWeight: isRepeating ? 400 : 600 }}>
                 {isRepeating
-                  ? 'Lịch làm việc sẽ được tự động lặp lại vào các ngày trong tuần'
-                  : '✓ Chế độ chỉ tạo 1 ca duy nhất vào ngày được chọn'}
+                  ? isEditMode
+                    ? 'Lịch làm việc sẽ được cập nhật lặp lại vào các ngày được chọn từ tuần này trở đi'
+                    : 'Lịch làm việc sẽ được tự động lặp lại vào các ngày trong tuần'
+                  : isEditMode
+                    ? '✓ Chỉ cập nhật duy nhất ca làm việc này (không ảnh hưởng các tuần sau)'
+                    : '✓ Chế độ chỉ tạo 1 ca duy nhất vào ngày được chọn'}
               </div>
 
               {isRepeating && (
@@ -1524,110 +1819,72 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
         startDateStr={displayDateFormatted}
         selectedDays={isRepeating ? selectedDays : [selectedDays[0] || (editingAssignment?.dayOfWeek || 'T2')]}
         onConfirm={async (scope, dateRange) => {
-          if (scopeAction === 'update' && pendingUpdatedItem) {
+          if (editingAssignment) {
             try {
               setIsSubmitting(true);
               setSubmitError(null);
 
-              // 1. Cập nhật ca hiện tại
-              if (onUpdate) {
-                await onUpdate(pendingUpdatedItem);
-              } else if (onSave) {
-                onSave([pendingUpdatedItem]);
-              }
-
-              // 2. Theo scope confirm (Following hoặc All): CHỈ UPDATE NHỮNG THỨ ĐƯỢC CHỌN (selectedDays)
-              if ((scope === 'following' || scope === 'all') && dateRange?.fromDate && dateRange?.toDate) {
-                const daysToUpdate = isRepeating ? selectedDays : [selectedDays[0] || pendingUpdatedItem.dayOfWeek];
-                const parts = (pendingUpdatedItem.shiftTime || '').split('-').map((s) => s.trim());
-                const rawStart = parts[0] || '08:00';
-                const rawEnd = parts[1] || '17:00';
-                const formattedStart = rawStart.length === 5 ? `${rawStart}:00` : rawStart;
-                const formattedEnd = rawEnd.length === 5 ? `${rawEnd}:00` : rawEnd;
-                const shiftConfigIdVal = pendingUpdatedItem.shiftId;
-
-                const schedulesInRange = await scheduleApi.getSchedules({
-                  employeeId: currentEmp?.id || pendingUpdatedItem.employeeId,
-                  fromDate: dateRange.fromDate,
-                  toDate: dateRange.toDate,
-                  pageSize: 1000,
-                });
-
-                const matchingOtherSchedules = schedulesInRange.filter((s) => {
-                  if (editingAssignment && s.id === editingAssignment.id) return false;
-                  const dow = getScheduleDayOfWeek(s);
-                  return daysToUpdate.includes(dow);
-                });
-
-                if (matchingOtherSchedules.length > 0) {
-                  await Promise.all(
-                    matchingOtherSchedules.map((s) =>
-                      scheduleApi.updateSchedule(s.id, {
-                        shiftName: pendingUpdatedItem.shiftName,
-                        shiftConfigId: shiftConfigIdVal,
-                        shiftCode: currentSelectedShift?.code,
-                        plannedStartTime: formattedStart,
-                        plannedEndTime: formattedEnd,
-                      }).catch((err) => {
-                        console.warn(`Lỗi khi cập nhật ca ${s.id}:`, err);
-                      })
-                    )
-                  );
-                }
-              }
-
-              if (onSuccess) {
-                await onSuccess();
-              }
-              onClose();
-            } catch (err: any) {
-              console.error('Lỗi khi cập nhật theo phạm vi:', err);
-              setSubmitError(err?.response?.data?.message || err?.message || 'Cập nhật ca làm việc thất bại.');
-            } finally {
-              setIsSubmitting(false);
-            }
-          } else if (scopeAction === 'delete' && editingAssignment) {
-            try {
-              setIsSubmitting(true);
-              setSubmitError(null);
-
-              // 1. Luôn xóa ca hiện tại
               if (onDelete) {
-                onDelete(editingAssignment.id);
+                await onDelete(editingAssignment.id, scope, dateRange);
               } else {
-                await scheduleApi.deleteSchedule(editingAssignment.id);
-              }
+                if (scope === 'entire') {
+                  const rawList = await scheduleApi.getRawSchedules({
+                    employeeId: editingAssignment.employeeId,
+                    pageSize: 1000,
+                  });
 
-              // 2. Nếu chọn scope Following hoặc All: xóa các ca khớp phạm vi
-              if ((scope === 'following' || scope === 'all') && dateRange?.fromDate && dateRange?.toDate) {
-                const daysToDelete = isRepeating ? selectedDays : [selectedDays[0] || editingAssignment.dayOfWeek];
-                const targetShiftNameLower = (editingAssignment.shiftName || '').toLowerCase().trim();
+                  const deletable = rawList.filter((s) => {
+                    if (s.checkInTime || s.checkOutTime) return false;
+                    if (s.status === 'Completed' || s.status === 'completed') return false;
+                    return true;
+                  });
 
-                const schedulesInRange = await scheduleApi.getSchedules({
-                  employeeId: editingAssignment.employeeId,
-                  fromDate: dateRange.fromDate,
-                  toDate: dateRange.toDate,
-                  pageSize: 1000,
-                });
+                  if (deletable.length > 0) {
+                    await Promise.allSettled(
+                      deletable.map((s) => scheduleApi.deleteSchedule(s.id))
+                    );
+                  }
+                } else {
+                  // 1. Luôn xóa ca hiện tại
+                  await scheduleApi.deleteSchedule(editingAssignment.id);
 
-                const matchingOther = schedulesInRange.filter((s) => {
-                  if (s.id === editingAssignment.id) return false;
-                  const dow = getScheduleDayOfWeek(s);
-                  const matchesDow = daysToDelete.includes(dow);
-                  const matchesShift = !targetShiftNameLower || (s.shiftName && s.shiftName.toLowerCase().trim() === targetShiftNameLower) || s.shiftId === editingAssignment.shiftId;
-                  return matchesDow && matchesShift;
-                });
+                  // 2. Nếu chọn scope Following hoặc All: xóa các ca khớp phạm vi
+                  if ((scope === 'following' || scope === 'all') && dateRange?.fromDate && dateRange?.toDate) {
+                    const daysToDelete = isRepeating ? selectedDays : [selectedDays[0] || editingAssignment.dayOfWeek];
+                    const targetShiftNameLower = (editingAssignment.shiftName || '').toLowerCase().trim();
 
-                if (matchingOther.length > 0) {
-                  await Promise.all(
-                    matchingOther.map((s) => scheduleApi.deleteSchedule(s.id).catch(() => {}))
-                  );
+                    const schedulesInRange = await scheduleApi.getSchedules({
+                      employeeId: editingAssignment.employeeId,
+                      fromDate: dateRange.fromDate,
+                      toDate: dateRange.toDate,
+                      pageSize: 1000,
+                    });
+
+                    const matchingOther = schedulesInRange.filter((s) => {
+                      if (s.id === editingAssignment.id) return false;
+                      const dow = getScheduleDayOfWeek(s);
+                      const matchesDow = !daysToDelete.length || daysToDelete.includes(dow);
+                      const matchesShift =
+                        !targetShiftNameLower ||
+                        (s.shiftName && s.shiftName.toLowerCase().trim() === targetShiftNameLower) ||
+                        s.shiftId === editingAssignment.shiftId;
+                      return matchesDow && matchesShift;
+                    });
+
+                    if (matchingOther.length > 0) {
+                      await Promise.allSettled(
+                        matchingOther.map((s) => scheduleApi.deleteSchedule(s.id))
+                      );
+                    }
+                  }
+                }
+
+                if (onSuccess) {
+                  await onSuccess('delete');
                 }
               }
 
-              if (onSuccess) {
-                await onSuccess();
-              }
+              setShowScopeModal(false);
               onClose();
             } catch (err: any) {
               console.error('Lỗi khi xóa ca theo phạm vi:', err);
