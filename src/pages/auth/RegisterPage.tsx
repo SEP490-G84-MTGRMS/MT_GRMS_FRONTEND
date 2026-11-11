@@ -15,13 +15,6 @@ import {
   ShieldCheck,
   ArrowRight,
 } from "lucide-react";
-import type { ConfirmationResult } from "firebase/auth";
-import {
-  isFirebasePhoneAuthConfigured,
-  sendFirebasePhoneOtp,
-  clearRecaptchaVerifier,
-  translateFirebaseSmsError,
-} from "../../config/firebase";
 import { authService } from "../../features/auth/authService";
 import { RegistrationOtpModal } from "../../features/auth/components/RegistrationOtpModal";
 import { useAuthStore } from "../../stores/useAuthStore";
@@ -44,17 +37,14 @@ export const RegisterPage: FC = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSuccess, setIsSuccess] = useState(false);
 
-  // State cho bước xác thực SMS OTP qua Google Firebase Phone Auth
+  // State cho bước xác thực SMS OTP qua TextBee Android SMS Gateway
   const [isOtpModalOpen, setIsOtpModalOpen] = useState(false);
   const [maskedPhone, setMaskedPhone] = useState("");
   const [isRealSmsSent, setIsRealSmsSent] = useState(false);
   const [devOtpCode, setDevOtpCode] = useState<string | null>(null);
   const [otpErrorMessage, setOtpErrorMessage] = useState<string | null>(null);
-  const [firebaseNotice, setFirebaseNotice] = useState<string | null>(null);
   const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
   const [isResendingOtp, setIsResendingOtp] = useState(false);
-  const [firebaseConfirmation, setFirebaseConfirmation] =
-    useState<ConfirmationResult | null>(null);
 
   // Tính toán độ mạnh mật khẩu (Weak / Medium / Strong)
   const passwordStrength = useMemo(() => {
@@ -136,7 +126,7 @@ export const RegisterPage: FC = () => {
     try {
       setIsLoading(true);
 
-      // 1. Kiểm tra trùng số điện thoại và gửi SMS qua TextBee Gateway trên Backend
+      // 1. Kiểm tra trùng số điện thoại và gửi SMS OTP qua TextBee Gateway trên Backend
       const otpRes = await authService.sendRegistrationOtp({
         phone: phone.trim(),
         storeName: storeName.trim(),
@@ -144,33 +134,8 @@ export const RegisterPage: FC = () => {
       });
 
       setMaskedPhone(otpRes.maskedPhone);
-
-      // 2. Nếu TextBee đã gửi SMS thật thành công thì dùng trực tiếp luôn
-      if (otpRes.isRealSmsSent) {
-        setFirebaseConfirmation(null);
-        setIsRealSmsSent(true);
-        setDevOtpCode(null);
-        setFirebaseNotice(null);
-      } else if (isFirebasePhoneAuthConfigured()) {
-        try {
-          const confirmation = await sendFirebasePhoneOtp(phone.trim());
-          setFirebaseConfirmation(confirmation);
-          setIsRealSmsSent(true);
-          setDevOtpCode(null);
-          setFirebaseNotice(null);
-        } catch {
-          setFirebaseConfirmation(null);
-          setIsRealSmsSent(false);
-          setDevOtpCode(otpRes.devOtpCode ?? null);
-          setFirebaseNotice(null);
-        }
-      } else {
-        setFirebaseConfirmation(null);
-        setIsRealSmsSent(otpRes.isRealSmsSent);
-        setDevOtpCode(otpRes.devOtpCode ?? null);
-        setFirebaseNotice(null);
-      }
-
+      setIsRealSmsSent(otpRes.isRealSmsSent);
+      setDevOtpCode(otpRes.devOtpCode ?? null);
       setOtpErrorMessage(null);
       setIsOtpModalOpen(true);
     } catch (err: unknown) {
@@ -189,29 +154,21 @@ export const RegisterPage: FC = () => {
     try {
       setIsVerifyingOtp(true);
 
-      let firebaseIdToken: string | undefined;
-      if (firebaseConfirmation) {
-        const userCredential = await firebaseConfirmation.confirm(otpCode);
-        firebaseIdToken = await userCredential.user.getIdToken();
-      }
-
       const res = await authService.register({
         fullName: fullName.trim(),
         storeName: storeName.trim(),
         phone: phone.trim(),
         password,
         agreeTerms,
-        otpCode: firebaseIdToken ? undefined : otpCode,
-        firebaseIdToken,
+        otpCode,
       });
 
-      clearRecaptchaVerifier();
       setIsOtpModalOpen(false);
       setAuth(res.user, res.accessToken);
       setIsSuccess(true);
     } catch (err: unknown) {
       const msg =
-        err instanceof Error && !err.message.includes("auth/")
+        err instanceof Error
           ? err.message
           : "Mã OTP không chính xác hoặc đã hết hạn. Vui lòng kiểm tra lại.";
       setOtpErrorMessage(msg);
@@ -230,27 +187,8 @@ export const RegisterPage: FC = () => {
         fullName: fullName.trim(),
       });
       setMaskedPhone(otpRes.maskedPhone);
-
-      if (isFirebasePhoneAuthConfigured()) {
-        try {
-          const confirmation = await sendFirebasePhoneOtp(phone.trim());
-          setFirebaseConfirmation(confirmation);
-          setIsRealSmsSent(true);
-          setDevOtpCode(null);
-          setFirebaseNotice(null);
-        } catch (fbErr: unknown) {
-          const reason = translateFirebaseSmsError(fbErr);
-          setFirebaseConfirmation(null);
-          setIsRealSmsSent(false);
-          setDevOtpCode(otpRes.devOtpCode ?? null);
-          setFirebaseNotice(reason);
-        }
-      } else {
-        setFirebaseConfirmation(null);
-        setIsRealSmsSent(otpRes.isRealSmsSent);
-        setDevOtpCode(otpRes.devOtpCode ?? null);
-        setFirebaseNotice(null);
-      }
+      setIsRealSmsSent(otpRes.isRealSmsSent);
+      setDevOtpCode(otpRes.devOtpCode ?? null);
     } catch (err: unknown) {
       const msg =
         err instanceof Error
@@ -568,9 +506,6 @@ export const RegisterPage: FC = () => {
         </button>
       </form>
 
-      {/* Container ẩn cho Google Firebase Invisible reCAPTCHA */}
-      <div id="recaptcha-verifier-container" />
-
       <RegistrationOtpModal
         isOpen={isOtpModalOpen}
         phone={phone.trim()}
@@ -578,14 +513,10 @@ export const RegisterPage: FC = () => {
         storeName={storeName.trim()}
         isRealSmsSent={isRealSmsSent}
         devOtpCode={devOtpCode}
-        firebaseNotice={firebaseNotice}
         isSubmitting={isVerifyingOtp}
         isResending={isResendingOtp}
         errorMessage={otpErrorMessage}
-        onClose={() => {
-          clearRecaptchaVerifier();
-          setIsOtpModalOpen(false);
-        }}
+        onClose={() => setIsOtpModalOpen(false)}
         onVerify={handleVerifyOtpAndCreateStore}
         onResend={handleResendRegistrationOtp}
       />

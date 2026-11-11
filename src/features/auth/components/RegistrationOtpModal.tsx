@@ -17,7 +17,6 @@ export interface RegistrationOtpModalProps {
   storeName: string;
   isRealSmsSent: boolean;
   devOtpCode?: string | null;
-  firebaseNotice?: string | null;
   isSubmitting: boolean;
   isResending: boolean;
   errorMessage: string | null;
@@ -35,7 +34,6 @@ export const RegistrationOtpModal: FC<RegistrationOtpModalProps> = ({
   storeName,
   isRealSmsSent,
   devOtpCode,
-  firebaseNotice,
   isSubmitting,
   isResending,
   errorMessage,
@@ -260,24 +258,7 @@ export const RegistrationOtpModal: FC<RegistrationOtpModalProps> = ({
           để kích hoạt cửa hàng <strong>{storeName}</strong>.
         </p>
 
-        {firebaseNotice && (
-          <div
-            style={{
-              backgroundColor: "#FFF8EB",
-              border: "1px solid #FFE8CC",
-              borderRadius: "12px",
-              padding: "10px 12px",
-              marginBottom: "12px",
-              fontSize: "12px",
-              color: "#9A3412",
-              lineHeight: 1.45,
-            }}
-          >
-            <strong>Lưu ý từ Google Firebase:</strong> {firebaseNotice}
-          </div>
-        )}
-
-        {/* Chế độ Dev / Firebase Fallback gợi ý nhanh nếu chưa cấu hình Firebase thật */}
+        {/* Chế độ Dev / TextBee Fallback gợi ý nhanh nếu chưa bật TextBee SMS Gateway */}
         {!isRealSmsSent && devOtpCode && (
           <div
             style={{
@@ -294,7 +275,7 @@ export const RegistrationOtpModal: FC<RegistrationOtpModalProps> = ({
           >
             <div style={{ fontSize: "12px", color: "#475569", lineHeight: 1.4 }}>
               <span style={{ fontWeight: 600, color: "#0F172A" }}>
-                Mã OTP (Dev / Chưa điền Firebase Config):
+                Mã OTP (Dev / Chưa bật TextBee Gateway):
               </span>{" "}
               <strong
                 style={{
