@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import type { Product, Customer } from '../../types/pos.types';
-import { Plus, Minus, Trash2, Search, Package, Phone, User, AlertTriangle } from 'lucide-react';
+import { Plus, Minus, Trash2, Search, Package, Phone, User, AlertTriangle, Gift } from 'lucide-react';
 import { mockCustomers } from '../../mock/posMockData';
+import { promotionApi, type CartGiftItemDto } from '../../../promotion/api/promotionApi';
 
 interface Props {
   isOpen: boolean;
   onClose: () => void;
   availableProducts: Product[];
+  branchId?: string;
   branchName: string;
   customers?: Customer[];
   onConfirm: (data: {
@@ -21,10 +23,15 @@ interface Props {
       productName: string;
       unitId?: string;
       unitName?: string;
+      isGift?: boolean;
+      promotionId?: string | null;
     }>;
     depositAmount: number;
     paymentMethod: string;
     note?: string;
+    discountAmount?: number;
+    appliedPromotionId?: string | null;
+    appliedPromotionSummary?: string | null;
   }) => Promise<void>;
 }
 
@@ -41,6 +48,7 @@ export const CreatePreOrderModal: React.FC<Props> = ({
   isOpen,
   onClose,
   availableProducts,
+  branchId,
   branchName,
   customers,
   onConfirm,
@@ -69,19 +77,80 @@ export const CreatePreOrderModal: React.FC<Props> = ({
   const [note, setNote] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Tính tổng tiền đơn
-  const totalAmount = orderItems.reduce(
+  // Khuyến mãi tự động cho Đơn đặt trước (KHÔNG áp dụng mã Voucher dùng 1 lần - REQ-ORD-PRE-01)
+  const [promoDiscount, setPromoDiscount] = useState<number>(0);
+  const [appliedPromoId, setAppliedPromoId] = useState<string | null>(null);
+  const [appliedPromoLabels, setAppliedPromoLabels] = useState<string[]>([]);
+  const [giftItems, setGiftItems] = useState<CartGiftItemDto[]>([]);
+
+  // Tính tổng tiền hàng & tổng thanh toán sau khuyến mãi
+  const totalMerchandiseAmount = orderItems.reduce(
     (sum, item) => sum + (item.quantity > 0 ? item.quantity * item.unitPrice : 0),
     0
   );
+  const effectivePromoDiscount = Math.min(totalMerchandiseAmount, Math.max(0, promoDiscount));
+  const totalAmount = Math.max(0, totalMerchandiseAmount - effectivePromoDiscount);
   const minDeposit = Math.round(totalAmount * 0.10);
-  const isDepositValid = totalAmount > 0 && depositAmount >= minDeposit && depositAmount <= totalAmount;
+  const isDepositValid = orderItems.length > 0 && depositAmount >= minDeposit && depositAmount <= totalAmount;
 
-  // Tự động đồng bộ tiền cọc tối thiểu khi số lượng hoặc mặt hàng thay đổi
+  // Thẩm định tự động các CTKM của cửa hàng khi mặt hàng/số lượng thay đổi
+  useEffect(() => {
+    if (!isOpen || orderItems.length === 0) {
+      setPromoDiscount(0);
+      setAppliedPromoId(null);
+      setAppliedPromoLabels([]);
+      setGiftItems([]);
+      return;
+    }
+
+    const validItems = orderItems.filter((i) => i.quantity > 0);
+    if (validItems.length === 0) {
+      setPromoDiscount(0);
+      setAppliedPromoId(null);
+      setAppliedPromoLabels([]);
+      setGiftItems([]);
+      return;
+    }
+
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      promotionApi
+        .evaluateCart({
+          items: validItems.map((i) => ({
+            productId: i.product.id,
+            productName: i.product.name,
+            unitPrice: i.unitPrice,
+            quantity: i.quantity,
+          })),
+          subTotal: totalMerchandiseAmount,
+          branchId: branchId && !branchId.startsWith('BR-') ? branchId : undefined,
+          customerId: selectedCustomerId && selectedCustomerId !== 'kh_retail' ? selectedCustomerId : undefined,
+        })
+        .then((res) => {
+          if (cancelled || !res) return;
+          setPromoDiscount(Math.max(0, Math.round(res.totalDiscountAmount || 0)));
+          setAppliedPromoId(res.appliedPromotionId || null);
+          setAppliedPromoLabels((res.appliedPromotions || []).filter((p) => !p.startsWith('Voucher [')));
+          setGiftItems(res.giftItems || []);
+        })
+        .catch(() => {});
+    }, 300);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [isOpen, orderItems, totalMerchandiseAmount, branchId, selectedCustomerId]);
+
+  // Tự động đồng bộ tiền cọc tối thiểu khi số lượng, mặt hàng hoặc khuyến mãi thay đổi
   useEffect(() => {
     if (totalAmount > 0) {
       const calculatedMin = Math.round(totalAmount * 0.10);
-      setDepositAmount((prev) => (prev < calculatedMin || prev === 0 ? calculatedMin : prev));
+      setDepositAmount((prev) => {
+        if (prev > totalAmount) return totalAmount;
+        if (prev < calculatedMin || prev === 0) return calculatedMin;
+        return prev;
+      });
     } else {
       setDepositAmount(0);
     }
@@ -220,16 +289,27 @@ export const CreatePreOrderModal: React.FC<Props> = ({
       return;
     }
 
-    // Kiểm tra số lượng từng mặt hàng theo đơn vị tính
+    // Kiểm tra số lượng từng mặt hàng và tổng tồn kho quy đổi theo từng sản phẩm
+    const productBaseQtyMap = new Map<string, { totalBaseQty: number; name: string; quantityOnHand: number; baseUnit: string }>();
     for (const item of orderItems) {
-      const maxAvailable = Math.floor(item.product.quantityOnHand / item.conversionRate);
       if (item.quantity <= 0) {
         alert(`Sản phẩm "${item.product.name}" (${item.unitName}) có số lượng không hợp lệ (phải > 0). Vui lòng nhập lại số lượng!`);
         return;
       }
-      if (item.quantity > maxAvailable) {
+      const existing = productBaseQtyMap.get(item.product.id) || {
+        totalBaseQty: 0,
+        name: item.product.name,
+        quantityOnHand: item.product.quantityOnHand,
+        baseUnit: item.product.baseUnit || 'sản phẩm',
+      };
+      existing.totalBaseQty += item.quantity * (item.conversionRate || 1);
+      productBaseQtyMap.set(item.product.id, existing);
+    }
+
+    for (const [, info] of productBaseQtyMap) {
+      if (info.totalBaseQty > info.quantityOnHand) {
         alert(
-          `Sản phẩm "${item.product.name}" (${item.unitName}) có số lượng (${item.quantity}) vượt quá tồn kho khả dụng (${maxAvailable} ${item.unitName})! Vui lòng giảm số lượng.`
+          `Tổng số lượng quy đổi của sản phẩm "${info.name}" (${info.totalBaseQty} ${info.baseUnit}) vượt quá tồn kho khả dụng (${info.quantityOnHand} ${info.baseUnit})! Vui lòng giảm số lượng.`
         );
         return;
       }
@@ -253,22 +333,41 @@ export const CreatePreOrderModal: React.FC<Props> = ({
 
     try {
       setIsSubmitting(true);
+      const paidPayloadItems = orderItems.map((i) => ({
+        productId: i.product.id,
+        productName: i.product.name,
+        quantity: i.quantity,
+        unitPrice: i.unitPrice,
+        unitId: i.unitId,
+        unitName: i.unitName,
+        conversionRate: i.conversionRate || 1,
+        isGift: false,
+      }));
+      const giftPayloadItems = giftItems
+        .filter((g) => g.productId && g.productId !== '00000000-0000-0000-0000-000000000000' && g.quantity > 0)
+        .map((g) => ({
+          productId: g.productId,
+          productName: g.productName,
+          quantity: g.quantity,
+          unitPrice: 0,
+          unitName: g.unitName || 'Cái',
+          conversionRate: 1,
+          isGift: true,
+          promotionId: g.promotionId || appliedPromoId,
+        }));
+
       await onConfirm({
         customerId: selectedCustomerId || '01a185f3-d197-72c1-b6e7-cdb5d5363467',
         customerName: customerName.trim() || 'Khách lẻ',
         customerPhone: customerPhone.trim(),
         expectedPickupDate: expectedDate,
-        items: orderItems.map((i) => ({
-          productId: i.product.id,
-          productName: i.product.name,
-          quantity: i.quantity,
-          unitPrice: i.unitPrice,
-          unitId: i.unitId,
-          unitName: i.unitName,
-        })),
+        items: [...paidPayloadItems, ...giftPayloadItems],
         depositAmount,
         paymentMethod,
         note,
+        discountAmount: effectivePromoDiscount,
+        appliedPromotionId: appliedPromoId,
+        appliedPromotionSummary: appliedPromoLabels.length > 0 ? appliedPromoLabels.join('; ') : null,
       });
       onClose();
     } catch (e: any) {
@@ -729,10 +828,45 @@ export const CreatePreOrderModal: React.FC<Props> = ({
             </table>
           </div>
 
-          {/* Tổng tiền & Tiền cọc */}
+          {/* Tổng tiền, Khuyến mãi tự động & Tiền cọc */}
           <div style={{ padding: 12, backgroundColor: '#f8fafc', borderRadius: 6, border: '1px solid #e2e8f0' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 13.5 }}>
-              <span>Tổng giá trị đơn hàng:</span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, fontSize: 13 }}>
+              <span style={{ color: '#475569' }}>Tổng tiền hàng:</span>
+              <b>{totalMerchandiseAmount.toLocaleString('vi-VN')} đ</b>
+            </div>
+
+            {(effectivePromoDiscount > 0 || appliedPromoLabels.length > 0) && (
+              <div style={{ marginBottom: 6, padding: '6px 8px', backgroundColor: '#f0fdfa', border: '1px solid #ccfbf1', borderRadius: 4 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5, color: '#0f766e', fontWeight: 600 }}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                    <Gift size={13} color="#0f766e" /> Khuyến mãi cửa hàng (Tự động):
+                  </span>
+                  <span style={{ color: '#dc2626' }}>-{effectivePromoDiscount.toLocaleString('vi-VN')} đ</span>
+                </div>
+                {appliedPromoLabels.map((lbl, i) => (
+                  <div key={i} style={{ fontSize: 11.5, color: '#115e59', marginTop: 2 }}>
+                    • {lbl}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {giftItems.length > 0 && (
+              <div style={{ marginBottom: 8, padding: '6px 8px', backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 4 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: '#15803d', marginBottom: 2, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                  <Gift size={13} color="#15803d" /> Quà tặng giữ kho kèm đơn (0 đ):
+                </div>
+                {giftItems.map((g, idx) => (
+                  <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, color: '#166534' }}>
+                    <span>✦ {g.productName} (x{g.quantity}{g.unitName ? ` ${g.unitName}` : ''})</span>
+                    <b>0 đ</b>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 13.5, paddingTop: 4, borderTop: '1px dashed #e2e8f0' }}>
+              <span><b>Tổng giá trị đơn hàng (sau KM):</b></span>
               <b style={{ color: '#0f766e', fontSize: 15 }}>{totalAmount.toLocaleString('vi-VN')} đ</b>
             </div>
 

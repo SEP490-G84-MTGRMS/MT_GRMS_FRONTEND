@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Search,
   ClipboardCheck,
@@ -15,6 +15,7 @@ import {
   LogIn,
   LogOut,
   Camera,
+  Store,
 } from 'lucide-react';
 import type { AttendanceRecord, ApprovalRequest, Branch } from '../types';
 import { scheduleApi, getShiftColor, type ScheduleResponse } from '../api/scheduleApi';
@@ -200,6 +201,7 @@ const mapScheduleToAttendanceRecord = (s: ScheduleResponse): AttendanceRecord =>
 export const AttendancePage: React.FC = () => {
   const { user } = useAuthStore();
   const location = useLocation();
+  const navigate = useNavigate();
   const roleUpper = (user?.role || '').toUpperCase();
   const isEmployeeRole =
     location.pathname.startsWith('/employee') ||
@@ -210,6 +212,9 @@ export const AttendancePage: React.FC = () => {
 
   // Backend data states
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
+  const [todayMySchedules, setTodayMySchedules] = useState<ScheduleResponse[]>([]);
+  const [isSelfCheckingIn, setIsSelfCheckingIn] = useState(false);
+  const [selfCheckInNotice, setSelfCheckInNotice] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
   const [shifts, setShifts] = useState<ShiftRowItem[]>([]);
   const [approvalRequests, setApprovalRequests] = useState<ApprovalRequest[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
@@ -296,12 +301,27 @@ export const AttendancePage: React.FC = () => {
   const [historyModalScheduleId, setHistoryModalScheduleId] = useState<string | null>(null);
   const [historyModalTitle, setHistoryModalTitle] = useState<string>('');
   const [openMenuScheduleId, setOpenMenuScheduleId] = useState<string | null>(null);
+  const [menuPosition, setMenuPosition] = useState<{
+    top?: number;
+    bottom?: number;
+    left?: number;
+    right?: number;
+  } | null>(null);
   const [isFaceIdModalOpen, setIsFaceIdModalOpen] = useState(false);
 
   useEffect(() => {
-    const handleGlobalClick = () => setOpenMenuScheduleId(null);
-    window.addEventListener('click', handleGlobalClick);
-    return () => window.removeEventListener('click', handleGlobalClick);
+    const handleGlobalClose = () => {
+      setOpenMenuScheduleId(null);
+      setMenuPosition(null);
+    };
+    window.addEventListener('click', handleGlobalClose);
+    window.addEventListener('scroll', handleGlobalClose, true);
+    window.addEventListener('resize', handleGlobalClose);
+    return () => {
+      window.removeEventListener('click', handleGlobalClose);
+      window.removeEventListener('scroll', handleGlobalClose, true);
+      window.removeEventListener('resize', handleGlobalClose);
+    };
   }, []);
 
   const handleOpenCreateRequest = (
@@ -365,6 +385,23 @@ export const AttendancePage: React.FC = () => {
         });
 
       const [shiftRes, rawSchedulesData] = await Promise.all([shiftConfigsPromise, schedulesPromise]);
+
+      if (isEmployeeRole) {
+        const now = new Date();
+        const todayIso = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+        if (weekData.fromDateIso <= todayIso && todayIso <= weekData.toDateIso) {
+          setTodayMySchedules(
+            rawSchedulesData.filter((s) => (s.workDate || '').substring(0, 10) === todayIso)
+          );
+        } else {
+          scheduleApi
+            .getRawMySchedules(todayIso, todayIso)
+            .then((list) => setTodayMySchedules(list))
+            .catch(() => {});
+        }
+      } else {
+        setTodayMySchedules([]);
+      }
 
       let rawSchedules = rawSchedulesData;
       if (selectedBranchIds.length > 1) {
@@ -498,17 +535,101 @@ export const AttendancePage: React.FC = () => {
     (r) => r.type === 'attendance' && r.status === 'pending'
   ).length;
 
+  const activeCheckedInToday = useMemo(
+    () =>
+      todayMySchedules.find(
+        (s) => Boolean(s.checkInTime) && !s.checkOutTime && s.status !== 'Cancelled'
+      ) || null,
+    [todayMySchedules]
+  );
+
+  const unCheckedTodaySchedule = useMemo(
+    () =>
+      todayMySchedules.find(
+        (s) =>
+          !s.checkInTime &&
+          !s.checkOutTime &&
+          (s.status === 'Scheduled' || s.status === 'Published')
+      ) || null,
+    [todayMySchedules]
+  );
+
+  const handleSelfCheckIn = async () => {
+    if (!unCheckedTodaySchedule || isSelfCheckingIn) return;
+    setIsSelfCheckingIn(true);
+    setSelfCheckInNotice(null);
+    try {
+      await scheduleApi.selfCheckIn(unCheckedTodaySchedule.id);
+      window.dispatchEvent(new CustomEvent('pos-attendance-updated'));
+      setSelfCheckInNotice({
+        text: `Đã chấm công vào ca "${unCheckedTodaySchedule.shiftName}" thành công! Bạn có thể vào màn hình Bán hàng POS ngay bây giờ.`,
+        type: 'success',
+      });
+      await fetchAttendanceData();
+    } catch (err: any) {
+      const apiMsg =
+        err?.response?.data?.message ||
+        err?.message ||
+        'Không thể chấm công vào ca. Vui lòng thử lại.';
+      setSelfCheckInNotice({ text: apiMsg, type: 'error' });
+    } finally {
+      setIsSelfCheckingIn(false);
+    }
+  };
+
   return (
     <div className="emp-page-container">
       {/* ─── HEADER BAR ─── */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
         <div>
           <h2 className="emp-header-title" style={{ margin: 0 }}>
             <span>Bảng chấm công</span>
           </h2>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          {isEmployeeRole && activeCheckedInToday && (
+            <button
+              type="button"
+              className="emp-btn emp-btn-primary"
+              onClick={() => navigate('/employee/pos')}
+              title="Chuyển sang giao diện Bán hàng POS"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 8,
+                backgroundColor: '#D97706',
+                borderColor: '#D97706',
+                color: '#FFFFFF',
+                fontWeight: 700,
+                boxShadow: '0 2px 8px rgba(217, 119, 6, 0.35)',
+              }}
+            >
+              <Store size={16} />
+              <span>Vào màn hình Bán hàng POS</span>
+            </button>
+          )}
+          {isEmployeeRole && !activeCheckedInToday && unCheckedTodaySchedule && (
+            <button
+              type="button"
+              className="emp-btn emp-btn-primary"
+              onClick={handleSelfCheckIn}
+              disabled={isSelfCheckingIn}
+              title={`Chấm công vào ca: ${unCheckedTodaySchedule.shiftName}`}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                backgroundColor: '#059669',
+                borderColor: '#059669',
+                color: '#FFFFFF',
+                fontWeight: 700,
+              }}
+            >
+              <LogIn size={16} />
+              <span>{isSelfCheckingIn ? 'Đang chấm công...' : 'Chấm công vào ca'}</span>
+            </button>
+          )}
           <button
             type="button"
             className="emp-btn emp-btn-primary"
@@ -538,6 +659,60 @@ export const AttendancePage: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {/* ─── THÔNG BÁO CHẤM CÔNG / TRẠNG THÁI VÀO CA POS ─── */}
+      {isEmployeeRole && (selfCheckInNotice || activeCheckedInToday) && (
+        <div
+          style={{
+            marginBottom: 14,
+            padding: '12px 16px',
+            borderRadius: 10,
+            backgroundColor: selfCheckInNotice?.type === 'error' ? '#FEF2F2' : '#ECFDF5',
+            border: `1px solid ${selfCheckInNotice?.type === 'error' ? '#FECACA' : '#A7F3D0'}`,
+            color: selfCheckInNotice?.type === 'error' ? '#991B1B' : '#065F46',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: 12,
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13.5, fontWeight: 600 }}>
+            {selfCheckInNotice?.type === 'error' ? (
+              <AlertCircle size={18} color="#DC2626" />
+            ) : (
+              <ClipboardCheck size={18} color="#059669" />
+            )}
+            <span>
+              {selfCheckInNotice
+                ? selfCheckInNotice.text
+                : `Đã chấm công vào ca hôm nay (${activeCheckedInToday?.shiftName || 'Ca trực'}) lúc ${formatTime(activeCheckedInToday?.checkInTime) || '--:--'}.`}
+            </span>
+          </div>
+          {activeCheckedInToday && (
+            <button
+              type="button"
+              onClick={() => navigate('/employee/pos')}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '7px 14px',
+                borderRadius: 8,
+                border: 'none',
+                backgroundColor: '#0F766E',
+                color: '#FFFFFF',
+                fontSize: 13,
+                fontWeight: 700,
+                cursor: 'pointer',
+              }}
+            >
+              <Store size={15} />
+              <span>Vào màn hình Bán hàng POS</span>
+            </button>
+          )}
+        </div>
+      )}
 
       {/* ─── TOOLBAR & FILTERS ─── */}
       <div className="emp-header-bar" style={{ flexWrap: 'wrap', gap: 12 }}>
@@ -1064,7 +1239,7 @@ export const AttendancePage: React.FC = () => {
               </tr>
             </thead>
             <tbody>
-              {shifts.map((sh) => (
+              {shifts.map((sh, shiftIndex) => (
                 <tr key={sh.id} style={{ minHeight: 90 }}>
                   {/* Cột thông tin Ca */}
                   <td style={{ verticalAlign: 'top', padding: 12 }}>
@@ -1104,7 +1279,24 @@ export const AttendancePage: React.FC = () => {
                                 <div
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    setOpenMenuScheduleId(isMenuOpen ? null : att.id);
+                                    if (isMenuOpen) {
+                                      setOpenMenuScheduleId(null);
+                                      setMenuPosition(null);
+                                    } else {
+                                      const rect = e.currentTarget.getBoundingClientRect();
+                                      const estimatedMenuHeight = 230;
+                                      const isLastRow = shifts.length > 1 && shiftIndex === shifts.length - 1;
+                                      const openUpward =
+                                        (isLastRow || window.innerHeight - rect.bottom < estimatedMenuHeight + 16) &&
+                                        rect.top > estimatedMenuHeight;
+                                      setMenuPosition({
+                                        top: openUpward ? undefined : rect.bottom + 4,
+                                        bottom: openUpward ? window.innerHeight - rect.top + 4 : undefined,
+                                        left: isRightAligned ? undefined : Math.max(8, rect.left),
+                                        right: isRightAligned ? Math.max(8, window.innerWidth - rect.right) : undefined,
+                                      });
+                                      setOpenMenuScheduleId(att.id);
+                                    }
                                   }}
                                   style={{
                                     background: '#FFFFFF',
@@ -1167,14 +1359,15 @@ export const AttendancePage: React.FC = () => {
                                   </div>
                                 </div>
 
-                                {isMenuOpen && (
+                                {isMenuOpen && menuPosition && (
                                   <div
                                     style={{
-                                      position: 'absolute',
-                                      top: 'calc(100% + 4px)',
-                                      left: isRightAligned ? 'auto' : 0,
-                                      right: isRightAligned ? 0 : 'auto',
-                                      zIndex: 500,
+                                      position: 'fixed',
+                                      top: menuPosition.top,
+                                      bottom: menuPosition.bottom,
+                                      left: menuPosition.left,
+                                      right: menuPosition.right,
+                                      zIndex: 9999,
                                       background: '#FFFFFF',
                                       boxShadow: '0 10px 25px -5px rgba(15, 23, 42, 0.15), 0 8px 10px -6px rgba(15, 23, 42, 0.1)',
                                       borderRadius: 8,
@@ -1534,6 +1727,7 @@ export const AttendancePage: React.FC = () => {
         branchId={(selectedBranchIds.length > 0 ? selectedBranchIds[0] : branches[0]?.id) || ''}
         branchName={branches.find((b) => b.id === (selectedBranchIds.length > 0 ? selectedBranchIds[0] : branches[0]?.id))?.name}
         onSuccess={() => {
+          window.dispatchEvent(new CustomEvent('pos-attendance-updated'));
           fetchAttendanceData();
         }}
       />

@@ -68,7 +68,6 @@ export interface DispatchFilterBarProps {
   keyword?: string;
   onKeywordChange?: (kw: string) => void;
   onResetFilters?: () => void;
-
   /** Số NCC có SL ma trận khác PO — nút cam khi > 0, xanh khi = 0 */
   pendingChangeCount?: number;
   pendingChangeLineCount?: number;
@@ -469,14 +468,14 @@ export const DispatchFilterBar: FC<DispatchFilterBarProps> = ({
 
   const hasActiveFilters = Boolean(
     tokens.code.length ||
-    tokens.name.length ||
-    tokens.product.length ||
-    tokens.branch.length ||
-    queries.code.trim() ||
-    queries.name.trim() ||
-    queries.product.trim() ||
-    queries.branch.trim() ||
-    draftFilters.urgency !== 'all'
+      tokens.name.length ||
+      tokens.product.length ||
+      tokens.branch.length ||
+      queries.code.trim() ||
+      queries.name.trim() ||
+      queries.product.trim() ||
+      queries.branch.trim() ||
+      draftFilters.urgency !== 'all'
   );
 
   const safeCounts: Record<DispatchTabType, number> = {

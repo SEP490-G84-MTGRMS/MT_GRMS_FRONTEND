@@ -20,6 +20,7 @@ export const CategoryModal: React.FC<CategoryModalProps> = ({
   const [name, setName] = useState('');
   const [code, setCode] = useState('');
   const [description, setDescription] = useState('');
+  const [touched, setTouched] = useState<{ name?: boolean; code?: boolean; description?: boolean }>({});
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -29,6 +30,7 @@ export const CategoryModal: React.FC<CategoryModalProps> = ({
       setName(categoryToEdit.name || '');
       setCode(categoryToEdit.code || '');
       setDescription(categoryToEdit.description || '');
+      setTouched({});
       setShowDeleteConfirm(false);
       setErrorMsg('');
       setIsSubmitting(false);
@@ -36,6 +38,7 @@ export const CategoryModal: React.FC<CategoryModalProps> = ({
       setName('');
       setCode('');
       setDescription('');
+      setTouched({});
       setShowDeleteConfirm(false);
       setErrorMsg('');
       setIsSubmitting(false);
@@ -44,10 +47,51 @@ export const CategoryModal: React.FC<CategoryModalProps> = ({
 
   if (!isOpen) return null;
 
+  const trimmedName = name.trim();
+  const nameError =
+    touched.name && !trimmedName
+      ? 'Vui lòng nhập tên nhóm hàng.'
+      : trimmedName.length > 100
+      ? 'Tên nhóm hàng không được vượt quá 100 ký tự.'
+      : '';
+
+  const trimmedCode = code.trim().toUpperCase();
+  const codeError =
+    !categoryToEdit && code !== ''
+      ? trimmedCode.length > 30
+        ? 'Mã nhóm hàng không được vượt quá 30 ký tự.'
+        : /\s/.test(code) || !/^[A-Z0-9_-]+$/.test(trimmedCode)
+        ? 'Mã nhóm hàng chỉ gồm chữ cái không dấu, số, gạch ngang (-) hoặc gạch dưới (_).'
+        : ''
+      : '';
+
+  const descError =
+    description.trim().length > 500
+      ? 'Mô tả nhóm hàng không được vượt quá 500 ký tự.'
+      : '';
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) {
+    setTouched({ name: true, code: true, description: true });
+    if (!trimmedName) {
       setErrorMsg('Vui lòng nhập tên nhóm hàng.');
+      return;
+    }
+    if (trimmedName.length > 100) {
+      setErrorMsg('Tên nhóm hàng không được vượt quá 100 ký tự.');
+      return;
+    }
+
+    if (!categoryToEdit && code !== '') {
+      if (trimmedCode.length > 30 || /\s/.test(code) || !/^[A-Z0-9_-]+$/.test(trimmedCode)) {
+        setErrorMsg('Mã nhóm hàng chỉ gồm chữ cái không dấu, số, gạch ngang/dưới và tối đa 30 ký tự.');
+        return;
+      }
+    }
+
+    const trimmedDesc = description.trim();
+    if (trimmedDesc.length > 500) {
+      setErrorMsg('Mô tả nhóm hàng không được vượt quá 500 ký tự.');
       return;
     }
 
@@ -55,10 +99,10 @@ export const CategoryModal: React.FC<CategoryModalProps> = ({
       setIsSubmitting(true);
       setErrorMsg('');
       await onSave(
-        name.trim(),
+        trimmedName,
         categoryToEdit?.id,
-        code.trim() || undefined,
-        description.trim() || undefined
+        trimmedCode || undefined,
+        trimmedDesc || undefined
       );
       onClose();
     } catch (err: any) {
@@ -139,53 +183,115 @@ export const CategoryModal: React.FC<CategoryModalProps> = ({
               <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                 {/* Tên nhóm hàng */}
                 <div>
-                  <label style={{ display: 'block', marginBottom: 6, fontWeight: 600, fontSize: 13.5, color: '#334155' }}>
-                    Tên nhóm hàng <span style={{ color: '#ef4444' }}>*</span>
-                  </label>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                    <label style={{ fontWeight: 600, fontSize: 13.5, color: '#334155' }}>
+                      Tên nhóm hàng <span style={{ color: '#ef4444' }}>*</span>
+                    </label>
+                    <span style={{ fontSize: 11.5, color: name.length > 100 ? '#dc2626' : '#94a3b8' }}>
+                      {name.length}/100
+                    </span>
+                  </div>
                   <input
                     type="text"
                     className="filter-input"
-                    style={{ padding: '8px 12px', fontSize: 13.5 }}
+                    style={{
+                      padding: '8px 12px',
+                      fontSize: 13.5,
+                      borderColor: nameError ? '#ef4444' : undefined,
+                      boxShadow: nameError ? '0 0 0 2px rgba(239, 68, 68, 0.12)' : undefined,
+                    }}
                     placeholder="Ví dụ: Rau Củ Sạch, Đồ Uống Pha Chế..."
                     value={name}
                     onChange={(e) => {
                       setName(e.target.value);
+                      setTouched((prev) => ({ ...prev, name: true }));
                       setErrorMsg('');
                     }}
+                    onBlur={() => setTouched((prev) => ({ ...prev, name: true }))}
                     autoFocus
-                    required
                   />
+                  {nameError && (
+                    <div style={{ color: '#dc2626', fontSize: 12, marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <AlertCircle size={13} style={{ flexShrink: 0 }} />
+                      <span>{nameError}</span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Mã nhóm hàng (tùy chọn hoặc tự sinh) */}
                 <div>
-                  <label style={{ display: 'block', marginBottom: 6, fontWeight: 600, fontSize: 13.5, color: '#334155' }}>
-                    Mã nhóm hàng {categoryToEdit ? '' : <span style={{ fontSize: 12, color: '#94a3b8', fontWeight: 400 }}>(Tự sinh nếu để trống)</span>}
-                  </label>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                    <label style={{ fontWeight: 600, fontSize: 13.5, color: '#334155' }}>
+                      Mã nhóm hàng {categoryToEdit ? '' : <span style={{ fontSize: 12, color: '#94a3b8', fontWeight: 400 }}>(Tự sinh nếu để trống)</span>}
+                    </label>
+                    {!categoryToEdit && (
+                      <span style={{ fontSize: 11.5, color: code.length > 30 ? '#dc2626' : '#94a3b8' }}>
+                        {code.length}/30
+                      </span>
+                    )}
+                  </div>
                   <input
                     type="text"
                     className="filter-input"
-                    style={{ padding: '8px 12px', fontSize: 13.5, textTransform: 'uppercase' }}
+                    style={{
+                      padding: '8px 12px',
+                      fontSize: 13.5,
+                      textTransform: 'uppercase',
+                      borderColor: codeError ? '#ef4444' : undefined,
+                      boxShadow: codeError ? '0 0 0 2px rgba(239, 68, 68, 0.12)' : undefined,
+                    }}
                     placeholder="Ví dụ: FRESH, BEV, DRY..."
                     value={code}
-                    onChange={(e) => setCode(e.target.value.toUpperCase())}
+                    onChange={(e) => {
+                      setCode(e.target.value.toUpperCase());
+                      setTouched((prev) => ({ ...prev, code: true }));
+                      setErrorMsg('');
+                    }}
+                    onBlur={() => setTouched((prev) => ({ ...prev, code: true }))}
                     disabled={Boolean(categoryToEdit)}
                   />
+                  {codeError && (
+                    <div style={{ color: '#dc2626', fontSize: 12, marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <AlertCircle size={13} style={{ flexShrink: 0 }} />
+                      <span>{codeError}</span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Mô tả nhóm hàng */}
                 <div>
-                  <label style={{ display: 'block', marginBottom: 6, fontWeight: 600, fontSize: 13.5, color: '#334155' }}>
-                    Mô tả
-                  </label>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                    <label style={{ fontWeight: 600, fontSize: 13.5, color: '#334155' }}>
+                      Mô tả
+                    </label>
+                    <span style={{ fontSize: 11.5, color: description.length > 500 ? '#dc2626' : '#94a3b8' }}>
+                      {description.length}/500
+                    </span>
+                  </div>
                   <textarea
                     rows={3}
                     className="filter-input"
-                    style={{ padding: '8px 12px', fontSize: 13, resize: 'vertical' }}
+                    style={{
+                      padding: '8px 12px',
+                      fontSize: 13,
+                      resize: 'vertical',
+                      borderColor: descError ? '#ef4444' : undefined,
+                      boxShadow: descError ? '0 0 0 2px rgba(239, 68, 68, 0.12)' : undefined,
+                    }}
                     placeholder="Ghi chú ngắn về nhóm sản phẩm này..."
                     value={description}
-                    onChange={(e) => setDescription(e.target.value)}
+                    onChange={(e) => {
+                      setDescription(e.target.value);
+                      setTouched((prev) => ({ ...prev, description: true }));
+                      setErrorMsg('');
+                    }}
                   />
+                  {descError && (
+                    <div style={{ color: '#dc2626', fontSize: 12, marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <AlertCircle size={13} style={{ flexShrink: 0 }} />
+                      <span>{descError}</span>
+                    </div>
+                  )}
                 </div>
 
                 {categoryToEdit && (

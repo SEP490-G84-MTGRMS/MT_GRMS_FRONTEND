@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import type { FC } from 'react';
 import {
   ShieldCheck,
@@ -19,12 +19,10 @@ import {
 import { posShiftApi } from '../api/posShiftApi';
 import type { ShiftCashMovementDto } from '../types/posShift.types';
 import { useAuthStore } from '../../../stores/useAuthStore';
-import { AN_NHIEN_BRANCHES } from '../mock/posMockData';
 
 export const StorePosCashControlPage: FC = () => {
   const { user } = useAuthStore();
   const currentTenantId = user?.tenantId || 'tenant_an_nhien_02';
-  const isAnNhienStore = currentTenantId === 'tenant_an_nhien_02';
 
   // Chi nhánh đang chọn
   const [selectedBranchId, setSelectedBranchId] = useState<string>('ALL');
@@ -45,16 +43,33 @@ export const StorePosCashControlPage: FC = () => {
   const [rejectionReason, setRejectionReason] = useState<string>('');
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
 
-  const availableBranches = useMemo(() => {
-    if (isAnNhienStore) {
-      return AN_NHIEN_BRANCHES;
+  useEffect(() => {
+    // Đồng bộ chi nhánh đang chọn từ TopNav
+    const handleGlobalBranchChange = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      const branch = customEvent.detail;
+      if (branch?.id) {
+        setSelectedBranchId(branch.id);
+      }
+    };
+
+    try {
+      const stored = localStorage.getItem('mtgrms_active_branch');
+      if (stored) {
+        const branch = JSON.parse(stored);
+        if (branch?.id) {
+          setSelectedBranchId(branch.id);
+        }
+      }
+    } catch {
+      // fallback
     }
-    return [
-      { id: 'cd5e8d1b-b08b-448d-beff-b85ea5873d52', name: 'Chi nhánh Cầu Giấy (Trung tâm)' },
-      { id: 'BR-02', name: 'Chi nhánh Thanh Xuân' },
-      { id: 'BR-03', name: 'Chi nhánh Quận 1' },
-    ];
-  }, [isAnNhienStore]);
+
+    window.addEventListener('mtgrms:branch-changed', handleGlobalBranchChange);
+    return () => {
+      window.removeEventListener('mtgrms:branch-changed', handleGlobalBranchChange);
+    };
+  }, []);
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
@@ -66,10 +81,8 @@ export const StorePosCashControlPage: FC = () => {
         setShiftTotalLimit(cfg.cashOutShiftTotalLimit ?? 0);
       }
 
-      // 2. Tải danh sách chờ duyệt theo chi nhánh
-      const branchParam = selectedBranchId === 'ALL'
-        ? (availableBranches[0]?.id || '')
-        : selectedBranchId;
+      // 2. Tải danh sách chờ duyệt theo chi nhánh (ALL => không truyền branchId để lấy toàn bộ tenant)
+      const branchParam = selectedBranchId === 'ALL' ? undefined : selectedBranchId;
 
       const summary = await posShiftApi.getPendingMovements(branchParam);
       if (summary?.movements) {
@@ -90,7 +103,7 @@ export const StorePosCashControlPage: FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedBranchId, availableBranches]);
+  }, [selectedBranchId]);
 
   useEffect(() => {
     loadData();
@@ -116,7 +129,7 @@ export const StorePosCashControlPage: FC = () => {
           parsed.cashOutApprovalThreshold = threshold;
           parsed.cashOutShiftTotalLimit = shiftTotalLimit;
           localStorage.setItem(storageKey, JSON.stringify(parsed));
-        } catch {}
+        } catch { }
       }
 
       setSaveMessage('Đã lưu cấu hình hạn mức duyệt chi két thành công!');
@@ -214,33 +227,6 @@ export const StorePosCashControlPage: FC = () => {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          {/* Lọc theo Chi nhánh */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 13, fontWeight: 700, color: '#475569' }}>Chi nhánh:</span>
-            <select
-              value={selectedBranchId}
-              onChange={(e) => setSelectedBranchId(e.target.value)}
-              style={{
-                height: 38,
-                padding: '0 12px',
-                borderRadius: 8,
-                border: '1px solid #cbd5e1',
-                backgroundColor: '#ffffff',
-                fontSize: 13,
-                fontWeight: 600,
-                color: '#1e293b',
-                cursor: 'pointer',
-              }}
-            >
-              <option value="ALL">Toàn bộ chi nhánh</option>
-              {availableBranches.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
           <button
             type="button"
             onClick={loadData}
@@ -536,7 +522,7 @@ export const StorePosCashControlPage: FC = () => {
               ))}
             </div>
             <p style={{ fontSize: 12, color: '#64748b', marginTop: 6, lineHeight: 1.4 }}>
-              💡 Phiếu chi dưới mức này được xuất tiền ngay. Chi bằng hoặc lớn hơn mức này bắt buộc Chủ cửa hàng duyệt.
+              Phiếu chi dưới mức này được xuất tiền ngay. Chi bằng hoặc lớn hơn mức này bắt buộc Chủ cửa hàng duyệt.
             </p>
           </div>
 
@@ -590,7 +576,7 @@ export const StorePosCashControlPage: FC = () => {
               ))}
             </div>
             <p style={{ fontSize: 12, color: '#64748b', marginTop: 6, lineHeight: 1.4 }}>
-              💡 Tổng các khoản chi vặt tích lũy trong ca không được vượt quá mức này. Đặt 0 nếu không giới hạn.
+              Tổng các khoản chi vặt tích lũy trong ca không được vượt quá mức này. Đặt 0 nếu không giới hạn.
             </p>
           </div>
 

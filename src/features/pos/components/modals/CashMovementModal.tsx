@@ -255,7 +255,7 @@ export const CashMovementModal: FC<Props> = ({
                   step={1000}
                   value={amount === 0 ? '' : amount}
                   onChange={(e) => setAmount(Number(e.target.value) || 0)}
-                  className="modal-input font-mono font-bold"
+                  className="modal-input tabular-nums font-bold"
                   style={{ fontSize: 15 }}
                   required
                 />

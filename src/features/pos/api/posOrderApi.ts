@@ -10,6 +10,8 @@ export interface OrderItemCreateDto {
   productName?: string;
   unitId?: string;
   unitName?: string;
+  isGift?: boolean;
+  promotionId?: string | null;
 }
 
 export interface OrderCreateRequest {
@@ -26,6 +28,11 @@ export interface OrderCreateRequest {
   shiftId?: string | null;
   pointsRedeemed?: number | null;
   voucherCode?: string | null;
+  appliedPromotionId?: string | null;
+  appliedPromotionSummary?: string | null;
+  promotionDiscountAmount?: number | null;
+  voucherDiscountAmount?: number | null;
+  pointsDiscountAmount?: number | null;
 }
 
 export interface OrderItemResponse {
@@ -40,6 +47,8 @@ export interface OrderItemResponse {
   actualPrice: number;
   totalLineAmount: number;
   batchCode?: string;
+  isGift?: boolean;
+  promotionId?: string | null;
 }
 
 export interface OrderResponse {
@@ -59,6 +68,14 @@ export interface OrderResponse {
   paymentStatus: string;
   status: string;
   items: OrderItemResponse[];
+  appliedPromotionId?: string | null;
+  appliedPromotionSummary?: string | null;
+  promotionDiscountAmount?: number;
+  appliedVoucherCode?: string | null;
+  voucherDiscountAmount?: number;
+  pointsRedeemed?: number;
+  pointsDiscountAmount?: number;
+  giftStockWarning?: string | null;
 }
 
 export interface PrintOrderResponse {
@@ -69,76 +86,90 @@ export interface PrintOrderResponse {
 export const posOrderApi = {
   /**
    * Lấy danh sách sản phẩm kinh doanh tại chi nhánh từ Backend CSDL (PostgreSQL).
-   * Ưu tiên tải từ /branches/{branchId}/products (chứa RetailPrice, CurrentStock, UnitPrices từ BranchProducts)
-   * và tự động fallback về /products nếu chi nhánh chưa có danh mục riêng.
+   * Yêu cầu nạp từ /branches/{branchId}/products (Status=Active, chứa RetailPrice, CurrentStock, UnitPrices từ BranchProducts).
+   * Không fallback về danh mục chung /products khi đã truyền branchId (REQ-BRANCH-SCOPE-01).
    */
-  getAllProducts: async (branchId?: string): Promise<Product[]> => {
+  getAllProducts: async (branchId?: string, signal?: AbortSignal): Promise<Product[]> => {
     if (branchId) {
-      try {
-        const res = await httpClient.get(`/branches/${branchId}/products`, {
-          params: { PageSize: 500, Status: 'Active' },
-        });
-        const paged = res.data?.data;
-        const items = Array.isArray(paged?.items)
-          ? paged.items
-          : Array.isArray(paged)
-          ? paged
-          : Array.isArray(res.data)
-          ? res.data
-          : [];
+      const res = await httpClient.get(`/branches/${branchId}/products`, {
+        params: { PageSize: 500, Status: 'Active' },
+        signal,
+      });
+      const paged = res.data?.data;
+      const items = Array.isArray(paged?.items)
+        ? paged.items
+        : Array.isArray(paged)
+        ? paged
+        : Array.isArray(res.data)
+        ? res.data
+        : [];
 
-        if (items.length > 0) {
-          return items.map((p: any) => ({
-            id: p.productId || p.id,
-            sku: p.sku || p.productCode || '',
-            barcode: p.barcode || '',
-            name: p.name || p.productName || '',
-            imageUrl: p.imageUrl,
-            spec: '',
-            shelfLocation: p.shelfLocation,
-            category: p.category || 'Bách hóa',
-            baseUnit: p.unit || p.baseUnit || 'Cái',
-            basePrice: p.retailPrice ?? p.basePrice ?? p.sellingPrice ?? 0,
-            costPrice: p.costPrice || 0,
-            quantityOnHand: p.currentStock ?? 100,
-            batchCode: 'LÔ-FEFO',
-            unitPrices: Array.isArray(p.unitPrices)
-              ? p.unitPrices.map((u: any) => ({
-                  unitId: u.unitId,
-                  unitName: u.unitName,
-                  conversionRate: Number(u.conversionRate ?? 1),
-                  price: Number(u.price ?? 0),
-                  isBaseUnit: Boolean(u.isBaseUnit),
-                }))
-              : undefined,
-          }));
-        }
-      } catch (err) {
-        console.warn('Backend branch products load failed, falling back to /products:', err);
-      }
+      return items.map((p: any) => ({
+        id: p.productId || p.id,
+        sku: p.sku || p.productCode || '',
+        barcode: p.barcode || '',
+        name: p.name || p.productName || '',
+        imageUrl: p.imageUrl,
+        spec: '',
+        shelfLocation: p.shelfLocation,
+        category: p.category || 'Bách hóa',
+        baseUnit: p.unit || p.baseUnit || 'Cái',
+        basePrice: p.retailPrice ?? p.basePrice ?? p.sellingPrice ?? 0,
+        costPrice: p.costPrice || 0,
+        quantityOnHand: p.currentStock ?? p.quantityOnHand ?? 0,
+        batchCode: 'LÔ-FEFO',
+        unitPrices: Array.isArray(p.unitPrices)
+          ? p.unitPrices.map((u: any) => ({
+              unitId: u.unitId || u.id,
+              unitName: u.unitName,
+              conversionRate: Number(u.conversionRate ?? 1),
+              price: Number(u.price ?? 0),
+              isBaseUnit: Boolean(u.isBaseUnit),
+            }))
+          : undefined,
+      }));
     }
 
-    const res = await httpClient.get('/products');
-    const rawList = Array.isArray(res.data?.data?.items)
-      ? res.data.data.items
-      : Array.isArray(res.data?.data)
-      ? res.data.data
+    return [];
+  },
+
+  searchBranchProducts: async (branchId: string, searchTerm: string): Promise<Product[]> => {
+    if (!branchId || !searchTerm.trim()) return [];
+    const res = await httpClient.get(`/branches/${branchId}/products`, {
+      params: { SearchTerm: searchTerm.trim(), Status: 'Active', PageSize: 20 },
+    });
+    const paged = res.data?.data;
+    const items = Array.isArray(paged?.items)
+      ? paged.items
+      : Array.isArray(paged)
+      ? paged
       : Array.isArray(res.data)
       ? res.data
       : [];
-    return rawList.map((p: any) => ({
-      id: p.id,
+
+    return items.map((p: any) => ({
+      id: p.productId || p.id,
       sku: p.sku || p.productCode || '',
       barcode: p.barcode || '',
-      name: p.productName || p.name || '',
+      name: p.name || p.productName || '',
       imageUrl: p.imageUrl,
-      spec: p.taxCategory === 'STANDARD_1PCT' ? 'VAT 1%' : '',
-      category: p.categoryName || 'Bách hóa',
-      baseUnit: p.unitName || p.baseUnit || 'Cái',
-      basePrice: p.basePrice || p.sellingPrice || 0,
+      spec: '',
+      shelfLocation: p.shelfLocation,
+      category: p.category || 'Bách hóa',
+      baseUnit: p.unit || p.baseUnit || 'Cái',
+      basePrice: p.retailPrice ?? p.basePrice ?? p.sellingPrice ?? 0,
       costPrice: p.costPrice || 0,
-      quantityOnHand: p.quantityOnHand ?? 100,
+      quantityOnHand: p.currentStock ?? p.quantityOnHand ?? 0,
       batchCode: 'LÔ-FEFO',
+      unitPrices: Array.isArray(p.unitPrices)
+        ? p.unitPrices.map((u: any) => ({
+            unitId: u.unitId || u.id,
+            unitName: u.unitName,
+            conversionRate: Number(u.conversionRate ?? 1),
+            price: Number(u.price ?? 0),
+            isBaseUnit: Boolean(u.isBaseUnit),
+          }))
+        : undefined,
     }));
   },
 
@@ -213,13 +244,16 @@ export const posOrderApi = {
       customer: receiptData.customer?.name || 'Khách lẻ',
       printTime: receiptData.createdAt || new Date().toLocaleString('vi-VN'),
       items: (receiptData.items || []).map((it: any) => ({
-        name: it.name,
+        name: it.isGift ? `[Quà KM] ${it.name}` : it.name,
         qty: it.quantity,
-        price: it.unitPrice,
+        price: it.isGift ? 0 : it.unitPrice,
       })),
       subtotal: receiptData.totalItemAmount || 0,
       discountPercent: 0,
-      discountAmount: (receiptData.orderDiscountAmount || 0) + (receiptData.pointsDiscountAmount || 0),
+      discountAmount:
+        (receiptData.orderDiscountAmount || 0) +
+        (receiptData.voucherDiscountAmount || 0) +
+        (receiptData.pointsDiscountAmount || 0),
       vatPercent: 0,
       vatAmount: 0,
       finalTotal: receiptData.finalAmount || 0,
@@ -319,9 +353,18 @@ export const posOrderApi = {
    * Đổi / Trả hàng chuẩn KiotViet: hoàn kho hàng trả, trừ kho FEFO hàng mới, bù trừ chênh lệch
    */
   returnExchangeOrder: async (orderId: string, data: {
-    returnedItems: Array<{ productId: string; quantity: number; unitPrice: number }>;
-    newItems: Array<{ productId: string; quantity: number; unitPrice: number; discountAmount?: number }>;
+    returnedItems: Array<{
+      productId: string;
+      quantity: number;
+      unitPrice: number;
+      unitName?: string;
+      condition?: 'Restock' | 'Damaged';
+      orderDetailId?: string;
+      isGift?: boolean;
+    }>;
+    newItems: Array<{ productId: string; quantity: number; unitPrice: number; unitName?: string; discountAmount?: number }>;
     settlementMethod: string;
+    reason?: string;
     note?: string;
   }): Promise<any> => {
     const res = await httpClient.post(`/orders/${orderId}/return-exchange`, data);

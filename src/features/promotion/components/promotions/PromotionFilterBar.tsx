@@ -1,12 +1,12 @@
 import type { FC } from 'react';
 import { Search, RotateCw, X } from 'lucide-react';
 import type { PromotionFilterState } from '../../types/promotion.types';
-import { MOCK_BRANCHES } from '../../mock/promotionMockData';
 
 interface PromotionFilterBarProps {
   filter: PromotionFilterState;
   onFilterChange: (newFilter: PromotionFilterState) => void;
   onRefresh: () => void;
+  branches?: string[];
 }
 
 export const PromotionFilterBar: FC<PromotionFilterBarProps> = ({
@@ -61,20 +61,6 @@ export const PromotionFilterBar: FC<PromotionFilterBarProps> = ({
           <option value="UPCOMING">Sắp diễn ra</option>
           <option value="PAUSED">Tạm dừng</option>
           <option value="EXPIRED">Đã kết thúc</option>
-        </select>
-
-        {/* Filter Branch */}
-        <select
-          value={filter.branch}
-          onChange={(e) => onFilterChange({ ...filter, branch: e.target.value })}
-          className="promotion-select"
-        >
-          <option value="ALL">Tất cả chi nhánh</option>
-          {MOCK_BRANCHES.map((b) => (
-            <option key={b} value={b}>
-              {b}
-            </option>
-          ))}
         </select>
 
         <button

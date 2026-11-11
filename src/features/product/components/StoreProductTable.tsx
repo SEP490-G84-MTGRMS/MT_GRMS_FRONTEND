@@ -2,7 +2,8 @@ import { useState, useMemo, useRef, useEffect } from 'react';
 import type { FC } from 'react';
 import type { StoreProductItem } from '../types/storeProduct.types';
 import { SupplierStatusBadge } from '../../supplier/components/SupplierStatusBadge';
-import { ArrowUpDown, ChevronLeft, ChevronRight, Package } from 'lucide-react';
+import { TablePagination } from '../../../components/common';
+import { ArrowUpDown, Package } from 'lucide-react';
 
 interface StoreProductTableProps {
   products: StoreProductItem[];
@@ -146,10 +147,6 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
       return 0;
     });
   }, [products, sortField, sortDir]);
-
-  const totalPages = Math.ceil(totalCount / pageSize) || 1;
-  const startItem = totalCount === 0 ? 0 : (pageIndex - 1) * pageSize + 1;
-  const endItem = Math.min(pageIndex * pageSize, totalCount);
 
   // Synchronize horizontal scrolling between header and body & detect vertical scroll
   const headerRef = useRef<HTMLDivElement>(null);
@@ -621,58 +618,16 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
         </table>
       </div>
 
-      {/* ── Footer Phân trang (Paging) tích hợp đồng bộ theo chuẩn http://localhost:5173/store-owner/suppliers ── */}
-      <div className="so-list-pager">
-        {/* Bên trái: Thông tin số lượng & Chọn số bản ghi / trang */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
-          <div>
-            Hiển thị <b>{startItem}</b> - <b>{endItem}</b> trên <b>{totalCount}</b> sản phẩm
-          </div>
-
-          {onPageSizeChange && (
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ color: '#64748b' }}>Bản ghi/trang:</span>
-              <select
-                className="so-list-pager-select"
-                value={pageSize}
-                onChange={(e) => onPageSizeChange(Number(e.target.value))}
-              >
-                <option value={15}>15</option>
-                <option value={24}>24</option>
-                <option value={36}>36</option>
-                <option value={48}>48</option>
-              </select>
-            </div>
-          )}
-        </div>
-
-        {/* Bên phải: Nút Trước / Trang x / y / Sau */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <button
-            type="button"
-            className="so-list-pager-btn"
-            disabled={pageIndex <= 1}
-            onClick={() => onPageChange(pageIndex - 1)}
-          >
-            <ChevronLeft size={13} />
-            <span>Trước</span>
-          </button>
-
-          <span style={{ padding: '0 8px', fontWeight: 600, color: '#0f172a' }}>
-            Trang {pageIndex} / {totalPages}
-          </span>
-
-          <button
-            type="button"
-            className="so-list-pager-btn"
-            disabled={pageIndex >= totalPages}
-            onClick={() => onPageChange(pageIndex + 1)}
-          >
-            <span>Sau</span>
-            <ChevronRight size={13} />
-          </button>
-        </div>
-      </div>
+      {/* ── Footer Phân trang chuẩn 1, 2, 3... ── */}
+      <TablePagination
+        currentPage={pageIndex}
+        pageSize={pageSize}
+        totalItems={totalCount}
+        pageSizeOptions={[15, 24, 36, 48]}
+        onPageChange={onPageChange}
+        onPageSizeChange={onPageSizeChange}
+        itemLabel="sản phẩm"
+      />
     </div>
   );
 };

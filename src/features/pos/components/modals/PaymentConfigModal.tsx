@@ -15,7 +15,9 @@ import {
   Sparkles,
   Info,
   ArrowRight,
-  Monitor
+  Monitor,
+  Lock,
+  Save,
 } from 'lucide-react';
 import { useAuthStore } from '../../../../stores/useAuthStore';
 
@@ -365,8 +367,8 @@ export const PaymentConfigModal: FC<Props> = ({ isOpen, onClose, onSaveSuccess }
                     {showApiKey ? <EyeOff size={18} /> : <Eye size={18} />}
                   </button>
                 </div>
-                <div style={{ fontSize: 11.5, color: '#64748b', marginTop: 4 }}>
-                  🔒 Được mã hóa AES-256 an toàn. Backend dùng key này để <b>đối soát 2 chiều (Double-Check)</b> chống request ảo.
+                <div style={{ fontSize: 11.5, color: '#64748b', marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <Lock size={12} color="#64748b" /> Được mã hóa AES-256 an toàn. Backend dùng key này để <b>đối soát 2 chiều (Double-Check)</b> chống request ảo.
                 </div>
               </div>
 
@@ -531,7 +533,7 @@ export const PaymentConfigModal: FC<Props> = ({ isOpen, onClose, onSaveSuccess }
                       <div style={{ padding: '4px 6px', color: '#64748b' }}>Tài khoản NH</div>
                       <div style={{ padding: '4px 6px', color: '#64748b' }}>Giao dịch</div>
                       <div style={{ marginTop: 8, padding: '4px 6px', backgroundColor: '#0284c7', color: '#ffffff', borderRadius: 4, fontWeight: 700 }}>
-                        ▶ Tích hợp Web
+                        Tích hợp Web
                       </div>
                       <div style={{ padding: '4px 14px', color: '#38bdf8', fontWeight: 700 }}>
                         • API Key
@@ -579,9 +581,12 @@ export const PaymentConfigModal: FC<Props> = ({ isOpen, onClose, onSaveSuccess }
                               fontSize: 11,
                               fontWeight: 700,
                               cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 3,
                             }}
                           >
-                            📋 Sao chép
+                            <Copy size={11} color="#0284c7" /> Sao chép
                           </button>
                         </div>
                       </div>
@@ -643,7 +648,7 @@ export const PaymentConfigModal: FC<Props> = ({ isOpen, onClose, onSaveSuccess }
                       <div style={{ padding: '4px 6px', color: '#64748b' }}>Tài khoản NH</div>
                       <div style={{ padding: '4px 6px', color: '#64748b' }}>Giao dịch</div>
                       <div style={{ marginTop: 8, padding: '4px 6px', backgroundColor: '#0284c7', color: '#ffffff', borderRadius: 4, fontWeight: 700 }}>
-                        ▶ Tích hợp Web
+                        Tích hợp Web
                       </div>
                       <div style={{ padding: '4px 14px', color: '#94a3b8' }}>
                         • API Key
@@ -759,9 +764,16 @@ export const PaymentConfigModal: FC<Props> = ({ isOpen, onClose, onSaveSuccess }
                 fontWeight: 600,
                 padding: '8px 18px',
                 borderRadius: 6,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
               }}
             >
-              {isSaving ? 'Đang lưu...' : '💾 Lưu Cấu Hình'}
+              {isSaving ? 'Đang lưu...' : (
+                <>
+                  <Save size={15} /> Lưu Cấu Hình
+                </>
+              )}
             </button>
           </div>
         </div>

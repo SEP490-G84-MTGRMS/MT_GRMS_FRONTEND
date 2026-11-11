@@ -55,20 +55,20 @@ export function buildPnlStatementTree(
   const opexChildren: PnlLineItem[] =
     liveCategories.length > 0
       ? liveCategories.map((cat, idx) => {
-          const amt = Number(cat.amount || 0);
-          const letter = String.fromCharCode(97 + idx);
-          return {
-            id: `item-3-2-${idx + 1}`,
-            code: `3.2.${letter}`,
-            title: cat.category || `Khoản mục chi phí ${idx + 1}`,
-            level: 3 as const,
-            amount: amt,
-            percentageOfNetRevenue: calculateMarginPct(amt, rev),
-            isNegative: true,
-          };
-        })
+        const amt = Number(cat.amount || 0);
+        const letter = String.fromCharCode(97 + idx);
+        return {
+          id: `item-3-2-${idx + 1}`,
+          code: `3.2.${letter}`,
+          title: cat.category || `Khoản mục chi phí ${idx + 1}`,
+          level: 3 as const,
+          amount: amt,
+          percentageOfNetRevenue: calculateMarginPct(amt, rev),
+          isNegative: true,
+        };
+      })
       : kpi.operatingExpenses > 0
-      ? [
+        ? [
           {
             id: 'item-3-2-1',
             code: '3.2.a',
@@ -79,7 +79,7 @@ export function buildPnlStatementTree(
             isNegative: true,
           },
         ]
-      : [];
+        : [];
 
   return [
     {
@@ -422,8 +422,8 @@ export const reportsPnlService = {
             Number(s.averageOrderValue ?? 0) > 0
               ? Number(s.averageOrderValue)
               : totalOrders > 0
-              ? Math.round(netRevenue / totalOrders)
-              : 0;
+                ? Math.round(netRevenue / totalOrders)
+                : 0;
 
           // Tăng trưởng thật từ backend comparison endpoint
           const comp = compRes?.data?.data;
@@ -458,29 +458,29 @@ export const reportsPnlService = {
           const rawCogsComp = s.cogsComparison;
           const cogsComparison: CogsValuationComparison = rawCogsComp
             ? {
-                weightedAverageCogs: Number(rawCogsComp.weightedAverageCogs ?? cogs),
-                fefoSpecificCogs: Number(rawCogsComp.fefoSpecificCogs ?? cogs),
-                cogsVariance: Number(rawCogsComp.cogsVariance ?? 0),
-                weightedAverageGrossProfit: Number(rawCogsComp.weightedAverageGrossProfit ?? grossProfit),
-                fefoSpecificGrossProfit: Number(rawCogsComp.fefoSpecificGrossProfit ?? grossProfit),
-                weightedAverageGrossMarginPct: Number(rawCogsComp.weightedAverageGrossMarginPct ?? grossMarginPct),
-                fefoSpecificGrossMarginPct: Number(rawCogsComp.fefoSpecificGrossMarginPct ?? grossMarginPct),
-                weightedAverageNetProfit: Number(rawCogsComp.weightedAverageNetProfit ?? netProfit),
-                fefoSpecificNetProfit: Number(rawCogsComp.fefoSpecificNetProfit ?? netProfit),
-                appliedTaxMethod: rawCogsComp.appliedTaxMethod || 'WEIGHTED_AVERAGE_TT152',
-              }
+              weightedAverageCogs: Number(rawCogsComp.weightedAverageCogs ?? cogs),
+              fefoSpecificCogs: Number(rawCogsComp.fefoSpecificCogs ?? cogs),
+              cogsVariance: Number(rawCogsComp.cogsVariance ?? 0),
+              weightedAverageGrossProfit: Number(rawCogsComp.weightedAverageGrossProfit ?? grossProfit),
+              fefoSpecificGrossProfit: Number(rawCogsComp.fefoSpecificGrossProfit ?? grossProfit),
+              weightedAverageGrossMarginPct: Number(rawCogsComp.weightedAverageGrossMarginPct ?? grossMarginPct),
+              fefoSpecificGrossMarginPct: Number(rawCogsComp.fefoSpecificGrossMarginPct ?? grossMarginPct),
+              weightedAverageNetProfit: Number(rawCogsComp.weightedAverageNetProfit ?? netProfit),
+              fefoSpecificNetProfit: Number(rawCogsComp.fefoSpecificNetProfit ?? netProfit),
+              appliedTaxMethod: rawCogsComp.appliedTaxMethod || 'WEIGHTED_AVERAGE_TT152',
+            }
             : {
-                weightedAverageCogs: cogs,
-                fefoSpecificCogs: cogs,
-                cogsVariance: 0,
-                weightedAverageGrossProfit: grossProfit,
-                fefoSpecificGrossProfit: grossProfit,
-                weightedAverageGrossMarginPct: grossMarginPct,
-                fefoSpecificGrossMarginPct: grossMarginPct,
-                weightedAverageNetProfit: netProfit,
-                fefoSpecificNetProfit: netProfit,
-                appliedTaxMethod: 'WEIGHTED_AVERAGE_TT152',
-              };
+              weightedAverageCogs: cogs,
+              fefoSpecificCogs: cogs,
+              cogsVariance: 0,
+              weightedAverageGrossProfit: grossProfit,
+              fefoSpecificGrossProfit: grossProfit,
+              weightedAverageGrossMarginPct: grossMarginPct,
+              fefoSpecificGrossMarginPct: grossMarginPct,
+              weightedAverageNetProfit: netProfit,
+              fefoSpecificNetProfit: netProfit,
+              appliedTaxMethod: 'WEIGHTED_AVERAGE_TT152',
+            };
 
           const liveKpiSummary: KpiSummaryData = {
             grossSales,

@@ -11,7 +11,6 @@ import { VoucherBatchTable } from '../components/vouchers/VoucherBatchTable';
 import { VoucherBatchModal } from '../components/vouchers/VoucherBatchModal';
 import { GenerateCodesModal } from '../components/vouchers/GenerateCodesModal';
 import { promotionApi, type VoucherBatchDto } from '../api/promotionApi';
-import { INITIAL_VOUCHER_BATCHES } from '../mock/promotionMockData';
 import type {
   VoucherBatchItem,
   VoucherFilterState,
@@ -20,7 +19,7 @@ import type {
 import '../promotion.css';
 
 export const VoucherListPage: FC = () => {
-  const [batches, setBatches] = useState<VoucherBatchItem[]>(INITIAL_VOUCHER_BATCHES);
+  const [batches, setBatches] = useState<VoucherBatchItem[]>([]);
   const [filter, setFilter] = useState<VoucherFilterState>({
     searchTerm: '',
     discountType: 'ALL',
@@ -45,6 +44,12 @@ export const VoucherListPage: FC = () => {
     status: dto.status,
     prefix: dto.prefix,
     description: dto.description || '',
+    allowWithPromotions:
+      dto.allowWithPromotions !== undefined
+        ? dto.allowWithPromotions
+        : dto.description
+        ? !dto.description.includes('"allowWithPromotions":false')
+        : true,
     codes: [],
   }), []);
 
@@ -54,11 +59,11 @@ export const VoucherListPage: FC = () => {
         searchTerm: filter.searchTerm || undefined,
         status: filter.status !== 'ALL' ? filter.status : undefined,
       });
-      if (res?.items && res.items.length > 0) {
+      if (res?.items) {
         setBatches(res.items.map(mapDtoToBatch));
       }
-    } catch {
-      // Keep initial mock batches
+    } catch (err) {
+      console.warn('Lỗi tải danh sách voucher từ CSDL:', err);
     }
   }, [filter.searchTerm, filter.status, mapDtoToBatch]);
 
@@ -154,8 +159,10 @@ export const VoucherListPage: FC = () => {
           endDate: savedBatch.endDate || new Date().toISOString(),
           prefix: savedBatch.prefix,
           description: savedBatch.description,
+          allowWithPromotions: savedBatch.allowWithPromotions,
         });
       }
+      await loadBatches();
     } catch {
       // Ignored for optimistic UI
     }
@@ -177,6 +184,7 @@ export const VoucherListPage: FC = () => {
     try {
       const target = batches.find((b) => b.id === batchId);
       await promotionApi.generateVoucherCodes(batchId, additionalCodes.length, target?.prefix);
+      await loadBatches();
     } catch {
       // Ignored for optimistic UI
     }
@@ -276,9 +284,9 @@ export const VoucherListPage: FC = () => {
           </select>
 
           <button
-            onClick={() => setBatches(INITIAL_VOUCHER_BATCHES)}
+            onClick={loadBatches}
             className="btn-secondary-pill"
-            title="Tải lại dữ liệu"
+            title="Tải lại dữ liệu từ CSDL"
           >
             <RotateCw className="w-3.5 h-3.5" />
             <span>Làm mới</span>

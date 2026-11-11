@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { FC } from 'react';
-import { Receipt, Printer, X, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
+import { Receipt, Printer, X, CheckCircle2, AlertCircle, Loader2, Gift, AlertTriangle } from 'lucide-react';
 import type { ReceiptData } from '../types/pos.types';
 import { posOrderApi } from '../api/posOrderApi';
 
@@ -121,6 +121,14 @@ export const PosReceiptModal: FC<Props> = ({ isOpen, receiptData, onClose }) => 
               </div>
             </div>
 
+            {/* Thông báo thiếu kho quà tặng nếu có */}
+            {receiptData.giftStockWarning && (
+              <div className="mb-2 px-2.5 py-1.5 rounded bg-amber-50 border border-amber-200 text-[11px] text-amber-800 flex items-center gap-1.5">
+                <AlertTriangle size={13} className="shrink-0 text-amber-600" />
+                <span>{receiptData.giftStockWarning}</span>
+              </div>
+            )}
+
             {/* 3. Danh Sách Mặt Hàng Dạng Bảng Chuẩn Siêu Thị */}
             <div className="text-xs mb-2">
               <table className="w-full border-collapse">
@@ -138,14 +146,24 @@ export const PosReceiptModal: FC<Props> = ({ isOpen, receiptData, onClose }) => 
                     <tr key={idx} className="align-top text-[11.5px]">
                       <td className="py-1.5 text-slate-500 font-mono">{idx + 1}</td>
                       <td className="py-1.5 pr-1 font-medium text-slate-900">
-                        {item.name}
+                        {item.isGift ? (
+                          <div>
+                            <span>{item.name}</span>
+                            <span className="ml-1 inline-flex items-center gap-1 px-1.5 py-0.2 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-semibold">
+                              <Gift size={10} className="text-emerald-600" />
+                              Quà tặng KM
+                            </span>
+                          </div>
+                        ) : (
+                          item.name
+                        )}
                       </td>
                       <td className="py-1.5 text-center text-slate-700 font-mono">{item.quantity}</td>
                       <td className="py-1.5 text-right text-slate-700 font-mono tabular-nums">
-                        {item.unitPrice.toLocaleString('vi-VN')}
+                        {item.isGift ? '0' : item.unitPrice.toLocaleString('vi-VN')}
                       </td>
                       <td className="py-1.5 text-right font-semibold text-slate-900 font-mono tabular-nums">
-                        {item.totalAmount.toLocaleString('vi-VN')}
+                        {item.isGift ? '0' : item.totalAmount.toLocaleString('vi-VN')}
                       </td>
                     </tr>
                   ))}
@@ -167,17 +185,47 @@ export const PosReceiptModal: FC<Props> = ({ isOpen, receiptData, onClose }) => 
 
             {/* 4. Tổng Kết Tiền Hàng & Thanh Toán (Hoàn Toàn Không Có VAT) */}
             <div className="space-y-1.5 text-xs py-2 border-b border-dashed border-slate-300">
-              {receiptData.orderDiscountAmount > 0 && (
+              {Boolean(receiptData.itemDiscountAmount && receiptData.itemDiscountAmount > 0) && (
                 <div className="flex justify-between items-center text-rose-600">
-                  <span>Tiền chiết khấu:</span>
+                  <span>Chiết khấu hàng hóa:</span>
                   <span className="font-mono tabular-nums font-semibold">
-                    - {receiptData.orderDiscountAmount.toLocaleString('vi-VN')} đ
+                    - {receiptData.itemDiscountAmount?.toLocaleString('vi-VN')} đ
+                  </span>
+                </div>
+              )}
+              {(receiptData.orderDiscountAmount > 0 || Boolean(receiptData.appliedPromotionSummary)) && (
+                <div>
+                  {receiptData.orderDiscountAmount > 0 && (
+                    <div className="flex justify-between items-center text-rose-600">
+                      <span>Khuyến mãi đơn hàng:</span>
+                      <span className="font-mono tabular-nums font-semibold">
+                        - {receiptData.orderDiscountAmount.toLocaleString('vi-VN')} đ
+                      </span>
+                    </div>
+                  )}
+                  {receiptData.appliedPromotionSummary && (
+                    <div className="text-[11px] text-teal-700 font-medium flex items-center gap-1">
+                      <Gift size={11} className="text-teal-700" />
+                      <span>CTKM: {receiptData.appliedPromotionSummary}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+              {(Boolean(receiptData.voucherDiscountAmount && receiptData.voucherDiscountAmount > 0) || Boolean(receiptData.appliedVoucherCode)) && (
+                <div className="flex justify-between items-center text-indigo-700">
+                  <span>
+                    Mã Voucher{receiptData.appliedVoucherCode ? ` (${receiptData.appliedVoucherCode})` : ''}:
+                  </span>
+                  <span className="font-mono tabular-nums font-semibold">
+                    - {(receiptData.voucherDiscountAmount || 0).toLocaleString('vi-VN')} đ
                   </span>
                 </div>
               )}
               {receiptData.pointsDiscountAmount > 0 && (
                 <div className="flex justify-between items-center text-emerald-600">
-                  <span>Dùng điểm tích lũy:</span>
+                  <span>
+                    Dùng điểm tích lũy{receiptData.pointsRedeemed ? ` (${receiptData.pointsRedeemed} điểm)` : ''}:
+                  </span>
                   <span className="font-mono tabular-nums font-semibold">
                     - {receiptData.pointsDiscountAmount.toLocaleString('vi-VN')} đ
                   </span>
@@ -246,31 +294,40 @@ export const PosReceiptModal: FC<Props> = ({ isOpen, receiptData, onClose }) => 
             </div>
 
             {/* 5. Khối Thông Tin Khách Hàng (Chuẩn Hóa Ở Chân Bill) */}
-            <div className="py-2.5 border-b border-dashed border-slate-300 text-xs">
-              <div className="font-bold text-center text-slate-800 uppercase tracking-wide mb-1.5">
-                THÔNG TIN KHÁCH HÀNG
+            {receiptData.customer &&
+             receiptData.customer.name.trim().toLowerCase() !== 'khách lẻ' &&
+             receiptData.customer.name.trim().toLowerCase() !== 'khách hàng lẻ' ? (
+              <div className="py-2.5 border-b border-dashed border-slate-300 text-xs">
+                <div className="font-bold text-center text-slate-800 uppercase tracking-wide mb-1.5">
+                  THÔNG TIN KHÁCH HÀNG
+                </div>
+                <div className="space-y-1 text-slate-700">
+                  <div className="flex items-start">
+                    <span className="w-28 shrink-0 text-slate-500">Tên khách hàng:</span>
+                    <span className="font-medium text-slate-900">{receiptData.customer.name}</span>
+                  </div>
+                  <div className="flex items-start">
+                    <span className="w-28 shrink-0 text-slate-500">Địa chỉ:</span>
+                    <span className="text-slate-800">{receiptData.customer.address || '---'}</span>
+                  </div>
+                  <div className="flex items-start">
+                    <span className="w-28 shrink-0 text-slate-500">Số điện thoại:</span>
+                    <span className="font-mono text-slate-800">{receiptData.customer.phone || '---'}</span>
+                  </div>
+                  <div className="flex items-start">
+                    <span className="w-28 shrink-0 text-slate-500">Tổng điểm tích lũy:</span>
+                    <span className="font-mono font-semibold text-teal-700">
+                      {receiptData.customer.loyaltyPoints ?? 0} điểm
+                    </span>
+                  </div>
+                </div>
               </div>
-              <div className="space-y-1 text-slate-700">
-                <div className="flex items-start">
-                  <span className="w-28 shrink-0 text-slate-500">Tên khách hàng:</span>
-                  <span className="font-medium text-slate-900">{receiptData.customer?.name || 'Khách hàng lẻ'}</span>
-                </div>
-                <div className="flex items-start">
-                  <span className="w-28 shrink-0 text-slate-500">Địa chỉ:</span>
-                  <span className="text-slate-800">{receiptData.customer?.address || '---'}</span>
-                </div>
-                <div className="flex items-start">
-                  <span className="w-28 shrink-0 text-slate-500">Số điện thoại:</span>
-                  <span className="font-mono text-slate-800">{receiptData.customer?.phone || '---'}</span>
-                </div>
-                <div className="flex items-start">
-                  <span className="w-28 shrink-0 text-slate-500">Tổng điểm tích lũy:</span>
-                  <span className="font-mono font-semibold text-teal-700">
-                    {receiptData.customer?.loyaltyPoints ?? (receiptData.earnedPoints || 0)} điểm
-                  </span>
-                </div>
+            ) : (
+              <div className="py-2 border-b border-dashed border-slate-300 text-xs flex justify-between items-center text-slate-700">
+                <span className="text-slate-500">Khách hàng:</span>
+                <span className="font-medium text-slate-800">Khách hàng lẻ (Không tích điểm)</span>
               </div>
-            </div>
+            )}
 
             {/* 6. Chân Hóa Đơn Chuẩn Siêu Thị */}
             <div className="text-center text-xs mt-3">

@@ -40,26 +40,40 @@ export const RegisterPage: FC = () => {
   const passwordStrength = useMemo(() => {
     if (!password)
       return { score: 0, text: "", color: "transparent", width: "0%" };
+
+    if (password.length < 6) {
+      return {
+        score: 1,
+        text: "Yếu (tối thiểu 6 ký tự)",
+        color: "var(--red-accent)",
+        width: "25%",
+      };
+    }
+
     let score = 0;
+    if (password.length >= 6) score += 1;
     if (password.length >= 8) score += 1;
-    if (/[A-Z]/.test(password)) score += 1;
+    if (/[A-Z]/.test(password) && /[a-z]/.test(password)) score += 1;
+    else if (/[A-Za-z]/.test(password)) score += 0.5;
     if (/[0-9]/.test(password)) score += 1;
     if (/[^A-Za-z0-9]/.test(password)) score += 1;
 
-    if (score <= 1)
+    if (score < 2.5) {
       return {
         score: 1,
         text: "Yếu",
         color: "var(--red-accent)",
-        width: "25%",
+        width: "35%",
       };
-    if (score === 2)
+    }
+    if (score < 4) {
       return {
         score: 2,
         text: "Trung bình",
         color: "var(--orange-accent)",
-        width: "60%",
+        width: "65%",
       };
+    }
     return {
       score: 3,
       text: "Mạnh",
@@ -84,8 +98,8 @@ export const RegisterPage: FC = () => {
       setErrorMessage("Vui lòng nhập số điện thoại liên hệ.");
       return;
     }
-    if (password.length < 8) {
-      setErrorMessage("Mật khẩu bảo mật phải có tối thiểu 8 ký tự.");
+    if (password.length < 6) {
+      setErrorMessage("Mật khẩu bảo mật phải có tối thiểu 6 ký tự.");
       return;
     }
     if (password !== confirmPassword) {
@@ -166,9 +180,9 @@ export const RegisterPage: FC = () => {
             type="button"
             className="auth-cta-primary-btn"
             style={{ maxWidth: "320px" }}
-            onClick={() => navigate("/admin/dashboard")}
+            onClick={() => navigate("/store-owner/dashboard")}
           >
-            <span>Vào trang Quản trị</span>
+            <span>Vào trang Quản trị cửa hàng</span>
             <ArrowRight size={18} strokeWidth={2.2} />
           </button>
         </div>
@@ -299,7 +313,7 @@ export const RegisterPage: FC = () => {
               id="reg-password"
               type={showPassword ? "text" : "password"}
               className="auth-styled-input has-eye-btn"
-              placeholder="Nhập mật khẩu..."
+              placeholder="Nhập mật khẩu (tối thiểu 6 ký tự)..."
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               autoComplete="new-password"

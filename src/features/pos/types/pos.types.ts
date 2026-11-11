@@ -49,6 +49,7 @@ export class CartItemDTO {
   product: ProductDTO = new ProductDTO();
   unit: string = '';
   unitId?: string;
+  conversionRate?: number;
   quantity: number = 1;
   unitPrice: number = 0;
   discountPerItem: number = 0;
@@ -142,6 +143,7 @@ export class ReceiptItemDTO {
   batchCode?: string;
   quantity: number = 1;
   totalAmount: number = 0;
+  isGift?: boolean;
 
   constructor(init?: Partial<ReceiptItemDTO>) {
     Object.assign(this, init);
@@ -181,8 +183,13 @@ export class ReceiptDataDTO {
   customer: ReceiptCustomerDTO | null = null;
   items: ReceiptItemDTO[] = [];
   totalItemAmount: number = 0;
+  itemDiscountAmount?: number = 0;
   orderDiscountAmount: number = 0;
+  voucherDiscountAmount?: number;
+  appliedVoucherCode?: string;
+  appliedPromotionSummary?: string;
   pointsDiscountAmount: number = 0;
+  pointsRedeemed?: number;
   vatAmount: number = 0;
   finalAmount: number = 0;
   finalAmountInWords: string = '';
@@ -192,6 +199,7 @@ export class ReceiptDataDTO {
   debtAmount?: number;
   remainingDebt?: number;
   debtNote?: string;
+  giftStockWarning?: string;
 
   constructor(init?: Partial<ReceiptDataDTO>) {
     Object.assign(this, init);

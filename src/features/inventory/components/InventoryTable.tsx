@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, FC } from 'react';
-import { ArrowUpDown, Boxes, ChevronLeft, ChevronRight, Hourglass } from 'lucide-react';
+import { ArrowUpDown, Boxes, Hourglass } from 'lucide-react';
 import type { InventoryItem } from '../types/inventory.types';
+import { TablePagination } from '../../../components/common';
+import '../../../styles/so-list-page.css';
 
 interface Props {
   items: InventoryItem[];
@@ -19,9 +21,9 @@ type SortDirection = 'asc' | 'desc';
 const fmt = (n: number) => new Intl.NumberFormat('vi-VN').format(n);
 
 const statusBadge = (status: InventoryItem['status']) => {
-  if (status === 'Out') return { label: 'Hết hàng', bg: '#fce8e6', color: '#c5221f' };
-  if (status === 'Low') return { label: 'Sắp hết', bg: '#feefc3', color: '#b06000' };
-  return { label: 'Đủ hàng', bg: '#e6f4ea', color: '#137333' };
+  if (status === 'Out') return { label: 'Hết hàng', bg: '#fef2f2', color: '#b91c1c', border: '#fecaca' };
+  if (status === 'Low') return { label: 'Sắp hết', bg: '#fffbeb', color: '#b45309', border: '#fde68a' };
+  return { label: 'Đủ hàng', bg: '#f0fdf4', color: '#15803d', border: '#bbf7d0' };
 };
 
 const COL_WIDTHS: CSSProperties[] = [
@@ -134,9 +136,7 @@ export const InventoryTable: FC<Props> = ({
     });
   }, [items, sortField, sortDir]);
 
-  const totalPages = Math.ceil(totalCount / pageSize) || 1;
   const startItem = totalCount === 0 ? 0 : (pageIndex - 1) * pageSize + 1;
-  const endItem = Math.min(pageIndex * pageSize, totalCount);
 
   const headerRef = useRef<HTMLDivElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
@@ -206,33 +206,13 @@ export const InventoryTable: FC<Props> = ({
   };
 
   return (
-    <div
-      style={{
-        backgroundColor: '#ffffff',
-        borderRadius: 8,
-        border: '1px solid #e2e8f0',
-        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
-        overflow: 'hidden',
-        display: 'flex',
-        flexDirection: 'column',
-        flex: 1,
-        minHeight: 0,
-        width: '100%',
-      }}
-    >
+    <div className="so-list-table-card">
       <div
         ref={headerRef}
-        style={{
-          width: '100%',
-          overflowX: 'hidden',
-          backgroundColor: '#f8fafc',
-          borderBottom: '1px solid #cbd5e1',
-          flexShrink: 0,
-          boxSizing: 'border-box',
-          paddingRight: hasScrollY ? 6 : 0,
-        }}
+        className="so-list-table-head"
+        style={{ paddingRight: hasScrollY ? 6 : 0 }}
       >
-        <table style={tableStyle}>
+        <table className="so-list-table" style={tableStyle}>
           {tableColGroup}
           <thead>
             <tr>
@@ -257,17 +237,10 @@ export const InventoryTable: FC<Props> = ({
 
       <div
         ref={bodyRef}
-        className="supplier-table-scroll-container"
+        className="so-list-table-body supplier-table-scroll-container"
         onScroll={handleBodyScroll}
-        style={{
-          overflowY: 'auto',
-          overflowX: 'hidden',
-          width: '100%',
-          flex: '1 1 auto',
-          minHeight: 0,
-        }}
       >
-        <table style={tableStyle}>
+        <table className="so-list-table" style={tableStyle}>
           {tableColGroup}
           <tbody>
             {sortedItems.length > 0 ? (
@@ -363,13 +336,16 @@ export const InventoryTable: FC<Props> = ({
                     <td style={{ ...tdBase, textAlign: 'center' }}>
                       <span
                         style={{
-                          display: 'inline-block',
-                          padding: '2px 8px',
-                          borderRadius: 12,
-                          fontSize: 11,
-                          fontWeight: 700,
-                          background: badge.bg,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          padding: '3px 10px',
+                          borderRadius: 9999,
+                          fontSize: 11.5,
+                          fontWeight: 600,
+                          backgroundColor: badge.bg,
                           color: badge.color,
+                          border: `1px solid ${badge.border}`,
                           whiteSpace: 'nowrap',
                         }}
                       >
@@ -432,105 +408,15 @@ export const InventoryTable: FC<Props> = ({
         </table>
       </div>
 
-      <div
-        style={{
-          padding: '10px 16px',
-          borderTop: '1px solid #e2e8f0',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          fontSize: 12,
-          color: '#64748b',
-          backgroundColor: '#ffffff',
-          flexWrap: 'wrap',
-          gap: 10,
-          flexShrink: 0,
-          zIndex: 15,
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
-          <div>
-            Hiển thị <b>{startItem}</b> - <b>{endItem}</b> trên <b>{totalCount}</b> dòng tồn kho
-          </div>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ color: '#64748b' }}>Bản ghi/trang:</span>
-            <select
-              value={pageSize}
-              onChange={(e) => onPageSizeChange(Number(e.target.value))}
-              style={{
-                height: 28,
-                padding: '0 8px',
-                borderRadius: 5,
-                border: '1px solid #cbd5e1',
-                backgroundColor: '#ffffff',
-                color: '#0f172a',
-                fontSize: 12,
-                fontWeight: 600,
-                cursor: 'pointer',
-                outline: 'none',
-              }}
-            >
-              <option value={10}>10</option>
-              <option value={20}>20</option>
-              <option value={50}>50</option>
-            </select>
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <button
-            type="button"
-            disabled={pageIndex <= 1}
-            onClick={() => onPageChange(pageIndex - 1)}
-            style={{
-              height: 28,
-              padding: '0 8px',
-              borderRadius: 6,
-              border: '1px solid #cbd5e1',
-              backgroundColor: '#ffffff',
-              color: pageIndex <= 1 ? '#94a3b8' : '#334155',
-              cursor: pageIndex <= 1 ? 'not-allowed' : 'pointer',
-              opacity: pageIndex <= 1 ? 0.45 : 1,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 4,
-              fontSize: 12,
-              fontWeight: 600,
-            }}
-          >
-            <ChevronLeft size={13} />
-            <span>Trước</span>
-          </button>
-
-          <span style={{ padding: '0 8px', fontWeight: 600, color: '#0f172a' }}>
-            Trang {pageIndex} / {totalPages}
-          </span>
-
-          <button
-            type="button"
-            disabled={pageIndex >= totalPages}
-            onClick={() => onPageChange(pageIndex + 1)}
-            style={{
-              height: 28,
-              padding: '0 8px',
-              borderRadius: 6,
-              border: '1px solid #cbd5e1',
-              backgroundColor: '#ffffff',
-              color: pageIndex >= totalPages ? '#94a3b8' : '#334155',
-              cursor: pageIndex >= totalPages ? 'not-allowed' : 'pointer',
-              opacity: pageIndex >= totalPages ? 0.45 : 1,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 4,
-              fontSize: 12,
-              fontWeight: 600,
-            }}
-          >
-            <span>Sau</span>
-            <ChevronRight size={13} />
-          </button>
-        </div>
-      </div>
+      <TablePagination
+        currentPage={pageIndex}
+        pageSize={pageSize}
+        totalItems={totalCount}
+        pageSizeOptions={[10, 15, 20, 50]}
+        onPageChange={onPageChange}
+        onPageSizeChange={onPageSizeChange}
+        itemLabel="dòng tồn kho"
+      />
     </div>
   );
 };

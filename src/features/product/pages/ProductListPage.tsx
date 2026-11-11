@@ -145,8 +145,13 @@ export const ProductListPage: React.FC = () => {
   // Dropdown đơn vị tính theo dòng sản phẩm (Ảnh 2 - REQ-07)
   const [selectedUnits, setSelectedUnits] = useState<Record<string, string>>({});
   const [activeUnitDropdownId, setActiveUnitDropdownId] = useState<string | null>(null);
+  const [unitDropdownPos, setUnitDropdownPos] = useState<{
+    top?: number;
+    bottom?: number;
+    left: number;
+  } | null>(null);
 
-  // Đóng popover chọn đơn vị khi click ra ngoài
+  // Đóng popover chọn đơn vị khi click ra ngoài hoặc cuộn trang
   useEffect(() => {
     if (!activeUnitDropdownId) return;
     const handleDocumentClick = (e: MouseEvent) => {
@@ -155,9 +160,16 @@ export const ProductListPage: React.FC = () => {
         setActiveUnitDropdownId(null);
       }
     };
+    const handleScrollOrResize = () => {
+      setActiveUnitDropdownId(null);
+    };
     document.addEventListener('mousedown', handleDocumentClick);
+    window.addEventListener('scroll', handleScrollOrResize, true);
+    window.addEventListener('resize', handleScrollOrResize);
     return () => {
       document.removeEventListener('mousedown', handleDocumentClick);
+      window.removeEventListener('scroll', handleScrollOrResize, true);
+      window.removeEventListener('resize', handleScrollOrResize);
     };
   }, [activeUnitDropdownId]);
 
@@ -207,12 +219,22 @@ export const ProductListPage: React.FC = () => {
         const mapped: ProductItem[] = await Promise.all(
           res.items.map(async (p) => {
             let uomConversions: UomConversion[] = (p as any).uomConversions || [];
+            let isBaseUnitPurchaseUnit: boolean | undefined = p.isBaseUnitPurchaseUnit;
+            let purchaseUnit: string | undefined = p.purchaseUnit ?? undefined;
             if (uomConversions.length === 0 && p.id) {
               const isGuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(p.id);
               if (isGuid) {
                 try {
                   const units = await productApi.getProductUnits(p.id);
                   if (units && units.length > 0) {
+                    const baseRow = units.find((u) => u.isBaseUnit);
+                    const purchaseRow = units.find((u) => Boolean(u.isPurchaseUnit));
+                    if (purchaseRow) {
+                      isBaseUnitPurchaseUnit = Boolean(purchaseRow.isBaseUnit);
+                      purchaseUnit = purchaseRow.unitName;
+                    } else if (baseRow) {
+                      isBaseUnitPurchaseUnit = baseRow.isPurchaseUnit ?? true;
+                    }
                     uomConversions = units
                       .filter((u) => !u.isBaseUnit)
                       .map((u) => ({
@@ -221,6 +243,7 @@ export const ProductListPage: React.FC = () => {
                         conversionRate: u.conversionRate,
                         price: u.price,
                         barcode: u.barcode ?? undefined,
+                        isPurchaseUnit: Boolean(u.isPurchaseUnit),
                       }));
                   }
                 } catch {
@@ -252,6 +275,8 @@ export const ProductListPage: React.FC = () => {
               isFavorite: Boolean(p.isFavorite),
               hasBatches: Boolean(p.hasBatches),
               eligibleForVatReduction: Boolean((p as any).eligibleForVatReduction),
+              isBaseUnitPurchaseUnit,
+              purchaseUnit,
               uomConversions,
             };
           })
@@ -407,6 +432,7 @@ export const ProductListPage: React.FC = () => {
           isFavorite: data.isFavorite ?? productToEdit.isFavorite,
           hasBatches: data.hasBatches !== undefined ? data.hasBatches : Boolean(productToEdit.hasBatches),
           eligibleForVatReduction: data.eligibleForVatReduction ?? productToEdit.eligibleForVatReduction ?? false,
+          isBaseUnitPurchaseUnit: data.isBaseUnitPurchaseUnit,
         });
 
         // 1. Xóa các đơn vị quy đổi đã bị người dùng gỡ bỏ qua DELETE /api/product-units/{id}
@@ -432,6 +458,7 @@ export const ProductListPage: React.FC = () => {
                   price: uom.price,
                   barcode: uom.barcode?.trim() || null,
                   isBaseUnit: false,
+                  isPurchaseUnit: Boolean(uom.isPurchaseUnit),
                 });
               } catch (unitErr) {
                 console.warn('Lỗi khi thêm đơn vị quy đổi:', unitErr);
@@ -445,6 +472,7 @@ export const ProductListPage: React.FC = () => {
                   price: uom.price,
                   barcode: uom.barcode?.trim() || null,
                   isBaseUnit: false,
+                  isPurchaseUnit: Boolean(uom.isPurchaseUnit),
                 });
               } catch (unitErr) {
                 console.warn(`Lỗi khi cập nhật đơn vị quy đổi ${uom.id}:`, unitErr);
@@ -496,6 +524,7 @@ export const ProductListPage: React.FC = () => {
           internalNote: data.internalNote,
           isFavorite: data.isFavorite ?? false,
           hasBatches: data.hasBatches ?? false,
+          isBaseUnitPurchaseUnit: data.isBaseUnitPurchaseUnit ?? true,
         });
 
         // Thêm các đơn vị quy đổi cho sản phẩm vừa tạo qua POST /api/products/{id}/units
@@ -509,6 +538,7 @@ export const ProductListPage: React.FC = () => {
                 price: uom.price || 0,
                 barcode: uom.barcode?.trim() || null,
                 isBaseUnit: false,
+                isPurchaseUnit: Boolean(uom.isPurchaseUnit),
               });
             } catch (unitErr: any) {
               console.warn('Lỗi khi thêm đơn vị quy đổi:', unitErr);
@@ -870,6 +900,7 @@ export const ProductListPage: React.FC = () => {
                       return (
                         <span
                           key={firstCat.id}
+                          title={firstCat.name}
                           style={{
                             display: 'inline-flex',
                             alignItems: 'center',
@@ -882,7 +913,7 @@ export const ProductListPage: React.FC = () => {
                             color: '#0F766E',
                             border: '1px solid #99F6E4',
                             whiteSpace: 'nowrap',
-                            maxWidth: selectedCategoryIds.length > 1 ? 140 : 200,
+                            maxWidth: selectedCategoryIds.length > 1 ? 140 : 180,
                           }}
                         >
                           <span
@@ -892,7 +923,7 @@ export const ProductListPage: React.FC = () => {
                               whiteSpace: 'nowrap',
                             }}
                           >
-                            {firstCat.name}
+                            {firstCat.name.length > 22 ? `${firstCat.name.slice(0, 22)}...` : firstCat.name}
                           </span>
                           <span
                             onClick={(e) => handleRemoveCategoryTag(e, firstCat.id)}
@@ -1114,25 +1145,35 @@ export const ProductListPage: React.FC = () => {
                           }}
                         >
                           <label
+                            title={c.name}
                             style={{
                               display: 'flex',
                               alignItems: 'center',
                               gap: 10,
                               cursor: 'pointer',
                               fontSize: 13,
-                              width: '100%',
+                              flex: 1,
+                              minWidth: 0,
+                              marginRight: 8,
                             }}
                           >
                             <input
                               type="checkbox"
                               checked={isChecked}
                               onChange={() => { }} // Handled at row click
-                              style={{ accentColor: '#0F766E', width: 16, height: 16 }}
+                              style={{ accentColor: '#0F766E', width: 16, height: 16, flexShrink: 0 }}
                             />
-                            <span style={{ fontWeight: isChecked ? 600 : 400, color: isChecked ? '#134E4A' : '#1E293B' }}>
-                              {c.name}
+                            <span
+                              style={{
+                                fontWeight: isChecked ? 600 : 400,
+                                color: isChecked ? '#134E4A' : '#1E293B',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
+                              }}
+                            >
+                              {c.name.length > 26 ? `${c.name.slice(0, 26)}...` : c.name}
                             </span>
-
                           </label>
                           {c.productCount !== undefined && (
                             <span style={{ fontSize: 11, color: '#64748B', fontWeight: 600, flexShrink: 0 }}>
@@ -1458,7 +1499,7 @@ export const ProductListPage: React.FC = () => {
         </div>
 
         {/* Table */}
-        <div style={{ overflowX: 'auto' }}>
+        <div className="product-table-scroll supplier-table-scroll-container">
           <table className="product-main-table">
             <thead>
               <tr>
@@ -1491,7 +1532,7 @@ export const ProductListPage: React.FC = () => {
               </tr>
             </thead>
             <tbody>
-              {filteredProducts.map((p) => {
+              {filteredProducts.map((p, rowIndex) => {
                 const isChecked = selectedProductIds.includes(p.id);
                 const isSelected = selectedProduct?.id === p.id && isDetailModalOpen;
 
@@ -1559,17 +1600,18 @@ export const ProductListPage: React.FC = () => {
                             style={{
                               width: 28,
                               height: 28,
-                              borderRadius: 4,
-                              backgroundColor: '#f1f5f9',
+                              borderRadius: 6,
+                              border: '1px dashed #cbd5e1',
+                              backgroundColor: '#f8fafc',
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
-                              fontSize: 13,
+                              fontSize: 10,
                               color: '#94a3b8',
                               flexShrink: 0,
                             }}
                           >
-                            📦
+                            N/A
                           </div>
                         )}
                         <span className="product-code-link">
@@ -1623,7 +1665,24 @@ export const ProductListPage: React.FC = () => {
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
-                              setActiveUnitDropdownId(activeUnitDropdownId === p.id ? null : p.id);
+                              if (activeUnitDropdownId === p.id) {
+                                setActiveUnitDropdownId(null);
+                                setUnitDropdownPos(null);
+                              } else {
+                                const rect = e.currentTarget.getBoundingClientRect();
+                                const estimatedMenuHeight = Math.max(allUnits.length * 34 + 12, 90);
+                                const isLastRows =
+                                  filteredProducts.length > 1 && rowIndex >= filteredProducts.length - 2;
+                                const openUpward =
+                                  (isLastRows || window.innerHeight - rect.bottom < estimatedMenuHeight + 24) &&
+                                  rect.top > estimatedMenuHeight;
+                                setUnitDropdownPos(
+                                  openUpward
+                                    ? { bottom: window.innerHeight - rect.top + 4, left: rect.left }
+                                    : { top: rect.bottom + 4, left: rect.left }
+                                );
+                                setActiveUnitDropdownId(p.id);
+                              }
                             }}
                             style={{
                               background: '#F0FDFA',
@@ -1651,19 +1710,19 @@ export const ProductListPage: React.FC = () => {
                             />
                           </button>
 
-                          {activeUnitDropdownId === p.id && otherUnits.length > 0 && (
+                          {activeUnitDropdownId === p.id && otherUnits.length > 0 && unitDropdownPos && (
                             <div
                               onClick={(e) => e.stopPropagation()}
                               style={{
-                                position: 'absolute',
-                                top: '100%',
-                                left: 0,
-                                zIndex: 50,
-                                marginTop: 4,
-                                minWidth: 100,
+                                position: 'fixed',
+                                top: unitDropdownPos.top,
+                                bottom: unitDropdownPos.bottom,
+                                left: unitDropdownPos.left,
+                                zIndex: 9999,
+                                minWidth: 110,
                                 background: '#ffffff',
                                 borderRadius: 8,
-                                boxShadow: '0 4px 16px rgba(0, 0, 0, 0.12)',
+                                boxShadow: '0 10px 25px -5px rgba(15, 23, 42, 0.18), 0 8px 10px -6px rgba(15, 23, 42, 0.1)',
                                 border: '1px solid #E2E8F0',
                                 padding: '4px 0',
                               }}
@@ -1731,12 +1790,17 @@ export const ProductListPage: React.FC = () => {
                     <td style={{ textAlign: 'center' }}>
                       <span
                         style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
                           fontSize: 11.5,
-                          fontWeight: 700,
-                          padding: '2px 8px',
+                          fontWeight: 600,
+                          padding: '3px 10px',
                           borderRadius: 9999,
-                          backgroundColor: p.status === 'Active' ? '#CCFBF1' : '#FEE2E2',
-                          color: p.status === 'Active' ? '#0F766E' : '#DC2626',
+                          backgroundColor: p.status === 'Active' ? '#f0fdf4' : '#f8fafc',
+                          color: p.status === 'Active' ? '#15803d' : '#64748b',
+                          border: p.status === 'Active' ? '1px solid #bbf7d0' : '1px solid #e2e8f0',
+                          whiteSpace: 'nowrap',
                         }}
                       >
                         {p.status === 'Active' ? 'Đang bán' : 'Ngừng kinh doanh'}

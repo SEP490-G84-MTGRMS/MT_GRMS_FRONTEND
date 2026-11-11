@@ -296,20 +296,20 @@
 /* ── Content Card & Table ── */
 .promotion-card {
   background: #ffffff;
-  border-radius: 20px;
-  border: 1px solid rgba(15, 118, 110, 0.12);
-  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.04);
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
   overflow: hidden;
   margin-bottom: 24px;
 }
 
 .promotion-card-header {
-  padding: 16px 22px;
+  padding: 12px 16px;
   border-bottom: 1px solid #e2e8f0;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: #fafbfc;
+  background: #ffffff;
 }
 
 .promotion-card-title {
@@ -329,24 +329,29 @@
 
 .promotion-table {
   width: 100%;
-  border-collapse: collapse;
-  font-size: 0.86rem;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 12.5px;
   text-align: left;
 }
 
 .promotion-table th {
   background: #f8fafc;
-  color: #475569;
-  font-weight: 600;
-  padding: 13px 16px;
-  border-bottom: 1px solid #e2e8f0;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 10px 12px;
+  border-bottom: 1px solid #cbd5e1;
   white-space: nowrap;
 }
 
 .promotion-table td {
-  padding: 13px 16px;
+  padding: 8px 12px;
   border-bottom: 1px solid #f1f5f9;
   color: #1e293b;
+  font-size: 12.5px;
   vertical-align: middle;
 }
 

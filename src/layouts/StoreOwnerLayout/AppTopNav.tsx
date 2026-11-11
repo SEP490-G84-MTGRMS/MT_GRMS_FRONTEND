@@ -114,6 +114,11 @@ const NAV_GROUPS: NavGroup[] = [
             badge: "",
           },
           {
+            label: "Nhóm hàng",
+            to: "/store-owner/categories",
+            badge: "",
+          },
+          {
             label: "Sản phẩm theo NCC",
             to: "/store-owner/suppliers/products",
             badge: "",
@@ -315,10 +320,6 @@ const NAV_GROUPS: NavGroup[] = [
             badge: "Mới",
             badgeType: "red",
           },
-          {
-            label: "Khuyến mãi theo khung giờ",
-            to: "/store-owner/promotions?view=flash-sale",
-          },
         ],
       },
       {
@@ -330,10 +331,6 @@ const NAV_GROUPS: NavGroup[] = [
             badge: "Hot",
             badgeType: "blue",
           },
-          {
-            label: "Phát hành mã quà tặng",
-            to: "/store-owner/vouchers?action=create",
-          },
         ],
       },
       {
@@ -344,10 +341,6 @@ const NAV_GROUPS: NavGroup[] = [
             to: "/store-owner/loyalty-config",
             badge: "Xu",
             badgeType: "blue",
-          },
-          {
-            label: "Hạng thành viên & Chiết khấu",
-            to: "/store-owner/loyalty-config?view=tiers",
           },
         ],
       },

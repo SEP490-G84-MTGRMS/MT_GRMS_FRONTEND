@@ -8,8 +8,6 @@ import {
   Truck,
   ShieldCheck,
   CheckCircle,
-  Clock,
-  Ban,
   FileText,
 } from 'lucide-react';
 import type { TransferOrder, TransferStatus } from '../types';
@@ -17,6 +15,7 @@ import { INITIAL_BRANCHES, INITIAL_TRANSFERS } from '../services/mockData';
 import { TransferFilterSidebar } from '../components/TransferFilterSidebar';
 import { ImportTransferExcelModal } from '../components/ImportTransferExcelModal';
 import { TransferDetailModal } from '../components/TransferDetailModal';
+import { TablePagination } from '../../../components/common';
 import { AdminToast, type ToastState } from '../../admin/components';
 import '../transfer.css';
 
@@ -50,6 +49,8 @@ export const TransferListPage: React.FC = () => {
   const [selectedTransfer, setSelectedTransfer] = useState<TransferOrder | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [pageIndex, setPageIndex] = useState<number>(1);
+  const [pageSize, setPageSize] = useState<number>(15);
 
   // Toast
   const [toast, setToast] = useState<ToastState | null>(null);
@@ -122,31 +123,91 @@ export const TransferListPage: React.FC = () => {
   }, [transfers, userRole, currentBranchId, searchCode, fromBranchId, toBranchId, selectedStatuses, recvStatus]);
 
   const totalTransferValue = filteredTransfers.reduce((sum, t) => sum + t.totalAmount, 0);
+  const pagedTransfers = useMemo(() => {
+    const start = (pageIndex - 1) * pageSize;
+    return filteredTransfers.slice(start, start + pageSize);
+  }, [filteredTransfers, pageIndex, pageSize]);
 
   const renderStatus = (status: TransferStatus) => {
     switch (status) {
       case 'Draft':
         return (
-          <span className="transfer-status-text draft">
-            <Clock size={14} /> Phiếu tạm
+          <span
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '3px 10px',
+              borderRadius: 9999,
+              fontSize: 11.5,
+              fontWeight: 600,
+              backgroundColor: '#f8fafc',
+              color: '#64748b',
+              border: '1px solid #e2e8f0',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            Phiếu tạm
           </span>
         );
       case 'In-Transit':
         return (
-          <span className="transfer-status-text transit">
-            <Truck size={14} /> Đang chuyển
+          <span
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '3px 10px',
+              borderRadius: 9999,
+              fontSize: 11.5,
+              fontWeight: 600,
+              backgroundColor: '#eff6ff',
+              color: '#1d4ed8',
+              border: '1px solid #bfdbfe',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            Đang chuyển
           </span>
         );
       case 'Received':
         return (
-          <span className="transfer-status-text received">
-            <CheckCircle size={14} /> Đã nhận
+          <span
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '3px 10px',
+              borderRadius: 9999,
+              fontSize: 11.5,
+              fontWeight: 600,
+              backgroundColor: '#f0fdf4',
+              color: '#15803d',
+              border: '1px solid #bbf7d0',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            Đã nhận
           </span>
         );
       case 'Cancelled':
         return (
-          <span className="transfer-status-text cancelled">
-            <Ban size={14} /> Đã hủy
+          <span
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '3px 10px',
+              borderRadius: 9999,
+              fontSize: 11.5,
+              fontWeight: 600,
+              backgroundColor: '#fef2f2',
+              color: '#dc2626',
+              border: '1px solid #fecaca',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            Đã hủy
           </span>
         );
     }
@@ -306,7 +367,7 @@ export const TransferListPage: React.FC = () => {
             </div>
           </div>
 
-          <div style={{ overflowX: 'auto' }}>
+          <div className="transfer-table-scroll supplier-table-scroll-container">
             <table className="transfer-table">
               <thead>
                 <tr>
@@ -338,7 +399,7 @@ export const TransferListPage: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {filteredTransfers.map((t) => {
+                {pagedTransfers.map((t) => {
                   const isChecked = selectedIds.includes(t.id);
                   const isReceiving = t.status === 'In-Transit';
 
@@ -440,6 +501,19 @@ export const TransferListPage: React.FC = () => {
               </tbody>
             </table>
           </div>
+
+          <TablePagination
+            currentPage={pageIndex}
+            pageSize={pageSize}
+            totalItems={filteredTransfers.length}
+            pageSizeOptions={[10, 15, 20, 50]}
+            onPageChange={(page) => setPageIndex(page)}
+            onPageSizeChange={(size) => {
+              setPageSize(size);
+              setPageIndex(1);
+            }}
+            itemLabel="phiếu chuyển"
+          />
         </div>
       </div>
 

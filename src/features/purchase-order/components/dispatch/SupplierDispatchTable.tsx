@@ -5,11 +5,10 @@ import {
   Send,
   CheckCircle2,
   ArrowUpDown,
-  ChevronLeft,
-  ChevronRight,
   Store,
 } from 'lucide-react';
 import type { SupplierDispatchGroup } from '../../types/po.types';
+import { TablePagination } from '../../../../components/common';
 
 interface SupplierDispatchTableProps {
   suppliers: SupplierDispatchGroup[];
@@ -137,10 +136,6 @@ export const SupplierDispatchTable: FC<SupplierDispatchTableProps> = ({
       return 0;
     });
   }, [suppliers, sortField, sortDir]);
-
-  const totalPages = Math.ceil(totalCount / pageSize) || 1;
-  const startItem = totalCount === 0 ? 0 : (pageIndex - 1) * pageSize + 1;
-  const endItem = Math.min(pageIndex * pageSize, totalCount);
 
   const th = (label: string, field?: SortField, align: 'left' | 'right' = 'left') => (
     <th
@@ -405,47 +400,15 @@ export const SupplierDispatchTable: FC<SupplierDispatchTableProps> = ({
         </table>
       </div>
 
-      <div
-        style={{
-          padding: '10px 16px',
-          borderTop: '1px solid #e2e8f0',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          fontSize: 12,
-          color: '#64748b',
-          gap: 10,
-          flexWrap: 'wrap',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-          <div>
-            Hiển thị <b>{startItem}</b> - <b>{endItem}</b> trên <b>{totalCount}</b> nhà cung cấp
-          </div>
-          {onPageSizeChange && (
-            <select
-              value={pageSize}
-              onChange={(e) => onPageSizeChange(Number(e.target.value))}
-              style={{ height: 28, borderRadius: 5, border: '1px solid #cbd5e1' }}
-            >
-              <option value={10}>10</option>
-              <option value={20}>20</option>
-              <option value={30}>30</option>
-            </select>
-          )}
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <button type="button" disabled={pageIndex <= 1} onClick={() => onPageChange(pageIndex - 1)} className="po-btn po-btn-secondary" style={{ height: 28 }}>
-            <ChevronLeft size={13} /> Trước
-          </button>
-          <span style={{ fontWeight: 600, color: '#0f172a' }}>
-            Trang {pageIndex}/{totalPages}
-          </span>
-          <button type="button" disabled={pageIndex >= totalPages} onClick={() => onPageChange(pageIndex + 1)} className="po-btn po-btn-secondary" style={{ height: 28 }}>
-            Sau <ChevronRight size={13} />
-          </button>
-        </div>
-      </div>
+      <TablePagination
+        currentPage={pageIndex}
+        pageSize={pageSize}
+        totalItems={totalCount}
+        pageSizeOptions={[10, 15, 20, 30]}
+        onPageChange={onPageChange}
+        onPageSizeChange={onPageSizeChange || (() => {})}
+        itemLabel="nhà cung cấp"
+      />
     </div>
   );
 };

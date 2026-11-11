@@ -14,8 +14,10 @@ import {
   X,
   UserCheck,
   AlertTriangle,
-  Building2,
   Eye,
+  BarChart3,
+  Scale,
+  FileText,
 } from 'lucide-react';
 import { posShiftApi } from '../api/posShiftApi';
 import type { ShiftDetailResponse, ConfirmHandoverRequest } from '../types/posShift.types';
@@ -23,11 +25,6 @@ import { employeeApi } from '../../employee/api/employeeApi';
 import { TablePagination } from '../../../components/common';
 import { useAuthStore } from '../../../stores/useAuthStore';
 import '../pos.css';
-
-interface BranchOption {
-  id: string;
-  name: string;
-}
 
 export const PosShiftPage: FC = () => {
   const navigate = useNavigate();
@@ -43,9 +40,6 @@ export const PosShiftPage: FC = () => {
     : isStoreOwner
       ? '/store-owner/employees/schedule'
       : '/pos';
-
-  // Danh sách chi nhánh thực tế từ API
-  const [branches, setBranches] = useState<BranchOption[]>([]);
 
   // Chi nhánh đang chọn (GUID hợp lệ)
   const [selectedBranchId, setSelectedBranchId] = useState<string>(
@@ -72,26 +66,53 @@ export const PosShiftPage: FC = () => {
   const [isSubmittingHandover, setIsSubmittingHandover] = useState<boolean>(false);
   const isOwnerOrAdmin = user?.role === 'STORE_OWNER' || user?.role === 'ADMIN';
 
-  // Tải danh sách chi nhánh thực tế từ CSDL
+  // Tải danh sách chi nhánh thực tế từ CSDL & Đồng bộ với TopNav
   useEffect(() => {
     let isMounted = true;
     employeeApi.getBranches().then((list) => {
       if (!isMounted) return;
       if (list && list.length > 0) {
-        setBranches(list);
-        // Nếu selectedBranchId chưa hợp lệ (rỗng hoặc mock BR-), gán sang branch thật đầu tiên
-        if (!selectedBranchId || selectedBranchId.startsWith('BR-')) {
+        // Khởi tạo từ mtgrms_active_branch nếu là Chủ cửa hàng
+        let initialId = '';
+        try {
+          const stored = localStorage.getItem('mtgrms_active_branch');
+          if (stored) {
+            const b = JSON.parse(stored);
+            if (b?.id && b.id !== 'ALL') {
+              const matched = list.find((item) => item.id === b.id || item.name === b.name);
+              if (matched) initialId = matched.id;
+            }
+          }
+        } catch {
+          // fallback
+        }
+
+        if (!initialId) {
           const match = branchFromUrl
             ? list.find((b) => b.id === branchFromUrl || b.name.includes(branchFromUrl))
             : list.find((b) => b.id === user?.branchId);
-          const initialId = match ? match.id : list[0].id;
-          setSelectedBranchId(initialId);
-          setSearchParams({ branchId: initialId });
+          initialId = match ? match.id : list[0].id;
         }
+
+        setSelectedBranchId(initialId);
+        setSearchParams({ branchId: initialId });
       }
     });
+
+    // Lắng nghe sự kiện đổi chi nhánh từ Taskbar TopNav
+    const handleGlobalBranchChange = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      const branch = customEvent.detail;
+      if (branch?.id && branch.id !== 'ALL') {
+        setSelectedBranchId(branch.id);
+        setSearchParams({ branchId: branch.id });
+      }
+    };
+
+    window.addEventListener('mtgrms:branch-changed', handleGlobalBranchChange);
     return () => {
       isMounted = false;
+      window.removeEventListener('mtgrms:branch-changed', handleGlobalBranchChange);
     };
   }, [branchFromUrl, user?.branchId]);
 
@@ -130,12 +151,6 @@ export const PosShiftPage: FC = () => {
   useEffect(() => {
     fetchShiftHistory();
   }, [fetchShiftHistory]);
-
-  // Cập nhật URL khi chọn chi nhánh
-  const handleBranchChange = (branchId: string) => {
-    setSelectedBranchId(branchId);
-    setSearchParams({ branchId });
-  };
 
   // Tính 4 thẻ KPI tổng hợp từ dữ liệu thực tế
   const kpiMetrics = useMemo(() => {
@@ -270,6 +285,17 @@ export const PosShiftPage: FC = () => {
     );
   };
 
+  const dedupeParticipants = (participants?: any[]) => {
+    if (!participants || participants.length === 0) return [];
+    const seen = new Set<string>();
+    return participants.filter((p) => {
+      const key = (p.userId || p.fullName || p.userName || '').trim();
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  };
+
   return (
     <div className="pos-shift-page-root flex flex-col h-full w-full min-h-0 overflow-hidden bg-[#F7FAFF]">
       {/* ─── 1. HEADER DUY NHẤT ĐỒNG BỘ ─── */}
@@ -313,32 +339,6 @@ export const PosShiftPage: FC = () => {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            {/* Lọc Chi Nhánh */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <Building2 size={16} className="text-slate-500" />
-              <select
-                value={selectedBranchId}
-                onChange={(e) => handleBranchChange(e.target.value)}
-                style={{
-                  height: 36,
-                  padding: '4px 10px',
-                  borderRadius: 6,
-                  border: '1px solid #CBD5E1',
-                  backgroundColor: '#FFFFFF',
-                  color: '#0F766E',
-                  fontWeight: 600,
-                  fontSize: 13,
-                  outline: 'none',
-                }}
-              >
-                {branches.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {b.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
             {/* Nút Làm Mới */}
             <button
               type="button"
@@ -535,13 +535,14 @@ export const PosShiftPage: FC = () => {
                   paginatedShifts.map((s) => {
                     const diff = s.discrepancy ?? 0;
                     const isPendingHandover = s.handoverStatus === 1 || s.handoverStatus === 'PENDING';
-                    const cashierDisplay = s.participants && s.participants.length > 0
-                      ? s.participants.map((p) => p.fullName || p.userName).join(', ')
+                    const uniqueParticipants = dedupeParticipants(s.participants);
+                    const cashierDisplay = uniqueParticipants.length > 0
+                      ? uniqueParticipants.map((p) => p.fullName || p.userName).join(', ')
                       : 'Thu ngân quầy';
 
                     return (
                       <tr key={s.id} style={{ borderBottom: '1px solid #F1F5F9', transition: 'background-color 0.15s' }}>
-                        <td style={{ padding: '12px 14px', fontWeight: 700, color: '#0F172A', fontFamily: 'monospace' }}>
+                        <td style={{ padding: '12px 14px', fontWeight: 700, color: '#0F172A', fontVariantNumeric: 'tabular-nums' }}>
                           {s.shiftCode}
                         </td>
                         <td style={{ padding: '12px 14px', color: '#334155', fontSize: 12 }}>
@@ -549,20 +550,42 @@ export const PosShiftPage: FC = () => {
                           <div><b>Đóng:</b> {s.closedAtUtc ? formatDate(s.closedAtUtc) : <span style={{ color: '#10B981' }}>Đang mở</span>}</div>
                         </td>
                         <td style={{ padding: '12px 14px', color: '#1E293B' }}>
-                          <span title={cashierDisplay} style={{ maxWidth: 160, display: 'inline-block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {cashierDisplay}
-                          </span>
+                          {uniqueParticipants.length > 0 ? (
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, maxWidth: 240 }} title={cashierDisplay}>
+                              {uniqueParticipants.map((p, pIdx) => (
+                                <span
+                                  key={p.id || pIdx}
+                                  style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    backgroundColor: '#F0FDFA',
+                                    border: '1px solid #CCFBF1',
+                                    color: '#0F766E',
+                                    padding: '2px 8px',
+                                    borderRadius: 6,
+                                    fontSize: 12,
+                                    fontWeight: 600,
+                                    whiteSpace: 'nowrap',
+                                  }}
+                                >
+                                  {p.fullName || p.userName}
+                                </span>
+                              ))}
+                            </div>
+                          ) : (
+                            <span style={{ color: '#64748B', fontStyle: 'italic' }}>Thu ngân quầy</span>
+                          )}
                         </td>
-                        <td style={{ padding: '12px 14px', textAlign: 'right', fontFamily: 'monospace', color: '#475569' }}>
+                        <td style={{ padding: '12px 14px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: '#475569' }}>
                           {formatVND(s.openingFloat)}
                         </td>
-                        <td style={{ padding: '12px 14px', textAlign: 'right', fontFamily: 'monospace', color: '#0F766E', fontWeight: 600 }}>
+                        <td style={{ padding: '12px 14px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: '#0F766E', fontWeight: 600 }}>
                           {formatVND(s.expectedCash)}
                         </td>
-                        <td style={{ padding: '12px 14px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 700, color: '#0F172A' }}>
+                        <td style={{ padding: '12px 14px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 700, color: '#0F172A' }}>
                           {s.actualCashCounted !== null && s.actualCashCounted !== undefined ? formatVND(s.actualCashCounted) : '---'}
                         </td>
-                        <td style={{ padding: '12px 14px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 700 }}>
+                        <td style={{ padding: '12px 14px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 700 }}>
                           {diff === 0 ? (
                             <span style={{ color: '#059669' }}>Khớp (0 đ)</span>
                           ) : diff > 0 ? (
@@ -687,10 +710,12 @@ export const PosShiftPage: FC = () => {
                     {formatVND(handoverShift.retainedFloatAmount || handoverShift.actualCashCounted || handoverShift.expectedCash)}
                   </span>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: '#64748B' }}>Người bàn giao:</span>
-                  <span style={{ fontWeight: 600 }}>
-                    {handoverShift.participants?.length ? handoverShift.participants[0].fullName || handoverShift.participants[0].userName : 'Thu ngân'}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ color: '#64748B' }}>Nhân viên ca bàn giao:</span>
+                  <span style={{ fontWeight: 600, textAlign: 'right' }}>
+                    {dedupeParticipants(handoverShift.participants).length
+                      ? dedupeParticipants(handoverShift.participants).map((p) => p.fullName || p.userName).join(', ')
+                      : 'Thu ngân'}
                   </span>
                 </div>
               </div>
@@ -706,8 +731,8 @@ export const PosShiftPage: FC = () => {
                     onChange={() => setHandoverDecision('CONFIRMED')}
                     style={{ accentColor: '#0F766E' }}
                   />
-                  <span style={{ fontWeight: 600, color: '#065F46' }}>
-                    ✓ Khớp tiền: Tôi xác nhận đã nhận đủ số tiền mặt bàn giao trên.
+                  <span style={{ fontWeight: 600, color: '#065F46', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                    <CheckCircle2 size={15} color="#059669" /> Khớp tiền: Tôi xác nhận đã nhận đủ số tiền mặt bàn giao trên.
                   </span>
                 </label>
 
@@ -720,8 +745,8 @@ export const PosShiftPage: FC = () => {
                     onChange={() => setHandoverDecision('DISPUTED')}
                     style={{ accentColor: '#DC2626' }}
                   />
-                  <span style={{ fontWeight: 600, color: '#991B1B' }}>
-                    ✕ Khiếu nại: Số tiền thực tế trong két không khớp / bị sai lệch.
+                  <span style={{ fontWeight: 600, color: '#991B1B', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                    <AlertTriangle size={15} color="#dc2626" /> Khiếu nại: Số tiền thực tế trong két không khớp / bị sai lệch.
                   </span>
                 </label>
               </div>
@@ -844,18 +869,37 @@ export const PosShiftPage: FC = () => {
             <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
               {/* Nhân viên trực ca */}
               <div style={{ background: '#F8FAFC', padding: '10px 14px', borderRadius: 8, border: '1px solid #E2E8F0', fontSize: 12.5 }}>
-                <span style={{ color: '#64748B' }}>Nhân viên trực ca: </span>
-                <b style={{ color: '#0F172A' }}>
-                  {selectedDetailShift.participants?.length
-                    ? selectedDetailShift.participants.map((p) => p.fullName || p.userName).join(', ')
-                    : 'Thu ngân quầy'}
-                </b>
+                <div style={{ color: '#64748B', marginBottom: 4 }}>Nhân viên tham gia trực ca:</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  {dedupeParticipants(selectedDetailShift.participants).length ? (
+                    dedupeParticipants(selectedDetailShift.participants).map((p, idx) => (
+                      <span
+                        key={p.id || idx}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          backgroundColor: '#F0FDFA',
+                          border: '1px solid #CCFBF1',
+                          color: '#0F766E',
+                          padding: '3px 10px',
+                          borderRadius: 6,
+                          fontWeight: 600,
+                          fontSize: 12.5,
+                        }}
+                      >
+                        {p.fullName || p.userName}
+                      </span>
+                    ))
+                  ) : (
+                    <b style={{ color: '#0F172A' }}>Thu ngân quầy</b>
+                  )}
+                </div>
               </div>
 
               {/* Bảng chỉ số đối soát tiền két Z-Report */}
               <div>
-                <div style={{ fontWeight: 700, fontSize: 13.5, color: '#0F172A', marginBottom: 8 }}>
-                  📊 Báo Cáo Kết Toán Tiền Két (Z-Report):
+                <div style={{ fontWeight: 700, fontSize: 13.5, color: '#0F172A', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <BarChart3 size={16} color="#0F766E" /> Báo Cáo Kết Toán Tiền Két (Z-Report):
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
                   <div style={{ background: '#F8FAFC', padding: '8px 12px', borderRadius: 6, border: '1px solid #E2E8F0' }}>
@@ -899,8 +943,8 @@ export const PosShiftPage: FC = () => {
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                  <span style={{ fontWeight: 700, fontSize: 13, color: (selectedDetailShift.discrepancy ?? 0) === 0 ? '#15803D' : '#991B1B' }}>
-                    ⚖️ Kết quả đối soát chênh lệch:
+                  <span style={{ fontWeight: 700, fontSize: 13, color: (selectedDetailShift.discrepancy ?? 0) === 0 ? '#15803D' : '#991B1B', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <Scale size={15} color={(selectedDetailShift.discrepancy ?? 0) === 0 ? '#15803D' : '#991B1B'} /> Kết quả đối soát chênh lệch:
                   </span>
                   <span style={{ fontSize: 15, fontWeight: 800, color: (selectedDetailShift.discrepancy ?? 0) === 0 ? '#15803D' : '#DC2626' }}>
                     {(selectedDetailShift.discrepancy ?? 0) === 0
@@ -927,8 +971,8 @@ export const PosShiftPage: FC = () => {
               {/* Lịch sử phiếu thu/chi trong ca */}
               {selectedDetailShift.cashMovements && selectedDetailShift.cashMovements.length > 0 && (
                 <div>
-                  <div style={{ fontWeight: 700, fontSize: 13, color: '#0F172A', marginBottom: 6 }}>
-                    📑 Lịch Sử Phiếu Thu / Chi Trong Ca ({selectedDetailShift.cashMovements.length}):
+                  <div style={{ fontWeight: 700, fontSize: 13, color: '#0F172A', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <FileText size={15} color="#0F766E" /> Lịch Sử Phiếu Thu / Chi Trong Ca ({selectedDetailShift.cashMovements.length}):
                   </div>
                   <div style={{ border: '1px solid #E2E8F0', borderRadius: 6, overflow: 'hidden' }}>
                     <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse', textAlign: 'left' }}>

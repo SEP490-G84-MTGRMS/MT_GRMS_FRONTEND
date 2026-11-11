@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { FC } from 'react';
+import { AlertTriangle, X } from 'lucide-react';
 import type { CartItem } from '../../types/pos.types';
 
 interface Props {
@@ -36,9 +37,13 @@ export const BelowCostWarningModal: FC<Props> = ({
   return (
     <div className="pos-modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="pos-modal-dialog" style={{ maxWidth: 640 }}>
-        <div className="pos-modal-header" style={{ backgroundColor: '#fff7ed', borderBottomColor: '#fed7aa' }}>
-          <b style={{ color: '#c2410c' }}>⚠ Cảnh Báo Bán Dưới Giá Vốn Tại Quầy POS</b>
-          <button type="button" className="pos-modal-close-btn" onClick={onClose}>✕</button>
+        <div className="pos-modal-header" style={{ backgroundColor: '#fff7ed', borderBottomColor: '#fed7aa', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <b style={{ color: '#c2410c', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <AlertTriangle size={18} color="#ea580c" /> Cảnh Báo Bán Dưới Giá Vốn Tại Quầy POS
+          </b>
+          <button type="button" className="pos-modal-close-btn" onClick={onClose} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <X size={16} />
+          </button>
         </div>
         <div className="pos-modal-body">
           <div

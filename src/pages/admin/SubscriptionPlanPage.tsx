@@ -221,7 +221,7 @@ export const SubscriptionPlanPage: React.FC = () => {
   };
 
   return (
-    <div style={{ width: "100%" }}>
+    <div style={{ width: "100%", display: "flex", flexDirection: "column", flex: 1, minHeight: 0, height: "100%" }}>
       {/* TOAST NOTIFICATION */}
       {toast && (
         <div
@@ -258,7 +258,7 @@ export const SubscriptionPlanPage: React.FC = () => {
       )}
 
       {/* HEADER & BREADCRUMB */}
-      <div style={{ marginBottom: 20 }}>
+      <div style={{ marginBottom: 14, flexShrink: 0 }}>
         <div
           style={{
             fontSize: 12.5,

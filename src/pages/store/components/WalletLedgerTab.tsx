@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import type { WalletTransaction, StoreInfo } from '../storeData';
 import { walletApi } from '../api/walletApi';
+import { TablePagination } from '../../../components/common/TablePagination/TablePagination';
 
 interface WalletLedgerTabProps {
   storeInfo: StoreInfo;
@@ -23,6 +24,8 @@ export const WalletLedgerTab: FC<WalletLedgerTabProps> = ({
   onOpenTopupModal,
 }) => {
   const [filterType, setFilterType] = useState<string>('ALL');
+  const [pageIndex, setPageIndex] = useState<number>(1);
+  const [pageSize, setPageSize] = useState<number>(10);
   const [liveTransactions, setLiveTransactions] = useState<WalletTransaction[]>(transactions);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [balanceStats, setBalanceStats] = useState<{
@@ -96,15 +99,17 @@ export const WalletLedgerTab: FC<WalletLedgerTabProps> = ({
     .reduce((sum, t) => sum + t.amount, 0);
 
   const currentWalletBalance = balanceStats.walletBalance || storeInfo.walletBalance;
+  const pagedList = filteredList.slice((pageIndex - 1) * pageSize, pageIndex * pageSize);
 
   return (
-    <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 24, fontFamily: 'var(--font-sans)' }}>
+    <div style={{ width: '100%', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, gap: 16, fontFamily: 'var(--font-sans)' }}>
       {/* 3 Summary Cards */}
       <div
         style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(3, 1fr)',
-          gap: 20,
+          gap: 16,
+          flexShrink: 0,
         }}
       >
         {/* Card 1: Số dư ví khả dụng */}
@@ -258,104 +263,100 @@ export const WalletLedgerTab: FC<WalletLedgerTabProps> = ({
         </div>
       </div>
 
-      {/* Ledger Table Card */}
-      <div className="profile-card" style={{ border: '1.5px solid #EDF2F9', borderRadius: 20 }}>
-        <div className="profile-card-header" style={{ padding: '18px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <Wallet size={19} color="var(--blue-primary)" />
-            <div className="profile-card-title" style={{ fontSize: 16, fontWeight: 800 }}>
-              Sao kê lịch sử biến động số dư ví
-            </div>
-            {isLoading && <RefreshCw size={14} className="animate-spin text-teal-600" />}
+      {/* Ledger Header + Filter Bar */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <Wallet size={19} color="var(--blue-primary)" />
+          <div className="profile-card-title" style={{ fontSize: 16, fontWeight: 800 }}>
+            Sao kê lịch sử biến động số dư ví
           </div>
-
-          {/* Filter Pills */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Filter size={15} color="#94A3B8" />
-            {[
-              { key: 'ALL', label: 'Tất cả' },
-              { key: 'TOPUP', label: 'Nạp tiền' },
-              { key: 'PURCHASE_PLAN', label: 'Gói dịch vụ' },
-              { key: 'PURCHASE_ADDON', label: 'Tiện ích' },
-            ].map((f) => {
-              const isSelected = filterType === f.key;
-              return (
-                <button
-                  key={f.key}
-                  type="button"
-                  onClick={() => setFilterType(f.key)}
-                  style={{
-                    padding: '5px 12px',
-                    borderRadius: 'var(--radius-pill)',
-                    border: isSelected ? '1.5px solid var(--blue-primary)' : '1px solid #CBD5E1',
-                    backgroundColor: isSelected ? 'var(--blue-light)' : '#FFFFFF',
-                    color: isSelected ? 'var(--blue-primary)' : '#475569',
-                    fontSize: 12,
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    transition: 'all 0.15s ease',
-                  }}
-                >
-                  {f.label}
-                </button>
-              );
-            })}
-          </div>
+          {isLoading && <RefreshCw size={14} className="animate-spin text-teal-600" />}
         </div>
 
-        {/* Transactions Table */}
-        <div style={{ overflowX: 'auto' }}>
-          <table
-            style={{
-              width: '100%',
-              borderCollapse: 'collapse',
-              fontSize: 13,
-              textAlign: 'left',
-            }}
-          >
+        {/* Filter Pills */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <Filter size={15} color="#94A3B8" />
+          {[
+            { key: 'ALL', label: 'Tất cả' },
+            { key: 'TOPUP', label: 'Nạp tiền' },
+            { key: 'PURCHASE_PLAN', label: 'Gói dịch vụ' },
+            { key: 'PURCHASE_ADDON', label: 'Tiện ích' },
+          ].map((f) => {
+            const isSelected = filterType === f.key;
+            return (
+              <button
+                key={f.key}
+                type="button"
+                onClick={() => {
+                  setFilterType(f.key);
+                  setPageIndex(1);
+                }}
+                style={{
+                  padding: '5px 12px',
+                  borderRadius: 'var(--radius-pill)',
+                  border: isSelected ? '1.5px solid var(--blue-primary)' : '1px solid #CBD5E1',
+                  backgroundColor: isSelected ? 'var(--blue-light)' : '#FFFFFF',
+                  color: isSelected ? 'var(--blue-primary)' : '#475569',
+                  fontSize: 12,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                {f.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Ledger Table Card */}
+      <div className="so-list-table-card">
+        <div className="so-list-table-body supplier-table-scroll-container">
+          <table className="so-list-table" style={{ minWidth: 880 }}>
             <thead>
-              <tr style={{ backgroundColor: '#F8FAFC', color: '#64748B', fontWeight: 700, borderBottom: '1px solid #E2E8F0' }}>
-                <th style={{ padding: '12px 16px' }}>Mã giao dịch</th>
-                <th style={{ padding: '12px 16px' }}>Thời gian</th>
-                <th style={{ padding: '12px 16px' }}>Nội dung mô tả</th>
-                <th style={{ padding: '12px 16px', textAlign: 'right' }}>Số tiền biến động</th>
-                <th style={{ padding: '12px 16px', textAlign: 'right' }}>Số dư sau GD</th>
-                <th style={{ padding: '12px 16px', textAlign: 'center' }}>Phương thức</th>
-                <th style={{ padding: '12px 16px', textAlign: 'center' }}>Trạng thái</th>
+              <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #cbd5e1' }}>
+                <th className="so-list-th" style={{ width: 52, textAlign: 'center', position: 'sticky', top: 0, zIndex: 10 }}>#</th>
+                <th className="so-list-th" style={{ width: 170, position: 'sticky', top: 0, zIndex: 10 }}>Mã giao dịch</th>
+                <th className="so-list-th" style={{ width: 160, position: 'sticky', top: 0, zIndex: 10 }}>Thời gian</th>
+                <th className="so-list-th" style={{ position: 'sticky', top: 0, zIndex: 10 }}>Nội dung mô tả</th>
+                <th className="so-list-th" style={{ width: 150, textAlign: 'right', position: 'sticky', top: 0, zIndex: 10 }}>Số tiền biến động</th>
+                <th className="so-list-th" style={{ width: 150, textAlign: 'right', position: 'sticky', top: 0, zIndex: 10 }}>Số dư sau GD</th>
+                <th className="so-list-th" style={{ width: 120, textAlign: 'center', position: 'sticky', top: 0, zIndex: 10 }}>Phương thức</th>
+                <th className="so-list-th" style={{ width: 130, textAlign: 'center', position: 'sticky', top: 0, zIndex: 10 }}>Trạng thái</th>
               </tr>
             </thead>
             <tbody>
-              {filteredList.length === 0 ? (
+              {pagedList.length === 0 ? (
                 <tr>
-                  <td colSpan={7} style={{ padding: '36px 16px', textAlign: 'center', color: '#94A3B8' }}>
+                  <td colSpan={8} style={{ padding: '36px 16px', textAlign: 'center', color: '#94A3B8' }}>
                     Chưa có giao dịch ví nào được ghi nhận.
                   </td>
                 </tr>
               ) : (
-                filteredList.map((tx) => {
+                pagedList.map((tx, index) => {
                   const isPositive = tx.type === 'TOPUP' || tx.type === 'REFUND';
+                  const rowNum = (pageIndex - 1) * pageSize + index + 1;
                   return (
-                    <tr
-                      key={tx.id}
-                      style={{
-                        borderBottom: '1px solid #F1F5F9',
-                      }}
-                    >
-                      <td style={{ padding: '14px 16px', fontFamily: 'var(--font-mono)', fontWeight: 700, color: '#0F172A' }}>
+                    <tr key={tx.id} className="so-list-row">
+                      <td className="so-list-td" style={{ textAlign: 'center', color: '#64748b', fontWeight: 600, fontFamily: 'var(--font-mono)' }}>
+                        {rowNum}
+                      </td>
+                      <td className="so-list-td" style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: '#0F766E' }}>
                         {tx.transactionCode}
                       </td>
-                      <td style={{ padding: '14px 16px', color: '#64748B' }}>
+                      <td className="so-list-td" style={{ color: '#64748B', fontFamily: 'var(--font-mono)' }}>
                         {tx.createdAt}
                       </td>
-                      <td style={{ padding: '14px 16px', color: '#1E293B' }}>
+                      <td className="so-list-td" style={{ color: '#1E293B' }}>
                         {tx.description}
                       </td>
                       <td
+                        className="so-list-td"
                         style={{
-                          padding: '14px 16px',
                           textAlign: 'right',
                           fontFamily: 'var(--font-mono)',
-                          fontWeight: 800,
+                          fontWeight: 700,
                           color: isPositive ? '#15803D' : '#DC2626',
                           fontVariantNumeric: 'tabular-nums',
                         }}
@@ -364,8 +365,8 @@ export const WalletLedgerTab: FC<WalletLedgerTabProps> = ({
                         {new Intl.NumberFormat('vi-VN').format(tx.amount)} đ
                       </td>
                       <td
+                        className="so-list-td"
                         style={{
-                          padding: '14px 16px',
                           textAlign: 'right',
                           fontFamily: 'var(--font-mono)',
                           fontWeight: 700,
@@ -375,31 +376,35 @@ export const WalletLedgerTab: FC<WalletLedgerTabProps> = ({
                       >
                         {new Intl.NumberFormat('vi-VN').format(tx.balanceAfter)} đ
                       </td>
-                      <td style={{ padding: '14px 16px', textAlign: 'center' }}>
+                      <td className="so-list-td" style={{ textAlign: 'center' }}>
                         <span
                           style={{
                             display: 'inline-block',
-                            padding: '3px 10px',
-                            borderRadius: 'var(--radius-pill)',
+                            padding: '2px 10px',
+                            borderRadius: 9999,
                             fontSize: 11.5,
-                            fontWeight: 700,
-                            backgroundColor: tx.paymentMethod === 'VietQR' ? 'var(--blue-light)' : '#F1F5F9',
-                            color: tx.paymentMethod === 'VietQR' ? 'var(--blue-primary)' : '#334155',
+                            fontWeight: 600,
+                            backgroundColor: tx.paymentMethod === 'VietQR' ? '#f0fdfa' : '#f8fafc',
+                            color: tx.paymentMethod === 'VietQR' ? '#0f766e' : '#334155',
+                            border: tx.paymentMethod === 'VietQR' ? '1px solid #ccfbf1' : '1px solid #e2e8f0',
                           }}
                         >
                           {tx.paymentMethod}
                         </span>
                       </td>
-                      <td style={{ padding: '14px 16px', textAlign: 'center' }}>
+                      <td className="so-list-td" style={{ textAlign: 'center' }}>
                         <span
                           style={{
-                            display: 'inline-block',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
                             padding: '3px 10px',
-                            borderRadius: 'var(--radius-pill)',
+                            borderRadius: 9999,
                             fontSize: 11.5,
-                            fontWeight: 700,
-                            backgroundColor: '#F0FDF4',
-                            color: '#15803D',
+                            fontWeight: 600,
+                            backgroundColor: '#f0fdf4',
+                            color: '#15803d',
+                            border: '1px solid #bbf7d0',
                           }}
                         >
                           Thành công
@@ -412,6 +417,20 @@ export const WalletLedgerTab: FC<WalletLedgerTabProps> = ({
             </tbody>
           </table>
         </div>
+
+        <TablePagination
+          currentPage={pageIndex}
+          pageSize={pageSize}
+          totalItems={filteredList.length}
+          pageSizeOptions={[10, 15, 20, 50]}
+          onPageChange={(page) => setPageIndex(page)}
+          onPageSizeChange={(size) => {
+            setPageSize(size);
+            setPageIndex(1);
+          }}
+          itemLabel="giao dịch"
+          isLoading={isLoading}
+        />
       </div>
     </div>
   );

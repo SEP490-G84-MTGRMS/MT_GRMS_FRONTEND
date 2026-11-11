@@ -17,6 +17,7 @@ import { useAuthStore } from '../../stores/useAuthStore';
 import { ApprovalRequestsModal } from '../../features/employee/components/ApprovalRequestsModal';
 import { CreateScheduleRequestModal } from '../../features/employee/components/CreateScheduleRequestModal';
 import { scheduleApprovalApi } from '../../features/employee/api/scheduleApprovalApi';
+import { scheduleApi } from '../../features/employee/api/scheduleApi';
 
 /* ─── Brand Logo SVG ─── */
 const BrandLogo: FC = () => (
@@ -57,9 +58,42 @@ export const AppTopNav: FC = () => {
   const [showApprovalRequestsModal, setShowApprovalRequestsModal] = useState(false);
   const [showCreateRequestModal, setShowCreateRequestModal] = useState(false);
   const [pendingApprovalCount, setPendingApprovalCount] = useState(0);
+  const [hasActiveCheckInToday, setHasActiveCheckInToday] = useState(false);
   const accountMenuRef = useRef<HTMLDivElement | null>(null);
 
   const isOwnerOrAdmin = user?.role === 'STORE_OWNER' || user?.role === 'ADMIN';
+
+  const syncTodayAttendanceStatus = useCallback(() => {
+    if (!user || isOwnerOrAdmin) {
+      setHasActiveCheckInToday(false);
+      return;
+    }
+    const now = new Date();
+    const yyyy = now.getFullYear();
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const dd = String(now.getDate()).padStart(2, '0');
+    const todayIso = `${yyyy}-${mm}-${dd}`;
+    scheduleApi
+      .getRawMySchedules(todayIso, todayIso)
+      .then((list) => {
+        const checkedIn = list.some(
+          (s) => Boolean(s.checkInTime) && !s.checkOutTime && s.status !== 'Cancelled'
+        );
+        setHasActiveCheckInToday(checkedIn);
+      })
+      .catch(() => {
+        // Giữ nguyên trạng thái hiện tại nếu mất mạng tạm thời
+      });
+  }, [user, isOwnerOrAdmin]);
+
+  useEffect(() => {
+    syncTodayAttendanceStatus();
+    const handleAttendanceUpdated = () => syncTodayAttendanceStatus();
+    window.addEventListener('pos-attendance-updated', handleAttendanceUpdated);
+    return () => {
+      window.removeEventListener('pos-attendance-updated', handleAttendanceUpdated);
+    };
+  }, [syncTodayAttendanceStatus, location.pathname]);
 
   const fetchPendingCount = useCallback(() => {
     if (isOwnerOrAdmin) {
@@ -392,6 +426,34 @@ export const AppTopNav: FC = () => {
               <FilePlus size={17} color="currentColor" />
               <span>Làm đơn</span>
             </button>
+
+            {/* 5. Vào màn hình Bán hàng POS (hiển thị ngay khi nhân viên đã chấm công vào ca hôm nay) */}
+            {hasActiveCheckInToday && (
+              <button
+                type="button"
+                onClick={() => navigate('/employee/pos')}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  margin: 'auto 0 auto 8px',
+                  padding: '6px 14px',
+                  borderRadius: 999,
+                  border: '1px solid #FDE68A',
+                  backgroundColor: '#F59E0B',
+                  color: '#FFFFFF',
+                  fontSize: 13,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                  boxShadow: '0 2px 6px rgba(245, 158, 11, 0.35)',
+                }}
+                title="Mở giao diện Bán hàng POS tại quầy"
+              >
+                <Store size={16} />
+                <span>Vào màn hình Bán hàng POS</span>
+              </button>
+            )}
           </div>
 
           {/* Right Section */}

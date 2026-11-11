@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { Camera, X, CheckCircle, AlertTriangle, RefreshCw, LogIn, LogOut, UserCheck, ShieldAlert } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Camera, X, CheckCircle, AlertTriangle, RefreshCw, LogIn, LogOut, UserCheck, ShieldAlert, Store } from 'lucide-react';
 import {
   loadFaceApiModels,
   buildLabeledFaceDescriptors,
@@ -30,6 +31,7 @@ export const FaceIdAttendanceModal: React.FC<FaceIdAttendanceModalProps> = ({
   onSuccess,
 }) => {
   const { user } = useAuthStore();
+  const navigate = useNavigate();
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -46,6 +48,7 @@ export const FaceIdAttendanceModal: React.FC<FaceIdAttendanceModalProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [actionSuccessMsg, setActionSuccessMsg] = useState<string | null>(null);
   const [actionErrorMsg, setActionErrorMsg] = useState<string | null>(null);
+  const [hasCheckedInForPos, setHasCheckedInForPos] = useState(false);
 
   // Dừng camera và giải phóng tài nguyên
   const stopCamera = useCallback(() => {
@@ -286,6 +289,8 @@ export const FaceIdAttendanceModal: React.FC<FaceIdAttendanceModalProps> = ({
 
         const successText = `Điểm danh VÀO CA thành công: ${currentUserData.fullName} (Khoảng cách: ${currentMatch.distance.toFixed(2)})`;
         setActionSuccessMsg(successText);
+        setHasCheckedInForPos(true);
+        window.dispatchEvent(new CustomEvent('pos-attendance-updated'));
         if (onSuccess) onSuccess('in', currentUserData.fullName);
       } else {
         await scheduleApi.checkOutFaceId({
@@ -297,13 +302,13 @@ export const FaceIdAttendanceModal: React.FC<FaceIdAttendanceModalProps> = ({
 
         const successText = `Điểm danh RA CA thành công: ${currentUserData.fullName} (Khoảng cách: ${currentMatch.distance.toFixed(2)})`;
         setActionSuccessMsg(successText);
+        setHasCheckedInForPos(false);
+        window.dispatchEvent(new CustomEvent('pos-attendance-updated'));
         if (onSuccess) onSuccess('out', currentUserData.fullName);
+        setTimeout(() => {
+          onClose();
+        }, 2500);
       }
-
-      // Tự động đóng modal sau 2.5s thành công
-      setTimeout(() => {
-        onClose();
-      }, 2500);
     } catch (err: any) {
       console.error(`Lỗi chấm công ${type}:`, err);
       setActionErrorMsg(err?.response?.data?.message || err?.message || `Chấm công thất bại. Vui lòng thử lại.`);
@@ -691,6 +696,34 @@ export const FaceIdAttendanceModal: React.FC<FaceIdAttendanceModalProps> = ({
           >
             Đóng
           </button>
+
+          {/* NÚT VÀO MÀN HÌNH BÁN HÀNG POS SAU KHI CHẤM CÔNG VÀO CA */}
+          {(hasCheckedInForPos || (Boolean(currentUserData?.checkInTime) && !currentUserData?.checkOutTime)) && (
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                navigate('/employee/pos');
+              }}
+              style={{
+                padding: '10px 20px',
+                borderRadius: 8,
+                border: 'none',
+                backgroundColor: '#D97706',
+                color: '#FFFFFF',
+                fontSize: 13,
+                fontWeight: 700,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                cursor: 'pointer',
+                boxShadow: '0 2px 6px rgba(217, 119, 6, 0.35)',
+              }}
+            >
+              <Store size={16} />
+              <span>Vào màn hình Bán hàng POS</span>
+            </button>
+          )}
 
           {/* NÚT XÁC NHẬN VÀO CA */}
           <button

@@ -13,6 +13,8 @@ import {
   Package,
   ArrowLeftRight,
   DoorOpen,
+  ShoppingCart,
+  Lock,
 } from 'lucide-react';
 import type { OrderTab, Product } from '../types/pos.types';
 import type { ShiftDetailResponse } from '../types/posShift.types';
@@ -40,6 +42,8 @@ interface Props {
   currentShift?: ShiftDetailResponse | null;
   onOpenCashMovement?: () => void;
   onOpenShift?: () => void;
+  ownerShiftMode?: 'attach' | 'shiftless' | null;
+  onOpenOwnerShiftModeModal?: () => void;
 }
 
 export const PosHeader: FC<Props> = ({
@@ -64,11 +68,13 @@ export const PosHeader: FC<Props> = ({
   currentShift,
   onOpenCashMovement,
   onOpenShift,
+  ownerShiftMode,
+  onOpenOwnerShiftModeModal,
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuthStore();
-  const isStoreOwner = user?.role === 'STORE_OWNER';
+  const isStoreOwner = user?.role === 'STORE_OWNER' || user?.role === 'ADMIN';
   const roleLabel = isStoreOwner ? 'Chủ cửa hàng' : 'Nhân viên';
   const rawCashierName = user?.fullName || (isStoreOwner ? 'Trần Văn Chủ' : 'Lê Thị Thu Ngân');
   // Rút gọn phần chú thích chức vụ/cửa hàng trong ngoặc đơn để không làm tràn thanh tiêu đề
@@ -467,6 +473,65 @@ export const PosHeader: FC<Props> = ({
             </div>
           )}
 
+          {/* Badge chế độ bán hàng cho Chủ cửa hàng / Admin */}
+          {isStoreOwner && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              {currentShift ? (
+                ownerShiftMode === 'attach' ? (
+                  <button
+                    type="button"
+                    onClick={onOpenOwnerShiftModeModal}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      padding: '4px 10px',
+                      borderRadius: 8,
+                      backgroundColor: '#f0fdfa',
+                      border: '1.5px solid #0f766e',
+                      color: '#0f766e',
+                      fontSize: 12,
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
+                    }}
+                    title={`Đang bán vào ca ${currentShift.shiftCode} (Bỏ tiền vào ngăn kéo quầy). Bấm để đổi chế độ.`}
+                  >
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                      <ShoppingCart size={13} color="#0f766e" /> Bán vào ca #{currentShift.shiftCode}
+                    </span>
+                    <span style={{ fontSize: 11, textDecoration: 'underline', color: '#0d9488' }}>[Đổi]</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={onOpenOwnerShiftModeModal}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      padding: '4px 10px',
+                      borderRadius: 8,
+                      backgroundColor: '#f8fafc',
+                      border: '1.5px solid #94a3b8',
+                      color: '#334155',
+                      fontSize: 12,
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
+                    }}
+                    title="Đang bán riêng vào Két sắt (Không tính vào ca nhân viên). Bấm để đổi chế độ."
+                  >
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                      <Lock size={13} color="#475569" /> Bán riêng (Két sắt)
+                    </span>
+                    <span style={{ fontSize: 11, textDecoration: 'underline', color: '#64748b' }}>[Đổi]</span>
+                  </button>
+                )
+              ) : null}
+            </div>
+          )}
+
           <div
             className="pos-cashier-badge"
             style={{
@@ -506,8 +571,8 @@ export const PosHeader: FC<Props> = ({
 
             {isMenuOpen && (
               <div className="pos-hamburger-dropdown">
-                {/* Lối tắt quay lại Dashboard cho Chủ Cửa Hàng */}
-                {isStoreOwner && (
+                {/* Lối tắt quay lại Dashboard cho Chủ Cửa Hàng hoặc Nhân Viên */}
+                {isStoreOwner ? (
                   <>
                     <button
                       type="button"
@@ -521,6 +586,24 @@ export const PosHeader: FC<Props> = ({
                       <div className="item-content">
                         <div className="item-title">Về Dashboard Chủ Cửa Hàng</div>
                         <div className="item-desc">Quay lại trang tổng quan bán lẻ & quản trị</div>
+                      </div>
+                    </button>
+                    <div style={{ height: 1, backgroundColor: '#e2e8f0', margin: '4px 0' }} />
+                  </>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      className="pos-dropdown-item"
+                      onClick={() => {
+                        setIsMenuOpen(false);
+                        navigate('/employee/schedule');
+                      }}
+                    >
+                      <ArrowLeft size={16} className="text-teal-700" />
+                      <div className="item-content">
+                        <div className="item-title">Về Dashboard Nhân Viên</div>
+                        <div className="item-desc">Xem lịch làm việc, bảng chấm công & đơn hàng</div>
                       </div>
                     </button>
                     <div style={{ height: 1, backgroundColor: '#e2e8f0', margin: '4px 0' }} />

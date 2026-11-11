@@ -14,7 +14,8 @@ import {
   ShieldCheck,
   Save,
   Monitor,
-  ArrowRight
+  ArrowRight,
+  Lock,
 } from 'lucide-react';
 import { useAuthStore } from '../../../stores/useAuthStore';
 import { VIETNAMESE_BANKS, type StorePaymentConfigData } from '../components/modals/PaymentConfigModal';
@@ -310,8 +311,8 @@ export const StorePaymentConfigPage: FC = () => {
                   {showApiKey ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
               </div>
-              <div style={{ fontSize: 11.5, color: '#64748b', marginTop: 4 }}>
-                🔒 Mã hóa AES-256. Dùng để <b>Double-Check đối soát 2 chiều</b> chống request ảo 100%.
+              <div style={{ fontSize: 11.5, color: '#64748b', marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                <Lock size={12} color="#64748b" /> Mã hóa AES-256. Dùng để <b>Double-Check đối soát 2 chiều</b> chống request ảo 100%.
               </div>
             </div>
 
@@ -391,9 +392,17 @@ export const StorePaymentConfigPage: FC = () => {
                 padding: '10px',
                 borderRadius: 8,
                 marginTop: 6,
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 6,
               }}
             >
-              {isSaving ? 'Đang lưu...' : '💾 Lưu Cấu Hình Ngay'}
+              {isSaving ? 'Đang lưu...' : (
+                <>
+                  <Save size={16} /> Lưu Cấu Hình Ngay
+                </>
+              )}
             </button>
           </div>
         </div>
@@ -476,7 +485,7 @@ export const StorePaymentConfigPage: FC = () => {
                   <div style={{ padding: '4px 6px', color: '#64748b' }}>Tài khoản NH</div>
                   <div style={{ padding: '4px 6px', color: '#64748b' }}>Giao dịch</div>
                   <div style={{ marginTop: 8, padding: '4px 6px', backgroundColor: '#0284c7', color: '#ffffff', borderRadius: 4, fontWeight: 700 }}>
-                    ▶ Tích hợp Web
+                    Tích hợp Web
                   </div>
                   <div style={{ padding: '4px 14px', color: '#38bdf8', fontWeight: 700 }}>
                     • API Key
@@ -523,9 +532,12 @@ export const StorePaymentConfigPage: FC = () => {
                           fontSize: 11.5,
                           fontWeight: 700,
                           cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 3,
                         }}
                       >
-                        📋 Sao chép
+                        <Copy size={11} color="#0284c7" /> Sao chép
                       </button>
                     </div>
                   </div>
@@ -586,7 +598,7 @@ export const StorePaymentConfigPage: FC = () => {
                   <div style={{ padding: '4px 6px', color: '#64748b' }}>Tài khoản NH</div>
                   <div style={{ padding: '4px 6px', color: '#64748b' }}>Giao dịch</div>
                   <div style={{ marginTop: 8, padding: '4px 6px', backgroundColor: '#0284c7', color: '#ffffff', borderRadius: 4, fontWeight: 700 }}>
-                    ▶ Tích hợp Web
+                    Tích hợp Web
                   </div>
                   <div style={{ padding: '4px 14px', color: '#94a3b8' }}>
                     • API Key

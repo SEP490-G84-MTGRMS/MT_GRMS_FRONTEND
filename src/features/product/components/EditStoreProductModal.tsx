@@ -6,7 +6,8 @@ import type {
   EditStoreProductInput,
   StoreProductUnitPrice,
 } from '../types/storeProduct.types';
-import { X, Save, AlertTriangle, Loader2, AlertCircle } from 'lucide-react';
+import { X, Save, AlertTriangle, Loader2, AlertCircle, History } from 'lucide-react';
+import { PriceHistoryModal } from './PriceHistoryModal';
 import '../../supplier/supplier.css';
 
 interface EditStoreProductModalProps {
@@ -96,6 +97,7 @@ export const EditStoreProductModal: FC<EditStoreProductModalProps> = ({
   const [isSaving, setIsSaving] = useState<boolean>(false);
 
   const [showUnsavedConfirm, setShowUnsavedConfirm] = useState<boolean>(false);
+  const [showPriceHistory, setShowPriceHistory] = useState<boolean>(false);
 
   useEffect(() => {
     if (isOpen && product) {
@@ -302,24 +304,46 @@ export const EditStoreProductModal: FC<EditStoreProductModalProps> = ({
                 Chỉnh sửa sản phẩm tại chi nhánh
               </h2>
             </div>
-            <button
-              type="button"
-              id="btnCloseEditProductModalX"
-              onClick={handleRequestClose}
-              disabled={isSaving}
-              className="modal-close"
-              style={{
-                background: 'transparent',
-                border: 'none',
-                cursor: isSaving ? 'not-allowed' : 'pointer',
-                color: '#64748b',
-                padding: 4,
-                borderRadius: 6,
-              }}
-              title="Đóng (Esc)"
-            >
-              <X size={18} />
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <button
+                type="button"
+                onClick={() => setShowPriceHistory(true)}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  fontSize: 12,
+                  color: '#7c3aed',
+                  backgroundColor: '#f5f3ff',
+                  border: '1px solid #ddd6fe',
+                  borderRadius: 6,
+                  padding: '4px 10px',
+                  cursor: 'pointer',
+                  fontWeight: 500,
+                }}
+              >
+                <History size={13} />
+                Lịch sử giá
+              </button>
+              <button
+                type="button"
+                id="btnCloseEditProductModalX"
+                onClick={handleRequestClose}
+                disabled={isSaving}
+                className="modal-close"
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  cursor: isSaving ? 'not-allowed' : 'pointer',
+                  color: '#64748b',
+                  padding: 4,
+                  borderRadius: 6,
+                }}
+                title="Đóng (Esc)"
+              >
+                <X size={18} />
+              </button>
+            </div>
           </div>
 
           <form
@@ -483,6 +507,29 @@ export const EditStoreProductModal: FC<EditStoreProductModalProps> = ({
 
               {fieldErrors.retailPrice && (
                 <div style={{ paddingLeft: 152, fontSize: 12, color: '#ef4444' }}>{fieldErrors.retailPrice}</div>
+              )}
+
+              {product.costPrice && parsedPrice > 0 && parsedPrice < product.costPrice && (
+                <div
+                  style={{
+                    marginLeft: 152,
+                    marginTop: 4,
+                    padding: '8px 12px',
+                    backgroundColor: '#FEF3C7',
+                    border: '1px solid #F59E0B',
+                    borderRadius: 8,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    fontSize: 12,
+                    color: '#92400E',
+                  }}
+                >
+                  <AlertTriangle size={15} color="#D97706" style={{ flexShrink: 0 }} />
+                  <span>
+                    <strong>Cảnh báo giá bán:</strong> Giá bán tại chi nhánh đang thấp hơn giá vốn ({fmt(product.costPrice)} đ). Cần sự xác nhận của Quản lý chi nhánh.
+                  </span>
+                </div>
               )}
 
               <FieldRow label="Số lượng đặt hàng tối thiểu" htmlFor="inputEditMoq">
@@ -686,6 +733,17 @@ export const EditStoreProductModal: FC<EditStoreProductModalProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {showPriceHistory && product && (
+        <PriceHistoryModal
+          isOpen={showPriceHistory}
+          onClose={() => setShowPriceHistory(false)}
+          productId={product.productId}
+          productName={product.name}
+          branchId={product.storeId}
+          branchName={product.storeName}
+        />
       )}
     </>
   );
