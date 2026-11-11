@@ -1,36 +1,23 @@
 import { describe, it, expect } from 'vitest';
+import {
+  validateVietnamesePhone,
+  validateDebtLimit,
+  validateCollectionAmount,
+  sanitizeCustomerText,
+  normalizeDebtLimit,
+  validateSafeCustomerText,
+} from '../utils/customerValidation';
 
-/**
- * Validates Vietnamese mobile phone numbers (10 digits starting with 03, 05, 07, 08, 09).
- * @param phone - Raw phone number string.
- * @returns True if valid Vietnamese phone format, false otherwise.
- */
-export function validateVietnamesePhone(phone: string): boolean {
-  const cleanPhone = phone.trim();
-  const phoneRegex = /^(0[3|5|7|8|9])[0-9]{8}$/;
-  return phoneRegex.test(cleanPhone);
-}
+export {
+  validateVietnamesePhone,
+  validateDebtLimit,
+  validateCollectionAmount,
+  sanitizeCustomerText,
+  normalizeDebtLimit,
+  validateSafeCustomerText,
+};
 
-/**
- * Validates customer debt limit input.
- * @param limit - Debt limit number.
- * @returns True if non-negative, false otherwise.
- */
-export function validateDebtLimit(limit: number): boolean {
-  return Number.isFinite(limit) && limit >= 0;
-}
-
-/**
- * Validates maximum collection amount against outstanding accounts receivable balance.
- * @param amount - Collection amount attempted.
- * @param currentDebt - Current outstanding debt.
- * @returns True if amount is within debt range, false if exceeds.
- */
-export function validateCollectionAmount(amount: number, currentDebt: number): boolean {
-  return amount > 0 && amount <= currentDebt;
-}
-
-describe('Customer CRM Validation Unit Tests', () => {
+describe('Customer CRM Validation & Sanitization Unit Tests', () => {
   describe('validateVietnamesePhone', () => {
     it('should accept valid 10-digit Vietnamese phone numbers', () => {
       expect(validateVietnamesePhone('0912345678')).toBe(true);
@@ -46,15 +33,33 @@ describe('Customer CRM Validation Unit Tests', () => {
     });
   });
 
-  describe('validateDebtLimit', () => {
+  describe('validateDebtLimit & normalizeDebtLimit', () => {
     it('should allow valid positive debt limits and zero', () => {
       expect(validateDebtLimit(0)).toBe(true);
       expect(validateDebtLimit(5000000)).toBe(true);
+      expect(normalizeDebtLimit(5000000)).toBe(5000000);
     });
 
-    it('should reject negative debt limits', () => {
+    it('should reject negative debt limits and clamp them to 0 in normalizeDebtLimit', () => {
       expect(validateDebtLimit(-1)).toBe(false);
       expect(validateDebtLimit(-5000000)).toBe(false);
+      expect(normalizeDebtLimit(-5000000)).toBe(0);
+    });
+  });
+
+  describe('sanitizeCustomerText & validateSafeCustomerText', () => {
+    it('should strip XSS script tags and SQLi payloads from customer names', () => {
+      expect(sanitizeCustomerText("Trần Ánh 🌟 <script>alert(1)</script> ' OR 1=1 --")).toBe(
+        'Trần Ánh 🌟'
+      );
+      expect(sanitizeCustomerText('<script>alert(1)</script>', 'Khách hàng')).toBe('Khách hàng');
+      expect(sanitizeCustomerText('<img src=x onerror=alert(1)>', 'Khách hàng')).toBe('Khách hàng');
+    });
+
+    it('should reject inputs containing HTML tags in validateSafeCustomerText', () => {
+      expect(validateSafeCustomerText('Nguyễn Văn A')).toBe(true);
+      expect(validateSafeCustomerText('<script>alert(1)</script>')).toBe(false);
+      expect(validateSafeCustomerText('Trần Ánh <img src=x>')).toBe(false);
     });
   });
 

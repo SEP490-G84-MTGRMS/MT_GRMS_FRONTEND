@@ -3,6 +3,7 @@ import { AlertCircle } from 'lucide-react';
 import { TablePagination } from '../../../components/common';
 import type { CustomerDto } from '../types/customer.types';
 import { formatMoney } from '../../finance/utils/formatters';
+import { sanitizeCustomerText, normalizeDebtLimit } from '../utils/customerValidation';
 
 export interface CustomerTableProps {
   customers: CustomerDto[];
@@ -84,13 +85,15 @@ export const CustomerTable: FC<CustomerTableProps> = ({
           </thead>
           <tbody id="crm-cust-tbody">
             {displayedCustomers.map((c) => {
-              const debt = Number(c.currentDebtAR) || 0;
-              const limit = Number(c.debtLimit) || 0;
+              const debt = Math.max(0, Number(c.currentDebtAR) || 0);
+              const limit = normalizeDebtLimit(c.debtLimit);
               const pct = limit > 0 ? Math.min(100, Math.round((debt / limit) * 100)) : 0;
               const isOverLimit = limit > 0 && debt > limit;
               const hasDebt = debt > 0;
               const fillCls = isOverLimit ? 'red' : pct >= 80 ? 'amber' : 'green';
               const code = c.customerCode || c.id.slice(0, 8).toUpperCase();
+              const safeFullName = sanitizeCustomerText(c.fullName, 'Khách hàng');
+              const safeCompanyName = sanitizeCustomerText(c.companyName);
 
               return (
                 <tr
@@ -101,7 +104,7 @@ export const CustomerTable: FC<CustomerTableProps> = ({
                   {/* Cột 1: Khách hàng */}
                   <td>
                     <div className="fw-700">
-                      {c.fullName}
+                      {safeFullName}
                       {isOverLimit && (
                         <span className="badge badge-red" style={{ marginLeft: 6 }}>
                           Vượt hạn mức
@@ -110,7 +113,7 @@ export const CustomerTable: FC<CustomerTableProps> = ({
                     </div>
                     <div className="text-faint" style={{ fontSize: '11.5px', marginTop: 2 }}>
                       <span className="font-mono">{code}</span> • {c.phoneNumber || ''} • {c.membershipTier || 'Thành viên'}
-                      {c.companyName ? ` (${c.companyName})` : ''}
+                      {safeCompanyName ? ` (${safeCompanyName})` : ''}
                     </div>
                   </td>
 

@@ -288,6 +288,16 @@ describe('FinanceOverviewPage — Prototype FE-10 Upgrades Suite', () => {
     expect(screen.getByText('Lợi nhuận')).toBeDefined();
     expect(screen.getByText('Lãi ròng')).toBeDefined();
 
+    // Verify all 6 waterfall bars touch the horizontal axis (baselineY = 211)
+    const waterfallSvg = screen.getByRole('img', { name: /Biểu đồ thác nước lãi lỗ 6 bước/i });
+    const barRects = waterfallSvg.querySelectorAll('rect.waterfall-bar-rect');
+    expect(barRects.length).toBe(6);
+    barRects.forEach((rect) => {
+      const y = parseFloat(rect.getAttribute('y') || '0');
+      const h = parseFloat(rect.getAttribute('height') || '0');
+      expect(Math.round(y + h)).toBe(211);
+    });
+
     // Turn on Accounting Mode
     const switchToggle = screen.getByRole('switch');
     fireEvent.click(switchToggle);

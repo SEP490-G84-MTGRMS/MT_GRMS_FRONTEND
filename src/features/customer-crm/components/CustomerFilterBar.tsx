@@ -1,5 +1,5 @@
 import type { FC } from 'react';
-import { RotateCw, X } from 'lucide-react';
+import { Search, UserPlus, RotateCw, X } from 'lucide-react';
 import type { DebtFilterStatus } from '../types/customer.types';
 
 interface CustomerFilterBarProps {
@@ -21,98 +21,128 @@ export const CustomerFilterBar: FC<CustomerFilterBarProps> = ({
   onTierChange,
   selectedDebtStatus,
   onDebtStatusChange,
+  onOpenCreate,
   onRefresh,
   isRefreshing,
 }) => {
+  const pills: { id: DebtFilterStatus; label: string }[] = [
+    { id: 'ALL', label: 'Tất cả' },
+    { id: 'DEBT', label: 'Đang nợ' },
+    { id: 'OVER_LIMIT', label: 'Vượt hạn mức' },
+  ];
+
   return (
-    <div className="filter-bar">
-      {/* Search box chuẩn prototype: 🔍 Tìm tên, SĐT, mã KH, mã số thuế... */}
-      <div className="search-box">
-        <span className="search-icon">🔍</span>
-        <input
-          id="crm-cust-search"
-          type="text"
-          className="input"
-          placeholder="Tìm tên, SĐT, mã KH, mã số thuế..."
-          value={searchTerm}
-          onChange={(e) => onSearchChange(e.target.value)}
-        />
-        {searchTerm && (
-          <button
-            type="button"
-            onClick={() => onSearchChange('')}
-            className="customer-clear-btn"
-            title="Xóa tìm kiếm"
-          >
-            <X className="w-3.5 h-3.5" />
-          </button>
-        )}
-      </div>
+    <div className="customer-filter-bar" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '12px', background: '#ffffff', padding: '14px 18px', borderRadius: '16px', border: '1px solid #E2E8F0', marginBottom: '20px' }}>
+      {/* Search & Select filters */}
+      <div className="customer-filter-left" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '12px', flex: 1 }}>
+        {/* Search Input */}
+        <div className="customer-search-box" style={{ position: 'relative', minWidth: '260px', flex: '1 1 300px', maxWidth: '420px' }}>
+          <Search className="w-4 h-4 customer-search-icon" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#94A3B8' }} />
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => onSearchChange(e.target.value)}
+            placeholder="Tìm tên, SĐT, mã KH, mã số thuế..."
+            className="customer-search-input"
+            style={{ width: '100%', padding: '9px 36px 9px 36px', borderRadius: '10px', border: '1px solid #CBD5E1', fontSize: '13.5px', outline: 'none' }}
+          />
+          {searchTerm && (
+            <button
+              type="button"
+              onClick={() => onSearchChange('')}
+              className="customer-clear-btn"
+              title="Xóa tìm kiếm"
+              style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8' }}
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </div>
 
-      {/* 3 Quick Chips lọc nhanh chuẩn prototype */}
-      <div className="flex-gap">
-        <button
-          type="button"
-          className={`pill-btn ${selectedDebtStatus === 'ALL' ? 'active' : ''}`}
-          onClick={() => onDebtStatusChange('ALL')}
-        >
-          Tất cả
-        </button>
-        <button
-          type="button"
-          className={`pill-btn ${selectedDebtStatus === 'DEBT' ? 'active' : ''}`}
-          onClick={() => onDebtStatusChange('DEBT')}
-        >
-          Đang nợ
-        </button>
-        <button
-          type="button"
-          className={`pill-btn ${selectedDebtStatus === 'OVER_LIMIT' ? 'active' : ''}`}
-          onClick={() => onDebtStatusChange('OVER_LIMIT')}
-        >
-          Vượt hạn mức
-        </button>
+        {/* 3 Pill chips */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          {pills.map((p) => {
+            const isActive = selectedDebtStatus === p.id;
+            return (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => onDebtStatusChange(p.id)}
+                className={`pill-btn ${isActive ? 'active' : ''}`}
+                style={{
+                  height: '34px',
+                  padding: '0 14px',
+                  borderRadius: '9999px',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  border: isActive ? '1px solid #0F766E' : '1px solid #E2E8F0',
+                  background: isActive ? '#0F766E' : '#F8FAFC',
+                  color: isActive ? '#ffffff' : '#475569',
+                  boxShadow: isActive ? '0 2px 6px rgba(15, 118, 110, 0.22)' : 'none',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                {p.label}
+              </button>
+            );
+          })}
+        </div>
 
-        {/* Bộ lọc nhóm / hạng thẻ thành viên */}
+        {/* Membership Tier Filter */}
         <select
           value={selectedTier}
           onChange={(e) => onTierChange(e.target.value)}
-          className="select"
-          style={{
-            height: '32px',
-            padding: '0 12px',
-            fontSize: '12.5px',
-            borderRadius: '9999px',
-            border: '1px solid var(--border, #e2e8f0)',
-            background: 'var(--bg-card, #ffffff)',
-            color: 'var(--text-main, #0f172a)',
-            cursor: 'pointer',
-          }}
-          title="Lọc theo nhóm / hạng thẻ thành viên"
+          className="customer-select"
+          style={{ height: '34px', padding: '0 12px', borderRadius: '10px', border: '1px solid #CBD5E1', fontSize: '13px', color: '#334155', background: '#F8FAFC' }}
         >
           <option value="ALL">Tất cả nhóm khách</option>
-          <option value="Standard">Thành viên (Standard)</option>
-          <option value="Silver">Thân thiết (Silver)</option>
-          <option value="Gold">Bán buôn nhỏ (Gold)</option>
-          <option value="VIP">Khách sỉ / VIP</option>
+          <option value="Standard">Thành viên</option>
+          <option value="Silver">Thân thiết</option>
+          <option value="Gold">Bán buôn / Khách sỉ</option>
+          <option value="VIP">Đối tác VIP</option>
         </select>
+      </div>
 
-        {/* Nút tải lại */}
+      {/* Action Buttons */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
         <button
-          type="button"
           onClick={onRefresh}
           disabled={isRefreshing}
           title="Tải lại danh sách"
-          className="pill-btn"
-          style={{ padding: '0 10px' }}
+          className="action-icon-btn"
+          style={{ width: '36px', height: '36px', borderRadius: '10px', border: '1px solid #CBD5E1', background: '#ffffff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
         >
           <RotateCw
-            className="w-3.5 h-3.5"
+            className="w-4 h-4"
             style={{
               animation: isRefreshing ? 'spin 1s linear infinite' : 'none',
-              color: isRefreshing ? 'var(--teal-primary, #0f766e)' : 'inherit',
+              color: isRefreshing ? '#0F766E' : '#64748B',
             }}
           />
+        </button>
+
+        <button
+          onClick={onOpenCreate}
+          className="btn-primary-pill"
+          style={{
+            height: '36px',
+            padding: '0 16px',
+            borderRadius: '10px',
+            background: '#0F766E',
+            color: '#ffffff',
+            border: 'none',
+            fontSize: '13.5px',
+            fontWeight: 700,
+            cursor: 'pointer',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+            boxShadow: '0 2px 6px rgba(15, 118, 110, 0.25)',
+          }}
+        >
+          <UserPlus className="w-4 h-4" />
+          <span>+ Thêm khách hàng</span>
         </button>
       </div>
     </div>

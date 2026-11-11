@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Membership tier for loyalty program
  */
 export type MembershipTier = 'Standard' | 'Silver' | 'Gold' | 'VIP';

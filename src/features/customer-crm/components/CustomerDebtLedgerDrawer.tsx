@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import type { CustomerDto, CustomerDebtLedgerDto } from '../types/customer.types';
 import { customerApi } from '../api/customerApi';
+import { sanitizeCustomerText, normalizeDebtLimit } from '../utils/customerValidation';
 
 interface CustomerDebtLedgerDrawerProps {
   customer: CustomerDto | null;
@@ -67,8 +68,10 @@ export const CustomerDebtLedgerDrawer: FC<CustomerDebtLedgerDrawerProps> = ({
     .filter((l) => l.transactionType === 'DEBT_DECREASE')
     .reduce((sum, l) => sum + l.amount, 0);
 
+  const safeFullName = sanitizeCustomerText(customer.fullName, 'Khách hàng');
+  const safeDebtLimit = normalizeDebtLimit(customer.debtLimit);
   const hasDebt = customer.currentDebtAR > 0;
-  const isOverLimit = customer.currentDebtAR > customer.debtLimit && customer.debtLimit > 0;
+  const isOverLimit = customer.currentDebtAR > safeDebtLimit && safeDebtLimit > 0;
 
   return (
     <div className="customer-drawer-backdrop" onClick={onClose}>
@@ -101,7 +104,7 @@ export const CustomerDebtLedgerDrawer: FC<CustomerDebtLedgerDrawerProps> = ({
                 </span>
               </div>
               <p style={{ margin: '4px 0 0', fontSize: '0.82rem', color: '#64748b' }}>
-                Khách hàng: <strong>{customer.fullName}</strong> ({customer.phoneNumber})
+                Khách hàng: <strong>{safeFullName}</strong> ({customer.phoneNumber})
               </p>
             </div>
           </div>
@@ -135,9 +138,9 @@ export const CustomerDebtLedgerDrawer: FC<CustomerDebtLedgerDrawerProps> = ({
               >
                 {formatCurrency(customer.currentDebtAR)}
               </div>
-              {customer.debtLimit > 0 && (
+              {safeDebtLimit > 0 && (
                 <div style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: '2px' }}>
-                  Hạn mức: {formatCurrency(customer.debtLimit)}
+                  Hạn mức: {formatCurrency(safeDebtLimit)}
                 </div>
               )}
             </div>

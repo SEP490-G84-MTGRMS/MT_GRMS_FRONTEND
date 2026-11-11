@@ -15,17 +15,19 @@ export interface PnlWaterfallSvgProps {
 interface WaterfallBarDescriptor {
   label1: string;
   label2: string;
-  start: number;
-  end: number;
+  value: number;
   delta: number;
   color: string;
   isNeg: boolean;
+  operator?: '−' | '=';
   type: 'rev' | 'cogs' | 'gross' | 'opex' | 'tax' | 'net';
 }
 
 /**
  * Visual SVG 6-step Waterfall Chart for P&L breakdown
  * (Net Revenue -> COGS -> Gross Profit -> OpEx -> HKD Tax -> Net Profit).
+ * All bars are grounded on the horizontal baseline (bottom = 0) with heights
+ * directly proportional to their absolute values for clear visual comparison.
  */
 export const PnlWaterfallSvg: React.FC<PnlWaterfallSvgProps> = ({
   netRevenue,
@@ -37,18 +39,19 @@ export const PnlWaterfallSvg: React.FC<PnlWaterfallSvgProps> = ({
   periodLabel = 'Tháng này',
   accountingBasis = 'CASH',
 }) => {
-  const rev = Math.max(netRevenue, 1);
-  const afterCogs = Math.max(0, rev - cogs);
-  const afterOp = Math.max(0, afterCogs - opExpenses);
-  const net = Math.max(0, afterOp - estTax);
+  const rev = Math.max(netRevenue, 0);
+  const absCogs = Math.abs(cogs);
+  const absGross = Math.max(0, grossProfit);
+  const absOpex = Math.abs(opExpenses);
+  const absTax = Math.abs(estTax);
+  const absNet = Math.max(0, netProfit);
 
   const bars: WaterfallBarDescriptor[] = [
     {
       type: 'rev',
       label1: 'Doanh thu',
       label2: 'thuần',
-      start: 0,
-      end: rev,
+      value: rev,
       delta: rev,
       color: '#0F766E', // Teal
       isNeg: false,
@@ -57,57 +60,58 @@ export const PnlWaterfallSvg: React.FC<PnlWaterfallSvgProps> = ({
       type: 'cogs',
       label1: '- Giá vốn',
       label2: 'hàng bán',
-      start: afterCogs,
-      end: rev,
-      delta: cogs,
+      value: absCogs,
+      delta: absCogs,
       color: '#EA580C', // Orange
       isNeg: true,
+      operator: '−',
     },
     {
       type: 'gross',
       label1: 'Lợi nhuận',
       label2: 'gộp',
-      start: 0,
-      end: afterCogs,
+      value: absGross,
       delta: grossProfit,
       color: '#0F766E', // Teal
-      isNeg: false,
+      isNeg: grossProfit < 0,
+      operator: '=',
     },
     {
       type: 'opex',
       label1: '- Chi phí',
       label2: 'vận hành',
-      start: afterOp,
-      end: afterCogs,
-      delta: opExpenses,
+      value: absOpex,
+      delta: absOpex,
       color: '#EA580C', // Orange
       isNeg: true,
+      operator: '−',
     },
     {
       type: 'tax',
       label1: '- Thuế',
       label2: 'ước tính',
-      start: net,
-      end: afterOp,
-      delta: estTax,
+      value: absTax,
+      delta: absTax,
       color: '#D97706', // Amber
       isNeg: true,
+      operator: '−',
     },
     {
       type: 'net',
       label1: 'Lãi ròng',
       label2: 'giữ lại',
-      start: 0,
-      end: net,
+      value: absNet,
       delta: netProfit,
       color: '#16A34A', // Emerald
-      isNeg: false,
+      isNeg: netProfit < 0,
+      operator: '=',
     },
   ];
 
-  const maxVal = Math.max(rev, 1);
+  const maxVal = Math.max(rev, absCogs, absGross, absOpex, absTax, absNet, 1);
   const chartTop = 36;
   const chartH = 175;
+  const baselineY = chartTop + chartH; // 211 — horizontal axis (0)
 
   return (
     <div className="pnl-waterfall-svg-wrapper">
@@ -149,33 +153,55 @@ export const PnlWaterfallSvg: React.FC<PnlWaterfallSvgProps> = ({
             {(maxVal / 1000000).toFixed(0)}tr
           </text>
 
-          {/* 6 Step Waterfall Bars */}
+          {/* 6 Step Grounded Waterfall Bars (all anchored at baselineY = 211) */}
           {bars.map((bar, idx) => {
             const x = 44 + idx * 116;
-            const topY = chartTop + chartH - (bar.end / maxVal) * chartH;
-            const botY = chartTop + chartH - (bar.start / maxVal) * chartH;
-            const y = Math.min(topY, botY);
-            const h = Math.max(6, Math.abs(botY - topY));
-            const deltaMillions = (bar.delta / 1000000).toFixed(1).replace('.', ',') + 'tr';
-            const labelVal = (bar.isNeg ? '-' : '') + deltaMillions;
+            const rawHeight = (Math.abs(bar.value) / maxVal) * chartH;
+            const h = bar.value === 0 ? 3 : Math.max(6, rawHeight);
+            const y = baselineY - h;
+            const absDelta = Math.abs(bar.delta);
+            const deltaMillions = (absDelta / 1000000).toFixed(1).replace('.', ',') + 'tr';
+            const labelVal = (bar.isNeg && absDelta > 0 ? '-' : '') + deltaMillions;
             const valY = Math.max(18, y - 8);
+
+            const prevBar = idx > 0 ? bars[idx - 1] : null;
+            const prevRawH = prevBar ? (Math.abs(prevBar.value) / maxVal) * chartH : 0;
+            const prevH = prevBar ? (prevBar.value === 0 ? 3 : Math.max(6, prevRawH)) : 0;
+            const prevY = baselineY - prevH;
 
             return (
               <g key={bar.type} className="waterfall-bar-group">
-                <title>{`${bar.label1} ${bar.label2}: ${bar.isNeg ? '-' : ''}${formatMoney(bar.delta)}`}</title>
-                {/* Connecting dashed line to previous bar */}
+                <title>{`${bar.label1} ${bar.label2}: ${bar.isNeg && absDelta > 0 ? '-' : ''}${formatMoney(absDelta)}`}</title>
+                {/* Connecting dashed line & math operator badge from previous bar */}
                 {idx > 0 && (
-                  <line
-                    x1={x - 40}
-                    y1={y}
-                    x2={x}
-                    y2={y}
-                    stroke="#94a3b8"
-                    strokeDasharray="2 2"
-                    strokeWidth="1"
-                  />
+                  <>
+                    <line
+                      x1={x - 40}
+                      y1={prevY.toFixed(1)}
+                      x2={x}
+                      y2={y.toFixed(1)}
+                      stroke="#cbd5e1"
+                      strokeDasharray="3 3"
+                      strokeWidth="1"
+                    />
+                    {bar.operator && (
+                      <g transform={`translate(${x - 20}, 235)`}>
+                        <circle r="9" fill="#f1f5f9" stroke="#cbd5e1" strokeWidth="1" />
+                        <text
+                          x="0"
+                          y="3.5"
+                          textAnchor="middle"
+                          fontSize="11"
+                          fontWeight="800"
+                          fill="#475569"
+                        >
+                          {bar.operator}
+                        </text>
+                      </g>
+                    )}
+                  </>
                 )}
-                {/* Main bar */}
+                {/* Main bar grounded at horizontal axis (baselineY = 211) */}
                 <rect
                   x={x}
                   y={y.toFixed(1)}
