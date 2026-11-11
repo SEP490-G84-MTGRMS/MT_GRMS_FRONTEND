@@ -2,6 +2,7 @@ export type SupplierReturnStatus =
   | 'DRAFT'
   | 'PENDING_SUPPLIER'
   | 'APPROVED'
+  | 'PARTIALLY_HANDED_OVER'
   | 'REJECTED'
   | 'COMPLETED'
   | 'CANCELLED';
@@ -49,6 +50,10 @@ export interface SupplierReturnListItem {
   createdAt: string;
   handedOverAt?: string;
   lineCount?: number;
+  stocktakeId?: string | null;
+  stocktakeCode?: string | null;
+  resolutionType?: string | null;
+  settlementStatus?: string | null;
 }
 
 export interface SupplierReturnDetail extends SupplierReturnListItem {

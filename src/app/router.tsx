@@ -31,7 +31,6 @@ import {
 import {
   GoodsReceiptListPage,
   GoodsReceiptFormPage,
-  GoodsReceiptDetailPage,
 } from '../features/goods-receipt';
 
 // 2c. Batch & Expiry Feature (FE-02 / UI-02-01)
@@ -46,6 +45,13 @@ import {
   SupplierReturnFormPage,
   SupplierReturnDetailPage,
 } from '../features/supplier-return';
+
+// 2f. Stocktake Feature (Phiếu kiểm kê hàng hóa)
+import {
+  StocktakeListPage,
+  StocktakeFormPage,
+  StocktakeDetailPage,
+} from '../features/stocktake';
 
 // 3. Service Expenses Feature (FE-07)
 import { ServiceExpensesPage } from '../features/service-expenses/pages/ServiceExpensesPage';
@@ -431,7 +437,7 @@ export const router = createBrowserRouter([
       },
       {
         path: 'goods-receipts/:id',
-        element: <GoodsReceiptDetailPage defaultRole="store_owner" />,
+        element: <GoodsReceiptFormPage defaultRole="store_owner" />,
       },
       {
         path: 'goods-receipts/:id/confirm',
@@ -464,6 +470,22 @@ export const router = createBrowserRouter([
       {
         path: 'expiry',
         element: <BatchListPage defaultRole="store_owner" />,
+      },
+      {
+        path: 'stocktakes',
+        element: <StocktakeListPage defaultRole="store_owner" />,
+      },
+      {
+        path: 'stocktakes/create',
+        element: <StocktakeFormPage defaultRole="store_owner" />,
+      },
+      {
+        path: 'stocktakes/:id',
+        element: <StocktakeDetailPage defaultRole="store_owner" />,
+      },
+      {
+        path: 'stocktakes/:id/edit',
+        element: <StocktakeFormPage defaultRole="store_owner" />,
       },
       {
         path: 'expenses',
@@ -812,6 +834,22 @@ export const router = createBrowserRouter([
         path: 'payroll',
         element: <PayslipManagementPage />,
       },
+      {
+        path: 'stocktakes',
+        element: <StocktakeListPage defaultRole="employee" />,
+      },
+      {
+        path: 'stocktakes/create',
+        element: <StocktakeFormPage defaultRole="employee" />,
+      },
+      {
+        path: 'stocktakes/:id',
+        element: <StocktakeDetailPage defaultRole="employee" />,
+      },
+      {
+        path: 'stocktakes/:id/edit',
+        element: <StocktakeFormPage defaultRole="employee" />,
+      },
     ],
   },
 
@@ -835,6 +873,22 @@ export const router = createBrowserRouter([
       {
         path: 'payroll',
         element: <PayslipManagementPage />,
+      },
+      {
+        path: 'stocktakes',
+        element: <StocktakeListPage defaultRole="employee" />,
+      },
+      {
+        path: 'stocktakes/create',
+        element: <StocktakeFormPage defaultRole="employee" />,
+      },
+      {
+        path: 'stocktakes/:id',
+        element: <StocktakeDetailPage defaultRole="employee" />,
+      },
+      {
+        path: 'stocktakes/:id/edit',
+        element: <StocktakeFormPage defaultRole="employee" />,
       },
     ],
   },
@@ -1129,7 +1183,7 @@ export const router = createBrowserRouter([
       },
       {
         path: 'goods-receipts/:id',
-        element: <GoodsReceiptDetailPage defaultRole="employee" />,
+        element: <GoodsReceiptFormPage defaultRole="employee" />,
       },
       {
         path: 'goods-receipts/:id/confirm',
@@ -1157,7 +1211,7 @@ export const router = createBrowserRouter([
       },
       {
         path: ':id',
-        element: <GoodsReceiptDetailPage defaultRole="store_owner" />,
+        element: <GoodsReceiptFormPage defaultRole="store_owner" />,
       },
       {
         path: ':id/confirm',
@@ -1183,7 +1237,7 @@ export const router = createBrowserRouter([
       },
       {
         path: ':id',
-        element: <GoodsReceiptDetailPage defaultRole="employee" />,
+        element: <GoodsReceiptFormPage defaultRole="employee" />,
       },
       {
         path: ':id/confirm',
@@ -1220,6 +1274,28 @@ export const router = createBrowserRouter([
       {
         index: true,
         element: <BatchListPage defaultRole="employee" />,
+      },
+    ],
+  },
+  {
+    path: '/stocktakes',
+    element: <StoreOwnerLayout />,
+    children: [
+      {
+        index: true,
+        element: <StocktakeListPage defaultRole="store_owner" />,
+      },
+      {
+        path: 'create',
+        element: <StocktakeFormPage defaultRole="store_owner" />,
+      },
+      {
+        path: ':id',
+        element: <StocktakeDetailPage defaultRole="store_owner" />,
+      },
+      {
+        path: ':id/edit',
+        element: <StocktakeFormPage defaultRole="store_owner" />,
       },
     ],
   },

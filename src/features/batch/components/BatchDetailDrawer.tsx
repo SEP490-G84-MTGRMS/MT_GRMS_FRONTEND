@@ -10,6 +10,7 @@ import {
   Check,
   Building2,
   Clock,
+  ClipboardCheck,
 } from 'lucide-react';
 import type { BatchItem } from '../types/batch.types';
 
@@ -21,6 +22,7 @@ interface BatchDetailDrawerProps {
   onDiscountClick: (batch: BatchItem) => void;
   onWriteOffClick: (batch: BatchItem) => void;
   onViewGrn: (grnNo: string) => void;
+  onStocktakeClick?: (batch: BatchItem) => void;
 }
 
 const formatCurrency = (val: number): string => {
@@ -35,6 +37,7 @@ export const BatchDetailDrawer: FC<BatchDetailDrawerProps> = ({
   onDiscountClick,
   onWriteOffClick,
   onViewGrn,
+  onStocktakeClick,
 }) => {
   const [isEditingLoc, setIsEditingLoc] = useState(false);
   const [locInput, setLocInput] = useState('');
@@ -204,10 +207,17 @@ export const BatchDetailDrawer: FC<BatchDetailDrawerProps> = ({
                       fontWeight: 800,
                       fontFamily: 'monospace',
                       fontSize: 13,
-                      color: batch.daysLeft < 0 ? '#e11d48' : batch.daysLeft <= 3 ? '#d97706' : '#0d9488',
+                      color:
+                        batch.daysLeft >= 9999 || batch.expiryDate === '—'
+                          ? '#94a3b8'
+                          : batch.daysLeft < 0
+                          ? '#e11d48'
+                          : batch.daysLeft <= 3
+                          ? '#d97706'
+                          : '#0d9488',
                     }}
                   >
-                    {batch.daysLeft} ngày
+                    {batch.daysLeft >= 9999 || batch.expiryDate === '—' ? '—' : `${batch.daysLeft} ngày`}
                   </span>
                 </div>
                 {batch.discountPercent && (
@@ -253,6 +263,16 @@ export const BatchDetailDrawer: FC<BatchDetailDrawerProps> = ({
                   <span style={{ color: '#64748b' }}>Tồn kho thực tế:</span>
                   <span style={{ fontWeight: 800, color: '#0d9488', fontSize: 13.5 }}>
                     {batch.qtyCurrent} {batch.unit}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: '#64748b' }}>Khả dụng / Cách ly / Giữ trả:</span>
+                  <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 12 }}>
+                    <span style={{ color: '#15803d' }}>{batch.qtyAvailable}</span>
+                    {' / '}
+                    <span style={{ color: '#d97706' }}>{batch.qtyQuarantined || 0}</span>
+                    {' / '}
+                    <span style={{ color: '#2563eb' }}>{batch.qtyReserved || 0}</span>
                   </span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -373,6 +393,30 @@ export const BatchDetailDrawer: FC<BatchDetailDrawerProps> = ({
               <FileText size={13} />
               <span>Xem GRN gốc: {batch.originalGrnNo}</span>
             </button>
+
+            {onStocktakeClick && (
+              <button
+                type="button"
+                onClick={() => onStocktakeClick(batch)}
+                style={{
+                  height: 32,
+                  padding: '0 12px',
+                  borderRadius: 6,
+                  border: '1px solid #0d9488',
+                  backgroundColor: '#f0fdfa',
+                  color: '#0f766e',
+                  fontSize: 12,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 5,
+                }}
+              >
+                <ClipboardCheck size={13} />
+                <span>Kiểm kê lô này</span>
+              </button>
+            )}
 
             {batch.status !== 'Expired' && (
               <button

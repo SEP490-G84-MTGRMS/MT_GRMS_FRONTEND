@@ -48,7 +48,7 @@ export const GrnFormHeaderCard: FC<GrnFormHeaderCardProps> = ({
   grnNo,
   branchId,
   poReference,
-  availablePos,
+  availablePos: _availablePos = [],
   branches = [],
   supplierName,
   supplierCode,
@@ -61,7 +61,7 @@ export const GrnFormHeaderCard: FC<GrnFormHeaderCardProps> = ({
   employeeBranchId = '',
   readOnly = false,
   onBranchChange,
-  onPoChange,
+  onPoChange: _onPoChange,
   onInvoiceNoChange,
   onPaymentTermChange,
   onPaymentMethodChange,
@@ -235,50 +235,24 @@ export const GrnFormHeaderCard: FC<GrnFormHeaderCardProps> = ({
             <Package size={13} color="#64748b" />
             <span>Đơn mua hàng PO gốc:</span>
           </label>
-          {readOnly ? (
-            <div
-              style={{
-                height: 34,
-                padding: '0 10px',
-                backgroundColor: '#f8fafc',
-                border: '1px solid #cbd5e1',
-                borderRadius: 6,
-                fontSize: 12.5,
-                fontFamily: 'monospace',
-                fontWeight: 700,
-                color: '#0284c7',
-                display: 'flex',
-                alignItems: 'center',
-              }}
-            >
-              {poReference}
-            </div>
-          ) : (
-            <select
-              value={poReference}
-              onChange={(e) => onPoChange(e.target.value)}
-              style={{
-                width: '100%',
-                height: 34,
-                padding: '0 10px',
-                borderRadius: 6,
-                border: poReference ? '1px solid #0d9488' : '1px solid #cbd5e1',
-                fontSize: 12.5,
-                fontWeight: 600,
-                color: poReference ? '#0f766e' : '#334155',
-                backgroundColor: poReference ? '#f0fdfa' : '#ffffff',
-                outline: 'none',
-                cursor: 'pointer',
-              }}
-            >
-              <option value="">-- Chọn đơn đặt hàng PO --</option>
-              {availablePos.map((po) => (
-                <option key={po.poCode} value={po.poCode}>
-                  {po.poCode} — {po.supplierName} ({po.branchId})
-                </option>
-              ))}
-            </select>
-          )}
+          <div
+            style={{
+              height: 34,
+              padding: '0 10px',
+              backgroundColor: '#f8fafc',
+              border: '1px solid #cbd5e1',
+              borderRadius: 6,
+              fontSize: 12.5,
+              fontFamily: 'monospace',
+              fontWeight: 700,
+              color: poReference ? '#0284c7' : '#94a3b8',
+              display: 'flex',
+              alignItems: 'center',
+            }}
+            title="PO gốc cố định theo đơn được chọn để nhập kho"
+          >
+            {poReference || '—'}
+          </div>
         </div>
 
         {/* 4. Mã nhà cung cấp */}

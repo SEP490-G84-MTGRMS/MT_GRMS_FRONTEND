@@ -688,11 +688,15 @@ export const PoDetailDrawer: FC<PoDetailDrawerProps> = ({
                 </button>
               )}
 
-              {(order.status === 'APPROVED' ||
-                order.status === 'DISPATCHED' ||
-                order.status === 'SENT' ||
-                order.status === 'CONFIRMED') &&
-                onReceiveNow && (
+              {onReceiveNow &&
+                (order.activeGoodsReceiptStatus?.toUpperCase() === 'COMPLETED' ||
+                  order.activeGoodsReceiptStatus?.toUpperCase() === 'DRAFT' ||
+                  order.status === 'APPROVED' ||
+                  order.status === 'DISPATCHED' ||
+                  order.status === 'SENT' ||
+                  order.status === 'CONFIRMED' ||
+                  order.status === 'PARTIALLY_RECEIVED' ||
+                  order.status === 'RECEIVED') && (
                   <button
                     type="button"
                     onClick={() => onReceiveNow(order)}
@@ -705,7 +709,10 @@ export const PoDetailDrawer: FC<PoDetailDrawerProps> = ({
                       borderRadius: 8,
                       fontSize: 13,
                       fontWeight: 700,
-                      backgroundColor: '#0d9488',
+                      backgroundColor:
+                        order.activeGoodsReceiptStatus?.toUpperCase() === 'COMPLETED'
+                          ? '#059669'
+                          : '#0d9488',
                       border: 'none',
                       color: '#ffffff',
                       cursor: 'pointer',
@@ -713,7 +720,13 @@ export const PoDetailDrawer: FC<PoDetailDrawerProps> = ({
                     }}
                   >
                     <PackageCheck size={16} />
-                    <span>Nhập kho ngay (FE-7)</span>
+                    <span>
+                      {order.activeGoodsReceiptStatus?.toUpperCase() === 'COMPLETED'
+                        ? 'Xem phiếu nhập kho'
+                        : order.activeGoodsReceiptStatus?.toUpperCase() === 'DRAFT'
+                          ? 'Tiếp tục xác nhận nhập kho'
+                          : 'Nhận hàng / Nhập kho'}
+                    </span>
                   </button>
                 )}
             </div>
