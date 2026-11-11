@@ -24,14 +24,13 @@ interface PoListTableProps {
 
 const canShowReceiveAction = (order: PurchaseOrderListItem): boolean => {
   const grn = (order.activeGoodsReceiptStatus || '').toUpperCase();
-  // Khi đã nhập rồi (COMPLETED / RECEIVED) thì bỏ icon nhập hàng đi, chỉ để lại nút chi tiết
-  if (grn === 'COMPLETED') return false;
+  // Đã có GRN COMPLETED → vẫn hiện nút để xem phiếu nhập
+  if (grn === 'COMPLETED' && order.activeGoodsReceiptId) return true;
   if (grn === 'DRAFT') return true;
+  if (order.status === 'CANCELLED' || order.status === 'REJECTED') return false;
   if (
-    order.status === 'CANCELLED' ||
-    order.status === 'REJECTED' ||
-    order.status === 'RECEIVED' ||
-    order.status === 'COMPLETED'
+    (order.status === 'RECEIVED' || order.status === 'COMPLETED') &&
+    !order.activeGoodsReceiptId
   ) {
     return false;
   }
@@ -40,8 +39,31 @@ const canShowReceiveAction = (order: PurchaseOrderListItem): boolean => {
     order.status === 'CONFIRMED' ||
     order.status === 'APPROVED' ||
     order.status === 'DISPATCHED' ||
-    order.status === 'PARTIALLY_RECEIVED'
+    order.status === 'PARTIALLY_RECEIVED' ||
+    order.status === 'RECEIVED' ||
+    order.status === 'COMPLETED'
   );
+};
+
+const grnPipelineBadge = (
+  order: PurchaseOrderListItem
+): { label: string; bg: string; color: string; border: string } | null => {
+  const grn = (order.activeGoodsReceiptStatus || '').toUpperCase();
+  if (grn === 'COMPLETED') {
+    return { label: 'Đã nhập kho', bg: '#f0fdf4', color: '#15803d', border: '#bbf7d0' };
+  }
+  if (grn === 'DRAFT') {
+    return { label: 'GRN nháp', bg: '#fffbeb', color: '#b45309', border: '#fde68a' };
+  }
+  if (
+    order.status === 'SENT' ||
+    order.status === 'CONFIRMED' ||
+    order.status === 'APPROVED' ||
+    order.status === 'DISPATCHED'
+  ) {
+    return { label: 'Chờ nhập', bg: '#eff6ff', color: '#1d4ed8', border: '#bfdbfe' };
+  }
+  return null;
 };
 
 const receiveActionTitle = (order: PurchaseOrderListItem): string => {
@@ -534,7 +556,30 @@ export const PoListTable: FC<PoListTableProps> = ({
                     </td>
 
                     <td className="so-list-td so-list-td--wrap" style={{ textAlign: 'center', ...cellWrap }}>
-                      {renderStatusBadge(order.status)}
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                        {renderStatusBadge(order.status)}
+                        {(() => {
+                          const pipe = grnPipelineBadge(order);
+                          if (!pipe) return null;
+                          return (
+                            <span
+                              style={{
+                                fontSize: 10,
+                                fontWeight: 700,
+                                padding: '1px 6px',
+                                borderRadius: 999,
+                                background: pipe.bg,
+                                color: pipe.color,
+                                border: `1px solid ${pipe.border}`,
+                                whiteSpace: 'nowrap',
+                              }}
+                              title={order.activeGoodsReceiptCode || pipe.label}
+                            >
+                              {pipe.label}
+                            </span>
+                          );
+                        })()}
+                      </div>
                     </td>
 
                     <td

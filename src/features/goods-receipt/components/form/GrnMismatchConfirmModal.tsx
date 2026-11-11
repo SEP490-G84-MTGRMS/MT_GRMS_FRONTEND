@@ -118,6 +118,23 @@ export const GrnMismatchConfirmModal: FC<GrnMismatchConfirmModalProps> = ({
 
           <div
             style={{
+              padding: '10px 12px',
+              borderRadius: 8,
+              backgroundColor: '#eff6ff',
+              border: '1px solid #bfdbfe',
+              marginBottom: 12,
+              fontSize: 12.5,
+              color: '#1e3a8a',
+              lineHeight: 1.5,
+            }}
+          >
+            <b>Quy tắc nhập kho (1 lần / PO):</b> Sau khi hoàn tất phiếu này, PO sẽ <b>đóng (COMPLETED)</b> kể cả
+            khi giao thiếu. Phần còn thiếu <b>không</b> nhập tiếp trên cùng PO — cần <b>tạo đơn đặt bù</b> từ Matrix /
+            Dispatch Hub rồi nhập bằng phiếu mới.
+          </div>
+
+          <div
+            style={{
               maxHeight: 240,
               overflowY: 'auto',
               border: '1px solid #e2e8f0',

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { FC } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Grid, Zap, Layers, Loader2 } from 'lucide-react';
 import { purchaseOrderApi } from '../api/purchaseOrderApi';
 import type { PurchaseOrderListItem, PoListFilterState, PurchaseOrderStatus } from '../types/po-list.types';
@@ -86,13 +86,21 @@ const mapFilterStatusToBackend = (status: PoListFilterState['status']): string |
 
 export const StoreOwnerPurchaseOrderListPage: FC = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const supplierIdFromUrl = searchParams.get('supplierId') || '';
 
   const [orders, setOrders] = useState<PurchaseOrderListItem[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
 
-  const [filterInputs, setFilterInputs] = useState<PoListFilterState>(DEFAULT_FILTERS);
-  const [appliedFilters, setAppliedFilters] = useState<PoListFilterState>(DEFAULT_FILTERS);
+  const [filterInputs, setFilterInputs] = useState<PoListFilterState>(() => ({
+    ...DEFAULT_FILTERS,
+    supplierId: supplierIdFromUrl,
+  }));
+  const [appliedFilters, setAppliedFilters] = useState<PoListFilterState>(() => ({
+    ...DEFAULT_FILTERS,
+    supplierId: supplierIdFromUrl,
+  }));
 
   const [pageIndex, setPageIndex] = useState(1);
   const [pageSize, setPageSize] = useState(10);

@@ -411,8 +411,9 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
           updated.differenceQty = received - updated.orderedQty;
           updated.lineTotal = received * updated.unitPrice;
         }
+        // RULE-02: giá nhận = giá PO — không cho sửa unitPrice trên form
         if (field === 'unitPrice') {
-          updated.lineTotal = (updated.receivedQty || 0) * Number(value);
+          return it;
         }
         if (field === 'manageBatch') {
           if (value) {
@@ -700,6 +701,21 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
       }}
     >
       <AdminToast toast={toast} onClose={() => setToast(null)} />
+
+      <div
+        style={{
+          padding: '10px 14px',
+          borderRadius: 8,
+          background: '#eff6ff',
+          border: '1px solid #bfdbfe',
+          fontSize: 12.5,
+          color: '#1e3a8a',
+          lineHeight: 1.5,
+        }}
+      >
+        <b>Quy tắc nhập (1 lần / PO):</b> Giá dòng = giá PO (không đổi lúc nhận). Hoàn tất phiếu → PO{' '}
+        <b>COMPLETED</b> kể cả giao thiếu; phần thiếu phải <b>đặt bù đơn mới</b>, không tạo GRN thứ 2 trên cùng PO.
+      </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <button
