@@ -72,6 +72,7 @@ export const PayslipManagementPage: React.FC = () => {
   const [payingPayslip, setPayingPayslip] = useState<PayslipDetailedRecord | null>(null);
   const [batchPayingPayslips, setBatchPayingPayslips] = useState<PayslipDetailedRecord[] | null>(null);
   const [showActionDropdown, setShowActionDropdown] = useState<boolean>(false);
+  const actionDropdownRef = useRef<HTMLDivElement>(null);
   const [isRecalculating, setIsRecalculating] = useState<boolean>(false);
 
   // Common Notification & Confirm Modals state
@@ -116,11 +117,14 @@ export const PayslipManagementPage: React.FC = () => {
     });
   };
 
-  // Click outside to close branch dropdown
+  // Click outside to close branch & action dropdowns
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (branchDropdownRef.current && !branchDropdownRef.current.contains(event.target as Node)) {
         setIsBranchDropdownOpen(false);
+      }
+      if (actionDropdownRef.current && !actionDropdownRef.current.contains(event.target as Node)) {
+        setShowActionDropdown(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -904,7 +908,7 @@ export const PayslipManagementPage: React.FC = () => {
           )}
 
           {/* Action Dropdown */}
-          <div style={{ position: 'relative' }}>
+          <div ref={actionDropdownRef} style={{ position: 'relative' }}>
             <button
               type="button"
               className="emp-btn emp-btn-secondary"
@@ -925,7 +929,7 @@ export const PayslipManagementPage: React.FC = () => {
                   boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
                   border: '1px solid #E2E8F0',
                   minWidth: 220,
-                  zIndex: 200,
+                  zIndex: 1000,
                   overflow: 'hidden',
                 }}
               >

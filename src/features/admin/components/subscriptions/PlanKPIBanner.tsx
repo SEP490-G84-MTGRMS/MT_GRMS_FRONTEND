@@ -13,7 +13,7 @@ export const PlanKPIBanner: FC<PlanKPIBannerProps> = ({ plans }) => {
   const totalTenants = plans.reduce((acc, curr) => acc + curr.activeTenantCount, 0);
 
   return (
-    <div className="admin-kpi-grid" style={{ marginBottom: 20 }}>
+    <div className="admin-kpi-grid" style={{ marginBottom: 14, flexShrink: 0 }}>
       {/* KPI 1: Tổng số gói */}
       <div className="admin-kpi-card">
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>

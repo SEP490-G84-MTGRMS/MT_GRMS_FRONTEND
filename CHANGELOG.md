@@ -4,6 +4,11 @@ Toàn bộ các thay đổi của repository Frontend React SPA được tổng 
 
 ---
 
+## [Unreleased] - 2026-11-10
+
+### Fixed
+- **Sửa lỗi xác thực mật khẩu màn Đăng ký (`RegisterPage.tsx`)**: Điều chỉnh điều kiện độ dài tối thiểu từ 8 ký tự về 6 ký tự đồng bộ với Backend, nâng cấp thanh đo độ mạnh mật khẩu `passwordStrength` giúp các mật khẩu trung bình (từ 6 ký tự trở lên kết hợp chữ và số hoặc độ dài >= 8) được phép tạo tài khoản thành công mà không bị chặn, cập nhật thông báo lỗi chuẩn xác và điều hướng trực tiếp vào Cổng quản trị cửa hàng (`/store-owner/dashboard`) [FE-AUTH] [worklog: docs/worklogs/2026-11-10_FE-AUTH_AI_register-password-strength-fix.md].
+
 ## [Unreleased] - 2026-11-09
 
 ### Added

@@ -2,8 +2,6 @@ import { useState, useMemo, useRef, useEffect } from 'react';
 import type { FC, CSSProperties } from 'react';
 import {
   ArrowUpDown,
-  ChevronLeft,
-  ChevronRight,
   PackageOpen,
   Eye,
   Tag,
@@ -11,6 +9,7 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import type { BatchItem, BatchStatus } from '../types/batch.types';
+import { TablePagination } from '../../../components/common';
 
 interface BatchTableProps {
   batches: BatchItem[];
@@ -157,10 +156,6 @@ export const BatchTable: FC<BatchTableProps> = ({
     }
   };
 
-  const totalPages = Math.ceil(totalCount / pageSize) || 1;
-  const startItem = totalCount === 0 ? 0 : (pageIndex - 1) * pageSize + 1;
-  const endItem = Math.min(pageIndex * pageSize, totalCount);
-
   const tableColGroup = (
     <colgroup>
       <col style={{ width: '9%' }} />
@@ -181,11 +176,11 @@ export const BatchTable: FC<BatchTableProps> = ({
   );
 
   const renderStatusBadge = (status: BatchStatus) => {
-    const map: Record<BatchStatus, { color: string; label: string }> = {
-      Expired: { color: '#be123c', label: 'Expired' },
-      Critical: { color: '#b45309', label: 'Critical' },
-      Warning: { color: '#1d4ed8', label: 'Warning' },
-      Normal: { color: '#15803d', label: 'Normal' },
+    const map: Record<BatchStatus, { bg: string; color: string; border: string; label: string }> = {
+      Expired: { bg: '#fef2f2', color: '#b91c1c', border: '#fecaca', label: 'Hết hạn' },
+      Critical: { bg: '#fffbeb', color: '#b45309', border: '#fde68a', label: 'Khẩn cấp' },
+      Warning: { bg: '#eff6ff', color: '#1d4ed8', border: '#bfdbfe', label: 'Cận hạn' },
+      Normal: { bg: '#f0fdf4', color: '#15803d', border: '#bbf7d0', label: 'An toàn' },
     };
     const s = map[status];
     return (
@@ -193,12 +188,14 @@ export const BatchTable: FC<BatchTableProps> = ({
         style={{
           display: 'inline-flex',
           alignItems: 'center',
-          fontSize: 12,
-          fontWeight: 700,
+          justifyContent: 'center',
+          padding: '3px 10px',
+          borderRadius: 9999,
+          fontSize: 11.5,
+          fontWeight: 600,
           color: s.color,
-          background: 'none',
-          border: 'none',
-          padding: 0,
+          backgroundColor: s.bg,
+          border: `1px solid ${s.border}`,
           whiteSpace: 'nowrap',
         }}
       >
@@ -487,50 +484,15 @@ export const BatchTable: FC<BatchTableProps> = ({
         </table>
       </div>
 
-      <div className="so-list-pager">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
-          <div>
-            Hiển thị <b>{startItem}</b> - <b>{endItem}</b> trên <b>{totalCount}</b> lô hàng
-          </div>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ color: '#64748b' }}>Bản ghi/trang:</span>
-            <select
-              className="so-list-pager-select"
-              value={pageSize}
-              onChange={(e) => onPageSizeChange(Number(e.target.value))}
-            >
-              <option value={10}>10</option>
-              <option value={20}>20</option>
-              <option value={30}>30</option>
-              <option value={50}>50</option>
-            </select>
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <button
-            type="button"
-            className="so-list-pager-btn"
-            disabled={pageIndex <= 1}
-            onClick={() => onPageChange(pageIndex - 1)}
-          >
-            <ChevronLeft size={13} />
-            <span>Trước</span>
-          </button>
-          <span style={{ padding: '0 8px', fontWeight: 600, color: '#0f172a' }}>
-            Trang {pageIndex} / {totalPages}
-          </span>
-          <button
-            type="button"
-            className="so-list-pager-btn"
-            disabled={pageIndex >= totalPages}
-            onClick={() => onPageChange(pageIndex + 1)}
-          >
-            <span>Sau</span>
-            <ChevronRight size={13} />
-          </button>
-        </div>
-      </div>
+      <TablePagination
+        currentPage={pageIndex}
+        pageSize={pageSize}
+        totalItems={totalCount}
+        pageSizeOptions={[10, 15, 20, 30, 50]}
+        onPageChange={onPageChange}
+        onPageSizeChange={onPageSizeChange}
+        itemLabel="lô hàng"
+      />
     </div>
   );
 };

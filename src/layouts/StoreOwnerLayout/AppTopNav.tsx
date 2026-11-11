@@ -114,6 +114,11 @@ const NAV_GROUPS: NavGroup[] = [
             badge: "",
           },
           {
+            label: "Nhóm hàng",
+            to: "/store-owner/categories",
+            badge: "",
+          },
+          {
             label: "Sản phẩm theo NCC",
             to: "/store-owner/suppliers/products",
             badge: "",

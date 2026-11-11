@@ -222,8 +222,8 @@ export const StoreSettingsHubPage: FC = () => {
 
         {/* Tab: Chi nhánh & Kho hàng */}
         {activeTab === 'branches' && (
-          <div>
-            <div style={{ marginBottom: 18 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+            <div style={{ marginBottom: 14, flexShrink: 0 }}>
               <h1 style={{ fontSize: 22, fontWeight: 800, color: '#0F172A', margin: 0 }}>
                 Quản lý chi nhánh & Kho hàng
               </h1>
@@ -251,7 +251,7 @@ export const StoreSettingsHubPage: FC = () => {
 
         {/* Tab 5: Thanh toán & Ví gian hàng */}
         {activeTab === 'wallet' && (
-          <div style={{ marginTop: 8 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, marginTop: 4 }}>
             <WalletLedgerTab
               storeInfo={storeInfo}
               transactions={transactions}

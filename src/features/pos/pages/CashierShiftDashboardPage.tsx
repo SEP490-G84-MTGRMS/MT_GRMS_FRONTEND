@@ -10,6 +10,7 @@ import {
   CheckCircle2,
   Receipt,
   Search,
+  Lock,
 } from 'lucide-react';
 import { DebtCollectionModal } from '../../customer-crm/components/DebtCollectionModal';
 import { CreateExpenseModal } from '../../service-expenses/components/CreateExpenseModal';
@@ -276,7 +277,7 @@ export const CashierShiftDashboardPage: React.FC = () => {
           </div>
 
           <h1 style={{ fontSize: '1.6rem', fontWeight: 900, color: '#0F172A', margin: '4px 0' }}>
-            Xin chào, Em Nam! 👋
+            Xin chào, Em Nam!
           </h1>
           <p style={{ margin: 0, fontSize: '0.86rem', color: '#64748B' }}>
             Bàn làm việc thu ngân POS • Thao tác nhanh, chống thao tác sai
@@ -530,8 +531,8 @@ export const CashierShiftDashboardPage: React.FC = () => {
               Phiếu thu/chi đã lập trong ca hôm nay ({shiftActivities.length})
             </h3>
           </div>
-          <span style={{ fontSize: '0.78rem', color: '#64748B' }}>
-            🔒 Chế độ bảo mật thu ngân: Không hiển thị số dư tồn quỹ của chủ tiệm
+          <span style={{ fontSize: '0.78rem', color: '#64748B', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+            <Lock size={12} color="#64748B" /> Chế độ bảo mật thu ngân: Không hiển thị số dư tồn quỹ của chủ tiệm
           </span>
         </div>
 

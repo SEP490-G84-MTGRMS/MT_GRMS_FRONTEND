@@ -3,11 +3,11 @@ import type { FC } from 'react';
 import {
   Building2,
   ShoppingCart,
-  ChevronLeft,
-  ChevronRight,
   ArrowUpDown,
 } from 'lucide-react';
 import type { BranchListItem } from '../../types/po.types';
+import { TablePagination } from '../../../../components/common';
+import '../../../../styles/so-list-page.css';
 
 interface BranchOrderTableProps {
   branches: BranchListItem[];
@@ -99,10 +99,6 @@ export const BranchOrderTable: FC<BranchOrderTableProps> = ({
     });
   }, [branches, sortField, sortDir]);
 
-  const totalPages = Math.ceil(totalCount / pageSize) || 1;
-  const startItem = totalCount === 0 ? 0 : (pageIndex - 1) * pageSize + 1;
-  const endItem = Math.min(pageIndex * pageSize, totalCount);
-
   const headerRef = useRef<HTMLDivElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
   const [hasScrollY, setHasScrollY] = useState(false);
@@ -169,17 +165,17 @@ export const BranchOrderTable: FC<BranchOrderTableProps> = ({
           style={{
             display: 'inline-flex',
             alignItems: 'center',
-            gap: 5,
+            justifyContent: 'center',
             padding: '3px 10px',
-            borderRadius: 12,
-            fontSize: 12,
+            borderRadius: 9999,
+            fontSize: 11.5,
             fontWeight: 600,
-            backgroundColor: '#dcfce7',
+            backgroundColor: '#f0fdf4',
             color: '#15803d',
+            border: '1px solid #bbf7d0',
             whiteSpace: 'nowrap',
           }}
         >
-          <span style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: '#16a34a' }} />
           <span>Hoạt động</span>
         </span>
       );
@@ -189,17 +185,17 @@ export const BranchOrderTable: FC<BranchOrderTableProps> = ({
         style={{
           display: 'inline-flex',
           alignItems: 'center',
-          gap: 5,
+          justifyContent: 'center',
           padding: '3px 10px',
-          borderRadius: 12,
-          fontSize: 12,
+          borderRadius: 9999,
+          fontSize: 11.5,
           fontWeight: 600,
-          backgroundColor: '#f1f5f9',
+          backgroundColor: '#f8fafc',
           color: '#64748b',
+          border: '1px solid #e2e8f0',
           whiteSpace: 'nowrap',
         }}
       >
-        <span style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: '#94a3b8' }} />
         <span>Ngừng hoạt động</span>
       </span>
     );
@@ -562,112 +558,16 @@ export const BranchOrderTable: FC<BranchOrderTableProps> = ({
         </table>
       </div>
 
-      {/* ── Footer Phân trang (Paging) tích hợp theo chuẩn SupplierTable ── */}
-      <div
-        style={{
-          padding: '10px 16px',
-          borderTop: '1px solid #e2e8f0',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          fontSize: 12,
-          color: '#64748b',
-          backgroundColor: '#ffffff',
-          flexWrap: 'wrap',
-          gap: 10,
-          flexShrink: 0,
-          zIndex: 15,
-        }}
-      >
-        {/* Bên trái: Thông tin số lượng & Chọn số bản ghi / trang */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
-          <div>
-            Hiển thị <b>{startItem}</b> - <b>{endItem}</b> trên <b>{totalCount}</b> chi nhánh
-          </div>
-
-          {onPageSizeChange && (
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ color: '#64748b' }}>Bản ghi/trang:</span>
-              <select
-                value={pageSize}
-                onChange={(e) => onPageSizeChange(Number(e.target.value))}
-                style={{
-                  height: 28,
-                  padding: '0 8px',
-                  borderRadius: 5,
-                  border: '1px solid #cbd5e1',
-                  backgroundColor: '#ffffff',
-                  color: '#0f172a',
-                  fontSize: 12,
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  outline: 'none',
-                }}
-              >
-                <option value={10}>10</option>
-                <option value={20}>20</option>
-                <option value={30}>30</option>
-                <option value={50}>50</option>
-              </select>
-            </div>
-          )}
-        </div>
-
-        {/* Bên phải: Nút Trước / Trang x / y / Sau */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <button
-            type="button"
-            disabled={pageIndex <= 1}
-            onClick={() => onPageChange(pageIndex - 1)}
-            style={{
-              height: 28,
-              padding: '0 8px',
-              borderRadius: 6,
-              border: '1px solid #cbd5e1',
-              backgroundColor: '#ffffff',
-              color: pageIndex <= 1 ? '#94a3b8' : '#334155',
-              cursor: pageIndex <= 1 ? 'not-allowed' : 'pointer',
-              opacity: pageIndex <= 1 ? 0.45 : 1,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 4,
-              fontSize: 12,
-              fontWeight: 600,
-            }}
-          >
-            <ChevronLeft size={13} />
-            <span>Trước</span>
-          </button>
-
-          <span style={{ padding: '0 8px', fontWeight: 600, color: '#0f172a' }}>
-            Trang {pageIndex} / {totalPages}
-          </span>
-
-          <button
-            type="button"
-            disabled={pageIndex >= totalPages}
-            onClick={() => onPageChange(pageIndex + 1)}
-            style={{
-              height: 28,
-              padding: '0 8px',
-              borderRadius: 6,
-              border: '1px solid #cbd5e1',
-              backgroundColor: '#ffffff',
-              color: pageIndex >= totalPages ? '#94a3b8' : '#334155',
-              cursor: pageIndex >= totalPages ? 'not-allowed' : 'pointer',
-              opacity: pageIndex >= totalPages ? 0.45 : 1,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 4,
-              fontSize: 12,
-              fontWeight: 600,
-            }}
-          >
-            <span>Sau</span>
-            <ChevronRight size={13} />
-          </button>
-        </div>
-      </div>
+      {/* ── Footer Phân trang chuẩn 1, 2, 3... ── */}
+      <TablePagination
+        currentPage={pageIndex}
+        pageSize={pageSize}
+        totalItems={totalCount}
+        pageSizeOptions={[10, 15, 20, 30, 50]}
+        onPageChange={onPageChange}
+        onPageSizeChange={onPageSizeChange || (() => {})}
+        itemLabel="chi nhánh"
+      />
     </div>
   );
 };

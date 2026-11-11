@@ -61,7 +61,7 @@ export const EditFloatModal: FC<Props> = ({
                 value={floatAmount === 0 ? '' : floatAmount}
                 onChange={(e) => setFloatAmount(Math.max(0, Number(e.target.value) || 0))}
                 placeholder="1.500.000"
-                className="modal-input font-mono tabular-nums font-bold text-teal-800"
+                className="modal-input tabular-nums font-bold text-teal-800"
                 autoFocus
                 required
               />

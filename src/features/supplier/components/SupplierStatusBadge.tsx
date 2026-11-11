@@ -27,22 +27,24 @@ export const SupplierTypeBadge: FC<{ type: SupplierType }> = ({ type }) => {
   );
 };
 
-export const SupplierStatusBadge: FC<{ status: SupplierStatus }> = ({ status }) => (
-  <span
-    style={{
-      display: 'inline-flex',
-      alignItems: 'center',
-      gap: 4,
-      padding: '2px 8px',
-      borderRadius: 4,
-      fontSize: '11.5px',
-      fontWeight: 700,
-      backgroundColor: status === 'Active' ? '#dcfce7' : '#f1f5f9',
-      color: status === 'Active' ? '#15803d' : '#64748b',
-      border: status === 'Active' ? '1px solid #86efac' : '1px solid #cbd5e1',
-      whiteSpace: 'nowrap',
-    }}
-  >
-    {status === 'Active' ? '🟢 Hoạt động' : '⚪ Tạm ngưng'}
-  </span>
-);
+export const SupplierStatusBadge: FC<{ status: SupplierStatus }> = ({ status }) => {
+  const isActive = status === 'Active';
+  return (
+    <span
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        padding: '3px 10px',
+        borderRadius: 9999,
+        fontSize: '12px',
+        fontWeight: 600,
+        backgroundColor: isActive ? '#f0fdf4' : '#f8fafc',
+        color: isActive ? '#15803d' : '#64748b',
+        border: isActive ? '1px solid #bbf7d0' : '1px solid #e2e8f0',
+        whiteSpace: 'nowrap',
+      }}
+    >
+      {isActive ? 'Hoạt động' : 'Tạm ngưng'}
+    </span>
+  );
+};

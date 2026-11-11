@@ -4,11 +4,10 @@ import {
   Eye,
   Edit3,
   ArrowUpDown,
-  ChevronLeft,
-  ChevronRight,
   FileText,
 } from 'lucide-react';
 import type { PurchaseOrderListItem, PurchaseOrderStatus } from '../../types/po-list.types';
+import { TablePagination } from '../../../../components/common';
 
 interface PoListTableProps {
   orders: PurchaseOrderListItem[];
@@ -117,10 +116,6 @@ export const PoListTable: FC<PoListTableProps> = ({
     });
   }, [orders, sortField, sortDir]);
 
-  const totalPages = Math.ceil(totalCount / pageSize) || 1;
-  const startItem = totalCount === 0 ? 0 : (pageIndex - 1) * pageSize + 1;
-  const endItem = Math.min(pageIndex * pageSize, totalCount);
-
   const headerRef = useRef<HTMLDivElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
   const [hasScrollY, setHasScrollY] = useState(false);
@@ -198,37 +193,34 @@ export const PoListTable: FC<PoListTableProps> = ({
   };
 
   const renderStatusBadge = (status: PurchaseOrderStatus) => {
-    const colors: Record<string, string> = {
-      SENT: '#b45309',
-      CONFIRMED: '#15803d',
-      PARTIALLY_RECEIVED: '#4338ca',
-      RECEIVED: '#0369a1',
-      CANCELLED: '#dc2626',
+    const styles: Record<string, { bg: string; color: string; border: string; label: string }> = {
+      SENT: { bg: '#fffbeb', color: '#b45309', border: '#fde68a', label: 'Đã gửi' },
+      CONFIRMED: { bg: '#f0fdf4', color: '#15803d', border: '#bbf7d0', label: 'Đã chốt' },
+      PARTIALLY_RECEIVED: { bg: '#eef2ff', color: '#4338ca', border: '#c7d2fe', label: 'Nhận 1 phần' },
+      RECEIVED: { bg: '#f0f9ff', color: '#0369a1', border: '#bae6fd', label: 'Đã nhập' },
+      CANCELLED: { bg: '#fef2f2', color: '#dc2626', border: '#fecaca', label: 'Đã hủy' },
     };
-    const labels: Record<string, string> = {
-      SENT: 'Đã gửi',
-      CONFIRMED: 'Đã chốt',
-      PARTIALLY_RECEIVED: 'Nhận 1 phần',
-      RECEIVED: 'Đã nhập',
-      CANCELLED: 'Đã hủy',
-    };
+    const st = styles[status] || { bg: '#f8fafc', color: '#334155', border: '#e2e8f0', label: status };
 
     return (
       <span
         style={{
-          display: 'inline-block',
-          fontSize: 12,
-          fontWeight: 700,
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '3px 10px',
+          borderRadius: 9999,
+          fontSize: 11.5,
+          fontWeight: 600,
           maxWidth: '100%',
-          color: colors[status] || '#334155',
-          background: 'none',
-          border: 'none',
-          padding: 0,
-          ...cellWrap,
+          color: st.color,
+          backgroundColor: st.bg,
+          border: `1px solid ${st.border}`,
+          whiteSpace: 'nowrap',
         }}
-        title={labels[status] || status}
+        title={st.label}
       >
-        {labels[status] || status}
+        {st.label}
       </span>
     );
   };
@@ -573,55 +565,15 @@ export const PoListTable: FC<PoListTableProps> = ({
         </table>
       </div>
 
-      <div className="so-list-pager">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
-          <div>
-            Hiển thị <b>{startItem}</b> - <b>{endItem}</b> trên <b>{totalCount}</b> đơn mua hàng PO
-          </div>
-
-          {onPageSizeChange && (
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ color: '#64748b' }}>Bản ghi/trang:</span>
-              <select
-                className="so-list-pager-select"
-                value={pageSize}
-                onChange={(e) => onPageSizeChange(Number(e.target.value))}
-              >
-                <option value={10}>10</option>
-                <option value={20}>20</option>
-                <option value={30}>30</option>
-                <option value={50}>50</option>
-              </select>
-            </div>
-          )}
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <button
-            type="button"
-            className="so-list-pager-btn"
-            disabled={pageIndex <= 1}
-            onClick={() => onPageChange(pageIndex - 1)}
-          >
-            <ChevronLeft size={13} />
-            <span>Trước</span>
-          </button>
-
-          <span style={{ padding: '0 8px', fontWeight: 600, color: '#0f172a' }}>
-            Trang {pageIndex} / {totalPages}
-          </span>
-
-          <button
-            type="button"
-            className="so-list-pager-btn"
-            disabled={pageIndex >= totalPages}
-            onClick={() => onPageChange(pageIndex + 1)}
-          >
-            <span>Sau</span>
-            <ChevronRight size={13} />
-          </button>
-        </div>
-      </div>
+      <TablePagination
+        currentPage={pageIndex}
+        pageSize={pageSize}
+        totalItems={totalCount}
+        pageSizeOptions={[10, 15, 20, 30, 50]}
+        onPageChange={onPageChange}
+        onPageSizeChange={onPageSizeChange || (() => {})}
+        itemLabel="đơn mua hàng PO"
+      />
     </div>
   );
 };

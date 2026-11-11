@@ -3,8 +3,6 @@ import type { FC, CSSProperties } from 'react';
 import {
   ArrowUpDown,
   Printer,
-  ChevronLeft,
-  ChevronRight,
   PackageOpen,
   ArrowRightCircle,
   FileCheck2,
@@ -14,6 +12,7 @@ import {
   FileText,
 } from 'lucide-react';
 import type { GoodsReceiptListItem, GrnStatus } from '../types/grn.types';
+import { TablePagination } from '../../../components/common';
 
 interface GrnTableProps {
   receipts: GoodsReceiptListItem[];
@@ -103,10 +102,6 @@ export const GrnTable: FC<GrnTableProps> = ({
     });
   }, [receipts, sortField, sortOrder]);
 
-  const totalPages = Math.ceil(totalCount / pageSize) || 1;
-  const startItem = totalCount === 0 ? 0 : (pageIndex - 1) * pageSize + 1;
-  const endItem = Math.min(pageIndex * pageSize, totalCount);
-
   const headerRef = useRef<HTMLDivElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
   const [hasScrollY, setHasScrollY] = useState(false);
@@ -187,40 +182,34 @@ export const GrnTable: FC<GrnTableProps> = ({
   };
 
   const renderStatusBadge = (status: GrnStatus) => {
-    const colors: Record<string, string> = {
-      TODAY: '#0369a1',
-      DRAFT: '#b45309',
-      CONFIRMED: '#15803d',
-      COMPLETED: '#15803d',
-      MISMATCH: '#dc2626',
-      CANCELED: '#64748b',
-      CANCELLED: '#64748b',
+    const styles: Record<string, { bg: string; color: string; border: string; label: string }> = {
+      TODAY: { bg: '#f0f9ff', color: '#0369a1', border: '#bae6fd', label: 'Scheduled' },
+      DRAFT: { bg: '#fffbeb', color: '#b45309', border: '#fde68a', label: 'Draft' },
+      CONFIRMED: { bg: '#f0fdf4', color: '#15803d', border: '#bbf7d0', label: 'Confirmed' },
+      COMPLETED: { bg: '#f0fdf4', color: '#15803d', border: '#bbf7d0', label: 'Confirmed' },
+      MISMATCH: { bg: '#fef2f2', color: '#dc2626', border: '#fecaca', label: 'Mismatch' },
+      CANCELED: { bg: '#f8fafc', color: '#64748b', border: '#e2e8f0', label: 'Cancelled' },
+      CANCELLED: { bg: '#f8fafc', color: '#64748b', border: '#e2e8f0', label: 'Cancelled' },
     };
-    const labels: Record<string, string> = {
-      TODAY: 'Scheduled',
-      DRAFT: 'Draft',
-      CONFIRMED: 'Confirmed',
-      COMPLETED: 'Confirmed',
-      MISMATCH: 'Mismatch',
-      CANCELED: 'Cancelled',
-      CANCELLED: 'Cancelled',
-    };
+    const st = styles[status] || { bg: '#f8fafc', color: '#334155', border: '#e2e8f0', label: status };
 
     return (
       <span
         style={{
           display: 'inline-flex',
           alignItems: 'center',
-          fontSize: 12,
-          fontWeight: 700,
+          justifyContent: 'center',
+          padding: '3px 10px',
+          borderRadius: 9999,
+          fontSize: 11.5,
+          fontWeight: 600,
           whiteSpace: 'nowrap',
-          color: colors[status] || '#334155',
-          background: 'none',
-          border: 'none',
-          padding: 0,
+          color: st.color,
+          backgroundColor: st.bg,
+          border: `1px solid ${st.border}`,
         }}
       >
-        {labels[status] || status}
+        {st.label}
       </span>
     );
   };
@@ -540,50 +529,16 @@ export const GrnTable: FC<GrnTableProps> = ({
         </table>
       </div>
 
-      <div className="so-list-pager">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
-          <div>
-            Hiển thị <b>{startItem}</b> - <b>{endItem}</b> trong tổng số <b>{totalCount}</b> phiếu
-          </div>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ color: '#64748b' }}>Bản ghi/trang:</span>
-            <select
-              className="so-list-pager-select"
-              value={pageSize}
-              onChange={(e) => onPageSizeChange(Number(e.target.value))}
-            >
-              <option value={10}>10</option>
-              <option value={20}>20</option>
-              <option value={30}>30</option>
-              <option value={50}>50</option>
-            </select>
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <button
-            type="button"
-            className="so-list-pager-btn"
-            disabled={pageIndex <= 1}
-            onClick={() => onPageChange(pageIndex - 1)}
-          >
-            <ChevronLeft size={13} />
-            <span>Trước</span>
-          </button>
-          <span style={{ padding: '0 8px', fontWeight: 600, color: '#0f172a' }}>
-            Trang {pageIndex} / {totalPages}
-          </span>
-          <button
-            type="button"
-            className="so-list-pager-btn"
-            disabled={pageIndex >= totalPages}
-            onClick={() => onPageChange(pageIndex + 1)}
-          >
-            <span>Sau</span>
-            <ChevronRight size={13} />
-          </button>
-        </div>
-      </div>
+      <TablePagination
+        currentPage={pageIndex}
+        pageSize={pageSize}
+        totalItems={totalCount}
+        pageSizeOptions={[10, 15, 20, 30, 50]}
+        onPageChange={onPageChange}
+        onPageSizeChange={onPageSizeChange}
+        itemLabel="phiếu"
+        isLoading={isLoading}
+      />
     </div>
   );
 };
