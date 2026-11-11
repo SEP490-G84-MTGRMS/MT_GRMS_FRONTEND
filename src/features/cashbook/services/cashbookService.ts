@@ -346,6 +346,7 @@ function mapBackendEntryToLedgerTransaction(
     referenceDocId: entry.referenceCode || entry.sourceId || undefined,
     sourceId: entry.sourceId,
     sourceModuleName,
+    sourceType: entry.sourceType,
     isAutomated: entry.sourceType !== 'MANUAL',
     isCompensating,
     originalEntryId: isCompensating ? entry.sourceId || undefined : undefined,
@@ -467,7 +468,14 @@ export const cashbookService = {
       filtered = filtered.filter((tx) => tx.accountId === params.accountId);
     }
 
-    if (params.transactionType && params.transactionType !== 'ALL') {
+    if (params.sourceType) {
+      filtered = filtered.filter(
+        (tx) =>
+          tx.sourceType === params.sourceType ||
+          tx.sourceModuleName === params.sourceType ||
+          tx.referenceDocType === params.sourceType
+      );
+    } else if (params.transactionType && params.transactionType !== 'ALL') {
       filtered = filtered.filter((tx) => tx.transactionType === params.transactionType);
     }
 
@@ -512,6 +520,7 @@ export const cashbookService = {
       if (params.branchId && params.branchId !== 'ALL') queryParams.branchId = params.branchId;
       if (params.startDate) queryParams.fromDate = params.startDate;
       if (params.endDate) queryParams.toDate = params.endDate;
+      if (params.sourceType) queryParams.sourceType = params.sourceType;
       if (params.searchQuery && params.searchQuery.trim()) {
         queryParams.keyword = params.searchQuery.trim();
       }
@@ -537,7 +546,14 @@ export const cashbookService = {
         }
       }
 
-      if (params.transactionType && params.transactionType !== 'ALL') {
+      if (params.sourceType) {
+        mappedItems = mappedItems.filter(
+          (tx) =>
+            tx.sourceType === params.sourceType ||
+            tx.sourceModuleName === params.sourceType ||
+            tx.referenceDocType === params.sourceType
+        );
+      } else if (params.transactionType && params.transactionType !== 'ALL') {
         mappedItems = mappedItems.filter((tx) => tx.transactionType === params.transactionType);
       }
 
@@ -900,6 +916,7 @@ export const cashbookService = {
       referenceDocType: 'INTERNAL_TRANSFER',
       referenceDocId: recTxId,
       sourceModuleName: 'INTERNAL_TRANSFER',
+      sourceType: 'INTERNAL_TRANSFER',
       linkedTransactionId: recTxId,
       isAutomated: true,
       createdBy: dto.performedBy || 'Nguyễn Trường An',
@@ -922,6 +939,7 @@ export const cashbookService = {
       referenceDocType: 'INTERNAL_TRANSFER',
       referenceDocId: payTxId,
       sourceModuleName: 'INTERNAL_TRANSFER',
+      sourceType: 'INTERNAL_TRANSFER',
       linkedTransactionId: payTxId,
       isAutomated: true,
       createdBy: dto.performedBy || 'Nguyễn Trường An',

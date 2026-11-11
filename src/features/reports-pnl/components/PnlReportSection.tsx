@@ -45,6 +45,7 @@ export interface PnlReportSectionProps {
   onShowToast?: (message: string, type?: ToastState['type']) => void;
   hideRefreshButton?: boolean;
   embedded?: boolean;
+  accountingMode?: boolean;
 }
 
 interface PnlReportBodyProps {
@@ -59,6 +60,7 @@ interface PnlReportBodyProps {
   hideRefreshButton?: boolean;
   activeTab: ViewTab;
   accountingBasis: AccountingBasis;
+  accountingMode?: boolean;
   showAccountingDetails: boolean;
   onToggleAccountingDetails: () => void;
   onOpenExportModal: () => void;
@@ -329,7 +331,8 @@ const PnlStatementContent: React.FC<{
   isLoading: boolean;
   taxAmount: number;
   accountingBasis: AccountingBasis;
-}> = ({ reportData, isLoading, taxAmount, accountingBasis }) => (
+  accountingMode?: boolean;
+}> = ({ reportData, isLoading, taxAmount, accountingBasis, accountingMode }) => (
   <div className="pnl-statement-section">
     <div className="pnl-statement-header">
       <h3>Bảng phân tích Lãi lỗ chi tiết (Dành cho kế toán)</h3>
@@ -340,6 +343,7 @@ const PnlStatementContent: React.FC<{
       isLoading={isLoading}
       estimatedTaxAmount={taxAmount}
       cogsComparison={reportData?.kpiSummary?.cogsComparison}
+      accountingMode={accountingMode || accountingBasis === 'ACCRUAL'}
     />
   </div>
 );
@@ -347,7 +351,7 @@ const PnlStatementContent: React.FC<{
 const PnlReportBody: React.FC<PnlReportBodyProps> = ({
   filter, onFilterChange, branches, reportData, isLoading, isFetching = false,
   errorMsg, onRefresh, hideRefreshButton = false, activeTab, accountingBasis,
-  showAccountingDetails, onToggleAccountingDetails, onOpenExportModal,
+  accountingMode, showAccountingDetails, onToggleAccountingDetails, onOpenExportModal,
 }) => {
   const metrics = computePnlSummaryMetrics(reportData?.kpiSummary);
   const waterfallItems = buildWaterfallItems(reportData?.kpiSummary, metrics.grossMarginDisplay);
@@ -379,6 +383,7 @@ const PnlReportBody: React.FC<PnlReportBodyProps> = ({
         <PnlStatementContent
           reportData={reportData} isLoading={isLoading}
           taxAmount={metrics.taxAmount} accountingBasis={accountingBasis}
+          accountingMode={accountingMode}
         />
       )}
     </div>
@@ -389,9 +394,9 @@ const PnlReportBody: React.FC<PnlReportBodyProps> = ({
  * Reusable P&L report section supporting standalone and embedded overview modes.
  */
 export const PnlReportSection: React.FC<PnlReportSectionProps> = (props) => {
-  const { filter, branches, reportData, onShowToast, embedded = false } = props;
+  const { filter, branches, reportData, onShowToast, embedded = false, accountingMode = false } = props;
   const [activeTab, setActiveTab] = useState<ViewTab>('ALL');
-  const [accountingBasis, setAccountingBasis] = useState<AccountingBasis>('CASH');
+  const [accountingBasis, setAccountingBasis] = useState<AccountingBasis>(() => (accountingMode ? 'ACCRUAL' : 'CASH'));
   const [showAccountingDetails, setShowAccountingDetails] = useState(false);
   const exportModal = useControlledExportModal(
     props.isExportModalOpen,
@@ -415,7 +420,7 @@ export const PnlReportSection: React.FC<PnlReportSectionProps> = (props) => {
         reportData={reportData} isLoading={props.isLoading} isFetching={props.isFetching}
         errorMsg={props.errorMsg} onRefresh={props.onRefresh}
         hideRefreshButton={props.hideRefreshButton} activeTab={activeTab}
-        accountingBasis={accountingBasis} showAccountingDetails={showAccountingDetails}
+        accountingBasis={accountingBasis} accountingMode={accountingMode} showAccountingDetails={showAccountingDetails}
         onToggleAccountingDetails={() => setShowAccountingDetails((prev) => !prev)}
         onOpenExportModal={exportModal.openModal}
       />

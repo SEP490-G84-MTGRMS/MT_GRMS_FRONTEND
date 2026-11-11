@@ -26,12 +26,14 @@ import {
   FileText,
   UserCheck,
   Building2,
+  Printer,
 } from 'lucide-react';
 import { posShiftApi } from '../../pos/api/posShiftApi';
 import type {
   ShiftCashMovementDto,
   ShiftDetailResponse,
   ConfirmHandoverRequest,
+  ZReportResponse,
 } from '../../pos/types/posShift.types';
 import { employeeApi } from '../../employee/api/employeeApi';
 import type { Branch } from '../../employee/types';
@@ -116,6 +118,8 @@ export const CashControlHubPage: FC = () => {
   // Tab 1 (Pending) data state
   const [pendingMovements, setPendingMovements] = useState<ShiftCashMovementDto[]>([]);
   const [unconfirmedDrops, setUnconfirmedDrops] = useState<ShiftCashMovementDto[]>([]);
+  const [resolvedMovements, setResolvedMovements] = useState<ShiftCashMovementDto[]>([]);
+  const [pendingFilter, setPendingFilter] = useState<'ALL' | 'DROPS' | 'EXPENSES'>('ALL');
   const [isPendingLoading, setIsPendingLoading] = useState<boolean>(false);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
 
@@ -137,6 +141,12 @@ export const CashControlHubPage: FC = () => {
   const [handoverDecision, setHandoverDecision] = useState<'CONFIRMED' | 'DISPUTED'>('CONFIRMED');
   const [disputeReason, setDisputeReason] = useState<string>('');
   const [isSubmittingHandover, setIsSubmittingHandover] = useState<boolean>(false);
+
+  // Z-Report thermal invoice modal state
+  const [zReportShiftId, setZReportShiftId] = useState<string | null>(null);
+  const [zReportData, setZReportData] = useState<ZReportResponse | null>(null);
+  const [isLoadingZReport, setIsLoadingZReport] = useState<boolean>(false);
+  const [zReportError, setZReportError] = useState<string | null>(null);
 
   // Tab 3 (Limits) settings state
   const [threshold, setThreshold] = useState<number>(200000);
@@ -192,7 +202,7 @@ export const CashControlHubPage: FC = () => {
   }, [user?.branchId]);
 
   /**
-   * Fetch cash movement settings and pending items for Tab 1.
+   * Fetch cash movement settings, pending items, and resolved history today for Tab 1.
    */
   const loadPendingData = useCallback(async () => {
     setIsPendingLoading(true);
@@ -218,12 +228,48 @@ export const CashControlHubPage: FC = () => {
         setPendingMovements([]);
         setUnconfirmedDrops([]);
       }
+
+      // Tải lịch sử các phiếu thu/chi đã duyệt hoặc đã nhận đủ trong ngày hôm nay
+      try {
+        const now = new Date();
+        const startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0).toISOString();
+        const endToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999).toISOString();
+        const targetBranch = branchParam || (branches[0]?.id || user?.branchId || '');
+        if (targetBranch && !targetBranch.startsWith('BR-')) {
+          const shiftsToday = await posShiftApi.getShiftHistory(targetBranch, startToday, endToday);
+          if (shiftsToday && shiftsToday.length > 0) {
+            const resolvedItems: ShiftCashMovementDto[] = [];
+            for (const s of shiftsToday) {
+              if (s.cashMovements && s.cashMovements.length > 0) {
+                for (const m of s.cashMovements) {
+                  const isApproved = m.status === 'Recorded' || m.status === 1;
+                  const isRejected = m.status === 'Rejected' || m.status === 3;
+                  const isDropConfirmed = (m.category === 'CASH_DRAW' || m.category === 2) && m.isConfirmedByOwner;
+                  if (isApproved || isRejected || isDropConfirmed) {
+                    resolvedItems.push({ ...m, shiftId: s.id });
+                  }
+                }
+              }
+            }
+            setResolvedMovements((prev) => {
+              const map = new Map<string, ShiftCashMovementDto>();
+              resolvedItems.forEach((item) => map.set(item.id, item));
+              prev.forEach((item) => map.set(item.id, item));
+              return Array.from(map.values()).sort(
+                (a, b) => new Date(b.occurredAtUtc).getTime() - new Date(a.occurredAtUtc).getTime()
+              );
+            });
+          }
+        }
+      } catch (errHistory) {
+        console.warn('Lỗi lấy lịch sử ca để đồng bộ phiếu đã duyệt hôm nay:', errHistory);
+      }
     } catch (err) {
       console.error('Lỗi tải dữ liệu kiểm soát quỹ POS:', err);
     } finally {
       setIsPendingLoading(false);
     }
-  }, [selectedBranchId]);
+  }, [selectedBranchId, branches, user?.branchId]);
 
   /**
    * Fetch shift history for Tab 2.
@@ -339,6 +385,15 @@ export const CashControlHubPage: FC = () => {
     setActionLoadingId(id);
     try {
       await posShiftApi.approveCashMovement(id);
+      const target = pendingMovements.find((m) => m.id === id);
+      if (target) {
+        const approvedItem: ShiftCashMovementDto = {
+          ...target,
+          status: 'Recorded',
+          approvedAtUtc: new Date().toISOString(),
+        };
+        setResolvedMovements((prev) => [approvedItem, ...prev.filter((m) => m.id !== id)]);
+      }
       await loadPendingData();
     } catch (err: any) {
       alert(err.response?.data?.message || 'Không thể duyệt phiếu chi');
@@ -359,6 +414,16 @@ export const CashControlHubPage: FC = () => {
     setActionLoadingId(rejectingId);
     try {
       await posShiftApi.rejectCashMovement(rejectingId, rejectionReason.trim());
+      const target = pendingMovements.find((m) => m.id === rejectingId);
+      if (target) {
+        const rejectedItem: ShiftCashMovementDto = {
+          ...target,
+          status: 'Rejected',
+          rejectionReason: rejectionReason.trim(),
+          approvedAtUtc: new Date().toISOString(),
+        };
+        setResolvedMovements((prev) => [rejectedItem, ...prev.filter((m) => m.id !== rejectingId)]);
+      }
       setRejectingId(null);
       setRejectionReason('');
       await loadPendingData();
@@ -377,11 +442,143 @@ export const CashControlHubPage: FC = () => {
     setActionLoadingId(id);
     try {
       await posShiftApi.confirmCashDrop(id);
+      const target = unconfirmedDrops.find((m) => m.id === id);
+      if (target) {
+        const confirmedDropItem: ShiftCashMovementDto = {
+          ...target,
+          isConfirmedByOwner: true,
+          confirmedByOwnerAtUtc: new Date().toISOString(),
+        };
+        setResolvedMovements((prev) => [confirmedDropItem, ...prev.filter((m) => m.id !== id)]);
+      }
       await loadPendingData();
     } catch (err: any) {
       alert(err.response?.data?.message || 'Không thể xác nhận nhận tiền rút két');
     } finally {
       setActionLoadingId(null);
+    }
+  };
+
+  /**
+   * Open Z-Report thermal receipt modal and fetch detailed Z-Report via posShiftApi.getZReport.
+   * @param shiftId - The target shift ID.
+   */
+  const handleOpenZReport = async (shiftId: string) => {
+    setZReportShiftId(shiftId);
+    setIsLoadingZReport(true);
+    setZReportError(null);
+    setZReportData(null);
+    try {
+      const report = await posShiftApi.getZReport(shiftId);
+      setZReportData(report);
+    } catch (err: any) {
+      console.warn('Lỗi gọi API getZReport, tạo fallback từ dữ liệu ca:', err);
+      const fallbackShift = shifts.find((s) => s.id === shiftId);
+      if (fallbackShift) {
+        const fallbackReport: ZReportResponse = {
+          shiftId: fallbackShift.id,
+          shiftCode: fallbackShift.shiftCode,
+          shiftName: fallbackShift.shiftName,
+          branchId: fallbackShift.branchId,
+          branchName: fallbackShift.branchName,
+          tillId: fallbackShift.tillId,
+          openedAtUtc: fallbackShift.openedAtUtc,
+          closedAtUtc: fallbackShift.closedAtUtc,
+          openingFloat: fallbackShift.openingFloat,
+          cashSales: fallbackShift.actualCashCounted !== null && fallbackShift.actualCashCounted !== undefined
+            ? Math.max(0, fallbackShift.actualCashCounted - fallbackShift.openingFloat)
+            : 0,
+          totalCashIn: fallbackShift.totalCashIn || 0,
+          totalCashOut: fallbackShift.totalCashOut || 0,
+          totalBankRevenue: fallbackShift.totalBankRevenue || 0,
+          totalOrdersCount: 0,
+          expectedCashInTill: fallbackShift.expectedCash || 0,
+          actualCashCounted: fallbackShift.actualCashCounted,
+          discrepancy: fallbackShift.discrepancy,
+          retainedFloatAmount: fallbackShift.retainedFloatAmount || 0,
+          droppedToSafeAmount: fallbackShift.droppedToSafeAmount || 0,
+          handoverStatus: fallbackShift.handoverStatus,
+          receiverUserId: null,
+          notes: fallbackShift.notes,
+          cashMovements: fallbackShift.cashMovements || [],
+        };
+        setZReportData(fallbackReport);
+      } else {
+        setZReportError(err?.response?.data?.message || 'Không thể tải chi tiết Z-Report cho ca này.');
+      }
+    } finally {
+      setIsLoadingZReport(false);
+    }
+  };
+
+  /**
+   * Handle printing Z-Report thermal invoice using browser print window.
+   */
+  const handlePrintZReport = () => {
+    const el = document.getElementById('z-report-receipt-paper');
+    if (!el) {
+      window.print();
+      return;
+    }
+    const printWindow = window.open('', '_blank', 'width=440,height=700');
+    if (printWindow) {
+      printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <meta charset="utf-8" />
+            <title>Z-Report — ${zReportData?.shiftCode || 'POS'}</title>
+            <style>
+              @page {
+                size: 80mm auto;
+                margin: 4mm;
+              }
+              body {
+                font-family: 'Courier New', Courier, monospace;
+                font-size: 12px;
+                color: #000000;
+                margin: 0;
+                padding: 8px;
+                background: #ffffff;
+              }
+              .receipt-paper {
+                width: 100%;
+                max-width: 320px;
+                margin: 0 auto;
+              }
+              hr {
+                border: none;
+                border-top: 1px dashed #000000;
+                margin: 8px 0;
+              }
+              .text-center { text-align: center; }
+              .text-right { text-align: right; }
+              .fw-bold { font-weight: bold; }
+              .flex-row {
+                display: flex;
+                justify-content: space-between;
+                margin-bottom: 3px;
+              }
+              @media print {
+                body { padding: 0; }
+              }
+            </style>
+          </head>
+          <body>
+            ${el.innerHTML}
+            <script>
+              window.onload = function() {
+                window.focus();
+                window.print();
+                setTimeout(function() { window.close(); }, 600);
+              };
+            </script>
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+    } else {
+      window.print();
     }
   };
 
@@ -918,348 +1115,463 @@ export const CashControlHubPage: FC = () => {
             </div>
           </div>
 
-          {/* Hai Danh Sách Chờ Duyệt (Phiếu chi & Rút két) */}
+          {/* ─── ACTION INBOX: YÊU CẦU CA & KÉT CHỜ DUYỆT ─── */}
           <div
             style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(480px, 1fr))',
-              gap: 20,
-              alignItems: 'start',
+              backgroundColor: '#ffffff',
+              borderRadius: 12,
+              border: '1px solid #e2e8f0',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+              overflow: 'hidden',
             }}
           >
-            {/* DANH SÁCH 1: PHIẾU CHI KÉT VƯỢT HẠN MỨC CHỜ DUYỆT */}
+            {/* Header */}
             <div
               style={{
-                backgroundColor: '#ffffff',
-                borderRadius: 12,
-                border: '1px solid #e2e8f0',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-                overflow: 'hidden',
+                padding: '16px 20px',
+                borderBottom: '1px solid #e2e8f0',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                backgroundColor: '#f8fafc',
+                flexWrap: 'wrap',
+                gap: 12,
               }}
             >
-              <div
-                style={{
-                  padding: '16px 20px',
-                  borderBottom: '1px solid #e2e8f0',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  backgroundColor: '#f8fafc',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <ArrowUpCircle size={20} className="text-rose-600" />
-                  <h3 style={{ fontSize: 15, fontWeight: 800, color: '#0f172a', margin: 0 }}>
-                    Phiếu Chi Két Chờ Phê Duyệt ({pendingMovements.length})
-                  </h3>
-                </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <Clock size={20} className="text-teal-700" />
+                <h3 style={{ fontSize: 16, fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                  ⏳ Yêu cầu Ca &amp; Két đang chờ duyệt ({pendingMovements.length + unconfirmedDrops.length})
+                </h3>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <span
                   style={{
-                    fontSize: 11.5,
-                    fontWeight: 700,
-                    padding: '3px 8px',
+                    backgroundColor: '#ccfbf1',
+                    color: '#0f766e',
+                    border: '1px solid #99f6e4',
+                    padding: '4px 10px',
                     borderRadius: 20,
-                    backgroundColor: pendingMovements.length > 0 ? '#ffe4e6' : '#f1f5f9',
-                    color: pendingMovements.length > 0 ? '#b91c1c' : '#64748b',
+                    fontSize: 12,
+                    fontWeight: 700,
                   }}
                 >
-                  {pendingMovements.length > 0 ? 'Cần duyệt' : 'Đã duyệt hết'}
+                  Đồng bộ 1 nguồn với Sổ quỹ &amp; Tài chính
                 </span>
+                {/* Filter buttons */}
+                <div style={{ display: 'inline-flex', backgroundColor: '#e2e8f0', borderRadius: 8, padding: 2 }}>
+                  <button
+                    type="button"
+                    onClick={() => setPendingFilter('ALL')}
+                    style={{
+                      padding: '4px 10px',
+                      fontSize: 12,
+                      fontWeight: 600,
+                      borderRadius: 6,
+                      border: 'none',
+                      cursor: 'pointer',
+                      backgroundColor: pendingFilter === 'ALL' ? '#ffffff' : 'transparent',
+                      color: pendingFilter === 'ALL' ? '#0f766e' : '#64748b',
+                      boxShadow: pendingFilter === 'ALL' ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
+                    }}
+                  >
+                    Tất cả ({pendingMovements.length + unconfirmedDrops.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPendingFilter('DROPS')}
+                    style={{
+                      padding: '4px 10px',
+                      fontSize: 12,
+                      fontWeight: 600,
+                      borderRadius: 6,
+                      border: 'none',
+                      cursor: 'pointer',
+                      backgroundColor: pendingFilter === 'DROPS' ? '#ffffff' : 'transparent',
+                      color: pendingFilter === 'DROPS' ? '#0f766e' : '#64748b',
+                      boxShadow: pendingFilter === 'DROPS' ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
+                    }}
+                  >
+                    Nộp két sắt ({unconfirmedDrops.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPendingFilter('EXPENSES')}
+                    style={{
+                      padding: '4px 10px',
+                      fontSize: 12,
+                      fontWeight: 600,
+                      borderRadius: 6,
+                      border: 'none',
+                      cursor: 'pointer',
+                      backgroundColor: pendingFilter === 'EXPENSES' ? '#ffffff' : 'transparent',
+                      color: pendingFilter === 'EXPENSES' ? '#ea580c' : '#64748b',
+                      boxShadow: pendingFilter === 'EXPENSES' ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
+                    }}
+                  >
+                    Chi vượt hạn mức ({pendingMovements.length})
+                  </button>
+                </div>
               </div>
-
-              {pendingMovements.length === 0 ? (
-                <div style={{ padding: '36px 20px', textAlign: 'center' }}>
-                  <CheckCircle2 size={40} className="text-emerald-500" style={{ margin: '0 auto 10px' }} />
-                  <div style={{ fontSize: 14, fontWeight: 700, color: '#1e293b' }}>
-                    Không có phiếu chi nào đang chờ phê duyệt
-                  </div>
-                  <div style={{ fontSize: 12.5, color: '#64748b', marginTop: 4 }}>
-                    Mọi khoản chi vặt tại quầy hiện tại đều tuân thủ hạn mức duyệt tự động.
-                  </div>
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column' }}>
-                  {pendingMovements.map((item) => (
-                    <div
-                      key={item.id}
-                      style={{
-                        padding: 16,
-                        borderBottom: '1px solid #f1f5f9',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: 10,
-                      }}
-                    >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                        <div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <span style={{ fontSize: 13, fontWeight: 800, color: '#0f172a' }}>
-                              Phiếu chi: #{item.id.slice(0, 8)}
-                            </span>
-                            <span
-                              style={{
-                                fontSize: 11,
-                                fontWeight: 700,
-                                backgroundColor: '#fee2e2',
-                                color: '#991b1b',
-                                padding: '2px 6px',
-                                borderRadius: 4,
-                              }}
-                            >
-                              Chờ Chủ duyệt
-                            </span>
-                          </div>
-                          <div
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: 14,
-                              marginTop: 4,
-                              fontSize: 12,
-                              color: '#64748b',
-                            }}
-                          >
-                            <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                              <User size={13} />
-                              {item.createdByName || 'Thu ngân'}
-                            </span>
-                            <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                              <Clock size={13} />
-                              {item.occurredAtUtc ? formatDate(item.occurredAtUtc) : 'Vừa tạo'}
-                            </span>
-                          </div>
-                        </div>
-
-                        <div style={{ textAlign: 'right' }}>
-                          <div style={{ fontSize: 18, fontWeight: 800, color: '#e11d48' }}>
-                            -{formatVND(item.amount)}
-                          </div>
-                          <span style={{ fontSize: 11, color: '#94a3b8' }}>Vượt hạn mức tự duyệt</span>
-                        </div>
-                      </div>
-
-                      <div
-                        style={{
-                          padding: '8px 12px',
-                          backgroundColor: '#f8fafc',
-                          borderRadius: 6,
-                          border: '1px solid #e2e8f0',
-                          fontSize: 13,
-                          color: '#334155',
-                        }}
-                      >
-                        <b>Lý do chi:</b> {item.reason || 'Chi vặt phát sinh tại quầy thu ngân'}
-                      </div>
-
-                      {/* Action buttons */}
-                      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 4 }}>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setRejectingId(item.id);
-                            setRejectionReason('');
-                          }}
-                          disabled={actionLoadingId === item.id}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 6,
-                            padding: '6px 14px',
-                            borderRadius: 6,
-                            border: '1px solid #fecdd3',
-                            backgroundColor: '#ffffff',
-                            color: '#e11d48',
-                            fontSize: 12.5,
-                            fontWeight: 700,
-                            cursor: 'pointer',
-                          }}
-                        >
-                          <X size={14} />
-                          <span>Từ chối</span>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => handleApproveMovement(item.id)}
-                          disabled={actionLoadingId === item.id}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 6,
-                            padding: '6px 16px',
-                            borderRadius: 6,
-                            border: 'none',
-                            backgroundColor: '#0f766e',
-                            color: '#ffffff',
-                            fontSize: 12.5,
-                            fontWeight: 700,
-                            cursor: 'pointer',
-                            boxShadow: '0 1px 3px rgba(15, 118, 110, 0.2)',
-                          }}
-                        >
-                          <Check size={14} />
-                          <span>{actionLoadingId === item.id ? 'Đang duyệt...' : 'Duyệt xuất tiền'}</span>
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
 
-            {/* DANH SÁCH 2: KHOẢN RÚT KÉT NỘP QUỸ CHỜ XÁC NHẬN */}
-            <div
-              style={{
-                backgroundColor: '#ffffff',
-                borderRadius: 12,
-                border: '1px solid #e2e8f0',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-                overflow: 'hidden',
-              }}
-            >
-              <div
-                style={{
-                  padding: '16px 20px',
-                  borderBottom: '1px solid #e2e8f0',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  backgroundColor: '#f8fafc',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <ArrowDownCircle size={20} className="text-sky-600" />
-                  <h3 style={{ fontSize: 15, fontWeight: 800, color: '#0f172a', margin: 0 }}>
-                    Khoản Rút Két Nộp Quỹ Chờ Xác Nhận ({unconfirmedDrops.length})
-                  </h3>
-                </div>
-                <span
-                  style={{
-                    fontSize: 11.5,
-                    fontWeight: 700,
-                    padding: '3px 8px',
-                    borderRadius: 20,
-                    backgroundColor: unconfirmedDrops.length > 0 ? '#e0f2fe' : '#f1f5f9',
-                    color: unconfirmedDrops.length > 0 ? '#0284c7' : '#64748b',
-                  }}
-                >
-                  {unconfirmedDrops.length > 0 ? 'Chờ xác nhận' : 'Đã nhận đủ'}
-                </span>
-              </div>
+            {/* Content: Action Inbox Items List */}
+            <div style={{ padding: 18 }}>
+              {(() => {
+                const showDrops = pendingFilter === 'ALL' || pendingFilter === 'DROPS';
+                const showExpenses = pendingFilter === 'ALL' || pendingFilter === 'EXPENSES';
+                const visibleDrops = showDrops ? unconfirmedDrops : [];
+                const visibleExpenses = showExpenses ? pendingMovements : [];
+                const totalVisible = visibleDrops.length + visibleExpenses.length;
 
-              {unconfirmedDrops.length === 0 ? (
-                <div style={{ padding: '36px 20px', textAlign: 'center' }}>
-                  <CheckCircle2 size={40} className="text-sky-500" style={{ margin: '0 auto 10px' }} />
-                  <div style={{ fontSize: 14, fontWeight: 700, color: '#1e293b' }}>
-                    Không có khoản nộp tiền rút két nào đang chờ xác nhận
-                  </div>
-                  <div style={{ fontSize: 12.5, color: '#64748b', marginTop: 4 }}>
-                    Mọi khoản rút két giảm tải tiền mặt trong ca đã được Chủ cửa hàng xác nhận đầy đủ.
-                  </div>
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column' }}>
-                  {unconfirmedDrops.map((item) => (
-                    <div
-                      key={item.id}
-                      style={{
-                        padding: 16,
-                        borderBottom: '1px solid #f1f5f9',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: 10,
-                      }}
-                    >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                        <div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <span style={{ fontSize: 13, fontWeight: 800, color: '#0f172a' }}>
-                              Rút két nộp tiền: #{item.id.slice(0, 8)}
-                            </span>
-                            <span
-                              style={{
-                                fontSize: 11,
-                                fontWeight: 700,
-                                backgroundColor: '#e0f2fe',
-                                color: '#0369a1',
-                                padding: '2px 6px',
-                                borderRadius: 4,
-                              }}
-                            >
-                              Chờ Chủ nhận tiền
-                            </span>
-                          </div>
-                          <div
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: 14,
-                              marginTop: 4,
-                              fontSize: 12,
-                              color: '#64748b',
-                            }}
-                          >
-                            <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                              <User size={13} />
-                              {item.createdByName || 'Thu ngân'}
-                            </span>
-                            <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                              <Clock size={13} />
-                              {item.occurredAtUtc ? formatDate(item.occurredAtUtc) : 'Vừa tạo'}
-                            </span>
-                          </div>
-                        </div>
-
-                        <div style={{ textAlign: 'right' }}>
-                          <div style={{ fontSize: 18, fontWeight: 800, color: '#0284c7' }}>
-                            +{formatVND(item.amount)}
-                          </div>
-                          <span style={{ fontSize: 11, color: '#94a3b8' }}>Tiền mặt giao nộp</span>
-                        </div>
+                if (totalVisible === 0) {
+                  return (
+                    <div style={{ padding: '40px 20px', textAlign: 'center' }}>
+                      <CheckCircle2 size={42} className="text-emerald-500" style={{ margin: '0 auto 10px' }} />
+                      <div style={{ fontSize: 15, fontWeight: 700, color: '#1e293b' }}>
+                        Tất cả yêu cầu rút két và chi tại quầy đã được xử lý xong.
                       </div>
-
-                      <div
-                        style={{
-                          padding: '8px 12px',
-                          backgroundColor: '#f8fafc',
-                          borderRadius: 6,
-                          border: '1px solid #e2e8f0',
-                          fontSize: 13,
-                          color: '#334155',
-                        }}
-                      >
-                        <b>Ghi chú:</b> {item.reason || 'Rút tiền mặt khỏi két nộp về chủ cửa hàng để giảm tồn quỹ'}
-                      </div>
-
-                      {/* Action */}
-                      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 4 }}>
-                        <button
-                          type="button"
-                          onClick={() => handleConfirmDrop(item.id)}
-                          disabled={actionLoadingId === item.id}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 6,
-                            padding: '7px 18px',
-                            borderRadius: 6,
-                            border: 'none',
-                            backgroundColor: '#0284c7',
-                            color: '#ffffff',
-                            fontSize: 12.5,
-                            fontWeight: 700,
-                            cursor: 'pointer',
-                            boxShadow: '0 1px 3px rgba(2, 132, 199, 0.25)',
-                          }}
-                        >
-                          <Check size={14} />
-                          <span>{actionLoadingId === item.id ? 'Đang xử lý...' : 'Xác nhận đã nhận đủ tiền'}</span>
-                        </button>
+                      <div style={{ fontSize: 13, color: '#64748b', marginTop: 4 }}>
+                        Không có yêu cầu nộp két sắt hoặc chi quầy vượt hạn mức nào cần Chủ cửa hàng phê duyệt lúc này.
                       </div>
                     </div>
-                  ))}
-                </div>
-              )}
+                  );
+                }
+
+                return (
+                  <div className="action-inbox-list" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    {/* Render Drops (Nộp két sắt) */}
+                    {visibleDrops.map((item) => (
+                      <div
+                        key={`drop-${item.id}`}
+                        className="action-inbox-item"
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: 16,
+                          padding: '14px 18px',
+                          backgroundColor: '#f0fdfa',
+                          border: '1px solid #ccfbf1',
+                          borderLeft: '4px solid #0f766e',
+                          borderRadius: 8,
+                          transition: 'all 0.15s ease',
+                          flexWrap: 'wrap',
+                        }}
+                      >
+                        <div className="action-inbox-content" style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 260, flex: 1 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                            <span
+                              style={{
+                                backgroundColor: '#ccfbf1',
+                                color: '#0f766e',
+                                border: '1px solid #99f6e4',
+                                padding: '2px 8px',
+                                borderRadius: 4,
+                                fontWeight: 700,
+                                fontSize: 11.5,
+                              }}
+                            >
+                              Nộp két sắt
+                            </span>
+                            <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 13, color: '#0f172a' }}>
+                              #{item.id.slice(0, 8)}
+                            </span>
+                            <span className="action-inbox-title" style={{ fontSize: 14, fontWeight: 700, color: '#0f172a' }}>
+                              Rút két nộp về két sắt
+                            </span>
+                          </div>
+                          <div className="action-inbox-meta" style={{ fontSize: 13, color: '#334155' }}>
+                            {item.reason || 'Rút tiền mặt khỏi két nộp về két sắt để giảm tồn quỹ'}
+                          </div>
+                          <div style={{ fontSize: 11.5, color: '#64748b', display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                            <span>
+                              Nhân viên: <strong style={{ color: '#0f172a' }}>{item.createdByName || 'Thu ngân'}</strong>
+                            </span>
+                            <span>&bull;</span>
+                            <span>Ca #{item.shiftId ? item.shiftId.slice(0, 8) : '---'}</span>
+                            <span>&bull;</span>
+                            <span>{item.occurredAtUtc ? formatDate(item.occurredAtUtc) : 'Vừa tạo'}</span>
+                          </div>
+                        </div>
+
+                        <div className="action-inbox-actions" style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                          <div style={{ textAlign: 'right' }}>
+                            <div style={{ fontSize: 18, fontWeight: 800, color: '#0f766e', fontVariantNumeric: 'tabular-nums' }}>
+                              +{formatVND(item.amount)}
+                            </div>
+                            <span style={{ fontSize: 11, color: '#0f766e', fontWeight: 600 }}>Tiền giao nộp két</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleConfirmDrop(item.id)}
+                            disabled={actionLoadingId === item.id}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 6,
+                              padding: '8px 18px',
+                              borderRadius: 6,
+                              border: 'none',
+                              backgroundColor: '#0f766e',
+                              color: '#ffffff',
+                              fontSize: 13,
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              boxShadow: '0 1px 3px rgba(15, 118, 110, 0.25)',
+                              transition: 'all 0.15s ease',
+                            }}
+                          >
+                            <Check size={15} />
+                            <span>{actionLoadingId === item.id ? 'Đang xác nhận...' : 'Đã nhận đủ'}</span>
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+
+                    {/* Render Expenses (Chi vượt hạn mức) */}
+                    {visibleExpenses.map((item) => (
+                      <div
+                        key={`exp-${item.id}`}
+                        className="action-inbox-item"
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: 16,
+                          padding: '14px 18px',
+                          backgroundColor: '#fff7ed',
+                          border: '1px solid #ffedd5',
+                          borderLeft: '4px solid #ea580c',
+                          borderRadius: 8,
+                          transition: 'all 0.15s ease',
+                          flexWrap: 'wrap',
+                        }}
+                      >
+                        <div className="action-inbox-content" style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 260, flex: 1 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                            <span
+                              style={{
+                                backgroundColor: '#ffedd5',
+                                color: '#ea580c',
+                                border: '1px solid #fed7aa',
+                                padding: '2px 8px',
+                                borderRadius: 4,
+                                fontWeight: 700,
+                                fontSize: 11.5,
+                              }}
+                            >
+                              Chi vượt hạn mức
+                            </span>
+                            <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 13, color: '#0f172a' }}>
+                              #{item.id.slice(0, 8)}
+                            </span>
+                            <span className="action-inbox-title" style={{ fontSize: 14, fontWeight: 700, color: '#0f172a' }}>
+                              Chi tiền tại quầy POS
+                            </span>
+                          </div>
+                          <div className="action-inbox-meta" style={{ fontSize: 13, color: '#334155' }}>
+                            {item.reason || 'Chi vặt phát sinh tại quầy thu ngân'}
+                          </div>
+                          <div style={{ fontSize: 11.5, color: '#64748b', display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                            <span>
+                              Nhân viên: <strong style={{ color: '#0f172a' }}>{item.createdByName || 'Thu ngân'}</strong>
+                            </span>
+                            <span>&bull;</span>
+                            <span>Ca #{item.shiftId ? item.shiftId.slice(0, 8) : '---'}</span>
+                            <span>&bull;</span>
+                            <span>{item.occurredAtUtc ? formatDate(item.occurredAtUtc) : 'Vừa tạo'}</span>
+                          </div>
+                        </div>
+
+                        <div className="action-inbox-actions" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                          <div style={{ textAlign: 'right' }}>
+                            <div style={{ fontSize: 18, fontWeight: 800, color: '#ea580c', fontVariantNumeric: 'tabular-nums' }}>
+                              -{formatVND(item.amount)}
+                            </div>
+                            <span style={{ fontSize: 11, color: '#ea580c', fontWeight: 600 }}>Chi quỹ quầy</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setRejectingId(item.id);
+                              setRejectionReason('');
+                            }}
+                            disabled={actionLoadingId === item.id}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 6,
+                              padding: '8px 14px',
+                              borderRadius: 6,
+                              border: '1px solid #fecdd3',
+                              backgroundColor: '#ffffff',
+                              color: '#dc2626',
+                              fontSize: 13,
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              transition: 'all 0.15s ease',
+                            }}
+                          >
+                            <X size={15} />
+                            <span>Từ chối</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleApproveMovement(item.id)}
+                            disabled={actionLoadingId === item.id}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 6,
+                              padding: '8px 18px',
+                              borderRadius: 6,
+                              border: 'none',
+                              backgroundColor: '#0f766e',
+                              color: '#ffffff',
+                              fontSize: 13,
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              boxShadow: '0 1px 3px rgba(15, 118, 110, 0.25)',
+                              transition: 'all 0.15s ease',
+                            }}
+                          >
+                            <Check size={15} />
+                            <span>{actionLoadingId === item.id ? 'Đang duyệt...' : 'Duyệt chi'}</span>
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
+            </div>
+          </div>
+
+          {/* ─── BẢNG: LỊCH SỬ ĐÃ DUYỆT TRONG NGÀY ─── */}
+          <div
+            style={{
+              backgroundColor: '#ffffff',
+              borderRadius: 12,
+              border: '1px solid #e2e8f0',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+              overflow: 'hidden',
+            }}
+          >
+            <div
+              style={{
+                padding: '16px 20px',
+                borderBottom: '1px solid #e2e8f0',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                backgroundColor: '#f8fafc',
+                flexWrap: 'wrap',
+                gap: 10,
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <History size={18} className="text-teal-700" />
+                <h3 style={{ fontSize: 15, fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                  📜 Lịch sử đã duyệt trong ngày ({resolvedMovements.length})
+                </h3>
+              </div>
+              <span style={{ fontSize: 12, color: '#64748b' }}>
+                Theo dõi các khoản tiền mặt đã xác nhận hôm nay
+              </span>
+            </div>
+
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, textAlign: 'left' }}>
+                <thead>
+                  <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#475569', fontSize: 12, fontWeight: 700 }}>
+                    <th style={{ padding: '10px 16px' }}>Mã phiếu</th>
+                    <th style={{ padding: '10px 16px' }}>Loại phiếu</th>
+                    <th style={{ padding: '10px 16px' }}>Nội dung</th>
+                    <th style={{ padding: '10px 16px' }}>Thu ngân</th>
+                    <th style={{ padding: '10px 16px', textAlign: 'right' }}>Số tiền</th>
+                    <th style={{ padding: '10px 16px', textAlign: 'center' }}>Trạng thái</th>
+                    <th style={{ padding: '10px 16px' }}>Thời gian xử lý</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {resolvedMovements.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} style={{ padding: '36px 16px', textAlign: 'center', color: '#64748b' }}>
+                        <CheckCircle2 size={32} className="text-emerald-500" style={{ margin: '0 auto 8px' }} />
+                        <div style={{ fontWeight: 600, color: '#334155' }}>Chưa có phiếu đã xử lý trong ngày hôm nay.</div>
+                        <div style={{ fontSize: 12, marginTop: 4 }}>
+                          Khi bạn duyệt chi hoặc xác nhận nhận tiền rút két, các khoản tiền đã xử lý sẽ lưu vào đây.
+                        </div>
+                      </td>
+                    </tr>
+                  ) : (
+                    resolvedMovements.map((r) => {
+                      const isDrop = r.category === 'CASH_DRAW' || r.category === 2;
+                      const isRejected = r.status === 'Rejected' || r.status === 3;
+
+                      return (
+                        <tr key={r.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                          <td style={{ padding: '12px 16px', fontFamily: 'monospace', fontWeight: 700, color: '#0f172a' }}>
+                            #{r.id.slice(0, 8)}
+                          </td>
+                          <td style={{ padding: '12px 16px' }}>
+                            {isDrop ? (
+                              <span style={{ backgroundColor: '#ccfbf1', color: '#0f766e', border: '1px solid #99f6e4', padding: '2px 8px', borderRadius: 4, fontWeight: 700, fontSize: 11.5 }}>
+                                Nộp két sắt
+                              </span>
+                            ) : (
+                              <span style={{ backgroundColor: '#ffedd5', color: '#ea580c', border: '1px solid #fed7aa', padding: '2px 8px', borderRadius: 4, fontWeight: 700, fontSize: 11.5 }}>
+                                Chi tại quầy POS
+                              </span>
+                            )}
+                          </td>
+                          <td style={{ padding: '12px 16px', color: '#1e293b' }}>
+                            <div>{r.reason || (isDrop ? 'Rút tiền nộp két sắt' : 'Chi tiền tại quầy')}</div>
+                            {r.rejectionReason && (
+                              <div style={{ fontSize: 11.5, color: '#b91c1c', marginTop: 2 }}>
+                                <b>Lý do từ chối:</b> {r.rejectionReason}
+                              </div>
+                            )}
+                          </td>
+                          <td style={{ padding: '12px 16px', color: '#334155', fontWeight: 600 }}>
+                            {r.createdByName || 'Thu ngân'}
+                          </td>
+                          <td
+                            style={{
+                              padding: '12px 16px',
+                              textAlign: 'right',
+                              fontWeight: 700,
+                              fontVariantNumeric: 'tabular-nums',
+                              color: isDrop ? '#0f766e' : '#ea580c',
+                            }}
+                          >
+                            {isDrop ? `+${formatVND(r.amount)}` : `-${formatVND(r.amount)}`}
+                          </td>
+                          <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                            {isRejected ? (
+                              <span style={{ backgroundColor: '#fee2e2', color: '#991b1b', border: '1px solid #fecaca', padding: '3px 10px', borderRadius: 12, fontWeight: 700, fontSize: 11.5 }}>
+                                Đã từ chối
+                              </span>
+                            ) : isDrop ? (
+                              <span style={{ backgroundColor: '#ccfbf1', color: '#0f766e', border: '1px solid #99f6e4', padding: '3px 10px', borderRadius: 12, fontWeight: 700, fontSize: 11.5 }}>
+                                Đã nhận đủ
+                              </span>
+                            ) : (
+                              <span style={{ backgroundColor: '#dcfce7', color: '#15803d', border: '1px solid #bbf7d0', padding: '3px 10px', borderRadius: 12, fontWeight: 700, fontSize: 11.5 }}>
+                                Đã duyệt
+                              </span>
+                            )}
+                          </td>
+                          <td style={{ padding: '12px 16px', color: '#64748b', fontSize: 12 }}>
+                            {formatDate(r.approvedAtUtc || r.confirmedByOwnerAtUtc || r.occurredAtUtc)}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
@@ -1518,10 +1830,11 @@ export const CashControlHubPage: FC = () => {
                             {renderHandoverBadge(s.handoverStatus)}
                           </td>
                           <td style={{ padding: '12px 14px', textAlign: 'center' }}>
-                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, justifyContent: 'center' }}>
+                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, justifyContent: 'center', flexWrap: 'wrap' }}>
+                              {/* Nút Xem Hóa Đơn In Nhiệt Z-Report POS */}
                               <button
                                 type="button"
-                                onClick={() => setSelectedDetailShift(s)}
+                                onClick={() => handleOpenZReport(s.id)}
                                 style={{
                                   display: 'inline-flex',
                                   alignItems: 'center',
@@ -1535,13 +1848,117 @@ export const CashControlHubPage: FC = () => {
                                   fontWeight: 600,
                                   cursor: 'pointer',
                                 }}
-                                title="Xem Z-Report chi tiết phiên ca & Lý do chênh lệch"
+                                title="Xem Z-Report in nhiệt & đối soát tiền két"
+                              >
+                                <Printer size={13} />
+                                <span>Z-Report</span>
+                              </button>
+
+                              {/* Nút Xem Chi Tiết Giao Dịch Thu/Chi Trong Ca */}
+                              <button
+                                type="button"
+                                onClick={() => setSelectedDetailShift(s)}
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: 4,
+                                  padding: '4px 8px',
+                                  borderRadius: 6,
+                                  border: '1px solid #CBD5E1',
+                                  backgroundColor: '#FFFFFF',
+                                  color: '#475569',
+                                  fontSize: 12,
+                                  fontWeight: 600,
+                                  cursor: 'pointer',
+                                }}
+                                title="Xem chi tiết các giao dịch và nhân viên trực ca"
                               >
                                 <Eye size={13} />
                                 <span>Chi tiết</span>
                               </button>
 
-                              {isPendingHandover && !isOwnerOrAdmin && (
+                              {/* Xử lý nhận ca & Phân quyền Chủ shop / Nhân viên */}
+                              {isPendingHandover && (
+                                !isOwnerOrAdmin ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setHandoverShift(s);
+                                      setHandoverDecision('CONFIRMED');
+                                      setDisputeReason('');
+                                    }}
+                                    style={{
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: 4,
+                                      padding: '4px 8px',
+                                      borderRadius: 6,
+                                      border: '1px solid #D97706',
+                                      backgroundColor: '#FFFBEB',
+                                      color: '#B45309',
+                                      fontSize: 12,
+                                      fontWeight: 600,
+                                      cursor: 'pointer',
+                                    }}
+                                    title="Xác nhận nhận tiền bàn giao ca này"
+                                  >
+                                    <UserCheck size={13} />
+                                    <span>Nhận ca</span>
+                                  </button>
+                                ) : (
+                                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                                    <span
+                                      style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: 4,
+                                        padding: '4px 8px',
+                                        borderRadius: 6,
+                                        backgroundColor: '#FFFBEB',
+                                        border: '1px solid #FDE68A',
+                                        color: '#B45309',
+                                        fontSize: 11.5,
+                                        fontWeight: 600,
+                                      }}
+                                      title="Ca đang chờ nhân viên ca tiếp theo đăng nhập quầy POS để kiểm đếm và nhận két"
+                                    >
+                                      <Clock size={12} />
+                                      <span>Chờ nhân viên ca sau xác nhận</span>
+                                    </span>
+
+                                    {diff !== 0 && (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setHandoverShift(s);
+                                          setHandoverDecision('CONFIRMED');
+                                          setDisputeReason('');
+                                        }}
+                                        style={{
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: 4,
+                                          padding: '4px 8px',
+                                          borderRadius: 6,
+                                          border: '1px solid #DC2626',
+                                          backgroundColor: '#FEF2F2',
+                                          color: '#DC2626',
+                                          fontSize: 11.5,
+                                          fontWeight: 700,
+                                          cursor: 'pointer',
+                                        }}
+                                        title="Chủ cửa hàng can thiệp xem xét và phê duyệt lệch quỹ két"
+                                      >
+                                        <AlertTriangle size={12} />
+                                        <span>Can thiệp duyệt lệch quỹ</span>
+                                      </button>
+                                    )}
+                                  </div>
+                                )
+                              )}
+
+                              {/* Trường hợp ca có khiếu nại Dispute: Chủ shop can thiệp xử lý */}
+                              {(s.handoverStatus === 3 || s.handoverStatus === 'DISPUTED') && isOwnerOrAdmin && (
                                 <button
                                   type="button"
                                   onClick={() => {
@@ -1555,17 +1972,17 @@ export const CashControlHubPage: FC = () => {
                                     gap: 4,
                                     padding: '4px 8px',
                                     borderRadius: 6,
-                                    border: '1px solid #D97706',
-                                    backgroundColor: '#FFFBEB',
-                                    color: '#B45309',
-                                    fontSize: 12,
-                                    fontWeight: 600,
+                                    border: '1px solid #DC2626',
+                                    backgroundColor: '#FEF2F2',
+                                    color: '#DC2626',
+                                    fontSize: 11.5,
+                                    fontWeight: 700,
                                     cursor: 'pointer',
                                   }}
-                                  title="Xác nhận nhận tiền bàn giao ca này"
+                                  title="Xử lý tranh chấp khiếu nại bàn giao ca này"
                                 >
-                                  <UserCheck size={13} />
-                                  <span>Nhận ca</span>
+                                  <Scale size={13} />
+                                  <span>Xử lý Dispute</span>
                                 </button>
                               )}
                             </div>
@@ -2388,6 +2805,280 @@ export const CashControlHubPage: FC = () => {
               >
                 Đóng
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── 9. MODAL HÓA ĐƠN IN NHIỆT Z-REPORT (.receipt-paper) ─── */}
+      {zReportShiftId && (
+        <div
+          className="pos-modal-overlay"
+          onClick={() => setZReportShiftId(null)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.65)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 10000,
+            padding: 16,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              backgroundColor: '#FFFFFF',
+              borderRadius: 12,
+              width: '100%',
+              maxWidth: 460,
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+              border: '1px solid #E2E8F0',
+              padding: '20px 24px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 16,
+            }}
+          >
+            {/* Header Modal */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                borderBottom: '1px solid #E2E8F0',
+                paddingBottom: 12,
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Printer size={18} className="text-teal-700" />
+                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: '#0F172A' }}>
+                  Báo Cáo Kết Toán Ca POS (Z-Report)
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setZReportShiftId(null)}
+                style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#64748B' }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Content: Receipt Paper hoặc Loading */}
+            {isLoadingZReport ? (
+              <div style={{ padding: '40px 20px', textAlign: 'center', color: '#64748B' }}>
+                <RefreshCw size={28} className="animate-spin text-teal-700" style={{ margin: '0 auto 12px' }} />
+                <div style={{ fontWeight: 600, color: '#1E293B' }}>Đang tải báo cáo Z-Report từ máy chủ...</div>
+                <div style={{ fontSize: 12, marginTop: 4 }}>Tính toán kết toán doanh số và đối soát két bán hàng</div>
+              </div>
+            ) : zReportError ? (
+              <div style={{ padding: '24px 16px', textAlign: 'center', backgroundColor: '#FEF2F2', borderRadius: 8, border: '1px solid #FECACA' }}>
+                <AlertCircle size={32} color="#DC2626" style={{ margin: '0 auto 8px' }} />
+                <div style={{ fontWeight: 700, color: '#991B1B' }}>{zReportError}</div>
+                <button
+                  type="button"
+                  onClick={() => handleOpenZReport(zReportShiftId)}
+                  style={{
+                    marginTop: 12,
+                    padding: '6px 14px',
+                    borderRadius: 6,
+                    border: '1px solid #DC2626',
+                    backgroundColor: '#FFFFFF',
+                    color: '#DC2626',
+                    fontSize: 12,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Thử lại
+                </button>
+              </div>
+            ) : zReportData ? (
+              <div
+                id="z-report-receipt-paper"
+                className="receipt-paper"
+                style={{
+                  width: '100%',
+                  maxWidth: 380,
+                  margin: '0 auto',
+                  padding: '24px 20px',
+                  backgroundColor: '#FFFFFF',
+                  border: '1px dashed #94A3B8',
+                  borderRadius: 6,
+                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)',
+                  fontFamily: "'Courier New', Courier, monospace, ui-monospace",
+                  fontSize: 12.5,
+                  color: '#0F172A',
+                  lineHeight: 1.5,
+                }}
+              >
+                <div style={{ textAlign: 'center', fontWeight: 800, fontSize: 16, letterSpacing: 0.5, color: '#0F172A' }}>
+                  PHIẾU KẾT CA POS (Z-REPORT)
+                </div>
+                <div style={{ textAlign: 'center', color: '#64748B', fontSize: 12, marginTop: 4 }}>
+                  <b>{zReportData.shiftCode}</b> &bull; {zReportData.branchName || 'Chi nhánh POS'}
+                </div>
+                <div style={{ textAlign: 'center', color: '#64748B', fontSize: 11.5 }}>
+                  Tên ca: {zReportData.shiftName} &bull; Quầy #{zReportData.tillId}
+                </div>
+
+                <hr style={{ border: 'none', borderTop: '1px dashed #CBD5E1', margin: '12px 0' }} />
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
+                  <span style={{ color: '#64748B' }}>Mở ca:</span>
+                  <span style={{ fontWeight: 600 }}>{formatDate(zReportData.openedAtUtc)}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
+                  <span style={{ color: '#64748B' }}>Đóng ca:</span>
+                  <span style={{ fontWeight: 600 }}>{zReportData.closedAtUtc ? formatDate(zReportData.closedAtUtc) : 'Đang mở (chưa đóng)'}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
+                  <span style={{ color: '#64748B' }}>Tổng số đơn hàng:</span>
+                  <span style={{ fontWeight: 700 }}>{zReportData.totalOrdersCount} đơn</span>
+                </div>
+
+                <hr style={{ border: 'none', borderTop: '1px dashed #CBD5E1', margin: '12px 0' }} />
+
+                {/* Các dòng chỉ số tài chính Z-Report */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                  <span>Tiền đầu ca (Opening Float):</span>
+                  <span style={{ fontWeight: 700 }}>{formatVND(zReportData.openingFloat)}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                  <span>Doanh số tiền mặt thực tế:</span>
+                  <span style={{ fontWeight: 700, color: '#0F766E' }}>+{formatVND(zReportData.cashSales)}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                  <span>Doanh thu quét mã VietQR:</span>
+                  <span style={{ fontWeight: 700, color: '#0284C7' }}>+{formatVND(zReportData.totalBankRevenue)}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                  <span>Tiền rút nộp két sắt trong ca:</span>
+                  <span style={{ fontWeight: 700, color: '#D97706' }}>-{formatVND(zReportData.droppedToSafeAmount || 0)}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                  <span>Chi tiền tại quầy trong ca:</span>
+                  <span style={{ fontWeight: 700, color: '#DC2626' }}>-{formatVND(zReportData.totalCashOut || 0)}</span>
+                </div>
+                {zReportData.totalCashIn > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                    <span>Nạp tiền mặt bổ sung (+):</span>
+                    <span style={{ fontWeight: 700, color: '#059669' }}>+{formatVND(zReportData.totalCashIn)}</span>
+                  </div>
+                )}
+
+                <hr style={{ border: 'none', borderTop: '1px dashed #CBD5E1', margin: '12px 0' }} />
+
+                {/* Đối soát két cuối ca */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: 13, marginBottom: 4 }}>
+                  <span>Két kỳ vọng tính toán:</span>
+                  <span>{formatVND(zReportData.expectedCashInTill)}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: 13, marginBottom: 4 }}>
+                  <span>Két thực tế kiểm đếm:</span>
+                  <span>
+                    {zReportData.actualCashCounted !== null && zReportData.actualCashCounted !== undefined
+                      ? formatVND(zReportData.actualCashCounted)
+                      : '--- (Chưa chốt)'}
+                  </span>
+                </div>
+                {(() => {
+                  const diff = zReportData.discrepancy !== null && zReportData.discrepancy !== undefined
+                    ? zReportData.discrepancy
+                    : (zReportData.actualCashCounted !== null && zReportData.actualCashCounted !== undefined
+                        ? zReportData.actualCashCounted - zReportData.expectedCashInTill
+                        : 0);
+                  const diffColor = diff === 0 ? '#059669' : diff > 0 ? '#059669' : '#DC2626';
+                  return (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800, fontSize: 13.5, color: diffColor, marginTop: 2 }}>
+                      <span>Chênh lệch (Difference):</span>
+                      <span>
+                        {diff === 0 ? 'Khớp (0 đ)' : diff > 0 ? `+${formatVND(diff)} (Thừa)` : `${formatVND(diff)} (Thiếu)`}
+                      </span>
+                    </div>
+                  );
+                })()}
+
+                {zReportData.retainedFloatAmount !== undefined && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, fontSize: 11.5, color: '#64748B' }}>
+                    <span>Tiền để lại két ca sau:</span>
+                    <span style={{ fontWeight: 600 }}>{formatVND(zReportData.retainedFloatAmount || 0)}</span>
+                  </div>
+                )}
+
+                {zReportData.notes && (
+                  <>
+                    <hr style={{ border: 'none', borderTop: '1px dashed #CBD5E1', margin: '10px 0' }} />
+                    <div style={{ fontSize: 11.5 }}>
+                      <span style={{ color: '#64748B' }}>Ghi chú ca / Giải trình lệch:</span>
+                      <div style={{ padding: '6px 8px', backgroundColor: '#F8FAFC', borderRadius: 4, border: '1px solid #E2E8F0', marginTop: 3 }}>
+                        {zReportData.notes}
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                <div style={{ textAlign: 'center', fontSize: 11, color: '#94A3B8', marginTop: 16 }}>
+                  -- MT-GRMS POS CASH MANAGEMENT --
+                </div>
+              </div>
+            ) : null}
+
+            {/* Modal Footer */}
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                borderTop: '1px solid #E2E8F0',
+                paddingTop: 14,
+                gap: 10,
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => setZReportShiftId(null)}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: 6,
+                  border: '1px solid #CBD5E1',
+                  background: '#FFFFFF',
+                  color: '#475569',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                Đóng
+              </button>
+
+              {zReportData && (
+                <button
+                  type="button"
+                  onClick={handlePrintZReport}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    padding: '8px 18px',
+                    borderRadius: 6,
+                    border: 'none',
+                    backgroundColor: '#0F766E',
+                    color: '#FFFFFF',
+                    fontSize: 13,
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    boxShadow: '0 2px 4px rgba(15, 118, 110, 0.25)',
+                  }}
+                >
+                  <Printer size={16} />
+                  <span>In phiếu kết ca (Z-Report)</span>
+                </button>
+              )}
             </div>
           </div>
         </div>

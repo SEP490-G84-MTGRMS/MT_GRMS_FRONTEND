@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import type { FC, FormEvent } from 'react';
+import { useNavigate } from 'react-router-dom';
 import type { CashAccount, CreateReceiptDTO, CounterpartyType } from '../types/cashbook.types';
 
 interface CreateReceiptModalProps {
@@ -17,6 +18,7 @@ export const CreateReceiptModal: FC<CreateReceiptModalProps> = ({
   onSubmit,
   initialCategory,
 }) => {
+  const navigate = useNavigate();
   const [accountId, setAccountId] = useState(accounts[0]?.id || '');
   const [amountStr, setAmountStr] = useState('');
   const [category, setCategory] = useState(initialCategory || 'Chủ nạp thêm vốn (Capital Contribution)');
@@ -34,10 +36,10 @@ export const CreateReceiptModal: FC<CreateReceiptModalProps> = ({
       setDescription('Bổ sung vốn kinh doanh vào quỹ (Không tính thuế)');
       const safeOrBank = accounts.find((a) => a.isSafeDeposit || a.accountType === 'BANK') || accounts[0];
       if (safeOrBank) setAccountId(safeOrBank.id);
-    } else if (cat.includes('Thu nợ khách hàng')) {
+    } else if (cat.includes('bán hàng') || cat.includes('bán lẻ')) {
       setCounterpartyType('CUSTOMER');
       setCounterpartyName('');
-      setDescription('Thu tiền nợ bán lẻ của khách hàng');
+      setDescription('Thu tiền bán hàng ngoài POS');
     } else if (cat.includes('Thu lãi')) {
       setCounterpartyType('OTHER');
       setCounterpartyName('Ngân hàng');
@@ -60,13 +62,13 @@ export const CreateReceiptModal: FC<CreateReceiptModalProps> = ({
 
   if (!isOpen) return null;
 
+  // Single-source Debt Collection (FE-08) rule: Excludes "Thu nợ khách hàng" to avoid off-book discrepancy
   const categories = [
     'Chủ nạp thêm vốn (Capital Contribution)',
-    'Thu bán lẻ khác',
-    'Thu nợ khách hàng',
+    'Thu bán hàng ngoài POS',
     'Hoàn ứng nội bộ',
     'Thu lãi tiền gửi ngân hàng',
-    'Thu khác',
+    'Thu nhập khác',
   ];
 
   const handleSubmit = async (e: FormEvent) => {
@@ -116,6 +118,50 @@ export const CreateReceiptModal: FC<CreateReceiptModalProps> = ({
 
         <form onSubmit={handleSubmit}>
           <div className="cb-modal-body">
+            {/* Guide to Single-Source Debt Collection Module (FE-08) */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 12,
+                padding: '10px 14px',
+                borderRadius: 12,
+                backgroundColor: '#EFF6FF',
+                border: '1px solid #BFDBFE',
+                color: '#1E40AF',
+                fontSize: '12px',
+              }}
+            >
+              <div>
+                <strong>💡 Bạn muốn thu nợ khách hàng?</strong>
+                <div style={{ color: '#1E3A8A', marginTop: 2 }}>
+                  Để cấn trừ công nợ tự động theo chuẩn 1 nguồn, vui lòng thực hiện tại Phân hệ Công nợ (FE-08), tránh thu lệch ngoài sổ.
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  navigate('/store-owner/customers');
+                }}
+                style={{
+                  flexShrink: 0,
+                  backgroundColor: '#2563EB',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: 8,
+                  padding: '6px 12px',
+                  fontWeight: 700,
+                  fontSize: '11.5px',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                Mở Sổ nợ FE-08 →
+              </button>
+            </div>
+
             {errorMsg && (
               <div className="cb-overdraft-alert">
                 <span>⚠️</span> {errorMsg}

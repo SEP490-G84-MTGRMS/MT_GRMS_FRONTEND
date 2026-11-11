@@ -5,7 +5,7 @@ import {
   EXPENSE_CATEGORY_LABELS,
   type ExpenseCategory,
   type ExpenseFilterParams,
-  type ExpenseStatus,
+  type ExpenseQuickStatus,
 } from '../types/expense.types';
 import {
   calculatePeriodRange,
@@ -109,6 +109,21 @@ export const ExpenseFilterBar: FC<ExpenseFilterBarProps> = ({
     applyPeriod('custom', undefined, f, t);
   };
 
+  const STATUS_CHIPS: { id: ExpenseQuickStatus; label: string }[] = [
+    { id: 'ALL', label: 'Tất cả' },
+    { id: 'PENDING_APPROVAL', label: 'Chờ duyệt' },
+    { id: 'PENDING_PAYMENT', label: 'Chờ thanh toán' },
+    { id: 'PAID', label: 'Đã thanh toán' },
+    { id: 'SUSPICIOUS', label: 'Bất thường' },
+  ];
+
+  const handleChipClick = (id: ExpenseQuickStatus) => {
+    onFilterChange({
+      quickStatus: id,
+      status: id === 'PAID' ? 'Paid' : id === 'PENDING_PAYMENT' ? 'Pending' : undefined,
+    });
+  };
+
   const handleReset = () => {
     setSearchInput('');
     setSelectedPeriod('this-month');
@@ -119,6 +134,10 @@ export const ExpenseFilterBar: FC<ExpenseFilterBarProps> = ({
     if (onPeriodLabelChange) {
       onPeriodLabelChange(range.label);
     }
+    onFilterChange({
+      quickStatus: 'ALL',
+      status: undefined,
+    });
     onReset();
   };
 
@@ -230,21 +249,21 @@ export const ExpenseFilterBar: FC<ExpenseFilterBarProps> = ({
           </select>
         </div>
 
-        {/* Status Selection */}
-        <div>
-          <select
-            value={filters.status || ''}
-            onChange={(e) =>
-              onFilterChange({ status: (e.target.value as ExpenseStatus) || undefined })
-            }
-            aria-label="Lọc theo trạng thái"
-            className="expense-filter-select"
-          >
-            <option value="">Tất cả trạng thái</option>
-            <option value="Pending">Chờ thanh toán</option>
-            <option value="Paid">Đã thanh toán</option>
-            <option value="Cancelled">Đã hủy</option>
-          </select>
+        {/* 5 Quick Chips (Pill buttons): Tất cả | Chờ duyệt | Chờ thanh toán | Đã thanh toán | Bất thường */}
+        <div className="expense-quick-chips">
+          {STATUS_CHIPS.map((chip) => {
+            const isActive = (filters.quickStatus || 'ALL') === chip.id;
+            return (
+              <button
+                key={chip.id}
+                type="button"
+                onClick={() => handleChipClick(chip.id)}
+                className={`expense-pill-btn ${isActive ? 'active' : ''}`}
+              >
+                {chip.label}
+              </button>
+            );
+          })}
         </div>
       </div>
 

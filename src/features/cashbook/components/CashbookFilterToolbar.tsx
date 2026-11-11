@@ -50,10 +50,11 @@ export const CashbookFilterToolbar: FC<CashbookFilterToolbarProps> = ({
     { id: 'BR-02', label: 'Chi nhánh Q7' },
   ];
 
-  const typeOptions: { id: TransactionType | 'ALL'; label: string }[] = [
+  const typeOptions = [
     { id: 'ALL', label: 'Tất cả loại phiếu' },
     { id: 'RECEIPT', label: 'Phiếu Thu (+)' },
     { id: 'PAYMENT', label: 'Phiếu Chi (-)' },
+    { id: 'TRANSFER', label: 'Chuyển nội bộ' },
     { id: 'ADJUSTMENT', label: 'Điều chỉnh kiểm kê' },
   ];
 
@@ -69,6 +70,7 @@ export const CashbookFilterToolbar: FC<CashbookFilterToolbarProps> = ({
   const isFiltered =
     (filters.branchId && filters.branchId !== 'ALL') ||
     (filters.transactionType && filters.transactionType !== 'ALL') ||
+    Boolean(filters.sourceType) ||
     (filters.datePeriod && filters.datePeriod !== 'this_month') ||
     Boolean(filters.searchQuery) ||
     Boolean(filters.startDate) ||
@@ -93,8 +95,27 @@ export const CashbookFilterToolbar: FC<CashbookFilterToolbarProps> = ({
     onChangeFilter({ searchQuery: '' });
   };
 
-  const handleQuickTypeSelect = (type: TransactionType | 'ALL') => {
-    onChangeFilter({ transactionType: type });
+  const handleQuickChipSelect = (chip: 'ALL' | 'RECEIPT' | 'PAYMENT' | 'INTERNAL_TRANSFER') => {
+    if (chip === 'ALL') {
+      onChangeFilter({ transactionType: 'ALL', sourceType: undefined });
+    } else if (chip === 'RECEIPT') {
+      onChangeFilter({ transactionType: 'RECEIPT', sourceType: undefined });
+    } else if (chip === 'PAYMENT') {
+      onChangeFilter({ transactionType: 'PAYMENT', sourceType: undefined });
+    } else if (chip === 'INTERNAL_TRANSFER') {
+      onChangeFilter({ transactionType: 'ALL', sourceType: 'INTERNAL_TRANSFER' });
+    }
+  };
+
+  const currentTypeSelectValue =
+    filters.sourceType === 'INTERNAL_TRANSFER' ? 'TRANSFER' : filters.transactionType || 'ALL';
+
+  const handleTypeSelectChange = (val: string) => {
+    if (val === 'TRANSFER') {
+      onChangeFilter({ transactionType: 'ALL', sourceType: 'INTERNAL_TRANSFER' });
+    } else {
+      onChangeFilter({ transactionType: val as TransactionType | 'ALL', sourceType: undefined });
+    }
   };
 
   return (
@@ -161,10 +182,8 @@ export const CashbookFilterToolbar: FC<CashbookFilterToolbarProps> = ({
               <SlidersHorizontal size={16} />
             </div>
             <select
-              value={filters.transactionType || 'ALL'}
-              onChange={(e) =>
-                onChangeFilter({ transactionType: e.target.value as TransactionType | 'ALL' })
-              }
+              value={currentTypeSelectValue}
+              onChange={(e) => handleTypeSelectChange(e.target.value)}
               className="cb-native-select"
               title="Lọc theo loại giao dịch"
             >
@@ -220,36 +239,37 @@ export const CashbookFilterToolbar: FC<CashbookFilterToolbarProps> = ({
 
       {/* Sub-row: Quick Type Chips & Custom Date Range Pickers */}
       <div className="cb-filter-row-bottom">
-        {/* Quick Type Selection Pills */}
+        {/* Quick Type Selection Pills: 4 Pill Chips chuẩn prototype */}
         <div className="cb-quick-chip-group">
-          <span className="cb-quick-chip-label">Phân loại nhanh:</span>
+          <span className="cb-quick-chip-label">Phân loại:</span>
           <button
             type="button"
-            onClick={() => handleQuickTypeSelect('ALL')}
-            className={`cb-quick-chip ${!filters.transactionType || filters.transactionType === 'ALL' ? 'active-all' : ''}`}
+            onClick={() => handleQuickChipSelect('ALL')}
+            className={`cb-quick-chip ${!filters.sourceType && (!filters.transactionType || filters.transactionType === 'ALL') ? 'active-all' : ''}`}
           >
             Tất cả
           </button>
           <button
             type="button"
-            onClick={() => handleQuickTypeSelect('RECEIPT')}
-            className={`cb-quick-chip ${filters.transactionType === 'RECEIPT' ? 'active-receipt' : ''}`}
+            onClick={() => handleQuickChipSelect('RECEIPT')}
+            className={`cb-quick-chip ${!filters.sourceType && filters.transactionType === 'RECEIPT' ? 'active-receipt' : ''}`}
           >
-            🟢 Phiếu Thu (+)
+            Thu tiền
           </button>
           <button
             type="button"
-            onClick={() => handleQuickTypeSelect('PAYMENT')}
-            className={`cb-quick-chip ${filters.transactionType === 'PAYMENT' ? 'active-payment' : ''}`}
+            onClick={() => handleQuickChipSelect('PAYMENT')}
+            className={`cb-quick-chip ${!filters.sourceType && filters.transactionType === 'PAYMENT' ? 'active-payment' : ''}`}
           >
-            🔴 Phiếu Chi (-)
+            Chi tiền
           </button>
           <button
             type="button"
-            onClick={() => handleQuickTypeSelect('ADJUSTMENT')}
-            className={`cb-quick-chip ${filters.transactionType === 'ADJUSTMENT' ? 'active-adjustment' : ''}`}
+            onClick={() => handleQuickChipSelect('INTERNAL_TRANSFER')}
+            className={`cb-quick-chip ${filters.sourceType === 'INTERNAL_TRANSFER' ? 'active-transfer' : ''}`}
+            title="Lọc các bút toán kép chuyển quỹ nội bộ (sourceType = INTERNAL_TRANSFER)"
           >
-            🟠 Kiểm kê
+            Chuyển nội bộ
           </button>
         </div>
 

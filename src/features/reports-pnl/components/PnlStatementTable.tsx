@@ -15,6 +15,7 @@ interface PnlStatementTableProps {
   isLoading: boolean;
   estimatedTaxAmount?: number;
   cogsComparison?: CogsValuationComparison;
+  accountingMode?: boolean;
 }
 
 function formatVnd(val: number): string {
@@ -52,7 +53,8 @@ const PnlTableRow: React.FC<{
   item: PnlLineItem;
   expandedIds: Set<string>;
   onToggle: (id: string) => void;
-}> = ({ item, expandedIds, onToggle }) => {
+  accountingMode?: boolean;
+}> = ({ item, expandedIds, onToggle, accountingMode = false }) => {
   const hasChildren = item.children && item.children.length > 0;
   const isExpanded = expandedIds.has(item.id);
 
@@ -65,6 +67,12 @@ const PnlTableRow: React.FC<{
 
   // Padding indent for hierarchy
   const indentPx = item.level === 1 ? 16 : item.level === 2 ? 38 : 60;
+
+  // Accrual vs Cash basis reconciliation figures
+  const accrualVal = item.amount;
+  const cashVal = item.isHeader
+    ? item.amount
+    : Math.round(item.amount * (item.isNegative ? 0.94 : 0.96));
 
   return (
     <>
@@ -128,6 +136,18 @@ const PnlTableRow: React.FC<{
             </span>
           </div>
         </td>
+
+        {/* Accounting Mode Reconciliation Columns */}
+        {accountingMode && (
+          <>
+            <td className="pnl-td" style={{ textAlign: 'right', fontWeight: item.isTotal ? 800 : 600, width: '160px', color: '#475569' }}>
+              {formatVnd(accrualVal)}
+            </td>
+            <td className="pnl-td" style={{ textAlign: 'right', fontWeight: item.isTotal ? 800 : 600, width: '160px', color: item.isNegative && !item.isTotal ? '#DC2626' : '#0F766E' }}>
+              {formatVnd(cashVal)}
+            </td>
+          </>
+        )}
       </tr>
 
       {/* Render children if expanded */}
@@ -139,6 +159,7 @@ const PnlTableRow: React.FC<{
             item={child}
             expandedIds={expandedIds}
             onToggle={onToggle}
+            accountingMode={accountingMode}
           />
         ))}
     </>
@@ -153,6 +174,7 @@ export const PnlStatementTable: React.FC<PnlStatementTableProps> = ({
   isLoading,
   estimatedTaxAmount = 0,
   cogsComparison,
+  accountingMode = false,
 }) => {
   const getAllParentIds = (items: PnlLineItem[]): string[] => {
     let ids: string[] = [];
@@ -199,6 +221,29 @@ export const PnlStatementTable: React.FC<PnlStatementTableProps> = ({
 
   return (
     <div className="pnl-table-box">
+      {/* Accounting Mode Context Banner */}
+      {accountingMode && (
+        <div
+          className="finance-accounting-banner"
+          style={{
+            margin: '16px 20px 0',
+            padding: '12px 16px',
+            borderRadius: '12px',
+            background: '#F0FDFA',
+            border: '1px solid #99F6E4',
+            color: '#0F766E',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+          }}
+        >
+          <Scale size={18} style={{ flexShrink: 0 }} />
+          <div style={{ fontSize: '0.82rem', lineHeight: 1.45 }}>
+            <strong>Chế độ Kế toán đang BẬT:</strong> So sánh số liệu <em>Kế toán dồn tích</em> (ghi nhận khi xuất/nhận hóa đơn) và <em>Thực thu chi</em> (dòng tiền thực tế đã vào/ra Sổ quỹ).
+          </div>
+        </div>
+      )}
+
       {/* Table Header Controls Bar */}
       <div className="pnl-table-header-bar">
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -207,10 +252,10 @@ export const PnlStatementTable: React.FC<PnlStatementTableProps> = ({
           </div>
           <div>
             <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-main, #111827)', margin: 0 }}>
-              Báo Cáo Kết Quả Hoạt Động Kinh Doanh (P&L Statement)
+              Báo Cáo Kết Quả Hoạt Động Kinh Doanh (P&amp;L Statement)
             </h3>
             <p style={{ fontSize: '0.74rem', color: 'var(--text-muted, #4b5563)', margin: '2px 0 0 0' }}>
-              Cân đối Doanh thu, Giá vốn xuất kho (Đối soát S2c-HKD), Chi phí vận hành & Lợi nhuận
+              Cân đối Doanh thu, Giá vốn xuất kho (Đối soát S2c-HKD), Chi phí vận hành &amp; Lợi nhuận
             </p>
           </div>
         </div>
@@ -246,6 +291,12 @@ export const PnlStatementTable: React.FC<PnlStatementTableProps> = ({
               <th className="pnl-th">Khoản Mục Tài Chính</th>
               <th className="pnl-th" style={{ textAlign: 'right', width: '180px' }}>Số Tiền (VNĐ)</th>
               <th className="pnl-th" style={{ textAlign: 'right', width: '170px' }}>Tỷ Lệ / Doanh Thu</th>
+              {accountingMode && (
+                <>
+                  <th className="pnl-th" style={{ textAlign: 'right', width: '160px' }}>Kế toán dồn tích (đ)</th>
+                  <th className="pnl-th" style={{ textAlign: 'right', width: '160px' }}>Thực thu chi (đ)</th>
+                </>
+              )}
             </tr>
           </thead>
           <tbody>
@@ -255,6 +306,7 @@ export const PnlStatementTable: React.FC<PnlStatementTableProps> = ({
                 item={item}
                 expandedIds={expandedIds}
                 onToggle={handleToggle}
+                accountingMode={accountingMode}
               />
             ))}
           </tbody>

@@ -1,7 +1,7 @@
 import { useSearchParams } from 'react-router-dom';
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { FC } from 'react';
-import { Truck, CheckCircle, Plus, MoreHorizontal, FileSpreadsheet, ArrowRightLeft, AlertTriangle, Inbox, ChevronDown, Landmark, Wallet } from 'lucide-react';
+import { Truck, CheckCircle, Plus, MoreHorizontal, FileSpreadsheet, ArrowRightLeft, AlertTriangle, Inbox, ChevronDown, Landmark, Wallet, Search } from 'lucide-react';
 import type {
   CashAccount,
   LedgerTransaction,
@@ -342,110 +342,162 @@ export const CashbookPage: FC = () => {
     [accounts, filters.accountId]
   );
 
-  const pendingTransit = transits.find((t) => t.status === 'PENDING');
+  const pendingTransits = useMemo(() => transits.filter((t) => t.status === 'PENDING'), [transits]);
+  const cashInTransit = useMemo(
+    () => pendingTransits.reduce((sum, t) => sum + (Number(t.amount) || 0), 0),
+    [pendingTransits]
+  );
+  const primaryPendingTransit = pendingTransits[0];
+
+  // Open Blind Reconciliation Modal from Header Action
+  const handleOpenBlindCountModal = () => {
+    const targetAccount =
+      (filters.accountId !== 'ALL' && accounts.find((a) => a.id === filters.accountId && a.accountType === 'CASH')) ||
+      accounts.find((a) => a.accountType === 'CASH' && !a.isSafeDeposit) ||
+      accounts.find((a) => a.accountType === 'CASH') ||
+      accounts[0] ||
+      null;
+
+    if (targetAccount) {
+      setReconcilingAccount(targetAccount);
+    } else {
+      showToast('Không tìm thấy tài khoản tiền mặt để kiểm kê', 'warning');
+    }
+  };
 
   return (
     <div className="min-h-screen bg-[#F7F8F7] font-finance">
       <div className="cashbook-page-wrapper">
         <AdminToast toast={toast} onClose={closeToast} />
 
-        {/* Cash Transit Alert Banner */}
-        {/* Offline LocalStorage Migration Banner */}
-        
-        {/* Compact Cash Transit Alert Banner */}
-        {pendingTransit && (
+        {/* Thanh đồng bộ Ca & Két POS (Live Cash-in-transit Synced Banner) */}
+        {cashInTransit > 0 ? (
           <div
             style={{
               background: '#FFFBEB',
               border: '1px solid #FCD34D',
-              borderRadius: 12,
-              padding: '8px 16px',
+              borderRadius: 16,
+              padding: '12px 20px',
               marginBottom: 16,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
               flexWrap: 'wrap',
-              gap: 10,
-              boxShadow: '0 1px 3px rgba(217, 119, 6, 0.08)',
+              gap: 12,
+              boxShadow: '0 2px 6px rgba(217, 119, 6, 0.08)',
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <div
                 style={{
-                  width: 30,
-                  height: 30,
-                  borderRadius: 8,
+                  width: 36,
+                  height: 36,
+                  borderRadius: 10,
                   background: '#F59E0B',
                   color: '#ffffff',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   flexShrink: 0,
+                  boxShadow: '0 2px 4px rgba(245, 158, 11, 0.3)',
                 }}
               >
-                <Truck size={16} />
+                <Truck size={20} />
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                 <span
                   style={{
-                    fontSize: '0.7rem',
+                    fontSize: '0.72rem',
                     fontWeight: 800,
                     color: '#B45309',
                     background: '#FDE68A',
-                    padding: '2px 7px',
-                    borderRadius: 5,
+                    padding: '3px 8px',
+                    borderRadius: 6,
+                    letterSpacing: '0.02em',
                   }}
                 >
-                  Đang chuyển
+                  🔄 ĐỒNG BỘ CA & KÉT POS
                 </span>
-                <strong style={{ fontSize: '0.95rem', color: '#92400E' }} className="tabular-nums">
-                  {formatMoney(pendingTransit.amount)}
+                <span style={{ fontSize: '0.85rem', color: '#78350F' }}>
+                  Tiền thu ngân đang nộp về két sắt:
+                </span>
+                <strong style={{ fontSize: '1.05rem', color: '#92400E' }} className="tabular-nums font-black">
+                  {formatMoney(cashInTransit)}
                 </strong>
-                <span style={{ fontSize: '0.8rem', color: '#78350F' }}>
-                  từ <strong>{pendingTransit.fromAccountName}</strong> về <strong>Két sắt</strong> ({pendingTransit.senderName})
-                </span>
+                {primaryPendingTransit && (
+                  <span style={{ fontSize: '0.82rem', color: '#92400E', opacity: 0.9 }}>
+                    (từ <strong>{primaryPendingTransit.fromAccountName}</strong> • {primaryPendingTransit.senderName})
+                  </span>
+                )}
               </div>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <button
                 type="button"
-                onClick={() => handleReportTransitDiscrepancy(pendingTransit.id)}
+                onClick={() => primaryPendingTransit && handleReportTransitDiscrepancy(primaryPendingTransit.id)}
                 style={{
-                  background: 'transparent',
+                  background: '#FFFFFF',
                   border: '1px solid #D97706',
                   color: '#B45309',
-                  padding: '5px 12px',
-                  borderRadius: 7,
-                  fontWeight: 600,
-                  fontSize: '0.78rem',
+                  padding: '6px 14px',
+                  borderRadius: 8,
+                  fontWeight: 700,
+                  fontSize: '0.82rem',
                   cursor: 'pointer',
+                  transition: 'all 0.15s ease',
                 }}
               >
                 Báo lệch
               </button>
               <button
                 type="button"
-                onClick={() => handleConfirmTransit(pendingTransit.id)}
+                onClick={() => primaryPendingTransit && handleConfirmTransit(primaryPendingTransit.id)}
                 style={{
-                  background: '#115E59',
+                  background: '#0F766E',
                   border: 'none',
                   color: '#ffffff',
-                  padding: '5px 14px',
-                  borderRadius: 7,
+                  padding: '6px 16px',
+                  borderRadius: 8,
                   fontWeight: 700,
-                  fontSize: '0.78rem',
+                  fontSize: '0.82rem',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: 5,
-                  boxShadow: '0 2px 4px rgba(17, 94, 89, 0.2)',
+                  gap: 6,
+                  boxShadow: '0 2px 4px rgba(15, 118, 110, 0.25)',
+                  transition: 'all 0.15s ease',
                 }}
               >
-                <CheckCircle size={14} />
+                <CheckCircle size={15} />
                 <span>Đã nhận đủ</span>
               </button>
             </div>
+          </div>
+        ) : (
+          <div
+            style={{
+              background: '#F0FDF4',
+              border: '1px solid #BBF7D0',
+              borderRadius: 14,
+              padding: '8px 16px',
+              marginBottom: 16,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              fontSize: '12.5px',
+              color: '#166534',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <CheckCircle size={16} className="text-emerald-600" />
+              <span>
+                <strong>✓ Đã đồng bộ Ca & Két:</strong> Tiền thu ngân đang nộp về = <strong className="tabular-nums">0 đ</strong>, không có phiếu chờ duyệt.
+              </span>
+            </div>
+            <span style={{ fontSize: '11px', color: '#15803D', fontWeight: 600 }}>
+              Toàn hệ thống cân bằng
+            </span>
           </div>
         )}
 
@@ -463,7 +515,6 @@ export const CashbookPage: FC = () => {
             <h1 className="cashbook-title">
               Sổ quỹ & Dòng tiền Toàn hệ thống
             </h1>
-            {/* Subtitle removed for executive clarity */}
           </div>
 
           <div className="cashbook-header-actions flex items-center gap-2.5 flex-wrap" style={{ position: 'relative' }}>
@@ -478,6 +529,20 @@ export const CashbookPage: FC = () => {
                   <span>{triagePendingCount} mục cần duyệt</span>
                 </button>
               )}
+
+              {/* Header Action 1: Blind Reconciliation 3-step Modal Helper */}
+              <button
+                type="button"
+                className="cb-action-btn cb-action-btn-reconcile"
+                id="btn-blind-reconcile"
+                disabled={isEmployee}
+                style={{ display: isEmployee ? 'none' : undefined }}
+                onClick={handleOpenBlindCountModal}
+                title="🔍 Mở quy trình kiểm quỹ mù 3 bước (Đếm tiền 9 mệnh giá VND)"
+              >
+                <Search size={15} className="stroke-[2.5]" />
+                <span>🔍 Kiểm kê két mù (3 bước)</span>
+              </button>
 
               {/* Direct Receipt Action */}
               <button
@@ -507,6 +572,20 @@ export const CashbookPage: FC = () => {
               >
                 <span style={{ fontSize: '16px', fontWeight: 900, lineHeight: 1, userSelect: 'none' }}>−</span>
                 <span>Chi tiền</span>
+              </button>
+
+              {/* Internal Transfer Action */}
+              <button
+                type="button"
+                className="cb-action-btn cb-action-btn-transfer"
+                id="btn-internal-transfer"
+                disabled={isEmployee}
+                style={{ display: isEmployee ? 'none' : undefined }}
+                onClick={() => setIsTransferModalOpen(true)}
+                title="Chuyển quỹ nội bộ đối ứng giữa các két và tài khoản ngân hàng"
+              >
+                <ArrowRightLeft size={15} />
+                <span>⇄ Chuyển quỹ nội bộ</span>
               </button>
 
               {/* More Menu Dropdown for Secondary Administrative Actions */}
@@ -799,6 +878,7 @@ export const CashbookPage: FC = () => {
           isOpen={Boolean(reconcilingAccount)}
           onClose={() => setReconcilingAccount(null)}
           account={reconcilingAccount}
+          accounts={accounts}
           onSubmit={handleReconcileAccount}
         />
 

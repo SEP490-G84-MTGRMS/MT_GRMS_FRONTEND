@@ -153,6 +153,22 @@ export const ExpenseTable: FC<ExpenseTableProps> = ({
                     <span className="expense-table-category">
                       {EXPENSE_CATEGORY_LABELS[item.category] || item.category}
                     </span>
+                    {item.isFlaggedAsSuspiciousSplit && (
+                      <span
+                        style={{
+                          fontSize: '0.68rem',
+                          fontWeight: 700,
+                          color: '#B91C1C',
+                          background: '#FEF2F2',
+                          border: '1px solid #FECACA',
+                          borderRadius: '9999px',
+                          padding: '1px 7px',
+                        }}
+                        title={item.suspiciousReason || 'Cảnh báo xé nhỏ hạn mức chi (Anti-Splitting)'}
+                      >
+                        ⚠️ Nghi vấn
+                      </span>
+                    )}
                     {item.isRecurring && (
                       <span
                         className="badge-recurring"

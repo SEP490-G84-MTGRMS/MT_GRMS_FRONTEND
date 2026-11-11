@@ -1,5 +1,5 @@
 import { type FC, useState, useRef, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../../stores/useAuthStore';
 import { employeeApi } from '../../employee/api/employeeApi';
 import {
@@ -49,6 +49,7 @@ const getInitialActiveBranchId = (userBranchId?: string): string => {
 };
 
 export const ServiceExpensesPage: FC = () => {
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const user = useAuthStore((state) => state.user);
   const isEmployee =
@@ -66,6 +67,7 @@ export const ServiceExpensesPage: FC = () => {
       branchId: getInitialActiveBranchId(user?.branchId),
       category: '',
       status: '',
+      quickStatus: 'ALL',
       keyword: urlSearch,
       fromDate: urlSearch ? undefined : initialRange.fromDate,
       toDate: urlSearch ? undefined : initialRange.toDate,
@@ -201,6 +203,7 @@ export const ServiceExpensesPage: FC = () => {
       branchId: getInitialActiveBranchId(user?.branchId),
       category: '',
       status: '',
+      quickStatus: 'ALL',
       keyword: '',
       fromDate: range.fromDate,
       toDate: range.toDate,
@@ -240,6 +243,13 @@ export const ServiceExpensesPage: FC = () => {
     showToast('Đã hủy khoản chi phí thành công.', 'info');
   };
 
+  const todayIso = new Date().toISOString().substring(0, 10);
+  const clientOverdueCount = expensesData?.items
+    ? expensesData.items.filter(
+        (i) => i.status === 'Pending' && i.dueDate && i.dueDate < todayIso
+      ).length
+    : 0;
+
   return (
     <div className="expense-page">
       {/* Toast Notification (Shared AdminToast) */}
@@ -253,11 +263,11 @@ export const ServiceExpensesPage: FC = () => {
       {/* Top Header Bar */}
       <div className="expense-topbar" style={{ marginTop: '16px' }}>
         <div className="expense-topbar-title">
-          <h1 style={{ fontSize: '1.4rem', fontWeight: 800, margin: 0, color: 'var(--text-main, #0F172A)' }}>
-            Phải trả
+          <h1 style={{ fontSize: '1.45rem', fontWeight: 800, margin: 0, color: 'var(--text-main, #0F172A)' }}>
+            Chi phí &amp; hóa đơn phải trả
           </h1>
           <p style={{ margin: '4px 0 0', fontSize: '0.84rem', color: '#64748B' }}>
-            Theo dõi tiền điện kho lạnh bảo quản thực phẩm, tiền thuê mặt bằng cửa hàng, mua bao bì túi ni lông &amp; cuộn in bill, bảo trì tủ đông mát...
+            Quản lý tiền mặt bằng, điện nước, bảo trì tủ mát, bao bì &amp; giao vận, lương nhân viên (chuẩn Thông tư 152 &amp; Anti-Splitting)
           </p>
         </div>
 
@@ -270,6 +280,28 @@ export const ServiceExpensesPage: FC = () => {
             className="action-icon-btn"
           >
             <RefreshIcon size={16} color="currentColor" />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => navigate('/store-owner/cashbook')}
+            className="btn-secondary-pill"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '9px 16px',
+              borderRadius: '9999px',
+              fontWeight: 600,
+              fontSize: '0.85rem',
+              cursor: 'pointer',
+              border: '1px solid #cbd5e1',
+              background: '#ffffff',
+              color: '#334155',
+              boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+            }}
+          >
+            <span>Đối chiếu Sổ quỹ</span>
           </button>
 
           <button
@@ -302,6 +334,7 @@ export const ServiceExpensesPage: FC = () => {
         summary={summaryData}
         isLoading={isSummaryLoading}
         periodLabel={periodLabel}
+        overdueCount={clientOverdueCount}
       />
 
       {/* Filter Bar */}

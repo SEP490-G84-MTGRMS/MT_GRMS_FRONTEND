@@ -1,16 +1,16 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { keepPreviousData, useQuery, type UseQueryResult } from '@tanstack/react-query';
+import { AlertCircle, BarChart3 } from 'lucide-react';
 import {
-  AlertCircle,
-  BarChart3,
-  CheckCircle2,
-  ChevronRight,
-  Printer,
-  RefreshCw,
-  TrendingUp,
-} from 'lucide-react';
-import { formatCompactMoney, formatMoney } from '../utils/formatters';
+  FinanceHeader,
+  HeroCashCards,
+  ActionInbox,
+  SummaryPillars,
+  type CashMetrics,
+  type FinanceTabKey,
+  type PillarsSummaryData,
+} from '../components';
 import {
   cashbookService,
   type BackendCashbookSummaryResponse,
@@ -54,40 +54,6 @@ interface ExpensesSummaryResponse {
   overdueAmount?: number;
   totalOverdueAmount?: number;
   overdueCount?: number;
-}
-
-interface CashMetrics {
-  cashAtRegisters: number;
-  safeDeposit: number;
-  bankBalances: number;
-  cashInTransit: number;
-  totalAssets: number;
-  pctCash: number;
-  pctSafe: number;
-  pctBank: number;
-  pctTransit: number;
-}
-
-interface PillarsSummaryData {
-  totalCustomerDebt: number;
-  overLimitCustomersCount: number;
-  totalDebtorsCount: number;
-  overduePayablesAmount: number;
-  overduePayablesCount: number;
-  netProfitMonth: number;
-  netMarginPct: number;
-  activePeriodLabel: string;
-  taxDueYear: number;
-  currentYear: number;
-}
-
-interface UrgentTodoItemConfig {
-  id: string;
-  variant: 'danger' | 'warning';
-  title: string;
-  subtitle: string;
-  ctaLabel: string;
-  onAction: () => void;
 }
 
 interface ZoneAQueriesResult {
@@ -425,8 +391,14 @@ function useOverviewRefresh(
       showToast('Không thể cập nhật số liệu tài chính. Vui lòng thử lại.', 'error');
     }
   }, [
-    refetchCashAccounts, refetchCashSummary, refetchDebtsSummary,
-    refetchExpensesSummary, refetchPendingMovements, refetchPnlReport, refetchTaxSummary, showToast,
+    refetchCashAccounts,
+    refetchCashSummary,
+    refetchDebtsSummary,
+    refetchExpensesSummary,
+    refetchPendingMovements,
+    refetchPnlReport,
+    refetchTaxSummary,
+    showToast,
   ]);
 
   const isRefreshing =
@@ -440,63 +412,6 @@ function useOverviewRefresh(
 
   return { handleRefreshAll, isRefreshing };
 }
-
-interface OverviewHeaderProps {
-  todayLabel: string;
-  isRefreshing: boolean;
-  canExport: boolean;
-  onRefreshAll: () => void;
-  onOpenExportModal: () => void;
-  onNavigateCashbook: () => void;
-}
-
-const OverviewHeader: React.FC<OverviewHeaderProps> = ({
-  todayLabel,
-  isRefreshing,
-  canExport,
-  onRefreshAll,
-  onOpenExportModal,
-  onNavigateCashbook,
-}) => (
-  <div className="finance-overview-header">
-    <div className="finance-overview-title">
-      <h1>Tổng quan Tài chính</h1>
-      <p>
-        Dòng tiền tức thời, công nợ hôm nay và kết quả kinh doanh Lãi lỗ ({todayLabel})
-      </p>
-    </div>
-    <div className="finance-overview-actions">
-      <button
-        type="button"
-        onClick={onRefreshAll}
-        disabled={isRefreshing}
-        className="finance-btn-secondary"
-        title="Làm mới dữ liệu từ máy chủ"
-      >
-        <RefreshCw size={15} className={isRefreshing ? 'animate-spin' : ''} />
-        <span>Cập nhật</span>
-      </button>
-      <button
-        type="button"
-        onClick={onOpenExportModal}
-        disabled={!canExport}
-        className="finance-btn-secondary"
-        title="In và xuất báo cáo Lãi lỗ"
-      >
-        <Printer size={15} />
-        <span>In & Xuất Báo Cáo</span>
-      </button>
-      <button
-        type="button"
-        onClick={onNavigateCashbook}
-        className="btn-primary-teal"
-        id="btn-quick-receipt-payment"
-      >
-        <span>+ Thu / Chi tiền</span>
-      </button>
-    </div>
-  </div>
-);
 
 const OverviewErrorBanner: React.FC<{ onRetry: () => void }> = ({ onRetry }) => (
   <div className="finance-error-banner">
@@ -513,347 +428,12 @@ const OverviewErrorBanner: React.FC<{ onRetry: () => void }> = ({ onRetry }) => 
   </div>
 );
 
-const CashAllocationBar: React.FC<{ metrics: CashMetrics }> = ({ metrics }) => (
-  <div
-    className="finance-allocation-track"
-    role="progressbar"
-    aria-valuenow={100}
-    aria-valuemin={0}
-    aria-valuemax={100}
-  >
-    <div
-      style={{ width: `${metrics.pctCash}%`, background: '#115E59' }}
-      title={`Tiền mặt quầy: ${formatMoney(metrics.cashAtRegisters)}`}
-    />
-    <div
-      style={{ width: `${metrics.pctSafe}%`, background: '#2DD4BF' }}
-      title={`Két sắt chủ shop: ${formatMoney(metrics.safeDeposit)}`}
-    />
-    <div
-      style={{ width: `${metrics.pctBank}%`, background: '#94A3B8' }}
-      title={`Ngân hàng: ${formatMoney(metrics.bankBalances)}`}
-    />
-    {metrics.cashInTransit > 0 && (
-      <div
-        style={{ width: `${metrics.pctTransit}%`, background: '#B45309' }}
-        title={`Đang chuyển về két sắt: ${formatMoney(metrics.cashInTransit)}`}
-      />
-    )}
-  </div>
-);
-
-const CashAllocationLegend: React.FC<{ metrics: CashMetrics }> = ({ metrics }) => {
-  const legendItems = [
-    { label: 'Tiền quầy:', value: formatCompactMoney(metrics.cashAtRegisters), color: '#115E59' },
-    { label: 'Két sắt:', value: formatCompactMoney(metrics.safeDeposit), color: '#2DD4BF' },
-    { label: 'Ngân hàng:', value: formatCompactMoney(metrics.bankBalances), color: '#94A3B8' },
-    {
-      label: 'Đang chuyển:',
-      value: metrics.cashInTransit > 0 ? formatCompactMoney(metrics.cashInTransit) : '0đ',
-      color: '#B45309',
-    },
-  ];
-
-  return (
-    <div className="finance-legend-grid">
-      {legendItems.map((item) => (
-        <div key={item.label} className="finance-legend-item">
-          <span className="finance-legend-dot" style={{ background: item.color }} />
-          <span className="finance-legend-label">{item.label}</span>
-          <span className="finance-legend-val">{item.value}</span>
-        </div>
-      ))}
-    </div>
-  );
-};
-
-const CashSnapshotHeroCard: React.FC<{ isLoading: boolean; metrics: CashMetrics }> = ({
-  isLoading,
-  metrics,
-}) => (
-  <section aria-labelledby="hero-title" className="finance-hero-card">
-    <div className="finance-hero-header">
-      <div>
-        <span id="hero-title" className="finance-hero-title-text">
-          Tiền hiện có hôm nay (có thể tiêu ngay)
-        </span>
-        <div className="finance-hero-amount">
-          {isLoading ? (
-            <span style={{ fontSize: '1.5rem', color: '#94A3B8' }}>Đang tải số dư...</span>
-          ) : (
-            formatMoney(metrics.totalAssets)
-          )}
-        </div>
-      </div>
-
-      <div className="finance-hero-badge">
-        <TrendingUp size={16} />
-        <span>Dữ liệu thực từ sổ quỹ & tài khoản ngân hàng</span>
-      </div>
-    </div>
-
-    <div>
-      <CashAllocationBar metrics={metrics} />
-      <CashAllocationLegend metrics={metrics} />
-    </div>
-  </section>
-);
-
-/**
- * Builds the list of urgent daily financial tasks requiring owner attention.
- */
-function buildUrgentTasks(
-  overduePayablesCount: number,
-  overduePayablesAmount: number,
-  overLimitCustomersCount: number,
-  onNavigateExpenses: () => void,
-  onNavigateCustomers: () => void
-): UrgentTodoItemConfig[] {
-  const tasks: UrgentTodoItemConfig[] = [];
-
-  if (overduePayablesCount > 0) {
-    tasks.push({
-      id: 'overdue-payables',
-      variant: 'danger',
-      title: `${overduePayablesCount} khoản phải trả đã quá hạn (${formatMoney(overduePayablesAmount)})`,
-      subtitle: 'Các khoản chi phí dịch vụ quá hạn thanh toán cần được giải ngân',
-      ctaLabel: 'Xem chi tiết',
-      onAction: onNavigateExpenses,
-    });
-  }
-
-  if (overLimitCustomersCount > 0) {
-    tasks.push({
-      id: 'over-limit-customers',
-      variant: 'warning',
-      title: `${overLimitCustomersCount} khách hàng vượt hạn mức nợ`,
-      subtitle: 'Cần thu hồi công nợ trước khi tiếp tục cho phép ghi nợ đơn mới',
-      ctaLabel: 'Thu nợ ngay',
-      onAction: onNavigateCustomers,
-    });
-  }
-
-  return tasks;
-}
-
-const UrgentTodoItem: React.FC<{ task: UrgentTodoItemConfig }> = ({ task }) => (
-  <div className={`finance-todo-item ${task.variant}`}>
-    <div className="finance-todo-left">
-      <div className={`finance-todo-icon ${task.variant}`}>!</div>
-      <div>
-        <h3 className={`finance-todo-title ${task.variant}`}>{task.title}</h3>
-        <p className={`finance-todo-sub ${task.variant}`}>{task.subtitle}</p>
-      </div>
-    </div>
-    <button type="button" onClick={task.onAction} className={`finance-todo-btn ${task.variant}`}>
-      {task.ctaLabel}
-    </button>
-  </div>
-);
-
-interface UrgentTodoSectionProps {
-  pillars: PillarsSummaryData;
-  onNavigateExpenses: () => void;
-  onNavigateCustomers: () => void;
-}
-
-const UrgentTodoSection: React.FC<UrgentTodoSectionProps> = ({
-  pillars,
-  onNavigateExpenses,
-  onNavigateCustomers,
-}) => {
-  const tasks = buildUrgentTasks(
-    pillars.overduePayablesCount,
-    pillars.overduePayablesAmount,
-    pillars.overLimitCustomersCount,
-    onNavigateExpenses,
-    onNavigateCustomers
-  );
-
-  if (tasks.length === 0) {
-    return (
-      <section aria-label="Việc cần làm trong ngày" className="finance-todo-empty-strip">
-        <div className="finance-todo-empty-left">
-          <CheckCircle2 size={18} style={{ flexShrink: 0 }} />
-          <span>
-            Việc cần làm trong ngày: Tuyệt vời! Không có khoản nợ quá hạn hoặc khoản chi nào cần xử
-            lý khẩn cấp hôm nay.
-          </span>
-        </div>
-        <span className="finance-todo-empty-badge">0 việc khẩn</span>
-      </section>
-    );
-  }
-
-  return (
-    <section aria-labelledby="tasks-title" className="finance-todo-section">
-      <div className="finance-todo-header">
-        <h2 id="tasks-title">Việc cần làm trong ngày</h2>
-        <span className="finance-todo-count-badge">{tasks.length} việc</span>
-      </div>
-      <div className="finance-todo-list">
-        {tasks.map((task) => (
-          <UrgentTodoItem key={task.id} task={task} />
-        ))}
-      </div>
-    </section>
-  );
-};
-
-interface SummaryPillarCardProps {
-  title: string;
-  badgeText?: string;
-  valueText: string;
-  valueColor?: string;
-  subNote?: string;
-  footerLeftText: string;
-  footerLeftColor: string;
-  footerLeftBold?: boolean;
-  ctaLabel: string;
-  isPending?: boolean;
-  onClick: () => void;
-}
-
-const SummaryPillarCard: React.FC<SummaryPillarCardProps> = ({
-  title, badgeText, valueText, valueColor, subNote,
-  footerLeftText, footerLeftColor, footerLeftBold = false,
-  ctaLabel, isPending = false, onClick,
-}) => (
-  <div
-    role="button"
-    tabIndex={0}
-    aria-label={title}
-    onClick={onClick}
-    onKeyDown={(e) => {
-      if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault();
-        onClick();
-      }
-    }}
-    className="finance-summary-card"
-    style={isPending ? { opacity: 0.7 } : undefined}
-  >
-    <div>
-      <div className="finance-summary-header-row">
-        <span className="finance-summary-title">{title}</span>
-        {badgeText && <span className="finance-summary-period-badge">{badgeText}</span>}
-      </div>
-      <div className="finance-summary-val" style={valueColor ? { color: valueColor } : undefined}>
-        {valueText}
-      </div>
-      {subNote && (
-        <div style={{ fontSize: '0.74rem', color: '#64748B', marginTop: -8, marginBottom: 8 }}>
-          {subNote}
-        </div>
-      )}
-    </div>
-    <div className="finance-summary-footer">
-      <span style={{ color: footerLeftColor, fontWeight: footerLeftBold ? 700 : 600 }}>
-        {footerLeftText}
-      </span>
-      <span style={{ color: '#0F766E', fontWeight: 700, display: 'flex', alignItems: 'center' }}>
-        {ctaLabel} <ChevronRight size={14} />
-      </span>
-    </div>
-  </div>
-);
-
-interface SummaryPillarsGridProps {
-  pillars: PillarsSummaryData;
-  isPnlPending: boolean;
-  onNavigate: (path: string) => void;
-}
-
-/**
- * Builds the P&L and tax summary cards for the bottom-right pillars.
- */
-function buildPnlAndTaxCards(
-  pillars: PillarsSummaryData,
-  onNavigate: (path: string) => void,
-  isPnlPending: boolean
-): Array<SummaryPillarCardProps & { id: string }> {
-  return [
-    {
-      id: 'net-profit-pnl',
-      title: 'Lợi nhuận ròng PnL',
-      badgeText: pillars.activePeriodLabel,
-      valueText: formatMoney(pillars.netProfitMonth),
-      valueColor: pillars.netProfitMonth >= 0 ? '#15803D' : '#DC2626',
-      footerLeftText: `Tỷ suất lợi nhuận: ${pillars.netMarginPct}%`,
-      footerLeftColor: '#475569',
-      ctaLabel: 'Xem phân tích bên dưới',
-      isPending: isPnlPending,
-      onClick: scrollToPnlSection,
-    },
-    {
-      id: 'tax-due-year',
-      title: `Thuế năm nay (Lũy kế ${pillars.currentYear})`,
-      valueText: formatMoney(pillars.taxDueYear),
-      valueColor: '#B45309',
-      subNote: 'Theo Thông tư 152/2025/TT-BTC',
-      footerLeftText: 'Kỳ thuế hiện tại',
-      footerLeftColor: '#B45309',
-      ctaLabel: 'Kê khai thuế',
-      onClick: () => onNavigate('/store-owner/tax-snapshots'),
-    },
-  ];
-}
-
-/**
- * Builds the 4 summary pillar cards configuration from Zone A and Zone B data.
- */
-function buildSummaryCards(
-  pillars: PillarsSummaryData,
-  onNavigate: (path: string) => void,
-  isPnlPending: boolean
-): Array<SummaryPillarCardProps & { id: string }> {
-  const hasDebtors = pillars.totalDebtorsCount > 0;
-  const hasOverdue = pillars.overduePayablesCount > 0;
-  return [
-    {
-      id: 'customer-debt',
-      title: 'Khách đang nợ mình',
-      valueText: formatMoney(pillars.totalCustomerDebt),
-      footerLeftText: hasDebtors ? `${pillars.totalDebtorsCount} khách hàng ghi nợ` : 'Không có nợ xấu',
-      footerLeftColor: '#B45309',
-      ctaLabel: 'Xem sổ nợ',
-      onClick: () => onNavigate('/store-owner/customers'),
-    },
-    {
-      id: 'service-payables',
-      title: 'Phải trả dịch vụ',
-      valueText: formatMoney(pillars.overduePayablesAmount),
-      footerLeftText: hasOverdue ? `${pillars.overduePayablesCount} khoản quá hạn` : 'Đã thanh toán đủ',
-      footerLeftColor: hasOverdue ? '#DC2626' : '#15803D',
-      footerLeftBold: true,
-      ctaLabel: 'Xem chi tiết',
-      onClick: () => onNavigate('/store-owner/expenses'),
-    },
-    ...buildPnlAndTaxCards(pillars, onNavigate, isPnlPending),
-  ];
-}
-
-const SummaryPillarsGrid: React.FC<SummaryPillarsGridProps> = ({
-  pillars,
-  isPnlPending,
-  onNavigate,
-}) => {
-  const cards = buildSummaryCards(pillars, onNavigate, isPnlPending);
-  return (
-    <section aria-label="Tóm tắt 4 trụ cột tài chính" className="finance-summary-grid">
-      {cards.map(({ id, ...cardProps }) => (
-        <SummaryPillarCard key={id} {...cardProps} />
-      ))}
-    </section>
-  );
-};
-
 const PnlZoneDivider: React.FC = () => (
   <div className="finance-zone-divider" aria-hidden="true">
     <div className="finance-zone-divider-line" />
     <span className="finance-zone-divider-label">
       <BarChart3 size={14} />
-      Phân tích Lãi lỗ & Hiệu quả kinh doanh theo kỳ
+      Phân tích Lãi lỗ &amp; Hiệu quả kinh doanh theo kỳ
     </span>
     <div className="finance-zone-divider-line" />
   </div>
@@ -869,6 +449,7 @@ interface EmbeddedPnlSectionProps {
   onOpenExportModal: () => void;
   onCloseExportModal: () => void;
   onShowToast: (message: string, type?: ToastState['type']) => void;
+  accountingMode: boolean;
 }
 
 const EmbeddedPnlSection: React.FC<EmbeddedPnlSectionProps> = ({
@@ -881,6 +462,7 @@ const EmbeddedPnlSection: React.FC<EmbeddedPnlSectionProps> = ({
   onOpenExportModal,
   onCloseExportModal,
   onShowToast,
+  accountingMode,
 }) => (
   <div className="finance-pnl-zone">
     <PnlReportSection
@@ -902,49 +484,25 @@ const EmbeddedPnlSection: React.FC<EmbeddedPnlSectionProps> = ({
       onShowToast={onShowToast}
       hideRefreshButton={true}
       embedded={true}
+      accountingMode={accountingMode}
     />
   </div>
 );
 
-interface FinanceOverviewZoneAProps {
-  isLoading: boolean;
-  isError: boolean;
-  isPnlPending: boolean;
-  cashMetrics: CashMetrics;
-  pillars: PillarsSummaryData;
-  onRetry: () => void;
-  onNavigate: (path: string) => void;
-}
-
-const FinanceOverviewZoneA: React.FC<FinanceOverviewZoneAProps> = ({
-  isLoading,
-  isError,
-  isPnlPending,
-  cashMetrics,
-  pillars,
-  onRetry,
-  onNavigate,
-}) => (
-  <>
-    {isError && <OverviewErrorBanner onRetry={onRetry} />}
-    <CashSnapshotHeroCard isLoading={isLoading} metrics={cashMetrics} />
-    <UrgentTodoSection
-      pillars={pillars}
-      onNavigateExpenses={() => onNavigate('/store-owner/expenses')}
-      onNavigateCustomers={() => onNavigate('/store-owner/customers')}
-    />
-    <SummaryPillarsGrid pillars={pillars} isPnlPending={isPnlPending} onNavigate={onNavigate} />
-  </>
-);
-
 /**
- * Coordinates Zone A & Zone B state, queries, deep-linking, and actions for FinanceOverviewPage.
+ * Controller hook managing finance overview state, queries, and interactions.
  */
 function useFinanceOverviewController() {
   const [currentYear] = useState(() => new Date().getFullYear());
   const [todayLabel] = useState(() => new Date().toLocaleDateString('vi-VN'));
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [pnlFilter, setPnlFilter] = useState<PnlFilterParams>(createInitialPnlFilter);
+  const [accountingMode, setAccountingMode] = useState(false);
+
+  const [searchParams, setSearchParams] = useSearchParams();
+  const rawTab = searchParams.get('tab');
+  const activeTab: FinanceTabKey =
+    rawTab === 'overview' || rawTab === 'pnl' ? rawTab : 'all';
 
   const { toast, showToast, dismissToast } = useOverviewToast();
   const zoneA = useZoneAQueries(currentYear);
@@ -955,6 +513,15 @@ function useFinanceOverviewController() {
   usePnlDeepLinkScroll(!isLoading);
 
   const pendingMovements = zoneA.pendingMovementsQuery.data?.movements || [];
+  const unconfirmedDropsCount = zoneA.pendingMovementsQuery.data?.unconfirmedDropsCount ??
+    pendingMovements.filter(
+      (m) =>
+        (m.category === 'CASH_DRAW' || (m.category as unknown) === 2) &&
+        !m.isConfirmedByOwner
+    ).length;
+
+  const pendingApprovalsCount = zoneA.pendingMovementsQuery.data?.pendingApprovalsCount ?? 0;
+
   const cashInTransit = pendingMovements
     .filter(
       (m) =>
@@ -968,6 +535,7 @@ function useFinanceOverviewController() {
     zoneA.cashSummaryQuery.data,
     cashInTransit
   );
+
   const pillars = buildPillarsSummary(
     zoneA,
     pnlReportQuery.data,
@@ -975,8 +543,40 @@ function useFinanceOverviewController() {
     currentYear
   );
 
+  const handleTabChange = useCallback((tab: FinanceTabKey) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (tab === 'all') {
+        next.delete('tab');
+      } else {
+        next.set('tab', tab);
+      }
+      return next;
+    });
+    if (tab === 'pnl') {
+      window.requestAnimationFrame(() => scrollToPnlSection());
+    }
+  }, [setSearchParams]);
+
+  const handleToggleAccountingMode = useCallback(() => {
+    setAccountingMode((prev) => {
+      const next = !prev;
+      showToast(
+        next
+          ? 'Đã bật Chế độ Kế toán (hiện đối chiếu dồn tích & thực thu chi).'
+          : 'Đã ẩn thuật ngữ kế toán để xem đơn giản.',
+        'teal'
+      );
+      return next;
+    });
+  }, [showToast]);
+
   return {
     todayLabel,
+    activeTab,
+    handleTabChange,
+    accountingMode,
+    handleToggleAccountingMode,
     toast,
     showToast,
     dismissToast,
@@ -989,7 +589,11 @@ function useFinanceOverviewController() {
     isLoading,
     isError: zoneA.cashAccountsQuery.isError || zoneA.cashSummaryQuery.isError,
     isPnlPending: pnlReportQuery.isPlaceholderData && pnlReportQuery.isFetching,
+    cashAccounts: zoneA.cashAccountsQuery.data || [],
     cashMetrics,
+    cashInTransit,
+    unconfirmedDropsCount,
+    pendingApprovalsCount,
     pillars,
     ...refresh,
   };
@@ -997,47 +601,90 @@ function useFinanceOverviewController() {
 
 /**
  * Unified Finance Overview Page combining Zone A (real-time cash & daily obligations)
- * and Zone B (period P&L analytics) powered by a single shared React Query source of truth.
+ * and Zone B (period P&L analytics) with individual account hero cards, action inbox,
+ * and 6-step visual P&L waterfall chart.
  */
 export const FinanceOverviewPage: React.FC = () => {
   const navigate = useNavigate();
   const ctrl = useFinanceOverviewController();
 
+  const showZoneA = ctrl.activeTab === 'all' || ctrl.activeTab === 'overview';
+  const showZoneB = ctrl.activeTab === 'all' || ctrl.activeTab === 'pnl';
+
   return (
     <div className="finance-overview-container">
       <AdminToast toast={ctrl.toast} onClose={ctrl.dismissToast} />
       <main className="finance-overview-main">
-        <OverviewHeader
+        {/* Top Header & Sub-tabs */}
+        <FinanceHeader
           todayLabel={ctrl.todayLabel}
+          activeTab={ctrl.activeTab}
+          onTabChange={ctrl.handleTabChange}
+          accountingMode={ctrl.accountingMode}
+          onToggleAccountingMode={ctrl.handleToggleAccountingMode}
           isRefreshing={ctrl.isRefreshing}
           canExport={Boolean(ctrl.pnlReportQuery.data)}
           onRefreshAll={ctrl.handleRefreshAll}
           onOpenExportModal={() => ctrl.setIsExportModalOpen(true)}
           onNavigateCashbook={() => navigate('/store-owner/cashbook')}
+          onNavigateCashControl={() => navigate('/store-owner/cash-control?tab=pending')}
         />
-        <FinanceOverviewZoneA
-          isLoading={ctrl.isLoading}
-          isError={ctrl.isError}
-          isPnlPending={ctrl.isPnlPending}
-          cashMetrics={ctrl.cashMetrics}
-          pillars={ctrl.pillars}
-          onRetry={ctrl.handleRefreshAll}
-          onNavigate={navigate}
-        />
-        <PnlZoneDivider />
-        <EmbeddedPnlSection
-          filter={ctrl.pnlFilter}
-          onFilterChange={ctrl.setPnlFilter}
-          branches={ctrl.branches}
-          pnlReportQuery={ctrl.pnlReportQuery}
-          onRefresh={ctrl.handleRefreshAll}
-          isExportModalOpen={ctrl.isExportModalOpen}
-          onOpenExportModal={() => ctrl.setIsExportModalOpen(true)}
-          onCloseExportModal={() => ctrl.setIsExportModalOpen(false)}
-          onShowToast={ctrl.showToast}
-        />
+
+        {ctrl.isError && <OverviewErrorBanner onRetry={ctrl.handleRefreshAll} />}
+
+        {/* Zone A: Real-Time Cash Health & Daily Obligations */}
+        {showZoneA && (
+          <>
+            <HeroCashCards
+              isLoading={ctrl.isLoading}
+              metrics={ctrl.cashMetrics}
+              accounts={ctrl.cashAccounts}
+              onNavigateCashbook={() => navigate('/store-owner/cashbook')}
+              onNavigateCashControl={() => navigate('/store-owner/cash-control?tab=pending')}
+            />
+
+            <ActionInbox
+              unconfirmedDropsCount={ctrl.unconfirmedDropsCount}
+              pendingApprovalsCount={ctrl.pendingApprovalsCount}
+              cashInTransit={ctrl.cashInTransit}
+              overduePayablesCount={ctrl.pillars.overduePayablesCount}
+              overduePayablesAmount={ctrl.pillars.overduePayablesAmount}
+              overLimitCustomersCount={ctrl.pillars.overLimitCustomersCount}
+              onNavigateCashControl={() => navigate('/store-owner/cash-control?tab=pending')}
+              onNavigateExpenses={() => navigate('/store-owner/expenses')}
+              onNavigateCustomers={() => navigate('/store-owner/customers')}
+            />
+
+            <SummaryPillars
+              pillars={ctrl.pillars}
+              isPnlPending={ctrl.isPnlPending}
+              onNavigate={navigate}
+              onScrollToPnl={scrollToPnlSection}
+            />
+          </>
+        )}
+
+        {/* Zone Divider between Zone A and Zone B */}
+        {ctrl.activeTab === 'all' && <PnlZoneDivider />}
+
+        {/* Zone B: Profit & Loss (P&L) Waterfall & Reports */}
+        {showZoneB && (
+          <EmbeddedPnlSection
+            filter={ctrl.pnlFilter}
+            onFilterChange={ctrl.setPnlFilter}
+            branches={ctrl.branches}
+            pnlReportQuery={ctrl.pnlReportQuery}
+            onRefresh={ctrl.handleRefreshAll}
+            isExportModalOpen={ctrl.isExportModalOpen}
+            onOpenExportModal={() => ctrl.setIsExportModalOpen(true)}
+            onCloseExportModal={() => ctrl.setIsExportModalOpen(false)}
+            onShowToast={ctrl.showToast}
+            accountingMode={ctrl.accountingMode}
+          />
+        )}
       </main>
     </div>
   );
 };
+
 export default FinanceOverviewPage;

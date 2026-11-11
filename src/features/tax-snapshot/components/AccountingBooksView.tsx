@@ -23,6 +23,7 @@ import {
 } from '../types/taxSnapshot';
 import { taxSnapshotApi } from '../api/taxSnapshotApi';
 import { formatMoney } from '../../finance/utils/formatters';
+import { TaxBookPrintModal } from './TaxBookPrintModal';
 
 interface Props {
   summary?: HouseholdTaxSummaryDto;
@@ -164,6 +165,7 @@ export const AccountingBooksView: FC<Props> = ({ summary, year, periodType, peri
   const [isLoadingBooks, setIsLoadingBooks] = useState<boolean>(false);
   const [bookError, setBookError] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState<boolean>(false);
+  const [isPrintModalOpen, setIsPrintModalOpen] = useState<boolean>(false);
 
   // Synchronize period from parent props
   useEffect(() => {
@@ -895,7 +897,7 @@ export const AccountingBooksView: FC<Props> = ({ summary, year, periodType, peri
           </button>
           <button
             type="button"
-            onClick={handlePrint}
+            onClick={() => setIsPrintModalOpen(true)}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -912,7 +914,7 @@ export const AccountingBooksView: FC<Props> = ({ summary, year, periodType, peri
             }}
           >
             <Printer size={15} />
-            <span>In sổ chuẩn A4</span>
+            <span>Xem bản in & In A4</span>
           </button>
         </div>
       </div>
@@ -1778,6 +1780,23 @@ export const AccountingBooksView: FC<Props> = ({ summary, year, periodType, peri
           </div>
         </div>
       </div>
+
+      {/* Modal Xem trước và in ấn A4 chuẩn Thông tư 152 */}
+      <TaxBookPrintModal
+        isOpen={isPrintModalOpen}
+        onClose={() => setIsPrintModalOpen(false)}
+        activeBookTab={activeBookTab}
+        onSelectBookTab={(type) => setActiveBookTab(type)}
+        bookTabs={bookTabs}
+        activeTabMetadata={activeTabMetadata}
+        entries={filteredEntries}
+        fundMetrics={fundMetrics}
+        totalAmount={totalAmount}
+        summary={summary}
+        periodDisplayName={periodDisplayName}
+        year={year}
+        onPrint={handlePrint}
+      />
     </div>
   );
 };

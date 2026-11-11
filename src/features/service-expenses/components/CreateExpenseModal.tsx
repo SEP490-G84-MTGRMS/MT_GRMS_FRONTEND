@@ -19,6 +19,7 @@ import {
 } from '../types/expense.types';
 import { MoneyInput } from '../../../components/common/MoneyInput';
 import { formatMoney } from '../../finance/utils/formatters';
+import { uploadImageToCloudinary } from '../../../utils/cloudinary';
 
 interface CreateExpenseModalProps {
   isOpen: boolean;
@@ -153,6 +154,7 @@ export const CreateExpenseModal: FC<CreateExpenseModalProps> = ({
 
   const [attachMode, setAttachMode] = useState<'upload' | 'url'>('upload');
   const [uploadedFile, setUploadedFile] = useState<{ name: string; size: string } | null>(null);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   if (!isOpen) return null;
@@ -173,14 +175,17 @@ export const CreateExpenseModal: FC<CreateExpenseModalProps> = ({
     }
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 10 * 1024 * 1024) {
+    // Reset input target value để có thể chọn lại file cùng tên nếu muốn
+    e.target.value = '';
+
+    if (file.size > 5 * 1024 * 1024) {
       setErrors((prev) => ({
         ...prev,
-        attachedBillUrl: 'Kích thước tệp không được vượt quá 10MB',
+        attachedBillUrl: 'Kích thước tệp không được vượt quá 5MB theo giới hạn Cloudinary',
       }));
       return;
     }
@@ -190,20 +195,27 @@ export const CreateExpenseModal: FC<CreateExpenseModalProps> = ({
         ? `${(file.size / (1024 * 1024)).toFixed(1)} MB`
         : `${Math.round(file.size / 1024)} KB`;
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result as string;
-      setFormData((prev) => ({ ...prev, attachedBillUrl: result }));
+    setIsUploadingImage(true);
+    setErrors((prev) => {
+      const updated = { ...prev };
+      delete updated.attachedBillUrl;
+      return updated;
+    });
+
+    try {
+      // Tải hình ảnh hóa đơn lên Cloudinary lưu trữ an toàn, nhận về đường dẫn HTTPS
+      const secureUrl = await uploadImageToCloudinary(file, 'mtgrms/expenses');
+      setFormData((prev) => ({ ...prev, attachedBillUrl: secureUrl }));
       setUploadedFile({ name: file.name, size: fileSizeStr });
-      if (errors.attachedBillUrl) {
-        setErrors((prev) => {
-          const updated = { ...prev };
-          delete updated.attachedBillUrl;
-          return updated;
-        });
-      }
-    };
-    reader.readAsDataURL(file);
+    } catch (uploadErr: unknown) {
+      const err = uploadErr as { message?: string };
+      setErrors((prev) => ({
+        ...prev,
+        attachedBillUrl: err?.message || 'Không thể tải ảnh chứng từ lên Cloudinary',
+      }));
+    } finally {
+      setIsUploadingImage(false);
+    }
   };
 
   const handleRemoveFile = () => {
@@ -747,7 +759,7 @@ export const CreateExpenseModal: FC<CreateExpenseModalProps> = ({
                               {uploadedFile?.name || 'chung_tu_hoa_don.png'}
                             </span>
                             <span className="expense-upload-file-size">
-                              {uploadedFile?.size || 'Ảnh chứng từ đã tải lên'}
+                              {uploadedFile?.size || 'Ảnh chứng từ Cloudinary'}
                             </span>
                           </div>
                           <button
@@ -757,6 +769,13 @@ export const CreateExpenseModal: FC<CreateExpenseModalProps> = ({
                           >
                             Xóa tệp
                           </button>
+                        </div>
+                      ) : isUploadingImage ? (
+                        <div className="expense-upload-dropzone" style={{ cursor: 'wait', padding: '24px 16px' }}>
+                          <div className="expense-upload-spinner" />
+                          <span className="expense-upload-dropzone-text" style={{ color: '#0F766E', fontWeight: 600 }}>
+                            Đang tải ảnh lên Cloudinary... Vui lòng chờ
+                          </span>
                         </div>
                       ) : (
                         <label className="expense-upload-dropzone">
@@ -768,7 +787,7 @@ export const CreateExpenseModal: FC<CreateExpenseModalProps> = ({
                           />
                           <UploadIcon size={24} color="#0F766E" />
                           <span className="expense-upload-dropzone-text">
-                            Kéo thả hoặc <strong>chọn ảnh hóa đơn</strong>
+                            Kéo thả hoặc <strong>chọn ảnh hóa đơn</strong> (Cloudinary)
                           </span>
                         </label>
                       )}
@@ -813,7 +832,7 @@ export const CreateExpenseModal: FC<CreateExpenseModalProps> = ({
             </button>
             <button
               type="submit"
-              disabled={isSubmitting || !isFormValid}
+              disabled={isSubmitting || isUploadingImage || !isFormValid}
               className="btn-primary-pill"
               style={{
                 minWidth: '160px',
@@ -822,14 +841,16 @@ export const CreateExpenseModal: FC<CreateExpenseModalProps> = ({
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: 8,
-                background: isFormValid ? 'var(--brand-700, #115E59)' : '#CBD5E1',
-                cursor: isFormValid ? 'pointer' : 'not-allowed',
+                background: isFormValid && !isUploadingImage ? 'var(--brand-700, #115E59)' : '#CBD5E1',
+                cursor: isFormValid && !isUploadingImage ? 'pointer' : 'not-allowed',
                 fontWeight: 700,
               }}
             >
               <CheckCircle size={18} />
               <span>
-                {isSubmitting
+                {isUploadingImage
+                  ? 'Đang tải ảnh...'
+                  : isSubmitting
                   ? 'Đang lưu...'
                   : parsedAmount > 0
                   ? `Chi ${formatMoney(parsedAmount)}`
