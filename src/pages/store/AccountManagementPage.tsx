@@ -5,17 +5,16 @@ import {
   INITIAL_STORE_INFO,
   INITIAL_USER_PROFILE,
   INITIAL_SESSIONS,
-  INITIAL_TRANSACTIONS,
   type StoreInfo,
   type UserProfile,
   type UserSessionItem,
-  type WalletTransaction,
 } from './storeData';
 import type { AccountTabKey } from './components/AccountSidebarNav';
 import { AccountProfileTab } from './components/AccountProfileTab';
 import { WalletLedgerTab } from './components/WalletLedgerTab';
 import { TermsOfServiceTab } from './components/TermsOfServiceTab';
 import { StoreWalletTopupModal } from './components/StoreWalletTopupModal';
+import { storeApi, mapBackendStoreToFrontend } from './api/storeApi';
 
 export const AccountManagementPage: FC = () => {
   const [searchParams] = useSearchParams();
@@ -30,8 +29,22 @@ export const AccountManagementPage: FC = () => {
   const [userProfile, setUserProfile] = useState<UserProfile>(INITIAL_USER_PROFILE);
   const [sessions, setSessions] = useState<UserSessionItem[]>(INITIAL_SESSIONS);
   const [storeInfo, setStoreInfo] = useState<StoreInfo>(INITIAL_STORE_INFO);
-  const [transactions, setTransactions] = useState<WalletTransaction[]>(INITIAL_TRANSACTIONS);
+  const [walletRefreshKey, setWalletRefreshKey] = useState<number>(0);
   const [showTopupModal, setShowTopupModal] = useState<boolean>(false);
+
+  useEffect(() => {
+    const fetchStore = async () => {
+      try {
+        const res = await storeApi.getStoreInfo();
+        if (res.success && res.data) {
+          setStoreInfo((prev) => mapBackendStoreToFrontend(res.data, prev.walletBalance));
+        }
+      } catch {
+        // Bỏ qua nếu chưa lấy được thông tin gian hàng
+      }
+    };
+    fetchStore();
+  }, []);
 
   useEffect(() => {
     if (tabParam && tabParam !== activeTab && ['account-profile', 'wallet', 'terms'].includes(tabParam)) {
@@ -54,26 +67,14 @@ export const AccountManagementPage: FC = () => {
   };
 
   // Nạp tiền ví
-  const handleTopupSuccess = (amount: number) => {
-    const newBal = storeInfo.walletBalance + amount;
-    const newTx: WalletTransaction = {
-      id: `tx-${Date.now()}`,
-      transactionCode: `WAL-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(100 + Math.random() * 900)}`,
-      type: 'TOPUP',
-      amount,
-      balanceBefore: storeInfo.walletBalance,
-      balanceAfter: newBal,
-      description: 'Nạp tiền vào ví gian hàng qua VietQR Napas247',
-      paymentMethod: 'VietQR',
-      status: 'Success',
-      createdAt: 'Vừa xong',
-    };
+  const handleTopupSuccess = (amount: number, newBalance?: number) => {
+    const newBal = newBalance !== undefined ? newBalance : storeInfo.walletBalance + amount;
 
     setStoreInfo((prev) => ({
       ...prev,
       walletBalance: newBal,
     }));
-    setTransactions((prev) => [newTx, ...prev]);
+    setWalletRefreshKey((k) => k + 1);
     setShowTopupModal(false);
   };
 
@@ -92,8 +93,7 @@ export const AccountManagementPage: FC = () => {
 
         {activeTab === 'wallet' && (
           <WalletLedgerTab
-            storeInfo={storeInfo}
-            transactions={transactions}
+            refreshKey={walletRefreshKey}
             onOpenTopupModal={() => setShowTopupModal(true)}
           />
         )}

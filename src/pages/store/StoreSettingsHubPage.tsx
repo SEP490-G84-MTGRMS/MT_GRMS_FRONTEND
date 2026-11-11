@@ -4,9 +4,7 @@ import { useSearchParams, useNavigate, Navigate } from 'react-router-dom';
 import {
   INITIAL_STORE_INFO,
   type StoreInfo,
-  type WalletTransaction,
   type SubscriptionPlanItem,
-  INITIAL_TRANSACTIONS,
 } from './storeData';
 import { StoreSidebarNav, type StoreHubTabKey } from './components/StoreSidebarNav';
 import { StoreTopStatusBar } from './components/StoreTopStatusBar';
@@ -48,7 +46,7 @@ export const StoreSettingsHubPage: FC = () => {
   );
 
   const [storeInfo, setStoreInfo] = useState<StoreInfo>(INITIAL_STORE_INFO);
-  const [transactions, setTransactions] = useState<WalletTransaction[]>(INITIAL_TRANSACTIONS);
+  const [walletRefreshKey, setWalletRefreshKey] = useState<number>(0);
 
   const [selectedPlanForCheckout, setSelectedPlanForCheckout] =
     useState<SubscriptionPlanItem | null>(null);
@@ -84,24 +82,12 @@ export const StoreSettingsHubPage: FC = () => {
   // Nạp tiền ví
   const handleTopupSuccess = (amount: number, newBalance?: number) => {
     const newBal = newBalance !== undefined ? newBalance : storeInfo.walletBalance + amount;
-    const newTx: WalletTransaction = {
-      id: `tx-${Date.now()}`,
-      transactionCode: `WAL-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(100 + Math.random() * 900)}`,
-      type: 'TOPUP',
-      amount,
-      balanceBefore: storeInfo.walletBalance,
-      balanceAfter: newBal,
-      description: 'Nạp tiền vào ví gian hàng qua VietQR Napas247',
-      paymentMethod: 'VietQR',
-      status: 'Success',
-      createdAt: 'Vừa xong',
-    };
 
     setStoreInfo((prev) => ({
       ...prev,
       walletBalance: newBal,
     }));
-    setTransactions((prev) => [newTx, ...prev]);
+    setWalletRefreshKey((k) => k + 1);
     setShowTopupModal(false);
   };
 
@@ -133,19 +119,6 @@ export const StoreSettingsHubPage: FC = () => {
           return expDate.toISOString().split('T')[0];
         })();
 
-    const newTx: WalletTransaction = {
-      id: `tx-${Date.now()}`,
-      transactionCode: `SUB-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(100 + Math.random() * 900)}`,
-      type: 'PURCHASE_PLAN',
-      amount: result.totalAmount,
-      balanceBefore: storeInfo.walletBalance,
-      balanceAfter: newBal,
-      description: `Đăng ký & Nâng cấp ${result.planName} (${result.months} tháng)`,
-      paymentMethod: result.paymentMethod,
-      status: 'Success',
-      createdAt: 'Vừa xong',
-    };
-
     setStoreInfo((prev) => ({
       ...prev,
       currentPlan: result.planName,
@@ -153,7 +126,7 @@ export const StoreSettingsHubPage: FC = () => {
       subscriptionExpiresAt: newExpStr,
       walletBalance: newBal,
     }));
-    setTransactions((prev) => [newTx, ...prev]);
+    setWalletRefreshKey((k) => k + 1);
     setSelectedPlanForCheckout(null);
   };
 
@@ -253,8 +226,7 @@ export const StoreSettingsHubPage: FC = () => {
         {activeTab === 'wallet' && (
           <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, marginTop: 4 }}>
             <WalletLedgerTab
-              storeInfo={storeInfo}
-              transactions={transactions}
+              refreshKey={walletRefreshKey}
               onOpenTopupModal={() => setShowTopupModal(true)}
             />
           </div>
