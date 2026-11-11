@@ -52,8 +52,11 @@ export const InventoryListPage: FC = () => {
       const res = await inventoryApi.getStockSummary(applied);
       setItems(res.items);
       setTotalCount(res.totalCount);
-    } catch {
-      // Handled in api
+    } catch (err: any) {
+      setItems([]);
+      setTotalCount(0);
+      setToastMessage(err?.message || 'Không tải được tồn kho. Kiểm tra kết nối API.');
+      setTimeout(() => setToastMessage(''), 4000);
     } finally {
       setIsLoading(false);
     }

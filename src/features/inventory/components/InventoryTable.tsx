@@ -222,10 +222,10 @@ export const InventoryTable: FC<Props> = ({
               <th style={thBaseStyle}>Nhóm</th>
               <th style={thBaseStyle}>Chi nhánh</th>
               <th style={{ ...thBaseStyle, textAlign: 'center' }}>ĐVT</th>
-              {renderSortTh('onHand', 'OnHand', 'right')}
-              <th style={{ ...thBaseStyle, textAlign: 'right' }}>Committed</th>
-              {renderSortTh('available', 'Available', 'right')}
-              <th style={{ ...thBaseStyle, textAlign: 'right' }}>OnOrder</th>
+              {renderSortTh('onHand', 'Tồn', 'right')}
+              <th style={{ ...thBaseStyle, textAlign: 'right' }}>Cách ly/Giữ</th>
+              {renderSortTh('available', 'Khả dụng', 'right')}
+              <th style={{ ...thBaseStyle, textAlign: 'right' }}>Đang đặt</th>
               <th style={{ ...thBaseStyle, textAlign: 'right' }}>Giá vốn</th>
               {renderSortTh('totalValue', 'Giá trị', 'right')}
               {renderSortTh('status', 'Trạng thái', 'center')}
