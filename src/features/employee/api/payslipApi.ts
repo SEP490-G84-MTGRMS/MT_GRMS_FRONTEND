@@ -151,6 +151,7 @@ export function normalizePayslipStatus(status: number | string | undefined): 'UN
 export function mapBackendSummaryToDetailedRecord(dto: PayslipSummaryDto): PayslipDetailedRecord {
   return {
     id: dto.id,
+    payslipCode: dto.payslipCode,
     employeeId: dto.employeeId,
     employeeCode: dto.employeeCode,
     employeeName: dto.employeeName,

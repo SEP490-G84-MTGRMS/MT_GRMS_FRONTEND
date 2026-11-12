@@ -25,7 +25,7 @@ import { CreateScheduleRequestModal } from '../components/approval-requests/Crea
 import { ScheduleRequestsHistoryModal } from '../components/approval-requests/ScheduleRequestsHistoryModal';
 import { FaceIdAttendanceModal } from '../components/attendance/FaceIdAttendanceModal';
 import { ScheduleRequestType } from '../types/scheduleApprovalTypes';
-import { getVietnamToday } from '../lib/vietnamTime';
+import { getVietnamToday, matchesAnyVietnameseSearch } from '../lib/vietnamTime';
 import { useAuthStore } from '../../../stores/useAuthStore';
 import '../employee.css';
 
@@ -133,8 +133,15 @@ const mapScheduleToAttendanceRecord = (s: ScheduleResponse): AttendanceRecord =>
   const checkOutTime = formatTime(s.checkOutTime);
 
   // Status mapping
+  const isPaidLeave =
+    s.approvalType === 'PAID_LEAVE' || s.checkInMethod === 'MANUAL_PAID_LEAVE';
+  const isUnpaidLeave =
+    s.approvalType === 'UNPAID_LEAVE' ||
+    s.checkInMethod === 'MANUAL_UNPAID_LEAVE' ||
+    s.status === 'Cancelled';
+
   let status: AttendanceRecord['status'] = 'not_checked';
-  if (s.status === 'Cancelled') {
+  if (isUnpaidLeave || isPaidLeave) {
     status = 'absent';
   } else if (s.checkInTime && !s.checkOutTime) {
     const today = getVietnamToday();
@@ -190,6 +197,8 @@ const mapScheduleToAttendanceRecord = (s: ScheduleResponse): AttendanceRecord =>
     workHours: s.actualWorkHours > 0 ? s.actualWorkHours : (s.durationHours || 0),
     gpsLocation: s.branchName || 'Chi nhánh',
     deviceInfo: s.checkInMethod || (s.checkInFaceImageUrl ? 'Khuôn mặt (FaceID)' : 'QR Code / GPS'),
+    checkInMethod: s.checkInMethod || undefined,
+    approvalType: s.approvalType || undefined,
     approvalStatus: String(s.approvalStatus ?? ''),
     note: s.approvalReason || undefined,
   };
@@ -456,24 +465,19 @@ export const AttendancePage: React.FC = () => {
     fetchAttendanceData();
   }, [fetchAttendanceData]);
 
-  // Client-side filtering by employee name/code or shift name/date/note
+  // Client-side filtering by employee name/code or shift name/date/note (không phân biệt dấu/hoa-thường)
   const filteredRecords = useMemo(() => {
     if (!searchEmployee.trim()) return records;
-    const lower = searchEmployee.toLowerCase().trim();
     return records.filter((r) => {
       if (isEmployeeRole) {
-        return (
-          r.shiftName.toLowerCase().includes(lower) ||
-          (r.shiftCode ? r.shiftCode.toLowerCase().includes(lower) : false) ||
-          r.dateStr.toLowerCase().includes(lower) ||
-          (r.note ? r.note.toLowerCase().includes(lower) : false)
+        return matchesAnyVietnameseSearch(
+          [r.shiftName, r.shiftCode, r.dateStr, r.note],
+          searchEmployee
         );
       }
-      return (
-        r.employeeName.toLowerCase().includes(lower) ||
-        r.employeeCode.toLowerCase().includes(lower) ||
-        r.shiftName.toLowerCase().includes(lower) ||
-        (r.shiftCode ? r.shiftCode.toLowerCase().includes(lower) : false)
+      return matchesAnyVietnameseSearch(
+        [r.employeeName, r.employeeCode, r.shiftName, r.shiftCode],
+        searchEmployee
       );
     });
   }, [records, searchEmployee, isEmployeeRole]);
@@ -850,6 +854,12 @@ export const AttendancePage: React.FC = () => {
                                 <div
                                   onClick={(e) => {
                                     e.stopPropagation();
+                                    if (isStoreOwnerOrAdmin || !isEmployeeRole) {
+                                      setOpenMenuScheduleId(null);
+                                      setMenuPosition(null);
+                                      setSelectedRecord(att);
+                                      return;
+                                    }
                                     if (isMenuOpen) {
                                       setOpenMenuScheduleId(null);
                                       setMenuPosition(null);
@@ -878,13 +888,23 @@ export const AttendancePage: React.FC = () => {
                                     boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
                                     transition: 'all 0.15s ease',
                                   }}
-                                  title="Bấm để xem chi tiết hoặc gửi yêu cầu"
+                                  title={
+                                    isStoreOwnerOrAdmin || !isEmployeeRole
+                                      ? 'Bấm để xem chi tiết và chấm công'
+                                      : 'Bấm để xem chi tiết hoặc gửi yêu cầu'
+                                  }
                                 >
                                   <div style={{ fontWeight: 600, fontSize: 12, color: '#0F172A' }}>
                                     {att.employeeName}
                                   </div>
                                   <div style={{ fontSize: 11, color: '#64748B', marginTop: 2 }}>
-                                    {att.checkInTime ? `${att.checkInTime} - ${att.checkOutTime || '...'}` : 'Chưa check-in'}
+                                    {att.checkInTime
+                                      ? `${att.checkInTime} - ${att.checkOutTime || '...'}`
+                                      : att.approvalType === 'PAID_LEAVE'
+                                        ? 'Nghỉ phép có lương'
+                                        : att.approvalType === 'UNPAID_LEAVE'
+                                          ? 'Nghỉ không lương'
+                                          : 'Chưa check-in'}
                                   </div>
                                   <div style={{ marginTop: 4 }}>
                                     {att.status === 'ontime' && (
@@ -924,13 +944,19 @@ export const AttendancePage: React.FC = () => {
                                         <span style={{ width: 13, height: 13, borderRadius: '50%', background: '#94A3B8', color: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
                                           <Check size={9} strokeWidth={3} />
                                         </span>
-                                        <span>Nghỉ làm</span>
+                                        <span>
+                                          {att.approvalType === 'PAID_LEAVE'
+                                            ? 'Nghỉ có lương'
+                                            : att.approvalType === 'UNPAID_LEAVE'
+                                              ? 'Nghỉ không lương'
+                                              : 'Nghỉ làm'}
+                                        </span>
                                       </span>
                                     )}
                                   </div>
                                 </div>
 
-                                {isMenuOpen && menuPosition && (
+                                {isMenuOpen && menuPosition && isEmployeeRole && !isStoreOwnerOrAdmin && (
                                   <div
                                     style={{
                                       position: 'fixed',
@@ -1253,7 +1279,7 @@ export const AttendancePage: React.FC = () => {
         record={selectedRecord}
         onUpdateStatus={handleUpdateRecordStatus}
         onSaved={fetchAttendanceData}
-        isReadOnly={isEmployeeRole}
+        isReadOnly={isEmployeeRole && !isStoreOwnerOrAdmin}
         onRequestIncident={(rec: any, type: any) => {
           setSelectedRecord(null);
           handleOpenCreateRequest(rec, type);

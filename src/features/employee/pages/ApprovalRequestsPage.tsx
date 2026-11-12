@@ -21,6 +21,7 @@ import {
   type ReviewScheduleApprovalRequestDto,
 } from '../types/scheduleApprovalTypes';
 import { TablePagination, NotificationModal } from '../../../components/common';
+import { matchesAnyVietnameseSearch } from '../lib/vietnamTime';
 import '../employee.css';
 
 const ACTIVE_BRANCH_STORAGE_KEY = 'mtgrms_active_branch';
@@ -131,14 +132,15 @@ export const ApprovalRequestsPage: React.FC = () => {
 
   // Client-side filtering (Search keyword & Active branch)
   const filteredRequests = requests.filter((req) => {
-    // 1. Keyword search (Mã NV, Tên NV, Lý do)
-    if (searchTerm.trim()) {
-      const q = searchTerm.toLowerCase().trim();
-      const matchName = req.employeeName?.toLowerCase().includes(q);
-      const matchCode = req.employeeCode?.toLowerCase().includes(q);
-      const matchReason = req.reason?.toLowerCase().includes(q);
-      const matchShift = req.shiftName?.toLowerCase().includes(q);
-      if (!matchName && !matchCode && !matchReason && !matchShift) return false;
+    // 1. Keyword search (Mã NV, Tên NV, Lý do, Tên ca - không phân biệt dấu/hoa-thường)
+    if (
+      searchTerm.trim() &&
+      !matchesAnyVietnameseSearch(
+        [req.employeeName, req.employeeCode, req.reason, req.shiftName],
+        searchTerm
+      )
+    ) {
+      return false;
     }
 
     // 2. Active branch filter (nếu client có danh sách tổng)

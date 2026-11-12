@@ -70,3 +70,44 @@ export const normalizeVietnameseComparison = (input?: string | null): string => 
     .toLowerCase();
 };
 
+const normalizeCaseAndSpace = (input?: string | null): string => {
+  if (!input) return '';
+  return input
+    .trim()
+    .replace(/\s+/g, ' ')
+    .normalize('NFC')
+    .toLowerCase();
+};
+
+/**
+ * Kiểm tra trường văn bản có chứa từ khóa tìm kiếm hay không:
+ * - Nếu từ khóa CÓ dấu tiếng Việt (VD: "án", "đạt"): khớp đúng dấu, không phân biệt hoa - thường.
+ * - Nếu từ khóa KHÔNG dấu (VD: "an", "nguyen"): khớp cả văn bản có dấu và không dấu, không phân biệt hoa - thường.
+ */
+export const matchesVietnameseSearch = (
+  text?: string | null,
+  query?: string | null
+): boolean => {
+  const normalizedQueryNoAccent = normalizeVietnameseComparison(query);
+  if (!normalizedQueryNoAccent) return true;
+  if (!text) return false;
+
+  const normalizedQueryWithAccent = normalizeCaseAndSpace(query);
+  if (normalizedQueryWithAccent !== normalizedQueryNoAccent) {
+    return normalizeCaseAndSpace(text).includes(normalizedQueryWithAccent);
+  }
+
+  return normalizeVietnameseComparison(text).includes(normalizedQueryNoAccent);
+};
+
+/**
+ * Kiểm tra ít nhất một trường trong danh sách khớp với từ khóa tìm kiếm.
+ */
+export const matchesAnyVietnameseSearch = (
+  fields: Array<string | null | undefined>,
+  query?: string | null
+): boolean => {
+  if (!normalizeVietnameseComparison(query)) return true;
+  return fields.some((field) => matchesVietnameseSearch(field, query));
+};
+

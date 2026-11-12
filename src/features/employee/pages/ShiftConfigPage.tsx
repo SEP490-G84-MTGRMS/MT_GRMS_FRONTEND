@@ -24,7 +24,7 @@ import {
 } from '../api/shiftConfigApi';
 import { ConfirmModal, NotificationModal, TablePagination } from '../../../components/common';
 import { AttendanceConfigModal } from '../components/shift-config/AttendanceConfigModal';
-import { normalizeVietnameseComparison } from '../lib/vietnamTime';
+import { normalizeVietnameseComparison, matchesAnyVietnameseSearch } from '../lib/vietnamTime';
 import '../employee.css';
 
 // Helper format HH:mm:ss -> HH:mm
@@ -192,16 +192,26 @@ export const ShiftConfigPage: React.FC = () => {
         filterStatus === 'active' ? true : filterStatus === 'inactive' ? false : undefined;
       const branchIdParam = activeBranch && activeBranch.id !== 'ALL' ? activeBranch.id : undefined;
 
+      const trimmedKeyword = debouncedSearchTerm.trim();
       const pagedResult = await shiftConfigApi.getShiftConfigsPaged({
-        keyword: debouncedSearchTerm.trim() || undefined,
         branchId: branchIdParam,
         isActive: statusParam,
-        page: currentPage,
-        pageSize,
+        page: trimmedKeyword ? 1 : currentPage,
+        pageSize: trimmedKeyword ? 1000 : pageSize,
       });
 
-      setShifts(pagedResult.items || []);
-      setTotalItems(pagedResult.totalItems || 0);
+      const rawItems = pagedResult.items || [];
+      if (trimmedKeyword) {
+        const matchedItems = rawItems.filter((s) =>
+          matchesAnyVietnameseSearch([s.shiftCode, s.shiftName], trimmedKeyword)
+        );
+        const startIdx = (currentPage - 1) * pageSize;
+        setShifts(matchedItems.slice(startIdx, startIdx + pageSize));
+        setTotalItems(matchedItems.length);
+      } else {
+        setShifts(rawItems);
+        setTotalItems(pagedResult.totalItems || 0);
+      }
     } catch (err: any) {
       console.error('Lỗi tải ca làm việc:', err);
       setErrorMessage(
@@ -1268,7 +1278,7 @@ export const ShiftConfigPage: React.FC = () => {
 
                         <div style={{ maxHeight: 180, overflowY: 'auto' }}>
                           {branches
-                            .filter((b) => b.name.toLowerCase().includes(modalBranchSearch.toLowerCase().trim()))
+                            .filter((b) => matchesAnyVietnameseSearch([b.name], modalBranchSearch))
                             .map((b) => {
                               const isChecked = formBranchIds.includes(b.id);
                               return (

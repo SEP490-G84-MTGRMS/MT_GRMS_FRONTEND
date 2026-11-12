@@ -27,6 +27,7 @@ import { EmployeeDetailModal } from '../components/employee-list/EmployeeDetailM
 import { ApprovalRequestsModal } from '../components/approval-requests/ApprovalRequestsModal';
 import { ImportEmployeeModal } from '../components/employee-list/ImportEmployeeModal';
 import { TablePagination, NotificationModal, ConfirmModal } from '../../../components/common';
+import { matchesAnyVietnameseSearch } from '../lib/vietnamTime';
 import '../employee.css';
 
 const ACTIVE_BRANCH_STORAGE_KEY = 'mtgrms_active_branch';
@@ -135,21 +136,38 @@ export const EmployeeListPage: React.FC = () => {
           ? activeBranch.id
           : undefined;
 
+      const trimmedKeyword = debouncedKeyword.trim();
       const res = await employeeApi.getEmployeesPaged({
-        keyword: debouncedKeyword || undefined,
         branchId: currentBranchId,
         status: statusFilter !== 'all' ? statusFilter : undefined,
-        page,
-        pageSize,
+        page: trimmedKeyword ? 1 : page,
+        pageSize: trimmedKeyword ? 1000 : pageSize,
       });
+
+      const filteredItems = trimmedKeyword
+        ? res.items.filter((emp) =>
+            matchesAnyVietnameseSearch(
+              [emp.fullName, emp.employeeCode, emp.phone, emp.citizenId, emp.email],
+              trimmedKeyword
+            )
+          )
+        : res.items;
+
       // Ưu tiên nhân viên đang làm việc (active) hiển thị lên đầu
-      const sortedItems = [...res.items].sort((a, b) => {
+      const sortedItems = [...filteredItems].sort((a, b) => {
         const aActive = a.status === 'active' ? 0 : 1;
         const bActive = b.status === 'active' ? 0 : 1;
         return aActive - bActive;
       });
-      setEmployees(sortedItems);
-      setTotalItems(res.totalItems);
+
+      if (trimmedKeyword) {
+        const startIdx = (page - 1) * pageSize;
+        setEmployees(sortedItems.slice(startIdx, startIdx + pageSize));
+        setTotalItems(sortedItems.length);
+      } else {
+        setEmployees(sortedItems);
+        setTotalItems(res.totalItems);
+      }
     } catch (err: any) {
       const msg = err?.response?.data?.message || err?.message || 'Không thể tải danh sách nhân viên.';
       setErrorMessage(msg);
@@ -261,11 +279,16 @@ export const EmployeeListPage: React.FC = () => {
       if (selectedDetailEmployee?.id === employeeId) {
         setSelectedDetailEmployee({ ...selectedDetailEmployee, status: newStatus });
       }
+      const lockAccountNote = currentEmp.userId
+        ? newStatus === 'inactive'
+          ? ' Tài khoản đăng nhập liên kết đã bị khóa.'
+          : ' Tài khoản đăng nhập liên kết đã được mở khóa.'
+        : '';
       setNotification({
         isOpen: true,
         type: 'success',
         title: 'Cập nhật trạng thái thành công',
-        message: `Trạng thái của nhân viên "${currentEmp.fullName}" đã chuyển sang ${newStatus === 'active' ? 'Đang làm việc' : 'Tạm dừng hoạt động'}.`,
+        message: `Trạng thái của nhân viên "${currentEmp.fullName}" đã chuyển sang ${newStatus === 'active' ? 'Đang làm việc' : 'Tạm dừng hoạt động'}.${lockAccountNote}`,
         itemCode: currentEmp.employeeCode,
       });
     } catch (err: any) {

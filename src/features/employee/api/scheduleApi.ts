@@ -130,6 +130,16 @@ export interface ManualAttendancePayload {
   note?: string | null;
 }
 
+export interface ResetAttendancePayload {
+  reason?: string | null;
+}
+
+export interface ResetAttendanceResponse {
+  schedule: ScheduleResponse;
+  hasUnpaidPayslip: boolean;
+  message: string;
+}
+
 export const getShiftColor = (nameOrCode: string = ''): string => {
   const lower = nameOrCode.toLowerCase();
   if (lower.includes('sáng') || lower.includes('sang')) return '#3B82F6';
@@ -367,6 +377,24 @@ export const scheduleApi = {
       return res.data.data;
     }
     throw new Error(res.data?.message || 'Chấm công thủ công thất bại.');
+  },
+
+  /**
+   * Hủy chấm công và đưa ca làm việc về trạng thái chờ vào ca (Published)
+   * Backend: POST /api/schedules/{id}/attendance/reset
+   */
+  async resetManualAttendance(
+    id: string,
+    payload: ResetAttendancePayload = {}
+  ): Promise<ResetAttendanceResponse> {
+    const res = await httpClient.post<ApiResponse<ResetAttendanceResponse>>(
+      `/schedules/${id}/attendance/reset`,
+      payload
+    );
+    if (res.data?.success && res.data.data) {
+      return res.data.data;
+    }
+    throw new Error(res.data?.message || 'Không thể hủy kết quả chấm công.');
   },
 
   /**

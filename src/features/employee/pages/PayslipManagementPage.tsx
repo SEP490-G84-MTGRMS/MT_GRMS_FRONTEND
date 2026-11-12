@@ -29,7 +29,7 @@ import { PayslipDetailModal } from '../components/payslip-management/PayslipDeta
 import { PayslipPaymentModal } from '../components/payslip-management/PayslipPaymentModal';
 import { useLocation } from 'react-router-dom';
 import { ConfirmModal, NotificationModal } from '../../../components/common';
-import { getVietnamCurrentMonthIso } from '../lib/vietnamTime';
+import { getVietnamCurrentMonthIso, matchesAnyVietnameseSearch } from '../lib/vietnamTime';
 import { useAuthStore } from '../../../stores/useAuthStore';
 import '../employee.css';
 
@@ -189,9 +189,8 @@ export const PayslipManagementPage: React.FC = () => {
         periodMonth,
         branchId: branchIdParam,
         status: isOwnerOrAdmin && statusFilter !== 'ALL' ? statusFilter : undefined,
-        keyword: isOwnerOrAdmin && keyword.trim() ? keyword.trim() : undefined,
         page: 1,
-        pageSize: 100,
+        pageSize: 500,
       });
 
       const items = (paged.items || []).map(mapBackendSummaryToDetailedRecord);
@@ -204,11 +203,26 @@ export const PayslipManagementPage: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [periodMonth, activeBranch, statusFilter, keyword, isOwnerOrAdmin]);
+  }, [periodMonth, activeBranch, statusFilter, isOwnerOrAdmin]);
 
   useEffect(() => {
     fetchPayslips();
   }, [fetchPayslips]);
+
+  // Lọc client-side theo từ khóa (hỗ trợ tiếng Việt có dấu / không dấu, không phân biệt hoa - thường)
+  const filteredPayslips = useMemo(() => {
+    if (!isOwnerOrAdmin || !keyword.trim()) return payslips;
+    return payslips.filter((item) =>
+      matchesAnyVietnameseSearch(
+        [item.employeeCode, item.employeeName, item.payslipCode, item.branchName, item.note],
+        keyword
+      )
+    );
+  }, [payslips, keyword, isOwnerOrAdmin]);
+
+  useEffect(() => {
+    setSelectedIds([]);
+  }, [keyword]);
 
   // Financial Summary Cards
   const financialSummary = useMemo(() => {
@@ -216,7 +230,7 @@ export const PayslipManagementPage: React.FC = () => {
     let totalPaid = 0;
     let totalRemaining = 0;
 
-    payslips.forEach((item) => {
+    filteredPayslips.forEach((item) => {
       totalPayroll += item.netSalary;
       if (item.status === 'PAID') {
         totalPaid += item.netSalary;
@@ -229,9 +243,9 @@ export const PayslipManagementPage: React.FC = () => {
       totalPayroll,
       totalPaid,
       totalRemaining,
-      totalEmployees: payslips.length,
+      totalEmployees: filteredPayslips.length,
     };
-  }, [payslips]);
+  }, [filteredPayslips]);
 
   // Format Helpers
   const formatVND = (num?: number) => {
@@ -285,7 +299,7 @@ export const PayslipManagementPage: React.FC = () => {
   // Row selection
   const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.checked) {
-      setSelectedIds(payslips.map((p) => p.id));
+      setSelectedIds(filteredPayslips.map((p) => p.id));
     } else {
       setSelectedIds([]);
     }
@@ -299,7 +313,7 @@ export const PayslipManagementPage: React.FC = () => {
 
   // Batch Payment modal trigger
   const handleOpenBatchPayModal = () => {
-    const unpaidSelected = payslips.filter(
+    const unpaidSelected = filteredPayslips.filter(
       (p) => selectedIds.includes(p.id) && p.status === 'UNPAID'
     );
     if (unpaidSelected.length === 0) {
@@ -392,7 +406,7 @@ export const PayslipManagementPage: React.FC = () => {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
         <h2 className="emp-header-title">
           <span>{isOwnerOrAdmin ? 'Bảng tính lương' : 'Phiếu lương của tôi'}</span>
-          <span className="count-badge">{payslips.length}</span>
+          <span className="count-badge">{filteredPayslips.length}</span>
         </h2>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -832,7 +846,7 @@ export const PayslipManagementPage: React.FC = () => {
                     showNotification(
                       'info',
                       'Xuất file Excel',
-                      `Đang xuất bảng lương ${payslips.length} nhân sự ra tệp Excel (.xlsx)...`
+                      `Đang xuất bảng lương ${filteredPayslips.length} nhân sự ra tệp Excel (.xlsx)...`
                     );
                   }}
                 >
@@ -937,8 +951,8 @@ export const PayslipManagementPage: React.FC = () => {
                     type="checkbox"
                     style={{ accentColor: '#0F766E' }}
                     checked={
-                      payslips.length > 0 &&
-                      selectedIds.length === payslips.length
+                      filteredPayslips.length > 0 &&
+                      selectedIds.length === filteredPayslips.length
                     }
                     onChange={handleSelectAll}
                   />
@@ -955,7 +969,7 @@ export const PayslipManagementPage: React.FC = () => {
             </tr>
           </thead>
           <tbody>
-            {payslips.length === 0 && !isLoading ? (
+            {filteredPayslips.length === 0 && !isLoading ? (
               <tr>
                 <td
                   colSpan={isOwnerOrAdmin ? 9 : 8}
@@ -999,7 +1013,7 @@ export const PayslipManagementPage: React.FC = () => {
                 </td>
               </tr>
             ) : (
-              payslips.map((item) => {
+              filteredPayslips.map((item) => {
                 const isSelected = selectedIds.includes(item.id);
                 const isPaid = item.status === 'PAID';
                 const initials = item.employeeName

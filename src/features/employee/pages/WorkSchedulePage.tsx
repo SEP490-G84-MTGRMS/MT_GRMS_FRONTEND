@@ -39,7 +39,7 @@ import { ScheduleRequestType } from '../types/scheduleApprovalTypes';
 import { employeeApi } from '../api/employeeApi';
 import { shiftConfigApi, type ShiftConfigDto } from '../api/shiftConfigApi';
 import { scheduleApi, getShiftColor } from '../api/scheduleApi';
-import { getVietnamToday } from '../lib/vietnamTime';
+import { getVietnamToday, matchesAnyVietnameseSearch } from '../lib/vietnamTime';
 import { useAuthStore } from '../../../stores/useAuthStore';
 import '../employee.css';
 
@@ -472,12 +472,11 @@ export const WorkSchedulePage: React.FC = () => {
 
   const filteredEmployees = useMemo(() => {
     return employees.filter((e) => {
-      // 1. Tìm kiếm theo từ khóa (tên hoặc mã nhân viên)
-      const keyword = searchEmployee.trim().toLowerCase();
-      const matchesKeyword =
-        !keyword ||
-        e.fullName.toLowerCase().includes(keyword) ||
-        e.employeeCode.toLowerCase().includes(keyword);
+      // 1. Tìm kiếm theo từ khóa (tên hoặc mã nhân viên - không phân biệt dấu/hoa-thường)
+      const matchesKeyword = matchesAnyVietnameseSearch(
+        [e.fullName, e.employeeCode],
+        searchEmployee
+      );
 
       if (!matchesKeyword) return false;
 
@@ -522,11 +521,8 @@ export const WorkSchedulePage: React.FC = () => {
       });
     }
     if (searchEmployee.trim()) {
-      const kw = searchEmployee.trim().toLowerCase();
-      list = list.filter(
-        (s) =>
-          s.name.toLowerCase().includes(kw) ||
-          (s.code ? s.code.toLowerCase().includes(kw) : false)
+      list = list.filter((s) =>
+        matchesAnyVietnameseSearch([s.name, s.code], searchEmployee)
       );
     }
     return list;

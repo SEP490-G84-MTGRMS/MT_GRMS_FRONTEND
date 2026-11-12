@@ -206,12 +206,15 @@ export interface AttendanceRecord {
   workHours?: number;
   gpsLocation?: string;
   deviceInfo?: string;
+  checkInMethod?: string;
+  approvalType?: string;
   approvalStatus?: string;
   note?: string;
 }
 
 export interface PayslipDetailedRecord {
   id: string; // PL004173
+  payslipCode?: string;
   employeeId: string;
   employeeCode: string; // NV001
   employeeName: string; // Dung Phạm
