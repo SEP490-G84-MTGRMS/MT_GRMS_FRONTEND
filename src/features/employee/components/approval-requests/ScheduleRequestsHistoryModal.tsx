@@ -1,17 +1,20 @@
-﻿import React, { useEffect, useState } from 'react';
-import { X, Loader2, CheckCircle2, XCircle, Clock, Paperclip } from 'lucide-react';
+import React, { useCallback, useEffect, useState } from 'react';
+import { X, Loader2, CheckCircle2, XCircle, Clock, Paperclip, Pencil, Trash2 } from 'lucide-react';
 import {
   ScheduleApprovalStatus,
   ScheduleRequestTypeLabels,
   type ScheduleApprovalRequestDto,
 } from '../../types/scheduleApprovalTypes';
 import { scheduleApprovalApi } from '../../api/scheduleApprovalApi';
+import { ConfirmModal, NotificationModal, type NotificationType } from '../../../../components/common';
+import { CreateScheduleRequestModal } from './CreateScheduleRequestModal';
 
 export interface ScheduleRequestsHistoryModalProps {
   isOpen: boolean;
   onClose: () => void;
   scheduleId: string | null;
   shiftTitle?: string;
+  onChanged?: () => void;
 }
 
 export const ScheduleRequestsHistoryModal: React.FC<ScheduleRequestsHistoryModalProps> = ({
@@ -19,20 +22,70 @@ export const ScheduleRequestsHistoryModal: React.FC<ScheduleRequestsHistoryModal
   onClose,
   scheduleId,
   shiftTitle,
+  onChanged,
 }) => {
   const [requests, setRequests] = useState<ScheduleApprovalRequestDto[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
+  const [editingRequest, setEditingRequest] = useState<ScheduleApprovalRequestDto | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<ScheduleApprovalRequestDto | null>(null);
+  const [deleting, setDeleting] = useState<boolean>(false);
+  const [notification, setNotification] = useState<{
+    isOpen: boolean;
+    type: NotificationType;
+    title: string;
+    message: string;
+  }>({
+    isOpen: false,
+    type: 'success',
+    title: '',
+    message: '',
+  });
+
+  const fetchRequests = useCallback(() => {
+    if (!scheduleId) return;
+    setLoading(true);
+    scheduleApprovalApi
+      .getRequestsByScheduleId(scheduleId)
+      .then((res) => setRequests(res || []))
+      .catch(() => setRequests([]))
+      .finally(() => setLoading(false));
+  }, [scheduleId]);
 
   useEffect(() => {
     if (isOpen && scheduleId) {
-      setLoading(true);
-      scheduleApprovalApi
-        .getRequestsByScheduleId(scheduleId)
-        .then((res) => setRequests(res || []))
-        .catch(() => setRequests([]))
-        .finally(() => setLoading(false));
+      fetchRequests();
     }
-  }, [isOpen, scheduleId]);
+  }, [isOpen, scheduleId, fetchRequests]);
+
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) return;
+    try {
+      setDeleting(true);
+      await scheduleApprovalApi.deleteRequest(deleteTarget.id);
+      setDeleteTarget(null);
+      fetchRequests();
+      onChanged?.();
+      setNotification({
+        isOpen: true,
+        type: 'success',
+        title: 'Xóa phiếu yêu cầu thành công',
+        message: 'Phiếu yêu cầu đang chờ duyệt đã được xóa khỏi hệ thống.',
+      });
+    } catch (err: unknown) {
+      const msg =
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+        'Không thể xóa phiếu yêu cầu. Vui lòng thử lại sau.';
+      setDeleteTarget(null);
+      setNotification({
+        isOpen: true,
+        type: 'error',
+        title: 'Xóa phiếu yêu cầu thất bại',
+        message: msg,
+      });
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -234,9 +287,57 @@ export const ScheduleRequestsHistoryModal: React.FC<ScheduleRequestsHistoryModal
                       </span>
                       {renderStatusBadge(r.status)}
                     </div>
-                    <span style={{ fontSize: 11, color: '#94A3B8' }}>
-                      {formatDateTime(r.createdAt)}
-                    </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontSize: 11, color: '#94A3B8' }}>
+                        {formatDateTime(r.createdAt)}
+                      </span>
+                      {r.status === ScheduleApprovalStatus.Pending && (
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                          <button
+                            type="button"
+                            onClick={() => setEditingRequest(r)}
+                            title="Chỉnh sửa phiếu yêu cầu"
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 4,
+                              padding: '3px 8px',
+                              borderRadius: 6,
+                              border: '1px solid #CBD5E1',
+                              background: '#FFFFFF',
+                              color: '#0F766E',
+                              fontSize: 11,
+                              fontWeight: 600,
+                              cursor: 'pointer',
+                            }}
+                          >
+                            <Pencil size={12} />
+                            Sửa
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setDeleteTarget(r)}
+                            title="Xóa phiếu yêu cầu"
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 4,
+                              padding: '3px 8px',
+                              borderRadius: 6,
+                              border: '1px solid #FECACA',
+                              background: '#FEF2F2',
+                              color: '#DC2626',
+                              fontSize: 11,
+                              fontWeight: 600,
+                              cursor: 'pointer',
+                            }}
+                          >
+                            <Trash2 size={12} />
+                            Xóa
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   {/* Lý do */}
@@ -346,6 +447,43 @@ export const ScheduleRequestsHistoryModal: React.FC<ScheduleRequestsHistoryModal
           </button>
         </div>
       </div>
+
+      {/* Modal chỉnh sửa phiếu yêu cầu (chỉ khi Pending) */}
+      <CreateScheduleRequestModal
+        isOpen={Boolean(editingRequest)}
+        onClose={() => setEditingRequest(null)}
+        editRequest={editingRequest}
+        onSuccess={() => {
+          fetchRequests();
+          onChanged?.();
+        }}
+      />
+
+      {/* Modal xác nhận xóa phiếu yêu cầu */}
+      <ConfirmModal
+        isOpen={Boolean(deleteTarget)}
+        onClose={() => !deleting && setDeleteTarget(null)}
+        onConfirm={handleConfirmDelete}
+        variant="danger"
+        title="Xác nhận xóa phiếu yêu cầu"
+        message={
+          deleteTarget
+            ? `Bạn có chắc chắn muốn xóa phiếu "${ScheduleRequestTypeLabels[deleteTarget.requestType] || deleteTarget.requestType}" đang chờ duyệt này không?`
+            : ''
+        }
+        confirmText="Xóa phiếu"
+        cancelText="Hủy"
+        isLoading={deleting}
+      />
+
+      {/* Modal thông báo kết quả */}
+      <NotificationModal
+        isOpen={notification.isOpen}
+        onClose={() => setNotification((prev) => ({ ...prev, isOpen: false }))}
+        type={notification.type}
+        title={notification.title}
+        message={notification.message}
+      />
     </div>
   );
 };

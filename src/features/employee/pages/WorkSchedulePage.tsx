@@ -781,11 +781,6 @@ export const WorkSchedulePage: React.FC = () => {
     );
   };
 
-  const formatVND = (num?: number) => {
-    if (!num) return '0 ₫';
-    return `${num.toLocaleString('vi-VN')} ₫`;
-  };
-
   return (
     <div className="emp-page-container">
       {/* ─── HEADER BAR ─── */}
@@ -811,6 +806,53 @@ export const WorkSchedulePage: React.FC = () => {
             <RefreshCw size={15} className={isLoading ? 'spin' : ''} />
             <span>Tải lại</span>
           </button>
+
+          {!isEmployeeRole && (
+            <button
+              type="button"
+              className="emp-btn emp-btn-secondary"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                height: 36,
+                padding: '0 12px',
+                fontSize: 13,
+                fontWeight: 600,
+                color: '#0F766E',
+                borderColor: '#99F6E4',
+                backgroundColor: '#F0FDFA',
+                cursor: 'pointer',
+                borderRadius: 8,
+                transition: 'all 0.15s ease',
+              }}
+              onClick={() => {
+                const branchParam = activeBranch && activeBranch.id !== 'ALL' ? activeBranch.id : (branches[0]?.id || '');
+                navigate(branchParam ? `/store-owner/shifts?branchId=${branchParam}` : '/store-owner/shifts');
+              }}
+              title="Xem nhật ký lịch sử ca bán hàng và bàn giao quầy thu ngân"
+            >
+              <Clock size={15} />
+              <span>Lịch sử giao ca</span>
+            </button>
+          )}
+
+          {!isEmployeeRole && (
+            <button
+              type="button"
+              className="emp-btn emp-btn-primary"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+              onClick={() => {
+                setSelectedEmpId(undefined);
+                setSelectedDay(undefined);
+                setEditingAssignment(null);
+                setShowAddModal(true);
+              }}
+            >
+              <Plus size={16} />
+              <span>Phân ca</span>
+            </button>
+          )}
         </div>
       </div>
       <div className="emp-header-bar">
@@ -977,53 +1019,6 @@ export const WorkSchedulePage: React.FC = () => {
             <option value="by_employee">Xem theo nhân viên</option>
             <option value="by_shift">Xem theo ca</option>
           </select>
-
-          {!isEmployeeRole && (
-            <button
-              type="button"
-              className="emp-btn emp-btn-secondary"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 6,
-                height: 36,
-                padding: '0 12px',
-                fontSize: 13,
-                fontWeight: 600,
-                color: '#0F766E',
-                borderColor: '#99F6E4',
-                backgroundColor: '#F0FDFA',
-                cursor: 'pointer',
-                borderRadius: 8,
-                transition: 'all 0.15s ease',
-              }}
-              onClick={() => {
-                const branchParam = activeBranch && activeBranch.id !== 'ALL' ? activeBranch.id : (branches[0]?.id || '');
-                navigate(branchParam ? `/store-owner/shifts?branchId=${branchParam}` : '/store-owner/shifts');
-              }}
-              title="Xem nhật ký lịch sử ca bán hàng và bàn giao quầy thu ngân"
-            >
-              <Clock size={15} />
-              <span>Lịch sử giao ca</span>
-            </button>
-          )}
-
-          {!isEmployeeRole && (
-            <button
-              type="button"
-              className="emp-btn emp-btn-primary"
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
-              onClick={() => {
-                setSelectedEmpId(undefined);
-                setSelectedDay(undefined);
-                setEditingAssignment(null);
-                setShowAddModal(true);
-              }}
-            >
-              <Plus size={16} />
-              <span>Phân ca</span>
-            </button>
-          )}
         </div>
       </div>
 
@@ -1047,47 +1042,17 @@ export const WorkSchedulePage: React.FC = () => {
                     <div style={{ fontSize: 15, fontWeight: 700 }}>{d.date}</div>
                   </th>
                 ))}
-                <th style={{ width: 140, textAlign: 'right' }}>Lương dự kiến</th>
               </tr>
             </thead>
             <tbody>
               {filteredEmployees.length === 0 ? (
                 <tr>
-                  <td colSpan={9} style={{ textAlign: 'center', padding: '36px 0', color: '#64748B' }}>
+                  <td colSpan={8} style={{ textAlign: 'center', padding: '36px 0', color: '#64748B' }}>
                     Không có nhân viên nào phù hợp với bộ lọc.
                   </td>
                 </tr>
               ) : (
                 paginatedEmployees.map((emp, empRowIndex) => {
-                  const empAssignments = assignments.filter(
-                    (a) => (isEmployeeRole || a.employeeId === emp.id) && a.status?.toLowerCase() !== 'cancelled'
-                  );
-                  const shiftCount = empAssignments.length;
-                  const totalWeekHours = empAssignments.reduce((sum, a) => {
-                    if (typeof a.durationHours === 'number' && a.durationHours > 0) {
-                      return sum + a.durationHours;
-                    }
-                    const matchedShift = shifts.find(
-                      (s) => s.id === a.shiftId || (a.shiftName && s.name.toLowerCase().trim() === a.shiftName.toLowerCase().trim())
-                    );
-                    if (matchedShift && matchedShift.totalHours > 0) {
-                      return sum + matchedShift.totalHours;
-                    }
-                    if (a.shiftTime && a.shiftTime.includes('-')) {
-                      const [st, et] = a.shiftTime.split('-').map((x) => x.trim());
-                      const [sh, sm] = (st || '00:00').split(':').map(Number);
-                      const [eh, em] = (et || '00:00').split(':').map(Number);
-                      if (!isNaN(sh) && !isNaN(sm) && !isNaN(eh) && !isNaN(em)) {
-                        let diff = eh * 60 + em - (sh * 60 + sm);
-                        if (diff <= 0) diff += 24 * 60;
-                        return sum + Math.round((diff / 60) * 100) / 100;
-                      }
-                    }
-                    return sum + 8;
-                  }, 0);
-                  const roundedWeekHours = Math.round(totalWeekHours * 10) / 10;
-                  const estimatedWage = shiftCount * 250000;
-
                   return (
                     <tr key={emp.id} style={{ height: 68 }}>
                       {/* Cột nhân viên (Click để xem chi tiết lịch làm việc 360) */}
@@ -1508,14 +1473,6 @@ export const WorkSchedulePage: React.FC = () => {
                           </td>
                         );
                       })}
-
-                      {/* Lương dự kiến */}
-                      <td style={{ textAlign: 'right', verticalAlign: 'middle' }}>
-                        <div style={{ fontWeight: 700, color: '#0F766E' }}>{formatVND(estimatedWage)}</div>
-                        <div style={{ fontSize: 11, color: '#64748B' }}>
-                          {shiftCount} ca ({roundedWeekHours}h)
-                        </div>
-                      </td>
                     </tr>
                   );
                 }))}
@@ -2125,6 +2082,7 @@ export const WorkSchedulePage: React.FC = () => {
         }}
         scheduleId={historyModalScheduleId}
         shiftTitle={historyModalTitle}
+        onChanged={fetchSchedules}
       />
     </div>
   );

@@ -14,18 +14,18 @@ import {
 } from 'lucide-react';
 import {
   ScheduleRequestType,
-  ShiftSwapType,
+  ScheduleApprovalStatus,
   LeaveType,
   ScheduleRequestTypeLabels,
   LeaveTypeLabels,
   type CreateScheduleApprovalRequestDto,
+  type ScheduleApprovalRequestDto,
 } from '../../types/scheduleApprovalTypes';
 import { scheduleApprovalApi } from '../../api/scheduleApprovalApi';
-import { employeeApi } from '../../api/employeeApi';
 import { scheduleApi } from '../../api/scheduleApi';
 import { formatLocalDateIso, getVietnamToday } from '../../lib/vietnamTime';
 import { uploadImageToCloudinary } from '../../../../utils/cloudinary';
-import type { Employee } from '../../types';
+import { NotificationModal } from '../../../../components/common';
 
 export interface ScheduleSelectionItem {
   id: string;
@@ -35,6 +35,11 @@ export interface ScheduleSelectionItem {
   plannedStartTime?: string | null;
   plannedEndTime?: string | null;
   employeeId: string;
+  status?: string | null;
+  checkInTime?: string | null;
+  checkOutTime?: string | null;
+  checkInMethod?: string | null;
+  checkOutMethod?: string | null;
 }
 
 export interface CreateScheduleRequestModalProps {
@@ -42,6 +47,7 @@ export interface CreateScheduleRequestModalProps {
   onClose: () => void;
   schedule?: ScheduleSelectionItem | null;
   initialType?: ScheduleRequestType;
+  editRequest?: ScheduleApprovalRequestDto | null;
   onSuccess?: () => void;
 }
 
@@ -70,6 +76,7 @@ export const CreateScheduleRequestModal: React.FC<CreateScheduleRequestModalProp
   onClose,
   schedule = null,
   initialType = ScheduleRequestType.LeaveRequest,
+  editRequest = null,
   onSuccess,
 }) => {
   const [selectedSchedule, setSelectedSchedule] = useState<ScheduleSelectionItem | null>(schedule);
@@ -79,8 +86,6 @@ export const CreateScheduleRequestModal: React.FC<CreateScheduleRequestModalProp
   const [requestType, setRequestType] = useState<ScheduleRequestType>(initialType);
   const [leaveType, setLeaveType] = useState<LeaveType>(LeaveType.SickLeave);
   const [isPaidLeaveRequested, setIsPaidLeaveRequested] = useState<boolean>(false);
-  const [swapType, setSwapType] = useState<ShiftSwapType>(ShiftSwapType.Cover);
-  const [targetEmployeeId, setTargetEmployeeId] = useState<string>('');
   const [checkInTime, setCheckInTime] = useState<string>('08:00');
   const [checkOutTime, setCheckOutTime] = useState<string>('17:00');
   const [overtimeMinutes, setOvertimeMinutes] = useState<number>(60);
@@ -92,11 +97,19 @@ export const CreateScheduleRequestModal: React.FC<CreateScheduleRequestModalProp
   const [uploadingImage, setUploadingImage] = useState<boolean>(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
 
-  const [colleagues, setColleagues] = useState<Employee[]>([]);
-  const [loadingColleagues, setLoadingColleagues] = useState<boolean>(false);
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [reasonTouched, setReasonTouched] = useState<boolean>(false);
+  const [existingRequests, setExistingRequests] = useState<ScheduleApprovalRequestDto[]>([]);
+  const [createdNotification, setCreatedNotification] = useState<{
+    isOpen: boolean;
+    requestTypeLabel: string;
+    shiftInfo: string;
+  }>({
+    isOpen: false,
+    requestTypeLabel: '',
+    shiftInfo: '',
+  });
 
   const reasonError = !reason.trim()
     ? 'Vui lòng nhập lý do giải trình.'
@@ -118,8 +131,6 @@ export const CreateScheduleRequestModal: React.FC<CreateScheduleRequestModalProp
     setRequestType(initialType);
     setLeaveType(LeaveType.SickLeave);
     setIsPaidLeaveRequested(false);
-    setSwapType(ShiftSwapType.Cover);
-    setTargetEmployeeId('');
     setOvertimeMinutes(60);
     setReason('');
     setReasonTouched(false);
@@ -127,6 +138,44 @@ export const CreateScheduleRequestModal: React.FC<CreateScheduleRequestModalProp
     setUploadingImage(false);
     setUploadError(null);
     setErrorMessage(null);
+    setCreatedNotification({ isOpen: false, requestTypeLabel: '', shiftInfo: '' });
+
+    if (editRequest) {
+      setRequestType(editRequest.requestType);
+      setLeaveType(editRequest.leaveType || LeaveType.SickLeave);
+      setIsPaidLeaveRequested(Boolean(editRequest.isPaidLeave));
+      setOvertimeMinutes(editRequest.requestedOvertimeMinutes ?? 60);
+      setReason(editRequest.reason || '');
+      const existingImages =
+        editRequest.evidenceImageUrls && editRequest.evidenceImageUrls.length > 0
+          ? editRequest.evidenceImageUrls
+          : editRequest.evidenceImageUrl
+            ? [editRequest.evidenceImageUrl]
+            : [];
+      setEvidenceImageUrls(existingImages);
+
+      const resolvedSchedule: ScheduleSelectionItem = schedule || {
+        id: editRequest.scheduleId,
+        workDate: editRequest.workDate ? editRequest.workDate.slice(0, 10) : '',
+        shiftName: editRequest.shiftName || 'Ca làm việc',
+        branchId: editRequest.branchId,
+        plannedStartTime: editRequest.plannedStartTime || '08:00',
+        plannedEndTime: editRequest.plannedEndTime || '17:00',
+        employeeId: editRequest.employeeId,
+      };
+      setSelectedSchedule(resolvedSchedule);
+      setCheckInTime(
+        editRequest.requestedCheckInTime
+          ? editRequest.requestedCheckInTime.slice(11, 16)
+          : safeFormatTime(resolvedSchedule.plannedStartTime, '08:00')
+      );
+      setCheckOutTime(
+        editRequest.requestedCheckOutTime
+          ? editRequest.requestedCheckOutTime.slice(11, 16)
+          : safeFormatTime(resolvedSchedule.plannedEndTime, '17:00')
+      );
+      return;
+    }
 
     if (schedule) {
       setSelectedSchedule(schedule);
@@ -150,6 +199,11 @@ export const CreateScheduleRequestModal: React.FC<CreateScheduleRequestModalProp
             plannedStartTime: s.plannedStartTime || '08:00',
             plannedEndTime: s.plannedEndTime || '17:00',
             employeeId: s.employeeId,
+            status: s.status,
+            checkInTime: s.checkInTime,
+            checkOutTime: s.checkOutTime,
+            checkInMethod: s.checkInMethod,
+            checkOutMethod: s.checkOutMethod,
           }));
           setMySchedules(list);
           if (list.length > 0) {
@@ -166,29 +220,168 @@ export const CreateScheduleRequestModal: React.FC<CreateScheduleRequestModalProp
         })
         .finally(() => setLoadingSchedules(false));
     }
-  }, [isOpen, initialType, schedule]);
+  }, [isOpen, initialType, schedule, editRequest]);
 
-  // Tải đồng nghiệp cùng chi nhánh
+  // Tải danh sách yêu cầu hiện có của ca để kiểm tra xung đột giữa các loại đơn
   useEffect(() => {
-    if (selectedSchedule?.branchId) {
-      setLoadingColleagues(true);
-      employeeApi
-        .getEmployeesPaged({ branchId: selectedSchedule.branchId, status: 'active', pageSize: 100 })
-        .then((res) => {
-          const list = (res.items || []).filter((e) => e.id !== selectedSchedule.employeeId);
-          setColleagues(list);
-          if (list.length > 0 && !targetEmployeeId) {
-            setTargetEmployeeId(list[0].id);
-          }
-        })
-        .catch(() => {
-          setColleagues([]);
-        })
-        .finally(() => setLoadingColleagues(false));
+    if (!isOpen || editRequest || !selectedSchedule?.id) {
+      setExistingRequests([]);
+      return;
     }
-  }, [selectedSchedule]);
+
+    let cancelled = false;
+    scheduleApprovalApi
+      .getRequestsByScheduleId(selectedSchedule.id)
+      .then((res) => {
+        if (!cancelled) {
+          setExistingRequests(res || []);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setExistingRequests([]);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, editRequest, selectedSchedule?.id]);
+
+  const getOptionDisabledReason = (optType: ScheduleRequestType): string | null => {
+    if (editRequest) {
+      return optType !== editRequest.requestType ? 'Không thể đổi loại phiếu khi chỉnh sửa' : null;
+    }
+    if (!selectedSchedule) return null;
+
+    const pendingRequests = existingRequests.filter(
+      (r) => r.status === ScheduleApprovalStatus.Pending
+    );
+    const approvedRequests = existingRequests.filter(
+      (r) => r.status === ScheduleApprovalStatus.Approved
+    );
+
+    if (pendingRequests.some((r) => r.requestType === optType)) {
+      return 'Đã có đơn cùng loại đang chờ duyệt';
+    }
+
+    if (selectedSchedule.status === 'Cancelled') {
+      return 'Ca làm việc đã bị hủy';
+    }
+
+    const hasActiveLeave =
+      selectedSchedule.status === 'OnLeave' ||
+      pendingRequests.some((r) => r.requestType === ScheduleRequestType.LeaveRequest) ||
+      approvedRequests.some((r) => r.requestType === ScheduleRequestType.LeaveRequest);
+    if (hasActiveLeave) {
+      return 'Ca đã có đơn xin nghỉ';
+    }
+
+    const hasPendingShiftSwap = pendingRequests.some(
+      (r) => r.requestType === ScheduleRequestType.ShiftSwap
+    );
+    if (hasPendingShiftSwap && optType !== ScheduleRequestType.ShiftSwap) {
+      return 'Ca đang có đơn đổi ca chờ duyệt';
+    }
+
+    if (optType === ScheduleRequestType.LeaveRequest) {
+      if (
+        selectedSchedule.status === 'Completed' ||
+        selectedSchedule.status === 'InProgress' ||
+        Boolean(selectedSchedule.checkInTime)
+      ) {
+        return 'Ca đã chấm công hoặc đã kết thúc';
+      }
+      if (pendingRequests.some((r) => r.requestType !== ScheduleRequestType.LeaveRequest)) {
+        return 'Ca đang có đơn OT, đổi ca hoặc sự cố chờ duyệt';
+      }
+    }
+
+    if (optType === ScheduleRequestType.ShiftSwap) {
+      if (
+        selectedSchedule.status === 'Completed' ||
+        selectedSchedule.status === 'InProgress' ||
+        Boolean(selectedSchedule.checkInTime)
+      ) {
+        return 'Ca đã bắt đầu hoặc đã chấm công';
+      }
+      if (pendingRequests.some((r) => r.requestType !== ScheduleRequestType.ShiftSwap)) {
+        return 'Ca đang có đơn khác chờ duyệt';
+      }
+    }
+
+    if (optType === ScheduleRequestType.CheckInIncident) {
+      if (approvedRequests.some((r) => r.requestType === ScheduleRequestType.CheckInIncident)) {
+        return 'Sự cố Check-in đã được duyệt';
+      }
+      if (selectedSchedule.checkInTime && selectedSchedule.checkInMethod !== 'INCIDENT_PENDING') {
+        return 'Ca đã được ghi nhận giờ vào';
+      }
+    }
+
+    if (optType === ScheduleRequestType.CheckOutIncident) {
+      if (approvedRequests.some((r) => r.requestType === ScheduleRequestType.CheckOutIncident)) {
+        return 'Sự cố Check-out đã được duyệt';
+      }
+      if (selectedSchedule.checkOutTime && selectedSchedule.checkOutMethod !== 'INCIDENT_PENDING') {
+        return 'Ca đã được ghi nhận giờ ra';
+      }
+    }
+
+    return null;
+  };
+
+  // Nếu loại đơn đang chọn không hợp lệ với ca hiện tại, tự động chuyển sang option hợp lệ đầu tiên
+  const selectedOptionDisabledReason = getOptionDisabledReason(requestType);
+
+  useEffect(() => {
+    if (!isOpen || editRequest || !selectedSchedule || !selectedOptionDisabledReason) return;
+    const allTypes: ScheduleRequestType[] = [
+      ScheduleRequestType.CheckInIncident,
+      ScheduleRequestType.CheckOutIncident,
+      ScheduleRequestType.LeaveRequest,
+      ScheduleRequestType.ShiftSwap,
+      ScheduleRequestType.Overtime,
+    ];
+    const firstValid = allTypes.find((t) => !getOptionDisabledReason(t));
+    if (firstValid && firstValid !== requestType) {
+      setRequestType(firstValid);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, editRequest, selectedSchedule?.id, existingRequests, selectedOptionDisabledReason]);
 
   if (!isOpen) return null;
+
+  if (createdNotification.isOpen) {
+    return (
+      <NotificationModal
+        isOpen={createdNotification.isOpen}
+        onClose={() => {
+          setCreatedNotification({ isOpen: false, requestTypeLabel: '', shiftInfo: '' });
+          onClose();
+        }}
+        type="success"
+        title={editRequest ? 'Cập nhật phiếu yêu cầu thành công' : 'Gửi phiếu yêu cầu thành công'}
+        message={
+          <div>
+            <p style={{ margin: '0 0 6px' }}>
+              Yêu cầu <strong>{createdNotification.requestTypeLabel}</strong>
+              {createdNotification.shiftInfo ? (
+                <>
+                  {' '}cho ca <strong>{createdNotification.shiftInfo}</strong>
+                </>
+              ) : null}{' '}
+              {editRequest ? 'đã được cập nhật thành công.' : 'đã được gửi thành công.'}
+            </p>
+            <p style={{ margin: 0, color: '#64748B', fontSize: 13 }}>
+              Phiếu đang ở trạng thái chờ Store Owner xem xét và phê duyệt.
+            </p>
+          </div>
+        }
+        confirmText="Đóng"
+      />
+    );
+  }
 
   const handleSelectScheduleChange = (scheduleId: string) => {
     const found = mySchedules.find((s) => s.id === scheduleId);
@@ -258,6 +451,11 @@ export const CreateScheduleRequestModal: React.FC<CreateScheduleRequestModalProp
       return;
     }
 
+    if (selectedOptionDisabledReason) {
+      setErrorMessage(selectedOptionDisabledReason);
+      return;
+    }
+
     if (uploadingImage) {
       setErrorMessage('Ảnh minh chứng đang được tải lên, vui lòng chờ giây lát.');
       return;
@@ -288,13 +486,7 @@ export const CreateScheduleRequestModal: React.FC<CreateScheduleRequestModalProp
         payload.leaveType = leaveType;
         payload.isPaidLeaveRequested = isPaidLeaveRequested;
       } else if (requestType === ScheduleRequestType.ShiftSwap) {
-        if (!targetEmployeeId) {
-          setErrorMessage('Vui lòng chọn đồng nghiệp muốn đổi ca.');
-          setSubmitting(false);
-          return;
-        }
-        payload.swapType = swapType;
-        payload.targetEmployeeId = targetEmployeeId;
+        // Đơn đổi ca chỉ gửi thông tin ca hiện tại & lý do muốn đổi để Store Owner xem xét duyệt
       } else if (requestType === ScheduleRequestType.CheckInIncident) {
         const datePrefix = (selectedSchedule.workDate || '').slice(0, 10);
         payload.requestedCheckInTime = `${datePrefix}T${checkInTime}:00`;
@@ -305,9 +497,17 @@ export const CreateScheduleRequestModal: React.FC<CreateScheduleRequestModalProp
         payload.requestedOvertimeMinutes = overtimeMinutes;
       }
 
-      await scheduleApprovalApi.createRequest(selectedSchedule.id, payload);
+      const savedRequest = editRequest
+        ? await scheduleApprovalApi.updateRequest(editRequest.id, payload)
+        : await scheduleApprovalApi.createRequest(selectedSchedule.id, payload);
       onSuccess?.();
-      onClose();
+      const shiftName = savedRequest?.shiftName || selectedSchedule.shiftName || 'Ca làm việc';
+      const workDateLabel = formatDateVn(savedRequest?.workDate || selectedSchedule.workDate);
+      setCreatedNotification({
+        isOpen: true,
+        requestTypeLabel: ScheduleRequestTypeLabels[requestType] || 'Yêu cầu ca làm việc',
+        shiftInfo: workDateLabel ? `${shiftName} (${workDateLabel})` : shiftName,
+      });
     } catch (err: unknown) {
       const msg =
         (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
@@ -381,7 +581,7 @@ export const CreateScheduleRequestModal: React.FC<CreateScheduleRequestModalProp
           }}
         >
           <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0, color: '#0F172A' }}>
-            Tạo phiếu yêu cầu ca làm việc
+            {editRequest ? 'Chỉnh sửa phiếu yêu cầu ca làm việc' : 'Tạo phiếu yêu cầu ca làm việc'}
           </h3>
           <button
             type="button"
@@ -449,7 +649,7 @@ export const CreateScheduleRequestModal: React.FC<CreateScheduleRequestModalProp
                 Ca làm việc áp dụng <span style={{ color: '#EF4444' }}>*</span>
               </label>
 
-              {schedule ? (
+              {schedule || (editRequest && selectedSchedule) ? (
                 <div
                   style={{
                     background: '#F8FAFC',
@@ -465,7 +665,7 @@ export const CreateScheduleRequestModal: React.FC<CreateScheduleRequestModalProp
                 >
                   <Calendar size={16} color="#0F766E" />
                   <span>
-                    <b>{schedule.shiftName}</b> ({safeFormatTime(schedule.plannedStartTime)} - {safeFormatTime(schedule.plannedEndTime)}) • {formatDateVn(schedule.workDate)}
+                    <b>{(schedule || selectedSchedule)!.shiftName}</b> ({safeFormatTime((schedule || selectedSchedule)!.plannedStartTime)} - {safeFormatTime((schedule || selectedSchedule)!.plannedEndTime)}) • {formatDateVn((schedule || selectedSchedule)!.workDate)}
                   </span>
                 </div>
               ) : (
@@ -542,17 +742,26 @@ export const CreateScheduleRequestModal: React.FC<CreateScheduleRequestModalProp
               >
                 {requestOptions.map((opt) => {
                   const isSelected = requestType === opt.type;
+                  const disabledReason = getOptionDisabledReason(opt.type);
+                  const isDisabledOption = Boolean(disabledReason);
                   const Icon = opt.icon;
                   return (
                     <div
                       key={opt.type}
-                      onClick={() => setRequestType(opt.type)}
+                      onClick={() => {
+                        if (!isDisabledOption && !editRequest) {
+                          setRequestType(opt.type);
+                          setErrorMessage(null);
+                        }
+                      }}
+                      title={disabledReason || opt.desc}
                       style={{
                         padding: '10px 12px',
                         borderRadius: 8,
-                        border: isSelected ? '1.5px solid #0F766E' : '1px solid #CBD5E1',
-                        background: isSelected ? '#F0FDFA' : '#FFFFFF',
-                        cursor: 'pointer',
+                        border: isSelected && !isDisabledOption ? '1.5px solid #0F766E' : '1px solid #CBD5E1',
+                        background: isSelected && !isDisabledOption ? '#F0FDFA' : isDisabledOption ? '#F8FAFC' : '#FFFFFF',
+                        cursor: isDisabledOption || editRequest ? 'not-allowed' : 'pointer',
+                        opacity: isDisabledOption ? 0.55 : 1,
                         display: 'flex',
                         alignItems: 'center',
                         gap: 10,
@@ -561,15 +770,15 @@ export const CreateScheduleRequestModal: React.FC<CreateScheduleRequestModalProp
                     >
                       <Icon
                         size={18}
-                        color={isSelected ? '#0F766E' : '#64748B'}
+                        color={isSelected && !isDisabledOption ? '#0F766E' : '#64748B'}
                         style={{ flexShrink: 0 }}
                       />
                       <div style={{ minWidth: 0 }}>
                         <div
                           style={{
-                            fontWeight: isSelected ? 700 : 600,
+                            fontWeight: isSelected && !isDisabledOption ? 700 : 600,
                             fontSize: 13,
-                            color: isSelected ? '#0F766E' : '#1E293B',
+                            color: isSelected && !isDisabledOption ? '#0F766E' : '#1E293B',
                           }}
                         >
                           {opt.title}
@@ -577,14 +786,14 @@ export const CreateScheduleRequestModal: React.FC<CreateScheduleRequestModalProp
                         <div
                           style={{
                             fontSize: 11,
-                            color: isSelected ? '#0F766E' : '#64748B',
+                            color: disabledReason ? '#DC2626' : isSelected ? '#0F766E' : '#64748B',
                             marginTop: 1,
                             whiteSpace: 'nowrap',
                             overflow: 'hidden',
                             textOverflow: 'ellipsis',
                           }}
                         >
-                          {opt.desc}
+                          {disabledReason || opt.desc}
                         </div>
                       </div>
                     </div>
@@ -665,107 +874,16 @@ export const CreateScheduleRequestModal: React.FC<CreateScheduleRequestModalProp
             {requestType === ScheduleRequestType.ShiftSwap && (
               <div
                 style={{
-                  padding: 12,
-                  background: '#F8FAFC',
+                  padding: '10px 12px',
+                  background: '#F0FDFA',
                   borderRadius: 8,
-                  border: '1px solid #E2E8F0',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: 10,
+                  border: '1px solid #CCFBF1',
+                  fontSize: 12.5,
+                  color: '#115E59',
+                  lineHeight: 1.5,
                 }}
               >
-                <div>
-                  <label
-                    style={{
-                      fontSize: 12,
-                      fontWeight: 600,
-                      color: '#334155',
-                      display: 'block',
-                      marginBottom: 4,
-                    }}
-                  >
-                    Hình thức đổi ca
-                  </label>
-                  <div style={{ display: 'flex', gap: 20 }}>
-                    <label
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: 6,
-                        fontSize: 13,
-                        cursor: 'pointer',
-                      }}
-                    >
-                      <input
-                        type="radio"
-                        name="swapType"
-                        value={ShiftSwapType.Cover}
-                        checked={swapType === ShiftSwapType.Cover}
-                        onChange={() => setSwapType(ShiftSwapType.Cover)}
-                        style={{ accentColor: '#0F766E' }}
-                      />
-                      <span>Nhờ làm thay</span>
-                    </label>
-                    <label
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: 6,
-                        fontSize: 13,
-                        cursor: 'pointer',
-                      }}
-                    >
-                      <input
-                        type="radio"
-                        name="swapType"
-                        value={ShiftSwapType.CrossSwap}
-                        checked={swapType === ShiftSwapType.CrossSwap}
-                        onChange={() => setSwapType(ShiftSwapType.CrossSwap)}
-                        style={{ accentColor: '#0F766E' }}
-                      />
-                      <span>Đổi chéo ca</span>
-                    </label>
-                  </div>
-                </div>
-
-                <div>
-                  <label
-                    style={{
-                      fontSize: 12,
-                      fontWeight: 600,
-                      color: '#334155',
-                      display: 'block',
-                      marginBottom: 4,
-                    }}
-                  >
-                    Chọn đồng nghiệp <span style={{ color: '#EF4444' }}>*</span>
-                  </label>
-                  {loadingColleagues ? (
-                    <div style={{ fontSize: 12, color: '#64748B', display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <Loader2 size={13} className="emp-spin-icon" />
-                      <span>Đang tải danh sách nhân viên...</span>
-                    </div>
-                  ) : colleagues.length === 0 ? (
-                    <div style={{ fontSize: 12, color: '#B45309' }}>
-                      Chưa tìm thấy đồng nghiệp trong cùng chi nhánh.
-                    </div>
-                  ) : (
-                    <select
-                      className="emp-form-select"
-                      value={targetEmployeeId}
-                      onChange={(e) => setTargetEmployeeId(e.target.value)}
-                      style={{ width: '100%', height: 38, fontSize: 13, background: '#FFFFFF' }}
-                      required
-                    >
-                      <option value="">-- Chọn đồng nghiệp --</option>
-                      {colleagues.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.fullName} ({c.employeeCode})
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                </div>
+                Vui lòng ghi rõ <b>thông tin ca muốn đổi</b> (ngày/ca mong muốn hoặc người đổi cùng nếu có) và <b>lý do</b> ở ô bên dưới để Chủ cửa hàng xem xét phê duyệt và sắp xếp lại lịch làm việc.
               </div>
             )}
 
@@ -1226,7 +1344,12 @@ export const CreateScheduleRequestModal: React.FC<CreateScheduleRequestModalProp
             <button
               type="submit"
               className="emp-btn emp-btn-primary"
-              disabled={submitting || uploadingImage || (!selectedSchedule && mySchedules.length === 0)}
+              disabled={
+                submitting ||
+                uploadingImage ||
+                Boolean(selectedOptionDisabledReason) ||
+                (!selectedSchedule && mySchedules.length === 0)
+              }
               style={{
                 fontSize: 13,
                 height: 36,
@@ -1234,7 +1357,7 @@ export const CreateScheduleRequestModal: React.FC<CreateScheduleRequestModalProp
                 minWidth: 120,
               }}
             >
-              {submitting ? 'Đang gửi...' : 'Gửi yêu cầu'}
+              {submitting ? 'Đang lưu...' : editRequest ? 'Lưu thay đổi' : 'Gửi yêu cầu'}
             </button>
           </div>
         </form>

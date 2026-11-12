@@ -476,7 +476,7 @@ export const AttendancePage: React.FC = () => {
         );
       }
       return matchesAnyVietnameseSearch(
-        [r.employeeName, r.employeeCode, r.shiftName, r.shiftCode],
+        [r.employeeName, r.employeeCode],
         searchEmployee
       );
     });
@@ -768,22 +768,27 @@ export const AttendancePage: React.FC = () => {
             <RefreshCw size={28} className="emp-spin" style={{ margin: '0 auto 12px', display: 'block', color: '#0F766E' }} />
             <div style={{ fontWeight: 600 }}>Đang tải dữ liệu điểm danh thực tế từ máy chủ...</div>
           </div>
-        ) : shifts.length === 0 && filteredRecords.length === 0 ? (
+        ) : (shifts.length === 0 && filteredRecords.length === 0) ||
+          (Boolean(searchEmployee.trim()) && filteredRecords.length === 0) ? (
           <div style={{ padding: 48, textAlign: 'center', color: '#64748B' }}>
             <Clock size={36} style={{ margin: '0 auto 12px', display: 'block', color: '#CBD5E1' }} />
             <div style={{ fontWeight: 700, fontSize: 15, color: '#0F172A' }}>
-              Không có dữ liệu ca làm việc hoặc chấm công
+              {searchEmployee.trim()
+                ? 'Không tìm thấy nhân viên phù hợp'
+                : 'Không có dữ liệu ca làm việc hoặc chấm công'}
             </div>
             <p style={{ fontSize: 13, color: '#64748B', marginTop: 4 }}>
-              Không tìm thấy ca làm việc nào trong tuần này ({weekData.label}). Hãy phân ca trước tại mục &quot;Lịch làm việc&quot;.
+              {searchEmployee.trim()
+                ? `Không có kết quả nào khớp với "${searchEmployee.trim()}".`
+                : `Không tìm thấy ca làm việc nào trong tuần này (${weekData.label}). Hãy phân ca trước tại mục "Lịch làm việc".`}
             </p>
             <button
               type="button"
               className="emp-btn emp-btn-secondary"
               style={{ marginTop: 12 }}
-              onClick={fetchAttendanceData}
+              onClick={searchEmployee.trim() ? () => setSearchEmployee('') : fetchAttendanceData}
             >
-              Tải lại trang
+              {searchEmployee.trim() ? 'Xóa tìm kiếm' : 'Tải lại trang'}
             </button>
           </div>
         ) : (
@@ -1318,6 +1323,7 @@ export const AttendancePage: React.FC = () => {
           onClose={() => setHistoryModalScheduleId(null)}
           scheduleId={historyModalScheduleId}
           shiftTitle={historyModalTitle}
+          onChanged={fetchAttendanceData}
         />
       )}
 

@@ -19,6 +19,22 @@ export const scheduleApprovalApi = {
   },
 
   /**
+   * Cập nhật đơn yêu cầu (chỉ khi đang ở trạng thái Pending)
+   */
+  updateRequest: async (requestId: string, data: CreateScheduleApprovalRequestDto): Promise<ScheduleApprovalRequestDto> => {
+    const res = await httpClient.put<ApiResponse<ScheduleApprovalRequestDto>>(`/schedule-approval-requests/${requestId}`, data);
+    return res.data.data!;
+  },
+
+  /**
+   * Xóa đơn yêu cầu (chỉ khi đang ở trạng thái Pending)
+   */
+  deleteRequest: async (requestId: string): Promise<boolean> => {
+    const res = await httpClient.delete<ApiResponse<boolean>>(`/schedule-approval-requests/${requestId}`);
+    return res.data.data ?? false;
+  },
+
+  /**
    * Tải nhiều tệp hình ảnh bằng chứng lên Cloudinary qua backend
    */
   uploadEvidenceImages: async (files: File[]): Promise<string[]> => {

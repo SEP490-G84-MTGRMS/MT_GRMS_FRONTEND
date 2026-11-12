@@ -21,6 +21,7 @@ import {
   type ReviewScheduleApprovalRequestDto,
 } from '../types/scheduleApprovalTypes';
 import { TablePagination, NotificationModal } from '../../../components/common';
+import { ApprovalRequestsModal } from '../components/approval-requests/ApprovalRequestsModal';
 import { matchesAnyVietnameseSearch } from '../lib/vietnamTime';
 import '../employee.css';
 
@@ -84,6 +85,7 @@ export const ApprovalRequestsPage: React.FC = () => {
 
   // Sub-modal xác nhận Duyệt / Từ chối
   const [selectedRequest, setSelectedRequest] = useState<ScheduleApprovalRequestDto | null>(null);
+  const [detailRequest, setDetailRequest] = useState<ScheduleApprovalRequestDto | null>(null);
   const [isApproveAction, setIsApproveAction] = useState<boolean>(true);
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState<boolean>(false);
   const [reviewNote, setReviewNote] = useState<string>('');
@@ -569,7 +571,12 @@ export const ApprovalRequestsPage: React.FC = () => {
                 const isPending = req.status === ScheduleApprovalStatus.Pending;
 
                 return (
-                  <tr key={req.id}>
+                  <tr
+                    key={req.id}
+                    onClick={() => setDetailRequest(req)}
+                    style={{ cursor: 'pointer' }}
+                    title="Bấm để xem chi tiết đơn"
+                  >
                     <td style={{ fontWeight: 600, color: '#0F766E' }}>
                       {req.employeeCode || '—'}
                     </td>
@@ -605,12 +612,11 @@ export const ApprovalRequestsPage: React.FC = () => {
                           </div>
                         )}
 
-                        {req.requestType === ScheduleRequestType.ShiftSwap && (
+                        {req.requestType === ScheduleRequestType.ShiftSwap && req.targetEmployeeName && (
                           <div style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>
-                            Đổi ca với: <strong>{req.targetEmployeeName || 'Đồng nghiệp'}</strong>
+                            Đổi ca với: <strong>{req.targetEmployeeName}</strong>
                             {req.peerConfirmed === true && ' (Đã đồng ý)'}
                             {req.peerConfirmed === false && ' (Đã từ chối)'}
-                            {req.peerConfirmed === null && ' (Chờ xác nhận)'}
                           </div>
                         )}
 
@@ -633,7 +639,10 @@ export const ApprovalRequestsPage: React.FC = () => {
                         {images.length > 0 && (
                           <div style={{ marginTop: 4 }}>
                             <span
-                              onClick={() => handleOpenLightbox(images, 0)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleOpenLightbox(images, 0);
+                              }}
                               style={{
                                 color: '#0F766E',
                                 cursor: 'pointer',
@@ -664,7 +673,7 @@ export const ApprovalRequestsPage: React.FC = () => {
                         <span style={{ fontSize: 13, color: '#94A3B8' }}>—</span>
                       )}
                     </td>
-                    <td style={{ textAlign: 'center' }}>
+                    <td style={{ textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
                       {isPending ? (
                         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
                           <button
@@ -741,6 +750,14 @@ export const ApprovalRequestsPage: React.FC = () => {
           />
         </div>
       </div>
+
+      {/* ─── SUB-MODAL CHI TIẾT PHIẾU YÊU CẦU ─── */}
+      <ApprovalRequestsModal
+        isOpen={Boolean(detailRequest)}
+        onClose={() => setDetailRequest(null)}
+        request={detailRequest}
+        onSuccess={fetchRequests}
+      />
 
       {/* ─── SUB-MODAL XÁC NHẬN DUYỆT / TỪ CHỐI ─── */}
       {isConfirmModalOpen && selectedRequest && (
