@@ -98,6 +98,8 @@ interface SearchableSelectProps {
   allowClearToId?: string;
   clearLabel?: string;
   minWidth?: number;
+  /** Chỉ lọc theo primary (vd: ô mã chỉ theo mã, ô tên chỉ theo tên). */
+  matchPrimaryOnly?: boolean;
   onSelect: (id: string) => boolean | void;
 }
 
@@ -110,6 +112,7 @@ const SearchableSelect: FC<SearchableSelectProps> = ({
   allowClearToId,
   clearLabel,
   minWidth = 240,
+  matchPrimaryOnly = false,
   onSelect,
 }) => {
   const [query, setQuery] = useState('');
@@ -123,16 +126,16 @@ const SearchableSelect: FC<SearchableSelectProps> = ({
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return options.slice(0, 12);
-    return options
-      .filter(
-        (o) =>
-          o.primary.toLowerCase().includes(q) ||
-          (o.secondary && o.secondary.toLowerCase().includes(q)) ||
-          o.id.toLowerCase().includes(q)
-      )
-      .slice(0, 12);
-  }, [options, query]);
+    if (!q) return options;
+    return options.filter((o) => {
+      if (o.primary.toLowerCase().includes(q)) return true;
+      if (matchPrimaryOnly) return false;
+      return (
+        (o.secondary && o.secondary.toLowerCase().includes(q)) ||
+        o.id.toLowerCase().includes(q)
+      );
+    });
+  }, [options, query, matchPrimaryOnly]);
 
   useEffect(() => {
     const onOutside = (e: MouseEvent) => {
@@ -149,11 +152,24 @@ const SearchableSelect: FC<SearchableSelectProps> = ({
     setFocusedIndex(0);
   }, [query, open]);
 
+  useEffect(() => {
+    if (open) {
+      // Cho phép gõ tìm ngay khi mở — không bị chip chiếm chỗ
+      requestAnimationFrame(() => inputRef.current?.focus());
+    }
+  }, [open]);
+
   const pick = (id: string) => {
     const ok = onSelect(id);
     if (ok === false) return;
     setQuery('');
     setOpen(false);
+  };
+
+  const enterSearchMode = () => {
+    setQuery('');
+    setOpen(true);
+    requestAnimationFrame(() => inputRef.current?.focus());
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
@@ -184,41 +200,38 @@ const SearchableSelect: FC<SearchableSelectProps> = ({
   };
 
   const hasSelection = Boolean(chipText) && selectedId !== (allowClearToId ?? '');
+  // Khi mở/đang gõ: full input để tìm & đổi CN linh hoạt (Store Owner)
+  const searchMode = open || Boolean(query);
 
   return (
     <div ref={rootRef} className="po-filter-field" style={{ position: 'relative', flexShrink: 0 }}>
       <label className="po-filter-label">{label}</label>
-      <div style={{ position: 'relative', width: minWidth }}>
+      <div style={{ position: 'relative', minWidth, width: 'max-content', maxWidth: '100%' }}>
         <div
-          onClick={() => {
-            inputRef.current?.focus();
-            setOpen(true);
-          }}
+          onClick={enterSearchMode}
           style={{
-            display: 'flex',
+            display: 'inline-flex',
             alignItems: 'center',
             flexWrap: 'nowrap',
             gap: 4,
-            width: '100%',
+            minWidth,
+            width: 'max-content',
+            maxWidth: '100%',
             height: CTRL_H,
-            overflow: 'hidden',
             padding: '0 28px 0 6px',
             borderRadius: 6,
             border: open || hasSelection ? '1px solid #0d9488' : '1px solid #cbd5e1',
-            backgroundColor: hasSelection ? '#f0fdfa' : '#ffffff',
+            backgroundColor: hasSelection && !searchMode ? '#f0fdfa' : '#ffffff',
             boxShadow: open ? '0 0 0 3px rgba(13, 148, 136, 0.12)' : 'none',
             boxSizing: 'border-box',
             cursor: 'text',
-            minWidth: 0,
           }}
         >
-          {hasSelection && !query && (
+          {hasSelection && !searchMode && (
             <span
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
-                flex: '1 1 auto',
-                minWidth: 0,
                 gap: 4,
                 height: 22,
                 padding: '0 4px 0 8px',
@@ -228,63 +241,64 @@ const SearchableSelect: FC<SearchableSelectProps> = ({
                 fontSize: 12,
                 fontWeight: 700,
                 border: '1px solid #99f6e4',
-                maxWidth: '100%',
+                whiteSpace: 'nowrap',
               }}
             >
-              <span
-                style={{
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                  minWidth: 0,
-                  flex: 1,
-                }}
-                title={chipText}
-              >
-                {chipText}
-              </span>
-              {allowClearToId !== undefined && selectedId !== allowClearToId && (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
+              <span style={{ whiteSpace: 'nowrap' }}>{chipText}</span>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (allowClearToId !== undefined && selectedId !== allowClearToId) {
                     pick(allowClearToId);
-                  }}
-                  title={clearLabel || 'Xóa lựa chọn'}
-                  style={{
-                    width: 16,
-                    height: 16,
-                    flexShrink: 0,
-                    border: 'none',
-                    background: 'transparent',
-                    color: '#0f766e',
-                    cursor: 'pointer',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    padding: 0,
-                  }}
-                >
-                  <X size={11} />
-                </button>
-              )}
+                    return;
+                  }
+                  enterSearchMode();
+                }}
+                title={
+                  allowClearToId !== undefined
+                    ? clearLabel || 'Xóa lựa chọn'
+                    : 'Tìm / đổi chi nhánh'
+                }
+                style={{
+                  width: 16,
+                  height: 16,
+                  flexShrink: 0,
+                  border: 'none',
+                  background: 'transparent',
+                  color: '#0f766e',
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: 0,
+                }}
+              >
+                <X size={11} />
+              </button>
             </span>
           )}
           <input
             ref={inputRef}
             type="text"
             value={query}
-            placeholder={hasSelection && !query ? 'Đổi...' : placeholder}
+            placeholder={
+              searchMode
+                ? placeholder
+                : hasSelection
+                  ? 'Đổi...'
+                  : placeholder
+            }
             onChange={(e) => {
               setQuery(e.target.value);
               setOpen(true);
             }}
-            onFocus={() => setOpen(true)}
+            onFocus={enterSearchMode}
             onKeyDown={handleKeyDown}
             style={{
-              flex: hasSelection && !query ? '0 0 56px' : '1 1 auto',
-              minWidth: 0,
-              width: hasSelection && !query ? 56 : '100%',
+              flex: searchMode || !hasSelection ? '1 1 auto' : '0 0 56px',
+              minWidth: searchMode || !hasSelection ? Math.max(120, minWidth - 40) : 56,
+              width: searchMode || !hasSelection ? Math.max(120, minWidth - 40) : 56,
               height: 24,
               border: 'none',
               outline: 'none',
@@ -305,16 +319,18 @@ const SearchableSelect: FC<SearchableSelectProps> = ({
               position: 'absolute',
               top: '100%',
               left: 0,
-              minWidth: '100%',
-              width: Math.max(minWidth, 260),
+              minWidth: 'max(100%, 280px)',
+              width: 'max-content',
+              maxWidth: 'min(560px, 90vw)',
               marginTop: 4,
               backgroundColor: '#ffffff',
               border: '1px solid #cbd5e1',
               borderRadius: 8,
               boxShadow: '0 10px 25px -5px rgba(15, 23, 42, 0.12)',
               zIndex: 90,
-              maxHeight: 260,
+              maxHeight: 280,
               overflowY: 'auto',
+              overflowX: 'auto',
               padding: '4px 0',
             }}
           >
@@ -334,19 +350,35 @@ const SearchableSelect: FC<SearchableSelectProps> = ({
                     onMouseDown={(e) => e.preventDefault()}
                     onClick={() => pick(item.id)}
                     style={{
+                      display: 'block',
                       width: '100%',
                       textAlign: 'left',
                       border: 'none',
                       cursor: 'pointer',
                       padding: '8px 12px',
                       backgroundColor: active || isSelected ? '#f0fdfa' : 'transparent',
+                      whiteSpace: 'nowrap',
                     }}
                   >
-                    <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a' }}>
+                    <div
+                      style={{
+                        fontSize: 13,
+                        fontWeight: 600,
+                        color: '#0f172a',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
                       {highlightMatch(item.primary, query)}
                     </div>
                     {item.secondary && (
-                      <div style={{ fontSize: 11.5, color: '#64748b', marginTop: 2 }}>
+                      <div
+                        style={{
+                          fontSize: 11.5,
+                          color: '#64748b',
+                          marginTop: 2,
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
                         {highlightMatch(item.secondary, query)}
                       </div>
                     )}
@@ -405,7 +437,17 @@ export const OrderMatrixFilterBar: FC<OrderMatrixFilterBarProps> = ({
     setDraftKeyword(keyword);
   }, [keyword]);
 
-  const branchOptions: SearchOption[] = useMemo(
+  const branchCodeOptions: SearchOption[] = useMemo(
+    () =>
+      branches.map((b) => ({
+        id: b.id,
+        primary: b.code,
+        secondary: b.name,
+      })),
+    [branches]
+  );
+
+  const branchNameOptions: SearchOption[] = useMemo(
     () =>
       branches.map((b) => ({
         id: b.id,
@@ -458,21 +500,32 @@ export const OrderMatrixFilterBar: FC<OrderMatrixFilterBarProps> = ({
 
   return (
     <div className="po-filter-box">
-      {/* ── ROW 1: Chi nhánh / NCC / khung ngày / Áp dụng ── */}
+      {/* ── DÒNG 1: Phạm vi CN / NCC / khung ngày / khoảng ngày ── */}
       <div className="po-filter-row">
         <div className="po-filter-row-left">
           {!hideBranchSelect && (
-            <SearchableSelect
-              label="Chi nhánh:"
-              placeholder="Nhập mã / tên CN..."
-              options={branchOptions}
-              selectedId={selectedBranchId}
-              selectedLabel={
-                selectedBranch ? `${selectedBranch.code} — ${selectedBranch.name}` : undefined
-              }
-              minWidth={190}
-              onSelect={handleBranchChange}
-            />
+            <>
+              <SearchableSelect
+                label="Mã CN:"
+                placeholder="Mã CN..."
+                options={branchCodeOptions}
+                selectedId={selectedBranchId}
+                selectedLabel={selectedBranch?.code}
+                minWidth={120}
+                matchPrimaryOnly
+                onSelect={handleBranchChange}
+              />
+              <SearchableSelect
+                label="Tên CN:"
+                placeholder="Tên CN..."
+                options={branchNameOptions}
+                selectedId={selectedBranchId}
+                selectedLabel={selectedBranch?.name}
+                minWidth={180}
+                matchPrimaryOnly
+                onSelect={handleBranchChange}
+              />
+            </>
           )}
 
           {hideBranchSelect && (
@@ -511,20 +564,20 @@ export const OrderMatrixFilterBar: FC<OrderMatrixFilterBarProps> = ({
           )}
 
           <SearchableSelect
-            label="Nhà cung cấp:"
-            placeholder="Nhập mã / tên NCC..."
+            label="NCC:"
+            placeholder="Mã / tên NCC..."
             options={supplierOptions}
             selectedId={selectedSupplierId || 'ALL'}
             selectedLabel={
               selectedSupplierId === 'ALL' || !selectedSupplierId
-                ? 'Tất cả nhà cung cấp'
+                ? 'Tất cả NCC'
                 : selectedSupplier
                   ? `${selectedSupplier.code} — ${selectedSupplier.name}`
                   : undefined
             }
             allowClearToId="ALL"
             clearLabel="Về tất cả NCC"
-            minWidth={220}
+            minWidth={180}
             onSelect={handleSupplierChange}
           />
 
@@ -532,7 +585,7 @@ export const OrderMatrixFilterBar: FC<OrderMatrixFilterBarProps> = ({
 
           {onSelectDuration && (
             <div className="po-filter-field">
-              <label className="po-filter-label">Khung ngày:</label>
+              <label className="po-filter-label">Khung:</label>
               <div style={{ display: 'inline-flex', gap: 3 }}>
                 {[7, 14, 21, 31].map((d) => {
                   const active = durationDays === d;
@@ -560,15 +613,15 @@ export const OrderMatrixFilterBar: FC<OrderMatrixFilterBarProps> = ({
               </div>
             </div>
           )}
-        </div>
 
-        <div className="po-filter-row-right">
+          <div className="po-bar-divider" />
+
           <div className="po-filter-field">
             <label className="po-filter-label">Từ:</label>
             <input
               type="date"
               className="po-ctrl-date"
-              style={{ width: 122, height: CTRL_H, fontSize: 12 }}
+              style={{ width: 118, height: CTRL_H, fontSize: 12 }}
               value={dateFrom}
               onChange={(e) => onDateFromChange(e.target.value)}
             />
@@ -576,7 +629,7 @@ export const OrderMatrixFilterBar: FC<OrderMatrixFilterBarProps> = ({
             <input
               type="date"
               className="po-ctrl-date"
-              style={{ width: 122, height: CTRL_H, fontSize: 12 }}
+              style={{ width: 118, height: CTRL_H, fontSize: 12 }}
               value={dateTo}
               onChange={(e) => onDateToChange(e.target.value)}
             />
@@ -585,7 +638,7 @@ export const OrderMatrixFilterBar: FC<OrderMatrixFilterBarProps> = ({
               className="po-ctrl-btn-apply"
               onClick={handleApply}
               title="Áp dụng khoảng ngày và tìm kiếm sản phẩm"
-              style={{ padding: '0 12px', height: CTRL_H, fontSize: 12, fontWeight: 600 }}
+              style={{ padding: '0 10px', height: CTRL_H, fontSize: 12, fontWeight: 600 }}
             >
               Áp dụng
             </button>
@@ -596,7 +649,7 @@ export const OrderMatrixFilterBar: FC<OrderMatrixFilterBarProps> = ({
               title="Đặt lại các bộ lọc"
               style={{
                 height: CTRL_H,
-                padding: '0 10px',
+                padding: '0 8px',
                 fontSize: 12,
                 fontWeight: 600,
                 color: '#64748b',
@@ -612,7 +665,7 @@ export const OrderMatrixFilterBar: FC<OrderMatrixFilterBarProps> = ({
         </div>
       </div>
 
-      {/* ── ROW 2: Sản phẩm / ngành hàng / checkbox / thao tác ── */}
+      {/* ── DÒNG 2: Sản phẩm / checkbox / thao tác Excel ── */}
       <div className="po-filter-row">
         <div className="po-filter-row-left">
           <div className="po-filter-field">
@@ -620,7 +673,7 @@ export const OrderMatrixFilterBar: FC<OrderMatrixFilterBarProps> = ({
             <div
               className="po-ctrl-search"
               style={{
-                width: 260,
+                width: 220,
                 height: CTRL_H,
                 border: draftKeyword.trim() || keyword ? '1px solid #0d9488' : undefined,
                 backgroundColor: draftKeyword.trim() || keyword ? '#f0fdfa' : undefined,

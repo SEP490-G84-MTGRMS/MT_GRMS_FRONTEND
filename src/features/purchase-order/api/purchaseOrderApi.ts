@@ -351,10 +351,18 @@ export const purchaseOrderApi = {
         finalQty: number;
       }> = [];
 
+      const guidRe =
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
       Object.entries(cellMap).forEach(([rowKey, dayMap]) => {
         const sep = rowKey.indexOf('__');
         const productId = sep >= 0 ? rowKey.slice(0, sep) : rowKey;
-        const supplierId = sep >= 0 ? rowKey.slice(sep + 2) : undefined;
+        const rowSupplierId = sep >= 0 ? rowKey.slice(sep + 2) : undefined;
+        // Bỏ SupplierId rác / cũ (không còn trong bảng Suppliers) để tránh FK 23503
+        const safeSupplierId =
+          rowSupplierId && rowSupplierId !== 'none' && guidRe.test(rowSupplierId)
+            ? rowSupplierId
+            : undefined;
         Object.entries(dayMap).forEach(([dateKey, cell]) => {
           const isOwnerAdjusted = Boolean(
             cell.isOwnerAdjusted || cell.isOwnerOverridden || (cell.storeQty !== null && cell.storeQty !== undefined)
@@ -368,7 +376,7 @@ export const purchaseOrderApi = {
           ) {
             cells.push({
               productId,
-              supplierId: supplierId && supplierId !== 'none' ? supplierId : undefined,
+              supplierId: safeSupplierId,
               deliveryDate: dateKey,
               employeeQty: cell.employeeQty ?? 0,
               storeQty: cell.storeQty ?? null,

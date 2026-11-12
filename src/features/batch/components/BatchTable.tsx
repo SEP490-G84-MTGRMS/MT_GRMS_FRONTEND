@@ -168,24 +168,31 @@ export const BatchTable: FC<BatchTableProps> = ({
   const allCurrentSelected =
     sortedBatches.length > 0 && sortedBatches.every((b) => selectedIds.includes(b.id));
 
+  const tableMinWidth = 1640;
+  const tableFitStyle: CSSProperties = {
+    minWidth: tableMinWidth,
+    width: '100%',
+    tableLayout: 'fixed',
+  };
+
   const tableColGroup = (
     <colgroup>
-      <col style={{ width: '3%' }} />
-      <col style={{ width: '8%' }} />
-      <col style={{ width: '13%' }} />
-      <col style={{ width: '8%' }} />
-      <col style={{ width: '7%' }} />
-      <col style={{ width: '6%' }} />
-      <col style={{ width: '8%' }} />
-      <col style={{ width: '9%' }} />
-      <col style={{ width: '6%' }} />
-      <col style={{ width: '6%' }} />
-      <col style={{ width: '5%' }} />
-      <col style={{ width: '5%' }} />
-      <col style={{ width: '3%' }} />
-      <col style={{ width: '6%' }} />
-      <col style={{ width: '4%' }} />
-      <col style={{ width: '3%' }} />
+      <col style={{ width: 40 }} />
+      <col style={{ width: 120 }} />
+      <col style={{ width: 200 }} />
+      <col style={{ width: 110 }} />
+      <col style={{ width: 100 }} />
+      <col style={{ width: 80 }} />
+      <col style={{ width: 130 }} />
+      <col style={{ width: 160 }} />
+      <col style={{ width: 90 }} />
+      <col style={{ width: 90 }} />
+      <col style={{ width: 84 }} />
+      <col style={{ width: 72 }} />
+      <col style={{ width: 52 }} />
+      <col style={{ width: 100 }} />
+      <col style={{ width: 92 }} />
+      <col style={{ width: 128 }} />
     </colgroup>
   );
 
@@ -290,9 +297,9 @@ export const BatchTable: FC<BatchTableProps> = ({
       <div
         ref={headerRef}
         className="so-list-table-head"
-        style={{ paddingRight: hasScrollY ? 6 : 0, overflowX: 'hidden' }}
+        style={{ paddingRight: hasScrollY ? 6 : 0 }}
       >
-        <table className="so-list-table" style={{ minWidth: '100%', width: '100%' }}>
+        <table className="so-list-table" style={tableFitStyle}>
           {tableColGroup}
           <thead>
             <tr>
@@ -329,11 +336,10 @@ export const BatchTable: FC<BatchTableProps> = ({
 
       <div
         ref={bodyRef}
-        className="so-list-table-body"
+        className="so-list-table-body supplier-table-scroll-container"
         onScroll={handleBodyScroll}
-        style={{ overflowX: 'hidden' }}
       >
-        <table className="so-list-table" style={{ minWidth: '100%', width: '100%' }}>
+        <table className="so-list-table" style={tableFitStyle}>
           {tableColGroup}
           <tbody>
             {sortedBatches.length === 0 ? (
@@ -498,7 +504,7 @@ export const BatchTable: FC<BatchTableProps> = ({
 
                     <td style={{ textAlign: 'center' }}>{renderStatusBadge(row.status)}</td>
 
-                    <td style={{ textAlign: 'right' }}>
+                    <td className="so-list-td--actions" style={{ textAlign: 'right' }}>
                       <div className="so-list-actions">
                         <button
                           type="button"

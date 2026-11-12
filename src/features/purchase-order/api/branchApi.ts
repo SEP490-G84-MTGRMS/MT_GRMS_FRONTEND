@@ -1,6 +1,7 @@
 import { httpClient } from '../../../api/httpClient';
 import type { ApiResponse, PagedResult } from '../../../api/types';
-import type { BranchListItem, MatrixCellMap } from '../types/po.types';
+import { storeProductApi } from '../../product/api/storeProductApi';
+import type { BranchListItem } from '../types/po.types';
 import type { BranchFilterParams } from '../types/branch.types';
 
 export interface BranchBackendDto {
@@ -14,43 +15,16 @@ export interface BranchBackendDto {
   pendingOrdersCount: number;
   lastOrderDate?: string;
   createdAt: string;
+  /** Số SP đã gán bán tại CN (BranchProducts) — nếu BE có trả. */
+  productCount?: number;
+  catalogProductCount?: number;
+  totalProducts?: number;
 }
 
-/** Đếm số sản phẩm (SKU) đang có qty > 0 trong draft Order Matrix của chi nhánh. */
-export const countMatrixProductsForBranch = (branchId: string): number => {
-  if (!branchId || typeof localStorage === 'undefined') return 0;
-
-  const productIds = new Set<string>();
-  const prefix = `matrix_draft_${branchId}_`;
-
-  try {
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (!key || !key.startsWith(prefix)) continue;
-
-      const raw = localStorage.getItem(key);
-      if (!raw) continue;
-
-      const cellMap = JSON.parse(raw) as MatrixCellMap;
-      for (const [productId, days] of Object.entries(cellMap || {})) {
-        if (!days) continue;
-        const hasQty = Object.values(days).some((cell) => {
-          const finalQty = Number(cell?.finalQty ?? 0);
-          const employeeQty = Number(cell?.employeeQty ?? 0);
-          const storeQty = cell?.storeQty == null ? 0 : Number(cell.storeQty);
-          return finalQty > 0 || employeeQty > 0 || storeQty > 0;
-        });
-        if (hasQty) productIds.add(productId);
-      }
-    }
-  } catch {
-    return 0;
-  }
-
-  return productIds.size;
-};
-
-export const mapBackendBranchToListItem = (item: BranchBackendDto): BranchListItem => {
+export const mapBackendBranchToListItem = (
+  item: BranchBackendDto,
+  catalogProductCount = 0
+): BranchListItem => {
   const isInactive = item.status?.toLowerCase() === 'inactive';
   let formattedDate = '—';
   if (item.lastOrderDate) {
@@ -65,6 +39,11 @@ export const mapBackendBranchToListItem = (item: BranchBackendDto): BranchListIt
       : '—';
   }
 
+  const fromDto =
+    item.catalogProductCount ?? item.productCount ?? item.totalProducts;
+  const productCount =
+    typeof fromDto === 'number' && fromDto >= 0 ? fromDto : catalogProductCount;
+
   return {
     id: item.id,
     code: item.code,
@@ -74,7 +53,8 @@ export const mapBackendBranchToListItem = (item: BranchBackendDto): BranchListIt
     managerPhone: item.phone || '—',
     stockQty: 0,
     orderQty: 0,
-    matrixProductCount: countMatrixProductsForBranch(item.id),
+    // Field giữ tên cũ để khỏi đụng type — giá trị = số SP đã gán cửa hàng (BranchProducts)
+    matrixProductCount: productCount,
     orderSummary: `${item.pendingOrdersCount || 0} đơn chờ xử lý`,
     draftCount: 0,
     pendingCount: item.pendingOrdersCount || 0,
@@ -141,7 +121,25 @@ export const branchApi = {
 
       if (res.data?.success && res.data.data) {
         const paged = res.data.data;
-        const items = paged.items.map(mapBackendBranchToListItem);
+        // Đồng bộ với màn /stores/products: đếm BranchProducts qua /branches/summaries
+        let countById = new Map<string, number>();
+        try {
+          const summaries = await storeProductApi.getStoreSummaries();
+          countById = new Map(
+            (summaries || [])
+              .filter((s) => s?.id)
+              .map((s) => [String(s.id).toLowerCase(), Number(s.totalProducts || 0)])
+          );
+        } catch {
+          countById = new Map();
+        }
+
+        const items = paged.items.map((item) =>
+          mapBackendBranchToListItem(
+            item,
+            countById.get(String(item.id).toLowerCase()) ?? 0
+          )
+        );
         return { items, total: paged.totalItems };
       }
 
@@ -158,7 +156,17 @@ export const branchApi = {
     try {
       const res = await httpClient.get<ApiResponse<BranchBackendDto>>(`/branches/${id}`);
       if (res.data?.success && res.data.data) {
-        return mapBackendBranchToListItem(res.data.data);
+        let catalogCount = 0;
+        try {
+          const summaries = await storeProductApi.getStoreSummaries();
+          const hit = (summaries || []).find(
+            (s) => String(s.id).toLowerCase() === String(id).toLowerCase()
+          );
+          catalogCount = Number(hit?.totalProducts || 0);
+        } catch {
+          catalogCount = 0;
+        }
+        return mapBackendBranchToListItem(res.data.data, catalogCount);
       }
       return null;
     } catch (err: any) {

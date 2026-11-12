@@ -9,6 +9,10 @@ import {
 } from 'lucide-react';
 import type { PurchaseOrderListItem } from '../../types/po-list.types';
 import { TablePagination } from '../../../../components/common';
+import {
+  formatDeliveryDateGateMessage,
+  isDeliveryDateReached,
+} from '../../lib/deliveryDateGate';
 
 interface PoListTableProps {
   orders: PurchaseOrderListItem[];
@@ -82,8 +86,17 @@ const resolveDisplayStatus = (
 const receiveActionTitle = (order: PurchaseOrderListItem): string => {
   const grn = (order.activeGoodsReceiptStatus || '').toUpperCase();
   if (grn === 'COMPLETED') return `Xem phiếu nhập ${order.activeGoodsReceiptCode || ''}`.trim();
+  if (!isDeliveryDateReached(order.deliveryDate)) {
+    return formatDeliveryDateGateMessage(order.deliveryDate);
+  }
   if (grn === 'DRAFT') return `Tiếp tục xác nhận phiếu nháp ${order.activeGoodsReceiptCode || ''}`.trim();
   return 'Nhận hàng / Nhập kho theo PO này';
+};
+
+const isReceiveBlockedByDeliveryDate = (order: PurchaseOrderListItem): boolean => {
+  const grn = (order.activeGoodsReceiptStatus || '').toUpperCase();
+  if (grn === 'COMPLETED') return false;
+  return !isDeliveryDateReached(order.deliveryDate);
 };
 
 type SortField =
@@ -619,8 +632,10 @@ export const PoListTable: FC<PoListTableProps> = ({
                         {onReceiveOrder && canShowReceiveAction(order) && (
                           <button
                             type="button"
+                            disabled={isReceiveBlockedByDeliveryDate(order)}
                             onClick={(e) => {
                               e.stopPropagation();
+                              if (isReceiveBlockedByDeliveryDate(order)) return;
                               onReceiveOrder(order);
                             }}
                             style={{
@@ -630,13 +645,15 @@ export const PoListTable: FC<PoListTableProps> = ({
                               width: 26,
                               height: 26,
                               borderRadius: 6,
-                              backgroundColor:
-                                (order.activeGoodsReceiptStatus || '').toUpperCase() === 'COMPLETED'
+                              backgroundColor: isReceiveBlockedByDeliveryDate(order)
+                                ? '#f1f5f9'
+                                : (order.activeGoodsReceiptStatus || '').toUpperCase() === 'COMPLETED'
                                   ? '#ecfdf5'
                                   : '#f0fdfa',
-                              border: '1px solid #99f6e4',
-                              color: '#0f766e',
-                              cursor: 'pointer',
+                              border: `1px solid ${isReceiveBlockedByDeliveryDate(order) ? '#cbd5e1' : '#99f6e4'}`,
+                              color: isReceiveBlockedByDeliveryDate(order) ? '#94a3b8' : '#0f766e',
+                              cursor: isReceiveBlockedByDeliveryDate(order) ? 'not-allowed' : 'pointer',
+                              opacity: isReceiveBlockedByDeliveryDate(order) ? 0.65 : 1,
                             }}
                             title={receiveActionTitle(order)}
                           >

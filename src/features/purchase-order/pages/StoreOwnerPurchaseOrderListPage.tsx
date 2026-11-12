@@ -8,6 +8,11 @@ import { PoListFilterBar } from '../components/po-list/PoListFilterBar';
 import { PoListTable } from '../components/po-list/PoListTable';
 import { PoDetailDrawer } from '../components/po-list/PoDetailDrawer';
 import { AdminToast, type ToastState } from '../../admin/components';
+import {
+  formatDeliveryDateGateMessage,
+  isDeliveryDateReached,
+  toDeliveryDateKey,
+} from '../lib/deliveryDateGate';
 import '../purchase-order.css';
 import '../../supplier/supplier.css';
 
@@ -73,6 +78,7 @@ const RECEIVE_ELIGIBLE_STATUSES: PurchaseOrderStatus[] = [
 const canReceiveOrder = (order: PurchaseOrderListItem): boolean => {
   if (order.activeGoodsReceiptStatus?.toUpperCase() === 'COMPLETED') return true; // xem phiếu
   if (order.status === 'CANCELLED' || order.status === 'REJECTED') return false;
+  // DRAFT đã tạo: cho mở lại; tạo mới / hoàn tất: phải đến ngày giao (check ở handle + table)
   return RECEIVE_ELIGIBLE_STATUSES.includes(order.status) || order.status === 'RECEIVED';
 };
 
@@ -143,6 +149,7 @@ export const StoreOwnerPurchaseOrderListPage: FC = () => {
           createdSource: 'Chủ cửa hàng (Dispatch Hub)',
           lastUpdated: formatVnDateTime(po.lastAmendedAtUtc || po.createdAt),
           expectedDelivery: formatVnDate(po.deliveryDate),
+          deliveryDate: toDeliveryDateKey(po.deliveryDate),
           itemCount: po.details?.length ?? 0,
           totalAmount: po.totalAmount,
           status: mapBackendStatus(po.status),
@@ -238,6 +245,12 @@ export const StoreOwnerPurchaseOrderListPage: FC = () => {
     if (grnId && grnStatus === 'COMPLETED') {
       showToast(`PO ${order.poCode} đã nhập kho (${order.activeGoodsReceiptCode}). Mở phiếu nhập.`, 'info');
       navigate(`/store-owner/goods-receipts/${grnId}`);
+      return;
+    }
+
+    // Rule: chỉ nhập hàng từ ngày giao trở đi (xem phiếu COMPLETED vẫn được)
+    if (!isDeliveryDateReached(order.deliveryDate)) {
+      showToast(formatDeliveryDateGateMessage(order.deliveryDate), 'warning');
       return;
     }
 

@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import type { FC } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import dayjs from 'dayjs';
 import type {
   DayColInfo,
@@ -313,12 +313,11 @@ function buildEmptyCellMap(
   prodList: OrderMatrixProduct[],
   existing?: MatrixCellMap
 ): MatrixCellMap {
-  const map: MatrixCellMap = { ...(existing || {}) };
+  // Chỉ giữ ô thuộc SP×NCC đang có trên matrix — bỏ draft localStorage với SupplierId cũ (sau khi xóa/tạo lại NCC).
+  const map: MatrixCellMap = {};
   prodList.forEach((p) => {
     const key = `${p.id}__${p.supplierId || 'none'}`;
-    if (!map[key]) {
-      map[key] = {};
-    }
+    map[key] = existing?.[key] ? { ...existing[key] } : {};
   });
   return map;
 }
@@ -329,6 +328,7 @@ export interface OrderMatrixPageProps {
 
 export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
 
   const initialSupplier = searchParams.get('supplier') || 'ALL';
@@ -432,6 +432,7 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
   // Nạp danh sách chi nhánh thật (không dùng mock DC1 / BR-01)
   useEffect(() => {
     let isMounted = true;
+    const norm = (id: string) => id.trim().toLowerCase();
     const loadBranches = async () => {
       try {
         const summaries = await storeProductApi.getStoreSummaries();
@@ -444,23 +445,40 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
         const authUser = useAuthStore.getState().user;
         const employeeBranchId = !isStoreOwner ? (authUser?.branchId || '') : '';
 
-        const urlBranch =
+        // Ưu tiên branch từ URL (màn /branches → Đặt hàng?branchId=...) — không ghi đè sang CN khác
+        const urlBranchRaw =
           employeeBranchId ||
           searchParams.get('branchId') ||
           searchParams.get('branch') ||
           searchParams.get('storeId') ||
           '';
-        if (urlBranch && realBranches.some((b) => b.id === urlBranch)) {
-          setSelectedBranchId(urlBranch);
-        } else {
+        const urlBranch = GUID_RE.test(urlBranchRaw) ? urlBranchRaw : '';
+
+        if (urlBranch) {
+          const matched = realBranches.find((b) => norm(b.id) === norm(urlBranch));
+          const resolvedId = matched?.id || urlBranch;
+          setSelectedBranchId(resolvedId);
+          // Nếu CN từ URL chưa có trong summaries (lệch API), vẫn giữ id để matrix load đúng branch
+          if (!matched) {
+            setBranches((prev) =>
+              prev.some((b) => norm(b.id) === norm(resolvedId))
+                ? prev
+                : [{ id: resolvedId, code: 'CN', name: 'Chi nhánh đã chọn' }, ...prev]
+            );
+          }
+          return;
+        }
+
+        // Không có branch trên URL → chọn mặc định 1 lần (không cướp selection đang chọn)
+        setSelectedBranchId((prev) => {
+          if (prev && realBranches.some((b) => norm(b.id) === norm(prev))) {
+            return prev;
+          }
           const withProducts = (summaries || []).find(
             (b) => GUID_RE.test(b.id) && (b.totalProducts || 0) > 0
           );
-          const nextId = withProducts?.id || realBranches[0]?.id || '';
-          if (nextId !== selectedBranchId) {
-            setSelectedBranchId(nextId);
-          }
-        }
+          return withProducts?.id || realBranches[0]?.id || prev || '';
+        });
       } catch {
         if (isMounted) {
           setBranches([]);
@@ -526,7 +544,16 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
           }
         }
 
-        setCellMap(buildEmptyCellMap(res.products || [], targetCells));
+        const sanitizedCells = buildEmptyCellMap(res.products || [], targetCells);
+        setCellMap(sanitizedCells);
+        try {
+          localStorage.setItem(
+            `matrix_draft_${selectedBranchId}_ALL`,
+            JSON.stringify(sanitizedCells)
+          );
+        } catch {
+          // ignore quota
+        }
         const nextSuppliers = suppliersFromMatrix(res.products || [], res.supplierConfigs || []);
         setSuppliers(nextSuppliers);
         if (res.branchIsActive === false) {
@@ -1283,6 +1310,15 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
           setKeyword('');
           setCellMap({});
           setIsDirty(false);
+          // Đồng bộ URL để quay lại / reload vẫn đúng CN (và khớp luồng từ màn branches)
+          if (isStoreOwner && GUID_RE.test(id)) {
+            const next = new URLSearchParams(searchParams);
+            next.set('branchId', id);
+            navigate(
+              { pathname: location.pathname, search: `?${next.toString()}` },
+              { replace: true }
+            );
+          }
         }}
         suppliers={suppliers}
         selectedSupplierId={selectedSupplierId}

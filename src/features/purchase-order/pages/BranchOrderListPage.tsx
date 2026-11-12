@@ -6,7 +6,7 @@ import type { BranchListItem, BranchFilterState } from '../types/po.types';
 import { BranchFilterBar } from '../components/branch/BranchFilterBar';
 import { BranchOrderTable } from '../components/branch/BranchOrderTable';
 import { AdminToast, type ToastState } from '../../admin/components';
-import { branchApi, countMatrixProductsForBranch } from '../api/branchApi';
+import { branchApi } from '../api/branchApi';
 import '../purchase-order.css';
 import '../../supplier/supplier.css';
 
@@ -61,19 +61,14 @@ export const BranchOrderListPage: FC = () => {
     fetchBranches();
   }, [fetchBranches]);
 
-  // Đồng bộ lại số SP trên Matrix khi quay lại tab (sau khi chỉnh Order Matrix)
+  // Đồng bộ lại số SP cửa hàng khi quay lại tab (sau khi gán SP ở /stores/products)
   useEffect(() => {
-    const refreshMatrixCounts = () => {
-      setBranches((prev) =>
-        prev.map((b) => ({
-          ...b,
-          matrixProductCount: countMatrixProductsForBranch(b.id),
-        }))
-      );
+    const refreshCatalogCounts = () => {
+      void fetchBranches();
     };
-    window.addEventListener('focus', refreshMatrixCounts);
-    return () => window.removeEventListener('focus', refreshMatrixCounts);
-  }, []);
+    window.addEventListener('focus', refreshCatalogCounts);
+    return () => window.removeEventListener('focus', refreshCatalogCounts);
+  }, [fetchBranches]);
 
   const handleSearch = (newFilters: BranchFilterState) => {
     setAppliedFilters(newFilters);

@@ -115,11 +115,13 @@ export const SupplierProductTable: FC<SupplierProductTableProps> = ({
   const headerRef = useRef<HTMLDivElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
   const [hasScrollY, setHasScrollY] = useState(false);
+  const [emptyViewportWidth, setEmptyViewportWidth] = useState(0);
 
   useEffect(() => {
     const updateScrollState = () => {
       if (bodyRef.current) {
         setHasScrollY(bodyRef.current.scrollHeight > bodyRef.current.clientHeight);
+        setEmptyViewportWidth(bodyRef.current.clientWidth);
       }
     };
 
@@ -314,16 +316,31 @@ export const SupplierProductTable: FC<SupplierProductTableProps> = ({
             ) : (
               <tr>
                 <td
-                  colSpan={11}
+                  colSpan={13}
                   style={{
-                    textAlign: 'center',
-                    padding: '48px 16px',
-                    color: '#64748b',
-                    fontSize: 13,
+                    padding: 0,
                     borderBottom: '1px solid #f1f5f9',
+                    verticalAlign: 'middle',
                   }}
                 >
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+                  <div
+                    style={{
+                      position: 'sticky',
+                      left: 0,
+                      width: emptyViewportWidth || '100%',
+                      minHeight: 220,
+                      boxSizing: 'border-box',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 8,
+                      padding: '48px 16px',
+                      color: '#64748b',
+                      fontSize: 13,
+                      textAlign: 'center',
+                    }}
+                  >
                     <Package size={36} color="#cbd5e1" />
                     <span style={{ fontWeight: 600, color: '#475569' }}>
                       Chưa có sản phẩm nào phù hợp với bộ lọc
@@ -335,7 +352,16 @@ export const SupplierProductTable: FC<SupplierProductTableProps> = ({
                       type="button"
                       onClick={onOpenAssignModal}
                       className="po-btn po-btn-primary"
-                      style={{ marginTop: 8, height: 32, padding: '0 14px' }}
+                      style={{
+                        marginTop: 8,
+                        height: 32,
+                        padding: '0 14px',
+                        alignSelf: 'center',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 6,
+                      }}
                     >
                       <Plus size={14} />
                       <span>Gán sản phẩm ngay</span>
