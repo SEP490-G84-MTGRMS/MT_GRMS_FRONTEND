@@ -24,6 +24,11 @@ import { GrnFormActionBar } from '../components/form/GrnFormActionBar';
 import { GrnMismatchConfirmModal } from '../components/form/GrnMismatchConfirmModal';
 import { GrnPrintPreviewModal } from '../components/form/GrnPrintPreviewModal';
 import { AdminToast, type ToastState } from '../../admin/components';
+import {
+  formatDeliveryDateGateMessage,
+  isDeliveryDateReached,
+  toDeliveryDateKey,
+} from '../../purchase-order/lib/deliveryDateGate';
 import '../../purchase-order/purchase-order.css';
 
 const mapPaymentMethod = (method: PaymentMethod): string => {
@@ -144,6 +149,7 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
   const [paymentTerm, setPaymentTerm] = useState<PaymentTerm>('30');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('Credit');
   const [notes, setNotes] = useState('');
+  const [poDeliveryDate, setPoDeliveryDate] = useState<string | null>(null);
   const [items, setItems] = useState<GrnItemDetail[]>([]);
   const [discountAmount, setDiscountAmount] = useState(0);
   const [vatPercent, setVatPercent] = useState(0);
@@ -241,6 +247,7 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
         setAvailablePos(pos);
         setPoReference(matched.poCode);
         setSelectedPoId(matched.id);
+        setPoDeliveryDate(toDeliveryDateKey(matched.expectedDeliveryDate));
         return;
       }
 
@@ -344,6 +351,14 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
           });
         }
 
+        const deliveryKey = toDeliveryDateKey(details.deliveryDate);
+        setPoDeliveryDate(deliveryKey);
+        if (!isDeliveryDateReached(deliveryKey)) {
+          showToast(formatDeliveryDateGateMessage(deliveryKey), 'warning');
+          navigate(listPath);
+          return;
+        }
+
         setSupplierId(details.supplierId);
         setSupplierName(details.supplierName);
         setSupplierCode(details.supplierCode);
@@ -387,7 +402,7 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
     return () => {
       cancelled = true;
     };
-  }, [selectedPoId, isCreateMode, role, employeeBranchId]);
+  }, [selectedPoId, isCreateMode, role, employeeBranchId, listPath, navigate]);
 
   const costs: GrnCostSummary = useMemo(() => {
     const goodsTotal = items.reduce((acc, it) => acc + it.lineTotal, 0);
@@ -511,6 +526,10 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
       showToast('Danh sách hàng nhập không được để trống!', 'error');
       return false;
     }
+    if (!isDeliveryDateReached(poDeliveryDate)) {
+      showToast(formatDeliveryDateGateMessage(poDeliveryDate), 'warning');
+      return false;
+    }
 
     const groups = new Map<string, typeof items>();
     for (const it of items) {
@@ -607,29 +626,30 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
     if (!validateForm()) return;
     setIsSaving(true);
     try {
-      // Phiếu DRAFT đã có: hủy rồi tạo lại để lưu đúng kiểm đếm (API chưa có update dòng)
+      const command = buildCreateCommand(false);
+      let saved: BackendGoodsReceiptDto;
+
       if (!isCreateMode && id && receiptStatus === 'DRAFT') {
-        await goodsReceiptApi.cancelGoodsReceipt(
-          id,
-          autoComplete
-            ? 'Cập nhật kiểm đếm và hoàn tất nhập kho'
-            : 'Cập nhật kiểm đếm phiếu nháp'
-        );
+        saved = await goodsReceiptApi.updateDraftGoodsReceipt(id, command);
+        if (autoComplete) {
+          saved = await goodsReceiptApi.completeGoodsReceipt(saved.id, notes);
+        }
+      } else {
+        saved = await goodsReceiptApi.createGoodsReceipt(buildCreateCommand(autoComplete));
       }
 
-      const created = await goodsReceiptApi.createGoodsReceipt(buildCreateCommand(autoComplete));
-      const hasAutoReturn = autoComplete && !!created.createdReturnCode;
+      const hasAutoReturn = autoComplete && !!saved.createdReturnCode;
       showToast(
         autoComplete
           ? hasAutoReturn
-            ? `Hoàn tất nhập kho ${created.code} & Đã lập Phiếu trả hàng ${created.createdReturnCode} (Từ chối nhận hàng — Tài xế chở về ngay)!`
-            : `Hoàn tất nhập kho ${created.code}. Tồn kho đã được cập nhật.`
-          : `Đã lưu nháp phiếu ${created.code}.`,
+            ? `Hoàn tất nhập kho ${saved.code} & Đã lập Phiếu trả hàng ${saved.createdReturnCode} (Từ chối nhận hàng — Tài xế chở về ngay)!`
+            : `Hoàn tất nhập kho ${saved.code}. Tồn kho đã được cập nhật.`
+          : `Đã lưu nháp phiếu ${saved.code}.`,
         'success'
       );
       setTimeout(() => {
-        if (redirectToReturn && created.createdReturnId) {
-          navigate(`/store-owner/supplier-returns/${created.createdReturnId}`);
+        if (redirectToReturn && saved.createdReturnId) {
+          navigate(`/store-owner/supplier-returns/${saved.createdReturnId}`);
         } else if (redirectToReturn) {
           navigate('/store-owner/supplier-returns');
         } else {
@@ -814,6 +834,7 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
         onSaveDraft={handleSaveDraft}
         onCompleteAndPrint={handleCompleteAndPrint}
         onComplete={handleComplete}
+        hidePrint
       />
 
       <GrnMismatchConfirmModal

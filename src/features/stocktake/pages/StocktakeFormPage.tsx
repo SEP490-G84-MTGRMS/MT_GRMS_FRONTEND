@@ -141,8 +141,8 @@ export const StocktakeFormPage: FC<{ defaultRole?: 'store_owner' | 'employee' }>
       .getById(id)
       .then((detail) => {
         setBranchId(detail.branchId);
-        setScopeType(detail.scopeType);
-        setScopeReference(detail.scopeReference || '');
+        setScopeType(detail.scopeType === 'BY_SHELF' ? 'FULL_BRANCH' : detail.scopeType);
+        setScopeReference(detail.scopeType === 'BY_SHELF' ? '' : detail.scopeReference || '');
         setNote(detail.note || '');
         setLines(
           detail.lines.map((l) => ({
@@ -207,13 +207,6 @@ export const StocktakeFormPage: FC<{ defaultRole?: 'store_owner' | 'employee' }>
         if (scopeType === 'BY_CATEGORY' && scopeReference.trim()) {
           const kw = scopeReference.trim().toLowerCase();
           filtered = filtered.filter((b) => b.categoryName.toLowerCase().includes(kw));
-        } else if (scopeType === 'BY_SHELF' && scopeReference.trim()) {
-          const kw = scopeReference.trim().toLowerCase();
-          filtered = filtered.filter(
-            (b) =>
-              b.shelfLocation.toLowerCase().includes(kw) ||
-              b.zoneArea.toLowerCase().includes(kw)
-          );
         }
 
         const mapped = filtered.map(mapBatchToLine);
@@ -540,12 +533,11 @@ export const StocktakeFormPage: FC<{ defaultRole?: 'store_owner' | 'employee' }>
           >
             <option value="FULL_BRANCH">Toàn bộ chi nhánh</option>
             <option value="BY_CATEGORY">Theo ngành hàng</option>
-            <option value="BY_SHELF">Theo khu vực / vị trí kệ</option>
             <option value="SELECTED_ITEMS">Theo lô / sản phẩm được chọn</option>
           </select>
         </div>
 
-        {(scopeType === 'BY_CATEGORY' || scopeType === 'BY_SHELF') && (
+        {scopeType === 'BY_CATEGORY' && (
           <div>
             <label
               style={{

@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import type { FC } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Building2, History, Download, Plus, Loader2 } from 'lucide-react';
+import { Building2, History, Plus, Loader2 } from 'lucide-react';
 import type { BranchListItem, BranchFilterState } from '../types/po.types';
 import { BranchFilterBar } from '../components/branch/BranchFilterBar';
 import { BranchOrderTable } from '../components/branch/BranchOrderTable';
@@ -150,16 +150,6 @@ export const BranchOrderListPage: FC = () => {
             <History size={14} />
             <span>Lịch sử đơn hàng</span>
           </Link>
-
-          <button
-            type="button"
-            className="po-btn po-btn-secondary"
-            style={{ height: 32, padding: '0 14px' }}
-            onClick={() => showToast('Đang kết xuất danh sách chi nhánh ra tệp Excel (.xlsx)...', 'info')}
-          >
-            <Download size={14} />
-            <span>Xuất Excel</span>
-          </button>
 
           <Link
             to="/store-owner/purchase-orders/create-matrix"

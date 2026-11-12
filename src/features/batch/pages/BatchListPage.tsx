@@ -223,12 +223,7 @@ export const BatchListPage: FC<{ defaultRole?: UserRole }> = ({
   };
 
   const handleWriteOff = (batch: BatchItem) => {
-    const confirmed = window.confirm(
-      `Xác nhận tạo phiếu xuất hủy phế phẩm (FE-06) cho lô ${batch.batchCode} (${batch.productName})?\n\nSố lượng tiêu hủy: ${batch.qtyCurrent} ${batch.unit}\nTổng giá trị hao hụt: ${new Intl.NumberFormat('vi-VN').format(batch.totalValuation)} đ`
-    );
-    if (confirmed) {
-      showToast('Chưa có API xuất hủy — phiếu chưa được tạo.', 'warning');
-    }
+    handleCreateStocktake(batch);
   };
 
   const handlePrint = () => {

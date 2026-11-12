@@ -367,6 +367,7 @@ export const GoodsReceiptDetailPage: FC<{ defaultRole?: UserRole }> = ({
             </div>
           </div>
 
+          {defaultRole !== 'store_owner' && (
           <div
             style={{
               display: 'flex',
@@ -422,6 +423,7 @@ export const GoodsReceiptDetailPage: FC<{ defaultRole?: UserRole }> = ({
               <span>Thủ kho</span>
             </button>
           </div>
+          )}
         </div>
 
         {/* ── 1. HEADER CARD (Thông tin chung & Đối soát Đơn PO gốc) ── */}

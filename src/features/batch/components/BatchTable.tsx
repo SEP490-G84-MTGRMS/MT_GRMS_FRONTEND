@@ -4,8 +4,6 @@ import {
   ArrowUpDown,
   PackageOpen,
   Eye,
-  Tag,
-  Trash2,
   AlertTriangle,
   ClipboardCheck,
 } from 'lucide-react';
@@ -67,8 +65,8 @@ export const BatchTable: FC<BatchTableProps> = ({
   onPageChange,
   onPageSizeChange,
   onSelectBatch,
-  onDiscountClick,
-  onWriteOffClick,
+  onDiscountClick: _onDiscountClick,
+  onWriteOffClick: _onWriteOffClick,
   onResetFilters,
 }) => {
   const [sortField, setSortField] = useState<SortField | null>('expiryDate');
@@ -520,34 +518,18 @@ export const BatchTable: FC<BatchTableProps> = ({
                             type="button"
                             className="so-list-action-btn so-list-action-btn--icon"
                             onClick={() => onQuickStocktake(row)}
-                            title="Kiểm kê lô hàng này"
+                            title={
+                              row.status === 'Expired' || row.status === 'Critical'
+                                ? 'Kiểm kê / xuất hủy'
+                                : 'Kiểm kê lô hàng này'
+                            }
                             aria-label="Kiểm kê lô hàng"
-                            style={{ color: '#0f766e', borderColor: '#99f6e4' }}
+                            style={{
+                              color: row.status === 'Expired' ? '#dc2626' : '#0f766e',
+                              borderColor: row.status === 'Expired' ? '#fecaca' : '#99f6e4',
+                            }}
                           >
                             <ClipboardCheck size={14} />
-                          </button>
-                        )}
-                        {(row.status === 'Warning' || row.status === 'Critical') && (
-                          <button
-                            type="button"
-                            className="so-list-action-btn so-list-action-btn--icon"
-                            onClick={() => onDiscountClick(row)}
-                            title="Giảm giá FEFO"
-                            aria-label="Giảm giá"
-                            style={{ color: '#1d4ed8', borderColor: '#bfdbfe' }}
-                          >
-                            <Tag size={14} />
-                          </button>
-                        )}
-                        {(row.status === 'Expired' || row.status === 'Critical') && (
-                          <button
-                            type="button"
-                            className="so-list-action-btn so-list-action-btn--icon so-list-action-btn--danger"
-                            onClick={() => onWriteOffClick(row)}
-                            title="Xuất hủy"
-                            aria-label="Xuất hủy"
-                          >
-                            <Trash2 size={14} />
                           </button>
                         )}
                       </div>

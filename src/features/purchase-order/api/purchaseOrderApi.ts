@@ -123,6 +123,7 @@ export interface PurchaseOrderListApiItem {
   totalAmount: number;
   note?: string;
   createdAt: string;
+  createdByRole?: string;
   activeGoodsReceiptId?: string | null;
   activeGoodsReceiptCode?: string | null;
   activeGoodsReceiptStatus?: string | null;
@@ -155,6 +156,7 @@ export const purchaseOrderApi = {
     status?: string;
     dateFrom?: string;
     dateTo?: string;
+    keyword?: string;
     pageIndex?: number;
     pageSize?: number;
   }): Promise<PurchaseOrderPagedResult> {
@@ -165,6 +167,7 @@ export const purchaseOrderApi = {
         Status: params.status && params.status !== 'all' ? params.status : undefined,
         DateFrom: params.dateFrom || undefined,
         DateTo: params.dateTo || undefined,
+        Keyword: params.keyword?.trim() || undefined,
         PageIndex: params.pageIndex ?? 1,
         PageSize: params.pageSize ?? 10,
       },
@@ -296,30 +299,11 @@ export const purchaseOrderApi = {
           status: d.status || 'DRAFT',
         };
       }
-    } catch {
-      // Fallback
+      throw new Error(res.data?.message || 'Không tải được ma trận đặt hàng.');
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { message?: string } }; message?: string };
+      throw new Error(e.response?.data?.message || e.message || 'Không tải được ma trận đặt hàng.');
     }
-
-    const localKey = `matrix_draft_${branchId}_${supplierId || 'ALL'}`;
-    let cachedMap: MatrixCellMap = {};
-    try {
-      const raw = localStorage.getItem(localKey);
-      if (raw) {
-        cachedMap = JSON.parse(raw);
-      }
-    } catch {
-      // ignore
-    }
-
-    return {
-      products: [],
-      cellMap: cachedMap,
-      supplierConfigs: [],
-      dayStatuses: [],
-      branchIsActive: true,
-      serverNow: new Date().toISOString(),
-      status: 'DRAFT',
-    };
   },
 
   /**

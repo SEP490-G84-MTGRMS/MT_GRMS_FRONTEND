@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import type { FC } from 'react';
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import dayjs from 'dayjs';
@@ -152,6 +152,17 @@ function mapServerStatus(status?: string): DayCutoffStatus {
     default:
       return 'OPEN';
   }
+}
+
+
+function tokenMatches(value: string | undefined, tokens: string[]): boolean {
+  if (!tokens.length) return true;
+  const hay = (value || '').toLowerCase();
+  return tokens.some((t) => {
+    const needle = t.trim().toLowerCase();
+    if (!needle) return true;
+    return hay === needle || hay.includes(needle);
+  });
 }
 
 // Compute dynamic day columns — ưu tiên DayStatuses từ BE (OpenSpec §4.4)
@@ -359,7 +370,11 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
     GUID_RE.test(branchParam) ? branchParam : ''
   );
 
-  const [selectedSupplierId, setSelectedSupplierId] = useState<string>(initialSupplier);
+  const [supplierCodes, setSupplierCodes] = useState<string[]>([]);
+  const [supplierNames, setSupplierNames] = useState<string[]>([]);
+  const [productSkus, setProductSkus] = useState<string[]>([]);
+  const [productNames, setProductNames] = useState<string[]>([]);
+  const supplierFilterSeededRef = useRef(false);
   const [viewFrom, setViewFrom] = useState<Date>(initialViewFrom);
   const [dateFromInput, setDateFromInput] = useState<string>(initialToday);
   const [dateToInput, setDateToInput] = useState<string>(() =>
@@ -367,7 +382,6 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
   );
 
   // State: Secondary Filters
-  const [keyword, setKeyword] = useState<string>('');
   const [moqOnly, setMoqOnly] = useState<boolean>(false);
   const [orderedOnly, setOrderedOnly] = useState<boolean>(false);
   const [ownerModifiedOnly, setOwnerModifiedOnly] = useState<boolean>(false);
@@ -377,6 +391,21 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
   const [matrixProducts, setMatrixProducts] = useState<OrderMatrixProduct[]>([]);
   const [supplierConfigs, setSupplierConfigs] = useState<OrderMatrixSupplierDeliveryConfig[]>([]);
   const [, setIsLoadingMatrix] = useState<boolean>(false);
+
+  /** NCC khớp filter mã/tên (AND giữa 2 field; empty = tất cả). */
+  const matchedSupplierIds = useMemo(() => {
+    if (!supplierCodes.length && !supplierNames.length) return null as string[] | null;
+    return suppliers
+      .filter((s) => tokenMatches(s.code, supplierCodes) && tokenMatches(s.name, supplierNames))
+      .map((s) => s.id);
+  }, [suppliers, supplierCodes, supplierNames]);
+
+  /** Key cho dayColumns / Excel: 1 NCC → id đó; 0 hoặc nhiều → ALL. */
+  const selectedSupplierId = useMemo(() => {
+    if (!matchedSupplierIds) return 'ALL';
+    if (matchedSupplierIds.length === 1) return matchedSupplierIds[0];
+    return 'ALL';
+  }, [matchedSupplierIds]);
 
   const isCellEditable = (d: DayColInfo, product?: OrderMatrixProduct) => {
     if (!branchIsActive) return false;
@@ -561,15 +590,25 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
         }
         const nextSuppliers = suppliersFromMatrix(res.products || [], res.supplierConfigs || []);
         setSuppliers(nextSuppliers);
+        // Seed filter từ ?supplier= đúng một lần (không ghi đè khi user đã xóa filter)
+        if (!supplierFilterSeededRef.current && initialSupplier && initialSupplier !== 'ALL') {
+          const seeded = nextSuppliers.find((s) => s.id === initialSupplier);
+          if (seeded) {
+            supplierFilterSeededRef.current = true;
+            if (seeded.code) setSupplierCodes([seeded.code]);
+            if (seeded.name) setSupplierNames([seeded.name]);
+          }
+        }
         if (res.branchIsActive === false) {
           showToast('Chi nhánh đang ngừng hoạt động — ma trận chỉ xem, không chỉnh sửa/chốt.', 'warning');
         }
-      } catch {
+      } catch (err: unknown) {
         if (!isMounted) return;
         setMatrixProducts([]);
         setCellMap({});
         setDayStatuses([]);
-        showToast('Không tải được sản phẩm theo chi nhánh cho ma trận đặt hàng.', 'error');
+        const e = err as { message?: string };
+        showToast(e.message || 'Không tải được sản phẩm theo chi nhánh cho ma trận đặt hàng.', 'error');
       } finally {
         if (isMounted) setIsLoadingMatrix(false);
       }
@@ -727,12 +766,13 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
 
   // Filtered Products
   const filteredProducts = useMemo(() => {
-    const kw = keyword.trim().toLowerCase();
     return matrixProducts.filter((p) => {
-      if (selectedSupplierId !== 'ALL' && p.supplierId !== selectedSupplierId) return false;
-      if (kw && !p.name.toLowerCase().includes(kw) && !p.sku.toLowerCase().includes(kw)) {
-        return false;
-      }
+      if (matchedSupplierIds && !matchedSupplierIds.includes(p.supplierId)) return false;
+      const sup = suppliers.find((s) => s.id === p.supplierId);
+      if (!tokenMatches(sup?.code || p.supplierName, supplierCodes)) return false;
+      if (!tokenMatches(sup?.name || p.supplierName, supplierNames)) return false;
+      if (!tokenMatches(p.sku, productSkus)) return false;
+      if (!tokenMatches(p.name, productNames)) return false;
       if (moqOnly) {
         const hasMoqFail = dayColumns.some((d) => {
           const q = cellMap[`${p.id}__${p.supplierId || 'none'}`]?.[d.dateKey]?.finalQty || 0;
@@ -757,8 +797,12 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
     });
   }, [
     matrixProducts,
-    selectedSupplierId,
-    keyword,
+    matchedSupplierIds,
+    suppliers,
+    supplierCodes,
+    supplierNames,
+    productSkus,
+    productNames,
     moqOnly,
     orderedOnly,
     ownerModifiedOnly,
@@ -770,9 +814,9 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
   const { moqFails } = useMemo(() => {
     const fails: string[] = [];
     const activeProducts =
-      selectedSupplierId === 'ALL'
+      !matchedSupplierIds
         ? matrixProducts
-        : matrixProducts.filter((p) => p.supplierId === selectedSupplierId);
+        : matrixProducts.filter((p) => matchedSupplierIds.includes(p.supplierId));
 
     activeProducts.forEach((p) => {
       dayColumns.forEach((d) => {
@@ -784,7 +828,7 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
     });
 
     return { moqFails: fails };
-  }, [dayColumns, cellMap, selectedSupplierId, matrixProducts]);
+  }, [dayColumns, cellMap, matchedSupplierIds, matrixProducts]);
 
   // Change duration preset (7, 14, 21, 31)
   const handleSelectDuration = (days: number) => {
@@ -908,9 +952,9 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
     let copyCount = 0;
     let skipped = 0;
     const relevantProducts =
-      selectedSupplierId === 'ALL'
+      !matchedSupplierIds
         ? matrixProducts
-        : matrixProducts.filter((p) => p.supplierId === selectedSupplierId);
+        : matrixProducts.filter((p) => matchedSupplierIds.includes(p.supplierId));
 
     relevantProducts.forEach((p) => {
       if (p.isRowDisabled) return;
@@ -1232,9 +1276,9 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
     };
 
     const activeSuppliers =
-      selectedSupplierId === 'ALL'
+      !matchedSupplierIds
         ? suppliers
-        : suppliers.filter((s) => s.id === selectedSupplierId);
+        : suppliers.filter((s) => matchedSupplierIds.includes(s.id));
 
     activeSuppliers.forEach((sup) => {
       const supProducts = matrixProducts.filter((p) => p.supplierId === sup.id);
@@ -1452,8 +1496,10 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
         fixedBranchLabel={branches.find((b) => b.id === selectedBranchId)?.name}
         onSelectBranch={(id) => {
           setSelectedBranchId(id);
-          setSelectedSupplierId('ALL');
-          setKeyword('');
+          setSupplierCodes([]);
+          setSupplierNames([]);
+          setProductSkus([]);
+          setProductNames([]);
           setCellMap({});
           setIsDirty(false);
           // Đồng bộ URL để quay lại / reload vẫn đúng CN (và khớp luồng từ màn branches)
@@ -1467,10 +1513,15 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
           }
         }}
         suppliers={suppliers}
-        selectedSupplierId={selectedSupplierId}
-        onSelectSupplier={(id) => {
-          setSelectedSupplierId(id);
-        }}
+        supplierCodes={supplierCodes}
+        onSupplierCodesChange={setSupplierCodes}
+        supplierNames={supplierNames}
+        onSupplierNamesChange={setSupplierNames}
+        products={matrixProducts}
+        productSkus={productSkus}
+        onProductSkusChange={setProductSkus}
+        productNames={productNames}
+        onProductNamesChange={setProductNames}
         dateFrom={dateFromInput}
         dateTo={dateToInput}
         onDateFromChange={(val) => setDateFromInput(val)}
@@ -1478,8 +1529,6 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
         onApplyRange={handleApplyRange}
         durationDays={durationDays}
         onSelectDuration={handleSelectDuration}
-        keyword={keyword}
-        onKeywordChange={(kw) => setKeyword(kw)}
         moqOnly={moqOnly}
         onMoqOnlyChange={(checked) => setMoqOnly(checked)}
         orderedOnly={orderedOnly}
@@ -1491,7 +1540,10 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
         showSoh={showSoh}
         onShowSohChange={(checked) => setShowSoh(checked)}
         onResetFilters={() => {
-          setKeyword('');
+          setSupplierCodes([]);
+          setSupplierNames([]);
+          setProductSkus([]);
+          setProductNames([]);
           setMoqOnly(false);
           setOrderedOnly(false);
           setOwnerModifiedOnly(false);

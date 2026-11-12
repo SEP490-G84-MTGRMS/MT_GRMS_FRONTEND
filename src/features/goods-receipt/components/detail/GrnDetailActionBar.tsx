@@ -2,8 +2,6 @@ import type { FC } from 'react';
 import {
   ArrowLeft,
   CheckCircle2,
-  Printer,
-  Barcode,
   List,
 } from 'lucide-react';
 import type { GrnStatus } from '../../types/grn.types';
@@ -26,8 +24,8 @@ export const GrnDetailActionBar: FC<GrnDetailActionBarProps> = ({
   onBackToEdit,
   onBackToList,
   onConfirmGrn,
-  onPrintGrn,
-  onPrintLabels,
+  onPrintGrn: _onPrintGrn,
+  onPrintLabels: _onPrintLabels,
 }) => {
   const isDraftOrConfirming = isConfirmationMode || status === 'DRAFT';
 
@@ -84,28 +82,7 @@ export const GrnDetailActionBar: FC<GrnDetailActionBarProps> = ({
 
       {/* Right side actions */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        {/* Print Buttons */}
-        <button
-          type="button"
-          onClick={onPrintLabels}
-          className="po-btn po-btn-outline"
-          style={{ height: 38, padding: '0 14px', fontSize: 13, gap: 6 }}
-          title="In tem mã vạch và thông tin lô hàng dán lên kệ"
-        >
-          <Barcode size={16} color="#0f766e" />
-          <span>In tem mã vạch</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={onPrintGrn}
-          className="po-btn po-btn-outline"
-          style={{ height: 38, padding: '0 14px', fontSize: 13, gap: 6 }}
-          title="In phiếu nhập kho A4/A5 để ký nhận"
-        >
-          <Printer size={16} color="#0f766e" />
-          <span>In phiếu nhập kho</span>
-        </button>
+        {/* H5: ẩn PRINT stub */}
 
         {/* Post Button for Confirmation / Draft */}
         {isDraftOrConfirming && (

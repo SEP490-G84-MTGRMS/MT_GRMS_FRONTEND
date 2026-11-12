@@ -39,6 +39,7 @@ const canShowReceiveAction = (order: PurchaseOrderListItem): boolean => {
     return false;
   }
   return (
+    order.status === 'PENDING_APPROVAL' ||
     order.status === 'SENT' ||
     order.status === 'CONFIRMED' ||
     order.status === 'APPROVED' ||
@@ -604,7 +605,12 @@ export const PoListTable: FC<PoListTableProps> = ({
                           <Eye size={12} />
                         </button>
 
-                        {(order.status === 'SENT' || order.status === 'CONFIRMED') && onEditOrder && (
+                        {(order.status === 'SENT' ||
+                          order.status === 'CONFIRMED' ||
+                          order.status === 'PENDING_APPROVAL' ||
+                          order.status === 'DISPATCHED' ||
+                          order.status === 'APPROVED') &&
+                          onEditOrder && (
                           <button
                             type="button"
                             onClick={(e) => {
