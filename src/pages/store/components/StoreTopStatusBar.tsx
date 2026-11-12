@@ -36,10 +36,10 @@ export const StoreTopStatusBar: FC<StoreTopStatusBarProps> = ({
         </div>
       </div>
 
-      {/* 3. Ngành hàng */}
+      {/* 3. Tên cửa hàng */}
       <div className="store-status-col">
-        <span className="store-status-label">Ngành hàng</span>
-        <div className="store-status-value">{storeInfo.industry}</div>
+        <span className="store-status-label">Tên cửa hàng</span>
+        <div className="store-status-value">{storeInfo.name}</div>
       </div>
 
       {/* 4. Hạn sử dụng còn */}

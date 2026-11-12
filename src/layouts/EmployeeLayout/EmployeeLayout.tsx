@@ -1,6 +1,7 @@
 import type { FC } from 'react';
 import { Outlet, Navigate } from 'react-router-dom';
 import { AppTopNav } from './AppTopNav';
+import { ProtectedRoute } from '../../components/auth/ProtectedRoute';
 import { useAuthStore } from '../../stores/useAuthStore';
 
 export const EmployeeLayout: FC = () => {
@@ -39,7 +40,9 @@ export const EmployeeLayout: FC = () => {
           minHeight: 0,
         }}
       >
-        <Outlet />
+        <ProtectedRoute>
+          <Outlet />
+        </ProtectedRoute>
       </main>
     </div>
   );
