@@ -167,6 +167,8 @@ export const StoreOwnerPurchaseOrderListPage: FC = () => {
           activeGoodsReceiptId: po.activeGoodsReceiptId ?? null,
           activeGoodsReceiptCode: po.activeGoodsReceiptCode ?? null,
           activeGoodsReceiptStatus: po.activeGoodsReceiptStatus ?? null,
+          sourceType: po.sourceType ?? null,
+          sourceSupplierReturnId: po.sourceSupplierReturnId ?? null,
           items: (po.details ?? []).map((d) => ({
             id: d.id,
             name: d.productName,
@@ -270,8 +272,15 @@ export const StoreOwnerPurchaseOrderListPage: FC = () => {
 
     const grnStatus = (order.activeGoodsReceiptStatus || '').toUpperCase();
     const grnId = order.activeGoodsReceiptId;
+    const isExchange =
+      String(order.sourceType || '').toUpperCase() === 'SUPPLIER_RETURN';
 
-    if (grnId && grnStatus === 'COMPLETED') {
+    // PO đổi hàng nhận nhiều đợt: nếu còn PARTIALLY_RECEIVED thì tạo GRN mới, không khóa vào GRN cũ.
+    if (
+      grnId &&
+      grnStatus === 'COMPLETED' &&
+      !(isExchange && order.status === 'PARTIALLY_RECEIVED')
+    ) {
       showToast(`PO ${order.poCode} đã nhập kho (${order.activeGoodsReceiptCode}). Mở phiếu nhập.`, 'info');
       navigate(`/store-owner/goods-receipts/${grnId}`);
       return;

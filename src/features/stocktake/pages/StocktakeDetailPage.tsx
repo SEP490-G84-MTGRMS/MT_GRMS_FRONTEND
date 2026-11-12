@@ -1147,7 +1147,9 @@ export const StocktakeDetailPage: FC<{ defaultRole?: 'store_owner' | 'employee' 
                   }}
                 >
                   <option value="DEDUCT_INVOICE">Cấn trừ công nợ / Hóa đơn (DEDUCT_INVOICE)</option>
-                  <option value="REPLACE_GOODS">Đổi hàng bù từ NCC (REPLACE_GOODS)</option>
+                  <option value="REPLACE_GOODS">
+                    Đổi hàng bù từ NCC (trừ tồn lúc bàn giao → PO → GRN)
+                  </option>
                   <option value="REFUND">Hoàn tiền mặt / Chuyển khoản (REFUND)</option>
                   <option value="SUPPLIER_CREDIT">Ghi nhận Credit Note (SUPPLIER_CREDIT)</option>
                 </select>

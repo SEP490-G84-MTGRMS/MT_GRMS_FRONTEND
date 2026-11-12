@@ -9,6 +9,7 @@ import type {
   RecordSupplierResponsePayload,
   CompleteHandoverPayload,
   CancelSupplierReturnPayload,
+  ExchangePurchaseOrderSummary,
 } from '../types/supplierReturn.types';
 import {
   MOCK_SUPPLIER_RETURNS,
@@ -296,5 +297,26 @@ export const supplierReturnApi = {
     ret.status = 'CANCELLED';
     ret.cancellationReason = payload.reason;
     return ret;
+  },
+
+  async createExchangePurchaseOrders(id: string): Promise<ExchangePurchaseOrderSummary[]> {
+    const res = await httpClient.post(`/supplier-returns/${id}/exchange-purchase-orders`);
+    const data = res.data?.data;
+    if (!data) throw new Error(res.data?.message || 'Không tạo được PO đổi hàng.');
+    return Array.isArray(data) ? data : [data];
+  },
+
+  async getRelatedPurchaseOrders(id: string): Promise<ExchangePurchaseOrderSummary[]> {
+    const res = await httpClient.get(`/supplier-returns/${id}/purchase-orders`);
+    return res.data?.data || [];
+  },
+
+  async recordCostSharePayment(
+    id: string,
+    payload: { amount: number; note?: string }
+  ): Promise<SupplierReturnDetail> {
+    const res = await httpClient.post(`/supplier-returns/${id}/cost-share-payments`, payload);
+    if (!res.data?.data) throw new Error(res.data?.message || 'Không ghi nhận được thanh toán.');
+    return res.data.data;
   },
 };

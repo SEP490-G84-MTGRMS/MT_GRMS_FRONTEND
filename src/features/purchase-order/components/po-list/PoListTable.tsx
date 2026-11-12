@@ -26,15 +26,19 @@ interface PoListTableProps {
   onReceiveOrder?: (order: PurchaseOrderListItem) => void;
 }
 
+const isExchangePo = (order: PurchaseOrderListItem): boolean =>
+  String(order.sourceType || '').toUpperCase() === 'SUPPLIER_RETURN';
+
 const canShowReceiveAction = (order: PurchaseOrderListItem): boolean => {
   const grn = (order.activeGoodsReceiptStatus || '').toUpperCase();
-  // Đã có GRN COMPLETED → vẫn hiện nút để xem phiếu nhập
+  // Đã có GRN COMPLETED → vẫn hiện nút để xem phiếu nhập (hoặc nhập tiếp nếu PO đổi hàng partial)
   if (grn === 'COMPLETED' && order.activeGoodsReceiptId) return true;
   if (grn === 'DRAFT') return true;
   if (order.status === 'CANCELLED' || order.status === 'REJECTED') return false;
   if (
     (order.status === 'RECEIVED' || order.status === 'COMPLETED') &&
-    !order.activeGoodsReceiptId
+    !order.activeGoodsReceiptId &&
+    !isExchangePo(order)
   ) {
     return false;
   }
@@ -68,7 +72,20 @@ const resolveDisplayStatus = (
     CANCELLED: { label: 'Đã hủy', bg: '#fef2f2', color: '#dc2626', border: '#fecaca' },
   };
 
-  if (grn === 'COMPLETED' || order.status === 'RECEIVED' || order.status === 'COMPLETED') {
+  if (order.status === 'PARTIALLY_RECEIVED' || (isExchangePo(order) && order.status === 'PARTIALLY_RECEIVED')) {
+    return byStatus.PARTIALLY_RECEIVED;
+  }
+  if (
+    !isExchangePo(order) &&
+    (grn === 'COMPLETED' || order.status === 'RECEIVED' || order.status === 'COMPLETED')
+  ) {
+    return { label: 'Đã nhập kho', bg: '#f0fdf4', color: '#15803d', border: '#bbf7d0' };
+  }
+  if (
+    isExchangePo(order) &&
+    (order.status === 'RECEIVED' || order.status === 'COMPLETED') &&
+    grn === 'COMPLETED'
+  ) {
     return { label: 'Đã nhập kho', bg: '#f0fdf4', color: '#15803d', border: '#bbf7d0' };
   }
   if (grn === 'DRAFT') {
@@ -86,7 +103,12 @@ const resolveDisplayStatus = (
 
 const receiveActionTitle = (order: PurchaseOrderListItem): string => {
   const grn = (order.activeGoodsReceiptStatus || '').toUpperCase();
-  if (grn === 'COMPLETED') return `Xem phiếu nhập ${order.activeGoodsReceiptCode || ''}`.trim();
+  if (isExchangePo(order) && order.status === 'PARTIALLY_RECEIVED') {
+    return 'Nhận tiếp hàng đổi trên cùng PO';
+  }
+  if (grn === 'COMPLETED' && !isExchangePo(order)) {
+    return `Xem phiếu nhập ${order.activeGoodsReceiptCode || ''}`.trim();
+  }
   if (!isDeliveryDateReached(order.deliveryDate)) {
     return formatDeliveryDateGateMessage(order.deliveryDate);
   }
@@ -465,6 +487,29 @@ export const PoListTable: FC<PoListTableProps> = ({
                         >
                           {order.poCode}
                         </span>
+                        {String(order.sourceType || '').toUpperCase() === 'SUPPLIER_RETURN' && (
+                          <span
+                            style={{
+                              display: 'inline-flex',
+                              alignSelf: 'flex-start',
+                              marginTop: 2,
+                              padding: '1px 6px',
+                              borderRadius: 999,
+                              fontSize: 10,
+                              fontWeight: 700,
+                              color: '#0369a1',
+                              background: '#e0f2fe',
+                              border: '1px solid #7dd3fc',
+                            }}
+                            title={
+                              order.sourceSupplierReturnId
+                                ? `PO đổi hàng từ phiếu trả ${order.sourceSupplierReturnId}`
+                                : 'PO đổi hàng từ phiếu trả NCC'
+                            }
+                          >
+                            Đổi hàng NCC
+                          </span>
+                        )}
                         {order.revisionNumber != null && order.revisionNumber > 1 && (
                           <span style={{ fontSize: 11, fontWeight: 700, color: '#0369a1' }}>
                             Rev {order.revisionNumber}

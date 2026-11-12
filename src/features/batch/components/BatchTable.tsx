@@ -15,9 +15,6 @@ interface BatchTableProps {
   totalCount: number;
   pageIndex: number;
   pageSize: number;
-  selectedIds?: string[];
-  onToggleSelect?: (batch: BatchItem) => void;
-  onToggleSelectAll?: (batches: BatchItem[]) => void;
   onQuickStocktake?: (batch: BatchItem) => void;
   onPageChange: (newPage: number) => void;
   onPageSizeChange: (newSize: number) => void;
@@ -58,9 +55,6 @@ export const BatchTable: FC<BatchTableProps> = ({
   totalCount,
   pageIndex,
   pageSize,
-  selectedIds = [],
-  onToggleSelect,
-  onToggleSelectAll,
   onQuickStocktake,
   onPageChange,
   onPageSizeChange,
@@ -163,10 +157,7 @@ export const BatchTable: FC<BatchTableProps> = ({
     }
   };
 
-  const allCurrentSelected =
-    sortedBatches.length > 0 && sortedBatches.every((b) => selectedIds.includes(b.id));
-
-  const tableMinWidth = 1640;
+  const tableMinWidth = 1600;
   const tableFitStyle: CSSProperties = {
     minWidth: tableMinWidth,
     width: '100%',
@@ -175,7 +166,6 @@ export const BatchTable: FC<BatchTableProps> = ({
 
   const tableColGroup = (
     <colgroup>
-      <col style={{ width: 40 }} />
       <col style={{ width: 120 }} />
       <col style={{ width: 200 }} />
       <col style={{ width: 110 }} />
@@ -301,17 +291,6 @@ export const BatchTable: FC<BatchTableProps> = ({
           {tableColGroup}
           <thead>
             <tr>
-              <th style={{ ...thBaseStyle, textAlign: 'center', padding: '10px 6px' }}>
-                {onToggleSelectAll && (
-                  <input
-                    type="checkbox"
-                    checked={allCurrentSelected}
-                    onChange={() => onToggleSelectAll(sortedBatches)}
-                    title="Chọn tất cả lô trên trang để kiểm kê"
-                    style={{ cursor: 'pointer', width: 14, height: 14, accentColor: '#0f766e' }}
-                  />
-                )}
-              </th>
               <SortTh field="sku" label="Mã SKU" />
               <SortTh field="productName" label="Tên sản phẩm" />
               <SortTh field="batchCode" label="Mã lô" />
@@ -343,7 +322,7 @@ export const BatchTable: FC<BatchTableProps> = ({
             {sortedBatches.length === 0 ? (
               <tr>
                 <td
-                  colSpan={16}
+                  colSpan={15}
                   style={{
                     padding: '48px 16px',
                     textAlign: 'center',
@@ -379,24 +358,8 @@ export const BatchTable: FC<BatchTableProps> = ({
               </tr>
             ) : (
               sortedBatches.map((row) => {
-                const isSelected = selectedIds.includes(row.id);
                 return (
-                  <tr
-                    key={row.id}
-                    className="so-list-row"
-                    style={isSelected ? { backgroundColor: '#f0fdfa' } : undefined}
-                  >
-                    <td style={{ textAlign: 'center', padding: '8px 6px' }}>
-                      {onToggleSelect && (
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={() => onToggleSelect(row)}
-                          title="Chọn lô này để kiểm kê"
-                          style={{ cursor: 'pointer', width: 14, height: 14, accentColor: '#0f766e' }}
-                        />
-                      )}
-                    </td>
+                  <tr key={row.id} className="so-list-row">
                     <td style={{ fontFamily: 'var(--font-mono, monospace)', fontSize: 12, color: '#334155' }}>
                       {row.sku}
                     </td>

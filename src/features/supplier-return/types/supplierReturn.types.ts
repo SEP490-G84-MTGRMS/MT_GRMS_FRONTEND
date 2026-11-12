@@ -54,6 +54,13 @@ export interface SupplierReturnListItem {
   stocktakeCode?: string | null;
   resolutionType?: string | null;
   settlementStatus?: string | null;
+  replacementStatus?: string | null;
+  storeCostSharePercentSnapshot?: number | null;
+  supplierCostSharePercentSnapshot?: number | null;
+  replacementValue?: number;
+  storePayableAmount?: number;
+  storePaidAmount?: number;
+  supplierBearAmount?: number;
 }
 
 export interface SupplierReturnDetail extends SupplierReturnListItem {
@@ -65,6 +72,16 @@ export interface SupplierReturnDetail extends SupplierReturnListItem {
   respondedAt?: string;
   handedOverBy?: string;
   lines: SupplierReturnLine[];
+}
+
+export interface ExchangePurchaseOrderSummary {
+  id: string;
+  code: string;
+  status: string;
+  totalQty: number;
+  totalAmount: number;
+  deliveryDate?: string | null;
+  createdAt: string;
 }
 
 export interface EligibleGrnLookup {

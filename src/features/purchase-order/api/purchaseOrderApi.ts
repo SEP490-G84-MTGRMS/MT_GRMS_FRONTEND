@@ -127,6 +127,8 @@ export interface PurchaseOrderListApiItem {
   activeGoodsReceiptId?: string | null;
   activeGoodsReceiptCode?: string | null;
   activeGoodsReceiptStatus?: string | null;
+  sourceType?: string | null;
+  sourceSupplierReturnId?: string | null;
   details: Array<{
     id: string;
     productId: string;
@@ -541,6 +543,8 @@ export const purchaseOrderApi = {
         totalAmount: Number(po.totalAmount || 0),
         status: (po.status as PurchaseOrderStatus) || 'PENDING_APPROVAL',
         note: po.note || '',
+        sourceType: po.sourceType || null,
+        sourceSupplierReturnId: po.sourceSupplierReturnId || null,
         items: (po.details || []).map((d: any) => ({
           id: d.id,
           name: d.productName,
@@ -589,6 +593,8 @@ export const purchaseOrderApi = {
         totalAmount: Number(po.totalAmount || 0),
         status: (po.status as PurchaseOrderStatus) || 'PENDING_APPROVAL',
         note: po.note || '',
+        sourceType: po.sourceType || null,
+        sourceSupplierReturnId: po.sourceSupplierReturnId || null,
         items: (po.details || []).map((d: any) => ({
           id: d.id,
           name: d.productName,

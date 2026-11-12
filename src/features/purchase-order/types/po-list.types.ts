@@ -45,6 +45,9 @@ export interface PurchaseOrderListItem {
   activeGoodsReceiptId?: string | null;
   activeGoodsReceiptCode?: string | null;
   activeGoodsReceiptStatus?: string | null;
+  /** null/MANUAL_MATRIX = mua thường; SUPPLIER_RETURN = đổi hàng từ phiếu trả */
+  sourceType?: string | null;
+  sourceSupplierReturnId?: string | null;
   items: PurchaseOrderItemDetail[];
 }
 
