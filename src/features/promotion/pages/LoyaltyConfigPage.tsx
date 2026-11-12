@@ -4,11 +4,10 @@ import { Award, Settings, History, Save } from 'lucide-react';
 import { AdminToast, type ToastState } from '../../admin/components';
 import { LoyaltyConfigForm } from '../components/loyalty/LoyaltyConfigForm';
 import { LoyaltyLedgerTable } from '../components/loyalty/LoyaltyLedgerTable';
-import { AdjustPointsModal } from '../components/loyalty/AdjustPointsModal';
+import { AdjustPointsModal, type AdjustPointsFormData } from '../components/loyalty/AdjustPointsModal';
 import { promotionApi } from '../api/promotionApi';
 import {
   INITIAL_LOYALTY_CONFIG,
-  INITIAL_POINT_LEDGER,
 } from '../mock/promotionMockData';
 import type {
   LoyaltySystemConfig,
@@ -19,9 +18,10 @@ import '../promotion.css';
 export const LoyaltyConfigPage: FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [config, setConfig] = useState<LoyaltySystemConfig>(INITIAL_LOYALTY_CONFIG);
-  const [ledger, setLedger] = useState<PointLedgerItem[]>(INITIAL_POINT_LEDGER);
+  const [ledger, setLedger] = useState<PointLedgerItem[]>([]);
   const [isAdjustModalOpen, setIsAdjustModalOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [validationErrors, setValidationErrors] = useState<string[]>([]);
 
   useEffect(() => {
     promotionApi.getLoyaltyConfig()
@@ -41,6 +41,18 @@ export const LoyaltyConfigPage: FC = () => {
       })
       .catch(() => {
         // Fallback to default initial config
+      });
+  }, []);
+
+  useEffect(() => {
+    promotionApi.getLoyaltyLedger()
+      .then((items) => setLedger(items.map((item) => ({
+        ...item,
+        createdAt: new Date(item.createdAt).toLocaleString('vi-VN'),
+      }))))
+      .catch(() => {
+        setLedger([]);
+        showToast('Không thể tải sổ cái điểm từ máy chủ', 'error');
       });
   }, []);
 
@@ -77,6 +89,17 @@ export const LoyaltyConfigPage: FC = () => {
   };
 
   const handleSaveConfig = async () => {
+    const errors: string[] = [];
+    if (config.earningRateAmount <= 0) errors.push('Số tiền tích điểm phải lớn hơn 0');
+    if (!Number.isInteger(config.earningPoints) || config.earningPoints <= 0) errors.push('Điểm được cộng phải là số nguyên dương');
+    if (!Number.isInteger(config.redemptionRatePoints) || config.redemptionRatePoints <= 0) errors.push('Điểm quy đổi phải là số nguyên dương');
+    if (config.redemptionRateAmount <= 0) errors.push('Giá trị quy đổi phải lớn hơn 0');
+    if (!Number.isInteger(config.minRedemptionPoints) || config.minRedemptionPoints < 0) errors.push('Điểm đổi tối thiểu phải là số nguyên không âm');
+    if (errors.length) {
+      setValidationErrors(errors);
+      return;
+    }
+    setValidationErrors([]);
     try {
       setIsSaving(true);
       await promotionApi.updateLoyaltyConfig({
@@ -96,11 +119,20 @@ export const LoyaltyConfigPage: FC = () => {
     }
   };
 
-  const handleSaveAdjustment = (entry: PointLedgerItem) => {
-    setLedger((prev) => [entry, ...prev]);
-    showToast(
-      `Đã điều chỉnh ${entry.pointsChanged > 0 ? '+' : ''}${entry.pointsChanged} điểm cho khách hàng ${entry.customerName}!`
-    );
+  const handleSaveAdjustment = async (form: AdjustPointsFormData) => {
+    try {
+      const entry = await promotionApi.adjustLoyaltyPoints(form);
+      if (!entry) throw new Error('Máy chủ không trả về giao dịch vừa tạo');
+      setLedger((prev) => [{
+        ...entry,
+        createdAt: new Date(entry.createdAt).toLocaleString('vi-VN'),
+      }, ...prev]);
+      showToast('Điều chỉnh điểm và cập nhật sổ cái thành công!');
+    } catch (error: any) {
+      const message = error?.response?.data?.message || error?.response?.data?.error?.message || 'Không thể điều chỉnh điểm. Vui lòng kiểm tra khách hàng và số dư điểm.';
+      showToast(message, 'error');
+      throw error;
+    }
   };
 
   return (
@@ -182,11 +214,24 @@ export const LoyaltyConfigPage: FC = () => {
 
         {/* Main Content Area based on Tab */}
         {activeTab === 'config' ? (
-          <LoyaltyConfigForm
-            config={config}
-            onChange={setConfig}
-            onSave={handleSaveConfig}
-          />
+          <>
+            {validationErrors.length > 0 && (
+              <div role="alert" className="promo-validation-summary">
+                <strong>Vui lòng kiểm tra lại thiết lập tích điểm:</strong>
+                <ul>
+                  {validationErrors.map((error) => <li key={error}>{error}</li>)}
+                </ul>
+              </div>
+            )}
+            <LoyaltyConfigForm
+              config={config}
+              onChange={(nextConfig) => {
+                setConfig(nextConfig);
+                if (validationErrors.length) setValidationErrors([]);
+              }}
+              onSave={handleSaveConfig}
+            />
+          </>
         ) : (
           <LoyaltyLedgerTable
             ledger={ledger}

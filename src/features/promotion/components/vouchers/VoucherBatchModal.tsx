@@ -33,8 +33,10 @@ export const VoucherBatchModal: FC<VoucherBatchModalProps> = ({
   );
   const [description, setDescription] = useState('');
   const [allowWithPromotions, setAllowWithPromotions] = useState(true);
+  const [validationErrors, setValidationErrors] = useState<string[]>([]);
 
   useEffect(() => {
+    setValidationErrors([]);
     if (editingBatch) {
       setName(editingBatch.name);
       setBatchCode(editingBatch.batchCode);
@@ -68,10 +70,24 @@ export const VoucherBatchModal: FC<VoucherBatchModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) {
-      alert('Vui lòng nhập tên đợt voucher!');
+    const errors: string[] = [];
+    if (!name.trim() || name.trim().length > 150) errors.push('Tên đợt voucher phải có từ 1 đến 150 ký tự');
+    if (batchCode.trim() && (batchCode.trim().length > 50 || !/^[A-Za-z0-9_-]+$/.test(batchCode.trim()))) errors.push('Mã đợt tối đa 50 ký tự và chỉ gồm chữ, số, _ hoặc -');
+    if (!prefix.trim() || prefix.trim().length > 20 || !/^[A-Za-z0-9_-]+$/.test(prefix.trim())) errors.push('Tiền tố phải có từ 1 đến 20 ký tự và chỉ gồm chữ, số, _ hoặc -');
+    if (discountValue <= 0) errors.push('Giá trị giảm phải lớn hơn 0');
+    if (discountType === 'PERCENT' && discountValue > 100) errors.push('Tỷ lệ giảm không được vượt quá 100%');
+    if (minOrderValue < 0) errors.push('Đơn tối thiểu không được âm');
+    if (maxDiscount !== undefined && maxDiscount <= 0) errors.push('Giảm tối đa phải lớn hơn 0 hoặc để trống');
+    if (!Number.isInteger(totalQuantity) || totalQuantity < 1 || totalQuantity > 10000) errors.push('Số lượng mã phải là số nguyên từ 1 đến 10.000');
+    const today = new Date().toLocaleDateString('en-CA');
+    if (!editingBatch && startDate < today) errors.push('Ngày bắt đầu không được là ngày trong quá khứ');
+    if (!startDate || !endDate || new Date(endDate) <= new Date(startDate)) errors.push('Ngày hết hạn phải sau ngày bắt đầu');
+    if (description.trim().length > 1000) errors.push('Ghi chú không quá 1.000 ký tự');
+    if (errors.length) {
+      setValidationErrors(errors);
       return;
     }
+    setValidationErrors([]);
 
     if (editingBatch) {
       const updatedBatch: VoucherBatchItem = {
@@ -147,6 +163,14 @@ export const VoucherBatchModal: FC<VoucherBatchModalProps> = ({
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
           <div className="promo-modal-body">
+            {validationErrors.length > 0 && (
+              <div role="alert" className="promo-validation-summary">
+                <strong>Vui lòng kiểm tra lại thông tin:</strong>
+                <ul>
+                  {validationErrors.map((error) => <li key={error}>{error}</li>)}
+                </ul>
+              </div>
+            )}
             <div className="form-grid-2">
               <div className="form-group">
                 <label className="form-label form-label-required">Tên đợt Voucher</label>
@@ -227,11 +251,11 @@ export const VoucherBatchModal: FC<VoucherBatchModalProps> = ({
                 <label className="form-label">Giảm tối đa (VNĐ)</label>
                 <input
                   type="number"
-                  value={maxDiscount || ''}
+                  value={maxDiscount ?? ''}
                   onChange={(e) => setMaxDiscount(e.target.value ? Number(e.target.value) : undefined)}
                   placeholder="Không giới hạn"
                   className="form-input"
-                  disabled={discountType !== 'PERCENT'}
+                  min={1}
                 />
               </div>
 

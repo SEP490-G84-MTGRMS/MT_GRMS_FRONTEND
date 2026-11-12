@@ -312,7 +312,8 @@ export const VoucherBatchTable: FC<VoucherBatchTableProps> = ({
                           <button
                             onClick={() => onDelete(batch.id)}
                             className="btn-table-icon btn-danger-icon"
-                            title="Xóa đợt voucher"
+                            disabled={batch.status === 'ACTIVE'}
+                            title={batch.status === 'ACTIVE' ? 'Hãy tạm dừng đợt voucher trước khi xóa' : 'Xóa đợt voucher'}
                           >
                             <Trash2 size={14} />
                           </button>

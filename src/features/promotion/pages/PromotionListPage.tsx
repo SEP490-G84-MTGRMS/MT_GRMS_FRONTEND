@@ -300,11 +300,16 @@ export const PromotionListPage: FC = () => {
 
   const handleDelete = async (id: string) => {
     const promo = promotions.find((p) => p.id === id);
+    if (promo?.status === 'ACTIVE') {
+      showToast('Không thể xóa chương trình đang chạy. Hãy tạm ngưng chương trình trước.', 'error');
+      return;
+    }
     if (window.confirm('Bạn có chắc chắn muốn xóa chương trình khuyến mãi này không?')) {
       try {
         await promotionApi.deletePromotion(id);
       } catch {
-        // Ignored
+        showToast('Không thể xóa chương trình. Vui lòng kiểm tra trạng thái và thử lại.', 'error');
+        return;
       }
       setPromotions((prev) => prev.filter((item) => item.id !== id));
       showToast(`Đã xóa chương trình "${promo?.name || id}" thành công!`, 'warning');

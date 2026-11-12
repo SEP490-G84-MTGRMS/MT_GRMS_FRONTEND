@@ -279,7 +279,8 @@ export const PromotionTable: FC<PromotionTableProps> = ({
                           <button
                             onClick={() => onDelete(item.id)}
                             className="btn-table-icon btn-danger-icon"
-                            title="Xóa chương trình"
+                            disabled={item.status === 'ACTIVE'}
+                            title={item.status === 'ACTIVE' ? 'Hãy tạm ngưng chương trình trước khi xóa' : 'Xóa chương trình'}
                           >
                             <Trash2 size={14} />
                           </button>

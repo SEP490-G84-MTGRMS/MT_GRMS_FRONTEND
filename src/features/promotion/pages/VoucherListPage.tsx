@@ -104,8 +104,10 @@ export const VoucherListPage: FC = () => {
     });
   }, [batches, filter]);
 
-  const handleToggleBatchStatus = (batchId: string) => {
-    setBatches((prev) =>
+  const handleToggleBatchStatus = async (batchId: string) => {
+    try {
+      await promotionApi.toggleVoucherBatchStatus(batchId);
+      setBatches((prev) =>
       prev.map((b) => {
         if (b.id === batchId) {
           const nextStatus = b.status === 'ACTIVE' ? 'PAUSED' : 'ACTIVE';
@@ -122,7 +124,10 @@ export const VoucherListPage: FC = () => {
         }
         return b;
       })
-    );
+      );
+    } catch {
+      showToast('Không thể cập nhật trạng thái đợt voucher.', 'error');
+    }
   };
 
   const handleOpenCreate = () => {
@@ -135,12 +140,21 @@ export const VoucherListPage: FC = () => {
     setIsCreateModalOpen(true);
   };
 
-  const handleDeleteBatch = (batchId: string) => {
+  const handleDeleteBatch = async (batchId: string) => {
     const target = batches.find((b) => b.id === batchId);
     if (!target) return;
+    if (target.status === 'ACTIVE') {
+      showToast('Không thể xóa đợt voucher đang lưu hành. Hãy tạm dừng trước khi xóa.', 'error');
+      return;
+    }
     if (window.confirm(`Bạn có chắc chắn muốn xóa đợt voucher "${target.name}"?`)) {
-      setBatches((prev) => prev.filter((b) => b.id !== batchId));
-      showToast(`Đã xóa đợt voucher "${target.name}" thành công!`);
+      try {
+        await promotionApi.deleteVoucherBatch(batchId);
+        setBatches((prev) => prev.filter((b) => b.id !== batchId));
+        showToast(`Đã xóa đợt voucher "${target.name}" thành công!`);
+      } catch {
+        showToast('Không thể xóa đợt voucher. Nếu đang chạy, hãy tạm dừng trước.', 'error');
+      }
     }
   };
 

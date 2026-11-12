@@ -21,7 +21,10 @@ export const GenerateCodesModal: FC<GenerateCodesModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (qty <= 0) return;
+    if (!Number.isInteger(qty) || qty < 1 || qty > 10000) {
+      alert('Số lượng mã phải là số nguyên từ 1 đến 10.000');
+      return;
+    }
 
     const newCodes: VoucherCodeItem[] = Array.from({ length: Math.min(qty, 5) }).map((_, i) => ({
       id: `gen-code-${Date.now()}-${i}`,
@@ -62,7 +65,7 @@ export const GenerateCodesModal: FC<GenerateCodesModalProps> = ({
                 value={qty}
                 onChange={(e) => setQty(Number(e.target.value))}
                 min={1}
-                max={500}
+                max={10000}
                 className="form-input font-bold text-center text-lg"
                 required
               />
