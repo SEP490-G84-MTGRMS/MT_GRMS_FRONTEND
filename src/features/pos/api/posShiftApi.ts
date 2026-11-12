@@ -225,6 +225,25 @@ export const posShiftApi = {
     return res.data?.data || res.data;
   },
 
+  async closeBusinessDay(request: {
+    branchId: string;
+    businessDate: string;
+    actualCashCounted: number;
+    note?: string;
+  }): Promise<{
+    id: string;
+    status: string;
+    totalCashSales: number;
+    totalBankSales: number;
+    cashDiscrepancy: number;
+    referenceCode: string;
+  }> {
+    const res = await httpClient.post('/business-days/close', request, {
+      headers: { 'Idempotency-Key': generateUuidV7() },
+    });
+    return res.data?.data || res.data;
+  },
+
   /**
    * Kiểm tra xem thu ngân hiện tại có đủ điều kiện trực ca (có lịch làm việc hợp lệ) để bán hàng POS hay không (REQ-STRICT-SCHEDULE-VALIDATION)
    */

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import type { FC } from 'react';
-import { Lock, AlertCircle, CheckCircle, X, CreditCard, Banknote, TrendingUp, Sparkles, BarChart3, AlertTriangle } from 'lucide-react';
+import { Lock, AlertCircle, CheckCircle, X, CreditCard, Banknote, TrendingUp, Sparkles, BarChart3, AlertTriangle, Clock } from 'lucide-react';
 import { posShiftApi } from '../../api/posShiftApi';
 import type { ShiftDetailResponse, ShiftCashMovementDto } from '../../types/posShift.types';
 
@@ -47,6 +47,8 @@ export const CloseShiftModal: FC<Props> = ({
   const [droppedToSafe, setDroppedToSafe] = useState<number>(0);
   const [receiverUserId, setReceiverUserId] = useState<string>('Thu ngân ca sau');
   const [notes, setNotes] = useState<string>('');
+  const [earlyOrLateReason, setEarlyOrLateReason] = useState<string>('');
+  const [plannedEndTime, setPlannedEndTime] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -101,9 +103,87 @@ export const CloseShiftModal: FC<Props> = ({
 
   useEffect(() => {
     if (isOpen) {
+      setCurrentShiftData(shift);
       refreshMovements();
+      posShiftApi.checkCashierEligibility(shift.branchId)
+        .then((res) => {
+          if (res?.activeSchedule?.plannedEndTime) {
+            setPlannedEndTime(res.activeSchedule.plannedEndTime);
+          }
+        })
+        .catch(() => {});
     }
-  }, [isOpen, shift.id]);
+  }, [isOpen, shift.id, shift.branchId]);
+
+  // Phát hiện chốt ca SỚM hoặc MUỘN để bắt buộc nhập lý do giải trình cho Chủ cửa hàng
+  const shiftTimingStatus = useMemo(() => {
+    const now = new Date();
+    const openedAt = new Date(currentShiftData.openedAtUtc);
+    const durationMinutes = Math.max(1, Math.round((now.getTime() - openedAt.getTime()) / 60000));
+    const hours = Math.floor(durationMinutes / 60);
+    const mins = durationMinutes % 60;
+    const durationText = hours > 0 ? `${hours} giờ ${mins} phút` : `${mins} phút`;
+
+    // Ưu tiên kiểm tra theo giờ kết thúc ca phân công (plannedEndTime, định dạng HH:mm)
+    let targetEndStr = plannedEndTime;
+    if (!targetEndStr) {
+      const nameLower = (currentShiftData.shiftName || '').toLowerCase();
+      if (nameLower.includes('sáng')) targetEndStr = '14:00';
+      else if (nameLower.includes('chiều') || nameLower.includes('tối')) targetEndStr = '22:00';
+    }
+
+    if (targetEndStr && /^\d{1,2}:\d{2}/.test(targetEndStr)) {
+      const [eh, em] = targetEndStr.split(':').map(Number);
+      const plannedEndMinutes = eh * 60 + em;
+      const nowMinutes = now.getHours() * 60 + now.getMinutes();
+      const diffMinutes = nowMinutes - plannedEndMinutes;
+
+      if (diffMinutes < -15) {
+        const earlyMins = Math.abs(diffMinutes);
+        return {
+          type: 'EARLY' as const,
+          label: `Chốt ca sớm (${earlyMins >= 60 ? `${Math.floor(earlyMins / 60)}h${earlyMins % 60}p` : `${earlyMins} phút`} trước giờ kết ca ${targetEndStr})`,
+          durationText,
+          targetEndStr,
+        };
+      }
+      if (diffMinutes > 30) {
+        return {
+          type: 'LATE' as const,
+          label: `Chốt ca muộn (${diffMinutes >= 60 ? `${Math.floor(diffMinutes / 60)}h${diffMinutes % 60}p` : `${diffMinutes} phút`} sau giờ kết ca ${targetEndStr})`,
+          durationText,
+          targetEndStr,
+        };
+      }
+    }
+
+    // Kiểm tra theo thời lượng trực ca tiêu chuẩn (dưới 3.5 tiếng = chốt sớm, trên 9 tiếng = chốt muộn)
+    if (durationMinutes < 210) {
+      return {
+        type: 'EARLY' as const,
+        label: `Chốt ca sớm (Mới mở ca được ${durationText})`,
+        durationText,
+        targetEndStr: targetEndStr || 'Tiêu chuẩn >= 4h',
+      };
+    }
+    if (durationMinutes > 540) {
+      return {
+        type: 'LATE' as const,
+        label: `Chốt ca muộn (Ca kéo dài ${durationText})`,
+        durationText,
+        targetEndStr: targetEndStr || 'Tiêu chuẩn <= 8h',
+      };
+    }
+
+    return {
+      type: 'ON_TIME' as const,
+      label: `Đúng giờ (${durationText})`,
+      durationText,
+      targetEndStr: targetEndStr || 'Đúng khung giờ',
+    };
+  }, [currentShiftData.openedAtUtc, currentShiftData.shiftName, plannedEndTime]);
+
+  const isEarlyOrLate = shiftTimingStatus.type === 'EARLY' || shiftTimingStatus.type === 'LATE';
 
   // Tiền đếm từ 9 mệnh giá
   const detailCashCounted = useMemo(() => {
@@ -161,7 +241,14 @@ export const CloseShiftModal: FC<Props> = ({
 
   // Kiểm tra Invariant
   const allocatedSum = retainedFloat + droppedToSafe;
-  const isAllocationValid = Math.abs(allocatedSum - actualCashCounted) < 1;
+  const isAllocationValid =
+    Number.isSafeInteger(actualCashCounted) &&
+    actualCashCounted >= 0 &&
+    Number.isSafeInteger(retainedFloat) &&
+    retainedFloat >= 0 &&
+    Number.isSafeInteger(droppedToSafe) &&
+    droppedToSafe >= 0 &&
+    Math.abs(allocatedSum - actualCashCounted) < 1;
 
   const handleCountChange = (denom: number, count: number) => {
     setCounts((prev) => ({
@@ -180,10 +267,14 @@ export const CloseShiftModal: FC<Props> = ({
     }
   };
 
-  const isShiftClosing = currentShiftData.status === 'Closing' || currentShiftData.status === 2;
+  const isShiftClosing = currentShiftData.status === 'Closing' || currentShiftData.status === 3;
   const isShiftOpen = currentShiftData.status === 'Open' || currentShiftData.status === 1;
 
   const handleStartClosing = async () => {
+    if (notes.trim().length > 500) {
+      setErrorMsg('Ghi chú tối đa 500 ký tự.');
+      return;
+    }
     setIsLoading(true);
     setErrorMsg(null);
     try {
@@ -198,6 +289,10 @@ export const CloseShiftModal: FC<Props> = ({
   };
 
   const handleCancelClosing = async () => {
+    if (notes.trim().length > 500) {
+      setErrorMsg('Ghi chú tối đa 500 ký tự.');
+      return;
+    }
     if (!window.confirm('Bạn có chắc muốn hủy chốt ca và mở lại quầy cho các thu ngân tiếp tục bán hàng?')) return;
     setIsLoading(true);
     setErrorMsg(null);
@@ -214,6 +309,31 @@ export const CloseShiftModal: FC<Props> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isShiftClosing) {
+      setErrorMsg('Vui lòng bấm “Bắt đầu kiểm đếm” để khóa bán quầy trước khi hoàn tất đóng ca.');
+      return;
+    }
+    if (!Number.isSafeInteger(actualCashCounted) || actualCashCounted < 0) {
+      setErrorMsg('Tiền mặt thực đếm phải là số nguyên không âm trong giới hạn hợp lệ.');
+      return;
+    }
+    if (
+      !Number.isSafeInteger(retainedFloat) ||
+      retainedFloat < 0 ||
+      !Number.isSafeInteger(droppedToSafe) ||
+      droppedToSafe < 0
+    ) {
+      setErrorMsg('Tiền để lại két và tiền nộp két phải là số nguyên không âm.');
+      return;
+    }
+    if (!receiverUserId.trim()) {
+      setErrorMsg('Vui lòng nhập người nhận ca tiếp theo.');
+      return;
+    }
+    if (receiverUserId.trim().length > 100 || notes.trim().length > 500 || earlyOrLateReason.trim().length > 500) {
+      setErrorMsg('Người nhận tối đa 100 ký tự; ghi chú và giải trình tối đa 500 ký tự.');
+      return;
+    }
     if (hasPending) {
       setErrorMsg('Vui lòng xử lý hết các phiếu chi đang chờ duyệt trước khi chốt ca!');
       return;
@@ -224,16 +344,28 @@ export const CloseShiftModal: FC<Props> = ({
       return;
     }
 
+    if (isEarlyOrLate && !earlyOrLateReason.trim()) {
+      setErrorMsg(
+        `Bắt buộc nhập lý do giải trình vì bạn đang ${shiftTimingStatus.type === 'EARLY' ? 'chốt ca sớm' : 'chốt ca muộn'} để Chủ cửa hàng kiểm soát!`
+      );
+      return;
+    }
+
     setIsLoading(true);
     setErrorMsg(null);
 
     try {
+      const formattedEarlyLateReason = isEarlyOrLate && earlyOrLateReason.trim()
+        ? `[${shiftTimingStatus.type === 'EARLY' ? 'CHỐT CA SỚM' : 'CHỐT CA MUỘN'} - ${shiftTimingStatus.label}]: ${earlyOrLateReason.trim()}`
+        : undefined;
+
       const closed = await posShiftApi.confirmCloseShift(shift.id, {
         actualCashCounted,
         retainedFloatAmount: retainedFloat,
         droppedToSafeAmount: droppedToSafe,
         receiverUserId: receiverUserId.trim() || undefined,
         notes: notes.trim() || undefined,
+        earlyOrLateReason: formattedEarlyLateReason,
       });
 
       onShiftClosed(closed);
@@ -432,8 +564,20 @@ export const CloseShiftModal: FC<Props> = ({
                 </span>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
-                {/* Cột 1: Doanh thu Tiền mặt */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 10 }}>
+                {/* Cột 1: Tiền mặt đầu ca (Opening Float) */}
+                <div style={{ padding: '8px 10px', backgroundColor: '#fffbeb', borderRadius: 8, border: '1px solid #fde68a' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11.5, color: '#92400e', fontWeight: 600 }}>
+                    <Banknote size={14} className="text-amber-600" />
+                    <span>Tiền mặt đầu ca</span>
+                  </div>
+                  <div style={{ fontSize: 15, fontWeight: 800, color: '#b45309', marginTop: 4, fontFamily: 'monospace' }}>
+                    {(currentShiftData.openingFloat || 0).toLocaleString('vi-VN')} đ
+                  </div>
+                  <div style={{ fontSize: 10.5, color: '#b45309', marginTop: 2 }}>Vốn lẻ nhận bàn giao đầu ca</div>
+                </div>
+
+                {/* Cột 2: Doanh thu Tiền mặt */}
                 <div style={{ padding: '8px 10px', backgroundColor: '#ffffff', borderRadius: 8, border: '1px solid #e2e8f0' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11.5, color: '#475569', fontWeight: 600 }}>
                     <Banknote size={14} className="text-emerald-600" />
@@ -445,7 +589,7 @@ export const CloseShiftModal: FC<Props> = ({
                   <div style={{ fontSize: 10.5, color: '#94a3b8', marginTop: 2 }}>Cộng dồn vào két tiền mặt</div>
                 </div>
 
-                {/* Cột 2: Doanh thu Chuyển khoản VietQR */}
+                {/* Cột 3: Doanh thu Chuyển khoản VietQR */}
                 <div style={{ padding: '8px 10px', backgroundColor: '#ffffff', borderRadius: 8, border: '1px solid #bfdbfe' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11.5, color: '#1e40af', fontWeight: 600 }}>
                     <CreditCard size={14} className="text-blue-600" />
@@ -457,7 +601,7 @@ export const CloseShiftModal: FC<Props> = ({
                   <div style={{ fontSize: 10.5, color: '#64748b', marginTop: 2 }}>Đã vào tài khoản NH (ngoài két)</div>
                 </div>
 
-                {/* Cột 3: Tổng doanh thu toàn ca */}
+                {/* Cột 4: Tổng doanh thu toàn ca */}
                 <div style={{ padding: '8px 10px', backgroundColor: '#f0fdf4', borderRadius: 8, border: '1px solid #86efac' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11.5, color: '#166534', fontWeight: 600 }}>
                     <TrendingUp size={14} className="text-emerald-700" />
@@ -523,6 +667,7 @@ export const CloseShiftModal: FC<Props> = ({
                       <input
                         type="number"
                         min={0}
+                        max={Number.MAX_SAFE_INTEGER}
                         step={1000}
                         value={quickCashAmount === 0 ? '' : quickCashAmount}
                         onChange={(e) => setQuickCashAmount(Math.max(0, parseInt(e.target.value, 10) || 0))}
@@ -623,6 +768,8 @@ export const CloseShiftModal: FC<Props> = ({
                             <input
                               type="number"
                               min={0}
+                              max={Number.MAX_SAFE_INTEGER}
+                              step={1}
                               value={count === 0 ? '' : count}
                               onChange={(e) => handleCountChange(denom, parseInt(e.target.value, 10) || 0)}
                               placeholder="0"
@@ -648,7 +795,7 @@ export const CloseShiftModal: FC<Props> = ({
               )}
             </div>
 
-            {/* 3. BẢNG ĐỐI SOÁT G vs H */}
+            {/* 3. BẢNG ĐỐI SOÁT G vs H (KÈM CHI TIẾT TIỀN MẶT ĐẦU CA + BÁN HÀNG + THU - CHI) */}
             <div
               style={{
                 backgroundColor: '#f8fafc',
@@ -661,8 +808,35 @@ export const CloseShiftModal: FC<Props> = ({
                 fontSize: 12.5,
               }}
             >
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', paddingBottom: 6, borderBottom: '1px dashed #e2e8f0', fontSize: 12 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: '#64748b' }}>+ Tiền mặt đầu ca (Opening Float):</span>
+                  <span style={{ fontWeight: 600, fontFamily: 'monospace', color: '#b45309' }}>
+                    {(currentShiftData.openingFloat || 0).toLocaleString('vi-VN')} đ
+                  </span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: '#64748b' }}>+ Bán hàng thu tiền mặt:</span>
+                  <span style={{ fontWeight: 600, fontFamily: 'monospace', color: '#059669' }}>
+                    +{cashSales.toLocaleString('vi-VN')} đ
+                  </span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: '#64748b' }}>+ Thu tiền mặt khác trong ca:</span>
+                  <span style={{ fontWeight: 600, fontFamily: 'monospace', color: '#0284c7' }}>
+                    +{(currentShiftData.totalCashIn || 0).toLocaleString('vi-VN')} đ
+                  </span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: '#64748b' }}>- Chi tiền mặt / Rút két trong ca:</span>
+                  <span style={{ fontWeight: 600, fontFamily: 'monospace', color: '#dc2626' }}>
+                    -{(currentShiftData.totalCashOut || 0).toLocaleString('vi-VN')} đ
+                  </span>
+                </div>
+              </div>
+
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: '#64748b' }}>Tiền mặt lý thuyết hệ thống (G = Đầu ca + Bán hàng TM + Thu - Chi):</span>
+                <span style={{ color: '#334155', fontWeight: 600 }}>Tiền mặt lý thuyết hệ thống (G = Đầu ca + Bán hàng TM + Thu - Chi):</span>
                 <span style={{ fontWeight: 700, fontFamily: 'monospace', color: '#1e293b' }}>
                   {expectedCash.toLocaleString('vi-VN')} đ
                 </span>
@@ -709,6 +883,7 @@ export const CloseShiftModal: FC<Props> = ({
                   <input
                     type="number"
                     min={0}
+                    max={Number.MAX_SAFE_INTEGER}
                     step={1000}
                     value={retainedFloat}
                     onChange={(e) => setRetainedFloat(Number(e.target.value) || 0)}
@@ -721,6 +896,7 @@ export const CloseShiftModal: FC<Props> = ({
                   <input
                     type="number"
                     min={0}
+                    max={Number.MAX_SAFE_INTEGER}
                     step={1000}
                     value={droppedToSafe}
                     onChange={(e) => setDroppedToSafe(Number(e.target.value) || 0)}
@@ -732,7 +908,7 @@ export const CloseShiftModal: FC<Props> = ({
               {!isAllocationValid && (
                 <div style={{ marginTop: 8, fontSize: 12, color: '#dc2626', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
                   <AlertTriangle size={14} color="#dc2626" style={{ flexShrink: 0 }} />
-                  <span>Tổng phân bổ ({allocatedSum.toLocaleString('vi-VN')} đ) lệch so với thực đếm ({actualCashCounted.toLocaleString('vi-VN')} đ) {Math.abs(allocatedSum - actualCashCounted).toLocaleString('vi-VN')} đ!</span>
+                  <span>Hai khoản phân bổ phải là số nguyên không âm và tổng phải bằng tiền thực đếm. Chênh lệch hiện tại: {Math.abs(allocatedSum - actualCashCounted).toLocaleString('vi-VN')} đ.</span>
                 </div>
               )}
             </div>
@@ -745,6 +921,7 @@ export const CloseShiftModal: FC<Props> = ({
                   type="text"
                   value={receiverUserId}
                   onChange={(e) => setReceiverUserId(e.target.value)}
+                  maxLength={100}
                   className="modal-input"
                   required
                 />
@@ -756,10 +933,99 @@ export const CloseShiftModal: FC<Props> = ({
                   type="text"
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
+                  maxLength={500}
                   className="modal-input"
                   placeholder="Ghi chú chênh lệch hoặc tình hình ca..."
                 />
               </div>
+            </div>
+
+            {/* 5.5. KIỂM SOÁT GIỜ CHỐT CA SỚM / MUỘN (BẮT BUỘC GIẢI TRÌNH VỚI CHỦ CỬA HÀNG) */}
+            <div
+              style={{
+                padding: '12px 14px',
+                borderRadius: 8,
+                backgroundColor: isEarlyOrLate ? '#fffbeb' : '#f8fafc',
+                border: isEarlyOrLate ? '1px solid #f59e0b' : '1px solid #e2e8f0',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 8,
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700, fontSize: 13, color: isEarlyOrLate ? '#b45309' : '#334155' }}>
+                  <Clock size={15} color={isEarlyOrLate ? '#d97706' : '#0f766e'} />
+                  <span>Kiểm soát thời gian trực ca: {shiftTimingStatus.label}</span>
+                </div>
+                <span
+                  style={{
+                    padding: '2px 8px',
+                    borderRadius: 999,
+                    fontSize: 11,
+                    fontWeight: 700,
+                    backgroundColor: shiftTimingStatus.type === 'EARLY' ? '#fef3c7' : shiftTimingStatus.type === 'LATE' ? '#fee2e2' : '#dcfce7',
+                    color: shiftTimingStatus.type === 'EARLY' ? '#b45309' : shiftTimingStatus.type === 'LATE' ? '#b91c1c' : '#15803d',
+                    border: shiftTimingStatus.type === 'EARLY' ? '1px solid #fcd34d' : shiftTimingStatus.type === 'LATE' ? '1px solid #fca5a5' : '1px solid #86efac',
+                  }}
+                >
+                  {shiftTimingStatus.type === 'EARLY' ? 'CHỐT CA SỚM' : shiftTimingStatus.type === 'LATE' ? 'CHỐT CA MUỘN' : 'ĐÚNG GIỜ'}
+                </span>
+              </div>
+
+              {isEarlyOrLate && (
+                <>
+                  <div style={{ fontSize: 12, color: '#92400e' }}>
+                    Ca làm việc đang được đóng <b>{shiftTimingStatus.type === 'EARLY' ? 'sớm hơn' : 'muộn hơn'}</b> khung giờ tiêu chuẩn ({shiftTimingStatus.targetEndStr}). Hệ thống yêu cầu <b>bắt buộc nhập lý do giải trình</b> để Chủ cửa hàng kiểm soát:
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {(shiftTimingStatus.type === 'EARLY'
+                      ? [
+                          'Vắng khách / Đóng cửa quầy sớm theo chỉ đạo',
+                          'Đổi ca / Bàn giao sớm cho ca tiếp theo',
+                          'Có việc cá nhân đột xuất đã báo Quản lý',
+                          'Hoàn tất kiểm kê & kết toán sớm',
+                        ]
+                      : [
+                          'Đông khách cuối ca / Phục vụ nốt khách tại quầy',
+                          'Kiểm đếm hàng hóa & vệ sinh quầy cuối ngày',
+                          'Chờ đối soát chuyển khoản / đơn đặt trước',
+                          'Tăng ca hỗ trợ thêm theo yêu cầu cửa hàng',
+                        ]
+                    ).map((preset) => (
+                      <button
+                        key={preset}
+                        type="button"
+                        onClick={() => setEarlyOrLateReason(preset)}
+                        style={{
+                          padding: '3px 8px',
+                          borderRadius: 6,
+                          fontSize: 11.5,
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          border: earlyOrLateReason === preset ? '1px solid #d97706' : '1px solid #fcd34d',
+                          backgroundColor: earlyOrLateReason === preset ? '#d97706' : '#ffffff',
+                          color: earlyOrLateReason === preset ? '#ffffff' : '#92400e',
+                        }}
+                      >
+                        {preset}
+                      </button>
+                    ))}
+                  </div>
+                  <input
+                    type="text"
+                    value={earlyOrLateReason}
+                    onChange={(e) => setEarlyOrLateReason(e.target.value)}
+                    maxLength={500}
+                    placeholder={`Nhập lý do ${shiftTimingStatus.type === 'EARLY' ? 'chốt ca sớm' : 'chốt ca muộn'} (Bắt buộc)...`}
+                    className="modal-input"
+                    style={{
+                      borderColor: !earlyOrLateReason.trim() ? '#f59e0b' : '#10b981',
+                      backgroundColor: '#ffffff',
+                    }}
+                    required={isEarlyOrLate}
+                  />
+                </>
+              )}
             </div>
 
             {/* Thông báo quy trình gửi báo cáo chốt ca đến Chủ cửa hàng */}
@@ -861,18 +1127,18 @@ export const CloseShiftModal: FC<Props> = ({
 
             <button
               type="submit"
-              disabled={isLoading || hasPending || !isAllocationValid}
+              disabled={!isShiftClosing || isLoading || hasPending || !isAllocationValid || (isEarlyOrLate && !earlyOrLateReason.trim())}
               style={{
                 display: 'flex',
                 alignItems: 'center',
                 gap: 6,
                 padding: '8px 22px',
                 borderRadius: 6,
-                backgroundColor: hasPending || !isAllocationValid ? '#94a3b8' : '#0f766e',
+                backgroundColor: !isShiftClosing || hasPending || !isAllocationValid || (isEarlyOrLate && !earlyOrLateReason.trim()) ? '#94a3b8' : '#0f766e',
                 color: '#ffffff',
                 border: 'none',
                 fontWeight: 600,
-                cursor: hasPending || !isAllocationValid || isLoading ? 'not-allowed' : 'pointer',
+                cursor: !isShiftClosing || hasPending || !isAllocationValid || (isEarlyOrLate && !earlyOrLateReason.trim()) || isLoading ? 'not-allowed' : 'pointer',
               }}
             >
               <CheckCircle size={16} />

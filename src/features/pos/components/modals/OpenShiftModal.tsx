@@ -68,13 +68,32 @@ export const OpenShiftModal: FC<Props> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
+
+    const trimmedShiftName = shiftName.trim();
+    if (!branchId.trim() || !tillId.trim()) {
+      setErrorMsg('Thiếu thông tin chi nhánh hoặc quầy thu ngân. Vui lòng tải lại màn hình.');
+      return;
+    }
+    if (trimmedShiftName.length < 2 || trimmedShiftName.length > 80) {
+      setErrorMsg('Tên ca phải có từ 2 đến 80 ký tự.');
+      return;
+    }
+    if (!Number.isSafeInteger(openingFloat) || openingFloat < 0) {
+      setErrorMsg('Tiền mặt đầu ca phải là số nguyên không âm.');
+      return;
+    }
+    if (notes.trim().length > 500) {
+      setErrorMsg('Ghi chú tối đa 500 ký tự.');
+      return;
+    }
+
     setIsLoading(true);
 
     try {
       const shift = await posShiftApi.openShift({
         branchId,
         tillId,
-        shiftName: shiftName.trim() || `Ca ${new Date().toLocaleTimeString('vi-VN')}`,
+        shiftName: trimmedShiftName,
         openingFloat,
         notes: notes.trim() || undefined,
       });
@@ -253,6 +272,7 @@ export const OpenShiftModal: FC<Props> = ({
                 type="text"
                 value={shiftName}
                 onChange={(e) => setShiftName(e.target.value)}
+                maxLength={80}
                 placeholder="VD: Ca Sáng - 06/11/2026"
                 style={{
                   width: '100%',
@@ -329,6 +349,7 @@ export const OpenShiftModal: FC<Props> = ({
                   <input
                     type="number"
                     min={0}
+                    max={Number.MAX_SAFE_INTEGER}
                     step={1000}
                     value={openingFloat === 0 ? '' : openingFloat}
                     onChange={(e) => setOpeningFloat(Number(e.target.value) || 0)}
@@ -455,6 +476,7 @@ export const OpenShiftModal: FC<Props> = ({
               <textarea
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
+                maxLength={500}
                 rows={2}
                 placeholder="VD: Két có đủ mệnh giá tiền lẻ 10k, 20k, 50k..."
                 style={{

@@ -28,6 +28,7 @@ import { AdminToast, type ToastState } from '../../admin/components/common/Admin
 import { formatMoney } from '../../finance/utils/formatters';
 import '../cashbook.css';
 import { useAuthStore } from '../../../stores/useAuthStore';
+import { posOrderApi, type OwnerUnsettledSummaryResponse } from '../../pos/api/posOrderApi';
 
 export const CashbookPage: FC = () => {
   const { user } = useAuthStore();
@@ -83,6 +84,28 @@ export const CashbookPage: FC = () => {
   const [isTriageModalOpen, setIsTriageModalOpen] = useState(false);
   const [triagePendingCount, setTriagePendingCount] = useState(0);
   const [reconcilingAccount, setReconcilingAccount] = useState<CashAccount | null>(null);
+  const [ownerUnsettled, setOwnerUnsettled] = useState<OwnerUnsettledSummaryResponse | null>(null);
+  const [isOwnerEodModalOpen, setIsOwnerEodModalOpen] = useState(false);
+  const [ownerEodNote, setOwnerEodNote] = useState('');
+  const [isSettlingOwnerEod, setIsSettlingOwnerEod] = useState(false);
+  const [operationBranch, setOperationBranch] = useState<{ id: string; code?: string; name: string }>(() => {
+    try {
+      const stored = localStorage.getItem('mtgrms_active_branch');
+      if (stored) return JSON.parse(stored);
+    } catch {
+      // Fallback về toàn hệ thống nếu dữ liệu lưu không hợp lệ.
+    }
+    return { id: 'ALL', code: 'ALL', name: 'Toàn hệ thống' };
+  });
+
+  useEffect(() => {
+    const handleBranchChange = (event: Event) => {
+      const branch = (event as CustomEvent).detail;
+      if (branch?.id) setOperationBranch(branch);
+    };
+    window.addEventListener('mtgrms:branch-changed', handleBranchChange);
+    return () => window.removeEventListener('mtgrms:branch-changed', handleBranchChange);
+  }, []);
 
   // Ref and click outside listener for More Actions Menu
   const moreMenuRef = useRef<HTMLDivElement>(null);
@@ -164,6 +187,14 @@ export const CashbookPage: FC = () => {
   useEffect(() => {
     void loadData();
   }, [loadData]);
+
+  useEffect(() => {
+    if (isEmployee) return;
+    const branchId = operationBranch.id === 'ALL' ? undefined : operationBranch.id;
+    posOrderApi.getOwnerUnsettledSummary(branchId)
+      .then(setOwnerUnsettled)
+      .catch(() => setOwnerUnsettled(null));
+  }, [isEmployee, operationBranch.id]);
 
   // Account Card Selection
   const handleSelectAccount = (accountId: string) => {
@@ -302,7 +333,46 @@ export const CashbookPage: FC = () => {
     [accounts, filters.accountId]
   );
 
+  const openOwnerDailySettlement = () => {
+    if (operationBranch.id === 'ALL') {
+      showToast('Hãy chọn một Chi nhánh thao tác trên thanh trên cùng trước khi chốt doanh thu.', 'warning');
+      return;
+    }
+    setIsOwnerEodModalOpen(true);
+  };
+
   const pendingTransit = transits.find((t) => t.status === 'PENDING');
+
+  const handleSettleOwnerDaily = async () => {
+    if (operationBranch.id === 'ALL') {
+      showToast('Hãy chọn một Chi nhánh thao tác trên thanh trên cùng trước khi chốt doanh thu.', 'warning');
+      return;
+    }
+    if (!ownerUnsettled || ownerUnsettled.unsettledOrdersCount === 0) {
+      showToast('Hiện không có đơn bán lẻ trực tiếp nào của Chủ tiệm chờ chốt cuối ngày.', 'info');
+      return;
+    }
+    setIsSettlingOwnerEod(true);
+    try {
+      const branchParam = operationBranch.id;
+      const res = await posOrderApi.settleOwnerDailyOrders({
+        branchId: branchParam,
+        note: ownerEodNote.trim() || null,
+      });
+      showToast(
+        `Đã chốt ${res.settledOrdersCount} đơn bán lẻ cuối ngày (${formatMoney(res.totalSettledAmount)}) vào Két sắt & Ngân hàng!`,
+        'success'
+      );
+      setIsOwnerEodModalOpen(false);
+      setOwnerEodNote('');
+      void posOrderApi.getOwnerUnsettledSummary(operationBranch.id).then(setOwnerUnsettled).catch(() => {});
+      void loadData();
+    } catch (err: any) {
+      showToast(err?.response?.data?.message || err?.message || 'Lỗi khi chốt doanh thu cuối ngày', 'error');
+    } finally {
+      setIsSettlingOwnerEod(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-[#F7F8F7] font-finance">
@@ -409,6 +479,43 @@ export const CashbookPage: FC = () => {
           </div>
         )}
 
+        {/* Banner Chốt doanh thu bán lẻ cuối ngày cho Chủ tiệm (không cộng lẻ từng đơn) */}
+        {!isEmployee && ownerUnsettled && ownerUnsettled.unsettledOrdersCount > 0 && (
+          <div
+            style={{
+              background: '#ECFDF5',
+              border: '1px solid #6EE7B7',
+              borderRadius: 12,
+              padding: '10px 16px',
+              marginBottom: 16,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: 10,
+              boxShadow: '0 1px 3px rgba(5, 150, 105, 0.08)',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <span
+                style={{
+                  fontSize: '0.72rem',
+                  fontWeight: 800,
+                  color: '#065F46',
+                  background: '#A7F3D0',
+                  padding: '3px 8px',
+                  borderRadius: 6,
+                }}
+              >
+                Chờ chốt cuối ngày
+              </span>
+              <span style={{ fontSize: '0.85rem', color: '#064E3B' }}>
+                {operationBranch.id === 'ALL' ? 'Toàn hệ thống đang có ' : `${operationBranch.name} đang có `}<strong>{ownerUnsettled.unsettledOrdersCount} đơn bán lẻ trực tiếp của Chủ tiệm</strong> chưa kết toán vào Sổ quỹ (Tiền mặt: <strong>{formatMoney(ownerUnsettled.cashRevenue)}</strong> · CK/VietQR: <strong>{formatMoney(ownerUnsettled.bankRevenue)}</strong> · Tổng: <strong>{formatMoney(ownerUnsettled.totalRevenue)}</strong>)
+              </span>
+            </div>
+          </div>
+        )}
+
         {/* Executive Header for Store Owner Multi-Branch Treasury */}
         <div className="cashbook-header-card" style={{ padding: "20px 28px", borderRadius: 20 }}>
           <div className="cashbook-header-info">
@@ -436,6 +543,23 @@ export const CashbookPage: FC = () => {
                 >
                   <AlertTriangle size={15} className="text-amber-600" />
                   <span>{triagePendingCount} mục cần duyệt</span>
+                </button>
+              )}
+
+              {!isEmployee && (
+                <button
+                  type="button"
+                  onClick={openOwnerDailySettlement}
+                  className="h-10 px-3 bg-teal-50 hover:bg-teal-100 border border-teal-300 text-teal-900 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-colors"
+                  title="Gộp toàn bộ đơn bán lẻ trực tiếp của Chủ tiệm trong ngày vào Két sắt & Ngân hàng (không cộng lẻ từng đơn)"
+                >
+                  <CheckCircle size={15} className="text-teal-700" />
+                  <span>
+                    Chốt cuối ngày
+                    {ownerUnsettled && ownerUnsettled.unsettledOrdersCount > 0
+                      ? ` (${ownerUnsettled.unsettledOrdersCount})`
+                      : ''}
+                  </span>
                 </button>
               )}
 
@@ -817,6 +941,132 @@ export const CashbookPage: FC = () => {
             void loadData();
           }}
         />
+
+        {/* Modal Chốt doanh thu bán lẻ cuối ngày cho Chủ cửa hàng */}
+        {isOwnerEodModalOpen && (
+          <div
+            style={{
+              position: 'fixed',
+              inset: 0,
+              backgroundColor: 'rgba(15, 23, 42, 0.55)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 1000,
+              padding: 16,
+            }}
+            onClick={() => setIsOwnerEodModalOpen(false)}
+          >
+            <div
+              style={{
+                backgroundColor: '#ffffff',
+                borderRadius: 16,
+                width: '100%',
+                maxWidth: 520,
+                padding: 24,
+                boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.15)',
+                border: '1px solid #e2e8f0',
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #e2e8f0', paddingBottom: 12 }}>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800, color: '#0f172a' }}>
+                    Chốt Doanh Thu Bán Lẻ Cuối Ngày (Chủ Tiệm)
+                  </h3>
+                  <p style={{ margin: '4px 0 0', fontSize: 12, color: '#64748b' }}>
+                    Gộp toàn bộ đơn bán trực tiếp của Chủ cửa hàng thành 1 bút toán tổng vào Két sắt &amp; Ngân hàng
+                  </p>
+                </div>
+              </div>
+
+              <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <div style={{ background: '#eff6ff', border: '1px solid #93c5fd', borderRadius: 10, padding: '10px 14px' }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#1e40af', textTransform: 'uppercase' }}>Chi nhánh được chốt</div>
+                  <div style={{ marginTop: 3, fontSize: 15, fontWeight: 800, color: '#0f172a' }}>{operationBranch.name}</div>
+                  <div style={{ marginTop: 2, fontSize: 11, color: '#64748b' }}>Mã chi nhánh: {operationBranch.code || operationBranch.id}</div>
+                </div>
+                <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, padding: 14, display: 'flex', flexDirection: 'column', gap: 8, fontSize: 13 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#475569' }}>Số đơn bán lẻ trực tiếp chờ chốt:</span>
+                    <strong style={{ color: '#0f172a' }}>{ownerUnsettled?.unsettledOrdersCount || 0} đơn hàng</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#065f46' }}>Doanh thu Tiền mặt (gộp vào Két sắt):</span>
+                    <strong style={{ color: '#059669' }}>+{formatMoney(ownerUnsettled?.cashRevenue || 0)}</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#1e40af' }}>Doanh thu Chuyển khoản / VietQR (gộp vào Ngân hàng):</span>
+                    <strong style={{ color: '#2563eb' }}>+{formatMoney(ownerUnsettled?.bankRevenue || 0)}</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 8, borderTop: '1px dashed #cbd5e1', fontSize: 14 }}>
+                    <span style={{ fontWeight: 700, color: '#0f172a' }}>Tổng doanh thu kết toán cuối ngày:</span>
+                    <strong style={{ fontWeight: 800, color: '#0f766e' }}>{formatMoney(ownerUnsettled?.totalRevenue || 0)}</strong>
+                  </div>
+                </div>
+
+                <div style={{ fontSize: 12, color: '#475569', backgroundColor: '#f0fdfa', border: '1px solid #99f6e4', borderRadius: 8, padding: '8px 12px' }}>
+                  <b>Cơ chế gom bút toán Sổ quỹ:</b> Đối với nhân viên, doanh thu chỉ được cộng gộp khi nhân viên <b>Chốt ca &amp; Chủ duyệt bàn giao</b>. Đối với Chủ tiệm bán trực tiếp (không mở ca), bấm xác nhận bên dưới để gộp 1 lần cuối ngày vào Sổ quỹ thay vì cộng lẻ từng đơn.
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#334155', marginBottom: 4 }}>
+                    Ghi chú kết toán cuối ngày (tùy chọn):
+                  </label>
+                  <input
+                    type="text"
+                    value={ownerEodNote}
+                    onChange={(e) => setOwnerEodNote(e.target.value)}
+                    placeholder="VD: Chốt doanh thu bán lẻ cuối ngày của Chủ cửa hàng..."
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      borderRadius: 8,
+                      border: '1px solid #cbd5e1',
+                      fontSize: 13,
+                    }}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 8 }}>
+                  <button
+                    type="button"
+                    onClick={() => setIsOwnerEodModalOpen(false)}
+                    style={{
+                      padding: '8px 16px',
+                      borderRadius: 8,
+                      border: '1px solid #cbd5e1',
+                      backgroundColor: '#ffffff',
+                      color: '#475569',
+                      fontWeight: 600,
+                      fontSize: 13,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Đóng
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isSettlingOwnerEod || !ownerUnsettled || ownerUnsettled.unsettledOrdersCount === 0}
+                    onClick={handleSettleOwnerDaily}
+                    style={{
+                      padding: '8px 18px',
+                      borderRadius: 8,
+                      border: 'none',
+                      backgroundColor: !ownerUnsettled || ownerUnsettled.unsettledOrdersCount === 0 ? '#94a3b8' : '#0f766e',
+                      color: '#ffffff',
+                      fontWeight: 700,
+                      fontSize: 13,
+                      cursor: !ownerUnsettled || ownerUnsettled.unsettledOrdersCount === 0 || isSettlingOwnerEod ? 'not-allowed' : 'pointer',
+                    }}
+                  >
+                    {isSettlingOwnerEod ? 'Đang chốt sổ...' : 'Xác Nhận Chốt Doanh Thu Cuối Ngày'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

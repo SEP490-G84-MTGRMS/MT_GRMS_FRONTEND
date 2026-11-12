@@ -4,6 +4,12 @@ export type CashMovementStatus = 'Recorded' | 'PendingApproval' | 'Rejected' | '
 export type HandoverStatus = 'PENDING' | 'CONFIRMED' | 'DISPUTED' | 1 | 2 | 3;
 export type ShiftState = 'Open' | 'Closed' | 'Closing' | 'ForceClosed' | 1 | 2 | 3 | 4;
 
+export const MANUAL_CASH_MOVEMENT_CATEGORY = {
+  EXPENSE: 1,
+  CASH_DRAW: 2,
+  CASH_DEPOSIT: 3,
+} as const;
+
 export interface ShiftParticipantDto {
   id: string;
   shiftId: string;
@@ -99,6 +105,7 @@ export interface CloseShiftRequest {
   droppedToSafeAmount: number;
   receiverUserId?: string | null;
   notes?: string | null;
+  earlyOrLateReason?: string | null;
 }
 
 export interface ConfirmHandoverRequest {
@@ -167,6 +174,7 @@ export interface ConfirmCloseShiftRequest {
   droppedToSafeAmount: number;
   receiverUserId?: string | null;
   notes?: string | null;
+  earlyOrLateReason?: string | null;
 }
 
 export interface ForceCloseShiftRequest {
@@ -192,5 +200,8 @@ export interface CashierShiftEligibilityDto {
   employeeName?: string | null;
   reason?: string | null;
   activeSchedule?: CashierShiftInfo | null;
+  isFullTime?: boolean;
+  hasClosedShiftToday?: boolean;
+  salaryType?: string | null;
 }
 
