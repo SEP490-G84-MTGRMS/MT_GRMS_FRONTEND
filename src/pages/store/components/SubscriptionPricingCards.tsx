@@ -11,6 +11,7 @@ import { storeApi, type BackendPricingPlanResponse } from "../api/storeApi";
 interface SubscriptionPricingCardsProps {
   onSelectPlan: (plan: SubscriptionPlanItem) => void;
   currentPlanName?: string;
+  trialState?: 'ELIGIBLE' | 'ACTIVE' | 'EXPIRED' | 'PAID' | 'REVIEW_REQUIRED' | null;
 }
 
 export const mapBackendPlanToCardItem = (
@@ -121,6 +122,7 @@ export const mapBackendPlanToCardItem = (
 export const SubscriptionPricingCards: FC<SubscriptionPricingCardsProps> = ({
   onSelectPlan,
   currentPlanName,
+  trialState,
 }) => {
   const [plans, setPlans] =
     useState<SubscriptionPlanItem[]>(SUBSCRIPTION_PLANS);
@@ -344,11 +346,26 @@ export const SubscriptionPricingCards: FC<SubscriptionPricingCardsProps> = ({
   return (
     <div className="pricing-cards-grid">
       {plans.map((plan) => {
-        const isCurrentPlan = currentPlanName
-          ? plan.name.toLowerCase().includes(currentPlanName.toLowerCase()) ||
-            currentPlanName.toLowerCase().includes(plan.name.toLowerCase()) ||
-            currentPlanName.toUpperCase().includes(plan.code.toUpperCase())
+        const normalizedCurrentPlan = (currentPlanName || "").trim().toLowerCase();
+        const isUnselectedPlan =
+          trialState === "ELIGIBLE" ||
+          !normalizedCurrentPlan ||
+          normalizedCurrentPlan.includes("chưa kích hoạt") ||
+          normalizedCurrentPlan.includes("chưa chọn");
+        const isCurrentPro =
+          !isUnselectedPlan &&
+          (normalizedCurrentPlan.includes("pro") ||
+            normalizedCurrentPlan.includes("chuyên nghiệp"));
+        const isCurrentPlan = !isUnselectedPlan
+          ? plan.name.toLowerCase().includes(normalizedCurrentPlan) ||
+            normalizedCurrentPlan.includes(plan.name.toLowerCase()) ||
+            normalizedCurrentPlan.toUpperCase().includes(plan.code.toUpperCase())
           : false;
+        const isActiveCurrentPlan = isCurrentPlan && trialState !== "EXPIRED";
+        const isExpiredCurrentPlan = isCurrentPlan && trialState === "EXPIRED";
+        const isDowngradeBlocked = isCurrentPro && plan.code.toUpperCase() !== "PRO";
+        const isTrialDisabled =
+          isCurrentPro || Boolean(trialState && trialState !== "ELIGIBLE");
 
         return (
           <div
@@ -404,7 +421,7 @@ export const SubscriptionPricingCards: FC<SubscriptionPricingCardsProps> = ({
                       whiteSpace: "nowrap",
                     }}
                   >
-                    ✨ 3 ngày 0 đ
+                    3 ngày 0 đ
                   </span>
                 )}
               </div>
@@ -474,7 +491,7 @@ export const SubscriptionPricingCards: FC<SubscriptionPricingCardsProps> = ({
             </div>
 
             {/* CTA Button */}
-            {isCurrentPlan ? (
+            {isActiveCurrentPlan ? (
               <button
                 type="button"
                 className="pricing-cta-button"
@@ -494,36 +511,56 @@ export const SubscriptionPricingCards: FC<SubscriptionPricingCardsProps> = ({
               <button
                 type="button"
                 className="pricing-cta-button"
+                disabled={isTrialDisabled}
                 style={{
-                  backgroundColor: "#F1F5F9",
-                  color: "#1E293B",
+                  backgroundColor: isTrialDisabled ? "#E2E8F0" : "#F1F5F9",
+                  color: isTrialDisabled ? "#64748B" : "#1E293B",
                   border: "1px solid #CBD5E1",
                   fontWeight: 700,
+                  cursor: isTrialDisabled ? "not-allowed" : "pointer",
                   fontFamily: "var(--font-sans)",
                   transition: "all 0.15s ease",
                 }}
-                onClick={() => onSelectPlan(plan)}
+                onClick={() => {
+                  if (!isTrialDisabled) onSelectPlan(plan);
+                }}
               >
-                Trải nghiệm miễn phí
+                {isCurrentPro
+                  ? 'Không khả dụng ở Gói Pro'
+                  : trialState === 'ACTIVE'
+                    ? 'Đang trong thời gian dùng thử'
+                    : trialState && trialState !== 'ELIGIBLE'
+                      ? 'Đã hết lượt dùng thử'
+                      : 'Dùng thử miễn phí 3 ngày'}
               </button>
             ) : (
               <button
                 type="button"
                 className="pricing-cta-button"
+                disabled={isDowngradeBlocked}
                 style={{
-                  backgroundColor: "var(--blue-primary)",
-                  color: "#FFFFFF",
-                  border: "none",
+                  backgroundColor: isDowngradeBlocked ? "#E2E8F0" : "var(--blue-primary)",
+                  color: isDowngradeBlocked ? "#64748B" : "#FFFFFF",
+                  border: isDowngradeBlocked ? "1px solid #CBD5E1" : "none",
                   fontWeight: 700,
-                  boxShadow: plan.highlight
-                    ? "0 4px 14px rgba(15, 118, 110, 0.32)"
-                    : "0 2px 8px rgba(15, 118, 110, 0.16)",
+                  cursor: isDowngradeBlocked ? "not-allowed" : "pointer",
+                  boxShadow: isDowngradeBlocked
+                    ? "none"
+                    : plan.highlight
+                      ? "0 4px 14px rgba(15, 118, 110, 0.32)"
+                      : "0 2px 8px rgba(15, 118, 110, 0.16)",
                   fontFamily: "var(--font-sans)",
                   transition: "all 0.15s ease",
                 }}
-                onClick={() => onSelectPlan(plan)}
+                onClick={() => {
+                  if (!isDowngradeBlocked) onSelectPlan(plan);
+                }}
               >
-                Nâng cấp ngay
+                {isDowngradeBlocked
+                  ? "Không hỗ trợ hạ cấp"
+                  : isExpiredCurrentPlan
+                    ? "Gia hạn gói ngay"
+                    : "Nâng cấp ngay"}
               </button>
             )}
           </div>

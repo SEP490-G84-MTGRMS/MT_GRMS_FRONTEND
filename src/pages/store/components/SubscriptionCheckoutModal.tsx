@@ -1,5 +1,5 @@
 // src/pages/store/components/SubscriptionCheckoutModal.tsx
-import { useState, type FC } from "react";
+import { useState, useEffect, useRef, type FC } from "react";
 import {
   X,
   Wallet,
@@ -15,7 +15,7 @@ import {
   HardDrive,
 } from "lucide-react";
 import type { SubscriptionPlanItem, StoreInfo } from "../storeData";
-import { storeApi } from "../api/storeApi";
+import { storeApi, mapStoreProblemMessage } from "../api/storeApi";
 
 interface SubscriptionCheckoutModalProps {
   plan: SubscriptionPlanItem;
@@ -47,6 +47,52 @@ export const SubscriptionCheckoutModal: FC<SubscriptionCheckoutModalProps> = ({
   const [extraStorageGb, setExtraStorageGb] = useState<number>(0);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isCompleted, setIsCompleted] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  const idempotencyKeyRef = useRef<string>(crypto.randomUUID());
+
+  useEffect(() => {
+    const previousFocus = document.activeElement as HTMLElement | null;
+    const dialogEl = dialogRef.current;
+    const getFocusable = () =>
+      dialogEl
+        ? Array.from(
+            dialogEl.querySelectorAll<HTMLElement>(
+              'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+            ),
+          )
+        : [];
+
+    const firstFocusable = getFocusable()[0];
+    firstFocusable?.focus();
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !isProcessing) {
+        e.preventDefault();
+        onClose();
+        return;
+      }
+      if (e.key === "Tab") {
+        const focusables = getFocusable();
+        if (focusables.length === 0) return;
+        const first = focusables[0];
+        const last = focusables[focusables.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      previousFocus?.focus?.();
+    };
+  }, [isProcessing, onClose]);
 
   const months = isTrialPlan ? 0 : cycle === "3m" ? 3 : cycle === "6m" ? 6 : 12;
   const bonusMonths = !isTrialPlan && cycle === "12m" ? 1 : 0;
@@ -107,8 +153,9 @@ export const SubscriptionCheckoutModal: FC<SubscriptionCheckoutModalProps> = ({
     : `Gói ${plan.name}`;
 
   const handleConfirmPayment = async () => {
+    setErrorMessage(null);
     if (!isTrialPlan && !hasEnoughWalletBalance) {
-      alert(
+      setErrorMessage(
         `Số dư ví gian hàng không đủ. Vui lòng nạp thêm ${new Intl.NumberFormat("vi-VN").format(missingAmount)} đ vào ví.`,
       );
       return;
@@ -116,62 +163,73 @@ export const SubscriptionCheckoutModal: FC<SubscriptionCheckoutModalProps> = ({
 
     setIsProcessing(true);
     try {
-      const res = isTrialPlan
-        ? await storeApi.activateTrial()
-        : await storeApi.purchaseSubscription({
-            planCode: plan.code || plan.id,
-            months,
-            extraBranches: isPro ? extraBranches : 0,
-            hasStaffManagementAddon: isPro ? true : hasStaffAddon,
-            extraStorageGb,
-            requestId: crypto.randomUUID(),
-            paymentMethod: "Wallet",
-          });
+      if (isTrialPlan) {
+        const res = await storeApi.activateTrial(idempotencyKeyRef.current);
+        if (res.success && res.data) {
+          const expiresAt = res.data.trialExpiresAt ?? undefined;
+          const daysRemaining = expiresAt
+            ? Math.max(1, Math.ceil((new Date(expiresAt).getTime() - Date.now()) / (24 * 60 * 60 * 1000)))
+            : 3;
+          setIsProcessing(false);
+          setIsCompleted(true);
+          setTimeout(() => {
+            onSuccess({
+              planName: "Gói Dùng Thử (Trải Nghiệm)",
+              months: 0,
+              totalAmount: 0,
+              paymentMethod: "Wallet",
+              subscriptionExpiresAt: expiresAt,
+              daysRemaining,
+            });
+          }, 600);
+          return;
+        }
+        setIsProcessing(false);
+        setErrorMessage(res.message || "Không thể kích hoạt gói dùng thử.");
+        return;
+      }
+
+      const res = await storeApi.purchaseSubscription({
+        planCode: plan.code || plan.id,
+        months,
+        extraBranches: isPro ? extraBranches : 0,
+        hasStaffManagementAddon: isPro ? true : hasStaffAddon,
+        extraStorageGb,
+        requestId: idempotencyKeyRef.current,
+        paymentMethod: "Wallet",
+      });
 
       if (res.success && res.data) {
         setIsProcessing(false);
         setIsCompleted(true);
         setTimeout(() => {
           onSuccess({
-            planName:
-              res.data.planName ||
-              (isTrialPlan ? "Gói Dùng Thử (3 Ngày)" : plan.name),
-            months: isTrialPlan ? 0 : months + bonusMonths,
+            planName: res.data.planName || plan.name,
+            months: months + bonusMonths,
             totalAmount: res.data.totalAmount || grandTotal,
             paymentMethod: "Wallet",
             subscriptionExpiresAt: res.data.subscriptionExpiresAt,
-            daysRemaining:
-              res.data.daysRemaining || (isTrialPlan ? 3 : undefined),
+            daysRemaining: res.data.daysRemaining,
           });
-        }, 800);
+        }, 600);
         return;
       }
 
-      if (!res.success) {
-        setIsProcessing(false);
-        alert(res.message || "Thanh toán không thành công.");
-        return;
-      }
+      setIsProcessing(false);
+      setErrorMessage(res.message || "Thanh toán không thành công.");
     } catch (err: unknown) {
-      console.warn("API purchase fallback triggered:", err);
+      setIsProcessing(false);
+      setErrorMessage(mapStoreProblemMessage(err));
     }
-
-    setIsProcessing(false);
-    setIsCompleted(true);
-    setTimeout(() => {
-      onSuccess({
-        planName: isTrialPlan ? "Gói Dùng Thử (3 Ngày)" : plan.name,
-        months: isTrialPlan ? 0 : months + bonusMonths,
-        totalAmount: grandTotal,
-        paymentMethod: "Wallet",
-        daysRemaining: isTrialPlan ? 3 : undefined,
-      });
-    }, 800);
   };
 
   return (
-    <div className="store-modal-backdrop" onClick={onClose}>
+    <div className="store-modal-backdrop" onClick={() => !isProcessing && onClose()}>
       <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="checkout-modal-title"
         className="store-modal-dialog"
         onClick={(e) => e.stopPropagation()}
         style={{
@@ -222,6 +280,7 @@ export const SubscriptionCheckoutModal: FC<SubscriptionCheckoutModalProps> = ({
             </div>
             <div>
               <h3
+                id="checkout-modal-title"
                 style={{
                   margin: 0,
                   fontSize: 16.5,
@@ -1338,6 +1397,28 @@ export const SubscriptionCheckoutModal: FC<SubscriptionCheckoutModalProps> = ({
                     </div>
                   </div>
                 </>
+              )}
+
+              {errorMessage && (
+                <div
+                  role="alert"
+                  style={{
+                    marginTop: 10,
+                    padding: "10px 14px",
+                    borderRadius: 12,
+                    border: "1px solid #FECACA",
+                    backgroundColor: "#FEF2F2",
+                    color: "#B91C1C",
+                    fontSize: 13,
+                    fontWeight: 600,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                  }}
+                >
+                  <AlertCircle size={16} style={{ flexShrink: 0 }} />
+                  <span>{errorMessage}</span>
+                </div>
               )}
 
               {/* Action Buttons */}

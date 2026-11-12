@@ -57,6 +57,9 @@ export interface RegisterPayload {
   password: string;
   agreeTerms: boolean;
   otpCode?: string;
+  startTrial?: boolean;
+  idempotencyKey?: string;
+  challengeId?: string | null;
 }
 
 export interface SendRegistrationOtpPayload {
@@ -64,6 +67,7 @@ export interface SendRegistrationOtpPayload {
   storeName?: string;
   fullName?: string;
   email: string;
+  startTrial?: boolean;
 }
 
 export interface SendRegistrationOtpResult {
@@ -73,6 +77,7 @@ export interface SendRegistrationOtpResult {
   expiresInSeconds: number;
   isRealEmailSent: boolean;
   devOtpCode?: string | null;
+  challengeId?: string | null;
 }
 
 export interface AuthResponse {

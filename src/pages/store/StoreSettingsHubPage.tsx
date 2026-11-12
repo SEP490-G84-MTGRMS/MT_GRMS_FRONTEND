@@ -3,6 +3,7 @@ import { useState, useEffect, type FC } from "react";
 import { useSearchParams, useNavigate, Navigate } from "react-router-dom";
 import {
   INITIAL_STORE_INFO,
+  SUBSCRIPTION_PLANS,
   type StoreInfo,
   type SubscriptionPlanItem,
 } from "./storeData";
@@ -11,6 +12,7 @@ import {
   type StoreHubTabKey,
 } from "./components/StoreSidebarNav";
 import { StoreTopStatusBar } from "./components/StoreTopStatusBar";
+import { StoreInfoTab } from "./components/StoreInfoTab";
 import { SubscriptionPricingCards } from "./components/SubscriptionPricingCards";
 import { SubscriptionCheckoutModal } from "./components/SubscriptionCheckoutModal";
 import { StoreWalletTopupModal } from "./components/StoreWalletTopupModal";
@@ -18,9 +20,10 @@ import { OrderHistoryTab } from "./components/OrderHistoryTab";
 import { TermsOfServiceTab } from "./components/TermsOfServiceTab";
 import { WalletLedgerTab } from "./components/WalletLedgerTab";
 import { BranchManagementTab } from "./components/BranchManagementTab";
-import { storeApi, mapBackendStoreToFrontend } from "./api/storeApi";
+import { storeApi, mapBackendStoreToFrontend, type TrialStatus } from "./api/storeApi";
 import { StorageAddonCard } from "./components/StorageAddonCard";
 import { BranchAddonModal } from "./components/BranchAddonModal";
+import { TrialStatusBanner } from "./components/TrialStatusBanner";
 
 const VALID_TABS: StoreHubTabKey[] = [
   "store-info",
@@ -35,11 +38,7 @@ export const StoreSettingsHubPage: FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const rawTab = searchParams.get("tab");
-
-  // Nếu người dùng truy cập tab tài khoản cá nhân, chuyển hướng sang trang Profile riêng
-  if (rawTab === "account-profile") {
-    return <Navigate to="/store-owner/account?tab=account-profile" replace />;
-  }
+  const isAccountProfileRedirect = rawTab === "account-profile";
 
   const tabParam = rawTab as StoreHubTabKey | null;
 
@@ -47,39 +46,81 @@ export const StoreSettingsHubPage: FC = () => {
     tabParam && VALID_TABS.includes(tabParam) ? tabParam : "store-info",
   );
 
-  const [storeInfo, setStoreInfo] = useState<StoreInfo>(INITIAL_STORE_INFO);
+  const [storeInfo, setStoreInfo] = useState<StoreInfo>({
+    ...INITIAL_STORE_INFO,
+    name: "Đang tải...",
+    currentPlan: "Đang tải...",
+    subscriptionExpiresAt: "Chưa kích hoạt",
+    daysRemaining: 0,
+    branchesCount: 1,
+    walletBalance: 0,
+  });
+  const [trialStatus, setTrialStatus] = useState<TrialStatus | null>(null);
   const [walletRefreshKey, setWalletRefreshKey] = useState<number>(0);
 
   const [selectedPlanForCheckout, setSelectedPlanForCheckout] =
     useState<SubscriptionPlanItem | null>(null);
   const [showTopupModal, setShowTopupModal] = useState<boolean>(false);
   const [showBranchAddonModal, setShowBranchAddonModal] = useState<boolean>(false);
-  const currentPlanCode = storeInfo.currentPlan.toUpperCase();
-  const isStandardPlan = currentPlanCode.includes("STANDARD") || currentPlanCode.includes("THƯỜNG");
-  const isProPlan = currentPlanCode.includes("PRO");
-
-  // Load real store info from Backend API
-  useEffect(() => {
-    const fetchStore = async () => {
-      try {
-        const res = await storeApi.getStoreInfo();
-        if (res.success && res.data) {
-          setStoreInfo((prev) =>
-            mapBackendStoreToFrontend(res.data, prev.walletBalance),
-          );
-        }
-      } catch {
-        // Giữ mock fallback nếu mạng lỗi
+  const isEligibleNoPlan = trialStatus?.state === "ELIGIBLE";
+  const effectiveStoreInfo: StoreInfo = isEligibleNoPlan
+    ? {
+        ...storeInfo,
+        currentPlan: "Chưa kích hoạt",
+        subscriptionExpiresAt: "Chưa kích hoạt",
+        daysRemaining: 0,
       }
-    };
-    fetchStore();
-  }, []);
+    : storeInfo;
+  const currentPlanCode = effectiveStoreInfo.currentPlan.toUpperCase();
+  const isStandardPlan =
+    !isEligibleNoPlan &&
+    (currentPlanCode.includes("STANDARD") || currentPlanCode.includes("THƯỜNG"));
+  const isProPlan = !isEligibleNoPlan && currentPlanCode.includes("PRO");
+
+  const refreshStoreAndTrialStatus = async () => {
+    try {
+      const [infoRes, trialRes] = await Promise.allSettled([
+        storeApi.getStoreInfo(),
+        storeApi.getTrialStatus(),
+      ]);
+      if (infoRes.status === "fulfilled" && infoRes.value.success && infoRes.value.data) {
+        setStoreInfo((prev) =>
+          mapBackendStoreToFrontend(infoRes.value.data, prev.walletBalance),
+        );
+      }
+      if (trialRes.status === "fulfilled" && trialRes.value.success && trialRes.value.data) {
+        setTrialStatus(trialRes.value.data);
+      }
+    } catch {
+      // Giữ trạng thái hiện tại nếu mạng lỗi
+    }
+  };
+
+  // Load real store info + trial onboarding status from Backend API
+  useEffect(() => {
+    if (isAccountProfileRedirect) return;
+    let active = true;
+    Promise.allSettled([storeApi.getStoreInfo(), storeApi.getTrialStatus()]).then(([infoRes, trialRes]) => {
+      if (!active) return;
+      if (infoRes.status === "fulfilled" && infoRes.value.success && infoRes.value.data) {
+        setStoreInfo((prev) => mapBackendStoreToFrontend(infoRes.value.data, prev.walletBalance));
+      }
+      if (trialRes.status === "fulfilled" && trialRes.value.success && trialRes.value.data) {
+        setTrialStatus(trialRes.value.data);
+      }
+    });
+    return () => { active = false; };
+  }, [isAccountProfileRedirect]);
 
   useEffect(() => {
     if (tabParam && tabParam !== activeTab && VALID_TABS.includes(tabParam)) {
       setActiveTab(tabParam);
     }
   }, [tabParam, activeTab]);
+
+  if (isAccountProfileRedirect) {
+    return <Navigate to="/store-owner/account?tab=account-profile" replace />;
+  }
 
   // Điều hướng chuyển tab khi click sidebar
   const handleSelectTab = (tab: StoreHubTabKey) => {
@@ -137,6 +178,34 @@ export const StoreSettingsHubPage: FC = () => {
     }));
     setWalletRefreshKey((k) => k + 1);
     setSelectedPlanForCheckout(null);
+    refreshStoreAndTrialStatus();
+  };
+
+  const trialPlanItem =
+    SUBSCRIPTION_PLANS.find((p) => p.code === "TRIAL") ?? SUBSCRIPTION_PLANS[0];
+
+  const handleUpdateStoreInfo = async (
+    updated: Partial<StoreInfo>,
+  ): Promise<boolean> => {
+    try {
+      const res = await storeApi.updateStoreInfo({
+        name: updated.name || storeInfo.name,
+        taxCode: updated.taxCode,
+        hotline: updated.hotline,
+        address: updated.address,
+        city: updated.city,
+      });
+      if (res.success && res.data) {
+        setStoreInfo((prev) =>
+          mapBackendStoreToFrontend(res.data, prev.walletBalance),
+        );
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error("Update store info error:", error);
+      return false;
+    }
   };
 
   return (
@@ -148,13 +217,26 @@ export const StoreSettingsHubPage: FC = () => {
       <div className="store-hub-main">
         {/* Top Status Bar */}
         <StoreTopStatusBar
-          storeInfo={storeInfo}
+          storeInfo={effectiveStoreInfo}
           onNavigateBranches={() => handleSelectTab("branches")}
         />
+
+        {/* Tab 0: Thông tin gian hàng */}
+        {activeTab === "store-info" && (
+          <StoreInfoTab
+            storeInfo={effectiveStoreInfo}
+            onUpdateStoreInfo={handleUpdateStoreInfo}
+          />
+        )}
 
         {/* Tab 1: Gói dịch vụ */}
         {activeTab === "subscriptions" && (
           <div style={{ width: "100%" }}>
+            <TrialStatusBanner
+              trialStatus={trialStatus}
+              onStartTrial={() => setSelectedPlanForCheckout(trialPlanItem)}
+              onOpenWallet={() => handleSelectTab("wallet")}
+            />
             {isStandardPlan && <StorageAddonCard
               onPurchased={(amount) => {
                 setStoreInfo((prev) => ({ ...prev, walletBalance: Math.max(0, prev.walletBalance - amount) }));
@@ -167,7 +249,8 @@ export const StoreSettingsHubPage: FC = () => {
             </section>}
             <SubscriptionPricingCards
               onSelectPlan={(plan) => setSelectedPlanForCheckout(plan)}
-              currentPlanName={storeInfo.currentPlan}
+              currentPlanName={effectiveStoreInfo.currentPlan}
+              trialState={trialStatus?.state ?? null}
             />
           </div>
         )}

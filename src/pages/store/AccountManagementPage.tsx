@@ -15,9 +15,12 @@ import { WalletLedgerTab } from './components/WalletLedgerTab';
 import { TermsOfServiceTab } from './components/TermsOfServiceTab';
 import { StoreWalletTopupModal } from './components/StoreWalletTopupModal';
 import { storeApi, mapBackendStoreToFrontend } from './api/storeApi';
+import { authService } from '../../features/auth/authService';
+import { useAuthStore } from '../../stores/useAuthStore';
 
 export const AccountManagementPage: FC = () => {
   const [searchParams] = useSearchParams();
+  const { user: authUser } = useAuthStore();
   const tabParam = searchParams.get('tab') as AccountTabKey | null;
 
   const [activeTab, setActiveTab] = useState<AccountTabKey>(
@@ -26,24 +29,66 @@ export const AccountManagementPage: FC = () => {
       : 'account-profile'
   );
 
-  const [userProfile, setUserProfile] = useState<UserProfile>(INITIAL_USER_PROFILE);
+  const [userProfile, setUserProfile] = useState<UserProfile>(() =>
+    authUser
+      ? {
+          ...INITIAL_USER_PROFILE,
+          userId: authUser.id,
+          fullName: authUser.fullName || INITIAL_USER_PROFILE.fullName,
+          userName: authUser.phone || authUser.email || INITIAL_USER_PROFILE.userName,
+          role: authUser.role || INITIAL_USER_PROFILE.role,
+          phone: authUser.phone || '',
+          email: authUser.email || '',
+        }
+      : INITIAL_USER_PROFILE
+  );
   const [sessions, setSessions] = useState<UserSessionItem[]>(INITIAL_SESSIONS);
   const [storeInfo, setStoreInfo] = useState<StoreInfo>(INITIAL_STORE_INFO);
   const [walletRefreshKey, setWalletRefreshKey] = useState<number>(0);
   const [showTopupModal, setShowTopupModal] = useState<boolean>(false);
 
   useEffect(() => {
-    const fetchStore = async () => {
-      try {
-        const res = await storeApi.getStoreInfo();
-        if (res.success && res.data) {
-          setStoreInfo((prev) => mapBackendStoreToFrontend(res.data, prev.walletBalance));
-        }
-      } catch {
-        // Bỏ qua nếu chưa lấy được thông tin gian hàng
+    let active = true;
+    const fetchAccountData = async () => {
+      const [storeRes, meRes, twoFactorRes] = await Promise.allSettled([
+        storeApi.getStoreInfo(),
+        authService.getMe(),
+        authService.getTwoFactorStatus(),
+      ]);
+      if (!active) return;
+
+      if (storeRes.status === 'fulfilled' && storeRes.value.success && storeRes.value.data) {
+        setStoreInfo((prev) => mapBackendStoreToFrontend(storeRes.value.data, prev.walletBalance));
+      }
+      if (meRes.status === 'fulfilled' && meRes.value) {
+        const me = meRes.value;
+        setUserProfile((prev) => ({
+          ...prev,
+          userId: me.id,
+          fullName: me.fullName || prev.fullName,
+          userName: me.phone || me.email || prev.userName,
+          role: me.role || prev.role,
+          phone: me.phone || '',
+          email: me.email || '',
+          note: storeRes.status === 'fulfilled' && storeRes.value.success && storeRes.value.data
+            ? `Quản trị gian hàng ${storeRes.value.data.name}`
+            : prev.note,
+          address: storeRes.status === 'fulfilled' && storeRes.value.success && storeRes.value.data?.address
+            ? storeRes.value.data.address
+            : prev.address,
+        }));
+      }
+      if (twoFactorRes.status === 'fulfilled' && twoFactorRes.value) {
+        setUserProfile((prev) => ({
+          ...prev,
+          isTwoFactorEnabled: Boolean(twoFactorRes.value.enabled),
+        }));
       }
     };
-    fetchStore();
+    fetchAccountData();
+    return () => {
+      active = false;
+    };
   }, []);
 
   useEffect(() => {

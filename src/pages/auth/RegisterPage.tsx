@@ -1,6 +1,6 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import type { FC, FormEvent } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   ArrowLeft,
   User,
@@ -20,8 +20,13 @@ import { authService } from "../../features/auth/authService";
 import { RegistrationOtpModal } from "../../features/auth/components/RegistrationOtpModal";
 import { useAuthStore } from "../../stores/useAuthStore";
 
+export const isTrialRegistrationIntent = (intent: string | null) => intent === "trial";
+
 export const RegisterPage: FC = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const startTrial = isTrialRegistrationIntent(searchParams.get("intent"));
+  const registrationIdempotencyKey = useRef(crypto.randomUUID());
   const setAuth = useAuthStore((state) => state.setAuth);
 
   const [fullName, setFullName] = useState("");
@@ -41,6 +46,7 @@ export const RegisterPage: FC = () => {
 
   // State cho bước xác thực Email OTP kích hoạt cửa hàng
   const [isOtpModalOpen, setIsOtpModalOpen] = useState(false);
+  const [challengeId, setChallengeId] = useState<string | null>(null);
   const [maskedEmail, setMaskedEmail] = useState("");
   const [isRealEmailSent, setIsRealEmailSent] = useState(false);
   const [devOtpCode, setDevOtpCode] = useState<string | null>(null);
@@ -142,8 +148,11 @@ export const RegisterPage: FC = () => {
         email: email.trim(),
         storeName: storeName.trim(),
         fullName: fullName.trim(),
+        startTrial,
       });
 
+      registrationIdempotencyKey.current = crypto.randomUUID();
+      setChallengeId(otpRes.challengeId ?? null);
       setMaskedEmail(otpRes.maskedEmail);
       setIsRealEmailSent(otpRes.isRealEmailSent);
       setDevOtpCode(otpRes.devOtpCode ?? null);
@@ -173,6 +182,9 @@ export const RegisterPage: FC = () => {
         password,
         agreeTerms,
         otpCode,
+        startTrial,
+        idempotencyKey: registrationIdempotencyKey.current,
+        challengeId,
       });
 
       setIsOtpModalOpen(false);
@@ -198,7 +210,10 @@ export const RegisterPage: FC = () => {
         email: email.trim(),
         storeName: storeName.trim(),
         fullName: fullName.trim(),
+        startTrial,
       });
+      registrationIdempotencyKey.current = crypto.randomUUID();
+      setChallengeId(otpRes.challengeId ?? null);
       setMaskedEmail(otpRes.maskedEmail);
       setIsRealEmailSent(otpRes.isRealEmailSent);
       setDevOtpCode(otpRes.devOtpCode ?? null);
@@ -250,16 +265,17 @@ export const RegisterPage: FC = () => {
               lineHeight: 1.5,
             }}
           >
-            Chào mừng bạn đến với hệ thống bán lẻ <strong>MT-GRMS</strong>. Cửa
-            hàng <strong>{storeName}</strong> của bạn đã sẵn sàng trải nghiệm.
+            {startTrial
+              ? <>Trial 3 ngày của <strong>{storeName}</strong> bắt đầu từ lúc đăng ký thành công, không cần thẻ và không tự động gia hạn.</>
+              : <>Cửa hàng <strong>{storeName}</strong> đã được tạo. Hãy chọn gói dịch vụ trước khi sử dụng chức năng kinh doanh.</>}
           </p>
           <button
             type="button"
             className="auth-cta-primary-btn"
             style={{ maxWidth: "320px" }}
-            onClick={() => navigate("/store-owner/dashboard")}
+            onClick={() => navigate(startTrial ? "/store-owner/dashboard" : "/store-owner/subscriptions?tab=subscriptions&onboarding=1")}
           >
-            <span>Vào trang Quản trị cửa hàng</span>
+            <span>{startTrial ? "Vào trang Quản trị cửa hàng" : "Chọn gói dịch vụ"}</span>
             <ArrowRight size={18} strokeWidth={2.2} />
           </button>
         </div>
@@ -277,6 +293,13 @@ export const RegisterPage: FC = () => {
       </div>
 
       <h1 className="auth-card-heading">Đăng ký mở cửa hàng</h1>
+
+      {startTrial && (
+        <div className="auth-alert" role="status" style={{ marginBottom: "14px" }}>
+          <ShieldCheck size={17} strokeWidth={2} />
+          <span>Dùng thử miễn phí 3 ngày. 72 giờ bắt đầu ngay khi đăng ký thành công, không cần thẻ và không tự động gia hạn.</span>
+        </div>
+      )}
 
       {errorMessage && (
         <div
