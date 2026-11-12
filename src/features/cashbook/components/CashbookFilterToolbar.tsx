@@ -14,12 +14,14 @@ interface CashbookFilterToolbarProps {
   filters: CashbookFilterParams;
   onChangeFilter: (updated: Partial<CashbookFilterParams>) => void;
   onResetFilter: () => void;
+  branches?: { id: string; name: string }[];
 }
 
 export const CashbookFilterToolbar: FC<CashbookFilterToolbarProps> = ({
   filters,
   onChangeFilter,
   onResetFilter,
+  branches,
 }) => {
   const [searchInput, setSearchInput] = useState(filters.searchQuery || '');
   const [isCustomDate, setIsCustomDate] = useState(filters.datePeriod === 'custom');
@@ -46,8 +48,12 @@ export const CashbookFilterToolbar: FC<CashbookFilterToolbarProps> = ({
 
   const branchOptions = [
     { id: 'ALL', label: 'Toàn hệ thống' },
-    { id: 'BR-01', label: 'Chi nhánh Q1' },
-    { id: 'BR-02', label: 'Chi nhánh Q7' },
+    ...(branches && branches.length > 0
+      ? branches.map((b) => ({ id: b.id, label: b.name }))
+      : [
+          { id: 'BR-01', label: 'Chi nhánh Q1' },
+          { id: 'BR-02', label: 'Chi nhánh Q7' },
+        ]),
   ];
 
   const typeOptions = [

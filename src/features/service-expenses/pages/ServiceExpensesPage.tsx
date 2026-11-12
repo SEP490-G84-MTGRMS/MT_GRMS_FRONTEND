@@ -10,6 +10,7 @@ import {
 } from '../../admin/components';
 import { BillPreviewModal } from '../components/BillPreviewModal';
 import { CreateExpenseModal } from '../components/CreateExpenseModal';
+import { ConfirmModal } from '../../../components/common';
 import { ExpenseFilterBar } from '../components/ExpenseFilterBar';
 import { ExpenseKpiCards } from '../components/ExpenseKpiCards';
 import { ExpenseTable } from '../components/ExpenseTable';
@@ -125,6 +126,7 @@ export const ServiceExpensesPage: FC = () => {
   // Modals state
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [payingItem, setPayingItem] = useState<ServiceExpenseDto | null>(null);
+  const [cancelingItem, setCancelingItem] = useState<ServiceExpenseDto | null>(null);
   const [previewBill, setPreviewBill] = useState<{
     url: string;
     title: string;
@@ -230,23 +232,28 @@ export const ServiceExpensesPage: FC = () => {
     }
   };
 
-  const handleCancelClick = async (item: ServiceExpenseDto) => {
-    const confirm = window.confirm(
-      `Bạn có chắc chắn muốn hủy khoản chi "${item.expenseId} - ${item.vendorName}"? Thao tác này không thể hoàn tác.`
-    );
-    if (!confirm) return;
+  const handleCancelClick = (item: ServiceExpenseDto) => {
+    setCancelingItem(item);
+  };
 
-    await cancelExpenseMutation.mutateAsync({
-      expenseId: item.expenseId,
-      reason: 'Người dùng hủy thao tác trên hệ thống quản lý',
-    });
-    showToast('Đã hủy khoản chi phí thành công.', 'info');
+  const handleConfirmCancel = async () => {
+    if (!cancelingItem) return;
+    try {
+      await cancelExpenseMutation.mutateAsync({
+        expenseId: cancelingItem.expenseId,
+        reason: 'Người dùng hủy thao tác trên hệ thống quản lý',
+      });
+      showToast('Đã hủy khoản chi phí thành công.', 'info');
+      setCancelingItem(null);
+    } catch (err: unknown) {
+      showToast(err instanceof Error ? err.message : 'Lỗi khi hủy khoản chi', 'error');
+    }
   };
 
   const todayIso = new Date().toISOString().substring(0, 10);
   const clientOverdueCount = expensesData?.items
     ? expensesData.items.filter(
-        (i) => i.status === 'Pending' && i.dueDate && i.dueDate < todayIso
+        (i) => i.status === 'Pending' && Boolean(i.dueDate) && i.dueDate < todayIso
       ).length
     : 0;
 
@@ -390,6 +397,20 @@ export const ServiceExpensesPage: FC = () => {
         onClose={() => setPreviewBill(null)}
         imageUrl={previewBill?.url || null}
         title={previewBill?.title || ''}
+      />
+
+      {/* Cancel Confirmation Modal */}
+      <ConfirmModal
+        isOpen={Boolean(cancelingItem)}
+        onClose={() => setCancelingItem(null)}
+        onConfirm={handleConfirmCancel}
+        title="Xác nhận hủy khoản chi phí"
+        itemName={cancelingItem ? `${cancelingItem.expenseId} - ${cancelingItem.vendorName}` : ''}
+        message="Khoản chi sau khi hủy sẽ không thể hoàn tác hoặc tiếp tục thanh toán. Bạn có chắc chắn muốn hủy không?"
+        confirmText="Đồng ý hủy"
+        cancelText="Đóng"
+        variant="danger"
+        isLoading={cancelExpenseMutation.isPending}
       />
     </div>
   );

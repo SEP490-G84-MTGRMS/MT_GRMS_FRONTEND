@@ -65,7 +65,7 @@ function mapVoucherToExpenseDto(v: any): ServiceExpenseDto {
     status: statusStr,
     approvalStatus: v.status || '',
     expenseDate: dateStr,
-    dueDate: dateStr,
+    dueDate: v.dueDate ? String(v.dueDate).substring(0, 10) : (v.paymentDueDate ? String(v.paymentDueDate).substring(0, 10) : ''),
     vendorName: v.beneficiaryName || 'Nhà cung cấp',
     cashBookId: v.paymentSourceAccountId || null,
     attachedBillUrl: v.evidenceAttachmentUrl || null,

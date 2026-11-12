@@ -64,6 +64,7 @@ interface PnlReportBodyProps {
   showAccountingDetails: boolean;
   onToggleAccountingDetails: () => void;
   onOpenExportModal: () => void;
+  onShowToast?: (message: string, type?: ToastState['type']) => void;
 }
 
 /**
@@ -79,6 +80,7 @@ export function buildWaterfallItems(
   const opexTotal = (kpi?.operatingExpenses ?? 0) + (kpi?.shrinkageLoss ?? 0);
   const taxVal = kpi?.estimatedTaxAmount ?? 0;
   const netProfitVal = kpi?.netProfitAfterTax ?? 0;
+  const taxPct = netRev > 0 ? Math.round((taxVal / netRev) * 1000) / 10 : 1.5;
 
   return [
     {
@@ -98,8 +100,13 @@ export function buildWaterfallItems(
       type: 'negative', subLabel: 'Điện nước, thuê cửa hàng, nhân sự & xóa nợ xấu',
     },
     {
-      id: 'tax', label: 'Nghĩa vụ thuế HKD (1.5%)', amount: -taxVal,
-      type: 'negative', subLabel: 'GTGT 1.0% + TNCN 0.5% theo TT 152/2025/TT-BTC',
+      id: 'tax',
+      label: `Nghĩa vụ thuế HKD (${taxPct}%)`,
+      amount: -taxVal,
+      type: 'negative',
+      subLabel: taxPct === 1.5
+        ? 'GTGT 1.0% + TNCN 0.5% theo TT 152/2025/TT-BTC'
+        : `GTGT + TNCN (thuế suất hiệu dụng ${taxPct}%)`,
     },
     {
       id: 'net', label: 'LỢI NHUẬN RÒNG THỰC NHẬN', amount: netProfitVal,
@@ -352,6 +359,7 @@ const PnlReportBody: React.FC<PnlReportBodyProps> = ({
   filter, onFilterChange, branches, reportData, isLoading, isFetching = false,
   errorMsg, onRefresh, hideRefreshButton = false, activeTab, accountingBasis,
   accountingMode, showAccountingDetails, onToggleAccountingDetails, onOpenExportModal,
+  onShowToast,
 }) => {
   const metrics = computePnlSummaryMetrics(reportData?.kpiSummary);
   const waterfallItems = buildWaterfallItems(reportData?.kpiSummary, metrics.grossMarginDisplay);
@@ -364,6 +372,7 @@ const PnlReportBody: React.FC<PnlReportBodyProps> = ({
         branches={branches} filter={filter} isLoading={isLoading || Boolean(isFetching)}
         onFilterChange={onFilterChange} onOpenExportModal={onOpenExportModal}
         onRefresh={onRefresh} hideRefresh={hideRefreshButton}
+        onShowToast={onShowToast}
       />
       {errorMsg && <PnlErrorBanner message={errorMsg} />}
       <PnlStoryBanner
@@ -423,6 +432,7 @@ export const PnlReportSection: React.FC<PnlReportSectionProps> = (props) => {
         accountingBasis={accountingBasis} accountingMode={accountingMode} showAccountingDetails={showAccountingDetails}
         onToggleAccountingDetails={() => setShowAccountingDetails((prev) => !prev)}
         onOpenExportModal={exportModal.openModal}
+        onShowToast={onShowToast}
       />
       {reportData && (
         <PnlExportModal

@@ -257,7 +257,7 @@ const NAV_GROUPS: NavGroup[] = [
       {
         label: "Chi phí & hóa đơn phải trả",
         to: "/store-owner/expenses",
-        desc: "Tiền điện, mặt bằng, bảo trì (đã bỏ mục trùng)",
+        desc: "Tiền điện, mặt bằng, bảo trì",
         icon: "🧾",
       },
       {

@@ -281,6 +281,45 @@ describe('FE-07 Service Expenses API & Workflow Tests', () => {
       expect(paidOnly.items).toHaveLength(1);
       expect(paidOnly.items[0].voucherCode).toBe('EXP-2');
     });
+
+    it('TC-EXP-11: should map dueDate correctly without falling back to expenseDate', async () => {
+      const mockList = {
+        data: {
+          success: true,
+          data: [
+            {
+              id: '11111111-1111-1111-1111-111111111111',
+              voucherCode: 'EXP-WITH-DUEDATE',
+              status: 'Approved',
+              expenseDate: '2026-11-01T10:00:00Z',
+              dueDate: '2026-11-20T00:00:00Z',
+            },
+            {
+              id: '22222222-2222-2222-2222-222222222222',
+              voucherCode: 'EXP-WITH-PAYMENTDUEDATE',
+              status: 'Approved',
+              expenseDate: '2026-11-01T10:00:00Z',
+              paymentDueDate: '2026-11-25T00:00:00Z',
+            },
+            {
+              id: '33333333-3333-3333-3333-333333333333',
+              voucherCode: 'EXP-NO-DUEDATE',
+              status: 'Approved',
+              expenseDate: '2026-11-01T10:00:00Z',
+            },
+          ],
+        },
+      };
+
+      vi.spyOn(financeHttpClient, 'get').mockResolvedValueOnce(mockList as any);
+
+      const result = await expenseApi.getServiceExpenses();
+      expect(result.items).toHaveLength(3);
+      expect(result.items[0].dueDate).toBe('2026-11-20');
+      expect(result.items[1].dueDate).toBe('2026-11-25');
+      expect(result.items[2].dueDate).toBe('');
+      expect(result.items[2].expenseDate).toBe('2026-11-01');
+    });
   });
 });
 

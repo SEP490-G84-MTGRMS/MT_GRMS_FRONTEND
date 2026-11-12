@@ -1,7 +1,7 @@
 import { useSearchParams } from 'react-router-dom';
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { FC } from 'react';
-import { Truck, CheckCircle, Plus, MoreHorizontal, FileSpreadsheet, ArrowRightLeft, AlertTriangle, Inbox, ChevronDown, Landmark, Wallet, Search } from 'lucide-react';
+import { Truck, CheckCircle, Plus, MoreHorizontal, FileSpreadsheet, ArrowRightLeft, AlertTriangle, ChevronDown, Landmark, Wallet, Search, X } from 'lucide-react';
 import type {
   CashAccount,
   LedgerTransaction,
@@ -24,6 +24,7 @@ import { CashReconciliationModal } from '../components/CashReconciliationModal';
 import { CashbookExportModal } from '../components/CashbookExportModal';
 import { TriageInboxModal } from '../components/TriageInboxModal';
 import { AdminToast, type ToastState } from '../../admin/components/common/AdminToast';
+import { employeeApi } from '../../employee/api/employeeApi';
 import { formatMoney } from '../../finance/utils/formatters';
 import '../cashbook.css';
 import { useAuthStore } from '../../../stores/useAuthStore';
@@ -41,6 +42,23 @@ export const CashbookPage: FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [isLoading, setIsLoading] = useState(false);
+  const [branches, setBranches] = useState<{ id: string; name: string }[]>([]);
+
+  // Tải danh sách chi nhánh để hiển thị linh hoạt trong bộ lọc
+  useEffect(() => {
+    let isMounted = true;
+    employeeApi
+      .getBranches()
+      .then((list) => {
+        if (isMounted && list && list.length > 0) {
+          setBranches(list);
+        }
+      })
+      .catch((err) => console.warn('Could not load branches in Cashbook:', err));
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const [filters, setFilters] = useState<CashbookFilterParams>({
     branchId: 'ALL',
@@ -51,6 +69,37 @@ export const CashbookPage: FC = () => {
   });
 
   useEffect(() => {
+    // Initial sync from active branch storage
+    try {
+      const stored = localStorage.getItem('mtgrms_active_branch');
+      if (stored) {
+        const b = JSON.parse(stored);
+        if (b?.id) {
+          setFilters((prev) => ({ ...prev, branchId: b.id }));
+          setCurrentPage(1);
+        }
+      }
+    } catch {}
+
+    const handleGlobalBranchChange = (e: Event) => {
+      const customEvent = e as CustomEvent<{ id?: string }>;
+      const branch = customEvent.detail;
+      if (branch?.id) {
+        setFilters((prev) => ({
+          ...prev,
+          branchId: branch.id,
+        }));
+        setCurrentPage(1);
+      }
+    };
+
+    window.addEventListener('mtgrms:branch-changed', handleGlobalBranchChange);
+    return () => {
+      window.removeEventListener('mtgrms:branch-changed', handleGlobalBranchChange);
+    };
+  }, []);
+
+  useEffect(() => {
     if (urlSearch) {
       setFilters((prev) => ({
         ...prev,
@@ -59,6 +108,7 @@ export const CashbookPage: FC = () => {
         startDate: undefined,
         endDate: undefined,
       }));
+      setCurrentPage(1);
     }
   }, [urlSearch]);
 
@@ -79,6 +129,7 @@ export const CashbookPage: FC = () => {
       );
     }
     setFilters((prev) => ({ ...prev, ...updated }));
+    setCurrentPage(1);
   };
 
   const handleResetFilters = () => {
@@ -100,16 +151,17 @@ export const CashbookPage: FC = () => {
       startDate: undefined,
       endDate: undefined,
     });
+    setCurrentPage(1);
   };
 
   const [summaryKPI, setSummaryKPI] = useState<CashbookSummaryKPI>({
-    totalOpeningBalance: 345_050_000, // Standardized per Decision D2
-    totalReceipts: 16_450_000,
-    totalPayments: 2_200_000,
-    totalClosingBalance: 359_300_000, // 345.050.000 + 16.450.000 - 2.200.000
-    totalCashInDrawers: 20_700_000,
-    totalBankDeposits: 178_250_000,
-    totalSafeDepositBalance: 150_000_000,
+    totalOpeningBalance: 0,
+    totalReceipts: 0,
+    totalPayments: 0,
+    totalClosingBalance: 0,
+    totalCashInDrawers: 0,
+    totalBankDeposits: 0,
+    totalSafeDepositBalance: 0,
   });
 
   // Modal States
@@ -176,7 +228,7 @@ export const CashbookPage: FC = () => {
       const branchParam = filters.branchId !== 'ALL' ? filters.branchId : undefined;
       const [accs, trns, kpis, txResult] = await Promise.all([
         cashbookService.getCashAccounts(branchParam),
-        cashbookService.getCashTransits(),
+        cashbookService.getCashTransits(branchParam),
         cashbookService.getSummaryKPI(branchParam),
         cashbookService.getTransactions(filters, currentPage, pageSize),
       ]);
@@ -264,41 +316,76 @@ export const CashbookPage: FC = () => {
     }
   };
 
-  // Report Cash Transit Discrepancy
-  const handleReportTransitDiscrepancy = async (transitId: string) => {
-    const reason = window.prompt(
-      'Báo lệch tiền điều chuyển về Két sắt:\n\nNhập lý do chênh lệch hoặc số tiền thực nhận:'
-    );
-    if (!reason || !reason.trim()) return;
+  // Reason Prompt Modal State (Enterprise UX standard - replaces primitive window.prompt)
+  const [reasonPrompt, setReasonPrompt] = useState<{
+    isOpen: boolean;
+    title: string;
+    description: string;
+    placeholder?: string;
+    confirmText?: string;
+    variant?: 'danger' | 'warning' | 'primary';
+    onSubmit: (val: string) => Promise<void>;
+  } | null>(null);
+  const [reasonValue, setReasonValue] = useState('');
+  const [isSubmittingReason, setIsSubmittingReason] = useState(false);
+  const [reasonError, setReasonError] = useState('');
 
-    try {
-      await cashbookService.reportTransitDiscrepancy(transitId, reason.trim());
-      showToast('Đã ghi nhận chênh lệch tiền chuyển về két sắt', 'warning');
-      void loadData();
-    } catch (err: unknown) {
-      showToast(err instanceof Error ? err.message : 'Lỗi ghi nhận chênh lệch', 'error');
-    }
+  // Report Cash Transit Discrepancy
+  const handleReportTransitDiscrepancy = (transitId: string) => {
+    setReasonValue('');
+    setReasonError('');
+    setReasonPrompt({
+      isOpen: true,
+      title: 'Báo lệch tiền điều chuyển về Két sắt',
+      description: 'Nhập thông tin lý do chênh lệch hoặc số tiền thực tế nhận được khi rút két bàn giao:',
+      placeholder: 'VD: Thực nhận 1.450.000đ do thiếu 50.000đ tiền lẻ...',
+      confirmText: 'Ghi nhận chênh lệch',
+      variant: 'warning',
+      onSubmit: async (reason: string) => {
+        await cashbookService.reportTransitDiscrepancy(transitId, reason);
+        showToast('Đã ghi nhận chênh lệch tiền chuyển về két sắt', 'warning');
+        void loadData();
+      },
+    });
   };
 
   // Void Transaction Handler (Immutable Ledger)
-  const handleVoidTransaction = async (tx: LedgerTransaction) => {
-    const reason = window.prompt(
-      `Xác nhận gạch bỏ phiếu [${tx.transactionCode}] - ${tx.amount.toLocaleString('vi-VN')} đ?\n\n(Quy tắc Sổ cái bất biến: Hệ thống sẽ tạo 1 phiếu đối ứng bù trừ, không xóa phiếu gốc trên cơ sở dữ liệu).\n\nNhập lý do hủy:`
-    );
+  const handleVoidTransaction = (tx: LedgerTransaction) => {
+    setReasonValue('');
+    setReasonError('');
+    setReasonPrompt({
+      isOpen: true,
+      title: `Gạch bỏ phiếu [${tx.transactionCode}]`,
+      description: `Xác nhận gạch bỏ phiếu ${tx.transactionCode} (${tx.amount.toLocaleString('vi-VN')} đ). Theo nguyên tắc Kế toán Bất biến (Immutable Ledger), hệ thống sẽ tạo tự động một bút toán đối ứng bù trừ, không xóa dữ liệu gốc. Vui lòng nhập lý do:`,
+      placeholder: 'VD: Nhập nhầm tài khoản / khách hủy đơn hàng sau thanh toán...',
+      confirmText: 'Xác nhận gạch bỏ',
+      variant: 'danger',
+      onSubmit: async (reason: string) => {
+        const comp = await cashbookService.voidTransaction(tx.id, reason);
+        showToast(
+          `Đã gạch bỏ phiếu ${tx.transactionCode}. Bút toán bù trừ ${comp.transactionCode} đã được tạo tự động!`,
+          'success'
+        );
+        void loadData();
+      },
+    });
+  };
 
-    if (!reason || !reason.trim()) {
+  const handleConfirmReasonPrompt = async () => {
+    if (!reasonPrompt) return;
+    if (!reasonValue.trim()) {
+      setReasonError('Vui lòng nhập lý do để tiếp tục');
       return;
     }
-
+    setIsSubmittingReason(true);
     try {
-      const comp = await cashbookService.voidTransaction(tx.id, reason.trim());
-      showToast(
-        `Đã gạch bỏ phiếu ${tx.transactionCode}. Bút toán bù trừ ${comp.transactionCode} đã được tạo tự động!`,
-        'success'
-      );
-      void loadData();
+      await reasonPrompt.onSubmit(reasonValue.trim());
+      setReasonPrompt(null);
+      setReasonValue('');
     } catch (err: unknown) {
-      showToast(err instanceof Error ? err.message : 'Lỗi khi hủy phiếu', 'error');
+      showToast(err instanceof Error ? err.message : 'Lỗi khi thực hiện thao tác', 'error');
+    } finally {
+      setIsSubmittingReason(false);
     }
   };
 
@@ -598,18 +685,6 @@ export const CashbookPage: FC = () => {
                 >
                   <MoreHorizontal size={17} style={{ color: isMoreMenuOpen ? '#0F766E' : '#64748B' }} />
                   <span>Thao tác khác</span>
-                  {!isEmployee && triagePendingCount > 0 && (
-                    <span
-                      style={{
-                        width: 8,
-                        height: 8,
-                        borderRadius: '50%',
-                        backgroundColor: '#EF4444',
-                        display: 'inline-block',
-                      }}
-                      title={`${triagePendingCount} giao dịch cần duyệt`}
-                    />
-                  )}
                   <ChevronDown
                     size={14}
                     style={{
@@ -624,59 +699,6 @@ export const CashbookPage: FC = () => {
                   <div className="cb-more-dropdown-menu">
                     {!isEmployee && (
                       <>
-                        <div className="cb-more-dropdown-header">
-                          <span>Thao tác mở rộng</span>
-                          <span style={{ fontSize: '10px', color: '#94A3B8', fontWeight: 500 }}>FE-17 Quản trị</span>
-                        </div>
-
-                        {/* 1. Internal Transfer */}
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setIsMoreMenuOpen(false);
-                            setIsTransferModalOpen(true);
-                          }}
-                          className="cb-more-dropdown-item"
-                        >
-                          <div className="cb-more-item-icon teal">
-                            <ArrowRightLeft size={16} />
-                          </div>
-                          <div className="cb-more-item-text">
-                            <div className="cb-more-item-title">Chuyển quỹ nội bộ</div>
-                            <div className="cb-more-item-sub">Két tiền mặt ↔ Ngân hàng</div>
-                          </div>
-                        </button>
-                      </>
-                    )}
-
-                    {/* 3. Triage Inbox */}
-                    {!isEmployee && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIsMoreMenuOpen(false);
-                          setIsTriageModalOpen(true);
-                        }}
-                        className="cb-more-dropdown-item"
-                      >
-                        <div className="cb-more-item-icon indigo">
-                          <Inbox size={16} />
-                        </div>
-                        <div className="cb-more-item-text">
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                            <span className="cb-more-item-title">Hộp thư duyệt Triage</span>
-                            {triagePendingCount > 0 && (
-                              <span className="cb-more-badge">{triagePendingCount}</span>
-                            )}
-                          </div>
-                          <div className="cb-more-item-sub">Duyệt giao dịch chuyển khoản treo</div>
-                        </div>
-                      </button>
-                    )}
-
-                    {!isEmployee && (
-                      <>
-                        <div className="cb-more-dropdown-divider" />
                         <div className="cb-more-dropdown-header">
                           <span>Đặc quyền Chủ tiệm</span>
                           <span style={{ fontSize: '10px', color: '#0F766E', fontWeight: 700 }}>Vốn & Thuế</span>
@@ -823,6 +845,7 @@ export const CashbookPage: FC = () => {
             filters={filters}
             onChangeFilter={handleFilterChange}
             onResetFilter={handleResetFilters}
+            branches={branches}
           />
         </div>
 
@@ -899,6 +922,132 @@ export const CashbookPage: FC = () => {
             void loadData();
           }}
         />
+
+        {/* Reason / Prompt Modal (Enterprise UX standard - replaces primitive window.prompt) */}
+        {reasonPrompt && (
+          <div
+            style={{
+              position: 'fixed',
+              inset: 0,
+              backgroundColor: 'rgba(15, 23, 42, 0.5)',
+              backdropFilter: 'blur(3px)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 9999,
+              padding: 16,
+            }}
+            onClick={() => {
+              if (!isSubmittingReason) setReasonPrompt(null);
+            }}
+          >
+            <div
+              style={{
+                background: '#ffffff',
+                borderRadius: 16,
+                boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+                maxWidth: 480,
+                width: '100%',
+                padding: 24,
+                position: 'relative',
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 12 }}>
+                <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 700, color: '#0F172A' }}>
+                  {reasonPrompt.title}
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setReasonPrompt(null)}
+                  disabled={isSubmittingReason}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#64748B',
+                    cursor: 'pointer',
+                    padding: 4,
+                  }}
+                  title="Đóng"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <p style={{ margin: '0 0 16px', fontSize: '0.88rem', color: '#475569', lineHeight: 1.5 }}>
+                {reasonPrompt.description}
+              </p>
+
+              <div style={{ marginBottom: 16 }}>
+                <textarea
+                  value={reasonValue}
+                  onChange={(e) => {
+                    setReasonValue(e.target.value);
+                    if (reasonError) setReasonError('');
+                  }}
+                  rows={3}
+                  placeholder={reasonPrompt.placeholder || 'Nhập lý do...'}
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    borderRadius: 8,
+                    border: reasonError ? '1.5px solid #EF4444' : '1px solid #CBD5E1',
+                    fontSize: '0.88rem',
+                    fontFamily: 'inherit',
+                    resize: 'vertical',
+                    boxSizing: 'border-box',
+                  }}
+                  autoFocus
+                />
+                {reasonError && (
+                  <p style={{ color: '#EF4444', fontSize: '0.8rem', margin: '4px 0 0', fontWeight: 600 }}>
+                    {reasonError}
+                  </p>
+                )}
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+                <button
+                  type="button"
+                  onClick={() => setReasonPrompt(null)}
+                  disabled={isSubmittingReason}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: 8,
+                    border: '1px solid #CBD5E1',
+                    background: '#F8FAFC',
+                    color: '#475569',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Hủy bỏ
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmReasonPrompt}
+                  disabled={isSubmittingReason}
+                  style={{
+                    padding: '8px 20px',
+                    borderRadius: 8,
+                    border: 'none',
+                    background:
+                      reasonPrompt.variant === 'danger'
+                        ? '#DC2626'
+                        : reasonPrompt.variant === 'warning'
+                        ? '#D97706'
+                        : '#0F766E',
+                    color: '#ffffff',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                  }}
+                >
+                  {isSubmittingReason ? 'Đang xử lý...' : reasonPrompt.confirmText || 'Xác nhận'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

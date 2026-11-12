@@ -100,7 +100,7 @@ export const TaxSnapshotPage: FC = () => {
   };
 
   const handlePeriodTypeChange = (pType: TaxPeriodType) => {
-    const defaultNumber = pType === TaxPeriodType.Month ? 1 : pType === TaxPeriodType.Quarter ? 1 : 2026;
+    const defaultNumber = pType === TaxPeriodType.Month ? 1 : pType === TaxPeriodType.Quarter ? 1 : filterParams.year;
     setPeriod(pType, defaultNumber);
   };
 
@@ -582,6 +582,10 @@ export const TaxSnapshotPage: FC = () => {
           setSelectedSnapshot(null);
         }}
         snapshot={selectedSnapshot}
+        onExport={(snap) => {
+          setSelectedSnapshot(snap);
+          setIsExportOpen(true);
+        }}
       />
 
       {/* Export Modal */}

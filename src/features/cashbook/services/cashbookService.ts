@@ -13,6 +13,7 @@ import type {
 } from '../types/cashbook.types';
 import { financeHttpClient } from '../../../api/financeHttpClient';
 import { generateUuidV7 } from '../../../utils/uuid';
+import { posShiftApi } from '../../pos/api/posShiftApi';
 
 export interface BackendCashbookEntryResponse {
   id: string;
@@ -403,8 +404,35 @@ export const cashbookService = {
 
   /**
    * Retrieves Cash Transit transfers (Tiền đang chuyển về két sắt)
+   * Connects to POS live pending movements API with local storage fallback
    */
-  async getCashTransits(): Promise<CashTransitItem[]> {
+  async getCashTransits(branchId?: string): Promise<CashTransitItem[]> {
+    try {
+      const branchParam = branchId === 'ALL' ? undefined : branchId;
+      const res = await posShiftApi.getPendingMovements(branchParam);
+      if (res?.movements && res.movements.length > 0) {
+        const drops = res.movements.filter(
+          (m) => (m.category === 'CASH_DRAW' || (m.category as unknown) === 2) && !m.isConfirmedByOwner
+        );
+        if (drops.length > 0) {
+          return drops.map((d) => ({
+            id: d.id,
+            transferCode: `CD-${d.id.substring(0, 8).toUpperCase()}`,
+            amount: d.amount,
+            fromAccountId: 'POS_TILL',
+            fromAccountName: d.createdByName ? `Két quầy (${d.createdByName})` : 'Két quầy thu ngân',
+            toAccountId: 'ACC-SAFE-01',
+            toAccountName: 'Két sắt trung tâm',
+            senderName: d.createdByName || 'Thu ngân',
+            sentAt: d.occurredAtUtc || new Date().toISOString(),
+            status: 'PENDING',
+            note: d.reason || 'Rút két nộp tiền về két sắt',
+          }));
+        }
+      }
+    } catch (e) {
+      console.warn('Lỗi tải pending cash transit từ POS API, fallback local:', e);
+    }
     return loadState<CashTransitItem[]>(STORAGE_KEYS.TRANSITS, isMockMode() ? INITIAL_TRANSITS : []);
   },
 
@@ -412,27 +440,33 @@ export const cashbookService = {
    * Confirms a Cash Transit has been received into the Safe Deposit
    */
   async confirmTransitReceived(transitId: string, performedBy = 'Chủ shop'): Promise<void> {
+    try {
+      await posShiftApi.confirmCashDrop(transitId);
+    } catch (posErr) {
+      console.warn('Xác nhận drop trên POS API bỏ qua hoặc lỗi (có thể là local mock):', posErr);
+    }
+
     const transits = await this.getCashTransits();
     const tIndex = transits.findIndex((t) => t.id === transitId);
-    if (tIndex === -1) throw new Error('Không tìm thấy khoản chuyển tiền');
+    if (tIndex !== -1) {
+      const transit = transits[tIndex];
+      transit.status = 'RECEIVED';
+      transits[tIndex] = transit;
+      saveState(STORAGE_KEYS.TRANSITS, transits);
 
-    const transit = transits[tIndex];
-    transit.status = 'RECEIVED';
-    transits[tIndex] = transit;
-    saveState(STORAGE_KEYS.TRANSITS, transits);
-
-    await this.createReceipt({
-      accountId: transit.toAccountId,
-      amount: transit.amount,
-      category: 'Tiền mặt chuyển về két sắt',
-      counterpartyType: 'INTERNAL',
-      counterpartyName: transit.fromAccountName,
-      description: `[ĐÃ NHẬN ĐỦ KÉT SẮT] Bởi ${performedBy} từ ${transit.fromAccountName} (Mã chuyển: ${transit.transferCode})`,
-      referenceDocType: 'CASH_TRANSIT',
-      referenceDocId: transit.id,
-      sourceModuleName: 'INTERNAL_TRANSFER',
-      isAutomated: true,
-    });
+      await this.createReceipt({
+        accountId: transit.toAccountId,
+        amount: transit.amount,
+        category: 'Tiền mặt chuyển về két sắt',
+        counterpartyType: 'INTERNAL',
+        counterpartyName: transit.fromAccountName,
+        description: `[ĐÃ NHẬN ĐỦ KÉT SẮT] Bởi ${performedBy} từ ${transit.fromAccountName} (Mã chuyển: ${transit.transferCode})`,
+        referenceDocType: 'CASH_TRANSIT',
+        referenceDocId: transit.id,
+        sourceModuleName: 'INTERNAL_TRANSFER',
+        isAutomated: true,
+      });
+    }
   },
 
   /**

@@ -31,7 +31,7 @@ export const TaxSnapshotDetailDrawer: FC<Props> = ({
   onOpenExportModal,
   onExport,
 }) => {
-  const [activeTab, setActiveTab] = useState<'summary' | 'orders'>('summary');
+  const [activeTab, setActiveTab] = useState<'summary' | 'orders' | 'invoices'>('summary');
   const [isUpdating, setIsUpdating] = useState<boolean>(false);
   const [isVerifyingIntegrity, setIsVerifyingIntegrity] = useState<boolean>(false);
   const [integrityCheckResult, setIntegrityCheckResult] = useState<{
@@ -123,8 +123,8 @@ export const TaxSnapshotDetailDrawer: FC<Props> = ({
           </button>
 
           <button
-            onClick={() => setActiveTab('orders')}
-            className={'tax-drawer-tab-btn ' + (activeTab === 'orders' ? 'active' : '')}
+            onClick={() => setActiveTab('invoices')}
+            className={'tax-drawer-tab-btn ' + (activeTab === 'invoices' || activeTab === 'orders' ? 'active' : '')}
           >
             <Layers size={16} />
             <span>Bảng kê hóa đơn ({snapshot.ordersCount ?? 0})</span>
@@ -301,6 +301,27 @@ export const TaxSnapshotDetailDrawer: FC<Props> = ({
                 Hiển thị các hóa đơn bán lẻ POS cấu thành doanh thu {periodTitle}:
               </div>
 
+              {/* Thông tin giải thích lưu trữ dữ liệu chuyên nghiệp */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: 12,
+                  padding: '12px 16px',
+                  borderRadius: 10,
+                  backgroundColor: '#F0FDFA',
+                  border: '1px solid #99F6E4',
+                  color: '#0F766E',
+                  fontSize: '0.82rem',
+                  lineHeight: 1.5,
+                }}
+              >
+                <ShieldCheck size={18} style={{ flexShrink: 0, marginTop: 2, color: '#0D9488' }} />
+                <div>
+                  Dữ liệu bảng kê chi tiết từng hóa đơn được lưu trữ an toàn trong tệp sao lưu điện tử của kỳ chốt thuế. Bạn có thể bấm nút &apos;Xuất tờ khai Form 01&apos; ở dưới để trích xuất đầy đủ file XML/Excel theo chuẩn Thông tư 152.
+                </div>
+              </div>
+
               {(snapshot.ordersCount ?? 0) === 0 && paginatedOrders.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '40px 16px', background: '#F8FAFC', borderRadius: 12, border: '1px dashed #CBD5E1', color: '#64748B' }}>
                   <Receipt size={32} style={{ margin: '0 auto 8px', color: '#94A3B8' }} />
@@ -321,21 +342,35 @@ export const TaxSnapshotDetailDrawer: FC<Props> = ({
                         </tr>
                       </thead>
                       <tbody>
-                        {paginatedOrders.map((ord: any) => (
-                          <tr key={ord.orderId}>
-                            <td style={{ fontWeight: 700, color: '#0F766E' }}>{ord.orderCode}</td>
-                            <td style={{ color: '#64748B', fontSize: '0.78rem' }}>{ord.orderDate}</td>
-                            <td style={{ fontWeight: 600, color: '#1E293B' }}>{ord.customerName}</td>
-                            <td>
-                              <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: 6, background: '#F1F5F9', fontSize: '0.72rem', fontWeight: 600, color: '#475569' }}>
-                                {ord.paymentMethod}
-                              </span>
-                            </td>
-                            <td style={{ textAlign: 'right', fontWeight: 800, color: '#0F172A' }}>
-                              {formatVND(ord.finalAmount)}
+                        {paginatedOrders.length > 0 ? (
+                          paginatedOrders.map((ord: any) => (
+                            <tr key={ord.orderId}>
+                              <td style={{ fontWeight: 700, color: '#0F766E' }}>{ord.orderCode}</td>
+                              <td style={{ color: '#64748B', fontSize: '0.78rem' }}>{ord.orderDate}</td>
+                              <td style={{ fontWeight: 600, color: '#1E293B' }}>{ord.customerName}</td>
+                              <td>
+                                <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: 6, background: '#F1F5F9', fontSize: '0.72rem', fontWeight: 600, color: '#475569' }}>
+                                  {ord.paymentMethod}
+                                </span>
+                              </td>
+                              <td style={{ textAlign: 'right', fontWeight: 800, color: '#0F172A' }}>
+                                {formatVND(ord.finalAmount)}
+                              </td>
+                            </tr>
+                          ))
+                        ) : (
+                          <tr>
+                            <td colSpan={5} style={{ textAlign: 'center', padding: '36px 16px', color: '#64748B' }}>
+                              <Receipt size={28} style={{ margin: '0 auto 8px', color: '#0F766E' }} />
+                              <p style={{ margin: 0, fontWeight: 700, fontSize: '0.88rem', color: '#0F172A' }}>
+                                Đã chốt số liệu gồm {snapshot.ordersCount ?? 0} hóa đơn trong kỳ
+                              </p>
+                              <p style={{ margin: '6px 0 0', fontSize: '0.8rem', color: '#475569', maxWidth: 520, marginLeft: 'auto', marginRight: 'auto', lineHeight: 1.5 }}>
+                                Dữ liệu bảng kê chi tiết từng hóa đơn được lưu trữ an toàn trong tệp sao lưu điện tử của kỳ chốt thuế. Bạn có thể bấm nút &apos;Xuất tờ khai Form 01&apos; ở dưới để trích xuất đầy đủ file XML/Excel theo chuẩn Thông tư 152.
+                              </p>
                             </td>
                           </tr>
-                        ))}
+                        )}
                       </tbody>
                     </table>
                   </div>

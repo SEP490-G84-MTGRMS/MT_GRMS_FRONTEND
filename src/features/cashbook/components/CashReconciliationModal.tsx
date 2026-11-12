@@ -70,6 +70,7 @@ export const CashReconciliationModal: FC<CashReconciliationModalProps> = ({
   const [discrepancyReason, setDiscrepancyReason] = useState('');
   const [customNote, setCustomNote] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
 
   const denomRefs = useRef<Record<number, HTMLDivElement | null>>({});
 
@@ -143,25 +144,12 @@ export const CashReconciliationModal: FC<CashReconciliationModalProps> = ({
 
   const handleExit = () => {
     if (totalCounted > 0) {
-      const save = window.confirm(
-        'Bạn có muốn lưu nháp số tiền đã đếm để lần sau đếm tiếp không?\n\n• Bấm OK: Lưu nháp\n• Bấm Cancel: Bỏ kết quả đếm'
-      );
-      if (save) {
-        saveDraft();
-      } else {
-        clearDraft();
-      }
+      saveDraft();
     }
     onClose();
   };
 
   const handleStep1Next = () => {
-    if (totalCounted === 0) {
-      const confirmZero = window.confirm(
-        'Tất cả mệnh giá đều bằng 0đ (két đang trống).\nBạn có chắc chắn két quầy hoàn toàn không có tiền mặt không?'
-      );
-      if (!confirmZero) return;
-    }
     saveDraft();
     setStep(2);
   };
@@ -190,7 +178,7 @@ export const CashReconciliationModal: FC<CashReconciliationModalProps> = ({
 
   const handleFinalSubmit = async () => {
     if (difference !== 0 && !discrepancyReason) {
-      alert('Vui lòng chọn lý do phát sinh chênh lệch tiền');
+      setSubmitError('Vui lòng chọn lý do phát sinh chênh lệch tiền');
       return;
     }
 
@@ -621,6 +609,11 @@ export const CashReconciliationModal: FC<CashReconciliationModalProps> = ({
                 <label className="block text-sm font-bold text-gray-900">
                   Lý do chênh lệch tiền (Bắt buộc chọn):
                 </label>
+                {submitError && (
+                  <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs font-semibold">
+                    ⚠️ {submitError}
+                  </div>
+                )}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                   {[
                     'Trả nhầm tiền thối cho khách',
@@ -630,7 +623,10 @@ export const CashReconciliationModal: FC<CashReconciliationModalProps> = ({
                     <button
                       key={r}
                       type="button"
-                      onClick={() => setDiscrepancyReason(r)}
+                      onClick={() => {
+                        setDiscrepancyReason(r);
+                        setSubmitError('');
+                      }}
                       className={`p-3.5 rounded-xl border text-left text-sm font-semibold transition-all ${
                         discrepancyReason === r
                           ? 'border-teal-600 bg-teal-50 text-teal-950 ring-2 ring-teal-200'

@@ -1,5 +1,5 @@
 import React from 'react';
-import { RefreshCw, Printer, BookOpen, Clock, Plus } from 'lucide-react';
+import { RefreshCw, Printer, BookOpen, Clock } from 'lucide-react';
 
 export type FinanceTabKey = 'all' | 'overview' | 'pnl';
 
@@ -83,17 +83,6 @@ export const FinanceHeader: React.FC<FinanceHeaderProps> = ({
             <span>In & Xuất Báo Cáo</span>
           </button>
 
-          {/* Navigate to Cashbook */}
-          <button
-            type="button"
-            onClick={onNavigateCashbook}
-            className="finance-btn-secondary"
-            title="Mở Sổ quỹ chi tiết"
-          >
-            <BookOpen size={15} />
-            <span>Mở Sổ quỹ</span>
-          </button>
-
           {/* Navigate to Pending Shifts & Safes */}
           <button
             type="button"
@@ -105,16 +94,16 @@ export const FinanceHeader: React.FC<FinanceHeaderProps> = ({
             <span>Ca & Két chờ duyệt</span>
           </button>
 
-          {/* Quick Receipt & Payment Action */}
+          {/* Navigate to Cashbook */}
           <button
             type="button"
             onClick={onNavigateCashbook}
             className="btn-primary-teal"
             id="btn-quick-receipt-payment"
-            title="Tạo phiếu thu / chi quỹ nhanh"
+            title="Mở Sổ quỹ chi tiết để quản lý Thu / Chi tiền"
           >
-            <Plus size={15} />
-            <span>+ Thu / Chi tiền</span>
+            <BookOpen size={15} />
+            <span>Mở Sổ quỹ Thu/Chi</span>
           </button>
         </div>
       </div>

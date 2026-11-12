@@ -161,6 +161,7 @@ export const CustomerManagementPage: FC = () => {
           summary={kpiSummary}
           customers={customers}
           isLoading={isKpiLoading}
+          onFilterDebt={() => setSelectedDebtStatus('DEBT')}
           onFilterOverLimit={() => setSelectedDebtStatus('OVER_LIMIT')}
         />
 

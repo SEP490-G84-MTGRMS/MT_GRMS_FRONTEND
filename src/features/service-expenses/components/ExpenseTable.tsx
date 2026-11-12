@@ -43,22 +43,7 @@ export const ExpenseTable: FC<ExpenseTableProps> = ({
   onCancel,
 }) => {
   const navigate = useNavigate();
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
-
-  const toggleSelectAll = () => {
-    if (selectedIds.length === data.length) {
-      setSelectedIds([]);
-    } else {
-      setSelectedIds(data.map((item) => item.expenseId));
-    }
-  };
-
-  const toggleSelectOne = (id: string) => {
-    setSelectedIds((prev) =>
-      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
-    );
-  };
 
   if (isLoading) {
     return (
@@ -118,13 +103,6 @@ export const ExpenseTable: FC<ExpenseTableProps> = ({
         <table className="expense-table">
           <thead>
             <tr>
-              <th style={{ width: 32, textAlign: 'center' }}>
-                <input
-                  type="checkbox"
-                  checked={data.length > 0 && selectedIds.length === data.length}
-                  onChange={toggleSelectAll}
-                />
-              </th>
               <th>Mã phiếu chi</th>
               <th>Danh mục chi phí</th>
               <th>Chi nhánh</th>
@@ -138,13 +116,6 @@ export const ExpenseTable: FC<ExpenseTableProps> = ({
           <tbody>
             {data.map((item) => (
               <tr key={item.expenseId}>
-                <td style={{ textAlign: 'center' }}>
-                  <input
-                    type="checkbox"
-                    checked={selectedIds.includes(item.expenseId)}
-                    onChange={() => toggleSelectOne(item.expenseId)}
-                  />
-                </td>
                 <td className="expense-table-id">
                   <span className="mono-badge">{item.voucherCode || item.expenseId}</span>
                 </td>

@@ -1,18 +1,27 @@
-import React from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Calendar,
   Building2,
   RotateCw,
   Printer,
   ChevronDown,
+  SlidersHorizontal,
 } from 'lucide-react';
 import type {
   BranchOption,
   PnlFilterParams,
   PresetPeriod,
 } from '../types/reportsPnl.types';
+import { TaxRateConfigModal } from '../../tax-snapshot/components/TaxRateConfigModal';
+import {
+  loadStoredTaxRates,
+  saveStoredTaxRates,
+  clearStoredTaxRates,
+  type StoredTaxRates,
+} from '../services/reportsPnlService';
+import '../../tax-snapshot/tax-snapshot.css';
 
-interface PnlFilterToolbarProps {
+export interface PnlFilterToolbarProps {
   branches: BranchOption[];
   filter: PnlFilterParams;
   isLoading: boolean;
@@ -20,6 +29,8 @@ interface PnlFilterToolbarProps {
   onOpenExportModal: () => void;
   onRefresh: () => void;
   hideRefresh?: boolean;
+  onTaxConfigChange?: () => void;
+  onShowToast?: (message: string, type?: 'success' | 'error' | 'warning' | 'info') => void;
 }
 
 const PRESET_OPTIONS: { id: PresetPeriod; label: string }[] = [
@@ -159,10 +170,58 @@ const CustomDateRangeFields: React.FC<{
 const FilterToolbarActions: React.FC<{
   isLoading: boolean;
   hideRefresh: boolean;
+  hasCustomTax: boolean;
+  onOpenTaxModal: () => void;
   onRefresh: () => void;
   onOpenExportModal: () => void;
-}> = ({ isLoading, hideRefresh, onRefresh, onOpenExportModal }) => (
+}> = ({
+  isLoading,
+  hideRefresh,
+  hasCustomTax,
+  onOpenTaxModal,
+  onRefresh,
+  onOpenExportModal,
+}) => (
   <div className="pnl-filter-right">
+    <button
+      type="button"
+      onClick={onOpenTaxModal}
+      disabled={isLoading}
+      className="btn-secondary-pill"
+      title={
+        hasCustomTax
+          ? 'Cấu hình thuế (Đang áp dụng thuế suất tùy chỉnh / chính sách giảm thuế)'
+          : 'Cấu hình mức thuế suất GTGT, TNCN và chính sách giảm thuế'
+      }
+      style={{
+        position: 'relative',
+        ...(hasCustomTax
+          ? {
+              borderColor: '#0F766E',
+              color: '#0F766E',
+              background: '#F0FDFA',
+              fontWeight: 700,
+            }
+          : {}),
+      }}
+    >
+      <SlidersHorizontal size={15} />
+      <span>Cấu hình thuế</span>
+      {hasCustomTax && (
+        <span
+          style={{
+            width: 6,
+            height: 6,
+            borderRadius: '50%',
+            backgroundColor: '#0F766E',
+            position: 'absolute',
+            top: 6,
+            right: 6,
+          }}
+        />
+      )}
+    </button>
+
     {!hideRefresh && (
       <button
         type="button"
@@ -188,7 +247,7 @@ const FilterToolbarActions: React.FC<{
 );
 
 /**
- * Filter toolbar component for branch selection and period switching.
+ * Filter toolbar component for branch selection, tax rate configuration, and period switching.
  */
 export const PnlFilterToolbar: React.FC<PnlFilterToolbarProps> = ({
   branches,
@@ -198,7 +257,54 @@ export const PnlFilterToolbar: React.FC<PnlFilterToolbarProps> = ({
   onOpenExportModal,
   onRefresh,
   hideRefresh = false,
+  onTaxConfigChange,
+  onShowToast,
 }) => {
+  const [isTaxModalOpen, setIsTaxModalOpen] = useState<boolean>(false);
+  const [taxRates, setTaxRates] = useState<StoredTaxRates>(loadStoredTaxRates);
+
+  useEffect(() => {
+    setTaxRates(loadStoredTaxRates());
+  }, [isTaxModalOpen]);
+
+  const hasCustomTax =
+    taxRates.customVatRate != null ||
+    taxRates.customPitRate != null ||
+    taxRates.vatReductionPercentage != null ||
+    Boolean(taxRates.applyVatReduction2026);
+
+  const handleOpenTaxModal = useCallback(() => {
+    setTaxRates(loadStoredTaxRates());
+    setIsTaxModalOpen(true);
+  }, []);
+
+  const handleSaveTaxRates = useCallback(
+    (rates: StoredTaxRates) => {
+      saveStoredTaxRates(rates);
+      setTaxRates(rates);
+      setIsTaxModalOpen(false);
+      if (onTaxConfigChange) {
+        onTaxConfigChange();
+      } else {
+        onRefresh();
+      }
+      onShowToast?.('Đã lưu cấu hình tham số thuế suất và áp dụng cho báo cáo P&L.', 'success');
+    },
+    [onTaxConfigChange, onRefresh, onShowToast]
+  );
+
+  const handleResetTaxRates = useCallback(() => {
+    clearStoredTaxRates();
+    setTaxRates({});
+    setIsTaxModalOpen(false);
+    if (onTaxConfigChange) {
+      onTaxConfigChange();
+    } else {
+      onRefresh();
+    }
+    onShowToast?.('Đã đặt lại cấu hình thuế suất về mặc định (1.5%).', 'success');
+  }, [onTaxConfigChange, onRefresh, onShowToast]);
+
   const handleBranchChange = (branchId: string) => {
     onFilterChange({ ...filter, branchId });
   };
@@ -239,35 +345,49 @@ export const PnlFilterToolbar: React.FC<PnlFilterToolbarProps> = ({
   };
 
   return (
-    <div className="pnl-filter-bar">
-      <div className="pnl-filter-left">
-        <BranchSelectField
-          branches={branches}
-          value={filter.branchId || 'ALL'}
-          isLoading={isLoading}
-          onChange={handleBranchChange}
-        />
-        <PresetPeriodGroup
-          activePreset={filter.presetPeriod}
-          isLoading={isLoading}
-          onSelect={handlePresetChange}
-        />
-        {filter.presetPeriod === 'CUSTOM' && (
-          <CustomDateRangeFields
-            startDate={filter.startDate}
-            endDate={filter.endDate}
+    <>
+      <div className="pnl-filter-bar">
+        <div className="pnl-filter-left">
+          <BranchSelectField
+            branches={branches}
+            value={filter.branchId || 'ALL'}
             isLoading={isLoading}
-            onChange={handleCustomDateChange}
+            onChange={handleBranchChange}
           />
-        )}
+          <PresetPeriodGroup
+            activePreset={filter.presetPeriod}
+            isLoading={isLoading}
+            onSelect={handlePresetChange}
+          />
+          {filter.presetPeriod === 'CUSTOM' && (
+            <CustomDateRangeFields
+              startDate={filter.startDate}
+              endDate={filter.endDate}
+              isLoading={isLoading}
+              onChange={handleCustomDateChange}
+            />
+          )}
+        </div>
+
+        <FilterToolbarActions
+          isLoading={isLoading}
+          hideRefresh={hideRefresh}
+          hasCustomTax={hasCustomTax}
+          onOpenTaxModal={handleOpenTaxModal}
+          onRefresh={onRefresh}
+          onOpenExportModal={onOpenExportModal}
+        />
       </div>
 
-      <FilterToolbarActions
-        isLoading={isLoading}
-        hideRefresh={hideRefresh}
-        onRefresh={onRefresh}
-        onOpenExportModal={onOpenExportModal}
-      />
-    </div>
+      {isTaxModalOpen && (
+        <TaxRateConfigModal
+          isOpen={isTaxModalOpen}
+          onClose={() => setIsTaxModalOpen(false)}
+          currentRates={taxRates}
+          onSave={handleSaveTaxRates}
+          onResetToDefault={handleResetTaxRates}
+        />
+      )}
+    </>
   );
 };

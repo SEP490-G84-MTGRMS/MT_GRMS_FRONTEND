@@ -1,5 +1,5 @@
 import type { FC } from 'react';
-import { Search, UserPlus, RotateCw, X } from 'lucide-react';
+import { Search, RotateCw, X } from 'lucide-react';
 import type { DebtFilterStatus } from '../types/customer.types';
 
 interface CustomerFilterBarProps {
@@ -9,7 +9,6 @@ interface CustomerFilterBarProps {
   onTierChange: (val: string) => void;
   selectedDebtStatus: DebtFilterStatus;
   onDebtStatusChange: (val: DebtFilterStatus) => void;
-  onOpenCreate?: () => void;
   onRefresh: () => void;
   isRefreshing?: boolean;
 }
@@ -21,7 +20,6 @@ export const CustomerFilterBar: FC<CustomerFilterBarProps> = ({
   onTierChange,
   selectedDebtStatus,
   onDebtStatusChange,
-  onOpenCreate,
   onRefresh,
   isRefreshing,
 }) => {
@@ -107,6 +105,7 @@ export const CustomerFilterBar: FC<CustomerFilterBarProps> = ({
       {/* Action Buttons */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
         <button
+          type="button"
           onClick={onRefresh}
           disabled={isRefreshing}
           title="Tải lại danh sách"
@@ -120,29 +119,6 @@ export const CustomerFilterBar: FC<CustomerFilterBarProps> = ({
               color: isRefreshing ? '#0F766E' : '#64748B',
             }}
           />
-        </button>
-
-        <button
-          onClick={onOpenCreate}
-          className="btn-primary-pill"
-          style={{
-            height: '36px',
-            padding: '0 16px',
-            borderRadius: '10px',
-            background: '#0F766E',
-            color: '#ffffff',
-            border: 'none',
-            fontSize: '13.5px',
-            fontWeight: 700,
-            cursor: 'pointer',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '6px',
-            boxShadow: '0 2px 6px rgba(15, 118, 110, 0.25)',
-          }}
-        >
-          <UserPlus className="w-4 h-4" />
-          <span>+ Thêm khách hàng</span>
         </button>
       </div>
     </div>

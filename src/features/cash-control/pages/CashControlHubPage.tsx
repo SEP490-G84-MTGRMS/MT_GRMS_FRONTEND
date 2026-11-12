@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import type { FC } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
@@ -27,6 +27,7 @@ import {
   Building2,
   Printer,
 } from 'lucide-react';
+import { AdminToast, type ToastState } from '../../admin/components';
 import { posShiftApi } from '../../pos/api/posShiftApi';
 import type {
   ShiftCashMovementDto,
@@ -153,6 +154,20 @@ export const CashControlHubPage: FC = () => {
   const [isSavingSettings, setIsSavingSettings] = useState<boolean>(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
 
+  // AdminToast standard state
+  const [toast, setToast] = useState<ToastState | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showToast = (message: string, type: ToastState['type'] = 'success') => {
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current);
+    }
+    setToast({ id: Date.now().toString(), message, type });
+    toastTimerRef.current = setTimeout(() => {
+      setToast(null);
+    }, 3200);
+  };
+
   /**
    * Load branch list and synchronize active branch from local storage or TopNav.
    */
@@ -233,10 +248,26 @@ export const CashControlHubPage: FC = () => {
         const now = new Date();
         const startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0).toISOString();
         const endToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999).toISOString();
-        const targetBranch = branchParam || (branches[0]?.id || user?.branchId || '');
-        if (targetBranch && !targetBranch.startsWith('BR-')) {
-          const shiftsToday = await posShiftApi.getShiftHistory(targetBranch, startToday, endToday);
-          if (shiftsToday && shiftsToday.length > 0) {
+        let shiftsToday: ShiftDetailResponse[] = [];
+        if (selectedBranchId === 'ALL') {
+          const validBranches = branches.filter((b) => b.id && !b.id.startsWith('BR-'));
+          if (validBranches.length > 0) {
+            const settled = await Promise.allSettled(
+              validBranches.map((b) => posShiftApi.getShiftHistory(b.id, startToday, endToday))
+            );
+            shiftsToday = settled
+              .filter((r): r is PromiseFulfilledResult<ShiftDetailResponse[]> => r.status === 'fulfilled')
+              .flatMap((r) => r.value || []);
+          } else if (user?.branchId && !user.branchId.startsWith('BR-')) {
+            shiftsToday = await posShiftApi.getShiftHistory(user.branchId, startToday, endToday);
+          }
+        } else {
+          const targetBranch = branchParam || (branches[0]?.id || user?.branchId || '');
+          if (targetBranch && !targetBranch.startsWith('BR-')) {
+            shiftsToday = await posShiftApi.getShiftHistory(targetBranch, startToday, endToday);
+          }
+        }
+        if (shiftsToday && shiftsToday.length > 0) {
             const resolvedItems: ShiftCashMovementDto[] = [];
             for (const s of shiftsToday) {
               if (s.cashMovements && s.cashMovements.length > 0) {
@@ -259,7 +290,6 @@ export const CashControlHubPage: FC = () => {
               );
             });
           }
-        }
       } catch (errHistory) {
         console.warn('Lỗi lấy lịch sử ca để đồng bộ phiếu đã duyệt hôm nay:', errHistory);
       }
@@ -274,17 +304,6 @@ export const CashControlHubPage: FC = () => {
    * Fetch shift history for Tab 2.
    */
   const loadHistoryData = useCallback(async () => {
-    if (!selectedBranchId || selectedBranchId === 'ALL') {
-      const targetBranchId = branches[0]?.id || user?.branchId || '';
-      if (!targetBranchId) return;
-    }
-
-    const branchToQuery = selectedBranchId === 'ALL'
-      ? (branches[0]?.id || user?.branchId || '')
-      : selectedBranchId;
-
-    if (!branchToQuery || branchToQuery.startsWith('BR-')) return;
-
     setIsHistoryLoading(true);
     setHistoryError(null);
     try {
@@ -303,7 +322,25 @@ export const CashControlHubPage: FC = () => {
         fromIso = start.toISOString();
       }
 
-      const res = await posShiftApi.getShiftHistory(branchToQuery, fromIso, toIso);
+      let res: ShiftDetailResponse[] = [];
+      if (selectedBranchId === 'ALL') {
+        const validBranches = branches.filter((b) => b.id && !b.id.startsWith('BR-'));
+        if (validBranches.length > 0) {
+          const settled = await Promise.allSettled(
+            validBranches.map((b) => posShiftApi.getShiftHistory(b.id, fromIso, toIso))
+          );
+          res = settled
+            .filter((r): r is PromiseFulfilledResult<ShiftDetailResponse[]> => r.status === 'fulfilled')
+            .flatMap((r) => r.value || []);
+          res.sort((a, b) => new Date(b.openedAtUtc).getTime() - new Date(a.openedAtUtc).getTime());
+        } else if (user?.branchId && !user.branchId.startsWith('BR-')) {
+          res = await posShiftApi.getShiftHistory(user.branchId, fromIso, toIso) || [];
+        }
+      } else {
+        if (!selectedBranchId || selectedBranchId.startsWith('BR-')) return;
+        res = await posShiftApi.getShiftHistory(selectedBranchId, fromIso, toIso) || [];
+      }
+
       setShifts(res || []);
       setCurrentPage(1);
     } catch (err: any) {
@@ -368,9 +405,10 @@ export const CashControlHubPage: FC = () => {
       }
 
       setSaveMessage('Đã lưu cấu hình hạn mức duyệt chi két thành công!');
+      showToast('Đã lưu cấu hình hạn mức duyệt chi két thành công!', 'success');
       setTimeout(() => setSaveMessage(null), 3500);
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Không thể lưu cấu hình hạn mức');
+      showToast(err.response?.data?.message || 'Không thể lưu cấu hình hạn mức', 'error');
     } finally {
       setIsSavingSettings(false);
     }
@@ -393,9 +431,10 @@ export const CashControlHubPage: FC = () => {
         };
         setResolvedMovements((prev) => [approvedItem, ...prev.filter((m) => m.id !== id)]);
       }
+      showToast('Đã duyệt phiếu chi két thành công!', 'success');
       await loadPendingData();
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Không thể duyệt phiếu chi');
+      showToast(err.response?.data?.message || 'Không thể duyệt phiếu chi', 'error');
     } finally {
       setActionLoadingId(null);
     }
@@ -407,7 +446,7 @@ export const CashControlHubPage: FC = () => {
   const handleRejectConfirm = async () => {
     if (!rejectingId) return;
     if (!rejectionReason.trim()) {
-      alert('Vui lòng nhập lý do từ chối phiếu chi!');
+      showToast('Vui lòng nhập lý do từ chối phiếu chi!', 'warning');
       return;
     }
     setActionLoadingId(rejectingId);
@@ -423,11 +462,12 @@ export const CashControlHubPage: FC = () => {
         };
         setResolvedMovements((prev) => [rejectedItem, ...prev.filter((m) => m.id !== rejectingId)]);
       }
+      showToast('Đã từ chối phiếu chi thành công.', 'info');
       setRejectingId(null);
       setRejectionReason('');
       await loadPendingData();
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Không thể từ chối phiếu chi');
+      showToast(err.response?.data?.message || 'Không thể từ chối phiếu chi', 'error');
     } finally {
       setActionLoadingId(null);
     }
@@ -450,9 +490,10 @@ export const CashControlHubPage: FC = () => {
         };
         setResolvedMovements((prev) => [confirmedDropItem, ...prev.filter((m) => m.id !== id)]);
       }
+      showToast('Đã xác nhận nhận tiền rút két về két sắt an toàn!', 'success');
       await loadPendingData();
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Không thể xác nhận nhận tiền rút két');
+      showToast(err.response?.data?.message || 'Không thể xác nhận nhận tiền rút két', 'error');
     } finally {
       setActionLoadingId(null);
     }
@@ -587,7 +628,7 @@ export const CashControlHubPage: FC = () => {
   const handleConfirmHandoverSubmit = async () => {
     if (!handoverShift) return;
     if (handoverDecision === 'DISPUTED' && !disputeReason.trim()) {
-      alert('Vui lòng nhập lý do khiếu nại bàn giao lệch tiền.');
+      showToast('Vui lòng nhập lý do khiếu nại bàn giao lệch tiền.', 'warning');
       return;
     }
 
@@ -599,16 +640,17 @@ export const CashControlHubPage: FC = () => {
       };
 
       await posShiftApi.confirmHandover(handoverShift.id, request);
-      alert(
+      showToast(
         handoverDecision === 'CONFIRMED'
           ? 'Đã xác nhận nhận bàn giao ca thành công!'
-          : 'Đã gửi khiếu nại bàn giao ca thành công!'
+          : 'Đã gửi khiếu nại bàn giao ca thành công!',
+        'success'
       );
       setHandoverShift(null);
       setDisputeReason('');
       await loadHistoryData();
     } catch (err: any) {
-      alert(err?.response?.data?.message || err?.message || 'Lỗi khi gửi xác nhận bàn giao ca.');
+      showToast(err?.response?.data?.message || err?.message || 'Lỗi khi gửi xác nhận bàn giao ca.', 'error');
     } finally {
       setIsSubmittingHandover(false);
     }
@@ -714,7 +756,7 @@ export const CashControlHubPage: FC = () => {
         display: 'flex',
         flexDirection: 'column',
         gap: 20,
-        fontFamily: 'Inter, system-ui, -apple-system, sans-serif',
+        fontFamily: "'Be Vietnam Pro', system-ui, -apple-system, sans-serif",
       }}
     >
       {/* ─── 1. TOP HEADER BAR ─── */}
@@ -3081,6 +3123,13 @@ export const CashControlHubPage: FC = () => {
             </div>
           </div>
         </div>
+      )}
+      {/* Toast Notification (Shared AdminToast) */}
+      {toast && (
+        <AdminToast
+          toast={toast}
+          onClose={() => setToast(null)}
+        />
       )}
     </div>
   );

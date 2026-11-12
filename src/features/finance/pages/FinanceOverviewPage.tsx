@@ -80,8 +80,16 @@ const PRESET_PERIOD_LABELS: Record<PnlFilterParams['presetPeriod'], string> = {
 function createInitialPnlFilter(): PnlFilterParams {
   const today = new Date();
   const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+  let initialBranch = 'ALL';
+  try {
+    const stored = localStorage.getItem('mtgrms_active_branch');
+    if (stored) {
+      const b = JSON.parse(stored);
+      if (b?.id) initialBranch = b.id;
+    }
+  } catch {}
   return {
-    branchId: 'ALL',
+    branchId: initialBranch,
     presetPeriod: 'THIS_MONTH',
     startDate: formatLocalYmd(firstDayOfMonth),
     endDate: formatLocalYmd(today),
@@ -267,36 +275,45 @@ function usePnlDeepLinkScroll(isReady: boolean): void {
 /**
  * Loads real-time Zone A cashbook, debt, expense, and tax queries.
  */
-function useZoneAQueries(currentYear: number): ZoneAQueriesResult {
+function useZoneAQueries(currentYear: number, branchId?: string): ZoneAQueriesResult {
+  const branchParam = branchId === 'ALL' ? undefined : branchId;
+
   const cashAccountsQuery = useQuery({
-    queryKey: ['finance-overview-cash-accounts'],
-    queryFn: () => cashbookService.getCashAccounts(),
+    queryKey: ['finance-overview-cash-accounts', branchId],
+    queryFn: () => cashbookService.getCashAccounts(branchParam),
   });
 
   const cashSummaryQuery = useQuery({
-    queryKey: ['finance-overview-cash-summary'],
+    queryKey: ['finance-overview-cash-summary', branchId],
     queryFn: async () => {
       const res = await financeHttpClient.get<{ data: BackendCashbookSummaryResponse }>(
-        '/cashbook/summary'
+        '/cashbook/summary',
+        { params: branchParam ? { branchId: branchParam } : undefined }
       );
       return res.data?.data;
     },
   });
 
   const debtsSummaryQuery = useQuery({
-    queryKey: ['finance-overview-debts-summary'],
+    queryKey: ['finance-overview-debts-summary', branchId],
     queryFn: () =>
-      fetchOptionalSummary<DebtsSummaryResponse>('/customers/debts/summary', 'debts summary'),
+      fetchOptionalSummary<DebtsSummaryResponse>(
+        branchParam ? `/customers/debts/summary?branchId=${branchParam}` : '/customers/debts/summary',
+        'debts summary'
+      ),
   });
 
   const expensesSummaryQuery = useQuery({
-    queryKey: ['finance-overview-expenses-summary'],
+    queryKey: ['finance-overview-expenses-summary', branchId],
     queryFn: () =>
-      fetchOptionalSummary<ExpensesSummaryResponse>('/expenses/summary', 'expenses summary'),
+      fetchOptionalSummary<ExpensesSummaryResponse>(
+        branchParam ? `/expenses/summary?branchId=${branchParam}` : '/expenses/summary',
+        'expenses summary'
+      ),
   });
 
   const taxSummaryQuery = useQuery({
-    queryKey: ['tax-summary-overview', currentYear],
+    queryKey: ['tax-summary-overview', currentYear, branchId],
     queryFn: () =>
       taxSnapshotApi.getTaxSummary({
         year: currentYear,
@@ -307,10 +324,10 @@ function useZoneAQueries(currentYear: number): ZoneAQueriesResult {
   });
 
   const pendingMovementsQuery = useQuery({
-    queryKey: ['finance-overview-pending-movements'],
+    queryKey: ['finance-overview-pending-movements', branchId],
     queryFn: async () => {
       try {
-        return await posShiftApi.getPendingMovements();
+        return await posShiftApi.getPendingMovements(branchParam);
       } catch (err) {
         console.error('Failed to fetch pending movements for cash-in-transit:', err);
         return { pendingApprovalsCount: 0, unconfirmedDropsCount: 0, movements: [] };
@@ -505,9 +522,28 @@ function useFinanceOverviewController() {
     rawTab === 'overview' || rawTab === 'pnl' ? rawTab : 'all';
 
   const { toast, showToast, dismissToast } = useOverviewToast();
-  const zoneA = useZoneAQueries(currentYear);
+  const zoneA = useZoneAQueries(currentYear, pnlFilter.branchId);
   const { branchesQuery, pnlReportQuery } = usePnlSectionQueries(pnlFilter);
   const refresh = useOverviewRefresh(zoneA, pnlReportQuery, showToast);
+
+  // Synchronize branch from global top navigation
+  useEffect(() => {
+    const handleGlobalBranchChange = (e: Event) => {
+      const customEvent = e as CustomEvent<{ id?: string }>;
+      const branch = customEvent.detail;
+      if (branch?.id) {
+        setPnlFilter((prev) => ({
+          ...prev,
+          branchId: branch.id,
+        }));
+      }
+    };
+
+    window.addEventListener('mtgrms:branch-changed', handleGlobalBranchChange);
+    return () => {
+      window.removeEventListener('mtgrms:branch-changed', handleGlobalBranchChange);
+    };
+  }, []);
 
   const isLoading = zoneA.cashAccountsQuery.isLoading || zoneA.cashSummaryQuery.isLoading;
   usePnlDeepLinkScroll(!isLoading);

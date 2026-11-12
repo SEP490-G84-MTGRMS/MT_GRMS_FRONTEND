@@ -165,6 +165,7 @@ export const AccountingBooksView: FC<Props> = ({ summary, year, periodType, peri
   const [isLoadingBooks, setIsLoadingBooks] = useState<boolean>(false);
   const [bookError, setBookError] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState<boolean>(false);
+  const [exportError, setExportError] = useState<string | null>(null);
   const [isPrintModalOpen, setIsPrintModalOpen] = useState<boolean>(false);
 
   // Synchronize period from parent props
@@ -411,6 +412,7 @@ export const AccountingBooksView: FC<Props> = ({ summary, year, periodType, peri
   const handleExportExcel = async (onlyActiveBook = false) => {
     try {
       setIsExporting(true);
+      setExportError(null);
       const targetBookType = onlyActiveBook ? activeBookTab : undefined;
       const blob = await taxSnapshotApi.exportTaxExcel(
         {
@@ -443,7 +445,7 @@ export const AccountingBooksView: FC<Props> = ({ summary, year, periodType, peri
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : 'Không thể xuất file sổ kế toán Excel từ máy chủ.');
+      setExportError(err instanceof Error ? err.message : 'Không thể xuất file sổ kế toán Excel từ máy chủ.');
     } finally {
       setIsExporting(false);
     }
@@ -938,6 +940,28 @@ export const AccountingBooksView: FC<Props> = ({ summary, year, periodType, peri
         >
           <AlertCircle size={16} />
           <span>{bookError}</span>
+        </div>
+      )}
+
+      {/* Export Error Notice */}
+      {exportError && (
+        <div
+          className="no-print"
+          style={{
+            padding: '10px 14px',
+            borderRadius: 8,
+            background: '#FEF2F2',
+            border: '1px solid #FECACA',
+            color: '#991B1B',
+            fontSize: '0.82rem',
+            marginBottom: 14,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+          }}
+        >
+          <AlertCircle size={16} />
+          <span>⚠️ {exportError}</span>
         </div>
       )}
 

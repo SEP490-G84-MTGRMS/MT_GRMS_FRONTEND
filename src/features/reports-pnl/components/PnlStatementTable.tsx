@@ -70,9 +70,7 @@ const PnlTableRow: React.FC<{
 
   // Accrual vs Cash basis reconciliation figures
   const accrualVal = item.amount;
-  const cashVal = item.isHeader
-    ? item.amount
-    : Math.round(item.amount * (item.isNegative ? 0.94 : 0.96));
+  const cashVal = item.amount;
 
   return (
     <>
@@ -176,6 +174,9 @@ export const PnlStatementTable: React.FC<PnlStatementTableProps> = ({
   cogsComparison,
   accountingMode = false,
 }) => {
+  const taxRow = pnlTree.find((r) => r.id === 'sec-4-tax');
+  const taxRatePct = taxRow?.percentageOfNetRevenue ?? 1.5;
+
   const getAllParentIds = (items: PnlLineItem[]): string[] => {
     let ids: string[] = [];
     for (const it of items) {
@@ -436,7 +437,7 @@ export const PnlStatementTable: React.FC<PnlStatementTableProps> = ({
               Liên thông Đối soát Kê khai & Nộp thuế HKD (Sổ S2c-HKD)
             </div>
             <p style={{ margin: '3px 0 0', fontSize: '0.78rem', color: '#B45309', lineHeight: 1.45 }}>
-              Nghĩa vụ thuế 1.5% (<strong>{formatVnd(estimatedTaxAmount)}</strong>) được trích lập tự động từ Doanh thu thuần bán lẻ. Sau khi xác nhận nộp thuế, hệ thống sẽ tự động hạch toán Phiếu Chi sang Sổ quỹ, bảo đảm đối soát ba bên tuyệt đối.
+              Nghĩa vụ thuế {taxRatePct > 0 ? `${taxRatePct}%` : 'HKD'} (<strong>{formatVnd(estimatedTaxAmount)}</strong>) được trích lập tự động từ Doanh thu thuần bán lẻ. Sau khi xác nhận nộp thuế, hệ thống sẽ tự động hạch toán Phiếu Chi sang Sổ quỹ, bảo đảm đối soát ba bên tuyệt đối.
             </p>
           </div>
         </div>

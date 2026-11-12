@@ -127,7 +127,7 @@ export const CreateExpenseModal: FC<CreateExpenseModalProps> = ({
 
   // Poka-yoke: Do NOT pre-select category. User must explicitly choose one.
   const [formData, setFormData] = useState(() => ({
-    branchId: defaultBranchId || '',
+    branchId: defaultBranchId && defaultBranchId !== 'ALL' ? defaultBranchId : '',
     category: '' as unknown as ExpenseCategory,
     amount: '',
     expenseDate: new Date().toISOString().split('T')[0],
@@ -144,10 +144,12 @@ export const CreateExpenseModal: FC<CreateExpenseModalProps> = ({
 
   // Cập nhật branchId nếu defaultBranchId hoặc danh sách chi nhánh sẵn sàng
   useEffect(() => {
-    if (!formData.branchId && (defaultBranchId || activeBranches[0]?.id)) {
+    const validDefault = defaultBranchId && defaultBranchId !== 'ALL' ? defaultBranchId : '';
+    const fallbackId = validDefault || activeBranches[0]?.id || '';
+    if ((!formData.branchId || formData.branchId === 'ALL') && fallbackId) {
       setFormData((prev) => ({
         ...prev,
-        branchId: defaultBranchId || activeBranches[0]?.id || '',
+        branchId: fallbackId,
       }));
     }
   }, [defaultBranchId, activeBranches, formData.branchId]);
@@ -243,9 +245,15 @@ export const CreateExpenseModal: FC<CreateExpenseModalProps> = ({
       return;
     }
 
+    const targetBranchId =
+      formData.branchId && formData.branchId !== 'ALL'
+        ? formData.branchId
+        : (defaultBranchId && defaultBranchId !== 'ALL' ? defaultBranchId : activeBranches[0]?.id) || '';
+
     const parsedAmount = Number(formData.amount);
     const result = createExpenseSchema.safeParse({
       ...formData,
+      branchId: targetBranchId,
       amount: parsedAmount,
     });
 
@@ -261,7 +269,7 @@ export const CreateExpenseModal: FC<CreateExpenseModalProps> = ({
 
     try {
       await onSubmit({
-        branchId: formData.branchId,
+        branchId: targetBranchId,
         category: formData.category,
         amount: parsedAmount,
         expenseDate: formData.expenseDate,
@@ -521,6 +529,28 @@ export const CreateExpenseModal: FC<CreateExpenseModalProps> = ({
                     👉 Hãy bấm chọn một danh mục ở trên để tiếp tục
                   </div>
                 )}
+
+                {/* Branch Selector */}
+                <div className="form-group" style={{ marginBottom: 16 }}>
+                  <label className="form-label" style={{ fontWeight: 700 }}>
+                    Chi nhánh hạch toán <span style={{ color: '#ef4444' }}>*</span>
+                  </label>
+                  <select
+                    value={formData.branchId}
+                    onChange={(e) => handleChange('branchId', e.target.value)}
+                    className={`form-select ${errors.branchId ? 'error' : ''}`}
+                  >
+                    {activeBranches.length === 0 && (
+                      <option value="">-- Đang tải chi nhánh... --</option>
+                    )}
+                    {activeBranches.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.name}
+                      </option>
+                    ))}
+                  </select>
+                  {errors.branchId && <p className="form-error">{errors.branchId}</p>}
+                </div>
 
                 {/* MoneyInput */}
                 <div className="form-group" style={{ marginBottom: 16 }}>
