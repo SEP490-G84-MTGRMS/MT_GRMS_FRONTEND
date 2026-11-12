@@ -274,6 +274,7 @@ export const ProductListPage: React.FC = () => {
               taxCategory: (p as any).taxCategory || 'STANDARD_1PCT',
               isFavorite: Boolean(p.isFavorite),
               hasBatches: Boolean(p.hasBatches),
+              eligibleForVatReduction: Boolean((p as any).eligibleForVatReduction),
               isBaseUnitPurchaseUnit,
               purchaseUnit,
               uomConversions,
@@ -429,7 +430,8 @@ export const ProductListPage: React.FC = () => {
           description: data.description,
           internalNote: data.internalNote,
           isFavorite: data.isFavorite ?? productToEdit.isFavorite,
-          hasBatches: data.hasBatches ?? productToEdit.hasBatches ?? false,
+          hasBatches: data.hasBatches !== undefined ? data.hasBatches : Boolean(productToEdit.hasBatches),
+          eligibleForVatReduction: data.eligibleForVatReduction ?? productToEdit.eligibleForVatReduction ?? false,
           isBaseUnitPurchaseUnit: data.isBaseUnitPurchaseUnit,
         });
 
@@ -487,8 +489,24 @@ export const ProductListPage: React.FC = () => {
           message: `Thông tin hàng hóa "${data.productName}" đã được cập nhật thành công vào hệ thống.`,
           itemCode: data.productCode,
         });
+        setProducts((prev) =>
+          prev.map((p) =>
+            p.id === productToEdit.id
+              ? {
+                  ...p,
+                  ...data,
+                  hasBatches: data.hasBatches !== undefined ? data.hasBatches : Boolean(p.hasBatches),
+                  isFavorite: data.isFavorite !== undefined ? data.isFavorite : Boolean(p.isFavorite),
+                }
+              : p
+          )
+        );
         if (selectedProduct && selectedProduct.id === productToEdit.id) {
-          setSelectedProduct({ ...selectedProduct, ...data } as ProductItem);
+          setSelectedProduct({
+            ...selectedProduct,
+            ...data,
+            hasBatches: data.hasBatches !== undefined ? data.hasBatches : Boolean(selectedProduct.hasBatches),
+          } as ProductItem);
         }
       } else {
         // Tạo mới sản phẩm trên Backend qua POST /api/products
@@ -639,6 +657,40 @@ export const ProductListPage: React.FC = () => {
     );
     if (selectedProduct && selectedProduct.id === product.id) {
       setSelectedProduct({ ...selectedProduct, status: nextStatus });
+    }
+  };
+
+  const handleToggleHasBatches = async (product: ProductItem, nextVal: boolean) => {
+    setProducts((prev) =>
+      prev.map((p) => (p.id === product.id ? { ...p, hasBatches: nextVal } : p))
+    );
+    if (selectedProduct && selectedProduct.id === product.id) {
+      setSelectedProduct({ ...selectedProduct, hasBatches: nextVal });
+    }
+    try {
+      await productApi.updateProduct(product.id, {
+        name: product.productName,
+        categoryId: product.categoryId,
+        sellingPrice: product.sellingPrice,
+        barcode: product.barcode?.trim() || undefined,
+        baseUnit: product.baseUnit?.trim() || 'Cái',
+        costPrice: product.costPrice ?? undefined,
+        status: product.status,
+        imageUrl: product.imageUrl,
+        imageUrls: product.imageUrls || (product.imageUrl ? [product.imageUrl] : []),
+        description: product.description,
+        internalNote: product.internalNote,
+        isFavorite: Boolean(product.isFavorite),
+        hasBatches: nextVal,
+        eligibleForVatReduction: Boolean(product.eligibleForVatReduction),
+      });
+      showToast(
+        nextVal
+          ? `Đã bật quản lý theo lô & HSD cho "${product.productName}"`
+          : `Đã tắt quản lý theo lô & HSD cho "${product.productName}"`
+      );
+    } catch (err: any) {
+      console.warn('Lỗi khi cập nhật trạng thái quản lý theo lô:', err);
     }
   };
 
@@ -1820,6 +1872,7 @@ export const ProductListPage: React.FC = () => {
         }}
         onDelete={handleDeleteProduct}
         onToggleStatus={handleToggleStatus}
+        onToggleHasBatches={handleToggleHasBatches}
         onDuplicate={handleDuplicateProduct}
         userRole={userRole}
       />

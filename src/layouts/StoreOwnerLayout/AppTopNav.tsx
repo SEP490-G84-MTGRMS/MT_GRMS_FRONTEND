@@ -134,10 +134,6 @@ const NAV_GROUPS: NavGroup[] = [
             badge: "Mới",
             badgeType: "blue",
           },
-          {
-            label: "Thiết lập bảng giá",
-            to: "/store-owner/suppliers/products?view=pricing",
-          },
         ],
       },
       {
@@ -156,8 +152,10 @@ const NAV_GROUPS: NavGroup[] = [
             badgeType: "blue",
           },
           {
-            label: "Kiểm kho & Cân đối",
-            to: "/store-owner/suppliers/products?view=inventory",
+            label: "Kiểm kê hàng hóa",
+            to: "/store-owner/stocktakes",
+            badge: "KK",
+            badgeType: "blue",
           },
           {
             label: "Chuyển hàng liên kho",

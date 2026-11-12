@@ -39,17 +39,6 @@ export const GrnProductEntryTable: FC<GrnProductEntryTableProps> = ({
   const [barcodeQuery, setBarcodeQuery] = useState('');
   const [barcodeAlert, setBarcodeAlert] = useState<string | null>(null);
 
-  // Check if an expiration date is within 30 days (FEFO alert)
-  const isNearExpiry = (expDateStr?: string): boolean => {
-    if (!expDateStr) return false;
-    const exp = new Date(expDateStr);
-    if (isNaN(exp.getTime())) return false;
-    const now = new Date();
-    const diffTime = exp.getTime() - now.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays >= 0 && diffDays < 30;
-  };
-
   const handleBarcodeKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       e.preventDefault();
@@ -316,9 +305,8 @@ export const GrnProductEntryTable: FC<GrnProductEntryTableProps> = ({
                 const shortageQty = Math.max(0, -groupDiff);
                 const isShort = shortageQty > 0;
                 const isMismatch = groupDiff !== 0;
-                const isNearExp = isNearExpiry(row.expiryDate);
                 const hasExcessDelivery = gReceived > row.orderedQty;
-                const manageBatch = !!row.manageBatch;
+                const manageBatch = Boolean(row.hasBatches ?? row.manageBatch);
                 const siblingCount = items.filter((it) => groupKey(it) === groupKey(row)).length;
                 const isFirstInGroup =
                   items.findIndex((it) => groupKey(it) === groupKey(row)) === idx;
@@ -384,32 +372,30 @@ export const GrnProductEntryTable: FC<GrnProductEntryTableProps> = ({
 
                     {/* 6. SL thực nhận (= chấp nhận) */}
                     <td style={{ padding: '6px 6px', textAlign: 'right' }}>
-                      {readOnly ? (
-                        <span style={{ fontWeight: 700, color: '#0d9488' }}>{row.receivedQty}</span>
-                      ) : (
-                        <input
-                          type="number"
-                          min={0}
-                          value={row.receivedQty}
-                          onChange={(e) => {
-                            const val = Math.max(0, parseFloat(e.target.value) || 0);
-                            onItemChange(row.id, 'receivedQty', val);
-                          }}
-                          style={{
-                            width: 68,
-                            height: 28,
-                            padding: '0 6px',
-                            textAlign: 'right',
-                            borderRadius: 4,
-                            border: '1.5px solid #0d9488',
-                            fontWeight: 700,
-                            fontSize: 12.5,
-                            color: '#0f172a',
-                            backgroundColor: '#f0fdfa',
-                            outline: 'none',
-                          }}
-                        />
-                      )}
+                      <input
+                        type="number"
+                        min={0}
+                        disabled={readOnly}
+                        value={row.receivedQty}
+                        onChange={(e) => {
+                          const val = Math.max(0, parseFloat(e.target.value) || 0);
+                          onItemChange(row.id, 'receivedQty', val);
+                        }}
+                        style={{
+                          width: 68,
+                          height: 28,
+                          padding: '0 6px',
+                          textAlign: 'right',
+                          borderRadius: 4,
+                          border: '1.5px solid ' + (readOnly ? '#cbd5e1' : '#0d9488'),
+                          fontWeight: 700,
+                          fontSize: 12.5,
+                          color: readOnly ? '#475569' : '#0f172a',
+                          backgroundColor: readOnly ? '#f1f5f9' : '#f0fdfa',
+                          outline: 'none',
+                          cursor: readOnly ? 'not-allowed' : 'text',
+                        }}
+                      />
                     </td>
 
                     {/* 7. SL thiếu (= SL đặt − tổng thực nhận nhóm) */}
@@ -428,37 +414,31 @@ export const GrnProductEntryTable: FC<GrnProductEntryTableProps> = ({
                     {/* 8. Lý do từ chối / giao thiếu */}
                     <td style={{ padding: '6px 8px' }}>
                       {isShort && isFirstInGroup ? (
-                        readOnly ? (
-                          <span style={{ color: '#dc2626', fontSize: 11, fontWeight: 600 }}>
-                            {row.rejectionReason
-                              ? REJECTION_REASON_LABELS[row.rejectionReason]
-                              : 'Chưa chọn lý do'}
-                          </span>
-                        ) : (
-                          <select
-                            value={row.rejectionReason || ''}
-                            onChange={(e) =>
-                              onItemChange(row.id, 'rejectionReason', e.target.value as RejectionReason)
-                            }
-                            style={{
-                              width: '100%',
-                              height: 28,
-                              borderRadius: 4,
-                              border: !row.rejectionReason ? '1.5px solid #dc2626' : '1px solid #cbd5e1',
-                              fontSize: 11,
-                              color: !row.rejectionReason ? '#dc2626' : '#0f172a',
-                              backgroundColor: !row.rejectionReason ? '#fff1f2' : '#ffffff',
-                              outline: 'none',
-                            }}
-                          >
-                            <option value="">-- Chọn lý do thiếu/từ chối --</option>
-                            {Object.entries(REJECTION_REASON_LABELS).map(([code, label]) => (
-                              <option key={code} value={code}>
-                                {label}
-                              </option>
-                            ))}
-                          </select>
-                        )
+                        <select
+                          value={row.rejectionReason || ''}
+                          disabled={readOnly}
+                          onChange={(e) =>
+                            onItemChange(row.id, 'rejectionReason', e.target.value as RejectionReason)
+                          }
+                          style={{
+                            width: '100%',
+                            height: 28,
+                            borderRadius: 4,
+                            border: readOnly ? '1px solid #cbd5e1' : (!row.rejectionReason ? '1.5px solid #dc2626' : '1px solid #cbd5e1'),
+                            fontSize: 11,
+                            color: readOnly ? '#475569' : (!row.rejectionReason ? '#dc2626' : '#0f172a'),
+                            backgroundColor: readOnly ? '#f1f5f9' : (!row.rejectionReason ? '#fff1f2' : '#ffffff'),
+                            outline: 'none',
+                            cursor: readOnly ? 'not-allowed' : 'pointer',
+                          }}
+                        >
+                          <option value="">-- Chọn lý do thiếu/từ chối --</option>
+                          {Object.entries(REJECTION_REASON_LABELS).map(([code, label]) => (
+                            <option key={code} value={code}>
+                              {label}
+                            </option>
+                          ))}
+                        </select>
                       ) : (
                         <span style={{ color: '#94a3b8', fontSize: 11 }}>—</span>
                       )}
@@ -494,15 +474,23 @@ export const GrnProductEntryTable: FC<GrnProductEntryTableProps> = ({
                       )}
                     </td>
 
-                    {/* 11. Quản lý batch */}
+                    {/* 11. Quản lý batch — lấy cấu hình từ bảng Product */}
                     <td style={{ padding: '6px 8px', textAlign: 'center' }}>
                       <input
                         type="checkbox"
                         checked={manageBatch}
-                        disabled={readOnly}
-                        onChange={(e) => onItemChange(row.id, 'manageBatch', e.target.checked)}
-                        title="Tick nếu dòng này quản lý theo lô / HSD"
-                        style={{ width: 16, height: 16, cursor: readOnly ? 'default' : 'pointer' }}
+                        disabled={true}
+                        title={
+                          manageBatch
+                            ? 'Sản phẩm quản lý theo Lô & HSD (cấu hình từ danh mục sản phẩm)'
+                            : 'Sản phẩm không quản lý theo Lô & HSD'
+                        }
+                        style={{
+                          width: 16,
+                          height: 16,
+                          cursor: 'not-allowed',
+                          accentColor: '#0d9488',
+                        }}
                       />
                     </td>
 
@@ -510,14 +498,11 @@ export const GrnProductEntryTable: FC<GrnProductEntryTableProps> = ({
                     <td style={{ padding: '6px 8px', width: 180, minWidth: 180 }}>
                       {!manageBatch ? (
                         <span style={{ color: '#94a3b8', fontSize: 11 }}>—</span>
-                      ) : readOnly ? (
-                        <span style={{ fontFamily: 'monospace', fontWeight: 600, color: '#334155' }}>
-                          {row.batchCode || '—'}
-                        </span>
                       ) : (
                         <input
                           type="text"
                           value={row.batchCode || ''}
+                          disabled={readOnly}
                           onChange={(e) => onItemChange(row.id, 'batchCode', e.target.value)}
                           placeholder="BAT-..."
                           style={{
@@ -529,6 +514,9 @@ export const GrnProductEntryTable: FC<GrnProductEntryTableProps> = ({
                             border: '1px solid #cbd5e1',
                             fontFamily: 'monospace',
                             fontSize: 11.5,
+                            color: readOnly ? '#475569' : '#0f172a',
+                            backgroundColor: readOnly ? '#f1f5f9' : '#ffffff',
+                            cursor: readOnly ? 'not-allowed' : 'text',
                             boxSizing: 'border-box',
                           }}
                         />
@@ -539,20 +527,26 @@ export const GrnProductEntryTable: FC<GrnProductEntryTableProps> = ({
                     <td style={{ padding: '6px 8px' }}>
                       {!manageBatch ? (
                         <span style={{ color: '#94a3b8', fontSize: 11 }}>—</span>
-                      ) : readOnly ? (
-                        <span style={{ fontSize: 11.5 }}>{row.manufactureDate || '—'}</span>
                       ) : (
                         <input
                           type="date"
                           value={row.manufactureDate || ''}
+                          disabled={readOnly}
                           onChange={(e) => onItemChange(row.id, 'manufactureDate', e.target.value)}
                           style={{
                             width: '100%',
                             height: 28,
                             padding: '0 4px',
                             borderRadius: 4,
-                            border: !row.manufactureDate ? '1.5px solid #f59e0b' : '1px solid #cbd5e1',
+                            border: readOnly
+                              ? '1px solid #cbd5e1'
+                              : !row.manufactureDate
+                              ? '1.5px solid #f59e0b'
+                              : '1px solid #cbd5e1',
                             fontSize: 11,
+                            color: readOnly ? '#475569' : '#0f172a',
+                            backgroundColor: readOnly ? '#f1f5f9' : '#ffffff',
+                            cursor: readOnly ? 'not-allowed' : 'text',
                             boxSizing: 'border-box',
                           }}
                         />
@@ -563,30 +557,26 @@ export const GrnProductEntryTable: FC<GrnProductEntryTableProps> = ({
                     <td style={{ padding: '6px 8px' }}>
                       {!manageBatch ? (
                         <span style={{ color: '#94a3b8', fontSize: 11 }}>—</span>
-                      ) : readOnly ? (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                          <span style={{ fontSize: 11.5 }}>{row.expiryDate || '—'}</span>
-                          {isNearExp && (
-                            <span style={{ fontSize: 10, fontWeight: 700, color: '#b45309' }}>
-                              Cận HSD
-                            </span>
-                          )}
-                        </div>
                       ) : (
                         <input
                           type="date"
                           value={row.expiryDate || ''}
+                          disabled={readOnly}
                           onChange={(e) => onItemChange(row.id, 'expiryDate', e.target.value)}
                           style={{
                             width: '100%',
                             height: 28,
                             padding: '0 4px',
                             borderRadius: 4,
-                            border:
-                              !row.expiryDate || isNearExp
-                                ? '1.5px solid #f59e0b'
-                                : '1px solid #cbd5e1',
+                            border: readOnly
+                              ? '1px solid #cbd5e1'
+                              : !row.expiryDate
+                              ? '1.5px solid #f59e0b'
+                              : '1px solid #cbd5e1',
                             fontSize: 11,
+                            color: readOnly ? '#475569' : '#0f172a',
+                            backgroundColor: readOnly ? '#f1f5f9' : '#ffffff',
+                            cursor: readOnly ? 'not-allowed' : 'text',
                             boxSizing: 'border-box',
                           }}
                         />

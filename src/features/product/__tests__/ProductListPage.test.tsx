@@ -435,4 +435,63 @@ describe('ProductListPage - Task T6 BR-SEC-01 Phân quyền Giá vốn theo Vai 
       expect(productApi.deleteProduct).toHaveBeenCalledWith('p-1');
     });
   });
+
+  it('cập nhật thành công hasBatches khi chỉnh sửa sản phẩm', async () => {
+    (categoryApi.getCategories as any).mockResolvedValue([
+      { id: 'cat-1', name: 'Nước uống', productCount: 1 },
+    ]);
+    (productApi.getProductsPaged as any).mockResolvedValue({
+      items: [mockSampleProduct],
+      pageIndex: 1,
+      pageSize: 20,
+      totalCount: 1,
+      totalPages: 1,
+      hasPreviousPage: false,
+      hasNextPage: false,
+    });
+    (productApi.updateProduct as any).mockResolvedValue({
+      ...mockSampleProduct,
+      hasBatches: true,
+    });
+
+    render(<ProductListPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Nước suối Aquafina 500ml')).toBeDefined();
+    });
+
+    // Click vào dòng sản phẩm để mở modal chi tiết
+    fireEvent.click(screen.getByText('Nước suối Aquafina 500ml'));
+
+    // Trong modal chi tiết, click "Sửa hàng hóa"
+    await waitFor(() => {
+      expect(screen.getByText('Sửa hàng hóa')).toBeDefined();
+    });
+    fireEvent.click(screen.getByText('Sửa hàng hóa'));
+
+    // Modal chỉnh sửa mở ra
+    await waitFor(() => {
+      expect(screen.getByLabelText(/Quản lý theo lô & hạn sử dụng/i)).toBeDefined();
+    });
+
+    const checkbox = screen.getByLabelText(/Quản lý theo lô & hạn sử dụng/i) as HTMLInputElement;
+    expect(checkbox.checked).toBe(false);
+
+    // Click tickbox
+    fireEvent.click(checkbox);
+    expect(checkbox.checked).toBe(true);
+
+    // Bấm Cập nhật
+    fireEvent.click(screen.getByText('Cập nhật'));
+
+    // Kiểm tra API updateProduct được gọi với hasBatches: true
+    await waitFor(() => {
+      expect(productApi.updateProduct).toHaveBeenCalledWith(
+        'p-1',
+        expect.objectContaining({
+          hasBatches: true,
+        })
+      );
+    });
+  });
 });

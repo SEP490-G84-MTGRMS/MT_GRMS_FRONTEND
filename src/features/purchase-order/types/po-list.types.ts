@@ -39,6 +39,10 @@ export interface PurchaseOrderListItem {
   status: PurchaseOrderStatus;
   note?: string;
   revisionNumber?: number;
+  /** Phiếu GRN DRAFT/COMPLETED gắn PO (nếu có) — dùng điều hướng Nhận hàng */
+  activeGoodsReceiptId?: string | null;
+  activeGoodsReceiptCode?: string | null;
+  activeGoodsReceiptStatus?: string | null;
   items: PurchaseOrderItemDetail[];
 }
 

@@ -47,10 +47,12 @@ const mapBackendStatus = (status: string): PurchaseOrderStatus => {
       return 'SENT';
     case 'APPROVED':
     case 'CONFIRMED':
+    case 'FINALIZED':
       return 'CONFIRMED';
     case 'PARTIALLY_RECEIVED':
       return 'PARTIALLY_RECEIVED';
     case 'RECEIVED':
+    case 'COMPLETED':
       return 'RECEIVED';
     case 'CANCELLED':
     case 'REJECTED':
@@ -58,6 +60,20 @@ const mapBackendStatus = (status: string): PurchaseOrderStatus => {
     default:
       return 'SENT';
   }
+};
+
+const RECEIVE_ELIGIBLE_STATUSES: PurchaseOrderStatus[] = [
+  'SENT',
+  'CONFIRMED',
+  'APPROVED',
+  'DISPATCHED',
+  'PARTIALLY_RECEIVED',
+];
+
+const canReceiveOrder = (order: PurchaseOrderListItem): boolean => {
+  if (order.activeGoodsReceiptStatus?.toUpperCase() === 'COMPLETED') return true; // xem phiếu
+  if (order.status === 'CANCELLED' || order.status === 'REJECTED') return false;
+  return RECEIVE_ELIGIBLE_STATUSES.includes(order.status) || order.status === 'RECEIVED';
 };
 
 /** Map UI filter status → backend status (nếu có). */
@@ -124,6 +140,9 @@ export const StoreOwnerPurchaseOrderListPage: FC = () => {
           status: mapBackendStatus(po.status),
           note: po.note,
           revisionNumber: po.revisionNumber ?? 1,
+          activeGoodsReceiptId: po.activeGoodsReceiptId ?? null,
+          activeGoodsReceiptCode: po.activeGoodsReceiptCode ?? null,
+          activeGoodsReceiptStatus: po.activeGoodsReceiptStatus ?? null,
           items: (po.details ?? []).map((d) => ({
             id: d.id,
             name: d.productName,
@@ -196,6 +215,36 @@ export const StoreOwnerPurchaseOrderListPage: FC = () => {
     setFilterInputs(DEFAULT_FILTERS);
     setAppliedFilters(DEFAULT_FILTERS);
     setPageIndex(1);
+  };
+
+  /** Nhận hàng từ PO → tạo / tiếp tục confirm / xem GRN (goods-receipts vẫn là sổ chứng từ). */
+  const handleReceiveOrder = (order: PurchaseOrderListItem) => {
+    if (!canReceiveOrder(order) && !order.activeGoodsReceiptId) {
+      showToast(`PO ${order.poCode} chưa đủ điều kiện nhận hàng.`, 'warning');
+      return;
+    }
+
+    const grnStatus = (order.activeGoodsReceiptStatus || '').toUpperCase();
+    const grnId = order.activeGoodsReceiptId;
+
+    if (grnId && grnStatus === 'COMPLETED') {
+      showToast(`PO ${order.poCode} đã nhập kho (${order.activeGoodsReceiptCode}). Mở phiếu nhập.`, 'info');
+      navigate(`/store-owner/goods-receipts/${grnId}`);
+      return;
+    }
+
+    if (grnId && grnStatus === 'DRAFT') {
+      showToast(`Tiếp tục xác nhận phiếu nhập nháp ${order.activeGoodsReceiptCode}.`, 'info');
+      navigate(`/store-owner/goods-receipts/${grnId}/confirm`);
+      return;
+    }
+
+    const params = new URLSearchParams({
+      po: order.id,
+      poCode: order.poCode,
+    });
+    showToast(`Tạo phiếu nhập kho từ PO ${order.poCode}.`, 'info');
+    navigate(`/store-owner/goods-receipts/create?${params.toString()}`);
   };
 
   return (
@@ -279,12 +328,14 @@ export const StoreOwnerPurchaseOrderListPage: FC = () => {
           );
           navigate(`/store-owner/purchase-orders/create-matrix?${params.toString()}`);
         }}
+        onReceiveOrder={handleReceiveOrder}
       />
 
       <PoDetailDrawer
         order={selectedOrder}
         isOpen={Boolean(selectedOrder)}
         onClose={() => setSelectedOrder(null)}
+        onReceiveNow={handleReceiveOrder}
       />
     </div>
   );
