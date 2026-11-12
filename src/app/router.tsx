@@ -494,6 +494,10 @@ export const router = createBrowserRouter([
         ),
       },
       {
+        path: 'finance/cashbook',
+        element: <Navigate to="/store-owner/cashbook" replace />,
+      },
+      {
         path: 'finance/*',
         element: <Navigate to="/store-owner/finance" replace />,
       },
