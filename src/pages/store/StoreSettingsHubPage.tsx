@@ -14,12 +14,13 @@ import { StoreTopStatusBar } from "./components/StoreTopStatusBar";
 import { SubscriptionPricingCards } from "./components/SubscriptionPricingCards";
 import { SubscriptionCheckoutModal } from "./components/SubscriptionCheckoutModal";
 import { StoreWalletTopupModal } from "./components/StoreWalletTopupModal";
-import { StoreInfoTab } from "./components/StoreInfoTab";
 import { OrderHistoryTab } from "./components/OrderHistoryTab";
 import { TermsOfServiceTab } from "./components/TermsOfServiceTab";
 import { WalletLedgerTab } from "./components/WalletLedgerTab";
 import { BranchManagementTab } from "./components/BranchManagementTab";
 import { storeApi, mapBackendStoreToFrontend } from "./api/storeApi";
+import { StorageAddonCard } from "./components/StorageAddonCard";
+import { BranchAddonModal } from "./components/BranchAddonModal";
 
 const VALID_TABS: StoreHubTabKey[] = [
   "store-info",
@@ -52,6 +53,10 @@ export const StoreSettingsHubPage: FC = () => {
   const [selectedPlanForCheckout, setSelectedPlanForCheckout] =
     useState<SubscriptionPlanItem | null>(null);
   const [showTopupModal, setShowTopupModal] = useState<boolean>(false);
+  const [showBranchAddonModal, setShowBranchAddonModal] = useState<boolean>(false);
+  const currentPlanCode = storeInfo.currentPlan.toUpperCase();
+  const isStandardPlan = currentPlanCode.includes("STANDARD") || currentPlanCode.includes("THƯỜNG");
+  const isProPlan = currentPlanCode.includes("PRO");
 
   // Load real store info from Backend API
   useEffect(() => {
@@ -134,31 +139,6 @@ export const StoreSettingsHubPage: FC = () => {
     setSelectedPlanForCheckout(null);
   };
 
-  // Cập nhật thông tin store
-  const handleUpdateStoreInfo = async (
-    updated: Partial<StoreInfo>,
-  ): Promise<boolean> => {
-    try {
-      const res = await storeApi.updateStoreInfo({
-        name: updated.name || storeInfo.name,
-        taxCode: updated.taxCode,
-        hotline: updated.hotline,
-        address: updated.address,
-        city: updated.city,
-      });
-      if (res.success && res.data) {
-        setStoreInfo((prev) =>
-          mapBackendStoreToFrontend(res.data, prev.walletBalance),
-        );
-        return true;
-      }
-      return false;
-    } catch (error) {
-      console.error("Update store info error:", error);
-      return false;
-    }
-  };
-
   return (
     <div className="store-hub-container">
       {/* 1. Sidebar bên trái chuẩn phong cách KiotViet */}
@@ -175,24 +155,16 @@ export const StoreSettingsHubPage: FC = () => {
         {/* Tab 1: Gói dịch vụ */}
         {activeTab === "subscriptions" && (
           <div style={{ width: "100%" }}>
-            <div style={{ marginBottom: 18 }}>
-              <h1
-                style={{
-                  fontSize: 22,
-                  fontWeight: 800,
-                  color: "#0F172A",
-                  margin: 0,
-                }}
-              >
-                Gói dịch vụ MT-GRMS
-              </h1>
-              <p
-                style={{ fontSize: 13, color: "#64748B", margin: "4px 0 0 0" }}
-              >
-                Lựa chọn gói thuê bao phù hợp với quy mô chuỗi cửa hàng, quản lý
-                đa chi nhánh và tự động hóa bán lẻ.
-              </p>
-            </div>
+            {isStandardPlan && <StorageAddonCard
+              onPurchased={(amount) => {
+                setStoreInfo((prev) => ({ ...prev, walletBalance: Math.max(0, prev.walletBalance - amount) }));
+                setWalletRefreshKey((key) => key + 1);
+              }}
+            />}
+            {isProPlan && <section style={{ marginBottom: 18, padding: 20, border: "1px solid #DDE7F3", borderRadius: 24, background: "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
+              <div><strong style={{ color: "#0F172A" }}>Mở rộng chuỗi cửa hàng</strong><div style={{ marginTop: 4, color: "#64748B", fontSize: 13 }}>Gói Pro có thể mua thêm chi nhánh: 80.000 đ/chi nhánh/tháng.</div></div>
+              <button type="button" onClick={() => setShowBranchAddonModal(true)} style={{ padding: "10px 18px", border: 0, borderRadius: 9999, background: "#0066FF", color: "#FFF", fontWeight: 700 }}>Mua thêm chi nhánh</button>
+            </section>}
             <SubscriptionPricingCards
               onSelectPlan={(plan) => setSelectedPlanForCheckout(plan)}
               currentPlanName={storeInfo.currentPlan}
@@ -261,6 +233,16 @@ export const StoreSettingsHubPage: FC = () => {
           storeInfo={storeInfo}
           onClose={() => setShowTopupModal(false)}
           onSuccess={handleTopupSuccess}
+        />
+      )}
+
+      {showBranchAddonModal && (
+        <BranchAddonModal
+          onClose={() => setShowBranchAddonModal(false)}
+          onPurchased={(amount) => {
+            setStoreInfo((prev) => ({ ...prev, walletBalance: Math.max(0, prev.walletBalance - amount) }));
+            setWalletRefreshKey((key) => key + 1);
+          }}
         />
       )}
     </div>

@@ -132,7 +132,61 @@ export const storeApi = {
     const res = await httpClient.get<ApiResponse<SubscriptionOrderHistoryItem[]>>('/tenant/subscriptions/history');
     return res.data;
   },
+
+  async getStorageUsage(): Promise<ApiResponse<StorageUsage>> {
+    const res = await httpClient.get<ApiResponse<StorageUsage>>('/tenant/storage');
+    return res.data;
+  },
+
+  async getStorageQuote(extraGb: number): Promise<ApiResponse<StorageQuote>> {
+    const res = await httpClient.get<ApiResponse<StorageQuote>>('/tenant/storage/quote', {
+      params: { extraGb },
+    });
+    return res.data;
+  },
+
+  async purchaseStorage(extraGb: number, requestId: string): Promise<ApiResponse<StorageQuote>> {
+    const res = await httpClient.post<ApiResponse<StorageQuote>>('/tenant/storage/purchase', {
+      extraGb,
+      requestId,
+    });
+    return res.data;
+  },
+
+  async getBranchAddonQuote(extraBranches: number): Promise<ApiResponse<BranchAddonQuote>> {
+    const res = await httpClient.get<ApiResponse<BranchAddonQuote>>('/tenant/branch-addon/quote', { params: { extraBranches } });
+    return res.data;
+  },
+
+  async purchaseBranchAddon(extraBranches: number, requestId: string): Promise<ApiResponse<BranchAddonQuote>> {
+    const res = await httpClient.post<ApiResponse<BranchAddonQuote>>('/tenant/branch-addon/purchase', { extraBranches, requestId });
+    return res.data;
+  },
 };
+
+export interface StorageUsage {
+  usedBytes: number;
+  limitBytes: number;
+  baseGb: number;
+  extraGb: number;
+  addonExpiresAt?: string | null;
+}
+
+export interface StorageQuote {
+  extraGb: number;
+  subtotal: number;
+  vat: number;
+  total: number;
+  expiresAt: string;
+}
+
+export interface BranchAddonQuote {
+  extraBranches: number;
+  subtotal: number;
+  vat: number;
+  total: number;
+  expiresAt: string;
+}
 
 export interface SubscriptionOrderHistoryItem {
   code: string;
@@ -151,6 +205,8 @@ export interface PurchaseSubscriptionPayload {
   extraBranches?: number;
   hasStaffManagementAddon?: boolean;
   extraWarehouses?: number;
+  extraStorageGb?: number;
+  requestId?: string;
   paymentMethod?: 'Wallet' | 'VietQR';
 }
 
