@@ -9,14 +9,13 @@ import {
   ChevronUp,
 } from 'lucide-react';
 import { AdminToast, type ToastState } from '../../admin/components';
-import { PnlFilterToolbar } from '../components/PnlFilterToolbar';
+import { PnlFilterToolbar, formatLocalYmd } from '../components/PnlFilterToolbar';
 import { PnlKpiCardsSection } from '../components/PnlKpiCardsSection';
 import { PnlChartsSection } from '../components/PnlChartsSection';
 import { PnlStatementTable } from '../components/PnlStatementTable';
 import { PnlExportModal } from '../components/PnlExportModal';
 import { reportsPnlService } from '../services/reportsPnlService';
 import { WaterfallChart, type WaterfallItem } from '../../../components/common/WaterfallChart';
-import { MOCK_PNL_MONTH } from '../../finance/data/mockFinanceData';
 import { formatMoney } from '../../finance/utils/formatters';
 import type {
   BranchOption,
@@ -52,11 +51,13 @@ export const ReportsPnlDashboardPage: React.FC = () => {
   };
 
   const [filter, setFilter] = useState<PnlFilterParams>(() => {
+    const today = new Date();
+    const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
     return {
       branchId: 'ALL',
       presetPeriod: 'THIS_MONTH',
-      startDate: '2026-10-01',
-      endDate: '2026-10-27',
+      startDate: formatLocalYmd(firstDay),
+      endDate: formatLocalYmd(today),
     };
   });
 
@@ -100,16 +101,18 @@ export const ReportsPnlDashboardPage: React.FC = () => {
     fetchReport(true);
   };
 
-  // Reconciled figures with Gate 0 Mock Ledger
-  const netRev = reportData?.kpiSummary?.netRevenue || MOCK_PNL_MONTH.netSales; // 560.86M
-  const cogsVal = reportData?.kpiSummary?.cogs || MOCK_PNL_MONTH.cogs; // 386.9934M
-  const grossProfitVal = reportData?.kpiSummary?.grossProfit || MOCK_PNL_MONTH.grossProfit; // 173.8666M
-  const opexVal = reportData?.kpiSummary?.operatingExpenses || MOCK_PNL_MONTH.operatingExpenses; // 81.3247M
-  const taxVal = reportData?.kpiSummary?.estimatedTaxAmount || MOCK_PNL_MONTH.shrinkageWarehouse; // 6.73032M
-  const netProfitVal = reportData?.kpiSummary?.netProfitAfterTax || MOCK_PNL_MONTH.netProfit; // 85.811.580 đ
+  // Live figures from report data (0 if not loaded yet)
+  const netRev = reportData?.kpiSummary?.netRevenue ?? 0;
+  const cogsVal = reportData?.kpiSummary?.cogs ?? 0;
+  const grossProfitVal = reportData?.kpiSummary?.grossProfit ?? 0;
+  const opexVal = reportData?.kpiSummary?.operatingExpenses ?? 0;
+  const shrinkageVal = reportData?.kpiSummary?.shrinkageLoss ?? 0;
+  const taxVal = reportData?.kpiSummary?.estimatedTaxAmount ?? 0;
+  const netProfitVal = reportData?.kpiSummary?.netProfitAfterTax ?? 0;
 
-  // Story formula: "Cứ 100đ bán ra, lãi ~15đ"
-  const profitPerHundred = netRev > 0 ? Math.round((netProfitVal / netRev) * 100) : 15;
+  // Story formula: "Cứ 100đ bán ra, lãi ~Xđ" (tránh chia cho 0 khi netRev === 0)
+  const profitPerHundred = netRev > 0 ? Math.round((netProfitVal / netRev) * 100) : 0;
+  const grossMarginDisplay = netRev > 0 ? Math.round((grossProfitVal / netRev) * 100) : 0;
 
   const waterfallItems: WaterfallItem[] = [
     {
@@ -117,35 +120,35 @@ export const ReportsPnlDashboardPage: React.FC = () => {
       label: 'Doanh thu thuần POS',
       amount: netRev,
       type: 'positive',
-      subLabel: 'Doanh số thực thu qua quầy dịch vụ & phụ tùng',
+      subLabel: 'Doanh số thực thu sau chiết khấu & trả hàng',
     },
     {
       id: 'cogs',
-      label: 'Giá vốn phụ tùng & vật tư',
+      label: 'Giá vốn hàng bán (COGS)',
       amount: -cogsVal,
       type: 'negative',
-      subLabel: 'Chi phí nhập linh kiện thay thế',
+      subLabel: 'Giá vốn xuất kho đối soát S2c-HKD',
     },
     {
       id: 'gross',
       label: 'Lợi nhuận gộp',
       amount: grossProfitVal,
       type: 'subtotal',
-      subLabel: `Biên lãi gộp: ${Math.round((grossProfitVal / netRev) * 100)}%`,
+      subLabel: `Biên lãi gộp: ${grossMarginDisplay}%`,
     },
     {
       id: 'opex',
       label: 'Chi phí mặt bằng & vận hành',
-      amount: -opexVal,
+      amount: -(opexVal + shrinkageVal),
       type: 'negative',
-      subLabel: 'Điện nước, thuê cửa hàng, phụ cấp thợ',
+      subLabel: 'Điện nước, thuê cửa hàng, nhân sự & xóa nợ xấu',
     },
     {
       id: 'tax',
-      label: 'Nghĩa vụ thuế & hao hụt',
+      label: 'Nghĩa vụ thuế HKD (1.5%)',
       amount: -taxVal,
       type: 'negative',
-      subLabel: 'Nghị định 141/2026 & hao hụt kho',
+      subLabel: 'GTGT 1.0% + TNCN 0.5% theo TT 40 & TT 152',
     },
     {
       id: 'net',
@@ -291,10 +294,10 @@ export const ReportsPnlDashboardPage: React.FC = () => {
           </div>
           <div>
             <div style={{ fontSize: '0.92rem', fontWeight: 800, color: '#134E4A' }}>
-              Hiệu quả kinh doanh tháng 10/2026: Cứ 100đ bán ra, tiệm lãi được {profitPerHundred}đ
+              Hiệu quả kinh doanh kỳ {filter.startDate} → {filter.endDate}: Cứ 100đ bán ra, tiệm lãi được {profitPerHundred}đ
             </div>
             <div style={{ fontSize: '0.8rem', color: '#0F766E', marginTop: 2 }}>
-              Doanh thu: <strong>{formatMoney(netRev)}</strong> | Lãi ròng thực nhận về két: <strong style={{ color: '#15803D' }}>{formatMoney(netProfitVal)}</strong>
+              Doanh thu thuần: <strong>{formatMoney(netRev)}</strong> | Lãi ròng thực nhận về két: <strong style={{ color: '#15803D' }}>{formatMoney(netProfitVal)}</strong>
             </div>
           </div>
         </div>
@@ -398,6 +401,8 @@ export const ReportsPnlDashboardPage: React.FC = () => {
             <PnlStatementTable
               pnlTree={reportData?.pnlTree || []}
               isLoading={isLoading}
+              estimatedTaxAmount={taxVal}
+              cogsComparison={reportData?.kpiSummary?.cogsComparison}
             />
           </div>
         )}

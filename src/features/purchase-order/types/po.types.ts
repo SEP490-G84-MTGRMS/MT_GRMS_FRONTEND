@@ -36,8 +36,9 @@ export interface OrderMatrixSupplierDeliveryConfig {
   isActive: boolean;
   isAssignedToBranch: boolean;
   inactiveReason?: string;
-  leadTimeDays: number;
   cutoffTime: string;
+  /** Số ngày trước ngày giao để chốt đơn (0 = cùng ngày giao). */
+  cutoffDayOffset?: number;
   activeDeliveryDays: number[]; // 0: CN, 1: T2, ..., 6: T7
   blackoutDates: string[]; // YYYY-MM-DD
 }
@@ -86,7 +87,17 @@ export interface MatrixCellData {
 export type MatrixCellMap = Record<string, Record<string, MatrixCellData>>; // productId -> (dateKey -> MatrixCellData)
 export type QtyMatrixMap = Record<string, Record<string, number>>; // productId -> (dateKey -> qty) - backward compatible
 
-export type DayCutoffStatus = 'OPEN' | 'CUTOFF_DUE' | 'LOCKED' | 'PO_GENERATED';
+export type DayCutoffStatus = 'OPEN' | 'CUTOFF_DUE' | 'LOCKED' | 'PO_GENERATED' | 'SUPPLIER_OFF';
+
+export interface OrderMatrixDayStatus {
+  supplierId: string;
+  deliveryDate: string; // YYYY-MM-DD
+  deliveryDateStatus: 'OPEN' | 'CUTOFF_DUE' | 'LOCKED' | 'FINALIZED' | 'SUPPLIER_OFF' | string;
+  cutoffDateTime?: string;
+  primaryReasonCode?: string;
+  poCode?: string;
+  poId?: string;
+}
 
 export interface DayColInfo {
   date: Date;
@@ -101,6 +112,7 @@ export interface DayColInfo {
   cutoffStatus: DayCutoffStatus;
   cutoffLabel?: string;
   poCode?: string;
+  primaryReasonCode?: string;
 }
 
 export interface SplitPoItem {
@@ -153,7 +165,7 @@ export interface GeneratedPO {
   deliveryDate: string;
   totalQuantity: number;
   totalAmount: number;
-  status: 'APPROVED' | 'PENDING_APPROVAL';
+  status: 'APPROVED' | 'PENDING_APPROVAL' | string;
   itemCount: number;
 }
 
@@ -169,6 +181,8 @@ export interface BranchListItem {
   managerEmail?: string;
   stockQty: number; // Số lượng tồn kho thực tế
   orderQty: number; // Số lượng đặt hàng hiện tại của chi nhánh
+  /** Số SKU đang có số lượng > 0 trên Order Matrix (draft) của chi nhánh */
+  matrixProductCount: number;
   inventoryStatus?: BranchInventoryStatus;
   inventoryNote?: string;
   orderSummary: string;
@@ -180,11 +194,15 @@ export interface BranchListItem {
 }
 
 export interface BranchFilterState {
-  keyword: string;
-  branchCode: string;
-  status: 'all' | 'active' | 'inactive';
-  dateFrom: string;
-  dateTo: string;
+  /** @deprecated dùng branchCodes / branchNames / addresses / phones */
+  keyword?: string;
+  /** @deprecated dùng branchCodes */
+  branchCode?: string;
+  branchCodes: string[];
+  branchNames: string[];
+  addresses: string[];
+  phones: string[];
+  status: string;
   pageIndex: number;
   pageSize: number;
 }
@@ -194,6 +212,8 @@ export type CutoffUrgency = 'critical' | 'today' | 'later' | 'completed';
 
 export interface DispatchItemSku {
   id: string;
+  productId: string;
+  deliveryDate: string; // yyyy-MM-dd
   name: string;
   sku: string;
   unit: string;
@@ -218,5 +238,184 @@ export interface SupplierDispatchGroup {
   note: string;
   status: 'draft' | 'dispatched';
   poCode?: string;
+  /** Đã có PO nhưng còn trước cutoff — cho phép chốt lại (amend). */
+  canAmend?: boolean;
+  /** Draft SL khác PO đã chốt — cần cập nhật & gửi lại email. */
+  hasPendingChanges?: boolean;
+  pendingChangeLineCount?: number;
+  /** Chi tiết từng dòng SL khác PO (product × ngày × CH). */
+  pendingChanges?: DispatchPendingChangeLine[];
   dispatchedAt?: string;
+  linkedBranchCount?: number;
+  branchesWithQty?: number;
+  skuCount?: number;
+  totalQty?: number;
+  totalAmount?: number;
+  branches?: DispatchSupplierBranchSummary[];
+}
+
+export type DispatchPendingUpdateStatus = 'EDITABLE' | 'LOCKED_CUTOFF';
+
+export interface DispatchPendingChangeLine {
+  productId: string;
+  productName: string;
+  sku: string;
+  unit: string;
+  deliveryDate: string;
+  draftQty: number;
+  committedQty: number;
+  poCode?: string;
+  branchId?: string;
+  branchCode?: string;
+  branchName?: string;
+  /** EDITABLE = còn amend; LOCKED_CUTOFF = đã qua cutoff */
+  updateStatus?: DispatchPendingUpdateStatus;
+  /** Gắn từ FE khi flatten */
+  supplierId?: string;
+  supplierCode?: string;
+  supplierName?: string;
+}
+
+export interface DispatchSupplierBranchSummary {
+  branchId: string;
+  branchCode: string;
+  branchName: string;
+  skuCount: number;
+  totalQty: number;
+  totalAmount: number;
+  status: 'draft' | 'dispatched' | 'mixed' | string;
+  hasPendingChanges?: boolean;
+}
+
+export interface DispatchSupplierDetailLine {
+  id: string;
+  productId: string;
+  name: string;
+  sku: string;
+  unit: string;
+  price: number;
+  /** SL trên ma trận */
+  qty: number;
+  /** SL đã chốt trên PO */
+  committedQty: number;
+  deliveryDate: string;
+  cutoffSchedule: string;
+  dayStatus: string;
+}
+
+export interface DispatchSupplierDetailBranch {
+  branchId: string;
+  branchCode: string;
+  branchName: string;
+  status: string;
+  items: DispatchSupplierDetailLine[];
+}
+
+export interface DispatchSupplierDetail {
+  supplierId: string;
+  code: string;
+  name: string;
+  email?: string;
+  serverNow: string;
+  viewFrom: string;
+  durationDays: number;
+  cutoffTimeStr: string;
+  countdownDisplay: string;
+  remainingMinutes?: number;
+  urgency: CutoffUrgency;
+  status: 'draft' | 'dispatched' | string;
+  branches: DispatchSupplierDetailBranch[];
+}
+
+/** NEAREST = ngày giao gần nhất; DAYS_* = rolling từ hôm nay; WEEK/ALL giữ tương thích cũ. */
+export type DispatchScope =
+  | 'NEAREST'
+  | 'DAYS_7'
+  | 'DAYS_14'
+  | 'DAYS_21'
+  | 'DAYS_31'
+  | 'WEEK'
+  | 'ALL';
+export type EmailSendMode = 'SEND_NOW' | 'SCHEDULED_SEND';
+
+export interface SupplierDispatchPackage {
+  id: string;
+  dispatchBatchId: string;
+  supplierId: string;
+  supplierCode: string;
+  supplierName: string;
+  emailTo: string;
+  emailCc: string[];
+  emailSendMode: EmailSendMode | string;
+  scheduledSendAtUtc?: string;
+  emailStatus: string;
+  generationStatus: string;
+  fileName?: string;
+  fileSize?: number;
+  attemptCount: number;
+  lastError?: string;
+  generatedAtUtc?: string;
+  sentAtUtc?: string;
+  createdAt: string;
+  purchaseOrderCount: number;
+  purchaseOrderCodes: string[];
+  canDownload: boolean;
+  canCancelSchedule: boolean;
+  canRetryGeneration: boolean;
+  canRetryEmail: boolean;
+}
+
+export interface DispatchEmailOptions {
+  emailSendMode: EmailSendMode;
+  scheduledSendAt?: string;
+  ccEmails: string[];
+}
+
+export interface SplitGroupLine {
+  productId: string;
+  productName: string;
+  sku: string;
+  unit: string;
+  quantity: number;
+  unitPrice: number;
+  lineAmount: number;
+  hasMissingPrice: boolean;
+}
+
+export interface SplitGroupResult {
+  branchId?: string;
+  branchName?: string;
+  supplierId: string;
+  supplierName: string;
+  supplierCode?: string;
+  deliveryDate: string;
+  status: 'SUCCESS' | 'AMENDED' | 'NO_CHANGES' | 'FAILED' | 'SKIPPED' | 'ALREADY_FINALIZED';
+  revisionNumber?: number;
+  purchaseOrderId?: string;
+  purchaseOrderCode?: string;
+  errorCode?: string;
+  errorMessage?: string;
+  validLineCount?: number;
+  invalidLineCount?: number;
+  totalQuantity?: number;
+  totalAmount?: number;
+  hasMissingPrice?: boolean;
+  lines?: SplitGroupLine[];
+  warnings?: string[];
+}
+
+export interface SplitMatrixBatchResult {
+  branchId: string;
+  scope?: DispatchScope;
+  serverNow?: string;
+  totalGroups: number;
+  successCount: number;
+  amendedCount?: number;
+  noChangesCount?: number;
+  failedCount: number;
+  skippedCount: number;
+  alreadyFinalizedCount: number;
+  results: SplitGroupResult[];
+  createdPurchaseOrders: GeneratedPO[];
+  dispatchPackage?: SupplierDispatchPackage | null;
 }

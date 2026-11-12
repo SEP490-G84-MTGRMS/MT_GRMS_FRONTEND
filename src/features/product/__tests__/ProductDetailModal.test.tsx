@@ -60,7 +60,7 @@ describe('ProductDetailModal - Chức năng Switch Đơn vị tính (REQ-08)', (
     // Mã hàng & Mã vạch mặc định
     const codes = screen.getAllByText('SP000008');
     expect(codes.length).toBeGreaterThan(0);
-    expect(screen.getByText('8930000001')).toBeDefined();
+    expect(screen.getAllByText('8930000001').length).toBeGreaterThan(0);
   });
 
   it('chuyển đổi sang đơn vị thùng khi click Pill trên Header và cập nhật toàn bộ thông số', () => {
@@ -96,7 +96,7 @@ describe('ProductDetailModal - Chức năng Switch Đơn vị tính (REQ-08)', (
 
     // Mã hàng và Mã vạch riêng của thùng
     expect(screen.getAllByText('SP000008-THUNG').length).toBeGreaterThan(0);
-    expect(screen.getByText('8930000009')).toBeDefined();
+    expect(screen.getAllByText('8930000009').length).toBeGreaterThan(0);
   });
 
   it('chuyển đổi đơn vị tính khi click trực tiếp vào dòng trong Bảng Đơn vị tính', () => {

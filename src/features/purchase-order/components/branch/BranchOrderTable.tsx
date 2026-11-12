@@ -2,15 +2,12 @@ import { useState, useMemo, useRef, useEffect } from 'react';
 import type { FC } from 'react';
 import {
   Building2,
-  MapPin,
-  Phone,
-  Eye,
   ShoppingCart,
-  ChevronLeft,
-  ChevronRight,
   ArrowUpDown,
 } from 'lucide-react';
 import type { BranchListItem } from '../../types/po.types';
+import { TablePagination } from '../../../../components/common';
+import '../../../../styles/so-list-page.css';
 
 interface BranchOrderTableProps {
   branches: BranchListItem[];
@@ -19,11 +16,17 @@ interface BranchOrderTableProps {
   pageSize: number;
   onPageChange: (page: number) => void;
   onPageSizeChange?: (size: number) => void;
-  onViewDetail: (branch: BranchListItem) => void;
   onOrder: (branchId: string) => void;
 }
 
-type SortField = 'code' | 'name' | 'managerName' | 'pendingCount' | 'status' | 'lastUpdated';
+type SortField =
+  | 'code'
+  | 'name'
+  | 'managerName'
+  | 'matrixProductCount'
+  | 'pendingCount'
+  | 'status'
+  | 'lastUpdated';
 type SortDirection = 'asc' | 'desc';
 
 export const BranchOrderTable: FC<BranchOrderTableProps> = ({
@@ -33,7 +36,6 @@ export const BranchOrderTable: FC<BranchOrderTableProps> = ({
   pageSize,
   onPageChange,
   onPageSizeChange,
-  onViewDetail,
   onOrder,
 }) => {
   const [sortField, setSortField] = useState<SortField | null>(null);
@@ -73,6 +75,10 @@ export const BranchOrderTable: FC<BranchOrderTableProps> = ({
           valA = a.managerName.toLowerCase();
           valB = b.managerName.toLowerCase();
           break;
+        case 'matrixProductCount':
+          valA = a.matrixProductCount ?? 0;
+          valB = b.matrixProductCount ?? 0;
+          break;
         case 'pendingCount':
           valA = a.pendingCount ?? 0;
           valB = b.pendingCount ?? 0;
@@ -92,10 +98,6 @@ export const BranchOrderTable: FC<BranchOrderTableProps> = ({
       return 0;
     });
   }, [branches, sortField, sortDir]);
-
-  const totalPages = Math.ceil(totalCount / pageSize) || 1;
-  const startItem = totalCount === 0 ? 0 : (pageIndex - 1) * pageSize + 1;
-  const endItem = Math.min(pageIndex * pageSize, totalCount);
 
   const headerRef = useRef<HTMLDivElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
@@ -134,12 +136,13 @@ export const BranchOrderTable: FC<BranchOrderTableProps> = ({
   const tableColGroup = (
     <colgroup>
       <col style={{ width: '8%' }} />
-      <col style={{ width: '25%' }} />
-      <col style={{ width: '16%' }} />
-      <col style={{ width: '11%' }} />
-      <col style={{ width: '12%' }} />
-      <col style={{ width: '10%' }} />
       <col style={{ width: '18%' }} />
+      <col style={{ width: '14%' }} />
+      <col style={{ width: '12%' }} />
+      <col style={{ width: '11%' }} />
+      <col style={{ width: '11%' }} />
+      <col style={{ width: '10%' }} />
+      <col style={{ width: '16%' }} />
     </colgroup>
   );
 
@@ -162,17 +165,17 @@ export const BranchOrderTable: FC<BranchOrderTableProps> = ({
           style={{
             display: 'inline-flex',
             alignItems: 'center',
-            gap: 5,
+            justifyContent: 'center',
             padding: '3px 10px',
-            borderRadius: 12,
-            fontSize: 12,
+            borderRadius: 9999,
+            fontSize: 11.5,
             fontWeight: 600,
-            backgroundColor: '#dcfce7',
+            backgroundColor: '#f0fdf4',
             color: '#15803d',
+            border: '1px solid #bbf7d0',
             whiteSpace: 'nowrap',
           }}
         >
-          <span style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: '#16a34a' }} />
           <span>Hoạt động</span>
         </span>
       );
@@ -182,17 +185,17 @@ export const BranchOrderTable: FC<BranchOrderTableProps> = ({
         style={{
           display: 'inline-flex',
           alignItems: 'center',
-          gap: 5,
+          justifyContent: 'center',
           padding: '3px 10px',
-          borderRadius: 12,
-          fontSize: 12,
+          borderRadius: 9999,
+          fontSize: 11.5,
           fontWeight: 600,
-          backgroundColor: '#f1f5f9',
+          backgroundColor: '#f8fafc',
           color: '#64748b',
+          border: '1px solid #e2e8f0',
           whiteSpace: 'nowrap',
         }}
       >
-        <span style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: '#94a3b8' }} />
         <span>Ngừng hoạt động</span>
       </span>
     );
@@ -263,7 +266,7 @@ export const BranchOrderTable: FC<BranchOrderTableProps> = ({
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <span>Tên Chi Nhánh & Địa Chỉ</span>
+                  <span>Tên Chi Nhánh</span>
                   <ArrowUpDown size={12} color={sortField === 'name' ? '#0f766e' : '#94a3b8'} />
                 </div>
               </th>
@@ -279,6 +282,23 @@ export const BranchOrderTable: FC<BranchOrderTableProps> = ({
                 <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                   <span>Người Quản Lý</span>
                   <ArrowUpDown size={12} color={sortField === 'managerName' ? '#0f766e' : '#94a3b8'} />
+                </div>
+              </th>
+
+              <th
+                onClick={() => handleSort('matrixProductCount')}
+                style={{
+                  ...thBaseStyle,
+                  cursor: 'pointer',
+                  userSelect: 'none',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span>SP trên Matrix</span>
+                  <ArrowUpDown
+                    size={12}
+                    color={sortField === 'matrixProductCount' ? '#0f766e' : '#94a3b8'}
+                  />
                 </div>
               </th>
 
@@ -361,7 +381,7 @@ export const BranchOrderTable: FC<BranchOrderTableProps> = ({
             {sortedBranches.length === 0 ? (
               <tr>
                 <td
-                  colSpan={7}
+                  colSpan={8}
                   style={{
                     padding: '48px 16px',
                     textAlign: 'center',
@@ -412,58 +432,68 @@ export const BranchOrderTable: FC<BranchOrderTableProps> = ({
                     </span>
                   </td>
 
-                  {/* 2. Tên & Địa chỉ */}
+                  {/* 2. Tên chi nhánh */}
+                  <td
+                    style={{
+                      padding: '10px 12px',
+                      verticalAlign: 'middle',
+                      borderBottom: '1px solid #f1f5f9',
+                      fontWeight: 600,
+                      color: '#0f172a',
+                      fontSize: 13,
+                      lineHeight: 1.35,
+                      whiteSpace: 'normal',
+                      wordBreak: 'break-word',
+                    }}
+                    title={b.name}
+                  >
+                    {b.name}
+                  </td>
+
+                  {/* 3. Người quản lý */}
+                  <td
+                    style={{
+                      padding: '10px 12px',
+                      verticalAlign: 'middle',
+                      borderBottom: '1px solid #f1f5f9',
+                      fontWeight: 600,
+                      color: '#1e293b',
+                      fontSize: 12.5,
+                      whiteSpace: 'normal',
+                      wordBreak: 'break-word',
+                    }}
+                  >
+                    {b.managerName || '—'}
+                  </td>
+
+                  {/* 4. SP đang nhập trên Order Matrix */}
                   <td style={{ padding: '10px 12px', verticalAlign: 'middle', borderBottom: '1px solid #f1f5f9' }}>
-                    <div style={{ fontWeight: 600, color: '#0f172a', fontSize: 13, lineHeight: 1.35 }}>
-                      {b.name}
-                    </div>
-                    <div
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 4,
-                        color: '#64748b',
-                        fontSize: 11.5,
-                        marginTop: 2,
-                      }}
-                    >
-                      <MapPin size={11} style={{ flexShrink: 0, color: '#94a3b8' }} />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       <span
                         style={{
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                        }}
-                        title={b.address}
-                      >
-                        {b.address}
-                      </span>
-                    </div>
-                  </td>
-
-                  {/* 3. Người quản lý & SĐT */}
-                  <td style={{ padding: '10px 12px', verticalAlign: 'middle', borderBottom: '1px solid #f1f5f9' }}>
-                    <div style={{ fontWeight: 600, color: '#1e293b', fontSize: 12.5, lineHeight: 1.3 }}>
-                      {b.managerName || '—'}
-                    </div>
-                    {b.managerPhone && b.managerPhone !== '—' && (
-                      <div
-                        style={{
-                          display: 'flex',
+                          display: 'inline-flex',
                           alignItems: 'center',
-                          gap: 4,
-                          color: '#64748b',
-                          fontSize: 11.5,
-                          marginTop: 2,
+                          justifyContent: 'center',
+                          minWidth: 26,
+                          height: 22,
+                          padding: '0 8px',
+                          borderRadius: 11,
+                          fontSize: 12,
+                          fontWeight: 700,
+                          backgroundColor: (b.matrixProductCount ?? 0) > 0 ? '#ecfdf5' : '#f1f5f9',
+                          color: (b.matrixProductCount ?? 0) > 0 ? '#047857' : '#64748b',
+                          border:
+                            (b.matrixProductCount ?? 0) > 0 ? '1px solid #a7f3d0' : '1px solid #e2e8f0',
                         }}
+                        title="Số sản phẩm đang có số lượng trên Order Matrix"
                       >
-                        <Phone size={11} style={{ flexShrink: 0, color: '#94a3b8' }} />
-                        <span>{b.managerPhone}</span>
-                      </div>
-                    )}
+                        {b.matrixProductCount ?? 0}
+                      </span>
+                      <span style={{ fontSize: 11.5, color: '#64748b' }}>SP</span>
+                    </div>
                   </td>
 
-                  {/* 4. Đơn PO đang chờ */}
+                  {/* 5. Đơn PO đang chờ */}
                   <td style={{ padding: '10px 12px', verticalAlign: 'middle', borderBottom: '1px solid #f1f5f9' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       <span
@@ -519,43 +549,6 @@ export const BranchOrderTable: FC<BranchOrderTableProps> = ({
                         <ShoppingCart size={12} style={{ flexShrink: 0 }} />
                         <span>Đặt hàng</span>
                       </button>
-
-                      <button
-                        type="button"
-                        onClick={() => onViewDetail(b)}
-                        className="po-btn po-btn-secondary"
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: 4,
-                          height: 28,
-                          padding: '0 10px',
-                          borderRadius: 'var(--radius-pill)',
-                          fontSize: 11.5,
-                          fontWeight: 600,
-                          backgroundColor: '#ffffff',
-                          border: '1px solid #cbd5e1',
-                          color: '#334155',
-                          cursor: 'pointer',
-                          whiteSpace: 'nowrap',
-                          flexShrink: 0,
-                          transition: 'all 0.15s ease',
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.borderColor = '#0f766e';
-                          e.currentTarget.style.color = '#0f766e';
-                          e.currentTarget.style.backgroundColor = '#f0fdfa';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.borderColor = '#cbd5e1';
-                          e.currentTarget.style.color = '#334155';
-                          e.currentTarget.style.backgroundColor = '#ffffff';
-                        }}
-                        title="Xem chi tiết chi nhánh"
-                      >
-                        <Eye size={12} style={{ flexShrink: 0 }} />
-                        <span>Chi tiết</span>
-                      </button>
                     </div>
                   </td>
                 </tr>
@@ -565,112 +558,16 @@ export const BranchOrderTable: FC<BranchOrderTableProps> = ({
         </table>
       </div>
 
-      {/* ── Footer Phân trang (Paging) tích hợp theo chuẩn SupplierTable ── */}
-      <div
-        style={{
-          padding: '10px 16px',
-          borderTop: '1px solid #e2e8f0',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          fontSize: 12,
-          color: '#64748b',
-          backgroundColor: '#ffffff',
-          flexWrap: 'wrap',
-          gap: 10,
-          flexShrink: 0,
-          zIndex: 15,
-        }}
-      >
-        {/* Bên trái: Thông tin số lượng & Chọn số bản ghi / trang */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
-          <div>
-            Hiển thị <b>{startItem}</b> - <b>{endItem}</b> trên <b>{totalCount}</b> chi nhánh
-          </div>
-
-          {onPageSizeChange && (
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ color: '#64748b' }}>Bản ghi/trang:</span>
-              <select
-                value={pageSize}
-                onChange={(e) => onPageSizeChange(Number(e.target.value))}
-                style={{
-                  height: 28,
-                  padding: '0 8px',
-                  borderRadius: 5,
-                  border: '1px solid #cbd5e1',
-                  backgroundColor: '#ffffff',
-                  color: '#0f172a',
-                  fontSize: 12,
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  outline: 'none',
-                }}
-              >
-                <option value={10}>10</option>
-                <option value={20}>20</option>
-                <option value={30}>30</option>
-                <option value={50}>50</option>
-              </select>
-            </div>
-          )}
-        </div>
-
-        {/* Bên phải: Nút Trước / Trang x / y / Sau */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <button
-            type="button"
-            disabled={pageIndex <= 1}
-            onClick={() => onPageChange(pageIndex - 1)}
-            style={{
-              height: 28,
-              padding: '0 8px',
-              borderRadius: 6,
-              border: '1px solid #cbd5e1',
-              backgroundColor: '#ffffff',
-              color: pageIndex <= 1 ? '#94a3b8' : '#334155',
-              cursor: pageIndex <= 1 ? 'not-allowed' : 'pointer',
-              opacity: pageIndex <= 1 ? 0.45 : 1,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 4,
-              fontSize: 12,
-              fontWeight: 600,
-            }}
-          >
-            <ChevronLeft size={13} />
-            <span>Trước</span>
-          </button>
-
-          <span style={{ padding: '0 8px', fontWeight: 600, color: '#0f172a' }}>
-            Trang {pageIndex} / {totalPages}
-          </span>
-
-          <button
-            type="button"
-            disabled={pageIndex >= totalPages}
-            onClick={() => onPageChange(pageIndex + 1)}
-            style={{
-              height: 28,
-              padding: '0 8px',
-              borderRadius: 6,
-              border: '1px solid #cbd5e1',
-              backgroundColor: '#ffffff',
-              color: pageIndex >= totalPages ? '#94a3b8' : '#334155',
-              cursor: pageIndex >= totalPages ? 'not-allowed' : 'pointer',
-              opacity: pageIndex >= totalPages ? 0.45 : 1,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 4,
-              fontSize: 12,
-              fontWeight: 600,
-            }}
-          >
-            <span>Sau</span>
-            <ChevronRight size={13} />
-          </button>
-        </div>
-      </div>
+      {/* ── Footer Phân trang chuẩn 1, 2, 3... ── */}
+      <TablePagination
+        currentPage={pageIndex}
+        pageSize={pageSize}
+        totalItems={totalCount}
+        pageSizeOptions={[10, 15, 20, 30, 50]}
+        onPageChange={onPageChange}
+        onPageSizeChange={onPageSizeChange || (() => {})}
+        itemLabel="chi nhánh"
+      />
     </div>
   );
 };

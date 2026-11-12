@@ -8,11 +8,13 @@ interface Props {
   onUpdateQuantity: (id: string, quantity: number) => void;
   onRemoveItem: (id: string) => void;
   onUpdateItemDiscount: (id: string, discount: number, type: 'vnd' | 'percent') => void;
+  onUpdateItemUnit?: (id: string, unitName: string, price: number, unitId?: string) => void;
 
   onOpenBelowCostWarning: (item: CartItem) => void;
   onOpenCatalogModal?: () => void;
   orderNote: string;
   onOrderNoteChange: (note: string) => void;
+  appliedPromotions?: string[];
 }
 
 export const PosCartTable: FC<Props> = ({
@@ -20,10 +22,12 @@ export const PosCartTable: FC<Props> = ({
   onUpdateQuantity,
   onRemoveItem,
   onUpdateItemDiscount,
+  onUpdateItemUnit,
 
   onOpenBelowCostWarning,
   orderNote,
   onOrderNoteChange,
+  appliedPromotions = [],
 }) => {
   const [activeDiscountItemId, setActiveDiscountItemId] = useState<string | null>(null);
 
@@ -84,16 +88,36 @@ export const PosCartTable: FC<Props> = ({
                     </td>
                     <td>
                       <div style={{ fontWeight: 600, color: '#0f172a' }}>{item.product.name}</div>
-                      {item.product.spec && (
-                        <span style={{ fontSize: 12, color: '#475569', marginRight: 8 }}>
-                          {item.product.spec}
-                        </span>
-                      )}
-                      <div style={{ fontSize: 11, color: '#16a34a', marginTop: 2 }}>
-                        &#10003; Tồn kho: {item.product.quantityOnHand}
+                      <div style={{ fontSize: 11, color: '#16a34a', marginTop: 2, display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                        <span>&#10003; Tồn kho: {item.product.quantityOnHand}</span>
                       </div>
                     </td>
-                    <td style={{ textAlign: 'center' }}>{item.unit}</td>
+                    <td style={{ textAlign: 'center' }}>
+                      {item.product.unitPrices && item.product.unitPrices.length > 1 ? (
+                        <select
+                          className="pos-unit-select"
+                          value={item.unitId || item.unit}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            const matched = item.product.unitPrices?.find(
+                              (u) => (u.unitId && u.unitId === val) || u.unitName === val
+                            );
+                            if (matched && onUpdateItemUnit) {
+                              onUpdateItemUnit(item.id, matched.unitName, matched.price, matched.unitId);
+                            }
+                          }}
+                          title="Chọn đơn vị tính"
+                        >
+                          {item.product.unitPrices.map((u, uIdx) => (
+                            <option key={u.unitId || `${u.unitName}-${uIdx}`} value={u.unitId || u.unitName}>
+                              {u.unitName}{u.conversionRate > 1 ? ` (x${u.conversionRate})` : ''}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <span style={{ fontWeight: 500 }}>{item.unit}</span>
+                      )}
+                    </td>
                     <td style={{ textAlign: 'center' }}>
                       <input
                         type="number"
@@ -219,12 +243,16 @@ export const PosCartTable: FC<Props> = ({
             )}
 
             {/* Dải khuyến mại tự động hóa đơn */}
-            {cart.length > 0 && (
+            {cart.length > 0 && appliedPromotions && appliedPromotions.length > 0 && (
               <tr style={{ backgroundColor: '#fdf2f8' }}>
                 <td colSpan={9} style={{ padding: '8px 12px', color: '#db2777', fontWeight: 600 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <Tag size={14} className="text-pink-600" />
-                    <span>Khuyến mại hóa đơn: Giảm giá tự động 7.00% theo chương trình khách hàng</span>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    {appliedPromotions.map((promo, idx) => (
+                      <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <Tag size={14} className="text-pink-600" />
+                        <span>Khuyến mại: {promo}</span>
+                      </div>
+                    ))}
                   </div>
                 </td>
               </tr>

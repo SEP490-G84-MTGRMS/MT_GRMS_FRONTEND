@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { FC } from 'react';
-import type { SupplierSummary, CreateSupplierInput, SupplierType, SupplierCategory } from '../types/supplier.types';
+import type { SupplierSummary, CreateSupplierInput, SupplierType } from '../types/supplier.types';
 import { X, Save, Building, FileText, CreditCard, Info, Plus, QrCode } from 'lucide-react';
 import { getVietQrUrl, VIETNAM_BANKS } from '../lib/vietQrHelper';
 import '../supplier.css';
@@ -30,7 +30,6 @@ export const SupplierFormModal: FC<Props> = ({
         name: '',
         tradeName: '',
         supplierType: 'Goods',
-        category: 'FRESH',
         contactPerson: '',
         phone: '',
         email: '',
@@ -51,7 +50,6 @@ export const SupplierFormModal: FC<Props> = ({
       name: supp.name,
       tradeName: supp.tradeName || '',
       supplierType: supp.supplierType,
-      category: supp.category,
       contactPerson: supp.contactPerson || '',
       phone: supp.phone,
       email: supp.email || '',
@@ -193,22 +191,6 @@ export const SupplierFormModal: FC<Props> = ({
                 </div>
 
                 <div className="form-group">
-                  <label className="form-label">Phân Loại Ngành Hàng</label>
-                  <select
-                    value={formData.category}
-                    onChange={e => set({ category: e.target.value as SupplierCategory })}
-                    className="form-select"
-                  >
-                    <option value="FRESH">FRESH (Nông sản tươi)</option>
-                    <option value="AMBIENT">AMBIENT (Đồ khô / Tạp hóa)</option>
-                    <option value="FROZEN">FROZEN (Hàng đông lạnh)</option>
-                    <option value="UTILITIES">UTILITIES (Điện nước)</option>
-                    <option value="RENT">RENT (Thuê mặt bằng)</option>
-                    <option value="LOGISTICS">LOGISTICS (Vận chuyển)</option>
-                  </select>
-                </div>
-
-                <div className="form-group">
                   <label className="form-label">Địa Chỉ Kho / Cửa Hàng</label>
                   <input
                     type="text"
@@ -297,21 +279,6 @@ export const SupplierFormModal: FC<Props> = ({
                         <option value="Goods">Goods (Hàng hóa)</option>
                         <option value="Service">Service (Dịch vụ)</option>
                         <option value="Both">Both (Cả hai)</option>
-                      </select>
-                    </div>
-                    <div className="form-group">
-                      <label className="form-label">Phân Loại Ngành Hàng</label>
-                      <select
-                        value={formData.category}
-                        onChange={e => set({ category: e.target.value as SupplierCategory })}
-                        className="form-select"
-                      >
-                        <option value="FRESH">FRESH (Nông sản tươi)</option>
-                        <option value="AMBIENT">AMBIENT (Đồ khô / Tạp hóa)</option>
-                        <option value="FROZEN">FROZEN (Hàng đông lạnh)</option>
-                        <option value="UTILITIES">UTILITIES (Điện nước)</option>
-                        <option value="RENT">RENT (Thuê mặt bằng)</option>
-                        <option value="LOGISTICS">LOGISTICS (Vận chuyển)</option>
                       </select>
                     </div>
                     <div className="form-group">

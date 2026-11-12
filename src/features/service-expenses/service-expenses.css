@@ -299,40 +299,42 @@
 /* ── Data Table Container ── */
 .expense-table-container {
   background: #ffffff;
-  border-radius: var(--radius-lg, 24px);
-  border: 1px solid var(--border-subtle, #e5edf8);
-  box-shadow: var(--shadow-card, 0 10px 30px rgba(15, 118, 110, 0.06));
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
   overflow: hidden;
 }
 
 .expense-table {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
   text-align: left;
-  font-size: 0.84rem;
+  font-size: 12.5px;
 }
 
 .expense-table thead th {
   background: #f8fafc;
-  padding: 14px 16px;
-  color: #475569;
+  padding: 10px 12px;
+  color: #334155;
   font-weight: 700;
-  font-size: 0.77rem;
+  font-size: 12px;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
-  border-bottom: 1px solid #e2e8f0;
+  letter-spacing: 0.03em;
+  border-bottom: 1px solid #cbd5e1;
   white-space: nowrap;
 }
 
 .expense-table tbody td {
-  padding: 13px 16px;
+  padding: 8px 12px;
   border-bottom: 1px solid #f1f5f9;
-  color: #334155;
+  color: #1e293b;
+  font-size: 12.5px;
   vertical-align: middle;
 }
 
 .expense-table tbody tr:hover {
-  background: #f8faff;
+  background: #f8fafc;
 }
 
 .expense-table-code {

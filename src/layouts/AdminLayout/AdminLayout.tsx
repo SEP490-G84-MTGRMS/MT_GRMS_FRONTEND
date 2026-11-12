@@ -20,7 +20,7 @@ export const AdminLayout: FC = () => {
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(() => {
     try {
-      const saved = localStorage.getItem('admin_sidebar_open');
+      const saved = localStorage.getItem('ui_sidebar_open') ?? localStorage.getItem('admin_sidebar_open');
       return saved !== null ? saved === 'true' : true;
     } catch {
       return true;
@@ -31,7 +31,8 @@ export const AdminLayout: FC = () => {
     setIsSidebarOpen((prev) => {
       const next = !prev;
       try {
-        localStorage.setItem('admin_sidebar_open', String(next));
+        localStorage.setItem('ui_sidebar_open', String(next));
+        localStorage.removeItem('admin_sidebar_open');
       } catch {
         // ignore
       }

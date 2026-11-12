@@ -66,7 +66,7 @@ export const FulfillPreOrderModal: FC<Props> = ({
       });
       onClose();
     } catch (e: any) {
-      alert(`Lỗi khi giao hàng: ${e?.message || 'Không thể kết nối máy chủ'}`);
+      alert(`Lỗi khi bàn giao hàng: ${e?.message || 'Không thể kết nối máy chủ'}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -79,7 +79,7 @@ export const FulfillPreOrderModal: FC<Props> = ({
         <div className="pos-modal-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <PackageCheck size={20} color="#0f766e" />
-            <b>Thanh Toán &amp; Giao Hàng Đặt Trước — {preOrder.preOrderId}</b>
+            <b>Thanh Toán &amp; Bàn Giao Hàng Đặt Trước — {preOrder.preOrderId}</b>
           </div>
           <button type="button" className="pos-modal-close-btn" onClick={onClose}>✕</button>
         </div>
@@ -295,7 +295,7 @@ export const FulfillPreOrderModal: FC<Props> = ({
               style={{ padding: '8px 18px', fontSize: 13.5, backgroundColor: '#0f766e' }}
             >
               <CheckCircle2 size={15} />
-              <span>{isSubmitting ? 'Đang xử lý...' : `✓ Xác Nhận Thu ${remaining.toLocaleString('vi-VN')} đ & Giao Hàng`}</span>
+              <span>{isSubmitting ? 'Đang xử lý...' : `✓ Xác Nhận Thu ${remaining.toLocaleString('vi-VN')} đ & Bàn Giao Hàng`}</span>
             </button>
           </div>
         </div>

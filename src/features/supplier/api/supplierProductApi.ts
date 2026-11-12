@@ -26,12 +26,14 @@ export interface BatchAssignProductItemInput {
   productId: string;
   agreedPrice: number;
   moq: number;
+  allowedShortageQty?: number;
 }
 
 export interface SupplierAssignedProductInfo {
   productId: string;
   agreedPrice: number;
   moq: number;
+  allowedShortageQty: number;
 }
 
 export interface BatchAssignProductInput {
@@ -39,6 +41,7 @@ export interface BatchAssignProductInput {
   productIds: string[];
   agreedPrice?: number;
   moq?: number;
+  allowedShortageQty?: number;
   items?: BatchAssignProductItemInput[];
 }
 
@@ -118,6 +121,8 @@ export const supplierProductApi = {
         costPrice: item.costPrice,
         effectivePrice: item.effectivePurchasePrice ?? item.effectivePrice,
         moq: item.minimumOrderQuantity ?? item.moq ?? 1,
+        allowedShortageQty: item.allowedShortageQuantity ?? item.allowedShortageQty ?? 0,
+        imageUrl: item.imageUrl || undefined,
         isPrimary: Boolean(item.isPrimarySupplier ?? item.isPrimary),
         supplierProductCode: item.supplierProductCode || undefined,
         effectiveDate: item.createdAt ? item.createdAt.split('T')[0] : new Date().toISOString().split('T')[0],
@@ -154,6 +159,7 @@ export const supplierProductApi = {
       baseUoM: p.unitName || p.baseUnit || 'Cái',
       defaultWholesalePrice: p.costPrice || p.basePrice || 0,
       defaultMoq: 1,
+      imageUrl: p.imageUrl || (Array.isArray(p.imageUrls) ? p.imageUrls[0] : undefined) || undefined,
     }));
   },
 
@@ -169,6 +175,7 @@ export const supplierProductApi = {
           deliveryUoM: input.deliveryUoM,
           agreedWholesalePrice: input.agreedPrice,
           minimumOrderQuantity: input.moq,
+          allowedShortageQuantity: input.allowedShortageQty ?? 0,
           isPrimarySupplier: input.isPrimary ?? false,
           supplierProductCode: input.supplierProductCode,
         }
@@ -199,10 +206,12 @@ export const supplierProductApi = {
           productIds: input.productIds,
           agreedWholesalePrice: input.agreedPrice,
           minimumOrderQuantity: input.moq ?? 1,
+          allowedShortageQuantity: input.allowedShortageQty ?? 0,
           items: input.items?.map((item) => ({
             productId: item.productId,
             agreedWholesalePrice: item.agreedPrice,
             minimumOrderQuantity: item.moq,
+            allowedShortageQuantity: item.allowedShortageQty ?? 0,
           })),
         }
       );
@@ -230,6 +239,7 @@ export const supplierProductApi = {
           deliveryUoM: input.deliveryUoM,
           agreedWholesalePrice: input.agreedPrice,
           minimumOrderQuantity: input.moq,
+          allowedShortageQuantity: input.allowedShortageQty ?? 0,
           isPrimarySupplier: input.isPrimary ?? false,
           supplierProductCode: input.supplierProductCode,
         }
@@ -319,6 +329,7 @@ export const supplierProductApi = {
           productId: String(x.productId),
           agreedPrice: Number(x.agreedWholesalePrice ?? x.agreedPrice ?? 0),
           moq: Number(x.minimumOrderQuantity ?? x.moq ?? 1),
+          allowedShortageQty: Number(x.allowedShortageQuantity ?? x.allowedShortageQty ?? 0),
         }));
       }
     } catch {

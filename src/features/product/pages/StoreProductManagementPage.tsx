@@ -17,7 +17,7 @@ import { EditStoreProductModal } from '../components/EditStoreProductModal';
 import { AdminToast, type ToastState } from '../../admin/components';
 import { storeProductApi } from '../api/storeProductApi';
 import { supplierApi } from '../../supplier/api/supplierApi';
-import { Loader2, Package } from 'lucide-react';
+import { Building2, Loader2, Package } from 'lucide-react';
 import '../../purchase-order/purchase-order.css';
 import '../../supplier/supplier.css';
 
@@ -231,10 +231,10 @@ export const StoreProductManagementPage: FC = () => {
       }
 
       const headers = [
-        'Mã SKU',
-        'Tên Sản Phẩm',
         'Mã Cửa Hàng',
         'Tên Cửa Hàng',
+        'Mã SKU',
+        'Tên Sản Phẩm',
         'Mã Nhà Cung Cấp',
         'Tên Nhà Cung Cấp',
         'Giá Vốn (đ)',
@@ -248,10 +248,10 @@ export const StoreProductManagementPage: FC = () => {
 
       for (const item of exportItems) {
         const row = [
-          `"${(item.sku || '').replace(/"/g, '""')}"`,
-          `"${(item.name || '').replace(/"/g, '""')}"`,
           `"${(item.storeCode || '').replace(/"/g, '""')}"`,
           `"${(item.storeName || '').replace(/"/g, '""')}"`,
+          `"${(item.sku || '').replace(/"/g, '""')}"`,
+          `"${(item.name || '').replace(/"/g, '""')}"`,
           `"${(item.primarySupplierCode || '').replace(/"/g, '""')}"`,
           `"${(item.primarySupplierName || '').replace(/"/g, '""')}"`,
           item.costPrice,
@@ -311,6 +311,14 @@ export const StoreProductManagementPage: FC = () => {
         </div>
 
         <div className="so-list-header-actions">
+          <Link
+            to="/store-owner/suppliers"
+            className="po-btn po-btn-secondary"
+            title="Quay lại danh sách nhà cung cấp"
+          >
+            <Building2 size={14} />
+            <span>Danh sách NCC</span>
+          </Link>
           <Link
             to="/store-owner/suppliers/branches"
             className="po-btn po-btn-secondary"

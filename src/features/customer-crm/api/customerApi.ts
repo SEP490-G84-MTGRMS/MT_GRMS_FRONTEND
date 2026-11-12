@@ -1,5 +1,7 @@
 import { financeHttpClient } from '../../../api/financeHttpClient';
 import type { ApiResponse } from '../../../api/types';
+import { cashbookService } from '../../cashbook/services/cashbookService';
+import { generateUuidV7 } from '../../../utils/uuid';
 import type {
   CustomerDto,
   CreateCustomerInput,
@@ -10,13 +12,6 @@ import type {
   DebtFilterStatus,
   CustomerDebtLedgerDto,
 } from '../types/customer.types';
-
-function generateUUID(): string {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-    return crypto.randomUUID();
-  }
-  return 'idemp-' + Date.now() + '-' + Math.random().toString(36).substring(2, 9);
-}
 
 const DEFAULT_TILL_ID = '01a19664-6210-7b12-a9eb-6fa16ca5b9db';
 const DEFAULT_BANK_ID = '01a19664-6741-7f3d-9be7-cb4c7b876559';
@@ -130,9 +125,22 @@ export const customerApi = {
 
     const isCash = input.method === 'Cash';
     const paymentSourceType = isCash ? 1 : 3; // 1 = BranchTill, 3 = TenantBank
-    const defaultAccountId = isCash ? DEFAULT_TILL_ID : DEFAULT_BANK_ID;
-    const paymentSourceAccountId = input.targetAccountId || defaultAccountId;
-    const idempotencyKey = generateUUID();
+    let paymentSourceAccountId = input.targetAccountId;
+    if (!paymentSourceAccountId) {
+      try {
+        const accounts = await cashbookService.getCashAccounts();
+        const matched = accounts.find((a) =>
+          isCash ? a.accountType === 'CASH' : a.accountType === 'BANK'
+        );
+        paymentSourceAccountId = matched?.id;
+      } catch {
+        // fallback
+      }
+    }
+    if (!paymentSourceAccountId) {
+      paymentSourceAccountId = isCash ? DEFAULT_TILL_ID : DEFAULT_BANK_ID;
+    }
+    const idempotencyKey = generateUuidV7();
 
     const res = await financeHttpClient.post<ApiResponse<unknown>>(
       '/customers/debt/repay',
@@ -188,20 +196,30 @@ export const customerApi = {
         return [];
       }
 
-      return res.data.data.map((entry) => ({
-        id: entry.id,
-        customerId: entry.customerId,
-        transactionType:
-          entry.entryType === 'DebtRepayment' || entry.entryType === 'GoodsReturnOffset'
-            ? 'DEBT_DECREASE'
-            : 'DEBT_INCREASE',
-        amount: entry.amount,
-        balanceAfter: entry.balanceAfter,
-        referenceDocId: entry.referenceCode,
-        cashTransactionCode: entry.entryCode,
-        note: entry.description,
-        createdAt: entry.occurredAtUtc,
-      }));
+      return res.data.data.map((entry) => {
+        const isDecrease =
+          entry.entryType === 'DebtRepayment' || entry.entryType === 'GoodsReturnOffset';
+        const isBankMethod =
+          Boolean(entry.description?.includes('Bank')) ||
+          Boolean(entry.description?.includes('VietQR'));
+
+        return {
+          id: entry.id,
+          customerId: entry.customerId,
+          transactionType: isDecrease ? 'DEBT_DECREASE' : 'DEBT_INCREASE',
+          amount: entry.amount,
+          balanceAfter: entry.balanceAfter,
+          referenceDocId: entry.referenceCode,
+          paymentMethod:
+            entry.entryType === 'DebtRepayment' ? (isBankMethod ? 'VietQR' : 'Cash') : undefined,
+          cashTransactionCode:
+            entry.entryType === 'DebtRepayment'
+              ? entry.referenceCode || entry.entryCode
+              : entry.entryCode,
+          note: entry.description,
+          createdAt: entry.occurredAtUtc,
+        };
+      });
     } catch {
       return [];
     }

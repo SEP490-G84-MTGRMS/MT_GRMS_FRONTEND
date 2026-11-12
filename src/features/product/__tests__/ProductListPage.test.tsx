@@ -142,13 +142,13 @@ describe('ProductListPage - Task T6 BR-SEC-01 Phân quyền Giá vốn theo Vai 
     expect(screen.getByText(costPriceRegex)).toBeDefined();
   });
 
-  it('Ẩn hoàn toàn cột "Giá vốn" (cả th và td) khi vai trò người dùng là CASHIER / Cashier', async () => {
+  it('Ẩn hoàn toàn cột "Giá vốn" (cả th và td) khi vai trò người dùng là STAFF / Cashier', async () => {
     useAuthStore.setState({
       user: {
         id: 'usr-cashier',
         email: 'cashier@mtgrms.vn',
         fullName: 'Thu Ngân Quầy',
-        role: 'CASHIER',
+        role: 'STAFF',
         tenantId: 'tenant_mt_mart_01',
       },
       token: 'mock-token',
@@ -228,13 +228,13 @@ describe('ProductListPage - Task T6 BR-SEC-01 Phân quyền Giá vốn theo Vai 
       expect(screen.getByText('Nước ngọt Coca Cola 320ml')).toBeDefined();
     });
 
-    // Ban đầu hiển thị đơn vị cơ bản: "- chai" và giá bán 10,000 đ
-    expect(screen.getByText('- chai')).toBeDefined();
+    // Ban đầu hiển thị đơn vị cơ bản: "chai" và giá bán 10,000 đ
+    expect(screen.getByText('chai')).toBeDefined();
     expect(screen.getByText(/10[.,]000\s*đ/)).toBeDefined();
 
     // Click vào dropdown chọn đơn vị tính
-    const unitDropdownBtn = screen.getByTitle('Chọn đơn vị tính');
-    unitDropdownBtn.click();
+    const unitDropdownBtn = screen.getByTitle(/đơn vị tính/i);
+    fireEvent.click(unitDropdownBtn);
 
     // Menu mở ra hiển thị tùy chọn "thung"
     await waitFor(() => {
@@ -243,11 +243,11 @@ describe('ProductListPage - Task T6 BR-SEC-01 Phân quyền Giá vốn theo Vai 
 
     // Click chọn đơn vị "thung"
     const thungOption = screen.getByRole('button', { name: 'thung' });
-    thungOption.click();
+    fireEvent.click(thungOption);
 
-    // Dropdown chuyển sang hiển thị "- thung" và Giá bán cập nhật thành 220,000 đ
+    // Dropdown chuyển sang hiển thị "thung" và Giá bán cập nhật thành 220,000 đ
     await waitFor(() => {
-      expect(screen.getByText('- thung')).toBeDefined();
+      expect(screen.getByText('thung')).toBeDefined();
       expect(screen.getByText(/220[.,]000\s*đ/)).toBeDefined();
     });
   });
@@ -298,14 +298,14 @@ describe('ProductListPage - Task T6 BR-SEC-01 Phân quyền Giá vốn theo Vai 
 
     // Click vào dòng sản phẩm để mở ProductDetailModal
     const productRow = screen.getByText('Nước tăng lực Sting Dâu 330ml');
-    productRow.click();
+    fireEvent.click(productRow);
 
-    // Trong modal chi tiết, click nút "Chỉnh sửa"
+    // Trong modal chi tiết, click nút "Sửa hàng hóa"
     await waitFor(() => {
-      expect(screen.getByText('Chỉnh sửa')).toBeDefined();
+      expect(screen.getByRole('button', { name: /Sửa hàng hóa/i })).toBeDefined();
     });
-    const editBtn = screen.getByText('Chỉnh sửa');
-    editBtn.click();
+    const editBtn = screen.getByRole('button', { name: /Sửa hàng hóa/i });
+    fireEvent.click(editBtn);
 
     // Modal ProductFormModal mở ra, kiểm tra ô tên sản phẩm
     await waitFor(() => {
@@ -433,6 +433,65 @@ describe('ProductListPage - Task T6 BR-SEC-01 Phân quyền Giá vốn theo Vai 
     // Xác minh productApi.deleteProduct được gọi
     await waitFor(() => {
       expect(productApi.deleteProduct).toHaveBeenCalledWith('p-1');
+    });
+  });
+
+  it('cập nhật thành công hasBatches khi chỉnh sửa sản phẩm', async () => {
+    (categoryApi.getCategories as any).mockResolvedValue([
+      { id: 'cat-1', name: 'Nước uống', productCount: 1 },
+    ]);
+    (productApi.getProductsPaged as any).mockResolvedValue({
+      items: [mockSampleProduct],
+      pageIndex: 1,
+      pageSize: 20,
+      totalCount: 1,
+      totalPages: 1,
+      hasPreviousPage: false,
+      hasNextPage: false,
+    });
+    (productApi.updateProduct as any).mockResolvedValue({
+      ...mockSampleProduct,
+      hasBatches: true,
+    });
+
+    render(<ProductListPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Nước suối Aquafina 500ml')).toBeDefined();
+    });
+
+    // Click vào dòng sản phẩm để mở modal chi tiết
+    fireEvent.click(screen.getByText('Nước suối Aquafina 500ml'));
+
+    // Trong modal chi tiết, click "Sửa hàng hóa"
+    await waitFor(() => {
+      expect(screen.getByText('Sửa hàng hóa')).toBeDefined();
+    });
+    fireEvent.click(screen.getByText('Sửa hàng hóa'));
+
+    // Modal chỉnh sửa mở ra
+    await waitFor(() => {
+      expect(screen.getByLabelText(/Quản lý theo lô & hạn sử dụng/i)).toBeDefined();
+    });
+
+    const checkbox = screen.getByLabelText(/Quản lý theo lô & hạn sử dụng/i) as HTMLInputElement;
+    expect(checkbox.checked).toBe(false);
+
+    // Click tickbox
+    fireEvent.click(checkbox);
+    expect(checkbox.checked).toBe(true);
+
+    // Bấm Cập nhật
+    fireEvent.click(screen.getByText('Cập nhật'));
+
+    // Kiểm tra API updateProduct được gọi với hasBatches: true
+    await waitFor(() => {
+      expect(productApi.updateProduct).toHaveBeenCalledWith(
+        'p-1',
+        expect.objectContaining({
+          hasBatches: true,
+        })
+      );
     });
   });
 });

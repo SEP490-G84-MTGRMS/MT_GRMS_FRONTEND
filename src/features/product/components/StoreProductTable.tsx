@@ -2,7 +2,8 @@ import { useState, useMemo, useRef, useEffect } from 'react';
 import type { FC } from 'react';
 import type { StoreProductItem } from '../types/storeProduct.types';
 import { SupplierStatusBadge } from '../../supplier/components/SupplierStatusBadge';
-import { ArrowUpDown, ChevronLeft, ChevronRight, Package } from 'lucide-react';
+import { TablePagination } from '../../../components/common';
+import { ArrowUpDown, Package } from 'lucide-react';
 
 interface StoreProductTableProps {
   products: StoreProductItem[];
@@ -147,10 +148,6 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
     });
   }, [products, sortField, sortDir]);
 
-  const totalPages = Math.ceil(totalCount / pageSize) || 1;
-  const startItem = totalCount === 0 ? 0 : (pageIndex - 1) * pageSize + 1;
-  const endItem = Math.min(pageIndex * pageSize, totalCount);
-
   // Synchronize horizontal scrolling between header and body & detect vertical scroll
   const headerRef = useRef<HTMLDivElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
@@ -188,16 +185,16 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
 
   const tableColGroup = (
     <colgroup>
-      <col style={{ width: '4%' }} />
-      <col style={{ width: '8%' }} />
-      <col style={{ width: '12%' }} />
-      <col style={{ width: '6%' }} />
-      <col style={{ width: '9%' }} />
       <col style={{ width: '7%' }} />
-      <col style={{ width: '9%' }} />
-      <col style={{ width: '6%' }} />
-      <col style={{ width: '6%' }} />
+      <col style={{ width: '10%' }} />
+      <col style={{ width: '7%' }} />
       <col style={{ width: '12%' }} />
+      <col style={{ width: '7%' }} />
+      <col style={{ width: '10%' }} />
+      <col style={{ width: '4%' }} />
+      <col style={{ width: '6%' }} />
+      <col style={{ width: '6%' }} />
+      <col style={{ width: '10%' }} />
       <col style={{ width: '4%' }} />
       <col style={{ width: '4%' }} />
       <col style={{ width: '7%' }} />
@@ -232,8 +229,26 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
           {tableColGroup}
           <thead>
             <tr>
-              <th style={{ ...thStyle, textAlign: 'center' }}>
-                <span>Ảnh</span>
+              <th
+                style={{ ...thStyle, cursor: 'pointer' }}
+                onClick={() => handleSort('storeCode')}
+                title="Sắp xếp theo mã cửa hàng"
+              >
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                  <span>Mã Cửa Hàng</span>
+                  <ArrowUpDown size={12} style={{ color: sortField === 'storeCode' ? '#0f766e' : '#94a3b8', flexShrink: 0 }} />
+                </div>
+              </th>
+
+              <th
+                style={{ ...thStyle, cursor: 'pointer' }}
+                onClick={() => handleSort('storeName')}
+                title="Sắp xếp theo Cửa hàng"
+              >
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                  <span>Tên Cửa Hàng</span>
+                  <ArrowUpDown size={12} style={{ color: sortField === 'storeName' ? '#0f766e' : '#94a3b8', flexShrink: 0 }} />
+                </div>
               </th>
 
               <th
@@ -260,28 +275,6 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
 
               <th
                 style={{ ...thStyle, cursor: 'pointer' }}
-                onClick={() => handleSort('storeCode')}
-                title="Sắp xếp theo mã cửa hàng"
-              >
-                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                  <span>Mã Cửa Hàng</span>
-                  <ArrowUpDown size={12} style={{ color: sortField === 'storeCode' ? '#0f766e' : '#94a3b8', flexShrink: 0 }} />
-                </div>
-              </th>
-
-              <th
-                style={{ ...thStyle, cursor: 'pointer' }}
-                onClick={() => handleSort('storeName')}
-                title="Sắp xếp theo Cửa hàng"
-              >
-                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                  <span>Cửa Hàng</span>
-                  <ArrowUpDown size={12} style={{ color: sortField === 'storeName' ? '#0f766e' : '#94a3b8', flexShrink: 0 }} />
-                </div>
-              </th>
-
-              <th
-                style={{ ...thStyle, cursor: 'pointer' }}
                 onClick={() => handleSort('supplierCode')}
                 title="Sắp xếp theo mã nhà cung cấp"
               >
@@ -297,9 +290,13 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
                 title="Sắp xếp theo nhà cung cấp"
               >
                 <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                  <span>Nhà Cung Cấp</span>
+                  <span>Tên Nhà Cung Cấp</span>
                   <ArrowUpDown size={12} style={{ color: sortField === 'supplierName' ? '#0f766e' : '#94a3b8', flexShrink: 0 }} />
                 </div>
+              </th>
+
+              <th style={{ ...thStyle, textAlign: 'center' }}>
+                <span>Ảnh</span>
               </th>
 
               <th
@@ -392,9 +389,10 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
               </tr>
             ) : (
               sortedProducts.map((p) => {
+                const rowKey = `${p.id}-${p.supplierId || 'none'}`;
                 return (
                   <tr
-                    key={p.id}
+                    key={rowKey}
                     className="so-list-row"
                     style={{
                       borderBottom: '1px solid #f1f5f9',
@@ -407,6 +405,93 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
                       e.currentTarget.style.backgroundColor = '#ffffff';
                     }}
                   >
+                    {/* Mã Cửa Hàng */}
+                    <td style={{ padding: '8px 8px', verticalAlign: 'middle', borderBottom: '1px solid #f1f5f9' }}>
+                      <span
+                        style={{
+                          fontFamily: 'var(--font-mono, monospace)',
+                          fontSize: 12,
+                          fontWeight: 600,
+                          color: '#334155',
+                          whiteSpace: 'nowrap',
+                          display: 'inline-block',
+                        }}
+                        title={p.storeCode}
+                      >
+                        {p.storeCode || '---'}
+                      </span>
+                    </td>
+
+                    {/* Tên Cửa Hàng */}
+                    <td className="so-list-td--wrap">
+                      <div className="so-list-name" title={p.storeName}>{p.storeName}</div>
+                    </td>
+
+                    {/* Mã SKU */}
+                    <td style={{ padding: '8px 8px', verticalAlign: 'middle', borderBottom: '1px solid #f1f5f9' }}>
+                      <span
+                        style={{
+                          fontFamily: 'var(--font-mono, monospace)',
+                          fontSize: 12,
+                          fontWeight: 600,
+                          color: '#0f766e',
+                          whiteSpace: 'nowrap',
+                          display: 'inline-block',
+                        }}
+                        title={p.sku}
+                      >
+                        {p.sku}
+                      </span>
+                    </td>
+
+                    {/* Tên Sản phẩm */}
+                    <td className="so-list-td--wrap">
+                      <div className="so-list-name" title={p.name}>{p.name}</div>
+                    </td>
+
+                    {/* Mã Nhà Cung Cấp */}
+                    <td style={{ padding: '8px 8px', verticalAlign: 'middle', borderBottom: '1px solid #f1f5f9' }}>
+                      <span
+                        style={{
+                          fontFamily: 'var(--font-mono, monospace)',
+                          fontSize: 12,
+                          fontWeight: 600,
+                          color: '#334155',
+                          whiteSpace: 'nowrap',
+                          display: 'inline-block',
+                        }}
+                        title={p.primarySupplierCode}
+                      >
+                        {p.primarySupplierCode || '---'}
+                      </span>
+                    </td>
+
+                    {/* Tên Nhà Cung Cấp */}
+                    <td className="so-list-td--wrap">
+                      <div
+                        className="so-list-name"
+                        title={p.primarySupplierName}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}
+                      >
+                        <span>{p.primarySupplierName || '---'}</span>
+                        {p.isPrimarySupplier ? (
+                          <span
+                            style={{
+                              fontSize: 10,
+                              fontWeight: 700,
+                              color: '#0f766e',
+                              background: '#ccfbf1',
+                              borderRadius: 4,
+                              padding: '1px 6px',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            Chính
+                          </span>
+                        ) : null}
+                      </div>
+                    </td>
+
                     {/* Ảnh */}
                     <td style={{ padding: '6px 4px', textAlign: 'center', verticalAlign: 'middle', borderBottom: '1px solid #f1f5f9' }}>
                       {p.imageUrl ? (
@@ -440,73 +525,7 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
                       )}
                     </td>
 
-                    {/* Mã SKU */}
-                    <td style={{ padding: '8px 8px', verticalAlign: 'middle', borderBottom: '1px solid #f1f5f9' }}>
-                      <span
-                        style={{
-                          fontFamily: 'var(--font-mono, monospace)',
-                          fontSize: 12,
-                          fontWeight: 600,
-                          color: '#0f766e',
-                          whiteSpace: 'nowrap',
-                          display: 'inline-block',
-                        }}
-                        title={p.sku}
-                      >
-                        {p.sku}
-                      </span>
-                    </td>
-
-                    {/* 2. Tên Sản phẩm (xuống dòng tối đa 2 dòng khi dài) */}
-                    <td className="so-list-td--wrap">
-                      <div className="so-list-name" title={p.name}>{p.name}</div>
-                    </td>
-
-                    {/* 3. Mã Cửa Hàng */}
-                    <td style={{ padding: '8px 8px', verticalAlign: 'middle', borderBottom: '1px solid #f1f5f9' }}>
-                      <span
-                        style={{
-                          fontFamily: 'var(--font-mono, monospace)',
-                          fontSize: 12,
-                          fontWeight: 600,
-                          color: '#334155',
-                          whiteSpace: 'nowrap',
-                          display: 'inline-block',
-                        }}
-                        title={p.storeCode}
-                      >
-                        {p.storeCode || '---'}
-                      </span>
-                    </td>
-
-                    {/* 4. Cửa Hàng (xuống dòng tối đa 2 dòng khi dài) */}
-                    <td className="so-list-td--wrap">
-                      <div className="so-list-name" title={p.storeName}>{p.storeName}</div>
-                    </td>
-
-                    {/* 5. Mã Nhà Cung Cấp */}
-                    <td style={{ padding: '8px 8px', verticalAlign: 'middle', borderBottom: '1px solid #f1f5f9' }}>
-                      <span
-                        style={{
-                          fontFamily: 'var(--font-mono, monospace)',
-                          fontSize: 12,
-                          fontWeight: 600,
-                          color: '#334155',
-                          whiteSpace: 'nowrap',
-                          display: 'inline-block',
-                        }}
-                        title={p.primarySupplierCode}
-                      >
-                        {p.primarySupplierCode || '---'}
-                      </span>
-                    </td>
-
-                    {/* 6. Tên Nhà Cung Cấp */}
-                    <td className="so-list-td--wrap">
-                      <div className="so-list-name" title={p.primarySupplierName}>{p.primarySupplierName || '---'}</div>
-                    </td>
-
-                    {/* 8. Giá Vốn (đ) */}
+                    {/* Giá Vốn (đ) — theo NCC của dòng */}
                     <td style={{ padding: '8px 6px', textAlign: 'right', verticalAlign: 'middle', whiteSpace: 'nowrap', borderBottom: '1px solid #f1f5f9' }}>
                       <span style={{ fontFamily: 'var(--font-mono, monospace)', fontWeight: 600, fontSize: 12.5, color: '#64748b' }}>
                         {fmt(p.costPrice)} đ
@@ -599,58 +618,16 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
         </table>
       </div>
 
-      {/* ── Footer Phân trang (Paging) tích hợp đồng bộ theo chuẩn http://localhost:5173/store-owner/suppliers ── */}
-      <div className="so-list-pager">
-        {/* Bên trái: Thông tin số lượng & Chọn số bản ghi / trang */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
-          <div>
-            Hiển thị <b>{startItem}</b> - <b>{endItem}</b> trên <b>{totalCount}</b> sản phẩm
-          </div>
-
-          {onPageSizeChange && (
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ color: '#64748b' }}>Bản ghi/trang:</span>
-              <select
-                className="so-list-pager-select"
-                value={pageSize}
-                onChange={(e) => onPageSizeChange(Number(e.target.value))}
-              >
-                <option value={15}>15</option>
-                <option value={24}>24</option>
-                <option value={36}>36</option>
-                <option value={48}>48</option>
-              </select>
-            </div>
-          )}
-        </div>
-
-        {/* Bên phải: Nút Trước / Trang x / y / Sau */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <button
-            type="button"
-            className="so-list-pager-btn"
-            disabled={pageIndex <= 1}
-            onClick={() => onPageChange(pageIndex - 1)}
-          >
-            <ChevronLeft size={13} />
-            <span>Trước</span>
-          </button>
-
-          <span style={{ padding: '0 8px', fontWeight: 600, color: '#0f172a' }}>
-            Trang {pageIndex} / {totalPages}
-          </span>
-
-          <button
-            type="button"
-            className="so-list-pager-btn"
-            disabled={pageIndex >= totalPages}
-            onClick={() => onPageChange(pageIndex + 1)}
-          >
-            <span>Sau</span>
-            <ChevronRight size={13} />
-          </button>
-        </div>
-      </div>
+      {/* ── Footer Phân trang chuẩn 1, 2, 3... ── */}
+      <TablePagination
+        currentPage={pageIndex}
+        pageSize={pageSize}
+        totalItems={totalCount}
+        pageSizeOptions={[15, 24, 36, 48]}
+        onPageChange={onPageChange}
+        onPageSizeChange={onPageSizeChange}
+        itemLabel="sản phẩm"
+      />
     </div>
   );
 };

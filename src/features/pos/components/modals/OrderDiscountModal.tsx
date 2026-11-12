@@ -5,6 +5,7 @@ interface Props {
   isOpen: boolean;
   totalItemAmount: number;
   currentDiscountPercent: number;
+  autoPromoDiscount?: number;
   onClose: () => void;
   onApply: (discountPercent: number) => void;
 }
@@ -13,6 +14,7 @@ export const OrderDiscountModal: FC<Props> = ({
   isOpen,
   totalItemAmount,
   currentDiscountPercent,
+  autoPromoDiscount = 0,
   onClose,
   onApply,
 }) => {
@@ -26,15 +28,16 @@ export const OrderDiscountModal: FC<Props> = ({
       ? Math.round((totalItemAmount * val) / 100)
       : Math.min(totalItemAmount, val);
 
-  const autoPromotion = Math.round(totalItemAmount * 0.05); // 5% auto promo demo
+  const autoPromotion = Math.min(totalItemAmount, Math.max(0, autoPromoDiscount));
+  const effectiveDiscount = Math.min(totalItemAmount, Math.max(calculatedDiscount, autoPromotion));
 
   const handleSave = () => {
     const finalPercent =
       discountType === 'percent'
         ? val
         : totalItemAmount > 0
-        ? Math.round((val / totalItemAmount) * 100)
-        : 0;
+          ? Math.round((val / totalItemAmount) * 100)
+          : 0;
     onApply(finalPercent);
     onClose();
   };
@@ -94,7 +97,7 @@ export const OrderDiscountModal: FC<Props> = ({
               <tr style={{ backgroundColor: '#f8fafc' }}>
                 <td><b>Tổng giảm giá:</b></td>
                 <td style={{ textAlign: 'right', fontWeight: 800, color: '#dc2626' }}>
-                  -{calculatedDiscount.toLocaleString('vi-VN')} đ
+                  -{effectiveDiscount.toLocaleString('vi-VN')} đ
                 </td>
               </tr>
             </tbody>

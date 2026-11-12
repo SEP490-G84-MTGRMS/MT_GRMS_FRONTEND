@@ -708,3 +708,90 @@
     transform: translateY(0);
   }
 }
+
+/* ==========================================================================
+   Thanh Tiến Trình Các Bước Xác Thực (Auth Steps Progress)
+   ========================================================================== */
+.auth-steps-progress {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: flex-start !important;
+  justify-content: space-between !important;
+  margin: 18px 0 24px 0 !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.auth-step-item {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  gap: 8px !important;
+  position: relative !important;
+  z-index: 2 !important;
+  cursor: default !important;
+  flex-shrink: 0 !important;
+  min-width: 68px !important;
+}
+
+.auth-step-circle {
+  width: 32px !important;
+  height: 32px !important;
+  border-radius: 50% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  font-family: var(--font-sans) !important;
+  background-color: #F3F4F6 !important;
+  color: #9CA3AF !important;
+  border: 2px solid #E5E7EB !important;
+  transition: all 0.25s ease !important;
+  box-sizing: border-box !important;
+}
+
+.auth-step-item.active .auth-step-circle {
+  background-color: var(--blue-primary, #0F766E) !important;
+  color: #ffffff !important;
+  border-color: var(--blue-primary, #0F766E) !important;
+  box-shadow: 0 0 0 4px rgba(15, 118, 110, 0.18) !important;
+}
+
+.auth-step-item.completed .auth-step-circle {
+  background-color: var(--blue-primary, #0F766E) !important;
+  color: #ffffff !important;
+  border-color: var(--blue-primary, #0F766E) !important;
+}
+
+.auth-step-label {
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  color: #9CA3AF !important;
+  white-space: nowrap !important;
+  font-family: var(--font-sans) !important;
+  transition: color 0.25s ease !important;
+}
+
+.auth-step-item.active .auth-step-label {
+  color: var(--blue-primary, #0F766E) !important;
+  font-weight: 700 !important;
+}
+
+.auth-step-item.completed .auth-step-label {
+  color: #374151 !important;
+}
+
+.auth-step-divider {
+  flex: 1 !important;
+  height: 2px !important;
+  margin-top: 15px !important;
+  margin-left: 8px !important;
+  margin-right: 8px !important;
+  background-color: #E5E7EB !important;
+  transition: background-color 0.25s ease !important;
+}
+
+.auth-step-divider.active {
+  background-color: var(--blue-primary, #0F766E) !important;
+}

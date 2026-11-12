@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, type FC } from 'react';
+import { useState, useMemo, useRef, useEffect, useCallback, type FC } from 'react';
 import {
   Ticket,
   Plus,
@@ -10,7 +10,7 @@ import { AdminToast, type ToastState } from '../../admin/components';
 import { VoucherBatchTable } from '../components/vouchers/VoucherBatchTable';
 import { VoucherBatchModal } from '../components/vouchers/VoucherBatchModal';
 import { GenerateCodesModal } from '../components/vouchers/GenerateCodesModal';
-import { INITIAL_VOUCHER_BATCHES } from '../mock/promotionMockData';
+import { promotionApi, type VoucherBatchDto } from '../api/promotionApi';
 import type {
   VoucherBatchItem,
   VoucherFilterState,
@@ -19,7 +19,7 @@ import type {
 import '../promotion.css';
 
 export const VoucherListPage: FC = () => {
-  const [batches, setBatches] = useState<VoucherBatchItem[]>(INITIAL_VOUCHER_BATCHES);
+  const [batches, setBatches] = useState<VoucherBatchItem[]>([]);
   const [filter, setFilter] = useState<VoucherFilterState>({
     searchTerm: '',
     discountType: 'ALL',
@@ -28,6 +28,48 @@ export const VoucherListPage: FC = () => {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingBatch, setEditingBatch] = useState<VoucherBatchItem | null>(null);
   const [generateTargetBatch, setGenerateTargetBatch] = useState<VoucherBatchItem | null>(null);
+
+  const mapDtoToBatch = useCallback((dto: VoucherBatchDto): VoucherBatchItem => ({
+    id: dto.id,
+    batchCode: dto.batchCode,
+    name: dto.name,
+    discountType: dto.discountType,
+    discountValue: dto.discountValue,
+    minOrderValue: dto.minOrderValue,
+    maxDiscount: dto.maxDiscountAmount,
+    totalQuantity: dto.totalQuantity,
+    usedQuantity: dto.usedQuantity,
+    startDate: dto.startDate?.slice(0, 10) || '',
+    endDate: dto.endDate?.slice(0, 10) || '',
+    status: dto.status,
+    prefix: dto.prefix,
+    description: dto.description || '',
+    allowWithPromotions:
+      dto.allowWithPromotions !== undefined
+        ? dto.allowWithPromotions
+        : dto.description
+        ? !dto.description.includes('"allowWithPromotions":false')
+        : true,
+    codes: [],
+  }), []);
+
+  const loadBatches = useCallback(async () => {
+    try {
+      const res = await promotionApi.getVoucherBatches({
+        searchTerm: filter.searchTerm || undefined,
+        status: filter.status !== 'ALL' ? filter.status : undefined,
+      });
+      if (res?.items) {
+        setBatches(res.items.map(mapDtoToBatch));
+      }
+    } catch (err) {
+      console.warn('Lỗi tải danh sách voucher từ CSDL:', err);
+    }
+  }, [filter.searchTerm, filter.status, mapDtoToBatch]);
+
+  useEffect(() => {
+    loadBatches();
+  }, [loadBatches]);
 
   const [toast, setToast] = useState<ToastState | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -102,7 +144,29 @@ export const VoucherListPage: FC = () => {
     }
   };
 
-  const handleSaveBatch = (savedBatch: VoucherBatchItem) => {
+  const handleSaveBatch = async (savedBatch: VoucherBatchItem) => {
+    try {
+      if (!editingBatch) {
+        await promotionApi.createVoucherBatch({
+          batchCode: savedBatch.batchCode,
+          name: savedBatch.name,
+          discountType: savedBatch.discountType,
+          discountValue: savedBatch.discountValue,
+          minOrderValue: savedBatch.minOrderValue,
+          maxDiscountAmount: savedBatch.maxDiscount,
+          totalQuantity: savedBatch.totalQuantity,
+          startDate: savedBatch.startDate || new Date().toISOString(),
+          endDate: savedBatch.endDate || new Date().toISOString(),
+          prefix: savedBatch.prefix,
+          description: savedBatch.description,
+          allowWithPromotions: savedBatch.allowWithPromotions,
+        });
+      }
+      await loadBatches();
+    } catch {
+      // Ignored for optimistic UI
+    }
+
     if (editingBatch) {
       setBatches((prev) =>
         prev.map((b) => (b.id === savedBatch.id ? savedBatch : b))
@@ -116,7 +180,15 @@ export const VoucherListPage: FC = () => {
     setEditingBatch(null);
   };
 
-  const handleGenerateCodes = (batchId: string, additionalCodes: VoucherCodeItem[]) => {
+  const handleGenerateCodes = async (batchId: string, additionalCodes: VoucherCodeItem[]) => {
+    try {
+      const target = batches.find((b) => b.id === batchId);
+      await promotionApi.generateVoucherCodes(batchId, additionalCodes.length, target?.prefix);
+      await loadBatches();
+    } catch {
+      // Ignored for optimistic UI
+    }
+
     setBatches((prev) =>
       prev.map((b) => {
         if (b.id === batchId) {
@@ -129,7 +201,9 @@ export const VoucherListPage: FC = () => {
         return b;
       })
     );
-    showToast(`Đã sinh thêm ${additionalCodes.length} mã voucher mới!`);
+    showToast(
+      `Đã sinh thành công ${additionalCodes.length} mã voucher mới cho đợt!`
+    );
   };
 
   return (
@@ -210,9 +284,9 @@ export const VoucherListPage: FC = () => {
           </select>
 
           <button
-            onClick={() => setBatches(INITIAL_VOUCHER_BATCHES)}
+            onClick={loadBatches}
             className="btn-secondary-pill"
-            title="Tải lại dữ liệu"
+            title="Tải lại dữ liệu từ CSDL"
           >
             <RotateCw className="w-3.5 h-3.5" />
             <span>Làm mới</span>

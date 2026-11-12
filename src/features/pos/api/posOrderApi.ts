@@ -1,4 +1,5 @@
 import { httpClient } from '../../../api/httpClient';
+import { generateUuidV7 } from '../../../utils/uuid';
 import type { Product, Customer } from '../types/pos.types';
 
 export interface OrderItemCreateDto {
@@ -7,6 +8,10 @@ export interface OrderItemCreateDto {
   unitPrice: number;
   discountAmount?: number;
   productName?: string;
+  unitId?: string;
+  unitName?: string;
+  isGift?: boolean;
+  promotionId?: string | null;
 }
 
 export interface OrderCreateRequest {
@@ -19,6 +24,15 @@ export interface OrderCreateRequest {
   managerBypassCode?: string | null;
   note?: string | null;
   creatorRole?: string | null;
+  cashierName?: string | null;
+  shiftId?: string | null;
+  pointsRedeemed?: number | null;
+  voucherCode?: string | null;
+  appliedPromotionId?: string | null;
+  appliedPromotionSummary?: string | null;
+  promotionDiscountAmount?: number | null;
+  voucherDiscountAmount?: number | null;
+  pointsDiscountAmount?: number | null;
 }
 
 export interface OrderItemResponse {
@@ -33,6 +47,8 @@ export interface OrderItemResponse {
   actualPrice: number;
   totalLineAmount: number;
   batchCode?: string;
+  isGift?: boolean;
+  promotionId?: string | null;
 }
 
 export interface OrderResponse {
@@ -52,6 +68,14 @@ export interface OrderResponse {
   paymentStatus: string;
   status: string;
   items: OrderItemResponse[];
+  appliedPromotionId?: string | null;
+  appliedPromotionSummary?: string | null;
+  promotionDiscountAmount?: number;
+  appliedVoucherCode?: string | null;
+  voucherDiscountAmount?: number;
+  pointsRedeemed?: number;
+  pointsDiscountAmount?: number;
+  giftStockWarning?: string | null;
 }
 
 export interface PrintOrderResponse {
@@ -61,24 +85,91 @@ export interface PrintOrderResponse {
 
 export const posOrderApi = {
   /**
-   * Lấy danh sách toàn bộ sản phẩm thực tế từ Backend CSDL (PostgreSQL)
+   * Lấy danh sách sản phẩm kinh doanh tại chi nhánh từ Backend CSDL (PostgreSQL).
+   * Yêu cầu nạp từ /branches/{branchId}/products (Status=Active, chứa RetailPrice, CurrentStock, UnitPrices từ BranchProducts).
+   * Không fallback về danh mục chung /products khi đã truyền branchId (REQ-BRANCH-SCOPE-01).
    */
-  getAllProducts: async (): Promise<Product[]> => {
-    const res = await httpClient.get('/products');
-    const rawList = res.data?.data || res.data || [];
-    return rawList.map((p: any) => ({
-      id: p.id,
+  getAllProducts: async (branchId?: string, signal?: AbortSignal): Promise<Product[]> => {
+    if (branchId) {
+      const res = await httpClient.get(`/branches/${branchId}/products`, {
+        params: { PageSize: 500, Status: 'Active' },
+        signal,
+      });
+      const paged = res.data?.data;
+      const items = Array.isArray(paged?.items)
+        ? paged.items
+        : Array.isArray(paged)
+        ? paged
+        : Array.isArray(res.data)
+        ? res.data
+        : [];
+
+      return items.map((p: any) => ({
+        id: p.productId || p.id,
+        sku: p.sku || p.productCode || '',
+        barcode: p.barcode || '',
+        name: p.name || p.productName || '',
+        imageUrl: p.imageUrl,
+        spec: '',
+        shelfLocation: p.shelfLocation,
+        category: p.category || 'Bách hóa',
+        baseUnit: p.unit || p.baseUnit || 'Cái',
+        basePrice: p.retailPrice ?? p.basePrice ?? p.sellingPrice ?? 0,
+        costPrice: p.costPrice || 0,
+        quantityOnHand: p.currentStock ?? p.quantityOnHand ?? 0,
+        batchCode: 'LÔ-FEFO',
+        unitPrices: Array.isArray(p.unitPrices)
+          ? p.unitPrices.map((u: any) => ({
+              unitId: u.unitId || u.id,
+              unitName: u.unitName,
+              conversionRate: Number(u.conversionRate ?? 1),
+              price: Number(u.price ?? 0),
+              isBaseUnit: Boolean(u.isBaseUnit),
+            }))
+          : undefined,
+      }));
+    }
+
+    return [];
+  },
+
+  searchBranchProducts: async (branchId: string, searchTerm: string): Promise<Product[]> => {
+    if (!branchId || !searchTerm.trim()) return [];
+    const res = await httpClient.get(`/branches/${branchId}/products`, {
+      params: { SearchTerm: searchTerm.trim(), Status: 'Active', PageSize: 20 },
+    });
+    const paged = res.data?.data;
+    const items = Array.isArray(paged?.items)
+      ? paged.items
+      : Array.isArray(paged)
+      ? paged
+      : Array.isArray(res.data)
+      ? res.data
+      : [];
+
+    return items.map((p: any) => ({
+      id: p.productId || p.id,
       sku: p.sku || p.productCode || '',
       barcode: p.barcode || '',
-      name: p.productName || p.name || '',
+      name: p.name || p.productName || '',
       imageUrl: p.imageUrl,
-      spec: p.taxCategory === 'STANDARD_1PCT' ? 'VAT 1%' : '',
-      category: p.categoryName || 'Bách hóa',
-      baseUnit: p.unitName || p.baseUnit || 'Cái',
-      basePrice: p.basePrice || p.sellingPrice || 0,
+      spec: '',
+      shelfLocation: p.shelfLocation,
+      category: p.category || 'Bách hóa',
+      baseUnit: p.unit || p.baseUnit || 'Cái',
+      basePrice: p.retailPrice ?? p.basePrice ?? p.sellingPrice ?? 0,
       costPrice: p.costPrice || 0,
-      quantityOnHand: p.quantityOnHand ?? 100,
+      quantityOnHand: p.currentStock ?? p.quantityOnHand ?? 0,
       batchCode: 'LÔ-FEFO',
+      unitPrices: Array.isArray(p.unitPrices)
+        ? p.unitPrices.map((u: any) => ({
+            unitId: u.unitId || u.id,
+            unitName: u.unitName,
+            conversionRate: Number(u.conversionRate ?? 1),
+            price: Number(u.price ?? 0),
+            isBaseUnit: Boolean(u.isBaseUnit),
+          }))
+        : undefined,
     }));
   },
 
@@ -87,22 +178,28 @@ export const posOrderApi = {
    */
   getAllCustomers: async (): Promise<Customer[]> => {
     const res = await httpClient.get('/customers');
-    const rawList = res.data?.data || res.data || [];
+    const rawList = Array.isArray(res.data?.data?.items)
+      ? res.data.data.items
+      : Array.isArray(res.data?.data)
+      ? res.data.data
+      : Array.isArray(res.data)
+      ? res.data
+      : [];
     return rawList.map((c: any) => ({
       id: c.id,
-      code: c.code || c.customerCode || '',
-      name: c.name || '',
-      phone: c.phone || '',
+      code: c.customerCode || c.code || '',
+      name: c.fullName || c.name || '',
+      phone: c.phoneNumber || c.phone || '',
       email: c.email || '',
       address: c.address || '',
       area: 'Hà Nội',
       ward: '',
-      gender: 'Nam',
+      gender: c.gender || 'Nam',
       group: c.membershipTier || 'Khách hàng',
-      loyaltyPoints: c.loyaltyPoints || 0,
+      loyaltyPoints: c.loyaltyPoints ?? c.rewardPoints ?? 0,
       membershipTier: c.membershipTier || 'Standard',
       debtLimit: c.debtLimit || 0,
-      currentDebt: c.currentDebt || 0,
+      currentDebt: c.currentDebtAR ?? c.currentDebt ?? c.totalDebt ?? 0,
       allowDebt: Boolean(c.allowDebt),
       note: c.isBlockedForDebt ? 'Đang bị khóa nợ' : '',
     }));
@@ -111,9 +208,14 @@ export const posOrderApi = {
   /**
    * Tạo đơn hàng bán lẻ POS, tự động trừ kho FEFO, tích điểm và xử lý công nợ
    */
-  createOrder: async (data: OrderCreateRequest): Promise<OrderResponse> => {
-    const response = await httpClient.post<OrderResponse>('/orders', data);
-    return response.data;
+  createOrder: async (data: OrderCreateRequest, idempotencyKey?: string): Promise<OrderResponse> => {
+    const key = idempotencyKey || generateUuidV7();
+    const response = await httpClient.post<any>('/orders', data, {
+      headers: {
+        'Idempotency-Key': key,
+      },
+    });
+    return response.data?.data ?? response.data;
   },
 
   /**
@@ -142,15 +244,18 @@ export const posOrderApi = {
       customer: receiptData.customer?.name || 'Khách lẻ',
       printTime: receiptData.createdAt || new Date().toLocaleString('vi-VN'),
       items: (receiptData.items || []).map((it: any) => ({
-        name: it.name,
+        name: it.isGift ? `[Quà KM] ${it.name}` : it.name,
         qty: it.quantity,
-        price: it.unitPrice,
+        price: it.isGift ? 0 : it.unitPrice,
       })),
       subtotal: receiptData.totalItemAmount || 0,
       discountPercent: 0,
-      discountAmount: (receiptData.orderDiscountAmount || 0) + (receiptData.pointsDiscountAmount || 0),
-      vatPercent: 1,
-      vatAmount: receiptData.vatAmount || 0,
+      discountAmount:
+        (receiptData.orderDiscountAmount || 0) +
+        (receiptData.voucherDiscountAmount || 0) +
+        (receiptData.pointsDiscountAmount || 0),
+      vatPercent: 0,
+      vatAmount: 0,
       finalTotal: receiptData.finalAmount || 0,
       cashReceived: receiptData.cashTendered || receiptData.finalAmount || 0,
       cashChange: Math.max(0, (receiptData.cashTendered || 0) - (receiptData.finalAmount || 0)),
@@ -180,6 +285,7 @@ export const posOrderApi = {
         const backendRes = await httpClient.post<PrintOrderResponse>(`/orders/${receiptData.orderId}/print`, {
           printerName: 'POS-58',
           cashTendered: receiptData.cashTendered,
+          cashierName: receiptData.cashierName,
         });
         if (backendRes.data?.success) {
           return backendRes.data;
@@ -208,7 +314,7 @@ export const posOrderApi = {
    */
   getOrders: async (params?: any): Promise<{ items: any[]; totalCount: number }> => {
     const res = await httpClient.get('/orders', { params });
-    return res.data;
+    return res.data?.data || res.data || { items: [], totalCount: 0 };
   },
 
   /**
@@ -230,7 +336,7 @@ export const posOrderApi = {
   /**
    * Hoàn tất giao hàng đơn đặt trước
    */
-  fulfillPreOrder: async (orderId: string, data: { paymentMethod: string; amountPaid: number; note?: string }): Promise<any> => {
+  fulfillPreOrder: async (orderId: string, data: { paymentMethod: string; amountPaid: number; note?: string; cashierName?: string; shiftId?: string }): Promise<any> => {
     const res = await httpClient.put(`/orders/${orderId}/fulfill`, data);
     return res.data;
   },
@@ -247,9 +353,18 @@ export const posOrderApi = {
    * Đổi / Trả hàng chuẩn KiotViet: hoàn kho hàng trả, trừ kho FEFO hàng mới, bù trừ chênh lệch
    */
   returnExchangeOrder: async (orderId: string, data: {
-    returnedItems: Array<{ productId: string; quantity: number; unitPrice: number }>;
-    newItems: Array<{ productId: string; quantity: number; unitPrice: number; discountAmount?: number }>;
+    returnedItems: Array<{
+      productId: string;
+      quantity: number;
+      unitPrice: number;
+      unitName?: string;
+      condition?: 'Restock' | 'Damaged';
+      orderDetailId?: string;
+      isGift?: boolean;
+    }>;
+    newItems: Array<{ productId: string; quantity: number; unitPrice: number; unitName?: string; discountAmount?: number }>;
     settlementMethod: string;
+    reason?: string;
     note?: string;
   }): Promise<any> => {
     const res = await httpClient.post(`/orders/${orderId}/return-exchange`, data);

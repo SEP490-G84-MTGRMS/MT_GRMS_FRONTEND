@@ -1,4 +1,4 @@
-﻿import { useState, useRef, useEffect, useCallback, Fragment } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo, Fragment } from "react";
 import type { FC } from "react";
 import { NavLink, Link, useLocation, useNavigate } from "react-router-dom";
 import {
@@ -20,6 +20,9 @@ import {
   ChevronRight,
   Wallet,
   FileText,
+  CreditCard,
+  Boxes,
+  ShieldCheck,
 } from "lucide-react";
 import { useAuthStore } from "../../stores/useAuthStore";
 import {
@@ -28,6 +31,7 @@ import {
   NotificationDrawer,
 } from "../../features/notifications";
 import { BranchSelectorDropdown } from "./BranchSelectorDropdown";
+import { posShiftApi } from "../../features/pos/api/posShiftApi";
 /* ─── Data ─── */
 
 interface NavSubItem {
@@ -110,6 +114,11 @@ const NAV_GROUPS: NavGroup[] = [
             badge: "",
           },
           {
+            label: "Nhóm hàng",
+            to: "/store-owner/categories",
+            badge: "",
+          },
+          {
             label: "Sản phẩm theo NCC",
             to: "/store-owner/suppliers/products",
             badge: "",
@@ -120,10 +129,6 @@ const NAV_GROUPS: NavGroup[] = [
             to: "/store-owner/stores/products",
             badge: "Mới",
             badgeType: "blue",
-          },
-          {
-            label: "Thiết lập bảng giá",
-            to: "/store-owner/suppliers/products?view=pricing",
           },
         ],
       },
@@ -143,8 +148,10 @@ const NAV_GROUPS: NavGroup[] = [
             badgeType: "blue",
           },
           {
-            label: "Kiểm kho & Cân đối",
-            to: "/store-owner/suppliers/products?view=inventory",
+            label: "Kiểm kê hàng hóa",
+            to: "/store-owner/stocktakes",
+            badge: "KK",
+            badgeType: "blue",
           },
           {
             label: "Chuyển hàng liên kho",
@@ -196,32 +203,22 @@ const NAV_GROUPS: NavGroup[] = [
           {
             label: "Đặt hàng ma trận",
             to: "/store-owner/purchase-orders/create-matrix",
-            badge: "Chủ",
-            badgeType: "blue",
           },
           {
             label: "Chốt đơn với nhà cung cấp",
             to: "/store-owner/purchase-orders/dispatch-hub",
-            badge: "Hub",
-            badgeType: "blue",
           },
           {
             label: "Danh sách đơn mua hàng (PO)",
             to: "/store-owner/purchase-orders/list",
-            badge: "PO",
-            badgeType: "blue",
           },
           {
             label: "Phiếu nhập kho (GRN) & Lịch nhận",
             to: "/store-owner/goods-receipts",
-            badge: "GRN",
-            badgeType: "blue",
           },
           {
             label: "Trả hàng nhà cung cấp (RTV)",
             to: "/store-owner/supplier-returns",
-            badge: "RTV",
-            badgeType: "blue",
           },
         ],
       },
@@ -274,11 +271,7 @@ const NAV_GROUPS: NavGroup[] = [
       {
         title: "Nhân sự & Hồ sơ",
         items: [
-          { label: "Danh sách nhân viên", to: "/store-owner/employees" },
-          {
-            label: "Hồ sơ & Hợp đồng",
-            to: "/store-owner/employees?view=profiles",
-          },
+          { label: "Danh sách nhân viên", to: "/store-owner/employees" }
         ],
       },
       {
@@ -286,15 +279,19 @@ const NAV_GROUPS: NavGroup[] = [
         items: [
           {
             label: "Lịch làm việc chi nhánh",
-            to: "/store-owner/employees/schedule",
-            badge: "Lịch",
-            badgeType: "blue",
+            to: "/store-owner/employees/schedule"
           },
           {
-            label: "Bảng chấm công GPS/QR",
-            to: "/store-owner/employees/attendance",
-            badge: "GPS/QR",
-            badgeType: "blue",
+            label: "Bảng chấm công",
+            to: "/store-owner/employees/attendance"
+          },
+          {
+            label: "Duyệt đơn yêu cầu",
+            to: "/store-owner/employees/approval-requests"
+          },
+          {
+            label: "Cấu hình ca làm việc",
+            to: "/store-owner/employees/shifts"
           },
         ],
       },
@@ -304,13 +301,7 @@ const NAV_GROUPS: NavGroup[] = [
           {
             label: "Bảng tính lương tháng",
             to: "/store-owner/employees/payroll",
-            badge: "Mới",
-            badgeType: "red",
-          },
-          {
-            label: "Thiết lập ca & Phụ cấp",
-            to: "/store-owner/employees/schedule?view=shifts",
-          },
+          }
         ],
       },
     ],
@@ -329,10 +320,6 @@ const NAV_GROUPS: NavGroup[] = [
             badge: "Mới",
             badgeType: "red",
           },
-          {
-            label: "Khuyến mãi theo khung giờ",
-            to: "/store-owner/promotions?view=flash-sale",
-          },
         ],
       },
       {
@@ -344,10 +331,6 @@ const NAV_GROUPS: NavGroup[] = [
             badge: "Hot",
             badgeType: "blue",
           },
-          {
-            label: "Phát hành mã quà tặng",
-            to: "/store-owner/vouchers?action=create",
-          },
         ],
       },
       {
@@ -358,10 +341,6 @@ const NAV_GROUPS: NavGroup[] = [
             to: "/store-owner/loyalty-config",
             badge: "Xu",
             badgeType: "blue",
-          },
-          {
-            label: "Hạng thành viên & Chiết khấu",
-            to: "/store-owner/loyalty-config?view=tiers",
           },
         ],
       },
@@ -553,10 +532,15 @@ const NavDropdown: FC<DropdownProps> = ({
       return (
         (currPath === toPath || currPath.startsWith(toPath + "/")) &&
         !currPath.includes("/schedule") &&
+        !currPath.includes("/shifts") &&
         !currPath.includes("/attendance") &&
         !currPath.includes("/payroll") &&
         !hasOtherView
       );
+    }
+
+    if (toPath === "/store-owner/employees/shifts") {
+      return currPath === toPath || currPath.startsWith(toPath + "/");
     }
 
     if (toPath === "/store-owner/employees/schedule") {
@@ -851,11 +835,68 @@ export const AppTopNav: FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuthStore();
+  const userRole = (user?.role || "").toUpperCase();
+  const isEmployee =
+    userRole === "EMPLOYEE" ||
+    userRole === "CASHIER" ||
+    userRole === "STAFF";
+
+  const visibleNavGroups = useMemo(() => {
+    if (isEmployee) {
+      // Ẩn hoàn toàn menu Tài chính, Nhân sự và Cấu hình gói cước gian hàng đối với Employee
+      return NAV_GROUPS.filter(
+        (g) => g.id !== "finance" && g.id !== "employees" && g.id !== "store"
+      );
+    }
+    return NAV_GROUPS;
+  }, [isEmployee]);
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const accountMenuRef = useRef<HTMLDivElement | null>(null);
   const accountTimerRef = useRef<number | null>(null);
+  const [settingsMenuOpen, setSettingsMenuOpen] = useState(false);
+  const settingsMenuRef = useRef<HTMLDivElement | null>(null);
+  const settingsTimerRef = useRef<number | null>(null);
+  const [pendingCashApprovalCount, setPendingCashApprovalCount] = useState<number>(0);
+
+  useEffect(() => {
+    if (user?.role === 'STORE_OWNER') {
+      const fetchPending = async () => {
+        try {
+          const res = await posShiftApi.getPendingMovements('');
+          if (res?.movements) {
+            const count = res.movements.filter(
+              (m) => m.status === 'PendingApproval' || m.status === 2 || ((m.category === 'CASH_DRAW' || m.category === 2) && !m.isConfirmedByOwner)
+            ).length;
+            setPendingCashApprovalCount(count);
+          }
+        } catch {
+          // ignore
+        }
+      };
+      fetchPending();
+    }
+  }, [user?.role, location.pathname]);
+
+  const clearSettingsTimer = useCallback(() => {
+    if (settingsTimerRef.current !== null) {
+      window.clearTimeout(settingsTimerRef.current);
+      settingsTimerRef.current = null;
+    }
+  }, []);
+
+  const handleSettingsEnter = useCallback(() => {
+    clearSettingsTimer();
+    setSettingsMenuOpen(true);
+  }, [clearSettingsTimer]);
+
+  const handleSettingsLeave = useCallback(() => {
+    clearSettingsTimer();
+    settingsTimerRef.current = window.setTimeout(() => {
+      setSettingsMenuOpen(false);
+    }, 220);
+  }, [clearSettingsTimer]);
   const anchorRefs = useRef<
     Map<string, React.RefObject<HTMLDivElement | null>>
   >(new Map());
@@ -891,14 +932,41 @@ export const AppTopNav: FC = () => {
   useEffect(() => {
     clearCloseTimer();
     clearAccountTimer();
+    clearSettingsTimer();
     setOpenMenu(null);
     setMobileOpen(false);
     setAccountMenuOpen(false);
+    setSettingsMenuOpen(false);
     return () => {
       clearCloseTimer();
       clearAccountTimer();
+      clearSettingsTimer();
     };
-  }, [location.pathname, clearCloseTimer, clearAccountTimer]);
+  }, [location.pathname, clearCloseTimer, clearAccountTimer, clearSettingsTimer]);
+
+  // Close settings menu on click outside or Escape
+  useEffect(() => {
+    if (!settingsMenuOpen) return;
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        settingsMenuRef.current &&
+        !settingsMenuRef.current.contains(event.target as Node)
+      ) {
+        setSettingsMenuOpen(false);
+      }
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setSettingsMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [settingsMenuOpen]);
 
   // Close account menu on click outside or Escape
   useEffect(() => {
@@ -1129,7 +1197,7 @@ export const AppTopNav: FC = () => {
               flex: 1,
             }}
           >
-            {NAV_GROUPS.map((group) => {
+            {visibleNavGroups.map((group) => {
               const active = isGroupActive(group);
               const isOpen = openMenu === group.id;
               const ref = getAnchorRef(group.id);
@@ -1363,31 +1431,370 @@ export const AppTopNav: FC = () => {
               <NotificationPopover />
             </div>
 
-            {/* 5. Settings Gear icon */}
-            <Link
-              to="/store-owner/subscriptions"
-              style={{
-                width: 32,
-                height: 32,
-                borderRadius: "50%",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: "#ffffff",
-                textDecoration: "none",
-                transition: "background-color 0.15s ease",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor =
-                  "rgba(255, 255, 255, 0.14)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = "transparent";
-              }}
-              title="Thiết lập gian hàng & Gói dịch vụ"
+            {/* 5. Settings Gear icon with Interactive Dropdown */}
+            <div
+              style={{ position: "relative" }}
+              ref={settingsMenuRef}
+              onMouseEnter={handleSettingsEnter}
+              onMouseLeave={handleSettingsLeave}
             >
-              <Settings size={18} strokeWidth={2} />
-            </Link>
+              <button
+                type="button"
+                onClick={() => {
+                  clearSettingsTimer();
+                  setSettingsMenuOpen((v) => !v);
+                }}
+                style={{
+                  position: "relative",
+                  width: 32,
+                  height: 32,
+                  borderRadius: "50%",
+                  backgroundColor: settingsMenuOpen
+                    ? "rgba(255, 255, 255, 0.4)"
+                    : "transparent",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: "#ffffff",
+                  border: "none",
+                  cursor: "pointer",
+                  transition: "background-color 0.15s ease",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor =
+                    "rgba(255, 255, 255, 0.25)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = settingsMenuOpen
+                    ? "rgba(255, 255, 255, 0.4)"
+                    : "transparent";
+                }}
+                title={
+                  pendingCashApprovalCount > 0
+                    ? `Cài đặt (${pendingCashApprovalCount} phiếu chi/rút két chờ duyệt)`
+                    : "Thiết lập gian hàng, thanh toán & Gói dịch vụ"
+                }
+                aria-expanded={settingsMenuOpen}
+                aria-haspopup="true"
+              >
+                <Settings size={18} strokeWidth={2} />
+                {pendingCashApprovalCount > 0 && (
+                  <span
+                    style={{
+                      position: "absolute",
+                      top: 2,
+                      right: 2,
+                      width: 8,
+                      height: 8,
+                      borderRadius: "50%",
+                      backgroundColor: "#ef4444",
+                      border: "1.5px solid #0f766e",
+                    }}
+                  />
+                )}
+              </button>
+
+              {settingsMenuOpen && (
+                <div
+                  style={{
+                    position: "absolute",
+                    top: "100%",
+                    right: 0,
+                    paddingTop: 8,
+                    zIndex: 1000,
+                  }}
+                  onMouseEnter={handleSettingsEnter}
+                  onMouseLeave={handleSettingsLeave}
+                >
+                  <div
+                    style={{
+                      width: 330,
+                      backgroundColor: "#ffffff",
+                      borderRadius: 14,
+                      boxShadow:
+                        "0 12px 32px rgba(0, 0, 0, 0.16), 0 2px 8px rgba(0, 0, 0, 0.08)",
+                      border: "1px solid #E2E8F0",
+                      overflow: "hidden",
+                      display: "flex",
+                      flexDirection: "column",
+                      fontFamily: "var(--font-sans)",
+                    }}
+                  >
+                    {/* Header menu */}
+                    <div
+                      style={{
+                        padding: "12px 16px",
+                        backgroundColor: "#f8fafc",
+                        borderBottom: "1px solid #e2e8f0",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                      }}
+                    >
+                      <Settings size={16} className="text-teal-700" />
+                      <span
+                        style={{
+                          fontSize: 13,
+                          fontWeight: 700,
+                          color: "#0f172a",
+                          textTransform: "uppercase",
+                          letterSpacing: "0.5px",
+                        }}
+                      >
+                        Cài đặt & Thiết lập
+                      </span>
+                    </div>
+
+                    <div style={{ padding: "8px 0" }}>
+                      {/* Mục 1: Cấu hình VietQR & SePay */}
+                      <Link
+                        to="/store-owner/payment-config"
+                        onClick={() => setSettingsMenuOpen(false)}
+                        style={{
+                          display: "flex",
+                          alignItems: "flex-start",
+                          gap: 12,
+                          padding: "10px 16px",
+                          textDecoration: "none",
+                          color: "inherit",
+                          transition: "background-color 0.15s ease",
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = "#ecfdf5";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = "transparent";
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: 36,
+                            height: 36,
+                            borderRadius: 8,
+                            backgroundColor: "#ccfbf1",
+                            color: "#0f766e",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            flexShrink: 0,
+                            marginTop: 1,
+                          }}
+                        >
+                          <CreditCard size={18} />
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 6,
+                            }}
+                          >
+                            <span
+                              style={{
+                                fontSize: 13.5,
+                                fontWeight: 700,
+                                color: "#065f46",
+                              }}
+                            >
+                              Cấu hình VietQR & SePay
+                            </span>
+                            <span
+                              style={{
+                                fontSize: 10,
+                                fontWeight: 700,
+                                backgroundColor: "#10b981",
+                                color: "#ffffff",
+                                padding: "1px 6px",
+                                borderRadius: 10,
+                              }}
+                            >
+                              Mới
+                            </span>
+                          </div>
+                          <div
+                            style={{
+                              fontSize: 12,
+                              color: "#64748b",
+                              marginTop: 2,
+                            }}
+                          >
+                            Tài khoản ngân hàng, SePay API Key & Webhook
+                          </div>
+                        </div>
+                      </Link>
+
+                      <div
+                        style={{
+                          height: 1,
+                          backgroundColor: "#f1f5f9",
+                          margin: "6px 16px",
+                        }}
+                      />
+
+                      {/* Mục 2: Hạn Mức & Duyệt Chi Két POS */}
+                      <Link
+                        to="/store-owner/pos-cash-control"
+                        onClick={() => setSettingsMenuOpen(false)}
+                        style={{
+                          display: "flex",
+                          alignItems: "flex-start",
+                          gap: 12,
+                          padding: "10px 16px",
+                          textDecoration: "none",
+                          color: "inherit",
+                          transition: "background-color 0.15s ease",
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = "#f0fdfa";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = "transparent";
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: 36,
+                            height: 36,
+                            borderRadius: 8,
+                            backgroundColor: "#ccfbf1",
+                            color: "#0f766e",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            flexShrink: 0,
+                            marginTop: 1,
+                          }}
+                        >
+                          <ShieldCheck size={18} />
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 6,
+                            }}
+                          >
+                            <span
+                              style={{
+                                fontSize: 13.5,
+                                fontWeight: 700,
+                                color: "#0f766e",
+                              }}
+                            >
+                              Hạn Mức & Duyệt Chi Két POS
+                            </span>
+                            {pendingCashApprovalCount > 0 ? (
+                              <span
+                                style={{
+                                  fontSize: 10,
+                                  fontWeight: 700,
+                                  backgroundColor: "#ef4444",
+                                  color: "#ffffff",
+                                  padding: "1px 7px",
+                                  borderRadius: 10,
+                                }}
+                              >
+                                {pendingCashApprovalCount} cần duyệt
+                              </span>
+                            ) : (
+                              <span
+                                style={{
+                                  fontSize: 10,
+                                  fontWeight: 700,
+                                  backgroundColor: "#0f766e",
+                                  color: "#ffffff",
+                                  padding: "1px 6px",
+                                  borderRadius: 10,
+                                }}
+                              >
+                                POS
+                              </span>
+                            )}
+                          </div>
+                          <div
+                            style={{
+                              fontSize: 12,
+                              color: "#64748b",
+                              marginTop: 2,
+                            }}
+                          >
+                            Thiết lập hạn mức, phê duyệt chi két & xác nhận tiền rút két
+                          </div>
+                        </div>
+                      </Link>
+
+                      <div
+                        style={{
+                          height: 1,
+                          backgroundColor: "#f1f5f9",
+                          margin: "6px 16px",
+                        }}
+                      />
+
+                      {/* Mục 3: Gói dịch vụ MT-GRMS */}
+                      <Link
+                        to="/store-owner/subscriptions"
+                        onClick={() => setSettingsMenuOpen(false)}
+                        style={{
+                          display: "flex",
+                          alignItems: "flex-start",
+                          gap: 12,
+                          padding: "10px 16px",
+                          textDecoration: "none",
+                          color: "inherit",
+                          transition: "background-color 0.15s ease",
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = "#eff6ff";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = "transparent";
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: 36,
+                            height: 36,
+                            borderRadius: 8,
+                            backgroundColor: "#dbeafe",
+                            color: "#1d4ed8",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            flexShrink: 0,
+                            marginTop: 1,
+                          }}
+                        >
+                          <Boxes size={18} />
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div
+                            style={{
+                              fontSize: 13.5,
+                              fontWeight: 700,
+                              color: "#1e3a8a",
+                            }}
+                          >
+                            Gói dịch vụ MT-GRMS
+                          </div>
+                          <div
+                            style={{
+                              fontSize: 12,
+                              color: "#64748b",
+                              marginTop: 2,
+                            }}
+                          >
+                            Gói dịch vụ & Gia hạn phần mềm
+                          </div>
+                        </div>
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
 
             {/* 6. Profile Avatar User Dropdown */}
             <div
@@ -1524,39 +1931,41 @@ export const AppTopNav: FC = () => {
 
                     <div style={{ height: 1, backgroundColor: "#F1F5F9" }} />
 
-                    {/* Ví gian hàng & Hợp đồng */}
-                    <Link
-                      to="/store-owner/account?tab=wallet"
-                      onClick={() => setAccountMenuOpen(false)}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 12,
-                        padding: "11px 16px",
-                        textDecoration: "none",
-                        color: "#1E293B",
-                        backgroundColor: "transparent",
-                        transition: "background-color 0.15s ease",
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = "#F8FAFC";
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = "transparent";
-                      }}
-                    >
-                      <Wallet size={18} strokeWidth={1.9} color="#334155" />
-                      <span
+                    {/* Ví gian hàng & Hợp đồng (chỉ dành cho Chủ gian hàng & Admin) */}
+                    {!isEmployee && (
+                      <Link
+                        to="/store-owner/account?tab=wallet"
+                        onClick={() => setAccountMenuOpen(false)}
                         style={{
-                          flex: 1,
-                          fontSize: 13.5,
-                          fontWeight: 500,
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 12,
+                          padding: "11px 16px",
+                          textDecoration: "none",
                           color: "#1E293B",
+                          backgroundColor: "transparent",
+                          transition: "background-color 0.15s ease",
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = "#F8FAFC";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = "transparent";
                         }}
                       >
-                        Ví tiền
-                      </span>
-                    </Link>
+                        <Wallet size={18} strokeWidth={1.9} color="#334155" />
+                        <span
+                          style={{
+                            flex: 1,
+                            fontSize: 13.5,
+                            fontWeight: 500,
+                            color: "#1E293B",
+                          }}
+                        >
+                          Ví tiền
+                        </span>
+                      </Link>
+                    )}
 
                     <Link
                       to="/store-owner/account?tab=terms"
@@ -1717,7 +2126,7 @@ export const AppTopNav: FC = () => {
                 Quản lý Chuỗi Tạp Hóa
               </div>
             </div>
-            {NAV_GROUPS.map((group) => (
+            {visibleNavGroups.map((group) => (
               <div key={group.id} style={{ padding: "0 12px 4px" }}>
                 {group.to ? (
                   <NavLink

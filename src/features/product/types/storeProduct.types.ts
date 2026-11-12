@@ -22,8 +22,11 @@ export interface StoreProductItem {
   costPrice: number; // Giá vốn từ SupplierProduct
   currentStock: number; // Tồn kho thực tế (SOH)
   minStockLevel: number; // Định mức tồn tối thiểu / an toàn
+  /** Id NCC của dòng nguồn nhập (1 BranchProduct có thể nhiều dòng / nhiều NCC). */
+  supplierId?: string;
   primarySupplierCode?: string;
   primarySupplierName: string;
+  isPrimarySupplier?: boolean;
   minOrderQuantity: number; // MOQ từ NCC — chỉ xem tại màn này
   status: 'Active' | 'Inactive';
   shelfLocation?: string;

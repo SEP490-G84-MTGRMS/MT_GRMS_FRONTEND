@@ -1,4 +1,4 @@
-# Script tạo nhanh file Worklog tóm tắt cho Frontend (MT_GRMS_FRONTEND)
+﻿# Script tạo nhanh file Worklog tóm tắt cho Frontend (MT_GRMS_FRONTEND)
 # Cách dùng:
 #   powershell -File .\scripts\New-Worklog.ps1 -Feature "FE-01" -Author "Tam" -Desc "product-table"
 
@@ -53,7 +53,7 @@ $template = @"
 
 ### 3. Chi Tiết UI/UX & API Integration
 - **Đường dẫn Route (URL)**: `/...`
-- **API Endpoint Backend tương ứng**: `[GET / POST] /api/v1/...`
+- **API Endpoint Backend tương ứng**: `[GET / POST] /api/...`
 - **Breaking Changes**: [Không có hoặc mô tả cụ thể]
 
 ### 4. Kiểm Thử & Xác Nhận (Verification)

@@ -42,12 +42,17 @@
 .emp-page-container {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 14px;
   background-color: transparent;
   width: 100%;
   padding: 0;
   font-family: 'Be Vietnam Pro', system-ui, -apple-system, sans-serif;
   color: var(--emp-text-primary);
+  flex: 1 1 auto;
+  height: 100%;
+  max-height: 100%;
+  min-height: 0;
+  overflow: hidden;
 }
 
 /* ─── Header & Top Actions ─── */
@@ -58,10 +63,11 @@
   flex-wrap: wrap;
   gap: 16px;
   background: var(--emp-surface);
-  padding: 16px 20px;
+  padding: 14px 20px;
   border-radius: var(--emp-radius-xl);
   box-shadow: var(--emp-shadow-sm);
   border: 1px solid var(--emp-border);
+  flex-shrink: 0;
 }
 
 .emp-header-title {
@@ -313,32 +319,50 @@
 /* ─── Employee Table ─── */
 .emp-table-container {
   background: var(--emp-surface);
-  border-radius: var(--emp-radius-xl);
-  border: 1px solid var(--emp-border);
-  box-shadow: var(--emp-shadow-sm);
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: 100%;
+}
+
+.emp-table-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: auto;
+  width: 100%;
 }
 
 .emp-table {
   width: 100%;
   border-collapse: separate;
   border-spacing: 0;
-  font-size: 13px;
+  font-size: 12.5px;
 }
 
 .emp-table thead tr {
-  background: #F8FAFC;
-  border-bottom: 1px solid var(--emp-border);
+  background: #f8fafc;
+  border-bottom: 1px solid #cbd5e1;
 }
 
 .emp-table th {
-  padding: 14px 16px;
-  font-weight: 600;
-  color: var(--emp-text-secondary);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: #f8fafc;
+  padding: 10px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #334155;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
   text-align: left;
-  border-bottom: 1px solid var(--emp-border);
+  border-bottom: 1px solid #cbd5e1;
   white-space: nowrap;
 }
 
@@ -349,17 +373,18 @@
 
 .emp-table tbody tr {
   cursor: pointer;
-  transition: background-color 0.15s ease;
+  transition: background-color 0.12s ease;
 }
 
 .emp-table tbody tr:hover {
-  background: #F0FDFA;
+  background: #f8fafc;
 }
 
 .emp-table td {
-  padding: 14px 16px;
-  border-bottom: 1px solid var(--emp-border-light);
-  color: var(--emp-text-primary);
+  padding: 8px 12px;
+  border-bottom: 1px solid #f1f5f9;
+  color: #1e293b;
+  font-size: 12.5px;
   vertical-align: middle;
 }
 
@@ -462,9 +487,21 @@
   background: #FFFFFF;
   border-radius: var(--emp-radius-xl);
   box-shadow: var(--emp-shadow-modal);
-  width: 100%;
-  max-width: 950px;
-  max-height: 90vh;
+  width: 900px;
+  max-width: 95vw;
+  height: 85vh;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: modalFadeIn 0.2s ease-out;
+}
+
+.emp-modal-box {
+  background: #FFFFFF;
+  border-radius: var(--emp-radius-lg, 16px);
+  box-shadow: var(--emp-shadow-modal, 0 20px 48px rgba(15, 23, 42, 0.2));
+  border: 1px solid var(--emp-border, #E2E8F0);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -853,4 +890,17 @@
   white-space: nowrap;
   letter-spacing: normal;
   line-height: 20px;
+}
+
+@keyframes empSpin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.emp-spin-icon {
+  animation: empSpin 1s linear infinite;
 }

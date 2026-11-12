@@ -20,7 +20,7 @@ import { CategoryModal } from '../components/CategoryModal';
 import { ProductFormModal } from '../components/ProductFormModal';
 import { ProductDetailModal } from '../components/ProductDetailModal';
 import { ProductDeleteConfirmModal } from '../components/ProductDeleteConfirmModal';
-import { TablePagination } from '../../../components/common';
+import { TablePagination, NotificationModal } from '../../../components/common';
 import { useAuthStore } from '../../../stores/useAuthStore';
 import { AdminToast, type ToastState } from '../../admin/components';
 import '../product.css';
@@ -46,20 +46,19 @@ export const ProductListPage: React.FC = () => {
   const [totalCount, setTotalCount] = useState<number>(0);
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
-  // RBAC switch (StoreOwner vs Cashier) for BR-SEC-01 verification
+  // RBAC switch (StoreOwner vs Staff) for BR-SEC-01 verification
   const currentUser = useAuthStore((state) => state.user);
   const initialRole: 'StoreOwner' | 'Cashier' =
-    currentUser?.role === 'CASHIER' ? 'Cashier' : 'StoreOwner';
+    currentUser?.role === 'STAFF' ? 'Cashier' : 'StoreOwner';
   const [userRole, setUserRole] = useState<'StoreOwner' | 'Cashier'>(initialRole);
 
   // Sync role if auth state changes
   useEffect(() => {
-    if (currentUser?.role === 'CASHIER') {
+    if (currentUser?.role === 'STAFF') {
       setUserRole('Cashier');
     } else if (
       currentUser?.role === 'ADMIN' ||
-      currentUser?.role === 'STORE_OWNER' ||
-      currentUser?.role === 'MANAGER'
+      currentUser?.role === 'STORE_OWNER'
     ) {
       setUserRole('StoreOwner');
     }
@@ -146,8 +145,13 @@ export const ProductListPage: React.FC = () => {
   // Dropdown đơn vị tính theo dòng sản phẩm (Ảnh 2 - REQ-07)
   const [selectedUnits, setSelectedUnits] = useState<Record<string, string>>({});
   const [activeUnitDropdownId, setActiveUnitDropdownId] = useState<string | null>(null);
+  const [unitDropdownPos, setUnitDropdownPos] = useState<{
+    top?: number;
+    bottom?: number;
+    left: number;
+  } | null>(null);
 
-  // Đóng popover chọn đơn vị khi click ra ngoài
+  // Đóng popover chọn đơn vị khi click ra ngoài hoặc cuộn trang
   useEffect(() => {
     if (!activeUnitDropdownId) return;
     const handleDocumentClick = (e: MouseEvent) => {
@@ -156,9 +160,16 @@ export const ProductListPage: React.FC = () => {
         setActiveUnitDropdownId(null);
       }
     };
+    const handleScrollOrResize = () => {
+      setActiveUnitDropdownId(null);
+    };
     document.addEventListener('mousedown', handleDocumentClick);
+    window.addEventListener('scroll', handleScrollOrResize, true);
+    window.addEventListener('resize', handleScrollOrResize);
     return () => {
       document.removeEventListener('mousedown', handleDocumentClick);
+      window.removeEventListener('scroll', handleScrollOrResize, true);
+      window.removeEventListener('resize', handleScrollOrResize);
     };
   }, [activeUnitDropdownId]);
 
@@ -208,12 +219,22 @@ export const ProductListPage: React.FC = () => {
         const mapped: ProductItem[] = await Promise.all(
           res.items.map(async (p) => {
             let uomConversions: UomConversion[] = (p as any).uomConversions || [];
+            let isBaseUnitPurchaseUnit: boolean | undefined = p.isBaseUnitPurchaseUnit;
+            let purchaseUnit: string | undefined = p.purchaseUnit ?? undefined;
             if (uomConversions.length === 0 && p.id) {
               const isGuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(p.id);
               if (isGuid) {
                 try {
                   const units = await productApi.getProductUnits(p.id);
                   if (units && units.length > 0) {
+                    const baseRow = units.find((u) => u.isBaseUnit);
+                    const purchaseRow = units.find((u) => Boolean(u.isPurchaseUnit));
+                    if (purchaseRow) {
+                      isBaseUnitPurchaseUnit = Boolean(purchaseRow.isBaseUnit);
+                      purchaseUnit = purchaseRow.unitName;
+                    } else if (baseRow) {
+                      isBaseUnitPurchaseUnit = baseRow.isPurchaseUnit ?? true;
+                    }
                     uomConversions = units
                       .filter((u) => !u.isBaseUnit)
                       .map((u) => ({
@@ -222,6 +243,7 @@ export const ProductListPage: React.FC = () => {
                         conversionRate: u.conversionRate,
                         price: u.price,
                         barcode: u.barcode ?? undefined,
+                        isPurchaseUnit: Boolean(u.isPurchaseUnit),
                       }));
                   }
                 } catch {
@@ -251,6 +273,10 @@ export const ProductListPage: React.FC = () => {
               internalNote: p.internalNote ?? undefined,
               taxCategory: (p as any).taxCategory || 'STANDARD_1PCT',
               isFavorite: Boolean(p.isFavorite),
+              hasBatches: Boolean(p.hasBatches),
+              eligibleForVatReduction: Boolean((p as any).eligibleForVatReduction),
+              isBaseUnitPurchaseUnit,
+              purchaseUnit,
               uomConversions,
             };
           })
@@ -295,12 +321,21 @@ export const ProductListPage: React.FC = () => {
   // Toast
   const [toast, setToast] = useState<ToastState | null>(null);
 
+  // Notification Modal (Success / Error alerts)
+  const [notificationModal, setNotificationModal] = useState<{
+    isOpen: boolean;
+    type?: 'success' | 'error' | 'warning' | 'info';
+    title: string;
+    message: string | React.ReactNode;
+    itemCode?: string;
+  } | null>(null);
+
   const showToast = (message: string, type: ToastState['type'] = 'success') => {
     setToast({ id: Date.now().toString(), message, type });
     setTimeout(() => setToast(null), 3000);
   };
 
-// Category Actions
+  // Category Actions
 
   const handleSaveCategory = async (
     name: string,
@@ -319,11 +354,11 @@ export const ProductListPage: React.FC = () => {
           prev.map((c) =>
             c.id === id
               ? {
-                  ...c,
-                  name: updatedDto.name,
-                  code: updatedDto.code || updatedDto.categoryCode || c.code,
-                  description: updatedDto.description,
-                }
+                ...c,
+                name: updatedDto.name,
+                code: updatedDto.code || updatedDto.categoryCode || c.code,
+                description: updatedDto.description,
+              }
               : c
           )
         );
@@ -381,7 +416,7 @@ export const ProductListPage: React.FC = () => {
   ) => {
     try {
       if (productToEdit) {
-        // Cập nhật sản phẩm qua PUT /api/v1/products/{id}
+        // Cập nhật sản phẩm qua PUT /api/products/{id}
         await productApi.updateProduct(productToEdit.id, {
           name: data.productName || productToEdit.productName,
           categoryId: data.categoryId || productToEdit.categoryId,
@@ -395,9 +430,12 @@ export const ProductListPage: React.FC = () => {
           description: data.description,
           internalNote: data.internalNote,
           isFavorite: data.isFavorite ?? productToEdit.isFavorite,
+          hasBatches: data.hasBatches !== undefined ? data.hasBatches : Boolean(productToEdit.hasBatches),
+          eligibleForVatReduction: data.eligibleForVatReduction ?? productToEdit.eligibleForVatReduction ?? false,
+          isBaseUnitPurchaseUnit: data.isBaseUnitPurchaseUnit,
         });
 
-        // 1. Xóa các đơn vị quy đổi đã bị người dùng gỡ bỏ qua DELETE /api/v1/product-units/{id}
+        // 1. Xóa các đơn vị quy đổi đã bị người dùng gỡ bỏ qua DELETE /api/product-units/{id}
         if (deletedUnitIds && deletedUnitIds.length > 0) {
           for (const unitId of deletedUnitIds) {
             try {
@@ -420,12 +458,13 @@ export const ProductListPage: React.FC = () => {
                   price: uom.price,
                   barcode: uom.barcode?.trim() || null,
                   isBaseUnit: false,
+                  isPurchaseUnit: Boolean(uom.isPurchaseUnit),
                 });
               } catch (unitErr) {
                 console.warn('Lỗi khi thêm đơn vị quy đổi:', unitErr);
               }
             } else {
-              // Cập nhật đơn vị quy đổi hiện có qua PUT /api/v1/product-units/{id}
+              // Cập nhật đơn vị quy đổi hiện có qua PUT /api/product-units/{id}
               try {
                 await productApi.updateProductUnit(uom.id, {
                   unitName: uom.unitName,
@@ -433,6 +472,7 @@ export const ProductListPage: React.FC = () => {
                   price: uom.price,
                   barcode: uom.barcode?.trim() || null,
                   isBaseUnit: false,
+                  isPurchaseUnit: Boolean(uom.isPurchaseUnit),
                 });
               } catch (unitErr) {
                 console.warn(`Lỗi khi cập nhật đơn vị quy đổi ${uom.id}:`, unitErr);
@@ -442,11 +482,34 @@ export const ProductListPage: React.FC = () => {
         }
 
         showToast(`Cập nhật hàng hóa "${data.productName}" thành công.`);
+        setNotificationModal({
+          isOpen: true,
+          type: 'success',
+          title: 'Cập nhật hàng hóa thành công',
+          message: `Thông tin hàng hóa "${data.productName}" đã được cập nhật thành công vào hệ thống.`,
+          itemCode: data.productCode,
+        });
+        setProducts((prev) =>
+          prev.map((p) =>
+            p.id === productToEdit.id
+              ? {
+                  ...p,
+                  ...data,
+                  hasBatches: data.hasBatches !== undefined ? data.hasBatches : Boolean(p.hasBatches),
+                  isFavorite: data.isFavorite !== undefined ? data.isFavorite : Boolean(p.isFavorite),
+                }
+              : p
+          )
+        );
         if (selectedProduct && selectedProduct.id === productToEdit.id) {
-          setSelectedProduct({ ...selectedProduct, ...data } as ProductItem);
+          setSelectedProduct({
+            ...selectedProduct,
+            ...data,
+            hasBatches: data.hasBatches !== undefined ? data.hasBatches : Boolean(selectedProduct.hasBatches),
+          } as ProductItem);
         }
       } else {
-        // Tạo mới sản phẩm trên Backend qua POST /api/v1/products
+        // Tạo mới sản phẩm trên Backend qua POST /api/products
         const created = await productApi.createProduct({
           name: data.productName!,
           categoryId: data.categoryId!,
@@ -460,9 +523,11 @@ export const ProductListPage: React.FC = () => {
           description: data.description,
           internalNote: data.internalNote,
           isFavorite: data.isFavorite ?? false,
+          hasBatches: data.hasBatches ?? false,
+          isBaseUnitPurchaseUnit: data.isBaseUnitPurchaseUnit ?? true,
         });
 
-        // Thêm các đơn vị quy đổi cho sản phẩm vừa tạo qua POST /api/v1/products/{id}/units
+        // Thêm các đơn vị quy đổi cho sản phẩm vừa tạo qua POST /api/products/{id}/units
         if (data.uomConversions && data.uomConversions.length > 0) {
           const validUnits = data.uomConversions.filter((u) => u.unitName && u.unitName.trim() !== '');
           for (const uom of validUnits) {
@@ -473,6 +538,7 @@ export const ProductListPage: React.FC = () => {
                 price: uom.price || 0,
                 barcode: uom.barcode?.trim() || null,
                 isBaseUnit: false,
+                isPurchaseUnit: Boolean(uom.isPurchaseUnit),
               });
             } catch (unitErr: any) {
               console.warn('Lỗi khi thêm đơn vị quy đổi:', unitErr);
@@ -482,6 +548,13 @@ export const ProductListPage: React.FC = () => {
         }
 
         showToast(`Tạo mới hàng hóa "${created.name || data.productName}" thành công.`);
+        setNotificationModal({
+          isOpen: true,
+          type: 'success',
+          title: 'Tạo mới hàng hóa thành công',
+          message: `Hàng hóa "${created.name || data.productName}" đã được thêm mới thành công vào danh mục.`,
+          itemCode: created.productCode || data.productCode,
+        });
       }
 
       // Làm mới danh mục và danh sách sản phẩm từ backend
@@ -511,6 +584,13 @@ export const ProductListPage: React.FC = () => {
     try {
       await productApi.deleteProduct(productToDelete.id);
       showToast(`Đã xóa hàng hóa "${productToDelete.productName}" thành công.`);
+      setNotificationModal({
+        isOpen: true,
+        type: 'success',
+        title: 'Xóa hàng hóa thành công',
+        message: `Đã xóa hàng hóa "${productToDelete.productName}" khỏi danh mục kinh doanh.`,
+        itemCode: productToDelete.productCode,
+      });
       if (selectedProduct?.id === productToDelete.id) {
         setIsDetailModalOpen(false);
         setSelectedProduct(null);
@@ -545,6 +625,12 @@ export const ProductListPage: React.FC = () => {
         }
       }
       showToast(`Đã xóa thành công ${successCount} hàng hóa đã chọn.`);
+      setNotificationModal({
+        isOpen: true,
+        type: 'success',
+        title: 'Xóa hàng hóa thành công',
+        message: `Đã xóa thành công ${successCount} hàng hóa đã chọn khỏi danh mục kinh doanh.`,
+      });
       setSelectedProductIds([]);
       setIsBulkDeleteOpen(false);
       if (selectedProduct && selectedProductIds.includes(selectedProduct.id)) {
@@ -571,6 +657,40 @@ export const ProductListPage: React.FC = () => {
     );
     if (selectedProduct && selectedProduct.id === product.id) {
       setSelectedProduct({ ...selectedProduct, status: nextStatus });
+    }
+  };
+
+  const handleToggleHasBatches = async (product: ProductItem, nextVal: boolean) => {
+    setProducts((prev) =>
+      prev.map((p) => (p.id === product.id ? { ...p, hasBatches: nextVal } : p))
+    );
+    if (selectedProduct && selectedProduct.id === product.id) {
+      setSelectedProduct({ ...selectedProduct, hasBatches: nextVal });
+    }
+    try {
+      await productApi.updateProduct(product.id, {
+        name: product.productName,
+        categoryId: product.categoryId,
+        sellingPrice: product.sellingPrice,
+        barcode: product.barcode?.trim() || undefined,
+        baseUnit: product.baseUnit?.trim() || 'Cái',
+        costPrice: product.costPrice ?? undefined,
+        status: product.status,
+        imageUrl: product.imageUrl,
+        imageUrls: product.imageUrls || (product.imageUrl ? [product.imageUrl] : []),
+        description: product.description,
+        internalNote: product.internalNote,
+        isFavorite: Boolean(product.isFavorite),
+        hasBatches: nextVal,
+        eligibleForVatReduction: Boolean(product.eligibleForVatReduction),
+      });
+      showToast(
+        nextVal
+          ? `Đã bật quản lý theo lô & HSD cho "${product.productName}"`
+          : `Đã tắt quản lý theo lô & HSD cho "${product.productName}"`
+      );
+    } catch (err: any) {
+      console.warn('Lỗi khi cập nhật trạng thái quản lý theo lô:', err);
     }
   };
 
@@ -780,6 +900,7 @@ export const ProductListPage: React.FC = () => {
                       return (
                         <span
                           key={firstCat.id}
+                          title={firstCat.name}
                           style={{
                             display: 'inline-flex',
                             alignItems: 'center',
@@ -792,7 +913,7 @@ export const ProductListPage: React.FC = () => {
                             color: '#0F766E',
                             border: '1px solid #99F6E4',
                             whiteSpace: 'nowrap',
-                            maxWidth: selectedCategoryIds.length > 1 ? 140 : 200,
+                            maxWidth: selectedCategoryIds.length > 1 ? 140 : 180,
                           }}
                         >
                           <span
@@ -802,7 +923,7 @@ export const ProductListPage: React.FC = () => {
                               whiteSpace: 'nowrap',
                             }}
                           >
-                            {firstCat.name}
+                            {firstCat.name.length > 22 ? `${firstCat.name.slice(0, 22)}...` : firstCat.name}
                           </span>
                           <span
                             onClick={(e) => handleRemoveCategoryTag(e, firstCat.id)}
@@ -1024,25 +1145,35 @@ export const ProductListPage: React.FC = () => {
                           }}
                         >
                           <label
+                            title={c.name}
                             style={{
                               display: 'flex',
                               alignItems: 'center',
                               gap: 10,
                               cursor: 'pointer',
                               fontSize: 13,
-                              width: '100%',
+                              flex: 1,
+                              minWidth: 0,
+                              marginRight: 8,
                             }}
                           >
                             <input
                               type="checkbox"
                               checked={isChecked}
-                              onChange={() => {}} // Handled at row click
-                              style={{ accentColor: '#0F766E', width: 16, height: 16 }}
+                              onChange={() => { }} // Handled at row click
+                              style={{ accentColor: '#0F766E', width: 16, height: 16, flexShrink: 0 }}
                             />
-                            <span style={{ fontWeight: isChecked ? 600 : 400, color: isChecked ? '#134E4A' : '#1E293B' }}>
-                              {c.name}
+                            <span
+                              style={{
+                                fontWeight: isChecked ? 600 : 400,
+                                color: isChecked ? '#134E4A' : '#1E293B',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
+                              }}
+                            >
+                              {c.name.length > 26 ? `${c.name.slice(0, 26)}...` : c.name}
                             </span>
-                            
                           </label>
                           {c.productCount !== undefined && (
                             <span style={{ fontSize: 11, color: '#64748B', fontWeight: 600, flexShrink: 0 }}>
@@ -1305,376 +1436,414 @@ export const ProductListPage: React.FC = () => {
 
       {/* 2. Main Body: Full-width Table */}
       <div className="product-table-wrapper" style={{ width: '100%' }}>
-          {/* Summary bar */}
-          <div className="product-table-summary-bar">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <div>
-                Đang hiển thị <b>{filteredProducts.length}</b> mặt hàng
-              </div>
-              {selectedProductIds.length > 0 && (
-                <div
+        {/* Summary bar */}
+        <div className="product-table-summary-bar">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div>
+              Đang hiển thị <b>{filteredProducts.length}</b> mặt hàng
+            </div>
+            {selectedProductIds.length > 0 && (
+              <div
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  padding: '3px 10px',
+                  backgroundColor: '#FEF2F2',
+                  border: '1px solid #FECACA',
+                  borderRadius: 6,
+                }}
+              >
+                <span style={{ fontSize: 12.5, fontWeight: 600, color: '#991B1B' }}>
+                  Đã chọn {selectedProductIds.length} hàng hóa
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setIsBulkDeleteOpen(true)}
                   style={{
+                    padding: '2px 8px',
+                    fontSize: 12,
+                    borderRadius: 4,
                     display: 'inline-flex',
                     alignItems: 'center',
-                    gap: 8,
-                    padding: '3px 10px',
-                    backgroundColor: '#FEF2F2',
-                    border: '1px solid #FECACA',
-                    borderRadius: 6,
+                    gap: 4,
+                    backgroundColor: '#EF4444',
+                    color: '#FFFFFF',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontWeight: 600,
                   }}
                 >
-                  <span style={{ fontSize: 12.5, fontWeight: 600, color: '#991B1B' }}>
-                    Đã chọn {selectedProductIds.length} hàng hóa
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setIsBulkDeleteOpen(true)}
-                    style={{
-                      padding: '2px 8px',
-                      fontSize: 12,
-                      borderRadius: 4,
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 4,
-                      backgroundColor: '#EF4444',
-                      color: '#FFFFFF',
-                      border: 'none',
-                      cursor: 'pointer',
-                      fontWeight: 600,
-                    }}
-                  >
-                    <Trash2 size={13} />
-                    Xóa đã chọn
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedProductIds([])}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      color: '#64748B',
-                      fontSize: 12,
-                      cursor: 'pointer',
-                      textDecoration: 'underline',
-                      padding: '0 4px',
-                    }}
-                  >
-                    Bỏ chọn
-                  </button>
-                </div>
-              )}
-            </div>
-
+                  <Trash2 size={13} />
+                  Xóa đã chọn
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedProductIds([])}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#64748B',
+                    fontSize: 12,
+                    cursor: 'pointer',
+                    textDecoration: 'underline',
+                    padding: '0 4px',
+                  }}
+                >
+                  Bỏ chọn
+                </button>
+              </div>
+            )}
           </div>
 
-          {/* Table */}
-          <div style={{ overflowX: 'auto' }}>
-            <table className="product-main-table">
-              <thead>
-                <tr>
-                  <th style={{ width: 36, textAlign: 'center' }}>
-                    <input
-                      type="checkbox"
-                      checked={
-                        filteredProducts.length > 0 &&
-                        selectedProductIds.length === filteredProducts.length
+        </div>
+
+        {/* Table */}
+        <div className="product-table-scroll supplier-table-scroll-container">
+          <table className="product-main-table">
+            <thead>
+              <tr>
+                <th style={{ width: 36, textAlign: 'center' }}>
+                  <input
+                    type="checkbox"
+                    checked={
+                      filteredProducts.length > 0 &&
+                      selectedProductIds.length === filteredProducts.length
+                    }
+                    onChange={() => {
+                      if (selectedProductIds.length === filteredProducts.length) {
+                        setSelectedProductIds([]);
+                      } else {
+                        setSelectedProductIds(filteredProducts.map((p) => p.id));
                       }
-                      onChange={() => {
-                        if (selectedProductIds.length === filteredProducts.length) {
-                          setSelectedProductIds([]);
-                        } else {
-                          setSelectedProductIds(filteredProducts.map((p) => p.id));
-                        }
-                      }}
-                    />
-                  </th>
-                  <th style={{ width: 36, textAlign: 'center' }}>★</th>
-                  <th style={{ width: 180, minWidth: 150 }}>Mã hàng</th>
-                  <th>Tên hàng hóa</th>
-                  <th style={{ width: 110 }}>Đơn vị tính</th>
-                  <th style={{ textAlign: 'right', width: 120 }}>Giá bán</th>
-                  {userRole === 'StoreOwner' && (
-                    <th style={{ textAlign: 'right', width: 120 }}>Giá vốn</th>
-                  )}
-                  <th style={{ textAlign: 'center', width: 130 }}>Trạng thái</th>
-                  <th style={{ width: 130 }}>Thời gian tạo</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredProducts.map((p) => {
-                  const isChecked = selectedProductIds.includes(p.id);
-                  const isSelected = selectedProduct?.id === p.id && isDetailModalOpen;
+                    }}
+                  />
+                </th>
+                <th style={{ width: 36, textAlign: 'center' }}>★</th>
+                <th style={{ width: 180, minWidth: 150 }}>Mã hàng</th>
+                <th>Tên hàng hóa</th>
+                <th style={{ width: 110 }}>Đơn vị tính</th>
+                <th style={{ textAlign: 'right', width: 120 }}>Giá bán</th>
+                {userRole === 'StoreOwner' && (
+                  <th style={{ textAlign: 'right', width: 120 }}>Giá vốn</th>
+                )}
+                <th style={{ textAlign: 'center', width: 130 }}>Trạng thái</th>
+                <th style={{ width: 130 }}>Thời gian tạo</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredProducts.map((p, rowIndex) => {
+                const isChecked = selectedProductIds.includes(p.id);
+                const isSelected = selectedProduct?.id === p.id && isDetailModalOpen;
 
-                  // Tính toán đơn vị tính đang chọn và giá tương ứng (Ảnh 2 - REQ-07)
-                  const allUnits = [
-                    { unitName: p.baseUnit || 'Cái', price: p.sellingPrice ?? 0, barcode: p.barcode, productCode: p.productCode },
-                    ...(p.uomConversions || []),
-                  ];
-                  const currentUnitName = selectedUnits[p.id] || p.baseUnit || 'Cái';
-                  const currentUom = p.uomConversions?.find((u) => u.unitName === currentUnitName);
-                  const displayPrice = currentUom ? currentUom.price : (p.sellingPrice ?? 0);
-                  const displayCode = currentUom?.productCode || p.productCode;
-                  const otherUnits = allUnits.filter((u) => u.unitName !== currentUnitName);
+                // Tính toán đơn vị tính đang chọn và giá tương ứng (Ảnh 2 - REQ-07)
+                const allUnits = [
+                  { unitName: p.baseUnit || 'Cái', price: p.sellingPrice ?? 0, barcode: p.barcode, productCode: p.productCode },
+                  ...(p.uomConversions || []),
+                ];
+                const currentUnitName = selectedUnits[p.id] || p.baseUnit || 'Cái';
+                const currentUom = p.uomConversions?.find((u) => u.unitName === currentUnitName);
+                const displayPrice = currentUom ? currentUom.price : (p.sellingPrice ?? 0);
+                const displayCode = currentUom?.productCode || p.productCode;
+                const otherUnits = allUnits.filter((u) => u.unitName !== currentUnitName);
 
-                  return (
-                    <tr
-                      key={p.id}
-                      onClick={() => {
-                        setSelectedProduct(p);
-                        setIsDetailModalOpen(true);
-                      }}
-                      style={{
-                        cursor: 'pointer',
-                        backgroundColor: isSelected
-                          ? '#f0fdfa'
-                          : p.status === 'Discontinued'
-                            ? '#f8fafc'
-                            : undefined,
-                        opacity: p.status === 'Discontinued' ? 0.75 : 1,
-                      }}
-                    >
-                      <td style={{ textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          onChange={() => {
-                            if (isChecked) {
-                              setSelectedProductIds(selectedProductIds.filter((id) => id !== p.id));
-                            } else {
-                              setSelectedProductIds([...selectedProductIds, p.id]);
-                            }
-                          }}
-                        />
-                      </td>
-                      <td style={{ textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
-                        <button
-                          type="button"
-                          className={`favorite-star-btn ${p.isFavorite ? 'active' : ''}`}
-                          onClick={(e) => handleToggleFavorite(p.id, e)}
-                          title="Đánh dấu yêu thích"
-                        >
-                          {p.isFavorite ? '★' : '☆'}
-                        </button>
-                      </td>
-                      <td style={{ minWidth: 180, width: 220 }}>
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
-                          {p.imageUrl ? (
-                            <img
-                              src={p.imageUrl}
-                              alt=""
-                              style={{ width: 28, height: 28, borderRadius: 4, objectFit: 'cover', border: '1px solid #e2e8f0', flexShrink: 0 }}
-                            />
-                          ) : (
-                            <div
-                              style={{
-                                width: 28,
-                                height: 28,
-                                borderRadius: 4,
-                                backgroundColor: '#f1f5f9',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                fontSize: 13,
-                                color: '#94a3b8',
-                                flexShrink: 0,
-                              }}
-                            >
-                              📦
-                            </div>
-                          )}
-                          <span className="product-code-link">
-                            {displayCode}
-                          </span>
-                        </div>
-                      </td>
-                      {/* Tên hàng hóa */}
-                      <td>
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                          <span style={{ fontWeight: 600, color: '#1e293b' }}>
-                            {p.productName}
-                          </span>
-                          {p.isCombo && <span className="badge-combo">Combo</span>}
-                          {p.status === 'Discontinued' && (
-                            <span
-                              style={{
-                                marginLeft: 6,
-                                fontSize: 11,
-                                color: '#dc2626',
-                                background: '#fee2e2',
-                                padding: '2px 6px',
-                                borderRadius: 4,
-                              }}
-                            >
-                              Ngừng kinh doanh
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      {/* Đơn vị tính (chứa option chuyển đổi ĐVT) */}
-                      <td>
-                        {p.uomConversions && p.uomConversions.length > 0 ? (
-                          <div className="unit-dropdown-container" style={{ position: 'relative', display: 'inline-block' }}>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setActiveUnitDropdownId(activeUnitDropdownId === p.id ? null : p.id);
-                              }}
-                              style={{
-                                background: '#F0FDFA',
-                                border: '1px solid #CCFBF1',
-                                color: '#0F766E',
-                                fontWeight: 700,
-                                fontSize: 13,
-                                cursor: 'pointer',
-                                padding: '3px 8px',
-                                borderRadius: 6,
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: 4,
-                                transition: 'all 0.15s ease',
-                              }}
-                              title="Bấm để chuyển đổi đơn vị tính"
-                            >
-                              <span>{currentUnitName}</span>
-                              <ChevronDown
-                                size={13}
-                                style={{
-                                  transform: activeUnitDropdownId === p.id ? 'rotate(180deg)' : 'none',
-                                  transition: 'transform 0.15s ease',
-                                }}
-                              />
-                            </button>
-
-                            {activeUnitDropdownId === p.id && otherUnits.length > 0 && (
-                              <div
-                                onClick={(e) => e.stopPropagation()}
-                                style={{
-                                  position: 'absolute',
-                                  top: '100%',
-                                  left: 0,
-                                  zIndex: 50,
-                                  marginTop: 4,
-                                  minWidth: 100,
-                                  background: '#ffffff',
-                                  borderRadius: 8,
-                                  boxShadow: '0 4px 16px rgba(0, 0, 0, 0.12)',
-                                  border: '1px solid #E2E8F0',
-                                  padding: '4px 0',
-                                }}
-                              >
-                                {allUnits.map((u) => {
-                                  const isSelected = u.unitName === currentUnitName;
-                                  return (
-                                    <button
-                                      key={u.unitName}
-                                      type="button"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setSelectedUnits((prev) => ({ ...prev, [p.id]: u.unitName }));
-                                        setActiveUnitDropdownId(null);
-                                      }}
-                                      style={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'space-between',
-                                        width: '100%',
-                                        padding: '6px 12px',
-                                        fontSize: 12.5,
-                                        background: isSelected ? '#F0FDFA' : 'transparent',
-                                        color: isSelected ? '#0F766E' : '#334155',
-                                        fontWeight: isSelected ? 700 : 500,
-                                        border: 'none',
-                                        cursor: 'pointer',
-                                        whiteSpace: 'nowrap',
-                                        textAlign: 'left',
-                                        gap: 8,
-                                      }}
-                                      onMouseEnter={(e) => {
-                                        if (!isSelected) (e.currentTarget as HTMLElement).style.background = '#f8fafc';
-                                      }}
-                                      onMouseLeave={(e) => {
-                                        if (!isSelected) (e.currentTarget as HTMLElement).style.background = 'transparent';
-                                      }}
-                                    >
-                                      <span>{u.unitName}</span>
-                                      {u.unitName === (p.baseUnit || 'Cái') ? (
-                                        <span style={{ fontSize: 10, color: '#0F766E', background: '#CCFBF1', padding: '1px 4px', borderRadius: 4 }}>
-                                          Cơ bản
-                                        </span>
-                                      ) : null}
-                                    </button>
-                                  );
-                                })}
-                              </div>
-                            )}
-                          </div>
+                return (
+                  <tr
+                    key={p.id}
+                    onClick={() => {
+                      setSelectedProduct(p);
+                      setIsDetailModalOpen(true);
+                    }}
+                    style={{
+                      cursor: 'pointer',
+                      backgroundColor: isSelected
+                        ? '#f0fdfa'
+                        : p.status === 'Discontinued'
+                          ? '#f8fafc'
+                          : undefined,
+                      opacity: p.status === 'Discontinued' ? 0.75 : 1,
+                    }}
+                  >
+                    <td style={{ textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={() => {
+                          if (isChecked) {
+                            setSelectedProductIds(selectedProductIds.filter((id) => id !== p.id));
+                          } else {
+                            setSelectedProductIds([...selectedProductIds, p.id]);
+                          }
+                        }}
+                      />
+                    </td>
+                    <td style={{ textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
+                      <button
+                        type="button"
+                        className={`favorite-star-btn ${p.isFavorite ? 'active' : ''}`}
+                        onClick={(e) => handleToggleFavorite(p.id, e)}
+                        title="Đánh dấu yêu thích"
+                      >
+                        {p.isFavorite ? '★' : '☆'}
+                      </button>
+                    </td>
+                    <td style={{ minWidth: 180, width: 220 }}>
+                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
+                        {p.imageUrl ? (
+                          <img
+                            src={p.imageUrl}
+                            alt=""
+                            style={{ width: 28, height: 28, borderRadius: 4, objectFit: 'cover', border: '1px solid #e2e8f0', flexShrink: 0 }}
+                          />
                         ) : (
-                          <span style={{ fontWeight: 600, color: '#0F766E' }}>
-                            {p.baseUnit || 'Cái'}
-                          </span>
+                          <div
+                            style={{
+                              width: 28,
+                              height: 28,
+                              borderRadius: 6,
+                              border: '1px dashed #cbd5e1',
+                              backgroundColor: '#f8fafc',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: 10,
+                              color: '#94a3b8',
+                              flexShrink: 0,
+                            }}
+                          >
+                            N/A
+                          </div>
                         )}
-                      </td>
-                      <td style={{ textAlign: 'right', fontWeight: 600 }}>
-                        {(displayPrice ?? 0).toLocaleString('vi-VN')} đ
-                      </td>
-                      {userRole === 'StoreOwner' && (
-                        <td style={{ textAlign: 'right', color: '#64748b' }}>
-                          {p.costPrice != null ? `${Number(p.costPrice).toLocaleString('vi-VN')} đ` : '—'}
-                        </td>
-                      )}
-                      <td style={{ textAlign: 'center' }}>
-                        <span
-                          style={{
-                            fontSize: 11.5,
-                            fontWeight: 700,
-                            padding: '2px 8px',
-                            borderRadius: 9999,
-                            backgroundColor: p.status === 'Active' ? '#CCFBF1' : '#FEE2E2',
-                            color: p.status === 'Active' ? '#0F766E' : '#DC2626',
-                          }}
-                        >
-                          {p.status === 'Active' ? 'Đang bán' : 'Ngừng kinh doanh'}
+                        <span className="product-code-link">
+                          {displayCode}
                         </span>
-                      </td>
-                      <td style={{ fontSize: 12.5, color: '#64748b' }}>{p.createdAt}</td>
-                    </tr>
-                  );
-                })}
-
-                {filteredProducts.length === 0 && (
-                  <tr>
-                    <td
-                      colSpan={userRole === 'StoreOwner' ? 9 : 8}
-                      style={{ padding: '40px 20px', textAlign: 'center', color: '#94a3b8' }}
-                    >
-                      <Package size={40} style={{ margin: '0 auto 10px auto', opacity: 0.5 }} />
-                      <div style={{ fontSize: 15, fontWeight: 600 }}>Không tìm thấy sản phẩm nào</div>
-                      <div style={{ fontSize: 13, marginTop: 4 }}>
-                        Vui lòng thử tìm với từ khóa khác hoặc đặt lại bộ lọc.
                       </div>
                     </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+                    {/* Tên hàng hóa */}
+                    <td>
+                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                        <span style={{ fontWeight: 600, color: '#1e293b' }}>
+                          {p.productName}
+                        </span>
+                        {p.hasBatches && (
+                          <span
+                            style={{
+                              fontSize: 11,
+                              fontWeight: 600,
+                              color: '#1d4ed8',
+                              background: '#eff6ff',
+                              border: '1px solid #bfdbfe',
+                              padding: '2px 6px',
+                              borderRadius: 4,
+                            }}
+                          >
+                            Lô & HSD
+                          </span>
+                        )}
+                        {p.isCombo && <span className="badge-combo">Combo</span>}
+                        {p.status === 'Discontinued' && (
+                          <span
+                            style={{
+                              marginLeft: 6,
+                              fontSize: 11,
+                              color: '#dc2626',
+                              background: '#fee2e2',
+                              padding: '2px 6px',
+                              borderRadius: 4,
+                            }}
+                          >
+                            Ngừng kinh doanh
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    {/* Đơn vị tính (chứa option chuyển đổi ĐVT) */}
+                    <td>
+                      {p.uomConversions && p.uomConversions.length > 0 ? (
+                        <div className="unit-dropdown-container" style={{ position: 'relative', display: 'inline-block' }}>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (activeUnitDropdownId === p.id) {
+                                setActiveUnitDropdownId(null);
+                                setUnitDropdownPos(null);
+                              } else {
+                                const rect = e.currentTarget.getBoundingClientRect();
+                                const estimatedMenuHeight = Math.max(allUnits.length * 34 + 12, 90);
+                                const isLastRows =
+                                  filteredProducts.length > 1 && rowIndex >= filteredProducts.length - 2;
+                                const openUpward =
+                                  (isLastRows || window.innerHeight - rect.bottom < estimatedMenuHeight + 24) &&
+                                  rect.top > estimatedMenuHeight;
+                                setUnitDropdownPos(
+                                  openUpward
+                                    ? { bottom: window.innerHeight - rect.top + 4, left: rect.left }
+                                    : { top: rect.bottom + 4, left: rect.left }
+                                );
+                                setActiveUnitDropdownId(p.id);
+                              }
+                            }}
+                            style={{
+                              background: '#F0FDFA',
+                              border: '1px solid #CCFBF1',
+                              color: '#0F766E',
+                              fontWeight: 700,
+                              fontSize: 13,
+                              cursor: 'pointer',
+                              padding: '3px 8px',
+                              borderRadius: 6,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 4,
+                              transition: 'all 0.15s ease',
+                            }}
+                            title="Bấm để chuyển đổi đơn vị tính"
+                          >
+                            <span>{currentUnitName}</span>
+                            <ChevronDown
+                              size={13}
+                              style={{
+                                transform: activeUnitDropdownId === p.id ? 'rotate(180deg)' : 'none',
+                                transition: 'transform 0.15s ease',
+                              }}
+                            />
+                          </button>
 
-          {/* Enterprise Standard TablePagination */}
-          <TablePagination
-            currentPage={pageIndex}
-            pageSize={pageSize}
-            totalItems={totalCount}
-            pageSizeOptions={[10, 20, 50]}
-            onPageChange={(page) => setPageIndex(page)}
-            onPageSizeChange={(newSize) => {
-              setPageSize(newSize);
-              setPageIndex(1);
-            }}
-            itemLabel="hàng hóa"
-            isLoading={isLoading}
-          />
+                          {activeUnitDropdownId === p.id && otherUnits.length > 0 && unitDropdownPos && (
+                            <div
+                              onClick={(e) => e.stopPropagation()}
+                              style={{
+                                position: 'fixed',
+                                top: unitDropdownPos.top,
+                                bottom: unitDropdownPos.bottom,
+                                left: unitDropdownPos.left,
+                                zIndex: 9999,
+                                minWidth: 110,
+                                background: '#ffffff',
+                                borderRadius: 8,
+                                boxShadow: '0 10px 25px -5px rgba(15, 23, 42, 0.18), 0 8px 10px -6px rgba(15, 23, 42, 0.1)',
+                                border: '1px solid #E2E8F0',
+                                padding: '4px 0',
+                              }}
+                            >
+                              {allUnits.map((u) => {
+                                const isSelected = u.unitName === currentUnitName;
+                                return (
+                                  <button
+                                    key={u.unitName}
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setSelectedUnits((prev) => ({ ...prev, [p.id]: u.unitName }));
+                                      setActiveUnitDropdownId(null);
+                                    }}
+                                    style={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'space-between',
+                                      width: '100%',
+                                      padding: '6px 12px',
+                                      fontSize: 12.5,
+                                      background: isSelected ? '#F0FDFA' : 'transparent',
+                                      color: isSelected ? '#0F766E' : '#334155',
+                                      fontWeight: isSelected ? 700 : 500,
+                                      border: 'none',
+                                      cursor: 'pointer',
+                                      whiteSpace: 'nowrap',
+                                      textAlign: 'left',
+                                      gap: 8,
+                                    }}
+                                    onMouseEnter={(e) => {
+                                      if (!isSelected) (e.currentTarget as HTMLElement).style.background = '#f8fafc';
+                                    }}
+                                    onMouseLeave={(e) => {
+                                      if (!isSelected) (e.currentTarget as HTMLElement).style.background = 'transparent';
+                                    }}
+                                  >
+                                    <span>{u.unitName}</span>
+                                    {u.unitName === (p.baseUnit || 'Cái') ? (
+                                      <span style={{ fontSize: 10, color: '#0F766E', background: '#CCFBF1', padding: '1px 4px', borderRadius: 4 }}>
+                                        Cơ bản
+                                      </span>
+                                    ) : null}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <span style={{ fontWeight: 600, color: '#0F766E' }}>
+                          {p.baseUnit || 'Cái'}
+                        </span>
+                      )}
+                    </td>
+                    <td style={{ textAlign: 'right', fontWeight: 600 }}>
+                      {(displayPrice ?? 0).toLocaleString('vi-VN')} đ
+                    </td>
+                    {userRole === 'StoreOwner' && (
+                      <td style={{ textAlign: 'right', color: '#64748b' }}>
+                        {p.costPrice != null ? `${Number(p.costPrice).toLocaleString('vi-VN')} đ` : '—'}
+                      </td>
+                    )}
+                    <td style={{ textAlign: 'center' }}>
+                      <span
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: 11.5,
+                          fontWeight: 600,
+                          padding: '3px 10px',
+                          borderRadius: 9999,
+                          backgroundColor: p.status === 'Active' ? '#f0fdf4' : '#f8fafc',
+                          color: p.status === 'Active' ? '#15803d' : '#64748b',
+                          border: p.status === 'Active' ? '1px solid #bbf7d0' : '1px solid #e2e8f0',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {p.status === 'Active' ? 'Đang bán' : 'Ngừng kinh doanh'}
+                      </span>
+                    </td>
+                    <td style={{ fontSize: 12.5, color: '#64748b' }}>{p.createdAt}</td>
+                  </tr>
+                );
+              })}
+
+              {filteredProducts.length === 0 && (
+                <tr>
+                  <td
+                    colSpan={userRole === 'StoreOwner' ? 9 : 8}
+                    style={{ padding: '40px 20px', textAlign: 'center', color: '#94a3b8' }}
+                  >
+                    <Package size={40} style={{ margin: '0 auto 10px auto', opacity: 0.5 }} />
+                    <div style={{ fontSize: 15, fontWeight: 600 }}>Không tìm thấy sản phẩm nào</div>
+                    <div style={{ fontSize: 13, marginTop: 4 }}>
+                      Vui lòng thử tìm với từ khóa khác hoặc đặt lại bộ lọc.
+                    </div>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
+
+        {/* Enterprise Standard TablePagination */}
+        <TablePagination
+          currentPage={pageIndex}
+          pageSize={pageSize}
+          totalItems={totalCount}
+          pageSizeOptions={[10, 20, 50]}
+          onPageChange={(page) => setPageIndex(page)}
+          onPageSizeChange={(newSize) => {
+            setPageSize(newSize);
+            setPageIndex(1);
+          }}
+          itemLabel="hàng hóa"
+          isLoading={isLoading}
+        />
+      </div>
 
       {/* 3. Product Form Modal (Add / Edit Standard Product) */}
       <ProductFormModal
@@ -1703,6 +1872,7 @@ export const ProductListPage: React.FC = () => {
         }}
         onDelete={handleDeleteProduct}
         onToggleStatus={handleToggleStatus}
+        onToggleHasBatches={handleToggleHasBatches}
         onDuplicate={handleDuplicateProduct}
         userRole={userRole}
       />
@@ -1734,6 +1904,18 @@ export const ProductListPage: React.FC = () => {
         onSave={handleSaveCategory}
         onDelete={handleDeleteCategory}
       />
+
+      {/* 8. Notification Modal (Success / Alert popup) */}
+      {notificationModal && (
+        <NotificationModal
+          isOpen={notificationModal.isOpen}
+          onClose={() => setNotificationModal(null)}
+          type={notificationModal.type}
+          title={notificationModal.title}
+          message={notificationModal.message}
+          itemCode={notificationModal.itemCode}
+        />
+      )}
     </div>
   );
 };

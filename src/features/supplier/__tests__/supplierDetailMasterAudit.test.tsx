@@ -18,7 +18,6 @@ const baseSupplier: SupplierSummary = {
   code: 'SUP-20261101-0001',
   name: 'Công ty Cổ phần Nông sản Long Nhật',
   supplierType: 'Goods',
-  category: 'FRESH',
   contactPerson: 'Nguyễn Minh Đức',
   phone: '0986312587',
   email: 'longnhat@mtgrms.vn',
@@ -41,10 +40,9 @@ const baseSupplier: SupplierSummary = {
 
 // Fixture: Delivery Config
 const baseDeliveryConfig: SupplierDeliveryConfig = {
-  leadTimeDays: 2,
-  leadTimeUnit: 'BUSINESS_DAYS',
   minOrderQuantity: 10,
   activeDeliveryDays: [1, 2, 3, 4, 5],
+  cutoffDayOffset: 1,
   cutoffTime: '17:00',
   allowStoreEdit: true,
   editWindowType: 'BEFORE_CUTOFF',
@@ -292,8 +290,8 @@ describe('MASTER AUDIT SUITE – Supplier Detail Management', () => {
         />
       );
 
-      const inactiveOption = screen.getByTestId('radio-status-inactive');
-      fireEvent.click(inactiveOption);
+      const statusSwitch = screen.queryByTestId('radio-status-inactive') || screen.getByRole('switch');
+      fireEvent.click(statusSwitch);
 
       const submitBtn = screen.getByTestId('btn-save-general-info');
       fireEvent.click(submitBtn);

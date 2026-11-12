@@ -2,7 +2,8 @@ import { useState, useMemo, useRef, useEffect } from 'react';
 import type { FC } from 'react';
 import type { SupplierProductItem, SupplierSummary } from '../../types/supplier.types';
 import { SupplierProductTableRow } from './SupplierProductTableRow';
-import { ArrowUpDown, ChevronLeft, ChevronRight, Package, Plus } from 'lucide-react';
+import { TablePagination } from '../../../../components/common';
+import { ArrowUpDown, Package, Plus } from 'lucide-react';
 
 interface SupplierProductTableProps {
   products: SupplierProductItem[];
@@ -24,6 +25,7 @@ type SortField =
   | 'supplierCode'
   | 'agreedPrice'
   | 'moq'
+  | 'allowedShortageQty'
   | 'status';
 type SortDirection = 'asc' | 'desc';
 
@@ -94,6 +96,10 @@ export const SupplierProductTable: FC<SupplierProductTableProps> = ({
           valA = a.moq;
           valB = b.moq;
           break;
+        case 'allowedShortageQty':
+          valA = a.allowedShortageQty ?? 0;
+          valB = b.allowedShortageQty ?? 0;
+          break;
         case 'status':
           valA = a.status;
           valB = b.status;
@@ -105,10 +111,6 @@ export const SupplierProductTable: FC<SupplierProductTableProps> = ({
       return 0;
     });
   }, [products, sortField, sortDir, supplierMap]);
-
-  const totalPages = Math.ceil(totalCount / pageSize) || 1;
-  const startItem = totalCount === 0 ? 0 : (pageIndex - 1) * pageSize + 1;
-  const endItem = Math.min(pageIndex * pageSize, totalCount);
 
   const headerRef = useRef<HTMLDivElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
@@ -147,16 +149,18 @@ export const SupplierProductTable: FC<SupplierProductTableProps> = ({
   const tableColGroup = (
     <colgroup>
       <col style={{ width: '3%' }} />
-      <col style={{ width: '10%' }} />
-      <col style={{ width: '22%' }} />
-      <col style={{ width: '10%' }} />
-      <col style={{ width: '16%' }} />
-      <col style={{ width: '8%' }} />
       <col style={{ width: '5%' }} />
       <col style={{ width: '9%' }} />
-      <col style={{ width: '6%' }} />
+      <col style={{ width: '18%' }} />
       <col style={{ width: '8%' }} />
-      <col style={{ width: '10%' }} />
+      <col style={{ width: '14%' }} />
+      <col style={{ width: '8%' }} />
+      <col style={{ width: '5%' }} />
+      <col style={{ width: '8%' }} />
+      <col style={{ width: '6%' }} />
+      <col style={{ width: '7%' }} />
+      <col style={{ width: '7%' }} />
+      <col style={{ width: '8%' }} />
     </colgroup>
   );
 
@@ -184,6 +188,10 @@ export const SupplierProductTable: FC<SupplierProductTableProps> = ({
           <thead>
             <tr>
               <th style={{ ...thBaseStyle, textAlign: 'center' }}>#</th>
+
+              <th style={{ ...thBaseStyle, textAlign: 'center' }}>
+                <span>Ảnh</span>
+              </th>
 
               <th
                 onClick={() => handleSort('sku')}
@@ -244,6 +252,19 @@ export const SupplierProductTable: FC<SupplierProductTableProps> = ({
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4 }}>
                   <span>MOQ</span>
                   <ArrowUpDown size={12} color={sortField === 'moq' ? '#0f766e' : '#94a3b8'} />
+                </div>
+              </th>
+
+              <th
+                onClick={() => handleSort('allowedShortageQty')}
+                style={{ ...thBaseStyle, textAlign: 'right', cursor: 'pointer', userSelect: 'none' }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4 }}>
+                  <span>Thiếu cho phép</span>
+                  <ArrowUpDown
+                    size={12}
+                    color={sortField === 'allowedShortageQty' ? '#0f766e' : '#94a3b8'}
+                  />
                 </div>
               </th>
 
@@ -327,56 +348,16 @@ export const SupplierProductTable: FC<SupplierProductTableProps> = ({
         </table>
       </div>
 
-      {/* ── Footer Phân trang (Paging) tích hợp chuẩn theo SupplierTable ── */}
-      <div className="so-list-pager">
-        {/* Bên trái: Thông tin số lượng & Chọn số bản ghi / trang */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
-          <div>
-            Hiển thị <b>{startItem}</b> - <b>{endItem}</b> trên <b>{totalCount}</b> mặt hàng
-          </div>
-
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ color: '#64748b' }}>Bản ghi/trang:</span>
-            <select
-              className="so-list-pager-select"
-              value={pageSize}
-              onChange={(e) => onPageSizeChange(Number(e.target.value))}
-            >
-              <option value={20}>20</option>
-              <option value={24}>24</option>
-              <option value={36}>36</option>
-              <option value={48}>48</option>
-            </select>
-          </div>
-        </div>
-
-        {/* Bên phải: Nút Trước / Trang x / y / Sau */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <button
-            type="button"
-            className="so-list-pager-btn"
-            disabled={pageIndex <= 1}
-            onClick={() => onPageChange(pageIndex - 1)}
-          >
-            <ChevronLeft size={13} />
-            <span>Trước</span>
-          </button>
-
-          <span style={{ padding: '0 8px', fontWeight: 600, color: '#0f172a' }}>
-            Trang {pageIndex} / {totalPages}
-          </span>
-
-          <button
-            type="button"
-            className="so-list-pager-btn"
-            disabled={pageIndex >= totalPages}
-            onClick={() => onPageChange(pageIndex + 1)}
-          >
-            <span>Sau</span>
-            <ChevronRight size={13} />
-          </button>
-        </div>
-      </div>
+      {/* ── Footer Phân trang chuẩn 1, 2, 3... ── */}
+      <TablePagination
+        currentPage={pageIndex}
+        pageSize={pageSize}
+        totalItems={totalCount}
+        pageSizeOptions={[15, 20, 36, 48]}
+        onPageChange={onPageChange}
+        onPageSizeChange={onPageSizeChange}
+        itemLabel="mặt hàng"
+      />
     </div>
   );
 };

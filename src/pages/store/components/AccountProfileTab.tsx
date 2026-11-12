@@ -1,5 +1,5 @@
 // src/pages/store/components/AccountProfileTab.tsx
-import { useState, type FC } from 'react';
+import { useEffect, useState, type FC } from 'react';
 import {
   KeyRound,
   ShieldCheck,
@@ -12,6 +12,8 @@ import {
 import type { UserProfile, UserSessionItem } from '../storeData';
 import { EditProfileModal } from './EditProfileModal';
 import { ChangePasswordModal } from './ChangePasswordModal';
+import { authService } from '../../../features/auth/authService';
+import { TwoFactorVerificationModal } from './TwoFactorVerificationModal';
 
 interface AccountProfileTabProps {
   userProfile: UserProfile;
@@ -29,20 +31,45 @@ export const AccountProfileTab: FC<AccountProfileTabProps> = ({
   const [showEditModal, setShowEditModal] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [isTwoFactorLoading, setIsTwoFactorLoading] = useState(false);
+  const [twoFactorChange, setTwoFactorChange] = useState<boolean | null>(null);
+  const [twoFactorChallenge, setTwoFactorChallenge] = useState('');
+
+  useEffect(() => {
+    authService.getTwoFactorStatus()
+      .then((status) => onUpdateProfile({ isTwoFactorEnabled: status.enabled }))
+      .catch(() => undefined);
+    // Initial API synchronization only; parent callback is recreated after profile updates.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3000);
   };
 
-  const handleToggle2FA = () => {
-    const newVal = !userProfile.isTwoFactorEnabled;
-    onUpdateProfile({ isTwoFactorEnabled: newVal });
-    showToast(
-      newVal
-        ? 'Đã bật xác thực 2 lớp (2FA). Mã OTP sẽ được yêu cầu khi đăng nhập trên thiết bị lạ.'
-        : 'Đã tắt xác thực 2 lớp (2FA).'
-    );
+  const handleToggle2FA = () => setTwoFactorChange(!userProfile.isTwoFactorEnabled);
+
+  const requestTwoFactorChallenge = async (currentPassword: string) => {
+    const newVal = twoFactorChange;
+    if (newVal === null) throw new Error('Không xác định được trạng thái 2FA.');
+    try {
+      setIsTwoFactorLoading(true);
+      const challenge = await authService.requestTwoFactorChallenge(newVal, currentPassword);
+      setTwoFactorChallenge(challenge.challengeToken);
+      return challenge.maskedEmail;
+    } finally { setIsTwoFactorLoading(false); }
+  };
+
+  const confirmTwoFactorChallenge = async (otpCode: string) => {
+    try {
+      setIsTwoFactorLoading(true);
+      const status = await authService.confirmTwoFactorChallenge(twoFactorChallenge, otpCode);
+      onUpdateProfile({ isTwoFactorEnabled: status.enabled });
+      showToast(status.enabled ? 'Đã bật xác thực 2 lớp qua Email OTP.' : 'Đã tắt xác thực 2 lớp.');
+    } finally {
+      setIsTwoFactorLoading(false);
+    }
   };
 
   return (
@@ -71,6 +98,12 @@ export const AccountProfileTab: FC<AccountProfileTabProps> = ({
           <span>{toastMessage}</span>
         </div>
       )}
+      {twoFactorChange !== null && <TwoFactorVerificationModal
+        enable={twoFactorChange}
+        onClose={() => { setTwoFactorChange(null); setTwoFactorChallenge(''); }}
+        onRequest={requestTwoFactorChallenge}
+        onConfirm={confirmTwoFactorChallenge}
+      />}
 
       {/* Screen Title */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -254,7 +287,7 @@ export const AccountProfileTab: FC<AccountProfileTabProps> = ({
               <div className="security-row-title">
                 <span>Xác thực 2 lớp cho tài khoản của bạn</span>
                 <span
-                  title="Khi kích hoạt, mỗi lần đăng nhập từ trình duyệt hoặc thiết bị lạ sẽ yêu cầu nhập mã OTP bảo mật gửi về số điện thoại."
+                  title="Khi kích hoạt, mỗi lần đăng nhập sẽ yêu cầu mã OTP bảo mật gửi về Email của bạn."
                   style={{
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -273,7 +306,7 @@ export const AccountProfileTab: FC<AccountProfileTabProps> = ({
                 </span>
               </div>
               <div className="security-row-desc">
-                Yêu cầu mã xác thực khi bạn đăng nhập trên thiết bị lạ.
+                Yêu cầu mã xác thực Email OTP khi bạn đăng nhập.
               </div>
             </div>
           </div>
@@ -284,6 +317,7 @@ export const AccountProfileTab: FC<AccountProfileTabProps> = ({
             role="switch"
             aria-checked={userProfile.isTwoFactorEnabled}
             onClick={handleToggle2FA}
+            disabled={isTwoFactorLoading}
             style={{
               width: 48,
               height: 26,

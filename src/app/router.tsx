@@ -4,6 +4,7 @@ import { WebStoreLayout } from '../layouts/WebStoreLayout';
 import { AuthLayout } from '../layouts/AuthLayout';
 import { HomePage } from '../pages/HomePage';
 import { StoreOwnerLayout } from '../layouts/StoreOwnerLayout';
+import { EmployeeLayout } from '../layouts/EmployeeLayout';
 import { AdminLayout } from '../layouts/AdminLayout';
 import { AdminDashboardPage } from '../pages/admin/AdminDashboardPage';
 import { StoreOwnerDashboardPage } from '../features/store-owner-dashboard/pages/StoreOwnerDashboardPage';
@@ -22,6 +23,7 @@ import {
   BranchOrderListPage,
   EmployeeOrderMatrixPage,
   SupplierOrderDispatchHubPage,
+  SupplierDispatchDetailPage,
   StoreOwnerPurchaseOrderListPage,
 } from '../features/purchase-order';
 
@@ -29,7 +31,6 @@ import {
 import {
   GoodsReceiptListPage,
   GoodsReceiptFormPage,
-  GoodsReceiptDetailPage,
 } from '../features/goods-receipt';
 
 // 2c. Batch & Expiry Feature (FE-02 / UI-02-01)
@@ -45,6 +46,13 @@ import {
   SupplierReturnDetailPage,
 } from '../features/supplier-return';
 
+// 2f. Stocktake Feature (Phiếu kiểm kê hàng hóa)
+import {
+  StocktakeListPage,
+  StocktakeFormPage,
+  StocktakeDetailPage,
+} from '../features/stocktake';
+
 // 3. Service Expenses Feature (FE-07)
 import { ServiceExpensesPage } from '../features/service-expenses/pages/ServiceExpensesPage';
 
@@ -52,7 +60,7 @@ import { ServiceExpensesPage } from '../features/service-expenses/pages/ServiceE
 import { CustomerManagementPage } from '../features/customer-crm';
 
 // 5. Product Management Feature (FE-01)
-import { ProductListPage, StoreProductManagementPage } from '../features/product';
+import { ProductListPage, CategoryListPage, StoreProductManagementPage } from '../features/product';
 
 // 6. Transfer Feature (FE-15)
 import {
@@ -66,8 +74,10 @@ import {
 import {
   EmployeeListPage,
   WorkSchedulePage,
+  ShiftConfigPage,
   AttendancePage,
   PayslipManagementPage,
+  ApprovalRequestsPage,
 } from '../features/employee';
 
 // 8. Promotions Feature
@@ -101,6 +111,9 @@ import { TaxSnapshotPage } from '../features/tax-snapshot';
 import { FinanceOverviewPage } from '../features/finance/pages/FinanceOverviewPage';
 import { StoreSettingsHubPage } from '../pages/store/StoreSettingsHubPage';
 import { AccountManagementPage } from '../pages/store/AccountManagementPage';
+import { ProtectedRoute } from '../components/auth/ProtectedRoute';
+import { StorePaymentConfigPage } from '../features/pos/pages/StorePaymentConfigPage';
+import { StorePosCashControlPage } from '../features/pos/pages/StorePosCashControlPage';
 
 export const router = createBrowserRouter([
   {
@@ -287,6 +300,10 @@ export const router = createBrowserRouter([
         element: <ProductListPage />,
       },
       {
+        path: 'categories',
+        element: <CategoryListPage />,
+      },
+      {
         path: 'transfers',
         element: <TransferListPage />,
       },
@@ -317,6 +334,14 @@ export const router = createBrowserRouter([
       {
         path: 'settings/*',
         element: <StoreSettingsHubPage />,
+      },
+      {
+        path: 'payment-config',
+        element: <StorePaymentConfigPage />,
+      },
+      {
+        path: 'pos-cash-control',
+        element: <StorePosCashControlPage />,
       },
       {
         path: 'account',
@@ -380,11 +405,15 @@ export const router = createBrowserRouter([
       },
       {
         path: 'purchase-orders/employee-matrix',
-        element: <OrderMatrixPage forcedRole="EMPLOYEE" />,
+        element: <OrderMatrixPage forcedRole="STAFF" />,
       },
       {
         path: 'purchase-orders/dispatch-hub',
         element: <SupplierOrderDispatchHubPage />,
+      },
+      {
+        path: 'purchase-orders/dispatch-hub/:supplierId',
+        element: <SupplierDispatchDetailPage />,
       },
       {
         path: 'purchase-orders/cutoff-hub',
@@ -408,11 +437,11 @@ export const router = createBrowserRouter([
       },
       {
         path: 'goods-receipts/:id',
-        element: <GoodsReceiptDetailPage defaultRole="store_owner" />,
+        element: <GoodsReceiptFormPage defaultRole="store_owner" />,
       },
       {
         path: 'goods-receipts/:id/confirm',
-        element: <GoodsReceiptDetailPage defaultRole="store_owner" />,
+        element: <GoodsReceiptFormPage defaultRole="store_owner" />,
       },
       {
         path: 'purchase-orders/receipts',
@@ -443,6 +472,22 @@ export const router = createBrowserRouter([
         element: <BatchListPage defaultRole="store_owner" />,
       },
       {
+        path: 'stocktakes',
+        element: <StocktakeListPage defaultRole="store_owner" />,
+      },
+      {
+        path: 'stocktakes/create',
+        element: <StocktakeFormPage defaultRole="store_owner" />,
+      },
+      {
+        path: 'stocktakes/:id',
+        element: <StocktakeDetailPage defaultRole="store_owner" />,
+      },
+      {
+        path: 'stocktakes/:id/edit',
+        element: <StocktakeFormPage defaultRole="store_owner" />,
+      },
+      {
         path: 'expenses',
         element: <ServiceExpensesPage />,
       },
@@ -452,39 +497,91 @@ export const router = createBrowserRouter([
       },
       {
         path: 'reports/pnl',
-        element: <ReportsPnlDashboardPage />,
+        element: (
+          <ProtectedRoute allowedRoles={['STORE_OWNER', 'ADMIN', 'StoreOwner', 'Admin']}>
+            <ReportsPnlDashboardPage />
+          </ProtectedRoute>
+        ),
       },
-        {
-          path: 'finance',
-          element: <FinanceOverviewPage />,
-        },
-        {
-          path: 'finance/*',
-          element: <Navigate to="/store-owner/finance" replace />,
-        },
+      {
+        path: 'pnl',
+        element: <Navigate to="/store-owner/reports/pnl" replace />,
+      },
+      {
+        path: 'finance',
+        element: (
+          <ProtectedRoute allowedRoles={['STORE_OWNER', 'ADMIN', 'StoreOwner', 'Admin']}>
+            <FinanceOverviewPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'finance/*',
+        element: <Navigate to="/store-owner/finance" replace />,
+      },
       {
         path: 'cashbook',
-        element: <CashbookPage />,
+        element: (
+          <ProtectedRoute allowedRoles={['STORE_OWNER', 'ADMIN', 'StoreOwner', 'Admin']}>
+            <CashbookPage />
+          </ProtectedRoute>
+        ),
       },
       {
         path: 'tax-snapshots',
-        element: <TaxSnapshotPage />,
+        element: (
+          <ProtectedRoute allowedRoles={['STORE_OWNER', 'ADMIN', 'StoreOwner', 'Admin']}>
+            <TaxSnapshotPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'tax',
+        element: <Navigate to="/store-owner/tax-snapshots" replace />,
+      },
+      {
+        path: 'accounting-books',
+        element: <Navigate to="/store-owner/tax-snapshots" replace />,
       },
       {
         path: 'employees',
-        element: <EmployeeListPage />,
+        element: (
+          <ProtectedRoute allowedRoles={['STORE_OWNER', 'ADMIN', 'StoreOwner', 'Admin']}>
+            <EmployeeListPage />
+          </ProtectedRoute>
+        ),
       },
       {
         path: 'employees/schedule',
-        element: <WorkSchedulePage />,
+        element: (
+          <ProtectedRoute allowedRoles={['STORE_OWNER', 'ADMIN', 'StoreOwner', 'Admin']}>
+            <WorkSchedulePage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'employees/shifts',
+        element: <ShiftConfigPage />,
       },
       {
         path: 'employees/attendance',
-        element: <AttendancePage />,
+        element: (
+          <ProtectedRoute allowedRoles={['STORE_OWNER', 'ADMIN', 'StoreOwner', 'Admin']}>
+            <AttendancePage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'employees/approval-requests',
+        element: <ApprovalRequestsPage />,
       },
       {
         path: 'employees/payroll',
-        element: <PayslipManagementPage />,
+        element: (
+          <ProtectedRoute allowedRoles={['STORE_OWNER', 'ADMIN', 'StoreOwner', 'Admin']}>
+            <PayslipManagementPage />
+          </ProtectedRoute>
+        ),
       },
       {
         path: 'promotions',
@@ -510,6 +607,18 @@ export const router = createBrowserRouter([
         path: 'invoices',
         element: <InvoiceManagementPage />,
       },
+          {
+            path: 'payment-config',
+            element: <StorePaymentConfigPage />,
+          },
+          {
+            path: 'pos-cash-control',
+            element: <StorePosCashControlPage />,
+          },
+          {
+            path: 'shifts',
+            element: <PosShiftPage />,
+          },
     ],
   },
 
@@ -525,6 +634,10 @@ export const router = createBrowserRouter([
       {
         path: 'products',
         element: <ProductListPage />,
+      },
+      {
+        path: 'categories',
+        element: <CategoryListPage />,
       },
       {
         path: 'transfers',
@@ -599,8 +712,16 @@ export const router = createBrowserRouter([
         element: <WorkSchedulePage />,
       },
       {
+        path: 'employees/shifts',
+        element: <ShiftConfigPage />,
+      },
+      {
         path: 'employees/attendance',
         element: <AttendancePage />,
+      },
+      {
+        path: 'employees/approval-requests',
+        element: <ApprovalRequestsPage />,
       },
       {
         path: 'employees/payroll',
@@ -647,6 +768,20 @@ export const router = createBrowserRouter([
         index: true,
         element: <ProductListPage />,
       },
+      {
+        path: 'categories',
+        element: <CategoryListPage />,
+      },
+    ],
+  },
+  {
+    path: '/categories',
+    element: <StoreOwnerLayout />,
+    children: [
+      {
+        index: true,
+        element: <CategoryListPage />,
+      },
     ],
   },
 
@@ -688,12 +823,72 @@ export const router = createBrowserRouter([
         element: <WorkSchedulePage />,
       },
       {
+        path: 'shifts',
+        element: <ShiftConfigPage />,
+      },
+      {
         path: 'attendance',
         element: <AttendancePage />,
       },
       {
         path: 'payroll',
         element: <PayslipManagementPage />,
+      },
+      {
+        path: 'stocktakes',
+        element: <StocktakeListPage defaultRole="employee" />,
+      },
+      {
+        path: 'stocktakes/create',
+        element: <StocktakeFormPage defaultRole="employee" />,
+      },
+      {
+        path: 'stocktakes/:id',
+        element: <StocktakeDetailPage defaultRole="employee" />,
+      },
+      {
+        path: 'stocktakes/:id/edit',
+        element: <StocktakeFormPage defaultRole="employee" />,
+      },
+    ],
+  },
+
+  // ─── EMPLOYEE PORTAL (/employee) ───
+  {
+    path: '/employee',
+    element: <EmployeeLayout />,
+    children: [
+      {
+        index: true,
+        element: <Navigate to="/employee/schedule" replace />,
+      },
+      {
+        path: 'schedule',
+        element: <WorkSchedulePage />,
+      },
+      {
+        path: 'attendance',
+        element: <AttendancePage />,
+      },
+      {
+        path: 'payroll',
+        element: <PayslipManagementPage />,
+      },
+      {
+        path: 'stocktakes',
+        element: <StocktakeListPage defaultRole="employee" />,
+      },
+      {
+        path: 'stocktakes/create',
+        element: <StocktakeFormPage defaultRole="employee" />,
+      },
+      {
+        path: 'stocktakes/:id',
+        element: <StocktakeDetailPage defaultRole="employee" />,
+      },
+      {
+        path: 'stocktakes/:id/edit',
+        element: <StocktakeFormPage defaultRole="employee" />,
       },
     ],
   },
@@ -760,6 +955,18 @@ export const router = createBrowserRouter([
   {
     path: '/tax-snapshots/*',
     element: <Navigate to="/store-owner/tax-snapshots" replace />,
+  },
+  {
+    path: '/tax',
+    element: <Navigate to="/store-owner/tax-snapshots" replace />,
+  },
+  {
+    path: '/accounting-books',
+    element: <Navigate to="/store-owner/tax-snapshots" replace />,
+  },
+  {
+    path: '/pnl',
+    element: <Navigate to="/store-owner/reports/pnl" replace />,
   },
 
   // Cashbook Shortcut (FE-17)
@@ -884,7 +1091,7 @@ export const router = createBrowserRouter([
           },
           {
             path: 'create-matrix',
-            element: <OrderMatrixPage forcedRole="EMPLOYEE" />,
+            element: <OrderMatrixPage forcedRole="STAFF" />,
           },
         ],
       },
@@ -893,7 +1100,7 @@ export const router = createBrowserRouter([
         children: [
           {
             path: 'purchase-orders/create-matrix',
-            element: <OrderMatrixPage forcedRole="EMPLOYEE" />,
+            element: <OrderMatrixPage forcedRole="STAFF" />,
           },
         ],
       },
@@ -976,11 +1183,11 @@ export const router = createBrowserRouter([
       },
       {
         path: 'goods-receipts/:id',
-        element: <GoodsReceiptDetailPage defaultRole="employee" />,
+        element: <GoodsReceiptFormPage defaultRole="employee" />,
       },
       {
         path: 'goods-receipts/:id/confirm',
-        element: <GoodsReceiptDetailPage defaultRole="employee" />,
+        element: <GoodsReceiptFormPage defaultRole="employee" />,
       },
     ],
   },
@@ -1004,11 +1211,11 @@ export const router = createBrowserRouter([
       },
       {
         path: ':id',
-        element: <GoodsReceiptDetailPage defaultRole="store_owner" />,
+        element: <GoodsReceiptFormPage defaultRole="store_owner" />,
       },
       {
         path: ':id/confirm',
-        element: <GoodsReceiptDetailPage defaultRole="store_owner" />,
+        element: <GoodsReceiptFormPage defaultRole="store_owner" />,
       },
     ],
   },
@@ -1030,11 +1237,11 @@ export const router = createBrowserRouter([
       },
       {
         path: ':id',
-        element: <GoodsReceiptDetailPage defaultRole="employee" />,
+        element: <GoodsReceiptFormPage defaultRole="employee" />,
       },
       {
         path: ':id/confirm',
-        element: <GoodsReceiptDetailPage defaultRole="employee" />,
+        element: <GoodsReceiptFormPage defaultRole="employee" />,
       },
     ],
   },
@@ -1067,6 +1274,28 @@ export const router = createBrowserRouter([
       {
         index: true,
         element: <BatchListPage defaultRole="employee" />,
+      },
+    ],
+  },
+  {
+    path: '/stocktakes',
+    element: <StoreOwnerLayout />,
+    children: [
+      {
+        index: true,
+        element: <StocktakeListPage defaultRole="store_owner" />,
+      },
+      {
+        path: 'create',
+        element: <StocktakeFormPage defaultRole="store_owner" />,
+      },
+      {
+        path: ':id',
+        element: <StocktakeDetailPage defaultRole="store_owner" />,
+      },
+      {
+        path: ':id/edit',
+        element: <StocktakeFormPage defaultRole="store_owner" />,
       },
     ],
   },

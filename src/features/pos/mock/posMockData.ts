@@ -418,10 +418,12 @@ export const mockCustomers: Customer[] = [
 
 export const createInitialCartItem = (product: Product, quantity = 1, discountPerItem = 0): CartItem => {
   const actualPrice = Math.max(0, product.basePrice - discountPerItem);
+  const baseUnitObj = product.unitPrices?.find((u) => u.isBaseUnit);
   return {
     id: product.id,
     product,
     unit: product.baseUnit,
+    unitId: baseUnitObj?.unitId,
     quantity,
     unitPrice: product.basePrice,
     discountPerItem,
@@ -662,5 +664,293 @@ export const mockHistoryKpis: ShiftKpiItem[] = [
     formattedValue: '100%',
     subtitle: '0 ca lệch tiền / thất thoát',
     colorType: 'info',
+  },
+];
+
+
+// ==============================================================
+// DỮ LIỆU MẪU CỬA HÀNG THỰC PHẨM SẠCH AN NHIÊN (tenant_an_nhien_02)
+// ==============================================================
+export const mockProductsAnNhien: Product[] = [
+  {
+    id: 'f0000001-0000-0000-0000-000000000001',
+    sku: 'AN-GAO-01',
+    barcode: '8936012340011',
+    name: 'Gạo lứt huyết rồng An Nhiên 2kg',
+    imageUrl: 'https://images.unsplash.com/photo-1586201375761-83865001e31c?auto=format&fit=crop&w=300&q=80',
+    spec: 'Túi 2kg organic',
+    category: 'noodle_food',
+    baseUnit: 'Túi',
+    basePrice: 55000,
+    costPrice: 42000,
+    quantityOnHand: 80,
+    batchCode: 'BATCH-AN-GAO-2612',
+    expiryDate: '2027-10-01',
+    unitPrices: [
+      { unitId: 'an-unit-01-tui', unitName: 'Túi', conversionRate: 1, price: 55000, isBaseUnit: true },
+      { unitId: 'an-unit-01-thung', unitName: 'Thùng (10 túi)', conversionRate: 10, price: 520000, isBaseUnit: false },
+    ],
+  },
+  {
+    id: 'f0000002-0000-0000-0000-000000000002',
+    sku: 'AN-TRUNG-01',
+    barcode: '8936012340028',
+    name: 'Trứng gà ta thảo mộc hộp 10 quả',
+    imageUrl: 'https://images.unsplash.com/photo-1582722872445-44dc5f7e3c8f?auto=format&fit=crop&w=300&q=80',
+    spec: 'Hộp 10 quả sạch',
+    category: 'fresh',
+    baseUnit: 'Hộp',
+    basePrice: 45000,
+    costPrice: 36000,
+    quantityOnHand: 50,
+    batchCode: 'BATCH-AN-TRUNG-2611',
+    expiryDate: '2026-11-20',
+    unitPrices: [
+      { unitId: 'an-unit-02-hop', unitName: 'Hộp', conversionRate: 1, price: 45000, isBaseUnit: true },
+      { unitId: 'an-unit-02-thung', unitName: 'Thùng (12 hộp)', conversionRate: 12, price: 510000, isBaseUnit: false },
+    ],
+  },
+  {
+    id: 'f0000003-0000-0000-0000-000000000003',
+    sku: 'AN-MAM-01',
+    barcode: '8936012340035',
+    name: 'Nước mắm cốt nhĩ thuyền nan 500ml',
+    imageUrl: 'https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=300&q=80',
+    spec: 'Chai 500ml truyền thống',
+    category: 'noodle_food',
+    baseUnit: 'Chai',
+    basePrice: 85000,
+    costPrice: 68000,
+    quantityOnHand: 60,
+    batchCode: 'BATCH-AN-MAM-2708',
+    expiryDate: '2028-05-01',
+    unitPrices: [
+      { unitId: 'an-unit-03-chai', unitName: 'Chai', conversionRate: 1, price: 85000, isBaseUnit: true },
+      { unitId: 'an-unit-03-thung', unitName: 'Thùng (6 chai)', conversionRate: 6, price: 490000, isBaseUnit: false },
+    ],
+  },
+  {
+    id: 'f0000004-0000-0000-0000-000000000004',
+    sku: 'AN-TAO-01',
+    barcode: '8936012340042',
+    name: 'Táo Envy New Zealand nhập khẩu 1kg',
+    imageUrl: 'https://images.unsplash.com/photo-1560806887-1e4cd0b6cbd6?auto=format&fit=crop&w=300&q=80',
+    spec: 'Kg táo giòn ngọt',
+    category: 'fresh',
+    baseUnit: 'Kg',
+    basePrice: 125000,
+    costPrice: 90000,
+    quantityOnHand: 40,
+    batchCode: 'BATCH-AN-TAO-2611',
+    expiryDate: '2026-11-27',
+    unitPrices: [
+      { unitId: 'an-unit-04-kg', unitName: 'Kg', conversionRate: 1, price: 125000, isBaseUnit: true },
+      { unitId: 'an-unit-04-thung', unitName: 'Thùng (10 kg)', conversionRate: 10, price: 1180000, isBaseUnit: false },
+    ],
+  },
+  {
+    id: 'f0000005-0000-0000-0000-000000000005',
+    sku: 'AN-SUA-01',
+    barcode: '8936012340059',
+    name: 'Sữa tươi thanh trùng Mộc Châu 900ml',
+    imageUrl: 'https://images.unsplash.com/photo-1550583724-b2692b85b150?auto=format&fit=crop&w=300&q=80',
+    spec: 'Chai 900ml thanh trùng',
+    category: 'dairy',
+    baseUnit: 'Chai',
+    basePrice: 39000,
+    costPrice: 28000,
+    quantityOnHand: 90,
+    batchCode: 'BATCH-AN-SUA-2611',
+    expiryDate: '2026-11-12',
+    unitPrices: [
+      { unitId: 'an-unit-05-chai', unitName: 'Chai', conversionRate: 1, price: 39000, isBaseUnit: true },
+      { unitId: 'an-unit-05-thung', unitName: 'Thùng (12 chai)', conversionRate: 12, price: 450000, isBaseUnit: false },
+    ],
+  },
+  {
+    id: '01a191cf-1c93-7a8d-87f0-ea3e96376a0a',
+    sku: 'G7-3IN1-18G',
+    barcode: '8935024122310',
+    name: 'Cà phê hòa tan G7 3in1 Hộp 18 gói',
+    imageUrl: 'https://images.unsplash.com/photo-1559056199-641a0ac8b55e',
+    spec: 'Kệ Đồ Uống 01',
+    shelfLocation: 'Kệ Đồ Uống 01',
+    category: 'beverage',
+    baseUnit: 'Hộp',
+    basePrice: 58000,
+    costPrice: 42000,
+    quantityOnHand: 95,
+    batchCode: 'LOT-G7-202612',
+    expiryDate: '2026-12-15',
+    unitPrices: [
+      { unitId: 'a1000001-0000-0000-0000-000000000001', unitName: 'Hộp', conversionRate: 1, price: 58000, isBaseUnit: true },
+      { unitId: 'a1000001-0000-0000-0000-000000000002', unitName: 'Thùng', conversionRate: 24, price: 1350000, isBaseUnit: false },
+    ],
+  },
+  {
+    id: '01a191cf-1c95-7289-8d60-f54c655bc304',
+    sku: 'CHOCO-12P',
+    barcode: '8936036020380',
+    name: 'Bánh Orion Choco-Pie truyền thống Hộp 12 cái',
+    imageUrl: 'https://images.unsplash.com/photo-1578985545062-69928b1d9587',
+    spec: 'Kệ Bánh Kẹo 01',
+    shelfLocation: 'Kệ Bánh Kẹo 01',
+    category: 'confectionery',
+    baseUnit: 'Hộp',
+    basePrice: 55000,
+    costPrice: 40000,
+    quantityOnHand: 80,
+    batchCode: 'LOT-CP-202612',
+    expiryDate: '2026-12-30',
+    unitPrices: [
+      { unitId: 'a1000002-0000-0000-0000-000000000001', unitName: 'Hộp', conversionRate: 1, price: 55000, isBaseUnit: true },
+      { unitId: 'a1000002-0000-0000-0000-000000000002', unitName: 'Thùng', conversionRate: 8, price: 420000, isBaseUnit: false },
+    ],
+  },
+  {
+    id: '01a191cf-1c95-75e3-96e9-f0b8fe5528db',
+    sku: 'MUOI-HAOHAO-120G',
+    barcode: '8934563065249',
+    name: 'Muối chấm Hảo Hảo tôm chua cay Hũ 120g',
+    imageUrl: 'https://images.unsplash.com/photo-1596040033229-a9821ebd058d',
+    spec: 'Kệ Gia Vị 01',
+    shelfLocation: 'Kệ Gia Vị 01',
+    category: 'noodle_food',
+    baseUnit: 'Hũ',
+    basePrice: 16000,
+    costPrice: 11000,
+    quantityOnHand: 125,
+    batchCode: 'LOT-HH-202611',
+    expiryDate: '2026-11-28',
+    unitPrices: [
+      { unitId: 'a1000003-0000-0000-0000-000000000001', unitName: 'Hũ', conversionRate: 1, price: 16000, isBaseUnit: true },
+      { unitId: 'a1000003-0000-0000-0000-000000000002', unitName: 'Lốc', conversionRate: 6, price: 90000, isBaseUnit: false },
+      { unitId: 'a1000003-0000-0000-0000-000000000003', unitName: 'Thùng', conversionRate: 30, price: 430000, isBaseUnit: false },
+    ],
+  },
+  {
+    id: '01a191cf-1c95-77c5-bfde-6c6830e2c411',
+    sku: 'BIA-HANOI-SLEEK',
+    barcode: '8936000440824',
+    name: 'Bia Hà Nội Sleek Lon cao 330ml',
+    imageUrl: 'https://images.unsplash.com/photo-1608270192799-59e8f8d28242',
+    spec: 'Tủ Mát Đồ Uống',
+    shelfLocation: 'Tủ Mát Đồ Uống',
+    category: 'beverage',
+    baseUnit: 'Lon',
+    basePrice: 14000,
+    costPrice: 10500,
+    quantityOnHand: 150,
+    batchCode: 'LOT-BIA-202612',
+    expiryDate: '2026-12-10',
+    unitPrices: [
+      { unitId: 'a1000004-0000-0000-0000-000000000001', unitName: 'Lon', conversionRate: 1, price: 14000, isBaseUnit: true },
+      { unitId: 'a1000004-0000-0000-0000-000000000002', unitName: 'Lốc', conversionRate: 6, price: 82000, isBaseUnit: false },
+      { unitId: 'a1000004-0000-0000-0000-000000000003', unitName: 'Thùng', conversionRate: 24, price: 320000, isBaseUnit: false },
+    ],
+  },
+];
+
+export const mockCustomersAnNhien: Customer[] = [
+  {
+    id: 'cf000001-0000-0000-0000-000000000001',
+    code: 'KH-AN-001',
+    name: 'Bác Minh (Khách quen Ba Đình)',
+    phone: '0934567890',
+    email: 'minh.bac@gmail.com',
+    address: '15 Hoàng Hoa Thám, Ba Đình, Hà Nội',
+    area: 'Hà Nội',
+    ward: 'Thụy Khuê',
+    gender: 'Nam',
+    group: 'Gold',
+    loyaltyPoints: 150,
+    membershipTier: 'Gold',
+    debtLimit: 5000000,
+    currentDebt: 0,
+    allowDebt: true,
+    debtCount: 3,
+    totalDebtPurchased: 4500000,
+  },
+  {
+    id: 'cf000002-0000-0000-0000-000000000002',
+    code: 'KH-AN-002',
+    name: 'Chị Thu Hà (Khách đặt trước)',
+    phone: '0976543210',
+    email: 'thuha.hn@gmail.com',
+    address: '28 Ngọc Hà, Ba Đình, Hà Nội',
+    area: 'Hà Nội',
+    ward: 'Ngọc Hà',
+    gender: 'Nữ',
+    group: 'Silver',
+    loyaltyPoints: 80,
+    membershipTier: 'Silver',
+    debtLimit: 3000000,
+    currentDebt: 250000,
+    allowDebt: true,
+    debtCount: 1,
+    totalDebtPurchased: 2800000,
+  },
+];
+
+export interface MockStorePaymentConfig {
+  tenantId: string;
+  bankCode: string;
+  bankName: string;
+  bankAccountNumber: string;
+  bankAccountName: string;
+  sepayApiKey: string;
+  isActive: boolean;
+}
+
+export const mockStorePaymentConfigs: Record<string, MockStorePaymentConfig> = {
+  tenant_an_nhien_02: {
+    tenantId: 'tenant_an_nhien_02',
+    bankCode: 'MB',
+    bankName: 'MBBank - Ngân hàng Quân Đội',
+    bankAccountNumber: '0918889999',
+    bankAccountName: 'NGUYEN AN NHIEN',
+    sepayApiKey: 'sepay_apikey_annhien_demo_x9k2',
+    isActive: true,
+  },
+  tenant_mt_mart_01: {
+    tenantId: 'tenant_mt_mart_01',
+    bankCode: 'MB',
+    bankName: 'MBBank - Ngân hàng Quân Đội',
+    bankAccountNumber: '0974742130',
+    bankAccountName: 'MT GROCERY STORE',
+    sepayApiKey: 'sepay_apikey_mtmart_secret_key',
+    isActive: true,
+  },
+};
+
+export interface PosBranchOption {
+  id: string;
+  code: string;
+  name: string;
+  address: string;
+  phone: string;
+}
+
+export const AN_NHIEN_BRANCHES: PosBranchOption[] = [
+  {
+    id: 'BR-AN-01',
+    code: 'BR-AN-01',
+    name: 'An Nhiên Mart - Chi nhánh Ba Đình',
+    address: '120 Hoàng Hoa Thám, Tây Hồ, Hà Nội',
+    phone: '024 3822 9988',
+  },
+  {
+    id: 'BR-AN-02',
+    code: 'BR-AN-02',
+    name: 'An Nhiên Mart - Chi nhánh Cầu Giấy',
+    address: '268 Cầu Giấy, Q. Cầu Giấy, Hà Nội',
+    phone: '024 3833 7766',
+  },
+  {
+    id: 'BR-AN-03',
+    code: 'BR-AN-03',
+    name: 'An Nhiên Mart - Chi nhánh Đống Đa',
+    address: '85 Chùa Bộc, Q. Đống Đa, Hà Nội',
+    phone: '024 3855 6655',
   },
 ];

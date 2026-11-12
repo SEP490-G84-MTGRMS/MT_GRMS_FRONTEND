@@ -1,5 +1,6 @@
 // src/pages/store/components/StoreSidebarNav.tsx
 import type { FC } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   User,
   Building2,
@@ -7,6 +8,8 @@ import {
   History,
   FileText,
   Wallet,
+  ShieldCheck,
+  CreditCard,
 } from 'lucide-react';
 
 export type StoreHubTabKey =
@@ -26,6 +29,7 @@ export const StoreSidebarNav: FC<StoreSidebarNavProps> = ({
   activeTab,
   onSelectTab,
 }) => {
+  const navigate = useNavigate();
   return (
     <aside className="store-hub-sidebar" aria-label="Thanh điều hướng gian hàng">
       {/* Nhóm 1: Gian hàng */}
@@ -103,6 +107,31 @@ export const StoreSidebarNav: FC<StoreSidebarNavProps> = ({
             <Wallet size={18} strokeWidth={1.8} />
           </span>
           <span>Thanh toán & Ví</span>
+        </button>
+      </div>
+
+      {/* Nhóm 4: Cấu hình POS & Thu Chi Két */}
+      <div className="store-sidebar-group">
+        <div className="store-sidebar-title">Cấu hình POS & Quỹ</div>
+        <button
+          type="button"
+          className="store-sidebar-item"
+          onClick={() => navigate('/store-owner/pos-cash-control')}
+        >
+          <span className="store-sidebar-icon">
+            <ShieldCheck size={18} strokeWidth={1.8} />
+          </span>
+          <span>Hạn mức & Duyệt chi két</span>
+        </button>
+        <button
+          type="button"
+          className="store-sidebar-item"
+          onClick={() => navigate('/store-owner/payment-config')}
+        >
+          <span className="store-sidebar-icon">
+            <CreditCard size={18} strokeWidth={1.8} />
+          </span>
+          <span>Cấu hình VietQR & SePay</span>
         </button>
       </div>
     </aside>

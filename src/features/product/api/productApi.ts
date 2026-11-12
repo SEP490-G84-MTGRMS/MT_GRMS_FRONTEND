@@ -9,12 +9,13 @@ import type {
   ProductUnitUpdatePayload,
   ProductCreatePayload,
   ProductUpdatePayload,
+  ProductPriceHistoryDto,
 } from '../types';
 
 export const productApi = {
   /**
    * Lấy danh sách sản phẩm có phân trang, tìm kiếm đa tiêu chí và lọc theo danh mục
-   * Endpoint Backend: GET /api/products hoặc GET /api/v1/products
+   * Endpoint Backend: GET /api/products
    */
   async getProductsPaged(filter: ProductQueryFilter = {}): Promise<PagedResult<ProductResponse>> {
     const params: Record<string, any> = {
@@ -71,7 +72,7 @@ export const productApi = {
 
   /**
    * Tạo mới một hàng hóa trên Backend
-   * Endpoint Backend: POST /api/products hoặc POST /api/v1/products
+   * Endpoint Backend: POST /api/products
    */
   async createProduct(payload: ProductCreatePayload): Promise<ProductResponse> {
     const res = await httpClient.post<ApiResponse<ProductResponse>>('/products', payload);
@@ -106,7 +107,7 @@ export const productApi = {
 
   /**
    * Lấy danh sách đơn vị tính quy đổi của sản phẩm
-   * Endpoint Backend: GET /api/v1/products/{productId}/units
+   * Endpoint Backend: GET /api/products/{productId}/units
    */
   async getProductUnits(productId: string): Promise<ProductUnitResponse[]> {
     try {
@@ -122,7 +123,7 @@ export const productApi = {
 
   /**
    * Thêm mới đơn vị tính quy đổi cho một sản phẩm
-   * Endpoint Backend: POST /api/v1/products/{productId}/units
+   * Endpoint Backend: POST /api/products/{productId}/units
    */
   async createProductUnit(productId: string, payload: ProductUnitCreatePayload): Promise<ProductUnitResponse> {
     const res = await httpClient.post<ApiResponse<ProductUnitResponse>>(`/products/${productId}/units`, payload);
@@ -134,7 +135,7 @@ export const productApi = {
 
   /**
    * Cập nhật thông tin đơn vị tính quy đổi
-   * Endpoint Backend: PUT /api/v1/product-units/{id}
+   * Endpoint Backend: PUT /api/product-units/{id}
    */
   async updateProductUnit(id: string, payload: ProductUnitUpdatePayload): Promise<ProductUnitResponse> {
     const res = await httpClient.put<ApiResponse<ProductUnitResponse>>(`/product-units/${id}`, payload);
@@ -146,13 +147,31 @@ export const productApi = {
 
   /**
    * Xóa một đơn vị tính quy đổi
-   * Endpoint Backend: DELETE /api/v1/product-units/{id}
+   * Endpoint Backend: DELETE /api/product-units/{id}
    */
   async deleteProductUnit(id: string): Promise<void> {
     const res = await httpClient.delete<ApiResponse<any>>(`/product-units/${id}`);
     if (!res.data?.success) {
       throw new Error(res.data?.message || 'Không thể xóa đơn vị tính.');
     }
+  },
+
+  /**
+   * Lấy lịch sử biến động giá bán sản phẩm (FE-03.2 Price Change History Tracking)
+   * Endpoint Backend: GET /api/products/{id}/price-history
+   */
+  async getPriceHistory(productId: string, branchId?: string): Promise<ProductPriceHistoryDto[]> {
+    const params: Record<string, any> = {};
+    if (branchId) {
+      params.branchId = branchId;
+    }
+    const res = await httpClient.get<ApiResponse<ProductPriceHistoryDto[]>>(`/products/${productId}/price-history`, {
+      params,
+    });
+    if (res.data?.success && res.data.data) {
+      return res.data.data;
+    }
+    return [];
   },
 };
 

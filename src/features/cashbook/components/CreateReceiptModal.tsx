@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { FC, FormEvent } from 'react';
 import type { CashAccount, CreateReceiptDTO, CounterpartyType } from '../types/cashbook.types';
 
@@ -7,6 +7,7 @@ interface CreateReceiptModalProps {
   accounts: CashAccount[];
   onClose: () => void;
   onSubmit: (dto: CreateReceiptDTO) => Promise<void>;
+  initialCategory?: string;
 }
 
 export const CreateReceiptModal: FC<CreateReceiptModalProps> = ({
@@ -14,19 +15,53 @@ export const CreateReceiptModal: FC<CreateReceiptModalProps> = ({
   accounts,
   onClose,
   onSubmit,
+  initialCategory,
 }) => {
   const [accountId, setAccountId] = useState(accounts[0]?.id || '');
   const [amountStr, setAmountStr] = useState('');
-  const [category, setCategory] = useState('Thu bán lẻ khác');
+  const [category, setCategory] = useState(initialCategory || 'Chủ nạp thêm vốn (Capital Contribution)');
   const [counterpartyType, setCounterpartyType] = useState<CounterpartyType>('CUSTOMER');
   const [counterpartyName, setCounterpartyName] = useState('');
   const [description, setDescription] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const applyCategoryDefaults = (cat: string) => {
+    setCategory(cat);
+    if (cat.includes('nạp thêm vốn')) {
+      setCounterpartyType('OTHER');
+      setCounterpartyName('Chủ hộ kinh doanh');
+      setDescription('Bổ sung vốn kinh doanh vào quỹ (Không tính thuế)');
+      const safeOrBank = accounts.find((a) => a.isSafeDeposit || a.accountType === 'BANK') || accounts[0];
+      if (safeOrBank) setAccountId(safeOrBank.id);
+    } else if (cat.includes('Thu nợ khách hàng')) {
+      setCounterpartyType('CUSTOMER');
+      setCounterpartyName('');
+      setDescription('Thu tiền nợ bán lẻ của khách hàng');
+    } else if (cat.includes('Thu lãi')) {
+      setCounterpartyType('OTHER');
+      setCounterpartyName('Ngân hàng');
+      setDescription('Thu lãi tiền gửi không kỳ hạn');
+    } else {
+      setCounterpartyType('CUSTOMER');
+      setCounterpartyName('');
+      setDescription('');
+    }
+  };
+
+  useEffect(() => {
+    if (isOpen) {
+      setAmountStr('');
+      setErrorMsg('');
+      const targetCat = initialCategory || 'Chủ nạp thêm vốn (Capital Contribution)';
+      applyCategoryDefaults(targetCat);
+    }
+  }, [isOpen, initialCategory, accounts]);
+
   if (!isOpen) return null;
 
   const categories = [
+    'Chủ nạp thêm vốn (Capital Contribution)',
     'Thu bán lẻ khác',
     'Thu nợ khách hàng',
     'Hoàn ứng nội bộ',
@@ -120,7 +155,7 @@ export const CreateReceiptModal: FC<CreateReceiptModalProps> = ({
               <select
                 className="cb-form-select"
                 value={category}
-                onChange={(e) => setCategory(e.target.value)}
+                onChange={(e) => applyCategoryDefaults(e.target.value)}
               >
                 {categories.map((c) => (
                   <option key={c} value={c}>
@@ -128,6 +163,11 @@ export const CreateReceiptModal: FC<CreateReceiptModalProps> = ({
                   </option>
                 ))}
               </select>
+              {category.includes('nạp thêm vốn') && (
+                <div style={{ marginTop: 6, padding: '8px 12px', background: '#ECFDF5', border: '1px solid #A7F3D0', borderRadius: 8, fontSize: '12px', color: '#065F46' }}>
+                  💡 <strong>Bổ sung vốn chủ:</strong> Tăng số dư quỹ tiền mặt/ngân hàng, được hệ thống cách ly 100% khỏi Doanh thu tính thuế.
+                </div>
+              )}
             </div>
 
             <div className="cb-form-group">
@@ -135,14 +175,14 @@ export const CreateReceiptModal: FC<CreateReceiptModalProps> = ({
               <div style={{ display: 'flex', gap: '8px' }}>
                 <select
                   className="cb-form-select"
-                  style={{ width: '130px' }}
+                  style={{ width: '140px' }}
                   value={counterpartyType}
                   onChange={(e) => setCounterpartyType(e.target.value as CounterpartyType)}
                 >
                   <option value="CUSTOMER">Khách hàng</option>
+                  <option value="OTHER">Chủ tiệm / Khác</option>
                   <option value="EMPLOYEE">Nhân viên</option>
                   <option value="SUPPLIER">Nhà cung cấp</option>
-                  <option value="OTHER">Khác</option>
                 </select>
                 <input
                   type="text"

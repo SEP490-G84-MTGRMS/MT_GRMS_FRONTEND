@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import type { FC } from 'react';
-import { Plus, X } from 'lucide-react';
+import { Plus, X, Phone, Gift, AlertTriangle, BookOpen } from 'lucide-react';
 import type { Customer } from '../types/pos.types';
 import { useAuthStore } from '../../../stores/useAuthStore';
 
@@ -10,11 +10,23 @@ interface Props {
   onOpenAddCustomerModal: () => void;
   totalItemAmount: number;
   orderDiscountPercent: number;
+  orderDiscountAmount?: number;
   onOpenOrderDiscountModal: () => void;
   couponCode: string;
   onCouponCodeChange: (code: string) => void;
+  couponDiscountAmount?: number;
+  onValidateCoupon?: () => void;
+  isValidatingCoupon?: boolean;
+  couponStatusText?: string;
   usePoints: boolean;
   onToggleUsePoints: (use: boolean) => void;
+  pointsDeduction?: number;
+  pointsToRedeem?: number;
+  minPointsRequired?: number;
+  isPointsBlockedByPromo?: boolean;
+  isLoyaltyEnabled?: boolean;
+  appliedPromotions?: string[];
+  giftItems?: { productName: string; quantity: number; unitName?: string; equivalentValue?: number; reason?: string }[];
   paymentMethod: 'cash' | 'vietqr' | 'debt';
   onPaymentMethodChange: (method: 'cash' | 'vietqr' | 'debt') => void;
   cashTendered: number;
@@ -22,6 +34,8 @@ interface Props {
   onOpenVietQrModal: () => void;
   onSubmitCheckout: () => void;
   customerSearchList: Customer[];
+  isCheckoutDisabled?: boolean;
+  disabledReason?: string;
 }
 
 export const PosPaymentPanel: FC<Props> = ({
@@ -30,11 +44,23 @@ export const PosPaymentPanel: FC<Props> = ({
   onOpenAddCustomerModal,
   totalItemAmount,
   orderDiscountPercent,
+  orderDiscountAmount: externalOrderDiscount,
   onOpenOrderDiscountModal,
   couponCode,
   onCouponCodeChange,
+  couponDiscountAmount: externalCouponDiscount,
+  onValidateCoupon,
+  isValidatingCoupon,
+  couponStatusText,
   usePoints,
   onToggleUsePoints,
+  pointsDeduction: externalPointsDeduction,
+  pointsToRedeem = 0,
+  minPointsRequired = 20,
+  isPointsBlockedByPromo = false,
+  isLoyaltyEnabled = true,
+  appliedPromotions = [],
+  giftItems = [],
   paymentMethod,
   onPaymentMethodChange,
   cashTendered,
@@ -42,6 +68,8 @@ export const PosPaymentPanel: FC<Props> = ({
   onOpenVietQrModal,
   onSubmitCheckout,
   customerSearchList,
+  isCheckoutDisabled = false,
+  disabledReason,
 }) => {
   const { user } = useAuthStore();
   const isStoreOwner = user?.role === 'STORE_OWNER';
@@ -52,6 +80,12 @@ export const PosPaymentPanel: FC<Props> = ({
       onPaymentMethodChange('cash');
     }
   }, [isStoreOwner, paymentMethod, onPaymentMethodChange]);
+
+  const isWalkIn =
+    !customer ||
+    customer.code === 'KHACHLE' ||
+    customer.name.trim().toLowerCase() === 'khách lẻ' ||
+    customer.name.trim().toLowerCase() === 'khách hàng lẻ';
 
   const [customerSearchInput, setCustomerSearchInput] = useState('');
   const [isSearchingCustomer, setIsSearchingCustomer] = useState(false);
@@ -68,24 +102,53 @@ export const PosPaymentPanel: FC<Props> = ({
   }, []);
 
   // Tính toán các khoản giảm giá và thành tiền
-  const orderDiscountAmount = Math.round((totalItemAmount * orderDiscountPercent) / 100);
-  const couponDiscountAmount = couponCode.trim().toUpperCase() === 'VIP10' ? 20000 : 0;
+  const orderDiscountAmount = externalOrderDiscount !== undefined
+    ? externalOrderDiscount
+    : Math.round((totalItemAmount * orderDiscountPercent) / 100);
+  const couponDiscountAmount = externalCouponDiscount !== undefined
+    ? externalCouponDiscount
+    : (couponCode.trim().toUpperCase() === 'VIP10' ? 20000 : 0);
   const subTotalBeforePoints = Math.max(0, totalItemAmount - orderDiscountAmount - couponDiscountAmount);
 
-  // Điểm tích lũy: mỗi điểm = 100đ
-  const maxPointAmount = customer ? Math.min(customer.loyaltyPoints * 100, subTotalBeforePoints) : 0;
-  const pointsDeduction = usePoints && customer ? maxPointAmount : 0;
+  // Điểm tích lũy
+  const pointsDeduction = isPointsBlockedByPromo
+    ? 0
+    : (externalPointsDeduction !== undefined
+        ? externalPointsDeduction
+        : (usePoints && customer ? Math.min(customer.loyaltyPoints * 1000, subTotalBeforePoints) : 0));
 
   const finalAmount = Math.max(0, subTotalBeforePoints - pointsDeduction);
   const changeAmount = Math.max(0, cashTendered - finalAmount);
 
   // Tìm kiếm khách hàng thuần túy CHỈ BẰNG SỐ ĐIỆN THOẠI (SĐT)
-  const phoneQuery = customerSearchInput.replace(/\D/g, '');
+  // Helper chuẩn hóa tiếng Việt không dấu
+  const removeVietnameseTones = (str: string) => {
+    return str
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/đ/g, 'd')
+      .replace(/Đ/g, 'D')
+      .toLowerCase();
+  };
+
+  // Tìm kiếm khách hàng theo Tên (không dấu/có dấu), Số điện thoại và Mã KH
+  const qRaw = customerSearchInput.trim();
+  const qLower = qRaw.toLowerCase();
+  const qClean = removeVietnameseTones(qRaw);
+  const phoneQuery = qRaw.replace(/\D/g, '');
 
   const filteredCustomers = customerSearchList.filter((c) => {
-    if (!phoneQuery) return false;
+    if (!qRaw) return false;
     const cleanPhone = (c.phone || '').replace(/\D/g, '');
-    return cleanPhone.includes(phoneQuery);
+    const matchPhone = phoneQuery.length > 0 && cleanPhone.includes(phoneQuery);
+
+    const custNameRaw = c.name || '';
+    const matchNameExact = custNameRaw.toLowerCase().includes(qLower);
+    const matchNameNoTone = removeVietnameseTones(custNameRaw).includes(qClean);
+
+    const matchCode = (c.code || '').toLowerCase().includes(qLower);
+
+    return matchPhone || matchNameExact || matchNameNoTone || matchCode;
   });
 
   return (
@@ -104,21 +167,19 @@ export const PosPaymentPanel: FC<Props> = ({
 
       <hr className="pos-divider" />
 
-      {/* 1. KHÁCH HÀNG (F4) - CHỈ TÌM BẰNG SỐ ĐIỆN THOẠI */}
+      {/* 1. KHÁCH HÀNG (F4) - TÌM KIẾM ĐA TIÊU CHÍ */}
       <fieldset className="pos-fieldset">
         <legend className="pos-legend">
-          <b>Khách hàng (F4) - Chỉ tìm bằng SĐT</b>
+          <b>Khách hàng (F4) - Tên hoặc SĐT</b>
         </legend>
 
         <div style={{ display: 'flex', gap: 6, position: 'relative' }} ref={dropdownRef}>
           <input
-            type="tel"
+            type="text"
             id="customer_search"
             value={customerSearchInput}
             onChange={(e) => {
-              // Chỉ cho phép nhập số điện thoại
-              const val = e.target.value.replace(/[^\d\s.-]/g, '');
-              setCustomerSearchInput(val);
+              setCustomerSearchInput(e.target.value);
               setIsSearchingCustomer(true);
             }}
             onKeyDown={(e) => {
@@ -134,7 +195,7 @@ export const PosPaymentPanel: FC<Props> = ({
                 setIsSearchingCustomer(true);
               }
             }}
-            placeholder="Nhập số điện thoại khách hàng (F4)..."
+            placeholder="Tìm theo Tên, SĐT, Mã KH (F4)..."
             className="pos-input"
             style={{ flex: 1 }}
           />
@@ -148,7 +209,7 @@ export const PosPaymentPanel: FC<Props> = ({
             <Plus size={14} />
           </button>
 
-          {/* Dropdown tìm kiếm khách hàng chỉ theo SĐT */}
+          {/* Dropdown tìm kiếm khách hàng */}
           {isSearchingCustomer && customerSearchInput.trim() && (
             <div className="pos-customer-dropdown">
               {filteredCustomers.length > 0 ? (
@@ -163,20 +224,20 @@ export const PosPaymentPanel: FC<Props> = ({
                     }}
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: 13, fontWeight: 700, color: '#0f766e' }}>
-                        📞 {cust.phone}
+                      <b style={{ color: '#0f766e', fontSize: 13 }}>{cust.name}</b>
+                      <span style={{ fontSize: 12.5, fontWeight: 600, color: '#334155', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                        <Phone size={12} color="#475569" /> {cust.phone}
                       </span>
-                      <b style={{ color: '#1e293b' }}>{cust.name}</b>
                     </div>
                     <div style={{ fontSize: 11.5, color: '#16a34a', display: 'flex', justifyContent: 'space-between', marginTop: 3 }}>
-                      <span>Mã: {cust.code} &bull; {cust.membershipTier}</span>
+                      <span>Mã: {cust.code}</span>
                       <span>Tích lũy: {cust.loyaltyPoints} điểm</span>
                     </div>
                   </div>
                 ))
               ) : (
                 <div style={{ padding: 12, fontSize: 12, color: '#64748b', textAlign: 'center' }}>
-                  Không tìm thấy khách hàng với SĐT &quot;{customerSearchInput}&quot;. Bấm [+] để thêm mới.
+                  Không tìm thấy khách hàng phù hợp với &quot;{customerSearchInput}&quot;. Bấm [+] để thêm mới.
                 </div>
               )}
             </div>
@@ -189,7 +250,7 @@ export const PosPaymentPanel: FC<Props> = ({
             <div>
               <b>{customer.name}</b> ({customer.code})<br />
               <span className="pos-loyalty-text">
-                Điểm: <b>{customer.loyaltyPoints} điểm</b> ({customer.membershipTier})
+                Điểm tích lũy: <b>{customer.loyaltyPoints} điểm</b>
               </span>
               <div style={{ marginTop: 4, fontSize: 11, color: '#334155', display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
                 <span>Đã nợ: <b style={{ color: '#0f766e' }}>{customer.debtCount || 0} lần</b></span>
@@ -244,25 +305,79 @@ export const PosPaymentPanel: FC<Props> = ({
                   onClick={onOpenOrderDiscountModal}
                   title="Nhấp để tùy chỉnh chiết khấu đơn"
                 >
-                  Giảm giá ({orderDiscountPercent}%) [KM]:
+                  {orderDiscountPercent > 0
+                    ? `Giảm giá (${orderDiscountPercent}%) [KM]:`
+                    : orderDiscountAmount > 0
+                    ? 'Giảm giá tự động [KM]:'
+                    : 'Giảm giá (0%) [KM]:'}
                 </span>
+                {appliedPromotions && appliedPromotions.length > 0 && (
+                  <div style={{ fontSize: 11, color: '#0d9488', marginTop: 2 }}>
+                    {appliedPromotions.map((p, idx) => (
+                      <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <Gift size={11} color="#0d9488" /> {p}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </td>
               <td style={{ textAlign: 'right', color: '#dc2626' }}>
                 -{orderDiscountAmount.toLocaleString('vi-VN')} đ
               </td>
             </tr>
+            {giftItems && giftItems.length > 0 && (
+              <tr>
+                <td colSpan={2} style={{ background: '#f0fdf4', padding: '4px 8px', borderRadius: 4 }}>
+                  <div style={{ fontSize: 11.5, color: '#15803d', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <Gift size={13} color="#15803d" /> Quà tặng khuyến mãi xuất kho kèm đơn:
+                  </div>
+                  {giftItems.map((g, idx) => (
+                    <div key={idx} style={{ fontSize: 11, color: '#166534', display: 'flex', justifyContent: 'space-between' }}>
+                      <span>
+                        ✦ {g.productName} (x{g.quantity}{g.unitName ? ` ${g.unitName}` : ''})
+                      </span>
+                      <span style={{ fontWeight: 600 }}>
+                        0 đ{g.equivalentValue && g.equivalentValue > 0 ? ` (~${g.equivalentValue.toLocaleString('vi-VN')} đ)` : ''}
+                      </span>
+                    </div>
+                  ))}
+                </td>
+              </tr>
+            )}
             <tr>
-              <td>Mã coupon:</td>
+              <td>Mã Voucher:</td>
               <td style={{ textAlign: 'right' }}>
-                <input
-                  type="text"
-                  value={couponCode}
-                  onChange={(e) => onCouponCodeChange(e.target.value)}
-                  placeholder="Nhập mã..."
-                  style={{ width: 80, fontSize: 12, padding: '2px 4px', textAlign: 'center' }}
-                  className="pos-input"
-                />{' '}
-                {couponDiscountAmount > 0 ? `-${couponDiscountAmount.toLocaleString('vi-VN')} đ` : '0 đ'}
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                  <input
+                    type="text"
+                    value={couponCode}
+                    onChange={(e) => onCouponCodeChange(e.target.value)}
+                    placeholder="Mã voucher..."
+                    style={{ width: 95, fontSize: 12, padding: '2px 4px', textAlign: 'center' }}
+                    className="pos-input"
+                  />
+                  {onValidateCoupon && (
+                    <button
+                      type="button"
+                      className="pos-btn-secondary"
+                      onClick={onValidateCoupon}
+                      disabled={!couponCode.trim() || isValidatingCoupon}
+                      style={{ fontSize: 11, padding: '2px 6px', height: 26 }}
+                    >
+                      {isValidatingCoupon ? '...' : 'Áp dụng'}
+                    </button>
+                  )}
+                </div>
+                {couponStatusText && (
+                  <div style={{ fontSize: 11, color: couponDiscountAmount > 0 ? '#16a34a' : '#dc2626', marginTop: 2 }}>
+                    {couponStatusText}
+                  </div>
+                )}
+                {couponDiscountAmount > 0 && (
+                  <div style={{ color: '#16a34a', fontWeight: 600, fontSize: 12, marginTop: 2 }}>
+                    -{couponDiscountAmount.toLocaleString('vi-VN')} đ
+                  </div>
+                )}
               </td>
             </tr>
             <tr>
@@ -273,14 +388,35 @@ export const PosPaymentPanel: FC<Props> = ({
             </tr>
             <tr>
               <td>
-                <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, cursor: isPointsBlockedByPromo || isLoyaltyEnabled === false || isWalkIn ? 'not-allowed' : 'pointer' }}>
                   <input
                     type="checkbox"
-                    checked={usePoints}
-                    disabled={!customer || customer.loyaltyPoints === 0}
+                    checked={usePoints && !isPointsBlockedByPromo && isLoyaltyEnabled !== false && !isWalkIn}
+                    disabled={isLoyaltyEnabled === false || isWalkIn || !customer || customer.loyaltyPoints < minPointsRequired || isPointsBlockedByPromo}
                     onChange={(e) => onToggleUsePoints(e.target.checked)}
                   />
-                  <span>Dùng điểm ({pointsDeduction.toLocaleString('vi-VN')}):</span>
+                  <span>
+                    Dùng điểm ({pointsToRedeem} điểm):
+                    {isLoyaltyEnabled === false ? (
+                      <span style={{ display: 'block', fontSize: 10.5, color: '#94a3b8' }}>
+                        (Cấu hình tích/tiêu điểm đang tắt)
+                      </span>
+                    ) : isWalkIn ? (
+                      <span style={{ display: 'block', fontSize: 10.5, color: '#94a3b8' }}>
+                        (Khách lẻ không tích/tiêu điểm)
+                      </span>
+                    ) : isPointsBlockedByPromo ? (
+                      <span style={{ display: 'block', fontSize: 10.5, color: '#d97706' }}>
+                        (Không áp dụng cùng khuyến mãi)
+                      </span>
+                    ) : (
+                      customer && customer.loyaltyPoints < minPointsRequired && (
+                        <span style={{ display: 'block', fontSize: 10.5, color: '#94a3b8' }}>
+                          (Tối thiểu {minPointsRequired} điểm)
+                        </span>
+                      )
+                    )}
+                  </span>
                 </label>
               </td>
               <td style={{ textAlign: 'right', color: '#16a34a' }}>
@@ -383,13 +519,13 @@ export const PosPaymentPanel: FC<Props> = ({
           <div style={{ marginTop: 8, padding: 10, borderRadius: 6, backgroundColor: '#fffbeb', border: '1px solid #fde68a', fontSize: 12 }}>
             {!customer ? (
               <div style={{ color: '#b45309', display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ fontSize: 14 }}>⚠️</span>
+                <AlertTriangle size={15} color="#b45309" style={{ flexShrink: 0 }} />
                 <span><strong>Chưa chọn khách hàng:</strong> Vui lòng tìm và chọn khách hàng trước khi thực hiện ghi nợ.</span>
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                <div style={{ fontWeight: 700, color: '#92400e', marginBottom: 2 }}>
-                  📒 Thông tin sổ nợ khách hàng:
+                <div style={{ fontWeight: 700, color: '#92400e', marginBottom: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <BookOpen size={14} color="#92400e" /> Thông tin sổ nợ khách hàng:
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
                   <span>Số lần đã mua nợ:</span>
@@ -424,9 +560,18 @@ export const PosPaymentPanel: FC<Props> = ({
       {/* NÚT THANH TOÁN TO TOÀN CHIỀU RỘNG (Luôn cố định đáy) */}
       <button
         type="button"
+        disabled={isCheckoutDisabled}
         className={`pos-checkout-big-btn ${paymentMethod === 'debt' ? 'pos-btn-debt' : ''}`}
-        style={paymentMethod === 'debt' ? { backgroundColor: '#d97706', borderColor: '#b45309' } : undefined}
+        style={
+          isCheckoutDisabled
+            ? { backgroundColor: '#9ca3af', borderColor: '#6b7280', cursor: 'not-allowed', opacity: 0.7 }
+            : paymentMethod === 'debt'
+            ? { backgroundColor: '#d97706', borderColor: '#b45309' }
+            : undefined
+        }
+        title={disabledReason}
         onClick={() => {
+          if (isCheckoutDisabled) return;
           if (paymentMethod === 'vietqr') {
             onOpenVietQrModal();
           } else {
@@ -434,7 +579,9 @@ export const PosPaymentPanel: FC<Props> = ({
           }
         }}
       >
-        {paymentMethod === 'debt'
+        {isCheckoutDisabled && disabledReason
+          ? `KHÓA BÁN HÀNG (${disabledReason})`
+          : paymentMethod === 'debt'
           ? `GHI NỢ ĐƠN HÀNG (${finalAmount.toLocaleString('vi-VN')} đ)`
           : `THANH TOÁN (${finalAmount.toLocaleString('vi-VN')} đ)`}
       </button>

@@ -1,8 +1,13 @@
 export type PurchaseOrderStatus =
+  | 'PENDING_APPROVAL'     // Chờ duyệt
+  | 'APPROVED'             // Đã duyệt
+  | 'DISPATCHED'           // Đã gửi NCC
   | 'SENT'                 // Đã gửi NCC
   | 'CONFIRMED'            // NCC đã chốt đơn
   | 'PARTIALLY_RECEIVED'   // Đã nhận một phần
   | 'RECEIVED'             // Đã nhập kho xong
+  | 'COMPLETED'            // Đã hoàn tất nhập kho
+  | 'REJECTED'             // Đã từ chối
   | 'CANCELLED';           // Đã hủy
 
 export interface PurchaseOrderItemDetail {
@@ -33,6 +38,11 @@ export interface PurchaseOrderListItem {
   totalAmount: number;         // Tổng tiền đơn hàng (VNĐ)
   status: PurchaseOrderStatus;
   note?: string;
+  revisionNumber?: number;
+  /** Phiếu GRN DRAFT/COMPLETED gắn PO (nếu có) — dùng điều hướng Nhận hàng */
+  activeGoodsReceiptId?: string | null;
+  activeGoodsReceiptCode?: string | null;
+  activeGoodsReceiptStatus?: string | null;
   items: PurchaseOrderItemDetail[];
 }
 

@@ -27,11 +27,12 @@ export const PoListFilterBar: FC<PoListFilterBarProps> = ({
         border: '1px solid #e2e8f0',
         borderRadius: 8,
         padding: '12px 16px',
-        marginBottom: 12,
+        marginBottom: 0,
         boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)',
         display: 'flex',
         flexDirection: 'column',
         gap: 10,
+        flexShrink: 0,
       }}
     >
       {/* ── Dòng 1: Tìm kiếm + Chi nhánh + Nhà cung cấp + Trạng thái ── */}
@@ -171,10 +172,14 @@ export const PoListFilterBar: FC<PoListFilterBarProps> = ({
             }}
           >
             <option value="all">-- Tất cả trạng thái --</option>
+            <option value="PENDING_APPROVAL">🟠 PENDING_APPROVAL (Chờ duyệt)</option>
+            <option value="APPROVED">🟢 APPROVED (Đã duyệt)</option>
+            <option value="DISPATCHED">🟡 DISPATCHED (Đã gửi NCC)</option>
             <option value="SENT">🟡 SENT (Đã gửi NCC)</option>
             <option value="CONFIRMED">🟢 CONFIRMED (NCC đã chốt)</option>
             <option value="PARTIALLY_RECEIVED">🟣 PARTIALLY_RECEIVED (Nhận 1 phần)</option>
             <option value="RECEIVED">🔵 RECEIVED (Đã nhập kho xong)</option>
+            <option value="COMPLETED">🔵 COMPLETED (Hoàn tất nhập kho)</option>
             <option value="CANCELLED">🔴 CANCELLED (Đã hủy)</option>
           </select>
         </div>

@@ -1,7 +1,5 @@
 export type SupplierType = 'Goods' | 'Service' | 'Both';
 
-export type SupplierCategory = 'FRESH' | 'AMBIENT' | 'FROZEN' | 'UTILITIES' | 'RENT' | 'LOGISTICS';
-
 export type SupplierStatus = 'Active' | 'Inactive';
 
 export interface SupplierSummary {
@@ -10,7 +8,6 @@ export interface SupplierSummary {
   name: string;
   tradeName?: string;
   supplierType: SupplierType;
-  category: SupplierCategory;
   contactPerson: string;
   phone: string;
   email?: string;
@@ -75,7 +72,6 @@ export interface SupplierFilterState {
   contactPerson?: string;
   phone?: string;
   supplierType: string;
-  category: string;
   debtStatus: string;
   ratingFilter: string;
   status: string;
@@ -95,7 +91,6 @@ export interface CreateSupplierInput {
   name: string;
   tradeName?: string;
   supplierType: SupplierType;
-  category: SupplierCategory;
   contactPerson: string;
   phone: string;
   status?: SupplierStatus;
@@ -147,10 +142,10 @@ export interface HolidayDateRange {
 }
 
 export interface SupplierDeliveryConfig {
-  leadTimeDays: number;
-  leadTimeUnit: 'BUSINESS_DAYS' | 'CALENDAR_DAYS';
   minOrderQuantity: number;
   activeDeliveryDays: number[]; // 0 = Sun, 1 = Mon, ..., 6 = Sat
+  /** Số ngày trước ngày giao để chốt đơn (0 = cùng ngày giao). Mặc định 1. */
+  cutoffDayOffset: number;
   cutoffTime: string; // e.g. "14:00" or "16:00"
   allowStoreEdit: boolean;
   editWindowType: 'BEFORE_CUTOFF' | 'HOURS_BEFORE_DELIVERY' | 'HOURS_AFTER_ORDER';
@@ -177,6 +172,9 @@ export interface SupplierProductItem {
   importPrice?: number; // alias cho backward compatibility
   unit?: string;        // alias cho backward compatibility
   moq: number;
+  /** Số lượng thiếu hàng cho phép */
+  allowedShortageQty: number;
+  imageUrl?: string;
   isPrimary: boolean;
   supplierProductCode?: string;
   effectiveDate: string;
@@ -192,6 +190,7 @@ export interface MasterProduct {
   baseUoM: string;
   defaultWholesalePrice: number;
   defaultMoq: number;
+  imageUrl?: string;
 }
 
 export interface AssignProductInput {
@@ -200,6 +199,7 @@ export interface AssignProductInput {
   deliveryUoM: string;
   agreedPrice: number;
   moq: number;
+  allowedShortageQty?: number;
   isPrimary?: boolean;
   supplierProductCode?: string;
 }
@@ -209,6 +209,7 @@ export interface EditSupplierProductInput {
   deliveryUoM: string;
   agreedPrice: number;
   moq: number;
+  allowedShortageQty: number;
   isPrimary: boolean;
   supplierProductCode?: string;
   status: 'Active' | 'Inactive';
@@ -237,6 +238,10 @@ export interface SupplierBranchAssignmentItem {
   assignedAt: string;
   status: 'Active' | 'Inactive';
   inactiveReason?: string;
+  /** Mon..Sun */
+  deliveryDays?: string[];
+  /** VD: T2, T4, T6 */
+  deliveryDaysDisplay?: string;
 }
 
 export interface SupplierBranchFilterState {
@@ -259,5 +264,12 @@ export interface AssignSupplierToBranchesInput {
 export interface AssignSuppliersToBranchInput {
   branchId: string;
   supplierIds: string[];
+  items?: Array<{
+    supplierId: string;
+    deliveryDays: string[];
+  }>;
+  /** Mặc định Active; Inactive cần inactiveReason */
+  status?: 'Active' | 'Inactive';
+  inactiveReason?: string;
 }
 

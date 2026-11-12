@@ -5,6 +5,7 @@ import { AdminToast, type ToastState } from '../../admin/components';
 import { LoyaltyConfigForm } from '../components/loyalty/LoyaltyConfigForm';
 import { LoyaltyLedgerTable } from '../components/loyalty/LoyaltyLedgerTable';
 import { AdjustPointsModal } from '../components/loyalty/AdjustPointsModal';
+import { promotionApi } from '../api/promotionApi';
 import {
   INITIAL_LOYALTY_CONFIG,
   INITIAL_POINT_LEDGER,
@@ -20,10 +21,31 @@ export const LoyaltyConfigPage: FC = () => {
   const [config, setConfig] = useState<LoyaltySystemConfig>(INITIAL_LOYALTY_CONFIG);
   const [ledger, setLedger] = useState<PointLedgerItem[]>(INITIAL_POINT_LEDGER);
   const [isAdjustModalOpen, setIsAdjustModalOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    promotionApi.getLoyaltyConfig()
+      .then((data) => {
+        if (data) {
+          setConfig((prev) => ({
+            ...prev,
+            isEnabled: data.isEnabled,
+            earningRateAmount: data.earningRateAmount,
+            earningPoints: data.earningPoints,
+            redemptionRatePoints: data.redemptionRatePoints,
+            redemptionRateAmount: data.redemptionRateAmount,
+            minRedemptionPoints: data.minRedemptionPoints,
+            allowPointsWithPromotions: data.allowPointsWithPromotions,
+          }));
+        }
+      })
+      .catch(() => {
+        // Fallback to default initial config
+      });
+  }, []);
 
   // Active Tab from query param or default to 'config'
   const tabParam = searchParams.get('tab');
-  const viewParam = searchParams.get('view');
   const activeTab: 'config' | 'ledger' = tabParam === 'ledger' ? 'ledger' : 'config';
 
   const [toast, setToast] = useState<ToastState | null>(null);
@@ -54,18 +76,24 @@ export const LoyaltyConfigPage: FC = () => {
     );
   };
 
-  // Scroll to membership tiers if ?view=tiers
-  useEffect(() => {
-    if (viewParam === 'tiers') {
-      const el = document.getElementById('membership-tiers-section');
-      if (el) {
-        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }
+  const handleSaveConfig = async () => {
+    try {
+      setIsSaving(true);
+      await promotionApi.updateLoyaltyConfig({
+        isEnabled: config.isEnabled,
+        earningRateAmount: config.earningRateAmount,
+        earningPoints: config.earningPoints,
+        redemptionRatePoints: config.redemptionRatePoints,
+        redemptionRateAmount: config.redemptionRateAmount,
+        minRedemptionPoints: config.minRedemptionPoints,
+        allowPointsWithPromotions: config.allowPointsWithPromotions,
+      });
+      showToast('Đã lưu thành công chính sách tích điểm & đổi thưởng!');
+    } catch {
+      showToast('Lỗi khi lưu cấu hình tích điểm', 'error');
+    } finally {
+      setIsSaving(false);
     }
-  }, [viewParam, activeTab]);
-
-  const handleSaveConfig = () => {
-    showToast('Đã lưu thành công chính sách tích điểm & hạng thẻ!');
   };
 
   const handleSaveAdjustment = (entry: PointLedgerItem) => {
@@ -95,8 +123,8 @@ export const LoyaltyConfigPage: FC = () => {
             <Award className="w-6 h-6" />
           </div>
           <div className="promotion-topbar-text">
-            <h1>Thiết Lập Tích Điểm & Hạng Thẻ</h1>
-            <p>Cấu hình tỷ lệ tích / tiêu điểm, chính sách nâng hạng thẻ và quản lý sổ cái điểm thưởng</p>
+            <h1>Thiết Lập Tích Điểm & Đổi Thưởng</h1>
+            <p>Cấu hình tỷ lệ tích / tiêu điểm và quản lý sổ cái điểm thưởng cho toàn hệ thống</p>
           </div>
         </div>
       </div>
@@ -111,7 +139,7 @@ export const LoyaltyConfigPage: FC = () => {
               className={`loyalty-nav-tab-btn ${activeTab === 'config' ? 'active' : ''}`}
             >
               <Settings className="w-4 h-4" />
-              <span>Cấu hình tích điểm & Hạng thẻ</span>
+              <span>Cấu hình chính sách tích điểm</span>
             </button>
 
             <button
@@ -143,10 +171,10 @@ export const LoyaltyConfigPage: FC = () => {
               <button
                 onClick={handleSaveConfig}
                 className="btn-primary-pill loyalty-save-btn-top"
-                disabled={!config.isEnabled}
+                disabled={!config.isEnabled || isSaving}
               >
                 <Save size={15} />
-                <span>Lưu thiết lập</span>
+                <span>{isSaving ? 'Đang lưu...' : 'Lưu thiết lập'}</span>
               </button>
             </div>
           )}

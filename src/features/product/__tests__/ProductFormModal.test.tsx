@@ -374,4 +374,53 @@ describe('ProductFormModal - Quản lý đơn vị tính & Hàng cùng loại (R
     fireEvent.click(screen.getByTitle('Đóng xem ảnh'));
     expect(screen.queryByTitle('Đóng xem ảnh')).toBeNull();
   });
+
+  it('Kiểm tra nút tickbox Quản lý theo lô & HSD (FEFO) khi chỉnh sửa sản phẩm', async () => {
+    const handleSave = vi.fn();
+    const mockProduct: any = {
+      id: 'prod-edit-1',
+      productCode: 'SP000088',
+      productName: 'Bia Heineken',
+      categoryId: 'cat-1',
+      categoryName: 'Đồ uống',
+      baseUnit: 'Lon',
+      sellingPrice: 20000,
+      costPrice: 15000,
+      onHand: 100,
+      committed: 0,
+      status: 'Active',
+      createdAt: '2026-10-31',
+      updatedAt: '2026-10-31',
+      hasBatches: false,
+      uomConversions: [],
+    };
+
+    render(
+      <ProductFormModal
+        isOpen={true}
+        productToEdit={mockProduct}
+        categories={mockCategories}
+        onClose={vi.fn()}
+        onSave={handleSave}
+        onOpenCreateCategoryModal={vi.fn()}
+      />
+    );
+
+    const checkbox = screen.getByLabelText(/Quản lý theo lô & hạn sử dụng/i) as HTMLInputElement;
+    expect(checkbox.checked).toBe(false);
+
+    // Click checkbox để bật quản lý lô
+    fireEvent.click(checkbox);
+    expect(checkbox.checked).toBe(true);
+
+    // Nhấn Cập nhật (trong chế độ chỉnh sửa)
+    const saveBtn = screen.getByText('Cập nhật');
+    fireEvent.click(saveBtn);
+
+    expect(handleSave).toHaveBeenCalledWith(
+      expect.objectContaining({ hasBatches: true }),
+      false,
+      expect.any(Array)
+    );
+  });
 });

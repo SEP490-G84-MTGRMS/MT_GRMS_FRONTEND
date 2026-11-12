@@ -4,8 +4,6 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import {
   ArrowLeft,
   Menu,
-  Bookmark,
-  Printer,
   Clock,
   Plus,
   ChevronLeft,
@@ -13,8 +11,13 @@ import {
   Layers,
   Receipt,
   Package,
+  ArrowLeftRight,
+  DoorOpen,
+  ShoppingCart,
+  Lock,
 } from 'lucide-react';
 import type { OrderTab, Product } from '../types/pos.types';
+import type { ShiftDetailResponse } from '../types/posShift.types';
 import { useAuthStore } from '../../../stores/useAuthStore';
 
 interface Props {
@@ -30,9 +33,17 @@ interface Props {
   onAddTab?: () => void;
   salesMode?: 'fast' | 'normal';
   onToggleSalesMode?: (mode: 'fast' | 'normal') => void;
-  onHoldOrder?: () => void;
-  onPrintRecent?: () => void;
   onCloseShift?: () => void;
+  branchName?: string;
+  branches?: Array<{ id: string; name: string; address?: string }>;
+  selectedBranchId?: string;
+  onSelectBranch?: (branchId: string) => void;
+  onOpenInventoryLookup?: () => void;
+  currentShift?: ShiftDetailResponse | null;
+  onOpenCashMovement?: () => void;
+  onOpenShift?: () => void;
+  ownerShiftMode?: 'attach' | 'shiftless' | null;
+  onOpenOwnerShiftModeModal?: () => void;
 }
 
 export const PosHeader: FC<Props> = ({
@@ -48,16 +59,26 @@ export const PosHeader: FC<Props> = ({
   onAddTab,
   salesMode = 'fast',
   onToggleSalesMode,
-  onHoldOrder,
-  onPrintRecent,
   onCloseShift,
+  branchName,
+  branches = [],
+  selectedBranchId,
+  onSelectBranch,
+  onOpenInventoryLookup,
+  currentShift,
+  onOpenCashMovement,
+  onOpenShift,
+  ownerShiftMode,
+  onOpenOwnerShiftModeModal,
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuthStore();
-  const isStoreOwner = user?.role === 'STORE_OWNER';
+  const isStoreOwner = user?.role === 'STORE_OWNER' || user?.role === 'ADMIN';
   const roleLabel = isStoreOwner ? 'Chủ cửa hàng' : 'Nhân viên';
-  const cashierDisplayName = user?.fullName || (isStoreOwner ? 'Trần Văn Chủ' : 'Lê Thị Thu Ngân');
+  const rawCashierName = user?.fullName || (isStoreOwner ? 'Trần Văn Chủ' : 'Lê Thị Thu Ngân');
+  // Rút gọn phần chú thích chức vụ/cửa hàng trong ngoặc đơn để không làm tràn thanh tiêu đề
+  const cashierDisplayName = rawCashierName.replace(/\s*\([^)]*\)/g, '').trim();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -78,11 +99,11 @@ export const PosHeader: FC<Props> = ({
   const trimmedQuery = searchQuery.trim().toLowerCase();
   const matchingProducts = trimmedQuery
     ? products.filter(
-        (p) =>
-          p.name.toLowerCase().includes(trimmedQuery) ||
-          p.sku.toLowerCase().includes(trimmedQuery) ||
-          p.barcode.toLowerCase().includes(trimmedQuery)
-      )
+      (p) =>
+        p.name.toLowerCase().includes(trimmedQuery) ||
+        p.sku.toLowerCase().includes(trimmedQuery) ||
+        p.barcode.toLowerCase().includes(trimmedQuery)
+    )
     : [];
 
   const checkScrollable = useCallback(() => {
@@ -242,12 +263,44 @@ export const PosHeader: FC<Props> = ({
     <header className="pos-header-container">
       {/* 1. HÀNG TRÊN CÙNG: Brand + Quét mã / Search + Chế độ + Thu ngân + Menu Hamburger */}
       <div className="pos-header-top-row">
-        {/* Cột trái: Chi nhánh & Quầy gọn gàng */}
+        {/* Cột trái: Chi nhánh & Quầy (STORE_OWNER đổi được, EMPLOYEE cố định) */}
         <div className="pos-header-left">
-          <div className="pos-header-branding" onClick={() => navigate(posBasePath)} style={{ cursor: 'pointer' }}>
-            <div className="pos-header-subtitle" style={{ fontSize: 13, fontWeight: 600, color: '#0f766e', margin: 0 }}>
-              Chi nhánh: <b>{user?.tenantName ? user.tenantName.split(' ')[0] + ' Trung Tâm' : 'Chi nhánh trung tâm'}</b> &bull; Quầy #01
-            </div>
+          <div className="pos-header-branding" onClick={() => navigate(posBasePath)} style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+            {isStoreOwner && branches.length > 0 ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}>
+                <span style={{ fontSize: 12.5, fontWeight: 700, color: '#0f766e', whiteSpace: 'nowrap', flexShrink: 0 }}>Chi nhánh:</span>
+                <select
+                  value={selectedBranchId || branches[0]?.id}
+                  onClick={(e) => e.stopPropagation()}
+                  onChange={(e) => onSelectBranch?.(e.target.value)}
+                  style={{
+                    padding: '4px 8px',
+                    borderRadius: 6,
+                    border: '1.5px solid #0f766e',
+                    backgroundColor: '#f0fdfa',
+                    color: '#0f766e',
+                    fontWeight: 700,
+                    fontSize: 12.5,
+                    outline: 'none',
+                    cursor: 'pointer',
+                    maxWidth: 240,
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                  title="Chủ tiệm chuyển đổi chi nhánh bán hàng"
+                >
+                  {branches.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : (
+              <div className="pos-header-subtitle" style={{ fontSize: 13, fontWeight: 600, color: '#0f766e', margin: 0, whiteSpace: 'nowrap' }}>
+                Chi nhánh: <b>{branchName || (user?.tenantName ? user.tenantName.split(' ')[0] + ' Ba Đình' : 'An Nhiên Mart - Chi nhánh Ba Đình')}</b>
+              </div>
+            )}
           </div>
         </div>
 
@@ -369,6 +422,116 @@ export const PosHeader: FC<Props> = ({
             </div>
           )}
 
+
+
+          {/* Trạng thái ca làm việc cho Thu Ngân (Cashier) */}
+          {!isStoreOwner && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              {currentShift ? (
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 5,
+                    padding: '4px 8px',
+                    borderRadius: 6,
+                    backgroundColor: '#f1f5f9',
+                    border: '1px solid #cbd5e1',
+                    fontSize: 12,
+                    color: '#334155',
+                  }}
+                  title={`Ca đang mở: ${currentShift.shiftName}`}
+                >
+                  <span style={{ width: 7, height: 7, borderRadius: '50%', backgroundColor: '#10b981' }} />
+                  <b>{currentShift.shiftCode}</b>
+                </div>
+              ) : (
+                onOpenShift && (
+                  <button
+                    type="button"
+                    onClick={onOpenShift}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 4,
+                      padding: '4px 10px',
+                      borderRadius: 6,
+                      border: '1px solid #f59e0b',
+                      backgroundColor: '#fffbeb',
+                      color: '#b45309',
+                      fontSize: 12,
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                    }}
+                    title="Chưa mở ca - Bấm để mở ca bán hàng"
+                  >
+                    <DoorOpen size={14} />
+                    <span>Mở Ca</span>
+                  </button>
+                )
+              )}
+            </div>
+          )}
+
+          {/* Badge chế độ bán hàng cho Chủ cửa hàng / Admin */}
+          {isStoreOwner && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              {currentShift ? (
+                ownerShiftMode === 'attach' ? (
+                  <button
+                    type="button"
+                    onClick={onOpenOwnerShiftModeModal}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      padding: '4px 10px',
+                      borderRadius: 8,
+                      backgroundColor: '#f0fdfa',
+                      border: '1.5px solid #0f766e',
+                      color: '#0f766e',
+                      fontSize: 12,
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
+                    }}
+                    title={`Đang bán vào ca ${currentShift.shiftCode} (Bỏ tiền vào ngăn kéo quầy). Bấm để đổi chế độ.`}
+                  >
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                      <ShoppingCart size={13} color="#0f766e" /> Bán vào ca #{currentShift.shiftCode}
+                    </span>
+                    <span style={{ fontSize: 11, textDecoration: 'underline', color: '#0d9488' }}>[Đổi]</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={onOpenOwnerShiftModeModal}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      padding: '4px 10px',
+                      borderRadius: 8,
+                      backgroundColor: '#f8fafc',
+                      border: '1.5px solid #94a3b8',
+                      color: '#334155',
+                      fontSize: 12,
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
+                    }}
+                    title="Đang bán riêng vào Két sắt (Không tính vào ca nhân viên). Bấm để đổi chế độ."
+                  >
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                      <Lock size={13} color="#475569" /> Bán riêng (Két sắt)
+                    </span>
+                    <span style={{ fontSize: 11, textDecoration: 'underline', color: '#64748b' }}>[Đổi]</span>
+                  </button>
+                )
+              ) : null}
+            </div>
+          )}
+
           <div
             className="pos-cashier-badge"
             style={{
@@ -381,10 +544,16 @@ export const PosHeader: FC<Props> = ({
               backgroundColor: isStoreOwner ? '#ecfdf5' : '#f8fafc',
               color: isStoreOwner ? '#065f46' : '#334155',
               fontSize: 12.5,
+              maxWidth: 240,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
             }}
-            title={isStoreOwner ? "Quyền Chủ cửa hàng: Được phép bán nợ" : "Quyền Thu ngân: Ẩn nút bán nợ"}
+            title={`${roleLabel}: ${rawCashierName} (${isStoreOwner ? 'Được phép bán nợ' : 'Ẩn nút bán nợ'})`}
           >
-            <span>{roleLabel}: <b>{cashierDisplayName}</b></span>
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {roleLabel}: <b>{cashierDisplayName}</b>
+            </span>
           </div>
 
           {/* Menu Hamburger 3 gạch */}
@@ -402,8 +571,8 @@ export const PosHeader: FC<Props> = ({
 
             {isMenuOpen && (
               <div className="pos-hamburger-dropdown">
-                {/* Lối tắt quay lại Dashboard cho Chủ Cửa Hàng */}
-                {isStoreOwner && (
+                {/* Lối tắt quay lại Dashboard cho Chủ Cửa Hàng hoặc Nhân Viên */}
+                {isStoreOwner ? (
                   <>
                     <button
                       type="button"
@@ -421,6 +590,24 @@ export const PosHeader: FC<Props> = ({
                     </button>
                     <div style={{ height: 1, backgroundColor: '#e2e8f0', margin: '4px 0' }} />
                   </>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      className="pos-dropdown-item"
+                      onClick={() => {
+                        setIsMenuOpen(false);
+                        navigate('/employee/schedule');
+                      }}
+                    >
+                      <ArrowLeft size={16} className="text-teal-700" />
+                      <div className="item-content">
+                        <div className="item-title">Về Dashboard Nhân Viên</div>
+                        <div className="item-desc">Xem lịch làm việc, bảng chấm công & đơn hàng</div>
+                      </div>
+                    </button>
+                    <div style={{ height: 1, backgroundColor: '#e2e8f0', margin: '4px 0' }} />
+                  </>
                 )}
 
                 <button
@@ -428,43 +615,17 @@ export const PosHeader: FC<Props> = ({
                   className="pos-dropdown-item"
                   onClick={() => {
                     setIsMenuOpen(false);
-                    onHoldOrder?.();
-                  }}
-                >
-                  <Bookmark size={16} className="text-teal-700" />
-                  <div className="item-content">
-                    <div className="item-title">Giữ đơn hàng (Recall)</div>
-                    <div className="item-desc">Tạm lưu giỏ hàng hiện tại vào bộ nhớ</div>
-                  </div>
-                </button>
-
-                <button
-                  type="button"
-                  className="pos-dropdown-item"
-                  onClick={() => {
-                    setIsMenuOpen(false);
-                    onPrintRecent?.();
-                  }}
-                >
-                  <Printer size={16} className="text-teal-700" />
-                  <div className="item-content">
-                    <div className="item-title">In bill gần nhất</div>
-                    <div className="item-desc">Xem và in lại hóa đơn vừa thanh toán</div>
-                  </div>
-                </button>
-
-                <button
-                  type="button"
-                  className="pos-dropdown-item"
-                  onClick={() => {
-                    setIsMenuOpen(false);
-                    navigate(location.pathname.startsWith('/employee') ? '/employee/inventory-lookup' : '/pos/inventory-lookup');
+                    if (onOpenInventoryLookup) {
+                      onOpenInventoryLookup();
+                    } else {
+                      navigate(location.pathname.startsWith('/employee') ? '/employee/inventory-lookup' : '/pos/inventory-lookup');
+                    }
                   }}
                 >
                   <Layers size={16} className="text-teal-700" />
                   <div className="item-content">
                     <div className="item-title">Tra cứu tồn kho & Lô FEFO</div>
-                    <div className="item-desc">Tồn đa chi nhánh, hạn dùng & xả hàng</div>
+                    <div className="item-desc">Tồn đa chi nhánh, hạn dùng & chọn bán lô</div>
                   </div>
                 </button>
 
@@ -478,29 +639,56 @@ export const PosHeader: FC<Props> = ({
                 >
                   <Receipt size={16} className="text-teal-700" />
                   <div className="item-content">
-                    <div className="item-title">Quản lý hóa đơn & Đặt trước</div>
-                    <div className="item-desc">Lịch sử hóa đơn, in lại bill & giữ kho</div>
+                    <div className="item-title">Quản lý đơn hàng & Đổi trả</div>
+                    <div className="item-desc">Tra cứu hóa đơn, in lại bill & xử lý đổi trả</div>
                   </div>
                 </button>
 
-                <button
-                  type="button"
-                  className="pos-dropdown-item highlight"
-                  onClick={() => {
-                    setIsMenuOpen(false);
-                    if (onCloseShift) {
-                      onCloseShift();
-                    } else {
-                      navigate(location.pathname.startsWith('/employee') ? '/employee/pos/shift' : '/pos/shift');
-                    }
-                  }}
-                >
-                  <Clock size={16} className="text-teal-700" />
-                  <div className="item-content">
-                    <div className="item-title">Sổ ca & Chốt ca quầy</div>
-                    <div className="item-desc">Kiểm đếm két, thu chi & bàn giao ca</div>
-                  </div>
-                </button>
+                {/* 1. Thu / Chi tiền mặt két: CHỈ dành cho Nhân viên thu ngân trực tiếp quản lý ca bán hàng */}
+                {!isStoreOwner && onOpenCashMovement && (
+                  <button
+                    type="button"
+                    className="pos-dropdown-item"
+                    onClick={() => {
+                      setIsMenuOpen(false);
+                      if (!currentShift) {
+                        alert('Quầy chưa mở ca làm việc. Vui lòng mở ca trước khi lập phiếu thu/chi két.');
+                        onOpenShift?.();
+                        return;
+                      }
+                      onOpenCashMovement();
+                    }}
+                  >
+                    <ArrowLeftRight size={16} className="text-teal-700" />
+                    <div className="item-content">
+                      <div className="item-title">Thu / Chi tiền mặt két</div>
+                      <div className="item-desc">
+                        {currentShift ? 'Lập phiếu gửi tiền, rút tiền hoặc chi phát sinh tại két' : 'Cần mở ca trước khi thu/chi két'}
+                      </div>
+                    </div>
+                  </button>
+                )}
+
+                {!isStoreOwner && (
+                  <button
+                    type="button"
+                    className="pos-dropdown-item highlight"
+                    onClick={() => {
+                      setIsMenuOpen(false);
+                      if (onCloseShift) {
+                        onCloseShift();
+                      } else {
+                        navigate(location.pathname.startsWith('/employee') ? '/employee/pos/shift' : '/pos/shift');
+                      }
+                    }}
+                  >
+                    <Clock size={16} className="text-teal-700" />
+                    <div className="item-content">
+                      <div className="item-title">Sổ ca & Chốt ca quầy</div>
+                      <div className="item-desc">Kiểm đếm két, thu chi & bàn giao ca</div>
+                    </div>
+                  </button>
+                )}
               </div>
             )}
           </div>

@@ -11,7 +11,6 @@ const sampleSupplier: SupplierSummary = {
   code: 'SUP-20261101-0002',
   name: 'Nhà Cung Cấp Long Nhật',
   supplierType: 'Goods',
-  category: 'FRESH',
   contactPerson: 'Minh Đức',
   phone: '0986312587',
   email: 'minhkun01ad@gmail.com',

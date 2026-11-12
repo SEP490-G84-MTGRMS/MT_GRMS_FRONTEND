@@ -1,13 +1,16 @@
 import type { FC } from 'react';
-import { AlertTriangle, X, Check } from 'lucide-react';
-import type { GrnItemDetail } from '../../types/grn.types';
+import { AlertTriangle, X, Check, RotateCcw, Truck } from 'lucide-react';
+import type { GrnItemDetail, RejectionReason } from '../../types/grn.types';
+import { REJECTION_REASON_LABELS } from '../../types/grn.types';
 
 interface GrnMismatchConfirmModalProps {
   isOpen: boolean;
   mismatchedItems: GrnItemDetail[];
   onClose: () => void;
-  onConfirm: () => void;
+  onConfirm: (redirectToReturn?: boolean) => void;
 }
+
+const fmtCurrency = (val: number) => new Intl.NumberFormat('vi-VN').format(val);
 
 export const GrnMismatchConfirmModal: FC<GrnMismatchConfirmModalProps> = ({
   isOpen,
@@ -16,6 +19,15 @@ export const GrnMismatchConfirmModal: FC<GrnMismatchConfirmModalProps> = ({
   onConfirm,
 }) => {
   if (!isOpen) return null;
+
+  const totalRejectedQty = mismatchedItems.reduce(
+    (sum, it) => sum + Math.max(0, it.orderedQty - (it.receivedQty || 0)),
+    0
+  );
+  const totalReturnAmount = mismatchedItems.reduce(
+    (sum, it) => sum + Math.max(0, it.orderedQty - (it.receivedQty || 0)) * (it.unitPrice || 0),
+    0
+  );
 
   return (
     <div
@@ -36,7 +48,7 @@ export const GrnMismatchConfirmModal: FC<GrnMismatchConfirmModalProps> = ({
           backgroundColor: '#ffffff',
           borderRadius: 10,
           width: '100%',
-          maxWidth: 540,
+          maxWidth: 720,
           boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
           border: '1px solid #e2e8f0',
           overflow: 'hidden',
@@ -56,7 +68,7 @@ export const GrnMismatchConfirmModal: FC<GrnMismatchConfirmModalProps> = ({
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <AlertTriangle size={18} color="#e11d48" />
             <h3 style={{ margin: 0, fontSize: 14.5, fontWeight: 700, color: '#9f1239' }}>
-              Xác nhận chênh lệch hàng hóa so với đơn PO
+              Xác nhận từ chối nhận hàng &amp; Lập Phiếu trả hàng (RTV)
             </h3>
           </div>
           <button
@@ -76,16 +88,39 @@ export const GrnMismatchConfirmModal: FC<GrnMismatchConfirmModalProps> = ({
 
         {/* Content */}
         <div style={{ padding: '16px 20px', fontSize: 13, color: '#334155' }}>
-          <p style={{ margin: '0 0 12px 0', lineHeight: 1.5 }}>
-            Phát hiện <b>{mismatchedItems.length}</b> mặt hàng có số lượng thực nhận không khớp với số lượng đặt trên PO.
-            Hệ thống sẽ lưu phiếu ở trạng thái <b style={{ color: '#dc2626' }}>MISMATCH (Lệch hàng)</b> và lập biên bản đối soát.
+          <p style={{ margin: '0 0 10px 0', lineHeight: 1.55 }}>
+            Phát hiện <b>{mismatchedItems.length}</b> mặt hàng có số lượng từ chối nhận so với đơn PO (tổng cộng{' '}
+            <b style={{ color: '#dc2626' }}>{totalRejectedQty}</b> đơn vị — giá trị trả{' '}
+            <b style={{ color: '#b45309' }}>{fmtCurrency(totalReturnAmount)} đ</b>).
           </p>
 
           <div
             style={{
-              maxHeight: 220,
+              padding: '10px 12px',
+              borderRadius: 8,
+              backgroundColor: '#fff7ed',
+              border: '1px solid #fed7aa',
+              marginBottom: 12,
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: 10,
+              fontSize: 12.5,
+              color: '#9a3412',
+            }}
+          >
+            <Truck size={18} style={{ flexShrink: 0, marginTop: 2, color: '#ea580c' }} />
+            <div style={{ lineHeight: 1.5 }}>
+              Hệ thống sẽ <b>tự động lập Phiếu trả hàng (Loại: Từ chối nhận hàng)</b> ở trạng thái{' '}
+              <b>Đã bàn giao (Tài xế chở về ngay)</b> để xuất chứng từ ký nhận với tài xế và lưu vào màn hình{' '}
+              <b>Quản lý Trả Hàng Nhà Cung Cấp</b>. Chỉ số lượng chấp nhận mới được cộng vào tồn kho chi nhánh.
+            </div>
+          </div>
+
+          <div
+            style={{
+              maxHeight: 240,
               overflowY: 'auto',
-              border: '1px solid #f1f5f9',
+              border: '1px solid #e2e8f0',
               borderRadius: 6,
               backgroundColor: '#f8fafc',
             }}
@@ -93,41 +128,55 @@ export const GrnMismatchConfirmModal: FC<GrnMismatchConfirmModalProps> = ({
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
               <thead>
                 <tr style={{ backgroundColor: '#f1f5f9', borderBottom: '1px solid #e2e8f0', color: '#475569' }}>
-                  <th style={{ padding: '7px 10px', textAlign: 'left' }}>Sản phẩm</th>
-                  <th style={{ padding: '7px 8px', textAlign: 'right' }}>Đặt</th>
-                  <th style={{ padding: '7px 8px', textAlign: 'right' }}>Nhận</th>
-                  <th style={{ padding: '7px 10px', textAlign: 'center' }}>Lệch</th>
+                  <th style={{ padding: '8px 10px', textAlign: 'left' }}>Sản phẩm</th>
+                  <th style={{ padding: '8px 8px', textAlign: 'right' }}>SL Đặt</th>
+                  <th style={{ padding: '8px 8px', textAlign: 'right', color: '#0d9488' }}>Chấp nhận</th>
+                  <th style={{ padding: '8px 8px', textAlign: 'right', color: '#dc2626' }}>Từ chối trả</th>
+                  <th style={{ padding: '8px 10px', textAlign: 'left' }}>Lý do từ chối</th>
+                  <th style={{ padding: '8px 10px', textAlign: 'right' }}>Giá trị trả</th>
                 </tr>
               </thead>
               <tbody>
-                {mismatchedItems.map((it) => (
-                  <tr key={it.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                    <td style={{ padding: '7px 10px' }}>
-                      <div style={{ fontWeight: 600, color: '#0f172a' }}>{it.productName}</div>
-                      <div style={{ fontSize: 11, color: '#64748b', fontFamily: 'monospace' }}>{it.productCode}</div>
-                    </td>
-                    <td style={{ padding: '7px 8px', textAlign: 'right', color: '#475569' }}>
-                      {it.orderedQty} {it.unit}
-                    </td>
-                    <td style={{ padding: '7px 8px', textAlign: 'right', fontWeight: 700, color: '#0f172a' }}>
-                      {it.receivedQty} {it.unit}
-                    </td>
-                    <td style={{ padding: '7px 10px', textAlign: 'center' }}>
-                      <span
-                        style={{
-                          padding: '1px 6px',
-                          borderRadius: 4,
-                          fontSize: 11,
-                          fontWeight: 700,
-                          backgroundColor: it.differenceQty < 0 ? '#fee2e2' : '#f3e8ff',
-                          color: it.differenceQty < 0 ? '#dc2626' : '#7e22ce',
-                        }}
-                      >
-                        {it.differenceQty > 0 ? `+${it.differenceQty}` : it.differenceQty}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
+                {mismatchedItems.map((it) => {
+                  const rejected = Math.max(0, it.orderedQty - (it.receivedQty || 0));
+                  const reasonLabel = it.rejectionReason
+                    ? REJECTION_REASON_LABELS[it.rejectionReason as RejectionReason] || it.rejectionReason
+                    : 'Từ chối nhận hàng';
+                  return (
+                    <tr key={it.id} style={{ borderBottom: '1px solid #f1f5f9', backgroundColor: '#ffffff' }}>
+                      <td style={{ padding: '8px 10px' }}>
+                        <div style={{ fontWeight: 600, color: '#0f172a' }}>{it.productName}</div>
+                        <div style={{ fontSize: 11, color: '#64748b', fontFamily: 'monospace' }}>{it.productCode}</div>
+                      </td>
+                      <td style={{ padding: '8px 8px', textAlign: 'right', color: '#475569' }}>
+                        {it.orderedQty} {it.unit}
+                      </td>
+                      <td style={{ padding: '8px 8px', textAlign: 'right', fontWeight: 700, color: '#0d9488' }}>
+                        {it.receivedQty} {it.unit}
+                      </td>
+                      <td style={{ padding: '8px 8px', textAlign: 'right' }}>
+                        <span
+                          style={{
+                            padding: '2px 7px',
+                            borderRadius: 4,
+                            fontSize: 11,
+                            fontWeight: 700,
+                            backgroundColor: '#fee2e2',
+                            color: '#dc2626',
+                          }}
+                        >
+                          {rejected} {it.unit}
+                        </span>
+                      </td>
+                      <td style={{ padding: '8px 10px', color: '#9a3412', fontWeight: 600, fontSize: 11.5 }}>
+                        {reasonLabel}
+                      </td>
+                      <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 700, color: '#0f172a', fontFamily: 'monospace' }}>
+                        {fmtCurrency(rejected * (it.unitPrice || 0))} đ
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -142,13 +191,14 @@ export const GrnMismatchConfirmModal: FC<GrnMismatchConfirmModalProps> = ({
             display: 'flex',
             justifyContent: 'flex-end',
             gap: 10,
+            flexWrap: 'wrap',
           }}
         >
           <button
             type="button"
             onClick={onClose}
             style={{
-              height: 32,
+              height: 34,
               padding: '0 14px',
               borderRadius: 6,
               border: '1px solid #cbd5e1',
@@ -163,9 +213,30 @@ export const GrnMismatchConfirmModal: FC<GrnMismatchConfirmModalProps> = ({
           </button>
           <button
             type="button"
-            onClick={onConfirm}
+            onClick={() => onConfirm(true)}
             style={{
-              height: 32,
+              height: 34,
+              padding: '0 14px',
+              borderRadius: 6,
+              border: '1px solid #fdba74',
+              backgroundColor: '#fff7ed',
+              color: '#c2410c',
+              fontSize: 12.5,
+              fontWeight: 700,
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+            }}
+          >
+            <RotateCcw size={14} />
+            <span>Xác nhận &amp; Mở Phiếu trả hàng</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => onConfirm(false)}
+            style={{
+              height: 34,
               padding: '0 16px',
               borderRadius: 6,
               border: 'none',
@@ -180,7 +251,7 @@ export const GrnMismatchConfirmModal: FC<GrnMismatchConfirmModalProps> = ({
             }}
           >
             <Check size={14} />
-            <span>Xác nhận lập biên bản & Nhập kho</span>
+            <span>Xác nhận &amp; Hoàn tất nhập kho</span>
           </button>
         </div>
       </div>

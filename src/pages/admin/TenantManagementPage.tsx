@@ -193,12 +193,12 @@ export const TenantManagementPage: FC = () => {
   };
 
   return (
-    <div>
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, height: '100%' }}>
       {/* Toast Notification */}
       <AdminToast toast={toast} onClose={() => setToast(null)} />
 
       {/* Page Header */}
-      <div className="admin-page-header">
+      <div className="admin-page-header" style={{ flexShrink: 0, marginBottom: 14 }}>
         <div>
           <h1>Quản lý Khách hàng thuê (Tenants)</h1>
           <p>
@@ -226,7 +226,7 @@ export const TenantManagementPage: FC = () => {
       </div>
 
       {/* Filter & Search Toolbar */}
-      <div className="admin-toolbar-card" style={{ border: '1px solid #cbd5e1', borderRadius: 10 }}>
+      <div className="admin-toolbar-card" style={{ border: '1px solid #e2e8f0', borderRadius: 8, padding: '12px 16px', marginBottom: 12, flexShrink: 0 }}>
         <TenantSearchToolbar
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}

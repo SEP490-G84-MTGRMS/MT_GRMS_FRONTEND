@@ -115,6 +115,7 @@ const EditSupplierProductForm: FC<EditSupplierProductFormProps> = ({
   const initialPrice = item.agreedPrice > 0 ? item.agreedPrice : masterCost;
   const [purchasePrice, setPurchasePrice] = useState<number>(initialPrice);
   const [moq, setMoq] = useState<number>(item.moq);
+  const [allowedShortageQty, setAllowedShortageQty] = useState<number>(item.allowedShortageQty ?? 0);
   const [isActive, setIsActive] = useState<boolean>(item.status === 'Active');
   const [errorMsg, setErrorMsg] = useState('');
   const [isSaving, setIsSaving] = useState(false);
@@ -134,6 +135,11 @@ const EditSupplierProductForm: FC<EditSupplierProductFormProps> = ({
       return;
     }
 
+    if (isNaN(allowedShortageQty) || allowedShortageQty < 0) {
+      setErrorMsg('Số lượng thiếu hàng cho phép phải ≥ 0.');
+      return;
+    }
+
     setIsSaving(true);
     try {
       await onSave({
@@ -141,6 +147,7 @@ const EditSupplierProductForm: FC<EditSupplierProductFormProps> = ({
         deliveryUoM: unitLabel,
         agreedPrice: purchasePrice,
         moq,
+        allowedShortageQty,
         isPrimary: item.isPrimary,
         supplierProductCode: item.supplierProductCode,
         status: isActive ? 'Active' : 'Inactive',
@@ -302,6 +309,19 @@ const EditSupplierProductForm: FC<EditSupplierProductFormProps> = ({
               onChange={(e) => setMoq(parseInt(e.target.value, 10) || 1)}
               className="form-input"
               style={editableInputStyle}
+            />
+          </FieldRow>
+
+          <FieldRow label="Thiếu cho phép" htmlFor="inputAllowedShortageQty">
+            <input
+              id="inputAllowedShortageQty"
+              type="number"
+              min={0}
+              value={Number.isFinite(allowedShortageQty) ? allowedShortageQty : 0}
+              onChange={(e) => setAllowedShortageQty(Math.max(0, parseInt(e.target.value, 10) || 0))}
+              className="form-input"
+              style={editableInputStyle}
+              title="Số lượng thiếu hàng cho phép"
             />
           </FieldRow>
         </div>

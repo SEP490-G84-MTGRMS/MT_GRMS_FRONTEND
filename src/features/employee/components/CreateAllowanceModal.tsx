@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { AllowanceItem } from '../types';
 
 interface CreateAllowanceModalProps {
@@ -14,7 +14,15 @@ export const CreateAllowanceModal: React.FC<CreateAllowanceModalProps> = ({
 }) => {
   const [name, setName] = useState('');
   const [type, setType] = useState('Cố định hàng tháng');
-  const [amount, setAmount] = useState<number>(200000);
+  const [amount, setAmount] = useState<number | ''>('');
+
+  useEffect(() => {
+    if (isOpen) {
+      setName('');
+      setType('Cố định hàng tháng');
+      setAmount('');
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -28,7 +36,7 @@ export const CreateAllowanceModal: React.FC<CreateAllowanceModalProps> = ({
       id: `al_${Date.now()}`,
       name: name.trim(),
       type,
-      amount,
+      amount: Number(amount) || 0,
       enabled: true,
     };
     onSuccess(newAllowance);
@@ -37,7 +45,7 @@ export const CreateAllowanceModal: React.FC<CreateAllowanceModalProps> = ({
 
   return (
     <div className="emp-modal-overlay" style={{ zIndex: 1100 }}>
-      <div className="emp-modal-card" style={{ maxWidth: 500 }}>
+      <div className="emp-modal-card">
         <div className="emp-modal-header">
           <h3>Thêm mới loại phụ cấp</h3>
           <button type="button" className="emp-modal-close-btn" onClick={onClose}>
@@ -79,9 +87,11 @@ export const CreateAllowanceModal: React.FC<CreateAllowanceModalProps> = ({
               <input
                 type="number"
                 step="10000"
+                min="0"
                 className="emp-form-input"
-                value={amount}
-                onChange={(e) => setAmount(Number(e.target.value))}
+                placeholder="VD: 500,000"
+                value={amount === '' ? '' : amount}
+                onChange={(e) => setAmount(e.target.value === '' ? '' : Number(e.target.value))}
               />
             </div>
           </div>

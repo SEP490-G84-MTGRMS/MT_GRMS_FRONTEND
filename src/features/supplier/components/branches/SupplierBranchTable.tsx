@@ -2,7 +2,8 @@ import { useState, useMemo, useRef, useEffect } from 'react';
 import type { FC } from 'react';
 import type { SupplierBranchAssignmentItem } from '../../types/supplier.types';
 import { SupplierBranchTableRow } from './SupplierBranchTableRow';
-import { ArrowUpDown, ChevronLeft, ChevronRight, Store, Plus } from 'lucide-react';
+import { TablePagination } from '../../../../components/common';
+import { ArrowUpDown, Store, Plus } from 'lucide-react';
 
 interface SupplierBranchTableProps {
   assignments: SupplierBranchAssignmentItem[];
@@ -11,7 +12,7 @@ interface SupplierBranchTableProps {
   pageSize: number;
   onPageChange: (page: number) => void;
   onPageSizeChange: (pageSize: number) => void;
-  onToggleStatus: (item: SupplierBranchAssignmentItem) => void;
+  onEdit: (item: SupplierBranchAssignmentItem) => void;
   onOpenAssignModal: () => void;
 }
 
@@ -20,6 +21,7 @@ type SortField =
   | 'branchName'
   | 'supplierCode'
   | 'supplierName'
+  | 'deliveryDays'
   | 'status';
 type SortDirection = 'asc' | 'desc';
 
@@ -30,7 +32,7 @@ export const SupplierBranchTable: FC<SupplierBranchTableProps> = ({
   pageSize,
   onPageChange,
   onPageSizeChange,
-  onToggleStatus,
+  onEdit,
   onOpenAssignModal,
 }) => {
   const [sortField, setSortField] = useState<SortField | null>(null);
@@ -78,6 +80,10 @@ export const SupplierBranchTable: FC<SupplierBranchTableProps> = ({
           valA = a.supplierName.toLowerCase();
           valB = b.supplierName.toLowerCase();
           break;
+        case 'deliveryDays':
+          valA = (a.deliveryDaysDisplay || '').toLowerCase();
+          valB = (b.deliveryDaysDisplay || '').toLowerCase();
+          break;
         case 'status':
           valA = a.status;
           valB = b.status;
@@ -89,11 +95,6 @@ export const SupplierBranchTable: FC<SupplierBranchTableProps> = ({
       return 0;
     });
   }, [assignments, sortField, sortDir]);
-
-  // Pagination calculation
-  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
-  const startItem = totalCount === 0 ? 0 : (pageIndex - 1) * pageSize + 1;
-  const endItem = Math.min(pageIndex * pageSize, totalCount);
 
   // Synchronize scroll horizontal between header and body
   const handleBodyScroll = () => {
@@ -126,15 +127,15 @@ export const SupplierBranchTable: FC<SupplierBranchTableProps> = ({
     };
   }, [sortedAssignments, pageSize]);
 
-  // 6 cột đồng bộ 100% tỉ lệ với màn hình Quản lý Nhà Cung Cấp
   const tableColGroup = (
     <colgroup>
-      <col style={{ width: '13%' }} /> {/* MÃ CỬA HÀNG */}
-      <col style={{ width: '25%' }} /> {/* TÊN CỬA HÀNG / CHI NHÁNH */}
-      <col style={{ width: '14%' }} /> {/* MÃ NCC */}
-      <col style={{ width: '24%' }} /> {/* TÊN NHÀ CUNG CẤP */}
+      <col style={{ width: '11%' }} /> {/* MÃ CỬA HÀNG */}
+      <col style={{ width: '20%' }} /> {/* TÊN CỬA HÀNG / CHI NHÁNH */}
+      <col style={{ width: '11%' }} /> {/* MÃ NCC */}
+      <col style={{ width: '18%' }} /> {/* TÊN NHÀ CUNG CẤP */}
+      <col style={{ width: '14%' }} /> {/* NGÀY GIAO */}
       <col style={{ width: '12%' }} /> {/* TRẠNG THÁI */}
-      <col style={{ width: '12%' }} /> {/* THAO TÁC */}
+      <col style={{ width: '14%' }} /> {/* THAO TÁC */}
     </colgroup>
   );
 
@@ -198,6 +199,7 @@ export const SupplierBranchTable: FC<SupplierBranchTableProps> = ({
               {renderSortableHeader('Tên Cửa Hàng / Chi Nhánh', 'branchName')}
               {renderSortableHeader('Mã NCC', 'supplierCode')}
               {renderSortableHeader('Tên Nhà Cung Cấp', 'supplierName')}
+              {renderSortableHeader('Ngày giao', 'deliveryDays')}
               {renderSortableHeader('Trạng Thái', 'status', 'center')}
               <th style={{ ...thBaseStyle, textAlign: 'right' }}>Thao Tác</th>
             </tr>
@@ -219,13 +221,13 @@ export const SupplierBranchTable: FC<SupplierBranchTableProps> = ({
                 <SupplierBranchTableRow
                   key={item.id}
                   item={item}
-                  onToggleStatus={onToggleStatus}
+                  onEdit={onEdit}
                 />
               ))
             ) : (
               <tr>
                 <td
-                  colSpan={6}
+                  colSpan={7}
                   style={{
                     textAlign: 'center',
                     padding: '48px 16px',
@@ -259,56 +261,16 @@ export const SupplierBranchTable: FC<SupplierBranchTableProps> = ({
         </table>
       </div>
 
-      {/* ── Footer Phân trang chuẩn 100% theo SupplierTable ── */}
-      <div className="so-list-pager">
-        {/* Bên trái: Thông tin số lượng & Bản ghi/trang */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
-          <div>
-            Hiển thị <b>{startItem}</b> - <b>{endItem}</b> trên <b>{totalCount}</b> phân bổ
-          </div>
-
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ color: '#64748b' }}>Bản ghi/trang:</span>
-            <select
-              className="so-list-pager-select"
-              value={pageSize}
-              onChange={(e) => onPageSizeChange(Number(e.target.value))}
-            >
-              <option value={15}>15</option>
-              <option value={24}>24</option>
-              <option value={36}>36</option>
-              <option value={48}>48</option>
-            </select>
-          </div>
-        </div>
-
-        {/* Bên phải: Nút Trước / Trang x / y / Sau */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <button
-            type="button"
-            className="so-list-pager-btn"
-            disabled={pageIndex <= 1}
-            onClick={() => onPageChange(pageIndex - 1)}
-          >
-            <ChevronLeft size={13} />
-            <span>Trước</span>
-          </button>
-
-          <span style={{ padding: '0 8px', fontWeight: 600, color: '#0f172a' }}>
-            Trang {pageIndex} / {totalPages}
-          </span>
-
-          <button
-            type="button"
-            className="so-list-pager-btn"
-            disabled={pageIndex >= totalPages}
-            onClick={() => onPageChange(pageIndex + 1)}
-          >
-            <span>Sau</span>
-            <ChevronRight size={13} />
-          </button>
-        </div>
-      </div>
+      {/* ── Footer Phân trang chuẩn 1, 2, 3... ── */}
+      <TablePagination
+        currentPage={pageIndex}
+        pageSize={pageSize}
+        totalItems={totalCount}
+        pageSizeOptions={[15, 24, 36, 48]}
+        onPageChange={onPageChange}
+        onPageSizeChange={onPageSizeChange}
+        itemLabel="phân bổ"
+      />
     </div>
   );
 };

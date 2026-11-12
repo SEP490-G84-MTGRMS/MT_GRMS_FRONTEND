@@ -15,13 +15,18 @@ import type {
   PoLookupOption,
   UserRole,
 } from '../../types/grn.types';
-import { MOCK_GRN_BRANCHES } from '../../lib/mockGrnData';
+
+export interface GrnBranchOption {
+  id: string;
+  label: string;
+}
 
 interface GrnFormHeaderCardProps {
   grnNo: string;
   branchId: string;
   poReference: string;
   availablePos: PoLookupOption[];
+  branches?: GrnBranchOption[];
   supplierName: string;
   supplierCode: string;
   receiptTime: string;
@@ -43,7 +48,8 @@ export const GrnFormHeaderCard: FC<GrnFormHeaderCardProps> = ({
   grnNo,
   branchId,
   poReference,
-  availablePos,
+  availablePos: _availablePos = [],
+  branches = [],
   supplierName,
   supplierCode,
   receiptTime,
@@ -52,15 +58,17 @@ export const GrnFormHeaderCard: FC<GrnFormHeaderCardProps> = ({
   paymentTerm,
   paymentMethod,
   role,
-  employeeBranchId = 'BR-01',
+  employeeBranchId = '',
   readOnly = false,
   onBranchChange,
-  onPoChange,
+  onPoChange: _onPoChange,
   onInvoiceNoChange,
   onPaymentTermChange,
   onPaymentMethodChange,
 }) => {
   const isEmployee = role === 'employee';
+  const resolveBranchLabel = (id: string) =>
+    branches.find((b) => b.id === id)?.label || id || '—';
 
   return (
     <div
@@ -140,26 +148,11 @@ export const GrnFormHeaderCard: FC<GrnFormHeaderCardProps> = ({
                 color: '#1e293b',
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'space-between',
               }}
             >
               <span>
-                {MOCK_GRN_BRANCHES.find((b) => b.id === (isEmployee ? employeeBranchId : branchId))?.name || branchId}
+                {resolveBranchLabel(branchId || employeeBranchId)}
               </span>
-              {isEmployee && (
-                <span
-                  style={{
-                    fontSize: 10.5,
-                    padding: '1px 6px',
-                    borderRadius: 4,
-                    backgroundColor: '#e2e8f0',
-                    color: '#475569',
-                    fontWeight: 700,
-                  }}
-                >
-                  Cố định
-                </span>
-              )}
             </div>
           ) : (
             <select
@@ -179,9 +172,10 @@ export const GrnFormHeaderCard: FC<GrnFormHeaderCardProps> = ({
                 cursor: 'pointer',
               }}
             >
-              {MOCK_GRN_BRANCHES.map((b) => (
+              <option value="">-- Chọn chi nhánh --</option>
+              {branches.map((b) => (
                 <option key={b.id} value={b.id}>
-                  {b.name}
+                  {b.label}
                 </option>
               ))}
             </select>
@@ -241,53 +235,27 @@ export const GrnFormHeaderCard: FC<GrnFormHeaderCardProps> = ({
             <Package size={13} color="#64748b" />
             <span>Đơn mua hàng PO gốc:</span>
           </label>
-          {readOnly ? (
-            <div
-              style={{
-                height: 34,
-                padding: '0 10px',
-                backgroundColor: '#f8fafc',
-                border: '1px solid #cbd5e1',
-                borderRadius: 6,
-                fontSize: 12.5,
-                fontFamily: 'monospace',
-                fontWeight: 700,
-                color: '#0284c7',
-                display: 'flex',
-                alignItems: 'center',
-              }}
-            >
-              {poReference}
-            </div>
-          ) : (
-            <select
-              value={poReference}
-              onChange={(e) => onPoChange(e.target.value)}
-              style={{
-                width: '100%',
-                height: 34,
-                padding: '0 10px',
-                borderRadius: 6,
-                border: poReference ? '1px solid #0d9488' : '1px solid #cbd5e1',
-                fontSize: 12.5,
-                fontWeight: 600,
-                color: poReference ? '#0f766e' : '#334155',
-                backgroundColor: poReference ? '#f0fdfa' : '#ffffff',
-                outline: 'none',
-                cursor: 'pointer',
-              }}
-            >
-              <option value="">-- Chọn đơn đặt hàng PO --</option>
-              {availablePos.map((po) => (
-                <option key={po.poCode} value={po.poCode}>
-                  {po.poCode} — {po.supplierName} ({po.branchId})
-                </option>
-              ))}
-            </select>
-          )}
+          <div
+            style={{
+              height: 34,
+              padding: '0 10px',
+              backgroundColor: '#f8fafc',
+              border: '1px solid #cbd5e1',
+              borderRadius: 6,
+              fontSize: 12.5,
+              fontFamily: 'monospace',
+              fontWeight: 700,
+              color: poReference ? '#0284c7' : '#94a3b8',
+              display: 'flex',
+              alignItems: 'center',
+            }}
+            title="PO gốc cố định theo đơn được chọn để nhập kho"
+          >
+            {poReference || '—'}
+          </div>
         </div>
 
-        {/* 4. Nhà cung cấp */}
+        {/* 4. Mã nhà cung cấp */}
         <div>
           <label
             style={{
@@ -301,7 +269,42 @@ export const GrnFormHeaderCard: FC<GrnFormHeaderCardProps> = ({
             }}
           >
             <Building2 size={13} color="#64748b" />
-            <span>Nhà cung cấp:</span>
+            <span>Mã nhà cung cấp:</span>
+          </label>
+          <div
+            style={{
+              height: 34,
+              padding: '0 10px',
+              backgroundColor: '#f8fafc',
+              border: '1px solid #cbd5e1',
+              borderRadius: 6,
+              fontSize: 12.5,
+              fontWeight: 700,
+              fontFamily: 'monospace',
+              color: '#0f172a',
+              display: 'flex',
+              alignItems: 'center',
+            }}
+          >
+            <span>{supplierCode || '—'}</span>
+          </div>
+        </div>
+
+        {/* 5. Tên nhà cung cấp */}
+        <div>
+          <label
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 5,
+              fontSize: 12,
+              fontWeight: 600,
+              color: '#475569',
+              marginBottom: 5,
+            }}
+          >
+            <Building2 size={13} color="#64748b" />
+            <span>Tên nhà cung cấp:</span>
           </label>
           <div
             style={{
@@ -315,28 +318,19 @@ export const GrnFormHeaderCard: FC<GrnFormHeaderCardProps> = ({
               color: '#0f172a',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'space-between',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
             }}
+            title={supplierName || undefined}
           >
-            <span>{supplierName || '— Chưa chọn PO —'}</span>
-            {supplierCode && (
-              <span
-                style={{
-                  fontSize: 11,
-                  fontFamily: 'monospace',
-                  padding: '1px 6px',
-                  borderRadius: 4,
-                  backgroundColor: '#e2e8f0',
-                  color: '#475569',
-                }}
-              >
-                {supplierCode}
-              </span>
-            )}
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {supplierName || '— Chưa chọn PO —'}
+            </span>
           </div>
         </div>
 
-        {/* 5. Ngày giờ nhận hàng */}
+        {/* 6. Ngày giờ nhận hàng */}
         <div>
           <label
             style={{
@@ -371,7 +365,7 @@ export const GrnFormHeaderCard: FC<GrnFormHeaderCardProps> = ({
           />
         </div>
 
-        {/* 6. Số hóa đơn / Phiếu giao hàng */}
+        {/* 7. Số hóa đơn / Phiếu giao hàng */}
         <div>
           <label
             style={{
@@ -408,7 +402,7 @@ export const GrnFormHeaderCard: FC<GrnFormHeaderCardProps> = ({
           />
         </div>
 
-        {/* 7. Người lập phiếu */}
+        {/* 8. Người lập phiếu */}
         <div>
           <label
             style={{
@@ -443,7 +437,7 @@ export const GrnFormHeaderCard: FC<GrnFormHeaderCardProps> = ({
           />
         </div>
 
-        {/* 8. Hạn thanh toán */}
+        {/* 9. Hạn thanh toán */}
         <div>
           <label
             style={{
@@ -483,7 +477,7 @@ export const GrnFormHeaderCard: FC<GrnFormHeaderCardProps> = ({
           </select>
         </div>
 
-        {/* 9. Hình thức thanh toán */}
+        {/* 10. Hình thức thanh toán */}
         <div>
           <label
             style={{

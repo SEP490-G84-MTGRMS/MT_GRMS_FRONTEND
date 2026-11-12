@@ -1,10 +1,12 @@
 // src/layouts/StoreOwnerLayout/BranchSelectorDropdown.tsx
-import { useState, useEffect, useRef, type FC } from "react";
+import { useState, useEffect, useRef, useCallback, type FC } from "react";
 import { useNavigate } from "react-router-dom";
 import { ChevronDown, Check, Settings } from "lucide-react";
 import {
   branchManagementApi,
+  BRANCHES_UPDATED_EVENT,
   type BranchItemResponse,
+  type BranchesUpdatedEventDetail,
 } from "../../pages/store/api/branchManagementApi";
 
 export interface BranchOption {
@@ -60,13 +62,11 @@ export const BranchSelectorDropdown: FC = () => {
   const dropdownRef = useRef<HTMLDivElement | null>(null);
 
   // 1. Tải danh sách chi nhánh thực tế từ API Backend
-  useEffect(() => {
-    let isMounted = true;
-    const fetchBranches = async () => {
+  const fetchBranches = useCallback(
+    async (options?: { selectBranchId?: string }) => {
       try {
         const res = await branchManagementApi.getBranches({ pageSize: 50 });
         if (
-          isMounted &&
           res.success &&
           res.data?.items &&
           res.data.items.length > 0
@@ -77,32 +77,183 @@ export const BranchSelectorDropdown: FC = () => {
               code: b.code,
               name: b.name,
               address: b.address,
+              isHeadquarter: b.isHeadquarter,
             }),
           );
           setBranches(mapped);
 
-          // Nếu chi nhánh đang chọn không còn tồn tại, cập nhật về chi nhánh đầu tiên
+          // Cập nhật selectedBranch
           setSelectedBranch((current) => {
+            // 1. Nếu có branchId được chỉ định ưu tiên chọn (ví dụ vừa thêm chi nhánh mới)
+            if (options?.selectBranchId) {
+              const target = mapped.find((b) => b.id === options.selectBranchId);
+              if (target) {
+                try {
+                  localStorage.setItem(STORAGE_KEY, JSON.stringify(target));
+                  window.dispatchEvent(
+                    new CustomEvent("mtgrms:branch-changed", { detail: target }),
+                  );
+                } catch {
+                  // ignore
+                }
+                return target;
+              }
+            }
+
+            // 2. Nếu đang chọn "ALL", giữ nguyên
             if (current.id === "ALL") return current;
+
+            // 3. Nếu chi nhánh đang chọn có trong danh sách
             const exists = mapped.find((b) => b.id === current.id);
-            if (exists) return exists;
+            if (exists) {
+              if (
+                exists.name !== current.name ||
+                exists.address !== current.address ||
+                exists.code !== current.code
+              ) {
+                try {
+                  localStorage.setItem(STORAGE_KEY, JSON.stringify(exists));
+                } catch {
+                  // ignore
+                }
+              }
+              return exists;
+            }
+
+            // 4. Nếu không còn tồn tại (hoặc là mock cũ), fallback về chi nhánh đầu tiên
             const fallback = mapped[0];
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(fallback));
+            try {
+              localStorage.setItem(STORAGE_KEY, JSON.stringify(fallback));
+              window.dispatchEvent(
+                new CustomEvent("mtgrms:branch-changed", { detail: fallback }),
+              );
+            } catch {
+              // ignore
+            }
             return fallback;
           });
         }
       } catch {
         // Giữ mock fallback nếu mạng lỗi
       }
+    },
+    [],
+  );
+
+  // 2. Tải danh sách chi nhánh ban đầu & lắng nghe sự kiện cập nhật chi nhánh toàn cục
+  useEffect(() => {
+    fetchBranches();
+
+    const handleBranchesUpdated = (event: Event) => {
+      const customEvent = event as CustomEvent<BranchesUpdatedEventDetail>;
+      const detail = customEvent.detail;
+
+      // Cập nhật lạc quan (optimistic UI) tức thì
+      if (detail?.action === "create" && detail.branch) {
+        const createdBranch: BranchOption = {
+          id: detail.branch.id,
+          code: detail.branch.code,
+          name: detail.branch.name,
+          address: detail.branch.address,
+          isHeadquarter: detail.branch.isHeadquarter,
+        };
+
+        setBranches((prev) => {
+          const exists = prev.some((b) => b.id === createdBranch.id);
+          if (exists) return prev;
+          const cleanPrev = prev.filter(
+            (b) =>
+              b.id !== DEFAULT_BRANCHES[0].id && b.id !== DEFAULT_BRANCHES[1].id,
+          );
+          return [createdBranch, ...cleanPrev];
+        });
+
+        if (detail.selectCreated) {
+          setSelectedBranch(createdBranch);
+          try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(createdBranch));
+            window.dispatchEvent(
+              new CustomEvent("mtgrms:branch-changed", { detail: createdBranch }),
+            );
+          } catch {
+            // ignore
+          }
+        }
+      } else if (detail?.action === "update" && detail.branch) {
+        const updated = detail.branch;
+        setBranches((prev) =>
+          prev.map((b) =>
+            b.id === updated.id
+              ? {
+                  ...b,
+                  code: updated.code,
+                  name: updated.name,
+                  address: updated.address,
+                  isHeadquarter: updated.isHeadquarter,
+                }
+              : b,
+          ),
+        );
+        setSelectedBranch((current) => {
+          if (current.id === updated.id) {
+            const next: BranchOption = {
+              ...current,
+              code: updated.code,
+              name: updated.name,
+              address: updated.address,
+              isHeadquarter: updated.isHeadquarter,
+            };
+            try {
+              localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+            } catch {
+              // ignore
+            }
+            return next;
+          }
+          return current;
+        });
+      } else if (detail?.action === "delete" && detail.branchId) {
+        const deletedId = detail.branchId;
+        setBranches((prev) => prev.filter((b) => b.id !== deletedId));
+        setSelectedBranch((current) => {
+          if (current.id === deletedId) {
+            return ALL_BRANCHES_OPTION;
+          }
+          return current;
+        });
+      }
+
+      // Luôn đồng bộ dữ liệu chuẩn xác với backend
+      const targetId =
+        detail?.selectCreated && detail?.branch ? detail.branch.id : undefined;
+      fetchBranches({ selectBranchId: targetId });
     };
 
-    fetchBranches();
+    window.addEventListener(BRANCHES_UPDATED_EVENT, handleBranchesUpdated);
     return () => {
-      isMounted = false;
+      window.removeEventListener(BRANCHES_UPDATED_EVENT, handleBranchesUpdated);
+    };
+  }, [fetchBranches]);
+
+  // 3. Lắng nghe thay đổi chi nhánh từ tab khác qua localStorage
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === STORAGE_KEY && e.newValue) {
+        try {
+          const parsed = JSON.parse(e.newValue);
+          setSelectedBranch(parsed);
+        } catch {
+          // ignore
+        }
+      }
+    };
+    window.addEventListener("storage", handleStorageChange);
+    return () => {
+      window.removeEventListener("storage", handleStorageChange);
     };
   }, []);
 
-  // 2. Click outside để đóng dropdown
+  // 4. Click outside để đóng dropdown
   useEffect(() => {
     if (!isOpen) return;
 
@@ -129,7 +280,7 @@ export const BranchSelectorDropdown: FC = () => {
     };
   }, [isOpen]);
 
-  // 3. Chọn chi nhánh
+  // 5. Chọn chi nhánh
   const handleSelectBranch = (branch: BranchOption) => {
     setSelectedBranch(branch);
     setIsOpen(false);
@@ -156,7 +307,15 @@ export const BranchSelectorDropdown: FC = () => {
       {/* Nút bấm trên Header (không có icon và không có mã, chỉ tên và mũi tên) */}
       <button
         type="button"
-        onClick={() => setIsOpen((prev) => !prev)}
+        onClick={() => {
+          setIsOpen((prev) => {
+            const next = !prev;
+            if (next) {
+              fetchBranches();
+            }
+            return next;
+          });
+        }}
         style={{
           display: "inline-flex",
           alignItems: "center",
