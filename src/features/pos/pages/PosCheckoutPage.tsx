@@ -3,7 +3,6 @@ import type { FC } from 'react';
 import { CheckCircle2, AlertTriangle, ShieldAlert, AlertOctagon } from 'lucide-react';
 import type { OrderTab, CartItem, Product, Customer, ReceiptData } from '../types/pos.types';
 import {
-  initialCategories,
   mockCustomers,
   mockCustomersAnNhien,
   createInitialCartItem,
@@ -116,7 +115,7 @@ export const PosCheckoutPage: FC = () => {
   const [cashierEligibility, setCashierEligibility] = useState<CashierShiftEligibilityDto | null>(null);
   const isShiftClosing =
     !isStoreOwner &&
-    (currentShift?.status === 'Closing' || currentShift?.status === 2 || currentShift?.status === 3);
+    (currentShift?.status === 'Closing' || currentShift?.status === 3);
   const [isOpenShiftModalOpen, setIsOpenShiftModalOpen] = useState(false);
   const [isCashMovementModalOpen, setIsCashMovementModalOpen] = useState(false);
   const [isCloseShiftModalOpen, setIsCloseShiftModalOpen] = useState(false);
@@ -280,7 +279,7 @@ export const PosCheckoutPage: FC = () => {
       setCurrentShift(shift);
 
       if (!shift) {
-        if (eligibility && !eligibility.isAllowed) {
+        if (eligibility && (!eligibility.isAllowed || eligibility.hasClosedShiftToday)) {
           setIsOpenShiftModalOpen(false);
         } else {
           setIsOpenShiftModalOpen(true);
@@ -344,6 +343,7 @@ export const PosCheckoutPage: FC = () => {
   // Modals state
   const [isAddCustomerOpen, setIsAddCustomerOpen] = useState(false);
   const [isVietQrOpen, setIsVietQrOpen] = useState(false);
+  const [pendingPaymentOrder, setPendingPaymentOrder] = useState<Awaited<ReturnType<typeof posOrderApi.createOrder>> | null>(null);
   const [belowCostWarningItem, setBelowCostWarningItem] = useState<CartItem | null>(null);
   const [isDebtWarningOpen, setIsDebtWarningOpen] = useState(false);
   const [isOrderDiscountOpen, setIsOrderDiscountOpen] = useState(false);
@@ -363,6 +363,27 @@ export const PosCheckoutPage: FC = () => {
 
   // Tab hiện tại
   const currentTab = tabs.find((t) => t.id === activeTabId) || tabs[0];
+
+  // Danh mục lọc được lấy từ sản phẩm kinh doanh tại chi nhánh đang chọn.
+  const branchCategories = useMemo(() => {
+    const categoryMap = new Map<string, { name: string; count: number }>();
+
+    for (const product of products) {
+      const categoryId = product.category?.trim() || 'uncategorized';
+      const categoryName = product.categoryName?.trim() || product.category?.trim() || 'Chưa phân loại';
+      const existing = categoryMap.get(categoryId);
+      if (existing) {
+        existing.count += 1;
+      } else {
+        categoryMap.set(categoryId, { name: categoryName, count: 1 });
+      }
+    }
+
+    return [
+      { id: 'all', name: 'Tất cả', count: products.length },
+      ...Array.from(categoryMap, ([id, category]) => ({ id, ...category })),
+    ];
+  }, [products]);
 
   // 2. Nạp danh mục sản phẩm thuộc ĐÚNG chi nhánh đang chọn (/api/branches/{branchId}/products)
   useEffect(() => {
@@ -623,12 +644,13 @@ export const PosCheckoutPage: FC = () => {
   };
 
   const handleUpdateQuantity = (id: string, quantity: number) => {
+    const safeQuantity = Number.isFinite(quantity) ? Math.min(999, Math.max(1, Math.floor(quantity))) : 1;
     const updatedCart = currentTab.cart.map((item) => {
       if (item.id === id) {
         return {
           ...item,
-          quantity,
-          totalAmount: item.actualPrice * quantity,
+          quantity: safeQuantity,
+          totalAmount: item.actualPrice * safeQuantity,
         };
       }
       return item;
@@ -664,14 +686,19 @@ export const PosCheckoutPage: FC = () => {
   };
 
   const handleUpdateItemDiscount = (id: string, discount: number, type: 'vnd' | 'percent') => {
+    if (!Number.isFinite(discount)) return;
     const updatedCart = currentTab.cart.map((item) => {
       if (item.id === id) {
+        const safeDiscount = Math.min(
+          type === 'percent' ? 100 : Math.max(0, item.unitPrice),
+          Math.max(0, discount)
+        );
         const discountVnd =
-          type === 'vnd' ? discount : Math.round((item.unitPrice * discount) / 100);
+          type === 'vnd' ? safeDiscount : Math.round((item.unitPrice * safeDiscount) / 100);
         const actualPrice = Math.max(0, item.unitPrice - discountVnd);
         return {
           ...item,
-          discountPerItem: discount,
+          discountPerItem: safeDiscount,
           discountType: type,
           actualPrice,
           totalAmount: actualPrice * item.quantity,
@@ -836,7 +863,7 @@ export const PosCheckoutPage: FC = () => {
               setCouponStatusText(`✓ ${res.voucherResult.message || 'Mã hợp lệ'}`);
             } else {
               setVoucherDiscount(0);
-              setCouponStatusText(res.voucherResult.message || '');
+              setCouponStatusText(res.voucherResult.message ? `✗ ${res.voucherResult.message}` : '');
             }
           }
         })
@@ -865,13 +892,29 @@ export const PosCheckoutPage: FC = () => {
         setCouponStatusText(`✓ ${res.message || 'Mã hợp lệ'}`);
         showToast(`Áp dụng voucher ${res.code} thành công (-${res.discountAmount.toLocaleString('vi-VN')} đ)`);
       } else {
+        const msg = res?.message || 'Mã voucher không tồn tại hoặc không hợp lệ';
         setVoucherDiscount(0);
-        setCouponStatusText(`✗ ${res?.message || 'Mã không hợp lệ'}`);
-        showToast(res?.message || 'Mã không hợp lệ', 'error');
+        setCouponStatusText(`✗ ${msg}`);
+        showToast(msg, 'error');
       }
-    } catch {
+    } catch (err: unknown) {
+      const axiosErr = err as {
+        response?: {
+          status?: number;
+          data?: { message?: string; errors?: Record<string, string[]> };
+        };
+      };
+      const validationErrors = axiosErr?.response?.data?.errors
+        ? Object.values(axiosErr.response.data.errors).flat().filter(Boolean)
+        : [];
+      const serverMsg =
+        axiosErr?.response?.data?.message ||
+        validationErrors[0] ||
+        (axiosErr?.response?.status === 404 ? 'Mã voucher không tồn tại' : undefined);
+      const displayMsg = serverMsg || 'Không thể kiểm tra mã voucher lúc này, vui lòng thử lại';
       setVoucherDiscount(0);
-      setCouponStatusText('✗ Lỗi khi kiểm tra mã voucher');
+      setCouponStatusText(`✗ ${displayMsg}`);
+      showToast(displayMsg, 'error');
     } finally {
       setIsValidatingCoupon(false);
     }
@@ -983,6 +1026,147 @@ export const PosCheckoutPage: FC = () => {
     };
   };
 
+  const buildCreateOrderPayload = (debtNote?: string, managerBypass = false, isPendingPayment = false) => {
+    const isDebt = currentTab.paymentMethod === 'debt';
+    const isBank = currentTab.paymentMethod === 'vietqr';
+    const paymentMethod = isDebt ? 'CREDIT' : isBank ? 'BANK' : 'CASH';
+
+    const branchId = activeBranch.id || DEFAULT_GROCERY_BRANCH_ID;
+
+    const paidItems = currentTab.cart.map((c) => {
+      const manualDiscount = Math.max(0, (c.unitPrice - c.actualPrice) * c.quantity);
+
+      return {
+        productId: c.product.id || 'aaaaaaaa-1111-1111-1111-111111111111',
+        productName: c.product.name,
+        unitPrice: c.unitPrice,
+        quantity: c.quantity,
+        discountAmount: manualDiscount,
+        unitId: c.unitId,
+        unitName: c.unit,
+        isGift: false,
+      };
+    });
+
+    const giftOrderItems = effectiveGiftItems
+      .filter((g) => g.productId && g.productId !== '00000000-0000-0000-0000-000000000000' && g.quantity > 0)
+      .map((g) => ({
+        productId: g.productId,
+        productName: g.productName,
+        unitPrice: 0,
+        quantity: g.quantity,
+        discountAmount: 0,
+        unitName: g.unitName || 'Cái',
+        isGift: true,
+        promotionId: g.promotionId || effectivePromoId || null,
+      }));
+
+    const items = [...paidItems, ...giftOrderItems];
+    const effectiveVoucherCode =
+      couponDiscountAmount > 0 && currentTab.couponCode?.trim() ? currentTab.couponCode.trim() : undefined;
+
+    const isOwnerAttachingToShift = isStoreOwner && ownerShiftMode === 'attach' && Boolean(currentShift?.id);
+    const effectiveShiftId = isStoreOwner
+      ? (isOwnerAttachingToShift ? currentShift?.id : undefined)
+      : (currentShift?.id || undefined);
+
+    return {
+      branchId,
+      customerId: currentTab.customer?.id || null,
+      paymentMethod,
+      cashTendered: currentTab.paymentMethod === 'cash' ? currentTab.cashTendered : undefined,
+      discountAmount: orderDiscountAmount + couponDiscountAmount + pointsDeduction,
+      items,
+      managerBypassCode: managerBypass ? 'MGR-BYPASS-2026' : undefined,
+      note: currentTab.note || debtNote || undefined,
+      creatorRole: user?.role,
+      cashierName: isStoreOwner ? `Chủ cửa hàng: ${user?.fullName || 'Admin'}` : (user?.fullName || 'Thu ngân POS'),
+      shiftId: effectiveShiftId,
+      pointsRedeemed: pointsDeduction > 0 && currentTab.usePoints && currentTab.customer ? maxPointsCanUse : undefined,
+      voucherCode: effectiveVoucherCode,
+      appliedPromotionId: effectivePromoId || null,
+      appliedPromotionSummary: effectivePromoLabels.length > 0 ? effectivePromoLabels.join('; ') : null,
+      promotionDiscountAmount: isManualDiscountWinning ? 0 : orderDiscountAmount,
+      voucherDiscountAmount: couponDiscountAmount,
+      pointsDiscountAmount: pointsDeduction,
+      isPendingPayment,
+    };
+  };
+
+  // Tạo đơn giữ hàng chờ thanh toán (PendingPayment) trước khi mở mã QR chuyển khoản
+  const handleStartVietQrPayment = async () => {
+    if (!isStoreOwner && !currentShift) {
+      alert('Quầy hiện chưa có ca làm việc nào đang mở. Vui lòng mở ca làm việc trước khi thanh toán!');
+      setIsOpenShiftModalOpen(true);
+      return;
+    }
+    if (!isStoreOwner && cashierEligibility && !cashierEligibility.isAllowed) {
+      alert(cashierEligibility.reason || 'Bạn không có lịch làm việc trong ca hiện tại của chi nhánh.');
+      return;
+    }
+    if (!isStoreOwner && isShiftClosing) {
+      alert('Ca bán hàng đang kiểm đếm chốt ca (Closing). Tạm thời khóa thanh toán.');
+      return;
+    }
+    if (currentTab.cart.length === 0) {
+      alert('Giỏ hàng đang trống! Vui lòng thêm sản phẩm trước khi tạo mã VietQR.');
+      return;
+    }
+
+    // Nếu đã có đơn chờ thanh toán trước đó cho giỏ hiện tại thì mở lại modal QR
+    if (pendingPaymentOrder && pendingPaymentOrder.finalAmount === finalAmount) {
+      setIsVietQrOpen(true);
+      return;
+    }
+
+    // Nếu có đơn pending cũ khác số tiền thì hủy đơn cũ hoàn kho trước khi tạo đơn mới
+    if (pendingPaymentOrder) {
+      try {
+        await posOrderApi.cancelOrder(pendingPaymentOrder.id, {
+          reason: 'Cập nhật lại giỏ hàng trước khi thanh toán QR',
+          userRole: user?.role,
+        });
+      } catch {
+        // ignore
+      }
+      setPendingPaymentOrder(null);
+    }
+
+    try {
+      const payload = buildCreateOrderPayload(undefined, false, true);
+      const heldOrder = await posOrderApi.createOrder(payload);
+      setPendingPaymentOrder(heldOrder);
+      setIsVietQrOpen(true);
+      showToast(`Đã giữ hàng cho đơn ${heldOrder.orderCode} chờ xác nhận thanh toán VietQR!`, 'info');
+    } catch (apiErr: any) {
+      const errMsg = apiErr?.response?.data?.message || apiErr?.message || String(apiErr);
+      alert('Không thể giữ kho chờ thanh toán: ' + errMsg);
+    }
+  };
+
+  // Hủy đơn chờ thanh toán khi khách đóng QR hoặc lỗi thanh toán -> hoàn trả 100% tồn kho về BranchStocks
+  const handleCancelPendingVietQrPayment = async () => {
+    setIsVietQrOpen(false);
+    if (!pendingPaymentOrder) return;
+    const orderToCancel = pendingPaymentOrder;
+    setPendingPaymentOrder(null);
+    try {
+      await posOrderApi.cancelOrder(orderToCancel.id, {
+        reason: 'Chưa xác nhận thanh toán / Khách hủy chuyển khoản VietQR',
+        note: 'Tự động hoàn trả tồn kho giữ tạm (PendingPayment)',
+        userRole: user?.role,
+      });
+      showToast(`Đã hủy đơn chờ ${orderToCancel.orderCode} và hoàn trả tồn kho về quầy!`, 'info');
+      if (isValidGuid(activeBranch.id)) {
+        posOrderApi.getAllProducts(activeBranch.id).then((fresh) => {
+          if (fresh && fresh.length > 0) setProducts(fresh);
+        }).catch(() => {});
+      }
+    } catch (err: any) {
+      console.warn('Cancel pending order error:', err);
+    }
+  };
+
   const executeCompleteCheckout = async (debtNote?: string, managerBypass = false) => {
     let createdOrderId: string | undefined;
     let createdOrderCode: string | undefined;
@@ -991,66 +1175,16 @@ export const PosCheckoutPage: FC = () => {
       const isDebt = currentTab.paymentMethod === 'debt';
       const isBank = currentTab.paymentMethod === 'vietqr';
       const paymentMethod = isDebt ? 'CREDIT' : isBank ? 'BANK' : 'CASH';
-
-      const branchId = activeBranch.id || DEFAULT_GROCERY_BRANCH_ID;
-
-      const paidItems = currentTab.cart.map((c) => {
-        const manualDiscount = Math.max(0, (c.unitPrice - c.actualPrice) * c.quantity);
-
-        return {
-          productId: c.product.id || 'aaaaaaaa-1111-1111-1111-111111111111',
-          productName: c.product.name,
-          unitPrice: c.unitPrice,
-          quantity: c.quantity,
-          discountAmount: manualDiscount,
-          unitId: c.unitId,
-          unitName: c.unit,
-          isGift: false,
-        };
-      });
-
-      const giftOrderItems = effectiveGiftItems
-        .filter((g) => g.productId && g.productId !== '00000000-0000-0000-0000-000000000000' && g.quantity > 0)
-        .map((g) => ({
-          productId: g.productId,
-          productName: g.productName,
-          unitPrice: 0,
-          quantity: g.quantity,
-          discountAmount: 0,
-          unitName: g.unitName || 'Cái',
-          isGift: true,
-          promotionId: g.promotionId || effectivePromoId || null,
-        }));
-
-      const items = [...paidItems, ...giftOrderItems];
-      const effectiveVoucherCode =
-        couponDiscountAmount > 0 && currentTab.couponCode?.trim() ? currentTab.couponCode.trim() : undefined;
-
       const isOwnerAttachingToShift = isStoreOwner && ownerShiftMode === 'attach' && Boolean(currentShift?.id);
-      const effectiveShiftId = isStoreOwner
-        ? (isOwnerAttachingToShift ? currentShift?.id : undefined)
-        : (currentShift?.id || undefined);
 
-      const backendOrder = await posOrderApi.createOrder({
-        branchId,
-        customerId: currentTab.customer?.id || null,
-        paymentMethod,
-        cashTendered: currentTab.paymentMethod === 'cash' ? currentTab.cashTendered : undefined,
-        discountAmount: orderDiscountAmount + couponDiscountAmount + pointsDeduction,
-        items,
-        managerBypassCode: managerBypass ? 'MGR-BYPASS-2026' : undefined,
-        note: currentTab.note || debtNote || undefined,
-        creatorRole: user?.role,
-        cashierName: isStoreOwner ? `Chủ cửa hàng: ${user?.fullName || 'Admin'}` : (user?.fullName || 'Thu ngân POS'),
-        shiftId: effectiveShiftId,
-        pointsRedeemed: pointsDeduction > 0 && currentTab.usePoints && currentTab.customer ? maxPointsCanUse : undefined,
-        voucherCode: effectiveVoucherCode,
-        appliedPromotionId: effectivePromoId || null,
-        appliedPromotionSummary: effectivePromoLabels.length > 0 ? effectivePromoLabels.join('; ') : null,
-        promotionDiscountAmount: isManualDiscountWinning ? 0 : orderDiscountAmount,
-        voucherDiscountAmount: couponDiscountAmount,
-        pointsDiscountAmount: pointsDeduction,
-      });
+      let backendOrder: Awaited<ReturnType<typeof posOrderApi.createOrder>>;
+      if (isBank && pendingPaymentOrder) {
+        backendOrder = await posOrderApi.confirmOrderPayment(pendingPaymentOrder.id);
+        setPendingPaymentOrder(null);
+      } else {
+        const payload = buildCreateOrderPayload(debtNote, managerBypass, false);
+        backendOrder = await posOrderApi.createOrder(payload);
+      }
 
       createdOrderId = backendOrder.id;
       createdOrderCode = backendOrder.orderCode;
@@ -1110,6 +1244,15 @@ export const PosCheckoutPage: FC = () => {
       // Đồng bộ lại trạng thái ca và tiền lý thuyết
       checkShiftStatus();
 
+      // Cập nhật lại danh mục sản phẩm và tồn kho tức thì sau khi trừ kho FEFO
+      if (isValidGuid(activeBranch.id)) {
+        posOrderApi.getAllProducts(activeBranch.id).then((fresh) => {
+          if (fresh && fresh.length > 0) {
+            setProducts(fresh);
+          }
+        }).catch(() => {});
+      }
+
       setIsReceiptModalOpen(true);
     } catch (apiErr: unknown) {
       console.warn('Backend createOrder error:', apiErr);
@@ -1167,7 +1310,29 @@ export const PosCheckoutPage: FC = () => {
       return;
     }
 
-    if (currentTab.paymentMethod === 'cash' && currentTab.cashTendered < finalAmount) {
+    const hasInvalidCartLine = currentTab.cart.some(
+      (item) =>
+        !Number.isFinite(item.quantity) ||
+        item.quantity <= 0 ||
+        item.quantity > 999 ||
+        !Number.isFinite(item.unitPrice) ||
+        item.unitPrice < 0 ||
+        !Number.isFinite(item.actualPrice) ||
+        item.actualPrice < 0
+    );
+    if (hasInvalidCartLine || !Number.isFinite(finalAmount) || finalAmount < 0) {
+      alert('Giỏ hàng có số lượng, đơn giá hoặc tổng tiền không hợp lệ. Vui lòng kiểm tra lại các mặt hàng.');
+      return;
+    }
+    if (currentTab.note.trim().length > 500) {
+      alert('Ghi chú đơn hàng tối đa 500 ký tự.');
+      return;
+    }
+
+    if (
+      currentTab.paymentMethod === 'cash' &&
+      (!Number.isSafeInteger(currentTab.cashTendered) || currentTab.cashTendered < finalAmount)
+    ) {
       alert(
         `Tiền khách đưa (${currentTab.cashTendered.toLocaleString(
           'vi-VN'
@@ -1177,10 +1342,15 @@ export const PosCheckoutPage: FC = () => {
     }
 
     if (currentTab.paymentMethod === 'debt') {
-      if (!currentTab.customer) {
+      if (!currentTab.customer?.id) {
         alert('Vui lòng tìm và chọn khách hàng định danh trước khi thực hiện bán nợ!');
         return;
       }
+    }
+
+    if (currentTab.paymentMethod === 'vietqr' && !pendingPaymentOrder) {
+      handleStartVietQrPayment();
+      return;
     }
 
     executeCompleteCheckout();
@@ -1209,7 +1379,7 @@ export const PosCheckoutPage: FC = () => {
         onToggleSalesMode={(mode) => setIsCatalogModalOpen(mode === 'normal')}
         currentShift={currentShift}
         onOpenCashMovement={() => setIsCashMovementModalOpen(true)}
-        onCloseShift={() => setIsCloseShiftModalOpen(true)}
+        onOpenCloseShift={() => setIsCloseShiftModalOpen(true)}
         ownerShiftMode={ownerShiftMode}
         onOpenOwnerShiftModeModal={() => setIsOwnerShiftModeModalOpen(true)}
         onOpenShift={() => {
@@ -1247,14 +1417,16 @@ export const PosCheckoutPage: FC = () => {
               </span>
             </div>
           </div>
-          <button
-            type="button"
-            className="pos-btn-primary"
-            style={{ padding: '6px 14px', fontSize: '13px' }}
-            onClick={() => setIsOpenShiftModalOpen(true)}
-          >
-            + Mở ca làm việc ngay
-          </button>
+          {(!cashierEligibility || cashierEligibility.isAllowed) && (
+            <button
+              type="button"
+              className="pos-btn-primary"
+              style={{ padding: '6px 14px', fontSize: '13px' }}
+              onClick={() => setIsOpenShiftModalOpen(true)}
+            >
+              + Mở ca làm việc ngay
+            </button>
+          )}
         </div>
       )}
 
@@ -1393,7 +1565,7 @@ export const PosCheckoutPage: FC = () => {
             onPaymentMethodChange={(pm) => updateCurrentTab({ paymentMethod: pm })}
             cashTendered={currentTab.cashTendered}
             onCashTenderedChange={(val) => updateCurrentTab({ cashTendered: val })}
-            onOpenVietQrModal={() => setIsVietQrOpen(true)}
+            onOpenVietQrModal={handleStartVietQrPayment}
             onSubmitCheckout={handleCheckoutSubmit}
             customerSearchList={customers}
             isCheckoutDisabled={!isStoreOwner && (isShiftClosing || (cashierEligibility !== null && !cashierEligibility.isAllowed))}
@@ -1415,7 +1587,7 @@ export const PosCheckoutPage: FC = () => {
         isOpen={isCatalogModalOpen}
         onClose={() => setIsCatalogModalOpen(false)}
         products={products}
-        categories={initialCategories}
+        categories={branchCategories}
         onAddToCart={handleAddToCart}
       />
 
@@ -1436,9 +1608,9 @@ export const PosCheckoutPage: FC = () => {
 
       <VietQrModal
         isOpen={isVietQrOpen}
-        orderCode={`HD${Math.floor(100000 + Math.random() * 900000)}`}
-        amount={finalAmount}
-        onClose={() => setIsVietQrOpen(false)}
+        orderCode={pendingPaymentOrder?.orderCode || `HD${Math.floor(100000 + Math.random() * 900000)}`}
+        amount={pendingPaymentOrder?.finalAmount ?? finalAmount}
+        onClose={handleCancelPendingVietQrPayment}
         onConfirmAndPrint={() => {
           setIsVietQrOpen(false);
           executeCompleteCheckout();
@@ -1482,12 +1654,13 @@ setIsDebtWarningOpen(false);
             <PosInventoryLookupModal
         isOpen={isInventoryLookupOpen}
         onClose={() => setIsInventoryLookupOpen(false)}
+        currentBranchId={activeBranch.id}
         currentBranchName={activeBranch.name}
         products={products}
         onSelectBatchToCart={(prod, batchCode, expDate) => {
           handleAddToCart(prod, batchCode, expDate);
           setIsInventoryLookupOpen(false);
-          showToast(`Đã thêm sản phẩm "${prod.name}" (Lô: ${batchCode}) vào giỏ hàng`, 'success');
+          showToast(`Đã thêm sản phẩm "${prod.name}" (tự động phân bổ FEFO) vào giỏ hàng`, 'success');
         }}
       />
 
@@ -1552,7 +1725,10 @@ setIsDebtWarningOpen(false);
         <CloseShiftModal
           isOpen={isCloseShiftModalOpen}
           shift={currentShift}
-          onClose={() => setIsCloseShiftModalOpen(false)}
+          onClose={() => {
+            setIsCloseShiftModalOpen(false);
+            checkShiftStatus();
+          }}
           onShiftClosed={(_closed) => {
             setCurrentShift(null);
             setIsCloseShiftModalOpen(false);

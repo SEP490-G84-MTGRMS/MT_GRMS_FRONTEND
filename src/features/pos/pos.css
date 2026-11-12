@@ -675,7 +675,7 @@
   font-size: 15px;
   font-weight: 800;
   color: #0f172a;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--font-sans, 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
   font-variant-numeric: tabular-nums;
 }
 
@@ -1494,28 +1494,40 @@
 
 /* POS Catalog Modal (Bán thường) */
 .pos-catalog-modal-dialog {
-  max-width: 1040px;
-  width: 95vw;
-  max-height: 90vh;
+  max-width: 1480px;
+  width: 96vw;
+  height: 92vh;
+  max-height: 94vh;
   display: flex;
   flex-direction: column;
 }
 
 .pos-catalog-modal-body {
-  padding: 10px 16px;
+  padding: 14px 22px;
+  max-height: none;
   overflow-y: auto;
   flex: 1 1 0%;
   min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .pos-catalog-modal-dialog .pos-catalog-section {
   margin: 0;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 100%;
 }
 
 .pos-catalog-modal-dialog .pos-catalog-fieldset {
   border: none;
   padding: 0;
   background-color: transparent;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 100%;
 }
 
 .pos-catalog-modal-dialog .pos-catalog-legend {
@@ -1559,13 +1571,25 @@
 
 .pos-catalog-modal-dialog .pos-products-grid {
   display: grid;
-  grid-template-columns: repeat(5, 1fr) !important;
-  gap: 10px;
-  margin-bottom: 6px;
+  grid-template-columns: repeat(6, 1fr) !important;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+@media (max-width: 1366px) {
+  .pos-catalog-modal-dialog .pos-products-grid {
+    grid-template-columns: repeat(5, 1fr) !important;
+  }
+}
+
+@media (max-width: 1100px) {
+  .pos-catalog-modal-dialog .pos-products-grid {
+    grid-template-columns: repeat(4, 1fr) !important;
+  }
 }
 
 .pos-catalog-modal-dialog .pos-product-card {
-  padding: 8px;
+  padding: 10px;
   border-radius: 12px;
   border: 1px solid #e2e8f0;
   background-color: #ffffff;
@@ -1585,16 +1609,25 @@
 }
 
 .pos-catalog-modal-dialog .pos-product-image-wrap {
-  height: 114px;
+  height: 136px;
   width: 100%;
   border-radius: 8px;
-  margin-bottom: 6px;
+  margin-bottom: 8px;
   background-color: #f8fafc;
   overflow: hidden;
   position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.pos-catalog-modal-dialog .pos-product-name {
+  font-size: 13px;
+  height: 34px;
+}
+
+.pos-catalog-modal-dialog .pos-product-price {
+  font-size: 14.5px;
 }
 
 .pos-catalog-modal-dialog .pos-product-card .pos-product-stock-tag {
@@ -3128,4 +3161,36 @@
 .pos-unit-select:focus {
   border-color: #2563eb;
   box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+}
+/* POS viewport and real branch inventory dialogs */
+.pos-inventory-dialog { max-width: 880px; max-height: calc(100dvh - 32px); display: flex; flex-direction: column; }
+.pos-inventory-dialog .pos-modal-body { overflow-y: auto; min-height: 0; padding: 16px; }
+.pos-inventory-dialog .pos-modal-header { display: flex; justify-content: space-between; gap: 12px; }
+.pos-inventory-products { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; max-height: 140px; overflow-y: auto; }
+.pos-cart-footer-note { min-width: 0; }
+.pos-cart-table th:nth-child(4),
+.pos-cart-table td:nth-child(4) { min-width: 180px; }
+@media (max-width: 768px) {
+  .pos-page-wrapper { width: 100%; max-width: 100vw; overflow-x: hidden; }
+  .pos-header-left { flex: 1 1 100%; min-width: 0; max-width: 100%; }
+  .pos-header-left select { min-width: 0; max-width: min(240px, 65vw) !important; }
+  .pos-header-right-actions { flex-wrap: wrap; max-width: 100%; }
+  .pos-cart-footer-bar { flex-wrap: wrap; padding: 8px; }
+  .pos-cart-footer-note { flex-basis: 100%; max-width: none; }
+  .pos-cart-footer-total { flex-wrap: wrap; white-space: normal; }
+  .pos-modal-overlay { padding: 8px; }
+  .pos-modal-dialog { max-width: calc(100vw - 16px); max-height: calc(100dvh - 16px); overflow-y: auto; }
+  .pos-modal-header { flex-wrap: wrap; gap: 8px; }
+  .pos-catalog-modal-dialog .pos-modal-header { flex-wrap: nowrap; align-items: flex-start !important; }
+  .pos-catalog-modal-dialog .pos-modal-header > div,
+  .pos-catalog-modal-dialog .pos-modal-header > div > div { min-width: 0; }
+  .pos-catalog-modal-dialog .pos-modal-close-btn { flex-shrink: 0; }
+  .pos-modal-footer { flex-wrap: wrap; gap: 8px; }
+  .pos-catalog-modal-dialog .pos-products-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  .pos-catalog-modal-dialog .pos-product-price-box { flex-wrap: wrap; }
+  .pos-catalog-modal-dialog .pos-product-name { overflow-wrap: anywhere; }
+  .pos-modal-body { min-width: 0; }
+}
+@media (max-width: 380px) {
+  .pos-catalog-modal-dialog .pos-products-grid { grid-template-columns: minmax(0, 1fr) !important; }
 }

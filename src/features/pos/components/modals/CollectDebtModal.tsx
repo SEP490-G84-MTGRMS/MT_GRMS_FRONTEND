@@ -54,7 +54,7 @@ export const CollectDebtModal: FC<Props> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (payAmount <= 0) {
+    if (!Number.isSafeInteger(payAmount) || payAmount <= 0) {
       alert('Vui lòng nhập số tiền thu nợ lớn hơn 0!');
       return;
     }
@@ -67,6 +67,8 @@ export const CollectDebtModal: FC<Props> = ({
       );
       return;
     }
+
+    if (note.trim().length > 500) { alert('Ghi chú tối đa 500 ký tự.'); return; }
 
     onCollectDebt(invoice.invoiceId, {
       amount: payAmount,

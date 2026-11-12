@@ -19,6 +19,7 @@ export class ProductDTO {
   imageUrl?: string;
   spec?: string;
   category: string = '';
+  categoryName?: string;
   baseUnit: string = '';
   basePrice: number = 0;
   costPrice: number = 0;

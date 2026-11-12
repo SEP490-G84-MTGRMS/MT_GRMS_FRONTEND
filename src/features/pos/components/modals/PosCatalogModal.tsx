@@ -42,9 +42,10 @@ export const PosCatalogModal: FC<Props> = ({
       <div
         className="pos-modal-dialog pos-catalog-modal-dialog"
         style={{
-          maxWidth: 1040,
-          width: '95vw',
-          maxHeight: '92vh',
+          maxWidth: 1480,
+          width: '96vw',
+          height: '92vh',
+          maxHeight: '94vh',
           display: 'flex',
           flexDirection: 'column',
           backgroundColor: '#ffffff',
@@ -60,17 +61,17 @@ export const PosCatalogModal: FC<Props> = ({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            padding: '10px 18px',
+            padding: '12px 22px',
             borderBottom: '1px solid #e2e8f0',
             backgroundColor: '#f8fafc',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <div
               style={{
-                width: 28,
-                height: 28,
-                borderRadius: 8,
+                width: 34,
+                height: 34,
+                borderRadius: 10,
                 backgroundColor: '#f0fdfa',
                 border: '1px solid #ccfbf1',
                 display: 'flex',
@@ -79,13 +80,13 @@ export const PosCatalogModal: FC<Props> = ({
                 color: '#0f766e',
               }}
             >
-              <LayoutGrid size={16} />
+              <LayoutGrid size={18} />
             </div>
             <div>
-              <h2 style={{ margin: 0, fontSize: 14.5, fontWeight: 700, color: '#0f172a' }}>
+              <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#0f172a' }}>
                 Danh Mục Mặt Hàng Bán Thường
               </h2>
-              <p style={{ margin: 0, fontSize: 11.5, color: '#64748b' }}>
+              <p style={{ margin: 0, fontSize: 12, color: '#64748b' }}>
                 Chạm / nhấp để thêm nhanh sản phẩm vào giỏ hàng &bull; Nhấn <b>[F3]</b> hoặc <b>[ESC]</b> để đóng
               </p>
             </div>

@@ -12,6 +12,7 @@ import {
   Building2
 } from 'lucide-react';
 import { useAuthStore } from '../../../../stores/useAuthStore';
+import { httpClient } from '../../../../api/httpClient';
 
 interface Props {
   isOpen: boolean;
@@ -36,11 +37,14 @@ export const VietQrModal: FC<Props> = ({
   const [isSuccessPaid, setIsSuccessPaid] = useState(false);
   const [copiedContent, setCopiedContent] = useState(false);
 
-  // Đọc cấu hình ngân hàng của cửa hàng
+  // Đọc cấu hình ngân hàng công khai của cửa hàng (Zero-Plaintext: Không chứa API Key)
   const [bankCode, setBankCode] = useState('MB');
   const [bankAccountNumber, setBankAccountNumber] = useState('0918889999');
   const [bankAccountName, setBankAccountName] = useState('NGUYEN AN NHIEN');
   const [bankName, setBankName] = useState('MBBank');
+  const [customTenantPrefix, setCustomTenantPrefix] = useState(
+    currentTenantId === 'tenant_an_nhien_02' ? 'AN02' : 'MT01'
+  );
 
   useEffect(() => {
     if (!isOpen) return;
@@ -59,25 +63,61 @@ export const VietQrModal: FC<Props> = ({
         if (parsed.bankAccountNumber) setBankAccountNumber(parsed.bankAccountNumber);
         if (parsed.bankAccountName) setBankAccountName(parsed.bankAccountName);
         if (parsed.bankName) setBankName(parsed.bankName);
-        return;
+        if (parsed.tenantPrefix) setCustomTenantPrefix(parsed.tenantPrefix);
       } catch (e) {
         console.error('Lỗi nạp config thanh toán:', e);
       }
-    }
-
-    // Mặc định theo tenant
-    if (currentTenantId === 'tenant_an_nhien_02') {
+    } else if (currentTenantId === 'tenant_an_nhien_02') {
       setBankCode('MB');
       setBankAccountNumber('0918889999');
       setBankAccountName('NGUYEN AN NHIEN');
       setBankName('MBBank - Ngân hàng Quân Đội');
+      setCustomTenantPrefix('AN02');
     } else {
       setBankCode('MB');
       setBankAccountNumber('0974742130');
       setBankAccountName('MT GROCERY STORE');
       setBankName('MBBank - Ngân hàng Quân Đội');
+      setCustomTenantPrefix('MT01');
     }
+
+    // Đồng bộ cấu hình QR công khai từ Backend (An toàn cho mọi nhân viên thu ngân, không lộ API Key)
+    httpClient
+      .get('/payments/public-qr-config', { params: { tenantId: currentTenantId } })
+      .then((res) => {
+        const data = res.data;
+        if (!data) return;
+        if (data.bankCode) setBankCode(data.bankCode);
+        if (data.bankAccountNumber) setBankAccountNumber(data.bankAccountNumber);
+        if (data.bankAccountName) setBankAccountName(data.bankAccountName);
+        if (data.bankName) setBankName(data.bankName);
+        if (data.tenantPrefix) setCustomTenantPrefix(data.tenantPrefix);
+      })
+      .catch(() => {
+        // Giữ nguyên cấu hình cache nếu offline
+      });
   }, [isOpen, currentTenantId]);
+
+  // LỚP 6: Tự động Polling kiểm tra trạng thái gạch nợ mỗi 2.5 giây khi đang mở QR
+  useEffect(() => {
+    if (!isOpen || isSuccessPaid || !orderCode) return;
+
+    const pollTimer = setInterval(async () => {
+      try {
+        const res = await httpClient.get(`/payments/check-order/${encodeURIComponent(orderCode)}`);
+        if (res.data?.isPaid) {
+          setIsSuccessPaid(true);
+          setTimeout(() => {
+            onConfirmAndPrint();
+          }, 1000);
+        }
+      } catch {
+        // Bỏ qua lỗi mạng tạm thời trong khi chờ khách quét QR
+      }
+    }, 2500);
+
+    return () => clearInterval(pollTimer);
+  }, [isOpen, isSuccessPaid, orderCode, onConfirmAndPrint]);
 
   // Bộ đếm ngược 5 phút
   useEffect(() => {
@@ -94,9 +134,9 @@ export const VietQrModal: FC<Props> = ({
   const seconds = countdown % 60;
   const timerText = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
 
-  // Tiền tố đơn hàng phân lập theo Tenant
-  const tenantPrefix = currentTenantId === 'tenant_an_nhien_02' ? 'AN02' : 'MT01';
-  const transferContent = `${tenantPrefix}_${orderCode.replace(/^HD/, '')}`;
+  // Tiền tố đơn hàng phân lập theo Tenant (VD: AN02_HD1005)
+  const cleanCode = orderCode.replace(/^HD/i, '');
+  const transferContent = `${customTenantPrefix}_HD${cleanCode}`;
 
   // Link mã VietQR động chuẩn Napas 247
   const qrUrl = `https://img.vietqr.io/image/${bankCode}-${bankAccountNumber}-compact2.png?amount=${amount}&addInfo=${encodeURIComponent(
@@ -107,16 +147,13 @@ export const VietQrModal: FC<Props> = ({
   const handleCheckPayment = async () => {
     setIsChecking(true);
     try {
-      const res = await fetch(`/api/payments/check-order/${orderCode}`);
-      if (res.ok) {
-        const data = await res.json();
-        if (data.isPaid) {
-          setIsSuccessPaid(true);
-          setTimeout(() => {
-            onConfirmAndPrint();
-          }, 1000);
-          return;
-        }
+      const res = await httpClient.get(`/payments/check-order/${encodeURIComponent(orderCode)}`);
+      if (res.data?.isPaid) {
+        setIsSuccessPaid(true);
+        setTimeout(() => {
+          onConfirmAndPrint();
+        }, 1000);
+        return;
       }
     } catch {
       // Backend offline

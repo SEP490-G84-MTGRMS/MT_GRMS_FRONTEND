@@ -46,6 +46,54 @@ import { employeeApi } from '../../employee/api/employeeApi';
 import { useAuthStore } from '../../../stores/useAuthStore';
 import '../pos.css';
 
+/**
+ * Tách và làm sạch thời gian hẹn nhận hàng từ Note đơn đặt trước
+ * Tránh hiển thị chuỗi dài gồm cả SĐT, ghi chú xuất hàng và tag hệ thống [CHỐT CUỐI NGÀY: ...]
+ */
+const parsePreOrderPickupAndNotes = (rawNote?: string | null) => {
+  if (!rawNote || !rawNote.trim()) {
+    return {
+      pickupAppointment: '17:30 - Hôm nay',
+      fulfillmentNote: null as string | null,
+      notes: null as string | null,
+    };
+  }
+
+  // 1. Trích xuất thời gian hẹn nhận (VD: "Hẹn nhận: 12/11/2026 15:40" hoặc "12/11/2026 15:40")
+  let pickupAppointment = '';
+  const matchAppt = rawNote.match(/Hẹn nhận:\s*([^.|]+)/i);
+  if (matchAppt && matchAppt[1]) {
+    pickupAppointment = matchAppt[1].trim();
+  }
+
+  // 2. Trích xuất ghi chú xuất hàng/bàn giao nếu có
+  let fulfillmentNote: string | null = null;
+  const matchFulfill = rawNote.match(/Xuất hàng:\s*([^|]+)/i);
+  if (matchFulfill && matchFulfill[1]) {
+    fulfillmentNote = matchFulfill[1].trim();
+  }
+
+  // 3. Làm sạch ghi chú bổ sung khác (loại bỏ thông tin khách trùng lặp và tag hệ thống [CHỐT CUỐI NGÀY: ...])
+  let cleanNote = rawNote
+    .replace(/Hẹn nhận:\s*[^.|]+[.]?/i, '')
+    .replace(/Khách:\s*[^.|]+[.]?/i, '')
+    .replace(/\|\s*Xuất hàng:[^|]*/gi, '')
+    .replace(/\[CHỐT CUỐI NGÀY:[^\]]*\]/gi, '')
+    .replace(/[|]/g, '')
+    .trim();
+
+  if (!pickupAppointment) {
+    const firstPart = rawNote.split(/[|.]/)[0]?.trim();
+    pickupAppointment = firstPart || '17:30 - Hôm nay';
+  }
+
+  return {
+    pickupAppointment,
+    fulfillmentNote,
+    notes: cleanNote.length > 0 ? cleanNote : null,
+  };
+};
+
 export const InvoiceManagementPage: FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -306,6 +354,7 @@ export const InvoiceManagementPage: FC = () => {
             const totalOrderAmount = o.finalAmount ?? o.totalAmount ?? 0;
             const depositAmount = o.depositAmount || 0;
             const remainingAmount = Math.max(0, totalOrderAmount - depositAmount);
+            const parsedNoteInfo = parsePreOrderPickupAndNotes(o.note);
             return {
               orderUuid: o.id,
               preOrderId: o.orderCode || o.id,
@@ -315,7 +364,9 @@ export const InvoiceManagementPage: FC = () => {
               cashierName: o.cashierName || 'Thu ngân POS',
               fulfilledByCashierName: o.fulfilledByCashierName,
               fulfilledAt: o.fulfilledAtUtc ? new Date(o.fulfilledAtUtc).toLocaleString('vi-VN') : undefined,
-              pickupAppointment: o.note || '17:30 - Hôm nay',
+              pickupAppointment: parsedNoteInfo.pickupAppointment,
+              fulfillmentNote: parsedNoteInfo.fulfillmentNote,
+              notes: parsedNoteInfo.notes,
               customerName: o.customerName || 'Khách quen',
               customerPhone: o.customerPhone || '0987654321',
               totalMerchandiseAmount: o.totalAmount || totalOrderAmount,
@@ -363,38 +414,38 @@ export const InvoiceManagementPage: FC = () => {
     };
   }, [currentTenantId, isDefaultDemoStore]);
 
-  // Danh sách các chi nhánh có trong hệ thống (Tự động hợp nhất từ CSDL & cấu hình chuỗi)
+  // Danh sách các chi nhánh có trong hệ thống (Tự động hợp nhất từ CSDL & cấu hình chuỗi, loại trừ trùng lặp)
   const availableBranches = useMemo(() => {
     if (!isStoreOwner) {
       // Nhân viên thu ngân chỉ thấy chi nhánh được phân công của mình
       return [assignedBranch];
     }
 
-    const map = new Map<string, string>();
-    dbBranches.forEach((b) => map.set(b.id, b.name));
+    const seenNames = new Set<string>();
+    const list: Array<{ id: string; name: string }> = [];
 
-    if (isAnNhienStore) {
-      AN_NHIEN_BRANCHES.forEach((b) => map.set(b.id, b.name));
+    const addBranch = (id: string, name: string) => {
+      if (!name) return;
+      const norm = name.normalize('NFC').trim().toLowerCase().replace(/\s+/g, ' ');
+      if (!seenNames.has(norm)) {
+        seenNames.add(norm);
+        list.push({ id, name: name.trim() });
+      }
+    };
+
+    // Chỉ dùng danh sách chi nhánh từ Database Backend (ưu tiên tuyệt đối)
+    if (dbBranches && dbBranches.length > 0) {
+      dbBranches.forEach((b) => addBranch(b.id, b.name));
+    } else if (isAnNhienStore) {
+      AN_NHIEN_BRANCHES.forEach((b) => addBranch(b.id, b.name));
     } else {
-      map.set('BR-01', 'Chi nhánh Cầu Giấy (Trung tâm)');
-      map.set('BR-02', 'Chi nhánh Thanh Xuân');
-      map.set('BR-03', 'Chi nhánh Quận 1');
+      addBranch('BR-01', 'Chi nhánh Cầu Giấy (Trung tâm)');
+      addBranch('BR-02', 'Chi nhánh Thanh Xuân');
+      addBranch('BR-03', 'Chi nhánh Quận 1');
     }
 
-    invoices.forEach((inv) => {
-      if (inv.branchId && inv.branchName) {
-        map.set(inv.branchId, inv.branchName);
-      }
-    });
-    preOrders.forEach((pre) => {
-      if (pre.branchId && pre.branchName) {
-        map.set(pre.branchId, pre.branchName);
-      }
-    });
-
-    const list = Array.from(map.entries()).map(([id, name]) => ({ id, name }));
     return [{ id: 'ALL', name: 'Tất cả chi nhánh (Toàn chuỗi)' }, ...list];
-  }, [invoices, preOrders, isAnNhienStore, isStoreOwner, assignedBranch, dbBranches]);
+  }, [isAnNhienStore, isStoreOwner, assignedBranch, dbBranches]);
 
   // Modal Xác nhận hủy hóa đơn
   const [cancelModalInvoice, setCancelModalInvoice] = useState<InvoiceDTO | null>(null);
@@ -461,6 +512,10 @@ export const InvoiceManagementPage: FC = () => {
       return;
     }
 
+    if (!cancelReason.trim() || cancelReason.trim().length > 300 || cancelNote.trim().length > 500) {
+      alert('Lý do hủy bắt buộc, tối đa 300 ký tự; ghi chú tối đa 500 ký tự.');
+      return;
+    }
     try {
       await posOrderApi.cancelOrder(cancelModalInvoice.orderUuid || cancelModalInvoice.invoiceId, {
         reason: cancelReason,
@@ -474,6 +529,8 @@ export const InvoiceManagementPage: FC = () => {
         setCancelModalInvoice(null);
         return;
       }
+      alert(e?.response?.data?.message || 'Không thể hủy hóa đơn. Vui lòng thử lại.');
+      return;
     }
     setInvoices((prev) =>
       prev.map((i) =>
@@ -558,7 +615,7 @@ export const InvoiceManagementPage: FC = () => {
         if (s) setActiveShiftCash(s.expectedCash);
       }).catch(() => { });
     } catch (e: any) {
-      alert(`Lỗi khi xử lý đổi trả: ${e?.message || 'Không thể kết nối máy chủ'}`);
+      throw e;
     }
   };
 
@@ -591,8 +648,7 @@ export const InvoiceManagementPage: FC = () => {
       : (!assignedBranch.id.startsWith('BR-') ? assignedBranch.id : undefined);
 
     if (!targetBranchId) {
-      alert('Vui lòng chọn một chi nhánh cụ thể từ bộ lọc trước khi tạo đơn đặt trước.');
-      return;
+      throw new Error('Vui lòng chọn một chi nhánh cụ thể trước khi tạo đơn đặt trước.');
     }
     try {
       let createdCode: string | null = null;
@@ -617,7 +673,7 @@ export const InvoiceManagementPage: FC = () => {
           depositAmount: data.depositAmount,
           expectedPickupDate: data.expectedPickupDate,
           paymentMethod: data.paymentMethod,
-          note: `Khách: ${data.customerName} (${data.customerPhone}). ${data.note || ''}`,
+          note: data.note?.trim() || undefined,
           discountAmount: data.discountAmount || 0,
           appliedPromotionId: data.appliedPromotionId || null,
           appliedPromotionSummary: data.appliedPromotionSummary || null,
@@ -628,14 +684,15 @@ export const InvoiceManagementPage: FC = () => {
       } catch (apiErr: any) {
         console.error('Backend createPreOrder API error:', apiErr);
         const errMsg = apiErr?.response?.data?.message || apiErr?.message || 'Không thể tạo đơn đặt trước. Vui lòng kiểm tra lại tồn kho.';
-        alert(`Lỗi tạo đơn đặt trước: ${errMsg}`);
-        return;
+        throw new Error(errMsg);
       }
 
       const merchandiseAmt = data.items
         .filter((it) => !it.isGift)
         .reduce((s, it) => s + it.quantity * it.unitPrice, 0);
       const promoDisc = data.discountAmount || 0;
+      const merchandiseAmount = backendRes?.totalAmount ?? merchandiseAmt;
+      const discountAmount = backendRes?.discountAmount ?? promoDisc;
       const totalAmt = backendRes?.finalAmount ?? Math.max(0, merchandiseAmt - promoDisc);
       const newPreOrder: PreOrderDTO = {
         orderUuid: createdUuid,
@@ -649,9 +706,16 @@ export const InvoiceManagementPage: FC = () => {
         cashierName: creatorCashier,
         customerName: data.customerName,
         customerPhone: data.customerPhone,
-        pickupAppointment: new Date(data.expectedPickupDate).toLocaleString('vi-VN'),
-        totalMerchandiseAmount: merchandiseAmt,
-        discountAmount: promoDisc,
+        pickupAppointment: new Date(data.expectedPickupDate).toLocaleString('vi-VN', {
+          hour: '2-digit',
+          minute: '2-digit',
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+        }),
+        notes: data.note?.trim() || null,
+        totalMerchandiseAmount: merchandiseAmount,
+        discountAmount,
         appliedPromotionSummary: backendRes?.appliedPromotionSummary ?? data.appliedPromotionSummary ?? null,
         totalOrderAmount: totalAmt,
         depositAmount: data.depositAmount,
@@ -680,8 +744,27 @@ export const InvoiceManagementPage: FC = () => {
           : `Đã tạo thành công đơn đặt trước ${newPreOrder.preOrderId} (Cọc: ${data.depositAmount.toLocaleString('vi-VN')} đ)!`
       );
     } catch (e: any) {
-      alert(`Lỗi khi tạo đơn đặt trước: ${e?.response?.data?.message || e?.message || 'Không thể kết nối máy chủ'}`);
+      throw new Error(e?.response?.data?.message || e?.message || 'Không thể tạo đơn đặt trước.');
     }
+  };
+
+  // Kiểm tra chi nhánh khớp nhau (hỗ trợ cả GUID DB, mã BR-AN-*, và tên chi nhánh)
+  const isBranchMatching = (filterId: string, itemBranchId?: string, itemBranchName?: string) => {
+    if (filterId === 'ALL') return true;
+    if (itemBranchId && itemBranchId === filterId) return true;
+    const filterBranch = availableBranches.find((b) => b.id === filterId);
+    const normStr = (s: string) => s.normalize('NFC').trim().toLowerCase().replace(/\s+/g, ' ');
+    const filterName = normStr(filterBranch?.name || '');
+    const targetName = normStr(itemBranchName || '');
+    if (targetName && filterName && (targetName === filterName || targetName.includes(filterName) || filterName.includes(targetName))) {
+      return true;
+    }
+    if (filterName.includes('ba đình') && (targetName.includes('ba đình') || itemBranchId === 'BR-AN-01' || itemBranchId === 'cd5e8d1b-b08b-448d-beff-b85ea5873d52')) return true;
+    if (filterName.includes('cầu giấy') && (targetName.includes('cầu giấy') || itemBranchId === 'BR-01' || itemBranchId === 'BR-AN-02')) return true;
+    if (filterName.includes('đống đa') && (targetName.includes('đống đa') || itemBranchId === 'BR-AN-03')) return true;
+    if (filterName.includes('thanh xuân') && (targetName.includes('thanh xuân') || itemBranchId === 'BR-02')) return true;
+    if (filterName.includes('quận 1') && (targetName.includes('quận 1') || itemBranchId === 'BR-03')) return true;
+    return false;
   };
 
   // Lọc Hóa đơn
@@ -692,33 +775,16 @@ export const InvoiceManagementPage: FC = () => {
       const isSearching = isStoreOwner && searchQuery.trim().length > 0;
 
       const matchBranch = !isStoreOwner
-        ? // Nhân viên: BẮT BUỘC chỉ khớp chi nhánh được giao ca
-        (inv.branchId === branchFilter ||
-          ((branchFilter === 'BR-AN-01' || branchFilter === 'cd5e8d1b-b08b-448d-beff-b85ea5873d52') &&
-            (inv.branchId === 'BR-AN-01' || inv.branchId === 'cd5e8d1b-b08b-448d-beff-b85ea5873d52' || inv.branchName?.includes('Ba Đình'))) ||
-          ((branchFilter === 'BR-01' || branchFilter === 'BR-AN-02') &&
-            (inv.branchId === 'BR-01' || inv.branchId === 'BR-AN-02' || inv.branchName?.includes('Cầu Giấy'))) ||
-          (branchFilter === 'BR-02' && (inv.branchId === 'BR-02' || inv.branchName?.includes('Thanh Xuân'))) ||
-          (branchFilter === 'BR-AN-03' && (inv.branchId === 'BR-AN-03' || inv.branchName?.includes('Đống Đa'))) ||
-          (branchFilter === 'BR-03' && (inv.branchId === 'BR-03' || inv.branchName?.includes('Quận 1'))))
-        : // Chủ cửa hàng:
-        (isSearching ||
-          branchFilter === 'ALL' ||
-          inv.branchId === branchFilter ||
-          ((branchFilter === 'BR-AN-01' || branchFilter === 'cd5e8d1b-b08b-448d-beff-b85ea5873d52') &&
-            (inv.branchId === 'BR-AN-01' || inv.branchId === 'cd5e8d1b-b08b-448d-beff-b85ea5873d52' || inv.branchName?.includes('Ba Đình'))) ||
-          ((branchFilter === 'BR-01' || branchFilter === 'BR-AN-02') &&
-            (inv.branchId === 'BR-01' || inv.branchId === 'BR-AN-02' || inv.branchName?.includes('Cầu Giấy'))) ||
-          (branchFilter === 'BR-02' && (inv.branchId === 'BR-02' || inv.branchName?.includes('Thanh Xuân'))) ||
-          (branchFilter === 'BR-AN-03' && (inv.branchId === 'BR-AN-03' || inv.branchName?.includes('Đống Đa'))) ||
-          (branchFilter === 'BR-03' && (inv.branchId === 'BR-03' || inv.branchName?.includes('Quận 1'))));
+        ? isBranchMatching(branchFilter, inv.branchId, inv.branchName)
+        : (isSearching || branchFilter === 'ALL' || isBranchMatching(branchFilter, inv.branchId, inv.branchName));
 
       const cleanQuery = searchQuery.trim().toLowerCase();
+      const phoneQuery = cleanQuery.replace(/\D/g, '');
       const matchSearch =
         !searchQuery.trim() ||
         inv.invoiceId.toLowerCase().includes(cleanQuery) ||
         inv.customerName.toLowerCase().includes(cleanQuery) ||
-        (inv.customerPhone && inv.customerPhone.replace(/\D/g, '').includes(cleanQuery.replace(/\D/g, '')));
+        (phoneQuery.length > 0 && inv.customerPhone && inv.customerPhone.replace(/\D/g, '').includes(phoneQuery));
 
       const matchMethod =
         paymentMethodFilter === 'ALL' ||
@@ -730,7 +796,7 @@ export const InvoiceManagementPage: FC = () => {
 
       return matchBranch && matchSearch && matchMethod && matchStatus;
     });
-  }, [invoices, searchQuery, paymentMethodFilter, statusFilter, branchFilter, isStoreOwner]);
+  }, [invoices, searchQuery, paymentMethodFilter, statusFilter, branchFilter, isStoreOwner, availableBranches]);
 
   // Phân trang dữ liệu Hóa đơn
   const paginatedInvoices = useMemo(() => {
@@ -744,25 +810,8 @@ export const InvoiceManagementPage: FC = () => {
       const isSearching = isStoreOwner && searchQuery.trim().length > 0;
 
       const matchBranch = !isStoreOwner
-        ? // Nhân viên: BẮT BUỘC chỉ hiển thị đơn đặt trước của chi nhánh mình
-        (p.branchId === branchFilter ||
-          ((branchFilter === 'BR-AN-01' || branchFilter === 'cd5e8d1b-b08b-448d-beff-b85ea5873d52') &&
-            (p.branchId === 'BR-AN-01' || p.branchId === 'cd5e8d1b-b08b-448d-beff-b85ea5873d52' || p.branchName?.includes('Ba Đình'))) ||
-          ((branchFilter === 'BR-01' || branchFilter === 'BR-AN-02') &&
-            (p.branchId === 'BR-01' || p.branchId === 'BR-AN-02' || p.branchName?.includes('Cầu Giấy'))) ||
-          (branchFilter === 'BR-02' && (p.branchId === 'BR-02' || p.branchName?.includes('Thanh Xuân'))) ||
-          (branchFilter === 'BR-AN-03' && (p.branchId === 'BR-AN-03' || p.branchName?.includes('Đống Đa'))) ||
-          (branchFilter === 'BR-03' && (p.branchId === 'BR-03' || p.branchName?.includes('Quận 1'))))
-        : (isSearching ||
-          branchFilter === 'ALL' ||
-          p.branchId === branchFilter ||
-          ((branchFilter === 'BR-AN-01' || branchFilter === 'cd5e8d1b-b08b-448d-beff-b85ea5873d52') &&
-            (p.branchId === 'BR-AN-01' || p.branchId === 'cd5e8d1b-b08b-448d-beff-b85ea5873d52' || p.branchName?.includes('Ba Đình'))) ||
-          ((branchFilter === 'BR-01' || branchFilter === 'BR-AN-02') &&
-            (p.branchId === 'BR-01' || p.branchId === 'BR-AN-02' || p.branchName?.includes('Cầu Giấy'))) ||
-          (branchFilter === 'BR-02' && (p.branchId === 'BR-02' || p.branchName?.includes('Thanh Xuân'))) ||
-          (branchFilter === 'BR-AN-03' && (p.branchId === 'BR-AN-03' || p.branchName?.includes('Đống Đa'))) ||
-          (branchFilter === 'BR-03' && (p.branchId === 'BR-03' || p.branchName?.includes('Quận 1'))));
+        ? isBranchMatching(branchFilter, p.branchId, p.branchName)
+        : (isSearching || branchFilter === 'ALL' || isBranchMatching(branchFilter, p.branchId, p.branchName));
 
       const matchSearch =
         !searchQuery.trim() ||
@@ -772,7 +821,7 @@ export const InvoiceManagementPage: FC = () => {
 
       return matchBranch && matchSearch;
     });
-  }, [preOrders, searchQuery, branchFilter, isStoreOwner]);
+  }, [preOrders, searchQuery, branchFilter, isStoreOwner, availableBranches]);
 
   // Phân trang Đơn đặt trước
   const paginatedPreOrders = useMemo(() => {
@@ -813,7 +862,7 @@ export const InvoiceManagementPage: FC = () => {
         cashierName: fulfillingCashier,
       });
     } catch (e) {
-      console.warn('Backend fulfill pre-order error (using fallback local update):', e);
+      throw e;
     }
 
     setPreOrders((prev) =>
@@ -1733,7 +1782,7 @@ export const InvoiceManagementPage: FC = () => {
                       <th style={{ minWidth: 140 }}>Khách hàng</th>
                       <th style={{ minWidth: 150 }}>Người tạo</th>
                       <th style={{ width: 140 }}>Thời gian hẹn nhận hàng</th>
-                      <th style={{ width: 110, textAlign: 'right' }}>Tổng tiền đơn</th>
+                      <th style={{ width: 210, textAlign: 'right' }}>Tổng sau khuyến mại</th>
                       <th style={{ width: 90, textAlign: 'right' }}>Tiền cọc</th>
                       <th style={{ width: 110, textAlign: 'right' }}>Còn phải thu</th>
                       <th style={{ width: 120 }}>Phân bổ giữ kho</th>
@@ -1744,6 +1793,9 @@ export const InvoiceManagementPage: FC = () => {
                   <tbody>
                     {paginatedPreOrders.map((pre) => {
                       const isExpanded = expandedPreOrderId === pre.preOrderId;
+                      const giftItems = pre.items.filter((item) => item.isGift);
+                      const merchandiseAmount = pre.totalMerchandiseAmount ?? pre.totalOrderAmount;
+                      const discountAmount = pre.discountAmount ?? 0;
                       return (
                         <React.Fragment key={pre.preOrderId}>
                           <tr
@@ -1818,22 +1870,42 @@ export const InvoiceManagementPage: FC = () => {
                               <span style={{ fontWeight: 600, color: '#b45309' }}>
                                 {pre.pickupAppointment}
                               </span>
+                              {pre.notes && (
+                                <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }} title={pre.notes}>
+                                  Ghi chú: {pre.notes}
+                                </div>
+                              )}
                             </td>
                             <td style={{ textAlign: 'right', fontWeight: 600 }}>
-                              <div>{pre.totalOrderAmount.toLocaleString('vi-VN')} đ</div>
-                              {Boolean(pre.discountAmount && pre.discountAmount > 0) && (
+                              <div style={{ fontSize: 14, color: '#0f172a', fontWeight: 800 }}>
+                                {pre.totalOrderAmount.toLocaleString('vi-VN')} đ
+                              </div>
+                              <div style={{ fontSize: 10.5, color: '#64748b', fontWeight: 500 }}>
+                                Số tiền phải thanh toán cho toàn đơn
+                              </div>
+                              <div style={{ fontSize: 10.5, color: '#475569', fontWeight: 500 }}>
+                                Giá trị hàng: {merchandiseAmount.toLocaleString('vi-VN')} đ
+                              </div>
+                              {discountAmount > 0 && (
                                 <div style={{ fontSize: 10.5, color: '#dc2626', fontWeight: 600 }}>
-                                  -{(pre.discountAmount || 0).toLocaleString('vi-VN')} đ KM
+                                  Khuyến mại: -{discountAmount.toLocaleString('vi-VN')} đ
                                 </div>
                               )}
                               {pre.appliedPromotionSummary && (
-                                <div style={{ fontSize: 10, color: '#0f766e', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 3 }} title={pre.appliedPromotionSummary}>
+                                <div style={{ fontSize: 10, color: '#0f766e', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 3, justifyContent: 'flex-end' }} title={pre.appliedPromotionSummary}>
                                   <Gift size={10} color="#0f766e" /> {pre.appliedPromotionSummary}
                                 </div>
                               )}
-                              {pre.items.some((x) => x.isGift) && (
-                                <div style={{ fontSize: 10, color: '#15803d', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 3 }}>
-                                  <Gift size={10} color="#15803d" /> Kèm quà giữ kho
+                              {giftItems.length > 0 && (
+                                <div style={{ fontSize: 10, color: '#15803d', fontWeight: 600, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
+                                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                                    <Gift size={10} color="#15803d" /> Quà tặng 0 đ · đã giữ kho
+                                  </span>
+                                  {giftItems.map((gift, giftIndex) => (
+                                    <span key={`${gift.productId}-${giftIndex}`}>
+                                      {gift.quantity} {gift.unitName} {gift.productName}
+                                    </span>
+                                  ))}
                                 </div>
                               )}
                             </td>
@@ -2026,7 +2098,7 @@ export const InvoiceManagementPage: FC = () => {
                                     </tbody>
                                     <tfoot>
                                       <tr style={{ fontWeight: 700, backgroundColor: '#f8fafc', borderTop: '2px solid #cbd5e1' }}>
-                                        <td colSpan={4} style={{ textAlign: 'right' }}>Tổng cộng:</td>
+                                        <td colSpan={4} style={{ textAlign: 'right' }}>Phải thanh toán sau khuyến mại:</td>
                                         <td style={{ textAlign: 'right', color: '#0f766e' }}>
                                           {pre.items.reduce((sum, it) => sum + (it.quantity || 0), 0)}
                                         </td>
@@ -2052,10 +2124,25 @@ export const InvoiceManagementPage: FC = () => {
                                       fontSize: 12,
                                     }}
                                   >
-                                    <div style={{ display: 'flex', gap: 16 }}>
+                                    <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
                                       <div>Hẹn lấy: <b style={{ color: '#b45309' }}>{pre.pickupAppointment}</b></div>
+                                      <div>Giá trị hàng: <b>{merchandiseAmount.toLocaleString('vi-VN')} đ</b></div>
+                                      {discountAmount > 0 && (
+                                        <div>Khuyến mại: <b style={{ color: '#dc2626' }}>-{discountAmount.toLocaleString('vi-VN')} đ</b></div>
+                                      )}
+                                      <div>Tổng sau khuyến mại: <b>{pre.totalOrderAmount.toLocaleString('vi-VN')} đ</b></div>
                                       <div>Đã đặt cọc: <b style={{ color: '#15803d' }}>{pre.depositAmount.toLocaleString('vi-VN')} đ</b></div>
                                       <div>Còn phải thu: <b style={{ color: '#dc2626' }}>{pre.remainingAmount.toLocaleString('vi-VN')} đ</b></div>
+                                      {pre.fulfillmentNote && (
+                                        <div style={{ color: '#065f46' }}>
+                                          Xuất hàng: <b>{pre.fulfillmentNote}</b>
+                                        </div>
+                                      )}
+                                      {pre.notes && (
+                                        <div style={{ color: '#475569' }}>
+                                          Ghi chú: <b>{pre.notes}</b>
+                                        </div>
+                                      )}
                                     </div>
                                     <div style={{ color: '#64748b', fontSize: 11.5 }}>
                                       Người tạo: <b>{pre.cashierName}</b> &bull; Chi nhánh: <b>{pre.branchName}</b>

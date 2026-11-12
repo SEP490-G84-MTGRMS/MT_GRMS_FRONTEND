@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import type { Product, Customer } from '../../types/pos.types';
 import { Plus, Minus, Trash2, Search, Package, Phone, User, AlertTriangle, Gift } from 'lucide-react';
-import { mockCustomers } from '../../mock/posMockData';
 import { promotionApi, type CartGiftItemDto } from '../../../promotion/api/promotionApi';
 
 interface Props {
@@ -53,18 +52,18 @@ export const CreatePreOrderModal: React.FC<Props> = ({
   customers,
   onConfirm,
 }) => {
-  const customerList = customers && customers.length > 0 ? customers : mockCustomers;
+  const customerList = customers ?? [];
 
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerName, setCustomerName] = useState('');
-  const [selectedCustomerId, setSelectedCustomerId] = useState('kh_retail');
+  const [selectedCustomerId, setSelectedCustomerId] = useState('');
   const [isCustomerDropdownOpen, setIsCustomerDropdownOpen] = useState(false);
   const customerContainerRef = useRef<HTMLDivElement>(null);
 
   const [expectedDate, setExpectedDate] = useState(() => {
     const d = new Date();
     d.setDate(d.getDate() + 2);
-    return d.toISOString().slice(0, 16);
+    return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
   });
 
   const [orderItems, setOrderItems] = useState<PreOrderCartItem[]>([]);
@@ -90,7 +89,7 @@ export const CreatePreOrderModal: React.FC<Props> = ({
   );
   const effectivePromoDiscount = Math.min(totalMerchandiseAmount, Math.max(0, promoDiscount));
   const totalAmount = Math.max(0, totalMerchandiseAmount - effectivePromoDiscount);
-  const minDeposit = Math.round(totalAmount * 0.10);
+  const minDeposit = Math.ceil(totalAmount * 0.10);
   const isDepositValid = orderItems.length > 0 && depositAmount >= minDeposit && depositAmount <= totalAmount;
 
   // Thẩm định tự động các CTKM của cửa hàng khi mặt hàng/số lượng thay đổi
@@ -145,7 +144,7 @@ export const CreatePreOrderModal: React.FC<Props> = ({
   // Tự động đồng bộ tiền cọc tối thiểu khi số lượng, mặt hàng hoặc khuyến mãi thay đổi
   useEffect(() => {
     if (totalAmount > 0) {
-      const calculatedMin = Math.round(totalAmount * 0.10);
+      const calculatedMin = Math.ceil(totalAmount * 0.10);
       setDepositAmount((prev) => {
         if (prev > totalAmount) return totalAmount;
         if (prev < calculatedMin || prev === 0) return calculatedMin;
@@ -284,6 +283,30 @@ export const CreatePreOrderModal: React.FC<Props> = ({
   };
 
   const handleSubmit = async () => {
+    if (isSubmitting) return;
+    const normalizedPhone = customerPhone.trim().replace(/[\s().-]/g, '');
+    const selectedCustomer = customerList.find(customer => customer.id === selectedCustomerId);
+    if (!selectedCustomer || selectedCustomer.phone.replace(/[\s().-]/g, '') !== normalizedPhone) {
+      alert('Vui lòng chọn khách hàng định danh từ danh sách gợi ý.');
+      return;
+    }
+    if (!/^\+?\d{9,15}$/.test(normalizedPhone) || customerName.trim().length < 2 || customerName.trim().length > 100) {
+      alert('Thông tin tên hoặc số điện thoại khách hàng không hợp lệ.');
+      return;
+    }
+    const pickupTime = new Date(expectedDate).getTime();
+    if (!Number.isFinite(pickupTime) || pickupTime <= Date.now()) {
+      alert('Thời gian hẹn nhận hàng phải sau thời điểm hiện tại.');
+      return;
+    }
+    if (!Number.isSafeInteger(depositAmount) || depositAmount < 0 || !Number.isFinite(totalAmount)) {
+      alert('Tiền cọc phải là số nguyên không âm và tổng tiền phải hợp lệ.');
+      return;
+    }
+    if (note.trim().length > 500) {
+      alert('Ghi chú tối đa 500 ký tự.');
+      return;
+    }
     if (orderItems.length === 0) {
       alert('Vui lòng chọn ít nhất 1 mặt hàng cần đặt trước!');
       return;
@@ -292,7 +315,7 @@ export const CreatePreOrderModal: React.FC<Props> = ({
     // Kiểm tra số lượng từng mặt hàng và tổng tồn kho quy đổi theo từng sản phẩm
     const productBaseQtyMap = new Map<string, { totalBaseQty: number; name: string; quantityOnHand: number; baseUnit: string }>();
     for (const item of orderItems) {
-      if (item.quantity <= 0) {
+      if (!Number.isFinite(item.quantity) || item.quantity <= 0 || !Number.isFinite(item.conversionRate) || item.conversionRate <= 0 || !Number.isFinite(item.unitPrice) || item.unitPrice < 0) {
         alert(`Sản phẩm "${item.product.name}" (${item.unitName}) có số lượng không hợp lệ (phải > 0). Vui lòng nhập lại số lượng!`);
         return;
       }
@@ -357,9 +380,9 @@ export const CreatePreOrderModal: React.FC<Props> = ({
         }));
 
       await onConfirm({
-        customerId: selectedCustomerId || '01a185f3-d197-72c1-b6e7-cdb5d5363467',
+        customerId: selectedCustomerId,
         customerName: customerName.trim() || 'Khách lẻ',
-        customerPhone: customerPhone.trim(),
+        customerPhone: normalizedPhone,
         expectedPickupDate: expectedDate,
         items: [...paidPayloadItems, ...giftPayloadItems],
         depositAmount,
@@ -404,8 +427,9 @@ export const CreatePreOrderModal: React.FC<Props> = ({
                   placeholder="Nhập SĐT khách hàng..."
                   value={customerPhone}
                   onChange={(e) => {
-                    const val = e.target.value.replace(/[^\d\s.-]/g, '');
+                    const val = e.target.value.replace(/[^\d+\s.-]/g, '');
                     setCustomerPhone(val);
+                    setSelectedCustomerId('');
                     setIsCustomerDropdownOpen(true);
                   }}
                   onFocus={() => {
@@ -469,7 +493,7 @@ export const CreatePreOrderModal: React.FC<Props> = ({
                     ))
                   ) : (
                     <div style={{ padding: '8px 10px', fontSize: 12, color: '#64748b', textAlign: 'center' }}>
-                      Không tìm thấy SĐT &quot;{customerPhone}&quot;. Nhập tên khách mới bên cạnh.
+                      Không tìm thấy SĐT &quot;{customerPhone}&quot;. Hãy thêm khách tại màn bán hàng rồi chọn lại khách tại đây.
                     </div>
                   )}
                 </div>
@@ -486,6 +510,7 @@ export const CreatePreOrderModal: React.FC<Props> = ({
                 placeholder="Họ tên khách hàng..."
                 value={customerName}
                 onChange={(e) => setCustomerName(e.target.value)}
+                maxLength={100}
                 style={{
                   width: '100%',
                   padding: '7px 10px',
@@ -938,6 +963,7 @@ export const CreatePreOrderModal: React.FC<Props> = ({
                 placeholder="Ghi chú đơn đặt trước (nếu có)..."
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
+                maxLength={500}
                 style={{ width: '100%', padding: '5px 8px', borderRadius: 4, border: '1px solid #cbd5e1', fontSize: 12 }}
               />
             </div>

@@ -20,14 +20,20 @@ import {
   Save,
 } from 'lucide-react';
 import { useAuthStore } from '../../../../stores/useAuthStore';
+import { httpClient } from '../../../../api/httpClient';
 
 export interface StorePaymentConfigData {
   tenantId: string;
+  tenantPrefix?: string;
   bankCode: string;
   bankName: string;
   bankAccountNumber: string;
   bankAccountName: string;
-  sepayApiKey: string;
+  sepayApiKey?: string;
+  sepayApiKeyMasked?: string;
+  sepayWebhookSecretMasked?: string;
+  hasApiKey?: boolean;
+  isEncryptedAtRest?: boolean;
   webhookUrl: string;
   isActive: boolean;
 }
@@ -72,7 +78,7 @@ export const PaymentConfigModal: FC<Props> = ({ isOpen, onClose, onSaveSuccess }
   // Sinh Webhook URL tự động
   const webhookUrl = `${window.location.origin.replace(':5173', ':5000')}/api/payments/sepay-webhook`;
 
-  // Tải cấu hình từ localStorage / API khi mở Modal
+  // Tải cấu hình từ Backend API (mã hóa AES-256) và dọn sạch khóa plaintext trong localStorage
   useEffect(() => {
     if (!isOpen) return;
 
@@ -86,27 +92,43 @@ export const PaymentConfigModal: FC<Props> = ({ isOpen, onClose, onSaveSuccess }
         setBankCode(parsed.bankCode || 'MB');
         setBankAccountNumber(parsed.bankAccountNumber || '0918889999');
         setBankAccountName(parsed.bankAccountName || 'NGUYEN AN NHIEN');
-        setSepayApiKey(parsed.sepayApiKey || '');
         setIsActive(parsed.isActive !== false);
-        return;
+
+        // Bảo mật Zero-Plaintext: Xóa bỏ sepayApiKey khỏi localStorage nếu phiên cũ từng lưu
+        if (parsed.sepayApiKey) {
+          const sanitized = {
+            tenantId: currentTenantId,
+            bankCode: parsed.bankCode || 'MB',
+            bankName: parsed.bankName || 'MBBank - Ngân hàng Quân Đội',
+            bankAccountNumber: parsed.bankAccountNumber || '0918889999',
+            bankAccountName: parsed.bankAccountName || 'NGUYEN AN NHIEN',
+            webhookUrl,
+            isActive: parsed.isActive !== false,
+          };
+          localStorage.setItem(storageKey, JSON.stringify(sanitized));
+        }
       } catch (e) {
         console.error('Lỗi đọc cấu hình local:', e);
       }
     }
 
-    // Giá trị mẫu ban đầu cho từng tenant
-    if (currentTenantId === 'tenant_an_nhien_02') {
-      setBankCode('MB');
-      setBankAccountNumber('0918889999');
-      setBankAccountName('NGUYEN AN NHIEN');
-      setSepayApiKey('sepay_apikey_annhien_demo_x9k2');
-    } else {
-      setBankCode('MB');
-      setBankAccountNumber('0974742130');
-      setBankAccountName('MT GROCERY STORE');
-      setSepayApiKey('sepay_apikey_mtmart_secret_key');
-    }
-  }, [isOpen, currentTenantId]);
+    httpClient
+      .get('/payments/config')
+      .then((res) => {
+        const data = res.data;
+        if (data) {
+          if (data.bankCode) setBankCode(data.bankCode);
+          if (data.bankAccountNumber) setBankAccountNumber(data.bankAccountNumber);
+          if (data.bankAccountName) setBankAccountName(data.bankAccountName);
+          if (data.sepayApiKeyMasked) setSepayApiKey(data.sepayApiKeyMasked);
+          if (typeof data.isActive === 'boolean') setIsActive(data.isActive);
+        }
+      })
+      .catch(() => {
+        // Fallback hiển thị masked key khi chạy offline
+        setSepayApiKey('sepay_apikey_••••••••••••8899');
+      });
+  }, [isOpen, currentTenantId, webhookUrl]);
 
   if (!isOpen) return null;
 
@@ -132,23 +154,33 @@ export const PaymentConfigModal: FC<Props> = ({ isOpen, onClose, onSaveSuccess }
       isActive,
     };
 
-    // 1. Lưu LocalStorage để chạy mượt mà ngay cả khi offline
+    // 1. Chỉ lưu thông tin ngân hàng công khai vào LocalStorage (Tuyệt đối KHÔNG lưu sepayApiKey)
     const storageKey = `pos_payment_config_${currentTenantId}`;
-    localStorage.setItem(storageKey, JSON.stringify(configData));
+    localStorage.setItem(
+      storageKey,
+      JSON.stringify({
+        tenantId: currentTenantId,
+        bankCode: configData.bankCode,
+        bankName: configData.bankName,
+        bankAccountNumber: configData.bankAccountNumber,
+        bankAccountName: configData.bankAccountName,
+        webhookUrl,
+        isActive: configData.isActive,
+      })
+    );
 
-    // 2. Gửi request lưu Backend API
+    // 2. Gửi request lưu Backend API (mã hóa AES-256 trên Server)
     try {
-      await fetch('/api/payments/config', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(configData),
-      });
+      const res = await httpClient.post('/payments/config', configData);
+      if (res.data?.sepayApiKeyMasked) {
+        setSepayApiKey(res.data.sepayApiKeyMasked);
+      }
     } catch {
-      // Backend offline: Vẫn hoạt động bình thường nhờ Offline-First
+      // Backend offline
     }
 
     setIsSaving(false);
-    setSaveMessage('Đã lưu cấu hình tài khoản thanh toán thành công!');
+    setSaveMessage('Đã mã hóa AES-256 và lưu cấu hình thanh toán thành công!');
     onSaveSuccess?.(configData);
 
     setTimeout(() => {

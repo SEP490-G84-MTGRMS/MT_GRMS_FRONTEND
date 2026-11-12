@@ -1,6 +1,5 @@
-import { useState } from 'react';
 import type { FC } from 'react';
-import { X, Tag, AlertTriangle, ShoppingBag, Trash2 } from 'lucide-react';
+import { Tag, ShoppingBag, Trash2 } from 'lucide-react';
 import type { CartItem } from '../types/pos.types';
 
 interface Props {
@@ -21,22 +20,14 @@ export const PosCartTable: FC<Props> = ({
   cart,
   onUpdateQuantity,
   onRemoveItem,
-  onUpdateItemDiscount,
   onUpdateItemUnit,
 
-  onOpenBelowCostWarning,
   orderNote,
   onOrderNoteChange,
   appliedPromotions = [],
 }) => {
-  const [activeDiscountItemId, setActiveDiscountItemId] = useState<string | null>(null);
-
   const totalQuantity = cart.reduce((sum, item) => sum + item.quantity, 0);
   const totalItemAmount = cart.reduce((sum, item) => sum + item.totalAmount, 0);
-
-  const toggleDiscountPopover = (id: string) => {
-    setActiveDiscountItemId((prev) => (prev === id ? null : id));
-  };
 
   return (
     <div className="pos-cart-section">
@@ -58,14 +49,11 @@ export const PosCartTable: FC<Props> = ({
               <th style={{ width: 80, textAlign: 'center' }}>Số lượng</th>
               <th style={{ width: 120, textAlign: 'right' }}>Đơn giá</th>
               <th style={{ width: 120, textAlign: 'right' }}>Thành tiền</th>
-              <th style={{ width: 60, textAlign: 'center' }}>Tùy chọn</th>
             </tr>
           </thead>
           <tbody>
             {cart.length > 0 ? (
               cart.map((item, index) => {
-                const isBelowCost = item.actualPrice < item.product.costPrice;
-                const isPopoverOpen = activeDiscountItemId === item.id;
 
                 return (
                   <tr key={item.id} className="pos-cart-row">
@@ -123,10 +111,11 @@ export const PosCartTable: FC<Props> = ({
                         type="number"
                         min={1}
                         max={999}
+                        step={1}
                         value={item.quantity}
                         onChange={(e) => {
                           const val = Number(e.target.value);
-                          onUpdateQuantity(item.id, val > 0 ? val : 1);
+                          if (Number.isFinite(val)) onUpdateQuantity(item.id, val);
                         }}
                         className="pos-qty-input"
                       />
@@ -142,98 +131,13 @@ export const PosCartTable: FC<Props> = ({
                     <td style={{ textAlign: 'right', fontWeight: 700, color: '#0f172a' }}>
                       {item.totalAmount.toLocaleString('vi-VN')}
                     </td>
-                    <td style={{ textAlign: 'center', position: 'relative' }}>
-                      <button
-                        type="button"
-                        className={`pos-options-btn ${isPopoverOpen ? 'active' : ''}`}
-                        onClick={() => toggleDiscountPopover(item.id)}
-                        title="Điều chỉnh chiết khấu món"
-                      >
-                        &#8942;
-                      </button>
 
-                      {/* Popover điều chỉnh chiết khấu món */}
-                      {isPopoverOpen && (
-                        <div className="pos-item-discount-popover">
-                          <div className="pos-popover-title">
-                            <b>Chiết khấu {item.product.sku}</b>
-                            <button
-                              type="button"
-                              onClick={() => toggleDiscountPopover(item.id)}
-                              className="pos-popover-close"
-                              style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
-                            >
-                              <X size={13} />
-                            </button>
-                          </div>
-                          <div className="pos-popover-body">
-                            <div className="pos-popover-row">
-                              <span>Đơn giá niêm yết:</span>
-                              <b>{item.unitPrice.toLocaleString('vi-VN')} đ</b>
-                            </div>
-                            <div className="pos-popover-row">
-                              <span>Giảm giá trực tiếp:</span>
-                              <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                                <input
-                                  type="number"
-                                  value={item.discountPerItem}
-                                  onChange={(e) =>
-                                    onUpdateItemDiscount(
-                                      item.id,
-                                      Math.max(0, Number(e.target.value)),
-                                      item.discountType
-                                    )
-                                  }
-                                  className="pos-input"
-                                  style={{ width: 80, textAlign: 'right' }}
-                                />
-                                <button
-                                  type="button"
-                                  className={`pos-badge-btn ${item.discountType === 'vnd' ? 'active' : ''}`}
-                                  onClick={() => onUpdateItemDiscount(item.id, item.discountPerItem, 'vnd')}
-                                >
-                                  VND
-                                </button>
-                                <button
-                                  type="button"
-                                  className={`pos-badge-btn ${item.discountType === 'percent' ? 'active' : ''}`}
-                                  onClick={() => onUpdateItemDiscount(item.id, item.discountPerItem, 'percent')}
-                                >
-                                  %
-                                </button>
-                              </div>
-                            </div>
-                            <div className="pos-popover-row">
-                              <span>Giá bán thực tế:</span>
-                              <b style={{ color: 'var(--blue-primary)' }}>
-                                {item.actualPrice.toLocaleString('vi-VN')} đ
-                              </b>
-                            </div>
-
-                            {/* Cảnh báo bán dưới giá vốn */}
-                            <div style={{ marginTop: 8 }}>
-                              <button
-                                type="button"
-                                className="pos-below-cost-btn"
-                                onClick={() => {
-                                  toggleDiscountPopover(item.id);
-                                  onOpenBelowCostWarning(item);
-                                }}
-                              >
-                                <AlertTriangle size={13} style={{ display: 'inline', verticalAlign: '-1px', marginRight: 4 }} />
-                                {isBelowCost ? 'Đang bán dưới giá vốn (Cần PIN)' : 'Kiểm tra giá vốn'}
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </td>
                   </tr>
                 );
               })
             ) : (
               <tr>
-                <td colSpan={9} style={{ textAlign: 'center', padding: '40px 20px', color: '#64748b' }}>
+                <td colSpan={8} style={{ textAlign: 'center', padding: '40px 20px', color: '#64748b' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
                     <ShoppingBag size={32} className="text-slate-300" />
                     <span>Chưa có mặt hàng nào trong đơn. Quét mã vạch [F2] hoặc chọn mặt hàng ở chế độ Bán thường.</span>
@@ -245,7 +149,7 @@ export const PosCartTable: FC<Props> = ({
             {/* Dải khuyến mại tự động hóa đơn */}
             {cart.length > 0 && appliedPromotions && appliedPromotions.length > 0 && (
               <tr style={{ backgroundColor: '#fdf2f8' }}>
-                <td colSpan={9} style={{ padding: '8px 12px', color: '#db2777', fontWeight: 600 }}>
+                <td colSpan={8} style={{ padding: '8px 12px', color: '#db2777', fontWeight: 600 }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                     {appliedPromotions.map((promo, idx) => (
                       <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -268,7 +172,8 @@ export const PosCartTable: FC<Props> = ({
             type="text"
             value={orderNote}
             onChange={(e) => onOrderNoteChange(e.target.value)}
-            placeholder="Ghi chú đơn hàng (ví dụ: giao giờ hành chính, gọi trước khi đến)..."
+            maxLength={500}
+            placeholder="Ghi chú đơn hàng"
             className="pos-input"
             style={{ width: '100%' }}
           />

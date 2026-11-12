@@ -33,6 +33,30 @@ export interface OrderCreateRequest {
   promotionDiscountAmount?: number | null;
   voucherDiscountAmount?: number | null;
   pointsDiscountAmount?: number | null;
+  isPendingPayment?: boolean;
+}
+
+export interface OwnerUnsettledSummaryResponse {
+  unsettledOrdersCount: number;
+  cashRevenue: number;
+  bankRevenue: number;
+  totalRevenue: number;
+  earliestOrderTimeUtc?: string | null;
+  latestOrderTimeUtc?: string | null;
+}
+
+export interface SettleOwnerDailyRequest {
+  branchId?: string | null;
+  note?: string | null;
+}
+
+export interface OwnerDailySettlementResponse {
+  settledOrdersCount: number;
+  cashSettledAmount: number;
+  bankSettledAmount: number;
+  totalSettledAmount: number;
+  settlementCode: string;
+  settledAtUtc: string;
 }
 
 export interface OrderItemResponse {
@@ -99,12 +123,21 @@ export const posOrderApi = {
       const items = Array.isArray(paged?.items)
         ? paged.items
         : Array.isArray(paged)
-        ? paged
-        : Array.isArray(res.data)
-        ? res.data
-        : [];
+          ? paged
+          : Array.isArray(res.data)
+            ? res.data
+            : [];
 
-      return items.map((p: any) => ({
+      return items.map((p: any) => {
+        const rawCategory = p.category;
+        const categoryId = p.categoryId ?? p.categoryID ?? (typeof rawCategory === 'object' ? rawCategory?.id : undefined);
+        const categoryName =
+          p.categoryName ||
+          p.category?.name ||
+          (typeof rawCategory === 'string' ? rawCategory : '') ||
+          'Chưa phân loại';
+
+        return ({
         id: p.productId || p.id,
         sku: p.sku || p.productCode || '',
         barcode: p.barcode || '',
@@ -112,7 +145,8 @@ export const posOrderApi = {
         imageUrl: p.imageUrl,
         spec: '',
         shelfLocation: p.shelfLocation,
-        category: p.category || 'Bách hóa',
+        category: String(categoryId ?? categoryName),
+        categoryName,
         baseUnit: p.unit || p.baseUnit || 'Cái',
         basePrice: p.retailPrice ?? p.basePrice ?? p.sellingPrice ?? 0,
         costPrice: p.costPrice || 0,
@@ -120,14 +154,15 @@ export const posOrderApi = {
         batchCode: 'LÔ-FEFO',
         unitPrices: Array.isArray(p.unitPrices)
           ? p.unitPrices.map((u: any) => ({
-              unitId: u.unitId || u.id,
-              unitName: u.unitName,
-              conversionRate: Number(u.conversionRate ?? 1),
-              price: Number(u.price ?? 0),
-              isBaseUnit: Boolean(u.isBaseUnit),
-            }))
+            unitId: u.unitId || u.id,
+            unitName: u.unitName,
+            conversionRate: Number(u.conversionRate ?? 1),
+            price: Number(u.price ?? 0),
+            isBaseUnit: Boolean(u.isBaseUnit),
+          }))
           : undefined,
-      }));
+        });
+      });
     }
 
     return [];
@@ -142,10 +177,10 @@ export const posOrderApi = {
     const items = Array.isArray(paged?.items)
       ? paged.items
       : Array.isArray(paged)
-      ? paged
-      : Array.isArray(res.data)
-      ? res.data
-      : [];
+        ? paged
+        : Array.isArray(res.data)
+          ? res.data
+          : [];
 
     return items.map((p: any) => ({
       id: p.productId || p.id,
@@ -163,12 +198,12 @@ export const posOrderApi = {
       batchCode: 'LÔ-FEFO',
       unitPrices: Array.isArray(p.unitPrices)
         ? p.unitPrices.map((u: any) => ({
-            unitId: u.unitId || u.id,
-            unitName: u.unitName,
-            conversionRate: Number(u.conversionRate ?? 1),
-            price: Number(u.price ?? 0),
-            isBaseUnit: Boolean(u.isBaseUnit),
-          }))
+          unitId: u.unitId || u.id,
+          unitName: u.unitName,
+          conversionRate: Number(u.conversionRate ?? 1),
+          price: Number(u.price ?? 0),
+          isBaseUnit: Boolean(u.isBaseUnit),
+        }))
         : undefined,
     }));
   },
@@ -181,10 +216,10 @@ export const posOrderApi = {
     const rawList = Array.isArray(res.data?.data?.items)
       ? res.data.data.items
       : Array.isArray(res.data?.data)
-      ? res.data.data
-      : Array.isArray(res.data)
-      ? res.data
-      : [];
+        ? res.data.data
+        : Array.isArray(res.data)
+          ? res.data
+          : [];
     return rawList.map((c: any) => ({
       id: c.id,
       code: c.customerCode || c.code || '',
@@ -347,6 +382,34 @@ export const posOrderApi = {
   cancelOrder: async (orderId: string, data: { reason: string; note?: string; userRole?: string }): Promise<any> => {
     const res = await httpClient.put(`/orders/${orderId}/cancel`, data);
     return res.data;
+  },
+
+  /**
+   * Xác nhận đơn hàng chờ thanh toán (PendingPayment -> Completed / PAID) khi thanh toán VietQR thành công
+   */
+  confirmOrderPayment: async (orderId: string): Promise<OrderResponse> => {
+    const res = await httpClient.post(`/orders/${orderId}/confirm-payment`, {});
+    return res.data?.data ?? res.data;
+  },
+
+  /**
+   * Lấy thống kê các đơn hàng bán lẻ trực tiếp của Chủ cửa hàng (Shiftless) chưa kết toán cuối ngày
+   */
+  getOwnerUnsettledSummary: async (branchId?: string): Promise<OwnerUnsettledSummaryResponse> => {
+    const params: Record<string, string> = {};
+    if (branchId && branchId !== 'ALL') {
+      params.branchId = branchId;
+    }
+    const res = await httpClient.get('/orders/owner-unsettled-summary', { params });
+    return res.data?.data ?? res.data;
+  },
+
+  /**
+   * Chốt doanh thu bán lẻ cuối ngày cho Chủ cửa hàng (gộp toàn bộ đơn Shiftless trong ngày vào Két sắt & Ngân hàng)
+   */
+  settleOwnerDailyOrders: async (data: SettleOwnerDailyRequest): Promise<OwnerDailySettlementResponse> => {
+    const res = await httpClient.post('/orders/owner-settle-daily', data);
+    return res.data?.data ?? res.data;
   },
 
   /**

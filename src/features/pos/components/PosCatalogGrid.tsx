@@ -13,7 +13,7 @@ interface Props {
 export const PosCatalogGrid: FC<Props> = ({ products, categories, onAddToCart }) => {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [currentPage, setCurrentPage] = useState<number>(1);
-  const [pageSize, setPageSize] = useState<number>(10);
+  const [pageSize, setPageSize] = useState<number>(18);
 
   // Filter theo Category
   const filteredProducts = products.filter((p) => {
@@ -50,7 +50,7 @@ export const PosCatalogGrid: FC<Props> = ({ products, categories, onAddToCart })
                 className={`pos-category-btn ${selectedCategory === cat.id ? 'active' : ''}`}
                 onClick={() => handleCategorySelect(cat.id)}
               >
-                {cat.name} ({cat.id === 'all' ? products.length : products.filter((p) => p.category === cat.id).length})
+                {cat.name} ({cat.count})
               </button>
             ))}
           </div>
@@ -164,21 +164,23 @@ export const PosCatalogGrid: FC<Props> = ({ products, categories, onAddToCart })
           </div>
         )}
 
-        {/* Thanh Phân Trang Dùng Chung Chuẩn Prototype */}
+        {/* Thanh Phân Trang Dùng Chung Chuẩn Prototype - Đẩy xuống đáy hộp thoại */}
         {filteredProducts.length > 0 && (
-          <TablePagination
-            currentPage={currentPage}
-            pageSize={pageSize}
-            totalItems={totalCount}
-            itemLabel="sản phẩm"
-            pageSizeOptions={[10, 20, 50]}
-            onPageChange={setCurrentPage}
-            onPageSizeChange={(newSize) => {
-              setPageSize(newSize);
-              setCurrentPage(1);
-            }}
-            className="rounded-md border border-[#e2e8f0]"
-          />
+          <div style={{ marginTop: 'auto', paddingTop: 14 }}>
+            <TablePagination
+              currentPage={currentPage}
+              pageSize={pageSize}
+              totalItems={totalCount}
+              itemLabel="sản phẩm"
+              pageSizeOptions={[12, 18, 24, 48]}
+              onPageChange={setCurrentPage}
+              onPageSizeChange={(newSize) => {
+                setPageSize(newSize);
+                setCurrentPage(1);
+              }}
+              className="rounded-md border border-[#e2e8f0]"
+            />
+          </div>
         )}
       </fieldset>
     </div>
