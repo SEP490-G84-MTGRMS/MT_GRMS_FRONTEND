@@ -26,6 +26,7 @@ export const SubscriptionPlanEditPage: React.FC = () => {
 
   const [currentPlan, setCurrentPlan] = useState<SubscriptionPlan | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   // Form State
   const [name, setName] = useState("");
@@ -53,13 +54,22 @@ export const SubscriptionPlanEditPage: React.FC = () => {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!id) return;
+    if (!id) {
+      setLoadError("Thiếu mã gói dịch vụ.");
+      setIsLoading(false);
+      return;
+    }
 
     const loadPlan = async () => {
       try {
         setIsLoading(true);
+        setLoadError(null);
+        setCurrentPlan(null);
         const res = await planApi.getById(id);
         if (res.success && res.data) {
+          if (!res.data.quotas || !res.data.features) {
+            throw new Error("API chưa trả đủ hạn ngạch và tính năng của gói.");
+          }
           const plan = mapBackendPlanToFrontend(res.data);
           setCurrentPlan(plan);
           setName(plan.name);
@@ -69,10 +79,12 @@ export const SubscriptionPlanEditPage: React.FC = () => {
           setDescription(plan.description || "");
           setQuotas(plan.quotas);
           setFeatures(plan.features);
+        } else {
+          setLoadError(res.message || "Không tìm thấy gói dịch vụ.");
         }
       } catch (err: unknown) {
         const errorMsg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
-        setToastMessage(errorMsg || "Không thể tải thông tin gói cước");
+        setLoadError(errorMsg || (err instanceof Error ? err.message : "Không thể tải thông tin gói cước"));
       } finally {
         setIsLoading(false);
       }
@@ -128,7 +140,7 @@ export const SubscriptionPlanEditPage: React.FC = () => {
           <p
             style={{ color: "#64748b", fontSize: "13px", marginBottom: "16px" }}
           >
-            Mã định danh <code>{id}</code> không tồn tại trên hệ thống.
+            {loadError || `Mã định danh ${id} không tồn tại trên hệ thống.`}
           </p>
           <button
             type="button"
@@ -202,6 +214,7 @@ export const SubscriptionPlanEditPage: React.FC = () => {
       });
 
       if (res.success && res.data) {
+        setCurrentPlan(mapBackendPlanToFrontend(res.data));
         setToastMessage(`Đã cập nhật thành công gói cước "${name}"!`);
         setTimeout(() => {
           setIsSubmitting(false);
