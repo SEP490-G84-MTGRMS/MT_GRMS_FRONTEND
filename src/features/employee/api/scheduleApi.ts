@@ -152,6 +152,40 @@ const DAY_KEYS: Array<'CN' | 'T2' | 'T3' | 'T4' | 'T5' | 'T6' | 'T7'> = [
   'CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'
 ];
 
+export const isLeaveSchedule = (s: {
+  status?: string | null;
+  approvalType?: string | null;
+  checkInMethod?: string | null;
+  isLeave?: boolean | null;
+}): boolean => {
+  const statusLower = (s.status || '').toLowerCase();
+  const approvalUpper = (s.approvalType || '').toUpperCase();
+  const methodUpper = (s.checkInMethod || '').toUpperCase();
+  return (
+    Boolean(s.isLeave) ||
+    statusLower === 'onleave' ||
+    approvalUpper === 'PAID_LEAVE' ||
+    approvalUpper === 'UNPAID_LEAVE' ||
+    methodUpper === 'MANUAL_PAID_LEAVE' ||
+    methodUpper === 'MANUAL_UNPAID_LEAVE'
+  );
+};
+
+export const isScheduleDeletable = (s: {
+  status?: string | null;
+  approvalType?: string | null;
+  checkInTime?: string | null;
+  checkOutTime?: string | null;
+  checkInMethod?: string | null;
+  isLeave?: boolean | null;
+}): boolean => {
+  if (isLeaveSchedule(s)) return false;
+  if (s.checkInTime || s.checkOutTime) return false;
+  const statusLower = (s.status || '').toLowerCase();
+  if (statusLower === 'completed' || statusLower === 'inprogress') return false;
+  return true;
+};
+
 export const mapScheduleResponseToAssignment = (s: ScheduleResponse): ScheduleAssignment => {
   const d = new Date(s.workDate);
   const dayOfWeek = DAY_KEYS[d.getDay()] || 'T2';
@@ -161,6 +195,9 @@ export const mapScheduleResponseToAssignment = (s: ScheduleResponse): ScheduleAs
 
   const startFormatted = (s.plannedStartTime || '00:00').substring(0, 5);
   const endFormatted = (s.plannedEndTime || '00:00').substring(0, 5);
+  const approvalUpper = (s.approvalType || '').toUpperCase();
+  const isLeave = isLeaveSchedule(s);
+  const isPaidLeave = approvalUpper === 'PAID_LEAVE' || (s.checkInMethod || '').toUpperCase() === 'MANUAL_PAID_LEAVE';
 
   return {
     id: s.id,
@@ -178,6 +215,12 @@ export const mapScheduleResponseToAssignment = (s: ScheduleResponse): ScheduleAs
     branchId: s.branchId,
     branchName: s.branchName || 'Chi nhánh',
     status: s.status,
+    approvalType: s.approvalType,
+    checkInTime: s.checkInTime,
+    checkOutTime: s.checkOutTime,
+    checkInMethod: s.checkInMethod,
+    isLeave,
+    isPaidLeave,
   };
 };
 

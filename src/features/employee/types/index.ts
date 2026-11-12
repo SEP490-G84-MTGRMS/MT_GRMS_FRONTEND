@@ -178,6 +178,10 @@ export interface ScheduleAssignment {
   branchId?: string;
   branchName: string;
   status?: string;
+  approvalType?: string | null;
+  checkInTime?: string | null;
+  checkOutTime?: string | null;
+  checkInMethod?: string | null;
   isLeave?: boolean;
   isPaidLeave?: boolean;
 }

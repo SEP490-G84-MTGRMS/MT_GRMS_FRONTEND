@@ -7,7 +7,7 @@ import type {
   ScheduleAssignment,
 } from '../../types';
 import { shiftConfigApi, type ShiftConfigDto } from '../../api/shiftConfigApi';
-import { scheduleApi, type CreateRecurringSchedulePayload } from '../../api/scheduleApi';
+import { scheduleApi, isLeaveSchedule, isScheduleDeletable, type CreateRecurringSchedulePayload } from '../../api/scheduleApi';
 import { ScheduleScopeConfirmModal, type ScheduleScopeType, type ScheduleScopeDateRange } from './ScheduleScopeConfirmModal';
 import { getVietnamToday, getVietnamTodayIso } from '../../lib/vietnamTime';
 
@@ -1750,7 +1750,7 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
               background: '#F8FAFC',
             }}
           >
-            {isEditMode && onDelete && (
+            {isEditMode && onDelete && (!editingAssignment || !isLeaveSchedule(editingAssignment)) && (
               <button
                 type="button"
                 className="emp-btn"
@@ -1833,11 +1833,7 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
                     pageSize: 1000,
                   });
 
-                  const deletable = rawList.filter((s) => {
-                    if (s.checkInTime || s.checkOutTime) return false;
-                    if (s.status === 'Completed' || s.status === 'completed') return false;
-                    return true;
-                  });
+                  const deletable = rawList.filter((s) => isScheduleDeletable(s));
 
                   if (deletable.length > 0) {
                     await Promise.allSettled(
@@ -1845,10 +1841,12 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
                     );
                   }
                 } else {
-                  // 1. Luôn xóa ca hiện tại
-                  await scheduleApi.deleteSchedule(editingAssignment.id);
+                  // 1. Xóa ca hiện tại nếu không phải ca nghỉ phép / đã chấm công
+                  if (isScheduleDeletable(editingAssignment)) {
+                    await scheduleApi.deleteSchedule(editingAssignment.id);
+                  }
 
-                  // 2. Nếu chọn scope Following hoặc All: xóa các ca khớp phạm vi
+                  // 2. Nếu chọn scope Following hoặc All: xóa các ca khớp phạm vi (bỏ qua ca nghỉ phép và đã chấm công)
                   if ((scope === 'following' || scope === 'all') && dateRange?.fromDate && dateRange?.toDate) {
                     const daysToDelete = isRepeating ? selectedDays : [selectedDays[0] || editingAssignment.dayOfWeek];
                     const targetShiftNameLower = (editingAssignment.shiftName || '').toLowerCase().trim();
@@ -1862,6 +1860,7 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
 
                     const matchingOther = schedulesInRange.filter((s) => {
                       if (s.id === editingAssignment.id) return false;
+                      if (!isScheduleDeletable(s)) return false;
                       const dow = getScheduleDayOfWeek(s);
                       const matchesDow = !daysToDelete.length || daysToDelete.includes(dow);
                       const matchesShift =

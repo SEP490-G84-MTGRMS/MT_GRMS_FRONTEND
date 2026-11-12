@@ -38,7 +38,7 @@ import { ScheduleRequestsHistoryModal } from '../components/approval-requests/Sc
 import { ScheduleRequestType } from '../types/scheduleApprovalTypes';
 import { employeeApi } from '../api/employeeApi';
 import { shiftConfigApi, type ShiftConfigDto } from '../api/shiftConfigApi';
-import { scheduleApi, getShiftColor } from '../api/scheduleApi';
+import { scheduleApi, getShiftColor, isLeaveSchedule, isScheduleDeletable } from '../api/scheduleApi';
 import { getVietnamToday, matchesAnyVietnameseSearch } from '../lib/vietnamTime';
 import { useAuthStore } from '../../../stores/useAuthStore';
 import '../employee.css';
@@ -606,9 +606,17 @@ export const WorkSchedulePage: React.FC = () => {
   const handleDeleteAssignment = (assignId: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     const item = assignments.find((a) => a.id === assignId);
-    if (item) {
-      setDeletingAssignment(item);
+    if (!item) return;
+    if (isLeaveSchedule(item)) {
+      setNotificationModal({
+        isOpen: true,
+        type: 'warning',
+        title: 'Không thể xóa ca nghỉ phép',
+        message: 'Ca làm việc đang ở trạng thái nghỉ phép (nghỉ phép có lương hoặc không lương) không được phép xóa.',
+      });
+      return;
     }
+    setDeletingAssignment(item);
   };
 
   // 5. Hàm thực thi xóa ca làm việc trên Backend theo phạm vi
@@ -620,7 +628,7 @@ export const WorkSchedulePage: React.FC = () => {
     try {
       setIsLoading(true);
 
-      // TRƯỜNG HỢP 4: scope === 'entire' -> Xóa toàn bộ ca của nhân viên (trừ ca đã chấm công / có dữ liệu)
+      // TRƯỜNG HỢP 4: scope === 'entire' -> Xóa toàn bộ ca của nhân viên (trừ ca đã chấm công / nghỉ phép)
       if (scope === 'entire') {
         try {
           const rawList = await scheduleApi.getRawSchedules({
@@ -628,12 +636,8 @@ export const WorkSchedulePage: React.FC = () => {
             pageSize: 1000,
           });
 
-          // Lọc ra các ca chưa có dữ liệu chấm công và chưa hoàn thành
-          const deletable = rawList.filter((s) => {
-            if (s.checkInTime || s.checkOutTime) return false;
-            if (s.status === 'Completed' || s.status === 'completed') return false;
-            return true;
-          });
+          // Lọc ra các ca chưa có dữ liệu chấm công, chưa hoàn thành và không phải ca nghỉ phép (có lương / không lương)
+          const deletable = rawList.filter((s) => isScheduleDeletable(s));
 
           if (deletable.length > 0) {
             await Promise.allSettled(
@@ -650,7 +654,7 @@ export const WorkSchedulePage: React.FC = () => {
             isOpen: true,
             type: 'success',
             title: 'Thành công',
-            message: `Đã xóa toàn bộ ${deletable.length} ca làm việc chưa chấm công của nhân viên. Các ca đã có dữ liệu chấm công được giữ nguyên.`,
+            message: `Đã xóa toàn bộ ${deletable.length} ca làm việc chưa chấm công của nhân viên. Các ca đã có dữ liệu chấm công hoặc nghỉ phép được giữ nguyên.`,
           });
           return true;
         } catch (entireErr: any) {
@@ -665,11 +669,22 @@ export const WorkSchedulePage: React.FC = () => {
         }
       }
 
-      // CÁC TRƯỜNG HỢP CÒN LẠI (single, following, all):
-      // Luôn xóa ca hiện tại được bấm
-      await scheduleApi.deleteSchedule(target.id);
+      // Chặn xóa ca hiện tại nếu là ca nghỉ phép (có lương hoặc không lương)
+      if (isLeaveSchedule(target)) {
+        if (!scope || scope === 'single') {
+          setNotificationModal({
+            isOpen: true,
+            type: 'warning',
+            title: 'Không thể xóa ca nghỉ phép',
+            message: 'Ca làm việc đang ở trạng thái nghỉ phép (nghỉ phép có lương hoặc không lương) không được phép xóa.',
+          });
+          return false;
+        }
+      } else if (isScheduleDeletable(target)) {
+        await scheduleApi.deleteSchedule(target.id);
+      }
 
-      // Nếu người dùng chọn Option 2 (following) hoặc Option 3 (all), fetch và xóa các ca cùng phạm vi
+      // Nếu người dùng chọn Option 2 (following) hoặc Option 3 (all), fetch và xóa các ca cùng phạm vi (bỏ qua ca nghỉ phép và ca đã chấm công)
       if ((scope === 'following' || scope === 'all') && dateRange?.fromDate && dateRange?.toDate) {
         try {
           const schedulesInRange = await scheduleApi.getSchedules({
@@ -689,6 +704,7 @@ export const WorkSchedulePage: React.FC = () => {
 
           const otherMatching = schedulesInRange.filter((s) => {
             if (s.id === target.id) return false;
+            if (!isScheduleDeletable(s)) return false;
             const dow = s.dayOfWeek || (s.workDate ? DAY_MAP[new Date(s.workDate).getDay()] : undefined);
             const matchesDow = !targetDow || dow === targetDow;
             const matchesShift = !targetShiftId || s.shiftId === targetShiftId || (s.shiftName && s.shiftName.toLowerCase().trim() === targetShiftName);
@@ -1118,7 +1134,7 @@ export const WorkSchedulePage: React.FC = () => {
                           >
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'center' }}>
                               {matched.map((item) => {
-                                const isOnLeave = item.status?.toLowerCase() === 'onleave' || item.isLeave;
+                                const isOnLeave = isLeaveSchedule(item);
                                 const isMenuOpen = openMenuScheduleId === item.id;
                                 return (
                                   <div key={item.id} style={{ position: 'relative', width: '90%' }}>
@@ -1172,7 +1188,7 @@ export const WorkSchedulePage: React.FC = () => {
                                       title={!isEmployeeRole ? "Bấm để xem chi tiết và chỉnh sửa ca làm việc" : "Bấm để gửi yêu cầu hoặc thao tác ca làm"}
                                     >
                                       <span>{isOnLeave ? `[Nghỉ] ${item.shiftName}` : item.shiftName}</span>
-                                      {!isEmployeeRole && (
+                                      {!isEmployeeRole && !isOnLeave && (
                                         <button
                                           type="button"
                                           style={{
@@ -1555,7 +1571,7 @@ export const WorkSchedulePage: React.FC = () => {
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'center' }}>
                             {assignedEmps.map((item) => {
                               if (!item) return null;
-                              const isOnLeave = item.status?.toLowerCase() === 'onleave' || item.isLeave;
+                              const isOnLeave = isLeaveSchedule(item);
                               const isMenuOpen = openMenuScheduleId === ('shift_' + item.id);
                               const isMyShift = !isEmployeeRole || (
                                 (user?.id && item.employeeId === user.id) ||

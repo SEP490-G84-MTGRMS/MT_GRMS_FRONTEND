@@ -313,8 +313,8 @@ export const ScheduleScopeConfirmModal: React.FC<ScheduleScopeConfirmModalProps>
             {
               scope: 'entire' as const,
               title: actionType === 'delete'
-                ? 'Xóa toàn bộ ca của nhân viên (trừ các ca đã chấm công / có dữ liệu)'
-                : 'Toàn bộ ca làm việc của nhân viên (trừ ca đã chấm công)',
+                ? 'Xóa toàn bộ ca của nhân viên (trừ các ca đã chấm công / nghỉ phép)'
+                : 'Toàn bộ ca làm việc của nhân viên (trừ ca đã chấm công / nghỉ phép)',
             },
           ].map((item) => {
             const isSelected = selectedScope === item.scope;
@@ -379,11 +379,11 @@ export const ScheduleScopeConfirmModal: React.FC<ScheduleScopeConfirmModalProps>
           <strong>Lưu ý:</strong>{' '}
           {selectedScope === 'entire' ? (
             <span>
-              Hệ thống sẽ quét toàn bộ lịch làm việc của nhân viên này và <strong>chỉ xóa các ca chưa có dữ liệu chấm công</strong>. Các ca đã check-in, check-out hoặc đã hoàn thành sẽ được giữ nguyên 100%.
+              Hệ thống sẽ quét toàn bộ lịch làm việc của nhân viên này và <strong>chỉ xóa các ca chưa có dữ liệu chấm công và không phải ca nghỉ phép</strong>. Các ca đã check-in, check-out, đã hoàn thành hoặc nghỉ phép (có lương / không lương) sẽ được giữ nguyên 100%.
             </span>
           ) : (
             <span>
-              Chỉ áp dụng thay đổi trên các Chi tiết ca làm việc chưa chấm công
+              Chỉ áp dụng thay đổi trên các Chi tiết ca làm việc chưa chấm công và không phải ca nghỉ phép (có lương / không lương)
               {selectedDays && selectedDays.length > 0 && (
                 <span> thuộc các thứ được chọn (<strong>{selectedDays.join(', ')}</strong>)</span>
               )}
