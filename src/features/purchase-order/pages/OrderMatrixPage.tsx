@@ -23,14 +23,16 @@ import { OrderMatrixSplitModal } from '../components/matrix/OrderMatrixSplitModa
 import { OrderMatrixImportPreviewModal } from '../components/matrix/OrderMatrixImportPreviewModal';
 import {
   exportMatrixToExcel,
-  validateMatrixExcelFile,
-  applyMatrixExcelImport,
   type ExcelValidationResult,
+  type ExcelCellToApply,
+  type ExcelValidationErrorItem,
 } from '../lib/matrixExcelService';
+import { OrderMatrixImportResultModal, type MatrixExcelImportResult } from '../components/matrix/OrderMatrixImportResultModal';
 import { AdminToast, type ToastState } from '../../admin/components';
 import { purchaseOrderApi } from '../api/purchaseOrderApi';
 import { storeProductApi } from '../../product/api/storeProductApi';
 import { useAuthStore } from '../../../stores/useAuthStore';
+import { productRowKey } from '../lib/matrixRowKey';
 import '../purchase-order.css';
 
 const GUID_RE =
@@ -408,6 +410,9 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
   const [isSplitModalOpen, setIsSplitModalOpen] = useState<boolean>(false);
   const [importPreviewResult, setImportPreviewResult] = useState<ExcelValidationResult | null>(null);
   const [isImportModalOpen, setIsImportModalOpen] = useState<boolean>(false);
+  const [importResult, setImportResult] = useState<MatrixExcelImportResult | null>(null);
+  const [isImportResultOpen, setIsImportResultOpen] = useState(false);
+  const [pendingImportFileName, setPendingImportFileName] = useState<string>('');
 
   // State: Toast
   const [toast, setToast] = useState<ToastState | null>(null);
@@ -968,53 +973,127 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
     );
   };
 
-  // Excel Download — Chuẩn CISCA / MT-GRMS .xlsx
-  const handleExcelDownload = () => {
+  const buildSupplierCodeById = () => {
+    const map: Record<string, string> = {};
+    suppliers.forEach((s) => {
+      if (s.id) map[s.id] = s.code || s.id;
+    });
+    supplierConfigs.forEach((c) => {
+      if (c.supplierId && c.supplierCode) map[c.supplierId] = c.supplierCode;
+    });
+    return map;
+  };
+
+  const mapBackendIssue = (e: any): ExcelValidationErrorItem => ({
+    type: (e.type === 'WARNING' ? 'WARNING' : 'ERROR') as 'ERROR' | 'WARNING',
+    row: e.row ?? 0,
+    productCode: e.productCode || '-',
+    productName: e.productName || '-',
+    deliveryDate: e.deliveryDate || '-',
+    dateLabel: e.dateLabel || '-',
+    inputValue: e.inputValue ?? '-',
+    code: (e.code || 'FORMAT_INVALID') as ExcelValidationErrorItem['code'],
+    message: e.message || '',
+  });
+
+  const mapBackendPreviewToFe = (d: any, file: File): ExcelValidationResult => {
+    const cellsToApply: ExcelCellToApply[] = (d.cellsToApply || []).map((c: any) => ({
+      row: c.excelRow ?? 0,
+      rowKey: productRowKey({ id: c.productId, supplierId: c.supplierId }),
+      productId: c.productId,
+      supplierId: c.supplierId,
+      productCode: c.productCode || '',
+      productName: c.productName || '',
+      deliveryDate: typeof c.deliveryDate === 'string'
+        ? c.deliveryDate.slice(0, 10)
+        : dayjs(c.deliveryDate).format('YYYY-MM-DD'),
+      dateLabel: c.dateLabel || '',
+      currentQty: Number(c.currentQty || 0),
+      quantity: Number(c.quantity || 0),
+    }));
+
+    return {
+      valid: Boolean(d.valid),
+      fileName: d.fileName || file.name,
+      fileSize: d.fileSize || file.size,
+      scopeStatus: {
+        branchMatched: Boolean(d.scopeStatus?.branchMatched),
+        branchExpected: d.scopeStatus?.branchExpected || selectedBranchId,
+        branchActual: d.scopeStatus?.branchActual,
+        supplierMatched: Boolean(d.scopeStatus?.supplierMatched),
+        supplierExpected: d.scopeStatus?.supplierExpected || selectedSupplierId,
+        supplierActual: d.scopeStatus?.supplierActual,
+        periodMatched: Boolean(d.scopeStatus?.periodMatched),
+        periodExpected: d.scopeStatus?.periodExpected || '',
+      },
+      summary: {
+        totalCells: d.summary?.totalCells ?? 0,
+        validCells: d.summary?.validCells ?? cellsToApply.length,
+        errorCount: d.summary?.errorCount ?? (d.errors?.length || 0),
+        warningCount: d.summary?.warningCount ?? (d.warnings?.length || 0),
+        ignoredCells: d.summary?.ignoredCells ?? 0,
+        skippedOwnerLocked: d.summary?.skippedOwnerLocked ?? 0,
+        outOfFilterCount: d.summary?.outOfFilterCount ?? 0,
+        productsInFilterCount: d.scopeStatus?.productsInFilterCount ?? filteredProducts.length,
+      },
+      errors: (d.errors || []).map(mapBackendIssue),
+      warnings: (d.warnings || []).map(mapBackendIssue),
+      cellsToApply,
+    };
+  };
+
+  // Excel Download — khớp filteredProducts + role + Mã NCC
+  const handleExcelDownload = (blankQty = false) => {
     try {
       const branch = branches.find((b) => b.id === selectedBranchId);
       const supplier = suppliers.find((s) => s.id === selectedSupplierId);
-      exportMatrixToExcel(matrixProducts, dayColumns, cellMap, {
+      exportMatrixToExcel(filteredProducts, dayColumns, cellMap, {
         branch,
         supplier,
         supplierId: selectedSupplierId,
         viewFrom,
         viewTo: addDaysToDate(viewFrom, durationDays - 1),
         exportedBy: isStoreOwner ? 'Store Owner' : 'Nhân viên chi nhánh',
+        isStoreOwner,
+        blankQty,
+        supplierCodeById: buildSupplierCodeById(),
         isCellEditable,
       });
-      showToast('Đã xuất file bảng ma trận đặt hàng (.xlsx) chuẩn doanh nghiệp thành công!', 'success');
+      showToast(
+        blankQty
+          ? 'Đã tải mẫu Excel (ô editable trống) theo bộ lọc hiện tại.'
+          : 'Đã xuất file bảng ma trận đặt hàng (.xlsx) theo bộ lọc hiện tại!',
+        'success'
+      );
     } catch (err: any) {
       showToast('Xuất file Excel thất bại: ' + (err?.message || err), 'error');
     }
   };
 
-  // Excel Upload — 3 Giai đoạn: Validate -> Preview Modal -> Apply
+  // Excel Upload — BE preview (CN / NCC / SP filter) → modal → import API → result popup
   const handleExcelUpload = async (file: File) => {
     const branch = branches.find((b) => b.id === selectedBranchId);
     const supplier = suppliers.find((s) => s.id === selectedSupplierId);
+    setPendingImportFileName(file.name);
 
     try {
-      const validationResult = await validateMatrixExcelFile({
+      const allowedProducts = filteredProducts.map((p) => ({
+        productId: p.id,
+        supplierId: p.supplierId,
+      }));
+
+      const raw = await purchaseOrderApi.previewMatrixExcel({
         file,
-        currentBranchId: selectedBranchId,
-        currentBranchCode: branch?.code,
-        currentBranchName: branch?.name,
-        currentSupplierId: selectedSupplierId,
-        currentSupplierCode: supplier?.code,
-        currentSupplierName: supplier?.name,
-        viewFrom,
-        viewTo: addDaysToDate(viewFrom, durationDays - 1),
-        matrixProducts,
-        dayColumns,
-        cellMap,
-        supplierConfigs,
-        isCellEditable,
+        branchId: selectedBranchId,
+        supplierId: selectedSupplierId,
+        viewFrom: dayjs(viewFrom).format('YYYY-MM-DD'),
+        durationDays,
+        allowedProducts,
       });
 
-      setImportPreviewResult(validationResult);
+      setImportPreviewResult(mapBackendPreviewToFe(raw, file));
       setIsImportModalOpen(true);
     } catch (err: any) {
-      // Đảm bảo luôn mở Preview Modal kể cả khi gặp lỗi đọc file sớm
       const errResult: ExcelValidationResult = {
         valid: false,
         fileName: file?.name || 'unknown.xlsx',
@@ -1044,7 +1123,7 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
             dateLabel: '-',
             inputValue: '-',
             code: 'FORMAT_INVALID',
-            message: `Không thể đọc nội dung file Excel: ${err?.message || 'File lỗi hoặc không đúng định dạng'}`,
+            message: `Không thể kiểm tra file Excel trên máy chủ: ${err?.message || 'Lỗi không xác định'}`,
           },
         ],
         warnings: [],
@@ -1055,24 +1134,91 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
     }
   };
 
-  // Xử lý nạp dữ liệu từ Modal Preview sau khi đã kiểm tra không có lỗi
-  const handleConfirmApplyImport = () => {
-    if (!importPreviewResult || !importPreviewResult.valid || importPreviewResult.summary.validCells === 0) return;
+  const handleConfirmApplyImport = async () => {
+    if (!importPreviewResult || importPreviewResult.summary.validCells === 0) return;
+    if (importPreviewResult.summary.errorCount > 0 && importPreviewResult.cellsToApply.length === 0) return;
 
-    const newMap = applyMatrixExcelImport(
-      importPreviewResult.cellsToApply,
-      cellMap,
-      isStoreOwner
-    );
+    try {
+      const allowedProducts = filteredProducts.map((p) => ({
+        productId: p.id,
+        supplierId: p.supplierId,
+      }));
+      const viewTo = addDaysToDate(viewFrom, durationDays - 1);
+      const raw = await purchaseOrderApi.importMatrixExcel({
+        branchId: selectedBranchId,
+        supplierId: selectedSupplierId,
+        viewFrom: dayjs(viewFrom).format('YYYY-MM-DD'),
+        viewTo: dayjs(viewTo).format('YYYY-MM-DD'),
+        fileName: pendingImportFileName || importPreviewResult.fileName,
+        allowedProducts,
+        cells: importPreviewResult.cellsToApply.map((c) => ({
+          productId: c.productId,
+          supplierId: c.supplierId,
+          deliveryDate: c.deliveryDate,
+          quantity: c.quantity,
+          excelRow: c.row,
+          productCode: c.productCode,
+          productName: c.productName,
+          dateLabel: c.dateLabel,
+        })),
+      });
 
-    setCellMap(newMap);
-    setIsDirty(true);
-    setIsImportModalOpen(false);
+      const mapped: MatrixExcelImportResult = {
+        success: Boolean(raw.success),
+        fileName: raw.fileName || pendingImportFileName,
+        summary: {
+          appliedCells: raw.summary?.appliedCells ?? 0,
+          skippedOwnerLocked: raw.summary?.skippedOwnerLocked ?? 0,
+          errorCount: raw.summary?.errorCount ?? (raw.errors?.length || 0),
+          warningCount: raw.summary?.warningCount ?? (raw.warnings?.length || 0),
+          successDayCount: raw.summary?.successDayCount ?? (raw.successDays?.length || 0),
+        },
+        successDays: (raw.successDays || []).map((d: any) => ({
+          deliveryDate:
+            typeof d.deliveryDate === 'string'
+              ? d.deliveryDate.slice(0, 10)
+              : dayjs(d.deliveryDate).format('YYYY-MM-DD'),
+          dateLabel: d.dateLabel || '',
+          appliedCells: d.appliedCells ?? 0,
+          productCount: d.productCount ?? 0,
+        })),
+        errors: (raw.errors || []).map((e: any) => ({
+          type: e.type,
+          row: e.row,
+          productCode: e.productCode,
+          productName: e.productName,
+          deliveryDate: e.deliveryDate,
+          dateLabel: e.dateLabel,
+          inputValue: e.inputValue,
+          code: e.code,
+          message: e.message,
+        })),
+        warnings: (raw.warnings || []).map((e: any) => ({
+          type: e.type,
+          row: e.row,
+          productCode: e.productCode,
+          productName: e.productName,
+          deliveryDate: e.deliveryDate,
+          dateLabel: e.dateLabel,
+          inputValue: e.inputValue,
+          code: e.code,
+          message: e.message,
+        })),
+        draftPoId: raw.draftPoId,
+      };
 
-    showToast(
-      'Nạp thành công ' + importPreviewResult.summary.validCells + ' ô số lượng từ file "' + importPreviewResult.fileName + '" vào Ma trận!',
-      'success'
-    );
+      setIsImportModalOpen(false);
+      setImportResult(mapped);
+      setIsImportResultOpen(true);
+      setIsDirty(false);
+      setMatrixRefreshKey((k) => k + 1);
+      showToast(
+        `Đã nạp ${mapped.summary.appliedCells} ô vào ${mapped.summary.successDayCount} ngày giao.`,
+        mapped.summary.appliedCells > 0 ? 'success' : 'warning'
+      );
+    } catch (err: any) {
+      showToast(err?.message || 'Nạp Excel thất bại.', 'error');
+    }
   };
 
   // Compute PO Split Preview according to FE-05 rules:
@@ -1356,7 +1502,8 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
         onThisWeek={handleThisWeek}
         onCopyPrevWeek={handleCopyPrevWeek}
         onAutoSuggest={handleAutoSuggest}
-        onExcelDownload={handleExcelDownload}
+        onExcelDownload={() => handleExcelDownload(false)}
+        onExcelTemplateDownload={() => handleExcelDownload(true)}
         onExcelUpload={handleExcelUpload}
       />
 
@@ -1393,6 +1540,16 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
         onClose={() => setIsImportModalOpen(false)}
         result={importPreviewResult}
         onConfirmApply={handleConfirmApplyImport}
+      />
+
+      {/* 6. Excel Import Result — ngày thành công + lỗi chi tiết */}
+      <OrderMatrixImportResultModal
+        isOpen={isImportResultOpen}
+        result={importResult}
+        onClose={() => {
+          setIsImportResultOpen(false);
+          setImportResult(null);
+        }}
       />
     </div>
   );

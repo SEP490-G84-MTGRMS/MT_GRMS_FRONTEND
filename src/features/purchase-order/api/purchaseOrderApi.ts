@@ -402,6 +402,75 @@ export const purchaseOrderApi = {
   },
 
   /**
+   * Preview nạp Excel ma trận — BE kiểm tra khớp CN / NCC / SP filter.
+   */
+  async previewMatrixExcel(params: {
+    file: File;
+    branchId: string;
+    supplierId?: string;
+    viewFrom: string;
+    durationDays: number;
+    allowedProducts: Array<{ productId: string; supplierId: string }>;
+  }): Promise<any> {
+    const form = new FormData();
+    form.append('file', params.file);
+    form.append('branchId', params.branchId);
+    form.append('viewFrom', params.viewFrom);
+    form.append('durationDays', String(params.durationDays));
+    if (params.supplierId && params.supplierId !== 'ALL') {
+      form.append('supplierId', params.supplierId);
+    }
+    form.append('allowedProducts', JSON.stringify(params.allowedProducts));
+
+    const res = await httpClient.post<ApiResponse<any>>(
+      '/purchase-orders/matrix/excel/preview',
+      form,
+      { headers: { 'Content-Type': 'multipart/form-data' } }
+    );
+    if (res.data?.success && res.data.data) return res.data.data;
+    throw new Error(res.data?.message || 'Không thể kiểm tra file Excel ma trận.');
+  },
+
+  /**
+   * Import số lượng từ Excel vào draft (sau confirm preview).
+   */
+  async importMatrixExcel(payload: {
+    branchId: string;
+    supplierId?: string;
+    viewFrom: string;
+    viewTo: string;
+    fileName?: string;
+    allowedProducts: Array<{ productId: string; supplierId: string }>;
+    cells: Array<{
+      productId: string;
+      supplierId: string;
+      deliveryDate: string;
+      quantity: number;
+      excelRow?: number;
+      productCode?: string;
+      productName?: string;
+      dateLabel?: string;
+    }>;
+  }): Promise<any> {
+    const body = {
+      branchId: payload.branchId,
+      supplierId:
+        payload.supplierId && payload.supplierId !== 'ALL' ? payload.supplierId : undefined,
+      viewFrom: payload.viewFrom,
+      viewTo: payload.viewTo,
+      fileName: payload.fileName,
+      allowedProducts: payload.allowedProducts,
+      cells: payload.cells,
+    };
+    const res = await httpClient.post<ApiResponse<any>>(
+      '/purchase-orders/matrix/excel/import',
+      body
+    );
+    if (res.data?.success && res.data.data) return res.data.data;
+    throw new Error(res.data?.message || 'Không thể nạp Excel vào ma trận.');
+  },
+
+  /**
    * Chốt ma trận và tự động tách thành các đơn PO độc lập
    */
   async splitMatrixPo(
