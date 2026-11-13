@@ -27,6 +27,10 @@ export interface StoreProductItem {
   primarySupplierCode?: string;
   primarySupplierName: string;
   isPrimarySupplier?: boolean;
+  /** Còn ít nhất 1 NCC Active phục vụ CN cho SP này. */
+  hasActiveSupplierSource?: boolean;
+  /** SP đang bán tại CN nhưng mất nguồn NCC. */
+  lostSupplierSource?: boolean;
   minOrderQuantity: number; // MOQ từ NCC — chỉ xem tại màn này
   status: 'Active' | 'Inactive';
   shelfLocation?: string;

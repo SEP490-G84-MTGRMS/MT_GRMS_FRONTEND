@@ -240,7 +240,14 @@ export const GoodsReceiptDetailPage: FC<{ defaultRole?: UserRole }> = ({
         await goodsReceiptApi.completeGoodsReceipt(receipt.id, notes);
         setStatus('CONFIRMED');
         setIsSuccessModalOpen(true);
-        showToast(`Đã duyệt hoàn tất phiếu ${receipt.code}. Tồn kho chi nhánh đã được cập nhật!`, 'success');
+        const shortHint =
+          mismatchedItems.length > 0
+            ? ' PO đã đóng — phần thiếu phải đặt bù đơn mới (không nhập lại trên cùng PO).'
+            : ' PO nguồn đã chuyển COMPLETED.';
+        showToast(
+          `Đã hoàn tất phiếu ${receipt.code}. Tồn kho đã cập nhật.${shortHint}`,
+          'success'
+        );
       } catch (err: any) {
         showToast(err.response?.data?.message || err.message || 'Hoàn tất phiếu thất bại.', 'error');
       } finally {
@@ -360,6 +367,7 @@ export const GoodsReceiptDetailPage: FC<{ defaultRole?: UserRole }> = ({
             </div>
           </div>
 
+          {defaultRole !== 'store_owner' && (
           <div
             style={{
               display: 'flex',
@@ -415,6 +423,7 @@ export const GoodsReceiptDetailPage: FC<{ defaultRole?: UserRole }> = ({
               <span>Thủ kho</span>
             </button>
           </div>
+          )}
         </div>
 
         {/* ── 1. HEADER CARD (Thông tin chung & Đối soát Đơn PO gốc) ── */}

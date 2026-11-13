@@ -510,7 +510,7 @@ export const DispatchConfirmModal: FC<DispatchConfirmModalProps> = ({
                             {r.purchaseOrderCode}
                           </span>
                           <Link
-                            to={`/store-owner/purchase-orders?code=${encodeURIComponent(r.purchaseOrderCode)}`}
+                            to={`/store-owner/purchase-orders/list?code=${encodeURIComponent(r.purchaseOrderCode)}`}
                             target="_blank"
                             style={{
                               display: 'inline-flex',

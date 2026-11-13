@@ -245,6 +245,7 @@ export const goodsReceiptApi = {
     branchId: string;
     branchCode: string;
     branchName: string;
+    deliveryDate?: string | null;
     items: Array<{
       purchaseOrderDetailId: string;
       productId: string;
@@ -271,6 +272,23 @@ export const goodsReceiptApi = {
     const res = await httpClient.post<ApiResponse<BackendGoodsReceiptDto>>('/goods-receipts', command);
     if (!res.data?.success || !res.data.data) {
       throw new Error(res.data?.message || 'Không thể tạo phiếu nhập kho.');
+    }
+    return res.data.data;
+  },
+
+  /**
+   * Cập nhật dòng kiểm đếm phiếu nháp — giữ nguyên mã GRN.
+   */
+  async updateDraftGoodsReceipt(
+    id: string,
+    command: Record<string, unknown>
+  ): Promise<BackendGoodsReceiptDto> {
+    const res = await httpClient.put<ApiResponse<BackendGoodsReceiptDto>>(
+      `/goods-receipts/${id}`,
+      command
+    );
+    if (!res.data?.success || !res.data.data) {
+      throw new Error(res.data?.message || 'Không thể cập nhật phiếu nhập kho nháp.');
     }
     return res.data.data;
   },

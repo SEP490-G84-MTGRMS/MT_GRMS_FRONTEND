@@ -144,6 +144,8 @@ export interface CreateStocktakePayload {
 export interface ReviewStocktakePayload {
   action: 'APPROVE' | 'REJECT' | 'NEEDS_RECOUNT';
   note?: string | null;
+  /** RULE-03: bắt buộc khi có hàng thừa (variance &gt; 0) */
+  confirmSurplusFound?: boolean;
 }
 
 export interface CreateReturnFromStocktakePayload {

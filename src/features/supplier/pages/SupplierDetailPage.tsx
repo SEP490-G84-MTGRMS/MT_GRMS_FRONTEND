@@ -6,6 +6,7 @@ import type {
   SupplierSummary,
   APLedgerEntry,
   SupplierDeliveryConfig,
+  SupplierReturnPolicy,
   PurchaseOrderItem,
   UpdateBasicSupplierInput,
   UpdateSupplierBankInput,
@@ -15,6 +16,7 @@ import { SupplierDetailHeader } from '../components/detail/SupplierDetailHeader'
 import { SupplierGeneralProfileTab } from '../components/detail/SupplierGeneralProfileTab';
 import { SupplierDeliveryConfigTab } from '../components/detail/SupplierDeliveryConfigTab';
 import { SupplierHolidaysTab } from '../components/detail/SupplierHolidaysTab';
+import { SupplierReturnPolicyTab, DEFAULT_RETURN_POLICY } from '../components/detail/SupplierReturnPolicyTab';
 import { SupplierPayablesTab } from '../components/detail/SupplierPayablesTab';
 import { SupplierHistoryTab } from '../components/detail/SupplierHistoryTab';
 import { EditSupplierModal } from '../components/EditSupplierModal';
@@ -35,12 +37,13 @@ interface Props {
   onSupplierUpdated?: (supplier: SupplierSummary) => void;
 }
 
-type TabKey = 'profile' | 'delivery' | 'holidays' | 'payables' | 'history';
+type TabKey = 'profile' | 'delivery' | 'holidays' | 'returnPolicy' | 'payables' | 'history';
 
 const ALL_TABS: { key: TabKey; label: string }[] = [
   { key: 'profile', label: 'Hồ sơ chung' },
   { key: 'delivery', label: 'Giao hàng & Cutoff' },
   { key: 'holidays', label: 'Ngày nghỉ lễ' },
+  { key: 'returnPolicy', label: 'Chính sách trả hàng' },
   { key: 'payables', label: 'Công nợ & thanh toán' },
   { key: 'history', label: 'Lịch sử giao dịch' },
 ];
@@ -155,6 +158,7 @@ export const SupplierDetailPage: FC<Props> = ({
 
   const [apLedgers] = useState<APLedgerEntry[]>([]);
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrderItem[]>([]);
+  const [returnPolicy, setReturnPolicy] = useState<SupplierReturnPolicy | null>(null);
 
   // Load real supplier from API if not provided in props
   useEffect(() => {
@@ -216,6 +220,25 @@ export const SupplierDetailPage: FC<Props> = ({
         })
         .catch(() => {
           // keep local defaults
+        });
+
+      supplierApi
+        .getReturnPolicy(targetId)
+        .then((data) => {
+          if (!isMounted) return;
+          setReturnPolicy(
+            data || {
+              ...DEFAULT_RETURN_POLICY,
+              supplierId: targetId,
+            }
+          );
+        })
+        .catch(() => {
+          if (!isMounted) return;
+          setReturnPolicy({
+            ...DEFAULT_RETURN_POLICY,
+            supplierId: targetId,
+          });
         });
     }
 
@@ -284,17 +307,32 @@ export const SupplierDetailPage: FC<Props> = ({
     setIsVatModalOpen(false);
   };
 
-  const handleSaveDeliveryConfig = async (newCfg: SupplierDeliveryConfig) => {
+  const handleSaveDeliveryConfig = async (
+    newCfg: SupplierDeliveryConfig,
+    options?: { silentToast?: boolean; toastMessage?: string },
+  ) => {
     const supplierId = currentSupplier?.id;
     if (!supplierId) {
       throw new Error('Không xác định được nhà cung cấp.');
     }
     await supplierApi.updateDeliveryConfig(supplierId, mapDeliveryConfigToApi(newCfg));
     setDeliveryConfig(newCfg);
+    if (options?.silentToast) return;
     showToast(
-      `Đã lưu cấu hình lịch giao hàng và thời gian Cutoff thành công cho ${currentSupplier?.name || 'nhà cung cấp'}!`,
+      options?.toastMessage ||
+        `Đã lưu cấu hình lịch giao hàng và thời gian Cutoff thành công cho ${currentSupplier?.name || 'nhà cung cấp'}!`,
       'success',
     );
+  };
+
+  const handleSaveReturnPolicy = async (policy: SupplierReturnPolicy) => {
+    const supplierId = currentSupplier?.id;
+    if (!supplierId) {
+      throw new Error('Không xác định được nhà cung cấp.');
+    }
+    const saved = await supplierApi.upsertReturnPolicy(supplierId, policy);
+    setReturnPolicy(saved);
+    showToast('Đã lưu chính sách trả/đổi hàng thành công!', 'success');
   };
 
   const handleLinkCustomer = (_supplierId: string, customerId: string) => {
@@ -419,6 +457,19 @@ export const SupplierDetailPage: FC<Props> = ({
               supplier={currentSupplier}
               initialConfig={deliveryConfig}
               onSaveConfig={handleSaveDeliveryConfig}
+            />
+          )}
+
+          {activeTab === 'returnPolicy' && (
+            <SupplierReturnPolicyTab
+              initialPolicy={
+                returnPolicy || {
+                  ...DEFAULT_RETURN_POLICY,
+                  supplierId: currentSupplier.id,
+                }
+              }
+              readOnly={!isStoreOwner}
+              onSave={handleSaveReturnPolicy}
             />
           )}
 

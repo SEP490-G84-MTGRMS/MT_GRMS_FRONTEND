@@ -4,6 +4,7 @@ import { ArrowLeft, Save, Printer, CheckCircle2 } from 'lucide-react';
 interface GrnFormActionBarProps {
   readOnly?: boolean;
   isSaving?: boolean;
+  hidePrint?: boolean;
   onCancel: () => void;
   onSaveDraft: () => void;
   onCompleteAndPrint: () => void;
@@ -13,6 +14,7 @@ interface GrnFormActionBarProps {
 export const GrnFormActionBar: FC<GrnFormActionBarProps> = ({
   readOnly = false,
   isSaving = false,
+  hidePrint = false,
   onCancel,
   onSaveDraft,
   onCompleteAndPrint,
@@ -91,7 +93,8 @@ export const GrnFormActionBar: FC<GrnFormActionBarProps> = ({
             <span>Lưu nháp (Draft)</span>
           </button>
 
-          {/* 2. Nhập kho & In tem */}
+          {/* 2. Nhập kho & In tem — ẩn stub PRINT (H5) */}
+          {!hidePrint && (
           <button
             type="button"
             disabled={isSaving}
@@ -116,6 +119,7 @@ export const GrnFormActionBar: FC<GrnFormActionBarProps> = ({
             <Printer size={14} />
             <span>Nhập kho & In tem</span>
           </button>
+          )}
 
           {/* 3. HOÀN TẤT NHẬP KHO */}
           <button

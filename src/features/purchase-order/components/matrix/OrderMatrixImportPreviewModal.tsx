@@ -45,7 +45,8 @@ export const OrderMatrixImportPreviewModal: FC<OrderMatrixImportPreviewModalProp
   if (!isOpen || !result) return null;
 
   const hasErrors = result.summary.errorCount > 0;
-  const canApply = result.valid && result.summary.validCells > 0;
+  // Cho phép nạp khi còn ô hợp lệ; lỗi scope/cứng sẽ làm valid=false và validCells=0
+  const canApply = result.summary.validCells > 0 && result.cellsToApply.length > 0 && (!hasErrors || result.valid);
 
   return (
     <div

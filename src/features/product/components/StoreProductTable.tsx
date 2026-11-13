@@ -470,11 +470,15 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
                     <td className="so-list-td--wrap">
                       <div
                         className="so-list-name"
-                        title={p.primarySupplierName}
+                        title={
+                          p.lostSupplierSource
+                            ? 'Mất nguồn NCC — SP đang bán tại CN nhưng không còn NCC Active phục vụ'
+                            : p.primarySupplierName
+                        }
                         style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}
                       >
-                        <span>{p.primarySupplierName || '---'}</span>
-                        {p.isPrimarySupplier ? (
+                        <span>{p.lostSupplierSource ? '—' : p.primarySupplierName || '---'}</span>
+                        {p.isPrimarySupplier && !p.lostSupplierSource ? (
                           <span
                             style={{
                               fontSize: 10,
@@ -487,6 +491,21 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
                             }}
                           >
                             Chính
+                          </span>
+                        ) : null}
+                        {p.lostSupplierSource ? (
+                          <span
+                            style={{
+                              fontSize: 10,
+                              fontWeight: 700,
+                              color: '#b45309',
+                              background: '#fef3c7',
+                              borderRadius: 4,
+                              padding: '1px 6px',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            Mất nguồn NCC
                           </span>
                         ) : null}
                       </div>

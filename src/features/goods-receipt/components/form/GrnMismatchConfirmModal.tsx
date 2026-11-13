@@ -1,5 +1,5 @@
 import type { FC } from 'react';
-import { AlertTriangle, X, Check, RotateCcw, Truck } from 'lucide-react';
+import { AlertTriangle, X, Check, RotateCcw } from 'lucide-react';
 import type { GrnItemDetail, RejectionReason } from '../../types/grn.types';
 import { REJECTION_REASON_LABELS } from '../../types/grn.types';
 
@@ -48,13 +48,12 @@ export const GrnMismatchConfirmModal: FC<GrnMismatchConfirmModalProps> = ({
           backgroundColor: '#ffffff',
           borderRadius: 10,
           width: '100%',
-          maxWidth: 720,
+          maxWidth: 920,
           boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
           border: '1px solid #e2e8f0',
           overflow: 'hidden',
         }}
       >
-        {/* Header */}
         <div
           style={{
             padding: '14px 18px',
@@ -86,53 +85,48 @@ export const GrnMismatchConfirmModal: FC<GrnMismatchConfirmModalProps> = ({
           </button>
         </div>
 
-        {/* Content */}
-        <div style={{ padding: '16px 20px', fontSize: 13, color: '#334155' }}>
-          <p style={{ margin: '0 0 10px 0', lineHeight: 1.55 }}>
-            Phát hiện <b>{mismatchedItems.length}</b> mặt hàng có số lượng từ chối nhận so với đơn PO (tổng cộng{' '}
-            <b style={{ color: '#dc2626' }}>{totalRejectedQty}</b> đơn vị — giá trị trả{' '}
-            <b style={{ color: '#b45309' }}>{fmtCurrency(totalReturnAmount)} đ</b>).
+        <div style={{ padding: '14px 18px', fontSize: 13, color: '#334155' }}>
+          <p style={{ margin: '0 0 12px 0', lineHeight: 1.45 }}>
+            <b>{mismatchedItems.length}</b> mặt hàng từ chối — tổng{' '}
+            <b style={{ color: '#dc2626' }}>{totalRejectedQty}</b> ĐV ·{' '}
+            <b style={{ color: '#b45309' }}>{fmtCurrency(totalReturnAmount)} đ</b>
           </p>
 
           <div
             style={{
-              padding: '10px 12px',
-              borderRadius: 8,
-              backgroundColor: '#fff7ed',
-              border: '1px solid #fed7aa',
-              marginBottom: 12,
-              display: 'flex',
-              alignItems: 'flex-start',
-              gap: 10,
-              fontSize: 12.5,
-              color: '#9a3412',
-            }}
-          >
-            <Truck size={18} style={{ flexShrink: 0, marginTop: 2, color: '#ea580c' }} />
-            <div style={{ lineHeight: 1.5 }}>
-              Hệ thống sẽ <b>tự động lập Phiếu trả hàng (Loại: Từ chối nhận hàng)</b> ở trạng thái{' '}
-              <b>Đã bàn giao (Tài xế chở về ngay)</b> để xuất chứng từ ký nhận với tài xế và lưu vào màn hình{' '}
-              <b>Quản lý Trả Hàng Nhà Cung Cấp</b>. Chỉ số lượng chấp nhận mới được cộng vào tồn kho chi nhánh.
-            </div>
-          </div>
-
-          <div
-            style={{
-              maxHeight: 240,
-              overflowY: 'auto',
+              maxHeight: 320,
+              overflow: 'auto',
               border: '1px solid #e2e8f0',
               borderRadius: 6,
               backgroundColor: '#f8fafc',
             }}
           >
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+            <table
+              style={{
+                width: '100%',
+                minWidth: 820,
+                borderCollapse: 'collapse',
+                fontSize: 12,
+                tableLayout: 'fixed',
+              }}
+            >
+              <colgroup>
+                <col style={{ width: 130 }} />
+                <col style={{ width: 220 }} />
+                <col style={{ width: 72 }} />
+                <col style={{ width: 80 }} />
+                <col style={{ width: 88 }} />
+                <col style={{ width: 140 }} />
+                <col style={{ width: 110 }} />
+              </colgroup>
               <thead>
                 <tr style={{ backgroundColor: '#f1f5f9', borderBottom: '1px solid #e2e8f0', color: '#475569' }}>
-                  <th style={{ padding: '8px 10px', textAlign: 'left' }}>Sản phẩm</th>
-                  <th style={{ padding: '8px 8px', textAlign: 'right' }}>SL Đặt</th>
+                  <th style={{ padding: '8px 10px', textAlign: 'left' }}>Mã SP</th>
+                  <th style={{ padding: '8px 10px', textAlign: 'left' }}>Tên sản phẩm</th>
+                  <th style={{ padding: '8px 8px', textAlign: 'right' }}>SL đặt</th>
                   <th style={{ padding: '8px 8px', textAlign: 'right', color: '#0d9488' }}>Chấp nhận</th>
-                  <th style={{ padding: '8px 8px', textAlign: 'right', color: '#dc2626' }}>Từ chối trả</th>
-                  <th style={{ padding: '8px 10px', textAlign: 'left' }}>Lý do từ chối</th>
+                  <th style={{ padding: '8px 8px', textAlign: 'right', color: '#dc2626' }}>Từ chối</th>
+                  <th style={{ padding: '8px 10px', textAlign: 'left' }}>Lý do</th>
                   <th style={{ padding: '8px 10px', textAlign: 'right' }}>Giá trị trả</th>
                 </tr>
               </thead>
@@ -144,17 +138,39 @@ export const GrnMismatchConfirmModal: FC<GrnMismatchConfirmModalProps> = ({
                     : 'Từ chối nhận hàng';
                   return (
                     <tr key={it.id} style={{ borderBottom: '1px solid #f1f5f9', backgroundColor: '#ffffff' }}>
-                      <td style={{ padding: '8px 10px' }}>
-                        <div style={{ fontWeight: 600, color: '#0f172a' }}>{it.productName}</div>
-                        <div style={{ fontSize: 11, color: '#64748b', fontFamily: 'monospace' }}>{it.productCode}</div>
+                      <td
+                        style={{
+                          padding: '8px 10px',
+                          fontFamily: 'monospace',
+                          fontWeight: 700,
+                          color: '#0d9488',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                        }}
+                        title={it.productCode}
+                      >
+                        {it.productCode}
                       </td>
-                      <td style={{ padding: '8px 8px', textAlign: 'right', color: '#475569' }}>
+                      <td
+                        style={{
+                          padding: '8px 10px',
+                          fontWeight: 600,
+                          color: '#0f172a',
+                          whiteSpace: 'normal',
+                          wordBreak: 'break-word',
+                          lineHeight: 1.35,
+                        }}
+                      >
+                        {it.productName}
+                      </td>
+                      <td style={{ padding: '8px 8px', textAlign: 'right', color: '#475569', whiteSpace: 'nowrap' }}>
                         {it.orderedQty} {it.unit}
                       </td>
-                      <td style={{ padding: '8px 8px', textAlign: 'right', fontWeight: 700, color: '#0d9488' }}>
+                      <td style={{ padding: '8px 8px', textAlign: 'right', fontWeight: 700, color: '#0d9488', whiteSpace: 'nowrap' }}>
                         {it.receivedQty} {it.unit}
                       </td>
-                      <td style={{ padding: '8px 8px', textAlign: 'right' }}>
+                      <td style={{ padding: '8px 8px', textAlign: 'right', whiteSpace: 'nowrap' }}>
                         <span
                           style={{
                             padding: '2px 7px',
@@ -168,10 +184,28 @@ export const GrnMismatchConfirmModal: FC<GrnMismatchConfirmModalProps> = ({
                           {rejected} {it.unit}
                         </span>
                       </td>
-                      <td style={{ padding: '8px 10px', color: '#9a3412', fontWeight: 600, fontSize: 11.5 }}>
+                      <td
+                        style={{
+                          padding: '8px 10px',
+                          color: '#9a3412',
+                          fontWeight: 600,
+                          fontSize: 11.5,
+                          whiteSpace: 'normal',
+                          wordBreak: 'break-word',
+                        }}
+                      >
                         {reasonLabel}
                       </td>
-                      <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 700, color: '#0f172a', fontFamily: 'monospace' }}>
+                      <td
+                        style={{
+                          padding: '8px 10px',
+                          textAlign: 'right',
+                          fontWeight: 700,
+                          color: '#0f172a',
+                          fontFamily: 'monospace',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
                         {fmtCurrency(rejected * (it.unitPrice || 0))} đ
                       </td>
                     </tr>
@@ -182,7 +216,6 @@ export const GrnMismatchConfirmModal: FC<GrnMismatchConfirmModalProps> = ({
           </div>
         </div>
 
-        {/* Footer */}
         <div
           style={{
             padding: '12px 18px',
