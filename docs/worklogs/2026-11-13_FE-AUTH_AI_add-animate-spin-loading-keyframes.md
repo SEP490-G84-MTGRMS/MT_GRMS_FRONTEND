@@ -34,3 +34,4 @@
 ## 5. Ghi chú cho Manager khi duyệt & merge (Manager Merge Notes)
 - **Mức độ rủi ro**: **Low** (Chỉ bổ sung CSS animation utility).
 - **File cần review**: `src/styles/tailwind-compat.css`.
+
