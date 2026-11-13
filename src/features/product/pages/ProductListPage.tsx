@@ -274,6 +274,7 @@ export const ProductListPage: React.FC = () => {
               taxCategory: (p as any).taxCategory || 'STANDARD_1PCT',
               isFavorite: Boolean(p.isFavorite),
               hasBatches: Boolean(p.hasBatches),
+              allowRepack: Boolean((p as { allowRepack?: boolean }).allowRepack),
               eligibleForVatReduction: Boolean((p as any).eligibleForVatReduction),
               isBaseUnitPurchaseUnit,
               purchaseUnit,
@@ -431,6 +432,7 @@ export const ProductListPage: React.FC = () => {
           internalNote: data.internalNote,
           isFavorite: data.isFavorite ?? productToEdit.isFavorite,
           hasBatches: data.hasBatches !== undefined ? data.hasBatches : Boolean(productToEdit.hasBatches),
+          allowRepack: data.allowRepack !== undefined ? data.allowRepack : Boolean(productToEdit.allowRepack),
           eligibleForVatReduction: data.eligibleForVatReduction ?? productToEdit.eligibleForVatReduction ?? false,
           isBaseUnitPurchaseUnit: data.isBaseUnitPurchaseUnit,
         });
@@ -524,6 +526,7 @@ export const ProductListPage: React.FC = () => {
           internalNote: data.internalNote,
           isFavorite: data.isFavorite ?? false,
           hasBatches: data.hasBatches ?? false,
+          allowRepack: data.allowRepack ?? false,
           isBaseUnitPurchaseUnit: data.isBaseUnitPurchaseUnit ?? true,
         });
 

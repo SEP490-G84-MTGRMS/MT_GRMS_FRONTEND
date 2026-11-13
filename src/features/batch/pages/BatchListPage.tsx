@@ -21,7 +21,11 @@ import { BatchFilterBar } from '../components/BatchFilterBar';
 import { BatchTable } from '../components/BatchTable';
 import { BatchDetailDrawer } from '../components/BatchDetailDrawer';
 import { BatchDiscountModal } from '../components/BatchDiscountModal';
-import { BatchExpiryAlertModal } from '../components/BatchExpiryAlertModal';
+import { BatchRepackModal } from '../components/BatchRepackModal';
+import {
+  BatchExpiryAlertModal,
+  type BatchAlertMode,
+} from '../components/BatchExpiryAlertModal';
 import { AdminToast, type ToastState } from '../../admin/components';
 import '../../purchase-order/purchase-order.css';
 
@@ -61,9 +65,19 @@ export const BatchListPage: FC<{ defaultRole?: UserRole }> = ({
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [discountBatch, setDiscountBatch] = useState<BatchItem | null>(null);
   const [isDiscountModalOpen, setIsDiscountModalOpen] = useState(false);
+  const [repackBatch, setRepackBatch] = useState<BatchItem | null>(null);
   const [kpi, setKpi] = useState<BatchKpiSummary | null>(null);
   const [isAlertOpen, setIsAlertOpen] = useState(false);
+  const [alertMode, setAlertMode] = useState<BatchAlertMode>('near_expiry');
   const [toast, setToast] = useState<ToastState | null>(null);
+
+  const nearExpiryCount = (kpi?.warningCount || 0) + (kpi?.criticalCount || 0);
+  const expiredCount = kpi?.expiredCount || 0;
+
+  const openAlert = (mode: BatchAlertMode) => {
+    setAlertMode(mode);
+    setIsAlertOpen(true);
+  };
 
   const stocktakeBasePath =
     role === 'employee' ? '/employee/stocktakes' : '/store-owner/stocktakes';
@@ -260,20 +274,28 @@ export const BatchListPage: FC<{ defaultRole?: UserRole }> = ({
           <button
             type="button"
             className="po-btn po-btn-secondary"
-            onClick={() => setIsAlertOpen(true)}
+            onClick={() => openAlert('near_expiry')}
             style={
-              (kpi?.warningCount || 0) + (kpi?.criticalCount || 0) + (kpi?.expiredCount || 0) > 0
+              nearExpiryCount > 0
                 ? { borderColor: '#f59e0b', color: '#b45309', fontWeight: 800 }
                 : undefined
             }
           >
             <AlertTriangle size={14} />
-            <span>
-              Cảnh báo HSD
-              {(kpi?.warningCount || 0) + (kpi?.criticalCount || 0) + (kpi?.expiredCount || 0) > 0
-                ? ` (${(kpi?.warningCount || 0) + (kpi?.criticalCount || 0) + (kpi?.expiredCount || 0)})`
-                : ''}
-            </span>
+            <span>Cận hạn{nearExpiryCount > 0 ? ` (${nearExpiryCount})` : ''}</span>
+          </button>
+          <button
+            type="button"
+            className="po-btn po-btn-secondary"
+            onClick={() => openAlert('expired')}
+            style={
+              expiredCount > 0
+                ? { borderColor: '#f87171', color: '#be123c', fontWeight: 800 }
+                : undefined
+            }
+          >
+            <ClipboardCheck size={14} />
+            <span>Hết hạn{expiredCount > 0 ? ` (${expiredCount})` : ''}</span>
           </button>
           <button
             type="button"
@@ -329,6 +351,7 @@ export const BatchListPage: FC<{ defaultRole?: UserRole }> = ({
         pageIndex={pageIndex}
         pageSize={pageSize}
         onQuickStocktake={(b) => handleCreateStocktake(b)}
+        onProcessBatch={(b) => setRepackBatch(b)}
         onPageChange={(p) => setPageIndex(p)}
         onPageSizeChange={(s) => {
           setPageSize(s);
@@ -339,6 +362,18 @@ export const BatchListPage: FC<{ defaultRole?: UserRole }> = ({
         onWriteOffClick={handleWriteOff}
         onResetFilters={handleReset}
       />
+
+      {repackBatch && (
+        <BatchRepackModal
+          batch={repackBatch}
+          onClose={() => setRepackBatch(null)}
+          onDone={() => {
+            setRepackBatch(null);
+            setToast({ type: 'success', message: 'Chế biến khay thành công.' });
+            void loadBatches();
+          }}
+        />
+      )}
 
       <BatchDetailDrawer
         isOpen={isDrawerOpen}
@@ -366,6 +401,7 @@ export const BatchListPage: FC<{ defaultRole?: UserRole }> = ({
 
       <BatchExpiryAlertModal
         isOpen={isAlertOpen}
+        mode={alertMode}
         branchId={
           role === 'employee' && employeeBranchId
             ? employeeBranchId
@@ -385,6 +421,15 @@ export const BatchListPage: FC<{ defaultRole?: UserRole }> = ({
           if (role !== 'employee') {
             navigate('/store-owner/supplier-returns');
           }
+        }}
+        onCreateStocktake={(items) => {
+          setIsAlertOpen(false);
+          navigate(`${stocktakeBasePath}/create`, {
+            state: {
+              preselectedBatches: items,
+              branchId: items[0]?.branchId || '',
+            },
+          });
         }}
       />
     </div>

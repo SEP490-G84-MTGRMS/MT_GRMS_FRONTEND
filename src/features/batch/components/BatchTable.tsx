@@ -6,6 +6,7 @@ import {
   Eye,
   AlertTriangle,
   ClipboardCheck,
+  ChefHat,
 } from 'lucide-react';
 import type { BatchItem, BatchStatus } from '../types/batch.types';
 import { TablePagination } from '../../../components/common';
@@ -16,6 +17,7 @@ interface BatchTableProps {
   pageIndex: number;
   pageSize: number;
   onQuickStocktake?: (batch: BatchItem) => void;
+  onProcessBatch?: (batch: BatchItem) => void;
   onPageChange: (newPage: number) => void;
   onPageSizeChange: (newSize: number) => void;
   onSelectBatch: (batch: BatchItem) => void;
@@ -23,6 +25,27 @@ interface BatchTableProps {
   onWriteOffClick: (batch: BatchItem) => void;
   onResetFilters: () => void;
 }
+
+const isKgBatch = (row: BatchItem) =>
+  Boolean(row.isWeightProduct) || String(row.unit || '').trim().toLowerCase() === 'kg';
+
+const fmtQty = (n: number) =>
+  n.toLocaleString('vi-VN', { maximumFractionDigits: 3 });
+
+/** Tồn đang lưu theo ĐVT tồn (base). Quy đổi ra ĐVT nhập. */
+const getPurchaseQty = (stockQty: number, rate: number) => {
+  const r = rate > 0 ? rate : 1;
+  return Math.round((stockQty / r) * 1000) / 1000;
+};
+
+const getUnitMeta = (row: BatchItem) => {
+  const stockUnit = (row.stockUnit || row.unit || 'Cái').trim() || 'Cái';
+  const purchaseUnit = (row.unit || '').trim() || stockUnit;
+  const rate = Number(row.purchaseToStockRate) > 0 ? Number(row.purchaseToStockRate) : 1;
+  const sameUnit = rate === 1 || purchaseUnit.toLowerCase() === stockUnit.toLowerCase();
+  const rateLabel = Number.isInteger(rate) ? String(rate) : rate.toLocaleString('vi-VN');
+  return { stockUnit, purchaseUnit, rate, sameUnit, rateLabel };
+};
 
 type SortField =
   | 'productName'
@@ -56,6 +79,7 @@ export const BatchTable: FC<BatchTableProps> = ({
   pageIndex,
   pageSize,
   onQuickStocktake,
+  onProcessBatch,
   onPageChange,
   onPageSizeChange,
   onSelectBatch,
@@ -157,7 +181,7 @@ export const BatchTable: FC<BatchTableProps> = ({
     }
   };
 
-  const tableMinWidth = 1500;
+  const tableMinWidth = 1480;
   const tableFitStyle: CSSProperties = {
     minWidth: tableMinWidth,
     width: '100%',
@@ -175,8 +199,8 @@ export const BatchTable: FC<BatchTableProps> = ({
       <col style={{ width: 90 }} />
       <col style={{ width: 90 }} />
       <col style={{ width: 84 }} />
-      <col style={{ width: 72 }} />
-      <col style={{ width: 52 }} />
+      <col style={{ width: 120 }} />
+      <col style={{ width: 140 }} />
       <col style={{ width: 100 }} />
       <col style={{ width: 92 }} />
       <col style={{ width: 128 }} />
@@ -299,8 +323,17 @@ export const BatchTable: FC<BatchTableProps> = ({
               <th style={{ ...thBaseStyle, textAlign: 'center' }}>Ngày SX</th>
               <SortTh field="expiryDate" label="Hạn dùng" align="center" />
               <SortTh field="daysLeft" label="Còn (ngày)" align="right" />
-              <SortTh field="qtyCurrent" label="Tồn" align="right" />
-              <th style={{ ...thBaseStyle, textAlign: 'center' }}>ĐVT</th>
+              <th
+                style={{ ...thBaseStyle, textAlign: 'right' }}
+                title="Số lượng theo đơn vị nhập (quy đổi từ tồn)"
+              >
+                ĐVT nhập
+              </th>
+              <SortTh
+                field="qtyCurrent"
+                label="ĐVT tồn"
+                align="right"
+              />
               <SortTh field="costPrice" label="Giá vốn" align="right" />
               <SortTh field="status" label="Trạng thái" align="center" />
               <th style={{ ...thBaseStyle, textAlign: 'right' }}>Thao tác</th>
@@ -427,27 +460,81 @@ export const BatchTable: FC<BatchTableProps> = ({
 
                     <td style={{ textAlign: 'right' }}>{renderDaysLeft(row.daysLeft, row.expiryDate)}</td>
 
-                    <td
-                      style={{
-                        textAlign: 'right',
-                        fontFamily: 'monospace',
-                        fontWeight: 800,
-                        color: '#0f172a',
-                      }}
-                    >
-                      <div>{row.qtyCurrent}</div>
-                      {((row.qtyQuarantined ?? 0) > 0 || (row.qtyReserved ?? 0) > 0) && (
-                        <div style={{ fontSize: 10, fontWeight: 600, color: '#b45309', lineHeight: 1.2 }}>
-                          KD: {row.qtyAvailable ?? row.qtyCurrent}
-                          {(row.qtyQuarantined ?? 0) > 0 ? ` · CL:${row.qtyQuarantined}` : ''}
-                          {(row.qtyReserved ?? 0) > 0 ? ` · RTV:${row.qtyReserved}` : ''}
-                        </div>
-                      )}
-                    </td>
+                    {(() => {
+                      const { stockUnit, purchaseUnit, rate, sameUnit, rateLabel } = getUnitMeta(row);
+                      const stockQty = Number(row.qtyCurrent) || 0;
+                      const purchaseQty = getPurchaseQty(stockQty, rate);
+                      const availStock = row.qtyAvailable ?? stockQty;
+                      const availPurchase = getPurchaseQty(Number(availStock) || 0, rate);
+                      const hasHold =
+                        (row.qtyQuarantined ?? 0) > 0 || (row.qtyReserved ?? 0) > 0;
 
-                    <td style={{ textAlign: 'center', fontWeight: 600, color: '#475569' }}>
-                      {row.unit}
-                    </td>
+                      return (
+                        <>
+                          <td
+                            style={{
+                              textAlign: 'right',
+                              fontFamily: 'monospace',
+                              fontWeight: 800,
+                              color: '#0f172a',
+                            }}
+                            title={
+                              sameUnit
+                                ? undefined
+                                : `1 ${purchaseUnit} = ${rateLabel} ${stockUnit}`
+                            }
+                          >
+                            <div>
+                              {fmtQty(purchaseQty)}{' '}
+                              <span style={{ fontWeight: 600, color: '#64748b' }}>{purchaseUnit}</span>
+                            </div>
+                            {hasHold && (
+                              <div style={{ fontSize: 10, fontWeight: 600, color: '#b45309', lineHeight: 1.2 }}>
+                                KD: {fmtQty(availPurchase)} {purchaseUnit}
+                              </div>
+                            )}
+                          </td>
+
+                          <td
+                            style={{
+                              textAlign: 'right',
+                              fontFamily: 'monospace',
+                              fontWeight: 800,
+                              color: '#0f172a',
+                            }}
+                          >
+                            <div>
+                              {fmtQty(stockQty)}{' '}
+                              <span style={{ fontWeight: 600, color: '#64748b' }}>{stockUnit}</span>
+                            </div>
+                            {!sameUnit && (
+                              <div
+                                style={{
+                                  fontSize: 10,
+                                  fontWeight: 600,
+                                  color: '#0f766e',
+                                  lineHeight: 1.25,
+                                  marginTop: 2,
+                                }}
+                              >
+                                1 {purchaseUnit} = {rateLabel} {stockUnit}
+                              </div>
+                            )}
+                            {hasHold && (
+                              <div style={{ fontSize: 10, fontWeight: 600, color: '#b45309', lineHeight: 1.2 }}>
+                                KD: {fmtQty(Number(availStock) || 0)} {stockUnit}
+                                {(row.qtyQuarantined ?? 0) > 0
+                                  ? ` · CL:${fmtQty(row.qtyQuarantined ?? 0)}`
+                                  : ''}
+                                {(row.qtyReserved ?? 0) > 0
+                                  ? ` · RTV:${fmtQty(row.qtyReserved ?? 0)}`
+                                  : ''}
+                              </div>
+                            )}
+                          </td>
+                        </>
+                      );
+                    })()}
 
                     <td
                       style={{
@@ -489,6 +576,22 @@ export const BatchTable: FC<BatchTableProps> = ({
                             }}
                           >
                             <ClipboardCheck size={14} />
+                          </button>
+                        )}
+                        {onProcessBatch && isKgBatch(row) && (
+                          <button
+                            type="button"
+                            className="so-list-action-btn so-list-action-btn--icon"
+                            onClick={() => onProcessBatch(row)}
+                            title="Chế biến khay"
+                            aria-label="Chế biến khay"
+                            style={{
+                              color: '#b45309',
+                              borderColor: '#fde68a',
+                              background: '#fffbeb',
+                            }}
+                          >
+                            <ChefHat size={14} />
                           </button>
                         )}
                       </div>

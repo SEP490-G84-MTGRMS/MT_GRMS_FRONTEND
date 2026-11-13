@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState, type FC } from 'react';
-import { AlertTriangle, Loader2, X } from 'lucide-react';
+import { AlertTriangle, ClipboardCheck, Loader2, X } from 'lucide-react';
 import type { BatchFilterState, BatchItem } from '../types/batch.types';
 import { batchApi } from '../api/batchApi';
 import { supplierApi } from '../../supplier/api/supplierApi';
 import type { SupplierReturnPolicy } from '../../supplier/types/supplier.types';
 import { supplierReturnApi } from '../../supplier-return/api/supplierReturnApi';
+
+export type BatchAlertMode = 'near_expiry' | 'expired';
 
 type LotAction = 'return' | 'markdown' | 'expired' | 'no_grn';
 
@@ -25,9 +27,11 @@ const hasValidGrn = (batch: BatchItem): boolean =>
 
 interface BatchExpiryAlertModalProps {
   isOpen: boolean;
+  mode: BatchAlertMode;
   branchId: string;
   onClose: () => void;
   onCreated: (codes: string[]) => void;
+  onCreateStocktake: (batches: Array<BatchItem & { confirmQty?: number }>) => void;
 }
 
 const emptyFilters = (branchId: string, status: BatchFilterState['status']): BatchFilterState => ({
@@ -68,14 +72,18 @@ const actionLabel = (action: LotAction): string => {
 
 export const BatchExpiryAlertModal: FC<BatchExpiryAlertModalProps> = ({
   isOpen,
+  mode,
   branchId,
   onClose,
   onCreated,
+  onCreateStocktake,
 }) => {
   const [rows, setRows] = useState<AlertRow[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+
+  const isExpiredMode = mode === 'expired';
 
   useEffect(() => {
     if (!isOpen) return;
@@ -85,54 +93,64 @@ export const BatchExpiryAlertModal: FC<BatchExpiryAlertModalProps> = ({
       setIsLoading(true);
       setErrorMsg('');
       try {
-        const [warning, critical, expired] = await Promise.all([
-          batchApi.getBatches(emptyFilters(branchId, 'Warning')),
-          batchApi.getBatches(emptyFilters(branchId, 'Critical')),
-          batchApi.getBatches(emptyFilters(branchId, 'Expired')),
-        ]);
-        const lots = [...critical.items, ...warning.items, ...expired.items];
+        let lots: BatchItem[] = [];
+        if (isExpiredMode) {
+          const expired = await batchApi.getBatches(emptyFilters(branchId, 'Expired'));
+          lots = expired.items;
+        } else {
+          const [warning, critical] = await Promise.all([
+            batchApi.getBatches(emptyFilters(branchId, 'Warning')),
+            batchApi.getBatches(emptyFilters(branchId, 'Critical')),
+          ]);
+          lots = [...critical.items, ...warning.items];
+        }
+
         const unique = new Map<string, BatchItem>();
         lots.forEach((b) => unique.set(b.id, b));
 
-        const supplierIds = [
-          ...new Set(
-            [...unique.values()].map((b) => b.supplierId).filter((id) => id && id !== '—')
-          ),
-        ];
-        const policyEntries = await Promise.all(
-          supplierIds.map(async (id) => {
-            try {
-              return [id, await supplierApi.getReturnPolicy(id)] as const;
-            } catch {
-              return [id, null] as const;
-            }
-          })
-        );
-        const policies = Object.fromEntries(policyEntries) as Record<
-          string,
-          SupplierReturnPolicy | null
-        >;
+        let policies: Record<string, SupplierReturnPolicy | null> = {};
+        if (!isExpiredMode) {
+          const supplierIds = [
+            ...new Set(
+              [...unique.values()].map((b) => b.supplierId).filter((id) => id && id !== '—')
+            ),
+          ];
+          const policyEntries = await Promise.all(
+            supplierIds.map(async (id) => {
+              try {
+                return [id, await supplierApi.getReturnPolicy(id)] as const;
+              } catch {
+                return [id, null] as const;
+              }
+            })
+          );
+          policies = Object.fromEntries(policyEntries) as Record<
+            string,
+            SupplierReturnPolicy | null
+          >;
+        }
 
         if (cancelled) return;
 
         const nextRows: AlertRow[] = [...unique.values()].map((batch) => {
-          const hasGrn = hasValidGrn(batch);
-          if (batch.status === 'Expired') {
+          if (isExpiredMode) {
             return {
               batch,
-              selected: false,
+              selected: true,
               confirmQty: batch.qtyCurrent,
-              action: 'expired',
-              hint: 'Hết hạn: xử lý bằng phiếu kiểm kê (write-off), không tạo trả NCC.',
+              action: 'expired' as const,
+              hint: 'Hết hạn: tạo phiếu kiểm kê để write-off khi Store Owner duyệt.',
             };
           }
+
+          const hasGrn = hasValidGrn(batch);
           if (!hasGrn) {
             return {
               batch,
               selected: false,
               confirmQty: batch.qtyCurrent,
-              action: 'no_grn',
-              hint: 'Lô không gắn phiếu nhập gốc — không tạo được trả hàng.',
+              action: 'no_grn' as const,
+              hint: 'Lô không gắn phiếu nhập gốc — không tạo được trả/đổi hàng.',
             };
           }
           const policy = policies[batch.supplierId] || null;
@@ -143,7 +161,7 @@ export const BatchExpiryAlertModal: FC<BatchExpiryAlertModalProps> = ({
               batch,
               selected: true,
               confirmQty: batch.qtyCurrent,
-              action: 'return',
+              action: 'return' as const,
               hint: `Đủ điều kiện NEAR_EXPIRY · xử lý mặc định: ${resolution}`,
               resolutionType: resolution,
             };
@@ -152,7 +170,7 @@ export const BatchExpiryAlertModal: FC<BatchExpiryAlertModalProps> = ({
             batch,
             selected: false,
             confirmQty: batch.qtyCurrent,
-            action: 'markdown',
+            action: 'markdown' as const,
             hint: 'Policy NCC không cho trả cận hạn — giữ bán FEFO.',
           };
         });
@@ -162,7 +180,13 @@ export const BatchExpiryAlertModal: FC<BatchExpiryAlertModalProps> = ({
       } catch (err: unknown) {
         if (!cancelled) {
           setRows([]);
-          setErrorMsg(err instanceof Error ? err.message : 'Không tải được danh sách lô cận hạn.');
+          setErrorMsg(
+            err instanceof Error
+              ? err.message
+              : isExpiredMode
+                ? 'Không tải được danh sách lô hết hạn.'
+                : 'Không tải được danh sách lô cận hạn.'
+          );
         }
       } finally {
         if (!cancelled) setIsLoading(false);
@@ -173,16 +197,24 @@ export const BatchExpiryAlertModal: FC<BatchExpiryAlertModalProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [isOpen, branchId]);
+  }, [isOpen, branchId, isExpiredMode]);
 
   const selectedReturnRows = useMemo(
     () => rows.filter((r) => r.selected && r.action === 'return' && r.confirmQty > 0),
     [rows]
   );
 
-  const handleCreate = async () => {
+  const selectedExpiredRows = useMemo(
+    () => rows.filter((r) => r.selected && r.action === 'expired' && r.confirmQty > 0),
+    [rows]
+  );
+
+  const selectable = (row: AlertRow) =>
+    isExpiredMode ? row.action === 'expired' : row.action === 'return';
+
+  const handleCreateReturns = async () => {
     if (selectedReturnRows.length === 0) {
-      setErrorMsg('Chọn ít nhất 1 lô đủ điều kiện trả NCC và nhập SL xác nhận > 0.');
+      setErrorMsg('Chọn ít nhất 1 lô đủ điều kiện trả/đổi NCC và nhập SL xác nhận > 0.');
       return;
     }
 
@@ -212,7 +244,7 @@ export const BatchExpiryAlertModal: FC<BatchExpiryAlertModalProps> = ({
             supplierId: first.batch.supplierId,
             branchId: first.batch.branchId,
             reason: 'Hàng sắp hết hạn (Near-Expiry)',
-            reasonNotes: `Tạo từ cảnh báo HSD · ${group.length} lô · xác nhận SL trên kệ.`,
+            reasonNotes: `Tạo từ cảnh báo cận hạn · ${group.length} lô · xác nhận SL trên kệ.`,
             autoSubmit: false,
             resolutionType: first.resolutionType || 'REDUCE_PAYABLE',
             lines: group.map((r) => ({
@@ -236,7 +268,38 @@ export const BatchExpiryAlertModal: FC<BatchExpiryAlertModalProps> = ({
     }
   };
 
+  const handleCreateStocktake = () => {
+    if (selectedExpiredRows.length === 0) {
+      setErrorMsg('Chọn ít nhất 1 lô hết hạn và nhập SL xác nhận > 0.');
+      return;
+    }
+
+    const branchIds = new Set(selectedExpiredRows.map((r) => r.batch.branchId));
+    if (branchIds.size > 1) {
+      setErrorMsg(
+        'Phiếu kiểm kê chỉ thuộc 1 chi nhánh. Lọc 1 chi nhánh hoặc chỉ chọn lô cùng chi nhánh.'
+      );
+      return;
+    }
+
+    onCreateStocktake(
+      selectedExpiredRows.map((r) => ({
+        ...r.batch,
+        confirmQty: r.confirmQty,
+      }))
+    );
+  };
+
   if (!isOpen) return null;
+
+  const title = isExpiredMode ? 'Lô hết hạn' : 'Lô cận hạn — trả / đổi NCC';
+  const subtitle = isExpiredMode
+    ? 'Xác nhận SL còn trên kệ rồi tạo phiếu kiểm kê (write-off khi Store Owner duyệt).'
+    : 'Chỉ lô cảnh báo / khẩn cấp. Xác nhận SL rồi tạo phiếu trả/đổi nháp (Store Owner gửi NCC).';
+  const emptyText = isExpiredMode
+    ? 'Không có lô hết hạn theo chi nhánh đang lọc.'
+    : 'Không có lô cận hạn (cảnh báo / khẩn cấp) theo chi nhánh đang lọc.';
+  const accent = isExpiredMode ? '#be123c' : '#b45309';
 
   return (
     <div
@@ -276,12 +339,14 @@ export const BatchExpiryAlertModal: FC<BatchExpiryAlertModalProps> = ({
         >
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 800, fontSize: 16 }}>
-              <AlertTriangle size={18} color="#b45309" />
-              Cảnh báo lô cận hạn / hết hạn
+              {isExpiredMode ? (
+                <ClipboardCheck size={18} color={accent} />
+              ) : (
+                <AlertTriangle size={18} color={accent} />
+              )}
+              {title}
             </div>
-            <div style={{ fontSize: 12.5, color: '#64748b', marginTop: 4 }}>
-              Xác nhận SL còn trên kệ rồi tạo phiếu trả/đổi theo chính sách NCC (nháp — Store Owner gửi NCC).
-            </div>
+            <div style={{ fontSize: 12.5, color: '#64748b', marginTop: 4 }}>{subtitle}</div>
           </div>
           <button type="button" className="so-list-action-btn" onClick={onClose} title="Đóng">
             <X size={16} />
@@ -307,12 +372,11 @@ export const BatchExpiryAlertModal: FC<BatchExpiryAlertModalProps> = ({
         <div style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: 12 }}>
           {isLoading ? (
             <div style={{ padding: 40, textAlign: 'center', color: '#64748b' }}>
-              <Loader2 size={18} className="animate-spin" style={{ verticalAlign: 'middle' }} /> Đang tải lô...
+              <Loader2 size={18} className="animate-spin" style={{ verticalAlign: 'middle' }} /> Đang
+              tải lô...
             </div>
           ) : rows.length === 0 ? (
-            <div style={{ padding: 40, textAlign: 'center', color: '#64748b' }}>
-              Không có lô cảnh báo / khẩn cấp / hết hạn theo chi nhánh đang lọc.
-            </div>
+            <div style={{ padding: 40, textAlign: 'center', color: '#64748b' }}>{emptyText}</div>
           ) : (
             <table className="so-list-table" style={{ minWidth: 980, tableLayout: 'auto' }}>
               <thead>
@@ -320,11 +384,18 @@ export const BatchExpiryAlertModal: FC<BatchExpiryAlertModalProps> = ({
                   <th className="so-list-th" style={{ width: 36 }} />
                   <th className="so-list-th">SKU / Sản phẩm</th>
                   <th className="so-list-th">Mã lô</th>
+                  <th className="so-list-th">Chi nhánh</th>
                   <th className="so-list-th">HSD</th>
-                  <th className="so-list-th" style={{ textAlign: 'right' }}>Còn (ngày)</th>
+                  <th className="so-list-th" style={{ textAlign: 'right' }}>
+                    Còn (ngày)
+                  </th>
                   <th className="so-list-th">NCC</th>
-                  <th className="so-list-th" style={{ textAlign: 'right' }}>Tồn</th>
-                  <th className="so-list-th" style={{ textAlign: 'right' }}>SL xác nhận</th>
+                  <th className="so-list-th" style={{ textAlign: 'right' }}>
+                    Tồn
+                  </th>
+                  <th className="so-list-th" style={{ textAlign: 'right' }}>
+                    SL xác nhận
+                  </th>
                   <th className="so-list-th">Hướng xử lý</th>
                 </tr>
               </thead>
@@ -334,7 +405,7 @@ export const BatchExpiryAlertModal: FC<BatchExpiryAlertModalProps> = ({
                     <td>
                       <input
                         type="checkbox"
-                        disabled={row.action !== 'return'}
+                        disabled={!selectable(row)}
                         checked={row.selected}
                         onChange={(e) =>
                           setRows((prev) =>
@@ -356,18 +427,27 @@ export const BatchExpiryAlertModal: FC<BatchExpiryAlertModalProps> = ({
                     <td style={{ fontFamily: 'monospace', fontWeight: 700, color: '#0f766e' }}>
                       {row.batch.batchCode}
                     </td>
+                    <td style={{ fontSize: 12.5 }}>{row.batch.branchName}</td>
                     <td>{row.batch.expiryDate}</td>
-                    <td style={{ textAlign: 'right', fontWeight: 800, color: row.batch.daysLeft <= 3 ? '#be123c' : '#b45309' }}>
+                    <td
+                      style={{
+                        textAlign: 'right',
+                        fontWeight: 800,
+                        color: row.batch.daysLeft <= 0 ? '#be123c' : accent,
+                      }}
+                    >
                       {row.batch.daysLeft}
                     </td>
                     <td>{row.batch.supplierName}</td>
-                    <td style={{ textAlign: 'right', fontFamily: 'monospace' }}>{row.batch.qtyCurrent}</td>
+                    <td style={{ textAlign: 'right', fontFamily: 'monospace' }}>
+                      {row.batch.qtyCurrent}
+                    </td>
                     <td style={{ textAlign: 'right' }}>
                       <input
                         type="number"
                         min={0}
                         max={row.batch.qtyCurrent}
-                        disabled={row.action !== 'return'}
+                        disabled={!selectable(row)}
                         value={row.confirmQty}
                         onChange={(e) => {
                           const n = Math.max(0, Number(e.target.value) || 0);
@@ -391,7 +471,16 @@ export const BatchExpiryAlertModal: FC<BatchExpiryAlertModalProps> = ({
                       />
                     </td>
                     <td>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: row.action === 'return' ? '#0f766e' : '#b45309' }}>
+                      <div
+                        style={{
+                          fontSize: 12,
+                          fontWeight: 700,
+                          color:
+                            row.action === 'return' || row.action === 'expired'
+                              ? '#0f766e'
+                              : '#b45309',
+                        }}
+                      >
                         {actionLabel(row.action)}
                       </div>
                       <div style={{ fontSize: 11, color: '#64748b' }}>{row.hint}</div>
@@ -415,26 +504,45 @@ export const BatchExpiryAlertModal: FC<BatchExpiryAlertModalProps> = ({
           }}
         >
           <span style={{ fontSize: 12.5, color: '#475569' }}>
-            Đã chọn {selectedReturnRows.length} lô để tạo phiếu trả (tách theo GRN / NCC).
+            {isExpiredMode
+              ? `Đã chọn ${selectedExpiredRows.length} lô hết hạn để lập phiếu kiểm kê (1 chi nhánh / phiếu).`
+              : `Đã chọn ${selectedReturnRows.length} lô cận hạn để tạo phiếu trả/đổi (tách theo GRN / NCC).`}
           </span>
           <div style={{ display: 'flex', gap: 8 }}>
             <button type="button" className="so-list-filter-reset" onClick={onClose}>
               Đóng
             </button>
-            <button
-              type="button"
-              className="so-list-filter-search"
-              disabled={isSubmitting || selectedReturnRows.length === 0}
-              style={
-                isSubmitting || selectedReturnRows.length === 0
-                  ? { opacity: 0.55, cursor: 'not-allowed' }
-                  : undefined
-              }
-              onClick={() => void handleCreate()}
-            >
-              {isSubmitting ? <Loader2 size={14} className="animate-spin" /> : null}
-              Tạo phiếu gửi Store Owner
-            </button>
+            {isExpiredMode ? (
+              <button
+                type="button"
+                className="so-list-filter-search"
+                disabled={selectedExpiredRows.length === 0}
+                style={
+                  selectedExpiredRows.length === 0
+                    ? { opacity: 0.55, cursor: 'not-allowed' }
+                    : { backgroundColor: '#be123c', borderColor: '#be123c' }
+                }
+                onClick={handleCreateStocktake}
+              >
+                <ClipboardCheck size={14} />
+                Tạo phiếu kiểm kê
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="so-list-filter-search"
+                disabled={isSubmitting || selectedReturnRows.length === 0}
+                style={
+                  isSubmitting || selectedReturnRows.length === 0
+                    ? { opacity: 0.55, cursor: 'not-allowed' }
+                    : undefined
+                }
+                onClick={() => void handleCreateReturns()}
+              >
+                {isSubmitting ? <Loader2 size={14} className="animate-spin" /> : null}
+                Tạo phiếu gửi Store Owner
+              </button>
+            )}
           </div>
         </div>
       </div>

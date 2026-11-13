@@ -26,6 +26,8 @@ export interface ProductResponse {
   internalNote?: string | null;
   hasBatches: boolean;
   isFavorite: boolean;
+  allowRepack?: boolean;
+  sellRawByWeight?: boolean;
   isBaseUnitPurchaseUnit?: boolean;
   purchaseUnit?: string | null;
   createdAt: string;
@@ -136,6 +138,7 @@ export interface ProductCreatePayload {
   description?: string | null;
   internalNote?: string | null;
   hasBatches?: boolean;
+  allowRepack?: boolean;
   isFavorite?: boolean;
   isBaseUnitPurchaseUnit?: boolean;
 }
@@ -156,6 +159,7 @@ export interface ProductUpdatePayload {
   description?: string | null;
   internalNote?: string | null;
   hasBatches?: boolean;
+  allowRepack?: boolean;
   isFavorite?: boolean;
   eligibleForVatReduction?: boolean;
   isBaseUnitPurchaseUnit?: boolean;
@@ -204,6 +208,8 @@ export interface ProductItem {
   committed: number;
   isFavorite?: boolean;
   hasBatches?: boolean;
+  allowRepack?: boolean;
+  sellRawByWeight?: boolean;
   isCombo?: boolean;
   status: 'Active' | 'Discontinued';
   createdAt: string;

@@ -23,7 +23,7 @@ import '../../purchase-order/purchase-order.css';
 import '../../../styles/so-list-page.css';
 
 interface LocationState {
-  preselectedBatches?: BatchItem[];
+  preselectedBatches?: Array<BatchItem & { confirmQty?: number }>;
   branchId?: string;
 }
 
@@ -74,8 +74,12 @@ const applyCount = (
   };
 };
 
-const mapBatchToLine = (b: BatchItem): UpsertStocktakeLineInput => {
+const mapBatchToLine = (
+  b: BatchItem & { confirmQty?: number }
+): UpsertStocktakeLineInput => {
   const isExpired = b.status === 'Expired';
+  const confirmed =
+    typeof b.confirmQty === 'number' && b.confirmQty >= 0 ? b.confirmQty : b.qtyCurrent;
   return {
     branchStockId: b.id,
     productId: b.productId,
@@ -92,11 +96,11 @@ const mapBatchToLine = (b: BatchItem): UpsertStocktakeLineInput => {
     goodsReceiptLineId: null,
     unitCost: b.costPrice || 0,
     systemQty: b.qtyCurrent,
-    goodQty: isExpired ? 0 : b.qtyCurrent,
+    goodQty: isExpired ? 0 : confirmed,
     defectiveQty: 0,
     damagedQty: 0,
     nearExpiryQty: 0,
-    expiredQty: isExpired ? b.qtyCurrent : 0,
+    expiredQty: isExpired ? confirmed : 0,
     defectiveReasonCode: null,
     defectiveReasonDetail: null,
     nearExpiryAction: null,

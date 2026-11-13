@@ -1094,7 +1094,7 @@ export async function validateMatrixExcelFile(
       }
 
       const strVal = String(rawCellVal).trim();
-      const numVal = Number(strVal);
+      let numVal = Number(strVal);
 
       // Check numeric format
       if (isNaN(numVal)) {
@@ -1129,7 +1129,8 @@ export async function validateMatrixExcelFile(
         return;
       }
 
-      if (!Number.isInteger(numVal)) {
+      const isKgUnit = String(targetProduct.unit || '').trim().toLowerCase() === 'kg';
+      if (!Number.isInteger(numVal) && !isKgUnit) {
         result.errors.push({
           type: 'ERROR',
           row: rowNum,
@@ -1143,6 +1144,10 @@ export async function validateMatrixExcelFile(
         });
         result.summary.errorCount++;
         return;
+      }
+      if (isKgUnit && !Number.isInteger(numVal)) {
+        // Làm tròn 3 chữ số thập phân cho SP cân kg
+        numVal = Math.round(numVal * 1000) / 1000;
       }
 
       if (numVal > 1_000_000) {
