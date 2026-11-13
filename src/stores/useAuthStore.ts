@@ -8,6 +8,7 @@ interface AuthState {
   isAuthenticated: boolean;
   isLoading: boolean;
   setAuth: (user: UserProfile | null, token?: string) => void;
+  updateUser: (patch: Partial<UserProfile>) => void;
   checkAuth: () => Promise<UserProfile | null>;
   logout: () => Promise<void>;
 }
@@ -43,6 +44,18 @@ export const useAuthStore = create<AuthState>((set) => ({
       localStorage.removeItem('tenant_id');
     }
     set({ user: user || null, token: null, isAuthenticated: Boolean(user) });
+  },
+  updateUser: (patch) => {
+    set((state) => {
+      if (!state.user) return state;
+      const updatedUser = { ...state.user, ...patch };
+      try {
+        localStorage.setItem('auth_user', JSON.stringify(updatedUser));
+      } catch {
+        // Ignored in environments where localStorage is blocked
+      }
+      return { user: updatedUser };
+    });
   },
   checkAuth: async () => {
     try {

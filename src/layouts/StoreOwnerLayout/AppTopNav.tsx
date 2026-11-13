@@ -25,6 +25,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { useAuthStore } from "../../stores/useAuthStore";
+import { authService } from "../../features/auth/authService";
 import {
   NotificationBadge,
   NotificationPopover,
@@ -831,6 +832,39 @@ export const AppTopNav: FC = () => {
   const settingsMenuRef = useRef<HTMLDivElement | null>(null);
   const settingsTimerRef = useRef<number | null>(null);
   const [pendingCashApprovalCount, setPendingCashApprovalCount] = useState<number>(0);
+  const [is2FAActive, setIs2FAActive] = useState<boolean>(() => Boolean(user?.isTwoFactorEnabled));
+
+  useEffect(() => {
+    if (user?.isTwoFactorEnabled !== undefined) {
+      setIs2FAActive(Boolean(user.isTwoFactorEnabled));
+    }
+  }, [user?.isTwoFactorEnabled]);
+
+  useEffect(() => {
+    const handle2FAChange = (e: Event) => {
+      const customEvent = e as CustomEvent<{ enabled: boolean }>;
+      if (customEvent.detail && typeof customEvent.detail.enabled === "boolean") {
+        setIs2FAActive(customEvent.detail.enabled);
+      }
+    };
+    window.addEventListener("mtgrms:2fa-changed", handle2FAChange);
+    return () => {
+      window.removeEventListener("mtgrms:2fa-changed", handle2FAChange);
+    };
+  }, []);
+
+  // Khi mở popup menu tài khoản hoặc khi khởi động, kiểm tra đồng bộ 2FA từ server
+  useEffect(() => {
+    if (accountMenuOpen) {
+      authService
+        .getTwoFactorStatus()
+        .then((res) => {
+          setIs2FAActive(res.enabled);
+          useAuthStore.getState().updateUser({ isTwoFactorEnabled: res.enabled });
+        })
+        .catch(() => {});
+    }
+  }, [accountMenuOpen]);
 
   useEffect(() => {
     if (user?.role === 'STORE_OWNER') {
@@ -1863,17 +1897,57 @@ export const AppTopNav: FC = () => {
                         >
                           {user?.phone || user?.fullName || "0369880798"}
                         </div>
-                        <div
-                          style={{
-                            fontSize: 12,
-                            fontWeight: 500,
-                            color: "#EF4444",
-                            marginTop: 2,
-                            whiteSpace: "nowrap",
-                          }}
-                        >
-                          Chưa bật xác thực 2 lớp
-                        </div>
+                        {is2FAActive ? (
+                          <div
+                            style={{
+                              fontSize: 12,
+                              fontWeight: 600,
+                              color: "#10B981",
+                              marginTop: 2,
+                              whiteSpace: "nowrap",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 5,
+                            }}
+                          >
+                            <span
+                              style={{
+                                width: 6,
+                                height: 6,
+                                borderRadius: "50%",
+                                backgroundColor: "#10B981",
+                                display: "inline-block",
+                                flexShrink: 0,
+                              }}
+                            />
+                            Đã bật xác thực 2 lớp
+                          </div>
+                        ) : (
+                          <div
+                            style={{
+                              fontSize: 12,
+                              fontWeight: 500,
+                              color: "#EF4444",
+                              marginTop: 2,
+                              whiteSpace: "nowrap",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 5,
+                            }}
+                          >
+                            <span
+                              style={{
+                                width: 6,
+                                height: 6,
+                                borderRadius: "50%",
+                                backgroundColor: "#EF4444",
+                                display: "inline-block",
+                                flexShrink: 0,
+                              }}
+                            />
+                            Chưa bật xác thực 2 lớp
+                          </div>
+                        )}
                       </div>
                       <ChevronRight size={16} color="#94A3B8" />
                     </Link>
