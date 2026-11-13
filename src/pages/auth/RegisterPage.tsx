@@ -17,6 +17,7 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { authService } from "../../features/auth/authService";
+import { validateRegistration } from "../../features/auth/authValidation";
 import { RegistrationOtpModal } from "../../features/auth/components/RegistrationOtpModal";
 import { useAuthStore } from "../../stores/useAuthStore";
 
@@ -35,7 +36,7 @@ export const RegisterPage: FC = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [agreeTerms, setAgreeTerms] = useState(true);
+  const [agreeTerms, setAgreeTerms] = useState(false);
 
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -58,10 +59,10 @@ export const RegisterPage: FC = () => {
     if (!password)
       return { score: 0, text: "", color: "transparent", width: "0%" };
 
-    if (password.length < 6) {
+    if (password.length < 8) {
       return {
         score: 1,
-        text: "Yếu (tối thiểu 6 ký tự)",
+        text: "Yếu (tối thiểu 8 ký tự)",
         color: "var(--red-accent)",
         width: "25%",
       };
@@ -103,40 +104,9 @@ export const RegisterPage: FC = () => {
     e.preventDefault();
     setErrorMessage(null);
 
-    if (!fullName.trim()) {
-      setErrorMessage("Vui lòng nhập họ và tên chủ cửa hàng / người quản lý.");
-      return;
-    }
-    if (!storeName.trim()) {
-      setErrorMessage("Vui lòng nhập tên chuỗi hoặc cửa hàng bán lẻ.");
-      return;
-    }
-    const cleanPhone = phone.trim().replace(/\D/g, "");
-    if (!cleanPhone) {
-      setErrorMessage("Vui lòng nhập số điện thoại liên hệ.");
-      return;
-    }
-    if (!/^(0[3|5|7|8|9])[0-9]{8}$/.test(cleanPhone)) {
-      setErrorMessage("Số điện thoại không hợp lệ. Vui lòng nhập số điện thoại Việt Nam gồm 10 chữ số (bắt đầu bằng 03, 05, 07, 08, 09).");
-      return;
-    }
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!email.trim() || !emailRegex.test(email.trim())) {
-      setErrorMessage("Vui lòng nhập địa chỉ email hợp lệ (VD: chucuahang@gmail.com).");
-      return;
-    }
-    if (password.length < 6) {
-      setErrorMessage("Mật khẩu bảo mật phải có tối thiểu 6 ký tự.");
-      return;
-    }
-    if (password !== confirmPassword) {
-      setErrorMessage("Mật khẩu xác nhận không khớp. Vui lòng kiểm tra lại.");
-      return;
-    }
-    if (!agreeTerms) {
-      setErrorMessage(
-        "Vui lòng xác nhận đồng ý với Điều khoản dịch vụ để tiếp tục.",
-      );
+    const validationError = validateRegistration({ fullName, storeName, phone, email, password, confirmPassword, agreeTerms });
+    if (validationError) {
+      setErrorMessage(validationError);
       return;
     }
 
@@ -338,6 +308,7 @@ export const RegisterPage: FC = () => {
               onChange={(e) => setFullName(e.target.value)}
               disabled={isLoading}
               required
+              maxLength={100}
             />
           </div>
         </div>
@@ -363,6 +334,7 @@ export const RegisterPage: FC = () => {
               onChange={(e) => setStoreName(e.target.value)}
               disabled={isLoading}
               required
+              maxLength={150}
             />
           </div>
         </div>
@@ -384,13 +356,13 @@ export const RegisterPage: FC = () => {
               type="tel"
               inputMode="numeric"
               pattern="[0-9]*"
-              maxLength={11}
+              maxLength={10}
               className="auth-styled-input font-mono-input"
               placeholder="09xx xxx xxx"
               value={phone}
               onChange={(e) => {
                 // Tự động loại bỏ toàn bộ ký tự không phải chữ số (chống nhập chữ như asddda)
-                const numericOnly = e.target.value.replace(/\D/g, "").slice(0, 11);
+                const numericOnly = e.target.value.replace(/\D/g, "").slice(0, 10);
                 setPhone(numericOnly);
                 if (errorMessage) setErrorMessage(null);
               }}
@@ -441,6 +413,7 @@ export const RegisterPage: FC = () => {
               onChange={(e) => setEmail(e.target.value)}
               disabled={isLoading}
               required
+              maxLength={100}
             />
           </div>
         </div>
@@ -461,12 +434,13 @@ export const RegisterPage: FC = () => {
               id="reg-password"
               type={showPassword ? "text" : "password"}
               className="auth-styled-input has-eye-btn"
-              placeholder="Nhập mật khẩu (tối thiểu 6 ký tự)..."
+              placeholder="8–64 ký tự, có chữ hoa, số và ký tự đặc biệt"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               autoComplete="new-password"
               disabled={isLoading}
               required
+              maxLength={64}
             />
             <button
               type="button"
@@ -531,6 +505,7 @@ export const RegisterPage: FC = () => {
               autoComplete="new-password"
               disabled={isLoading}
               required
+              maxLength={64}
             />
             <button
               type="button"
