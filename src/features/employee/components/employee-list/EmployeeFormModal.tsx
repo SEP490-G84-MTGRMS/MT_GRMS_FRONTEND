@@ -1,17 +1,22 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Camera, Trash2, Search, ChevronDown, X, Check, Building2, AlertTriangle, RotateCw, Plus } from 'lucide-react';
 import type {
   Employee,
   Branch,
   AllowanceItem,
   SalaryType,
-} from '../types';
+} from '../../types';
 import { CreateUserModal } from './CreateUserModal';
 import { CreateAllowanceModal } from './CreateAllowanceModal';
-import { employeeApi } from '../api/employeeApi';
-import { mapFormToCreatePayload } from '../lib/employeeMapper';
-import { extractDescriptorFromImage } from '../lib/faceIdService';
-import { uploadImageToCloudinary } from '../../../utils/cloudinary';
+import { employeeApi } from '../../api/employeeApi';
+import { mapFormToCreatePayload } from '../../lib/employeeMapper';
+import { extractDescriptorFromImage } from '../../lib/faceIdService';
+import {
+  getVietnamToday,
+  getVietnamTodayIso,
+  normalizeVietnameseComparison,
+} from '../../lib/vietnamTime';
+import { uploadImageToCloudinary } from '../../../../utils/cloudinary';
 
 interface EmployeeFormModalProps {
   isOpen: boolean;
@@ -19,6 +24,7 @@ interface EmployeeFormModalProps {
   employee?: Employee | null;
   onSave: (employee: Employee, isAddNew?: boolean) => void;
   branches: Branch[];
+  existingEmployees?: Employee[];
 }
 
 const PREDEFINED_BANKS = [
@@ -46,6 +52,7 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
   employee,
   onSave,
   branches,
+  existingEmployees = [],
 }) => {
   const [activeTab, setActiveTab] = useState<'info' | 'salary'>('info');
 
@@ -169,6 +176,7 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
       setWorkingBranchId(initBranchId);
       setUserId(employee.userId || '');
       setUserName(employee.userName || '');
+      setUserPassword('');
       setNote(employee.note || '');
 
       setBankAccountNumber(employee.bankAccountNumber || '');
@@ -213,10 +221,11 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
       setCitizenId('');
       setAddress('');
 
-      setStartDate(new Date().toISOString().split('T')[0]);
+      setStartDate(getVietnamTodayIso());
       setWorkingBranchId(branches[0]?.id || '');
       setUserId('');
       setUserName('');
+      setUserPassword('');
       setNote('');
 
       setBankAccountNumber('');
@@ -234,7 +243,170 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
     }
     setFormError(null);
     setIsSubmitting(false);
+    setTouched({});
+    setHasSubmitted(false);
   }, [employee, branches, isOpen]);
+
+  // Inline validation state
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const [hasSubmitted, setHasSubmitted] = useState(false);
+
+  const markTouched = (field: string) => {
+    setTouched((prev) => ({ ...prev, [field]: true }));
+  };
+
+  // Real-time Inline Errors
+  const fullNameError = useMemo(() => {
+    const trimmed = fullName.trim();
+    if (!trimmed) return 'Họ và tên nhân viên không được để trống.';
+    if (trimmed.length < 2) return 'Họ và tên phải từ 2 đến 100 ký tự.';
+    if (fullName.length > 100) return 'Họ và tên không vượt quá 100 ký tự.';
+    if (!/^[\p{L}\s'.\-]+$/u.test(trimmed)) {
+      return 'Họ và tên không được chứa chữ số hoặc ký tự đặc biệt.';
+    }
+    return null;
+  }, [fullName]);
+
+  const phoneError = useMemo(() => {
+    const trimmed = phone.trim().replace(/^\+84/, '0');
+    if (!trimmed) return 'Số điện thoại không được để trống.';
+    if (!/^(0[3|5|7|8|9])[0-9]{8}$/.test(trimmed)) {
+      return 'Số điện thoại không đúng định dạng Việt Nam (10 số, bắt đầu bằng 03, 05, 07, 08, 09).';
+    }
+    return null;
+  }, [phone]);
+
+  const duplicateNameWarning = useMemo(() => {
+    const normalizedInput = normalizeVietnameseComparison(fullName);
+    if (!normalizedInput || normalizedInput.length < 2 || existingEmployees.length === 0) return null;
+    const matched = existingEmployees.find(
+      (emp) =>
+        emp.id !== employee?.id &&
+        normalizeVietnameseComparison(emp.fullName) === normalizedInput
+    );
+    if (matched) {
+      return `Lưu ý: Tên nhân viên trùng (hoặc tương đương không dấu/hoa-thường) với "${matched.fullName}" (${matched.employeeCode}).`;
+    }
+    return null;
+  }, [fullName, existingEmployees, employee?.id]);
+
+  const dateOfBirthAndStartDateError = useMemo(() => {
+    if (dateOfBirth) {
+      const dob = new Date(dateOfBirth);
+      if (!isNaN(dob.getTime())) {
+        const vnToday = getVietnamToday();
+        const minAgeDate = new Date(vnToday.getFullYear() - 15, vnToday.getMonth(), vnToday.getDate());
+        const maxAgeDate = new Date(vnToday.getFullYear() - 75, vnToday.getMonth(), vnToday.getDate());
+        if (dob > minAgeDate || dob < maxAgeDate) {
+          return 'Nhân viên phải đủ từ 15 tuổi đến 75 tuổi theo quy định lao động (tính theo múi giờ UTC+7).';
+        }
+        if (startDate) {
+          const start = new Date(startDate);
+          const minWorkDate = new Date(dob.getFullYear() + 15, dob.getMonth(), dob.getDate());
+          if (!isNaN(start.getTime()) && start < minWorkDate) {
+            return 'Ngày bắt đầu làm việc không hợp lệ so với ngày sinh (phải đủ 15 tuổi).';
+          }
+        }
+      }
+    }
+    return null;
+  }, [dateOfBirth, startDate]);
+
+  const allowancesError = useMemo(() => {
+    if (!enableAllowance || allowances.length === 0) return null;
+    const enabledList = allowances.filter((a) => a.enabled);
+    const seenNames = new Map<string, string>();
+    for (const item of enabledList) {
+      const trimmedName = (item.name || '').trim();
+      if (!trimmedName) {
+        return 'Tên khoản phụ cấp không được để trống.';
+      }
+      if (trimmedName.length > 100) {
+        return 'Tên khoản phụ cấp không vượt quá 100 ký tự.';
+      }
+      const normalizedName = normalizeVietnameseComparison(trimmedName);
+      if (seenNames.has(normalizedName)) {
+        const existingOriginal = seenNames.get(normalizedName);
+        return `Tên khoản phụ cấp "${trimmedName}" bị trùng lặp với "${existingOriginal}" (so sánh không phân biệt dấu tiếng Việt và chữ HOA/thường).`;
+      }
+      seenNames.set(normalizedName, trimmedName);
+      const amountNum = Number(item.amount) || 0;
+      if (amountNum < 0 || amountNum > 500000000) {
+        return 'Mức phụ cấp phải nằm trong khoảng từ 0 đến 500.000.000 đ.';
+      }
+    }
+    return null;
+  }, [enableAllowance, allowances]);
+
+  const citizenIdError = useMemo(() => {
+    const trimmed = citizenId.trim();
+    if (!trimmed) return 'Số CMND / CCCD không được để trống.';
+    if (!/^(00[1-9]|0[1-8][0-9]|09[0-6])[0-9]{9}$/.test(trimmed)) {
+      return 'Số CCCD phải gồm đúng 12 chữ số hợp lệ (3 số đầu thuộc mã tỉnh/thành 001–096).';
+    }
+    return null;
+  }, [citizenId]);
+
+  const employeeCodeError = useMemo(() => {
+    const trimmed = employeeCode.trim();
+    if (!trimmed) return null; // Để trống tự sinh
+    if (trimmed.length > 30) return 'Mã nhân viên không vượt quá 30 ký tự.';
+    if (!/^[A-Za-z0-9_-]+$/.test(trimmed)) {
+      return 'Mã nhân viên chỉ gồm chữ cái không dấu, số, gạch ngang/dưới và tối đa 30 ký tự.';
+    }
+    return null;
+  }, [employeeCode]);
+
+  const emailError = useMemo(() => {
+    const trimmed = email.trim();
+    if (!trimmed) return null;
+    if (trimmed.length > 100) return 'Email không vượt quá 100 ký tự.';
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+      return 'Địa chỉ email không đúng định dạng (Ví dụ: nguyenvana@gmail.com hoặc nhanvien@mtmart.vn).';
+    }
+    return null;
+  }, [email]);
+
+  const baseSalaryError = useMemo(() => {
+    if (baseSalary === '' || baseSalary === undefined) return null;
+    const num = Number(baseSalary);
+    if (isNaN(num) || num < 0) return 'Mức lương cơ bản không được âm.';
+    if (num > 1000000000) return 'Mức lương cơ bản không được vượt quá 1.000.000.000 đ.';
+    return null;
+  }, [baseSalary]);
+
+  const noteError = useMemo(() => {
+    if (note && note.length > 500) return 'Ghi chú không vượt quá 500 ký tự.';
+    return null;
+  }, [note]);
+
+  const addressError = useMemo(() => {
+    if (address && address.length > 255) return 'Địa chỉ không vượt quá 255 ký tự.';
+    return null;
+  }, [address]);
+
+  const bankAccountNumberError = useMemo(() => {
+    const trimmed = bankAccountNumber.trim();
+    if (!trimmed) return null;
+    if (trimmed.length > 30) return 'Số tài khoản ngân hàng không vượt quá 30 ký tự.';
+    if (/[^\x00-\x7F]/.test(trimmed)) {
+      return 'Số tài khoản ngân hàng chỉ được nhập chữ cái tiếng Việt không dấu (A-Z) và chữ số (0-9), không được nhập chữ có dấu.';
+    }
+    if (/\s/.test(trimmed)) {
+      return 'Số tài khoản ngân hàng phải viết liền không khoảng trắng (chỉ gồm chữ cái không dấu A-Z và chữ số 0-9).';
+    }
+    if (!/^[A-Za-z0-9]+$/.test(trimmed)) {
+      return 'Số tài khoản ngân hàng không hợp lệ: chỉ gồm chữ cái không dấu (A-Z) và chữ số (0-9), không chứa ký tự đặc biệt (Ví dụ: 19036688999012).';
+    }
+    return null;
+  }, [bankAccountNumber]);
+
+  const bankAccountHolderError = useMemo(() => {
+    if (bankAccountHolder && bankAccountHolder.length > 100) {
+      return 'Chủ tài khoản ngân hàng không vượt quá 100 ký tự.';
+    }
+    return null;
+  }, [bankAccountHolder]);
 
   const [isBranchDropdownOpen, setIsBranchDropdownOpen] = useState(false);
   const [branchSearchKeyword, setBranchSearchKeyword] = useState('');
@@ -484,32 +656,92 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
   };
 
   const handleSave = async (isAddNew: boolean = false) => {
+    setHasSubmitted(true);
     setFormError(null);
+
     if (isUploadingAvatar) {
       setFormError('Ảnh đại diện đang được tải lên Cloudinary, vui lòng chờ trong giây lát!');
       return;
     }
-    if (!fullName.trim()) {
-      setFormError('Vui lòng nhập Họ và tên nhân viên!');
+
+    if (fullNameError) {
+      setFormError(fullNameError);
+      setActiveTab('info');
       return;
     }
-    if (!phone.trim()) {
-      setFormError('Vui lòng nhập Số điện thoại!');
+
+    if (phoneError) {
+      setFormError(phoneError);
+      setActiveTab('info');
       return;
     }
-    if (!citizenId.trim()) {
-      setFormError('Vui lòng nhập Số CMND / CCCD (12 chữ số)!');
+
+    if (citizenIdError) {
+      setFormError(citizenIdError);
+      setActiveTab('info');
       return;
     }
-    if (!/^\d{12}$/.test(citizenId.trim())) {
-      setFormError('Số CMND / CCCD phải bao gồm đúng 12 chữ số!');
+
+    if (employeeCodeError) {
+      setFormError(employeeCodeError);
+      setActiveTab('info');
+      return;
+    }
+
+    if (emailError) {
+      setFormError(emailError);
+      setActiveTab('info');
+      return;
+    }
+
+    if (addressError) {
+      setFormError(addressError);
+      setActiveTab('info');
+      return;
+    }
+
+    if (noteError) {
+      setFormError(noteError);
+      setActiveTab('info');
+      return;
+    }
+
+    if (bankAccountNumberError) {
+      setFormError(bankAccountNumberError);
+      setActiveTab('info');
+      return;
+    }
+
+    if (bankAccountHolderError) {
+      setFormError(bankAccountHolderError);
+      setActiveTab('info');
       return;
     }
 
     if (bankSelect === 'OTHER' && !customBankName.trim()) {
       setFormError('Vui lòng nhập tên ngân hàng khác!');
+      setActiveTab('info');
       return;
     }
+
+    if (dateOfBirthAndStartDateError) {
+      setFormError(dateOfBirthAndStartDateError);
+      setActiveTab('info');
+      return;
+    }
+
+    if (baseSalaryError) {
+      setFormError(baseSalaryError);
+      setActiveTab('salary');
+      return;
+    }
+
+    if (allowancesError) {
+      setFormError(allowancesError);
+      setActiveTab('salary');
+      return;
+    }
+
     const effectiveBankName = bankSelect === 'OTHER' ? customBankName.trim() : bankSelect;
 
     const targetBranchId = workingBranchId || (branches[0] ? branches[0].id : '');
@@ -526,11 +758,19 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
       ? JSON.stringify(faceImageUrls)
       : (effectiveAvatar ? JSON.stringify([effectiveAvatar]) : undefined);
 
+    const normalizedPhone = phone
+      .trim()
+      .replace(/[\s.\-]/g, '')
+      .replace(/^\+84/, '0')
+      .replace(/^84(?=[0-9]{9}$)/, '0');
+    const normalizedCitizenId = citizenId.trim().replace(/\s+/g, '');
+
     const payload = mapFormToCreatePayload(
       {
-        fullName,
-        citizenId,
-        phone,
+        employeeCode: !employee ? employeeCode : undefined,
+        fullName: fullName.replace(/\s+/g, ' ').trim(),
+        citizenId: normalizedCitizenId,
+        phone: normalizedPhone,
         email,
         address,
         startDate,
@@ -689,54 +929,145 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
                   <div style={{ display: 'flex', gap: 24, alignItems: 'flex-start' }}>
                     <div style={{ flex: 1 }}>
                       <div className="emp-form-group">
-                        <label className="emp-form-label">
-                          Tên nhân viên <span className="required">*</span>
-                        </label>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                          <label className="emp-form-label" style={{ marginBottom: 0 }}>
+                            Tên nhân viên <span className="required">*</span>
+                          </label>
+                          <span style={{ fontSize: 11, color: fullName.length > 100 ? '#EF4444' : '#94A3B8' }}>
+                            {fullName.length}/100
+                          </span>
+                        </div>
                         <input
                           type="text"
                           className="emp-form-input"
                           placeholder="Nhập họ và tên đầy đủ"
                           value={fullName}
-                          onChange={(e) => setFullName(e.target.value)}
+                          maxLength={100}
+                          onChange={(e) => {
+                            setFullName(e.target.value);
+                            if (!touched.fullName) markTouched('fullName');
+                          }}
+                          onBlur={() => {
+                            setFullName((prev) => prev.replace(/\s+/g, ' ').trim());
+                            markTouched('fullName');
+                          }}
+                          style={{
+                            borderColor: (touched.fullName || hasSubmitted) && fullNameError ? '#EF4444' : undefined,
+                          }}
                           required
                         />
+                        {(touched.fullName || hasSubmitted) && fullNameError && (
+                          <div style={{ fontSize: 12, color: '#DC2626', marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <span>•</span> {fullNameError}
+                          </div>
+                        )}
+                        {!fullNameError && duplicateNameWarning && (
+                          <div style={{ fontSize: 12, color: '#D97706', marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <AlertTriangle size={13} style={{ flexShrink: 0 }} />
+                            <span>{duplicateNameWarning}</span>
+                          </div>
+                        )}
                       </div>
 
                       <div className="emp-grid-2">
                         <div className="emp-form-group">
-                          <label className="emp-form-label">Mã nhân viên</label>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                            <label className="emp-form-label" style={{ marginBottom: 0 }}>
+                              Mã nhân viên {employee && <span style={{ fontSize: 11, color: '#64748B' }}>(Cố định)</span>}
+                            </label>
+                            {!employee && (
+                              <span style={{ fontSize: 11, color: employeeCode.length > 30 ? '#EF4444' : '#94A3B8' }}>
+                                {employeeCode.length}/30
+                              </span>
+                            )}
+                          </div>
                           <input
                             type="text"
                             className="emp-form-input"
-                            placeholder="Tự sinh nếu bỏ trống"
+                            placeholder={employee ? employee.employeeCode : 'Tự sinh nếu bỏ trống (NV000001)'}
                             value={employeeCode}
-                            onChange={(e) => setEmployeeCode(e.target.value)}
+                            disabled={!!employee}
+                            maxLength={30}
+                            onChange={(e) => {
+                              setEmployeeCode(e.target.value.toUpperCase());
+                              if (!touched.employeeCode) markTouched('employeeCode');
+                            }}
+                            onBlur={() => markTouched('employeeCode')}
+                            style={{
+                              borderColor: (touched.employeeCode || hasSubmitted) && employeeCodeError ? '#EF4444' : undefined,
+                              backgroundColor: employee ? '#F1F5F9' : undefined,
+                              cursor: employee ? 'not-allowed' : undefined,
+                            }}
                           />
+                          {(touched.employeeCode || hasSubmitted) && employeeCodeError && (
+                            <div style={{ fontSize: 12, color: '#DC2626', marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                              <span>•</span> {employeeCodeError}
+                            </div>
+                          )}
                         </div>
                         <div className="emp-form-group">
-                          <label className="emp-form-label">
-                            Số điện thoại <span className="required">*</span>
-                          </label>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                            <label className="emp-form-label" style={{ marginBottom: 0 }}>
+                              Số điện thoại <span className="required">*</span>
+                            </label>
+                            <span style={{ fontSize: 11, color: phone.length > 20 ? '#EF4444' : '#94A3B8' }}>
+                              {phone.length}/20
+                            </span>
+                          </div>
                           <input
                             type="tel"
                             className="emp-form-input"
-                            placeholder="Số điện thoại liên hệ"
+                            placeholder="03x, 05x, 07x, 08x, 09x..."
                             value={phone}
-                            onChange={(e) => setPhone(e.target.value)}
+                            maxLength={20}
+                            onChange={(e) => {
+                              setPhone(e.target.value);
+                              if (!touched.phone) markTouched('phone');
+                            }}
+                            onBlur={() => {
+                              setPhone((prev) => prev.trim().replace(/^\+84/, '0'));
+                              markTouched('phone');
+                            }}
+                            style={{
+                              borderColor: (touched.phone || hasSubmitted) && phoneError ? '#EF4444' : undefined,
+                            }}
                             required
                           />
+                          {(touched.phone || hasSubmitted) && phoneError && (
+                            <div style={{ fontSize: 12, color: '#DC2626', marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                              <span>•</span> {phoneError}
+                            </div>
+                          )}
                         </div>
                       </div>
 
                       <div className="emp-form-group">
-                        <label className="emp-form-label">Email</label>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                          <label className="emp-form-label" style={{ marginBottom: 0 }}>Email</label>
+                          <span style={{ fontSize: 11, color: email.length > 100 ? '#EF4444' : '#94A3B8' }}>
+                            {email.length}/100
+                          </span>
+                        </div>
                         <input
                           type="email"
                           className="emp-form-input"
-                          placeholder="Địa chỉ hòm thư điện tử"
+                          placeholder="Ví dụ: nguyenvana@gmail.com hoặc nhanvien@mtmart.vn"
                           value={email}
-                          onChange={(e) => setEmail(e.target.value)}
+                          maxLength={100}
+                          onChange={(e) => {
+                            setEmail(e.target.value);
+                            if (!touched.email) markTouched('email');
+                          }}
+                          onBlur={() => markTouched('email')}
+                          style={{
+                            borderColor: (touched.email || hasSubmitted) && emailError ? '#EF4444' : undefined,
+                          }}
                         />
+                        {(touched.email || hasSubmitted) && emailError && (
+                          <div style={{ fontSize: 12, color: '#DC2626', marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <span>•</span> {emailError}
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -973,7 +1304,7 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
                       style={{
                         height: 40,
                         padding: '0 12px',
-                        border: `1px solid ${isBranchDropdownOpen ? '#0F766E' : '#CBD5E1'}`,
+                        border: `1px solid ${hasSubmitted && !workingBranchId ? '#EF4444' : isBranchDropdownOpen ? '#0F766E' : '#CBD5E1'}`,
                         borderRadius: 8,
                         background: '#FFFFFF',
                         cursor: 'pointer',
@@ -1166,6 +1497,11 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
                         </div>
                       </div>
                     )}
+                    {hasSubmitted && !workingBranchId && (
+                      <div style={{ fontSize: 12, color: '#DC2626', marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <span>•</span> Chi nhánh làm việc bắt buộc phải được chọn.
+                      </div>
+                    )}
                   </div>
 
                   <div className="emp-grid-2">
@@ -1205,14 +1541,32 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
                     </div>
 
                     <div className="emp-form-group">
-                      <label className="emp-form-label">Ghi chú</label>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                        <label className="emp-form-label" style={{ marginBottom: 0 }}>Ghi chú</label>
+                        <span style={{ fontSize: 11, color: note.length > 500 ? '#EF4444' : '#94A3B8' }}>
+                          {note.length}/500
+                        </span>
+                      </div>
                       <input
                         type="text"
                         className="emp-form-input"
                         placeholder="Ghi chú nhân sự..."
                         value={note}
-                        onChange={(e) => setNote(e.target.value)}
+                        maxLength={500}
+                        onChange={(e) => {
+                          setNote(e.target.value);
+                          if (!touched.note) markTouched('note');
+                        }}
+                        onBlur={() => markTouched('note')}
+                        style={{
+                          borderColor: (touched.note || hasSubmitted) && noteError ? '#EF4444' : undefined,
+                        }}
                       />
+                      {(touched.note || hasSubmitted) && noteError && (
+                        <div style={{ fontSize: 12, color: '#DC2626', marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <span>•</span> {noteError}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1222,14 +1576,32 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
                   <div className="emp-section-title">Thông tin tài khoản ngân hàng</div>
                   <div className="emp-grid-2">
                     <div className="emp-form-group">
-                      <label className="emp-form-label">Số tài khoản</label>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                        <label className="emp-form-label" style={{ marginBottom: 0 }}>Số tài khoản</label>
+                        <span style={{ fontSize: 11, color: bankAccountNumber.length > 30 ? '#EF4444' : '#94A3B8' }}>
+                          {bankAccountNumber.length}/30
+                        </span>
+                      </div>
                       <input
                         type="text"
                         className="emp-form-input"
-                        placeholder="Nhập số tài khoản"
+                        placeholder="Chữ không dấu và số, viết liền (VD: 19036688999012)"
                         value={bankAccountNumber}
-                        onChange={(e) => setBankAccountNumber(e.target.value)}
+                        maxLength={30}
+                        onChange={(e) => {
+                          setBankAccountNumber(e.target.value);
+                          if (!touched.bankAccountNumber) markTouched('bankAccountNumber');
+                        }}
+                        onBlur={() => markTouched('bankAccountNumber')}
+                        style={{
+                          borderColor: (touched.bankAccountNumber || hasSubmitted) && bankAccountNumberError ? '#EF4444' : undefined,
+                        }}
                       />
+                      {(touched.bankAccountNumber || hasSubmitted) && bankAccountNumberError && (
+                        <div style={{ fontSize: 12, color: '#DC2626', marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <span>•</span> {bankAccountNumberError}
+                        </div>
+                      )}
                     </div>
 
                     <div className="emp-form-group">
@@ -1260,20 +1632,46 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
                         placeholder="Nhập tên ngân hàng (VD: Shinhan Bank, Woori Bank...)"
                         value={customBankName}
                         onChange={(e) => setCustomBankName(e.target.value)}
+                        style={{
+                          borderColor: hasSubmitted && !customBankName.trim() ? '#EF4444' : undefined,
+                        }}
                         autoFocus
                       />
+                      {hasSubmitted && !customBankName.trim() && (
+                        <div style={{ fontSize: 12, color: '#DC2626', marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <span>•</span> Vui lòng nhập tên ngân hàng khác!
+                        </div>
+                      )}
                     </div>
                   )}
 
                   <div className="emp-form-group" style={{ marginTop: 12 }}>
-                    <label className="emp-form-label">Tên chủ tài khoản</label>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                      <label className="emp-form-label" style={{ marginBottom: 0 }}>Tên chủ tài khoản</label>
+                      <span style={{ fontSize: 11, color: bankAccountHolder.length > 100 ? '#EF4444' : '#94A3B8' }}>
+                        {bankAccountHolder.length}/100
+                      </span>
+                    </div>
                     <input
                       type="text"
                       className="emp-form-input"
-                      placeholder="VD: NGUYEN VAN A"
+                      placeholder="VD: NGUYEN VAN A (Tự in hoa)"
                       value={bankAccountHolder}
-                      onChange={(e) => setBankAccountHolder(e.target.value)}
+                      maxLength={100}
+                      onChange={(e) => {
+                        setBankAccountHolder(e.target.value.toUpperCase());
+                        if (!touched.bankAccountHolder) markTouched('bankAccountHolder');
+                      }}
+                      onBlur={() => markTouched('bankAccountHolder')}
+                      style={{
+                        borderColor: (touched.bankAccountHolder || hasSubmitted) && bankAccountHolderError ? '#EF4444' : undefined,
+                      }}
                     />
+                    {(touched.bankAccountHolder || hasSubmitted) && bankAccountHolderError && (
+                      <div style={{ fontSize: 12, color: '#DC2626', marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <span>•</span> {bankAccountHolderError}
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -1282,14 +1680,35 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
                   <div className="emp-section-title">Thông tin cá nhân</div>
                   <div className="emp-grid-3">
                     <div className="emp-form-group">
-                      <label className="emp-form-label">Số CMND / CCCD</label>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                        <label className="emp-form-label" style={{ marginBottom: 0 }}>
+                          Số CMND / CCCD <span className="required">*</span>
+                        </label>
+                        <span style={{ fontSize: 11, color: citizenId.length !== 12 && citizenId.length > 0 ? '#EF4444' : '#94A3B8' }}>
+                          {citizenId.length}/12
+                        </span>
+                      </div>
                       <input
                         type="text"
                         className="emp-form-input"
-                        placeholder="Số căn cước công dân"
+                        placeholder="Đúng 12 chữ số CCCD"
                         value={citizenId}
-                        onChange={(e) => setCitizenId(e.target.value)}
+                        maxLength={12}
+                        onChange={(e) => {
+                          const val = e.target.value.replace(/[^0-9]/g, '');
+                          setCitizenId(val);
+                          if (!touched.citizenId) markTouched('citizenId');
+                        }}
+                        onBlur={() => markTouched('citizenId')}
+                        style={{
+                          borderColor: (touched.citizenId || hasSubmitted) && citizenIdError ? '#EF4444' : undefined,
+                        }}
                       />
+                      {(touched.citizenId || hasSubmitted) && citizenIdError && (
+                        <div style={{ fontSize: 12, color: '#DC2626', marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <span>•</span> {citizenIdError}
+                        </div>
+                      )}
                     </div>
 
                     <div className="emp-form-group">
@@ -1298,8 +1717,20 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
                         type="date"
                         className="emp-form-input"
                         value={dateOfBirth}
-                        onChange={(e) => setDateOfBirth(e.target.value)}
+                        onChange={(e) => {
+                          setDateOfBirth(e.target.value);
+                          if (!touched.dateOfBirth) markTouched('dateOfBirth');
+                        }}
+                        onBlur={() => markTouched('dateOfBirth')}
+                        style={{
+                          borderColor: (touched.dateOfBirth || hasSubmitted) && dateOfBirthAndStartDateError ? '#EF4444' : undefined,
+                        }}
                       />
+                      {(touched.dateOfBirth || hasSubmitted) && dateOfBirthAndStartDateError && (
+                        <div style={{ fontSize: 12, color: '#DC2626', marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <span>•</span> {dateOfBirthAndStartDateError}
+                        </div>
+                      )}
                     </div>
 
                     <div className="emp-form-group">
@@ -1330,14 +1761,32 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
                   </div>
 
                   <div className="emp-form-group" style={{ marginTop: 12 }}>
-                    <label className="emp-form-label">Địa chỉ</label>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                      <label className="emp-form-label" style={{ marginBottom: 0 }}>Địa chỉ</label>
+                      <span style={{ fontSize: 11, color: address.length > 255 ? '#EF4444' : '#94A3B8' }}>
+                        {address.length}/255
+                      </span>
+                    </div>
                     <input
                       type="text"
                       className="emp-form-input"
                       placeholder="Số nhà, đường phố, phường/xã, quận/huyện, tỉnh/thành..."
                       value={address}
-                      onChange={(e) => setAddress(e.target.value)}
+                      maxLength={255}
+                      onChange={(e) => {
+                        setAddress(e.target.value);
+                        if (!touched.address) markTouched('address');
+                      }}
+                      onBlur={() => markTouched('address')}
+                      style={{
+                        borderColor: (touched.address || hasSubmitted) && addressError ? '#EF4444' : undefined,
+                      }}
                     />
+                    {(touched.address || hasSubmitted) && addressError && (
+                      <div style={{ fontSize: 12, color: '#DC2626', marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <span>•</span> {addressError}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1363,16 +1812,25 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
                     </div>
 
                     <div className="emp-form-group">
-                      <label className="emp-form-label">
-                        {salaryType === 'monthly'
-                          ? 'Mức lương chính (VNĐ/tháng)'
-                          : salaryType === 'hourly'
-                            ? 'Mức lương chính (VNĐ/giờ)'
-                            : 'Mức lương chính (VNĐ/ca)'}
-                      </label>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                        <label className="emp-form-label" style={{ marginBottom: 0 }}>
+                          {salaryType === 'monthly'
+                            ? 'Mức lương chính (VNĐ/tháng)'
+                            : salaryType === 'hourly'
+                              ? 'Mức lương chính (VNĐ/giờ)'
+                              : 'Mức lương chính (VNĐ/ca)'}
+                        </label>
+                        {baseSalary !== '' && !isNaN(Number(baseSalary)) && (
+                          <span style={{ fontSize: 11, color: '#0F766E', fontWeight: 600 }}>
+                            {Number(baseSalary).toLocaleString('vi-VN')} đ
+                          </span>
+                        )}
+                      </div>
                       <input
                         type="number"
                         step="50000"
+                        min="0"
+                        max="1000000000"
                         className="emp-form-input"
                         placeholder={
                           salaryType === 'monthly'
@@ -1382,8 +1840,20 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
                               : 'VD: 250,000'
                         }
                         value={baseSalary === '' ? '' : baseSalary}
-                        onChange={(e) => setBaseSalary(e.target.value === '' ? '' : Number(e.target.value))}
+                        onChange={(e) => {
+                          setBaseSalary(e.target.value === '' ? '' : Number(e.target.value));
+                          if (!touched.baseSalary) markTouched('baseSalary');
+                        }}
+                        onBlur={() => markTouched('baseSalary')}
+                        style={{
+                          borderColor: (touched.baseSalary || hasSubmitted) && baseSalaryError ? '#EF4444' : undefined,
+                        }}
                       />
+                      {(touched.baseSalary || hasSubmitted) && baseSalaryError && (
+                        <div style={{ fontSize: 12, color: '#DC2626', marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <span>•</span> {baseSalaryError}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1578,6 +2048,12 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
                         </tbody>
                       </table>
 
+                      {allowancesError && (
+                        <div style={{ fontSize: 12, color: '#DC2626', marginTop: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <span>•</span> {allowancesError}
+                        </div>
+                      )}
+
                       {/* Total Allowance Summary */}
                       <div
                         style={{
@@ -1655,6 +2131,7 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
       <CreateAllowanceModal
         isOpen={showCreateAllowance}
         onClose={() => setShowCreateAllowance(false)}
+        existingAllowances={allowances}
         onSuccess={handleAddAllowanceSuccess}
       />
     </>

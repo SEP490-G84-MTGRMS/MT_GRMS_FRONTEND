@@ -3,14 +3,17 @@ import { X, Check, AlertCircle, Loader2 } from 'lucide-react';
 import {
   ScheduleRequestType,
   ScheduleRequestTypeLabels,
+  ScheduleApprovalStatus,
+  LeaveTypeLabels,
   type ScheduleApprovalRequestDto,
   type ReviewScheduleApprovalRequestDto,
-} from '../types/scheduleApprovalTypes';
-import { scheduleApprovalApi } from '../api/scheduleApprovalApi';
+} from '../../types/scheduleApprovalTypes';
+import { scheduleApprovalApi } from '../../api/scheduleApprovalApi';
 
 export interface ApprovalRequestsModalProps {
   isOpen: boolean;
   onClose: () => void;
+  request?: ScheduleApprovalRequestDto | null;
   requests?: any[];
   onApprove?: (ids: string[]) => void;
   onReject?: (ids: string[]) => void;
@@ -20,6 +23,7 @@ export interface ApprovalRequestsModalProps {
 export const ApprovalRequestsModal: React.FC<ApprovalRequestsModalProps> = ({
   isOpen,
   onClose,
+  request = null,
   onSuccess,
 }) => {
   const [activeTab, setActiveTab] = useState<string>('ALL');
@@ -50,10 +54,15 @@ export const ApprovalRequestsModal: React.FC<ApprovalRequestsModalProps> = ({
   }, []);
 
   useEffect(() => {
-    if (isOpen) {
-      fetchRequests();
+    if (!isOpen) return;
+    if (request) {
+      setActionError(null);
+      setLoading(false);
+      setRequests([request]);
+      return;
     }
-  }, [isOpen, fetchRequests]);
+    fetchRequests();
+  }, [isOpen, request, fetchRequests]);
 
   if (!isOpen) return null;
 
@@ -69,6 +78,19 @@ export const ApprovalRequestsModal: React.FC<ApprovalRequestsModalProps> = ({
   const handleConfirmReview = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedRequest) return;
+
+    if (!isApproveAction && !reviewNote.trim()) {
+      alert('Vui lòng nhập lý do từ chối yêu cầu.');
+      return;
+    }
+    if (reviewNote.trim().length > 500) {
+      alert('Ghi chú phản hồi không được vượt quá 500 ký tự.');
+      return;
+    }
+    if (isApproveAction && selectedRequest.requestType === ScheduleRequestType.Overtime && (approvedMinutes < 0 || approvedMinutes > 480)) {
+      alert('Số phút OT phê duyệt phải từ 0 đến 480 phút.');
+      return;
+    }
 
     try {
       setSubmitting(true);
@@ -88,8 +110,12 @@ export const ApprovalRequestsModal: React.FC<ApprovalRequestsModalProps> = ({
       await scheduleApprovalApi.reviewRequest(selectedRequest.id, payload);
       setConfirmModalOpen(false);
       setSelectedRequest(null);
-      fetchRequests();
       onSuccess?.();
+      if (request) {
+        onClose();
+      } else {
+        fetchRequests();
+      }
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Xử lý yêu cầu thất bại.';
       alert(msg);
@@ -114,20 +140,22 @@ export const ApprovalRequestsModal: React.FC<ApprovalRequestsModalProps> = ({
         <div className="emp-modal-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0, color: '#0F172A' }}>
-              Duyệt phiếu yêu cầu ca làm việc
+              {request ? 'Chi tiết phiếu yêu cầu ca làm việc' : 'Duyệt phiếu yêu cầu ca làm việc'}
             </h3>
-            <span
-              style={{
-                fontSize: 12,
-                fontWeight: 600,
-                padding: '2px 8px',
-                borderRadius: 9999,
-                background: '#FEF2F2',
-                color: '#DC2626',
-              }}
-            >
-              {requests.length} chờ xử lý
-            </span>
+            {!request && (
+              <span
+                style={{
+                  fontSize: 12,
+                  fontWeight: 600,
+                  padding: '2px 8px',
+                  borderRadius: 9999,
+                  background: '#FEF2F2',
+                  color: '#DC2626',
+                }}
+              >
+                {requests.length} chờ xử lý
+              </span>
+            )}
           </div>
           <button
             type="button"
@@ -139,34 +167,36 @@ export const ApprovalRequestsModal: React.FC<ApprovalRequestsModalProps> = ({
         </div>
 
         {/* Tabs Bar */}
-        <div style={{ display: 'flex', borderBottom: '1px solid #E2E8F0', padding: '0 16px', background: '#F8FAFC', gap: 8, overflowX: 'auto' }}>
-          {[
-            { key: 'ALL', label: `Tất cả (${requests.length})` },
-            { key: ScheduleRequestType.LeaveRequest, label: `Nghỉ phép (${getCountByType(ScheduleRequestType.LeaveRequest)})` },
-            { key: ScheduleRequestType.ShiftSwap, label: `Đổi ca (${getCountByType(ScheduleRequestType.ShiftSwap)})` },
-            { key: ScheduleRequestType.CheckInIncident, label: `Sự cố công (${getCountByType(ScheduleRequestType.CheckInIncident)})` },
-            { key: ScheduleRequestType.Overtime, label: `Làm thêm OT (${getCountByType(ScheduleRequestType.Overtime)})` },
-          ].map((tab) => (
-            <button
-              key={tab.key}
-              type="button"
-              onClick={() => setActiveTab(tab.key)}
-              style={{
-                padding: '10px 14px',
-                fontSize: 13,
-                fontWeight: activeTab === tab.key ? 600 : 500,
-                color: activeTab === tab.key ? '#0F766E' : '#64748B',
-                border: 'none',
-                background: 'transparent',
-                borderBottom: activeTab === tab.key ? '2px solid #0F766E' : '2px solid transparent',
-                cursor: 'pointer',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
+        {!request && (
+          <div style={{ display: 'flex', borderBottom: '1px solid #E2E8F0', padding: '0 16px', background: '#F8FAFC', gap: 8, overflowX: 'auto' }}>
+            {[
+              { key: 'ALL', label: `Tất cả (${requests.length})` },
+              { key: ScheduleRequestType.LeaveRequest, label: `Nghỉ phép (${getCountByType(ScheduleRequestType.LeaveRequest)})` },
+              { key: ScheduleRequestType.ShiftSwap, label: `Đổi ca (${getCountByType(ScheduleRequestType.ShiftSwap)})` },
+              { key: ScheduleRequestType.CheckInIncident, label: `Sự cố công (${getCountByType(ScheduleRequestType.CheckInIncident)})` },
+              { key: ScheduleRequestType.Overtime, label: `Làm thêm OT (${getCountByType(ScheduleRequestType.Overtime)})` },
+            ].map((tab) => (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => setActiveTab(tab.key)}
+                style={{
+                  padding: '10px 14px',
+                  fontSize: 13,
+                  fontWeight: activeTab === tab.key ? 600 : 500,
+                  color: activeTab === tab.key ? '#0F766E' : '#64748B',
+                  border: 'none',
+                  background: 'transparent',
+                  borderBottom: activeTab === tab.key ? '2px solid #0F766E' : '2px solid transparent',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Body content */}
         <div className="emp-modal-body" style={{ padding: '16px 20px', overflowY: 'auto', flex: 1 }}>
@@ -223,40 +253,42 @@ export const ApprovalRequestsModal: React.FC<ApprovalRequestsModalProps> = ({
                       </div>
                     </div>
 
-                    <div style={{ display: 'flex', gap: 8 }}>
-                      <button
-                        type="button"
-                        onClick={() => handleOpenAction(r, false)}
-                        style={{
-                          padding: '6px 12px',
-                          borderRadius: 6,
-                          border: '1px solid #FCA5A5',
-                          background: '#FEF2F2',
-                          color: '#DC2626',
-                          fontSize: 12,
-                          fontWeight: 600,
-                          cursor: 'pointer',
-                        }}
-                      >
-                        Từ chối
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleOpenAction(r, true)}
-                        style={{
-                          padding: '6px 14px',
-                          borderRadius: 6,
-                          border: 'none',
-                          background: '#0F766E',
-                          color: '#FFFFFF',
-                          fontSize: 12,
-                          fontWeight: 600,
-                          cursor: 'pointer',
-                        }}
-                      >
-                        Duyệt
-                      </button>
-                    </div>
+                    {r.status === ScheduleApprovalStatus.Pending && (
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <button
+                          type="button"
+                          onClick={() => handleOpenAction(r, false)}
+                          style={{
+                            padding: '6px 12px',
+                            borderRadius: 6,
+                            border: '1px solid #FCA5A5',
+                            background: '#FEF2F2',
+                            color: '#DC2626',
+                            fontSize: 12,
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          Từ chối
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleOpenAction(r, true)}
+                          style={{
+                            padding: '6px 14px',
+                            borderRadius: 6,
+                            border: 'none',
+                            background: '#0F766E',
+                            color: '#FFFFFF',
+                            fontSize: 12,
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          Duyệt
+                        </button>
+                      </div>
+                    )}
                   </div>
 
                   {/* Chi tiết nội dung */}
@@ -266,15 +298,22 @@ export const ApprovalRequestsModal: React.FC<ApprovalRequestsModalProps> = ({
                       {r.reason}
                     </div>
 
-                    {r.requestType === ScheduleRequestType.ShiftSwap && (
-                      <div style={{ padding: '6px 10px', background: '#FAF5FF', border: '1px solid #E9D5FF', borderRadius: 6, color: '#7E22CE' }}>
-                        Đồng nghiệp đổi ca: <b>{r.targetEmployeeName || 'N/A'}</b> ({r.targetEmployeeCode})
+                    {r.requestType === ScheduleRequestType.LeaveRequest && (
+                      <div style={{ color: '#475569' }}>
+                        <span style={{ fontWeight: 600, color: '#64748B' }}>Loại nghỉ: </span>
+                        {r.leaveType ? LeaveTypeLabels[r.leaveType] : 'Xin nghỉ'}
+                        {r.isPaidLeave ? ' (Có lương)' : ' (Không lương)'}
                       </div>
                     )}
 
                     {r.requestType === ScheduleRequestType.Overtime && (
                       <div style={{ color: '#2563EB', fontWeight: 500 }}>
                         Số phút đề xuất OT: <b>{r.requestedOvertimeMinutes} phút</b>
+                        {r.approvedOvertimeMinutes !== null && r.approvedOvertimeMinutes !== undefined && (
+                          <span style={{ color: '#16A34A', marginLeft: 8 }}>
+                            (Đã duyệt: {r.approvedOvertimeMinutes} phút)
+                          </span>
+                        )}
                       </div>
                     )}
 
@@ -284,16 +323,26 @@ export const ApprovalRequestsModal: React.FC<ApprovalRequestsModalProps> = ({
                       </div>
                     )}
 
-                    {((r.evidenceImageUrls && r.evidenceImageUrls.length > 0) || r.evidenceImageUrl) && (
+                    {r.requestType === ScheduleRequestType.CheckOutIncident && (
+                      <div style={{ color: '#D97706', fontWeight: 500 }}>
+                        Giờ ra thực tế đề xuất: <b>{r.requestedCheckOutTime?.slice(11, 16) || 'N/A'}</b>
+                      </div>
+                    )}
+
+                    {r.reviewNote && (
+                      <div style={{ marginTop: 4, padding: '6px 10px', background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 6, color: '#334155' }}>
+                        <span style={{ fontWeight: 600, color: '#0F766E' }}>Phản hồi duyệt: </span>
+                        {r.reviewNote}
+                      </div>
+                    )}
+
+                    {r.evidenceImageUrls && r.evidenceImageUrls.length > 0 && (
                       <div style={{ marginTop: 6 }}>
                         <span style={{ color: '#64748B', display: 'block', marginBottom: 4 }}>
-                          Ảnh minh chứng ({r.evidenceImageUrls?.length || 1}):
+                          Ảnh minh chứng ({r.evidenceImageUrls.length}):
                         </span>
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                          {(r.evidenceImageUrls && r.evidenceImageUrls.length > 0
-                            ? r.evidenceImageUrls
-                            : [r.evidenceImageUrl!]
-                          ).map((url, i) => (
+                          {r.evidenceImageUrls.map((url, i) => (
                             <a
                               key={i}
                               href={url}

@@ -147,12 +147,25 @@ export const employeeApi = {
   },
 
   /**
-   * Xóa mềm nhân viên
+   * Xóa mềm nhân viên hoặc chuyển sang trạng thái ngừng làm việc nếu đã có lịch sử công/lương
    * Backend: DELETE /api/employees/{id}
    */
-  async deleteEmployee(id: string): Promise<boolean> {
-    const res = await httpClient.delete<ApiResponse<object>>(`/employees/${id}`);
-    return !!res.data?.success;
+  async deleteEmployee(id: string): Promise<{
+    success: boolean;
+    action?: 'deleted' | 'deactivated';
+    status?: 'inactive';
+    message?: string;
+  }> {
+    const res = await httpClient.delete<
+      ApiResponse<{ action?: 'deleted' | 'deactivated'; status?: 'inactive'; message?: string }>
+    >(`/employees/${id}`);
+    const data = res.data?.data;
+    return {
+      success: !!res.data?.success,
+      action: data?.action || 'deleted',
+      status: data?.status,
+      message: data?.message || res.data?.message,
+    };
   },
 
   /**

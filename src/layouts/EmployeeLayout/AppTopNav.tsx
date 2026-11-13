@@ -14,8 +14,8 @@ import {
   ClipboardCheck,
 } from 'lucide-react';
 import { useAuthStore } from '../../stores/useAuthStore';
-import { ApprovalRequestsModal } from '../../features/employee/components/ApprovalRequestsModal';
-import { CreateScheduleRequestModal } from '../../features/employee/components/CreateScheduleRequestModal';
+import { ApprovalRequestsModal } from '../../features/employee/components/approval-requests/ApprovalRequestsModal';
+import { CreateScheduleRequestModal } from '../../features/employee/components/approval-requests/CreateScheduleRequestModal';
 import { scheduleApprovalApi } from '../../features/employee/api/scheduleApprovalApi';
 import { scheduleApi } from '../../features/employee/api/scheduleApi';
 

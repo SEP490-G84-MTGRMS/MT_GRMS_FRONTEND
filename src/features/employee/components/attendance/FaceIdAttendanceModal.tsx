@@ -10,10 +10,10 @@ import {
   DISTANCE_THRESHOLD,
   type StaffFaceData,
   type MatchResult,
-} from '../lib/faceIdService';
-import { scheduleApi } from '../api/scheduleApi';
-import { employeeApi } from '../api/employeeApi';
-import { useAuthStore } from '../../../stores/useAuthStore';
+} from '../../lib/faceIdService';
+import { scheduleApi } from '../../api/scheduleApi';
+import { employeeApi } from '../../api/employeeApi';
+import { useAuthStore } from '../../../../stores/useAuthStore';
 
 interface FaceIdAttendanceModalProps {
   isOpen: boolean;

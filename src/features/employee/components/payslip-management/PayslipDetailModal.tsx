@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Printer, CreditCard, Receipt, Loader2, AlertCircle } from 'lucide-react';
-import type { PayslipDetailedRecord } from '../types';
+import type { PayslipDetailedRecord } from '../../types';
 import {
   payslipApi,
   mapBackendDetailToDetailedRecord,
   extractErrorMessage,
-} from '../api/payslipApi';
+} from '../../api/payslipApi';
 
 interface PayslipDetailModalProps {
   isOpen: boolean;
@@ -289,28 +289,76 @@ export const PayslipDetailModal: React.FC<PayslipDetailModalProps> = ({
                       {formatVND(effectiveBaseRate)} {rateUnitLabel}
                     </strong>
                   </div>
-                  <div>
-                    <span style={{ color: '#64748B' }}>Công chuẩn: </span>
-                    <strong style={{ color: '#0F172A' }}>{effectivePayslip.standardDays} ngày</strong>
-                  </div>
-                  <div>
-                    <span style={{ color: '#64748B' }}>Công thực tế: </span>
-                    <strong style={{ color: '#0F766E' }}>{effectivePayslip.workedDays} ngày</strong>
-                  </div>
+
+                  {/* Nhân viên làm theo giờ (HOURLY) không hiển thị Công chuẩn và Công thực tế */}
+                  {effectivePayslip.salaryType !== 'HOURLY' && (
+                    <>
+                      <div>
+                        <span style={{ color: '#64748B' }}>Công chuẩn: </span>
+                        <strong style={{ color: '#0F172A' }}>{effectivePayslip.standardDays} ngày</strong>
+                      </div>
+                      <div>
+                        <span style={{ color: '#64748B' }}>Công thực tế: </span>
+                        <strong style={{ color: '#0F766E' }}>{effectivePayslip.workedDays} ngày</strong>
+                      </div>
+                    </>
+                  )}
+
                   <div>
                     <span style={{ color: '#64748B' }}>Tổng giờ làm: </span>
                     <strong style={{ color: '#0F172A' }}>{effectivePayslip.totalWorkHours || 0} giờ</strong>
                   </div>
+
+                  {effectivePayslip.salaryType === 'SHIFT' && (
+                    <div>
+                      <span style={{ color: '#64748B' }}>Tổng số ca: </span>
+                      <strong style={{ color: '#0F172A' }}>{effectivePayslip.totalShifts || 0} ca</strong>
+                    </div>
+                  )}
+
                   <div>
                     <span style={{ color: '#64748B' }}>Giờ làm thêm (OT): </span>
                     <strong style={{ color: effectivePayslip.otHours > 0 ? '#D97706' : '#64748B' }}>
                       {effectivePayslip.otHours} giờ
                     </strong>
                   </div>
-                  {effectivePayslip.totalLateMinutes !== undefined && effectivePayslip.totalLateMinutes > 0 && (
+
+                  <div>
+                    <span style={{ color: '#64748B' }}>% Lương OT: </span>
+                    <strong style={{ color: '#0F766E' }}>
+                      {effectivePayslip.otRateWeekday || '150%'} (Thường) / {effectivePayslip.otRateSunday || '200%'} (CN)
+                    </strong>
+                  </div>
+
+                  <div>
+                    <span style={{ color: '#64748B' }}>Đi muộn: </span>
+                    <strong style={{ color: (effectivePayslip.totalLateMinutes || 0) > 0 ? '#DC2626' : '#0F172A' }}>
+                      {effectivePayslip.totalLateMinutes || 0} phút
+                    </strong>
+                  </div>
+
+                  <div>
+                    <span style={{ color: '#64748B' }}>Về sớm: </span>
+                    <strong style={{ color: (effectivePayslip.totalEarlyLeaveMinutes || 0) > 0 ? '#DC2626' : '#0F172A' }}>
+                      {effectivePayslip.totalEarlyLeaveMinutes || 0} phút
+                    </strong>
+                  </div>
+
+                  {effectivePayslip.salaryType !== 'HOURLY' && (
                     <div>
-                      <span style={{ color: '#64748B' }}>Đi muộn: </span>
-                      <strong style={{ color: '#DC2626' }}>{effectivePayslip.totalLateMinutes} phút</strong>
+                      <span style={{ color: '#64748B' }}>Nghỉ không lương: </span>
+                      <strong style={{ color: (effectivePayslip.unpaidLeaveDays || 0) > 0 ? '#D97706' : '#0F172A' }}>
+                        {effectivePayslip.unpaidLeaveDays || 0} ngày
+                      </strong>
+                    </div>
+                  )}
+
+                  {effectivePayslip.salaryType !== 'HOURLY' && (effectivePayslip.paidLeaveDays || 0) > 0 && (
+                    <div>
+                      <span style={{ color: '#64748B' }}>Nghỉ có lương: </span>
+                      <strong style={{ color: '#059669' }}>
+                        {effectivePayslip.paidLeaveDays} ngày
+                      </strong>
                     </div>
                   )}
                 </div>
@@ -353,7 +401,14 @@ export const PayslipDetailModal: React.FC<PayslipDetailModalProps> = ({
                     </div>
 
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-                      <span style={{ color: '#475569' }}>Lương làm thêm giờ (OT)</span>
+                      <div>
+                        <span style={{ color: '#475569' }}>Lương làm thêm giờ (OT)</span>
+                        {effectivePayslip.otHours > 0 && (
+                          <span style={{ fontSize: 11.5, color: '#64748B', marginLeft: 6 }}>
+                            ({effectivePayslip.otHours}h × {effectivePayslip.otRateWeekday || '150%'})
+                          </span>
+                        )}
+                      </div>
                       <strong style={{ color: effectivePayslip.overtimePay > 0 ? '#0F766E' : '#64748B' }}>
                         {formatVND(effectivePayslip.overtimePay)}
                       </strong>
