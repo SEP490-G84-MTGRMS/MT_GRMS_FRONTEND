@@ -307,15 +307,20 @@ export const SupplierDetailPage: FC<Props> = ({
     setIsVatModalOpen(false);
   };
 
-  const handleSaveDeliveryConfig = async (newCfg: SupplierDeliveryConfig) => {
+  const handleSaveDeliveryConfig = async (
+    newCfg: SupplierDeliveryConfig,
+    options?: { silentToast?: boolean; toastMessage?: string },
+  ) => {
     const supplierId = currentSupplier?.id;
     if (!supplierId) {
       throw new Error('Không xác định được nhà cung cấp.');
     }
     await supplierApi.updateDeliveryConfig(supplierId, mapDeliveryConfigToApi(newCfg));
     setDeliveryConfig(newCfg);
+    if (options?.silentToast) return;
     showToast(
-      `Đã lưu cấu hình lịch giao hàng và thời gian Cutoff thành công cho ${currentSupplier?.name || 'nhà cung cấp'}!`,
+      options?.toastMessage ||
+        `Đã lưu cấu hình lịch giao hàng và thời gian Cutoff thành công cho ${currentSupplier?.name || 'nhà cung cấp'}!`,
       'success',
     );
   };
