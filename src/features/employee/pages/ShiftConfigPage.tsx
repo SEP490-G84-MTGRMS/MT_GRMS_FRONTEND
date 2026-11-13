@@ -133,8 +133,6 @@ export const ShiftConfigPage: React.FC = () => {
   const [formShiftName, setFormShiftName] = useState('Tối');
   const [formStartTime, setFormStartTime] = useState('17:00');
   const [formEndTime, setFormEndTime] = useState('21:00');
-  const [formCheckInStart, setFormCheckInStart] = useState('14:00');
-  const [formCheckInEnd, setFormCheckInEnd] = useState('00:00');
   const [formBranchIds, setFormBranchIds] = useState<string[]>([]);
   const [formIsActive, setFormIsActive] = useState(true);
   const [formError, setFormError] = useState<string | null>(null);
@@ -235,8 +233,6 @@ export const ShiftConfigPage: React.FC = () => {
     setFormShiftName('');
     setFormStartTime('17:00');
     setFormEndTime('21:00');
-    setFormCheckInStart('14:00');
-    setFormCheckInEnd('00:00');
     setFormIsActive(true);
 
     if (activeBranch && activeBranch.id !== 'ALL') {
@@ -258,8 +254,6 @@ export const ShiftConfigPage: React.FC = () => {
     setFormShiftName(s.shiftName || '');
     setFormStartTime(formatTime(s.startTime));
     setFormEndTime(formatTime(s.endTime));
-    setFormCheckInStart(formatTime(s.allowedCheckInStart));
-    setFormCheckInEnd(formatTime(s.allowedCheckInEnd));
     setFormIsActive(s.isActive ?? true);
 
     if (s.branchIds && s.branchIds.length > 0) {
@@ -273,20 +267,6 @@ export const ShiftConfigPage: React.FC = () => {
     setFormError(null);
     setIsModalBranchDropdownOpen(false);
     setShowFormModal(true);
-  };
-
-  // Kiểm tra check-in có kéo dài sang hôm sau
-  const isNextDayCheckIn = (startStr: string, endStr: string, workStartStr: string): boolean => {
-    try {
-      const [sh, sm] = startStr.split(':').map(Number);
-      const [eh, em] = endStr.split(':').map(Number);
-      const [wsh] = workStartStr.split(':').map(Number);
-      if (eh * 60 + em <= sh * 60 + sm) return true;
-      if (eh * 60 + em < wsh * 60) return true;
-      return false;
-    } catch {
-      return false;
-    }
   };
 
   // Toggle trạng thái hoạt động trực tiếp trên dòng
@@ -353,7 +333,7 @@ export const ShiftConfigPage: React.FC = () => {
       setFormError('Giờ bắt đầu và giờ kết thúc không hợp lệ (thời lượng ca phải từ 0.5 đến 24 giờ).');
       return;
     }
-    const isNextDay = isNextDayCheckIn(formCheckInStart, formCheckInEnd, formStartTime);
+    const isNextDay = formEndTime < formStartTime;
 
     try {
       setIsSubmitting(true);
@@ -364,10 +344,6 @@ export const ShiftConfigPage: React.FC = () => {
           startTime: formStartTime.length === 5 ? `${formStartTime}:00` : formStartTime,
           endTime: formEndTime.length === 5 ? `${formEndTime}:00` : formEndTime,
           durationHours: durationInfo.hours,
-          allowedCheckInStart:
-            formCheckInStart.length === 5 ? `${formCheckInStart}:00` : formCheckInStart,
-          allowedCheckInEnd:
-            formCheckInEnd.length === 5 ? `${formCheckInEnd}:00` : formCheckInEnd,
           isCheckInNextDay: isNextDay,
           branchIds: formBranchIds,
           branchId: formBranchIds[0],
@@ -390,10 +366,6 @@ export const ShiftConfigPage: React.FC = () => {
           startTime: formStartTime.length === 5 ? `${formStartTime}:00` : formStartTime,
           endTime: formEndTime.length === 5 ? `${formEndTime}:00` : formEndTime,
           durationHours: durationInfo.hours,
-          allowedCheckInStart:
-            formCheckInStart.length === 5 ? `${formCheckInStart}:00` : formCheckInStart,
-          allowedCheckInEnd:
-            formCheckInEnd.length === 5 ? `${formCheckInEnd}:00` : formCheckInEnd,
           isCheckInNextDay: isNextDay,
           branchIds: formBranchIds,
           branchId: formBranchIds[0],
@@ -460,7 +432,6 @@ export const ShiftConfigPage: React.FC = () => {
   };
 
   const formDurationInfo = calculateHoursText(formStartTime, formEndTime);
-  const formIsNextDay = isNextDayCheckIn(formCheckInStart, formCheckInEnd, formStartTime);
 
   return (
     <div className="emp-page-container">
@@ -1047,75 +1018,6 @@ export const ShiftConfigPage: React.FC = () => {
                     >
                       {formDurationInfo.text}
                     </span>
-                  </div>
-                </div>
-
-                {/* Hàng 3: Giờ cho phép chấm công ⓘ */}
-                <div style={{ display: 'grid', gridTemplateColumns: '170px 1fr', alignItems: 'center', gap: 12 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                    <span style={{ fontSize: 14, fontWeight: 600, color: '#334155' }}>
-                      Giờ cho phép chấm công
-                    </span>
-                    <span title="Khoảng thời gian cho phép nhân viên điểm danh" style={{ cursor: 'pointer', display: 'flex' }}>
-                      <Info size={15} color="#94A3B8" />
-                    </span>
-                  </div>
-
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <div style={{ position: 'relative', width: 140 }}>
-                      <input
-                        type="time"
-                        value={formCheckInStart}
-                        onChange={(e) => setFormCheckInStart(e.target.value)}
-                        style={{
-                          width: '100%',
-                          height: 38,
-                          padding: '0 12px',
-                          borderRadius: 8,
-                          border: '1px solid #CBD5E1',
-                          fontSize: 14,
-                          fontWeight: 500,
-                          color: '#1E293B',
-                          background: '#FFFFFF',
-                          outline: 'none',
-                        }}
-                      />
-                    </div>
-
-                    <span style={{ fontSize: 13, color: '#475569', fontWeight: 500 }}>Đến</span>
-
-                    <div style={{ position: 'relative', width: 140 }}>
-                      <input
-                        type="time"
-                        value={formCheckInEnd}
-                        onChange={(e) => setFormCheckInEnd(e.target.value)}
-                        style={{
-                          width: '100%',
-                          height: 38,
-                          padding: '0 12px',
-                          borderRadius: 8,
-                          border: '1px solid #CBD5E1',
-                          fontSize: 14,
-                          fontWeight: 500,
-                          color: '#1E293B',
-                          background: '#FFFFFF',
-                          outline: 'none',
-                        }}
-                      />
-                    </div>
-
-                    {formIsNextDay && (
-                      <span
-                        style={{
-                          fontSize: 13,
-                          fontWeight: 500,
-                          color: '#475569',
-                          marginLeft: 6,
-                        }}
-                      >
-                        hôm sau
-                      </span>
-                    )}
                   </div>
                 </div>
 

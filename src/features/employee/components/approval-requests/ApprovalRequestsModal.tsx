@@ -306,12 +306,6 @@ export const ApprovalRequestsModal: React.FC<ApprovalRequestsModalProps> = ({
                       </div>
                     )}
 
-                    {r.requestType === ScheduleRequestType.ShiftSwap && r.targetEmployeeName && (
-                      <div style={{ padding: '6px 10px', background: '#FAF5FF', border: '1px solid #E9D5FF', borderRadius: 6, color: '#7E22CE' }}>
-                        Đồng nghiệp đổi ca: <b>{r.targetEmployeeName}</b>{r.targetEmployeeCode ? ` (${r.targetEmployeeCode})` : ''}
-                      </div>
-                    )}
-
                     {r.requestType === ScheduleRequestType.Overtime && (
                       <div style={{ color: '#2563EB', fontWeight: 500 }}>
                         Số phút đề xuất OT: <b>{r.requestedOvertimeMinutes} phút</b>
@@ -342,16 +336,13 @@ export const ApprovalRequestsModal: React.FC<ApprovalRequestsModalProps> = ({
                       </div>
                     )}
 
-                    {((r.evidenceImageUrls && r.evidenceImageUrls.length > 0) || r.evidenceImageUrl) && (
+                    {r.evidenceImageUrls && r.evidenceImageUrls.length > 0 && (
                       <div style={{ marginTop: 6 }}>
                         <span style={{ color: '#64748B', display: 'block', marginBottom: 4 }}>
-                          Ảnh minh chứng ({r.evidenceImageUrls?.length || 1}):
+                          Ảnh minh chứng ({r.evidenceImageUrls.length}):
                         </span>
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                          {(r.evidenceImageUrls && r.evidenceImageUrls.length > 0
-                            ? r.evidenceImageUrls
-                            : [r.evidenceImageUrl!]
-                          ).map((url, i) => (
+                          {r.evidenceImageUrls.map((url, i) => (
                             <a
                               key={i}
                               href={url}

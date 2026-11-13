@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import type { PayslipDetailedRecord, Branch } from '../types';
 import { employeeApi } from '../api/employeeApi';
+import { scheduleApi } from '../api/scheduleApi';
 import {
   payslipApi,
   mapBackendSummaryToDetailedRecord,
@@ -327,71 +328,119 @@ export const PayslipManagementPage: React.FC = () => {
     setBatchPayingPayslips(unpaidSelected);
   };
 
-  // Tính lại bảng lương cho các phiếu lương chưa chi trả
-  const handleRecalculateUnpaid = () => {
+  // Tính lại bảng lương cho các phiếu lương chưa chi trả (chỉ áp dụng cho nhân viên có ca làm trong tháng)
+  const handleRecalculateUnpaid = async () => {
     setShowActionDropdown(false);
 
-    const unpaidCount = payslips.filter((p) => p.status === 'UNPAID').length;
-    const paidCount = payslips.filter((p) => p.status === 'PAID').length;
+    const [year, month] = periodMonth.split('-').map(Number);
+    if (!year || !month) {
+      showNotification('warning', 'Kỳ tháng không hợp lệ', 'Vui lòng chọn kỳ tháng hợp lệ trước khi tính lại bảng lương.');
+      return;
+    }
 
-    setConfirmModal({
-      isOpen: true,
-      title: `Tính lại bảng lương kỳ ${monthLabel}`,
-      variant: 'primary',
-      confirmText: 'Bắt đầu tính lại',
-      cancelText: 'Hủy bỏ',
-      message: (
-        <div>
-          <p style={{ margin: '0 0 10px 0', fontSize: 13, color: '#334155', lineHeight: 1.5 }}>
-            Hệ thống sẽ tổng hợp lại toàn bộ ngày công, giờ làm, OT và phụ cấp mới nhất từ dữ liệu chấm công cho kỳ <strong>{monthLabel}</strong>:
-          </p>
-          <div style={{ background: '#F8FAFC', padding: '10px 14px', borderRadius: 8, border: '1px solid #E2E8F0', marginBottom: 12 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#D97706', fontWeight: 600 }}>
-              <span>•</span>
-              <span>Phiếu lương CHƯA CHI TRẢ: {unpaidCount} phiếu (sẽ được tính lại số liệu)</span>
-            </div>
-            {paidCount > 0 && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#059669', fontWeight: 600, marginTop: 4 }}>
+    const fromDate = `${year}-${String(month).padStart(2, '0')}-01`;
+    const lastDay = new Date(year, month, 0).getDate();
+    const toDate = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+    const activeBranchId = activeBranch && activeBranch.id !== 'ALL' ? activeBranch.id : undefined;
+
+    try {
+      setIsRecalculating(true);
+      const schedulesInMonth = await scheduleApi.getRawSchedules({
+        branchId: activeBranchId,
+        fromDate,
+        toDate,
+        pageSize: 1000,
+      });
+
+      const validSchedules = schedulesInMonth.filter(
+        (s) => (s.status || '').toLowerCase() !== 'cancelled' || (s.approvalType || '').toUpperCase() === 'UNPAID_LEAVE'
+      );
+      const employeeIdsWithSchedules = new Set(validSchedules.map((s) => s.employeeId));
+
+      if (employeeIdsWithSchedules.size === 0) {
+        showNotification(
+          'warning',
+          'Không có ca làm việc trong kỳ',
+          `Không tìm thấy nhân viên nào có ca làm việc trong ${monthLabel}${activeBranchId ? ` tại ${activeBranch?.name}` : ''}. Chỉ những nhân viên có ca làm việc trong tháng mới được khởi tạo hoặc tính lại bảng lương.`
+        );
+        return;
+      }
+
+      const unpaidWithScheduleCount = payslips.filter(
+        (p) => p.status === 'UNPAID' && employeeIdsWithSchedules.has(p.employeeId)
+      ).length;
+      const paidCount = payslips.filter((p) => p.status === 'PAID').length;
+
+      setConfirmModal({
+        isOpen: true,
+        title: `Tính lại bảng lương kỳ ${monthLabel}`,
+        variant: 'primary',
+        confirmText: 'Bắt đầu tính lại',
+        cancelText: 'Hủy bỏ',
+        message: (
+          <div>
+            <p style={{ margin: '0 0 10px 0', fontSize: 13, color: '#334155', lineHeight: 1.5 }}>
+              Hệ thống sẽ kiểm tra và tổng hợp lại ngày công, giờ làm, OT và phụ cấp mới nhất cho các nhân viên <strong>có ca làm việc</strong> trong kỳ <strong>{monthLabel}</strong>:
+            </p>
+            <div style={{ background: '#F8FAFC', padding: '10px 14px', borderRadius: 8, border: '1px solid #E2E8F0', marginBottom: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#0F766E', fontWeight: 600 }}>
                 <span>•</span>
-                <span>Phiếu lương ĐÃ THANH TOÁN: {paidCount} phiếu (bảo lưu nguyên vẹn, không ghi đè)</span>
+                <span>Nhân viên có ca làm việc trong tháng: {employeeIdsWithSchedules.size} nhân viên</span>
               </div>
-            )}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#D97706', fontWeight: 600, marginTop: 4 }}>
+                <span>•</span>
+                <span>Phiếu lương CHƯA CHI TRẢ hiện có: {unpaidWithScheduleCount} phiếu (sẽ được tính lại / khởi tạo theo ca thực tế)</span>
+              </div>
+              {paidCount > 0 && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#059669', fontWeight: 600, marginTop: 4 }}>
+                  <span>•</span>
+                  <span>Phiếu lương ĐÃ THANH TOÁN: {paidCount} phiếu (bảo lưu nguyên vẹn, không ghi đè)</span>
+                </div>
+              )}
+            </div>
+            <p style={{ margin: 0, fontSize: 12, color: '#64748B' }}>
+              Lưu ý: Nhân viên không có ca làm việc nào trong kỳ {monthLabel} sẽ không được khởi tạo lại bảng lương.
+            </p>
           </div>
-          <p style={{ margin: 0, fontSize: 12, color: '#64748B' }}>
-            Quá trình tính toán diễn ra tự động và sẽ cập nhật lại số liệu ngay khi hoàn thành.
-          </p>
-        </div>
-      ),
-      onConfirm: async () => {
-        setConfirmModal((prev) => ({ ...prev, isLoading: true }));
-        setIsRecalculating(true);
-        try {
-          const activeBranchId = activeBranch && activeBranch.id !== 'ALL' ? activeBranch.id : undefined;
-          await payslipApi.recalculatePayroll({
-            periodMonth,
-            branchId: activeBranchId,
-            note: `Tính lại lương kỳ ${periodMonth} - cập nhật công thực tế`,
-          });
+        ),
+        onConfirm: async () => {
+          setConfirmModal((prev) => ({ ...prev, isLoading: true }));
+          setIsRecalculating(true);
+          try {
+            const recalculatedList = await payslipApi.recalculatePayroll({
+              periodMonth,
+              branchId: activeBranchId,
+              note: `Tính lại lương kỳ ${periodMonth} - cập nhật công thực tế`,
+            });
 
-          setConfirmModal((prev) => ({ ...prev, isOpen: false, isLoading: false }));
-          showNotification(
-            'success',
-            'Tính lại bảng lương thành công',
-            `Đã hoàn tất tính toán và cập nhật lại dữ liệu bảng lương cho kỳ ${monthLabel}!`
-          );
-          await fetchPayslips();
-        } catch (err: any) {
-          setConfirmModal((prev) => ({ ...prev, isOpen: false, isLoading: false }));
-          showNotification(
-            'error',
-            'Không thể tính toán lại',
-            extractErrorMessage(err, 'Lỗi khi tính toán lại bảng lương.')
-          );
-        } finally {
-          setIsRecalculating(false);
-        }
-      },
-    });
+            setConfirmModal((prev) => ({ ...prev, isOpen: false, isLoading: false }));
+            showNotification(
+              'success',
+              'Tính lại bảng lương thành công',
+              `Đã hoàn tất tính toán và cập nhật bảng lương cho ${recalculatedList.length} nhân viên có ca làm việc trong kỳ ${monthLabel}!`
+            );
+            await fetchPayslips();
+          } catch (err: any) {
+            setConfirmModal((prev) => ({ ...prev, isOpen: false, isLoading: false }));
+            showNotification(
+              'error',
+              'Không thể tính toán lại',
+              extractErrorMessage(err, 'Lỗi khi tính toán lại bảng lương.')
+            );
+          } finally {
+            setIsRecalculating(false);
+          }
+        },
+      });
+    } catch (err: any) {
+      showNotification(
+        'error',
+        'Lỗi kiểm tra dữ liệu ca làm việc',
+        extractErrorMessage(err, 'Không thể kiểm tra danh sách ca làm việc trong kỳ tháng.')
+      );
+    } finally {
+      setIsRecalculating(false);
+    }
   };
 
   const handleResetFilters = () => {

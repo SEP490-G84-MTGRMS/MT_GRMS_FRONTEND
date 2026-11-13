@@ -17,8 +17,6 @@ export interface ScheduleResponse {
   plannedStartTime: string;
   plannedEndTime: string;
   durationHours: number;
-  allowedCheckInStart: string;
-  allowedCheckInEnd: string;
   isCheckInNextDay: boolean;
   checkInTime?: string | null;
   checkOutTime?: string | null;
@@ -35,7 +33,6 @@ export interface ScheduleResponse {
   approvalType?: string | null;
   approvalStatus: string;
   approvalReason?: string | null;
-  evidenceImageUrl?: string | null;
   approvedBy?: string | null;
   approvedAt?: string | null;
   createdAt: string;
@@ -62,8 +59,6 @@ export interface CreateScheduleItemPayload {
   plannedStartTime?: string; // "HH:mm:ss"
   plannedEndTime?: string;   // "HH:mm:ss"
   durationHours?: number;
-  allowedCheckInStart?: string;
-  allowedCheckInEnd?: string;
   isCheckInNextDay?: boolean;
 }
 
@@ -88,8 +83,6 @@ export interface CreateRecurringSchedulePayload {
   plannedStartTime?: string; // "HH:mm:ss"
   plannedEndTime?: string;   // "HH:mm:ss"
   durationHours?: number;
-  allowedCheckInStart?: string;
-  allowedCheckInEnd?: string;
   isCheckInNextDay?: boolean;
 }
 
@@ -103,8 +96,6 @@ export interface UpdateSchedulePayload {
   plannedStartTime?: string;
   plannedEndTime?: string;
   durationHours?: number;
-  allowedCheckInStart?: string;
-  allowedCheckInEnd?: string;
   isCheckInNextDay?: boolean;
   status?: string;
 }

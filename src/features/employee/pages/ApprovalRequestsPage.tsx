@@ -564,8 +564,6 @@ export const ApprovalRequestsPage: React.FC = () => {
               paginatedRequests.map((req) => {
                 const images = (req.evidenceImageUrls && req.evidenceImageUrls.length > 0)
                   ? req.evidenceImageUrls
-                  : req.evidenceImageUrl
-                  ? [req.evidenceImageUrl]
                   : [];
 
                 const isPending = req.status === ScheduleApprovalStatus.Pending;
@@ -609,14 +607,6 @@ export const ApprovalRequestsPage: React.FC = () => {
                         {req.requestType === ScheduleRequestType.Overtime && (
                           <div style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>
                             Thời gian tăng ca: <strong>{req.requestedOvertimeMinutes || 0} phút</strong>
-                          </div>
-                        )}
-
-                        {req.requestType === ScheduleRequestType.ShiftSwap && req.targetEmployeeName && (
-                          <div style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>
-                            Đổi ca với: <strong>{req.targetEmployeeName}</strong>
-                            {req.peerConfirmed === true && ' (Đã đồng ý)'}
-                            {req.peerConfirmed === false && ' (Đã từ chối)'}
                           </div>
                         )}
 
@@ -847,15 +837,11 @@ export const ApprovalRequestsPage: React.FC = () => {
                 <div>
                   <strong>Lý do gửi:</strong> {selectedRequest.reason}
                 </div>
-                {((selectedRequest.evidenceImageUrls && selectedRequest.evidenceImageUrls.length > 0) ||
-                  selectedRequest.evidenceImageUrl) && (
+                {selectedRequest.evidenceImageUrls && selectedRequest.evidenceImageUrls.length > 0 && (
                   <div style={{ marginTop: 8 }}>
                     <strong>Ảnh minh chứng:</strong>
                     <div style={{ display: 'flex', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
-                      {((selectedRequest.evidenceImageUrls && selectedRequest.evidenceImageUrls.length > 0)
-                        ? selectedRequest.evidenceImageUrls
-                        : [selectedRequest.evidenceImageUrl!]
-                      ).map((url, idx) => (
+                      {selectedRequest.evidenceImageUrls.map((url, idx) => (
                         <img
                           key={url}
                           src={url}
@@ -869,11 +855,7 @@ export const ApprovalRequestsPage: React.FC = () => {
                             cursor: 'pointer',
                           }}
                           onClick={() => {
-                            const list =
-                              selectedRequest.evidenceImageUrls && selectedRequest.evidenceImageUrls.length > 0
-                                ? selectedRequest.evidenceImageUrls
-                                : [selectedRequest.evidenceImageUrl!];
-                            handleOpenLightbox(list, idx);
+                            handleOpenLightbox(selectedRequest.evidenceImageUrls!, idx);
                           }}
                           title="Bấm để xem phóng to"
                         />

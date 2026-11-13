@@ -176,6 +176,7 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
       setWorkingBranchId(initBranchId);
       setUserId(employee.userId || '');
       setUserName(employee.userName || '');
+      setUserPassword('');
       setNote(employee.note || '');
 
       setBankAccountNumber(employee.bankAccountNumber || '');
@@ -224,6 +225,7 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
       setWorkingBranchId(branches[0]?.id || '');
       setUserId('');
       setUserName('');
+      setUserPassword('');
       setNote('');
 
       setBankAccountNumber('');
@@ -756,13 +758,18 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
       ? JSON.stringify(faceImageUrls)
       : (effectiveAvatar ? JSON.stringify([effectiveAvatar]) : undefined);
 
-    const normalizedPhone = phone.trim().replace(/^\+84/, '0');
+    const normalizedPhone = phone
+      .trim()
+      .replace(/[\s.\-]/g, '')
+      .replace(/^\+84/, '0')
+      .replace(/^84(?=[0-9]{9}$)/, '0');
+    const normalizedCitizenId = citizenId.trim().replace(/\s+/g, '');
 
     const payload = mapFormToCreatePayload(
       {
         employeeCode: !employee ? employeeCode : undefined,
         fullName: fullName.replace(/\s+/g, ' ').trim(),
-        citizenId,
+        citizenId: normalizedCitizenId,
         phone: normalizedPhone,
         email,
         address,

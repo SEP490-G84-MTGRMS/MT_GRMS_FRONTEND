@@ -1,9 +1,10 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Settings, Sliders, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
 import type { Branch } from '../../types';
 import { MOCK_BRANCHES } from '../../services/mockData';
 import { AttendanceConfigModal } from '../shift-config/AttendanceConfigModal';
 import { payslipApi, extractErrorMessage } from '../../api/payslipApi';
+import { scheduleApi } from '../../api/scheduleApi';
 
 interface CreatePayslipModalProps {
   isOpen: boolean;
@@ -55,6 +56,30 @@ export const CreatePayslipModal: React.FC<CreatePayslipModalProps> = ({
     setSubmitError(null);
 
     try {
+      const [year, month] = periodMonth.trim().split('-').map(Number);
+      const fromDate = `${year}-${String(month).padStart(2, '0')}-01`;
+      const lastDay = new Date(year, month, 0).getDate();
+      const toDate = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+
+      const schedulesInMonth = await scheduleApi.getRawSchedules({
+        branchId: branchId !== 'ALL' ? branchId : undefined,
+        fromDate,
+        toDate,
+        pageSize: 1000,
+      });
+
+      const validSchedules = schedulesInMonth.filter(
+        (s) => (s.status || '').toLowerCase() !== 'cancelled' || (s.approvalType || '').toUpperCase() === 'UNPAID_LEAVE'
+      );
+
+      if (validSchedules.length === 0) {
+        setSubmitError(
+          `Không có nhân viên nào có ca làm việc trong kỳ ${String(month).padStart(2, '0')}/${year}. Chỉ nhân viên có ca làm việc trong tháng mới được khởi tạo bảng lương.`
+        );
+        setIsSubmitting(false);
+        return;
+      }
+
       let typeFilterNum: number | undefined = undefined;
       if (salaryTypeFilter === 'MONTHLY') typeFilterNum = 1;
       else if (salaryTypeFilter === 'HOURLY') typeFilterNum = 2;

@@ -3,7 +3,6 @@ import type { ApiResponse } from '../../../api/types';
 import type {
   CreateScheduleApprovalRequestDto,
   ReviewScheduleApprovalRequestDto,
-  PeerConfirmShiftSwapDto,
   ScheduleApprovalRequestDto,
   PendingApprovalRequestsResponse,
   ScheduleRequestType,
@@ -85,14 +84,6 @@ export const scheduleApprovalApi = {
       params,
     });
     return res.data.data ?? { total: 0, items: [] };
-  },
-
-  /**
-   * Đồng nghiệp xác nhận hoặc từ chối đổi ca
-   */
-  peerConfirmShiftSwap: async (requestId: string, data: PeerConfirmShiftSwapDto): Promise<boolean> => {
-    const res = await httpClient.post<ApiResponse<boolean>>(`/schedule-approval-requests/${requestId}/peer-confirm`, data);
-    return res.data.data ?? false;
   },
 
   /**

@@ -149,9 +149,7 @@ export const CreateScheduleRequestModal: React.FC<CreateScheduleRequestModalProp
       const existingImages =
         editRequest.evidenceImageUrls && editRequest.evidenceImageUrls.length > 0
           ? editRequest.evidenceImageUrls
-          : editRequest.evidenceImageUrl
-            ? [editRequest.evidenceImageUrl]
-            : [];
+          : [];
       setEvidenceImageUrls(existingImages);
 
       const resolvedSchedule: ScheduleSelectionItem = schedule || {
@@ -478,7 +476,6 @@ export const CreateScheduleRequestModal: React.FC<CreateScheduleRequestModalProp
       const payload: CreateScheduleApprovalRequestDto = {
         requestType,
         reason: reason.trim(),
-        evidenceImageUrl: evidenceImageUrls.length > 0 ? evidenceImageUrls[0] : null,
         evidenceImageUrls: evidenceImageUrls.length > 0 ? evidenceImageUrls : null,
       };
 

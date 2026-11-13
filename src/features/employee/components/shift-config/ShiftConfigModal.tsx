@@ -57,8 +57,6 @@ export const ShiftConfigModal: React.FC<ShiftConfigModalProps> = ({
   const [shiftName, setShiftName] = useState('Tối');
   const [startTime, setStartTime] = useState('17:00');
   const [endTime, setEndTime] = useState('21:00');
-  const [checkInStart, setCheckInStart] = useState('14:00');
-  const [checkInEnd, setCheckInEnd] = useState('00:00');
   const [description, setDescription] = useState('');
   const [selectedBranchIds, setSelectedBranchIds] = useState<string[]>([]);
   const [isActive, setIsActive] = useState(true);
@@ -113,8 +111,6 @@ export const ShiftConfigModal: React.FC<ShiftConfigModalProps> = ({
       setShiftName(shiftToEdit.shiftName || '');
       setStartTime(formatTimeHHmm(shiftToEdit.startTime, '17:00'));
       setEndTime(formatTimeHHmm(shiftToEdit.endTime, '21:00'));
-      setCheckInStart(formatTimeHHmm(shiftToEdit.allowedCheckInStart, '14:00'));
-      setCheckInEnd(formatTimeHHmm(shiftToEdit.allowedCheckInEnd, '00:00'));
       setDescription(shiftToEdit.description || '');
       setIsActive(shiftToEdit.isActive ?? true);
 
@@ -132,8 +128,6 @@ export const ShiftConfigModal: React.FC<ShiftConfigModalProps> = ({
       setShiftName('');
       setStartTime('17:00');
       setEndTime('21:00');
-      setCheckInStart('14:00');
-      setCheckInEnd('00:00');
       setDescription('');
       setIsActive(true);
       if (branchId) {
@@ -154,20 +148,6 @@ export const ShiftConfigModal: React.FC<ShiftConfigModalProps> = ({
   const durationInfo = useMemo(() => {
     return calculateHoursText(startTime, endTime);
   }, [startTime, endTime]);
-
-  // Kiểm tra check-in có kéo dài sang ngày "hôm sau" hay không
-  const isNextDayCheckIn = (): boolean => {
-    try {
-      const [sh, sm] = checkInStart.split(':').map(Number);
-      const [eh, em] = checkInEnd.split(':').map(Number);
-      const [wsh] = startTime.split(':').map(Number);
-      if (eh * 60 + em <= sh * 60 + sm) return true;
-      if (eh * 60 + em < wsh * 60) return true;
-      return false;
-    } catch {
-      return false;
-    }
-  };
 
   // Toggle chi nhánh
   const handleToggleBranch = (bId: string) => {
@@ -191,22 +171,6 @@ export const ShiftConfigModal: React.FC<ShiftConfigModalProps> = ({
   const handleClearAllBranches = () => {
     setSelectedBranchIds([]);
     if (!touched.branches) markTouched('branches');
-  };
-
-  // Helper tính giờ check-in mặc định (-30p / +60p)
-  const calculateDefaultCheckIn = (timeStr: string, offsetMinutes: number): string => {
-    try {
-      const [h, m] = timeStr.split(':').map(Number);
-      if (isNaN(h) || isNaN(m)) return timeStr;
-      let total = h * 60 + m + offsetMinutes;
-      if (total < 0) total += 24 * 60;
-      total = total % (24 * 60);
-      const rh = Math.floor(total / 60);
-      const rm = total % 60;
-      return `${String(rh).padStart(2, '0')}:${String(rm).padStart(2, '0')}`;
-    } catch {
-      return timeStr;
-    }
   };
 
   // Helper kiểm tra trùng ca theo chi nhánh áp dụng
@@ -279,16 +243,6 @@ export const ShiftConfigModal: React.FC<ShiftConfigModalProps> = ({
     return null;
   }, [startTime, endTime, durationInfo.hours]);
 
-  const checkInError = useMemo(() => {
-    if (checkInStart && !/^([01]\d|2[0-3]):[0-5]\d$/.test(checkInStart)) {
-      return 'Khung giờ cho phép chấm công không hợp lệ.';
-    }
-    if (checkInEnd && !/^([01]\d|2[0-3]):[0-5]\d$/.test(checkInEnd)) {
-      return 'Khung giờ cho phép chấm công không hợp lệ.';
-    }
-    return null;
-  }, [checkInStart, checkInEnd]);
-
   const branchError = useMemo(() => {
     if (selectedBranchIds.length === 0) {
       return 'Vui lòng chọn ít nhất một chi nhánh áp dụng.';
@@ -321,10 +275,6 @@ export const ShiftConfigModal: React.FC<ShiftConfigModalProps> = ({
       setErrorMessage(timeError);
       return;
     }
-    if (checkInError) {
-      setErrorMessage(checkInError);
-      return;
-    }
     if (branchError) {
       setErrorMessage(branchError);
       return;
@@ -336,15 +286,11 @@ export const ShiftConfigModal: React.FC<ShiftConfigModalProps> = ({
 
     try {
       setSubmitting(true);
-      const isNextDay = isNextDayCheckIn();
+      const [sh, sm] = startTime.split(':').map(Number);
+      const [eh, em] = endTime.split(':').map(Number);
+      const isNextDay = (eh * 60 + em) < (sh * 60 + sm);
       const normalizedCode = shiftCode.trim() ? shiftCode.trim().toUpperCase() : undefined;
       const normalizedDesc = description.trim() ? description.trim() : undefined;
-      const finalCheckInStart = checkInStart.trim()
-        ? checkInStart.trim()
-        : calculateDefaultCheckIn(startTime, -30);
-      const finalCheckInEnd = checkInEnd.trim()
-        ? checkInEnd.trim()
-        : calculateDefaultCheckIn(startTime, 60);
 
       if (shiftToEdit) {
         const payload: UpdateShiftConfigPayload = {
@@ -353,8 +299,6 @@ export const ShiftConfigModal: React.FC<ShiftConfigModalProps> = ({
           startTime: startTime.length === 5 ? `${startTime}:00` : startTime,
           endTime: endTime.length === 5 ? `${endTime}:00` : endTime,
           durationHours: durationInfo.hours,
-          allowedCheckInStart: finalCheckInStart.length === 5 ? `${finalCheckInStart}:00` : finalCheckInStart,
-          allowedCheckInEnd: finalCheckInEnd.length === 5 ? `${finalCheckInEnd}:00` : finalCheckInEnd,
           isCheckInNextDay: isNextDay,
           branchIds: selectedBranchIds,
           branchId: selectedBranchIds[0],
@@ -369,8 +313,6 @@ export const ShiftConfigModal: React.FC<ShiftConfigModalProps> = ({
           startTime: startTime.length === 5 ? `${startTime}:00` : startTime,
           endTime: endTime.length === 5 ? `${endTime}:00` : endTime,
           durationHours: durationInfo.hours,
-          allowedCheckInStart: finalCheckInStart.length === 5 ? `${finalCheckInStart}:00` : finalCheckInStart,
-          allowedCheckInEnd: finalCheckInEnd.length === 5 ? `${finalCheckInEnd}:00` : finalCheckInEnd,
           isCheckInNextDay: isNextDay,
           branchIds: selectedBranchIds,
           branchId: selectedBranchIds[0],
@@ -657,96 +599,6 @@ export const ShiftConfigModal: React.FC<ShiftConfigModalProps> = ({
                   <div style={{ color: '#DC2626', fontSize: 12, marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
                     <span>•</span>
                     <span>{timeError}</span>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Hàng 4: Giờ cho phép chấm công ⓘ */}
-            <div style={{ display: 'grid', gridTemplateColumns: '170px 1fr', alignItems: 'flex-start', gap: 12 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 5, paddingTop: 8 }}>
-                <span style={{ fontSize: 14, fontWeight: 600, color: '#334155' }}>
-                  Giờ cho phép chấm công
-                </span>
-                <span title="Khoảng thời gian cho phép nhân viên điểm danh vào ca (mặc định trước ca 30p đến sau ca 60p)" style={{ cursor: 'pointer', display: 'flex' }}>
-                  <Info size={15} color="#94A3B8" />
-                </span>
-              </div>
-
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  {/* Check-in start */}
-                  <div style={{ position: 'relative', width: 205 }}>
-                    <input
-                      type="time"
-                      value={checkInStart}
-                      onChange={(e) => {
-                        setCheckInStart(e.target.value);
-                        if (!touched.checkIn) markTouched('checkIn');
-                      }}
-                      onBlur={() => markTouched('checkIn')}
-                      style={{
-                        width: '100%',
-                        height: 38,
-                        padding: '0 6px 0 10px',
-                        borderRadius: 8,
-                        border: `1px solid ${(touched.checkIn || hasSubmitted) && checkInError ? '#EF4444' : '#CBD5E1'}`,
-                        boxShadow: (touched.checkIn || hasSubmitted) && checkInError ? '0 0 0 2px rgba(239, 68, 68, 0.15)' : 'none',
-                        fontSize: 14,
-                        fontWeight: 500,
-                        color: '#1E293B',
-                        background: '#FFFFFF',
-                        outline: 'none',
-                      }}
-                    />
-                  </div>
-
-                  <span style={{ fontSize: 13, color: '#475569', fontWeight: 500 }}>Đến</span>
-
-                  {/* Check-in end */}
-                  <div style={{ position: 'relative', width: 205 }}>
-                    <input
-                      type="time"
-                      value={checkInEnd}
-                      onChange={(e) => {
-                        setCheckInEnd(e.target.value);
-                        if (!touched.checkIn) markTouched('checkIn');
-                      }}
-                      onBlur={() => markTouched('checkIn')}
-                      style={{
-                        width: '100%',
-                        height: 38,
-                        padding: '0 6px 0 10px',
-                        borderRadius: 8,
-                        border: `1px solid ${(touched.checkIn || hasSubmitted) && checkInError ? '#EF4444' : '#CBD5E1'}`,
-                        boxShadow: (touched.checkIn || hasSubmitted) && checkInError ? '0 0 0 2px rgba(239, 68, 68, 0.15)' : 'none',
-                        fontSize: 14,
-                        fontWeight: 500,
-                        color: '#1E293B',
-                        background: '#FFFFFF',
-                        outline: 'none',
-                      }}
-                    />
-                  </div>
-
-                  {/* Chữ 'hôm sau' khi kết thúc qua ngày hôm sau */}
-                  {isNextDayCheckIn() && (
-                    <span
-                      style={{
-                        fontSize: 13,
-                        fontWeight: 500,
-                        color: '#475569',
-                        marginLeft: 6,
-                      }}
-                    >
-                      hôm sau
-                    </span>
-                  )}
-                </div>
-                {(touched.checkIn || hasSubmitted) && checkInError && (
-                  <div style={{ color: '#DC2626', fontSize: 12, marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <span>•</span>
-                    <span>{checkInError}</span>
                   </div>
                 )}
               </div>

@@ -347,13 +347,6 @@ export const ScheduleRequestsHistoryModal: React.FC<ScheduleRequestsHistoryModal
                   </div>
 
                   {/* Thông tin chi tiết */}
-                  {r.targetEmployeeName && (
-                    <div style={{ fontSize: 12, color: '#334155' }}>
-                      <span style={{ color: '#64748B' }}>Đồng nghiệp đổi ca: </span>
-                      <b>{r.targetEmployeeName}</b> ({r.targetEmployeeCode})
-                    </div>
-                  )}
-
                   {r.requestedOvertimeMinutes && (
                     <div style={{ fontSize: 12, color: '#334155' }}>
                       <span style={{ color: '#64748B' }}>Làm thêm đề xuất: </span>
@@ -367,17 +360,14 @@ export const ScheduleRequestsHistoryModal: React.FC<ScheduleRequestsHistoryModal
                   )}
 
                   {/* Ảnh chứng cứ nếu có */}
-                  {((r.evidenceImageUrls && r.evidenceImageUrls.length > 0) || r.evidenceImageUrl) && (
+                  {r.evidenceImageUrls && r.evidenceImageUrls.length > 0 && (
                     <div style={{ marginTop: 4 }}>
                       <div style={{ fontSize: 11, color: '#64748B', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
                         <Paperclip size={12} color="#0F766E" />
-                        <span>Ảnh minh chứng ({r.evidenceImageUrls?.length || 1}):</span>
+                        <span>Ảnh minh chứng ({r.evidenceImageUrls.length}):</span>
                       </div>
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                        {(r.evidenceImageUrls && r.evidenceImageUrls.length > 0
-                          ? r.evidenceImageUrls
-                          : [r.evidenceImageUrl!]
-                        ).map((url, i) => (
+                        {r.evidenceImageUrls.map((url, i) => (
                           <a
                             key={i}
                             href={url}

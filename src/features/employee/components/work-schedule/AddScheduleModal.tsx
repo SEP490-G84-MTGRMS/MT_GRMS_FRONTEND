@@ -307,7 +307,7 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
             startTime: (c.startTime || '00:00').substring(0, 5),
             endTime: (c.endTime || '00:00').substring(0, 5),
             totalHours: c.durationHours,
-            checkInAllowance: `${(c.allowedCheckInStart || '00:00').substring(0, 5)} - ${(c.allowedCheckInEnd || '00:00').substring(0, 5)}`,
+            checkInAllowance: `${(c.startTime || '00:00').substring(0, 5)} - ${(c.endTime || '00:00').substring(0, 5)}`,
             color: getShiftColor(c.shiftName),
             status: c.isActive ? 'active' : 'inactive',
             branchId: c.branchId,
