@@ -135,6 +135,8 @@ export interface CreateSupplierReturnPayload {
   reasonNotes?: string;
   attachmentUrl?: string;
   submitImmediately?: boolean;
+  autoSubmit?: boolean;
+  resolutionType?: string;
   lines: {
     productId: string;
     goodsReceiptLineId?: string;

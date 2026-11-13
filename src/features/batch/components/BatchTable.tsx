@@ -157,7 +157,7 @@ export const BatchTable: FC<BatchTableProps> = ({
     }
   };
 
-  const tableMinWidth = 1600;
+  const tableMinWidth = 1500;
   const tableFitStyle: CSSProperties = {
     minWidth: tableMinWidth,
     width: '100%',
@@ -166,10 +166,9 @@ export const BatchTable: FC<BatchTableProps> = ({
 
   const tableColGroup = (
     <colgroup>
-      <col style={{ width: 120 }} />
+      <col style={{ width: 148 }} />
       <col style={{ width: 200 }} />
       <col style={{ width: 110 }} />
-      <col style={{ width: 100 }} />
       <col style={{ width: 80 }} />
       <col style={{ width: 130 }} />
       <col style={{ width: 160 }} />
@@ -281,7 +280,7 @@ export const BatchTable: FC<BatchTableProps> = ({
   );
 
   return (
-    <div className="so-list-table-card">
+    <div className="so-list-table-card so-list-table-card--wrap">
       <div
         ref={headerRef}
         className="so-list-table-head"
@@ -294,7 +293,6 @@ export const BatchTable: FC<BatchTableProps> = ({
               <SortTh field="sku" label="Mã SKU" />
               <SortTh field="productName" label="Tên sản phẩm" />
               <SortTh field="batchCode" label="Mã lô" />
-              <th style={thBaseStyle}>Ngành hàng</th>
               <th style={thBaseStyle}>Vị trí kệ</th>
               <th style={thBaseStyle}>Chi nhánh</th>
               <th style={thBaseStyle}>Nhà cung cấp</th>
@@ -322,7 +320,7 @@ export const BatchTable: FC<BatchTableProps> = ({
             {sortedBatches.length === 0 ? (
               <tr>
                 <td
-                  colSpan={15}
+                  colSpan={14}
                   style={{
                     padding: '48px 16px',
                     textAlign: 'center',
@@ -360,7 +358,7 @@ export const BatchTable: FC<BatchTableProps> = ({
               sortedBatches.map((row) => {
                 return (
                   <tr key={row.id} className="so-list-row">
-                    <td style={{ fontFamily: 'var(--font-mono, monospace)', fontSize: 12, color: '#334155' }}>
+                    <td style={{ fontFamily: 'var(--font-mono, monospace)', fontWeight: 600, color: '#334155' }}>
                       {row.sku}
                     </td>
 
@@ -396,8 +394,6 @@ export const BatchTable: FC<BatchTableProps> = ({
                       </span>
                     </td>
 
-                    <td style={{ color: '#475569', fontSize: 12 }}>{row.categoryName}</td>
-
                     <td>
                       <span
                         style={{
@@ -411,7 +407,7 @@ export const BatchTable: FC<BatchTableProps> = ({
                       </span>
                     </td>
 
-                    <td style={{ color: '#475569', fontSize: 12 }} title={row.branchName}>
+                    <td style={{ color: '#475569', fontSize: 12 }}>
                       {row.branchName}
                     </td>
 

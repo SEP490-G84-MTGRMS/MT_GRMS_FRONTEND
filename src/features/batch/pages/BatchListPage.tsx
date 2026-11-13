@@ -7,10 +7,12 @@ import {
   ArrowLeft,
   ClipboardCheck,
   ClipboardList,
+  AlertTriangle,
 } from 'lucide-react';
 import type {
   BatchItem,
   BatchFilterState,
+  BatchKpiSummary,
   BatchStatus,
   UserRole,
 } from '../types/batch.types';
@@ -19,6 +21,7 @@ import { BatchFilterBar } from '../components/BatchFilterBar';
 import { BatchTable } from '../components/BatchTable';
 import { BatchDetailDrawer } from '../components/BatchDetailDrawer';
 import { BatchDiscountModal } from '../components/BatchDiscountModal';
+import { BatchExpiryAlertModal } from '../components/BatchExpiryAlertModal';
 import { AdminToast, type ToastState } from '../../admin/components';
 import '../../purchase-order/purchase-order.css';
 
@@ -58,6 +61,8 @@ export const BatchListPage: FC<{ defaultRole?: UserRole }> = ({
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [discountBatch, setDiscountBatch] = useState<BatchItem | null>(null);
   const [isDiscountModalOpen, setIsDiscountModalOpen] = useState(false);
+  const [kpi, setKpi] = useState<BatchKpiSummary | null>(null);
+  const [isAlertOpen, setIsAlertOpen] = useState(false);
   const [toast, setToast] = useState<ToastState | null>(null);
 
   const stocktakeBasePath =
@@ -127,10 +132,12 @@ export const BatchListPage: FC<{ defaultRole?: UserRole }> = ({
       if (fetchId !== fetchIdRef.current) return;
       setBatches(result.items);
       setTotalCount(result.totalCount);
+      setKpi(result.kpiSummary);
     } catch (err: unknown) {
       if (fetchId !== fetchIdRef.current) return;
       setBatches([]);
       setTotalCount(0);
+      setKpi(null);
       const message =
         err instanceof Error ? err.message : 'Không thể tải danh sách lô hàng.';
       showToast(message, 'error');
@@ -252,6 +259,24 @@ export const BatchListPage: FC<{ defaultRole?: UserRole }> = ({
         <div className="so-list-header-actions">
           <button
             type="button"
+            className="po-btn po-btn-secondary"
+            onClick={() => setIsAlertOpen(true)}
+            style={
+              (kpi?.warningCount || 0) + (kpi?.criticalCount || 0) + (kpi?.expiredCount || 0) > 0
+                ? { borderColor: '#f59e0b', color: '#b45309', fontWeight: 800 }
+                : undefined
+            }
+          >
+            <AlertTriangle size={14} />
+            <span>
+              Cảnh báo HSD
+              {(kpi?.warningCount || 0) + (kpi?.criticalCount || 0) + (kpi?.expiredCount || 0) > 0
+                ? ` (${(kpi?.warningCount || 0) + (kpi?.criticalCount || 0) + (kpi?.expiredCount || 0)})`
+                : ''}
+            </span>
+          </button>
+          <button
+            type="button"
             className="po-btn po-btn-primary"
             style={{ backgroundColor: '#0f766e' }}
             onClick={() => handleCreateStocktake()}
@@ -337,6 +362,30 @@ export const BatchListPage: FC<{ defaultRole?: UserRole }> = ({
         batch={discountBatch}
         onClose={() => setIsDiscountModalOpen(false)}
         onApplyDiscount={handleApplyDiscount}
+      />
+
+      <BatchExpiryAlertModal
+        isOpen={isAlertOpen}
+        branchId={
+          role === 'employee' && employeeBranchId
+            ? employeeBranchId
+            : appliedFilters.branchId !== 'ALL'
+              ? appliedFilters.branchId
+              : ''
+        }
+        onClose={() => setIsAlertOpen(false)}
+        onCreated={(codes) => {
+          setIsAlertOpen(false);
+          showToast(
+            codes.length === 1
+              ? `Đã tạo phiếu trả hàng nháp ${codes[0]} — gửi Store Owner xem trên Phiếu trả NCC.`
+              : `Đã tạo ${codes.length} phiếu trả hàng nháp: ${codes.join(', ')}.`,
+            'success'
+          );
+          if (role !== 'employee') {
+            navigate('/store-owner/supplier-returns');
+          }
+        }}
       />
     </div>
   );
