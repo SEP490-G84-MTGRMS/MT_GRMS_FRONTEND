@@ -332,6 +332,14 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       : '';
 
   const trimmedBaseUnit = baseUnit.trim();
+  /** Đơn vị nhập = ProductUnit có isPurchaseUnit; không lấy từ baseUnit nếu đã chọn UOM khác. */
+  const purchaseUnitFromFlag = uomConversions.find((u) => Boolean(u.isPurchaseUnit));
+  const effectivePurchaseUnitName = (
+    purchaseUnitFromFlag?.unitName?.trim() ||
+    (isBaseUnitPurchaseUnit ? trimmedBaseUnit : '') ||
+    ''
+  ).trim();
+  const isPurchaseUnitKg = effectivePurchaseUnitName.toLowerCase() === 'kg';
   const baseUnitError =
     (touched.baseUnit || uomConversions.length > 0) && !trimmedBaseUnit
       ? 'Vui lòng nhập tên đơn vị cơ bản (Bắt buộc).'
@@ -406,16 +414,23 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   const handleSelectBaseUnitAsPurchaseUnit = () => {
     setIsBaseUnitPurchaseUnit(true);
     setUomConversions((prev) => prev.map((u) => ({ ...u, isPurchaseUnit: false })));
+    if (baseUnit.trim().toLowerCase() !== 'kg') {
+      setAllowRepack(false);
+    }
   };
 
   const handleSelectUomAsPurchaseUnit = (id: string) => {
     setIsBaseUnitPurchaseUnit(false);
+    const selected = uomConversions.find((u) => u.id === id);
     setUomConversions((prev) =>
       prev.map((u) => ({
         ...u,
         isPurchaseUnit: u.id === id,
       }))
     );
+    if ((selected?.unitName || '').trim().toLowerCase() !== 'kg') {
+      setAllowRepack(false);
+    }
   };
 
   const handleUpdateUom = (id: string, field: keyof UomConversion, value: any) => {
@@ -648,8 +663,8 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         sellingPrice,
         costPrice: userRole === 'StoreOwner' ? costPrice : productToEdit?.costPrice ?? 0,
         isFavorite,
-        hasBatches: hasBatches || allowRepack,
-        allowRepack,
+        hasBatches: hasBatches || (isPurchaseUnitKg && allowRepack),
+        allowRepack: isPurchaseUnitKg && allowRepack,
         eligibleForVatReduction,
         description: description.trim() || undefined,
         internalNote: internalNote.trim() || undefined,
@@ -1679,7 +1694,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                 </label>
               </div>
 
-              {baseUnit.trim().toLowerCase() === 'kg' && (
+              {isPurchaseUnitKg && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <input
                     id="product-allow-repack-checkbox"
@@ -1695,6 +1710,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                   <label
                     htmlFor="product-allow-repack-checkbox"
                     style={{ cursor: 'pointer', fontSize: 13, color: '#334155', fontWeight: 500, userSelect: 'none', margin: 0 }}
+                    title={`Đơn vị nhập: ${effectivePurchaseUnitName || '—'}`}
                   >
                     Cho chia khay / chế biến
                   </label>

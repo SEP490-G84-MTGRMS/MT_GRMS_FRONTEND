@@ -120,7 +120,7 @@ const EditSupplierProductForm: FC<EditSupplierProductFormProps> = ({
   const [isActive, setIsActive] = useState<boolean>(item.status === 'Active');
   const [errorMsg, setErrorMsg] = useState('');
   const [isSaving, setIsSaving] = useState(false);
-  const unitLabel = item.baseUoM || item.deliveryUoM || 'Cái';
+  const unitLabel = item.deliveryUoM || item.baseUoM || 'Cái';
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();

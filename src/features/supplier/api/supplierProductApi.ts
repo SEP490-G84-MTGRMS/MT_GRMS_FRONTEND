@@ -115,8 +115,9 @@ export const supplierProductApi = {
         sku: item.sku || '',
         name: item.productName || item.name || '',
         categoryName: item.categoryName || 'Chung',
-        deliveryUoM: item.baseUoM || item.deliveryUoM || 'Cái',
-        baseUoM: item.baseUoM || item.deliveryUoM || 'Cái',
+        // Đơn vị nhập = DeliveryUoM (lúc gán/purchase); không ưu tiên BaseUoM/tồn
+        deliveryUoM: item.deliveryUoM || item.baseUoM || 'Cái',
+        baseUoM: item.deliveryUoM || item.baseUoM || 'Cái',
         agreedPrice: Number(item.agreedWholesalePrice ?? item.agreedPrice ?? 0) || 0,
         costPrice: item.costPrice,
         effectivePrice: item.effectivePurchasePrice ?? item.effectivePrice,
@@ -150,17 +151,29 @@ export const supplierProductApi = {
     const raw = res.data.data;
     const list = Array.isArray(raw) ? raw : Array.isArray(raw.items) ? raw.items : [];
 
-    return list.map((p: any) => ({
-      id: p.id,
-      sku: p.sku || p.productCode || '',
-      barcode: p.barcode || '',
-      name: p.productName || p.name || '',
-      categoryName: p.categoryName || 'Chung',
-      baseUoM: p.unitName || p.baseUnit || 'Cái',
-      defaultWholesalePrice: p.costPrice || p.basePrice || 0,
-      defaultMoq: 1,
-      imageUrl: p.imageUrl || (Array.isArray(p.imageUrls) ? p.imageUrls[0] : undefined) || undefined,
-    }));
+    return list.map((p: any) => {
+      // ĐVT nhập = ProductUnit.IsPurchaseUnit (API: purchaseUnit), không dùng baseUnit/tồn
+      const purchaseUom =
+        (typeof p.purchaseUnit === 'string' && p.purchaseUnit.trim()) ||
+        (typeof p.PurchaseUnit === 'string' && p.PurchaseUnit.trim()) ||
+        '';
+      const baseUom =
+        (typeof p.baseUnit === 'string' && p.baseUnit.trim()) ||
+        (typeof p.unitName === 'string' && p.unitName.trim()) ||
+        'Cái';
+
+      return {
+        id: p.id,
+        sku: p.sku || p.productCode || '',
+        barcode: p.barcode || '',
+        name: p.productName || p.name || '',
+        categoryName: p.categoryName || 'Chung',
+        baseUoM: purchaseUom || baseUom,
+        defaultWholesalePrice: p.costPrice || p.basePrice || 0,
+        defaultMoq: 1,
+        imageUrl: p.imageUrl || (Array.isArray(p.imageUrls) ? p.imageUrls[0] : undefined) || undefined,
+      };
+    });
   },
 
   /**
@@ -342,4 +355,93 @@ export const supplierProductApi = {
     const assigned = await supplierProductApi.getSupplierAssignedProducts(supplierId);
     return assigned.map((x) => x.productId);
   },
+
+  /**
+   * Xuất Excel SP đã gán NCC (giá nhập sỉ + MOQ template).
+   */
+  async exportPriceMoqExcel(supplierId: string): Promise<void> {
+    try {
+      const res = await httpClient.get(`/suppliers/${supplierId}/products/export`, {
+        responseType: 'blob',
+      });
+      const contentType = String(res.headers?.['content-type'] || '');
+      if (contentType.includes('application/json')) {
+        const text = await (res.data as Blob).text();
+        const parsed = JSON.parse(text);
+        throw new Error(parsed?.message || 'Không thể xuất Excel.');
+      }
+
+      const blob = new Blob([res.data], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      });
+      const disposition = String(res.headers?.['content-disposition'] || '');
+      const match = /filename\*?=(?:UTF-8''|")?([^";]+)/i.exec(disposition);
+      const fileName = match
+        ? decodeURIComponent(match[1].replace(/"/g, ''))
+        : `NCC_GiaNhap_MOQ_${supplierId}.xlsx`;
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      if (err?.response?.data instanceof Blob) {
+        try {
+          const text = await err.response.data.text();
+          const parsed = JSON.parse(text);
+          throw new Error(parsed?.message || err.message || 'Không thể xuất Excel.');
+        } catch (inner: any) {
+          if (inner?.message) throw inner;
+        }
+      }
+      throw new Error(err?.response?.data?.message || err?.message || 'Không thể xuất Excel.');
+    }
+  },
+
+  /**
+   * Import Excel — BE validate + override giá nhập sỉ & MOQ.
+   */
+  async importPriceMoqExcel(
+    supplierId: string,
+    file: File
+  ): Promise<SupplierProductExcelImportResult> {
+    const form = new FormData();
+    form.append('file', file);
+    const res = await httpClient.post<ApiResponse<SupplierProductExcelImportResult>>(
+      `/suppliers/${supplierId}/products/import`,
+      form
+    );
+    if (res.data?.success && res.data.data) {
+      return res.data.data;
+    }
+    throw new Error(res.data?.message || 'Import Excel thất bại.');
+  },
 };
+
+export interface SupplierProductExcelImportRow {
+  row: number;
+  productId?: string;
+  sku: string;
+  productName: string;
+  agreedWholesalePrice?: number | null;
+  moq?: number | null;
+  status: 'OK' | 'ERROR' | string;
+  message: string;
+}
+
+export interface SupplierProductExcelImportResult {
+  fileName: string;
+  supplierId: string;
+  supplierCode: string;
+  supplierName: string;
+  summary: {
+    totalRows: number;
+    successCount: number;
+    failedCount: number;
+  };
+  rows: SupplierProductExcelImportRow[];
+}

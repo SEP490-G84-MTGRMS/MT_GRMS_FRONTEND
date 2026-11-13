@@ -133,10 +133,10 @@ export const SupplierProductTableRow: FC<SupplierProductTableRowProps> = ({
         </span>
       </td>
 
-      {/* 8. ĐVT */}
+      {/* 8. Đơn vị nhập */}
       <td style={{ padding: '10px 12px', textAlign: 'center', whiteSpace: 'nowrap' }}>
         <span style={{ fontSize: 12, fontWeight: 600, color: '#1e293b' }}>
-          {item.baseUoM || item.deliveryUoM}
+          {item.deliveryUoM || item.baseUoM}
         </span>
       </td>
 
@@ -179,7 +179,7 @@ export const SupplierProductTableRow: FC<SupplierProductTableRowProps> = ({
             color: '#475569',
           }}
         >
-          {item.moq} {item.baseUoM || item.deliveryUoM}
+          {item.moq} {item.deliveryUoM || item.baseUoM}
         </span>
       </td>
 
@@ -192,7 +192,7 @@ export const SupplierProductTableRow: FC<SupplierProductTableRowProps> = ({
             color: '#475569',
           }}
         >
-          {item.allowedShortageQty ?? 0} {item.baseUoM || item.deliveryUoM}
+          {item.allowedShortageQty ?? 0} {item.deliveryUoM || item.baseUoM}
         </span>
       </td>
 

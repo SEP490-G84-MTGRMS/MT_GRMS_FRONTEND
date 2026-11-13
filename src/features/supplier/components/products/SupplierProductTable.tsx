@@ -234,7 +234,7 @@ export const SupplierProductTable: FC<SupplierProductTableProps> = ({
               </th>
 
               <th style={{ ...thBaseStyle, textAlign: 'center' }}>
-                <span>ĐVT</span>
+                <span>Đơn vị nhập</span>
               </th>
 
               <th
