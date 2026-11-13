@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Settings, Sliders, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
-import type { Branch } from '../types';
-import { MOCK_BRANCHES } from '../services/mockData';
-import { AttendanceConfigModal } from './AttendanceConfigModal';
-import { payslipApi, extractErrorMessage } from '../api/payslipApi';
+import type { Branch } from '../../types';
+import { MOCK_BRANCHES } from '../../services/mockData';
+import { AttendanceConfigModal } from '../shift-config/AttendanceConfigModal';
+import { payslipApi, extractErrorMessage } from '../../api/payslipApi';
+import { scheduleApi } from '../../api/scheduleApi';
+import { getVietnamCurrentMonthIso } from '../../lib/vietnamTime';
 
 interface CreatePayslipModalProps {
   isOpen: boolean;
@@ -22,7 +24,7 @@ export const CreatePayslipModal: React.FC<CreatePayslipModalProps> = ({
   onCalculationSuccess,
   onCreateSuccess,
 }) => {
-  const [periodMonth, setPeriodMonth] = useState(initialPeriodMonth || '2026-11');
+  const [periodMonth, setPeriodMonth] = useState(() => initialPeriodMonth || getVietnamCurrentMonthIso());
   const [branchId, setBranchId] = useState('ALL');
   const [salaryTypeFilter, setSalaryTypeFilter] = useState<'ALL' | 'MONTHLY' | 'SHIFT' | 'HOURLY'>('ALL');
   const [standardDayHours, setStandardDayHours] = useState(8.0);
@@ -43,10 +45,42 @@ export const CreatePayslipModal: React.FC<CreatePayslipModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!periodMonth || !/^\d{4}-(0[1-9]|1[0-2])$/.test(periodMonth.trim())) {
+      setSubmitError('Kỳ tính lương phải có định dạng yyyy-MM (Ví dụ: 2026-11).');
+      return;
+    }
+    if (batchNote.length > 500) {
+      setSubmitError('Ghi chú không được vượt quá 500 ký tự.');
+      return;
+    }
     setIsSubmitting(true);
     setSubmitError(null);
 
     try {
+      const [year, month] = periodMonth.trim().split('-').map(Number);
+      const fromDate = `${year}-${String(month).padStart(2, '0')}-01`;
+      const lastDay = new Date(year, month, 0).getDate();
+      const toDate = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+
+      const schedulesInMonth = await scheduleApi.getRawSchedules({
+        branchId: branchId !== 'ALL' ? branchId : undefined,
+        fromDate,
+        toDate,
+        pageSize: 1000,
+      });
+
+      const validSchedules = schedulesInMonth.filter(
+        (s) => (s.status || '').toLowerCase() !== 'cancelled' || (s.approvalType || '').toUpperCase() === 'UNPAID_LEAVE'
+      );
+
+      if (validSchedules.length === 0) {
+        setSubmitError(
+          `Không có nhân viên nào có ca làm việc trong kỳ ${String(month).padStart(2, '0')}/${year}. Chỉ nhân viên có ca làm việc trong tháng mới được khởi tạo bảng lương.`
+        );
+        setIsSubmitting(false);
+        return;
+      }
+
       let typeFilterNum: number | undefined = undefined;
       if (salaryTypeFilter === 'MONTHLY') typeFilterNum = 1;
       else if (salaryTypeFilter === 'HOURLY') typeFilterNum = 2;
@@ -278,13 +312,20 @@ export const CreatePayslipModal: React.FC<CreatePayslipModalProps> = ({
 
             {/* Ghi chú chung đợt tính lương */}
             <div className="emp-form-group" style={{ marginTop: 8 }}>
-              <label className="emp-form-label">Ghi chú đợt khởi tạo bảng lương</label>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                <label className="emp-form-label" style={{ marginBottom: 0 }}>Ghi chú đợt khởi tạo bảng lương</label>
+                <span style={{ fontSize: 11, color: batchNote.length > 500 ? '#EF4444' : '#94A3B8' }}>
+                  {batchNote.length}/500
+                </span>
+              </div>
               <input
                 type="text"
                 className="emp-form-input"
+                maxLength={500}
                 placeholder="Ví dụ: Bảng lương tháng 11/2026 - Quyết toán kỳ chuẩn"
                 value={batchNote}
                 onChange={(e) => setBatchNote(e.target.value)}
+                style={{ borderColor: batchNote.length > 500 ? '#EF4444' : undefined }}
               />
             </div>
           </div>

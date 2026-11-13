@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { X, Loader2 } from 'lucide-react';
-import { scheduleApi } from '../api/scheduleApi';
+import { scheduleApi } from '../../api/scheduleApi';
+import { getVietnamToday } from '../../lib/vietnamTime';
 
 export type ScopeActionType = 'update' | 'delete';
-export type ScheduleScopeType = 'single' | 'following' | 'all';
+export type ScheduleScopeType = 'single' | 'following' | 'all' | 'entire';
 
 export interface ScheduleScopeDateRange {
   fromDate?: string;     // YYYY-MM-DD
@@ -29,7 +30,7 @@ interface ScheduleScopeConfirmModalProps {
 }
 
 const parseDate = (str?: string): Date => {
-  if (!str) return new Date();
+  if (!str) return getVietnamToday();
   if (str.includes('T')) {
     const d = new Date(str);
     if (!isNaN(d.getTime())) return d;
@@ -44,10 +45,10 @@ const parseDate = (str?: string): Date => {
     const parts = str.split('/');
     const d = parseInt(parts[0], 10);
     const m = parseInt(parts[1], 10) - 1;
-    const y = parts.length >= 3 ? parseInt(parts[2], 10) : new Date().getFullYear();
+    const y = parts.length >= 3 ? parseInt(parts[2], 10) : getVietnamToday().getFullYear();
     return new Date(y, m, d);
   }
-  return new Date();
+  return getVietnamToday();
 };
 
 const formatDateStr = (d: Date): string => {
@@ -210,6 +211,13 @@ export const ScheduleScopeConfirmModal: React.FC<ScheduleScopeConfirmModalProps>
         fromDateStr: tomorrowFormatted,
         toDateStr: endOfCurrentMonthFormatted,
       };
+    } else if (selectedScope === 'entire') {
+      dateRange = {
+        fromDate: undefined,
+        toDate: undefined,
+        fromDateStr: 'Toàn bộ',
+        toDateStr: 'Toàn bộ',
+      };
     } else {
       dateRange = {
         fromDate: formatIsoStr(effectiveStart),
@@ -299,8 +307,14 @@ export const ScheduleScopeConfirmModal: React.FC<ScheduleScopeConfirmModalProps>
             {
               scope: 'all' as const,
               title: actionType === 'delete'
-                ? `Xóa tất cả các ngày. Hết tháng cuối cùng được phân ca (${effectiveStartFormatted} - ${endOfLastMonthFormatted})`
+                ? `Xóa tất cả các tuần theo lịch này (${effectiveStartFormatted} - ${endOfLastMonthFormatted})`
                 : `Tất cả các ngày. Hết tháng cuối cùng được phân ca (${effectiveStartFormatted} - ${endOfLastMonthFormatted})`,
+            },
+            {
+              scope: 'entire' as const,
+              title: actionType === 'delete'
+                ? 'Xóa toàn bộ ca của nhân viên (trừ các ca đã chấm công / nghỉ phép)'
+                : 'Toàn bộ ca làm việc của nhân viên (trừ ca đã chấm công / nghỉ phép)',
             },
           ].map((item) => {
             const isSelected = selectedScope === item.scope;
@@ -361,10 +375,19 @@ export const ScheduleScopeConfirmModal: React.FC<ScheduleScopeConfirmModalProps>
         </div>
 
         {/* Lưu ý */}
-        <div style={{ marginTop: 20, marginBottom: 24, fontSize: 14, color: '#334155', lineHeight: 1.5 }}>
-          <strong>Lưu ý:</strong> Chỉ áp dụng thay đổi trên các Chi tiết ca làm việc chưa chấm công
-          {selectedDays && selectedDays.length > 0 && (
-            <span> thuộc các thứ được chọn (<strong>{selectedDays.join(', ')}</strong>)</span>
+        <div style={{ marginTop: 20, marginBottom: 24, fontSize: 13.5, color: '#334155', lineHeight: 1.5, background: '#F8FAFC', padding: '10px 14px', borderRadius: 6, border: '1px solid #E2E8F0' }}>
+          <strong>Lưu ý:</strong>{' '}
+          {selectedScope === 'entire' ? (
+            <span>
+              Hệ thống sẽ quét toàn bộ lịch làm việc của nhân viên này và <strong>chỉ xóa các ca chưa có dữ liệu chấm công và không phải ca nghỉ phép</strong>. Các ca đã check-in, check-out, đã hoàn thành hoặc nghỉ phép (có lương / không lương) sẽ được giữ nguyên 100%.
+            </span>
+          ) : (
+            <span>
+              Chỉ áp dụng thay đổi trên các Chi tiết ca làm việc chưa chấm công và không phải ca nghỉ phép (có lương / không lương)
+              {selectedDays && selectedDays.length > 0 && (
+                <span> thuộc các thứ được chọn (<strong>{selectedDays.join(', ')}</strong>)</span>
+              )}
+            </span>
           )}
         </div>
 

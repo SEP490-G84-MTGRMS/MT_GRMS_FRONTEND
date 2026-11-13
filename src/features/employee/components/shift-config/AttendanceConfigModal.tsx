@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { X, Info, Plus, Trash2, Settings, Building2, Copy, Check, RotateCw, AlertTriangle } from 'lucide-react';
-import type { Branch } from '../types';
+import type { Branch } from '../../types';
 import {
   attendancePolicyApi,
   type WorkHourConversionRule,
   type UpsertAttendancePolicyPayload,
-} from '../api/attendancePolicyApi';
+} from '../../api/attendancePolicyApi';
 
 export type { WorkHourConversionRule };
 
@@ -79,9 +79,18 @@ export const AttendanceConfigModal: React.FC<AttendanceConfigModalProps> = ({
   const [isCopying, setIsCopying] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  // Validation state (theo chuẩn pattern EmployeeFormModal)
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const [hasSubmitted, setHasSubmitted] = useState(false);
+
+  const markTouched = (field: string) => {
+    setTouched((prev) => ({ ...prev, [field]: true }));
+  };
+
   // Modal sao chép sang chi nhánh khác
   const [showCopyModal, setShowCopyModal] = useState(false);
   const [targetBranchIds, setTargetBranchIds] = useState<string[]>([]);
+  const [copySearch, setCopySearch] = useState('');
   const [copyFeedback, setCopyFeedback] = useState<string | null>(null);
 
   // Tải cấu hình chính sách từ Backend
@@ -115,6 +124,8 @@ export const AttendanceConfigModal: React.FC<AttendanceConfigModalProps> = ({
       });
       setRules(parsedRules);
       setIsCustomized(Boolean(dto.isCustomized));
+      setTouched({});
+      setHasSubmitted(false);
     } catch (err: any) {
       console.error('Lỗi tải cấu hình chấm công chi nhánh:', err);
       setErrorMessage(
@@ -137,9 +148,102 @@ export const AttendanceConfigModal: React.FC<AttendanceConfigModalProps> = ({
       setShowCopyModal(false);
       setCopyFeedback(null);
       setErrorMessage(null);
+      setTouched({});
+      setHasSubmitted(false);
       fetchBranchPolicy(defaultBranchId);
     }
   }, [isOpen, initialBranchId, branches, fetchBranchPolicy]);
+
+  // Realtime Inline Errors (chuẩn hóa theo Prompt_Validate_Input_NhanVien.md)
+  const branchError = useMemo(() => {
+    if (!selectedBranchId) {
+      return 'Chi nhánh không được để trống.';
+    }
+    return null;
+  }, [selectedBranchId]);
+
+  const standardDayHoursError = useMemo(() => {
+    const val = currentConfig.standardDayHours;
+    if (val === undefined || val === null || isNaN(val) || val <= 0 || val > 24) {
+      return 'Số giờ chuẩn của 1 ngày công phải lớn hơn 0 và không vượt quá 24 giờ.';
+    }
+    return null;
+  }, [currentConfig.standardDayHours]);
+
+  const lateThresholdError = useMemo(() => {
+    if (!currentConfig.enableLateThreshold) return null;
+    const val = currentConfig.lateThresholdMinutes;
+    if (val === undefined || val === null || isNaN(val) || val < 0 || val > 240) {
+      return 'Số phút đi muộn tối đa không được âm và không vượt quá 240 phút (4 giờ).';
+    }
+    return null;
+  }, [currentConfig.enableLateThreshold, currentConfig.lateThresholdMinutes]);
+
+  const earlyLeaveThresholdError = useMemo(() => {
+    if (!currentConfig.enableEarlyLeaveThreshold) return null;
+    const val = currentConfig.earlyLeaveThresholdMinutes;
+    if (val === undefined || val === null || isNaN(val) || val < 0 || val > 240) {
+      return 'Số phút về sớm tối đa không được âm và không vượt quá 240 phút (4 giờ).';
+    }
+    return null;
+  }, [currentConfig.enableEarlyLeaveThreshold, currentConfig.earlyLeaveThresholdMinutes]);
+
+  // Helper kiểm tra lỗi chi tiết từng rule quy đổi giờ sang công
+  const getRuleErrors = useCallback((r: WorkHourConversionRule) => {
+    const fromH = r.fromHours ?? 0;
+    const fromM = r.fromMinutes ?? 0;
+    const isFromInvalid = isNaN(fromH) || fromH < 0 || fromH > 24 || isNaN(fromM) || fromM < 0 || fromM > 59;
+    const isWorkUnitsInvalid = isNaN(r.workUnits) || r.workUnits <= 0 || r.workUnits > 5;
+    let isToInvalid = false;
+    let isRangeOrderInvalid = false;
+
+    if (r.type === 'range') {
+      const toH = r.toHours ?? 0;
+      const toM = r.toMinutes ?? 0;
+      isToInvalid = isNaN(toH) || toH < 0 || toH > 24 || isNaN(toM) || toM < 0 || toM > 59;
+      if (!isFromInvalid && !isToInvalid && toH * 60 + toM <= fromH * 60 + fromM) {
+        isRangeOrderInvalid = true;
+      }
+    }
+
+    return {
+      isFromInvalid,
+      isToInvalid,
+      isRangeOrderInvalid,
+      isWorkUnitsInvalid,
+      hasError: isFromInvalid || isToInvalid || isRangeOrderInvalid || isWorkUnitsInvalid,
+    };
+  }, []);
+
+  const rulesError = useMemo(() => {
+    if (!currentConfig.isConvertHoursToDays) return null;
+    if (!rules || rules.length === 0) {
+      return 'Vui lòng thêm ít nhất một quy tắc quy đổi giờ làm thành ngày công.';
+    }
+    for (let i = 0; i < rules.length; i++) {
+      const r = rules[i];
+      const err = getRuleErrors(r);
+      if (err.isWorkUnitsInvalid || err.isRangeOrderInvalid) {
+        return 'Quy tắc quy đổi công không hợp lệ: mốc giờ kết thúc phải lớn hơn mốc giờ bắt đầu và số công phải lớn hơn 0.';
+      }
+      if (err.isFromInvalid) {
+        return `Mốc giờ/phút bắt đầu trong quy tắc quy đổi công không hợp lệ (Dòng ${i + 1}).`;
+      }
+      if (err.isToInvalid) {
+        return `Mốc giờ/phút kết thúc trong quy tắc quy đổi công không hợp lệ (Dòng ${i + 1}).`;
+      }
+    }
+    return null;
+  }, [currentConfig.isConvertHoursToDays, rules, getRuleErrors]);
+
+  const validatePolicyConfig = (): string | null => {
+    if (branchError) return branchError;
+    if (standardDayHoursError) return standardDayHoursError;
+    if (lateThresholdError) return lateThresholdError;
+    if (earlyLeaveThresholdError) return earlyLeaveThresholdError;
+    if (rulesError) return rulesError;
+    return null;
+  };
 
   if (!isOpen) return null;
 
@@ -159,14 +263,17 @@ export const AttendanceConfigModal: React.FC<AttendanceConfigModalProps> = ({
       workUnitsLabel: '1.5 công',
     };
     setRules((prev) => [...prev, newRule]);
+    if (!touched.rules) markTouched('rules');
   };
 
   const handleRemoveRule = (id: string) => {
     setRules((prev) => prev.filter((r) => r.id !== id));
+    if (!touched.rules) markTouched('rules');
   };
 
   const handleUpdateRule = (id: string, updates: Partial<WorkHourConversionRule>) => {
     setRules((prev) => prev.map((r) => (r.id === id ? { ...r, ...updates } : r)));
+    if (!touched.rules) markTouched('rules');
   };
 
   // Mở modal sao chép
@@ -174,13 +281,31 @@ export const AttendanceConfigModal: React.FC<AttendanceConfigModalProps> = ({
     // Mặc định chọn tất cả chi nhánh khác chi nhánh hiện tại
     const otherBranchIds = branches.filter((b) => b.id !== selectedBranchId).map((b) => b.id);
     setTargetBranchIds(otherBranchIds);
+    setCopySearch('');
     setCopyFeedback(null);
     setShowCopyModal(true);
   };
 
   // Xác nhận sao chép sang các chi nhánh được chọn
   const handleConfirmCopy = async () => {
-    if (!selectedBranchId || targetBranchIds.length === 0) return;
+    if (!selectedBranchId) {
+      setCopyFeedback('Chi nhánh nguồn không được để trống.');
+      return;
+    }
+    if (targetBranchIds.length === 0) {
+      setCopyFeedback('Vui lòng chọn ít nhất một chi nhánh đích để sao chép.');
+      return;
+    }
+    if (targetBranchIds.includes(selectedBranchId)) {
+      setCopyFeedback('Danh sách chi nhánh đích không được chứa chi nhánh nguồn.');
+      return;
+    }
+
+    const validationErr = validatePolicyConfig();
+    if (validationErr) {
+      setCopyFeedback(validationErr);
+      return;
+    }
 
     try {
       setIsCopying(true);
@@ -220,7 +345,14 @@ export const AttendanceConfigModal: React.FC<AttendanceConfigModalProps> = ({
   // Lưu toàn bộ cài đặt cho chi nhánh đang chọn
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedBranchId) return;
+    setHasSubmitted(true);
+    setErrorMessage(null);
+
+    const validationErr = validatePolicyConfig();
+    if (validationErr) {
+      setErrorMessage(validationErr);
+      return;
+    }
 
     try {
       setIsSubmitting(true);
@@ -485,54 +617,65 @@ export const AttendanceConfigModal: React.FC<AttendanceConfigModalProps> = ({
               </div>
 
               {/* Dòng 1: Số giờ của 1 ngày công chuẩn */}
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 10,
-                  fontSize: 13.5,
-                  color: '#334155',
-                  marginBottom: 16,
-                }}
-              >
-                <span>Số giờ của 1 ngày công chuẩn là</span>
-                <input
-                  type="number"
-                  min={1}
-                  max={24}
-                  step={0.5}
-                  value={currentConfig.standardDayHours}
-                  onChange={(e) =>
-                    setCurrentConfig((prev) => ({
-                      ...prev,
-                      standardDayHours: Number(e.target.value) || 8,
-                    }))
-                  }
+              <div style={{ marginBottom: 16 }}>
+                <div
                   style={{
-                    width: 70,
-                    height: 34,
-                    textAlign: 'center',
-                    border: '1px solid #CBD5E1',
-                    borderRadius: 6,
-                    fontSize: 13.5,
-                    fontWeight: 600,
-                    color: '#0F172A',
-                    outline: 'none',
-                    background: '#FFFFFF',
-                  }}
-                />
-                <span>giờ</span>
-                <span
-                  title="Số giờ làm việc tiêu chuẩn tương ứng với 1 ngày công hoàn chỉnh (thường là 8 giờ)."
-                  style={{
-                    cursor: 'help',
-                    display: 'inline-flex',
+                    display: 'flex',
                     alignItems: 'center',
-                    color: '#94A3B8',
+                    gap: 10,
+                    fontSize: 13.5,
+                    color: '#334155',
                   }}
                 >
-                  <Info size={15} />
-                </span>
+                  <span>Số giờ của 1 ngày công chuẩn là</span>
+                  <input
+                    type="number"
+                    min={0.5}
+                    max={24}
+                    step={0.5}
+                    value={currentConfig.standardDayHours}
+                    onChange={(e) => {
+                      const val = parseFloat(e.target.value);
+                      setCurrentConfig((prev) => ({
+                        ...prev,
+                        standardDayHours: isNaN(val) ? ('' as any) : val,
+                      }));
+                      if (!touched.standardDayHours) markTouched('standardDayHours');
+                    }}
+                    onBlur={() => markTouched('standardDayHours')}
+                    style={{
+                      width: 70,
+                      height: 34,
+                      textAlign: 'center',
+                      border: `1px solid ${(touched.standardDayHours || hasSubmitted) && standardDayHoursError ? '#EF4444' : '#CBD5E1'}`,
+                      boxShadow: (touched.standardDayHours || hasSubmitted) && standardDayHoursError ? '0 0 0 2px rgba(239, 68, 68, 0.15)' : 'none',
+                      borderRadius: 6,
+                      fontSize: 13.5,
+                      fontWeight: 600,
+                      color: '#0F172A',
+                      outline: 'none',
+                      background: '#FFFFFF',
+                    }}
+                  />
+                  <span>giờ</span>
+                  <span
+                    title="Số giờ làm việc tiêu chuẩn tương ứng với 1 ngày công hoàn chỉnh (thường là 8 giờ)."
+                    style={{
+                      cursor: 'help',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      color: '#94A3B8',
+                    }}
+                  >
+                    <Info size={15} />
+                  </span>
+                </div>
+                {(touched.standardDayHours || hasSubmitted) && standardDayHoursError && (
+                  <div style={{ color: '#DC2626', fontSize: 12, marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <span>•</span>
+                    <span>{standardDayHoursError}</span>
+                  </div>
+                )}
               </div>
 
               {/* Dòng 2: Checkbox Quy đổi số giờ làm thành số ngày công */}
@@ -582,137 +725,171 @@ export const AttendanceConfigModal: React.FC<AttendanceConfigModalProps> = ({
               {/* Danh sách các mức quy đổi khi bật checkbox */}
               {currentConfig.isConvertHoursToDays && (
                 <div style={{ paddingLeft: 24, display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  {rules.map((rule) => (
-                    <div
-                      key={rule.id}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 8,
-                        fontSize: 13,
-                        color: '#334155',
-                        flexWrap: 'wrap',
-                      }}
-                    >
-                      <span>Từ</span>
-                      <input
-                        type="number"
-                        min={0}
-                        max={24}
-                        value={rule.fromHours}
-                        onChange={(e) =>
-                          handleUpdateRule(rule.id, { fromHours: Number(e.target.value) || 0 })
-                        }
+                  {rules.map((rule) => {
+                    const ruleErrors = getRuleErrors(rule);
+                    const shouldShowRuleError = Boolean(touched.rules || hasSubmitted);
+
+                    return (
+                      <div
+                        key={rule.id}
                         style={{
-                          width: 55,
-                          height: 32,
-                          textAlign: 'center',
-                          border: '1px solid #CBD5E1',
-                          borderRadius: 6,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 8,
                           fontSize: 13,
-                          outline: 'none',
+                          color: '#334155',
+                          flexWrap: 'wrap',
                         }}
-                      />
-                      <span>giờ</span>
-
-                      {rule.fromMinutes !== undefined && (
-                        <>
-                          <input
-                            type="number"
-                            min={0}
-                            max={59}
-                            value={rule.fromMinutes}
-                            onChange={(e) =>
-                              handleUpdateRule(rule.id, {
-                                fromMinutes: Number(e.target.value) || 0,
-                              })
-                            }
-                            style={{
-                              width: 55,
-                              height: 32,
-                              textAlign: 'center',
-                              border: '1px solid #CBD5E1',
-                              borderRadius: 6,
-                              fontSize: 13,
-                              outline: 'none',
-                            }}
-                          />
-                          <span>phút</span>
-                        </>
-                      )}
-
-                      {rule.type === 'range' ? (
-                        <>
-                          <span style={{ marginLeft: 4 }}>đến dưới</span>
-                          <input
-                            type="number"
-                            min={0}
-                            max={24}
-                            value={rule.toHours ?? 4}
-                            onChange={(e) =>
-                              handleUpdateRule(rule.id, { toHours: Number(e.target.value) || 0 })
-                            }
-                            style={{
-                              width: 55,
-                              height: 32,
-                              textAlign: 'center',
-                              border: '1px solid #CBD5E1',
-                              borderRadius: 6,
-                              fontSize: 13,
-                              outline: 'none',
-                            }}
-                          />
-                          <span>giờ</span>
-                          <input
-                            type="number"
-                            min={0}
-                            max={59}
-                            value={rule.toMinutes ?? 30}
-                            onChange={(e) =>
-                              handleUpdateRule(rule.id, { toMinutes: Number(e.target.value) || 0 })
-                            }
-                            style={{
-                              width: 55,
-                              height: 32,
-                              textAlign: 'center',
-                              border: '1px solid #CBD5E1',
-                              borderRadius: 6,
-                              fontSize: 13,
-                              outline: 'none',
-                            }}
-                          />
-                          <span>phút</span>
-                        </>
-                      ) : (
-                        <span style={{ marginLeft: 4 }}>trở lên</span>
-                      )}
-
-                      <span style={{ margin: '0 4px', color: '#64748B' }}>:</span>
-                      <span style={{ fontWeight: 600, color: '#0F172A', minWidth: 100 }}>
-                        ghi nhận {rule.workUnitsLabel}
-                      </span>
-
-                      {rules.length > 2 && (
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveRule(rule.id)}
+                      >
+                        <span>Từ</span>
+                        <input
+                          type="number"
+                          min={0}
+                          max={24}
+                          value={rule.fromHours}
+                          onChange={(e) =>
+                            handleUpdateRule(rule.id, { fromHours: Number(e.target.value) || 0 })
+                          }
                           style={{
-                            border: 'none',
-                            background: 'transparent',
-                            color: '#EF4444',
-                            cursor: 'pointer',
-                            padding: 4,
-                            borderRadius: 4,
-                            display: 'inline-flex',
-                            alignItems: 'center',
+                            width: 55,
+                            height: 32,
+                            textAlign: 'center',
+                            border: `1px solid ${shouldShowRuleError && ruleErrors.isFromInvalid ? '#EF4444' : '#CBD5E1'}`,
+                            boxShadow: shouldShowRuleError && ruleErrors.isFromInvalid ? '0 0 0 2px rgba(239, 68, 68, 0.15)' : 'none',
+                            borderRadius: 6,
+                            fontSize: 13,
+                            outline: 'none',
                           }}
-                          title="Xóa mức quy đổi"
-                        >
-                          <Trash2 size={15} />
-                        </button>
-                      )}
-                    </div>
-                  ))}
+                        />
+                        <span>giờ</span>
+
+                        {rule.fromMinutes !== undefined && (
+                          <>
+                            <input
+                              type="number"
+                              min={0}
+                              max={59}
+                              value={rule.fromMinutes}
+                              onChange={(e) =>
+                                handleUpdateRule(rule.id, {
+                                  fromMinutes: Number(e.target.value) || 0,
+                                })
+                              }
+                              style={{
+                                width: 55,
+                                height: 32,
+                                textAlign: 'center',
+                                border: `1px solid ${shouldShowRuleError && ruleErrors.isFromInvalid ? '#EF4444' : '#CBD5E1'}`,
+                                boxShadow: shouldShowRuleError && ruleErrors.isFromInvalid ? '0 0 0 2px rgba(239, 68, 68, 0.15)' : 'none',
+                                borderRadius: 6,
+                                fontSize: 13,
+                                outline: 'none',
+                              }}
+                            />
+                            <span>phút</span>
+                          </>
+                        )}
+
+                        {rule.type === 'range' ? (
+                          <>
+                            <span style={{ marginLeft: 4 }}>đến dưới</span>
+                            <input
+                              type="number"
+                              min={0}
+                              max={24}
+                              value={rule.toHours ?? 4}
+                              onChange={(e) =>
+                                handleUpdateRule(rule.id, { toHours: Number(e.target.value) || 0 })
+                              }
+                              style={{
+                                width: 55,
+                                height: 32,
+                                textAlign: 'center',
+                                border: `1px solid ${shouldShowRuleError && (ruleErrors.isToInvalid || ruleErrors.isRangeOrderInvalid) ? '#EF4444' : '#CBD5E1'}`,
+                                boxShadow: shouldShowRuleError && (ruleErrors.isToInvalid || ruleErrors.isRangeOrderInvalid) ? '0 0 0 2px rgba(239, 68, 68, 0.15)' : 'none',
+                                borderRadius: 6,
+                                fontSize: 13,
+                                outline: 'none',
+                              }}
+                            />
+                            <span>giờ</span>
+                            <input
+                              type="number"
+                              min={0}
+                              max={59}
+                              value={rule.toMinutes ?? 30}
+                              onChange={(e) =>
+                                handleUpdateRule(rule.id, { toMinutes: Number(e.target.value) || 0 })
+                              }
+                              style={{
+                                width: 55,
+                                height: 32,
+                                textAlign: 'center',
+                                border: `1px solid ${shouldShowRuleError && (ruleErrors.isToInvalid || ruleErrors.isRangeOrderInvalid) ? '#EF4444' : '#CBD5E1'}`,
+                                boxShadow: shouldShowRuleError && (ruleErrors.isToInvalid || ruleErrors.isRangeOrderInvalid) ? '0 0 0 2px rgba(239, 68, 68, 0.15)' : 'none',
+                                borderRadius: 6,
+                                fontSize: 13,
+                                outline: 'none',
+                              }}
+                            />
+                            <span>phút</span>
+                          </>
+                        ) : (
+                          <span style={{ marginLeft: 4 }}>trở lên</span>
+                        )}
+
+                        <span style={{ margin: '0 4px', color: '#64748B' }}>:</span>
+                        <span style={{ color: '#334155' }}>ghi nhận</span>
+                        <input
+                          type="number"
+                          min={0.1}
+                          max={5}
+                          step={0.25}
+                          value={rule.workUnits}
+                          onChange={(e) => {
+                            const val = parseFloat(e.target.value);
+                            handleUpdateRule(rule.id, {
+                              workUnits: isNaN(val) ? ('' as any) : val,
+                              workUnitsLabel: isNaN(val) ? '' : `${val} công`,
+                            });
+                          }}
+                          style={{
+                            width: 60,
+                            height: 32,
+                            textAlign: 'center',
+                            border: `1px solid ${shouldShowRuleError && ruleErrors.isWorkUnitsInvalid ? '#EF4444' : '#CBD5E1'}`,
+                            boxShadow: shouldShowRuleError && ruleErrors.isWorkUnitsInvalid ? '0 0 0 2px rgba(239, 68, 68, 0.15)' : 'none',
+                            borderRadius: 6,
+                            fontSize: 13,
+                            fontWeight: 600,
+                            color: '#0F172A',
+                            outline: 'none',
+                          }}
+                        />
+                        <span style={{ fontWeight: 600, color: '#0F172A' }}>công</span>
+
+                        {rules.length > 2 && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveRule(rule.id)}
+                            style={{
+                              border: 'none',
+                              background: 'transparent',
+                              color: '#EF4444',
+                              cursor: 'pointer',
+                              padding: 4,
+                              borderRadius: 4,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                            }}
+                            title="Xóa mức quy đổi"
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
 
                   <div>
                     <button
@@ -740,6 +917,13 @@ export const AttendanceConfigModal: React.FC<AttendanceConfigModalProps> = ({
                       <span>Thêm mức quy đổi</span>
                     </button>
                   </div>
+
+                  {(touched.rules || hasSubmitted) && rulesError && (
+                    <div style={{ color: '#DC2626', fontSize: 12, marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <span>•</span>
+                      <span>{rulesError}</span>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -753,139 +937,165 @@ export const AttendanceConfigModal: React.FC<AttendanceConfigModalProps> = ({
                 Cài đặt thời gian tối đa được đi muộn hoặc về sớm tại {currentBranchName}
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                 {/* Tính đi muộn sau */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13 }}>
-                  <label
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 8,
-                      minWidth: 160,
-                      cursor: 'pointer',
-                      color: '#334155',
-                    }}
-                  >
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13 }}>
+                    <label
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        minWidth: 160,
+                        cursor: 'pointer',
+                        color: '#334155',
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={currentConfig.enableLateThreshold}
+                        onChange={(e) => {
+                          setCurrentConfig((prev) => ({
+                            ...prev,
+                            enableLateThreshold: e.target.checked,
+                          }));
+                          if (!touched.lateThreshold) markTouched('lateThreshold');
+                        }}
+                        style={{
+                          width: 16,
+                          height: 16,
+                          accentColor: 'var(--blue-primary, #0F766E)',
+                          cursor: 'pointer',
+                        }}
+                      />
+                      <span>Tính đi muộn sau</span>
+                    </label>
                     <input
-                      type="checkbox"
-                      checked={currentConfig.enableLateThreshold}
-                      onChange={(e) =>
+                      type="number"
+                      min={0}
+                      max={240}
+                      value={currentConfig.lateThresholdMinutes}
+                      disabled={!currentConfig.enableLateThreshold}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value, 10);
                         setCurrentConfig((prev) => ({
                           ...prev,
-                          enableLateThreshold: e.target.checked,
-                        }))
-                      }
+                          lateThresholdMinutes: isNaN(val) ? ('' as any) : val,
+                        }));
+                        if (!touched.lateThreshold) markTouched('lateThreshold');
+                      }}
+                      onBlur={() => markTouched('lateThreshold')}
                       style={{
-                        width: 16,
-                        height: 16,
-                        accentColor: 'var(--blue-primary, #0F766E)',
-                        cursor: 'pointer',
+                        width: 70,
+                        height: 32,
+                        textAlign: 'center',
+                        border: `1px solid ${(touched.lateThreshold || hasSubmitted) && lateThresholdError ? '#EF4444' : '#CBD5E1'}`,
+                        boxShadow: (touched.lateThreshold || hasSubmitted) && lateThresholdError ? '0 0 0 2px rgba(239, 68, 68, 0.15)' : 'none',
+                        borderRadius: 6,
+                        fontSize: 13,
+                        outline: 'none',
+                        backgroundColor: currentConfig.enableLateThreshold ? '#FFFFFF' : '#F1F5F9',
                       }}
                     />
-                    <span>Tính đi muộn sau</span>
-                  </label>
-                  <input
-                    type="number"
-                    min={0}
-                    max={120}
-                    value={currentConfig.lateThresholdMinutes}
-                    disabled={!currentConfig.enableLateThreshold}
-                    onChange={(e) =>
-                      setCurrentConfig((prev) => ({
-                        ...prev,
-                        lateThresholdMinutes: Number(e.target.value) || 0,
-                      }))
-                    }
-                    style={{
-                      width: 70,
-                      height: 32,
-                      textAlign: 'center',
-                      border: '1px solid #CBD5E1',
-                      borderRadius: 6,
-                      fontSize: 13,
-                      outline: 'none',
-                      backgroundColor: currentConfig.enableLateThreshold ? '#FFFFFF' : '#F1F5F9',
-                    }}
-                  />
-                  <span style={{ color: '#334155' }}>phút</span>
-                  <span
-                    title="Số phút trễ tối đa cho phép trước khi bắt đầu ghi nhận vi phạm đi muộn."
-                    style={{
-                      cursor: 'help',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      color: '#94A3B8',
-                    }}
-                  >
-                    <Info size={15} />
-                  </span>
+                    <span style={{ color: '#334155' }}>phút</span>
+                    <span
+                      title="Số phút trễ tối đa cho phép trước khi bắt đầu ghi nhận vi phạm đi muộn (từ 0 đến 240 phút)."
+                      style={{
+                        cursor: 'help',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        color: '#94A3B8',
+                      }}
+                    >
+                      <Info size={15} />
+                    </span>
+                  </div>
+                  {(touched.lateThreshold || hasSubmitted) && lateThresholdError && (
+                    <div style={{ color: '#DC2626', fontSize: 12, marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <span>•</span>
+                      <span>{lateThresholdError}</span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Tính về sớm trước */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13 }}>
-                  <label
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 8,
-                      minWidth: 160,
-                      cursor: 'pointer',
-                      color: '#334155',
-                    }}
-                  >
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13 }}>
+                    <label
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        minWidth: 160,
+                        cursor: 'pointer',
+                        color: '#334155',
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={currentConfig.enableEarlyLeaveThreshold}
+                        onChange={(e) => {
+                          setCurrentConfig((prev) => ({
+                            ...prev,
+                            enableEarlyLeaveThreshold: e.target.checked,
+                          }));
+                          if (!touched.earlyLeaveThreshold) markTouched('earlyLeaveThreshold');
+                        }}
+                        style={{
+                          width: 16,
+                          height: 16,
+                          accentColor: 'var(--blue-primary, #0F766E)',
+                          cursor: 'pointer',
+                        }}
+                      />
+                      <span>Tính về sớm trước</span>
+                    </label>
                     <input
-                      type="checkbox"
-                      checked={currentConfig.enableEarlyLeaveThreshold}
-                      onChange={(e) =>
+                      type="number"
+                      min={0}
+                      max={240}
+                      value={currentConfig.earlyLeaveThresholdMinutes}
+                      disabled={!currentConfig.enableEarlyLeaveThreshold}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value, 10);
                         setCurrentConfig((prev) => ({
                           ...prev,
-                          enableEarlyLeaveThreshold: e.target.checked,
-                        }))
-                      }
+                          earlyLeaveThresholdMinutes: isNaN(val) ? ('' as any) : val,
+                        }));
+                        if (!touched.earlyLeaveThreshold) markTouched('earlyLeaveThreshold');
+                      }}
+                      onBlur={() => markTouched('earlyLeaveThreshold')}
                       style={{
-                        width: 16,
-                        height: 16,
-                        accentColor: 'var(--blue-primary, #0F766E)',
-                        cursor: 'pointer',
+                        width: 70,
+                        height: 32,
+                        textAlign: 'center',
+                        border: `1px solid ${(touched.earlyLeaveThreshold || hasSubmitted) && earlyLeaveThresholdError ? '#EF4444' : '#CBD5E1'}`,
+                        boxShadow: (touched.earlyLeaveThreshold || hasSubmitted) && earlyLeaveThresholdError ? '0 0 0 2px rgba(239, 68, 68, 0.15)' : 'none',
+                        borderRadius: 6,
+                        fontSize: 13,
+                        outline: 'none',
+                        backgroundColor: currentConfig.enableEarlyLeaveThreshold ? '#FFFFFF' : '#F1F5F9',
                       }}
                     />
-                    <span>Tính về sớm trước</span>
-                  </label>
-                  <input
-                    type="number"
-                    min={0}
-                    max={120}
-                    value={currentConfig.earlyLeaveThresholdMinutes}
-                    disabled={!currentConfig.enableEarlyLeaveThreshold}
-                    onChange={(e) =>
-                      setCurrentConfig((prev) => ({
-                        ...prev,
-                        earlyLeaveThresholdMinutes: Number(e.target.value) || 0,
-                      }))
-                    }
-                    style={{
-                      width: 70,
-                      height: 32,
-                      textAlign: 'center',
-                      border: '1px solid #CBD5E1',
-                      borderRadius: 6,
-                      fontSize: 13,
-                      outline: 'none',
-                      backgroundColor: currentConfig.enableEarlyLeaveThreshold ? '#FFFFFF' : '#F1F5F9',
-                    }}
-                  />
-                  <span style={{ color: '#334155' }}>phút</span>
-                  <span
-                    title="Số phút về sớm tối đa cho phép trước giờ tan ca mà không bị tính về sớm."
-                    style={{
-                      cursor: 'help',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      color: '#94A3B8',
-                    }}
-                  >
-                    <Info size={15} />
-                  </span>
+                    <span style={{ color: '#334155' }}>phút</span>
+                    <span
+                      title="Số phút về sớm tối đa cho phép trước giờ tan ca mà không bị tính về sớm (từ 0 đến 240 phút)."
+                      style={{
+                        cursor: 'help',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        color: '#94A3B8',
+                      }}
+                    >
+                      <Info size={15} />
+                    </span>
+                  </div>
+                  {(touched.earlyLeaveThreshold || hasSubmitted) && earlyLeaveThresholdError && (
+                    <div style={{ color: '#DC2626', fontSize: 12, marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <span>•</span>
+                      <span>{earlyLeaveThresholdError}</span>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -1004,17 +1214,58 @@ export const AttendanceConfigModal: React.FC<AttendanceConfigModalProps> = ({
                 </button>
               </div>
 
-              <div style={{ padding: '16px 20px', maxHeight: 300, overflowY: 'auto' }}>
+              <div style={{ padding: '16px 20px', maxHeight: 330, overflowY: 'auto' }}>
                 <p style={{ margin: '0 0 12px', fontSize: 13, color: '#475569' }}>
                   Sao chép toàn bộ thông số chấm công của <strong>"{currentBranchName}"</strong> sang các chi nhánh được chọn:
                 </p>
 
-                <div style={{ marginBottom: 10 }}>
+                {/* Ô tìm kiếm chi nhánh đích kèm character counter */}
+                <div style={{ position: 'relative', marginBottom: 12 }}>
+                  <input
+                    type="text"
+                    placeholder="Tìm nhanh chi nhánh đích..."
+                    value={copySearch}
+                    maxLength={50}
+                    onChange={(e) => setCopySearch(e.target.value)}
+                    style={{
+                      width: '100%',
+                      height: 34,
+                      padding: '0 45px 0 10px',
+                      border: '1px solid #CBD5E1',
+                      borderRadius: 6,
+                      fontSize: 12.5,
+                      outline: 'none',
+                    }}
+                  />
+                  <span
+                    style={{
+                      position: 'absolute',
+                      right: 10,
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      fontSize: 10.5,
+                      color: copySearch.length >= 50 ? '#EF4444' : '#94A3B8',
+                      pointerEvents: 'none',
+                    }}
+                  >
+                    {copySearch.length}/50
+                  </span>
+                </div>
+
+                <div style={{ marginBottom: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <button
                     type="button"
                     onClick={() => {
-                      const allOther = branches.filter((b) => b.id !== selectedBranchId).map((b) => b.id);
-                      setTargetBranchIds(targetBranchIds.length === allOther.length ? [] : allOther);
+                      const otherBranches = branches
+                        .filter((b) => b.id !== selectedBranchId)
+                        .filter((b) => b.name.toLowerCase().includes(copySearch.toLowerCase().trim()));
+                      const otherIds = otherBranches.map((b) => b.id);
+                      const isAllSelected = otherIds.length > 0 && otherIds.every((id) => targetBranchIds.includes(id));
+                      if (isAllSelected) {
+                        setTargetBranchIds((prev) => prev.filter((id) => !otherIds.includes(id)));
+                      } else {
+                        setTargetBranchIds((prev) => Array.from(new Set([...prev, ...otherIds])));
+                      }
                     }}
                     style={{
                       border: 'none',
@@ -1026,15 +1277,17 @@ export const AttendanceConfigModal: React.FC<AttendanceConfigModalProps> = ({
                       padding: 0,
                     }}
                   >
-                    {targetBranchIds.length === branches.filter((b) => b.id !== selectedBranchId).length
-                      ? 'Bỏ chọn tất cả'
-                      : 'Chọn tất cả chi nhánh'}
+                    Chọn / Bỏ chọn tất cả
                   </button>
+                  <span style={{ fontSize: 12, color: '#64748B' }}>
+                    Đã chọn: <strong style={{ color: '#0F766E' }}>{targetBranchIds.length}</strong> chi nhánh
+                  </span>
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {branches
                     .filter((b) => b.id !== selectedBranchId)
+                    .filter((b) => b.name.toLowerCase().includes(copySearch.toLowerCase().trim()))
                     .map((b) => {
                       const isChecked = targetBranchIds.includes(b.id);
                       return (
