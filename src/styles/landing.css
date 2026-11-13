@@ -185,6 +185,20 @@ button, input, select {
   flex-shrink: 0;
 }
 
+.brand-logo-img {
+  height: 52px;
+  width: auto;
+  max-width: 240px;
+  object-fit: contain;
+  display: block;
+}
+
+@media (max-width: 768px) {
+  .brand-logo-img {
+    height: 42px;
+  }
+}
+
 .logo-symbol {
   width: 36px;
   height: 36px;

@@ -13,37 +13,12 @@ export const Navbar: FC<NavbarProps> = ({ onOpenTrial }) => {
   return (
     <header className="site-header" id="header">
       <div className="container nav-container">
-        <Link to="/" className="brand-logo" aria-label="MT-GRMS Trang Chủ">
-          <div className="logo-symbol">
-            <svg width="30" height="30" viewBox="0 0 32 32" fill="none">
-              <path
-                d="M16 2C16 2 4 14.5 4 21C4 26.5228 8.47715 31 14 31C19.5228 31 24 26.5228 24 21C24 14.5 16 2 16 2Z"
-                fill="url(#brandBlueGrad)"
-              />
-              <path
-                d="M20 10C20 10 28 17.5 28 22C28 25.866 24.866 29 21 29C17.134 29 14 25.866 14 22C14 17.5 20 10 20 10Z"
-                fill="#14B8A6"
-                fillOpacity="0.9"
-              />
-              <circle cx="14" cy="22" r="3.5" fill="#FFFFFF" />
-              <defs>
-                <linearGradient
-                  id="brandBlueGrad"
-                  x1="4"
-                  y1="2"
-                  x2="24"
-                  y2="31"
-                  gradientUnits="userSpaceOnUse"
-                >
-                  <stop stopColor="#0F766E" />
-                  <stop offset="1" stopColor="#134E4A" />
-                </linearGradient>
-              </defs>
-            </svg>
-          </div>
-          <div className="logo-text">
-            <span className="logo-name">MT-GRMS</span>
-          </div>
+        <Link to="/" className="brand-logo" aria-label="THViet Trang Chủ">
+          <img
+            src="/logo/thviet_logo_horizontal.png"
+            alt="THViet - Quản Lý Tạp Hóa Việt"
+            className="brand-logo-img"
+          />
         </Link>
 
         <div className="nav-right-group">

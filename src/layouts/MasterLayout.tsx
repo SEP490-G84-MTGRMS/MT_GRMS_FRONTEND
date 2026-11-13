@@ -54,11 +54,14 @@ export const MasterLayout: FC = () => {
     <div className="dashboard-root">
       {/* Top Header */}
       <header className="dashboard-header">
-        <a href="/" className="dashboard-brand" aria-label="Trang chủ MT-GRMS">
-          <div className="dashboard-brand-logo">MT</div>
+        <a href="/" className="dashboard-brand" aria-label="Trang chủ THViet">
+          <div className="dashboard-brand-logo" style={{ backgroundColor: "#0F766E", color: "#FFFFFF", fontWeight: 900 }}>TH</div>
           <div>
-            <div className="dashboard-brand-name">MT-GRMS</div>
-            <div className="dashboard-brand-sub">Quản lý Chuỗi Tạp Hóa</div>
+            <div className="dashboard-brand-name">
+              <span style={{ color: "#0F766E" }}>TH</span>
+              <span style={{ color: "#14B8A6" }}>Viet</span>
+            </div>
+            <div className="dashboard-brand-sub">Quản lý Tạp Hóa Việt</div>
           </div>
         </a>
 
