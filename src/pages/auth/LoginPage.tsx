@@ -66,12 +66,12 @@ export const LoginPage: FC = () => {
     e.preventDefault();
     setErrorMessage(null);
 
-    if (!phoneOrEmail.trim()) {
+    if (!phoneOrEmail.trim() || phoneOrEmail.trim().length > 254) {
       setErrorMessage("Vui lòng nhập email hoặc tài khoản đăng nhập.");
       return;
     }
 
-    if (!password.trim()) {
+    if (!password || password.length > 128) {
       setErrorMessage("Vui lòng nhập mật khẩu.");
       return;
     }
@@ -206,6 +206,7 @@ export const LoginPage: FC = () => {
               autoComplete="username"
               disabled={isLoading}
               required
+              maxLength={254}
             />
           </div>
         </div>
@@ -233,6 +234,7 @@ export const LoginPage: FC = () => {
               autoComplete="current-password"
               disabled={isLoading}
               required
+              maxLength={128}
             />
             <button
               type="button"
