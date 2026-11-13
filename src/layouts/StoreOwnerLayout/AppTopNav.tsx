@@ -130,10 +130,6 @@ const NAV_GROUPS: NavGroup[] = [
             badge: "Mới",
             badgeType: "blue",
           },
-          {
-            label: "Thiết lập bảng giá",
-            to: "/store-owner/suppliers/products?view=pricing",
-          },
         ],
       },
       {
@@ -152,8 +148,10 @@ const NAV_GROUPS: NavGroup[] = [
             badgeType: "blue",
           },
           {
-            label: "Kiểm kho & Cân đối",
-            to: "/store-owner/suppliers/products?view=inventory",
+            label: "Kiểm kê hàng hóa",
+            to: "/store-owner/stocktakes",
+            badge: "KK",
+            badgeType: "blue",
           },
           {
             label: "Chuyển hàng liên kho",
@@ -350,34 +348,6 @@ const NAV_GROUPS: NavGroup[] = [
   },
 ];
 
-/* ─── Brand Logo SVG ─── */
-const BrandLogo: FC = () => (
-  <svg width="30" height="30" viewBox="0 0 32 32" fill="none">
-    <path
-      d="M16 2C16 2 4 14.5 4 21C4 26.5228 8.47715 31 14 31C19.5228 31 24 26.5228 24 21C24 14.5 16 2 16 2Z"
-      fill="url(#navBrandGrad)"
-    />
-    <path
-      d="M20 10C20 10 28 17.5 28 22C28 25.866 24.866 29 21 29C17.134 29 14 25.866 14 22C14 17.5 20 10 20 10Z"
-      fill="#14B8A6"
-      fillOpacity="0.9"
-    />
-    <circle cx="14" cy="22" r="3.5" fill="#FFFFFF" />
-    <defs>
-      <linearGradient
-        id="navBrandGrad"
-        x1="4"
-        y1="2"
-        x2="24"
-        y2="31"
-        gradientUnits="userSpaceOnUse"
-      >
-        <stop stopColor="#0F766E" />
-        <stop offset="1" stopColor="#134E4A" />
-      </linearGradient>
-    </defs>
-  </svg>
-);
 
 /* ─── Chevron Down ─── */
 const ChevronDown: FC<{ open: boolean }> = ({ open }) => (
@@ -1157,34 +1127,11 @@ export const AppTopNav: FC = () => {
               marginRight: 10,
             }}
           >
-            <BrandLogo />
-            <div>
-              <div
-                style={{
-                  fontSize: 15.5,
-                  fontWeight: 800,
-                  color: "#ffffff",
-                  letterSpacing: "-0.02em",
-                  lineHeight: 1.15,
-                  whiteSpace: "nowrap",
-                }}
-              >
-                MT-GRMS
-              </div>
-              <div
-                style={{
-                  fontSize: 9.5,
-                  fontWeight: 700,
-                  color: "rgba(255, 255, 255, 0.8)",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.06em",
-                  lineHeight: 1,
-                  whiteSpace: "nowrap",
-                }}
-              >
-                Quản lý Tạp Hóa
-              </div>
-            </div>
+            <img
+              src="/logo/thviet_logo_white.png"
+              alt="THViet - Quản Lý Tạp Hóa Việt"
+              style={{ height: 38, width: "auto", objectFit: "contain" }}
+            />
           </Link>
 
           {/* Menus List */}
@@ -1373,7 +1320,7 @@ export const AppTopNav: FC = () => {
               }}
               onClick={() =>
                 alert(
-                  "Tổng đài hỗ trợ MT-GRMS: 1900 6522 (8h00 - 22h00 hàng ngày)",
+                  "Tổng đài hỗ trợ THViet: 1900 6522 (8h00 - 22h00 hàng ngày)",
                 )
               }
               title="Tổng đài CSKH: 1900 6522"

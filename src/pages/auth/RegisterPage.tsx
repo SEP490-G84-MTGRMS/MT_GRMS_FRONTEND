@@ -1,11 +1,12 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import type { FC, FormEvent } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   ArrowLeft,
   User,
   Store,
   Phone,
+  Mail,
   Lock,
   Eye,
   EyeOff,
@@ -16,18 +17,26 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { authService } from "../../features/auth/authService";
+import { validateRegistration } from "../../features/auth/authValidation";
+import { RegistrationOtpModal } from "../../features/auth/components/RegistrationOtpModal";
 import { useAuthStore } from "../../stores/useAuthStore";
+
+export const isTrialRegistrationIntent = (intent: string | null) => intent === "trial";
 
 export const RegisterPage: FC = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const startTrial = isTrialRegistrationIntent(searchParams.get("intent"));
+  const registrationIdempotencyKey = useRef(crypto.randomUUID());
   const setAuth = useAuthStore((state) => state.setAuth);
 
   const [fullName, setFullName] = useState("");
   const [storeName, setStoreName] = useState("");
   const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [agreeTerms, setAgreeTerms] = useState(true);
+  const [agreeTerms, setAgreeTerms] = useState(false);
 
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -36,15 +45,24 @@ export const RegisterPage: FC = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSuccess, setIsSuccess] = useState(false);
 
-  // Tính toán độ mạnh mật khẩu (Weak / Medium / Strong)
+  // State cho bước xác thực Email OTP kích hoạt cửa hàng
+  const [isOtpModalOpen, setIsOtpModalOpen] = useState(false);
+  const [challengeId, setChallengeId] = useState<string | null>(null);
+  const [maskedEmail, setMaskedEmail] = useState("");
+  const [isRealEmailSent, setIsRealEmailSent] = useState(false);
+  const [devOtpCode, setDevOtpCode] = useState<string | null>(null);
+  const [otpErrorMessage, setOtpErrorMessage] = useState<string | null>(null);
+  const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
+  const [isResendingOtp, setIsResendingOtp] = useState(false);
+
   const passwordStrength = useMemo(() => {
     if (!password)
       return { score: 0, text: "", color: "transparent", width: "0%" };
 
-    if (password.length < 6) {
+    if (password.length < 8) {
       return {
         score: 1,
-        text: "Yếu (tối thiểu 6 ký tự)",
+        text: "Yếu (tối thiểu 8 ký tự)",
         color: "var(--red-accent)",
         width: "25%",
       };
@@ -86,53 +104,97 @@ export const RegisterPage: FC = () => {
     e.preventDefault();
     setErrorMessage(null);
 
-    if (!fullName.trim()) {
-      setErrorMessage("Vui lòng nhập họ và tên chủ cửa hàng / người quản lý.");
-      return;
-    }
-    if (!storeName.trim()) {
-      setErrorMessage("Vui lòng nhập tên chuỗi hoặc cửa hàng bán lẻ.");
-      return;
-    }
-    if (!phone.trim()) {
-      setErrorMessage("Vui lòng nhập số điện thoại liên hệ.");
-      return;
-    }
-    if (password.length < 6) {
-      setErrorMessage("Mật khẩu bảo mật phải có tối thiểu 6 ký tự.");
-      return;
-    }
-    if (password !== confirmPassword) {
-      setErrorMessage("Mật khẩu xác nhận không khớp. Vui lòng kiểm tra lại.");
-      return;
-    }
-    if (!agreeTerms) {
-      setErrorMessage(
-        "Vui lòng xác nhận đồng ý với Điều khoản dịch vụ để tiếp tục.",
-      );
+    const validationError = validateRegistration({ fullName, storeName, phone, email, password, confirmPassword, agreeTerms });
+    if (validationError) {
+      setErrorMessage(validationError);
       return;
     }
 
     try {
       setIsLoading(true);
+
+      const otpRes = await authService.sendRegistrationOtp({
+        phone: phone.trim(),
+        email: email.trim(),
+        storeName: storeName.trim(),
+        fullName: fullName.trim(),
+        startTrial,
+      });
+
+      registrationIdempotencyKey.current = crypto.randomUUID();
+      setChallengeId(otpRes.challengeId ?? null);
+      setMaskedEmail(otpRes.maskedEmail);
+      setIsRealEmailSent(otpRes.isRealEmailSent);
+      setDevOtpCode(otpRes.devOtpCode ?? null);
+      setOtpErrorMessage(null);
+      setIsOtpModalOpen(true);
+    } catch (err: unknown) {
+      const msg =
+        err instanceof Error
+          ? err.message
+          : "Không thể gửi mã xác thực Email OTP. Vui lòng thử lại.";
+      setErrorMessage(msg);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleVerifyOtpAndCreateStore = async (otpCode: string) => {
+    setOtpErrorMessage(null);
+    try {
+      setIsVerifyingOtp(true);
+
       const res = await authService.register({
         fullName: fullName.trim(),
         storeName: storeName.trim(),
         phone: phone.trim(),
+        email: email.trim(),
         password,
         agreeTerms,
+        otpCode,
+        startTrial,
+        idempotencyKey: registrationIdempotencyKey.current,
+        challengeId,
       });
 
-      setAuth(res.user, res.accessToken);
+      setIsOtpModalOpen(false);
+      setAuth(res.user);
       setIsSuccess(true);
     } catch (err: unknown) {
       const msg =
         err instanceof Error
           ? err.message
-          : "Đăng ký tài khoản không thành công. Vui lòng thử lại.";
-      setErrorMessage(msg);
+          : "Mã OTP không chính xác hoặc đã hết hạn. Vui lòng kiểm tra lại.";
+      setOtpErrorMessage(msg);
     } finally {
-      setIsLoading(false);
+      setIsVerifyingOtp(false);
+    }
+  };
+
+  const handleResendRegistrationOtp = async () => {
+    setOtpErrorMessage(null);
+    try {
+      setIsResendingOtp(true);
+      const otpRes = await authService.sendRegistrationOtp({
+        phone: phone.trim(),
+        email: email.trim(),
+        storeName: storeName.trim(),
+        fullName: fullName.trim(),
+        startTrial,
+      });
+      registrationIdempotencyKey.current = crypto.randomUUID();
+      setChallengeId(otpRes.challengeId ?? null);
+      setMaskedEmail(otpRes.maskedEmail);
+      setIsRealEmailSent(otpRes.isRealEmailSent);
+      setDevOtpCode(otpRes.devOtpCode ?? null);
+    } catch (err: unknown) {
+      const msg =
+        err instanceof Error
+          ? err.message
+          : "Không thể gửi lại mã Email OTP. Vui lòng thử lại.";
+      setOtpErrorMessage(msg);
+    } finally {
+      setIsResendingOtp(false);
     }
   };
 
@@ -173,16 +235,17 @@ export const RegisterPage: FC = () => {
               lineHeight: 1.5,
             }}
           >
-            Chào mừng bạn đến với hệ thống bán lẻ <strong>MT-GRMS</strong>. Cửa
-            hàng <strong>{storeName}</strong> của bạn đã sẵn sàng trải nghiệm.
+            {startTrial
+              ? <>Trial 3 ngày của <strong>{storeName}</strong> bắt đầu từ lúc đăng ký thành công, không cần thẻ và không tự động gia hạn.</>
+              : <>Cửa hàng <strong>{storeName}</strong> đã được tạo. Hãy chọn gói dịch vụ trước khi sử dụng chức năng kinh doanh.</>}
           </p>
           <button
             type="button"
             className="auth-cta-primary-btn"
             style={{ maxWidth: "320px" }}
-            onClick={() => navigate("/store-owner/dashboard")}
+            onClick={() => navigate(startTrial ? "/store-owner/dashboard" : "/store-owner/subscriptions?tab=subscriptions&onboarding=1")}
           >
-            <span>Vào trang Quản trị cửa hàng</span>
+            <span>{startTrial ? "Vào trang Quản trị cửa hàng" : "Chọn gói dịch vụ"}</span>
             <ArrowRight size={18} strokeWidth={2.2} />
           </button>
         </div>
@@ -192,7 +255,6 @@ export const RegisterPage: FC = () => {
 
   return (
     <div className="auth-card">
-      {/* Thanh trên cùng */}
       <div className="auth-card-topbar">
         <Link to="/" className="auth-back-home-link">
           <ArrowLeft size={14} strokeWidth={2.2} />
@@ -201,6 +263,13 @@ export const RegisterPage: FC = () => {
       </div>
 
       <h1 className="auth-card-heading">Đăng ký mở cửa hàng</h1>
+
+      {startTrial && (
+        <div className="auth-alert" role="status" style={{ marginBottom: "14px" }}>
+          <ShieldCheck size={17} strokeWidth={2} />
+          <span>Dùng thử miễn phí 3 ngày. 72 giờ bắt đầu ngay khi đăng ký thành công, không cần thẻ và không tự động gia hạn.</span>
+        </div>
+      )}
 
       {errorMessage && (
         <div
@@ -218,7 +287,6 @@ export const RegisterPage: FC = () => {
       )}
 
       <form onSubmit={handleSubmit} className="auth-form-fields">
-        {/* Tên người đại diện */}
         <div className="auth-field-block">
           <label
             htmlFor="reg-fullname"
@@ -240,11 +308,11 @@ export const RegisterPage: FC = () => {
               onChange={(e) => setFullName(e.target.value)}
               disabled={isLoading}
               required
+              maxLength={100}
             />
           </div>
         </div>
 
-        {/* Tên cửa hàng */}
         <div className="auth-field-block">
           <label
             htmlFor="reg-storename"
@@ -266,11 +334,11 @@ export const RegisterPage: FC = () => {
               onChange={(e) => setStoreName(e.target.value)}
               disabled={isLoading}
               required
+              maxLength={150}
             />
           </div>
         </div>
 
-        {/* Số điện thoại */}
         <div className="auth-field-block">
           <label
             htmlFor="reg-phone"
@@ -286,17 +354,70 @@ export const RegisterPage: FC = () => {
             <input
               id="reg-phone"
               type="tel"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              maxLength={10}
               className="auth-styled-input font-mono-input"
-              placeholder="Số điện thoại"
+              placeholder="09xx xxx xxx"
               value={phone}
-              onChange={(e) => setPhone(e.target.value)}
+              onChange={(e) => {
+                // Tự động loại bỏ toàn bộ ký tự không phải chữ số (chống nhập chữ như asddda)
+                const numericOnly = e.target.value.replace(/\D/g, "").slice(0, 10);
+                setPhone(numericOnly);
+                if (errorMessage) setErrorMessage(null);
+              }}
+              onKeyDown={(e) => {
+                // Chặn gõ phím chữ, chỉ cho phép số, phím xóa và điều hướng
+                const allowedControlKeys = [
+                  "Backspace",
+                  "Delete",
+                  "ArrowLeft",
+                  "ArrowRight",
+                  "Tab",
+                  "Enter",
+                ];
+                if (
+                  allowedControlKeys.includes(e.key) ||
+                  (e.ctrlKey || e.metaKey) // Ctrl+C, Ctrl+V, Ctrl+A
+                ) {
+                  return;
+                }
+                if (!/^\d$/.test(e.key)) {
+                  e.preventDefault();
+                }
+              }}
               disabled={isLoading}
               required
             />
           </div>
         </div>
 
-        {/* Mật khẩu */}
+        <div className="auth-field-block">
+          <label
+            htmlFor="reg-email"
+            className="auth-field-label"
+            style={{ marginBottom: "5px" }}
+          >
+            Email nhận mã OTP kích hoạt
+          </label>
+          <div className="auth-input-container">
+            <span className="auth-input-prefix-icon">
+              <Mail size={18} strokeWidth={1.8} />
+            </span>
+            <input
+              id="reg-email"
+              type="email"
+              className="auth-styled-input"
+              placeholder="chucuahang@gmail.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              disabled={isLoading}
+              required
+              maxLength={100}
+            />
+          </div>
+        </div>
+
         <div className="auth-field-block">
           <label
             htmlFor="reg-password"
@@ -313,12 +434,13 @@ export const RegisterPage: FC = () => {
               id="reg-password"
               type={showPassword ? "text" : "password"}
               className="auth-styled-input has-eye-btn"
-              placeholder="Nhập mật khẩu (tối thiểu 6 ký tự)..."
+              placeholder="8–64 ký tự, có chữ hoa, số và ký tự đặc biệt"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               autoComplete="new-password"
               disabled={isLoading}
               required
+              maxLength={64}
             />
             <button
               type="button"
@@ -361,7 +483,6 @@ export const RegisterPage: FC = () => {
           </div>
         )}
 
-        {/* Xác nhận lại mật khẩu */}
         <div className="auth-field-block">
           <label
             htmlFor="reg-confirm-password"
@@ -384,6 +505,7 @@ export const RegisterPage: FC = () => {
               autoComplete="new-password"
               disabled={isLoading}
               required
+              maxLength={64}
             />
             <button
               type="button"
@@ -400,7 +522,6 @@ export const RegisterPage: FC = () => {
           </div>
         </div>
 
-        {/* Đồng ý điều khoản */}
         <div className="auth-remember-row" style={{ alignItems: "flex-start" }}>
           <label
             className="auth-checkbox-wrap"
@@ -422,7 +543,6 @@ export const RegisterPage: FC = () => {
           </label>
         </div>
 
-        {/* Nút Submit */}
         <button
           type="submit"
           className="auth-cta-primary-btn"
@@ -431,7 +551,7 @@ export const RegisterPage: FC = () => {
           {isLoading ? (
             <>
               <Loader2 size={18} className="animate-spin" />
-              <span>Đang thiết lập cửa hàng...</span>
+              <span>Đang gửi mã OTP qua Email...</span>
             </>
           ) : (
             <>
@@ -441,6 +561,21 @@ export const RegisterPage: FC = () => {
           )}
         </button>
       </form>
+
+      <RegistrationOtpModal
+        isOpen={isOtpModalOpen}
+        email={email.trim()}
+        maskedEmail={maskedEmail}
+        storeName={storeName.trim()}
+        isRealEmailSent={isRealEmailSent}
+        devOtpCode={devOtpCode}
+        isSubmitting={isVerifyingOtp}
+        isResending={isResendingOtp}
+        errorMessage={otpErrorMessage}
+        onClose={() => setIsOtpModalOpen(false)}
+        onVerify={handleVerifyOtpAndCreateStore}
+        onResend={handleResendRegistrationOtp}
+      />
 
       <div className="auth-bottom-switch-link">
         Đã có tài khoản quản lý chuỗi?{" "}

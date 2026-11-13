@@ -5,6 +5,8 @@ import {
   Package,
   FileText,
   ArrowLeft,
+  ClipboardCheck,
+  ClipboardList,
 } from 'lucide-react';
 import type {
   BatchItem,
@@ -29,7 +31,7 @@ const DEFAULT_FILTERS: BatchFilterState = {
   branchId: 'ALL',
   status: 'ALL',
   pageIndex: 1,
-  pageSize: 10,
+  pageSize: 20,
 };
 
 export const BatchListPage: FC<{ defaultRole?: UserRole }> = ({
@@ -50,13 +52,52 @@ export const BatchListPage: FC<{ defaultRole?: UserRole }> = ({
   const [filterInputs, setFilterInputs] = useState<BatchFilterState>(DEFAULT_FILTERS);
   const [appliedFilters, setAppliedFilters] = useState<BatchFilterState>(DEFAULT_FILTERS);
   const [pageIndex, setPageIndex] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(20);
 
   const [selectedBatch, setSelectedBatch] = useState<BatchItem | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [discountBatch, setDiscountBatch] = useState<BatchItem | null>(null);
   const [isDiscountModalOpen, setIsDiscountModalOpen] = useState(false);
+  const [selectedBatches, setSelectedBatches] = useState<BatchItem[]>([]);
   const [toast, setToast] = useState<ToastState | null>(null);
+
+  const stocktakeBasePath =
+    role === 'employee' ? '/employee/stocktakes' : '/store-owner/stocktakes';
+
+  const handleToggleSelectBatch = (batch: BatchItem) => {
+    setSelectedBatches((prev) =>
+      prev.some((b) => b.id === batch.id)
+        ? prev.filter((b) => b.id !== batch.id)
+        : [...prev, batch]
+    );
+  };
+
+  const handleToggleSelectAllBatches = (pageBatches: BatchItem[]) => {
+    setSelectedBatches((prev) => {
+      const allSelected =
+        pageBatches.length > 0 && pageBatches.every((b) => prev.some((p) => p.id === b.id));
+      if (allSelected) {
+        return prev.filter((p) => !pageBatches.some((b) => b.id === p.id));
+      }
+      const next = [...prev];
+      pageBatches.forEach((b) => {
+        if (!next.some((p) => p.id === b.id)) next.push(b);
+      });
+      return next;
+    });
+  };
+
+  const handleCreateStocktake = (singleBatch?: BatchItem) => {
+    const itemsToCount = singleBatch ? [singleBatch] : selectedBatches;
+    navigate(`${stocktakeBasePath}/create`, {
+      state: {
+        preselectedBatches: itemsToCount,
+        branchId:
+          itemsToCount[0]?.branchId ||
+          (appliedFilters.branchId !== 'ALL' ? appliedFilters.branchId : ''),
+      },
+    });
+  };
 
   const fetchIdRef = useRef(0);
 
@@ -240,6 +281,27 @@ export const BatchListPage: FC<{ defaultRole?: UserRole }> = ({
         <div className="so-list-header-actions">
           <button
             type="button"
+            className="po-btn po-btn-primary"
+            style={{ backgroundColor: '#0f766e' }}
+            onClick={() => handleCreateStocktake()}
+          >
+            <ClipboardCheck size={14} />
+            <span>
+              {selectedBatches.length > 0
+                ? `Kiểm kê hàng hóa (${selectedBatches.length} lô đã chọn)`
+                : 'Kiểm kê hàng hóa'}
+            </span>
+          </button>
+          <button
+            type="button"
+            className="po-btn po-btn-secondary"
+            onClick={() => navigate(stocktakeBasePath)}
+          >
+            <ClipboardList size={14} />
+            <span>Phiếu kiểm kê</span>
+          </button>
+          <button
+            type="button"
             className="po-btn po-btn-secondary"
             onClick={() => navigate('/store-owner/goods-receipts')}
           >
@@ -253,14 +315,6 @@ export const BatchListPage: FC<{ defaultRole?: UserRole }> = ({
           >
             <Package size={14} />
             <span>Tồn kho</span>
-          </button>
-          <button
-            type="button"
-            className="po-btn po-btn-secondary"
-            onClick={() => navigate('/store-owner/products')}
-          >
-            <Package size={14} />
-            <span>Danh mục SP</span>
           </button>
         </div>
       </div>
@@ -282,6 +336,10 @@ export const BatchListPage: FC<{ defaultRole?: UserRole }> = ({
         totalCount={totalCount}
         pageIndex={pageIndex}
         pageSize={pageSize}
+        selectedIds={selectedBatches.map((b) => b.id)}
+        onToggleSelect={handleToggleSelectBatch}
+        onToggleSelectAll={handleToggleSelectAllBatches}
+        onQuickStocktake={(b) => handleCreateStocktake(b)}
         onPageChange={(p) => setPageIndex(p)}
         onPageSizeChange={(s) => {
           setPageSize(s);
@@ -300,6 +358,10 @@ export const BatchListPage: FC<{ defaultRole?: UserRole }> = ({
         onUpdateLocation={handleUpdateLocation}
         onDiscountClick={handleOpenDiscount}
         onWriteOffClick={handleWriteOff}
+        onStocktakeClick={(b) => {
+          setIsDrawerOpen(false);
+          handleCreateStocktake(b);
+        }}
         onViewGrn={(grnNo) => {
           setIsDrawerOpen(false);
           navigate(`/store-owner/goods-receipts?keyword=${grnNo}`);

@@ -32,6 +32,23 @@ export interface LoginCredentials {
   rememberMe?: boolean;
 }
 
+export interface SendLoginOtpResult {
+  requiresOtp: boolean;
+  user?: UserProfile;
+  tempToken: string;
+  maskedEmail: string;
+  targetEmail: string;
+  expiresInSeconds: number;
+  isRealEmailSent: boolean;
+  message: string;
+  devOtpCode?: string | null;
+}
+
+export interface VerifyLoginOtpPayload {
+  tempToken: string;
+  otpCode: string;
+}
+
 export interface RegisterPayload {
   fullName: string;
   storeName: string;
@@ -39,6 +56,28 @@ export interface RegisterPayload {
   email?: string;
   password: string;
   agreeTerms: boolean;
+  otpCode?: string;
+  startTrial?: boolean;
+  idempotencyKey?: string;
+  challengeId?: string | null;
+}
+
+export interface SendRegistrationOtpPayload {
+  phone?: string;
+  storeName?: string;
+  fullName?: string;
+  email: string;
+  startTrial?: boolean;
+}
+
+export interface SendRegistrationOtpResult {
+  success: boolean;
+  message: string;
+  maskedEmail: string;
+  expiresInSeconds: number;
+  isRealEmailSent: boolean;
+  devOtpCode?: string | null;
+  challengeId?: string | null;
 }
 
 export interface AuthResponse {

@@ -21,6 +21,7 @@ interface ProductDetailModalProps {
   onEdit: (product: ProductItem) => void;
   onDelete: (product: ProductItem) => void;
   onToggleStatus: (product: ProductItem) => void;
+  onToggleHasBatches?: (product: ProductItem, nextVal: boolean) => void;
   onDuplicate: (product: ProductItem) => void;
   userRole?: string; // "StoreOwner" | "Cashier"
 }
@@ -32,6 +33,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   onEdit,
   onDelete,
   onToggleStatus,
+  onToggleHasBatches,
   onDuplicate,
   userRole = 'StoreOwner',
 }) => {
@@ -555,9 +557,34 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                   </div>
 
                   <div>
-                    <div style={{ fontSize: 12, color: '#64748B', marginBottom: 2 }}>Quản lý theo lô & HSD</div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: product.hasBatches ? '#1D4ED8' : '#64748B' }}>
-                      {product.hasBatches ? '📦 Có quản lý lô & HSD (FEFO)' : '⚪ Không'}
+                    <div style={{ fontSize: 12, color: '#64748B', marginBottom: 4 }}>Quản lý theo lô & HSD</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <input
+                        id="detail-has-batches-checkbox"
+                        type="checkbox"
+                        checked={Boolean(product.hasBatches)}
+                        onChange={(e) => onToggleHasBatches?.(product, e.target.checked)}
+                        style={{
+                          width: 18,
+                          height: 18,
+                          cursor: 'pointer',
+                          accentColor: '#0F766E',
+                          margin: 0,
+                        }}
+                      />
+                      <label
+                        htmlFor="detail-has-batches-checkbox"
+                        style={{
+                          fontSize: 13,
+                          fontWeight: 600,
+                          color: product.hasBatches ? '#0F766E' : '#64748B',
+                          cursor: 'pointer',
+                          userSelect: 'none',
+                          margin: 0,
+                        }}
+                      >
+                        {product.hasBatches ? 'Có quản lý lô & HSD (FEFO)' : 'Không'}
+                      </label>
                     </div>
                   </div>
 

@@ -7,9 +7,6 @@ import {
   PlanQuotasCard,
   PlanFeaturesCard,
   PlanTenantsCard,
-  PlanBusinessStatsCard,
-  PlanChangelogCard,
-  PlanInternalNotesCard,
   UpdatePlanModal,
   DeletePlanModal,
 } from '../../features/admin/components/subscriptions';
@@ -212,23 +209,23 @@ export const SubscriptionPlanDetailPage: React.FC = () => {
                 letterSpacing: '-0.02em',
               }}
             >
-              Hồ sơ Chi tiết: {currentPlan.name}
+              Chi tiết gói dịch vụ
             </h1>
             <span
               className={currentPlan.status === 'Active' ? 'admin-badge-success' : 'admin-badge-secondary'}
               style={{ fontSize: 12, padding: '3px 10px', borderRadius: 9999, fontWeight: 700 }}
             >
-              {currentPlan.status === 'Active' ? 'Active - Đang mở bán' : 'Inactive - Tạm ngừng bán'}
+              {currentPlan.status === 'Active' ? 'Đang mở bán' : 'Tạm ngừng bán'}
             </span>
           </div>
           <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 6, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <span>{currentPlan.name}</span>
+            <span>&bull;</span>
             <span>Mã gói: <code style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--blue-primary)' }}>{currentPlan.code}</code></span>
             <span>&bull;</span>
             <span>Chu kỳ: Hàng tháng / Hàng năm</span>
             <span>&bull;</span>
             <span>Khởi tạo: <span style={{ fontFamily: 'var(--font-mono)' }}>{currentPlan.createdAt.split('T')[0]}</span></span>
-            <span>&bull;</span>
-            <span>Quản trị bởi: SaaS Master Admin</span>
           </div>
         </div>
 
@@ -277,7 +274,7 @@ export const SubscriptionPlanDetailPage: React.FC = () => {
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'minmax(0, 68%) minmax(0, 32%)',
+          gridTemplateColumns: 'minmax(0, 1fr)',
           gap: 24,
           alignItems: 'start',
         }}
@@ -290,14 +287,6 @@ export const SubscriptionPlanDetailPage: React.FC = () => {
           <PlanTenantsCard plan={currentPlan} />
         </div>
 
-        {/* CỘT PHỤ PHẢI */}
-        <div>
-          <PlanBusinessStatsCard plan={currentPlan} />
-          <PlanChangelogCard plan={currentPlan} />
-          <PlanInternalNotesCard
-            onSaveNote={() => showToast('Đã lưu ghi chú quản trị nội bộ thành công!')}
-          />
-        </div>
       </div>
 
       {/* MODALS */}

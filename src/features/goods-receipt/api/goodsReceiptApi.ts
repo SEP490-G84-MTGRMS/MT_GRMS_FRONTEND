@@ -42,6 +42,8 @@ export interface BackendGoodsReceiptDto {
   totalShortageQty: number;
   hasMismatch: boolean;
   note?: string;
+  createdReturnId?: string;
+  createdReturnCode?: string;
   lines: Array<{
     id: string;
     productId: string;

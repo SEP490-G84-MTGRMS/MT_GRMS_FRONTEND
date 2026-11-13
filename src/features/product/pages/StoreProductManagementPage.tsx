@@ -231,10 +231,10 @@ export const StoreProductManagementPage: FC = () => {
       }
 
       const headers = [
-        'Mã SKU',
-        'Tên Sản Phẩm',
         'Mã Cửa Hàng',
         'Tên Cửa Hàng',
+        'Mã SKU',
+        'Tên Sản Phẩm',
         'Mã Nhà Cung Cấp',
         'Tên Nhà Cung Cấp',
         'Giá Vốn (đ)',
@@ -248,10 +248,10 @@ export const StoreProductManagementPage: FC = () => {
 
       for (const item of exportItems) {
         const row = [
-          `"${(item.sku || '').replace(/"/g, '""')}"`,
-          `"${(item.name || '').replace(/"/g, '""')}"`,
           `"${(item.storeCode || '').replace(/"/g, '""')}"`,
           `"${(item.storeName || '').replace(/"/g, '""')}"`,
+          `"${(item.sku || '').replace(/"/g, '""')}"`,
+          `"${(item.name || '').replace(/"/g, '""')}"`,
           `"${(item.primarySupplierCode || '').replace(/"/g, '""')}"`,
           `"${(item.primarySupplierName || '').replace(/"/g, '""')}"`,
           item.costPrice,

@@ -67,9 +67,9 @@ const mapDtoToItems = (dto: BackendGoodsReceiptDto): GrnItemDetail[] =>
       productName: l.productName,
       unit: l.unit,
       orderedQty: l.orderedQty,
-      receivedQty: l.deliveredQty,
-      acceptedQty: l.deliveredQty,
-      rejectedQty: 0,
+      receivedQty: l.acceptedQty ?? l.deliveredQty,
+      acceptedQty: l.acceptedQty ?? l.deliveredQty,
+      rejectedQty: l.rejectedQty ?? 0,
       shortageQty: l.shortageQty,
       differenceQty: l.differenceQty,
       unitPrice: l.unitPrice,
@@ -115,9 +115,11 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  /** Chỉ khóa khi phiếu đã COMPLETED/CANCELLED; create + DRAFT (confirm/edit) vẫn sửa được */
+  /** Khóa khi lưu, khi xem chi tiết (:id mà không phải confirm/edit), hoặc khi phiếu đã COMPLETED/CANCELLED */
   const isReadOnly =
-    isSaving || (!isCreateMode && !!receiptStatus && receiptStatus !== 'DRAFT');
+    isSaving ||
+    (!isCreateMode && !isConfirmMode && !isEditMode) ||
+    (!isCreateMode && !!receiptStatus && receiptStatus !== 'DRAFT');
 
   const [grnNo, setGrnNo] = useState<string>('(Tự sinh khi lưu)');
   const [branchId, setBranchId] = useState<string>(employeeBranchId || '');
@@ -126,7 +128,7 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
   );
   const [supplierName, setSupplierName] = useState('');
   const [supplierCode, setSupplierCode] = useState('');
-  const [receiptTime] = useState<string>(() => {
+  const [receiptTime, setReceiptTime] = useState<string>(() => {
     const now = new Date();
     const d = String(now.getDate()).padStart(2, '0');
     const m = String(now.getMonth() + 1).padStart(2, '0');
@@ -136,7 +138,7 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
     return `${d}/${m}/${y} ${hh}:${mm}`;
   });
   const [invoiceNo, setInvoiceNo] = useState('');
-  const [createdBy] = useState(
+  const [createdBy, setCreatedBy] = useState<string>(
     role === 'employee' ? 'NV. Thủ kho' : 'Quản lý kho'
   );
   const [paymentTerm, setPaymentTerm] = useState<PaymentTerm>('30');
@@ -177,6 +179,21 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
       setNotes(dto.note || '');
       setDiscountAmount(dto.discountAmount || 0);
       setVatPercent(dto.vatPercent || 0);
+      if (dto.receivedAtUtc) {
+        const d = new Date(dto.receivedAtUtc);
+        const day = String(d.getDate()).padStart(2, '0');
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const year = d.getFullYear();
+        const hh = String(d.getHours()).padStart(2, '0');
+        const mm = String(d.getMinutes()).padStart(2, '0');
+        setReceiptTime(`${day}/${month}/${year} ${hh}:${mm}`);
+      }
+      if (dto.receiverName || dto.receiverUserId) {
+        setCreatedBy(dto.receiverName || dto.receiverUserId);
+      }
+      if (dto.paymentMethod) {
+        setPaymentMethod(dto.paymentMethod as PaymentMethod);
+      }
       setItems(mapDtoToItems(dto));
       if (dto.status && dto.status !== 'DRAFT' && (isConfirmMode || isEditMode)) {
         showToast('Phiếu này không còn ở trạng thái nháp — chuyển sang xem chi tiết.', 'info');
@@ -195,19 +212,24 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
 
   const loadPoLookup = useCallback(async () => {
     if (!isCreateMode) return;
+
+    const paramPoCode = searchParams.get('poCode');
+    const paramPoIdRaw = searchParams.get('po');
+    // Chỉ nhận GUID đầy đủ — tránh JSON.stringify(order) / id cắt cụt từ link cũ
+    const paramPoId =
+      paramPoIdRaw &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(paramPoIdRaw)
+        ? paramPoIdRaw
+        : null;
+
+    // Gắn mã PO từ URL ngay — tránh select trống trong lúc chờ API / khi PO chưa có trong lookup
+    if (paramPoCode) {
+      setPoReference(paramPoCode);
+    }
+
     try {
       const branchFilter = role === 'employee' && employeeBranchId ? employeeBranchId : undefined;
       const pos = await goodsReceiptApi.getPoLookup(branchFilter);
-      setAvailablePos(pos);
-
-      const paramPoCode = searchParams.get('poCode');
-      const paramPoIdRaw = searchParams.get('po');
-      // Chỉ nhận GUID đầy đủ — tránh JSON.stringify(order) / id cắt cụt từ link cũ
-      const paramPoId =
-        paramPoIdRaw &&
-        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(paramPoIdRaw)
-          ? paramPoIdRaw
-          : null;
 
       const matched = pos.find(
         (p) =>
@@ -216,19 +238,39 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
       );
 
       if (matched) {
+        setAvailablePos(pos);
         setPoReference(matched.poCode);
         setSelectedPoId(matched.id);
         return;
       }
 
-      // PO không còn trong lookup (đã có phiếu / sai trạng thái) — vẫn thử load theo id
-      // để API trả lỗi rõ, thay vì để bảng sản phẩm trống im lặng.
+      // PO deep-link chưa nằm trong lookup → vẫn hiện mã trên select + load chi tiết theo id
       if (paramPoId) {
+        const stubPos =
+          paramPoCode && !pos.some((p) => p.poCode === paramPoCode)
+            ? [
+                {
+                  id: paramPoId,
+                  poCode: paramPoCode,
+                  branchId: '',
+                  branchName: '',
+                  supplierId: '',
+                  supplierName: '',
+                  supplierCode: '',
+                  orderDate: '',
+                  expectedDeliveryDate: '',
+                  items: [],
+                } as PoLookupOption,
+                ...pos,
+              ]
+            : pos;
+        setAvailablePos(stubPos);
         if (paramPoCode) setPoReference(paramPoCode);
         setSelectedPoId(paramPoId);
         return;
       }
 
+      setAvailablePos(pos);
       if (paramPoCode) {
         setPoReference(paramPoCode);
         showToast(
@@ -278,6 +320,29 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
       try {
         const details = await goodsReceiptApi.getPoReceiptDetails(selectedPoId);
         if (!details || cancelled) return;
+
+        // Deep-link ?po=&poCode= : luôn gắn mã PO gốc (kể cả khi PO chưa nằm trong po-lookup)
+        if (details.code) {
+          setPoReference(details.code);
+          setAvailablePos((prev) => {
+            if (prev.some((p) => p.id === details.id || p.poCode === details.code)) return prev;
+            return [
+              {
+                id: details.id,
+                poCode: details.code,
+                branchId: details.branchId,
+                branchName: details.branchName || details.branchCode || '',
+                supplierId: details.supplierId,
+                supplierName: details.supplierName,
+                supplierCode: details.supplierCode,
+                orderDate: '',
+                expectedDeliveryDate: '',
+                items: [],
+              },
+              ...prev,
+            ];
+          });
+        }
 
         setSupplierId(details.supplierId);
         setSupplierName(details.supplierName);
@@ -378,18 +443,20 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
       if (!src) return prev;
       const key = String(src.purchaseOrderDetailId || src.productId);
       const lotIndex = prev.filter((it) => String(it.purchaseOrderDetailId || it.productId) === key).length + 1;
+      const isManaged = Boolean(src.hasBatches ?? src.manageBatch);
       const newRow: GrnItemDetail = {
         ...src,
         id: `${src.purchaseOrderDetailId || src.productId}-split-${Date.now()}`,
         isSplitLine: true,
-        manageBatch: true,
+        hasBatches: isManaged,
+        manageBatch: isManaged,
         receivedQty: 0,
         acceptedQty: 0,
         rejectedQty: 0,
         shortageQty: src.orderedQty,
         differenceQty: -src.orderedQty,
         lineTotal: 0,
-        batchCode: generateBatchCode(src.productCode, lotIndex),
+        batchCode: isManaged ? generateBatchCode(src.productCode, lotIndex) : '',
         manufactureDate: '',
         expiryDate: '',
         rejectionReason: undefined,
@@ -475,7 +542,8 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
     }
 
     for (const it of items) {
-      if (it.manageBatch && (it.receivedQty || 0) > 0) {
+      const isBatch = Boolean(it.hasBatches ?? it.manageBatch);
+      if (isBatch && (it.receivedQty || 0) > 0) {
         if (!it.manufactureDate?.trim()) {
           showToast(`${it.productCode}: đang quản lý batch — bắt buộc Ngày SX (MFG).`, 'error');
           return false;
@@ -510,20 +578,23 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
       const ordered = siblings[0]?.orderedQty ?? it.orderedQty;
       const sumReceived = siblings.reduce((s, r) => s + (r.receivedQty || 0), 0);
       const isShort = sumReceived < ordered;
+      const isFirstInGroup = siblings[0]?.id === it.id;
+      const rejected = isFirstInGroup && isShort ? ordered - sumReceived : 0;
       const groupReason =
         siblings.find((r) => r.rejectionReason)?.rejectionReason || it.rejectionReason;
+      const isBatch = Boolean(it.hasBatches ?? it.manageBatch);
       return {
         productId: it.productId,
         purchaseOrderDetailId: it.purchaseOrderDetailId,
         orderedQty: it.orderedQty,
-        deliveredQty: delivered,
+        deliveredQty: delivered + rejected,
         acceptedQty: delivered,
-        rejectedQty: 0,
+        rejectedQty: rejected,
         unitPrice: it.unitPrice,
-        manageBatch: !!it.manageBatch,
-        batchCode: it.manageBatch ? it.batchCode || undefined : undefined,
-        manufactureDate: it.manageBatch ? it.manufactureDate || undefined : undefined,
-        expiryDate: it.manageBatch ? it.expiryDate || undefined : undefined,
+        manageBatch: isBatch,
+        batchCode: isBatch ? it.batchCode || undefined : undefined,
+        manufactureDate: isBatch ? it.manufactureDate || undefined : undefined,
+        expiryDate: isBatch ? it.expiryDate || undefined : undefined,
         rejectionReason: isShort ? groupReason || 'SHORT_DELIVERY' : undefined,
         rejectionNote: it.rejectionNote,
         note: it.note,
@@ -531,7 +602,7 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
     }),
   });
 
-  const submitReceipt = async (autoComplete: boolean) => {
+  const submitReceipt = async (autoComplete: boolean, redirectToReturn = false) => {
     if (!validateForm()) return;
     setIsSaving(true);
     try {
@@ -546,13 +617,24 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
       }
 
       const created = await goodsReceiptApi.createGoodsReceipt(buildCreateCommand(autoComplete));
+      const hasAutoReturn = autoComplete && !!created.createdReturnCode;
       showToast(
         autoComplete
-          ? `Hoàn tất nhập kho ${created.code}. Tồn kho đã được cập nhật.`
+          ? hasAutoReturn
+            ? `Hoàn tất nhập kho ${created.code} & Đã lập Phiếu trả hàng ${created.createdReturnCode} (Từ chối nhận hàng — Tài xế chở về ngay)!`
+            : `Hoàn tất nhập kho ${created.code}. Tồn kho đã được cập nhật.`
           : `Đã lưu nháp phiếu ${created.code}.`,
         'success'
       );
-      setTimeout(() => navigate(listPath), 900);
+      setTimeout(() => {
+        if (redirectToReturn && created.createdReturnId) {
+          navigate(`/store-owner/supplier-returns/${created.createdReturnId}`);
+        } else if (redirectToReturn) {
+          navigate('/store-owner/supplier-returns');
+        } else {
+          navigate(listPath);
+        }
+      }, 950);
     } catch (err: any) {
       showToast(err.response?.data?.message || err.message || 'Lưu phiếu nhập kho thất bại.', 'error');
     } finally {
@@ -564,8 +646,8 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
     void submitReceipt(false);
   };
 
-  const executeCompleteReceipt = (_forcedStatus?: GrnStatus) => {
-    void submitReceipt(true);
+  const executeCompleteReceipt = (_forcedStatus?: GrnStatus, redirectToReturn = false) => {
+    void submitReceipt(true, redirectToReturn);
   };
 
   const hasGroupMismatch = () => {
@@ -724,9 +806,9 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
           (it) => (it.receivedQty || 0) !== it.orderedQty
         )}
         onClose={() => setIsMismatchModalOpen(false)}
-        onConfirm={() => {
+        onConfirm={(redirectToReturn) => {
           setIsMismatchModalOpen(false);
-          executeCompleteReceipt('MISMATCH');
+          executeCompleteReceipt('MISMATCH', redirectToReturn);
         }}
       />
 

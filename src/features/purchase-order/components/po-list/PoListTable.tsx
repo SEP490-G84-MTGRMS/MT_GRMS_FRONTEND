@@ -5,6 +5,7 @@ import {
   Edit3,
   ArrowUpDown,
   FileText,
+  PackageCheck,
 } from 'lucide-react';
 import type { PurchaseOrderListItem, PurchaseOrderStatus } from '../../types/po-list.types';
 import { TablePagination } from '../../../../components/common';
@@ -18,7 +19,37 @@ interface PoListTableProps {
   onPageSizeChange?: (size: number) => void;
   onViewDetail: (order: PurchaseOrderListItem) => void;
   onEditOrder?: (order: PurchaseOrderListItem) => void;
+  onReceiveOrder?: (order: PurchaseOrderListItem) => void;
 }
+
+const canShowReceiveAction = (order: PurchaseOrderListItem): boolean => {
+  const grn = (order.activeGoodsReceiptStatus || '').toUpperCase();
+  // Khi đã nhập rồi (COMPLETED / RECEIVED) thì bỏ icon nhập hàng đi, chỉ để lại nút chi tiết
+  if (grn === 'COMPLETED') return false;
+  if (grn === 'DRAFT') return true;
+  if (
+    order.status === 'CANCELLED' ||
+    order.status === 'REJECTED' ||
+    order.status === 'RECEIVED' ||
+    order.status === 'COMPLETED'
+  ) {
+    return false;
+  }
+  return (
+    order.status === 'SENT' ||
+    order.status === 'CONFIRMED' ||
+    order.status === 'APPROVED' ||
+    order.status === 'DISPATCHED' ||
+    order.status === 'PARTIALLY_RECEIVED'
+  );
+};
+
+const receiveActionTitle = (order: PurchaseOrderListItem): string => {
+  const grn = (order.activeGoodsReceiptStatus || '').toUpperCase();
+  if (grn === 'COMPLETED') return `Xem phiếu nhập ${order.activeGoodsReceiptCode || ''}`.trim();
+  if (grn === 'DRAFT') return `Tiếp tục xác nhận phiếu nháp ${order.activeGoodsReceiptCode || ''}`.trim();
+  return 'Nhận hàng / Nhập kho theo PO này';
+};
 
 type SortField =
   | 'poCode'
@@ -42,6 +73,7 @@ export const PoListTable: FC<PoListTableProps> = ({
   onPageSizeChange,
   onViewDetail,
   onEditOrder,
+  onReceiveOrder,
 }) => {
   const [sortField, setSortField] = useState<SortField | null>(null);
   const [sortDir, setSortDir] = useState<SortDirection>('asc');
@@ -553,6 +585,34 @@ export const PoListTable: FC<PoListTableProps> = ({
                             title="Sửa SL trên ma trận (còn trước cutoff) rồi chốt lại để cập nhật PO"
                           >
                             <Edit3 size={12} />
+                          </button>
+                        )}
+
+                        {onReceiveOrder && canShowReceiveAction(order) && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onReceiveOrder(order);
+                            }}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              width: 26,
+                              height: 26,
+                              borderRadius: 6,
+                              backgroundColor:
+                                (order.activeGoodsReceiptStatus || '').toUpperCase() === 'COMPLETED'
+                                  ? '#ecfdf5'
+                                  : '#f0fdfa',
+                              border: '1px solid #99f6e4',
+                              color: '#0f766e',
+                              cursor: 'pointer',
+                            }}
+                            title={receiveActionTitle(order)}
+                          >
+                            <PackageCheck size={12} />
                           </button>
                         )}
                       </div>

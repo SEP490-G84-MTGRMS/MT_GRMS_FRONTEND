@@ -8,97 +8,138 @@ import {
   Filter,
   RefreshCw,
 } from 'lucide-react';
-import type { WalletTransaction, StoreInfo } from '../storeData';
+import type { WalletTransaction } from '../storeData';
 import { walletApi } from '../api/walletApi';
 import { TablePagination } from '../../../components/common/TablePagination/TablePagination';
 
 interface WalletLedgerTabProps {
-  storeInfo: StoreInfo;
-  transactions: WalletTransaction[];
+  /** Thay đổi giá trị này để buộc tải lại sổ cái từ API (vd: sau khi nạp tiền / mua gói) */
+  refreshKey?: number;
   onOpenTopupModal: () => void;
 }
 
+const getStatusBadgeConfig = (status: string) => {
+  const normalized = status.toUpperCase();
+  if (normalized === 'SUCCESS' || normalized === 'COMPLETED') {
+    return {
+      label: 'Thành công',
+      bg: '#F0FDF4',
+      color: '#15803D',
+      border: '#BBF7D0',
+    };
+  }
+  if (normalized === 'PENDING') {
+    return {
+      label: 'Đang xử lý',
+      bg: '#FFF8EB',
+      color: '#B45309',
+      border: '#FFE8CC',
+    };
+  }
+  return {
+    label: 'Thất bại',
+    bg: '#FFF0F0',
+    color: '#DC2626',
+    border: '#FECACA',
+  };
+};
+
 export const WalletLedgerTab: FC<WalletLedgerTabProps> = ({
-  storeInfo,
-  transactions,
+  refreshKey = 0,
   onOpenTopupModal,
 }) => {
   const [filterType, setFilterType] = useState<string>('ALL');
   const [pageIndex, setPageIndex] = useState<number>(1);
   const [pageSize, setPageSize] = useState<number>(10);
-  const [liveTransactions, setLiveTransactions] = useState<WalletTransaction[]>(transactions);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [liveTransactions, setLiveTransactions] = useState<WalletTransaction[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [manualReloadKey, setManualReloadKey] = useState<number>(0);
   const [balanceStats, setBalanceStats] = useState<{
     walletBalance: number;
     totalTopup: number;
     totalSpent: number;
   }>({
-    walletBalance: storeInfo.walletBalance,
+    walletBalance: 0,
     totalTopup: 0,
     totalSpent: 0,
   });
 
-  // Load real transactions and balance from API
-  const loadData = async () => {
-    setIsLoading(true);
-    try {
-      const [txRes, balRes] = await Promise.all([
-        walletApi.getTransactions(),
-        walletApi.getBalance(),
-      ]);
-
-      if (txRes.success && txRes.data && txRes.data.length > 0) {
-        setLiveTransactions(
-          txRes.data.map((t) => ({
-            id: t.id,
-            transactionCode: t.transactionCode,
-            type: t.type as WalletTransaction['type'],
-            amount: t.amount,
-            balanceBefore: t.balanceBefore,
-            balanceAfter: t.balanceAfter,
-            description: t.description,
-            paymentMethod: t.paymentMethod as WalletTransaction['paymentMethod'],
-            status: (t.status === 'SUCCESS' ? 'Success' : t.status) as WalletTransaction['status'],
-            createdAt: t.createdAt ? new Date(t.createdAt).toLocaleString('vi-VN') : 'Vừa xong',
-          }))
-        );
-      } else {
-        setLiveTransactions(transactions);
-      }
-
-      if (balRes.success && balRes.data) {
-        setBalanceStats({
-          walletBalance: balRes.data.walletBalance,
-          totalTopup: balRes.data.totalTopup,
-          totalSpent: balRes.data.totalSpent,
-        });
-      }
-    } catch {
-      // Fallback local data
-      setLiveTransactions(transactions);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
+  // Tải sổ cái và số dư thật từ API (không dùng dữ liệu mẫu)
   useEffect(() => {
-    loadData();
-  }, [storeInfo.walletBalance]);
+    let isCancelled = false;
+
+    const fetchWalletData = async () => {
+      try {
+        const [txRes, balRes] = await Promise.all([
+          walletApi.getTransactions(),
+          walletApi.getBalance(),
+        ]);
+
+        if (isCancelled) return;
+
+        if (txRes.success && Array.isArray(txRes.data)) {
+          setLiveTransactions(
+            txRes.data.map((t) => ({
+              id: t.id,
+              transactionCode: t.transactionCode,
+              type: t.type as WalletTransaction['type'],
+              amount: t.amount,
+              balanceBefore: t.balanceBefore,
+              balanceAfter: t.balanceAfter,
+              description: t.description,
+              paymentMethod: t.paymentMethod as WalletTransaction['paymentMethod'],
+              status: t.status as WalletTransaction['status'],
+              createdAt: t.createdAt ? new Date(t.createdAt).toLocaleString('vi-VN') : 'Vừa xong',
+            }))
+          );
+          setLoadError(null);
+        } else {
+          setLiveTransactions([]);
+          setLoadError(txRes.message || 'Không thể tải lịch sử giao dịch ví.');
+        }
+
+        if (balRes.success && balRes.data) {
+          setBalanceStats({
+            walletBalance: balRes.data.walletBalance,
+            totalTopup: balRes.data.totalTopup,
+            totalSpent: balRes.data.totalSpent,
+          });
+        } else if (!balRes.success) {
+          setLoadError((prev) => prev || balRes.message || 'Không thể tải số dư ví.');
+        }
+      } catch {
+        if (isCancelled) return;
+        setLiveTransactions([]);
+        setLoadError('Không thể kết nối máy chủ để tải lịch sử giao dịch ví.');
+      } finally {
+        if (!isCancelled) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    void fetchWalletData();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [refreshKey, manualReloadKey]);
+
+  const handleRefresh = () => {
+    setIsLoading(true);
+    setLoadError(null);
+    setManualReloadKey((k) => k + 1);
+  };
 
   const filteredList = liveTransactions.filter((t) => {
     if (filterType === 'ALL') return true;
     return t.type === filterType;
   });
 
-  const totalTopup = balanceStats.totalTopup || liveTransactions
-    .filter((t) => t.type === 'TOPUP')
-    .reduce((sum, t) => sum + t.amount, 0);
-
-  const totalSpent = balanceStats.totalSpent || liveTransactions
-    .filter((t) => t.type === 'PURCHASE_PLAN' || t.type === 'PURCHASE_ADDON')
-    .reduce((sum, t) => sum + t.amount, 0);
-
-  const currentWalletBalance = balanceStats.walletBalance || storeInfo.walletBalance;
+  const totalTopup = balanceStats.totalTopup;
+  const totalSpent = balanceStats.totalSpent;
+  const currentWalletBalance = balanceStats.walletBalance;
   const pagedList = filteredList.slice((pageIndex - 1) * pageSize, pageIndex * pageSize);
 
   return (
@@ -273,8 +314,8 @@ export const WalletLedgerTab: FC<WalletLedgerTabProps> = ({
           {isLoading && <RefreshCw size={14} className="animate-spin text-teal-600" />}
         </div>
 
-        {/* Filter Pills */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        {/* Filter Pills & Refresh */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           <Filter size={15} color="#94A3B8" />
           {[
             { key: 'ALL', label: 'Tất cả' },
@@ -307,6 +348,29 @@ export const WalletLedgerTab: FC<WalletLedgerTabProps> = ({
               </button>
             );
           })}
+          <button
+            type="button"
+            onClick={handleRefresh}
+            disabled={isLoading}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 5,
+              padding: '5px 12px',
+              borderRadius: 'var(--radius-pill)',
+              border: '1px solid #CBD5E1',
+              backgroundColor: '#FFFFFF',
+              color: '#475569',
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: isLoading ? 'not-allowed' : 'pointer',
+              transition: 'all 0.15s ease',
+            }}
+            title="Tải lại dữ liệu ví từ máy chủ"
+          >
+            <RefreshCw size={12} className={isLoading ? 'animate-spin' : ''} />
+            <span>Làm mới</span>
+          </button>
         </div>
       </div>
 
@@ -330,13 +394,17 @@ export const WalletLedgerTab: FC<WalletLedgerTabProps> = ({
               {pagedList.length === 0 ? (
                 <tr>
                   <td colSpan={8} style={{ padding: '36px 16px', textAlign: 'center', color: '#94A3B8' }}>
-                    Chưa có giao dịch ví nào được ghi nhận.
+                    {isLoading ? 'Đang tải lịch sử giao dịch...' : (loadError ?? 'Chưa có giao dịch ví nào được ghi nhận.')}
                   </td>
                 </tr>
               ) : (
                 pagedList.map((tx, index) => {
                   const isPositive = tx.type === 'TOPUP' || tx.type === 'REFUND';
                   const rowNum = (pageIndex - 1) * pageSize + index + 1;
+                  const isVietQr = tx.paymentMethod?.toUpperCase() === 'VIETQR';
+                  const methodLabel =
+                    tx.paymentMethod?.toUpperCase() === 'WALLET' ? 'Wallet' : tx.paymentMethod;
+                  const statusCfg = getStatusBadgeConfig(tx.status);
                   return (
                     <tr key={tx.id} className="so-list-row">
                       <td className="so-list-td" style={{ textAlign: 'center', color: '#64748b', fontWeight: 600, fontFamily: 'var(--font-mono)' }}>
@@ -384,12 +452,12 @@ export const WalletLedgerTab: FC<WalletLedgerTabProps> = ({
                             borderRadius: 9999,
                             fontSize: 11.5,
                             fontWeight: 600,
-                            backgroundColor: tx.paymentMethod === 'VietQR' ? '#f0fdfa' : '#f8fafc',
-                            color: tx.paymentMethod === 'VietQR' ? '#0f766e' : '#334155',
-                            border: tx.paymentMethod === 'VietQR' ? '1px solid #ccfbf1' : '1px solid #e2e8f0',
+                            backgroundColor: isVietQr ? '#f0fdfa' : '#f8fafc',
+                            color: isVietQr ? '#0f766e' : '#334155',
+                            border: isVietQr ? '1px solid #ccfbf1' : '1px solid #e2e8f0',
                           }}
                         >
-                          {tx.paymentMethod}
+                          {methodLabel}
                         </span>
                       </td>
                       <td className="so-list-td" style={{ textAlign: 'center' }}>
@@ -402,12 +470,12 @@ export const WalletLedgerTab: FC<WalletLedgerTabProps> = ({
                             borderRadius: 9999,
                             fontSize: 11.5,
                             fontWeight: 600,
-                            backgroundColor: '#f0fdf4',
-                            color: '#15803d',
-                            border: '1px solid #bbf7d0',
+                            backgroundColor: statusCfg.bg,
+                            color: statusCfg.color,
+                            border: `1px solid ${statusCfg.border}`,
                           }}
                         >
-                          Thành công
+                          {statusCfg.label}
                         </span>
                       </td>
                     </tr>
