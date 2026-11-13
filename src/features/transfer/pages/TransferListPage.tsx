@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Plus,
@@ -10,8 +10,8 @@ import {
   CheckCircle,
   FileText,
 } from 'lucide-react';
-import type { TransferOrder, TransferStatus } from '../types';
-import { INITIAL_BRANCHES, INITIAL_TRANSFERS } from '../services/mockData';
+import type { Branch, TransferOrder, TransferStatus } from '../types';
+import { transferService } from '../services/transferService';
 import { TransferFilterSidebar } from '../components/TransferFilterSidebar';
 import { ImportTransferExcelModal } from '../components/ImportTransferExcelModal';
 import { TransferDetailModal } from '../components/TransferDetailModal';
@@ -23,12 +23,14 @@ export const TransferListPage: React.FC = () => {
   const navigate = useNavigate();
 
   // State
-  const [transfers, setTransfers] = useState<TransferOrder[]>(INITIAL_TRANSFERS);
-  const [branches] = useState(INITIAL_BRANCHES);
+  const [transfers, setTransfers] = useState<TransferOrder[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [totalItems, setTotalItems] = useState(0);
+  const [branches, setBranches] = useState<Branch[]>([]);
 
   // User role & current branch context (BR-SEC-02 simulation)
   const [userRole, setUserRole] = useState<'StoreOwner' | 'Employee'>('StoreOwner');
-  const [currentBranchId, setCurrentBranchId] = useState<string>('1'); // Chi nhánh trung tâm
+  const [currentBranchId, setCurrentBranchId] = useState<string>('');
 
   // Filters
   const [searchCode, setSearchCode] = useState('');
@@ -55,6 +57,30 @@ export const TransferListPage: React.FC = () => {
   // Toast
   const [toast, setToast] = useState<ToastState | null>(null);
 
+  const loadTransfers = useCallback(() => {
+    setIsLoading(true);
+    transferService.list({ page: pageIndex, pageSize, search: searchCode || undefined, fromBranchId: fromBranchId || undefined, toBranchId: toBranchId || undefined })
+      .then((result) => { setTransfers(result.items); setTotalItems(result.totalItems); })
+      .catch((error: unknown) => showToast(error instanceof Error ? error.message : 'Không tải được phiếu điều chuyển.', 'warning'))
+      .finally(() => setIsLoading(false));
+  }, [pageIndex, pageSize, searchCode, fromBranchId, toBranchId]);
+
+  useEffect(() => { void loadTransfers(); }, [loadTransfers]);
+
+  useEffect(() => {
+    transferService
+      .branches()
+      .then((data) => {
+        setBranches(data);
+        if (data.length > 0) {
+          setCurrentBranchId((prev) => (prev ? prev : data[0].id));
+        }
+      })
+      .catch((error: unknown) => {
+        showToast(error instanceof Error ? error.message : 'Không tải được danh sách chi nhánh.', 'warning');
+      });
+  }, []);
+
   const showToast = (message: string, type: ToastState['type'] = 'success') => {
     setToast({ id: Date.now().toString(), message, type });
     setTimeout(() => setToast(null), 3000);
@@ -78,11 +104,9 @@ export const TransferListPage: React.FC = () => {
     setRecvStatus('all');
   };
 
-  const handleToggleFavorite = (id: string, e: React.MouseEvent) => {
+  const handleToggleFavorite = (_id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    setTransfers(
-      transfers.map((t) => (t.id === id ? { ...t, isFavorite: !t.isFavorite } : t))
-    );
+    showToast('Thao tác đánh dấu yêu thích chưa được API hỗ trợ.', 'warning');
   };
 
   // Filter logic including BR-SEC-02
@@ -124,9 +148,8 @@ export const TransferListPage: React.FC = () => {
 
   const totalTransferValue = filteredTransfers.reduce((sum, t) => sum + t.totalAmount, 0);
   const pagedTransfers = useMemo(() => {
-    const start = (pageIndex - 1) * pageSize;
-    return filteredTransfers.slice(start, start + pageSize);
-  }, [filteredTransfers, pageIndex, pageSize]);
+    return filteredTransfers;
+  }, [filteredTransfers]);
 
   const renderStatus = (status: TransferStatus) => {
     switch (status) {
@@ -487,7 +510,8 @@ export const TransferListPage: React.FC = () => {
                   );
                 })}
 
-                {filteredTransfers.length === 0 && (
+                      {isLoading && <tr><td colSpan={9} style={{ padding: 28, textAlign: 'center' }}>Đang tải phiếu...</td></tr>}
+                      {!isLoading && filteredTransfers.length === 0 && (
                   <tr>
                     <td colSpan={9} style={{ padding: '40px 20px', textAlign: 'center', color: '#94a3b8' }}>
                       <FileText size={40} style={{ margin: '0 auto 10px auto', opacity: 0.5 }} />
@@ -505,7 +529,7 @@ export const TransferListPage: React.FC = () => {
           <TablePagination
             currentPage={pageIndex}
             pageSize={pageSize}
-            totalItems={filteredTransfers.length}
+            totalItems={totalItems}
             pageSizeOptions={[10, 15, 20, 50]}
             onPageChange={(page) => setPageIndex(page)}
             onPageSizeChange={(size) => {

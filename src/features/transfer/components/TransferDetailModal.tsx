@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import type { TransferOrder, TransferItem, TransferStatus } from '../types';
 import { CancelTransferModal } from './CancelTransferModal';
+import { transferService } from '../services/transferService';
 
 interface TransferDetailModalProps {
   isOpen: boolean;
@@ -60,15 +61,13 @@ export const TransferDetailModal: React.FC<TransferDetailModalProps> = ({
 
   if (!isOpen || !currentTransfer) return null;
 
-  const handleConfirmCancel = (reason: string) => {
-    const updated: TransferOrder = {
-      ...currentTransfer,
-      status: 'Cancelled',
-      cancelReason: reason,
-    };
-    setCurrentTransfer(updated);
-    if (onUpdateTransfer) {
-      onUpdateTransfer(updated);
+  const handleConfirmCancel = async (reason: string) => {
+    try {
+      const updated = await transferService.cancel(currentTransfer.id, reason);
+      setCurrentTransfer(updated);
+      onUpdateTransfer?.(updated);
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'Không thể hủy phiếu chuyển.');
     }
   };
 
