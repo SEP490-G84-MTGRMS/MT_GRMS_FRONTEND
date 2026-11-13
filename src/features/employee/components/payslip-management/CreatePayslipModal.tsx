@@ -5,6 +5,7 @@ import { MOCK_BRANCHES } from '../../services/mockData';
 import { AttendanceConfigModal } from '../shift-config/AttendanceConfigModal';
 import { payslipApi, extractErrorMessage } from '../../api/payslipApi';
 import { scheduleApi } from '../../api/scheduleApi';
+import { getVietnamCurrentMonthIso } from '../../lib/vietnamTime';
 
 interface CreatePayslipModalProps {
   isOpen: boolean;
@@ -23,7 +24,7 @@ export const CreatePayslipModal: React.FC<CreatePayslipModalProps> = ({
   onCalculationSuccess,
   onCreateSuccess,
 }) => {
-  const [periodMonth, setPeriodMonth] = useState(initialPeriodMonth || '2026-11');
+  const [periodMonth, setPeriodMonth] = useState(() => initialPeriodMonth || getVietnamCurrentMonthIso());
   const [branchId, setBranchId] = useState('ALL');
   const [salaryTypeFilter, setSalaryTypeFilter] = useState<'ALL' | 'MONTHLY' | 'SHIFT' | 'HOURLY'>('ALL');
   const [standardDayHours, setStandardDayHours] = useState(8.0);

@@ -235,7 +235,12 @@ export interface PayslipDetailedRecord {
   totalShifts?: number; // 25
   totalLateMinutes?: number;
   totalEarlyLeaveMinutes?: number;
+  paidLeaveDays?: number;
+  unpaidLeaveDays?: number;
   otHours: number; // 8.5
+  otRateWeekday?: string; // 150%
+  otRateSunday?: string; // 200%
+  otRatePercent?: string; // 150% (Thường) / 200% (CN)
   contractBaseSalary: number; // 8,000,000 (tương thích ngược với baseRate)
 
   // Thu nhập (Earnings)

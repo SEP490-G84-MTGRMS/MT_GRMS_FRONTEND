@@ -75,6 +75,8 @@ export interface PayslipResponse {
   approvedBy?: string | null;
   approvedAt?: string | null;
   createdAt: string;
+  otWeekday?: string | null;
+  otSunday?: string | null;
 }
 
 export interface GeneratePayrollBatchRequest {
@@ -166,6 +168,11 @@ export function mapBackendSummaryToDetailedRecord(dto: PayslipSummaryDto): Paysl
     baseSalaryEarned: dto.totalEarnings,
     overtimePay: 0,
     otHours: 0,
+    otRateWeekday: '150%',
+    otRateSunday: '200%',
+    otRatePercent: '150% (Thường) / 200% (CN)',
+    paidLeaveDays: 0,
+    unpaidLeaveDays: 0,
     totalEarnings: dto.totalEarnings,
     lunchAllowance: 0,
     travelAllowance: 0,
@@ -206,7 +213,12 @@ export function mapBackendDetailToDetailedRecord(dto: PayslipResponse): PayslipD
     totalShifts: dto.totalShifts,
     totalLateMinutes: dto.totalLateMinutes,
     totalEarlyLeaveMinutes: dto.totalEarlyLeaveMinutes,
+    paidLeaveDays: dto.paidLeaveDays ?? 0,
+    unpaidLeaveDays: dto.unpaidLeaveDays ?? 0,
     otHours: dto.otHours,
+    otRateWeekday: dto.otWeekday || '150%',
+    otRateSunday: dto.otSunday || '200%',
+    otRatePercent: dto.otWeekday ? `${dto.otWeekday} (Thường) / ${dto.otSunday || '200%'} (CN)` : '150% (Thường) / 200% (CN)',
     contractBaseSalary: dto.baseRate,
     baseSalaryEarned: dto.baseSalaryEarned,
     overtimePay: dto.overtimePay,

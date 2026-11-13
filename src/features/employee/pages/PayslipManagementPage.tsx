@@ -54,9 +54,9 @@ export const PayslipManagementPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // Filters state - Mặc định hiển thị kỳ tháng 10/2026 (kỳ chốt công mẫu của hệ thống)
+  // Filters state - Mặc định hiển thị kỳ tháng hiện tại theo múi giờ Việt Nam
   const [keyword, setKeyword] = useState<string>('');
-  const [periodMonth, setPeriodMonth] = useState<string>('2026-10');
+  const [periodMonth, setPeriodMonth] = useState<string>(() => getVietnamCurrentMonthIso());
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'UNPAID' | 'PAID'>('ALL');
   const [activeBranch, setActiveBranch] = useState<{ id: string; name: string } | null>(() => {
     try {
@@ -445,7 +445,7 @@ export const PayslipManagementPage: React.FC = () => {
 
   const handleResetFilters = () => {
     setKeyword('');
-    setPeriodMonth('2026-10');
+    setPeriodMonth(getVietnamCurrentMonthIso());
     setStatusFilter('ALL');
   };
 
@@ -776,7 +776,7 @@ export const PayslipManagementPage: React.FC = () => {
           {/* Nút đặt lại bộ lọc */}
           {isOwnerOrAdmin && (() => {
             const hasActiveFilters =
-              Boolean(keyword.trim()) || statusFilter !== 'ALL' || periodMonth !== '2026-10';
+              Boolean(keyword.trim()) || statusFilter !== 'ALL' || periodMonth !== currentMonthIso;
             return (
               <button
                 type="button"
@@ -1038,14 +1038,14 @@ export const PayslipManagementPage: React.FC = () => {
                     Hệ thống chưa tìm thấy phiếu lương đã tính trong kỳ này.
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'center', gap: 10, marginTop: 14 }}>
-                    {periodMonth !== '2026-10' && (
+                    {periodMonth !== currentMonthIso && (
                       <button
                         type="button"
                         className="emp-btn emp-btn-secondary"
-                        onClick={() => setPeriodMonth('2026-10')}
+                        onClick={() => setPeriodMonth(currentMonthIso)}
                         style={{ fontSize: 12, height: 32 }}
                       >
-                        Chuyển về kỳ Tháng 10/2026 (Kỳ mẫu)
+                        Chuyển về tháng hiện tại
                       </button>
                     )}
                     {isOwnerOrAdmin && (
