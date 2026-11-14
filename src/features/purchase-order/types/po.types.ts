@@ -39,6 +39,8 @@ export interface OrderMatrixSupplierDeliveryConfig {
   cutoffTime: string;
   /** Số ngày trước ngày giao để chốt đơn (0 = cùng ngày giao). */
   cutoffDayOffset?: number;
+  /** MOQ tổng đơn theo ngày giao (cấu hình NCC). 0 = không áp dụng. */
+  minOrderQuantity?: number;
   activeDeliveryDays: number[]; // 0: CN, 1: T2, ..., 6: T7
   blackoutDates: string[]; // YYYY-MM-DD
 }

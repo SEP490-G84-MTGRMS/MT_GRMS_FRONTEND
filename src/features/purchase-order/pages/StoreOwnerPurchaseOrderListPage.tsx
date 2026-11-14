@@ -1,13 +1,20 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { FC } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Grid, Zap, Layers, Loader2 } from 'lucide-react';
 import { purchaseOrderApi } from '../api/purchaseOrderApi';
+import { branchApi } from '../api/branchApi';
+import { supplierApi } from '../../supplier/api/supplierApi';
 import type { PurchaseOrderListItem, PoListFilterState, PurchaseOrderStatus } from '../types/po-list.types';
 import { PoListFilterBar } from '../components/po-list/PoListFilterBar';
 import { PoListTable } from '../components/po-list/PoListTable';
 import { PoDetailDrawer } from '../components/po-list/PoDetailDrawer';
 import { AdminToast, type ToastState } from '../../admin/components';
+import {
+  formatDeliveryDateGateMessage,
+  isDeliveryDateReached,
+  toDeliveryDateKey,
+} from '../lib/deliveryDateGate';
 import '../purchase-order.css';
 import '../../supplier/supplier.css';
 
@@ -38,31 +45,35 @@ const formatVnDate = (iso?: string): string => {
   return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
 };
 
-/** Map backend PO status → badge status trên UI list. */
-const mapBackendStatus = (status: string): PurchaseOrderStatus => {
-  switch ((status || '').toUpperCase()) {
-    case 'PENDING_APPROVAL':
-    case 'DISPATCHED':
-    case 'SENT':
-      return 'SENT';
-    case 'APPROVED':
-    case 'CONFIRMED':
-    case 'FINALIZED':
-      return 'CONFIRMED';
-    case 'PARTIALLY_RECEIVED':
-      return 'PARTIALLY_RECEIVED';
-    case 'RECEIVED':
-    case 'COMPLETED':
-      return 'RECEIVED';
-    case 'CANCELLED':
-    case 'REJECTED':
-      return 'CANCELLED';
-    default:
-      return 'SENT';
-  }
+const KNOWN_PO_STATUSES: PurchaseOrderStatus[] = [
+  'PENDING_APPROVAL',
+  'APPROVED',
+  'DISPATCHED',
+  'SENT',
+  'CONFIRMED',
+  'PARTIALLY_RECEIVED',
+  'RECEIVED',
+  'COMPLETED',
+  'REJECTED',
+  'CANCELLED',
+];
+
+/** Giữ nguyên status BE — không gộp SENT/DISPATCHED/PENDING_APPROVAL. */
+const normalizePoStatus = (status: string): PurchaseOrderStatus => {
+  const s = (status || '').toUpperCase();
+  return KNOWN_PO_STATUSES.includes(s as PurchaseOrderStatus)
+    ? (s as PurchaseOrderStatus)
+    : 'SENT';
+};
+
+const mapCreatedSource = (role?: string): string => {
+  const r = (role || '').toUpperCase();
+  if (r === 'EMPLOYEE' || r === 'STAFF') return 'NV Chi nhánh đề xuất';
+  return 'Chủ cửa hàng (PO Matrix)';
 };
 
 const RECEIVE_ELIGIBLE_STATUSES: PurchaseOrderStatus[] = [
+  'PENDING_APPROVAL',
   'SENT',
   'CONFIRMED',
   'APPROVED',
@@ -73,26 +84,38 @@ const RECEIVE_ELIGIBLE_STATUSES: PurchaseOrderStatus[] = [
 const canReceiveOrder = (order: PurchaseOrderListItem): boolean => {
   if (order.activeGoodsReceiptStatus?.toUpperCase() === 'COMPLETED') return true; // xem phiếu
   if (order.status === 'CANCELLED' || order.status === 'REJECTED') return false;
+  // DRAFT đã tạo: cho mở lại; tạo mới / hoàn tất: phải đến ngày giao (check ở handle + table)
   return RECEIVE_ELIGIBLE_STATUSES.includes(order.status) || order.status === 'RECEIVED';
 };
 
-/** Map UI filter status → backend status (nếu có). */
+/** Filter 1-1 với status BE — không remap SENT → PENDING_APPROVAL. */
 const mapFilterStatusToBackend = (status: PoListFilterState['status']): string | undefined => {
   if (status === 'all') return undefined;
-  if (status === 'SENT') return 'PENDING_APPROVAL';
-  if (status === 'CONFIRMED') return 'APPROVED';
   return status;
 };
 
 export const StoreOwnerPurchaseOrderListPage: FC = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const supplierIdFromUrl = searchParams.get('supplierId') || searchParams.get('supplier') || '';
+  const codeFromUrl = searchParams.get('code') || '';
 
   const [orders, setOrders] = useState<PurchaseOrderListItem[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
+  const [branchOptions, setBranchOptions] = useState<{ id: string; code: string; name: string }[]>([]);
+  const [supplierOptions, setSupplierOptions] = useState<{ id: string; code: string; name: string }[]>([]);
 
-  const [filterInputs, setFilterInputs] = useState<PoListFilterState>(DEFAULT_FILTERS);
-  const [appliedFilters, setAppliedFilters] = useState<PoListFilterState>(DEFAULT_FILTERS);
+  const [filterInputs, setFilterInputs] = useState<PoListFilterState>(() => ({
+    ...DEFAULT_FILTERS,
+    supplierId: supplierIdFromUrl || 'all',
+    keyword: codeFromUrl,
+  }));
+  const [appliedFilters, setAppliedFilters] = useState<PoListFilterState>(() => ({
+    ...DEFAULT_FILTERS,
+    supplierId: supplierIdFromUrl || 'all',
+    keyword: codeFromUrl,
+  }));
 
   const [pageIndex, setPageIndex] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -114,12 +137,12 @@ export const StoreOwnerPurchaseOrderListPage: FC = () => {
         status: mapFilterStatusToBackend(appliedFilters.status),
         dateFrom: appliedFilters.dateFrom || undefined,
         dateTo: appliedFilters.dateTo || undefined,
+        keyword: appliedFilters.keyword.trim() || undefined,
         pageIndex,
         pageSize,
       });
 
-      const keyword = appliedFilters.keyword.trim().toLowerCase();
-      let mapped: PurchaseOrderListItem[] = result.items.map((po) => {
+      const mapped: PurchaseOrderListItem[] = result.items.map((po) => {
         const branchCode = po.branchCode || '';
         const supplierCode = po.supplierCode || '';
         return {
@@ -132,17 +155,20 @@ export const StoreOwnerPurchaseOrderListPage: FC = () => {
           branchId: po.branchId,
           branchCode,
           branchName: po.branchName,
-          createdSource: 'Chủ cửa hàng (Dispatch Hub)',
+          createdSource: mapCreatedSource(po.createdByRole),
           lastUpdated: formatVnDateTime(po.lastAmendedAtUtc || po.createdAt),
           expectedDelivery: formatVnDate(po.deliveryDate),
+          deliveryDate: toDeliveryDateKey(po.deliveryDate),
           itemCount: po.details?.length ?? 0,
           totalAmount: po.totalAmount,
-          status: mapBackendStatus(po.status),
+          status: normalizePoStatus(po.status),
           note: po.note,
           revisionNumber: po.revisionNumber ?? 1,
           activeGoodsReceiptId: po.activeGoodsReceiptId ?? null,
           activeGoodsReceiptCode: po.activeGoodsReceiptCode ?? null,
           activeGoodsReceiptStatus: po.activeGoodsReceiptStatus ?? null,
+          sourceType: po.sourceType ?? null,
+          sourceSupplierReturnId: po.sourceSupplierReturnId ?? null,
           items: (po.details ?? []).map((d) => ({
             id: d.id,
             name: d.productName,
@@ -155,23 +181,8 @@ export const StoreOwnerPurchaseOrderListPage: FC = () => {
         };
       });
 
-      if (keyword) {
-        mapped = mapped.filter((o) => {
-          const matchCode = o.poCode.toLowerCase().includes(keyword);
-          const matchStore = o.storeRefCode.toLowerCase().includes(keyword);
-          const matchSup =
-            o.supplierName.toLowerCase().includes(keyword) || o.supplierCode.toLowerCase().includes(keyword);
-          const matchBranch =
-            o.branchName.toLowerCase().includes(keyword) || o.branchCode.toLowerCase().includes(keyword);
-          const matchItems = o.items.some(
-            (it) => it.name.toLowerCase().includes(keyword) || it.sku.toLowerCase().includes(keyword)
-          );
-          return matchCode || matchStore || matchSup || matchBranch || matchItems;
-        });
-      }
-
       setOrders(mapped);
-      setTotalCount(keyword ? mapped.length : result.totalItems);
+      setTotalCount(result.totalItems);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Không tải được danh sách PO.';
       showToast(message, 'error');
@@ -186,25 +197,60 @@ export const StoreOwnerPurchaseOrderListPage: FC = () => {
     void loadOrders();
   }, [loadOrders]);
 
-  const supplierOptions = useMemo(() => {
-    const map = new Map<string, { id: string; code: string; name: string }>();
-    orders.forEach((o) => {
-      if (!map.has(o.supplierId)) {
-        map.set(o.supplierId, { id: o.supplierId, code: o.supplierCode, name: o.supplierName });
+  useEffect(() => {
+    let mounted = true;
+    const loadCatalog = async () => {
+      try {
+        const [branchRes, supplierRes] = await Promise.all([
+          branchApi.getBranches({ status: 'all', pageIndex: 1, pageSize: 100 }),
+          supplierApi.getSuppliers({ pageIndex: 1, pageSize: 100 }),
+        ]);
+        if (!mounted) return;
+        setBranchOptions(
+          (branchRes.items ?? []).map((b) => ({
+            id: b.id,
+            code: b.code || '',
+            name: b.name,
+          }))
+        );
+        setSupplierOptions(
+          (supplierRes.items ?? []).map((s) => ({
+            id: s.id,
+            code: s.code || '',
+            name: s.name,
+          }))
+        );
+      } catch {
+        if (!mounted) return;
       }
-    });
-    return Array.from(map.values());
-  }, [orders]);
+    };
+    void loadCatalog();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
-  const branchOptions = useMemo(() => {
-    const map = new Map<string, { id: string; code: string; name: string }>();
-    orders.forEach((o) => {
-      if (!map.has(o.branchId)) {
-        map.set(o.branchId, { id: o.branchId, code: o.branchCode, name: o.branchName });
-      }
-    });
-    return Array.from(map.values());
-  }, [orders]);
+  useEffect(() => {
+    const nextSupplier = supplierIdFromUrl || 'all';
+    const nextKeyword = codeFromUrl;
+    setFilterInputs((prev) => ({
+      ...prev,
+      supplierId: nextSupplier,
+      keyword: nextKeyword || prev.keyword,
+    }));
+    setAppliedFilters((prev) => ({
+      ...prev,
+      supplierId: nextSupplier,
+      keyword: nextKeyword || prev.keyword,
+    }));
+    setPageIndex(1);
+  }, [supplierIdFromUrl, codeFromUrl]);
+
+  useEffect(() => {
+    if (!codeFromUrl || orders.length === 0) return;
+    const found = orders.find((o) => o.poCode.toLowerCase() === codeFromUrl.toLowerCase());
+    if (found) setSelectedOrder(found);
+  }, [codeFromUrl, orders]);
 
   const handleSearch = () => {
     setAppliedFilters(filterInputs);
@@ -226,10 +272,23 @@ export const StoreOwnerPurchaseOrderListPage: FC = () => {
 
     const grnStatus = (order.activeGoodsReceiptStatus || '').toUpperCase();
     const grnId = order.activeGoodsReceiptId;
+    const isExchange =
+      String(order.sourceType || '').toUpperCase() === 'SUPPLIER_RETURN';
 
-    if (grnId && grnStatus === 'COMPLETED') {
+    // PO đổi hàng nhận nhiều đợt: nếu còn PARTIALLY_RECEIVED thì tạo GRN mới, không khóa vào GRN cũ.
+    if (
+      grnId &&
+      grnStatus === 'COMPLETED' &&
+      !(isExchange && order.status === 'PARTIALLY_RECEIVED')
+    ) {
       showToast(`PO ${order.poCode} đã nhập kho (${order.activeGoodsReceiptCode}). Mở phiếu nhập.`, 'info');
       navigate(`/store-owner/goods-receipts/${grnId}`);
+      return;
+    }
+
+    // Rule: chỉ nhập hàng từ ngày giao trở đi (xem phiếu COMPLETED vẫn được)
+    if (!isDeliveryDateReached(order.deliveryDate)) {
+      showToast(formatDeliveryDateGateMessage(order.deliveryDate), 'warning');
       return;
     }
 

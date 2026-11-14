@@ -102,10 +102,10 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  flex-wrap: nowrap;
+  flex-wrap: nowrap !important;
   width: 100%;
   overflow-x: auto;
-  scrollbar-width: none;
+  scrollbar-width: thin;
 }
 .po-filter-row::-webkit-scrollbar {
   display: none;
@@ -1027,13 +1027,7 @@
   line-height: 1.5;
 }
 
-/* 3. Filter Bar */
-.po-filter-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-}
+/* 3. Filter Bar — không override wrap (giữ 2 dòng cố định ở .po-filter-box) */
 
 .po-select {
   height: 38px;

@@ -29,6 +29,7 @@ type BackendLoginUser = {
   tenantId?: string;
   phone?: string;
   isAdmin?: boolean;
+  isTwoFactorEnabled?: boolean;
 };
 
 function mapRole(roleName?: string): UserRole {
@@ -53,6 +54,7 @@ function mapLoginUser(user: BackendLoginUser): UserProfile {
     branchId: user.branchId || undefined,
     phone: user.phone,
     isAdmin: isUserAdmin,
+    isTwoFactorEnabled: typeof user.isTwoFactorEnabled === 'boolean' ? user.isTwoFactorEnabled : false,
   };
 }
 

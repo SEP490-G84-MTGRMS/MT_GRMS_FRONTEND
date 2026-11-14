@@ -254,11 +254,9 @@ export const GoodsReceiptListPage: FC<{ defaultRole?: UserRole }> = ({
     ) {
       navigate(`${basePath}/${receipt.id}${roleQuery}`);
     } else if (action === 'VIEW_BATCH') {
-      setSelectedReceipt(receipt);
-      setIsDrawerOpen(true);
-      showToast(`Xem danh sách lô hàng FEFO đã gán cho phiếu ${receipt.code}`, 'info');
+      navigate(`/store-owner/batches?keyword=${encodeURIComponent(receipt.code)}`);
     } else if (action === 'PRINT_RECEIPT') {
-      showToast(`Đang kết nối máy in để in phiếu nhập kho ${receipt.code}...`, 'success');
+      return;
     }
   };
 
@@ -290,6 +288,7 @@ export const GoodsReceiptListPage: FC<{ defaultRole?: UserRole }> = ({
         </div>
 
         <div className="so-list-header-actions">
+          {defaultRole !== 'store_owner' && (
           <div
             style={{
               display: 'flex',
@@ -346,6 +345,7 @@ export const GoodsReceiptListPage: FC<{ defaultRole?: UserRole }> = ({
               <span>Nhân viên</span>
             </button>
           </div>
+          )}
 
           <button
             type="button"

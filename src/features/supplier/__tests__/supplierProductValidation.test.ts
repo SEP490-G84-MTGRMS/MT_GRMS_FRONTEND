@@ -4,19 +4,14 @@ export function resolveEffectivePurchasePrice(
   agreedPrice: number,
   costPrice?: number | null
 ): { ok: true; value: number } | { ok: false; error: string } {
-  if (agreedPrice > 0) {
-    return { ok: true, value: agreedPrice };
-  }
   if (agreedPrice < 0) {
     return { ok: false, error: 'Giá sỉ thỏa thuận không được âm.' };
   }
-  if (costPrice == null) {
-    return {
-      ok: false,
-      error: 'Không xác định được giá nhập hợp lệ. Nhập giá thỏa thuận hoặc đảm bảo sản phẩm đã có giá vốn.',
-    };
+  if (agreedPrice > 0) {
+    return { ok: true, value: agreedPrice };
   }
-  return { ok: true, value: costPrice };
+  // 0 / trống = chưa thỏa thuận → hiệu lực = Master (có thể 0 nếu Master trống)
+  return { ok: true, value: costPrice ?? 0 };
 }
 
 export function validateSupplierProductInput(input: {
@@ -58,14 +53,14 @@ describe('Supplier Product Validation Unit Tests (REQ-SP01, BR-SP03)', () => {
     expect(resolveEffectivePurchasePrice(0, 8000)).toEqual({ ok: true, value: 8000 });
   });
 
-  it('should reject agreed price 0 when product has no cost price', () => {
+  it('should accept agreed price 0 when product has no cost price (null agreed, effective 0)', () => {
     const result = validateSupplierProductInput({
       agreedPrice: 0,
       moq: 5,
       costPrice: null,
     });
-    expect(result.valid).toBe(false);
-    expect(result.error).toContain('giá nhập hợp lệ');
+    expect(result.valid).toBe(true);
+    expect(resolveEffectivePurchasePrice(0, null)).toEqual({ ok: true, value: 0 });
   });
 
   it('should reject negative price', () => {

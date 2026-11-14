@@ -40,6 +40,7 @@ export const PayExpenseModal: FC<PayExpenseModalProps> = ({
     new Date().toISOString().split('T')[0]
   );
   const [note, setNote] = useState('');
+  const [approvalReason, setApprovalReason] = useState('');
   const [cashAccounts, setCashAccounts] = useState<CashAccount[]>([]);
   const [selectedAccountId, setSelectedAccountId] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -47,6 +48,7 @@ export const PayExpenseModal: FC<PayExpenseModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       setErrorMessage(null);
+      setApprovalReason('');
       void cashbookService.getCashAccounts().then((accounts) => {
         setCashAccounts(accounts);
         const filtered = accounts.filter((a) =>
@@ -72,9 +74,21 @@ export const PayExpenseModal: FC<PayExpenseModalProps> = ({
   const isCashOverdraft = paymentMethod === 'Cash' && isInsufficientBalance;
   const isBankOverdraft = paymentMethod === 'BankTransfer' && isInsufficientBalance;
 
+  // Poka-yoke: Bắt buộc nhập lý do phê duyệt khi khoản chi bị gắn cờ Anti-Splitting
+  const isApprovalReasonMissing = Boolean(
+    item?.isFlaggedAsSuspiciousSplit && !approvalReason.trim()
+  );
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSubmitting) return;
+
+    if (isApprovalReasonMissing) {
+      setErrorMessage(
+        'Phiếu chi bị gắn cờ nghi vấn Anti-Splitting. Bắt buộc nhập lý do giải trình phê duyệt trước khi xuất quỹ.'
+      );
+      return;
+    }
 
     if (isInsufficientBalance) {
       setErrorMessage(
@@ -93,6 +107,7 @@ export const PayExpenseModal: FC<PayExpenseModalProps> = ({
         createCashBookEntry,
         paymentDate,
         note: note.trim() || undefined,
+        approvalNote: item.isFlaggedAsSuspiciousSplit ? approvalReason.trim() : (note.trim() || undefined),
       });
       onClose();
     } catch (err: unknown) {
@@ -101,7 +116,7 @@ export const PayExpenseModal: FC<PayExpenseModalProps> = ({
       const serverMsg =
         errObj?.response?.data?.message ||
         errObj?.message ||
-        'Không thể thực hiện xuất quỹ chi trả. Vui lòng kiểm tra lại số dư tài khoản.';
+        'Không thể thực hiện xuất quỹ chi trả. Vui lòng kiểm tra lại.';
       setErrorMessage(serverMsg);
     }
   };
@@ -189,6 +204,39 @@ export const PayExpenseModal: FC<PayExpenseModalProps> = ({
                 </span>
               </div>
             </div>
+
+            {/* Poka-yoke: Anti-Splitting Flagged Expense Alert Banner */}
+            {item.isFlaggedAsSuspiciousSplit && (
+              <div
+                style={{
+                  padding: '12px 14px',
+                  background: '#FFF7ED',
+                  borderRadius: '12px',
+                  border: '1px solid #FFEDD5',
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: '10px',
+                  color: '#C2410C',
+                  fontSize: '0.8rem',
+                  lineHeight: 1.45,
+                }}
+              >
+                <div style={{ flexShrink: 0, marginTop: '2px' }}>
+                  <AlertTriangleIcon size={16} color="#EA580C" />
+                </div>
+                <div>
+                  <div style={{ fontWeight: 700, color: '#9A3412', marginBottom: '2px' }}>
+                    Cảnh báo: Khoản chi bị gắn cờ nghi vấn xé nhỏ hạn mức (Anti-Splitting)
+                  </div>
+                  <div>
+                    {item.suspiciousReason || 'Phát hiện dấu hiệu chia nhỏ hóa đơn để né hạn mức phê duyệt chi.'}
+                  </div>
+                  <div style={{ marginTop: '4px', fontSize: '0.75rem', color: '#B45309' }}>
+                    🛡️ Bắt buộc nhập lý do giải trình phê duyệt bên dưới để tiếp tục xuất quỹ.
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Payment Method */}
             <div className="form-group">
@@ -393,6 +441,35 @@ export const PayExpenseModal: FC<PayExpenseModalProps> = ({
                 className="form-textarea"
               />
             </div>
+
+            {/* Poka-yoke: Required Approval Reason for Suspicious Expense */}
+            {item.isFlaggedAsSuspiciousSplit && (
+              <div className="form-group">
+                <label className="form-label" style={{ color: '#9A3412', fontWeight: 700 }}>
+                  Lý do phê duyệt giải trình <span style={{ color: '#ef4444' }}>*</span>
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="Bắt buộc nhập lý do phê duyệt (Ví dụ: Đã đối chiếu hợp đồng & hóa đơn thực tế hợp lệ)..."
+                  value={approvalReason}
+                  onChange={(e) => {
+                    setApprovalReason(e.target.value);
+                    if (errorMessage) setErrorMessage(null);
+                  }}
+                  className="form-textarea"
+                  style={{
+                    borderColor: !approvalReason.trim() ? '#FB923C' : '#CBD5E1',
+                    background: '#FFFDF9',
+                  }}
+                  required
+                />
+                {!approvalReason.trim() && (
+                  <span style={{ fontSize: '0.72rem', color: '#EA580C', marginTop: 4, display: 'block' }}>
+                    * Bắt buộc nhập lý do để phê duyệt chi phí nghi vấn trước khi xuất quỹ
+                  </span>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Action buttons */}
@@ -407,10 +484,10 @@ export const PayExpenseModal: FC<PayExpenseModalProps> = ({
             </button>
             <button
               type="submit"
-              disabled={isSubmitting || isInsufficientBalance}
+              disabled={isSubmitting || isInsufficientBalance || isApprovalReasonMissing}
               className="btn-primary-pill"
               style={
-                isInsufficientBalance
+                isInsufficientBalance || isApprovalReasonMissing
                   ? {
                       opacity: 0.55,
                       cursor: 'not-allowed',
@@ -422,6 +499,8 @@ export const PayExpenseModal: FC<PayExpenseModalProps> = ({
               title={
                 isInsufficientBalance
                   ? 'Không thể thanh toán do tài khoản nguồn không đủ số dư'
+                  : isApprovalReasonMissing
+                  ? 'Bắt buộc nhập lý do phê duyệt giải trình cho phiếu chi nghi vấn'
                   : undefined
               }
             >

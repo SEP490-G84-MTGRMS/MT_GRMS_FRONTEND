@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { FC, FormEvent, KeyboardEvent } from 'react';
-import { Search, RotateCcw, X } from 'lucide-react';
+import { Search, RotateCcw, X, Download, Upload } from 'lucide-react';
 import type { SupplierSummary, SupplierProductItem } from '../../types/supplier.types';
 
 export interface SupplierProductFilterValues {
@@ -27,6 +27,11 @@ interface SupplierProductFilterBarProps {
   filteredCount?: number;
   onSearch: (values: SupplierProductFilterValues) => void;
   onReset: () => void;
+  /** Xuất Excel giá nhập sỉ + MOQ — cần chọn 1 NCC cụ thể */
+  onExportExcel?: (supplierId: string) => void;
+  /** Import Excel — cần chọn 1 NCC cụ thể */
+  onImportExcel?: (supplierId: string, file: File) => void;
+  excelBusy?: boolean;
 }
 
 type FieldKey = 'sku' | 'name' | 'supplierCode' | 'supplierName';
@@ -124,6 +129,9 @@ export const SupplierProductFilterBar: FC<SupplierProductFilterBarProps> = ({
   categories,
   onSearch,
   onReset,
+  onExportExcel,
+  onImportExcel,
+  excelBusy = false,
 }) => {
   const [tokens, setTokens] = useState<TokenMap>(() => tokensFromFilters(initialValues));
   const [queries, setQueries] = useState<QueryMap>(EMPTY_QUERIES);
@@ -135,6 +143,7 @@ export const SupplierProductFilterBar: FC<SupplierProductFilterBarProps> = ({
   const [focusedIndex, setFocusedIndex] = useState<number>(-1);
 
   const containerRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const inputRefs = useRef<Record<FieldKey, HTMLInputElement | null>>({
     sku: null,
     name: null,
@@ -147,6 +156,30 @@ export const SupplierProductFilterBar: FC<SupplierProductFilterBarProps> = ({
     setStatus(initialValues.statusFilter || 'ALL');
     setCategory(initialValues.categoryFilter || 'ALL');
   }, [initialValues]);
+
+  const resolveExcelSupplierId = (): string | null => {
+    if (initialValues.supplierId && initialValues.supplierId !== 'ALL') {
+      return initialValues.supplierId;
+    }
+    const codes = tokens.supplierCode;
+    if (codes.length === 1) {
+      const hit = suppliers.find((s) => s.code.toLowerCase() === codes[0].toLowerCase());
+      if (hit) return hit.id;
+    }
+    const names = tokens.supplierName;
+    if (names.length === 1) {
+      const hit = suppliers.find((s) => s.name.toLowerCase() === names[0].toLowerCase());
+      if (hit) return hit.id;
+    }
+    return null;
+  };
+
+  const showExcel = Boolean(onExportExcel || onImportExcel);
+  const excelSupplierId = resolveExcelSupplierId();
+  const canExcel = showExcel && Boolean(excelSupplierId);
+  const excelHint = canExcel
+    ? undefined
+    : 'Vào từ trang NCC hoặc lọc đúng 1 mã/tên NCC để Xuất/Nhập Excel';
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -735,11 +768,52 @@ export const SupplierProductFilterBar: FC<SupplierProductFilterBarProps> = ({
 
         <div />
 
-        <div className="so-list-filter-actions" style={{ justifyContent: 'flex-end', width: '100%' }}>
+        <div className="so-list-filter-actions" style={{ justifyContent: 'flex-end', width: '100%', flexWrap: 'wrap', gap: 8 }}>
           <button type="button" className="so-list-filter-search" onClick={handleSubmit}>
             <Search size={14} />
             <span>Tìm kiếm</span>
           </button>
+
+          {showExcel && onExportExcel && (
+            <button
+              type="button"
+              className="so-list-filter-reset"
+              onClick={() => excelSupplierId && onExportExcel(excelSupplierId)}
+              disabled={!canExcel || excelBusy}
+              title={excelHint || 'Xuất Excel SP Active của NCC (giá nhập sỉ + MOQ)'}
+              style={{ opacity: !canExcel || excelBusy ? 0.55 : 1 }}
+            >
+              <Download size={13} />
+              <span>Xuất Excel</span>
+            </button>
+          )}
+
+          {showExcel && onImportExcel && (
+            <>
+              <button
+                type="button"
+                className="so-list-filter-reset"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={!canExcel || excelBusy}
+                title={excelHint || 'Nhập Excel để cập nhật giá nhập sỉ + MOQ'}
+                style={{ opacity: !canExcel || excelBusy ? 0.55 : 1 }}
+              >
+                <Upload size={13} />
+                <span>{excelBusy ? 'Đang nhập...' : 'Nhập Excel'}</span>
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".xlsx,.xls"
+                style={{ display: 'none' }}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file && excelSupplierId) onImportExcel(excelSupplierId, file);
+                  e.target.value = '';
+                }}
+              />
+            </>
+          )}
 
           <button type="button" className="so-list-filter-reset" onClick={handleResetClick}>
             <RotateCcw size={13} />

@@ -1,10 +1,11 @@
 import { type FC, useEffect, useState } from 'react';
 import { SearchIcon, RefreshIcon } from '../../admin/components';
+import { employeeApi } from '../../employee/api/employeeApi';
 import {
   EXPENSE_CATEGORY_LABELS,
   type ExpenseCategory,
   type ExpenseFilterParams,
-  type ExpenseStatus,
+  type ExpenseQuickStatus,
 } from '../types/expense.types';
 import {
   calculatePeriodRange,
@@ -16,6 +17,7 @@ interface ExpenseFilterBarProps {
   onFilterChange: (updated: Partial<ExpenseFilterParams>) => void;
   onReset: () => void;
   onPeriodLabelChange?: (label: string) => void;
+  branches?: { id: string; name: string }[];
 }
 
 export const ExpenseFilterBar: FC<ExpenseFilterBarProps> = ({
@@ -23,12 +25,37 @@ export const ExpenseFilterBar: FC<ExpenseFilterBarProps> = ({
   onFilterChange,
   onReset,
   onPeriodLabelChange,
+  branches,
 }) => {
+  const currentMonthIso = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
   const [searchInput, setSearchInput] = useState(filters.keyword || '');
   const [selectedPeriod, setSelectedPeriod] = useState<PeriodType>('this-month');
-  const [customMonth, setCustomMonth] = useState('2026-10');
+  const [customMonth, setCustomMonth] = useState(currentMonthIso);
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
+  const [internalBranches, setInternalBranches] = useState<{ id: string; name: string }[]>([]);
+
+  // Tự động tải danh sách chi nhánh nếu component cha không truyền xuống
+  useEffect(() => {
+    if (!branches || branches.length === 0) {
+      let isMounted = true;
+      employeeApi.getBranches().then((list) => {
+        if (isMounted && list && list.length > 0) {
+          setInternalBranches(list);
+        }
+      });
+      return () => {
+        isMounted = false;
+      };
+    }
+  }, [branches]);
+
+  const activeBranches = branches && branches.length > 0 ? branches : internalBranches;
+
+  // Synchronize search input when external filters (such as URL search param) change
+  useEffect(() => {
+    setSearchInput(filters.keyword || '');
+  }, [filters.keyword]);
 
   // Debounce search input by 300ms
   useEffect(() => {
@@ -82,16 +109,35 @@ export const ExpenseFilterBar: FC<ExpenseFilterBarProps> = ({
     applyPeriod('custom', undefined, f, t);
   };
 
+  const STATUS_CHIPS: { id: ExpenseQuickStatus; label: string }[] = [
+    { id: 'ALL', label: 'Tất cả' },
+    { id: 'PENDING_APPROVAL', label: 'Chờ duyệt' },
+    { id: 'PENDING_PAYMENT', label: 'Chờ thanh toán' },
+    { id: 'PAID', label: 'Đã thanh toán' },
+    { id: 'SUSPICIOUS', label: 'Bất thường' },
+  ];
+
+  const handleChipClick = (id: ExpenseQuickStatus) => {
+    onFilterChange({
+      quickStatus: id,
+      status: id === 'PAID' ? 'Paid' : id === 'PENDING_PAYMENT' ? 'Pending' : undefined,
+    });
+  };
+
   const handleReset = () => {
     setSearchInput('');
     setSelectedPeriod('this-month');
-    setCustomMonth('2026-10');
+    setCustomMonth(currentMonthIso);
     setCustomFrom('');
     setCustomTo('');
     const range = calculatePeriodRange('this-month');
     if (onPeriodLabelChange) {
       onPeriodLabelChange(range.label);
     }
+    onFilterChange({
+      quickStatus: 'ALL',
+      status: undefined,
+    });
     onReset();
   };
 
@@ -121,10 +167,10 @@ export const ExpenseFilterBar: FC<ExpenseFilterBarProps> = ({
             className="expense-filter-select"
             style={{ fontWeight: 600, color: 'var(--blue-primary, #0F766E)' }}
           >
-            <option value="this-month">Tháng này (10/2026)</option>
-            <option value="last-month">Tháng trước (09/2026)</option>
-            <option value="this-quarter">Quý 4/2026</option>
-            <option value="this-year">Năm 2026</option>
+            <option value="this-month">Tháng này ({calculatePeriodRange('this-month').label})</option>
+            <option value="last-month">Tháng trước ({calculatePeriodRange('last-month').label})</option>
+            <option value="this-quarter">Quý này ({calculatePeriodRange('this-quarter').label})</option>
+            <option value="this-year">Năm nay ({calculatePeriodRange('this-year').label})</option>
             <option value="by-month">Chọn tháng bất kỳ...</option>
             <option value="custom">Tùy chọn khoảng ngày...</option>
             <option value="all">Toàn bộ thời gian</option>
@@ -176,9 +222,11 @@ export const ExpenseFilterBar: FC<ExpenseFilterBarProps> = ({
             className="expense-filter-select"
           >
             <option value="">Tất cả chi nhánh</option>
-            <option value="BR-01">Quận 1 (Trụ sở)</option>
-            <option value="BR-02">Bình Thạnh</option>
-            <option value="BR-03">Thủ Đức</option>
+            {activeBranches.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.name}
+              </option>
+            ))}
           </select>
         </div>
 
@@ -201,21 +249,21 @@ export const ExpenseFilterBar: FC<ExpenseFilterBarProps> = ({
           </select>
         </div>
 
-        {/* Status Selection */}
-        <div>
-          <select
-            value={filters.status || ''}
-            onChange={(e) =>
-              onFilterChange({ status: (e.target.value as ExpenseStatus) || undefined })
-            }
-            aria-label="Lọc theo trạng thái"
-            className="expense-filter-select"
-          >
-            <option value="">Tất cả trạng thái</option>
-            <option value="Pending">Chờ thanh toán</option>
-            <option value="Paid">Đã thanh toán</option>
-            <option value="Cancelled">Đã hủy</option>
-          </select>
+        {/* 5 Quick Chips (Pill buttons): Tất cả | Chờ duyệt | Chờ thanh toán | Đã thanh toán | Bất thường */}
+        <div className="expense-quick-chips">
+          {STATUS_CHIPS.map((chip) => {
+            const isActive = (filters.quickStatus || 'ALL') === chip.id;
+            return (
+              <button
+                key={chip.id}
+                type="button"
+                onClick={() => handleChipClick(chip.id)}
+                className={`expense-pill-btn ${isActive ? 'active' : ''}`}
+              >
+                {chip.label}
+              </button>
+            );
+          })}
         </div>
       </div>
 

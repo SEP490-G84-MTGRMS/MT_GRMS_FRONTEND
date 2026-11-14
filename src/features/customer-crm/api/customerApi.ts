@@ -46,7 +46,10 @@ export const customerApi = {
       params: {
         search: params?.search || undefined,
         tier: params?.tier && params.tier !== 'ALL' ? params.tier : undefined,
-        debtStatus: params?.debtStatus && params.debtStatus !== 'ALL' ? params.debtStatus : undefined,
+        debtStatus:
+          params?.debtStatus && params.debtStatus !== 'ALL' && params.debtStatus !== 'DEBT'
+            ? params.debtStatus
+            : undefined,
       },
     });
 
@@ -83,7 +86,7 @@ export const customerApi = {
       address: input.address?.trim() || null,
       debtLimit: Number(input.debtLimit) || 0,
       membershipTier: input.membershipTier || 'Standard',
-      allowDebt: Boolean(input.allowDebt),
+      allowDebt: input.allowDebt !== undefined ? Boolean(input.allowDebt) : (Number(input.debtLimit) || 0) > 0,
     });
 
     if (!res.data.success || !res.data.data) {
@@ -176,7 +179,7 @@ export const customerApi = {
    * Calculate KPI totals directly from Neon Database
    */
   async getKpiSummary(): Promise<CustomerKpiSummary> {
-    const res = await financeHttpClient.get<ApiResponse<CustomerKpiSummary>>('/customers/kpi-summary');
+    const res = await financeHttpClient.get<ApiResponse<CustomerKpiSummary>>('/customers/debts/summary');
     if (!res.data.success || !res.data.data) {
       throw new Error(res.data.message || 'Không thể tải thống kê KPI công nợ');
     }

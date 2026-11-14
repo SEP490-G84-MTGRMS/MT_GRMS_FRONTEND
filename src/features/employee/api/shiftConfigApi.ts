@@ -10,8 +10,6 @@ export interface ShiftConfigDto {
   startTime: string; // "17:00:00"
   endTime: string;   // "21:00:00"
   durationHours: number;
-  allowedCheckInStart: string; // "14:00:00"
-  allowedCheckInEnd: string;   // "00:00:00"
   isCheckInNextDay?: boolean;
   description?: string | null;
   isActive: boolean;
@@ -34,8 +32,6 @@ export interface CreateShiftConfigPayload {
   shiftName: string;
   startTime: string;
   endTime: string;
-  allowedCheckInStart?: string;
-  allowedCheckInEnd?: string;
   branchIds?: string[];
   branchId?: string;
   shiftCode?: string;
@@ -49,8 +45,6 @@ export interface UpdateShiftConfigPayload {
   shiftName: string;
   startTime: string;
   endTime: string;
-  allowedCheckInStart?: string;
-  allowedCheckInEnd?: string;
   branchIds?: string[];
   branchId?: string;
   shiftCode?: string;

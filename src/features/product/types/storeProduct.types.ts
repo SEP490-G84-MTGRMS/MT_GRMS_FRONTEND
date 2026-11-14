@@ -16,6 +16,7 @@ export interface StoreProductItem {
   sku: string;
   barcode: string;
   category: string;
+  /** Đơn vị nhập (DeliveryUoM / IsPurchaseUnit / BaseUnit) — không phải ĐVT bán lẻ. */
   unit: string;
   imageUrl?: string;
   retailPrice: number; // Giá bán lẻ niêm yết tại cửa hàng (ĐVT cơ sở)
@@ -27,6 +28,10 @@ export interface StoreProductItem {
   primarySupplierCode?: string;
   primarySupplierName: string;
   isPrimarySupplier?: boolean;
+  /** Còn ít nhất 1 NCC Active phục vụ CN cho SP này. */
+  hasActiveSupplierSource?: boolean;
+  /** SP đang bán tại CN nhưng mất nguồn NCC. */
+  lostSupplierSource?: boolean;
   minOrderQuantity: number; // MOQ từ NCC — chỉ xem tại màn này
   status: 'Active' | 'Inactive';
   shelfLocation?: string;

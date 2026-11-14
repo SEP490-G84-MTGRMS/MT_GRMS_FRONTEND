@@ -7,11 +7,10 @@ import {
   MoreHorizontal,
   Download,
   RefreshCw,
+  RotateCw,
   Check,
   Inbox,
   Building2,
-  ChevronDown,
-  X,
   Clock,
   DollarSign,
   Users,
@@ -20,32 +19,32 @@ import {
 } from 'lucide-react';
 import type { PayslipDetailedRecord, Branch } from '../types';
 import { employeeApi } from '../api/employeeApi';
+import { scheduleApi } from '../api/scheduleApi';
 import {
   payslipApi,
   mapBackendSummaryToDetailedRecord,
   extractErrorMessage,
 } from '../api/payslipApi';
-import { CreatePayslipModal } from '../components/CreatePayslipModal';
-import { PayslipDetailModal } from '../components/PayslipDetailModal';
-import { PayslipPaymentModal } from '../components/PayslipPaymentModal';
+import { CreatePayslipModal } from '../components/payslip-management/CreatePayslipModal';
+import { PayslipDetailModal } from '../components/payslip-management/PayslipDetailModal';
+import { PayslipPaymentModal } from '../components/payslip-management/PayslipPaymentModal';
 import { useLocation } from 'react-router-dom';
 import { ConfirmModal, NotificationModal } from '../../../components/common';
+import { getVietnamCurrentMonthIso, matchesAnyVietnameseSearch } from '../lib/vietnamTime';
 import { useAuthStore } from '../../../stores/useAuthStore';
 import '../employee.css';
+
+const ACTIVE_BRANCH_STORAGE_KEY = 'mtgrms_active_branch';
 
 export const PayslipManagementPage: React.FC = () => {
   const { user } = useAuthStore();
   const location = useLocation();
   const roleUpper = (user?.role || '').toUpperCase();
-  const isStaffRole =
-    location.pathname.startsWith('/employee') ||
-    roleUpper === 'STAFF' ||
-    roleUpper === 'EMPLOYEE' ||
-    roleUpper === 'CASHIER' ||
-    (!user?.isAdmin && roleUpper !== 'STORE_OWNER' && roleUpper !== 'ADMIN');
-  const isOwnerOrAdmin = !isStaffRole && Boolean(
+  const isEmployeePortal = location.pathname.startsWith('/employee/') || location.pathname === '/employee';
+  const isOwnerOrAdmin = !isEmployeePortal && Boolean(
     user?.isAdmin ||
     roleUpper === 'STORE_OWNER' ||
+    roleUpper === 'STOREOWNER' ||
     roleUpper === 'ADMIN'
   );
 
@@ -55,16 +54,49 @@ export const PayslipManagementPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // Filters state - Mặc định hiển thị kỳ tháng 10/2026 (kỳ chốt công mẫu của hệ thống)
+  // Filters state - Mặc định hiển thị kỳ tháng hiện tại theo múi giờ Việt Nam
   const [keyword, setKeyword] = useState<string>('');
-  const [periodMonth, setPeriodMonth] = useState<string>('2026-10');
+  const [periodMonth, setPeriodMonth] = useState<string>(() => getVietnamCurrentMonthIso());
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'UNPAID' | 'PAID'>('ALL');
-  const [selectedBranchId, setSelectedBranchId] = useState<string>('ALL');
+  const [activeBranch, setActiveBranch] = useState<{ id: string; name: string } | null>(() => {
+    try {
+      const stored = localStorage.getItem(ACTIVE_BRANCH_STORAGE_KEY);
+      if (stored) {
+        return JSON.parse(stored);
+      }
+    } catch {
+      // ignore
+    }
+    return null;
+  });
 
-  // Searchable Branch Dropdown state
-  const [isBranchDropdownOpen, setIsBranchDropdownOpen] = useState<boolean>(false);
-  const [branchSearchKeyword, setBranchSearchKeyword] = useState<string>('');
-  const branchDropdownRef = useRef<HTMLDivElement>(null);
+  // Lắng nghe thay đổi chi nhánh từ StoreOwnerLayout (BranchSelectorDropdown)
+  useEffect(() => {
+    const handleBranchChanged = (e: Event) => {
+      const customEvent = e as CustomEvent<any>;
+      if (customEvent.detail) {
+        setActiveBranch(customEvent.detail);
+      }
+    };
+
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === ACTIVE_BRANCH_STORAGE_KEY && e.newValue) {
+        try {
+          const parsed = JSON.parse(e.newValue);
+          setActiveBranch(parsed);
+        } catch {
+          // ignore
+        }
+      }
+    };
+
+    window.addEventListener('mtgrms:branch-changed', handleBranchChanged);
+    window.addEventListener('storage', handleStorageChange);
+    return () => {
+      window.removeEventListener('mtgrms:branch-changed', handleBranchChanged);
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, []);
 
   // Modals state
   const [isCreateOpen, setIsCreateOpen] = useState<boolean>(false);
@@ -117,12 +149,9 @@ export const PayslipManagementPage: React.FC = () => {
     });
   };
 
-  // Click outside to close branch & action dropdowns
+  // Click outside to close action dropdown
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (branchDropdownRef.current && !branchDropdownRef.current.contains(event.target as Node)) {
-        setIsBranchDropdownOpen(false);
-      }
       if (actionDropdownRef.current && !actionDropdownRef.current.contains(event.target as Node)) {
         setShowActionDropdown(false);
       }
@@ -154,14 +183,15 @@ export const PayslipManagementPage: React.FC = () => {
   const fetchPayslips = useCallback(async () => {
     setIsLoading(true);
     setErrorMessage(null);
+    const branchIdParam = isOwnerOrAdmin && activeBranch && activeBranch.id !== 'ALL' ? activeBranch.id : undefined;
+
     try {
       const paged = await payslipApi.getPayslipsPaged({
         periodMonth,
-        branchId: isOwnerOrAdmin && selectedBranchId !== 'ALL' ? selectedBranchId : undefined,
+        branchId: branchIdParam,
         status: isOwnerOrAdmin && statusFilter !== 'ALL' ? statusFilter : undefined,
-        keyword: isOwnerOrAdmin && keyword.trim() ? keyword.trim() : undefined,
         page: 1,
-        pageSize: 100,
+        pageSize: 500,
       });
 
       const items = (paged.items || []).map(mapBackendSummaryToDetailedRecord);
@@ -174,23 +204,26 @@ export const PayslipManagementPage: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [periodMonth, selectedBranchId, statusFilter, keyword, isOwnerOrAdmin]);
+  }, [periodMonth, activeBranch, statusFilter, isOwnerOrAdmin]);
 
   useEffect(() => {
     fetchPayslips();
   }, [fetchPayslips]);
 
-  const filteredBranchList = useMemo(() => {
-    if (!branchSearchKeyword.trim()) return branches;
-    return branches.filter((b) =>
-      b.name.toLowerCase().includes(branchSearchKeyword.toLowerCase().trim())
+  // Lọc client-side theo từ khóa (hỗ trợ tiếng Việt có dấu / không dấu, không phân biệt hoa - thường)
+  const filteredPayslips = useMemo(() => {
+    if (!isOwnerOrAdmin || !keyword.trim()) return payslips;
+    return payslips.filter((item) =>
+      matchesAnyVietnameseSearch(
+        [item.employeeCode, item.employeeName, item.payslipCode, item.branchName, item.note],
+        keyword
+      )
     );
-  }, [branches, branchSearchKeyword]);
+  }, [payslips, keyword, isOwnerOrAdmin]);
 
-  const selectedBranchName = useMemo(() => {
-    if (selectedBranchId === 'ALL') return 'Tất cả chi nhánh';
-    return branches.find((b) => b.id === selectedBranchId)?.name || 'Chi nhánh đã chọn';
-  }, [selectedBranchId, branches]);
+  useEffect(() => {
+    setSelectedIds([]);
+  }, [keyword]);
 
   // Financial Summary Cards
   const financialSummary = useMemo(() => {
@@ -198,7 +231,7 @@ export const PayslipManagementPage: React.FC = () => {
     let totalPaid = 0;
     let totalRemaining = 0;
 
-    payslips.forEach((item) => {
+    filteredPayslips.forEach((item) => {
       totalPayroll += item.netSalary;
       if (item.status === 'PAID') {
         totalPaid += item.netSalary;
@@ -211,9 +244,9 @@ export const PayslipManagementPage: React.FC = () => {
       totalPayroll,
       totalPaid,
       totalRemaining,
-      totalEmployees: payslips.length,
+      totalEmployees: filteredPayslips.length,
     };
-  }, [payslips]);
+  }, [filteredPayslips]);
 
   // Format Helpers
   const formatVND = (num?: number) => {
@@ -231,12 +264,9 @@ export const PayslipManagementPage: React.FC = () => {
     return cleanDate;
   };
 
-  // Month navigation
+  // Month navigation (múi giờ Việt Nam UTC+7)
   const currentMonthIso = useMemo(() => {
-    const now = new Date();
-    const yyyy = now.getFullYear();
-    const mm = String(now.getMonth() + 1).padStart(2, '0');
-    return `${yyyy}-${mm}`;
+    return getVietnamCurrentMonthIso();
   }, []);
 
   const handleCurrentMonth = () => {
@@ -270,7 +300,7 @@ export const PayslipManagementPage: React.FC = () => {
   // Row selection
   const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.checked) {
-      setSelectedIds(payslips.map((p) => p.id));
+      setSelectedIds(filteredPayslips.map((p) => p.id));
     } else {
       setSelectedIds([]);
     }
@@ -284,7 +314,7 @@ export const PayslipManagementPage: React.FC = () => {
 
   // Batch Payment modal trigger
   const handleOpenBatchPayModal = () => {
-    const unpaidSelected = payslips.filter(
+    const unpaidSelected = filteredPayslips.filter(
       (p) => selectedIds.includes(p.id) && p.status === 'UNPAID'
     );
     if (unpaidSelected.length === 0) {
@@ -298,79 +328,125 @@ export const PayslipManagementPage: React.FC = () => {
     setBatchPayingPayslips(unpaidSelected);
   };
 
-  // Tính lại bảng lương cho các phiếu lương chưa chi trả
-  const handleRecalculateUnpaid = () => {
+  // Tính lại bảng lương cho các phiếu lương chưa chi trả (chỉ áp dụng cho nhân viên có ca làm trong tháng)
+  const handleRecalculateUnpaid = async () => {
     setShowActionDropdown(false);
 
-    const unpaidCount = payslips.filter((p) => p.status === 'UNPAID').length;
-    const paidCount = payslips.filter((p) => p.status === 'PAID').length;
+    const [year, month] = periodMonth.split('-').map(Number);
+    if (!year || !month) {
+      showNotification('warning', 'Kỳ tháng không hợp lệ', 'Vui lòng chọn kỳ tháng hợp lệ trước khi tính lại bảng lương.');
+      return;
+    }
 
-    setConfirmModal({
-      isOpen: true,
-      title: `Tính lại bảng lương kỳ ${monthLabel}`,
-      variant: 'primary',
-      confirmText: 'Bắt đầu tính lại',
-      cancelText: 'Hủy bỏ',
-      message: (
-        <div>
-          <p style={{ margin: '0 0 10px 0', fontSize: 13, color: '#334155', lineHeight: 1.5 }}>
-            Hệ thống sẽ tổng hợp lại toàn bộ ngày công, giờ làm, OT và phụ cấp mới nhất từ dữ liệu chấm công cho kỳ <strong>{monthLabel}</strong>:
-          </p>
-          <div style={{ background: '#F8FAFC', padding: '10px 14px', borderRadius: 8, border: '1px solid #E2E8F0', marginBottom: 12 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#D97706', fontWeight: 600 }}>
-              <span>•</span>
-              <span>Phiếu lương CHƯA CHI TRẢ: {unpaidCount} phiếu (sẽ được tính lại số liệu)</span>
-            </div>
-            {paidCount > 0 && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#059669', fontWeight: 600, marginTop: 4 }}>
+    const fromDate = `${year}-${String(month).padStart(2, '0')}-01`;
+    const lastDay = new Date(year, month, 0).getDate();
+    const toDate = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+    const activeBranchId = activeBranch && activeBranch.id !== 'ALL' ? activeBranch.id : undefined;
+
+    try {
+      setIsRecalculating(true);
+      const schedulesInMonth = await scheduleApi.getRawSchedules({
+        branchId: activeBranchId,
+        fromDate,
+        toDate,
+        pageSize: 1000,
+      });
+
+      const validSchedules = schedulesInMonth.filter(
+        (s) => (s.status || '').toLowerCase() !== 'cancelled' || (s.approvalType || '').toUpperCase() === 'UNPAID_LEAVE'
+      );
+      const employeeIdsWithSchedules = new Set(validSchedules.map((s) => s.employeeId));
+
+      if (employeeIdsWithSchedules.size === 0) {
+        showNotification(
+          'warning',
+          'Không có ca làm việc trong kỳ',
+          `Không tìm thấy nhân viên nào có ca làm việc trong ${monthLabel}${activeBranchId ? ` tại ${activeBranch?.name}` : ''}. Chỉ những nhân viên có ca làm việc trong tháng mới được khởi tạo hoặc tính lại bảng lương.`
+        );
+        return;
+      }
+
+      const unpaidWithScheduleCount = payslips.filter(
+        (p) => p.status === 'UNPAID' && employeeIdsWithSchedules.has(p.employeeId)
+      ).length;
+      const paidCount = payslips.filter((p) => p.status === 'PAID').length;
+
+      setConfirmModal({
+        isOpen: true,
+        title: `Tính lại bảng lương kỳ ${monthLabel}`,
+        variant: 'primary',
+        confirmText: 'Bắt đầu tính lại',
+        cancelText: 'Hủy bỏ',
+        message: (
+          <div>
+            <p style={{ margin: '0 0 10px 0', fontSize: 13, color: '#334155', lineHeight: 1.5 }}>
+              Hệ thống sẽ kiểm tra và tổng hợp lại ngày công, giờ làm, OT và phụ cấp mới nhất cho các nhân viên <strong>có ca làm việc</strong> trong kỳ <strong>{monthLabel}</strong>:
+            </p>
+            <div style={{ background: '#F8FAFC', padding: '10px 14px', borderRadius: 8, border: '1px solid #E2E8F0', marginBottom: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#0F766E', fontWeight: 600 }}>
                 <span>•</span>
-                <span>Phiếu lương ĐÃ THANH TOÁN: {paidCount} phiếu (bảo lưu nguyên vẹn, không ghi đè)</span>
+                <span>Nhân viên có ca làm việc trong tháng: {employeeIdsWithSchedules.size} nhân viên</span>
               </div>
-            )}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#D97706', fontWeight: 600, marginTop: 4 }}>
+                <span>•</span>
+                <span>Phiếu lương CHƯA CHI TRẢ hiện có: {unpaidWithScheduleCount} phiếu (sẽ được tính lại / khởi tạo theo ca thực tế)</span>
+              </div>
+              {paidCount > 0 && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#059669', fontWeight: 600, marginTop: 4 }}>
+                  <span>•</span>
+                  <span>Phiếu lương ĐÃ THANH TOÁN: {paidCount} phiếu (bảo lưu nguyên vẹn, không ghi đè)</span>
+                </div>
+              )}
+            </div>
+            <p style={{ margin: 0, fontSize: 12, color: '#64748B' }}>
+              Lưu ý: Nhân viên không có ca làm việc nào trong kỳ {monthLabel} sẽ không được khởi tạo lại bảng lương.
+            </p>
           </div>
-          <p style={{ margin: 0, fontSize: 12, color: '#64748B' }}>
-            Quá trình tính toán diễn ra tự động và sẽ cập nhật lại số liệu ngay khi hoàn thành.
-          </p>
-        </div>
-      ),
-      onConfirm: async () => {
-        setConfirmModal((prev) => ({ ...prev, isLoading: true }));
-        setIsRecalculating(true);
-        try {
-          await payslipApi.recalculatePayroll({
-            periodMonth,
-            branchId: selectedBranchId !== 'ALL' ? selectedBranchId : undefined,
-            note: `Tính lại lương kỳ ${periodMonth} - cập nhật công thực tế`,
-          });
+        ),
+        onConfirm: async () => {
+          setConfirmModal((prev) => ({ ...prev, isLoading: true }));
+          setIsRecalculating(true);
+          try {
+            const recalculatedList = await payslipApi.recalculatePayroll({
+              periodMonth,
+              branchId: activeBranchId,
+              note: `Tính lại lương kỳ ${periodMonth} - cập nhật công thực tế`,
+            });
 
-          setConfirmModal((prev) => ({ ...prev, isOpen: false, isLoading: false }));
-          showNotification(
-            'success',
-            'Tính lại bảng lương thành công',
-            `Đã hoàn tất tính toán và cập nhật lại dữ liệu bảng lương cho kỳ ${monthLabel}!`
-          );
-          await fetchPayslips();
-        } catch (err: any) {
-          setConfirmModal((prev) => ({ ...prev, isOpen: false, isLoading: false }));
-          showNotification(
-            'error',
-            'Không thể tính toán lại',
-            extractErrorMessage(err, 'Lỗi khi tính toán lại bảng lương.')
-          );
-        } finally {
-          setIsRecalculating(false);
-        }
-      },
-    });
+            setConfirmModal((prev) => ({ ...prev, isOpen: false, isLoading: false }));
+            showNotification(
+              'success',
+              'Tính lại bảng lương thành công',
+              `Đã hoàn tất tính toán và cập nhật bảng lương cho ${recalculatedList.length} nhân viên có ca làm việc trong kỳ ${monthLabel}!`
+            );
+            await fetchPayslips();
+          } catch (err: any) {
+            setConfirmModal((prev) => ({ ...prev, isOpen: false, isLoading: false }));
+            showNotification(
+              'error',
+              'Không thể tính toán lại',
+              extractErrorMessage(err, 'Lỗi khi tính toán lại bảng lương.')
+            );
+          } finally {
+            setIsRecalculating(false);
+          }
+        },
+      });
+    } catch (err: any) {
+      showNotification(
+        'error',
+        'Lỗi kiểm tra dữ liệu ca làm việc',
+        extractErrorMessage(err, 'Không thể kiểm tra danh sách ca làm việc trong kỳ tháng.')
+      );
+    } finally {
+      setIsRecalculating(false);
+    }
   };
 
   const handleResetFilters = () => {
     setKeyword('');
-    setPeriodMonth('2026-10');
+    setPeriodMonth(getVietnamCurrentMonthIso());
     setStatusFilter('ALL');
-    setSelectedBranchId('ALL');
-    setIsBranchDropdownOpen(false);
-    setBranchSearchKeyword('');
   };
 
   return (
@@ -379,7 +455,7 @@ export const PayslipManagementPage: React.FC = () => {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
         <h2 className="emp-header-title">
           <span>{isOwnerOrAdmin ? 'Bảng tính lương' : 'Phiếu lương của tôi'}</span>
-          <span className="count-badge">{payslips.length}</span>
+          <span className="count-badge">{filteredPayslips.length}</span>
         </h2>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -607,207 +683,30 @@ export const PayslipManagementPage: React.FC = () => {
 
           {/* Bộ lọc Chi nhánh (Chỉ hiển thị cho Chủ cửa hàng / Quản lý) */}
           {isOwnerOrAdmin && (
-          <div ref={branchDropdownRef} style={{ position: 'relative' }}>
             <div
-              onClick={() => setIsBranchDropdownOpen(!isBranchDropdownOpen)}
               style={{
-                height: 36,
-                minWidth: 200,
-                padding: '0 12px',
-                background: '#FFFFFF',
-                border: isBranchDropdownOpen ? '1px solid #0F766E' : '1px solid #CBD5E1',
-                borderRadius: 8,
-                cursor: 'pointer',
-                display: 'flex',
+                display: 'inline-flex',
                 alignItems: 'center',
-                justifyContent: 'space-between',
                 gap: 8,
-                boxShadow: isBranchDropdownOpen ? '0 0 0 3px rgba(15, 118, 110, 0.12)' : 'none',
-                transition: 'all 0.15s ease',
+                height: 36,
+                padding: '0 14px',
+                borderRadius: 8,
+                background: '#F0FDFA',
+                border: '1px solid #99F6E4',
+                color: '#0F766E',
+                fontSize: 13,
+                fontWeight: 500,
               }}
+              title="Chi nhánh được đồng bộ trực tiếp từ bộ chọn chi nhánh của hệ thống ở thanh điều hướng trên cùng"
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, flex: 1 }}>
-                <Building2 size={15} color={selectedBranchId === 'ALL' ? '#64748B' : '#0F766E'} style={{ flexShrink: 0 }} />
-                <span
-                  style={{
-                    fontSize: 13,
-                    fontWeight: selectedBranchId === 'ALL' ? 500 : 600,
-                    color: selectedBranchId === 'ALL' ? '#334155' : '#0F766E',
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                  }}
-                >
-                  {selectedBranchName}
-                </span>
-              </div>
-              <ChevronDown size={14} color="#64748B" style={{ flexShrink: 0 }} />
+              <Building2 size={16} color="#0F766E" />
+              <span>
+                Chi nhánh:{' '}
+                <strong style={{ fontWeight: 600 }}>
+                  {activeBranch?.name || 'Tất cả chi nhánh'}
+                </strong>
+              </span>
             </div>
-
-            {isBranchDropdownOpen && (
-              <div
-                style={{
-                  position: 'absolute',
-                  top: 42,
-                  left: 0,
-                  width: 260,
-                  background: '#FFFFFF',
-                  borderRadius: 8,
-                  border: '1px solid #CBD5E1',
-                  boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
-                  zIndex: 200,
-                  overflow: 'hidden',
-                }}
-              >
-                {/* Ô tìm kiếm chi nhánh */}
-                <div style={{ padding: '8px 10px', borderBottom: '1px solid #F1F5F9', background: '#F8FAFC' }}>
-                  <div
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 8,
-                      background: '#FFFFFF',
-                      border: '1px solid #E2E8F0',
-                      borderRadius: 6,
-                      padding: '4px 8px',
-                    }}
-                  >
-                    <Search size={14} color="#94A3B8" />
-                    <input
-                      type="text"
-                      placeholder="Tìm chi nhánh..."
-                      value={branchSearchKeyword}
-                      onChange={(e) => setBranchSearchKeyword(e.target.value)}
-                      onClick={(e) => e.stopPropagation()}
-                      autoFocus
-                      style={{
-                        border: 'none',
-                        outline: 'none',
-                        fontSize: 12,
-                        width: '100%',
-                        background: 'transparent',
-                        color: '#0F172A',
-                      }}
-                    />
-                    {branchSearchKeyword && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setBranchSearchKeyword('');
-                        }}
-                        style={{
-                          background: 'transparent',
-                          border: 'none',
-                          color: '#94A3B8',
-                          cursor: 'pointer',
-                          padding: 0,
-                        }}
-                      >
-                        <X size={12} />
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* Danh sách cuộn chi nhánh */}
-                <div
-                  style={{
-                    maxHeight: 200,
-                    overflowY: 'auto',
-                    padding: '4px 0',
-                  }}
-                >
-                  {/* Option: Tất cả chi nhánh */}
-                  {(!branchSearchKeyword || 'tất cả chi nhánh'.includes(branchSearchKeyword.toLowerCase())) && (
-                    <div
-                      onClick={() => {
-                        setSelectedBranchId('ALL');
-                        setIsBranchDropdownOpen(false);
-                        setBranchSearchKeyword('');
-                      }}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        padding: '8px 12px',
-                        cursor: 'pointer',
-                        fontSize: 13,
-                        fontWeight: selectedBranchId === 'ALL' ? 600 : 400,
-                        color: selectedBranchId === 'ALL' ? '#0F766E' : '#334155',
-                        background: selectedBranchId === 'ALL' ? '#F0FDFA' : 'transparent',
-                        transition: 'background 0.15s ease',
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <Building2 size={15} color={selectedBranchId === 'ALL' ? '#0F766E' : '#94A3B8'} />
-                        <span>Tất cả chi nhánh</span>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <span style={{ fontSize: 11, color: '#94A3B8' }}>({branches.length})</span>
-                        {selectedBranchId === 'ALL' && <Check size={14} color="#0F766E" />}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Danh sách từng chi nhánh */}
-                  {filteredBranchList.map((b) => {
-                    const isSelected = selectedBranchId === b.id;
-                    return (
-                      <div
-                        key={b.id}
-                        onClick={() => {
-                          setSelectedBranchId(b.id);
-                          setIsBranchDropdownOpen(false);
-                          setBranchSearchKeyword('');
-                        }}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          padding: '8px 12px',
-                          cursor: 'pointer',
-                          fontSize: 13,
-                          fontWeight: isSelected ? 600 : 400,
-                          color: isSelected ? '#0F766E' : '#334155',
-                          background: isSelected ? '#F0FDFA' : 'transparent',
-                          transition: 'background 0.15s ease',
-                        }}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
-                          <span
-                            style={{
-                              width: 6,
-                              height: 6,
-                              borderRadius: '50%',
-                              background: isSelected ? '#0F766E' : '#CBD5E1',
-                              flexShrink: 0,
-                            }}
-                          />
-                          <span
-                            style={{
-                              whiteSpace: 'nowrap',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                            }}
-                          >
-                            {b.name}
-                          </span>
-                        </div>
-                        {isSelected && <Check size={14} color="#0F766E" style={{ flexShrink: 0 }} />}
-                      </div>
-                    );
-                  })}
-
-                  {filteredBranchList.length === 0 && (
-                    <div style={{ padding: '16px 12px', textAlign: 'center', color: '#94A3B8', fontSize: 12 }}>
-                      Không tìm thấy chi nhánh nào
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
           )}
 
           {/* Điều hướng kỳ tháng */}
@@ -874,18 +773,37 @@ export const PayslipManagementPage: React.FC = () => {
             </select>
           )}
 
-          {/* Nút đặt lại */}
-          {isOwnerOrAdmin && (keyword || statusFilter !== 'ALL' || selectedBranchId !== 'ALL') && (
-            <button
-              type="button"
-              className="emp-btn emp-btn-secondary"
-              onClick={handleResetFilters}
-              title="Đặt lại bộ lọc"
-              style={{ height: 36, padding: '0 12px', fontSize: 13, color: '#64748B' }}
-            >
-              Đặt lại
-            </button>
-          )}
+          {/* Nút đặt lại bộ lọc */}
+          {isOwnerOrAdmin && (() => {
+            const hasActiveFilters =
+              Boolean(keyword.trim()) || statusFilter !== 'ALL' || periodMonth !== currentMonthIso;
+            return (
+              <button
+                type="button"
+                disabled={!hasActiveFilters}
+                onClick={handleResetFilters}
+                title="Xóa toàn bộ bộ lọc và từ khóa"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  height: 36,
+                  padding: '0 12px',
+                  fontSize: 13,
+                  fontWeight: 500,
+                  color: hasActiveFilters ? '#EF4444' : '#94A3B8',
+                  background: hasActiveFilters ? '#FEE2E2' : '#F8FAFC',
+                  border: `1px solid ${hasActiveFilters ? '#FECACA' : '#E2E8F0'}`,
+                  borderRadius: 8,
+                  cursor: hasActiveFilters ? 'pointer' : 'not-allowed',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                <RotateCw size={13} />
+                <span>Đặt lại bộ lọc</span>
+              </button>
+            );
+          })()}
         </div>
 
         {/* Nút hành động */}
@@ -977,7 +895,7 @@ export const PayslipManagementPage: React.FC = () => {
                     showNotification(
                       'info',
                       'Xuất file Excel',
-                      `Đang xuất bảng lương ${payslips.length} nhân sự ra tệp Excel (.xlsx)...`
+                      `Đang xuất bảng lương ${filteredPayslips.length} nhân sự ra tệp Excel (.xlsx)...`
                     );
                   }}
                 >
@@ -1082,8 +1000,8 @@ export const PayslipManagementPage: React.FC = () => {
                     type="checkbox"
                     style={{ accentColor: '#0F766E' }}
                     checked={
-                      payslips.length > 0 &&
-                      selectedIds.length === payslips.length
+                      filteredPayslips.length > 0 &&
+                      selectedIds.length === filteredPayslips.length
                     }
                     onChange={handleSelectAll}
                   />
@@ -1100,7 +1018,7 @@ export const PayslipManagementPage: React.FC = () => {
             </tr>
           </thead>
           <tbody>
-            {payslips.length === 0 && !isLoading ? (
+            {filteredPayslips.length === 0 && !isLoading ? (
               <tr>
                 <td
                   colSpan={isOwnerOrAdmin ? 9 : 8}
@@ -1120,14 +1038,14 @@ export const PayslipManagementPage: React.FC = () => {
                     Hệ thống chưa tìm thấy phiếu lương đã tính trong kỳ này.
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'center', gap: 10, marginTop: 14 }}>
-                    {periodMonth !== '2026-10' && (
+                    {periodMonth !== currentMonthIso && (
                       <button
                         type="button"
                         className="emp-btn emp-btn-secondary"
-                        onClick={() => setPeriodMonth('2026-10')}
+                        onClick={() => setPeriodMonth(currentMonthIso)}
                         style={{ fontSize: 12, height: 32 }}
                       >
-                        Chuyển về kỳ Tháng 10/2026 (Kỳ mẫu)
+                        Chuyển về tháng hiện tại
                       </button>
                     )}
                     {isOwnerOrAdmin && (
@@ -1144,7 +1062,7 @@ export const PayslipManagementPage: React.FC = () => {
                 </td>
               </tr>
             ) : (
-              payslips.map((item) => {
+              filteredPayslips.map((item) => {
                 const isSelected = selectedIds.includes(item.id);
                 const isPaid = item.status === 'PAID';
                 const initials = item.employeeName

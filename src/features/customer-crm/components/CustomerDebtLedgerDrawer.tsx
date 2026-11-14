@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import type { CustomerDto, CustomerDebtLedgerDto } from '../types/customer.types';
 import { customerApi } from '../api/customerApi';
+import { sanitizeCustomerText, normalizeDebtLimit } from '../utils/customerValidation';
 
 interface CustomerDebtLedgerDrawerProps {
   customer: CustomerDto | null;
@@ -67,8 +68,10 @@ export const CustomerDebtLedgerDrawer: FC<CustomerDebtLedgerDrawerProps> = ({
     .filter((l) => l.transactionType === 'DEBT_DECREASE')
     .reduce((sum, l) => sum + l.amount, 0);
 
+  const safeFullName = sanitizeCustomerText(customer.fullName, 'Khách hàng');
+  const safeDebtLimit = normalizeDebtLimit(customer.debtLimit);
   const hasDebt = customer.currentDebtAR > 0;
-  const isOverLimit = customer.currentDebtAR > customer.debtLimit && customer.debtLimit > 0;
+  const isOverLimit = customer.currentDebtAR > safeDebtLimit && safeDebtLimit > 0;
 
   return (
     <div className="customer-drawer-backdrop" onClick={onClose}>
@@ -101,7 +104,7 @@ export const CustomerDebtLedgerDrawer: FC<CustomerDebtLedgerDrawerProps> = ({
                 </span>
               </div>
               <p style={{ margin: '4px 0 0', fontSize: '0.82rem', color: '#64748b' }}>
-                Khách hàng: <strong>{customer.fullName}</strong> ({customer.phoneNumber})
+                Khách hàng: <strong>{safeFullName}</strong> ({customer.phoneNumber})
               </p>
             </div>
           </div>
@@ -135,9 +138,9 @@ export const CustomerDebtLedgerDrawer: FC<CustomerDebtLedgerDrawerProps> = ({
               >
                 {formatCurrency(customer.currentDebtAR)}
               </div>
-              {customer.debtLimit > 0 && (
+              {safeDebtLimit > 0 && (
                 <div style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: '2px' }}>
-                  Hạn mức: {formatCurrency(customer.debtLimit)}
+                  Hạn mức: {formatCurrency(safeDebtLimit)}
                 </div>
               )}
             </div>
@@ -192,10 +195,32 @@ export const CustomerDebtLedgerDrawer: FC<CustomerDebtLedgerDrawerProps> = ({
                 -{formatCurrency(totalDecreased)}
               </div>
               <div style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: '2px' }}>
-                Tiền mặt & VietQR
+                Tiền mặt &amp; VietQR
               </div>
             </div>
           </div>
+
+          {/* FIFO Unpaid Invoices Badges */}
+          {customer.invoices && customer.invoices.filter((inv) => inv.status !== 'Paid').length > 0 && (
+            <div style={{ marginTop: '12px', padding: '10px 12px', background: '#F0FDFA', borderRadius: '10px', border: '1px solid #99F6E4' }}>
+              <div style={{ fontSize: '0.74rem', fontWeight: 700, color: '#0F766E', marginBottom: '6px' }}>
+                HÓA ĐƠN NỢ THEO THỨ TỰ FIFO (CẦN THU TRƯỚC):
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                {customer.invoices
+                  .filter((inv) => inv.status !== 'Paid')
+                  .map((inv, idx) => (
+                    <span
+                      key={inv.id}
+                      className="badge badge-teal"
+                      style={{ fontSize: '0.74rem', padding: '3px 8px' }}
+                    >
+                      #{idx + 1} {inv.id}: {formatCurrency(inv.amount)} ({inv.status === 'Partial' ? 'Nợ một phần' : 'Chưa trả'})
+                    </span>
+                  ))}
+              </div>
+            </div>
+          )}
 
           {/* Filter Segmented Control */}
           <div style={{ display: 'flex', gap: '8px', marginTop: '14px' }}>
@@ -370,10 +395,30 @@ export const CustomerDebtLedgerDrawer: FC<CustomerDebtLedgerDrawerProps> = ({
                     >
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                         {item.referenceDocId && (
-                          <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-                            <FileText className="w-3 h-3 text-slate-400" />
-                            Đơn: <strong>{item.referenceDocId}</strong>
-                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              onClose();
+                              navigate('/store-owner/invoices?search=' + encodeURIComponent(item.referenceDocId || ''));
+                            }}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              color: '#2563EB',
+                              background: '#EFF6FF',
+                              border: '1px solid #DBEAFE',
+                              padding: '2px 8px',
+                              borderRadius: '6px',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              fontSize: '0.75rem',
+                            }}
+                            title="Bấm để xem chi tiết hóa đơn/đơn hàng trên trang Quản lý Hóa đơn"
+                          >
+                            <FileText className="w-3 h-3 text-blue-500" />
+                            <span>Đơn: {item.referenceDocId} ↗</span>
+                          </button>
                         )}
                         {item.cashTransactionCode && (
                           <button

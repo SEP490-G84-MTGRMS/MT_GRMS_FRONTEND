@@ -1,8 +1,8 @@
-import type { FC } from 'react';
+import { useEffect, useState, type FC } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { X, AlertTriangle, ShieldCheck, Clock, RotateCcw, Tag } from 'lucide-react';
 import type { InventoryItem } from '../types/inventory.types';
-import { MOCK_BATCH_ITEMS } from '../../batch/lib/mockBatchData';
+import { inventoryApi, type InventoryBatchRow } from '../api/inventoryApi';
 
 interface Props {
   isOpen: boolean;
@@ -11,16 +11,53 @@ interface Props {
 }
 
 const fmt = (n: number) => new Intl.NumberFormat('vi-VN').format(n);
+const fmtDate = (v: string | null) => {
+  if (!v) return '—';
+  const d = new Date(v);
+  if (Number.isNaN(d.getTime()) || d.getFullYear() <= 1 || d.getFullYear() >= 9999) return '—';
+  return d.toLocaleDateString('vi-VN');
+};
 
 export const InventoryBatchDrawer: FC<Props> = ({ isOpen, onClose, item }) => {
   const navigate = useNavigate();
+  const [batches, setBatches] = useState<InventoryBatchRow[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (!isOpen || !item?.branchId) {
+      setBatches([]);
+      setError('');
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      setError('');
+      try {
+        const productId = item.productId || (/^[0-9a-f-]{36}$/i.test(item.id) ? item.id : null);
+        if (!productId) {
+          setBatches([]);
+          setError('Thiếu productId — mở trang Lô & HSD để xem chi tiết.');
+          return;
+        }
+        const rows = await inventoryApi.getProductBatches(productId, item.branchId);
+        if (!cancelled) setBatches(rows);
+      } catch (e: any) {
+        if (!cancelled) {
+          setBatches([]);
+          setError(e?.message || 'Không tải được danh sách lô.');
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, item]);
 
   if (!isOpen || !item) return null;
-
-  // Filter batches matching this SKU and branch
-  const batches = MOCK_BATCH_ITEMS.filter(
-    (b) => b.sku === item.sku && (!item.branchId || b.branchId === item.branchId)
-  );
 
   const getRiskBadge = (daysLeft: number) => {
     if (daysLeft <= 0) {
@@ -139,7 +176,22 @@ export const InventoryBatchDrawer: FC<Props> = ({ isOpen, onClose, item }) => {
             Danh sách {batches.length} lô hàng (Ưu tiên xuất theo FEFO - Hạn gần xuất trước):
           </div>
 
-          {batches.length === 0 ? (
+          {loading ? (
+            <div style={{ padding: 24, textAlign: 'center', color: '#64748b' }}>Đang tải lô hàng…</div>
+          ) : error ? (
+            <div
+              style={{
+                padding: 24,
+                textAlign: 'center',
+                color: '#b91c1c',
+                background: '#fef2f2',
+                borderRadius: 8,
+                border: '1px solid #fecaca',
+              }}
+            >
+              {error}
+            </div>
+          ) : batches.length === 0 ? (
             <div
               style={{
                 padding: 32,
@@ -185,9 +237,6 @@ export const InventoryBatchDrawer: FC<Props> = ({ isOpen, onClose, item }) => {
                         >
                           {batch.batchCode}
                         </span>
-                        <span style={{ fontSize: 12, color: '#64748b' }}>
-                          NCC: <strong>{batch.supplierName || 'NCC Đối tác'}</strong>
-                        </span>
                       </div>
 
                       <span
@@ -213,19 +262,19 @@ export const InventoryBatchDrawer: FC<Props> = ({ isOpen, onClose, item }) => {
                       <div>
                         <span style={{ color: '#64748b' }}>Ngày sản xuất:</span>
                         <div style={{ fontWeight: 600 }}>
-                          {batch.mfgDate || '—'}
+                          {fmtDate(batch.mfgDate)}
                         </div>
                       </div>
                       <div>
                         <span style={{ color: '#64748b' }}>Hạn sử dụng:</span>
                         <div style={{ fontWeight: 700, color: batch.daysLeft <= 14 ? '#dc2626' : '#0f172a' }}>
-                          {batch.expiryDate || '—'}
+                          {fmtDate(batch.expiryDate)}
                         </div>
                       </div>
                       <div>
-                        <span style={{ color: '#64748b' }}>Tồn lô:</span>
+                        <span style={{ color: '#64748b' }}>Khả dụng lô:</span>
                         <div style={{ fontWeight: 700, color: '#0f766e' }}>
-                          {fmt(batch.qtyCurrent)} {batch.unit}
+                          {fmt(batch.availableQty)} {item.unit}
                         </div>
                       </div>
                     </div>

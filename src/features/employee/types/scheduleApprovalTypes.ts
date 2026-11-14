@@ -7,12 +7,6 @@ export const ScheduleRequestType = {
 } as const;
 export type ScheduleRequestType = (typeof ScheduleRequestType)[keyof typeof ScheduleRequestType];
 
-export const ShiftSwapType = {
-  CrossSwap: 'CrossSwap',
-  Cover: 'Cover',
-} as const;
-export type ShiftSwapType = (typeof ShiftSwapType)[keyof typeof ShiftSwapType];
-
 export const LeaveType = {
   AnnualLeave: 'AnnualLeave',
   SickLeave: 'SickLeave',
@@ -50,14 +44,10 @@ export const LeaveTypeLabels: Record<LeaveType, string> = {
 export interface CreateScheduleApprovalRequestDto {
   requestType: ScheduleRequestType;
   reason: string;
-  evidenceImageUrl?: string | null;
   evidenceImageUrls?: string[] | null;
   scheduleId?: string | null;
   leaveType?: LeaveType | null;
   isPaidLeaveRequested?: boolean;
-  swapType?: ShiftSwapType | null;
-  targetEmployeeId?: string | null;
-  targetScheduleId?: string | null;
   requestedCheckInTime?: string | null;
   requestedCheckOutTime?: string | null;
   requestedOvertimeMinutes?: number | null;
@@ -72,11 +62,6 @@ export interface ReviewScheduleApprovalRequestDto {
   approvedOvertimeMinutes?: number | null;
 }
 
-export interface PeerConfirmShiftSwapDto {
-  isAgreed: boolean;
-  note?: string | null;
-}
-
 export interface ScheduleApprovalRequestDto {
   id: string;
   scheduleId: string;
@@ -88,17 +73,9 @@ export interface ScheduleApprovalRequestDto {
   requestType: ScheduleRequestType;
   status: ScheduleApprovalStatus;
   reason: string;
-  evidenceImageUrl?: string | null;
   evidenceImageUrls?: string[] | null;
   leaveType?: LeaveType | null;
   isPaidLeave: boolean;
-  swapType?: ShiftSwapType | null;
-  targetEmployeeId?: string | null;
-  targetEmployeeName?: string | null;
-  targetEmployeeCode?: string | null;
-  targetScheduleId?: string | null;
-  peerConfirmed?: boolean | null;
-  peerConfirmedAt?: string | null;
   requestedCheckInTime?: string | null;
   requestedCheckOutTime?: string | null;
   approvedCheckInTime?: string | null;

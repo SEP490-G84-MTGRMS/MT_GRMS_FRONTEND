@@ -1,12 +1,12 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import type { FC } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Building2, History, Download, Plus, Loader2 } from 'lucide-react';
+import { Building2, History, Plus, Loader2 } from 'lucide-react';
 import type { BranchListItem, BranchFilterState } from '../types/po.types';
 import { BranchFilterBar } from '../components/branch/BranchFilterBar';
 import { BranchOrderTable } from '../components/branch/BranchOrderTable';
 import { AdminToast, type ToastState } from '../../admin/components';
-import { branchApi, countMatrixProductsForBranch } from '../api/branchApi';
+import { branchApi } from '../api/branchApi';
 import '../purchase-order.css';
 import '../../supplier/supplier.css';
 
@@ -61,19 +61,14 @@ export const BranchOrderListPage: FC = () => {
     fetchBranches();
   }, [fetchBranches]);
 
-  // Đồng bộ lại số SP trên Matrix khi quay lại tab (sau khi chỉnh Order Matrix)
+  // Đồng bộ lại số SP cửa hàng khi quay lại tab (sau khi gán SP ở /stores/products)
   useEffect(() => {
-    const refreshMatrixCounts = () => {
-      setBranches((prev) =>
-        prev.map((b) => ({
-          ...b,
-          matrixProductCount: countMatrixProductsForBranch(b.id),
-        }))
-      );
+    const refreshCatalogCounts = () => {
+      void fetchBranches();
     };
-    window.addEventListener('focus', refreshMatrixCounts);
-    return () => window.removeEventListener('focus', refreshMatrixCounts);
-  }, []);
+    window.addEventListener('focus', refreshCatalogCounts);
+    return () => window.removeEventListener('focus', refreshCatalogCounts);
+  }, [fetchBranches]);
 
   const handleSearch = (newFilters: BranchFilterState) => {
     setAppliedFilters(newFilters);
@@ -155,16 +150,6 @@ export const BranchOrderListPage: FC = () => {
             <History size={14} />
             <span>Lịch sử đơn hàng</span>
           </Link>
-
-          <button
-            type="button"
-            className="po-btn po-btn-secondary"
-            style={{ height: 32, padding: '0 14px' }}
-            onClick={() => showToast('Đang kết xuất danh sách chi nhánh ra tệp Excel (.xlsx)...', 'info')}
-          >
-            <Download size={14} />
-            <span>Xuất Excel</span>
-          </button>
 
           <Link
             to="/store-owner/purchase-orders/create-matrix"

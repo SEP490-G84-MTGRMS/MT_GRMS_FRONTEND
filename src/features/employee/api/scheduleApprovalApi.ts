@@ -3,7 +3,6 @@ import type { ApiResponse } from '../../../api/types';
 import type {
   CreateScheduleApprovalRequestDto,
   ReviewScheduleApprovalRequestDto,
-  PeerConfirmShiftSwapDto,
   ScheduleApprovalRequestDto,
   PendingApprovalRequestsResponse,
   ScheduleRequestType,
@@ -16,6 +15,22 @@ export const scheduleApprovalApi = {
   createRequest: async (scheduleId: string, data: CreateScheduleApprovalRequestDto): Promise<ScheduleApprovalRequestDto> => {
     const res = await httpClient.post<ApiResponse<ScheduleApprovalRequestDto>>(`/schedules/${scheduleId}/requests`, data);
     return res.data.data!;
+  },
+
+  /**
+   * Cập nhật đơn yêu cầu (chỉ khi đang ở trạng thái Pending)
+   */
+  updateRequest: async (requestId: string, data: CreateScheduleApprovalRequestDto): Promise<ScheduleApprovalRequestDto> => {
+    const res = await httpClient.put<ApiResponse<ScheduleApprovalRequestDto>>(`/schedule-approval-requests/${requestId}`, data);
+    return res.data.data!;
+  },
+
+  /**
+   * Xóa đơn yêu cầu (chỉ khi đang ở trạng thái Pending)
+   */
+  deleteRequest: async (requestId: string): Promise<boolean> => {
+    const res = await httpClient.delete<ApiResponse<boolean>>(`/schedule-approval-requests/${requestId}`);
+    return res.data.data ?? false;
   },
 
   /**
@@ -69,14 +84,6 @@ export const scheduleApprovalApi = {
       params,
     });
     return res.data.data ?? { total: 0, items: [] };
-  },
-
-  /**
-   * Đồng nghiệp xác nhận hoặc từ chối đổi ca
-   */
-  peerConfirmShiftSwap: async (requestId: string, data: PeerConfirmShiftSwapDto): Promise<boolean> => {
-    const res = await httpClient.post<ApiResponse<boolean>>(`/schedule-approval-requests/${requestId}/peer-confirm`, data);
-    return res.data.data ?? false;
   },
 
   /**

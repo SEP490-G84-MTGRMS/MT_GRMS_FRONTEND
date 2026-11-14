@@ -4,10 +4,9 @@ import {
   ArrowUpDown,
   PackageOpen,
   Eye,
-  Tag,
-  Trash2,
   AlertTriangle,
   ClipboardCheck,
+  ChefHat,
 } from 'lucide-react';
 import type { BatchItem, BatchStatus } from '../types/batch.types';
 import { TablePagination } from '../../../components/common';
@@ -17,10 +16,8 @@ interface BatchTableProps {
   totalCount: number;
   pageIndex: number;
   pageSize: number;
-  selectedIds?: string[];
-  onToggleSelect?: (batch: BatchItem) => void;
-  onToggleSelectAll?: (batches: BatchItem[]) => void;
   onQuickStocktake?: (batch: BatchItem) => void;
+  onProcessBatch?: (batch: BatchItem) => void;
   onPageChange: (newPage: number) => void;
   onPageSizeChange: (newSize: number) => void;
   onSelectBatch: (batch: BatchItem) => void;
@@ -28,6 +25,27 @@ interface BatchTableProps {
   onWriteOffClick: (batch: BatchItem) => void;
   onResetFilters: () => void;
 }
+
+const isKgBatch = (row: BatchItem) =>
+  Boolean(row.isWeightProduct) || String(row.unit || '').trim().toLowerCase() === 'kg';
+
+const fmtQty = (n: number) =>
+  n.toLocaleString('vi-VN', { maximumFractionDigits: 3 });
+
+/** Tồn đang lưu theo ĐVT tồn (base). Quy đổi ra ĐVT nhập. */
+const getPurchaseQty = (stockQty: number, rate: number) => {
+  const r = rate > 0 ? rate : 1;
+  return Math.round((stockQty / r) * 1000) / 1000;
+};
+
+const getUnitMeta = (row: BatchItem) => {
+  const stockUnit = (row.stockUnit || row.unit || 'Cái').trim() || 'Cái';
+  const purchaseUnit = (row.unit || '').trim() || stockUnit;
+  const rate = Number(row.purchaseToStockRate) > 0 ? Number(row.purchaseToStockRate) : 1;
+  const sameUnit = rate === 1 || purchaseUnit.toLowerCase() === stockUnit.toLowerCase();
+  const rateLabel = Number.isInteger(rate) ? String(rate) : rate.toLocaleString('vi-VN');
+  return { stockUnit, purchaseUnit, rate, sameUnit, rateLabel };
+};
 
 type SortField =
   | 'productName'
@@ -60,15 +78,13 @@ export const BatchTable: FC<BatchTableProps> = ({
   totalCount,
   pageIndex,
   pageSize,
-  selectedIds = [],
-  onToggleSelect,
-  onToggleSelectAll,
   onQuickStocktake,
+  onProcessBatch,
   onPageChange,
   onPageSizeChange,
   onSelectBatch,
-  onDiscountClick,
-  onWriteOffClick,
+  onDiscountClick: _onDiscountClick,
+  onWriteOffClick: _onWriteOffClick,
   onResetFilters,
 }) => {
   const [sortField, setSortField] = useState<SortField | null>('expiryDate');
@@ -165,27 +181,29 @@ export const BatchTable: FC<BatchTableProps> = ({
     }
   };
 
-  const allCurrentSelected =
-    sortedBatches.length > 0 && sortedBatches.every((b) => selectedIds.includes(b.id));
+  const tableMinWidth = 1480;
+  const tableFitStyle: CSSProperties = {
+    minWidth: tableMinWidth,
+    width: '100%',
+    tableLayout: 'fixed',
+  };
 
   const tableColGroup = (
     <colgroup>
-      <col style={{ width: '3%' }} />
-      <col style={{ width: '8%' }} />
-      <col style={{ width: '13%' }} />
-      <col style={{ width: '8%' }} />
-      <col style={{ width: '7%' }} />
-      <col style={{ width: '6%' }} />
-      <col style={{ width: '8%' }} />
-      <col style={{ width: '9%' }} />
-      <col style={{ width: '6%' }} />
-      <col style={{ width: '6%' }} />
-      <col style={{ width: '5%' }} />
-      <col style={{ width: '5%' }} />
-      <col style={{ width: '3%' }} />
-      <col style={{ width: '6%' }} />
-      <col style={{ width: '4%' }} />
-      <col style={{ width: '3%' }} />
+      <col style={{ width: 148 }} />
+      <col style={{ width: 200 }} />
+      <col style={{ width: 110 }} />
+      <col style={{ width: 80 }} />
+      <col style={{ width: 130 }} />
+      <col style={{ width: 160 }} />
+      <col style={{ width: 90 }} />
+      <col style={{ width: 90 }} />
+      <col style={{ width: 84 }} />
+      <col style={{ width: 120 }} />
+      <col style={{ width: 140 }} />
+      <col style={{ width: 100 }} />
+      <col style={{ width: 92 }} />
+      <col style={{ width: 128 }} />
     </colgroup>
   );
 
@@ -286,39 +304,36 @@ export const BatchTable: FC<BatchTableProps> = ({
   );
 
   return (
-    <div className="so-list-table-card">
+    <div className="so-list-table-card so-list-table-card--wrap">
       <div
         ref={headerRef}
         className="so-list-table-head"
-        style={{ paddingRight: hasScrollY ? 6 : 0, overflowX: 'hidden' }}
+        style={{ paddingRight: hasScrollY ? 6 : 0 }}
       >
-        <table className="so-list-table" style={{ minWidth: '100%', width: '100%' }}>
+        <table className="so-list-table" style={tableFitStyle}>
           {tableColGroup}
           <thead>
             <tr>
-              <th style={{ ...thBaseStyle, textAlign: 'center', padding: '10px 6px' }}>
-                {onToggleSelectAll && (
-                  <input
-                    type="checkbox"
-                    checked={allCurrentSelected}
-                    onChange={() => onToggleSelectAll(sortedBatches)}
-                    title="Chọn tất cả lô trên trang để kiểm kê"
-                    style={{ cursor: 'pointer', width: 14, height: 14, accentColor: '#0f766e' }}
-                  />
-                )}
-              </th>
               <SortTh field="sku" label="Mã SKU" />
               <SortTh field="productName" label="Tên sản phẩm" />
               <SortTh field="batchCode" label="Mã lô" />
-              <th style={thBaseStyle}>Ngành hàng</th>
               <th style={thBaseStyle}>Vị trí kệ</th>
               <th style={thBaseStyle}>Chi nhánh</th>
               <th style={thBaseStyle}>Nhà cung cấp</th>
               <th style={{ ...thBaseStyle, textAlign: 'center' }}>Ngày SX</th>
               <SortTh field="expiryDate" label="Hạn dùng" align="center" />
               <SortTh field="daysLeft" label="Còn (ngày)" align="right" />
-              <SortTh field="qtyCurrent" label="Tồn" align="right" />
-              <th style={{ ...thBaseStyle, textAlign: 'center' }}>ĐVT</th>
+              <th
+                style={{ ...thBaseStyle, textAlign: 'center' }}
+                title="Đơn vị nhập (purchase UoM)"
+              >
+                ĐVT nhập
+              </th>
+              <SortTh
+                field="qtyCurrent"
+                label="Tồn"
+                align="right"
+              />
               <SortTh field="costPrice" label="Giá vốn" align="right" />
               <SortTh field="status" label="Trạng thái" align="center" />
               <th style={{ ...thBaseStyle, textAlign: 'right' }}>Thao tác</th>
@@ -329,17 +344,16 @@ export const BatchTable: FC<BatchTableProps> = ({
 
       <div
         ref={bodyRef}
-        className="so-list-table-body"
+        className="so-list-table-body supplier-table-scroll-container"
         onScroll={handleBodyScroll}
-        style={{ overflowX: 'hidden' }}
       >
-        <table className="so-list-table" style={{ minWidth: '100%', width: '100%' }}>
+        <table className="so-list-table" style={tableFitStyle}>
           {tableColGroup}
           <tbody>
             {sortedBatches.length === 0 ? (
               <tr>
                 <td
-                  colSpan={16}
+                  colSpan={14}
                   style={{
                     padding: '48px 16px',
                     textAlign: 'center',
@@ -375,25 +389,9 @@ export const BatchTable: FC<BatchTableProps> = ({
               </tr>
             ) : (
               sortedBatches.map((row) => {
-                const isSelected = selectedIds.includes(row.id);
                 return (
-                  <tr
-                    key={row.id}
-                    className="so-list-row"
-                    style={isSelected ? { backgroundColor: '#f0fdfa' } : undefined}
-                  >
-                    <td style={{ textAlign: 'center', padding: '8px 6px' }}>
-                      {onToggleSelect && (
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={() => onToggleSelect(row)}
-                          title="Chọn lô này để kiểm kê"
-                          style={{ cursor: 'pointer', width: 14, height: 14, accentColor: '#0f766e' }}
-                        />
-                      )}
-                    </td>
-                    <td style={{ fontFamily: 'var(--font-mono, monospace)', fontSize: 12, color: '#334155' }}>
+                  <tr key={row.id} className="so-list-row">
+                    <td style={{ fontFamily: 'var(--font-mono, monospace)', fontWeight: 600, color: '#334155' }}>
                       {row.sku}
                     </td>
 
@@ -429,8 +427,6 @@ export const BatchTable: FC<BatchTableProps> = ({
                       </span>
                     </td>
 
-                    <td style={{ color: '#475569', fontSize: 12 }}>{row.categoryName}</td>
-
                     <td>
                       <span
                         style={{
@@ -444,7 +440,7 @@ export const BatchTable: FC<BatchTableProps> = ({
                       </span>
                     </td>
 
-                    <td style={{ color: '#475569', fontSize: 12 }} title={row.branchName}>
+                    <td style={{ color: '#475569', fontSize: 12 }}>
                       {row.branchName}
                     </td>
 
@@ -464,27 +460,66 @@ export const BatchTable: FC<BatchTableProps> = ({
 
                     <td style={{ textAlign: 'right' }}>{renderDaysLeft(row.daysLeft, row.expiryDate)}</td>
 
-                    <td
-                      style={{
-                        textAlign: 'right',
-                        fontFamily: 'monospace',
-                        fontWeight: 800,
-                        color: '#0f172a',
-                      }}
-                    >
-                      <div>{row.qtyCurrent}</div>
-                      {((row.qtyQuarantined ?? 0) > 0 || (row.qtyReserved ?? 0) > 0) && (
-                        <div style={{ fontSize: 10, fontWeight: 600, color: '#b45309', lineHeight: 1.2 }}>
-                          KD: {row.qtyAvailable ?? row.qtyCurrent}
-                          {(row.qtyQuarantined ?? 0) > 0 ? ` · CL:${row.qtyQuarantined}` : ''}
-                          {(row.qtyReserved ?? 0) > 0 ? ` · RTV:${row.qtyReserved}` : ''}
-                        </div>
-                      )}
-                    </td>
+                    {(() => {
+                      const { stockUnit, purchaseUnit, rate, sameUnit, rateLabel } = getUnitMeta(row);
+                      const stockQty = Number(row.qtyCurrent) || 0;
+                      const purchaseQty = getPurchaseQty(stockQty, rate);
+                      const availStock = row.qtyAvailable ?? stockQty;
+                      const availPurchase = getPurchaseQty(Number(availStock) || 0, rate);
+                      const hasHold =
+                        (row.qtyQuarantined ?? 0) > 0 || (row.qtyReserved ?? 0) > 0;
 
-                    <td style={{ textAlign: 'center', fontWeight: 600, color: '#475569' }}>
-                      {row.unit}
-                    </td>
+                      return (
+                        <>
+                          {/* Chỉ tên đơn vị nhập */}
+                          <td
+                            style={{
+                              textAlign: 'center',
+                              fontWeight: 700,
+                              color: '#334155',
+                            }}
+                            title={
+                              sameUnit
+                                ? purchaseUnit
+                                : `1 ${purchaseUnit} = ${rateLabel} ${stockUnit}`
+                            }
+                          >
+                            {purchaseUnit}
+                          </td>
+
+                          {/* Tồn theo đơn vị nhập */}
+                          <td
+                            style={{
+                              textAlign: 'right',
+                              fontFamily: 'monospace',
+                              fontWeight: 800,
+                              color: '#0f172a',
+                            }}
+                            title={
+                              sameUnit
+                                ? undefined
+                                : `Tồn gốc: ${fmtQty(stockQty)} ${stockUnit}`
+                            }
+                          >
+                            <div>
+                              {fmtQty(purchaseQty)}{' '}
+                              <span style={{ fontWeight: 600, color: '#64748b' }}>{purchaseUnit}</span>
+                            </div>
+                            {hasHold && (
+                              <div style={{ fontSize: 10, fontWeight: 600, color: '#b45309', lineHeight: 1.2 }}>
+                                KD: {fmtQty(availPurchase)} {purchaseUnit}
+                                {(row.qtyQuarantined ?? 0) > 0
+                                  ? ` · CL:${fmtQty(getPurchaseQty(row.qtyQuarantined ?? 0, rate))}`
+                                  : ''}
+                                {(row.qtyReserved ?? 0) > 0
+                                  ? ` · RTV:${fmtQty(getPurchaseQty(row.qtyReserved ?? 0, rate))}`
+                                  : ''}
+                              </div>
+                            )}
+                          </td>
+                        </>
+                      );
+                    })()}
 
                     <td
                       style={{
@@ -498,7 +533,7 @@ export const BatchTable: FC<BatchTableProps> = ({
 
                     <td style={{ textAlign: 'center' }}>{renderStatusBadge(row.status)}</td>
 
-                    <td style={{ textAlign: 'right' }}>
+                    <td className="so-list-td--actions" style={{ textAlign: 'right' }}>
                       <div className="so-list-actions">
                         <button
                           type="button"
@@ -514,34 +549,34 @@ export const BatchTable: FC<BatchTableProps> = ({
                             type="button"
                             className="so-list-action-btn so-list-action-btn--icon"
                             onClick={() => onQuickStocktake(row)}
-                            title="Kiểm kê lô hàng này"
+                            title={
+                              row.status === 'Expired' || row.status === 'Critical'
+                                ? 'Kiểm kê / xuất hủy'
+                                : 'Kiểm kê lô hàng này'
+                            }
                             aria-label="Kiểm kê lô hàng"
-                            style={{ color: '#0f766e', borderColor: '#99f6e4' }}
+                            style={{
+                              color: row.status === 'Expired' ? '#dc2626' : '#0f766e',
+                              borderColor: row.status === 'Expired' ? '#fecaca' : '#99f6e4',
+                            }}
                           >
                             <ClipboardCheck size={14} />
                           </button>
                         )}
-                        {(row.status === 'Warning' || row.status === 'Critical') && (
+                        {onProcessBatch && isKgBatch(row) && (
                           <button
                             type="button"
                             className="so-list-action-btn so-list-action-btn--icon"
-                            onClick={() => onDiscountClick(row)}
-                            title="Giảm giá FEFO"
-                            aria-label="Giảm giá"
-                            style={{ color: '#1d4ed8', borderColor: '#bfdbfe' }}
+                            onClick={() => onProcessBatch(row)}
+                            title="Chế biến khay"
+                            aria-label="Chế biến khay"
+                            style={{
+                              color: '#b45309',
+                              borderColor: '#fde68a',
+                              background: '#fffbeb',
+                            }}
                           >
-                            <Tag size={14} />
-                          </button>
-                        )}
-                        {(row.status === 'Expired' || row.status === 'Critical') && (
-                          <button
-                            type="button"
-                            className="so-list-action-btn so-list-action-btn--icon so-list-action-btn--danger"
-                            onClick={() => onWriteOffClick(row)}
-                            title="Xuất hủy"
-                            aria-label="Xuất hủy"
-                          >
-                            <Trash2 size={14} />
+                            <ChefHat size={14} />
                           </button>
                         )}
                       </div>

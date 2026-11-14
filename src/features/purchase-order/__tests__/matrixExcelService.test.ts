@@ -3,7 +3,9 @@ import * as XLSX from 'xlsx';
 import {
   validateMatrixExcelFile,
   applyMatrixExcelImport,
+  resolveExportQty,
 } from '../lib/matrixExcelService';
+import { productRowKey } from '../lib/matrixRowKey';
 import type {
   OrderMatrixProduct,
   DayColInfo,
@@ -347,7 +349,7 @@ describe('Purchase Order Matrix — Excel Export & Import Engine (CISCA Specific
     expect(negErr).toBeDefined();
   });
 
-  it('Scenario 8: SL < MOQ -> WARNING; vẫn Apply được nếu không ERROR', async () => {
+  it('Scenario 8: SL < MOQ -> ERROR; không Apply được', async () => {
     const wsData = [
       ['Header info'],
       [`Mã CN: ${mockBranch.id}`],
@@ -369,15 +371,12 @@ describe('Purchase Order Matrix — Excel Export & Import Engine (CISCA Specific
       isCellEditable,
     });
 
-    // Per user rules: MOQ is a WARNING, not an ERROR. Result is valid and can be applied!
-    expect(result.valid).toBe(true);
-    expect(result.summary.errorCount).toBe(0);
-    expect(result.summary.warningCount).toBe(1);
-    const moqWarn = result.warnings.find((w) => w.code === 'MOQ_NOT_MET');
-    expect(moqWarn).toBeDefined();
-    expect(moqWarn?.inputValue).toBe(5);
-    expect(result.summary.validCells).toBe(1);
-    expect(result.cellsToApply[0].quantity).toBe(5);
+    expect(result.valid).toBe(false);
+    expect(result.summary.errorCount).toBeGreaterThanOrEqual(1);
+    const moqErr = result.errors.find((e) => e.code === 'MOQ_NOT_MET');
+    expect(moqErr).toBeDefined();
+    expect(moqErr?.inputValue).toBe(5);
+    expect(result.cellsToApply.length).toBe(0);
   });
 
   it('Scenario 9: Bội số đặt hàng không khớp -> WARNING (ORDER_MULTIPLE_INVALID)', async () => {
@@ -438,5 +437,86 @@ describe('Purchase Order Matrix — Excel Export & Import Engine (CISCA Specific
     expect(empMap['prod-001']['2026-11-04'].storeQty).toBe(30);
     expect(empMap['prod-001']['2026-11-04'].finalQty).toBe(30);
     expect(empMap['prod-001']['2026-11-04'].isOwnerAdjusted).toBe(true);
+  });
+
+  it('resolveExportQty: SO thấy storeQty khi đã chốt; Emp thấy employeeQty', () => {
+    const owned = {
+      employeeQty: 10,
+      storeQty: 12,
+      finalQty: 12,
+      isOwnerAdjusted: true,
+    };
+    expect(resolveExportQty(owned, true)).toBe(12);
+    expect(resolveExportQty(owned, false)).toBe(12); // owner-adjusted → hiện store/final cho emp (read-only)
+    const plain = {
+      employeeQty: 8,
+      storeQty: null,
+      finalQty: 8,
+      isOwnerAdjusted: false,
+    };
+    expect(resolveExportQty(plain, true)).toBe(8);
+    expect(resolveExportQty(plain, false)).toBe(8);
+  });
+
+  it('applyMatrixExcelImport ghi theo productRowKey khi có supplierId', () => {
+    const p = mockProducts[0];
+    const rk = productRowKey(p);
+    const map = applyMatrixExcelImport(
+      [
+        {
+          productId: p.id,
+          supplierId: p.supplierId,
+          rowKey: rk,
+          deliveryDate: '2026-11-04',
+          quantity: 40,
+        },
+      ],
+      {},
+      true
+    );
+    expect(map[rk]['2026-11-04'].storeQty).toBe(40);
+    expect(map[rk]['2026-11-04'].finalQty).toBe(40);
+  });
+
+  it('Header "Mã sản phẩm (SKU)" vẫn nhận diện được (compat export cũ)', async () => {
+    const wsData = [
+      ['HỆ THỐNG QUẢN LÝ BÁN LẺ MT-GRMS - ĐẶT HÀNG NHẬP KHO (PURCHASE ORDER MATRIX)'],
+      [`Chi nhánh: ${mockBranch.name} | Mã hệ thống: ${mockBranch.id}`],
+      [`Nhà cung cấp: ${mockSupplier.name} | Mã NCC: ${mockSupplier.id}`],
+      [],
+      [
+        'STT',
+        'Ngành hàng',
+        'Mã vạch',
+        'Mã sản phẩm (SKU)',
+        'Tên sản phẩm',
+        'ĐVT',
+        'MOQ',
+        'Bội số',
+        'Đơn giá (VNĐ)',
+        'T4 04/11 [2026-11-04]',
+        'Tổng SL',
+        'Thành tiền (VNĐ)',
+      ],
+      [1, 'Sữa tươi', '893', 'SP001', 'Sữa', 'Hộp', 10, 1, 32000, 15, 15, 480000],
+    ];
+    const file = createTestExcelFile(wsData);
+    const result = await validateMatrixExcelFile({
+      file,
+      currentBranchId: mockBranch.id,
+      currentBranchCode: mockBranch.code,
+      currentBranchName: mockBranch.name,
+      currentSupplierId: mockSupplier.id,
+      currentSupplierCode: mockSupplier.code,
+      currentSupplierName: mockSupplier.name,
+      viewFrom: new Date('2026-11-04'),
+      viewTo: new Date('2026-11-05'),
+      matrixProducts: mockProducts,
+      dayColumns: mockDays,
+      cellMap: mockCellMap,
+      isCellEditable,
+      baseDate: testBaseDate,
+    });
+    expect(result.errors.some((e) => e.code === 'HEADER_MISSING')).toBe(false);
   });
 });

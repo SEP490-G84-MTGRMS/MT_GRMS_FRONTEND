@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import type { FC } from 'react';
 import {
   X,
@@ -13,6 +14,7 @@ import {
   History,
 } from 'lucide-react';
 import type { CustomerDto } from '../types/customer.types';
+import { sanitizeCustomerText, normalizeDebtLimit } from '../utils/customerValidation';
 
 interface CustomerDrawerDetailProps {
   customer: CustomerDto | null;
@@ -38,16 +40,22 @@ export const CustomerDrawerDetail: FC<CustomerDrawerDetailProps> = ({
   onOpenCollect,
   onViewLedger,
 }) => {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'info' | 'invoices' | 'payments'>('info');
 
   if (!customer) return null;
 
+  const safeFullName = sanitizeCustomerText(customer.fullName, 'Khách hàng');
+  const safeAddress = sanitizeCustomerText(customer.address, 'Chưa cập nhật');
+  const safeDebtLimit = normalizeDebtLimit(customer.debtLimit);
+  const safeDebt = Math.max(0, Number(customer.currentDebtAR) || 0);
+
   const debtPercent =
-    customer.debtLimit > 0
-      ? Math.min(100, Math.round((customer.currentDebtAR / customer.debtLimit) * 100))
+    safeDebtLimit > 0
+      ? Math.min(100, Math.round((safeDebt / safeDebtLimit) * 100))
       : 0;
-  const isOverLimit = customer.currentDebtAR > customer.debtLimit && customer.debtLimit > 0;
-  const hasDebt = customer.currentDebtAR > 0;
+  const isOverLimit = safeDebt > safeDebtLimit && safeDebtLimit > 0;
+  const hasDebt = safeDebt > 0;
 
   return (
     <div className="customer-drawer-backdrop" onClick={onClose}>
@@ -56,12 +64,12 @@ export const CustomerDrawerDetail: FC<CustomerDrawerDetailProps> = ({
         <div className="customer-drawer-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <div className="customer-drawer-avatar">
-              {customer.fullName.slice(0, 2).toUpperCase()}
+              {safeFullName.slice(0, 2).toUpperCase()}
             </div>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-main, #111827)' }}>
-                  {customer.fullName}
+                  {safeFullName}
                 </h3>
                 <span className={`tier-badge tier-badge-${customer.membershipTier.toLowerCase()}`}>
                   {customer.membershipTier}
@@ -100,7 +108,7 @@ export const CustomerDrawerDetail: FC<CustomerDrawerDetailProps> = ({
               </p>
               <div style={{ marginTop: '8px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: '#94a3b8', marginBottom: '4px' }}>
-                  <span>Hạn mức: {formatCurrency(customer.debtLimit)}</span>
+                  <span>Hạn mức: {formatCurrency(safeDebtLimit)}</span>
                   <span style={{ fontWeight: isOverLimit ? 700 : 500, color: isOverLimit ? '#DC2626' : 'inherit' }}>
                     {debtPercent}%
                   </span>
@@ -186,7 +194,7 @@ export const CustomerDrawerDetail: FC<CustomerDrawerDetailProps> = ({
             >
               <ShieldAlert className="w-4 h-4" style={{ flexShrink: 0 }} />
               <span>
-                Cảnh báo: Khách hàng đã vượt hạn mức nợ cho phép ({formatCurrency(customer.debtLimit)}). Vui lòng thu hồi nợ trước khi xuất bán thêm.
+                Cảnh báo: Khách hàng đã vượt hạn mức nợ cho phép ({formatCurrency(safeDebtLimit)}). Vui lòng thu hồi nợ trước khi xuất bán thêm.
               </span>
             </div>
           )}
@@ -233,7 +241,7 @@ export const CustomerDrawerDetail: FC<CustomerDrawerDetailProps> = ({
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
                 <MapPin className="w-4 h-4" style={{ color: '#94a3b8', marginTop: '2px' }} />
                 <span style={{ color: '#64748b', width: '110px' }}>Địa chỉ:</span>
-                <span style={{ flex: 1, color: '#334155' }}>{customer.address || 'Chưa cập nhật'}</span>
+                <span style={{ flex: 1, color: '#334155' }}>{safeAddress}</span>
               </div>
               {customer.taxCode && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -268,7 +276,30 @@ export const CustomerDrawerDetail: FC<CustomerDrawerDetailProps> = ({
                     }}
                   >
                     <div>
-                      <div style={{ fontWeight: 700, color: 'var(--text-main, #111827)' }}>{inv.id}</div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onClose();
+                          navigate('/store-owner/invoices?search=' + encodeURIComponent(inv.id));
+                        }}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          padding: 0,
+                          fontWeight: 700,
+                          color: '#0F766E',
+                          cursor: 'pointer',
+                          textAlign: 'left',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          fontSize: '0.84rem',
+                        }}
+                        className="hover:underline"
+                        title="Bấm để xem chi tiết hóa đơn/đơn hàng trên trang Quản lý Hóa đơn"
+                      >
+                        {inv.id} ↗
+                      </button>
                       <div style={{ fontSize: '0.74rem', color: '#94a3b8' }}>{inv.date}</div>
                     </div>
                     <div style={{ textAlign: 'right' }}>

@@ -141,6 +141,25 @@ export interface HolidayDateRange {
   reason: string;
 }
 
+export interface SupplierReturnPolicy {
+  id: string;
+  supplierId: string;
+  allowReturn: boolean;
+  allowedReturnTypes: string[];
+  allowedResolutionTypes: string[];
+  defaultResolutionType: string;
+  nearExpiryMinDaysLeft?: number | null;
+  requireEvidenceImage: boolean;
+  maxReturnDaysAfterReceipt?: number | null;
+  costShareEnabled: boolean;
+  storeCostSharePercent?: number | null;
+  supplierCostSharePercent?: number | null;
+  costShareBase: string;
+  requireStorePaymentBeforeReplacement: boolean;
+  notes?: string | null;
+  isActive: boolean;
+}
+
 export interface SupplierDeliveryConfig {
   minOrderQuantity: number;
   activeDeliveryDays: number[]; // 0 = Sun, 1 = Mon, ..., 6 = Sat

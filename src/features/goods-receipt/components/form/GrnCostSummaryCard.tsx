@@ -15,6 +15,7 @@ const formatCurrency = (val: number): string => {
   return new Intl.NumberFormat('vi-VN').format(val);
 };
 
+/** Dùng cho màn chi tiết GRN — form create/confirm dùng GrnFormFooter. */
 export const GrnCostSummaryCard: FC<GrnCostSummaryCardProps> = ({
   notes,
   costs,
@@ -33,7 +34,6 @@ export const GrnCostSummaryCard: FC<GrnCostSummaryCardProps> = ({
         boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)',
       }}
     >
-      {/* Title */}
       <div
         style={{
           display: 'flex',
@@ -67,7 +67,6 @@ export const GrnCostSummaryCard: FC<GrnCostSummaryCardProps> = ({
           alignItems: 'start',
         }}
       >
-        {/* Left Column: Ghi chú nhập kho */}
         <div>
           <label
             style={{
@@ -102,12 +101,8 @@ export const GrnCostSummaryCard: FC<GrnCostSummaryCardProps> = ({
               resize: 'vertical',
             }}
           />
-          <div style={{ fontSize: 11.5, color: '#94a3b8', marginTop: 4 }}>
-            * Thông tin ghi chú sẽ được lưu vào lịch sử đối soát và hiển thị trên phiếu in.
-          </div>
         </div>
 
-        {/* Right Column: Bảng tính toán tài chính chi tiết */}
         <div
           style={{
             backgroundColor: '#f8fafc',
@@ -119,7 +114,6 @@ export const GrnCostSummaryCard: FC<GrnCostSummaryCardProps> = ({
             gap: 10,
           }}
         >
-          {/* 1. Tổng tiền hàng */}
           <div
             style={{
               display: 'flex',
@@ -135,7 +129,6 @@ export const GrnCostSummaryCard: FC<GrnCostSummaryCardProps> = ({
             </span>
           </div>
 
-          {/* 2. Chiết khấu NCC */}
           <div
             style={{
               display: 'flex',
@@ -173,7 +166,6 @@ export const GrnCostSummaryCard: FC<GrnCostSummaryCardProps> = ({
             />
           </div>
 
-          {/* 3. Thuế VAT */}
           <div
             style={{
               display: 'flex',
@@ -216,10 +208,8 @@ export const GrnCostSummaryCard: FC<GrnCostSummaryCardProps> = ({
             </div>
           </div>
 
-          {/* Dòng phân cách Grand Total */}
           <div style={{ borderTop: '1px dashed #cbd5e1', margin: '4px 0' }} />
 
-          {/* 4. TỔNG GIÁ TRỊ PHIẾU NHẬP KHO */}
           <div
             style={{
               display: 'flex',

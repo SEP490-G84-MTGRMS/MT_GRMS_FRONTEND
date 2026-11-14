@@ -43,22 +43,7 @@ export const ExpenseTable: FC<ExpenseTableProps> = ({
   onCancel,
 }) => {
   const navigate = useNavigate();
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
-
-  const toggleSelectAll = () => {
-    if (selectedIds.length === data.length) {
-      setSelectedIds([]);
-    } else {
-      setSelectedIds(data.map((item) => item.expenseId));
-    }
-  };
-
-  const toggleSelectOne = (id: string) => {
-    setSelectedIds((prev) =>
-      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
-    );
-  };
 
   if (isLoading) {
     return (
@@ -106,7 +91,7 @@ export const ExpenseTable: FC<ExpenseTableProps> = ({
           Không có khoản phải trả nào
         </h4>
         <p style={{ fontSize: '0.82rem', color: '#64748b', margin: 0 }}>
-          Bấm "+ Ghi nhận chi phí" để thêm hóa đơn phụ tùng hoặc chi phí mới.
+          Bấm "+ Ghi nhận chi phí" để thêm hóa đơn chi phí vận hành mới.
         </p>
       </div>
     );
@@ -118,13 +103,6 @@ export const ExpenseTable: FC<ExpenseTableProps> = ({
         <table className="expense-table">
           <thead>
             <tr>
-              <th style={{ width: 32, textAlign: 'center' }}>
-                <input
-                  type="checkbox"
-                  checked={data.length > 0 && selectedIds.length === data.length}
-                  onChange={toggleSelectAll}
-                />
-              </th>
               <th>Mã phiếu chi</th>
               <th>Danh mục chi phí</th>
               <th>Chi nhánh</th>
@@ -138,21 +116,30 @@ export const ExpenseTable: FC<ExpenseTableProps> = ({
           <tbody>
             {data.map((item) => (
               <tr key={item.expenseId}>
-                <td style={{ textAlign: 'center' }}>
-                  <input
-                    type="checkbox"
-                    checked={selectedIds.includes(item.expenseId)}
-                    onChange={() => toggleSelectOne(item.expenseId)}
-                  />
-                </td>
                 <td className="expense-table-id">
-                  <span className="mono-badge">{item.expenseId}</span>
+                  <span className="mono-badge">{item.voucherCode || item.expenseId}</span>
                 </td>
                 <td>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                     <span className="expense-table-category">
                       {EXPENSE_CATEGORY_LABELS[item.category] || item.category}
                     </span>
+                    {item.isFlaggedAsSuspiciousSplit && (
+                      <span
+                        style={{
+                          fontSize: '0.68rem',
+                          fontWeight: 700,
+                          color: '#B91C1C',
+                          background: '#FEF2F2',
+                          border: '1px solid #FECACA',
+                          borderRadius: '9999px',
+                          padding: '1px 7px',
+                        }}
+                        title={item.suspiciousReason || 'Cảnh báo xé nhỏ hạn mức chi (Anti-Splitting)'}
+                      >
+                        ⚠️ Nghi vấn
+                      </span>
+                    )}
                     {item.isRecurring && (
                       <span
                         className="badge-recurring"
@@ -271,7 +258,10 @@ export const ExpenseTable: FC<ExpenseTableProps> = ({
                     {item.status === 'Paid' && (
                       <button
                         type="button"
-                        onClick={() => navigate('/store-owner/cashbook?search=' + encodeURIComponent(item.expenseId))}
+                        onClick={() => {
+                          const targetSearch = item.voucherCode || item.invoiceNumber || item.expenseId;
+                          navigate('/store-owner/cashbook?search=' + encodeURIComponent(targetSearch));
+                        }}
                         title="Xem phiếu chi dòng tiền trong Sổ quỹ Cashbook"
                         style={{
                           background: '#F0FDFA',

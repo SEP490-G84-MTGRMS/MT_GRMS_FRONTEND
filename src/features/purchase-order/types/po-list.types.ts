@@ -33,7 +33,9 @@ export interface PurchaseOrderListItem {
   branchName: string;          // VD: BR-01 CH Nguyễn Trãi
   createdSource: string;       // VD: NV. Nguyễn Văn A (Nhập Grid), Chủ cửa hàng (Dispatch Hub)
   lastUpdated: string;         // VD: 08/10/2026 17:15
-  expectedDelivery: string;    // VD: 09/10/2026
+  expectedDelivery: string;    // VD: 09/10/2026 (hiển thị)
+  /** Ngày giao gốc ISO YYYY-MM-DD — dùng gate nhập hàng */
+  deliveryDate?: string | null;
   itemCount: number;           // Số mặt hàng (SKU)
   totalAmount: number;         // Tổng tiền đơn hàng (VNĐ)
   status: PurchaseOrderStatus;
@@ -43,6 +45,9 @@ export interface PurchaseOrderListItem {
   activeGoodsReceiptId?: string | null;
   activeGoodsReceiptCode?: string | null;
   activeGoodsReceiptStatus?: string | null;
+  /** null/MANUAL_MATRIX = mua thường; SUPPLIER_RETURN = đổi hàng từ phiếu trả */
+  sourceType?: string | null;
+  sourceSupplierReturnId?: string | null;
   items: PurchaseOrderItemDetail[];
 }
 

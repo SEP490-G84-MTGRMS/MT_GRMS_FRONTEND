@@ -247,7 +247,7 @@ export const SupplierReturnFormPage: FC = () => {
               Lập phiếu trả hàng nhà cung cấp (RTV)
             </h1>
             <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
-              Khởi tạo yêu cầu trả hàng từ phiếu nhập kho gốc đã hoàn tất
+              Khởi tạo yêu cầu trả hàng từ phiếu nhập kho gốc đã hoàn tất. Tồn chỉ trừ khi bàn giao thực tế — không dùng cho hàng thiếu kiểm kê (MISSING).
             </div>
           </div>
         </div>

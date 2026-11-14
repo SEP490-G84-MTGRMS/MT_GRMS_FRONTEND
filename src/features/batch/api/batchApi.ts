@@ -27,6 +27,8 @@ interface BatchListItemDto {
   qtyQuarantined?: number;
   qtyAvailable?: number;
   unit: string;
+  stockUnit?: string;
+  purchaseToStockRate?: number;
   costPrice: number;
   totalValuation: number;
   status: string;
@@ -36,6 +38,11 @@ interface BatchListItemDto {
   originalGrnId?: string | null;
   fefoDiscountPercent?: number;
   isFefoDiscountActive?: boolean;
+  isWeightProduct?: boolean;
+  allowRepack?: boolean;
+  packagedQty?: number;
+  packageCount?: number;
+  rawSellableQty?: number;
 }
 
 interface BatchPagedResultDto {
@@ -105,6 +112,8 @@ export const mapBatchDtoToItem = (dto: BatchListItemDto): BatchItem => ({
             (Number(dto.qtyQuarantined) || 0)
         ),
   unit: dto.unit || 'Cái',
+  stockUnit: dto.stockUnit || dto.unit || 'Cái',
+  purchaseToStockRate: Number(dto.purchaseToStockRate) > 0 ? Number(dto.purchaseToStockRate) : 1,
   costPrice: Number(dto.costPrice) || 0,
   totalValuation: Number(dto.totalValuation) || 0,
   status: normalizeStatus(dto.status),
@@ -114,6 +123,21 @@ export const mapBatchDtoToItem = (dto: BatchListItemDto): BatchItem => ({
   originalGrnId: dto.originalGrnId || undefined,
   discountPercent: dto.isFefoDiscountActive ? Number(dto.fefoDiscountPercent) || 0 : 0,
   movements: [],
+  isWeightProduct: Boolean(dto.isWeightProduct) || String(dto.unit || '').trim().toLowerCase() === 'kg',
+  allowRepack: Boolean(dto.allowRepack),
+  packagedQty: Number(dto.packagedQty) || 0,
+  packageCount: Number(dto.packageCount) || 0,
+  rawSellableQty:
+    dto.rawSellableQty !== undefined
+      ? Number(dto.rawSellableQty) || 0
+      : dto.qtyAvailable !== undefined
+        ? Number(dto.qtyAvailable) || 0
+        : Math.max(
+            0,
+            (Number(dto.qtyCurrent) || 0) -
+              (Number(dto.qtyReserved) || 0) -
+              (Number(dto.qtyQuarantined) || 0)
+          ),
 });
 
 const buildKeyword = (filters: BatchFilterState): string | undefined => {

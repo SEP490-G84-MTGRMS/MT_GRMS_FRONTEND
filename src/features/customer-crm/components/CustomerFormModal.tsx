@@ -2,6 +2,13 @@ import { useState, useEffect } from 'react';
 import type { FC, FormEvent } from 'react';
 import { X, User, Phone, Mail, MapPin, DollarSign, Award, Building } from 'lucide-react';
 import type { CustomerDto, MembershipTier } from '../types/customer.types';
+import {
+  sanitizeCustomerText,
+  validateSafeCustomerText,
+  validateVietnamesePhone,
+  validateDebtLimit,
+  normalizeDebtLimit,
+} from '../utils/customerValidation';
 
 interface CustomerFormModalProps {
   isOpen: boolean;
@@ -41,12 +48,12 @@ export const CustomerFormModal: FC<CustomerFormModalProps> = ({
 
   useEffect(() => {
     if (initialData) {
-      setFullName(initialData.fullName || '');
+      setFullName(sanitizeCustomerText(initialData.fullName));
       setPhoneNumber(initialData.phoneNumber || '');
       setEmail(initialData.email || '');
-      setAddress(initialData.address || '');
+      setAddress(sanitizeCustomerText(initialData.address));
       setTaxCode(initialData.taxCode || '');
-      setDebtLimit(initialData.debtLimit || 0);
+      setDebtLimit(normalizeDebtLimit(initialData.debtLimit));
       setAllowDebt(Boolean(initialData.allowDebt));
       setMembershipTier(initialData.membershipTier || 'Standard');
     } else {
@@ -74,30 +81,37 @@ export const CustomerFormModal: FC<CustomerFormModalProps> = ({
       setErrorMsg('Vui lòng nhập họ và tên khách hàng.');
       return;
     }
+    if (!validateSafeCustomerText(fullName)) {
+      setErrorMsg('Họ và tên khách hàng không được chứa thẻ HTML hoặc ký tự đặc biệt < >.');
+      return;
+    }
+    if (address.trim() && !validateSafeCustomerText(address)) {
+      setErrorMsg('Địa chỉ không được chứa thẻ HTML hoặc ký tự đặc biệt < >.');
+      return;
+    }
     if (!cleanPhone) {
       setErrorMsg('Vui lòng nhập số điện thoại.');
       return;
     }
 
-    const phoneRegex = /^(0[3|5|7|8|9])[0-9]{8}$/;
-    if (!phoneRegex.test(cleanPhone)) {
+    if (!validateVietnamesePhone(cleanPhone)) {
       setErrorMsg('Số điện thoại không đúng định dạng Việt Nam (10 số, bắt đầu bằng 03, 05, 07, 08, 09).');
       return;
     }
 
-    if (debtLimit < 0) {
+    if (!validateDebtLimit(Number(debtLimit))) {
       setErrorMsg('Hạn mức nợ không thể là số âm.');
       return;
     }
 
     try {
       await onSubmit({
-        fullName: fullName.trim(),
+        fullName: sanitizeCustomerText(fullName),
         phoneNumber: cleanPhone,
         email: email.trim() || undefined,
-        address: address.trim() || undefined,
+        address: sanitizeCustomerText(address) || undefined,
         taxCode: taxCode.trim() || undefined,
-        debtLimit: Number(debtLimit),
+        debtLimit: normalizeDebtLimit(debtLimit),
         allowDebt,
         membershipTier,
       });

@@ -69,7 +69,8 @@ export const storeProductApi = {
         sku: x.sku,
         barcode: x.barcode,
         category: x.category || '',
-        unit: x.unit,
+        // Đơn vị nhập: BE resolve DeliveryUoM → IsPurchaseUnit → BaseUnit (cùng logic màn NCC)
+        unit: x.unit || x.deliveryUoM || x.baseUoM || 'Cái',
         imageUrl: x.imageUrl || undefined,
         retailPrice: x.retailPrice,
         costPrice: x.costPrice,
@@ -80,6 +81,8 @@ export const storeProductApi = {
         primarySupplierCode: x.primarySupplierCode || x.supplierCode || '',
         primarySupplierName: x.primarySupplierName || x.supplierName || '',
         isPrimarySupplier: Boolean(x.isPrimarySupplier),
+        hasActiveSupplierSource: x.hasActiveSupplierSource !== false,
+        lostSupplierSource: Boolean(x.lostSupplierSource),
         status: x.status,
         shelfLocation: x.shelfLocation,
         assignedDate: x.assignedDate ? x.assignedDate.slice(0, 10) : new Date().toISOString().slice(0, 10),

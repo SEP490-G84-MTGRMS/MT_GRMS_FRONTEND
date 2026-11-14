@@ -7,10 +7,12 @@ import {
   ArrowLeft,
   ClipboardCheck,
   ClipboardList,
+  AlertTriangle,
 } from 'lucide-react';
 import type {
   BatchItem,
   BatchFilterState,
+  BatchKpiSummary,
   BatchStatus,
   UserRole,
 } from '../types/batch.types';
@@ -19,6 +21,11 @@ import { BatchFilterBar } from '../components/BatchFilterBar';
 import { BatchTable } from '../components/BatchTable';
 import { BatchDetailDrawer } from '../components/BatchDetailDrawer';
 import { BatchDiscountModal } from '../components/BatchDiscountModal';
+import { BatchRepackModal } from '../components/BatchRepackModal';
+import {
+  BatchExpiryAlertModal,
+  type BatchAlertMode,
+} from '../components/BatchExpiryAlertModal';
 import { AdminToast, type ToastState } from '../../admin/components';
 import '../../purchase-order/purchase-order.css';
 
@@ -58,37 +65,25 @@ export const BatchListPage: FC<{ defaultRole?: UserRole }> = ({
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [discountBatch, setDiscountBatch] = useState<BatchItem | null>(null);
   const [isDiscountModalOpen, setIsDiscountModalOpen] = useState(false);
-  const [selectedBatches, setSelectedBatches] = useState<BatchItem[]>([]);
+  const [repackBatch, setRepackBatch] = useState<BatchItem | null>(null);
+  const [kpi, setKpi] = useState<BatchKpiSummary | null>(null);
+  const [isAlertOpen, setIsAlertOpen] = useState(false);
+  const [alertMode, setAlertMode] = useState<BatchAlertMode>('near_expiry');
   const [toast, setToast] = useState<ToastState | null>(null);
+
+  const nearExpiryCount = (kpi?.warningCount || 0) + (kpi?.criticalCount || 0);
+  const expiredCount = kpi?.expiredCount || 0;
+
+  const openAlert = (mode: BatchAlertMode) => {
+    setAlertMode(mode);
+    setIsAlertOpen(true);
+  };
 
   const stocktakeBasePath =
     role === 'employee' ? '/employee/stocktakes' : '/store-owner/stocktakes';
 
-  const handleToggleSelectBatch = (batch: BatchItem) => {
-    setSelectedBatches((prev) =>
-      prev.some((b) => b.id === batch.id)
-        ? prev.filter((b) => b.id !== batch.id)
-        : [...prev, batch]
-    );
-  };
-
-  const handleToggleSelectAllBatches = (pageBatches: BatchItem[]) => {
-    setSelectedBatches((prev) => {
-      const allSelected =
-        pageBatches.length > 0 && pageBatches.every((b) => prev.some((p) => p.id === b.id));
-      if (allSelected) {
-        return prev.filter((p) => !pageBatches.some((b) => b.id === p.id));
-      }
-      const next = [...prev];
-      pageBatches.forEach((b) => {
-        if (!next.some((p) => p.id === b.id)) next.push(b);
-      });
-      return next;
-    });
-  };
-
   const handleCreateStocktake = (singleBatch?: BatchItem) => {
-    const itemsToCount = singleBatch ? [singleBatch] : selectedBatches;
+    const itemsToCount = singleBatch ? [singleBatch] : [];
     navigate(`${stocktakeBasePath}/create`, {
       state: {
         preselectedBatches: itemsToCount,
@@ -151,10 +146,12 @@ export const BatchListPage: FC<{ defaultRole?: UserRole }> = ({
       if (fetchId !== fetchIdRef.current) return;
       setBatches(result.items);
       setTotalCount(result.totalCount);
+      setKpi(result.kpiSummary);
     } catch (err: unknown) {
       if (fetchId !== fetchIdRef.current) return;
       setBatches([]);
       setTotalCount(0);
+      setKpi(null);
       const message =
         err instanceof Error ? err.message : 'Không thể tải danh sách lô hàng.';
       showToast(message, 'error');
@@ -231,12 +228,7 @@ export const BatchListPage: FC<{ defaultRole?: UserRole }> = ({
   };
 
   const handleWriteOff = (batch: BatchItem) => {
-    const confirmed = window.confirm(
-      `Xác nhận tạo phiếu xuất hủy phế phẩm (FE-06) cho lô ${batch.batchCode} (${batch.productName})?\n\nSố lượng tiêu hủy: ${batch.qtyCurrent} ${batch.unit}\nTổng giá trị hao hụt: ${new Intl.NumberFormat('vi-VN').format(batch.totalValuation)} đ`
-    );
-    if (confirmed) {
-      showToast('Chưa có API xuất hủy — phiếu chưa được tạo.', 'warning');
-    }
+    handleCreateStocktake(batch);
   };
 
   const handlePrint = () => {
@@ -289,16 +281,38 @@ export const BatchListPage: FC<{ defaultRole?: UserRole }> = ({
         <div className="so-list-header-actions">
           <button
             type="button"
+            className="po-btn po-btn-secondary"
+            onClick={() => openAlert('near_expiry')}
+            style={
+              nearExpiryCount > 0
+                ? { borderColor: '#f59e0b', color: '#b45309', fontWeight: 800 }
+                : undefined
+            }
+          >
+            <AlertTriangle size={14} />
+            <span>Cận hạn{nearExpiryCount > 0 ? ` (${nearExpiryCount})` : ''}</span>
+          </button>
+          <button
+            type="button"
+            className="po-btn po-btn-secondary"
+            onClick={() => openAlert('expired')}
+            style={
+              expiredCount > 0
+                ? { borderColor: '#f87171', color: '#be123c', fontWeight: 800 }
+                : undefined
+            }
+          >
+            <ClipboardCheck size={14} />
+            <span>Hết hạn{expiredCount > 0 ? ` (${expiredCount})` : ''}</span>
+          </button>
+          <button
+            type="button"
             className="po-btn po-btn-primary"
             style={{ backgroundColor: '#0f766e' }}
             onClick={() => handleCreateStocktake()}
           >
             <ClipboardCheck size={14} />
-            <span>
-              {selectedBatches.length > 0
-                ? `Kiểm kê hàng hóa (${selectedBatches.length} lô đã chọn)`
-                : 'Kiểm kê hàng hóa'}
-            </span>
+            <span>Kiểm kê hàng hóa</span>
           </button>
           <button
             type="button"
@@ -344,10 +358,8 @@ export const BatchListPage: FC<{ defaultRole?: UserRole }> = ({
         totalCount={totalCount}
         pageIndex={pageIndex}
         pageSize={pageSize}
-        selectedIds={selectedBatches.map((b) => b.id)}
-        onToggleSelect={handleToggleSelectBatch}
-        onToggleSelectAll={handleToggleSelectAllBatches}
         onQuickStocktake={(b) => handleCreateStocktake(b)}
+        onProcessBatch={(b) => setRepackBatch(b)}
         onPageChange={(p) => setPageIndex(p)}
         onPageSizeChange={(s) => {
           setPageSize(s);
@@ -358,6 +370,18 @@ export const BatchListPage: FC<{ defaultRole?: UserRole }> = ({
         onWriteOffClick={handleWriteOff}
         onResetFilters={handleReset}
       />
+
+      {repackBatch && (
+        <BatchRepackModal
+          batch={repackBatch}
+          onClose={() => setRepackBatch(null)}
+          onDone={() => {
+            setRepackBatch(null);
+            showToast('Chế biến khay thành công.');
+            void loadBatches();
+          }}
+        />
+      )}
 
       <BatchDetailDrawer
         isOpen={isDrawerOpen}
@@ -381,6 +405,40 @@ export const BatchListPage: FC<{ defaultRole?: UserRole }> = ({
         batch={discountBatch}
         onClose={() => setIsDiscountModalOpen(false)}
         onApplyDiscount={handleApplyDiscount}
+      />
+
+      <BatchExpiryAlertModal
+        isOpen={isAlertOpen}
+        mode={alertMode}
+        branchId={
+          role === 'employee' && employeeBranchId
+            ? employeeBranchId
+            : appliedFilters.branchId !== 'ALL'
+              ? appliedFilters.branchId
+              : ''
+        }
+        onClose={() => setIsAlertOpen(false)}
+        onCreated={(codes) => {
+          setIsAlertOpen(false);
+          showToast(
+            codes.length === 1
+              ? `Đã tạo phiếu trả hàng nháp ${codes[0]} — gửi Store Owner xem trên Phiếu trả NCC.`
+              : `Đã tạo ${codes.length} phiếu trả hàng nháp: ${codes.join(', ')}.`,
+            'success'
+          );
+          if (role !== 'employee') {
+            navigate('/store-owner/supplier-returns');
+          }
+        }}
+        onCreateStocktake={(items) => {
+          setIsAlertOpen(false);
+          navigate(`${stocktakeBasePath}/create`, {
+            state: {
+              preselectedBatches: items,
+              branchId: items[0]?.branchId || '',
+            },
+          });
+        }}
       />
     </div>
   );

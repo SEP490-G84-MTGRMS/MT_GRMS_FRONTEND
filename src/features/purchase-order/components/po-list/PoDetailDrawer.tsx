@@ -12,6 +12,10 @@ import {
   PackageCheck,
 } from 'lucide-react';
 import type { PurchaseOrderListItem, PurchaseOrderStatus } from '../../types/po-list.types';
+import {
+  formatDeliveryDateGateMessage,
+  isDeliveryDateReached,
+} from '../../lib/deliveryDateGate';
 
 interface PoDetailDrawerProps {
   order: PurchaseOrderListItem | null;
@@ -699,7 +703,25 @@ export const PoDetailDrawer: FC<PoDetailDrawerProps> = ({
                   order.status === 'RECEIVED') && (
                   <button
                     type="button"
-                    onClick={() => onReceiveNow(order)}
+                    disabled={
+                      order.activeGoodsReceiptStatus?.toUpperCase() !== 'COMPLETED' &&
+                      !isDeliveryDateReached(order.deliveryDate)
+                    }
+                    title={
+                      order.activeGoodsReceiptStatus?.toUpperCase() !== 'COMPLETED' &&
+                      !isDeliveryDateReached(order.deliveryDate)
+                        ? formatDeliveryDateGateMessage(order.deliveryDate)
+                        : undefined
+                    }
+                    onClick={() => {
+                      if (
+                        order.activeGoodsReceiptStatus?.toUpperCase() !== 'COMPLETED' &&
+                        !isDeliveryDateReached(order.deliveryDate)
+                      ) {
+                        return;
+                      }
+                      onReceiveNow(order);
+                    }}
                     style={{
                       display: 'inline-flex',
                       alignItems: 'center',
@@ -712,20 +734,39 @@ export const PoDetailDrawer: FC<PoDetailDrawerProps> = ({
                       backgroundColor:
                         order.activeGoodsReceiptStatus?.toUpperCase() === 'COMPLETED'
                           ? '#059669'
-                          : '#0d9488',
+                          : order.activeGoodsReceiptStatus?.toUpperCase() !== 'COMPLETED' &&
+                              !isDeliveryDateReached(order.deliveryDate)
+                            ? '#94a3b8'
+                            : '#0d9488',
                       border: 'none',
                       color: '#ffffff',
-                      cursor: 'pointer',
-                      boxShadow: '0 2px 6px rgba(13, 148, 136, 0.25)',
+                      cursor:
+                        order.activeGoodsReceiptStatus?.toUpperCase() !== 'COMPLETED' &&
+                        !isDeliveryDateReached(order.deliveryDate)
+                          ? 'not-allowed'
+                          : 'pointer',
+                      boxShadow:
+                        order.activeGoodsReceiptStatus?.toUpperCase() !== 'COMPLETED' &&
+                        !isDeliveryDateReached(order.deliveryDate)
+                          ? 'none'
+                          : '0 2px 6px rgba(13, 148, 136, 0.25)',
+                      opacity:
+                        order.activeGoodsReceiptStatus?.toUpperCase() !== 'COMPLETED' &&
+                        !isDeliveryDateReached(order.deliveryDate)
+                          ? 0.75
+                          : 1,
                     }}
                   >
                     <PackageCheck size={16} />
                     <span>
                       {order.activeGoodsReceiptStatus?.toUpperCase() === 'COMPLETED'
                         ? 'Xem phiếu nhập kho'
-                        : order.activeGoodsReceiptStatus?.toUpperCase() === 'DRAFT'
-                          ? 'Tiếp tục xác nhận nhập kho'
-                          : 'Nhận hàng / Nhập kho'}
+                        : order.activeGoodsReceiptStatus?.toUpperCase() !== 'COMPLETED' &&
+                            !isDeliveryDateReached(order.deliveryDate)
+                          ? 'Chưa đến ngày giao'
+                          : order.activeGoodsReceiptStatus?.toUpperCase() === 'DRAFT'
+                            ? 'Tiếp tục xác nhận nhập kho'
+                            : 'Nhận hàng / Nhập kho'}
                     </span>
                   </button>
                 )}

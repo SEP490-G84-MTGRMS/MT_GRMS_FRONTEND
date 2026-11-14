@@ -13,6 +13,7 @@ import type { UserProfile, UserSessionItem } from '../storeData';
 import { EditProfileModal } from './EditProfileModal';
 import { ChangePasswordModal } from './ChangePasswordModal';
 import { authService } from '../../../features/auth/authService';
+import { useAuthStore } from '../../../stores/useAuthStore';
 import { TwoFactorVerificationModal } from './TwoFactorVerificationModal';
 
 interface AccountProfileTabProps {
@@ -37,7 +38,11 @@ export const AccountProfileTab: FC<AccountProfileTabProps> = ({
 
   useEffect(() => {
     authService.getTwoFactorStatus()
-      .then((status) => onUpdateProfile({ isTwoFactorEnabled: status.enabled }))
+      .then((status) => {
+        onUpdateProfile({ isTwoFactorEnabled: status.enabled });
+        useAuthStore.getState().updateUser({ isTwoFactorEnabled: status.enabled });
+        window.dispatchEvent(new CustomEvent('mtgrms:2fa-changed', { detail: { enabled: status.enabled } }));
+      })
       .catch(() => undefined);
     // Initial API synchronization only; parent callback is recreated after profile updates.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -66,6 +71,8 @@ export const AccountProfileTab: FC<AccountProfileTabProps> = ({
       setIsTwoFactorLoading(true);
       const status = await authService.confirmTwoFactorChallenge(twoFactorChallenge, otpCode);
       onUpdateProfile({ isTwoFactorEnabled: status.enabled });
+      useAuthStore.getState().updateUser({ isTwoFactorEnabled: status.enabled });
+      window.dispatchEvent(new CustomEvent('mtgrms:2fa-changed', { detail: { enabled: status.enabled } }));
       showToast(status.enabled ? 'Đã bật xác thực 2 lớp qua Email OTP.' : 'Đã tắt xác thực 2 lớp.');
     } finally {
       setIsTwoFactorLoading(false);

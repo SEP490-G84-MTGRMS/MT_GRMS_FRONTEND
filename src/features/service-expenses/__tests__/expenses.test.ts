@@ -59,6 +59,7 @@ describe('FE-07 Service Expenses API & Workflow Tests', () => {
             pendingApprovalAmount: 18500000,
             paidAmount: 26500000,
             suspiciousCount: 1,
+            suspiciousAmount: 5000000,
           },
         },
       };
@@ -70,7 +71,9 @@ describe('FE-07 Service Expenses API & Workflow Tests', () => {
       expect(summary.totalExpenseThisMonth).toBe(45000000);
       expect(summary.totalPendingAmount).toBe(18500000);
       expect(summary.totalPaidAmount).toBe(26500000);
-      expect(summary.overdueCount).toBe(1);
+      expect(summary.overdueCount).toBe(0); // Sửa triệt để bug ngầm: overdueCount không còn gán từ suspiciousCount
+      expect(summary.suspiciousCount).toBe(1);
+      expect(summary.suspiciousAmount).toBe(5000000);
     });
 
     it('TC-EXP-03: should create a new valid service expense voucher', async () => {
@@ -224,6 +227,98 @@ describe('FE-07 Service Expenses API & Workflow Tests', () => {
       const result = await expenseApi.getServiceExpenses({ keyword: 'FPT' });
       expect(result.items).toHaveLength(1);
       expect(result.items[0].vendorName).toBe('FPT Telecom');
+    });
+
+    it('TC-EXP-09: should throw error when approve fails with business rejection instead of swallowing it', async () => {
+      vi.spyOn(financeHttpClient, 'post').mockRejectedValueOnce({
+        response: {
+          data: {
+            code: 'NOTE_REQUIRED_FOR_SUSPICIOUS_EXPENSE',
+            message: 'Phiếu chi bị gắn cờ nghi vấn xé nhỏ hạn mức. Bắt buộc nhập ghi chú giải trình khi phê duyệt.',
+          },
+        },
+      });
+
+      await expect(
+        expenseApi.payServiceExpense('01a1a64c-4421-7751-9c42-e5a5f4a00295', {
+          paymentMethod: 'Cash',
+          createCashBookEntry: true,
+          paymentDate: '2026-11-04',
+        })
+      ).rejects.toThrow('Phiếu chi bị gắn cờ nghi vấn xé nhỏ hạn mức. Bắt buộc nhập ghi chú giải trình khi phê duyệt.');
+    });
+
+    it('TC-EXP-10: should filter service expenses by quickStatus chips correctly', async () => {
+      const mockList = {
+        data: {
+          success: true,
+          data: [
+            {
+              id: '11111111-1111-1111-1111-111111111111',
+              voucherCode: 'EXP-1',
+              status: 'Approved',
+              amount: 100000,
+              isFlaggedAsSuspiciousSplit: true,
+            },
+            {
+              id: '22222222-2222-2222-2222-222222222222',
+              voucherCode: 'EXP-2',
+              status: 'Paid',
+              amount: 200000,
+              isFlaggedAsSuspiciousSplit: false,
+            },
+          ],
+        },
+      };
+
+      vi.spyOn(financeHttpClient, 'get').mockResolvedValue(mockList as any);
+
+      const suspiciousOnly = await expenseApi.getServiceExpenses({ quickStatus: 'SUSPICIOUS' });
+      expect(suspiciousOnly.items).toHaveLength(1);
+      expect(suspiciousOnly.items[0].voucherCode).toBe('EXP-1');
+
+      const paidOnly = await expenseApi.getServiceExpenses({ quickStatus: 'PAID' });
+      expect(paidOnly.items).toHaveLength(1);
+      expect(paidOnly.items[0].voucherCode).toBe('EXP-2');
+    });
+
+    it('TC-EXP-11: should map dueDate correctly without falling back to expenseDate', async () => {
+      const mockList = {
+        data: {
+          success: true,
+          data: [
+            {
+              id: '11111111-1111-1111-1111-111111111111',
+              voucherCode: 'EXP-WITH-DUEDATE',
+              status: 'Approved',
+              expenseDate: '2026-11-01T10:00:00Z',
+              dueDate: '2026-11-20T00:00:00Z',
+            },
+            {
+              id: '22222222-2222-2222-2222-222222222222',
+              voucherCode: 'EXP-WITH-PAYMENTDUEDATE',
+              status: 'Approved',
+              expenseDate: '2026-11-01T10:00:00Z',
+              paymentDueDate: '2026-11-25T00:00:00Z',
+            },
+            {
+              id: '33333333-3333-3333-3333-333333333333',
+              voucherCode: 'EXP-NO-DUEDATE',
+              status: 'Approved',
+              expenseDate: '2026-11-01T10:00:00Z',
+            },
+          ],
+        },
+      };
+
+      vi.spyOn(financeHttpClient, 'get').mockResolvedValueOnce(mockList as any);
+
+      const result = await expenseApi.getServiceExpenses();
+      expect(result.items).toHaveLength(3);
+      expect(result.items[0].dueDate).toBe('2026-11-20');
+      expect(result.items[1].dueDate).toBe('2026-11-25');
+      expect(result.items[2].dueDate).toBe('');
+      expect(result.items[2].expenseDate).toBe('2026-11-01');
     });
   });
 });

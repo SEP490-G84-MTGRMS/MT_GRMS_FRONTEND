@@ -8,6 +8,7 @@ interface CashReconciliationModalProps {
   isOpen: boolean;
   onClose: () => void;
   account: CashAccount | null;
+  accounts?: CashAccount[];
   onSubmit: (data: {
     accountId: string;
     actualBalance: number;
@@ -35,9 +36,20 @@ export const CashReconciliationModal: FC<CashReconciliationModalProps> = ({
   isOpen,
   onClose,
   account,
+  accounts,
   onSubmit,
 }) => {
   const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [selectedAccId, setSelectedAccId] = useState<string>(account?.id || '');
+
+  const activeAccount = useMemo(() => {
+    if (selectedAccId && accounts && accounts.length > 0) {
+      const found = accounts.find((a) => a.id === selectedAccId);
+      if (found) return found;
+    }
+    return account;
+  }, [selectedAccId, accounts, account]);
+
   const [counts, setCounts] = useState<Record<number, number>>({
     500000: 0,
     200000: 0,
@@ -58,40 +70,45 @@ export const CashReconciliationModal: FC<CashReconciliationModalProps> = ({
   const [discrepancyReason, setDiscrepancyReason] = useState('');
   const [customNote, setCustomNote] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
 
   const denomRefs = useRef<Record<number, HTMLDivElement | null>>({});
 
   // Restore Draft if exists
   useEffect(() => {
-    if (isOpen && account) {
+    if (isOpen) {
       setStep(1);
-      const draftKey = `reconcile_draft_${account.id}`;
-      const saved = localStorage.getItem(draftKey);
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved);
-          setCounts(parsed.counts || {});
-          setTouchedDenoms(parsed.touched || {});
-        } catch {
-          // ignore invalid draft
+      const targetAcc = activeAccount || account;
+      if (targetAcc) {
+        setSelectedAccId(targetAcc.id);
+        const draftKey = `reconcile_draft_${targetAcc.id}`;
+        const saved = localStorage.getItem(draftKey);
+        if (saved) {
+          try {
+            const parsed = JSON.parse(saved);
+            setCounts(parsed.counts || {});
+            setTouchedDenoms(parsed.touched || {});
+          } catch {
+            // ignore invalid draft
+          }
         }
       }
     }
-  }, [isOpen, account]);
+  }, [isOpen, account, activeAccount]);
 
   // Save Draft on change
   const saveDraft = () => {
-    if (account) {
+    if (activeAccount) {
       localStorage.setItem(
-        `reconcile_draft_${account.id}`,
+        `reconcile_draft_${activeAccount.id}`,
         JSON.stringify({ counts, touched: touchedDenoms, timestamp: Date.now() })
       );
     }
   };
 
   const clearDraft = () => {
-    if (account) {
-      localStorage.removeItem(`reconcile_draft_${account.id}`);
+    if (activeAccount) {
+      localStorage.removeItem(`reconcile_draft_${activeAccount.id}`);
     }
   };
 
@@ -103,7 +120,7 @@ export const CashReconciliationModal: FC<CashReconciliationModalProps> = ({
   }, [counts]);
 
   // System balance (Strictly hidden until Step 3)
-  const systemBalance = account?.currentBalance || 12_500_000;
+  const systemBalance = activeAccount?.currentBalance ?? 0;
   const difference = totalCounted - systemBalance;
 
   // Un-entered denominations count
@@ -127,25 +144,12 @@ export const CashReconciliationModal: FC<CashReconciliationModalProps> = ({
 
   const handleExit = () => {
     if (totalCounted > 0) {
-      const save = window.confirm(
-        'Bạn có muốn lưu nháp số tiền đã đếm để lần sau đếm tiếp không?\n\n• Bấm OK: Lưu nháp\n• Bấm Cancel: Bỏ kết quả đếm'
-      );
-      if (save) {
-        saveDraft();
-      } else {
-        clearDraft();
-      }
+      saveDraft();
     }
     onClose();
   };
 
   const handleStep1Next = () => {
-    if (totalCounted === 0) {
-      const confirmZero = window.confirm(
-        'Tất cả mệnh giá đều bằng 0đ (két đang trống).\nBạn có chắc chắn két quầy hoàn toàn không có tiền mặt không?'
-      );
-      if (!confirmZero) return;
-    }
     saveDraft();
     setStep(2);
   };
@@ -174,15 +178,16 @@ export const CashReconciliationModal: FC<CashReconciliationModalProps> = ({
 
   const handleFinalSubmit = async () => {
     if (difference !== 0 && !discrepancyReason) {
-      alert('Vui lòng chọn lý do phát sinh chênh lệch tiền');
+      setSubmitError('Vui lòng chọn lý do phát sinh chênh lệch tiền');
       return;
     }
 
     setIsSubmitting(true);
     try {
-      if (account) {
+      const targetAcc = activeAccount || account;
+      if (targetAcc) {
         await onSubmit({
-          accountId: account.id,
+          accountId: targetAcc.id,
           actualBalance: totalCounted,
           difference,
           reason: discrepancyReason + (customNote ? ` - ${customNote}` : ''),
@@ -197,7 +202,8 @@ export const CashReconciliationModal: FC<CashReconciliationModalProps> = ({
     }
   };
 
-  if (!isOpen || !account) return null;
+  const displayAccount = activeAccount || account;
+  if (!isOpen || !displayAccount) return null;
 
   return (
     <div
@@ -222,9 +228,9 @@ export const CashReconciliationModal: FC<CashReconciliationModalProps> = ({
             <h2
               className="text-base sm:text-lg font-bold text-gray-900 leading-tight"
               style={{ maxWidth: 'calc(100vw - 190px)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-              title={`Kiểm két cuối ca: ${account.accountName}`}
+              title={`Kiểm két cuối ca: ${displayAccount.accountName}`}
             >
-              Kiểm két cuối ca: {account.accountName}
+              Kiểm két cuối ca: {displayAccount.accountName}
             </h2>
             <span className="text-xs text-gray-500 mt-1 inline-block">
               Quy trình kiểm quỹ mù 3 bước
@@ -261,6 +267,45 @@ export const CashReconciliationModal: FC<CashReconciliationModalProps> = ({
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
             {/* Left Column: Denominations List (7/12) */}
             <div className="lg:col-span-7 space-y-3">
+              {/* Account Selection if multiple cash accounts available */}
+              {accounts && accounts.filter((a) => a.accountType === 'CASH').length > 1 && (
+                <div className="p-3.5 rounded-xl bg-white border border-gray-200 flex items-center justify-between gap-3 shadow-xs">
+                  <label className="text-xs font-bold text-gray-600 uppercase tracking-wide">
+                    Chọn két tiền kiểm kê:
+                  </label>
+                  <select
+                    value={displayAccount.id}
+                    onChange={(e) => {
+                      const newId = e.target.value;
+                      setSelectedAccId(newId);
+                      const draftKey = `reconcile_draft_${newId}`;
+                      const saved = localStorage.getItem(draftKey);
+                      if (saved) {
+                        try {
+                          const parsed = JSON.parse(saved);
+                          setCounts(parsed.counts || {});
+                          setTouchedDenoms(parsed.touched || {});
+                        } catch {
+                          // ignore
+                        }
+                      } else {
+                        setCounts({ 500000: 0, 200000: 0, 100000: 0, 50000: 0, 20000: 0, 10000: 0, 5000: 0, 2000: 0, 1000: 0 });
+                        setTouchedDenoms({});
+                      }
+                    }}
+                    className="px-3 py-1.5 rounded-lg border border-gray-300 font-bold text-sm text-gray-900 bg-gray-50 focus:bg-white focus:border-teal-600 outline-none"
+                  >
+                    {accounts
+                      .filter((a) => a.accountType === 'CASH')
+                      .map((a) => (
+                        <option key={a.id} value={a.id}>
+                          {a.accountName} ({a.branchName})
+                        </option>
+                      ))}
+                  </select>
+                </div>
+              )}
+
               <div className="p-4 rounded-xl bg-teal-50 border border-teal-200 text-sm text-teal-900 flex items-start gap-3">
                 <ShieldCheck className="shrink-0 text-teal-700 mt-0.5" size={20} />
                 <div>
@@ -564,6 +609,11 @@ export const CashReconciliationModal: FC<CashReconciliationModalProps> = ({
                 <label className="block text-sm font-bold text-gray-900">
                   Lý do chênh lệch tiền (Bắt buộc chọn):
                 </label>
+                {submitError && (
+                  <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs font-semibold">
+                    ⚠️ {submitError}
+                  </div>
+                )}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                   {[
                     'Trả nhầm tiền thối cho khách',
@@ -573,7 +623,10 @@ export const CashReconciliationModal: FC<CashReconciliationModalProps> = ({
                     <button
                       key={r}
                       type="button"
-                      onClick={() => setDiscrepancyReason(r)}
+                      onClick={() => {
+                        setDiscrepancyReason(r);
+                        setSubmitError('');
+                      }}
                       className={`p-3.5 rounded-xl border text-left text-sm font-semibold transition-all ${
                         discrepancyReason === r
                           ? 'border-teal-600 bg-teal-50 text-teal-950 ring-2 ring-teal-200'

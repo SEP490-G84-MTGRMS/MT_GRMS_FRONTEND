@@ -5,6 +5,10 @@ import {
   buildPnlStatementTree,
   reportsPnlService,
   MOCK_BRANCHES,
+  getTaxRateConfig,
+  loadStoredTaxRates,
+  saveStoredTaxRates,
+  clearStoredTaxRates,
 } from '../services/reportsPnlService';
 import { financeHttpClient } from '../../../api/financeHttpClient';
 
@@ -362,6 +366,140 @@ describe('Reports P&L Financial Calculations Unit & Integration Tests', () => {
       expect(opexNode?.children?.[0].amount).toBe(7000000);
       expect(opexNode?.children?.[1].title).toBe('Tiền điện 3 pha');
       expect(opexNode?.children?.[1].amount).toBe(3000000);
+    });
+  });
+
+  describe('5. Task [LG-01] - Dynamic Tax Rate Configuration for P&L', () => {
+    beforeEach(() => {
+      clearStoredTaxRates();
+    });
+
+    it('should return default HKD tax rates (1.0% VAT, 0.5% PIT = 1.5% total) when localStorage is empty', () => {
+      const stored = loadStoredTaxRates();
+      expect(stored).toEqual({});
+      const config = getTaxRateConfig();
+      expect(config.customVatRate).toBe(1.0);
+      expect(config.customPitRate).toBe(0.5);
+      expect(config.applyVatReduction2026).toBe(false);
+      expect(config.vatReductionPercentage).toBe(20);
+      expect(config.effectiveVatRate).toBe(1.0);
+      expect(config.effectiveTotalRatePct).toBe(1.5);
+    });
+
+    it('should calculate effective rates and reduced amounts when applyVatReduction2026 is true', () => {
+      saveStoredTaxRates({
+        customVatRate: 1.0,
+        customPitRate: 0.5,
+        applyVatReduction2026: true,
+        vatReductionPercentage: 20,
+      });
+
+      const config = getTaxRateConfig();
+      expect(config.applyVatReduction2026).toBe(true);
+      expect(config.effectiveVatRate).toBe(0.8);
+      expect(config.effectiveTotalRatePct).toBe(1.3);
+
+      const netRevenue = 100000000;
+      const estimatedTax = Math.round(netRevenue * (config.effectiveTotalRatePct / 100));
+      expect(estimatedTax).toBe(1300000);
+    });
+
+    it('should calculate custom tax rates correctly', () => {
+      saveStoredTaxRates({
+        customVatRate: 2.0,
+        customPitRate: 1.0,
+        applyVatReduction2026: false,
+      });
+
+      const config = getTaxRateConfig();
+      expect(config.customVatRate).toBe(2.0);
+      expect(config.customPitRate).toBe(1.0);
+      expect(config.effectiveVatRate).toBe(2.0);
+      expect(config.effectiveTotalRatePct).toBe(3.0);
+    });
+
+    it('should build P&L statement tree with correct dynamic tax percentages and titles', () => {
+      const kpi: any = {
+        netRevenue: 100000000,
+        cogs: 60000000,
+        grossProfit: 40000000,
+        grossMarginPct: 40,
+        operatingExpenses: 15000000,
+        shrinkageLoss: 1000000,
+        netProfit: 24000000,
+        netMarginPct: 24,
+        estimatedTaxAmount: 1300000, // 1.3%
+        netProfitAfterTax: 22700000,
+        netProfitAfterTaxMarginPct: 22.7,
+      };
+
+      const customConfig = {
+        customVatRate: 1.0,
+        customPitRate: 0.5,
+        applyVatReduction2026: true,
+        vatReductionPercentage: 20,
+        effectiveVatRate: 0.8,
+        effectiveTotalRatePct: 1.3,
+      };
+
+      const tree = buildPnlStatementTree(kpi, [], customConfig);
+      const taxSec = tree.find((x) => x.id === 'sec-4-tax');
+      expect(taxSec).toBeDefined();
+      expect(taxSec?.amount).toBe(1300000);
+      expect(taxSec?.percentageOfNetRevenue).toBe(1.3);
+      expect(taxSec?.title).toContain('GIẢM 20% VAT');
+
+      const vatItem = taxSec?.children?.find((x) => x.id === 'item-4-1');
+      expect(vatItem).toBeDefined();
+      expect(vatItem?.amount).toBe(800000); // 0.8% of 100m
+      expect(vatItem?.percentageOfNetRevenue).toBe(0.8);
+      expect(vatItem?.title).toContain('0.8%');
+      expect(vatItem?.title).toContain('đã giảm 20%');
+
+      const pitItem = taxSec?.children?.find((x) => x.id === 'item-4-2');
+      expect(pitItem).toBeDefined();
+      expect(pitItem?.amount).toBe(500000); // 0.5% of 100m
+      expect(pitItem?.percentageOfNetRevenue).toBe(0.5);
+      expect(pitItem?.title).toContain('0.5%');
+    });
+
+    it('should compute report data with dynamic tax in getPnlReportData', async () => {
+      saveStoredTaxRates({
+        customVatRate: 1.0,
+        customPitRate: 0.5,
+        applyVatReduction2026: true,
+        vatReductionPercentage: 20,
+      });
+
+      const report = await reportsPnlService.getPnlReportData({
+        branchId: 'ALL',
+        presetPeriod: 'THIS_MONTH',
+        startDate: '2026-10-01',
+        endDate: '2026-10-31',
+      });
+
+      const netRev = report.kpiSummary.netRevenue;
+      expect(report.kpiSummary.estimatedTaxAmount).toBe(Math.round(netRev * 0.013));
+      expect(report.kpiSummary.netProfitAfterTax).toBe(
+        report.kpiSummary.netProfit - report.kpiSummary.estimatedTaxAmount
+      );
+
+      const taxNode = report.pnlTree.find((x) => x.id === 'sec-4-tax');
+      expect(taxNode?.percentageOfNetRevenue).toBe(1.3);
+    });
+
+    it('should reset tax rates to default when clearStoredTaxRates is called', () => {
+      saveStoredTaxRates({
+        customVatRate: 2.5,
+        customPitRate: 1.5,
+        applyVatReduction2026: true,
+      });
+      clearStoredTaxRates();
+      const config = getTaxRateConfig();
+      expect(config.customVatRate).toBe(1.0);
+      expect(config.customPitRate).toBe(0.5);
+      expect(config.applyVatReduction2026).toBe(false);
+      expect(config.effectiveTotalRatePct).toBe(1.5);
     });
   });
 });

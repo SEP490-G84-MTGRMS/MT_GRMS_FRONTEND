@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import type { FC, FormEvent } from 'react';
 import { X, QrCode, Banknote, CheckCircle, AlertTriangle, Copy } from 'lucide-react';
 import type { CustomerDto } from '../types/customer.types';
+import type { CashAccount } from '../../cashbook/types/cashbook.types';
 import { VietQrDisplayCard } from './VietQrDisplayCard';
 import { cashbookService } from '../../cashbook/services/cashbookService';
 import { MoneyInput } from '../../../components/common/MoneyInput';
@@ -34,6 +35,7 @@ export const DebtCollectionModal: FC<DebtCollectionModalProps> = ({
   const [method, setMethod] = useState<'Cash' | 'VietQR'>('VietQR');
   const [note, setNote] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
+  const [accounts, setAccounts] = useState<CashAccount[]>([]);
   const [selectedAccountId, setSelectedAccountId] = useState<string>('');
 
   // Overpayment (Trả thừa) Handling - Decision D4
@@ -48,13 +50,34 @@ export const DebtCollectionModal: FC<DebtCollectionModalProps> = ({
   const [isCopiedContent, setIsCopiedContent] = useState(false);
 
   useEffect(() => {
+    let isMounted = true;
     cashbookService.getCashAccounts().then((accs) => {
-      const matched = accs.find((a) =>
-        method === 'Cash' ? a.accountType === 'CASH' : a.accountType === 'BANK'
-      );
-      if (matched) setSelectedAccountId(matched.id);
+      if (isMounted) {
+        setAccounts(accs);
+      }
     });
-  }, [method]);
+    return () => {
+      isMounted = false;
+    };
+  }, [isOpen]);
+
+  const filteredAccounts = accounts.filter((a) =>
+    method === 'Cash' ? a.accountType === 'CASH' : a.accountType === 'BANK'
+  );
+
+  useEffect(() => {
+    if (filteredAccounts.length > 0) {
+      const isSelectedValid = filteredAccounts.some((a) => a.id === selectedAccountId);
+      if (!isSelectedValid) {
+        const defaultAcc = filteredAccounts.find((a) => a.isDefault) || filteredAccounts[0];
+        setSelectedAccountId(defaultAcc.id);
+      }
+    } else {
+      setSelectedAccountId('');
+    }
+  }, [method, filteredAccounts, selectedAccountId]);
+
+  const selectedAccount = accounts.find((a) => a.id === selectedAccountId);
 
   useEffect(() => {
     if (customer) {
@@ -312,19 +335,53 @@ export const DebtCollectionModal: FC<DebtCollectionModalProps> = ({
                 </button>
               </div>
 
+              {/* Account Selection Dropdown */}
+              <div className="space-y-1.5">
+                <label
+                  htmlFor="target-account-select"
+                  className="block text-xs font-bold text-gray-700"
+                >
+                  {method === 'Cash' ? 'Két quầy nhận tiền:' : 'Tài khoản ngân hàng nhận tiền:'}
+                </label>
+                <select
+                  id="target-account-select"
+                  value={selectedAccountId}
+                  onChange={(e) => setSelectedAccountId(e.target.value)}
+                  className="w-full h-10 px-3 text-sm font-medium rounded-xl border border-gray-300 bg-white text-gray-800 focus:border-teal-600 focus:ring-1 focus:ring-teal-500 outline-none transition-colors"
+                >
+                  {filteredAccounts.length === 0 ? (
+                    <option value="" disabled>
+                      {method === 'Cash'
+                        ? '-- Không có két tiền mặt khả dụng --'
+                        : '-- Không có tài khoản ngân hàng khả dụng --'}
+                    </option>
+                  ) : (
+                    filteredAccounts.map((acc) => (
+                      <option key={acc.id} value={acc.id}>
+                        {acc.accountName}
+                        {acc.accountNumber ? ` - ${acc.accountNumber}` : ''}
+                        {acc.bankName ? ` (${acc.bankName})` : ''}
+                      </option>
+                    ))
+                  )}
+                </select>
+              </div>
+
               {/* VietQR View */}
               {method === 'VietQR' ? (
                 <div className="space-y-4 text-center">
                   <div className="bg-white p-4 rounded-2xl border border-gray-200 inline-block shadow-sm">
                     <VietQrDisplayCard
                       config={{
-                        bankId: '970436',
-                        bankName: 'Vietcombank',
-                        accountNo: '0071001234567',
-                        accountName: 'NGUYEN VAN CHU TIEM',
+                        bankId: selectedAccount?.bankName || '970436',
+                        bankName: selectedAccount?.bankName || 'Vietcombank',
+                        accountNo: selectedAccount?.accountNumber || '0071001234567',
+                        accountName: selectedAccount?.accountName || 'NGUYEN VAN CHU TIEM',
                         amount: Math.min(amount, currentDebt),
                         description: qrPaymentContent,
-                        qrDataUrl: 'https://api.vietqr.io/image/970436-0071001234567-compact2.png',
+                        qrDataUrl: selectedAccount?.accountNumber
+                          ? `https://api.vietqr.io/image/${selectedAccount.bankName || '970436'}-${selectedAccount.accountNumber}-compact2.png`
+                          : 'https://api.vietqr.io/image/970436-0071001234567-compact2.png',
                       }}
                     />
                   </div>
@@ -413,7 +470,8 @@ export const DebtCollectionModal: FC<DebtCollectionModalProps> = ({
                     Thu tiền mặt tại quầy thu ngân
                   </h4>
                   <p className="text-xs text-gray-600 max-w-sm mx-auto">
-                    Tiền mặt sau khi thu sẽ tự động ghi tăng vào <strong>Két quầy ca hiện tại</strong>{' '}
+                    Tiền mặt sau khi thu sẽ tự động ghi tăng vào{' '}
+                    <strong>{selectedAccount ? selectedAccount.accountName : 'Két quầy ca hiện tại'}</strong>{' '}
                     và sinh phiếu thu trong Sổ quỹ.
                   </p>
                 </div>

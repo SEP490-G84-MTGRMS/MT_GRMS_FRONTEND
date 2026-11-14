@@ -3,7 +3,7 @@
  * Standard Demo Date: 2026-10-27.
  */
 
-let mockCurrentDate: Date | null = new Date('2026-10-27T08:00:00Z');
+let mockCurrentDate: Date | null = import.meta.env.MODE === 'test' ? new Date('2026-10-27T08:00:00Z') : null;
 
 /**
  * Returns the current financial operation date (or the mocked demo date).

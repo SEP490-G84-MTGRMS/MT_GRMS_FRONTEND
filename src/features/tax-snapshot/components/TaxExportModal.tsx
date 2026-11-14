@@ -14,6 +14,7 @@ export const TaxExportModal: FC<Props> = ({ snapshot, isOpen, onClose }) => {
   const [exportType, setExportType] = useState<'excel' | 'xml'>('excel');
   const [isExporting, setIsExporting] = useState<boolean>(false);
   const [isDone, setIsDone] = useState<boolean>(false);
+  const [exportError, setExportError] = useState<string | null>(null);
 
   if (!isOpen || !snapshot) return null;
 
@@ -21,6 +22,7 @@ export const TaxExportModal: FC<Props> = ({ snapshot, isOpen, onClose }) => {
 
   const handleExport = async () => {
     setIsExporting(true);
+    setExportError(null);
     try {
       const pNum = snapshot.periodNumber ?? snapshot.quarter ?? 1;
       const pType = snapshot.periodType ?? 2;
@@ -72,7 +74,7 @@ export const TaxExportModal: FC<Props> = ({ snapshot, isOpen, onClose }) => {
       }
       setIsDone(true);
     } catch (err: any) {
-      alert(err.message || 'Không thể xuất báo cáo thuế');
+      setExportError(err.message || 'Không thể xuất báo cáo thuế từ máy chủ.');
     } finally {
       setIsExporting(false);
     }
@@ -101,6 +103,22 @@ export const TaxExportModal: FC<Props> = ({ snapshot, isOpen, onClose }) => {
         </div>
 
         <div className="tax-modal-body">
+          {exportError && (
+            <div
+              style={{
+                padding: '10px 14px',
+                background: '#FEF2F2',
+                border: '1px solid #FECACA',
+                borderRadius: 8,
+                color: '#B91C1C',
+                fontSize: '0.84rem',
+                fontWeight: 600,
+                marginBottom: 12,
+              }}
+            >
+              ⚠️ {exportError}
+            </div>
+          )}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <label
               className={'tax-radio-option ' + (exportType === 'excel' ? 'selected' : '')}

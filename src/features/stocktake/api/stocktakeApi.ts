@@ -129,11 +129,8 @@ const saveLocalStocktakes = (list: StocktakeDetail[]) => {
   }
 };
 
-const is404OrNetworkError = (err: unknown): boolean => {
-  const e = err as { response?: { status?: number }; code?: string };
-  if (!e.response) return true;
-  return e.response.status === 404;
-};
+/** M4: không fallback seed/localStorage — lỗi API phải hiện empty + toast. */
+const is404OrNetworkError = (_err: unknown): boolean => false;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const mapLineDto = (dto: any): StocktakeLine => {
@@ -591,6 +588,7 @@ export const stocktakeApi = {
     const command = {
       decision: payload.action,
       reviewNote: payload.note || null,
+      confirmSurplusFound: !!payload.confirmSurplusFound,
     };
     try {
       const res = await httpClient.post(`/stocktakes/${id}/review`, command);

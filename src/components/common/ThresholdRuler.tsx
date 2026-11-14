@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShieldAlert, AlertCircle, CheckCircle2, TrendingUp, HelpCircle } from 'lucide-react';
+import { AlertTriangle, Info } from 'lucide-react';
 import { formatMoney } from '../../features/finance/utils/formatters';
 import { HouseholdTaxGroup } from '../../features/tax-snapshot/types/taxSnapshot';
 
@@ -19,291 +19,94 @@ interface ThresholdRulerProps {
 export const ThresholdRuler: React.FC<ThresholdRulerProps> = ({
   currentYtdRevenue,
   threshold = 1000000000,
-  warningThreshold = 850000000,
   year = 2026,
-  quarter = 3,
-  periodType,
-  periodNumber,
-  periodLabel,
-  householdGroup,
-  onHelpClick,
 }) => {
-  // If the business is in Group 3 (> 3B) or Group 4 (> 50B)
-  if (
-    householdGroup === HouseholdTaxGroup.Group3_3BTo50B ||
-    householdGroup === HouseholdTaxGroup.Group4_Over50B ||
-    currentYtdRevenue > 3000000000
-  ) {
-    return (
-      <div
-        style={{
-          background: '#FFFBEB',
-          border: '1px solid #FDE68A',
-          borderRadius: '16px',
-          padding: '16px 20px',
-          boxShadow: '0 1px 4px rgba(217, 119, 6, 0.06)',
-          marginBottom: '20px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: '16px',
-          flexWrap: 'wrap',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div
-            style={{
-              width: '38px',
-              height: '38px',
-              borderRadius: '50%',
-              background: '#D97706',
-              color: '#ffffff',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0,
-            }}
-          >
-            <ShieldAlert size={20} />
-          </div>
-          <div>
-            <span style={{ fontSize: '0.92rem', fontWeight: 800, color: '#92400E', display: 'block' }}>
-              Hộ kinh doanh quy mô lớn (Doanh thu lũy kế: {formatMoney(currentYtdRevenue)})
-            </span>
-            <span style={{ fontSize: '0.8rem', color: '#B45309', marginTop: '2px', display: 'block' }}>
-              Quy mô thuộc nhóm kê khai theo chế độ kế toán chi tiết (Doanh thu - Chi phí).
-            </span>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const isOver1B = currentYtdRevenue > threshold;
+  const rem = Math.max(0, threshold - currentYtdRevenue);
+  const excess = Math.max(0, currentYtdRevenue - threshold);
+  const pct = (currentYtdRevenue / threshold) * 100;
+  const pctStr = pct.toFixed(2).replace('.', ',');
+  const clampedPct = Math.min(100, Math.max(0, pct));
 
-  const percentage = Math.min(100, Math.max(0, (currentYtdRevenue / threshold) * 100));
-  const excessAmount = Math.max(0, currentYtdRevenue - threshold);
-  const remainingAmount = Math.max(0, threshold - currentYtdRevenue);
-
-  let statusBadgeBg = '#ECFDF5';
-  let statusBadgeText = '#065F46';
-  let statusLabel = 'Đang trong hạn mức miễn thuế 100%';
-  let icon = <CheckCircle2 size={16} color="#059669" />;
-
-  if (currentYtdRevenue > threshold) {
-    statusBadgeBg = '#FEF2F2';
-    statusBadgeText = '#991B1B';
-    statusLabel = `Đã vượt hạn mức ${formatMoney(excessAmount)} (Phần vượt chịu thuế TNCN)`;
-    icon = <AlertCircle size={16} color="#DC2626" />;
-  } else if (currentYtdRevenue >= warningThreshold) {
-    statusBadgeBg = '#FFFBEB';
-    statusBadgeText = '#92400E';
-    statusLabel = `Vùng cảnh báo: Còn ${formatMoney(remainingAmount)} sẽ chạm ngưỡng tính thuế`;
-    icon = <TrendingUp size={16} color="#D97706" />;
-  }
-
-  const greenPct = (warningThreshold / threshold) * 100; // 85%
-  const yellowPct = ((threshold - warningThreshold) / threshold) * 100; // 15%
+  const fillClass = isOver1B ? 'danger' : pct >= 85 ? 'warn' : '';
 
   return (
-    <div
-      style={{
-        background: '#ffffff',
-        border: '1px solid #E2E8F0',
-        borderRadius: '16px',
-        padding: '16px 20px',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-        marginBottom: '20px',
-      }}
-    >
-      {/* Top Banner */}
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: '12px',
-          flexWrap: 'wrap',
-          gap: '10px',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-          <div
-            style={{
-              padding: '4px 10px',
-              borderRadius: '9999px',
-              backgroundColor: statusBadgeBg,
-              color: statusBadgeText,
-              fontWeight: 700,
-              fontSize: '0.8rem',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-            }}
-          >
-            {icon}
-            <span>{statusLabel}</span>
-          </div>
-          <span style={{ fontSize: '0.76rem', color: '#64748B', fontWeight: 500 }}>
-            (Theo quy định quản lý thuế hộ kinh doanh cá thể hiện hành)
-          </span>
+    <div className="tax-threshold-card" style={{ marginBottom: 18 }}>
+      <div className="tax-threshold-header">
+        <div className="tax-threshold-title">
+          📏 Ngưỡng doanh thu 1 tỷ đồng/năm (Thông tư 152) — Năm {year}
         </div>
-
-        {onHelpClick && (
-          <button
-            onClick={onHelpClick}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px',
-              fontSize: '0.76rem',
-              color: '#0F766E',
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              fontWeight: 600,
-            }}
-          >
-            <HelpCircle size={14} />
-            <span>Cách tính lũy kế theo năm</span>
-          </button>
-        )}
+        <span
+          className={`tax-threshold-badge ${isOver1B ? 'badge-red' : pct >= 85 ? 'badge-orange' : 'badge-teal'}`}
+        >
+          {isOver1B
+            ? `Đạt ${pctStr}% — Đã vượt ${formatMoney(excess)}`
+            : `Đạt ${pctStr}% — Còn ${formatMoney(rem)}`}
+        </span>
       </div>
 
-      {/* Progress Bar Container */}
-      <div style={{ position: 'relative', margin: '22px 0 14px 0' }}>
-        <div
-          style={{
-            height: '14px',
-            borderRadius: '9999px',
-            backgroundColor: '#E2E8F0',
-            overflow: 'hidden',
-            display: 'flex',
-            width: '100%',
-          }}
-        >
-          <div
-            title="Vùng 1: Miễn thuế 100% (0 - 850M)"
-            style={{
-              width: `${greenPct}%`,
-              backgroundColor: '#10B981',
-              height: '100%',
-            }}
-          />
-          <div
-            title="Vùng 2: Cảnh báo (850M - 1 Tỷ)"
-            style={{
-              width: `${yellowPct}%`,
-              backgroundColor: '#F59E0B',
-              height: '100%',
-            }}
-          />
-        </div>
-
-        {/* Current Pin Marker */}
-        <div
-          style={{
-            position: 'absolute',
-            left: `${percentage}%`,
-            top: '-5px',
-            transform: 'translateX(-50%)',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            zIndex: 10,
-          }}
-        >
-          <div
-            style={{
-              width: '12px',
-              height: '24px',
-              backgroundColor: '#0F172A',
-              borderRadius: '6px',
-              border: '2px solid #ffffff',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.25)',
-            }}
-          />
-          <span
-            style={{
-              position: 'absolute',
-              top: '28px',
-              fontSize: '0.72rem',
-              fontWeight: 800,
-              color: '#0F172A',
-              whiteSpace: 'nowrap',
-              background: '#F1F5F9',
-              padding: '2px 6px',
-              borderRadius: '5px',
-              border: '1px solid #CBD5E1',
-            }}
-          >
-            Hiện tại: {formatMoney(currentYtdRevenue)}
-          </span>
-        </div>
-
-        {/* 1 Billion Threshold Milestone Flag */}
-        <div
-          style={{
-            position: 'absolute',
-            left: '100%',
-            top: '-20px',
-            transform: 'translateX(-100%)',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'flex-end',
-          }}
-        >
-          <span
-            style={{
-              fontSize: '0.72rem',
-              fontWeight: 800,
-              color: '#DC2626',
-              background: '#FEE2E2',
-              padding: '2px 6px',
-              borderRadius: '4px',
-              border: '1px solid #FECACA',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            Ngưỡng 1.000.000.000 VND
-          </span>
-        </div>
-      </div>
-
-      {/* Detail explanation footer */}
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginTop: '36px',
-          paddingTop: '10px',
-          borderTop: '1px dashed #E2E8F0',
-          fontSize: '0.76rem',
-          color: '#64748B',
-          flexWrap: 'wrap',
-          gap: '8px',
-        }}
-      >
-        <div>
+      <div className="tax-threshold-body">
+        <div className="tax-threshold-metrics">
           <span>
-            {periodLabel
-              ? `Lũy kế YTD (${periodLabel}): `
-              : periodType === 1
-              ? `Lũy kế YTD (Tháng 1 đến Tháng ${periodNumber || 1}/${year}): `
-              : `Lũy kế YTD (Quý 1 đến Quý ${periodNumber || quarter || 1}/${year}): `}
+            Lũy kế hiện tại:{' '}
+            <strong className="num text-teal">{formatMoney(currentYtdRevenue)}</strong> /{' '}
+            <strong className="num">{formatMoney(threshold)}</strong>
           </span>
-          <strong style={{ color: '#0F172A' }}>{formatMoney(currentYtdRevenue)}</strong>
+          <span className={isOver1B ? 'text-red fw-600' : 'text-orange fw-600'}>
+            {isOver1B
+              ? `Đã vượt ngưỡng 1 tỷ — bắt buộc trọn bộ 7 sổ kế toán TT152`
+              : `Còn ${formatMoney(rem)} trước ngưỡng chuyển đổi thuế/sổ nâng cao`}
+          </span>
         </div>
-        <div>
-          <span>Phần doanh thu vượt ngưỡng chịu thuế TNCN: </span>
-          <strong style={{ color: currentYtdRevenue > threshold ? '#DC2626' : '#10B981' }}>
-            {currentYtdRevenue > threshold
-              ? formatMoney(excessAmount)
-              : '0 VND (Chưa vượt 1 tỷ)'}
-          </strong>
+
+        {/* Prototype Threshold Ruler Track */}
+        <div className="threshold-ruler">
+          <div className="threshold-track">
+            <div
+              className={`threshold-fill ${fillClass}`}
+              style={{ width: `${clampedPct}%` }}
+            />
+            <div
+              className="threshold-marker"
+              style={{ left: `${clampedPct}%` }}
+            >
+              <div className="threshold-marker-label">{pctStr}%</div>
+            </div>
+          </div>
+          <div className="threshold-labels">
+            <span>0 đ</span>
+            <span>500.000.000 đ (Ngưỡng sổ cơ bản)</span>
+            <span className="fw-700 text-red">1.000.000.000 đ (Ngưỡng nâng cao)</span>
+          </div>
         </div>
+
+        {/* Under 1B vs Over 1B Requirements Guidance Banner */}
+        {isOver1B ? (
+          <div className="tax-threshold-alert alert-danger">
+            <AlertTriangle size={18} className="flex-shrink-0 text-red" style={{ marginTop: 2 }} />
+            <div>
+              <strong className="text-red" style={{ fontSize: '0.88rem', display: 'block', marginBottom: 2 }}>
+                ⚠️ Cảnh báo trên 1 tỷ đồng: Cần hoàn tất trọn bộ 7 sổ kế toán mẫu TT152
+              </strong>
+              <p style={{ margin: 0, fontSize: '0.82rem', color: '#991B1B', lineHeight: 1.5 }}>
+                Doanh thu lũy kế năm đã vượt mốc 1.000.000.000 đ theo quy định mới nhất của Bộ Tài Chính. Hộ kinh doanh bắt buộc lập và hoàn tất trọn bộ 7 sổ kế toán mẫu Thông tư 152/2025/TT-BTC (gồm S1a/S2a, S2b, S2c, S2d, S2e, S3a) và kê khai thuế đầy đủ.
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div className="tax-threshold-alert alert-teal">
+            <Info size={18} className="flex-shrink-0 text-teal" style={{ marginTop: 2 }} />
+            <div>
+              <strong className="text-teal" style={{ fontSize: '0.88rem', display: 'block', marginBottom: 2 }}>
+                ✓ Doanh thu dưới 1 tỷ đồng: Tờ khai 01/CNKD & Sổ S2c-HKD
+              </strong>
+              <p style={{ margin: 0, fontSize: '0.82rem', color: '#0F766E', lineHeight: 1.5 }}>
+                Doanh thu lũy kế hiện tại nằm dưới ngưỡng 1.000.000.000 đ. Hộ kinh doanh được áp dụng chế độ quản lý thuế và kế toán đơn giản: Nộp <strong>Tờ khai 01/CNKD</strong> và theo dõi chi phí tại <strong>Sổ S2c-HKD</strong>.
+              </p>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
 };
-export default ThresholdRuler;
-
