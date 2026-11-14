@@ -25,7 +25,6 @@ import {
   Ticket,
   Star,
   Gift,
-  BookOpen,
 } from 'lucide-react';
 import { TablePagination } from '../../../components/common';
 import {
@@ -45,6 +44,8 @@ import { posShiftApi } from '../api/posShiftApi';
 import { employeeApi } from '../../employee/api/employeeApi';
 import { useAuthStore } from '../../../stores/useAuthStore';
 import '../pos.css';
+import '../../../styles/so-list-page.css';
+import './invoice-management-list.css';
 
 /**
  * Tách và làm sạch thời gian hẹn nhận hàng từ Note đơn đặt trước
@@ -492,11 +493,11 @@ export const InvoiceManagementPage: FC = () => {
 
   // Phân trang Hóa đơn (TablePagination)
   const [invoicePage, setInvoicePage] = useState(1);
-  const [invoicePageSize, setInvoicePageSize] = useState(10);
+  const [invoicePageSize, setInvoicePageSize] = useState(15);
 
   // Phân trang Đơn đặt trước
   const [preOrderPage, setPreOrderPage] = useState(1);
-  const [preOrderPageSize, setPreOrderPageSize] = useState(10);
+  const [preOrderPageSize, setPreOrderPageSize] = useState(15);
 
   // Đồng bộ tham số tìm kiếm từ URL (khi điều hướng từ trang Khách nợ CRM hoặc Sổ quỹ sang)
   useEffect(() => {
@@ -900,7 +901,7 @@ export const InvoiceManagementPage: FC = () => {
     showToast(`Đã thu ${data.amountPaid.toLocaleString('vi-VN')} đ (${data.paymentMethod === 'VIETQR' ? 'VietQR' : 'Tiền mặt'}) & bàn giao đơn ${preOrderId} thành công!`);
   };
   return (
-    <div className="pos-shift-page-root flex flex-col h-full w-full min-h-0 overflow-hidden bg-[#F7FAFF]">
+    <div className="invoice-management pos-shift-page-root flex flex-col h-full w-full min-h-0 overflow-hidden bg-[#F7FAFF]">
       {/* 1. UNIFIED SINGLE HEADER - ĐỒNG BỘ 100% VỚI SỔ QUỸ & CA THU NGÂN */}
       <header className="pos-shift-unified-header">
         {/* Khối trái: Nút quay lại bán hàng + Tên màn hình */}
@@ -1001,8 +1002,8 @@ export const InvoiceManagementPage: FC = () => {
       <main className="pos-shift-body-container flex-1 min-h-0 overflow-y-auto">
         <div className="shift-content-layout">
           {/* BỘ LỌC TÌM KIẾM - CHUẨN CARD VÀ PRESET BUTTONS CỦA POS */}
-          <div className="pos-shift-card">
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center' }}>
+          <div className="so-list-filter">
+            <div className="so-list-filter-row">
               {/* LỌC THEO CHI NHÁNH (MULTI-BRANCH FILTER) */}
               {!isStoreOwner ? (
                 <div
@@ -1028,7 +1029,7 @@ export const InvoiceManagementPage: FC = () => {
               ) : (
                 <div style={{ position: 'relative', minWidth: 260 }}>
                   <select
-                    className="filter-select w-full"
+                    className="so-list-filter-select w-full"
                     style={{
                       height: 36,
                       paddingLeft: 32,
@@ -1071,7 +1072,7 @@ export const InvoiceManagementPage: FC = () => {
                 <Search size={15} style={{ position: 'absolute', left: 12, color: '#94a3b8' }} />
                 <input
                   type="text"
-                  className="filter-select w-full"
+                  className="so-list-filter-input w-full"
                   style={{ paddingLeft: 34, height: 36 }}
                   placeholder={
                     activeTab === 'invoices'
@@ -1119,7 +1120,7 @@ export const InvoiceManagementPage: FC = () => {
               {activeTab === 'invoices' && (
                 <div style={{ display: 'flex', gap: 6 }}>
                   <select
-                    className="filter-select"
+                    className="so-list-filter-select"
                     style={{ height: 34 }}
                     value={paymentMethodFilter}
                     onChange={(e) => setPaymentMethodFilter(e.target.value as any)}
@@ -1131,7 +1132,7 @@ export const InvoiceManagementPage: FC = () => {
                   </select>
 
                   <select
-                    className="filter-select"
+                    className="so-list-filter-select"
                     style={{ height: 34 }}
                     value={statusFilter}
                     onChange={(e) => setStatusFilter(e.target.value as any)}
@@ -1143,13 +1144,22 @@ export const InvoiceManagementPage: FC = () => {
                   </select>
                 </div>
               )}
+              <button type="button" className="so-list-filter-reset" onClick={() => {
+                setSearchQuery('');
+                setTimePreset('today');
+                setPaymentMethodFilter('ALL');
+                setStatusFilter('ALL');
+                if (isStoreOwner) setBranchFilter('ALL');
+                setInvoicePage(1);
+                setPreOrderPage(1);
+              }}><RotateCcw size={14} /> Đặt lại</button>
             </div>
           </div>
 
           {/* BẢNG DỮ LIỆU - CHUẨN POS-SHIFT-CARD & POS-SHIFT-TABLE */}
           {activeTab === 'invoices' ? (
             /* TAB 1: HÓA ĐƠN BÁN LẺ */
-            <div className="pos-shift-card">
+            <div className="pos-shift-card so-list-table-card">
               <div className="pos-shift-card-header">
                 <div>
                   <h3 className="pos-shift-card-title">
@@ -1161,28 +1171,22 @@ export const InvoiceManagementPage: FC = () => {
                   </div>
                 </div>
 
-                <div className="shift-status-badge on-duty">
-                  <CheckCircle2 size={12} /> Đồng bộ bán hàng POS
-                </div>
               </div>
 
               <div className="pos-shift-table-responsive">
-                <table className="pos-shift-table">
+                <table className="pos-shift-table so-list-table invoice-list-table">
                   <thead>
                     <tr>
-                      <th style={{ width: 36, textAlign: 'center' }}>
-                        <input type="checkbox" />
-                      </th>
-                      <th style={{ width: 175 }}>Mã hóa đơn</th>
-                      <th style={{ width: 130 }}>Thời gian lập</th>
-                      <th style={{ minWidth: 140 }}>Khách hàng</th>
-                      <th style={{ minWidth: 130 }}>Người tạo</th>
-                      <th style={{ textAlign: 'right', width: 105 }}>Tổng tiền hàng</th>
-                      <th style={{ textAlign: 'right', width: 80 }}>Giảm giá</th>
-                      <th style={{ textAlign: 'right', width: 105 }}>Khách đã trả</th>
-                      <th style={{ textAlign: 'center', width: 125 }}>Phương thức TT</th>
-                      <th style={{ textAlign: 'center', width: 135 }}>Trạng thái</th>
-                      <th style={{ textAlign: 'center', width: 210 }}>Thao tác</th>
+                      <th style={{ width: '13%' }}>Mã hóa đơn</th>
+                      <th style={{ width: '8%' }}>Thời gian lập</th>
+                      <th style={{ width: '8%' }}>Khách hàng</th>
+                      <th style={{ width: '11%' }}>Người tạo</th>
+                      <th style={{ textAlign: 'right', width: '8%' }}>Tổng tiền hàng</th>
+                      <th style={{ textAlign: 'right', width: '6%' }}>Giảm giá</th>
+                      <th style={{ textAlign: 'right', width: '8%' }}>Khách đã trả</th>
+                      <th style={{ textAlign: 'center', width: '10%' }}>Phương thức TT</th>
+                      <th style={{ textAlign: 'center', width: '9%' }}>Trạng thái</th>
+                      <th style={{ textAlign: 'center', width: '19%' }}>Thao tác</th>
                     </tr>
                   </thead>
                   {paginatedInvoices.map((inv) => {
@@ -1200,15 +1204,12 @@ export const InvoiceManagementPage: FC = () => {
                           }}
                           onClick={() => toggleExpand(inv.invoiceId)}
                         >
-                          <td style={{ textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
-                            <input type="checkbox" />
-                          </td>
                           <td>
-                            <span style={{ fontWeight: 700, color: '#0f766e', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                              {inv.invoiceId}
+                            <span style={{ fontWeight: 700, color: '#0f766e', display: 'flex', alignItems: 'flex-start', gap: 4, whiteSpace: 'normal', overflowWrap: 'anywhere' }}>
+                              <span>{inv.invoiceId}</span>
                               {isExpanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
                             </span>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
+                            <div style={{ display: 'block', marginTop: 5 }}>
                               <span
                                 style={{
                                   fontSize: 10.5,
@@ -1217,16 +1218,23 @@ export const InvoiceManagementPage: FC = () => {
                                   backgroundColor: '#f1f5f9',
                                   color: '#475569',
                                   fontWeight: 500,
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: 3,
+                                  display: 'block',
+                                  width: 'fit-content',
+                                  maxWidth: '100%',
+                                  whiteSpace: 'normal',
+                                  overflowWrap: 'anywhere',
+                                  lineHeight: 1.35,
                                 }}
                               >
                                 {inv.branchName || 'Chi nhánh Cầu Giấy (Trung tâm)'}
                               </span>
                             </div>
                           </td>
-                          <td style={{ color: '#64748b' }}>{inv.createdAt}</td>
+                          <td style={{ color: '#64748b', lineHeight: 1.45 }}>
+                            {String(inv.createdAt).split(/\s+/).map((part, index) => (
+                              <div key={`${part}-${index}`}>{part}</div>
+                            ))}
+                          </td>
                           <td>
                             <b style={{ color: '#0f172a' }}>{inv.customerName}</b>
                             {inv.customerPhone && (
@@ -1238,7 +1246,7 @@ export const InvoiceManagementPage: FC = () => {
                           <td>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                               <User size={13} className="text-teal-700" style={{ flexShrink: 0 }} />
-                              <span style={{ fontWeight: 600, color: '#334155', fontSize: 12 }}>
+                              <span style={{ fontWeight: 600, color: '#334155', fontSize: 12, minWidth: 0, whiteSpace: 'normal', overflowWrap: 'anywhere' }}>
                                 {inv.cashierName || 'Phạm Thị Yến'}
                               </span>
                             </div>
@@ -1375,49 +1383,6 @@ export const InvoiceManagementPage: FC = () => {
                           </td>
                           <td style={{ textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
                             <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
-                              {isDebt && isStoreOwner ? (
-                                <button
-                                  type="button"
-                                  className="pos-btn-primary-pill"
-                                  style={{
-                                    height: 26,
-                                    padding: '0 9px',
-                                    fontSize: 11,
-                                    backgroundColor: '#0f766e',
-                                    borderColor: '#0d9488',
-                                  }}
-                                  title="Mở Sổ nợ khách hàng trong phân hệ Quản lý công nợ để thu nợ"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    const targetPath = location.pathname.startsWith('/store-owner')
-                                      ? '/store-owner/customers'
-                                      : '/store/customers';
-                                    const query = inv.customerPhone || inv.customerName || '';
-                                    navigate(`${targetPath}?search=${encodeURIComponent(query)}`);
-                                  }}
-                                >
-                                  <BookOpen size={12} />
-                                  <span>Sổ nợ</span>
-                                </button>
-                              ) : isDebt ? (
-                                <span
-                                  style={{
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    height: 24,
-                                    padding: '0 8px',
-                                    fontSize: 10.5,
-                                    borderRadius: 999,
-                                    backgroundColor: '#fef3c7',
-                                    color: '#b45309',
-                                    fontWeight: 600,
-                                    border: '1px solid #fde68a',
-                                  }}
-                                  title="Chỉ Chủ cửa hàng mới được quyền thu nợ tại phân hệ Quản lý công nợ"
-                                >
-                                  Nợ chờ chủ thu
-                                </span>
-                              ) : null}
                               <button
                                 type="button"
                                 className="pos-btn-secondary-pill"
@@ -1487,7 +1452,7 @@ export const InvoiceManagementPage: FC = () => {
                         {/* ACCORDION CHI TIẾT */}
                         {isExpanded && (
                           <tr>
-                            <td colSpan={11} style={{ padding: 12, backgroundColor: '#f8fafc' }}>
+                            <td colSpan={10} style={{ padding: 12, backgroundColor: '#f8fafc' }}>
                               <div
                                 style={{
                                   backgroundColor: '#ffffff',
@@ -1506,45 +1471,6 @@ export const InvoiceManagementPage: FC = () => {
                                     )}
                                   </div>
 
-                                  <div style={{ display: 'flex', gap: 8 }}>
-                                    {isDebt && (
-                                      isStoreOwner ? (
-                                        <button
-                                          type="button"
-                                          className="pos-btn-primary-pill"
-                                          style={{ height: 26, padding: '0 12px', fontSize: 11, backgroundColor: '#0f766e', borderColor: '#0d9488' }}
-                                          title="Mở Sổ nợ khách hàng trong phân hệ Quản lý công nợ để thu nợ"
-                                          onClick={() => {
-                                            const targetPath = location.pathname.startsWith('/store-owner')
-                                              ? '/store-owner/customers'
-                                              : '/store/customers';
-                                            const query = inv.customerPhone || inv.customerName || '';
-                                            navigate(`${targetPath}?search=${encodeURIComponent(query)}`);
-                                          }}
-                                        >
-                                          <BookOpen size={12} />
-                                          <span>Quản Lý Công Nợ Khách ({(inv.debtAmount || 0).toLocaleString('vi-VN')} đ)</span>
-                                        </button>
-                                      ) : (
-                                        <span
-                                          style={{
-                                            display: 'inline-flex',
-                                            alignItems: 'center',
-                                            height: 26,
-                                            padding: '0 10px',
-                                            fontSize: 11,
-                                            borderRadius: 6,
-                                            backgroundColor: '#fef3c7',
-                                            color: '#b45309',
-                                            fontWeight: 600,
-                                            border: '1px solid #fde68a',
-                                          }}
-                                        >
-                                          Đang nợ: {(inv.debtAmount || 0).toLocaleString('vi-VN')} đ (Chỉ Chủ cửa hàng thu nợ)
-                                        </span>
-                                      )
-                                    )}
-                                  </div>
                                 </div>
 
                                 {/* CHI TIẾT KHUYẾN MÃI / MÃ VOUCHER / ĐIỂM THƯỞNG (REQ-ORD-PROMO-01) */}
@@ -1660,79 +1586,6 @@ export const InvoiceManagementPage: FC = () => {
                                     ))}
                                   </tbody>
                                 </table>
-
-                                {/* THEO DÕI CÔNG NỢ & LỊCH SỬ THU NỢ CỦA HÓA ĐƠN */}
-                                {(isDebt || (inv.debtAmount !== undefined && inv.debtAmount > 0) || (inv.debtPaymentRecords && inv.debtPaymentRecords.length > 0)) && (
-                                  <div style={{ marginTop: 12, padding: 10, borderRadius: 6, backgroundColor: '#fefce8', border: '1px solid #fef08a' }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: inv.debtPaymentRecords && inv.debtPaymentRecords.length > 0 ? 8 : 0 }}>
-                                      <div>
-                                        <span style={{ fontWeight: 700, color: '#854d0e', fontSize: 12 }}>Theo dõi thanh toán công nợ: </span>
-                                        <span style={{ fontSize: 12, color: '#475569' }}>
-                                          Đã thanh toán: <strong style={{ color: '#16a34a' }}>{(inv.paidDebtAmount || 0).toLocaleString('vi-VN')} đ</strong> &bull;{' '}
-                                          Còn nợ lại: <strong style={{ color: (inv.debtAmount || 0) > 0 ? '#dc2626' : '#16a34a' }}>{(inv.debtAmount || 0).toLocaleString('vi-VN')} đ</strong>
-                                        </span>
-                                      </div>
-                                      {(inv.debtAmount || 0) > 0 && (
-                                        isStoreOwner ? (
-                                          <button
-                                            type="button"
-                                            className="pos-btn-primary-pill"
-                                            style={{ height: 24, padding: '0 10px', fontSize: 11, backgroundColor: '#0f766e', borderColor: '#0d9488' }}
-                                            title="Chuyển đến phần Quản lý công nợ khách hàng để thu nợ"
-                                            onClick={() => {
-                                              const targetPath = location.pathname.startsWith('/store-owner')
-                                                ? '/store-owner/customers'
-                                                : '/store/customers';
-                                              const query = inv.customerPhone || inv.customerName || '';
-                                              navigate(`${targetPath}?search=${encodeURIComponent(query)}`);
-                                            }}
-                                          >
-                                            <BookOpen size={12} />
-                                            <span>Mở Sổ Nợ Để Thu</span>
-                                          </button>
-                                        ) : (
-                                          <span style={{ fontSize: 11, color: '#b45309', fontStyle: 'italic', backgroundColor: '#fef3c7', padding: '2px 8px', borderRadius: 4 }}>
-                                            Chỉ Chủ cửa hàng thu nợ tại Quản lý công nợ
-                                          </span>
-                                        )
-                                      )}
-                                    </div>
-
-                                    {inv.debtPaymentRecords && inv.debtPaymentRecords.length > 0 && (
-                                      <div style={{ marginTop: 6, borderTop: '1px dashed #fde047', paddingTop: 6 }}>
-                                        <div style={{ fontSize: 11.5, fontWeight: 600, color: '#713f12', marginBottom: 4 }}>
-                                          Lịch sử các đợt trả tiền ({inv.debtPaymentRecords.length} lần):
-                                        </div>
-                                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
-                                          <thead>
-                                            <tr style={{ color: '#64748b', textAlign: 'left', borderBottom: '1px solid #fef08a' }}>
-                                              <th style={{ padding: '3px 6px' }}>Thời gian</th>
-                                              <th style={{ padding: '3px 6px', textAlign: 'right' }}>Số tiền</th>
-                                              <th style={{ padding: '3px 6px', textAlign: 'center' }}>Hình thức</th>
-                                              <th style={{ padding: '3px 6px' }}>Thu ngân</th>
-                                              <th style={{ padding: '3px 6px' }}>Ghi chú</th>
-                                            </tr>
-                                          </thead>
-                                          <tbody>
-                                            {inv.debtPaymentRecords.map((r) => (
-                                              <tr key={r.paymentId}>
-                                                <td style={{ padding: '3px 6px' }}>{r.paidAt}</td>
-                                                <td style={{ padding: '3px 6px', textAlign: 'right', fontWeight: 600, color: '#15803d' }}>
-                                                  {r.amount.toLocaleString('vi-VN')} đ
-                                                </td>
-                                                <td style={{ padding: '3px 6px', textAlign: 'center' }}>
-                                                  {r.paymentMethod === 'CASH' ? 'Tiền mặt' : 'VietQR'}
-                                                </td>
-                                                <td style={{ padding: '3px 6px' }}>{r.cashierName}</td>
-                                                <td style={{ padding: '3px 6px', color: '#64748b' }}>{r.note}</td>
-                                              </tr>
-                                            ))}
-                                          </tbody>
-                                        </table>
-                                      </div>
-                                    )}
-                                  </div>
-                                )}
                               </div>
                             </td>
                           </tr>
@@ -1748,7 +1601,7 @@ export const InvoiceManagementPage: FC = () => {
                 currentPage={invoicePage}
                 pageSize={invoicePageSize}
                 totalItems={filteredInvoices.length}
-                pageSizeOptions={[5, 10, 20]}
+                pageSizeOptions={[15, 24, 36, 48]}
                 onPageChange={(p) => setInvoicePage(p)}
                 onPageSizeChange={(s) => {
                   setInvoicePageSize(s);
@@ -1759,7 +1612,7 @@ export const InvoiceManagementPage: FC = () => {
             </div>
           ) : (
             /* TAB 2: ĐƠN ĐẶT TRƯỚC (PRE-ORDER) */
-            <div className="pos-shift-card">
+            <div className="pos-shift-card so-list-table-card">
               <div className="pos-shift-card-header">
                 <div>
                   <h3 className="pos-shift-card-title">
@@ -1793,19 +1646,21 @@ export const InvoiceManagementPage: FC = () => {
               </div>
 
               <div className="pos-shift-table-responsive">
-                <table className="pos-shift-table">
+                <table className="pos-shift-table so-list-table invoice-list-table">
                   <thead>
                     <tr>
-                      <th style={{ width: 170 }}>Mã đơn đặt trước</th>
-                      <th style={{ minWidth: 140 }}>Khách hàng</th>
-                      <th style={{ minWidth: 150 }}>Người tạo</th>
-                      <th style={{ width: 140 }}>Thời gian hẹn nhận hàng</th>
-                      <th style={{ width: 210, textAlign: 'right' }}>Tổng sau khuyến mại</th>
-                      <th style={{ width: 90, textAlign: 'right' }}>Tiền cọc</th>
-                      <th style={{ width: 110, textAlign: 'right' }}>Còn phải thu</th>
-                      <th style={{ width: 120 }}>Phân bổ giữ kho</th>
-                      <th style={{ width: 130, textAlign: 'center' }}>Trạng thái</th>
-                      <th style={{ width: 180, textAlign: 'center' }}>Thao tác quầy</th>
+                      <th style={{ width: 145 }}>Mã đơn đặt trước</th>
+                      <th style={{ width: 112 }}>Khách hàng</th>
+                      <th style={{ width: 105 }}>Người tạo</th>
+                      <th style={{ width: 115 }}>Thời gian hẹn nhận</th>
+                      <th style={{ width: 112, textAlign: 'right', lineHeight: 1.35 }}>
+                        Tổng sau<br />khuyến mại
+                      </th>
+                      <th style={{ width: 78, textAlign: 'right' }}>Tiền cọc</th>
+                      <th style={{ width: 92, textAlign: 'right' }}>Còn phải thu</th>
+                      <th style={{ width: 100 }}>Giữ kho</th>
+                      <th style={{ width: 108, textAlign: 'center' }}>Trạng thái</th>
+                      <th style={{ width: 155, textAlign: 'center' }}>Thao tác</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1835,11 +1690,11 @@ export const InvoiceManagementPage: FC = () => {
                                   }}
                                 />
                                 <div>
-                                  <b style={{ color: '#0f766e' }}>{pre.preOrderId}</b>
+                                  <b style={{ color: '#0f766e', whiteSpace: 'normal', overflowWrap: 'anywhere' }}>{pre.preOrderId}</b>
                                   <div style={{ color: '#64748b', fontSize: 11 }}>Tạo: {pre.createdAt}</div>
                                 </div>
                               </div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 3 }}>
+                              <div style={{ display: 'block', marginTop: 5 }}>
                                 <span
                                   style={{
                                     fontSize: 10.5,
@@ -1848,9 +1703,12 @@ export const InvoiceManagementPage: FC = () => {
                                     backgroundColor: '#f0fdf4',
                                     color: '#166534',
                                     fontWeight: 500,
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    gap: 3,
+                                    display: 'block',
+                                    width: 'fit-content',
+                                    maxWidth: '100%',
+                                    whiteSpace: 'normal',
+                                    overflowWrap: 'anywhere',
+                                    lineHeight: 1.35,
                                   }}
                                 >
                                   {pre.branchName || 'Chi nhánh Cầu Giấy (Trung tâm)'}
@@ -1870,7 +1728,7 @@ export const InvoiceManagementPage: FC = () => {
                             <td>
                               <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                                 <UserCheck size={13} className="text-teal-700" />
-                                <span style={{ fontWeight: 600, color: '#0f766e', fontSize: 12 }}>
+                                <span style={{ fontWeight: 600, color: '#0f766e', fontSize: 12, minWidth: 0, whiteSpace: 'normal', overflowWrap: 'anywhere' }}>
                                   {pre.cashierName || 'Thu ngân POS'}
                                 </span>
                               </div>
@@ -2182,7 +2040,7 @@ export const InvoiceManagementPage: FC = () => {
                 currentPage={preOrderPage}
                 pageSize={preOrderPageSize}
                 totalItems={filteredPreOrders.length}
-                pageSizeOptions={[5, 10, 20]}
+                pageSizeOptions={[15, 24, 36, 48]}
                 onPageChange={(p) => setPreOrderPage(p)}
                 onPageSizeChange={(s) => {
                   setPreOrderPageSize(s);
