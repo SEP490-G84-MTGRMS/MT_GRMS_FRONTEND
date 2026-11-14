@@ -40,7 +40,7 @@ export const VoucherBatchTable: FC<VoucherBatchTableProps> = ({
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(15);
   const [batchCodesMap, setBatchCodesMap] = useState<Record<string, VoucherCodeItem[]>>({});
   const [loadingCodesMap, setLoadingCodesMap] = useState<Record<string, boolean>>({});
 
@@ -164,20 +164,20 @@ export const VoucherBatchTable: FC<VoucherBatchTableProps> = ({
   };
 
   return (
-    <div className="so-list-table-card promotion-card">
+    <div className="so-list-table-card so-list-table-card--wrap promotion-card">
       <div className="table-responsive" style={{ width: '100%', overflowX: 'auto' }}>
-        <table className="so-list-table promotion-table" style={{ minWidth: 1330, width: '100%', tableLayout: 'fixed' }}>
+        <table className="so-list-table promotion-table" style={{ minWidth: 1350, width: '100%', tableLayout: 'fixed' }}>
           <thead>
             <tr>
               <th style={{ ...thStyle, width: 44, padding: '8px 8px', textAlign: 'center' }}></th>
-              <th style={{ ...thStyle, width: 125 }}>Mã đợt</th>
-              <th style={{ ...thStyle, width: 220 }}>Tên đợt Voucher / Coupon</th>
-              <th style={{ ...thStyle, width: 145 }}>Loại ưu đãi</th>
+              <th style={{ ...thStyle, width: 120 }}>Mã đợt</th>
+              <th style={{ ...thStyle, width: 210 }}>Tên đợt Voucher / Coupon</th>
+              <th style={{ ...thStyle, width: 140 }}>Loại ưu đãi</th>
               <th style={{ ...thStyle, width: 165 }}>Điều kiện áp dụng</th>
-              <th style={{ ...thStyle, width: 155 }}>Đã dùng / Phát hành</th>
-              <th style={{ ...thStyle, width: 245 }}>Thời gian hiệu lực</th>
-              <th style={{ ...thStyle, width: 135 }}>Trạng thái</th>
-              <th style={{ ...thStyle, width: 95, textAlign: 'right' }}>Thao tác</th>
+              <th style={{ ...thStyle, width: 150 }}>Đã dùng / Phát hành</th>
+              <th style={{ ...thStyle, width: 160 }}>Thời gian hiệu lực</th>
+              <th style={{ ...thStyle, width: 150 }}>Trạng thái</th>
+              <th style={{ ...thStyle, width: 210, textAlign: 'right' }}>Thao tác</th>
             </tr>
           </thead>
           <tbody>
@@ -269,7 +269,7 @@ export const VoucherBatchTable: FC<VoucherBatchTableProps> = ({
                       </td>
                       <td className="so-list-td">{renderDiscountType(batch.discountType, batch.discountValue)}</td>
                       <td className="so-list-td">
-                        <div className="voucher-conditions">
+                        <div className="voucher-conditions" style={{ whiteSpace: 'normal', wordBreak: 'break-word', lineHeight: 1.35 }}>
                           <div>
                             Đơn tối thiểu: <strong>{batch.minOrderValue.toLocaleString('vi-VN')} đ</strong>
                           </div>
@@ -295,11 +295,17 @@ export const VoucherBatchTable: FC<VoucherBatchTableProps> = ({
                         </div>
                       </td>
                       <td className="so-list-td">
-                        <div className="promo-date-badge">
-                          <Calendar size={13} />
-                          <span className="promo-date-text">{batch.startDate}</span>
-                          <span className="promo-date-arrow">→</span>
-                          <span className="promo-date-text">{batch.endDate}</span>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 3, fontSize: 12 }}>
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, color: '#334155' }}>
+                            <Calendar size={12} style={{ color: '#0f766e', flexShrink: 0 }} />
+                            <span style={{ color: '#64748b', fontSize: 11, minWidth: 24 }}>Từ:</span>
+                            <span style={{ fontFamily: 'var(--font-mono, monospace)', fontWeight: 600 }}>{batch.startDate}</span>
+                          </div>
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, color: '#334155' }}>
+                            <span style={{ width: 12, display: 'inline-block', flexShrink: 0 }} />
+                            <span style={{ color: '#64748b', fontSize: 11, minWidth: 24 }}>Đến:</span>
+                            <span style={{ fontFamily: 'var(--font-mono, monospace)', fontWeight: 600 }}>{batch.endDate}</span>
+                          </div>
                         </div>
                       </td>
                       <td className="so-list-td">
@@ -317,11 +323,11 @@ export const VoucherBatchTable: FC<VoucherBatchTableProps> = ({
                         </div>
                       </td>
                       <td className="so-list-td so-list-td--actions" style={{ textAlign: 'right' }}>
-                        <div className="table-actions">
+                        <div className="table-actions" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, justifyContent: 'flex-end', width: '100%' }}>
                           <button
                             onClick={() => onOpenGenerateCodes(batch)}
                             className="btn-secondary-pill"
-                            style={{ padding: '6px 12px', fontSize: '0.78rem' }}
+                            style={{ padding: '5px 10px', fontSize: '0.78rem', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 4 }}
                             title="Phát hành thêm mã cho đợt này"
                           >
                             <PlusCircle size={14} color="#0F766E" />
@@ -475,7 +481,7 @@ export const VoucherBatchTable: FC<VoucherBatchTableProps> = ({
         currentPage={currentPage}
         pageSize={pageSize}
         totalItems={batches.length}
-        pageSizeOptions={[10, 20, 50]}
+        pageSizeOptions={[15, 24, 36, 48]}
         itemLabel="đợt voucher"
         onPageChange={setCurrentPage}
         onPageSizeChange={(newSize) => {

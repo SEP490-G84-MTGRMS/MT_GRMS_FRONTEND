@@ -11,7 +11,6 @@ import {
 import {
   Gift,
   MessageCircle,
-  SquarePen,
   Settings,
   User,
   Store,
@@ -1523,42 +1522,7 @@ export const AppTopNav: FC = () => {
               <span>Hỗ trợ</span>
             </button>
 
-            {/* 2. Góp ý */}
-            <button
-              type="button"
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 6,
-                background: "none",
-                border: "none",
-                color: "#ffffff",
-                fontSize: 13,
-                fontWeight: 600,
-                cursor: "pointer",
-                padding: "6px 8px",
-                borderRadius: "var(--radius-pill)",
-                transition: "background-color 0.15s ease",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor =
-                  "rgba(255, 255, 255, 0.14)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = "transparent";
-              }}
-              onClick={() =>
-                alert(
-                  "Cảm ơn bạn! Mọi ý kiến đóng góp xin gửi về: hotro@mt-grms.vn",
-                )
-              }
-              title="Gửi ý kiến đóng góp tính năng"
-            >
-              <SquarePen size={15} strokeWidth={2} />
-              <span>Góp ý</span>
-            </button>
-
-            {/* 3. Divider */}
+            {/* 2. Divider */}
             <div
               style={{
                 width: 1,

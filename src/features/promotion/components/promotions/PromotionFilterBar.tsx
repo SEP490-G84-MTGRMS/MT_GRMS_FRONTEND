@@ -6,16 +6,14 @@ interface PromotionFilterBarProps {
   filter: PromotionFilterState;
   onFilterChange: (newFilter: PromotionFilterState) => void;
   onRefresh: () => void;
-  branches?: string[];
 }
 
 export const PromotionFilterBar: FC<PromotionFilterBarProps> = ({
   filter,
   onFilterChange,
   onRefresh,
-  branches,
 }) => {
-  const isFiltered = filter.searchTerm || filter.type !== 'ALL' || filter.status !== 'ALL' || (filter.branch && filter.branch !== 'ALL');
+  const isFiltered = Boolean(filter.searchTerm || filter.type !== 'ALL' || filter.status !== 'ALL');
 
   return (
     <div className="so-list-filter" style={{ marginBottom: 16 }}>
@@ -92,29 +90,12 @@ export const PromotionFilterBar: FC<PromotionFilterBarProps> = ({
           </select>
         </div>
 
-        {/* 4. Lọc Chi nhánh */}
-        {branches && branches.length > 0 && (
-          <div className="so-list-filter-field">
-            <label className="so-list-filter-label">Chi nhánh:</label>
-            <select
-              value={filter.branch || 'ALL'}
-              onChange={(e) => onFilterChange({ ...filter, branch: e.target.value })}
-              className={`so-list-filter-select ${filter.branch && filter.branch !== 'ALL' ? 'so-list-filter-select--active' : ''}`}
-            >
-              <option value="ALL">Tất cả chi nhánh</option>
-              {branches.map((b) => (
-                <option key={b} value={b}>{b}</option>
-              ))}
-            </select>
-          </div>
-        )}
-
         {/* Nút Thao tác Filter */}
         <div className="so-list-filter-actions" style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
           {isFiltered && (
             <button
               type="button"
-              onClick={() => onFilterChange({ searchTerm: '', type: 'ALL', status: 'ALL', branch: 'ALL' })}
+              onClick={() => onFilterChange({ ...filter, searchTerm: '', type: 'ALL', status: 'ALL' })}
               className="so-list-filter-reset"
               title="Đặt lại bộ lọc"
             >

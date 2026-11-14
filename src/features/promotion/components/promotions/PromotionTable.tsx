@@ -31,7 +31,7 @@ export const PromotionTable: FC<PromotionTableProps> = ({
 }) => {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(15);
 
   const paginatedPromotions = promotions.slice(
     (currentPage - 1) * pageSize,
@@ -95,20 +95,20 @@ export const PromotionTable: FC<PromotionTableProps> = ({
   };
 
   return (
-    <div className="so-list-table-card promotion-card">
+    <div className="so-list-table-card so-list-table-card--wrap promotion-card">
       <div className="table-responsive" style={{ width: '100%', overflowX: 'auto' }}>
-        <table className="so-list-table promotion-table" style={{ minWidth: 1340, width: '100%', tableLayout: 'fixed' }}>
+        <table className="so-list-table promotion-table" style={{ minWidth: 1290, width: '100%', tableLayout: 'fixed' }}>
           <thead>
             <tr>
               <th style={{ ...thStyle, width: 44, padding: '8px 8px', textAlign: 'center' }}></th>
-              <th style={{ ...thStyle, width: 125 }}>Mã CTKM</th>
+              <th style={{ ...thStyle, width: 120 }}>Mã CTKM</th>
               <th style={{ ...thStyle, width: 220 }}>Tên chương trình</th>
-              <th style={{ ...thStyle, width: 145 }}>Hình thức</th>
-              <th style={{ ...thStyle, width: 245 }}>Thời gian hiệu lực</th>
-              <th style={{ ...thStyle, width: 180 }}>Chi nhánh áp dụng</th>
-              <th style={{ ...thStyle, width: 185 }}>Lượt &amp; Ngân sách</th>
-              <th style={{ ...thStyle, width: 135 }}>Trạng thái</th>
-              <th style={{ ...thStyle, width: 85, textAlign: 'right' }}>Thao tác</th>
+              <th style={{ ...thStyle, width: 140 }}>Hình thức</th>
+              <th style={{ ...thStyle, width: 165 }}>Thời gian hiệu lực</th>
+              <th style={{ ...thStyle, width: 170 }}>Chi nhánh áp dụng</th>
+              <th style={{ ...thStyle, width: 180 }}>Lượt &amp; Ngân sách</th>
+              <th style={{ ...thStyle, width: 150 }}>Trạng thái</th>
+              <th style={{ ...thStyle, width: 100, textAlign: 'right' }}>Thao tác</th>
             </tr>
           </thead>
           <tbody>
@@ -162,11 +162,17 @@ export const PromotionTable: FC<PromotionTableProps> = ({
                       </td>
                       <td className="so-list-td">{renderTypeBadge(item.type)}</td>
                       <td className="so-list-td">
-                        <div className="promo-date-badge">
-                          <Calendar size={13} />
-                          <span className="promo-date-text">{item.startDate}</span>
-                          <span className="promo-date-arrow">→</span>
-                          <span className="promo-date-text">{item.endDate}</span>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 3, fontSize: 12 }}>
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, color: '#334155' }}>
+                            <Calendar size={12} style={{ color: '#0f766e', flexShrink: 0 }} />
+                            <span style={{ color: '#64748b', fontSize: 11, minWidth: 24 }}>Từ:</span>
+                            <span style={{ fontFamily: 'var(--font-mono, monospace)', fontWeight: 600 }}>{item.startDate}</span>
+                          </div>
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, color: '#334155' }}>
+                            <span style={{ width: 12, display: 'inline-block', flexShrink: 0 }} />
+                            <span style={{ color: '#64748b', fontSize: 11, minWidth: 24 }}>Đến:</span>
+                            <span style={{ fontFamily: 'var(--font-mono, monospace)', fontWeight: 600 }}>{item.endDate}</span>
+                          </div>
                         </div>
                       </td>
                       <td className="so-list-td">
@@ -175,22 +181,34 @@ export const PromotionTable: FC<PromotionTableProps> = ({
                           const isAll = item.branches.includes('ALL') || item.branches.length === 0;
                           return (
                             <div
-                              className="promo-branch-cell"
+                              style={{
+                                display: 'flex',
+                                alignItems: 'flex-start',
+                                gap: 6,
+                                fontSize: 12,
+                                whiteSpace: 'normal',
+                                wordBreak: 'break-word',
+                                lineHeight: 1.35,
+                              }}
                               title={
                                 isAll
                                   ? 'Áp dụng trên toàn bộ chuỗi cửa hàng'
                                   : displayBranches.join(', ')
                               }
                             >
-                              <MapPin size={13} className="promo-branch-icon" />
+                              <MapPin size={13} style={{ color: '#0f766e', marginTop: 2, flexShrink: 0 }} />
                               {isAll ? (
                                 <span className="promo-branch-all">Toàn hệ thống</span>
-                              ) : displayBranches.length === 1 ? (
-                                <span className="promo-branch-single">{displayBranches[0]}</span>
                               ) : (
-                                <div className="promo-branch-multi">
-                                  <span className="promo-branch-first">{displayBranches[0]}</span>
-                                  <span className="promo-branch-count">+{displayBranches.length - 1}</span>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                  <span style={{ color: '#334155', fontWeight: 600, wordBreak: 'break-word' }}>
+                                    {displayBranches[0]}
+                                  </span>
+                                  {displayBranches.length > 1 && (
+                                    <span style={{ fontSize: 11, color: '#0f766e', fontWeight: 700 }}>
+                                      +{displayBranches.length - 1} chi nhánh
+                                    </span>
+                                  )}
                                 </div>
                               )}
                             </div>
@@ -436,7 +454,7 @@ export const PromotionTable: FC<PromotionTableProps> = ({
         currentPage={currentPage}
         pageSize={pageSize}
         totalItems={promotions.length}
-        pageSizeOptions={[10, 20, 50]}
+        pageSizeOptions={[15, 24, 36, 48]}
         itemLabel="chương trình"
         onPageChange={setCurrentPage}
         onPageSizeChange={(newSize) => {

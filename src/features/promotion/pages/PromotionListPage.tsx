@@ -455,7 +455,6 @@ export const PromotionListPage: FC = () => {
         filter={filter}
         onFilterChange={setFilter}
         onRefresh={loadPromotions}
-        branches={branchNames}
       />
 
       {/* Table */}

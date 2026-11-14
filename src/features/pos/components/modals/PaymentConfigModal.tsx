@@ -80,6 +80,7 @@ export const PaymentConfigModal: FC<Props> = ({ isOpen, onClose, onSaveSuccess }
   const [branches, setBranches] = useState<Array<{ id: string; name: string; code?: string }>>([]);
   const [selectedBranchIds, setSelectedBranchIds] = useState<string[]>([]);
   const [paymentAccountId, setPaymentAccountId] = useState<string | null>(null);
+  const [savedAccountKey, setSavedAccountKey] = useState('');
 
   // Sinh Webhook URL tự động
   const webhookUrl = `${window.location.origin.replace(':5173', ':5000')}/api/payments/sepay-webhook`;
@@ -134,6 +135,7 @@ export const PaymentConfigModal: FC<Props> = ({ isOpen, onClose, onSaveSuccess }
           const accounts = Array.isArray(data.paymentAccounts) ? data.paymentAccounts : [];
           const account = accounts.find((item: any) => item.bankCode === data.bankCode && item.bankAccountNumber === data.bankAccountNumber) || accounts[0];
           setPaymentAccountId(account?.paymentAccountId || null);
+          setSavedAccountKey(account ? `${account.bankCode}|${account.bankAccountNumber}` : '');
           setSelectedBranchIds(Array.isArray(account?.branchIds) ? account.branchIds : []);
         }
       })
@@ -156,6 +158,18 @@ export const PaymentConfigModal: FC<Props> = ({ isOpen, onClose, onSaveSuccess }
       setSaveMessage('Vui lòng chọn ít nhất một chi nhánh sử dụng tài khoản này.');
       return;
     }
+    const nextAccountKey = `${bankCode}|${bankAccountNumber.trim()}`;
+    if (savedAccountKey && savedAccountKey !== nextAccountKey) {
+      const branchNames = branches
+        .filter((branch) => selectedBranchIds.includes(branch.id))
+        .map((branch) => branch.name)
+        .join(', ');
+      const confirmed = window.confirm(
+        `Bạn có chắc muốn thay tài khoản nhận tiền hiện tại bằng ${bankCode} - ${bankAccountNumber.trim()}` +
+        `${branchNames ? ` cho: ${branchNames}` : ''}?\n\nQR mới sẽ dùng tài khoản mới; giao dịch cũ không thay đổi.`
+      );
+      if (!confirmed) return;
+    }
     setIsSaving(true);
     setSaveMessage(null);
 
@@ -175,27 +189,30 @@ export const PaymentConfigModal: FC<Props> = ({ isOpen, onClose, onSaveSuccess }
 
     // 1. Chỉ lưu thông tin ngân hàng công khai vào LocalStorage (Tuyệt đối KHÔNG lưu sepayApiKey)
     const storageKey = `pos_payment_config_${currentTenantId}`;
-    localStorage.setItem(
-      storageKey,
-      JSON.stringify({
-        tenantId: currentTenantId,
-        bankCode: configData.bankCode,
-        bankName: configData.bankName,
-        bankAccountNumber: configData.bankAccountNumber,
-        bankAccountName: configData.bankAccountName,
-        webhookUrl,
-        isActive: configData.isActive,
-      })
-    );
-
     // 2. Gửi request lưu Backend API (mã hóa AES-256 trên Server)
     try {
       const res = await httpClient.post('/payments/config', configData);
       if (res.data?.sepayApiKeyMasked) {
         setSepayApiKey(res.data.sepayApiKeyMasked);
       }
-    } catch {
-      // Backend offline
+      if (res.data?.paymentAccountId) setPaymentAccountId(res.data.paymentAccountId);
+      setSavedAccountKey(nextAccountKey);
+      localStorage.setItem(
+        storageKey,
+        JSON.stringify({
+          tenantId: currentTenantId,
+          bankCode: configData.bankCode,
+          bankName: configData.bankName,
+          bankAccountNumber: configData.bankAccountNumber,
+          bankAccountName: configData.bankAccountName,
+          webhookUrl,
+          isActive: configData.isActive,
+        })
+      );
+    } catch (error: any) {
+      setIsSaving(false);
+      setSaveMessage(error?.response?.data?.message || 'Không thể lưu cấu hình lên máy chủ. Tài khoản hiện tại chưa bị thay đổi.');
+      return;
     }
 
     setIsSaving(false);

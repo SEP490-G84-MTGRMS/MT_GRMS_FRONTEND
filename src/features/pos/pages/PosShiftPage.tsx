@@ -60,7 +60,7 @@ export const PosShiftPage: FC = () => {
 
   // Phân trang
   const [currentPage, setCurrentPage] = useState<number>(1);
-  const [pageSize, setPageSize] = useState<number>(10);
+  const [pageSize, setPageSize] = useState<number>(15);
 
   // Modal Xác nhận bàn giao ca
   const [handoverShift, setHandoverShift] = useState<ShiftDetailResponse | null>(null);
@@ -904,7 +904,7 @@ export const PosShiftPage: FC = () => {
         )}
 
         {/* BẢNG LỊCH SỬ CÁC CA LÀM VIỆC */}
-        <div className="so-list-table-card">
+        <div className="so-list-table-card so-list-table-card--wrap">
           <div style={{ padding: '12px 16px', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#ffffff' }}>
             <h3 style={{ fontSize: 15, fontWeight: 700, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
               <History size={16} className="text-teal-700" />
@@ -913,7 +913,7 @@ export const PosShiftPage: FC = () => {
           </div>
 
           <div className="table-responsive" style={{ width: '100%', overflowX: 'auto' }}>
-            <table className="so-list-table" style={{ minWidth: 1220, width: '100%', tableLayout: 'fixed' }}>
+            <table className="so-list-table" style={{ minWidth: 1240, width: '100%', tableLayout: 'fixed' }}>
               <thead>
                 <tr>
                   <th style={{ width: 130, backgroundColor: '#f8fafc', padding: '8px 12px', fontSize: 12, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: '1px solid #cbd5e1' }}>Mã ca</th>
@@ -924,7 +924,7 @@ export const PosShiftPage: FC = () => {
                   <th style={{ width: 130, backgroundColor: '#f8fafc', padding: '8px 12px', fontSize: 12, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: '1px solid #cbd5e1', textAlign: 'right' }}>Thực đếm</th>
                   <th style={{ width: 130, backgroundColor: '#f8fafc', padding: '8px 12px', fontSize: 12, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: '1px solid #cbd5e1', textAlign: 'right' }}>Chênh lệch</th>
                   <th style={{ width: 140, backgroundColor: '#f8fafc', padding: '8px 12px', fontSize: 12, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: '1px solid #cbd5e1', textAlign: 'center' }}>Xác nhận kết ca</th>
-                  <th style={{ width: 110, backgroundColor: '#f8fafc', padding: '8px 12px', fontSize: 12, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: '1px solid #cbd5e1', textAlign: 'center' }}>Thao tác</th>
+                  <th style={{ width: 130, backgroundColor: '#f8fafc', padding: '8px 12px', fontSize: 12, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: '1px solid #cbd5e1', textAlign: 'center' }}>Thao tác</th>
                 </tr>
               </thead>
               <tbody>
@@ -1133,7 +1133,7 @@ export const PosShiftPage: FC = () => {
               pageSize={pageSize}
               totalItems={filteredShifts.length}
               itemLabel="ca làm việc"
-              pageSizeOptions={[10, 20, 50]}
+              pageSizeOptions={[15, 24, 36, 48]}
               onPageChange={setCurrentPage}
               onPageSizeChange={(newSize) => {
                 setPageSize(newSize);

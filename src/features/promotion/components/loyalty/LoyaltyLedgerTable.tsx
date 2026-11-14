@@ -15,7 +15,7 @@ export const LoyaltyLedgerTable: FC<LoyaltyLedgerTableProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('ALL');
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(15);
 
   const filteredLedger = useMemo(() => {
     return ledger.filter((item) => {
@@ -87,7 +87,7 @@ export const LoyaltyLedgerTable: FC<LoyaltyLedgerTableProps> = ({
   };
 
   return (
-    <div className="so-list-table-card promotion-card">
+    <div className="so-list-table-card so-list-table-card--wrap promotion-card">
       <div className="promotion-card-header">
         <h3 className="promotion-card-title">
           <span>Sổ cái lịch sử biến động điểm</span>
@@ -240,7 +240,7 @@ export const LoyaltyLedgerTable: FC<LoyaltyLedgerTableProps> = ({
                     </span>
                   </td>
                   <td className="so-list-td">
-                    <div style={{ fontSize: '0.8rem', color: '#334155', lineHeight: 1.4, maxWidth: 240 }}>
+                    <div style={{ fontSize: '0.8rem', color: '#334155', lineHeight: 1.4, maxWidth: 260, whiteSpace: 'normal', wordBreak: 'break-word' }}>
                       {row.reason}
                     </div>
                     {row.orderCode && (
@@ -267,7 +267,7 @@ export const LoyaltyLedgerTable: FC<LoyaltyLedgerTableProps> = ({
         currentPage={currentPage}
         pageSize={pageSize}
         totalItems={filteredLedger.length}
-        pageSizeOptions={[10, 20, 50]}
+        pageSizeOptions={[15, 24, 36, 48]}
         itemLabel="giao dịch"
         onPageChange={setCurrentPage}
         onPageSizeChange={(newSize) => {

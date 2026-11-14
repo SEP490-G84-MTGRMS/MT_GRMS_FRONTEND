@@ -10,7 +10,7 @@ interface Props {
 }
 
 export const ShiftHistoryTable: FC<Props> = ({ shifts, onOpenZReport }) => {
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(15);
   const [currentPage, setCurrentPage] = useState(1);
 
   const totalCount = shifts.length;
@@ -31,7 +31,7 @@ export const ShiftHistoryTable: FC<Props> = ({ shifts, onOpenZReport }) => {
   };
 
   return (
-    <div className="so-list-table-card">
+    <div className="so-list-table-card so-list-table-card--wrap">
       <div style={{ padding: '12px 16px', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#ffffff' }}>
         <h3 style={{ fontSize: 15, fontWeight: 700, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
           <History size={16} className="text-teal-700" />
@@ -146,7 +146,7 @@ export const ShiftHistoryTable: FC<Props> = ({ shifts, onOpenZReport }) => {
           pageSize={pageSize}
           totalItems={totalCount}
           itemLabel="phiên ca"
-          pageSizeOptions={[10, 20, 50]}
+          pageSizeOptions={[15, 24, 36, 48]}
           onPageChange={setCurrentPage}
           onPageSizeChange={(newSize) => {
             setPageSize(newSize);

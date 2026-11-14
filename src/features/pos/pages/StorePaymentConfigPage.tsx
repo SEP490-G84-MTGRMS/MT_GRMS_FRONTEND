@@ -48,6 +48,7 @@ export const StorePaymentConfigPage: FC = () => {
   const [bankAccountName, setBankAccountName] = useState('');
   const [tenantPrefix, setTenantPrefix] = useState('');
   const [paymentAccountId, setPaymentAccountId] = useState<string | null>(null);
+  const [savedAccountKey, setSavedAccountKey] = useState('');
   const [branches, setBranches] = useState<BranchOption[]>([]);
   const [selectedBranchIds, setSelectedBranchIds] = useState<string[]>([]);
 
@@ -100,6 +101,7 @@ export const StorePaymentConfigPage: FC = () => {
           (account: any) => account.bankCode === data.bankCode && account.bankAccountNumber === data.bankAccountNumber
         ) || accounts[0];
         setPaymentAccountId(currentAccount?.paymentAccountId || null);
+        setSavedAccountKey(currentAccount ? `${currentAccount.bankCode}|${currentAccount.bankAccountNumber}` : '');
         setSelectedBranchIds(Array.isArray(currentAccount?.branchIds) ? currentAccount.branchIds : []);
       })
       .catch(() => {
@@ -136,6 +138,19 @@ export const StorePaymentConfigPage: FC = () => {
 
   const handleSelectReceivingAccount = async (acc: SePayLinkedBankAccount) => {
     if (!isOwnerOrAdmin) return;
+    const isReplacing = !!bankAccountNumber &&
+      (bankCode !== acc.bankCode || bankAccountNumber.trim() !== acc.bankAccountNumber.trim());
+    if (isReplacing) {
+      const branchNames = branches
+        .filter((branch) => selectedBranchIds.includes(branch.id))
+        .map((branch) => branch.name)
+        .join(', ');
+      const confirmed = window.confirm(
+        `Thay tài khoản ${bankCode} - ${bankAccountNumber} bằng ${acc.bankCode} - ${acc.bankAccountNumber}` +
+        `${branchNames ? ` cho: ${branchNames}` : ''}?\n\nCác giao dịch cũ vẫn giữ tài khoản cũ.`
+      );
+      if (!confirmed) return;
+    }
     setBankCode(acc.bankCode);
     setBankAccountNumber(acc.bankAccountNumber);
     setBankAccountName(acc.bankAccountName);
@@ -155,7 +170,9 @@ export const StorePaymentConfigPage: FC = () => {
       branchIds: selectedBranchIds,
     };
     try {
-      await httpClient.post('/payments/config', publicQrCache);
+      const res = await httpClient.post('/payments/config', publicQrCache);
+      if (res.data?.paymentAccountId) setPaymentAccountId(res.data.paymentAccountId);
+      setSavedAccountKey(`${acc.bankCode}|${acc.bankAccountNumber.trim()}`);
       localStorage.setItem(storageKey, JSON.stringify(publicQrCache));
       setSaveMessage(
         `Đã chuyển tài khoản nhận tiền tại POS sang ${acc.bankCode} - ${acc.bankAccountNumber} (${acc.bankAccountName})!`
@@ -225,6 +242,18 @@ export const StorePaymentConfigPage: FC = () => {
       setSaveMessage('Cấu hình lần đầu bắt buộc phải nhập SePay API Key thật.');
       return;
     }
+    const nextAccountKey = `${bankCode}|${bankAccountNumber.trim()}`;
+    if (savedAccountKey && savedAccountKey !== nextAccountKey) {
+      const branchNames = branches
+        .filter((branch) => selectedBranchIds.includes(branch.id))
+        .map((branch) => branch.name)
+        .join(', ');
+      const confirmed = window.confirm(
+        `Bạn có chắc muốn thay tài khoản nhận tiền hiện tại bằng ${bankCode} - ${bankAccountNumber.trim()}` +
+        `${branchNames ? ` cho: ${branchNames}` : ''}?\n\nQR mới sẽ dùng tài khoản mới; giao dịch cũ không thay đổi.`
+      );
+      if (!confirmed) return;
+    }
     setIsSaving(true);
     setSaveMessage(null);
 
@@ -255,7 +284,9 @@ export const StorePaymentConfigPage: FC = () => {
         if (res.data.sepayApiKeyMasked) setMaskedApiKey(res.data.sepayApiKeyMasked);
         if (typeof res.data.hasApiKey === 'boolean') setHasApiKey(res.data.hasApiKey);
         if (res.data.tenantPrefix) setTenantPrefix(res.data.tenantPrefix);
+        if (res.data.paymentAccountId) setPaymentAccountId(res.data.paymentAccountId);
       }
+      setSavedAccountKey(nextAccountKey);
       localStorage.setItem(storageKey, JSON.stringify(publicQrCache));
       setSaveMessage(
         res.data?.message ||

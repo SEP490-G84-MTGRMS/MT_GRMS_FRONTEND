@@ -38,15 +38,15 @@ export const VietQrModal: FC<Props> = ({
   const [isChecking, setIsChecking] = useState(false);
   const [isSuccessPaid, setIsSuccessPaid] = useState(false);
   const [copiedContent, setCopiedContent] = useState(false);
+  const [isConfigLoading, setIsConfigLoading] = useState(false);
+  const [configError, setConfigError] = useState<string | null>(null);
 
   // Đọc cấu hình ngân hàng công khai của cửa hàng (Zero-Plaintext: Không chứa API Key)
-  const [bankCode, setBankCode] = useState('MB');
-  const [bankAccountNumber, setBankAccountNumber] = useState('0918889999');
-  const [bankAccountName, setBankAccountName] = useState('NGUYEN AN NHIEN');
-  const [bankName, setBankName] = useState('MBBank');
-  const [customTenantPrefix, setCustomTenantPrefix] = useState(
-    currentTenantId === 'tenant_an_nhien_02' ? 'AN02' : 'MT01'
-  );
+  const [bankCode, setBankCode] = useState('');
+  const [bankAccountNumber, setBankAccountNumber] = useState('');
+  const [bankAccountName, setBankAccountName] = useState('');
+  const [bankName, setBankName] = useState('');
+  const [customTenantPrefix, setCustomTenantPrefix] = useState('');
 
   useEffect(() => {
     if (!isOpen) return;
@@ -54,55 +54,45 @@ export const VietQrModal: FC<Props> = ({
     setCountdown(300);
     setIsSuccessPaid(false);
     setIsChecking(false);
-
-    const storageKey = `pos_payment_config_${currentTenantId}`;
-    const saved = localStorage.getItem(storageKey);
-
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (parsed.bankCode) setBankCode(parsed.bankCode);
-        if (parsed.bankAccountNumber) setBankAccountNumber(parsed.bankAccountNumber);
-        if (parsed.bankAccountName) setBankAccountName(parsed.bankAccountName);
-        if (parsed.bankName) setBankName(parsed.bankName);
-        if (parsed.tenantPrefix) setCustomTenantPrefix(parsed.tenantPrefix);
-      } catch (e) {
-        console.error('Lỗi nạp config thanh toán:', e);
-      }
-    } else if (currentTenantId === 'tenant_an_nhien_02') {
-      setBankCode('MB');
-      setBankAccountNumber('0918889999');
-      setBankAccountName('NGUYEN AN NHIEN');
-      setBankName('MBBank - Ngân hàng Quân Đội');
-      setCustomTenantPrefix('AN02');
-    } else {
-      setBankCode('MB');
-      setBankAccountNumber('0974742130');
-      setBankAccountName('MT GROCERY STORE');
-      setBankName('MBBank - Ngân hàng Quân Đội');
-      setCustomTenantPrefix('MT01');
-    }
+    setIsConfigLoading(true);
+    setConfigError(null);
+    setBankCode('');
+    setBankAccountNumber('');
+    setBankAccountName('');
+    setBankName('');
+    setCustomTenantPrefix('');
+    let cancelled = false;
 
     // Đồng bộ cấu hình QR công khai từ Backend (An toàn cho mọi nhân viên thu ngân, không lộ API Key)
     httpClient
       .get('/payments/public-qr-config', { params: { tenantId: currentTenantId, branchId } })
       .then((res) => {
+        if (cancelled) return;
         const data = res.data;
-        if (!data) return;
+        if (!data?.paymentAccountId || !data.bankCode || !data.bankAccountNumber || data.isActive === false) {
+          setConfigError('Chi nhánh chưa có tài khoản nhận chuyển khoản đang hoạt động. Vui lòng liên hệ chủ cửa hàng.');
+          return;
+        }
         if (data.bankCode) setBankCode(data.bankCode);
         if (data.bankAccountNumber) setBankAccountNumber(data.bankAccountNumber);
         if (data.bankAccountName) setBankAccountName(data.bankAccountName);
         if (data.bankName) setBankName(data.bankName);
         if (data.tenantPrefix) setCustomTenantPrefix(data.tenantPrefix);
       })
-      .catch(() => {
-        // Giữ nguyên cấu hình cache nếu offline
+      .catch((error) => {
+        if (cancelled) return;
+        setConfigError(error?.response?.data?.message || 'Không thể tải tài khoản nhận tiền của chi nhánh. Không tạo mã QR để tránh chuyển nhầm tiền.');
+      })
+      .finally(() => {
+        if (!cancelled) setIsConfigLoading(false);
       });
+
+    return () => { cancelled = true; };
   }, [isOpen, currentTenantId, branchId]);
 
   // LỚP 6: Tự động Polling kiểm tra trạng thái gạch nợ mỗi 2.5 giây khi đang mở QR
   useEffect(() => {
-    if (!isOpen || isSuccessPaid || !orderCode) return;
+    if (!isOpen || isSuccessPaid || !orderCode || isConfigLoading || configError) return;
 
     const pollTimer = setInterval(async () => {
       try {
@@ -119,7 +109,7 @@ export const VietQrModal: FC<Props> = ({
     }, 2500);
 
     return () => clearInterval(pollTimer);
-  }, [isOpen, isSuccessPaid, orderCode, onConfirmAndPrint]);
+  }, [isOpen, isSuccessPaid, orderCode, onConfirmAndPrint, isConfigLoading, configError]);
 
   // Bộ đếm ngược 5 phút
   useEffect(() => {
@@ -161,14 +151,7 @@ export const VietQrModal: FC<Props> = ({
       // Backend offline
     }
 
-    // Giả lập đối soát nhanh khi test quầy
-    setTimeout(() => {
-      setIsChecking(false);
-      setIsSuccessPaid(true);
-      setTimeout(() => {
-        onConfirmAndPrint();
-      }, 1000);
-    }, 1200);
+    setIsChecking(false);
   };
 
   const handleCopyContent = () => {
@@ -216,7 +199,17 @@ export const VietQrModal: FC<Props> = ({
 
         {/* Thân Modal */}
         <div style={{ padding: 20 }}>
-          {isSuccessPaid ? (
+          {isConfigLoading ? (
+            <div style={{ padding: '36px 20px', textAlign: 'center', color: '#475569' }}>
+              <RefreshCw size={28} className="animate-spin text-teal-600" style={{ margin: '0 auto 12px' }} />
+              Đang tải tài khoản nhận tiền của chi nhánh...
+            </div>
+          ) : configError ? (
+            <div style={{ padding: '24px 20px', textAlign: 'center', backgroundColor: '#fff7ed', border: '1px solid #fdba74', borderRadius: 8 }}>
+              <div style={{ fontSize: 17, fontWeight: 800, color: '#9a3412' }}>Không thể tạo mã QR</div>
+              <div style={{ fontSize: 13.5, color: '#7c2d12', marginTop: 8 }}>{configError}</div>
+            </div>
+          ) : isSuccessPaid ? (
             /* Thông báo thanh toán thành công */
             <div 
               style={{
@@ -443,7 +436,7 @@ export const VietQrModal: FC<Props> = ({
               type="button"
               className="pos-btn-secondary"
               onClick={handleCheckPayment}
-              disabled={isChecking || isSuccessPaid}
+              disabled={isChecking || isSuccessPaid || isConfigLoading || !!configError}
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -461,6 +454,7 @@ export const VietQrModal: FC<Props> = ({
               type="button"
               className="pos-btn-primary"
               onClick={onConfirmAndPrint}
+              disabled={isConfigLoading || !!configError}
               style={{
                 backgroundColor: '#0f766e',
                 color: '#ffffff',
