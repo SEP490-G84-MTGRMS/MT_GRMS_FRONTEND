@@ -73,8 +73,21 @@ export const LoyaltyLedgerTable: FC<LoyaltyLedgerTableProps> = ({
     }
   };
 
+  const thStyle: React.CSSProperties = {
+    backgroundColor: '#f8fafc',
+    padding: '8px 12px',
+    fontSize: 12,
+    fontWeight: 700,
+    color: '#334155',
+    textTransform: 'uppercase',
+    letterSpacing: '0.02em',
+    borderBottom: '1px solid #cbd5e1',
+    userSelect: 'none',
+    boxSizing: 'border-box',
+  };
+
   return (
-    <div className="promotion-card">
+    <div className="so-list-table-card so-list-table-card--wrap promotion-card">
       <div className="promotion-card-header">
         <h3 className="promotion-card-title">
           <span>Sổ cái lịch sử biến động điểm</span>
@@ -126,16 +139,16 @@ export const LoyaltyLedgerTable: FC<LoyaltyLedgerTableProps> = ({
       </div>
 
       <div className="table-responsive">
-        <table className="promotion-table">
+        <table className="so-list-table promotion-table">
           <thead>
             <tr>
-              <th style={{ width: 140 }}>Mã GD</th>
-              <th style={{ width: 170 }}>Khách hàng</th>
-              <th style={{ width: 160 }}>Loại biến động</th>
-              <th style={{ width: 100, textAlign: 'right' }}>Điểm (+/-)</th>
-              <th style={{ width: 100, textAlign: 'right' }}>Số dư sau</th>
-              <th>Lý do & Ghi chú</th>
-              <th style={{ width: 140 }}>Thời gian</th>
+              <th style={{ ...thStyle, width: 140 }}>Mã GD</th>
+              <th style={{ ...thStyle, width: 170 }}>Khách hàng</th>
+              <th style={{ ...thStyle, width: 160 }}>Loại biến động</th>
+              <th style={{ ...thStyle, width: 100, textAlign: 'right' }}>Điểm (+/-)</th>
+              <th style={{ ...thStyle, width: 100, textAlign: 'right' }}>Số dư sau</th>
+              <th style={{ ...thStyle }}>Lý do & Ghi chú</th>
+              <th style={{ ...thStyle, width: 140 }}>Thời gian</th>
             </tr>
           </thead>
           <tbody>
@@ -147,18 +160,31 @@ export const LoyaltyLedgerTable: FC<LoyaltyLedgerTableProps> = ({
               </tr>
             ) : (
               paginatedLedger.map((row) => (
-                <tr key={row.id}>
-                  <td>
-                    <span className="ledger-code-text">{row.transactionCode}</span>
+                <tr
+                  key={row.id}
+                  className="so-list-row"
+                  style={{
+                    borderBottom: '1px solid #f1f5f9',
+                    backgroundColor: '#ffffff',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#f8fafc';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = '#ffffff';
+                  }}
+                >
+                  <td className="so-list-td">
+                    <span className="so-list-code">{row.transactionCode}</span>
                   </td>
-                  <td>
+                  <td className="so-list-td">
                     <div className="ledger-customer-cell">
-                      <div className="ledger-customer-name">{row.customerName}</div>
+                      <div className="ledger-customer-name so-list-name">{row.customerName}</div>
                       <div className="ledger-customer-phone">{row.customerPhone}</div>
                     </div>
                   </td>
-                  <td>{renderTypeBadge(row.type)}</td>
-                  <td style={{ textAlign: 'right' }}>
+                  <td className="so-list-td">{renderTypeBadge(row.type)}</td>
+                  <td className="so-list-td" style={{ textAlign: 'right' }}>
                     <span
                       className={`ledger-points-val ${
                         row.pointsChanged > 0 ? 'ledger-points-plus' : 'ledger-points-minus'
@@ -167,12 +193,12 @@ export const LoyaltyLedgerTable: FC<LoyaltyLedgerTableProps> = ({
                       {row.pointsChanged > 0 ? `+${row.pointsChanged}` : row.pointsChanged}
                     </span>
                   </td>
-                  <td style={{ textAlign: 'right' }}>
+                  <td className="so-list-td" style={{ textAlign: 'right' }}>
                     <span style={{ fontWeight: 600, fontSize: '0.84rem', color: '#1e293b' }}>
                       {row.balanceAfter.toLocaleString('vi-VN')}
                     </span>
                   </td>
-                  <td>
+                  <td className="so-list-td">
                     <div style={{ fontSize: '0.8rem', color: '#334155', lineHeight: 1.4, maxWidth: 240 }}>
                       {row.reason}
                     </div>
@@ -182,7 +208,7 @@ export const LoyaltyLedgerTable: FC<LoyaltyLedgerTableProps> = ({
                       </span>
                     )}
                   </td>
-                  <td>
+                  <td className="so-list-td">
                     <div className="ledger-time-cell">
                       <div>{row.createdAt}</div>
                       <div className="ledger-time-creator">{row.createdBy}</div>
@@ -195,12 +221,12 @@ export const LoyaltyLedgerTable: FC<LoyaltyLedgerTableProps> = ({
         </table>
       </div>
 
-      {/* Shared Enterprise Pagination */}
+      {/* ── Footer Phân trang chuẩn theo StoreProductTable ── */}
       <TablePagination
         currentPage={currentPage}
         pageSize={pageSize}
         totalItems={filteredLedger.length}
-        pageSizeOptions={[5, 10, 20]}
+        pageSizeOptions={[10, 20, 50]}
         itemLabel="giao dịch"
         onPageChange={setCurrentPage}
         onPageSizeChange={(newSize) => {
