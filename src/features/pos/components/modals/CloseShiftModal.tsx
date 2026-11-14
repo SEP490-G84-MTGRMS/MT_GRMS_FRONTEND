@@ -116,7 +116,7 @@ export const CloseShiftModal: FC<Props> = ({
     }
   }, [isOpen, shift.id, shift.branchId]);
 
-  // Phát hiện chốt ca SỚM hoặc MUỘN để bắt buộc nhập lý do giải trình cho Chủ cửa hàng
+  // Phát hiện chốt ca SỚM hoặc MUỘN để kiểm soát thời gian trực ca
   const shiftTimingStatus = useMemo(() => {
     const now = new Date();
     const openedAt = new Date(currentShiftData.openedAtUtc);
@@ -125,21 +125,30 @@ export const CloseShiftModal: FC<Props> = ({
     const mins = durationMinutes % 60;
     const durationText = hours > 0 ? `${hours} giờ ${mins} phút` : `${mins} phút`;
 
-    // Ưu tiên kiểm tra theo giờ kết thúc ca phân công (plannedEndTime, định dạng HH:mm)
+    // Giờ kết thúc ca do chủ cửa hàng phân công (plannedEndTime)
     let targetEndStr = plannedEndTime;
     if (!targetEndStr) {
       const nameLower = (currentShiftData.shiftName || '').toLowerCase();
       if (nameLower.includes('sáng')) targetEndStr = '14:00';
-      else if (nameLower.includes('chiều') || nameLower.includes('tối')) targetEndStr = '22:00';
+      else if (nameLower.includes('chiều')) targetEndStr = '22:00';
+      else if (nameLower.includes('tối')) targetEndStr = '22:00';
     }
 
-    if (targetEndStr && /^\d{1,2}:\d{2}/.test(targetEndStr)) {
+    // Kiểm tra xem ca có phải ca linh hoạt / ca cả ngày (00:00 - 23:59:59) hay ca có giờ tan cụ thể
+    const isAllDayOrFlexible =
+      !targetEndStr ||
+      targetEndStr.startsWith('23:59') ||
+      targetEndStr.startsWith('00:00') ||
+      targetEndStr === '24:00';
+
+    if (targetEndStr && !isAllDayOrFlexible && /^\d{1,2}:\d{2}/.test(targetEndStr)) {
       const [eh, em] = targetEndStr.split(':').map(Number);
       const plannedEndMinutes = eh * 60 + em;
       const nowMinutes = now.getHours() * 60 + now.getMinutes();
       const diffMinutes = nowMinutes - plannedEndMinutes;
 
-      if (diffMinutes < -15) {
+      // Chốt sớm hơn giờ tan ca phân công quá 20 phút
+      if (diffMinutes < -20) {
         const earlyMins = Math.abs(diffMinutes);
         return {
           type: 'EARLY' as const,
@@ -148,6 +157,7 @@ export const CloseShiftModal: FC<Props> = ({
           targetEndStr,
         };
       }
+      // Chốt muộn hơn giờ tan ca phân công quá 30 phút
       if (diffMinutes > 30) {
         return {
           type: 'LATE' as const,
@@ -156,31 +166,39 @@ export const CloseShiftModal: FC<Props> = ({
           targetEndStr,
         };
       }
+      // Nằm trong khung tan ca bình thường (-20p đến +30p)
+      return {
+        type: 'ON_TIME' as const,
+        label: `Đúng giờ tan ca ${targetEndStr} (Đã trực ${durationText})`,
+        durationText,
+        targetEndStr,
+      };
     }
 
-    // Kiểm tra theo thời lượng trực ca tiêu chuẩn (dưới 3.5 tiếng = chốt sớm, trên 9 tiếng = chốt muộn)
+    // Với ca linh hoạt / ca mở cả ngày (23:59): Đánh giá theo thời lượng trực ca thực tế
+    // Tiêu chuẩn ca làm việc bán lẻ là từ 3.5h đến 9h
     if (durationMinutes < 210) {
       return {
         type: 'EARLY' as const,
         label: `Chốt ca sớm (Mới mở ca được ${durationText})`,
         durationText,
-        targetEndStr: targetEndStr || 'Tiêu chuẩn >= 4h',
+        targetEndStr: 'Tiêu chuẩn ca >= 3.5h',
       };
     }
-    if (durationMinutes > 540) {
+    if (durationMinutes > 600) {
       return {
         type: 'LATE' as const,
-        label: `Chốt ca muộn (Ca kéo dài ${durationText})`,
+        label: `Chốt ca muộn (Ca trực kéo dài ${durationText})`,
         durationText,
-        targetEndStr: targetEndStr || 'Tiêu chuẩn <= 8h',
+        targetEndStr: 'Tiêu chuẩn ca <= 9h',
       };
     }
 
     return {
       type: 'ON_TIME' as const,
-      label: `Đúng giờ (${durationText})`,
+      label: `Đúng giờ (Đã trực ${durationText})`,
       durationText,
-      targetEndStr: targetEndStr || 'Đúng khung giờ',
+      targetEndStr: 'Ca linh hoạt',
     };
   }, [currentShiftData.openedAtUtc, currentShiftData.shiftName, plannedEndTime]);
 
@@ -926,39 +944,7 @@ export const CloseShiftModal: FC<Props> = ({
                   {isEarlyOrLate && (
                     <>
                       <div style={{ fontSize: 11.5, color: '#92400e' }}>
-                        Chốt ca <b>{shiftTimingStatus.type === 'EARLY' ? 'sớm hơn' : 'muộn hơn'}</b> khung giờ chuẩn ({shiftTimingStatus.targetEndStr}). Bắt buộc nhập lý do giải trình:
-                      </div>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                        {(shiftTimingStatus.type === 'EARLY'
-                          ? [
-                              'Vắng khách / Đóng sớm theo chỉ đạo',
-                              'Đổi ca / Bàn giao sớm',
-                              'Việc cá nhân đột xuất đã báo Quản lý',
-                            ]
-                          : [
-                              'Đông khách / Phục vụ nốt khách tại quầy',
-                              'Kiểm đếm hàng & vệ sinh cuối ca',
-                              'Chờ đối soát chuyển khoản',
-                            ]
-                        ).map((preset) => (
-                          <button
-                            key={preset}
-                            type="button"
-                            onClick={() => setEarlyOrLateReason(preset)}
-                            style={{
-                              padding: '2px 6px',
-                              borderRadius: 4,
-                              fontSize: 11,
-                              fontWeight: 600,
-                              cursor: 'pointer',
-                              border: earlyOrLateReason === preset ? '1px solid #d97706' : '1px solid #fcd34d',
-                              backgroundColor: earlyOrLateReason === preset ? '#d97706' : '#ffffff',
-                              color: earlyOrLateReason === preset ? '#ffffff' : '#92400e',
-                            }}
-                          >
-                            {preset}
-                          </button>
-                        ))}
+                        Chốt ca <b>{shiftTimingStatus.type === 'EARLY' ? 'sớm hơn' : 'muộn hơn'}</b> khung giờ ({shiftTimingStatus.targetEndStr}). Bắt buộc nhập lý do giải trình:
                       </div>
                       <input
                         type="text"
