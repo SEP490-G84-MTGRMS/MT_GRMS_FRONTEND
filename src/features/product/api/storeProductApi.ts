@@ -231,4 +231,92 @@ export const storeProductApi = {
   removeProduct: async (storeId: string, productId: string): Promise<void> => {
     await httpClient.delete(`/branches/${storeId}/products/${productId}`);
   },
+
+  /**
+   * Xuất Excel SP đã gán chi nhánh (giá bán theo từng ĐVT).
+   */
+  async exportUnitPriceExcel(branchId: string): Promise<void> {
+    try {
+      const res = await httpClient.get(`/branches/${branchId}/products/export`, {
+        responseType: 'blob',
+      });
+      const contentType = String(res.headers?.['content-type'] || '');
+      if (contentType.includes('application/json')) {
+        const text = await (res.data as Blob).text();
+        const parsed = JSON.parse(text);
+        throw new Error(parsed?.message || 'Không thể xuất Excel.');
+      }
+
+      const blob = new Blob([res.data], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      });
+      const disposition = String(res.headers?.['content-disposition'] || '');
+      const match = /filename\*?=(?:UTF-8''|")?([^";]+)/i.exec(disposition);
+      const fileName = match
+        ? decodeURIComponent(match[1].replace(/"/g, ''))
+        : `CH_GiaBan_DVT_${branchId}.xlsx`;
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      if (err?.response?.data instanceof Blob) {
+        try {
+          const text = await err.response.data.text();
+          const parsed = JSON.parse(text);
+          throw new Error(parsed?.message || err.message || 'Không thể xuất Excel.');
+        } catch (inner: any) {
+          if (inner?.message) throw inner;
+        }
+      }
+      throw new Error(err?.response?.data?.message || err?.message || 'Không thể xuất Excel.');
+    }
+  },
+
+  /**
+   * Import Excel — BE validate + override giá bán theo ĐVT.
+   */
+  async importUnitPriceExcel(
+    branchId: string,
+    file: File
+  ): Promise<StoreProductExcelImportResult> {
+    const form = new FormData();
+    form.append('file', file);
+    const res = await httpClient.post<ApiResponse<StoreProductExcelImportResult>>(
+      `/branches/${branchId}/products/import`,
+      form
+    );
+    if (res.data?.success && res.data.data) {
+      return res.data.data;
+    }
+    throw new Error(res.data?.message || 'Import Excel thất bại.');
+  },
 };
+
+export interface StoreProductExcelImportRow {
+  row: number;
+  productId?: string;
+  sku: string;
+  productName: string;
+  unitPricesSummary?: string | null;
+  status: 'OK' | 'ERROR' | string;
+  message: string;
+}
+
+export interface StoreProductExcelImportResult {
+  fileName: string;
+  branchId: string;
+  branchCode: string;
+  branchName: string;
+  summary: {
+    totalRows: number;
+    successCount: number;
+    failedCount: number;
+  };
+  rows: StoreProductExcelImportRow[];
+}

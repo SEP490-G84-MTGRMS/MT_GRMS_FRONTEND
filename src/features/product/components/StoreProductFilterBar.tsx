@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { FC, FormEvent, KeyboardEvent } from 'react';
-import { Search, RotateCcw, X } from 'lucide-react';
+import { Search, RotateCcw, X, Download, Upload } from 'lucide-react';
 import type { StoreProductFilterValues, StoreSummary, StoreProductItem } from '../types/storeProduct.types';
 import type { SupplierSummary } from '../../supplier/types/supplier.types';
 
@@ -13,6 +13,11 @@ export interface StoreProductFilterBarProps {
   filteredCount?: number;
   onSearch: (values: StoreProductFilterValues) => void;
   onReset: () => void;
+  /** Xuất Excel giá bán theo ĐVT — cần chọn 1 cửa hàng cụ thể */
+  onExportExcel?: (storeId: string) => void;
+  /** Import Excel — cần chọn 1 cửa hàng cụ thể */
+  onImportExcel?: (storeId: string, file: File) => void;
+  excelBusy?: boolean;
 }
 
 type FieldKey = 'sku' | 'name' | 'storeCode' | 'storeName' | 'supplierCode' | 'supplierName';
@@ -115,6 +120,9 @@ export const StoreProductFilterBar: FC<StoreProductFilterBarProps> = ({
   products,
   onSearch,
   onReset,
+  onExportExcel,
+  onImportExcel,
+  excelBusy = false,
 }) => {
   const [tokens, setTokens] = useState<TokenMap>(() => tokensFromFilters(initialValues));
   const [queries, setQueries] = useState<QueryMap>(EMPTY_QUERIES);
@@ -127,6 +135,7 @@ export const StoreProductFilterBar: FC<StoreProductFilterBarProps> = ({
   const [focusedIndex, setFocusedIndex] = useState<number>(-1);
 
   const containerRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const inputRefs = useRef<Record<FieldKey, HTMLInputElement | null>>({
     sku: null,
     name: null,
@@ -140,6 +149,30 @@ export const StoreProductFilterBar: FC<StoreProductFilterBarProps> = ({
     setTokens(tokensFromFilters(initialValues));
     setStatus(initialValues.statusFilter || 'ALL');
   }, [initialValues]);
+
+  const resolveExcelStoreId = (): string | null => {
+    if (initialValues.storeId && initialValues.storeId !== 'ALL') {
+      return initialValues.storeId;
+    }
+    const codes = tokens.storeCode;
+    if (codes.length === 1) {
+      const hit = stores.find((s) => s.code.toLowerCase() === codes[0].toLowerCase());
+      if (hit) return hit.id;
+    }
+    const names = tokens.storeName;
+    if (names.length === 1) {
+      const hit = stores.find((s) => s.name.toLowerCase() === names[0].toLowerCase());
+      if (hit) return hit.id;
+    }
+    return null;
+  };
+
+  const showExcel = Boolean(onExportExcel || onImportExcel);
+  const excelStoreId = resolveExcelStoreId();
+  const canExcel = showExcel && Boolean(excelStoreId);
+  const excelHint = canExcel
+    ? undefined
+    : 'Chọn 1 cửa hàng cụ thể (thẻ ngữ cảnh hoặc lọc đúng 1 mã/tên CH) để Xuất/Nhập Excel';
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -772,8 +805,11 @@ export const StoreProductFilterBar: FC<StoreProductFilterBarProps> = ({
           )}
         </div>
 
-        {/* Cột 4: Nút Tìm kiếm & Đặt lại */}
-        <div className="so-list-filter-actions" style={{ justifyContent: 'flex-end', width: '100%' }}>
+        {/* Cột 4: Nút Tìm kiếm / Excel / Đặt lại */}
+        <div
+          className="so-list-filter-actions"
+          style={{ justifyContent: 'flex-end', width: '100%', flexWrap: 'wrap', gap: 8 }}
+        >
           <button
             type="button"
             className="so-list-filter-search"
@@ -782,6 +818,47 @@ export const StoreProductFilterBar: FC<StoreProductFilterBarProps> = ({
             <Search size={14} />
             <span>Tìm kiếm</span>
           </button>
+
+          {showExcel && onExportExcel && (
+            <button
+              type="button"
+              className="so-list-filter-reset"
+              onClick={() => excelStoreId && onExportExcel(excelStoreId)}
+              disabled={!canExcel || excelBusy}
+              title={excelHint || 'Xuất Excel SP của cửa hàng (giá bán theo ĐVT)'}
+              style={{ opacity: !canExcel || excelBusy ? 0.55 : 1 }}
+            >
+              <Download size={13} />
+              <span>Xuất Excel</span>
+            </button>
+          )}
+
+          {showExcel && onImportExcel && (
+            <>
+              <button
+                type="button"
+                className="so-list-filter-reset"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={!canExcel || excelBusy}
+                title={excelHint || 'Nhập Excel để cập nhật giá bán theo ĐVT'}
+                style={{ opacity: !canExcel || excelBusy ? 0.55 : 1 }}
+              >
+                <Upload size={13} />
+                <span>{excelBusy ? 'Đang nhập...' : 'Nhập Excel'}</span>
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".xlsx,.xls"
+                style={{ display: 'none' }}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file && excelStoreId) onImportExcel(excelStoreId, file);
+                  e.target.value = '';
+                }}
+              />
+            </>
+          )}
 
           <button
             type="button"

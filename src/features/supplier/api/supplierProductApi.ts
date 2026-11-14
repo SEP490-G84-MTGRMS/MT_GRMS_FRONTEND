@@ -161,6 +161,29 @@ export const supplierProductApi = {
         (typeof p.baseUnit === 'string' && p.baseUnit.trim()) ||
         (typeof p.unitName === 'string' && p.unitName.trim()) ||
         'Cái';
+      const deliveryUom = purchaseUom || baseUom;
+
+      // costPrice trên Master là theo ĐVT cơ bản — không được fallback sang basePrice (= sellingPrice)
+      const baseCost = Number(p.costPrice ?? 0);
+      const unitPrices: any[] = Array.isArray(p.unitPrices)
+        ? p.unitPrices
+        : Array.isArray(p.UnitPrices)
+        ? p.UnitPrices
+        : [];
+      const purchaseUnitRow =
+        unitPrices.find((u) => Boolean(u?.isPurchaseUnit ?? u?.IsPurchaseUnit)) ||
+        unitPrices.find((u) => {
+          const name = String(u?.unitName || u?.UnitName || '').trim().toLowerCase();
+          return name === deliveryUom.toLowerCase();
+        });
+      const purchaseIsBase =
+        Boolean(purchaseUnitRow?.isBaseUnit ?? purchaseUnitRow?.IsBaseUnit) ||
+        deliveryUom.toLowerCase() === baseUom.toLowerCase() ||
+        p.isBaseUnitPurchaseUnit === true;
+      const purchaseRate = purchaseIsBase
+        ? 1
+        : Number(purchaseUnitRow?.conversionRate ?? purchaseUnitRow?.ConversionRate ?? 1) || 1;
+      const importPrice = baseCost > 0 ? baseCost * purchaseRate : 0;
 
       return {
         id: p.id,
@@ -168,8 +191,8 @@ export const supplierProductApi = {
         barcode: p.barcode || '',
         name: p.productName || p.name || '',
         categoryName: p.categoryName || 'Chung',
-        baseUoM: purchaseUom || baseUom,
-        defaultWholesalePrice: p.costPrice || p.basePrice || 0,
+        baseUoM: deliveryUom,
+        defaultWholesalePrice: importPrice,
         defaultMoq: 1,
         imageUrl: p.imageUrl || (Array.isArray(p.imageUrls) ? p.imageUrls[0] : undefined) || undefined,
       };

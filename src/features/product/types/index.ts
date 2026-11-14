@@ -28,6 +28,8 @@ export interface ProductResponse {
   isFavorite: boolean;
   allowRepack?: boolean;
   sellRawByWeight?: boolean;
+  /** Giá đ/kg khi đóng khay (PROCESSED). Null/0 = dùng sellingPrice (RAW). */
+  processedSellingPricePerKg?: number | null;
   isBaseUnitPurchaseUnit?: boolean;
   purchaseUnit?: string | null;
   createdAt: string;
@@ -139,6 +141,7 @@ export interface ProductCreatePayload {
   internalNote?: string | null;
   hasBatches?: boolean;
   allowRepack?: boolean;
+  processedSellingPricePerKg?: number | null;
   isFavorite?: boolean;
   isBaseUnitPurchaseUnit?: boolean;
 }
@@ -160,6 +163,7 @@ export interface ProductUpdatePayload {
   internalNote?: string | null;
   hasBatches?: boolean;
   allowRepack?: boolean;
+  processedSellingPricePerKg?: number | null;
   isFavorite?: boolean;
   eligibleForVatReduction?: boolean;
   isBaseUnitPurchaseUnit?: boolean;
@@ -210,6 +214,7 @@ export interface ProductItem {
   hasBatches?: boolean;
   allowRepack?: boolean;
   sellRawByWeight?: boolean;
+  processedSellingPricePerKg?: number | null;
   isCombo?: boolean;
   status: 'Active' | 'Discontinued';
   createdAt: string;

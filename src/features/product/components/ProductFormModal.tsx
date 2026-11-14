@@ -4,7 +4,6 @@ import {
   Trash2,
   AlertCircle,
   Camera,
-  ChevronUp,
   ChevronDown,
   Save,
   Search,
@@ -12,14 +11,180 @@ import {
   Folder,
   Plus,
   Loader2,
-  Tag,
-  AlertTriangle,
-  History,
 } from 'lucide-react';
 import type { ProductItem, Category, UomConversion } from '../types';
 import { uploadImageToCloudinary } from '../../../utils/cloudinary';
 import { productApi } from '../api/productApi';
-import { PriceHistoryModal } from './PriceHistoryModal';
+
+/** ĐVT "Khay/Tray" không dùng làm quy đổi cố định — giá khay = kg × PROCESSED lúc đóng khay. */
+const isTrayUnitName = (name?: string | null): boolean => {
+  const n = (name || '').trim().toLowerCase();
+  return n === 'khay' || n === 'tray' || n === 'hộp khay' || n === 'hop khay';
+};
+
+/**
+ * Chuỗi quy đổi nhiều cấp:
+ * 1 Thùng = 5 Lốc, 1 Lốc = 4 Hộp → lưu API conversionRate = 20 (về đơn vị cơ bản).
+ */
+type FormUnitRow = {
+  id: string;
+  unitName: string;
+  /** 1 đơn vị này = convertsToQty × đơn vị convertsToId */
+  convertsToQty: number;
+  convertsToId: string | null;
+  barcode: string;
+  costPrice: number;
+  sellingPrice: number;
+  isBaseUnit: boolean;
+  isPurchaseUnit: boolean;
+};
+
+const newUnitRowId = () => `uom-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+
+const createUnitRow = (partial?: Partial<FormUnitRow>): FormUnitRow => ({
+  id: newUnitRowId(),
+  unitName: '',
+  convertsToQty: 1,
+  convertsToId: null,
+  barcode: '',
+  costPrice: 0,
+  sellingPrice: 0,
+  isBaseUnit: false,
+  isPurchaseUnit: false,
+  ...partial,
+});
+
+const formatQty = (n: number): string => {
+  if (!Number.isFinite(n)) return '?';
+  return Number.isInteger(n) ? String(n) : String(Math.round(n * 1000) / 1000);
+};
+
+/** Tính hệ số về đơn vị cơ bản + nhãn chuỗi "1 Thùng = 5 Lốc = 20 Hộp". */
+const resolveUnitChain = (
+  rowId: string,
+  rows: FormUnitRow[]
+): { rateToBase: number; pathLabel: string; error?: string } => {
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  const start = byId.get(rowId);
+  if (!start) return { rateToBase: NaN, pathLabel: '', error: 'Không tìm thấy đơn vị' };
+
+  if (start.isBaseUnit) {
+    const name = start.unitName.trim() || 'cơ bản';
+    return { rateToBase: 1, pathLabel: `1 ${name}` };
+  }
+
+  let rate = 1;
+  let current: FormUnitRow | undefined = start;
+  const segments: string[] = [`1 ${start.unitName.trim() || '?'}`];
+  const visited = new Set<string>();
+
+  while (current && !current.isBaseUnit) {
+    if (visited.has(current.id)) {
+      return { rateToBase: NaN, pathLabel: '', error: 'Chuỗi quy đổi bị vòng lặp' };
+    }
+    visited.add(current.id);
+
+    const qty = Number(current.convertsToQty);
+    if (!qty || qty <= 0) {
+      return { rateToBase: NaN, pathLabel: '', error: 'Số lượng quy đổi phải > 0' };
+    }
+    if (!current.convertsToId) {
+      return { rateToBase: NaN, pathLabel: '', error: 'Chưa chọn đơn vị quy về' };
+    }
+    const next = byId.get(current.convertsToId);
+    if (!next) {
+      return { rateToBase: NaN, pathLabel: '', error: 'Đơn vị quy về không tồn tại' };
+    }
+
+    rate *= qty;
+    segments.push(`${formatQty(rate)} ${next.unitName.trim() || '?'}`);
+    current = next;
+  }
+
+  if (!current?.isBaseUnit) {
+    return {
+      rateToBase: NaN,
+      pathLabel: '',
+      error: 'Chuỗi quy đổi chưa tới đơn vị cơ bản',
+    };
+  }
+
+  return { rateToBase: rate, pathLabel: segments.join(' = ') };
+};
+
+const sectionCardStyle: React.CSSProperties = {
+  border: '1px solid #E2E8F0',
+  borderRadius: 10,
+  padding: '18px 20px',
+  backgroundColor: '#FFFFFF',
+  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.02)',
+};
+const sectionTitleStyle: React.CSSProperties = {
+  fontSize: 14,
+  fontWeight: 700,
+  color: '#0F172A',
+  margin: '0 0 12px 0',
+  paddingBottom: 8,
+  borderBottom: '1px solid #F1F5F9',
+};
+const thStyle: React.CSSProperties = { padding: '10px 10px', fontWeight: 600, fontSize: 12.5, whiteSpace: 'nowrap' };
+const tdStyle: React.CSSProperties = { padding: '8px 10px' };
+const cellInputStyle: React.CSSProperties = { height: 34, padding: '6px 10px', fontSize: 13 };
+const errorBorderStyle: React.CSSProperties = { borderColor: '#EF4444', boxShadow: '0 0 0 2px rgba(239, 68, 68, 0.12)' };
+const cellErrorStyle: React.CSSProperties = { color: '#DC2626', fontSize: 11, marginTop: 3 };
+const cellWarnStyle: React.CSSProperties = { color: '#B45309', fontSize: 11, marginTop: 3, fontWeight: 600 };
+const radioStyle: React.CSSProperties = { accentColor: '#0F766E', width: 16, height: 16, cursor: 'pointer', margin: 0 };
+const toggleRowStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: 16,
+  padding: '10px 0',
+  borderBottom: '1px solid #F1F5F9',
+};
+const toggleTitleStyle: React.CSSProperties = { fontSize: 13.5, fontWeight: 600, color: '#0F172A' };
+const toggleHintStyle: React.CSSProperties = { fontSize: 12, color: '#64748B', marginTop: 2, lineHeight: 1.45 };
+
+const ToggleSwitch: React.FC<{ checked: boolean; disabled?: boolean; onChange: (next: boolean) => void }> = ({
+  checked,
+  disabled,
+  onChange,
+}) => (
+  <button
+    type="button"
+    role="switch"
+    aria-checked={checked}
+    disabled={disabled}
+    onClick={() => onChange(!checked)}
+    style={{
+      position: 'relative',
+      width: 40,
+      height: 22,
+      flexShrink: 0,
+      borderRadius: 999,
+      border: 'none',
+      padding: 0,
+      background: checked ? '#0D9488' : '#CBD5E1',
+      opacity: disabled ? 0.55 : 1,
+      cursor: disabled ? 'not-allowed' : 'pointer',
+      transition: 'background 0.15s ease',
+    }}
+  >
+    <span
+      style={{
+        position: 'absolute',
+        top: 3,
+        left: checked ? 21 : 3,
+        width: 16,
+        height: 16,
+        borderRadius: '50%',
+        background: '#FFFFFF',
+        boxShadow: '0 1px 2px rgba(0,0,0,0.2)',
+        transition: 'left 0.15s ease',
+      }}
+    />
+  </button>
+);
 
 interface ProductFormModalProps {
   isOpen: boolean;
@@ -28,7 +193,6 @@ interface ProductFormModalProps {
   onClose: () => void;
   onSave: (product: Partial<ProductItem>, saveAndAddNew?: boolean, deletedUnitIds?: string[]) => Promise<void> | void;
   onOpenCreateCategoryModal: () => void;
-  onDelete?: (product: ProductItem) => void;
   userRole?: string; // e.g. "StoreOwner" | "Cashier"
 }
 
@@ -39,7 +203,6 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   onClose,
   onSave,
   onOpenCreateCategoryModal,
-  onDelete,
   userRole = 'StoreOwner',
 }) => {
   // 1. Thông tin cơ bản
@@ -109,29 +272,26 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   const [previewImageModalUrl, setPreviewImageModalUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // 2. Giá vốn, giá bán
-  const [costPrice, setCostPrice] = useState<number>(0);
-  const [sellingPrice, setSellingPrice] = useState<number>(0);
   const [isFavorite, setIsFavorite] = useState<boolean>(false);
-  const [showPriceHistory, setShowPriceHistory] = useState<boolean>(false);
+  const [productStatus, setProductStatus] = useState<'Active' | 'Discontinued'>('Active');
   const [hasBatches, setHasBatches] = useState<boolean>(false);
   const [allowRepack, setAllowRepack] = useState<boolean>(false);
+  /** Giá đ/kg khi đóng khay (PROCESSED). Mặc định = RAW khi bật chia khay. */
+  const [processedSellingPrice, setProcessedSellingPrice] = useState<number>(0);
+  const [processedPriceDirty, setProcessedPriceDirty] = useState<boolean>(false);
   const [eligibleForVatReduction, setEligibleForVatReduction] = useState<boolean>(false);
 
   // Trạng thái lưu (loading)
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
-  // 4. Đơn vị tính & Quy đổi
-  const [isUomExpanded, setIsUomExpanded] = useState<boolean>(true);
-  const [baseUnit, setBaseUnit] = useState('');
-  const [baseUnitPrice, setBaseUnitPrice] = useState<number>(0);
-  const [isBaseUnitPurchaseUnit, setIsBaseUnitPurchaseUnit] = useState<boolean>(true);
-  const [uomConversions, setUomConversions] = useState<UomConversion[]>([]);
+  // Đơn vị & giá — danh sách dòng ngang hàng
+  const [unitRows, setUnitRows] = useState<FormUnitRow[]>([
+    createUnitRow({ isBaseUnit: true, isPurchaseUnit: true }),
+  ]);
   const [deletedUnitIds, setDeletedUnitIds] = useState<string[]>([]);
 
   // 5. Mô tả & Ghi chú sản phẩm
   const [description, setDescription] = useState('');
-  const [internalNote, setInternalNote] = useState('');
 
   // Alerts & Validation Popup
   const [warningMsg, setWarningMsg] = useState('');
@@ -145,7 +305,6 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     sellingPrice?: boolean;
     baseUnit?: boolean;
     description?: boolean;
-    internalNote?: boolean;
   }>({});
 
   const isEditing = Boolean(productToEdit);
@@ -160,61 +319,124 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         setCategoryId(productToEdit.categoryId || '');
         setImages(productToEdit.imageUrls && productToEdit.imageUrls.length > 0 ? productToEdit.imageUrls : (productToEdit.imageUrl ? [productToEdit.imageUrl] : []));
 
-        setCostPrice(productToEdit.costPrice || 0);
-        setSellingPrice(productToEdit.sellingPrice || 0);
         setIsFavorite(Boolean(productToEdit.isFavorite));
+        setProductStatus(productToEdit.status === 'Discontinued' ? 'Discontinued' : 'Active');
         setHasBatches(Boolean(productToEdit.hasBatches));
         setAllowRepack(Boolean(productToEdit.allowRepack));
+        {
+          const raw = productToEdit.sellingPrice || 0;
+          const processed = Number(productToEdit.processedSellingPricePerKg);
+          const hasCustomProcessed = Number.isFinite(processed) && processed > 0 && processed !== raw;
+          setProcessedSellingPrice(hasCustomProcessed ? processed : raw);
+          setProcessedPriceDirty(hasCustomProcessed);
+        }
         setEligibleForVatReduction(Boolean((productToEdit as any).eligibleForVatReduction));
         setIsSubmitting(false);
-
-        setBaseUnit(productToEdit.baseUnit || '');
-        setBaseUnitPrice(productToEdit.sellingPrice || 0);
         setDeletedUnitIds([]);
 
+        const buildBaseRow = (id: string, isPurchase: boolean): FormUnitRow =>
+          createUnitRow({
+            id,
+            unitName: productToEdit.baseUnit || '',
+            convertsToQty: 1,
+            convertsToId: null,
+            barcode: productToEdit.barcode || '',
+            costPrice: productToEdit.costPrice || 0,
+            sellingPrice: productToEdit.sellingPrice || 0,
+            isBaseUnit: true,
+            isPurchaseUnit: isPurchase,
+          });
+
+        /** API chỉ lưu rate + giá bán về base; giá vốn ĐVT khác suy từ giá vốn cơ bản × rate (BE không có cost theo ĐVT). */
+        const mapExtra = (u: UomConversion, baseId: string): FormUnitRow => {
+          const rate = u.conversionRate > 0 ? u.conversionRate : 1;
+          const baseCost = productToEdit.costPrice || 0;
+          return createUnitRow({
+            id: u.id,
+            unitName: u.unitName || '',
+            convertsToQty: rate,
+            convertsToId: baseId,
+            barcode: u.barcode || '',
+            costPrice: baseCost > 0 ? baseCost * rate : 0,
+            sellingPrice: u.price || 0,
+            isBaseUnit: false,
+            isPurchaseUnit: Boolean(u.isPurchaseUnit),
+          });
+        };
+
         if (productToEdit.uomConversions && productToEdit.uomConversions.length > 0) {
-          const hasNonBasePurchaseUnit = productToEdit.uomConversions.some((u) => Boolean(u.isPurchaseUnit));
-          setIsBaseUnitPurchaseUnit(
+          const trayUnits = productToEdit.uomConversions.filter((u) => isTrayUnitName(u.unitName));
+          const keepUnits = productToEdit.uomConversions.filter((u) => !isTrayUnitName(u.unitName));
+          if (trayUnits.length > 0) {
+            setDeletedUnitIds(
+              trayUnits.map((u) => u.id).filter((id) => id && !id.startsWith('uom-'))
+            );
+          }
+          const hasNonBasePurchase = keepUnits.some((u) => Boolean(u.isPurchaseUnit));
+          const baseIsPurchase =
             productToEdit.isBaseUnitPurchaseUnit !== undefined
               ? productToEdit.isBaseUnitPurchaseUnit
-              : !hasNonBasePurchaseUnit
-          );
-          setUomConversions(productToEdit.uomConversions);
+              : !hasNonBasePurchase;
+          const baseId = 'base';
+          setUnitRows([
+            buildBaseRow(baseId, baseIsPurchase),
+            ...keepUnits.map((u) => mapExtra(u, baseId)),
+          ]);
         } else {
-          setIsBaseUnitPurchaseUnit(productToEdit.isBaseUnitPurchaseUnit ?? true);
-          // Tự động nạp đơn vị tính từ API nếu chưa có sẵn
+          const baseIsPurchase = productToEdit.isBaseUnitPurchaseUnit ?? true;
+          setUnitRows([buildBaseRow('base', baseIsPurchase)]);
           productApi
             .getProductUnits(productToEdit.id)
             .then((units) => {
-              if (units && units.length > 0) {
-                const baseUnitRow = units.find((u) => u.isBaseUnit);
-                const nonBaseUnits = units.filter((u) => !u.isBaseUnit);
-                const hasNonBasePurchase = nonBaseUnits.some((u) => Boolean(u.isPurchaseUnit));
-                setIsBaseUnitPurchaseUnit(
-                  hasNonBasePurchase ? false : (baseUnitRow?.isPurchaseUnit ?? true)
-                );
-                setUomConversions(
-                  nonBaseUnits.map((u) => ({
-                    id: u.id,
-                    unitName: u.unitName,
-                    conversionRate: u.conversionRate,
-                    barcode: u.barcode || '',
-                    price: u.price,
-                    productCode: '',
-                    isPurchaseUnit: Boolean(u.isPurchaseUnit),
-                  }))
-                );
-              } else {
-                setUomConversions([]);
+              if (!units || units.length === 0) return;
+              const baseUnitApi = units.find((u) => u.isBaseUnit);
+              const nonBase = units.filter((u) => !u.isBaseUnit && !isTrayUnitName(u.unitName));
+              const tray = units.filter((u) => !u.isBaseUnit && isTrayUnitName(u.unitName));
+              if (tray.length > 0) {
+                setDeletedUnitIds((prev) => [
+                  ...prev,
+                  ...tray.map((u) => u.id).filter((id) => id && !prev.includes(id)),
+                ]);
               }
+              const hasNonBasePurchase = nonBase.some((u) => Boolean(u.isPurchaseUnit));
+              const basePurchase = hasNonBasePurchase
+                ? false
+                : (baseUnitApi?.isPurchaseUnit ?? true);
+              const baseId = baseUnitApi?.id || 'base';
+              setUnitRows([
+                createUnitRow({
+                  id: baseId,
+                  unitName: baseUnitApi?.unitName || productToEdit.baseUnit || '',
+                  convertsToQty: 1,
+                  convertsToId: null,
+                  barcode: baseUnitApi?.barcode || productToEdit.barcode || '',
+                  costPrice: productToEdit.costPrice || 0,
+                  sellingPrice: baseUnitApi?.price ?? productToEdit.sellingPrice ?? 0,
+                  isBaseUnit: true,
+                  isPurchaseUnit: basePurchase,
+                }),
+                ...nonBase.map((u) => mapExtra({
+                  id: u.id,
+                  unitName: u.unitName,
+                  conversionRate: u.conversionRate,
+                  barcode: u.barcode || '',
+                  price: u.price || 0,
+                  isPurchaseUnit: Boolean(u.isPurchaseUnit),
+                }, baseId)),
+              ]);
             })
             .catch(() => {
-              setUomConversions([]);
+              /* giữ dòng base đã set */
             });
         }
 
-        setDescription(productToEdit.description || '');
-        setInternalNote(productToEdit.internalNote || '');
+        {
+          const desc = (productToEdit.description || '').trim();
+          const note = (productToEdit.internalNote || '').trim();
+          setDescription(
+            desc && note && desc !== note ? `${desc}\n${note}` : desc || note
+          );
+        }
 
         setWarningMsg('');
         setValidationPopupMsg('');
@@ -226,22 +448,19 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         setCategoryId(categories[0]?.id || '');
         setImages([]);
 
-        setCostPrice(0);
-        setSellingPrice(0);
+        setProcessedSellingPrice(0);
+        setProcessedPriceDirty(false);
 
         setIsFavorite(false);
+        setProductStatus('Active');
         setHasBatches(false);
         setAllowRepack(false);
         setIsSubmitting(false);
 
-        setBaseUnit('');
-        setBaseUnitPrice(0);
-        setIsBaseUnitPurchaseUnit(true);
-        setUomConversions([]);
+        setUnitRows([createUnitRow({ isBaseUnit: true, isPurchaseUnit: true })]);
         setDeletedUnitIds([]);
 
         setDescription('');
-        setInternalNote('');
 
         setWarningMsg('');
         setValidationPopupMsg('');
@@ -263,10 +482,34 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     prevCatCountRef.current = categories.length;
   }, [categories]);
 
-  // Sync selling price with base unit price if not edited separately
-  const handleSellingPriceChange = (val: number) => {
-    setSellingPrice(val);
-    setBaseUnitPrice(val);
+  const baseRow = unitRows.find((r) => r.isBaseUnit) ?? unitRows[0];
+  const sellingPrice = baseRow?.sellingPrice ?? 0;
+  const costPrice = baseRow?.costPrice ?? 0;
+  const baseUnit = baseRow?.unitName ?? '';
+  const purchaseRow = unitRows.find((r) => r.isPurchaseUnit) ?? baseRow;
+  const effectivePurchaseUnitName = (purchaseRow?.unitName || '').trim();
+  const isPurchaseUnitKg = effectivePurchaseUnitName.toLowerCase() === 'kg';
+
+  const patchUnitRow = (id: string, patch: Partial<FormUnitRow>) => {
+    setUnitRows((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)));
+  };
+
+  const handleAllowRepackChange = (next: boolean) => {
+    setAllowRepack(next);
+    if (next) {
+      setHasBatches(true);
+      const tray = unitRows.filter((u) => isTrayUnitName(u.unitName));
+      if (tray.length > 0) {
+        setDeletedUnitIds((ids) => [
+          ...ids,
+          ...tray.map((u) => u.id).filter((id) => id && !id.startsWith('uom-') && !ids.includes(id)),
+        ]);
+        setUnitRows((prev) => prev.filter((u) => !isTrayUnitName(u.unitName)));
+      }
+      if (!processedPriceDirty) {
+        setProcessedSellingPrice(sellingPrice);
+      }
+    }
   };
 
   // Định dạng hiển thị số tiền có dấu chấm phân cách hàng nghìn (VD: 1.000.000)
@@ -300,13 +543,13 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   const trimmedBarcode = barcode.trim();
   const isMainBarcodeDuplicateWithUom =
     trimmedBarcode !== '' &&
-    uomConversions.some((u) => (u.barcode || '').trim().toLowerCase() === trimmedBarcode.toLowerCase());
+    unitRows.some((u) => (u.barcode || '').trim().toLowerCase() === trimmedBarcode.toLowerCase());
   const barcodeError =
     barcode !== ''
       ? trimmedBarcode.length > 50 || /\s/.test(barcode)
         ? 'Mã vạch không được chứa khoảng trắng và tối đa 50 ký tự.'
         : isMainBarcodeDuplicateWithUom
-        ? 'Mã vạch đang trùng với mã vạch của đơn vị quy đổi.'
+        ? 'Mã vạch đang trùng với mã vạch của đơn vị.'
         : ''
       : '';
 
@@ -332,138 +575,197 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       : '';
 
   const trimmedBaseUnit = baseUnit.trim();
-  /** Đơn vị nhập = ProductUnit có isPurchaseUnit; không lấy từ baseUnit nếu đã chọn UOM khác. */
-  const purchaseUnitFromFlag = uomConversions.find((u) => Boolean(u.isPurchaseUnit));
-  const effectivePurchaseUnitName = (
-    purchaseUnitFromFlag?.unitName?.trim() ||
-    (isBaseUnitPurchaseUnit ? trimmedBaseUnit : '') ||
-    ''
-  ).trim();
-  const isPurchaseUnitKg = effectivePurchaseUnitName.toLowerCase() === 'kg';
   const baseUnitError =
-    (touched.baseUnit || uomConversions.length > 0) && !trimmedBaseUnit
+    (touched.baseUnit || unitRows.length > 1) && !trimmedBaseUnit
       ? 'Vui lòng nhập tên đơn vị cơ bản (Bắt buộc).'
       : trimmedBaseUnit.length > 30
       ? 'Tên đơn vị cơ bản tối đa 30 ký tự.'
       : '';
 
   const descriptionError =
-    description.trim().length > 1000 ? 'Mô tả chi tiết không được vượt quá 1000 ký tự.' : '';
+    description.trim().length > 1000 ? 'Mô tả / ghi chú không được vượt quá 1000 ký tự.' : '';
 
-  const internalNoteError =
-    internalNote.trim().length > 500 ? 'Ghi chú nội bộ không được vượt quá 500 ký tự.' : '';
-
-  const getUomRowErrors = (uom: UomConversion) => {
-    const uName = (uom.unitName || '').trim();
+  const getUnitRowErrors = (row: FormUnitRow) => {
+    const uName = (row.unitName || '').trim();
     const lowerName = uName.toLowerCase();
-    const isDuplicateNameWithBase = trimmedBaseUnit !== '' && lowerName === trimmedBaseUnit.toLowerCase();
-    const isDuplicateNameWithOtherUom =
+    const isDuplicateName =
       uName !== '' &&
-      uomConversions.some((other) => other.id !== uom.id && (other.unitName || '').trim().toLowerCase() === lowerName);
+      unitRows.some((other) => other.id !== row.id && (other.unitName || '').trim().toLowerCase() === lowerName);
 
     const unitNameError = !uName
       ? 'Vui lòng nhập tên đơn vị.'
       : uName.length > 30
       ? 'Tối đa 30 ký tự.'
-      : isDuplicateNameWithBase || isDuplicateNameWithOtherUom
+      : isDuplicateName
       ? 'Trùng tên đơn vị tính.'
       : '';
 
-    const conversionRateError =
-      !uom.conversionRate || uom.conversionRate <= 0 ? 'Tỷ lệ phải > 0.' : '';
+    const chain = resolveUnitChain(row.id, unitRows);
+    const conversionError = row.isBaseUnit
+      ? ''
+      : !row.convertsToQty || row.convertsToQty <= 0
+      ? 'Số lượng phải > 0.'
+      : !row.convertsToId
+      ? 'Chọn đơn vị quy về.'
+      : chain.error || '';
 
     const priceError =
-      uom.price < 0 || uom.price > 1_000_000_000 ? 'Giá bán tối đa 1.000.000.000 đ.' : '';
+      row.sellingPrice < 0 || row.sellingPrice > 1_000_000_000 ? 'Giá bán tối đa 1.000.000.000 đ.' : '';
 
-    const uBarcode = (uom.barcode || '').trim();
+    const rowCostError =
+      row.costPrice < 0 || row.costPrice > 1_000_000_000 ? 'Giá vốn tối đa 1.000.000.000 đ.' : '';
+
+    const uBarcode = (row.barcode || '').trim();
     const lowerBarcode = uBarcode.toLowerCase();
-    const isDuplicateBarcodeWithMain = trimmedBarcode !== '' && lowerBarcode === trimmedBarcode.toLowerCase();
-    const isDuplicateBarcodeWithOtherUom =
+    const isDuplicateBarcodeWithMain =
+      !row.isBaseUnit && trimmedBarcode !== '' && lowerBarcode === trimmedBarcode.toLowerCase();
+    const isDuplicateBarcodeWithOther =
       uBarcode !== '' &&
-      uomConversions.some((other) => other.id !== uom.id && (other.barcode || '').trim().toLowerCase() === lowerBarcode);
+      unitRows.some(
+        (other) => other.id !== row.id && (other.barcode || '').trim().toLowerCase() === lowerBarcode
+      );
 
-    const barcodeError =
-      uom.barcode && (/\s/.test(uom.barcode) || uBarcode.length > 50)
+    const rowBarcodeError =
+      row.barcode && (/\s/.test(row.barcode) || uBarcode.length > 50)
         ? 'Không chứa khoảng trắng (tối đa 50 ký tự).'
-        : uBarcode && (isDuplicateBarcodeWithMain || isDuplicateBarcodeWithOtherUom)
+        : uBarcode && (isDuplicateBarcodeWithMain || isDuplicateBarcodeWithOther)
         ? 'Trùng mã vạch.'
         : '';
 
-    return { unitNameError, conversionRateError, priceError, barcodeError };
-  };
-
-  // Add UOM conversion row
-  const handleAddUom = () => {
-    if (!baseUnit.trim()) {
-      triggerValidationError('Vui lòng nhập tên đơn vị cơ bản trước khi thêm đơn vị quy đổi.');
-      return;
-    }
-    setValidationPopupMsg('');
-    const newUom: UomConversion = {
-      id: `uom-${Date.now()}`,
-      unitName: '',
-      conversionRate: 1,
-      barcode: '',
-      price: sellingPrice || 0,
-      productCode: productCode.trim() || 'Mã tự động',
-      isPurchaseUnit: false,
+    return {
+      unitNameError,
+      conversionError,
+      pathLabel: chain.pathLabel,
+      rateToBase: chain.rateToBase,
+      priceError,
+      rowCostError,
+      rowBarcodeError,
     };
-    setUomConversions([...uomConversions, newUom]);
   };
 
-  const handleSelectBaseUnitAsPurchaseUnit = () => {
-    setIsBaseUnitPurchaseUnit(true);
-    setUomConversions((prev) => prev.map((u) => ({ ...u, isPurchaseUnit: false })));
-    if (baseUnit.trim().toLowerCase() !== 'kg') {
-      setAllowRepack(false);
+  const handleAddUnitRow = () => {
+    setValidationPopupMsg('');
+    setUnitRows((prev) => {
+      const baseId = prev.find((r) => r.isBaseUnit)?.id ?? null;
+      return [
+        ...prev,
+        createUnitRow({
+          convertsToId: baseId,
+          convertsToQty: 1,
+        }),
+      ];
+    });
+  };
+
+  const handleSelectBaseUnit = (id: string) => {
+    if (hasTransactions) return;
+    const promoted = unitRows.find((r) => r.id === id);
+    if (promoted && !promoted.isBaseUnit && !promoted.id.startsWith('uom-') && promoted.id !== 'base') {
+      setDeletedUnitIds((prev) => (prev.includes(promoted.id) ? prev : [...prev, promoted.id]));
     }
+    setUnitRows((prev) => {
+      const oldBase = prev.find((r) => r.isBaseUnit);
+      const oldBaseId = oldBase?.id;
+      const demotedNewId = newUnitRowId();
+      const newBaseId = 'base';
+
+      return prev.map((r) => {
+        if (r.id === id) {
+          return {
+            ...r,
+            id: newBaseId,
+            isBaseUnit: true,
+            convertsToQty: 1,
+            convertsToId: null,
+          };
+        }
+        if (r.isBaseUnit) {
+          return {
+            ...r,
+            id: demotedNewId,
+            isBaseUnit: false,
+            convertsToQty: 1,
+            convertsToId: newBaseId,
+          };
+        }
+        let convertsToId = r.convertsToId;
+        if (convertsToId === id) convertsToId = newBaseId;
+        if (convertsToId === oldBaseId) convertsToId = demotedNewId;
+        return { ...r, isBaseUnit: false, convertsToId };
+      });
+    });
   };
 
-  const handleSelectUomAsPurchaseUnit = (id: string) => {
-    setIsBaseUnitPurchaseUnit(false);
-    const selected = uomConversions.find((u) => u.id === id);
-    setUomConversions((prev) =>
-      prev.map((u) => ({
-        ...u,
-        isPurchaseUnit: u.id === id,
-      }))
-    );
+  const handleSelectPurchaseUnit = (id: string) => {
+    const selected = unitRows.find((u) => u.id === id);
+    setUnitRows((prev) => prev.map((r) => ({ ...r, isPurchaseUnit: r.id === id })));
     if ((selected?.unitName || '').trim().toLowerCase() !== 'kg') {
       setAllowRepack(false);
     }
   };
 
-  const handleUpdateUom = (id: string, field: keyof UomConversion, value: any) => {
-    setUomConversions(
-      uomConversions.map((u) => {
-        if (u.id !== id) return u;
-        if (field === 'unitName') {
-          return {
-            ...u,
-            unitName: String(value),
-            productCode: productCode.trim() || u.productCode || 'Mã tự động',
-          };
-        }
-        if (field === 'conversionRate') {
-          const newRate = Number(value) || 0;
-          // Tự động tính giá bán theo tỷ lệ quy đổi * giá bán đơn vị cơ bản
-          const autoPrice = newRate > 0 && sellingPrice > 0 ? newRate * sellingPrice : u.price;
-          return { ...u, conversionRate: newRate, price: autoPrice };
-        }
-        return { ...u, [field]: value };
-      })
-    );
+  const handleUpdateUnitRow = (
+    id: string,
+    field: keyof FormUnitRow,
+    value: string | number | boolean | null
+  ) => {
+    if (field === 'unitName' && isTrayUnitName(String(value))) {
+      triggerValidationError(
+        'Không thêm ĐVT "Khay". Bật "Cho chia khay" và cấu hình "Giá khi đóng khay (đ/kg)" — khối lượng từng khay chỉ biết lúc chế biến.'
+      );
+      return;
+    }
+    const row = unitRows.find((r) => r.id === id);
+    if (field === 'sellingPrice' && row?.isBaseUnit && allowRepack && !processedPriceDirty) {
+      setProcessedSellingPrice(Number(value) || 0);
+    }
+    if (field === 'unitName' && row?.isPurchaseUnit && String(value).trim().toLowerCase() !== 'kg') {
+      setAllowRepack(false);
+    }
+    if (row?.isBaseUnit && (field === 'convertsToQty' || field === 'convertsToId')) {
+      patchUnitRow(id, { convertsToQty: 1, convertsToId: null });
+      return;
+    }
+    if (field === 'convertsToId' && value === id) {
+      triggerValidationError('Không thể quy đổi một đơn vị về chính nó.');
+      return;
+    }
+    patchUnitRow(id, { [field]: value } as Partial<FormUnitRow>);
   };
 
-  const handleRemoveUom = (id: string) => {
-    const removed = uomConversions.find((u) => u.id === id);
-    if (!id.startsWith('uom-')) {
+  const handleRemoveUnitRow = (id: string) => {
+    if (unitRows.length <= 1) {
+      triggerValidationError('Cần giữ ít nhất một đơn vị.');
+      return;
+    }
+    const removed = unitRows.find((u) => u.id === id);
+    if (!id.startsWith('uom-') && id !== 'base') {
       setDeletedUnitIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
     }
-    if (removed?.isPurchaseUnit) {
-      setIsBaseUnitPurchaseUnit(true);
+    setUnitRows((prev) => {
+      let next = prev.filter((u) => u.id !== id);
+      if (!next.some((r) => r.isBaseUnit) && next[0]) {
+        next = next.map((r, idx) =>
+          idx === 0
+            ? { ...r, isBaseUnit: true, convertsToQty: 1, convertsToId: null }
+            : r
+        );
+      }
+      const baseId = next.find((r) => r.isBaseUnit)?.id ?? next[0]?.id ?? null;
+      next = next.map((r) => {
+        if (r.convertsToId === id) {
+          return { ...r, convertsToId: r.isBaseUnit ? null : baseId };
+        }
+        return r;
+      });
+      if (!next.some((r) => r.isPurchaseUnit) && next[0]) {
+        next = next.map((r, idx) => ({ ...r, isPurchaseUnit: idx === 0 }));
+      }
+      return next;
+    });
+    if (removed?.isPurchaseUnit && (removed.unitName || '').trim().toLowerCase() === 'kg') {
+      setAllowRepack(false);
     }
-    setUomConversions(uomConversions.filter((u) => u.id !== id));
   };
 
   // Image Upload handler (Cloudinary Direct Unsigned Upload)
@@ -521,7 +823,6 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       sellingPrice: true,
       baseUnit: true,
       description: true,
-      internalNote: true,
     });
 
     if (isUploadingImage) {
@@ -574,63 +875,92 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       triggerValidationError('Giá bán không được nhỏ hơn 0 hoặc vượt quá 1.000.000.000 đ.');
       return;
     }
+    if (isPurchaseUnitKg && allowRepack) {
+      const processed = processedSellingPrice > 0 ? processedSellingPrice : sellingPrice;
+      if (processed <= 0) {
+        triggerValidationError('Giá khi đóng khay (đ/kg) phải lớn hơn 0, hoặc để trùng giá nguyên quả.');
+        return;
+      }
+      if (processed > 1_000_000_000) {
+        triggerValidationError('Giá khi đóng khay không được vượt quá 1.000.000.000 đ.');
+        return;
+      }
+    }
     if (costPrice < 0 || costPrice > 1_000_000_000) {
       triggerValidationError('Giá vốn không được nhỏ hơn 0 hoặc vượt quá 1.000.000.000 đ.');
       return;
     }
 
     if (description.trim().length > 1000) {
-      triggerValidationError('Mô tả sản phẩm không được vượt quá 1000 ký tự.');
-      return;
-    }
-    if (internalNote.trim().length > 500) {
-      triggerValidationError('Ghi chú nội bộ không được vượt quá 500 ký tự.');
+      triggerValidationError('Mô tả / ghi chú không được vượt quá 1000 ký tự.');
       return;
     }
 
-    // Validate danh sách đơn vị quy đổi (ProductUnit)
-    if (uomConversions.length > 0) {
-      const seenUnitNames = new Set<string>([trimmedBaseUnit.toLowerCase()]);
+    // Validate chuỗi quy đổi đơn vị
+    {
+      const seenUnitNames = new Set<string>();
       const seenBarcodes = new Set<string>();
-      if (trimmedBarcode) {
-        seenBarcodes.add(trimmedBarcode.toLowerCase());
+      if (trimmedBarcode) seenBarcodes.add(trimmedBarcode.toLowerCase());
+
+      if (!unitRows.some((r) => r.isBaseUnit)) {
+        triggerValidationError('Vui lòng chọn một đơn vị cơ bản.');
+        return;
+      }
+      if (!unitRows.some((r) => r.isPurchaseUnit)) {
+        triggerValidationError('Vui lòng chọn một đơn vị nhập hàng.');
+        return;
       }
 
-      for (const uom of uomConversions) {
-        const uName = (uom.unitName || '').trim();
+      for (const row of unitRows) {
+        const uName = (row.unitName || '').trim();
         if (!uName) {
-          triggerValidationError('Vui lòng nhập tên cho tất cả các đơn vị quy đổi.');
+          triggerValidationError('Vui lòng nhập tên cho tất cả các đơn vị.');
+          return;
+        }
+        if (isTrayUnitName(uName)) {
+          triggerValidationError(
+            'Không dùng ĐVT "Khay" trong quy đổi. Dùng "Giá khi đóng khay (đ/kg)" khi bật chia khay / chế biến.'
+          );
           return;
         }
         if (uName.length > 30) {
-          triggerValidationError(`Tên đơn vị quy đổi "${uName}" không được vượt quá 30 ký tự.`);
+          triggerValidationError(`Tên đơn vị "${uName}" không được vượt quá 30 ký tự.`);
           return;
         }
         const lowerName = uName.toLowerCase();
         if (seenUnitNames.has(lowerName)) {
-          triggerValidationError(`Tên đơn vị quy đổi "${uName}" không được trùng với đơn vị cơ bản hoặc trùng lặp nhau.`);
+          triggerValidationError(`Tên đơn vị "${uName}" bị trùng.`);
           return;
         }
         seenUnitNames.add(lowerName);
 
-        if (!uom.conversionRate || uom.conversionRate <= 0) {
-          triggerValidationError(`Tỷ lệ quy đổi của đơn vị "${uName}" phải lớn hơn 0.`);
+        const chain = resolveUnitChain(row.id, unitRows);
+        if (chain.error) {
+          triggerValidationError(`Đơn vị "${uName}": ${chain.error}.`);
           return;
         }
-        if (uom.price < 0 || uom.price > 1_000_000_000) {
+        if (!row.isBaseUnit && (!chain.rateToBase || chain.rateToBase <= 0)) {
+          triggerValidationError(`Đơn vị "${uName}": chưa quy đổi được về đơn vị cơ bản.`);
+          return;
+        }
+        if (row.sellingPrice < 0 || row.sellingPrice > 1_000_000_000) {
           triggerValidationError(`Giá bán của đơn vị "${uName}" không hợp lệ (0 - 1.000.000.000 đ).`);
           return;
         }
+        if (row.costPrice < 0 || row.costPrice > 1_000_000_000) {
+          triggerValidationError(`Giá vốn của đơn vị "${uName}" không hợp lệ (0 - 1.000.000.000 đ).`);
+          return;
+        }
 
-        const uBarcode = (uom.barcode || '').trim();
+        const uBarcode = (row.barcode || '').trim();
         if (uBarcode) {
           if (uBarcode.length > 50 || /\s/.test(uBarcode)) {
             triggerValidationError(`Mã vạch của đơn vị "${uName}" không hợp lệ (tối đa 50 ký tự, không chứa khoảng trắng).`);
             return;
           }
           const lowerBarcode = uBarcode.toLowerCase();
-          if (seenBarcodes.has(lowerBarcode)) {
-            triggerValidationError(`Mã vạch "${uBarcode}" của đơn vị "${uName}" bị trùng lặp với mã vạch sản phẩm hoặc đơn vị khác.`);
+          if (!row.isBaseUnit && seenBarcodes.has(lowerBarcode)) {
+            triggerValidationError(`Mã vạch "${uBarcode}" của đơn vị "${uName}" bị trùng.`);
             return;
           }
           seenBarcodes.add(lowerBarcode);
@@ -649,7 +979,55 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       setValidationPopupMsg('');
 
       const selectedCategory = categories.find((c) => c.id === categoryId);
-      const purchaseUnitObj = uomConversions.find((u) => Boolean(u.isPurchaseUnit));
+      const base = unitRows.find((r) => r.isBaseUnit) ?? unitRows[0];
+      const purchase = unitRows.find((r) => r.isPurchaseUnit) ?? base;
+      const extras = unitRows.filter(
+        (r) => r.id !== base.id && !isTrayUnitName(r.unitName)
+      );
+
+      const repackOn = isPurchaseUnitKg && allowRepack;
+      const processedEffective = repackOn
+        ? processedSellingPrice > 0
+          ? processedSellingPrice
+          : base.sellingPrice
+        : null;
+
+      const unitsToSave: UomConversion[] = extras.map((r) => {
+        const chain = resolveUnitChain(r.id, unitRows);
+        return {
+          id: r.id,
+          unitName: r.unitName.trim(),
+          conversionRate: chain.rateToBase > 0 ? chain.rateToBase : 1,
+          barcode: r.barcode.trim() || '',
+          price: r.sellingPrice || 0,
+          productCode: productCode.trim() || 'Mã tự động',
+          isPurchaseUnit: Boolean(r.isPurchaseUnit),
+        };
+      });
+
+      // BE chỉ lưu 1 giá vốn theo ĐVT cơ bản. Ưu tiên giá vốn dòng ĐV nhập (giá nhập) → quy về base.
+      let costToSave = 0;
+      if (userRole === 'StoreOwner') {
+        if (purchase && !purchase.isBaseUnit && purchase.costPrice > 0) {
+          const chain = resolveUnitChain(purchase.id, unitRows);
+          if (chain.rateToBase > 0) costToSave = purchase.costPrice / chain.rateToBase;
+        }
+        if (!(costToSave > 0) && base.costPrice > 0) {
+          costToSave = base.costPrice;
+        }
+        if (!(costToSave > 0)) {
+          for (const r of unitRows) {
+            if (r.isBaseUnit || !(r.costPrice > 0)) continue;
+            const chain = resolveUnitChain(r.id, unitRows);
+            if (chain.rateToBase > 0) {
+              costToSave = r.costPrice / chain.rateToBase;
+              break;
+            }
+          }
+        }
+      } else {
+        costToSave = productToEdit?.costPrice ?? 0;
+      }
 
       const payload: Partial<ProductItem> = {
         productCode: productCode.trim() || undefined,
@@ -659,18 +1037,20 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         categoryName: selectedCategory ? selectedCategory.name : 'Khác',
         imageUrl: images[0] || undefined,
         imageUrls: images,
-        baseUnit: baseUnit.trim(),
-        sellingPrice,
-        costPrice: userRole === 'StoreOwner' ? costPrice : productToEdit?.costPrice ?? 0,
+        baseUnit: base.unitName.trim(),
+        sellingPrice: base.sellingPrice,
+        processedSellingPricePerKg: processedEffective,
+        costPrice: costToSave,
         isFavorite,
-        hasBatches: hasBatches || (isPurchaseUnitKg && allowRepack),
-        allowRepack: isPurchaseUnitKg && allowRepack,
+        status: productStatus,
+        hasBatches: hasBatches || repackOn,
+        allowRepack: repackOn,
         eligibleForVatReduction,
         description: description.trim() || undefined,
-        internalNote: internalNote.trim() || undefined,
-        isBaseUnitPurchaseUnit: !purchaseUnitObj && isBaseUnitPurchaseUnit,
-        purchaseUnit: purchaseUnitObj?.unitName?.trim() || baseUnit.trim(),
-        uomConversions,
+        internalNote: '',
+        isBaseUnitPurchaseUnit: Boolean(base.isPurchaseUnit),
+        purchaseUnit: purchase.unitName.trim() || base.unitName.trim(),
+        uomConversions: unitsToSave,
       };
 
       await onSave(payload, saveAndAddNew, deletedUnitIds);
@@ -682,16 +1062,13 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         setBarcode('');
         setProductName('');
         setImages([]);
-        setSellingPrice(0);
-        setCostPrice(0);
-        setBaseUnit('');
-        setBaseUnitPrice(0);
-        setIsBaseUnitPurchaseUnit(true);
-        setUomConversions([]);
+        setProcessedSellingPrice(0);
+        setProcessedPriceDirty(false);
+        setUnitRows([createUnitRow({ isBaseUnit: true, isPurchaseUnit: true })]);
         setDeletedUnitIds([]);
         setDescription('');
-        setInternalNote('');
         setIsFavorite(false);
+        setProductStatus('Active');
         setHasBatches(false);
         setAllowRepack(false);
         setWarningMsg('');
@@ -708,14 +1085,49 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
 
   return (
     <div className="custom-modal-backdrop">
-      <div className="custom-modal-box" style={{ maxWidth: 1160, width: '96vw' }}>
+      <div
+        className="custom-modal-box"
+        style={{
+          maxWidth: 1160,
+          width: '96vw',
+          height: 'min(88vh, 900px)',
+          maxHeight: '88vh',
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+          borderRadius: 16,
+        }}
+      >
         {/* ========================================================= */}
         {/* HEADER: Tiêu đề & Nút đóng (19)                           */}
         {/* ========================================================= */}
-        <div className="custom-modal-header" style={{ padding: '16px 24px' }}>
-          <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#0F172A' }}>
-            {isEditing ? `Chỉnh sửa hàng hóa - ${productToEdit?.productName}` : 'Tạo hàng hóa'}
-          </h3>
+        <div className="custom-modal-header" style={{ padding: '16px 24px', flexShrink: 0 }}>
+          <div style={{ minWidth: 0 }}>
+            <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#0F172A' }}>
+              {isEditing ? `Chỉnh sửa hàng hóa - ${productToEdit?.productName}` : 'Thêm hàng hóa'}
+            </h3>
+            {isEditing && productToEdit && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6, fontSize: 12.5, color: '#64748B' }}>
+                <span style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontWeight: 600, color: '#334155' }}>
+                  {productToEdit.productCode}
+                </span>
+                <span
+                  style={{
+                    padding: '1px 8px',
+                    borderRadius: 999,
+                    fontWeight: 600,
+                    fontSize: 11.5,
+                    ...(productStatus === 'Active'
+                      ? { background: '#DCFCE7', color: '#15803D' }
+                      : { background: '#F1F5F9', color: '#64748B' }),
+                  }}
+                >
+                  {productStatus === 'Active' ? 'Đang kinh doanh' : 'Ngừng kinh doanh'}
+                </span>
+                {hasTransactions && <span>· Đã có giao dịch</span>}
+              </div>
+            )}
+          </div>
           <button
             type="button"
             className="custom-modal-close"
@@ -733,8 +1145,10 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         <div
           className="custom-modal-body"
           style={{
-            maxHeight: 'calc(88vh - 130px)',
+            flex: 1,
+            minHeight: 0,
             overflowY: 'auto',
+            overflowX: 'hidden',
             padding: '20px 24px',
             display: 'flex',
             flexDirection: 'column',
@@ -783,7 +1197,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                 borderBottom: '1px solid #F1F5F9',
               }}
             >
-              Thông tin cơ bản
+              1. Thông tin chung
             </h4>
 
             <div
@@ -1502,977 +1916,389 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
           </div>
 
           {/* ───────────────────────────────────────────────────────── */}
-          {/* 2. GIÁ VỐN, GIÁ BÁN (6, 7)                                */}
+          {/* 2. ĐƠN VỊ & GIÁ — một bảng duy nhất                         */}
           {/* ───────────────────────────────────────────────────────── */}
-          <div
-            style={{
-              border: '1px solid #E2E8F0',
-              borderRadius: 10,
-              padding: '18px 20px',
-              backgroundColor: '#FFFFFF',
-              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.02)',
-            }}
-          >
-            <h4
-              style={{
-                fontSize: 14,
-                fontWeight: 700,
-                color: '#0F172A',
-                margin: '0 0 16px 0',
-                paddingBottom: 8,
-                borderBottom: '1px solid #F1F5F9',
-              }}
-            >
-              Giá vốn, giá bán
-            </h4>
+          <div style={sectionCardStyle}>
+            <h4 style={sectionTitleStyle}>2. Đơn vị &amp; giá</h4>
+            <p style={{ margin: '0 0 12px', fontSize: 12, color: '#64748B', lineHeight: 1.45 }}>
+              Ví dụ: 1 Lốc = 4 Hộp, 1 Thùng = 5 Lốc → hệ thống tự ra 1 Thùng = 20 Hộp (đơn vị cơ bản).
+            </p>
 
-            <div style={{ display: 'grid', gridTemplateColumns: userRole === 'StoreOwner' ? '1fr 1fr' : '1fr', gap: 20 }}>
-              {/* (6) Giá vốn - Chỉ Chủ cửa hàng mới xem/sửa theo BR-SEC-01 */}
-              {userRole === 'StoreOwner' && (
-                <div>
-                  <label
-                    style={{
-                      display: 'block',
-                      marginBottom: 6,
-                      fontSize: 13,
-                      fontWeight: 600,
-                      color: '#334155',
-                    }}
-                  >
-                    Giá vốn
-                  </label>
-                  <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      className="filter-input"
-                      style={{
-                        paddingRight: 32,
-                        ...(costPriceError ? { borderColor: '#EF4444', boxShadow: '0 0 0 2px rgba(239, 68, 68, 0.12)' } : {}),
-                      }}
-                      placeholder="0"
-                      value={formatCurrencyInput(costPrice)}
-                      onChange={(e) => {
-                        setCostPrice(parseCurrencyInput(e.target.value));
-                        setTouched((prev) => ({ ...prev, costPrice: true }));
-                      }}
-                      onFocus={(e) => e.target.select()}
-                    />
-                    <span
-                      style={{
-                        position: 'absolute',
-                        right: 12,
-                        fontSize: 13,
-                        fontWeight: 600,
-                        color: '#64748B',
-                        pointerEvents: 'none',
-                      }}
-                    >
-                      đ
-                    </span>
-                  </div>
-                  {costPriceError && (
-                    <div style={{ color: '#DC2626', fontSize: 11.5, marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
-                      <AlertCircle size={13} style={{ flexShrink: 0 }} />
-                      <span>{costPriceError}</span>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* (7) Giá bán */}
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                  <label
-                    style={{
-                      fontSize: 13,
-                      fontWeight: 600,
-                      color: '#334155',
-                    }}
-                  >
-                    Giá bán <span style={{ color: '#EF4444' }}>*</span>
-                  </label>
-                  {productToEdit?.id && (
-                    <button
-                      type="button"
-                      onClick={() => setShowPriceHistory(true)}
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: 4,
-                        fontSize: 12,
-                        color: '#2563EB',
-                        backgroundColor: '#EFF6FF',
-                        border: '1px solid #BFDBFE',
-                        borderRadius: 6,
-                        padding: '2px 8px',
-                        cursor: 'pointer',
-                        fontWeight: 500,
-                      }}
-                    >
-                      <History size={12} />
-                      Lịch sử giá
-                    </button>
-                  )}
-                </div>
-                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    className="filter-input"
-                    style={{
-                      paddingRight: 32,
-                      ...(sellingPriceError ? { borderColor: '#EF4444', boxShadow: '0 0 0 2px rgba(239, 68, 68, 0.12)' } : {}),
-                    }}
-                    placeholder="0"
-                    value={formatCurrencyInput(sellingPrice)}
-                    onChange={(e) => {
-                      handleSellingPriceChange(parseCurrencyInput(e.target.value));
-                      setTouched((prev) => ({ ...prev, sellingPrice: true }));
-                    }}
-                    onFocus={(e) => e.target.select()}
-                    required
-                  />
-                  <span
-                    style={{
-                      position: 'absolute',
-                      right: 12,
-                      fontSize: 13,
-                      fontWeight: 600,
-                      color: '#64748B',
-                      pointerEvents: 'none',
-                    }}
-                  >
-                    đ
-                  </span>
-                </div>
-                {sellingPriceError && (
-                  <div style={{ color: '#DC2626', fontSize: 11.5, marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <AlertCircle size={13} style={{ flexShrink: 0 }} />
-                    <span>{sellingPriceError}</span>
-                  </div>
-                )}
-                {costPrice > 0 && sellingPrice > 0 && sellingPrice < costPrice && (
-                  <div
-                    style={{
-                      marginTop: 8,
-                      padding: '8px 12px',
-                      backgroundColor: '#FEF3C7',
-                      border: '1px solid #F59E0B',
-                      borderRadius: 8,
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 8,
-                      fontSize: 12,
-                      color: '#92400E',
-                    }}
-                  >
-                    <AlertTriangle size={15} color="#D97706" style={{ flexShrink: 0 }} />
-                    <span>
-                      <strong>Cảnh báo giá bán:</strong> Giá bán đang thấp hơn giá vốn ({costPrice.toLocaleString('vi-VN')} đ). Hệ thống sẽ tự động lưu vết audit log và cần sự đồng ý của Quản lý / Chủ cửa hàng.
-                    </span>
-                  </div>
-                )}
-              </div>
+            <div style={{ border: '1px solid #E2E8F0', borderRadius: 8, overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                <thead>
+                  <tr style={{ background: '#F8FAFC', borderBottom: '1px solid #E2E8F0', color: '#475569' }}>
+                    <th style={{ ...thStyle, textAlign: 'left', minWidth: 120 }}>Đơn vị</th>
+                    <th style={{ ...thStyle, textAlign: 'left', minWidth: 320 }}>Quy đổi</th>
+                    {userRole === 'StoreOwner' && (
+                      <th style={{ ...thStyle, textAlign: 'right', width: 110 }}>Giá vốn</th>
+                    )}
+                    <th style={{ ...thStyle, textAlign: 'right', width: 120 }}>
+                      Giá bán <span style={{ color: '#EF4444' }}>*</span>
+                    </th>
+                    <th style={{ ...thStyle, textAlign: 'center', width: 72 }}>Cơ bản</th>
+                    <th style={{ ...thStyle, textAlign: 'center', width: 72 }}>ĐV nhập</th>
+                    <th style={{ ...thStyle, width: 44 }}></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {unitRows.map((row) => {
+                    const rowErr = getUnitRowErrors(row);
+                    const lockBaseName = hasTransactions && row.isBaseUnit;
+                    const showBaseErr = row.isBaseUnit && baseUnitError;
+                    const convertTargets = unitRows.filter((o) => o.id !== row.id);
+                    return (
+                      <tr key={row.id} style={{ borderBottom: '1px solid #F1F5F9', verticalAlign: 'top' }}>
+                        <td style={tdStyle}>
+                          <input
+                            type="text"
+                            className="filter-input"
+                            placeholder="Hộp, Lốc, Thùng..."
+                            value={row.unitName}
+                            disabled={lockBaseName}
+                            title={lockBaseName ? 'Đã có giao dịch — không đổi tên đơn vị cơ bản' : undefined}
+                            onChange={(e) => {
+                              handleUpdateUnitRow(row.id, 'unitName', e.target.value);
+                              if (row.isBaseUnit) setTouched((prev) => ({ ...prev, baseUnit: true }));
+                            }}
+                            onBlur={() => {
+                              if (row.isBaseUnit) setTouched((prev) => ({ ...prev, baseUnit: true }));
+                            }}
+                            style={{
+                              ...cellInputStyle,
+                              ...(lockBaseName
+                                ? { backgroundColor: '#F1F5F9', color: '#64748B', cursor: 'not-allowed' }
+                                : {}),
+                              ...(rowErr.unitNameError || showBaseErr ? errorBorderStyle : {}),
+                            }}
+                          />
+                          {(rowErr.unitNameError || showBaseErr) && (
+                            <div style={cellErrorStyle}>{rowErr.unitNameError || baseUnitError}</div>
+                          )}
+                        </td>
+                        <td style={tdStyle}>
+                          {row.isBaseUnit ? (
+                            <div style={{ paddingTop: 8, color: '#94A3B8', fontSize: 12.5 }}>
+                              Đơn vị tồn kho (chuẩn = 1)
+                            </div>
+                          ) : (
+                            <div>
+                              <div
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: 6,
+                                  flexWrap: 'nowrap',
+                                  whiteSpace: 'nowrap',
+                                }}
+                              >
+                                <span style={{ color: '#64748B', fontWeight: 600, flexShrink: 0 }}>
+                                  1 {row.unitName.trim() || '…'} =
+                                </span>
+                                <input
+                                  type="number"
+                                  className="filter-input"
+                                  min={0.0001}
+                                  step="any"
+                                  placeholder="4"
+                                  value={row.convertsToQty === 0 ? '' : row.convertsToQty}
+                                  onChange={(e) =>
+                                    handleUpdateUnitRow(
+                                      row.id,
+                                      'convertsToQty',
+                                      e.target.value === '' ? 0 : Number(e.target.value)
+                                    )
+                                  }
+                                  onFocus={(e) => e.target.select()}
+                                  style={{
+                                    ...cellInputStyle,
+                                    width: 64,
+                                    flexShrink: 0,
+                                    textAlign: 'center',
+                                    ...(rowErr.conversionError ? errorBorderStyle : {}),
+                                  }}
+                                />
+                                <select
+                                  className="filter-input"
+                                  value={row.convertsToId || ''}
+                                  onChange={(e) =>
+                                    handleUpdateUnitRow(row.id, 'convertsToId', e.target.value || null)
+                                  }
+                                  style={{
+                                    ...cellInputStyle,
+                                    width: 110,
+                                    flexShrink: 0,
+                                    ...(rowErr.conversionError ? errorBorderStyle : {}),
+                                  }}
+                                >
+                                  <option value="">Chọn ĐVT</option>
+                                  {convertTargets.map((t) => (
+                                    <option key={t.id} value={t.id}>
+                                      {t.unitName.trim() || '(chưa đặt tên)'}
+                                    </option>
+                                  ))}
+                                </select>
+                                {rowErr.pathLabel && !rowErr.conversionError && (
+                                  <span
+                                    style={{
+                                      fontSize: 11.5,
+                                      color: '#0F766E',
+                                      fontWeight: 600,
+                                      overflow: 'hidden',
+                                      textOverflow: 'ellipsis',
+                                    }}
+                                    title={rowErr.pathLabel}
+                                  >
+                                    · {rowErr.pathLabel}
+                                  </span>
+                                )}
+                              </div>
+                              {rowErr.conversionError && (
+                                <div style={cellErrorStyle}>{rowErr.conversionError}</div>
+                              )}
+                            </div>
+                          )}
+                        </td>
+                        {userRole === 'StoreOwner' && (
+                          <td style={tdStyle}>
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              className="filter-input"
+                              placeholder="0"
+                              value={formatCurrencyInput(row.costPrice)}
+                              onChange={(e) => {
+                                handleUpdateUnitRow(row.id, 'costPrice', parseCurrencyInput(e.target.value));
+                                if (row.isBaseUnit) setTouched((prev) => ({ ...prev, costPrice: true }));
+                              }}
+                              onFocus={(e) => e.target.select()}
+                              style={{
+                                ...cellInputStyle,
+                                textAlign: 'right',
+                                ...(rowErr.rowCostError || (row.isBaseUnit && costPriceError) ? errorBorderStyle : {}),
+                              }}
+                            />
+                            {(rowErr.rowCostError || (row.isBaseUnit && costPriceError)) && (
+                              <div style={cellErrorStyle}>{rowErr.rowCostError || costPriceError}</div>
+                            )}
+                          </td>
+                        )}
+                        <td style={tdStyle}>
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            className="filter-input"
+                            placeholder="0"
+                            value={formatCurrencyInput(row.sellingPrice)}
+                            onChange={(e) => {
+                              handleUpdateUnitRow(row.id, 'sellingPrice', parseCurrencyInput(e.target.value));
+                              if (row.isBaseUnit) setTouched((prev) => ({ ...prev, sellingPrice: true }));
+                            }}
+                            onFocus={(e) => e.target.select()}
+                            style={{
+                              ...cellInputStyle,
+                              textAlign: 'right',
+                              fontWeight: row.isBaseUnit ? 600 : 400,
+                              ...(rowErr.priceError || (row.isBaseUnit && sellingPriceError) ? errorBorderStyle : {}),
+                            }}
+                          />
+                          {(rowErr.priceError || (row.isBaseUnit && sellingPriceError)) && (
+                            <div style={cellErrorStyle}>{rowErr.priceError || sellingPriceError}</div>
+                          )}
+                          {row.costPrice > 0 &&
+                            row.sellingPrice > 0 &&
+                            row.sellingPrice < row.costPrice && (
+                              <div style={cellWarnStyle}>Thấp hơn giá vốn</div>
+                            )}
+                        </td>
+                        <td style={{ ...tdStyle, textAlign: 'center', paddingTop: 16 }}>
+                          <input
+                            type="radio"
+                            name="product-base-unit"
+                            checked={row.isBaseUnit}
+                            disabled={hasTransactions}
+                            onChange={() => handleSelectBaseUnit(row.id)}
+                            title="Đơn vị cơ bản (tồn kho)"
+                            style={radioStyle}
+                          />
+                        </td>
+                        <td style={{ ...tdStyle, textAlign: 'center', paddingTop: 16 }}>
+                          <input
+                            type="radio"
+                            name="product-purchase-unit"
+                            checked={row.isPurchaseUnit}
+                            onChange={() => handleSelectPurchaseUnit(row.id)}
+                            title="Đơn vị nhập hàng"
+                            style={radioStyle}
+                          />
+                        </td>
+                        <td style={{ ...tdStyle, textAlign: 'center', paddingTop: 12 }}>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveUnitRow(row.id)}
+                            disabled={unitRows.length <= 1 || (hasTransactions && row.isBaseUnit)}
+                            title={
+                              unitRows.length <= 1
+                                ? 'Cần ít nhất một đơn vị'
+                                : hasTransactions && row.isBaseUnit
+                                ? 'Không xóa đơn vị cơ bản khi đã có giao dịch'
+                                : 'Xóa đơn vị'
+                            }
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              cursor:
+                                unitRows.length <= 1 || (hasTransactions && row.isBaseUnit)
+                                  ? 'not-allowed'
+                                  : 'pointer',
+                              color:
+                                unitRows.length <= 1 || (hasTransactions && row.isBaseUnit)
+                                  ? '#CBD5E1'
+                                  : '#64748B',
+                              padding: 4,
+                              display: 'inline-flex',
+                            }}
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
 
-            {/* Thuộc tính nâng cao: Quản lý theo lô & Bán chạy */}
-            <div style={{ display: 'flex', gap: 24, marginTop: 14, flexWrap: 'wrap' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <input
-                  id="product-has-batches-checkbox"
-                  type="checkbox"
-                  style={{ width: 18, height: 18, cursor: 'pointer', accentColor: '#0F766E', margin: 0 }}
-                  checked={hasBatches || allowRepack}
-                  onChange={(e) => setHasBatches(e.target.checked)}
-                />
-                <label
-                  htmlFor="product-has-batches-checkbox"
-                  style={{ cursor: 'pointer', fontSize: 13, color: '#334155', fontWeight: 500, userSelect: 'none', margin: 0 }}
-                >
-                  Quản lý theo lô & hạn sử dụng (FEFO)
-                </label>
-              </div>
-
-              {isPurchaseUnitKg && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <input
-                    id="product-allow-repack-checkbox"
-                    type="checkbox"
-                    style={{ width: 18, height: 18, cursor: 'pointer', accentColor: '#0F766E', margin: 0 }}
-                    checked={allowRepack}
-                    onChange={(e) => {
-                      const next = e.target.checked;
-                      setAllowRepack(next);
-                      if (next) setHasBatches(true);
-                    }}
-                  />
-                  <label
-                    htmlFor="product-allow-repack-checkbox"
-                    style={{ cursor: 'pointer', fontSize: 13, color: '#334155', fontWeight: 500, userSelect: 'none', margin: 0 }}
-                    title={`Đơn vị nhập: ${effectivePurchaseUnitName || '—'}`}
-                  >
-                    Cho chia khay / chế biến
-                  </label>
-                </div>
-              )}
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <input
-                  id="product-is-favorite-checkbox"
-                  type="checkbox"
-                  style={{ width: 18, height: 18, cursor: 'pointer', accentColor: '#0F766E', margin: 0 }}
-                  checked={isFavorite}
-                  onChange={(e) => setIsFavorite(e.target.checked)}
-                />
-                <label
-                  htmlFor="product-is-favorite-checkbox"
-                  style={{ cursor: 'pointer', fontSize: 13, color: '#334155', fontWeight: 500, userSelect: 'none', margin: 0 }}
-                >
-                  Đánh dấu hàng bán chạy / yêu thích (Ưu tiên POS)
-                </label>
-              </div>
-            </div>
-          </div>
-
-          {/* ───────────────────────────────────────────────────────── */}
-          {/* 4. QUẢN LÝ THEO ĐƠN VỊ TÍNH VÀ THUỘC TÍNH (8, 7, 9, 18)   */}
-          {/* ───────────────────────────────────────────────────────── */}
-          <div
-            style={{
-              border: '1px solid #E2E8F0',
-              borderRadius: 10,
-              padding: '18px 20px',
-              backgroundColor: '#FFFFFF',
-              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.02)',
-            }}
-          >
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                cursor: 'pointer',
-                paddingBottom: 8,
-                borderBottom: isUomExpanded ? '1px solid #F1F5F9' : 'none',
-                marginBottom: isUomExpanded ? 14 : 0,
-              }}
-              onClick={() => setIsUomExpanded(!isUomExpanded)}
-            >
-              <h4
-                style={{
-                  fontSize: 14,
-                  fontWeight: 700,
-                  color: '#0F172A',
-                  margin: 0,
-                }}
-              >
-                Quản lý theo đơn vị tính và thuộc tính
-              </h4>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10 }}>
               <button
                 type="button"
+                onClick={handleAddUnitRow}
+                title="Thêm đơn vị"
                 style={{
                   background: 'none',
                   border: 'none',
+                  color: '#0F766E',
+                  fontSize: 13,
+                  fontWeight: 700,
                   cursor: 'pointer',
-                  color: '#64748B',
-                  padding: 0,
+                  padding: '4px 0',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 4,
                 }}
               >
-                {isUomExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                <Plus size={14} /> Thêm đơn vị
               </button>
             </div>
-
-            {isUomExpanded && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                <div>
-                  <h5 style={{ fontSize: 13, fontWeight: 700, color: '#1E293B', margin: '0 0 4px 0' }}>
-                    Đơn vị tính
-                  </h5>
-                  <p style={{ fontSize: 12, color: '#64748B', margin: '0 0 12px 0' }}>
-                    Thêm đơn vị bán hoặc nhập như chai, lốc, thùng. Đặt công thức quy đổi để tính nhanh giá và tồn kho. Ví dụ: 1 lốc = 4 chai, 1 thùng = 20 lốc.
-                  </p>
-                </div>
-
-                {/* Dòng đơn vị cơ bản: (8) Tên đơn vị cơ bản & (7) Giá bán */}
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16 }}>
-                  <div style={{ width: 220 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                      <label style={{ fontSize: 12, fontWeight: 600, color: '#475569' }}>
-                        Tên đơn vị cơ bản <span style={{ color: '#EF4444' }}>*</span>
-                      </label>
-                      <span style={{ fontSize: 11, color: baseUnit.length > 30 ? '#DC2626' : '#94A3B8' }}>
-                        {baseUnit.length}/30
-                      </span>
-                    </div>
-                    <input
-                      type="text"
-                      className="filter-input"
-                      placeholder="VD: Chai, Lon, Gói, Hộp..."
-                      value={baseUnit}
-                      disabled={hasTransactions}
-                      onChange={(e) => {
-                        setBaseUnit(e.target.value);
-                        setTouched((prev) => ({ ...prev, baseUnit: true }));
-                      }}
-                      onBlur={() => setTouched((prev) => ({ ...prev, baseUnit: true }))}
-                      style={baseUnitError ? { borderColor: '#EF4444', boxShadow: '0 0 0 2px rgba(239, 68, 68, 0.12)' } : undefined}
-                    />
-                    {baseUnitError && (
-                      <div style={{ color: '#DC2626', fontSize: 11.5, marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
-                        <AlertCircle size={12} style={{ flexShrink: 0 }} />
-                        <span>{baseUnitError}</span>
-                      </div>
-                    )}
-                  </div>
-
-                  <div style={{ width: 180 }}>
-                    <label
-                      style={{
-                        display: 'block',
-                        marginBottom: 4,
-                        fontSize: 12,
-                        fontWeight: 600,
-                        color: '#475569',
-                      }}
-                    >
-                      Giá bán
-                    </label>
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      className="filter-input"
-                      placeholder="0"
-                      value={formatCurrencyInput(baseUnitPrice)}
-                      onChange={(e) => handleSellingPriceChange(parseCurrencyInput(e.target.value))}
-                      onFocus={(e) => e.target.select()}
-                      style={sellingPriceError ? { borderColor: '#EF4444', boxShadow: '0 0 0 2px rgba(239, 68, 68, 0.12)' } : undefined}
-                    />
-                  </div>
-
-                  <div style={{ paddingTop: 22 }}>
-                    <label
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: 8,
-                        cursor: 'pointer',
-                        fontSize: 12.5,
-                        fontWeight: 600,
-                        color: isBaseUnitPurchaseUnit ? '#0F766E' : '#475569',
-                        padding: '6px 10px',
-                        borderRadius: 6,
-                        backgroundColor: isBaseUnitPurchaseUnit ? '#F0FDFA' : '#F8FAFC',
-                        border: `1px solid ${isBaseUnitPurchaseUnit ? '#99F6E4' : '#E2E8F0'}`,
-                        userSelect: 'none',
-                      }}
-                      title="Đánh dấu đơn vị cơ bản là đơn vị dùng để nhập hàng"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={isBaseUnitPurchaseUnit}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            handleSelectBaseUnitAsPurchaseUnit();
-                          } else {
-                            setIsBaseUnitPurchaseUnit(false);
-                          }
-                        }}
-                        style={{ accentColor: '#0F766E', cursor: 'pointer', width: 15, height: 15 }}
-                      />
-                      <span>Đơn vị nhập hàng</span>
-                    </label>
-                  </div>
-                </div>
-
-                {/* Danh sách đơn vị quy đổi (9) */}
-                {uomConversions.map((uom) => {
-                  const rowErr = getUomRowErrors(uom);
-                  return (
-                    <div
-                      key={uom.id}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'flex-start',
-                        gap: 12,
-                        padding: '8px 0',
-                      }}
-                    >
-                      {/* Tên đơn vị */}
-                      <div style={{ width: 220 }}>
-                        <input
-                          type="text"
-                          className="filter-input"
-                          placeholder="thùng, lốc..."
-                          value={uom.unitName}
-                          onChange={(e) => handleUpdateUom(uom.id, 'unitName', e.target.value)}
-                          style={rowErr.unitNameError ? { borderColor: '#EF4444', boxShadow: '0 0 0 2px rgba(239, 68, 68, 0.12)' } : undefined}
-                        />
-                        {rowErr.unitNameError && (
-                          <div style={{ color: '#DC2626', fontSize: 11, marginTop: 3 }}>
-                            {rowErr.unitNameError}
-                          </div>
-                        )}
-                      </div>
-
-                      <span style={{ fontSize: 16, fontWeight: 700, color: '#475569', paddingTop: 7 }}>=</span>
-
-                      {/* Giá trị quy đổi */}
-                      <div style={{ width: 100 }}>
-                        <input
-                          type="number"
-                          className="filter-input"
-                          placeholder="1"
-                          value={uom.conversionRate === 0 ? '' : uom.conversionRate}
-                          onChange={(e) =>
-                            handleUpdateUom(uom.id, 'conversionRate', e.target.value === '' ? 0 : Number(e.target.value))
-                          }
-                          onFocus={(e) => e.target.select()}
-                          min={1}
-                          style={rowErr.conversionRateError ? { borderColor: '#EF4444', boxShadow: '0 0 0 2px rgba(239, 68, 68, 0.12)' } : undefined}
-                        />
-                        {rowErr.conversionRateError && (
-                          <div style={{ color: '#DC2626', fontSize: 11, marginTop: 3 }}>
-                            {rowErr.conversionRateError}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Text tên đơn vị cơ bản */}
-                      <span style={{ fontSize: 13, fontWeight: 600, color: '#334155', minWidth: 40, paddingTop: 9 }}>
-                        {baseUnit || 'đơn vị'}
-                      </span>
-
-                      {/* Giá bán đơn vị quy đổi */}
-                      <div style={{ width: 180 }}>
-                        <input
-                          type="text"
-                          inputMode="numeric"
-                          className="filter-input"
-                          placeholder="Giá bán"
-                          value={formatCurrencyInput(uom.price)}
-                          onChange={(e) =>
-                            handleUpdateUom(uom.id, 'price', parseCurrencyInput(e.target.value))
-                          }
-                          onFocus={(e) => e.target.select()}
-                          style={rowErr.priceError ? { borderColor: '#EF4444', boxShadow: '0 0 0 2px rgba(239, 68, 68, 0.12)' } : undefined}
-                        />
-                        {rowErr.priceError && (
-                          <div style={{ color: '#DC2626', fontSize: 11, marginTop: 3 }}>
-                            {rowErr.priceError}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Đánh dấu Đơn vị nhập hàng */}
-                      <label
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: 6,
-                          cursor: 'pointer',
-                          fontSize: 12.5,
-                          fontWeight: 600,
-                          color: uom.isPurchaseUnit ? '#0F766E' : '#475569',
-                          padding: '6px 10px',
-                          borderRadius: 6,
-                          backgroundColor: uom.isPurchaseUnit ? '#F0FDFA' : '#F8FAFC',
-                          border: `1px solid ${uom.isPurchaseUnit ? '#99F6E4' : '#E2E8F0'}`,
-                          userSelect: 'none',
-                          whiteSpace: 'nowrap',
-                          marginTop: 2,
-                        }}
-                        title="Đánh dấu đơn vị quy đổi này là đơn vị dùng để nhập hàng"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={Boolean(uom.isPurchaseUnit)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              handleSelectUomAsPurchaseUnit(uom.id);
-                            } else {
-                              handleUpdateUom(uom.id, 'isPurchaseUnit', false);
-                              setIsBaseUnitPurchaseUnit(true);
-                            }
-                          }}
-                          style={{ accentColor: '#0F766E', cursor: 'pointer', width: 15, height: 15 }}
-                        />
-                        <span>Đơn vị nhập hàng</span>
-                      </label>
-
-                      {/* Nút xóa */}
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveUom(uom.id)}
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          cursor: 'pointer',
-                          color: '#64748B',
-                          padding: 6,
-                          display: 'flex',
-                          alignItems: 'center',
-                          marginTop: 2,
-                        }}
-                        title="Xóa đơn vị"
-                      >
-                        <Trash2 size={18} />
-                      </button>
-                    </div>
-                  );
-                })}
-
-                {/* (18) + Thêm đơn vị */}
-                <div>
-                  <button
-                    type="button"
-                    onClick={handleAddUom}
-                    disabled={!baseUnit.trim()}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      color: !baseUnit.trim() ? '#94a3b8' : '#0F766E',
-                      fontSize: 13,
-                      fontWeight: 700,
-                      cursor: !baseUnit.trim() ? 'not-allowed' : 'pointer',
-                      padding: '4px 0',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 4,
-                      opacity: !baseUnit.trim() ? 0.6 : 1,
-                    }}
-                    title={!baseUnit.trim() ? 'Vui lòng nhập tên đơn vị cơ bản trước khi thêm đơn vị' : '+ Thêm đơn vị'}
-                  >
-                    + Thêm đơn vị
-                  </button>
-                  {!baseUnit.trim() && (
-                    <span style={{ fontSize: 12, color: '#ef4444', marginLeft: 8 }}>
-                      (Cần nhập tên đơn vị cơ bản trước)
-                    </span>
-                  )}
-                </div>
-
-                {/* BẢNG HÀNG CÙNG LOẠI (Hiển thị khi có đơn vị quy đổi) */}
-                {uomConversions.length > 0 && (
-                  <div style={{ marginTop: 16 }}>
-                    <div
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        marginBottom: 10,
-                      }}
-                    >
-                      <h5 style={{ fontSize: 13, fontWeight: 700, color: '#1E293B', margin: 0 }}>
-                        Hàng cùng loại
-                      </h5>
-                      <button
-                        type="button"
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          color: '#0284c7',
-                          fontSize: 13,
-                          fontWeight: 600,
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 4,
-                        }}
-                      >
-                        <Tag size={15} />
-                        <span>Thiết lập giá</span>
-                      </button>
-                    </div>
-
-                    <div style={{ overflowX: 'auto', border: '1px solid #E2E8F0', borderRadius: 8 }}>
-                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-                        <thead>
-                          <tr style={{ background: '#f8fafc', borderBottom: '1px solid #E2E8F0', color: '#475569', fontWeight: 600 }}>
-                            <th style={{ padding: '10px 12px', textAlign: 'left', minWidth: 100 }}>Đơn vị</th>
-                            <th style={{ padding: '10px 8px', textAlign: 'center', width: 90 }}>Quy đổi</th>
-                            <th style={{ padding: '10px 8px', textAlign: 'left', minWidth: 120 }}>Mã hàng</th>
-                            <th style={{ padding: '10px 8px', textAlign: 'left', minWidth: 130 }}>Mã vạch</th>
-                            <th style={{ padding: '10px 8px', textAlign: 'right', minWidth: 110 }}>Giá vốn</th>
-                            <th style={{ padding: '10px 8px', textAlign: 'right', minWidth: 110 }}>Giá bán</th>
-                            <th style={{ padding: '10px 8px', textAlign: 'center', minWidth: 110 }}>Đơn vị nhập</th>
-                            <th style={{ padding: '10px 12px', textAlign: 'center', width: 44 }}></th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {/* Dòng 1: Đơn vị cơ bản */}
-                          <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
-                            <td style={{ padding: '8px 12px', fontWeight: 600, color: '#1E293B' }}>
-                              {baseUnit || 'Đơn vị cơ bản'}
-                            </td>
-                            <td style={{ padding: '8px', textAlign: 'center' }}>
-                              <input
-                                type="text"
-                                disabled
-                                value={1}
-                                style={{
-                                  width: '100%',
-                                  padding: '6px 8px',
-                                  borderRadius: 6,
-                                  border: '1px solid #E2E8F0',
-                                  background: '#f1f5f9',
-                                  color: '#64748b',
-                                  textAlign: 'center',
-                                  fontSize: 13,
-                                }}
-                              />
-                            </td>
-                            <td style={{ padding: '8px' }}>
-                              <input
-                                type="text"
-                                placeholder="Tự động"
-                                value={productCode}
-                                onChange={(e) => setProductCode(e.target.value)}
-                                style={{
-                                  width: '100%',
-                                  padding: '6px 8px',
-                                  borderRadius: 6,
-                                  border: '1px solid #E2E8F0',
-                                  fontSize: 13,
-                                }}
-                              />
-                            </td>
-                            <td style={{ padding: '8px' }}>
-                              <input
-                                type="text"
-                                placeholder=""
-                                value={barcode}
-                                onChange={(e) => setBarcode(e.target.value)}
-                                style={{
-                                  width: '100%',
-                                  padding: '6px 8px',
-                                  borderRadius: 6,
-                                  border: '1px solid #E2E8F0',
-                                  fontSize: 13,
-                                }}
-                              />
-                            </td>
-                            <td style={{ padding: '8px' }}>
-                              <input
-                                type="text"
-                                inputMode="numeric"
-                                placeholder="0"
-                                value={formatCurrencyInput(costPrice)}
-                                onChange={(e) => setCostPrice(parseCurrencyInput(e.target.value))}
-                                onFocus={(e) => e.target.select()}
-                                style={{
-                                  width: '100%',
-                                  padding: '6px 8px',
-                                  borderRadius: 6,
-                                  border: '1px solid #E2E8F0',
-                                  textAlign: 'right',
-                                  fontSize: 13,
-                                }}
-                              />
-                            </td>
-                            <td style={{ padding: '8px' }}>
-                              <input
-                                type="text"
-                                inputMode="numeric"
-                                placeholder="0"
-                                value={formatCurrencyInput(sellingPrice)}
-                                onChange={(e) => handleSellingPriceChange(parseCurrencyInput(e.target.value))}
-                                onFocus={(e) => e.target.select()}
-                                style={{
-                                  width: '100%',
-                                  padding: '6px 8px',
-                                  borderRadius: 6,
-                                  border: '1px solid #E2E8F0',
-                                  textAlign: 'right',
-                                  fontSize: 13,
-                                }}
-                              />
-                            </td>
-                            <td style={{ padding: '8px', textAlign: 'center' }}>
-                              <input
-                                type="checkbox"
-                                checked={isBaseUnitPurchaseUnit}
-                                onChange={(e) => {
-                                  if (e.target.checked) {
-                                    handleSelectBaseUnitAsPurchaseUnit();
-                                  } else {
-                                    setIsBaseUnitPurchaseUnit(false);
-                                  }
-                                }}
-                                title="Đánh dấu là đơn vị nhập hàng"
-                                style={{ accentColor: '#0F766E', cursor: 'pointer', width: 16, height: 16 }}
-                              />
-                            </td>
-                            <td style={{ padding: '8px 12px', textAlign: 'center' }}>
-                              <button
-                                type="button"
-                                disabled
-                                style={{
-                                  background: 'none',
-                                  border: 'none',
-                                  color: '#cbd5e1',
-                                  cursor: 'not-allowed',
-                                  padding: 4,
-                                }}
-                                title="Không thể xóa đơn vị cơ bản"
-                              >
-                                <Trash2 size={16} />
-                              </button>
-                            </td>
-                          </tr>
-
-                          {/* Dòng 2 trở đi: Các đơn vị quy đổi */}
-                          {uomConversions.map((uom) => {
-                            const convertedCost = costPrice > 0 ? costPrice * (uom.conversionRate || 1) : 0;
-                            const rowErr = getUomRowErrors(uom);
-                            
-                            return (
-                              <tr key={uom.id} style={{ borderBottom: '1px solid #f1f5f9', verticalAlign: 'top' }}>
-                                <td style={{ padding: '12px 12px 8px', color: rowErr.unitNameError ? '#DC2626' : '#1E293B', fontWeight: 500 }}>
-                                  <div>{uom.unitName || '(Chưa đặt tên)'}</div>
-                                  {rowErr.unitNameError && (
-                                    <div style={{ color: '#DC2626', fontSize: 11, fontWeight: 400, marginTop: 2 }}>
-                                      {rowErr.unitNameError}
-                                    </div>
-                                  )}
-                                </td>
-                                <td style={{ padding: '8px', textAlign: 'center' }}>
-                                  <input
-                                    type="number"
-                                    min={1}
-                                    placeholder="1"
-                                    value={uom.conversionRate === 0 ? '' : uom.conversionRate}
-                                    onChange={(e) =>
-                                      handleUpdateUom(uom.id, 'conversionRate', e.target.value === '' ? 0 : Number(e.target.value))
-                                    }
-                                    onFocus={(e) => e.target.select()}
-                                    style={{
-                                      width: '100%',
-                                      padding: '6px 8px',
-                                      borderRadius: 6,
-                                      border: rowErr.conversionRateError ? '1px solid #EF4444' : '1px solid #E2E8F0',
-                                      textAlign: 'center',
-                                      fontSize: 13,
-                                    }}
-                                  />
-                                  {rowErr.conversionRateError && (
-                                    <div style={{ color: '#DC2626', fontSize: 10.5, marginTop: 2 }}>
-                                      {rowErr.conversionRateError}
-                                    </div>
-                                  )}
-                                </td>
-                                <td style={{ padding: '8px' }}>
-                                  <input
-                                    type="text"
-                                    disabled
-                                    placeholder="Theo mã hàng"
-                                    value={productCode.trim() || uom.productCode || 'Mã tự động'}
-                                    title="Mã hàng của đơn vị quy đổi mặc định giống mã sản phẩm"
-                                    style={{
-                                      width: '100%',
-                                      padding: '6px 8px',
-                                      borderRadius: 6,
-                                      border: '1px solid #E2E8F0',
-                                      backgroundColor: '#F1F5F9',
-                                      color: '#64748B',
-                                      fontSize: 13,
-                                      cursor: 'not-allowed',
-                                    }}
-                                  />
-                                </td>
-                                <td style={{ padding: '8px' }}>
-                                  <input
-                                    type="text"
-                                    placeholder=""
-                                    value={uom.barcode || ''}
-                                    onChange={(e) => handleUpdateUom(uom.id, 'barcode', e.target.value)}
-                                    style={{
-                                      width: '100%',
-                                      padding: '6px 8px',
-                                      borderRadius: 6,
-                                      border: rowErr.barcodeError ? '1px solid #EF4444' : '1px solid #E2E8F0',
-                                      fontSize: 13,
-                                    }}
-                                  />
-                                  {rowErr.barcodeError && (
-                                    <div style={{ color: '#DC2626', fontSize: 10.5, marginTop: 2 }}>
-                                      {rowErr.barcodeError}
-                                    </div>
-                                  )}
-                                </td>
-                                <td style={{ padding: '8px' }}>
-                                  <input
-                                    type="text"
-                                    disabled
-                                    value={convertedCost.toLocaleString('vi-VN')}
-                                    style={{
-                                      width: '100%',
-                                      padding: '6px 8px',
-                                      borderRadius: 6,
-                                      border: '1px solid #E2E8F0',
-                                      background: '#f1f5f9',
-                                      color: '#64748b',
-                                      textAlign: 'right',
-                                      fontSize: 13,
-                                    }}
-                                  />
-                                </td>
-                                <td style={{ padding: '8px' }}>
-                                  <input
-                                    type="text"
-                                    inputMode="numeric"
-                                    placeholder="0"
-                                    value={formatCurrencyInput(uom.price)}
-                                    onChange={(e) =>
-                                      handleUpdateUom(uom.id, 'price', parseCurrencyInput(e.target.value))
-                                    }
-                                    onFocus={(e) => e.target.select()}
-                                    style={{
-                                      width: '100%',
-                                      padding: '6px 8px',
-                                      borderRadius: 6,
-                                      border: rowErr.priceError ? '1px solid #EF4444' : '1px solid #E2E8F0',
-                                      textAlign: 'right',
-                                      fontSize: 13,
-                                    }}
-                                  />
-                                  {rowErr.priceError && (
-                                    <div style={{ color: '#DC2626', fontSize: 10.5, marginTop: 2 }}>
-                                      {rowErr.priceError}
-                                    </div>
-                                  )}
-                                </td>
-                                <td style={{ padding: '12px 8px 8px', textAlign: 'center' }}>
-                                  <input
-                                    type="checkbox"
-                                    checked={Boolean(uom.isPurchaseUnit)}
-                                    onChange={(e) => {
-                                      if (e.target.checked) {
-                                        handleSelectUomAsPurchaseUnit(uom.id);
-                                      } else {
-                                        handleUpdateUom(uom.id, 'isPurchaseUnit', false);
-                                        setIsBaseUnitPurchaseUnit(true);
-                                      }
-                                    }}
-                                    title="Đánh dấu là đơn vị nhập hàng"
-                                    style={{ accentColor: '#0F766E', cursor: 'pointer', width: 16, height: 16 }}
-                                  />
-                                </td>
-                                <td style={{ padding: '10px 12px 8px', textAlign: 'center' }}>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleRemoveUom(uom.id)}
-                                    style={{
-                                      background: 'none',
-                                      border: 'none',
-                                      color: '#64748B',
-                                      cursor: 'pointer',
-                                      padding: 4,
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                    }}
-                                    title="Xóa đơn vị quy đổi"
-                                  >
-                                    <Trash2 size={16} />
-                                  </button>
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
           </div>
 
           {/* ───────────────────────────────────────────────────────── */}
-          {/* 5. MÔ TẢ & GHI CHÚ SẢN PHẨM (12, 13)                      */}
+          {/* 3. BÁN & TỒN KHO                                          */}
           {/* ───────────────────────────────────────────────────────── */}
-          <div
-            style={{
-              border: '1px solid #E2E8F0',
-              borderRadius: 10,
-              padding: '18px 20px',
-              backgroundColor: '#FFFFFF',
-              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.02)',
-            }}
-          >
-            <h4
-              style={{
-                fontSize: 14,
-                fontWeight: 700,
-                color: '#0F172A',
-                margin: '0 0 16px 0',
-                paddingBottom: 8,
-                borderBottom: '1px solid #F1F5F9',
-              }}
-            >
-              Mô tả & Ghi chú sản phẩm
-            </h4>
+          <div style={sectionCardStyle}>
+            <h4 style={sectionTitleStyle}>3. Bán &amp; tồn kho</h4>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              {/* (12) Mô tả chi tiết */}
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                  <label style={{ fontSize: 13, fontWeight: 600, color: '#334155' }}>
-                    Mô tả chi tiết
-                  </label>
-                  <span style={{ fontSize: 11, color: description.length > 1000 ? '#DC2626' : '#94A3B8' }}>
-                    {description.length}/1000
-                  </span>
-                </div>
-                <textarea
-                  className="filter-input"
-                  rows={3}
-                  placeholder="Nhập thông tin giới thiệu, thành phần, hướng dẫn sử dụng sản phẩm..."
-                  value={description}
-                  onChange={(e) => {
-                    setDescription(e.target.value);
-                    setTouched((prev) => ({ ...prev, description: true }));
-                  }}
-                  style={descriptionError ? { borderColor: '#EF4444', boxShadow: '0 0 0 2px rgba(239, 68, 68, 0.12)' } : undefined}
-                />
-                {descriptionError && (
-                  <div style={{ color: '#DC2626', fontSize: 11.5, marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <AlertCircle size={13} style={{ flexShrink: 0 }} />
-                    <span>{descriptionError}</span>
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <div style={toggleRowStyle}>
+                <div>
+                  <div style={toggleTitleStyle}>Quản lý theo lô &amp; hạn sử dụng (FEFO)</div>
+                  <div style={toggleHintStyle}>
+                    {allowRepack && isPurchaseUnitKg
+                      ? 'Bắt buộc bật khi cho chia khay.'
+                      : 'Mỗi lần nhập tạo một lô có HSD; xuất bán lô hết hạn trước.'}
                   </div>
-                )}
+                </div>
+                <ToggleSwitch
+                  checked={hasBatches || (allowRepack && isPurchaseUnitKg)}
+                  disabled={allowRepack && isPurchaseUnitKg}
+                  onChange={setHasBatches}
+                />
               </div>
 
-              {/* (13) Ghi chú nội bộ */}
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                  <label style={{ fontSize: 13, fontWeight: 600, color: '#334155' }}>
-                    Ghi chú nội bộ
-                  </label>
-                  <span style={{ fontSize: 11, color: internalNote.length > 500 ? '#DC2626' : '#94A3B8' }}>
-                    {internalNote.length}/500
-                  </span>
-                </div>
-                <input
-                  type="text"
-                  className="filter-input"
-                  placeholder="Ghi chú dành cho thu ngân, thủ kho kiểm hàng..."
-                  value={internalNote}
-                  onChange={(e) => {
-                    setInternalNote(e.target.value);
-                    setTouched((prev) => ({ ...prev, internalNote: true }));
-                  }}
-                  style={internalNoteError ? { borderColor: '#EF4444', boxShadow: '0 0 0 2px rgba(239, 68, 68, 0.12)' } : undefined}
-                />
-                {internalNoteError && (
-                  <div style={{ color: '#DC2626', fontSize: 11.5, marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <AlertCircle size={13} style={{ flexShrink: 0 }} />
-                    <span>{internalNoteError}</span>
+              <div style={toggleRowStyle}>
+                <div>
+                  <div style={{ ...toggleTitleStyle, color: isPurchaseUnitKg ? '#0F172A' : '#94A3B8' }}>
+                    Cho chia khay / chế biến
                   </div>
-                )}
+                  <div style={toggleHintStyle}>
+                    {isPurchaseUnitKg
+                      ? 'Hàng nhập theo KG có thể đóng khay; giá khay tính theo khối lượng thực tế lúc đóng.'
+                      : `Chỉ áp dụng khi đơn vị nhập là KG (hiện tại: ${effectivePurchaseUnitName || 'chưa chọn'}).`}
+                  </div>
+                </div>
+                <ToggleSwitch
+                  checked={allowRepack && isPurchaseUnitKg}
+                  disabled={!isPurchaseUnitKg}
+                  onChange={handleAllowRepackChange}
+                />
               </div>
+
+              {isPurchaseUnitKg && allowRepack && (
+                <div style={{ padding: '12px 14px', margin: '0 0 6px 0', background: '#F0FDFA', border: '1px solid #CCFBF1', borderRadius: 8 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+                    <label style={{ fontSize: 13, fontWeight: 600, color: '#334155', minWidth: 170 }}>
+                      Giá khi đóng khay (đ/kg)
+                    </label>
+                    <div style={{ position: 'relative', display: 'flex', alignItems: 'center', width: 200 }}>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        className="filter-input"
+                        style={{ paddingRight: 32, fontWeight: 600 }}
+                        placeholder="Mặc định = giá nguyên quả"
+                        value={formatCurrencyInput(processedSellingPrice)}
+                        onChange={(e) => {
+                          setProcessedPriceDirty(true);
+                          setProcessedSellingPrice(parseCurrencyInput(e.target.value));
+                        }}
+                        onFocus={(e) => e.target.select()}
+                      />
+                      <span style={{ position: 'absolute', right: 12, fontSize: 13, fontWeight: 600, color: '#64748B', pointerEvents: 'none' }}>
+                        đ
+                      </span>
+                    </div>
+                    {processedSellingPrice > 0 && (
+                      <span style={{ fontSize: 12.5, color: '#0F766E', fontWeight: 600 }}>
+                        Ví dụ: khay 0,5 kg → {(Math.round((0.5 * processedSellingPrice) / 100) * 100).toLocaleString('vi-VN')} đ
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ ...toggleHintStyle, marginTop: 6 }}>
+                    Dưa/gọt sẵn: đặt khác giá nguyên quả. Thịt chỉ chia khay: để trùng giá nguyên quả.
+                  </div>
+                  {costPrice > 0 && processedSellingPrice > 0 && processedSellingPrice < costPrice && (
+                    <div style={{ ...cellWarnStyle, fontSize: 12 }}>
+                      Giá đóng khay đang thấp hơn giá vốn ({costPrice.toLocaleString('vi-VN')} đ/kg).
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
+          </div>
+
+          {/* ───────────────────────────────────────────────────────── */}
+          {/* 4. MÔ TẢ & GHI CHÚ (thu gọn mặc định)                      */}
+          {/* ───────────────────────────────────────────────────────── */}
+          <div style={sectionCardStyle}>
+            <h4 style={sectionTitleStyle}>4. Mô tả / ghi chú</h4>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+              <label style={{ fontSize: 13, fontWeight: 600, color: '#334155' }}>Nội dung</label>
+              <span style={{ fontSize: 11, color: description.length > 1000 ? '#DC2626' : '#94A3B8' }}>
+                {description.length}/1000
+              </span>
+            </div>
+            <textarea
+              className="filter-input"
+              rows={3}
+              placeholder="Ghi chú cho thu ngân, thủ kho, hoặc mô tả ngắn về hàng hóa..."
+              value={description}
+              onChange={(e) => {
+                setDescription(e.target.value);
+                setTouched((prev) => ({ ...prev, description: true }));
+              }}
+              style={descriptionError ? errorBorderStyle : undefined}
+            />
+            {descriptionError && <div style={cellErrorStyle}>{descriptionError}</div>}
           </div>
         </div>
 
@@ -2484,31 +2310,24 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
           style={{
             padding: '16px 28px',
             display: 'flex',
-            justifyContent: isEditing && productToEdit && onDelete ? 'space-between' : 'flex-end',
+            justifyContent: 'space-between',
             alignItems: 'center',
             gap: 12,
             borderTop: '1px solid #E2E8F0',
             backgroundColor: '#F8FAFC',
+            flexShrink: 0,
           }}
         >
-          {isEditing && productToEdit && onDelete && (
-            <button
-              type="button"
-              className="btn-danger-soft"
-              onClick={() => onDelete(productToEdit)}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: '#334155' }}>
+              {productStatus === 'Active' ? 'Đang bán' : 'Ngừng KD'}
+            </span>
+            <ToggleSwitch
+              checked={productStatus === 'Active'}
               disabled={isSubmitting}
-              style={{
-                borderRadius: 8,
-                padding: '8px 16px',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 6,
-              }}
-            >
-              <Trash2 size={15} />
-              <span>Xóa hàng hóa</span>
-            </button>
-          )}
+              onChange={(next) => setProductStatus(next ? 'Active' : 'Discontinued')}
+            />
+          </div>
 
           <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
             {/* (14) Bỏ qua */}
@@ -2535,7 +2354,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                 disabled={isSubmitting}
                 onClick={() => handleSubmit(true)}
               >
-                {isSubmitting ? 'Đang lưu...' : 'Lưu & Thêm hàng mới'}
+                {isSubmitting ? 'Đang lưu...' : 'Lưu & thêm mới'}
               </button>
             )}
 
@@ -2679,14 +2498,6 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         </div>
       )}
 
-      {showPriceHistory && productToEdit?.id && (
-        <PriceHistoryModal
-          isOpen={showPriceHistory}
-          onClose={() => setShowPriceHistory(false)}
-          productId={productToEdit.id}
-          productName={productName || productToEdit.productName || ''}
-        />
-      )}
     </div>
   );
 };
