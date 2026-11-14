@@ -24,7 +24,7 @@ import {
 import { scheduleApprovalApi } from '../../api/scheduleApprovalApi';
 import { scheduleApi } from '../../api/scheduleApi';
 import { formatLocalDateIso, getVietnamToday } from '../../lib/vietnamTime';
-import { uploadImageToCloudinary } from '../../../../utils/cloudinary';
+import { readFileAsDataUrl } from '../../../../utils/imageFile';
 import { NotificationModal } from '../../../../components/common';
 
 export interface ScheduleSelectionItem {
@@ -417,20 +417,11 @@ export const CreateScheduleRequestModal: React.FC<CreateScheduleRequestModalProp
       setUploadingImage(true);
       setUploadError(null);
 
-      // Thử gọi API upload danh sách ảnh lên backend / Cloudinary
-      let uploadedUrls: string[] = [];
-      try {
-        uploadedUrls = await scheduleApprovalApi.uploadEvidenceImages(files);
-      } catch {
-        // Fallback: upload tuần tự / song song qua client utility
-        uploadedUrls = await Promise.all(
-          files.map((f) => uploadImageToCloudinary(f, 'mtgrms/schedule-requests'))
-        );
-      }
-
-      setEvidenceImageUrls((prev) => [...prev, ...uploadedUrls]);
+      // Chỉ đọc ảnh cục bộ để xem trước; backend sẽ upload lên Cloudinary khi bấm Gửi yêu cầu
+      const dataUrls = await Promise.all(files.map(readFileAsDataUrl));
+      setEvidenceImageUrls((prev) => [...prev, ...dataUrls]);
     } catch (err: unknown) {
-      const msg = (err as Error)?.message || 'Không thể tải ảnh lên máy chủ.';
+      const msg = (err as Error)?.message || 'Không thể đọc tệp ảnh đã chọn.';
       setUploadError(msg);
     } finally {
       setUploadingImage(false);

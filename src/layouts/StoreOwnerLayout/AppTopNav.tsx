@@ -274,10 +274,16 @@ const NAV_GROUPS: NavGroup[] = [
     icon: UsersIcon,
     sections: [
       {
-        title: "Nhân sự & Hồ sơ",
+        title: "Nhân sự & Lương",
         items: [
-          { label: "Danh sách nhân viên", to: "/store-owner/employees" }
+          { label: "Danh sách nhân viên", to: "/store-owner/employees" },
+          {
+            label: "Bảng tính lương tháng",
+            to: "/store-owner/employees/payroll",
+          }
+
         ],
+
       },
       {
         title: "Lịch & Chấm công",
@@ -299,16 +305,7 @@ const NAV_GROUPS: NavGroup[] = [
             to: "/store-owner/employees/shifts"
           },
         ],
-      },
-      {
-        title: "Lương & Đãi ngộ",
-        items: [
-          {
-            label: "Bảng tính lương tháng",
-            to: "/store-owner/employees/payroll",
-          }
-        ],
-      },
+      }
     ],
   },
   {
@@ -955,7 +952,7 @@ export const AppTopNav: FC = () => {
           setIs2FAActive(res.enabled);
           useAuthStore.getState().updateUser({ isTwoFactorEnabled: res.enabled });
         })
-        .catch(() => {});
+        .catch(() => { });
     }
   }, [accountMenuOpen]);
 

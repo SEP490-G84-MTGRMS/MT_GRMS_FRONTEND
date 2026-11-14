@@ -17,7 +17,7 @@ import {
   History,
 } from 'lucide-react';
 import type { ProductItem, Category, UomConversion } from '../types';
-import { uploadImageToCloudinary } from '../../../utils/cloudinary';
+import { readFileAsDataUrl } from '../../../utils/imageFile';
 import { productApi } from '../api/productApi';
 import { PriceHistoryModal } from './PriceHistoryModal';
 
@@ -466,7 +466,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     setUomConversions(uomConversions.filter((u) => u.id !== id));
   };
 
-  // Image Upload handler (Cloudinary Direct Unsigned Upload)
+  // Image preview handler (chỉ đọc cục bộ, backend upload lên Cloudinary khi bấm Lưu)
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
@@ -481,15 +481,11 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     try {
       setIsUploadingImage(true);
       setValidationPopupMsg('');
-      const uploaded: string[] = [];
-      for (let i = 0; i < files.length; i++) {
-        const secureUrl = await uploadImageToCloudinary(files[i]);
-        uploaded.push(secureUrl);
-      }
-      setImages((prev) => [...prev, ...uploaded]);
+      const dataUrls = await Promise.all(Array.from(files).map(readFileAsDataUrl));
+      setImages((prev) => [...prev, ...dataUrls]);
     } catch (err: any) {
       triggerValidationError(
-        err?.message || 'Không thể tải ảnh lên Cloudinary. Vui lòng kiểm tra lại kết nối mạng hoặc cấu hình .env.'
+        err?.message || 'Không thể đọc tệp ảnh. Vui lòng thử lại.'
       );
     } finally {
       setIsUploadingImage(false);

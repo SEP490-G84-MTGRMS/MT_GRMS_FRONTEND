@@ -34,22 +34,6 @@ export const scheduleApprovalApi = {
   },
 
   /**
-   * Tải nhiều tệp hình ảnh bằng chứng lên Cloudinary qua backend
-   */
-  uploadEvidenceImages: async (files: File[]): Promise<string[]> => {
-    const formData = new FormData();
-    files.forEach((file) => {
-      formData.append('files', file);
-    });
-    const res = await httpClient.post<ApiResponse<string[]>>('/schedule-approval-requests/upload-evidences', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
-    return res.data.data ?? [];
-  },
-
-  /**
    * Lấy lịch sử các đơn đã gửi của một ca làm việc
    */
   getRequestsByScheduleId: async (scheduleId: string): Promise<ScheduleApprovalRequestDto[]> => {

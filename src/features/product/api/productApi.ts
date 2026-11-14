@@ -176,5 +176,3 @@ export const productApi = {
 };
 
 export type { ProductUnitUpdatePayload };
-export { uploadImageToCloudinary } from '../../../utils/cloudinary';
-export type { ImageUploadResponse } from '../../../utils/cloudinary';

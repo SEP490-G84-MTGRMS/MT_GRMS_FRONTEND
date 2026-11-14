@@ -16,7 +16,20 @@ import {
   getVietnamTodayIso,
   normalizeVietnameseComparison,
 } from '../../lib/vietnamTime';
-import { uploadImageToCloudinary } from '../../../../utils/cloudinary';
+
+const readFileAsDataUrl = (file: File): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        resolve(reader.result);
+      } else {
+        reject(new Error('Không thể đọc dữ liệu ảnh.'));
+      }
+    };
+    reader.onerror = () => reject(new Error('Không thể đọc tệp ảnh.'));
+    reader.readAsDataURL(file);
+  });
 
 interface EmployeeFormModalProps {
   isOpen: boolean;
@@ -472,15 +485,14 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
       setIsUploadingAvatar(true);
       setFormError(null);
       setFaceScanStatus('scanning');
-      setFaceScanMessage('Đang tải ảnh và trích xuất vector khuôn mặt...');
-      const secureUrl = await uploadImageToCloudinary(file, 'mtgrms/employees');
-      setAvatarUrl(secureUrl);
+      setFaceScanMessage('Đang đọc ảnh và trích xuất vector khuôn mặt...');
+      const localDataUrl = await readFileAsDataUrl(file);
+      setAvatarUrl(localDataUrl);
 
       // Tự động trích xuất vector FaceID từ ảnh đại diện
       try {
         const img = new Image();
-        img.crossOrigin = 'anonymous';
-        img.src = secureUrl;
+        img.src = localDataUrl;
         await new Promise((resolve, reject) => {
           img.onload = resolve;
           img.onerror = reject;
@@ -489,8 +501,8 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
         const descriptor = await extractDescriptorFromImage(img);
         if (descriptor && descriptor.length === 128) {
           // Thêm/cập nhật ảnh đại diện vào vị trí đầu tiên của danh sách huấn luyện đa ảnh
-          const remainingUrls = faceImageUrls.filter((u) => u !== secureUrl);
-          const newUrls = [secureUrl, ...remainingUrls].slice(0, 4);
+          const remainingUrls = faceImageUrls.filter((u) => u !== localDataUrl);
+          const newUrls = [localDataUrl, ...remainingUrls].slice(0, 4);
           const newDescriptors = [descriptor, ...faceDescriptorsList.slice(1)].slice(0, 4);
 
           setFaceImageUrls(newUrls);
@@ -509,7 +521,7 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
         setFaceScanMessage('Không thể trích xuất FaceID từ ảnh này.');
       }
     } catch (err: any) {
-      setFormError(err?.message || 'Không thể tải ảnh đại diện lên Cloudinary. Vui lòng thử lại.');
+      setFormError(err?.message || 'Không thể đọc ảnh đại diện. Vui lòng thử lại.');
       setFaceScanStatus('idle');
       setFaceScanMessage(null);
     } finally {
@@ -538,13 +550,12 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
       setIsUploadingAvatar(true);
       setFormError(null);
       setFaceScanStatus('scanning');
-      setFaceScanMessage('Đang tải ảnh mẫu và trích xuất vector khuôn mặt...');
-      const secureUrl = await uploadImageToCloudinary(file, 'mtgrms/employees');
+      setFaceScanMessage('Đang đọc ảnh mẫu và trích xuất vector khuôn mặt...');
+      const localDataUrl = await readFileAsDataUrl(file);
 
       try {
         const img = new Image();
-        img.crossOrigin = 'anonymous';
-        img.src = secureUrl;
+        img.src = localDataUrl;
         await new Promise((resolve, reject) => {
           img.onload = resolve;
           img.onerror = reject;
@@ -552,10 +563,10 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
 
         const descriptor = await extractDescriptorFromImage(img);
         if (descriptor && descriptor.length === 128) {
-          const newUrls = [...faceImageUrls, secureUrl].slice(0, 4);
+          const newUrls = [...faceImageUrls, localDataUrl].slice(0, 4);
           const newDescriptors = [...faceDescriptorsList, descriptor].slice(0, 4);
           if (!avatarUrl) {
-            setAvatarUrl(secureUrl);
+            setAvatarUrl(localDataUrl);
           }
           setFaceImageUrls(newUrls);
           setFaceDescriptorsList(newDescriptors);
@@ -572,7 +583,7 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
         setFormError('Không thể trích xuất đặc trưng khuôn mặt từ ảnh này.');
       }
     } catch (err: any) {
-      setFormError(err?.message || 'Không thể tải ảnh mẫu lên Cloudinary.');
+      setFormError(err?.message || 'Không thể đọc ảnh mẫu.');
     } finally {
       setIsUploadingAvatar(false);
       if (trainingInputRef.current) {
@@ -678,7 +689,7 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
     setFormError(null);
 
     if (isUploadingAvatar) {
-      setFormError('Ảnh đại diện đang được tải lên Cloudinary, vui lòng chờ trong giây lát!');
+      setFormError('Ảnh đại diện đang được xử lý, vui lòng chờ trong giây lát!');
       return;
     }
 
