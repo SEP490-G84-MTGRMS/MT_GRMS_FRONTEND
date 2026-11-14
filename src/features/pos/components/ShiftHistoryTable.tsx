@@ -17,61 +17,87 @@ export const ShiftHistoryTable: FC<Props> = ({ shifts, onOpenZReport }) => {
   const startIndex = (currentPage - 1) * pageSize;
   const currentItems = shifts.slice(startIndex, startIndex + pageSize);
 
+  const thStyle: React.CSSProperties = {
+    backgroundColor: '#f8fafc',
+    padding: '8px 12px',
+    fontSize: 12,
+    fontWeight: 700,
+    color: '#334155',
+    textTransform: 'uppercase',
+    letterSpacing: '0.02em',
+    borderBottom: '1px solid #cbd5e1',
+    userSelect: 'none',
+    boxSizing: 'border-box',
+  };
+
   return (
-    <div className="pos-shift-card">
-      <div className="pos-shift-card-header">
-        <h3 className="pos-shift-card-title">
-          <History size={17} className="text-teal-700" />
+    <div className="so-list-table-card so-list-table-card--wrap">
+      <div style={{ padding: '12px 16px', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#ffffff' }}>
+        <h3 style={{ fontSize: 15, fontWeight: 700, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <History size={16} className="text-teal-700" />
           <span>Lịch Sử Chi Tiết Các Phiên Ca Bán Hàng &amp; Bàn Giao Quầy</span>
         </h3>
       </div>
 
-      <div className="pos-shift-table-responsive">
-        <table className="pos-shift-table">
+      <div className="table-responsive">
+        <table className="so-list-table">
           <thead>
             <tr>
-              <th style={{ textAlign: 'left', width: '130px' }}>Mã ca</th>
-              <th style={{ textAlign: 'left', width: '150px' }}>Chi nhánh</th>
-              <th style={{ textAlign: 'left' }}>Thời gian bắt đầu - Kết thúc</th>
-              <th style={{ textAlign: 'left', width: '140px' }}>Thu ngân</th>
-              <th style={{ textAlign: 'right', width: '120px' }}>Tiền đầu ca</th>
-              <th style={{ textAlign: 'right', width: '130px' }}>Doanh thu bán</th>
-              <th style={{ textAlign: 'right', width: '130px' }}>Tiền thực đếm</th>
-              <th style={{ textAlign: 'center', width: '155px', whiteSpace: 'nowrap' }}>Chênh lệch</th>
-              <th style={{ textAlign: 'center', width: '120px', whiteSpace: 'nowrap' }}>Báo cáo</th>
+              <th style={{ ...thStyle, textAlign: 'left', width: '130px' }}>Mã ca</th>
+              <th style={{ ...thStyle, textAlign: 'left', width: '150px' }}>Chi nhánh</th>
+              <th style={{ ...thStyle, textAlign: 'left' }}>Thời gian bắt đầu - Kết thúc</th>
+              <th style={{ ...thStyle, textAlign: 'left', width: '140px' }}>Thu ngân</th>
+              <th style={{ ...thStyle, textAlign: 'right', width: '120px' }}>Tiền đầu ca</th>
+              <th style={{ ...thStyle, textAlign: 'right', width: '130px' }}>Doanh thu bán</th>
+              <th style={{ ...thStyle, textAlign: 'right', width: '130px' }}>Tiền thực đếm</th>
+              <th style={{ ...thStyle, textAlign: 'center', width: '155px', whiteSpace: 'nowrap' }}>Chênh lệch</th>
+              <th style={{ ...thStyle, textAlign: 'center', width: '120px', whiteSpace: 'nowrap' }}>Báo cáo</th>
             </tr>
           </thead>
           <tbody>
             {currentItems.map((s) => (
-              <tr key={s.shiftCode}>
-                <td>
-                  <span className="font-mono font-bold text-slate-800">{s.shiftCode}</span>
+              <tr
+                key={s.shiftCode}
+                className="so-list-row"
+                style={{
+                  borderBottom: '1px solid #f1f5f9',
+                  backgroundColor: '#ffffff',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#f8fafc';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#ffffff';
+                }}
+              >
+                <td className="so-list-td">
+                  <span className="so-list-code font-mono font-bold">{s.shiftCode}</span>
                 </td>
-                <td>
+                <td className="so-list-td">
                   <span className="text-slate-700">{s.branchName}</span>
                 </td>
-                <td>
+                <td className="so-list-td">
                   <span className="font-mono text-xs text-slate-600">{s.timeRange}</span>
                 </td>
-                <td>
-                  <span className="font-medium text-slate-800">{s.cashierName}</span>
+                <td className="so-list-td">
+                  <span className="font-medium text-slate-800 so-list-name">{s.cashierName}</span>
                 </td>
-                <td style={{ textAlign: 'right' }}>
+                <td className="so-list-td" style={{ textAlign: 'right' }}>
                   <span className="font-mono tabular-nums text-slate-600">
                     {s.initialFloat.toLocaleString('vi-VN')} đ
                   </span>
                 </td>
-                <td style={{ textAlign: 'right' }}>
+                <td className="so-list-td" style={{ textAlign: 'right' }}>
                   <span className="font-mono tabular-nums font-semibold text-teal-700">
                     {s.totalRevenue.toLocaleString('vi-VN')} đ
                   </span>
                 </td>
-                <td style={{ textAlign: 'right' }}>
+                <td className="so-list-td" style={{ textAlign: 'right' }}>
                   <span className="font-mono tabular-nums font-semibold text-slate-800">
                     {s.actualCashCounted.toLocaleString('vi-VN')} đ
                   </span>
                 </td>
-                <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
+                <td className="so-list-td" style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
                   {s.reconciliationDiff === 0 ? (
                     <span className="diff-badge match font-mono">
                       <CheckCircle2 size={13} style={{ flexShrink: 0 }} />
@@ -89,10 +115,10 @@ export const ShiftHistoryTable: FC<Props> = ({ shifts, onOpenZReport }) => {
                     </span>
                   )}
                 </td>
-                <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
+                <td className="so-list-td so-list-td--actions" style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
                   <button
                     type="button"
-                    className="z-report-btn-tag"
+                    className="so-list-action-btn"
                     onClick={() => onOpenZReport(s.shiftCode)}
                     title="Xem & in Z-Report"
                   >
@@ -104,7 +130,7 @@ export const ShiftHistoryTable: FC<Props> = ({ shifts, onOpenZReport }) => {
             ))}
             {currentItems.length === 0 && (
               <tr>
-                <td colSpan={9} style={{ textAlign: 'center', color: 'var(--text-muted)' }}>
+                <td colSpan={9} style={{ textAlign: 'center', color: '#64748b', padding: '36px 16px' }}>
                   Không tìm thấy phiên ca nào khớp với bộ lọc.
                 </td>
               </tr>
@@ -113,7 +139,7 @@ export const ShiftHistoryTable: FC<Props> = ({ shifts, onOpenZReport }) => {
         </table>
       </div>
 
-      {/* Shared Pagination Footer Chuẩn Hệ Thống */}
+      {/* ── Footer Phân trang chuẩn theo StoreProductTable ── */}
       {totalCount > 0 && (
         <TablePagination
           currentPage={currentPage}
@@ -126,7 +152,6 @@ export const ShiftHistoryTable: FC<Props> = ({ shifts, onOpenZReport }) => {
             setPageSize(newSize);
             setCurrentPage(1);
           }}
-          className="mt-3 rounded-lg border border-[#e2e8f0]"
         />
       )}
     </div>
